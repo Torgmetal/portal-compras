@@ -83,6 +83,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const [fProg, setFProg] = useState("TODOS"); // TODOS | PROG | NAO
   const [rastroOp, setRastroOp] = useState(false); // modal de rastreabilidade da OP inteira
   const [rastroItem, setRastroItem] = useState(null); // peça com a rastreabilidade do material dela
+  const [progItem, setProgItem] = useState(null); // peça com as ordens do Syneco (conferir a programação)
   const [expandido, setExpandido] = useState(() => new Set()); // conjuntos abertos (ver croquis faltantes)
   const [terceiroPecas, setTerceiroPecas] = useState(null); // peças abertas no modal de terceiro
   const [desenhoMarca, setDesenhoMarca] = useState(null); // marca aberta no modal de desenhos (GRD)
@@ -378,7 +379,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
               ]} />
             )}
             {temColunaProg && (
-              <Seg titulo="Programação" valor={fProg} onChange={setFProg} opcoes={[
+              <Seg titulo={`Programação${data.ordensSincronizadasEm ? ` (Syneco ${new Date(data.ordensSincronizadasEm).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })})` : ""}`} valor={fProg} onChange={setFProg} opcoes={[
                 { key: "TODOS", label: "Todas", dica: "Sem filtro de programação" },
                 { key: "PROG", label: "Programadas", n: programadas, ativo: "bg-sky-600 text-white", dica: "O programador já lançou a peça na produção (ordem no Syneco)" },
                 { key: "NAO", label: "Não lançadas", n: naoProgramadas, ativo: "bg-red-600 text-white", dica: "Ainda sem ordem no Syneco — o programador não lançou" },
@@ -467,7 +468,15 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                           const g = p.programacao;
                           const e = PROG[g?.situacao] || PROG.NAO_LANCADA;
                           const rota = g?.setores?.length ? `\nRota no Syneco: ${g.setores.join(" · ")}` : "";
-                          return <span className={`text-[11px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold ${e.cls}`} title={`${e.dica}${rota}${g?.planejadoUn ? `\nPlanejado: ${fmtN(g.planejadoUn)} un` : ""}`}>{e.txt}</span>;
+                          const qtdRuim = g?.qtdOk === false;
+                          const dica = `${e.dica}${rota}${g?.planejadoUn ? `\nPlanejado: ${fmtN(g.planejadoUn)} un` : ""}${qtdRuim ? `\n⚠ O Syneco planejou ${fmtN(g.planejadoUn)} un e a LPC pede ${fmtN(g.qtdLpc)} un.` : ""}\n\nClique para ver as ordens do Syneco.`;
+                          if (!g?.ordens?.length) return <span className={`text-[11px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold ${e.cls}`} title={dica}>{e.txt}</span>;
+                          return (
+                            <button type="button" onClick={(ev) => { ev.stopPropagation(); setProgItem(p); }} title={dica}
+                              className={`text-[11px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold inline-flex items-center gap-1 hover:brightness-95 ${e.cls}`}>
+                              {qtdRuim && <AlertTriangle size={10} />}{e.txt}
+                            </button>
+                          );
                         })()}
                       </td>
                     )}
@@ -576,7 +585,81 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     )}
     {rastroOp && data?.opNumero && <ModalRastreabilidade opNumero={data.opNumero} onClose={() => setRastroOp(false)} />}
     {rastroItem && <RastroDoItem peca={rastroItem} onClose={() => setRastroItem(null)} />}
+    {progItem && <OrdensDoItem peca={progItem} setor={setor} sincronizadoEm={data?.ordensSincronizadasEm} onClose={() => setProgItem(null)} />}
     </>
+  );
+}
+
+// ORDENS DO SYNECO da peça — é aqui que o PCP CONFERE a programação: qual operação/setor o
+// programador lançou, em que máquina, quantas peças planejou (contra a qtd da LPC), o status e
+// as datas. Sem isso o chip "programada" era só uma afirmação do portal. (Vitor 18/08.)
+function OrdensDoItem({ peca, setor, sincronizadoEm, onClose }) {
+  const g = peca?.programacao;
+  const ordens = g?.ordens || [];
+  const SETOR_SY = { CORTE: /corte|prepara|serra|plasma|oxico/i, MONTAGEM: /montag/i, SOLDA: /solda|mig|mag|tig/i, ACABAMENTO: /acabamento|esmeril|lixamento/i, JATO: /jato|granalha/i, PINTURA: /pintura|primer/i };
+  const rx = setor ? SETOR_SY[setor] : null;
+  const doSetor = (o) => (rx ? rx.test(o.setor || "") : true);
+  const nesteSetor = ordens.filter(doSetor);
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className="bg-white text-torg-dark rounded-2xl w-full max-w-3xl shadow-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 px-5 py-3 border-b border-gray-100">
+          <div className="min-w-0">
+            <h2 className="text-base font-bold inline-flex items-center gap-2"><Factory size={16} className="text-torg-blue" /> Programação no Syneco · <span className="font-mono">{peca.marca}</span></h2>
+            <p className="text-[12px] text-torg-gray truncate">{peca.descricao || peca.perfil || "—"} · LPC pede <b>{fmtN(peca.qte)}</b> un</p>
+          </div>
+          <button onClick={onClose} className="text-torg-gray hover:text-red-600 shrink-0"><X size={18} /></button>
+        </div>
+
+        {/* Veredito: dá pra afirmar que o programador lançou esta peça PARA ESTE SETOR? */}
+        <div className="px-5 pt-3">
+          {!nesteSetor.length ? (
+            <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-start gap-1.5">
+              <AlertTriangle size={13} className="mt-0.5 shrink-0" /> O Syneco não tem ordem de {SETOR_LABEL[setor] || setor} para esta peça — o programador lançou a peça, mas não para este setor.
+            </p>
+          ) : g.qtdOk === false ? (
+            <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-start gap-1.5">
+              <AlertTriangle size={13} className="mt-0.5 shrink-0" /> Programada, mas a quantidade não bate: o Syneco planejou <b>{fmtN(g.planejadoUn)}</b> un e a LPC pede <b>{fmtN(g.qtdLpc)}</b> un.
+            </p>
+          ) : (
+            <p className="text-[12px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 inline-flex items-start gap-1.5">
+              <CheckCircle2 size={13} className="mt-0.5 shrink-0" /> Programada para {SETOR_LABEL[setor] || setor}: {nesteSetor.length} ordem(ns) no Syneco, {fmtN(g.planejadoUn)} un planejada(s) — igual à LPC.
+            </p>
+          )}
+        </div>
+
+        <div className="px-5 py-3 overflow-y-auto">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="text-[10px] uppercase text-torg-gray border-b border-gray-100">
+                <th className="text-left py-1.5">Op.</th><th className="text-left py-1.5">Setor</th>
+                <th className="text-left py-1.5">Máquina</th><th className="text-right py-1.5">Planejado</th>
+                <th className="text-right py-1.5">Produzido</th><th className="text-left py-1.5">Status</th>
+                <th className="text-left py-1.5">Início</th><th className="text-left py-1.5">Fim</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {ordens.map((o, i) => (
+                <tr key={i} className={doSetor(o) ? "bg-blue-50/40" : ""}>
+                  <td className="py-1.5 font-mono">{o.operacao || "—"}</td>
+                  <td className="py-1.5 whitespace-nowrap font-semibold">{o.setor || "—"}</td>
+                  <td className="py-1.5 whitespace-nowrap">{o.maquina || <span className="text-gray-300">—</span>}</td>
+                  <td className="py-1.5 text-right tabular-nums">{fmtN(o.planejadoUn)}</td>
+                  <td className="py-1.5 text-right tabular-nums">{o.produzidoUn ? fmtN(o.produzidoUn) : <span className="text-gray-300">—</span>}</td>
+                  <td className="py-1.5 whitespace-nowrap">{o.status || "—"}</td>
+                  <td className="py-1.5 whitespace-nowrap tabular-nums">{fmtD(o.dataInicio)}</td>
+                  <td className="py-1.5 whitespace-nowrap tabular-nums">{fmtD(o.dataFim)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-[11px] text-torg-gray mt-2">As linhas destacadas são as deste setor. O Syneco separa <b>Corte</b> (op. 10 — laser/serra) de <b>Preparação</b> (op. 20 — furação/rosca) — as duas são a Preparação do portal.</p>
+        </div>
+        <div className="px-5 py-2.5 border-t border-gray-100">
+          <p className="text-[11px] text-torg-gray">Fonte: ordens do Syneco (SKA), enviadas pelo agente da fábrica{sincronizadoEm ? ` — última sincronização em ${new Date(sincronizadoEm).toLocaleString("pt-BR")}` : ""}. O portal só lê; quem cria a ordem é o programador.</p>
+        </div>
+      </div>
+    </div>
   );
 }
 

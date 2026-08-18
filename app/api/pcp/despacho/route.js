@@ -187,27 +187,37 @@ export async function GET(req) {
     PINTURA: /pintura|primer/i,
     EXPEDICAO: /expedi|carregamento/i,
   };
-  const progPorMarca = new Map(); // marca → { setores:[], statuses:Set, noSetor:bool, iniciado:bool }
+  const progPorMarca = new Map(); // marca → { setores:[], noSetor, planejadoUn, ordens:[] }
+  let ordensSincronizadasEm = null;
   try {
-    const ordens = await prisma.mesOrdem.groupBy({
-      by: ["item", "setor", "status"],
+    // As ordens CRUAS, não um agregado: o PCP precisa poder CONFERIR o que o programador fez —
+    // qual máquina, quanto planejou, qual o status e quando. (Vitor 18/08: "como posso confirmar
+    // que o programador realmente programou essas peças para a preparação?")
+    const ordens = await prisma.mesOrdem.findMany({
       where: { opId },
-      _sum: { planejadoUn: true },
-      _min: { dataInicio: true },
+      select: {
+        item: true, setor: true, operacao: true, maquina: true, status: true,
+        planejadoUn: true, produzidoUn: true, pesoPlanejado: true,
+        dataInicio: true, dataFim: true, updatedAt: true,
+      },
     });
     const rxSetor = setor ? SYNECO_DO_SETOR[setor] : null;
     for (const o of ordens) {
+      if (o.updatedAt && (!ordensSincronizadasEm || o.updatedAt > ordensSincronizadasEm)) ordensSincronizadasEm = o.updatedAt;
       if (!o.item) continue;
-      const g = progPorMarca.get(o.item) || { setores: new Set(), statuses: new Set(), noSetor: false, planejadoUn: 0, iniciadoEm: null };
+      const g = progPorMarca.get(o.item) || { setores: new Set(), noSetor: false, planejadoUn: 0, iniciado: false, ordens: [] };
       if (o.setor) g.setores.add(o.setor);
-      if (o.status) g.statuses.add(o.status);
-      const doSetor = rxSetor ? rxSetor.test(o.setor || "") : true;
-      if (doSetor) {
+      g.ordens.push({
+        setor: o.setor, operacao: o.operacao, maquina: o.maquina && o.maquina !== "---" ? o.maquina : null,
+        status: o.status, planejadoUn: Number(o.planejadoUn) || 0, produzidoUn: Number(o.produzidoUn) || 0,
+        pesoPlanejado: Number(o.pesoPlanejado) || 0,
+        dataInicio: o.dataInicio ? o.dataInicio.toISOString() : null,
+        dataFim: o.dataFim ? o.dataFim.toISOString() : null,
+      });
+      if (rxSetor ? rxSetor.test(o.setor || "") : true) {
         g.noSetor = true;
-        g.planejadoUn += Number(o._sum?.planejadoUn) || 0;
+        g.planejadoUn = Math.max(g.planejadoUn, Number(o.planejadoUn) || 0); // 10 e 20 repetem a qtd
         if (o.status && o.status !== "Não Inicializada") g.iniciado = true;
-        const di = o._min?.dataInicio;
-        if (di && (!g.iniciadoEm || di < g.iniciadoEm)) g.iniciadoEm = di;
       }
       progPorMarca.set(o.item, g);
     }
@@ -217,10 +227,16 @@ export async function GET(req) {
   //   OUTRO_SETOR  → tem ordem lançada, mas não pra este setor (rota diferente no Syneco)
   //   PROGRAMADA   → ordem lançada e ainda não iniciada
   //   INICIADA     → a ordem deste setor já rodou (produzindo/finalizada)
-  const programacaoDe = (marca) => {
+  const ORDEM_SETOR = ["Corte", "Preparação", "Montagem", "Solda", "Acabamento", "Jato", "Pintura"];
+  const programacaoDe = (marca, qte) => {
     const g = progPorMarca.get(marca);
-    if (!g) return { situacao: "NAO_LANCADA", setores: [], planejadoUn: 0, iniciadoEm: null };
-    const base = { setores: [...g.setores], planejadoUn: Math.round(g.planejadoUn || 0), iniciadoEm: g.iniciadoEm ? g.iniciadoEm.toISOString() : null };
+    if (!g) return { situacao: "NAO_LANCADA", setores: [], planejadoUn: 0, ordens: [] };
+    const ordens = [...g.ordens].sort((a, b) => String(a.operacao || "").localeCompare(String(b.operacao || ""), undefined, { numeric: true }) || ORDEM_SETOR.indexOf(a.setor) - ORDEM_SETOR.indexOf(b.setor));
+    const planejadoUn = Math.round(g.planejadoUn || 0);
+    // Confere a quantidade: o programador lançou a peça INTEIRA ou só parte dela? (a qtd da LPC
+    // é a verdade do portal; divergência = programação parcial ou peça relançada no Syneco)
+    const qtdOk = g.noSetor && qte != null ? planejadoUn === Number(qte) : null;
+    const base = { setores: [...g.setores], planejadoUn, qtdLpc: qte != null ? Number(qte) : null, qtdOk, ordens };
     if (!g.noSetor) return { situacao: "OUTRO_SETOR", ...base };
     return { situacao: g.iniciado ? "INICIADA" : "PROGRAMADA", ...base };
   };
@@ -239,7 +255,7 @@ export async function GET(req) {
     // avancouAlem: a peça JÁ está num setor à frente deste (Syneco/status/terceiro/encaminhada) —
     // não pode ficar pendente aqui atrás; o painel joga pro histórico (aba Peças prontas).
     const mat = p.perfil ? matPorPerfil.get(String(p.perfil).trim().toUpperCase()) || null : null;
-    return { ...p, material: mat, programacao: programacaoDe(p.marca), baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
+    return { ...p, material: mat, programacao: programacaoDe(p.marca, p.qte), baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
   });
 
   const emAberto = pecas.filter((p) => !p.destino && p.status === "PENDENTE");
@@ -248,7 +264,7 @@ export async function GET(req) {
   const baixados = setor ? pecas.filter((p) => p.baixadoPortal).length : 0;
   const precisamSyneco = setor ? pecas.filter((p) => p.precisaSyneco).length : 0;
 
-  return NextResponse.json({ opId, opNumero: opInfo?.numero || null, emProducao: !!opInfo?.emProducao, setor: setor || null, total: pecas.length, placar, baixados, precisamSyneco, compra: compraOp, pecas });
+  return NextResponse.json({ opId, opNumero: opInfo?.numero || null, emProducao: !!opInfo?.emProducao, setor: setor || null, total: pecas.length, placar, baixados, precisamSyneco, compra: compraOp, ordensSincronizadasEm: ordensSincronizadasEm ? ordensSincronizadasEm.toISOString() : null, pecas });
 }
 
 export async function POST(req) {
