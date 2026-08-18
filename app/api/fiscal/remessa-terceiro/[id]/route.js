@@ -12,8 +12,18 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 const ROLES = ["ADMIN", "FISCAL", "FINANCEIRO"];
 
+const materialResolvidoSchema = z.object({
+  idx: z.number().int().min(0),
+  codigoOmie: z.string().min(1),
+  descricao: z.string().max(200).nullable().optional(),
+  qtd: z.number().positive(),
+  valorUnit: z.number().positive(),
+});
+
 const schema = z.object({
   acao: z.enum(["gerar_pedido_omie", "registrar", "dispensar", "reabrir"]),
+  // gerar_pedido_omie: materiais já resolvidos na tela de preparação (código + valor)
+  materiais: z.array(materialResolvidoSchema).optional(),
   cfop: z.string().max(10).nullable().optional(),
   natureza: z.string().max(120).nullable().optional(),
   nfNumero: z.string().max(60).nullable().optional(),
@@ -39,16 +49,34 @@ export async function PATCH(req, { params }) {
 
     const rom = await prisma.romaneioTerceiro.findUnique({
       where: { id: atual.id },
-      select: { id: true, numero: true, itens: true, opRefNumero: true, servico: true, fornecedorId: true },
+      select: { id: true, numero: true, itens: true, materiais: true, opRefNumero: true, servico: true, fornecedorId: true },
     });
     const forn = rom.fornecedorId
       ? await prisma.fornecedor.findUnique({ where: { id: rom.fornecedorId }, select: { cnpj: true, uf: true, nCodOmie: true } })
       : null;
     if (!forn) return NextResponse.json({ error: "Terceiro sem cadastro de fornecedor vinculado — não dá pra localizar o cliente no Omie." }, { status: 400 });
 
+    const materiaisRom = Array.isArray(rom.materiais) ? rom.materiais : [];
+    let materiaisResolvidos = null;
+    if (materiaisRom.length > 0) {
+      // Remessa de MATERIAIS — exige os itens resolvidos (código + valor) da preparação.
+      const enviados = body.materiais || [];
+      if (enviados.length === 0) return NextResponse.json({ error: "Prepare a remessa (código do Omie + valor de cada material) antes de gerar." }, { status: 400 });
+      materiaisResolvidos = enviados.map((e) => {
+        const base = materiaisRom[e.idx] || {};
+        return { codigoOmie: e.codigoOmie, descricao: e.descricao || base.descricaoOmie || base.descricao || base.perfil || null, qtd: e.qtd, valorUnit: e.valorUnit };
+      });
+      // Persiste os códigos/valores escolhidos de volta no romaneio (memória).
+      const novosMateriais = materiaisRom.map((m, i) => {
+        const r = enviados.find((x) => x.idx === i);
+        return r ? { ...m, codigoOmie: r.codigoOmie, valorUnit: r.valorUnit } : m;
+      });
+      await prisma.romaneioTerceiro.update({ where: { id: atual.id }, data: { materiais: novosMateriais } }).catch(() => {});
+    }
+
     let resultado;
     try {
-      resultado = await criarPedidoRemessa(rom, { cnpj: forn.cnpj, uf: forn.uf, nCodOmie: forn.nCodOmie });
+      resultado = await criarPedidoRemessa(rom, { cnpj: forn.cnpj, uf: forn.uf, nCodOmie: forn.nCodOmie }, { materiaisResolvidos });
     } catch (e) {
       return NextResponse.json({ error: `Falha ao criar pedido no Omie: ${e.message}` }, { status: 502 });
     }

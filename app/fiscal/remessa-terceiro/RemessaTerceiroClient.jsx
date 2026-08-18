@@ -4,8 +4,10 @@ import { useStore } from "@/lib/store";
 import { fmtOP } from "@/lib/utils";
 import {
   Factory, Loader2, AlertCircle, X, FileText, Search,
-  PackageOpen, ReceiptText, MinusCircle, Undo2, Truck, FilePlus2, Eye, Boxes, Package,
+  PackageOpen, ReceiptText, MinusCircle, Undo2, Truck, FilePlus2, Eye, Boxes, Package, Check, Pencil,
 } from "lucide-react";
+
+const fmtR$ = (n) => (n == null ? "—" : Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
 
 const fmtKg = (n) => (n == null ? "—" : `${Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`);
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -25,6 +27,7 @@ export default function RemessaTerceiroClient() {
   const [busca, setBusca] = useState("");
   const [emitir, setEmitir] = useState(null); // remessa em emissão
   const [verItens, setVerItens] = useState(null); // remessa cujos itens estão sendo vistos
+  const [preparar, setPreparar] = useState(null); // remessa em preparação (gerar pedido)
 
   const carregar = useCallback(() => {
     setErro("");
@@ -141,7 +144,7 @@ export default function RemessaTerceiroClient() {
                         <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                           {r.remessaStatus === "PENDENTE" && (
                             <>
-                              <button onClick={() => acao(r.id, { acao: "gerar_pedido_omie" }, "Pedido de remessa criado no Omie (rascunho)")} title="Cria o Pedido de Venda no Omie (rascunho) — depois confira e fature lá" className="text-xs font-semibold text-white bg-torg-blue hover:bg-torg-dark px-2.5 py-1 rounded-lg inline-flex items-center gap-1"><FilePlus2 size={12} /> Gerar pedido Omie</button>
+                              <button onClick={() => setPreparar(r)} title="Preparar e gerar o Pedido de Venda no Omie (rascunho)" className="text-xs font-semibold text-white bg-torg-blue hover:bg-torg-dark px-2.5 py-1 rounded-lg inline-flex items-center gap-1"><FilePlus2 size={12} /> Gerar pedido Omie</button>
                               <button onClick={() => setEmitir(r)} title="Registrar NF já emitida no Omie" className="text-xs text-torg-blue hover:text-torg-dark border border-torg-blue-100 rounded-lg px-2 py-1 inline-flex items-center gap-1"><ReceiptText size={12} /> Registrar NF</button>
                               <button onClick={() => acao(r.id, { acao: "dispensar" }, "Remessa dispensada")} title="Não precisa de NF" className="text-torg-gray hover:text-red-600 p-1"><MinusCircle size={14} /></button>
                             </>
@@ -168,6 +171,168 @@ export default function RemessaTerceiroClient() {
 
       {emitir && <ModalEmitir remessa={emitir} onClose={() => setEmitir(null)} onSalvo={() => { setEmitir(null); carregar(); showToast("NF de remessa registrada", "success"); }} />}
       {verItens && <ModalItens remessa={verItens} onClose={() => setVerItens(null)} />}
+      {preparar && <ModalPrepararRemessa remessa={preparar} onClose={() => setPreparar(null)} onGerado={(msg) => { setPreparar(null); carregar(); showToast(msg || "Pedido de remessa criado no Omie (rascunho)", "success"); }} />}
+    </div>
+  );
+}
+
+// Preparação da remessa de MATERIAIS antes de gerar o pedido no Omie: resolve o custo
+// (preço de compra → estoque) de cada material e permite escolher manualmente o produto
+// dos que estão sem código. Só libera "Gerar remessa" quando todo item tem código + valor.
+function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
+  const [dados, setDados] = useState(null);
+  const [itens, setItens] = useState([]);
+  const [erro, setErro] = useState("");
+  const [gerando, setGerando] = useState(false);
+
+  useEffect(() => {
+    setErro("");
+    fetch(`/api/fiscal/remessa-terceiro/${remessa.id}/preparar`)
+      .then((r) => r.json())
+      .then((j) => { if (j.success) { setDados(j); setItens(j.itens || []); } else setErro(j.error || "Erro"); })
+      .catch(() => setErro("Erro ao preparar"));
+  }, [remessa.id]);
+
+  const setItem = (idx, patch) => setItens((arr) => arr.map((it) => (it.idx === idx ? { ...it, ...patch } : it)));
+  const totalGeral = itens.reduce((s, it) => s + (Number(it.valorUnit) || 0) * (Number(it.qtd) || 0), 0);
+  const pendentes = itens.filter((it) => !it.codigoOmie || !(Number(it.valorUnit) > 0));
+  const temMateriais = dados?.temMateriais;
+  const podeGerar = temMateriais ? (itens.length > 0 && pendentes.length === 0) : (dados?.marcasCount > 0);
+
+  async function gerar() {
+    setErro(""); setGerando(true);
+    try {
+      const payload = { acao: "gerar_pedido_omie" };
+      if (temMateriais) payload.materiais = itens.map((it) => ({ idx: it.idx, codigoOmie: it.codigoOmie, descricao: it.descricao || null, qtd: Number(it.qtd), valorUnit: Number(it.valorUnit) }));
+      const res = await fetch(`/api/fiscal/remessa-terceiro/${remessa.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const j = await res.json();
+      if (!j.success) throw new Error(j.error || "Erro");
+      onGerado(j.numeroPedido ? `Pedido ${j.numeroPedido} criado no Omie (rascunho) — confira e fature lá` : undefined);
+    } catch (e) { setErro(e.message); setGerando(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl my-8">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><FilePlus2 size={16} className="text-torg-blue" /> Preparar remessa — RT-{String(remessa.numero).padStart(3, "0")}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
+          {erro && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2"><AlertCircle size={14} className="mt-0.5 shrink-0" /><span>{erro}</span></div>}
+
+          {!dados ? (
+            <p className="py-8 text-center text-sm text-torg-gray inline-flex items-center gap-2 justify-center w-full"><Loader2 size={16} className="animate-spin" /> Resolvendo custos…</p>
+          ) : !temMateriais ? (
+            <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-4 text-sm text-torg-dark">
+              Este romaneio não tem materiais — a remessa sai como <strong>peças (ARM000001)</strong>{dados.marcasCount ? ` · ${dados.marcasCount} marca(s)` : ""}. Ao gerar, o Omie cria o pedido rascunho pra você conferir e faturar.
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-torg-gray">O valor vem do <strong>preço de compra</strong> (cotação vencedora) ou do <strong>custo do estoque</strong>. Onde faltou código, escolha o produto do Omie. Dá pra ajustar o valor manualmente.</p>
+              {pendentes.length > 0 && (
+                <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-100 rounded px-2.5 py-1.5 flex items-start gap-1.5"><AlertCircle size={13} className="mt-0.5 shrink-0" /> {pendentes.length} item(ns) ainda sem código ou valor — resolva pra liberar a geração.</p>
+              )}
+              <div className="overflow-x-auto border border-gray-100 rounded-lg">
+                <table className="w-full text-xs min-w-[760px]">
+                  <thead className="bg-gray-50/60"><tr className="text-[10px] text-gray-500 uppercase">
+                    <th className="px-2.5 py-1.5 text-left font-medium">Material</th>
+                    <th className="px-2.5 py-1.5 text-right font-medium">Qtd</th>
+                    <th className="px-2.5 py-1.5 text-left font-medium">Produto Omie</th>
+                    <th className="px-2.5 py-1.5 text-right font-medium">Valor un.</th>
+                    <th className="px-2.5 py-1.5 text-right font-medium">Total</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {itens.map((it) => {
+                      const total = (Number(it.valorUnit) || 0) * (Number(it.qtd) || 0);
+                      return (
+                        <tr key={it.idx} className={!it.codigoOmie || !(it.valorUnit > 0) ? "bg-amber-50/40" : ""}>
+                          <td className="px-2.5 py-1.5">
+                            <span className="font-mono text-torg-dark">{it.perfil || "—"}</span>
+                            {it.descricao && <span className="block text-[11px] text-torg-gray truncate max-w-[220px]" title={it.descricao}>{it.descricao}</span>}
+                          </td>
+                          <td className="px-2.5 py-1.5 text-right tabular-nums whitespace-nowrap">{it.qtd}{it.unidade ? ` ${it.unidade}` : ""}</td>
+                          <td className="px-2.5 py-1.5">
+                            {it.codigoOmie ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                <span className="font-mono text-torg-dark">{it.codigoOmie}</span>
+                                <button onClick={() => setItem(it.idx, { codigoOmie: null, valorUnit: it.fonte === "manual" ? it.valorUnit : null, fonte: null, precisaCodigo: true })} title="Trocar produto" className="text-gray-300 hover:text-torg-blue"><Pencil size={11} /></button>
+                              </span>
+                            ) : (
+                              <SeletorProduto onEscolher={(p) => setItem(it.idx, { codigoOmie: p.codigoOmie, descricao: p.descricao, valorUnit: it.valorUnit > 0 ? it.valorUnit : p.valorUnit, fonte: p.fonte || "manual", precisaCodigo: false })} />
+                            )}
+                            {it.fonte && it.codigoOmie && <span className="block text-[10px] text-torg-gray mt-0.5">{it.fonte === "compra" ? "preço de compra" : it.fonte === "estoque" ? "custo do estoque" : "manual"}</span>}
+                          </td>
+                          <td className="px-2.5 py-1.5 text-right">
+                            <input value={it.valorUnit ?? ""} onChange={(e) => setItem(it.idx, { valorUnit: e.target.value === "" ? null : parseFloat(String(e.target.value).replace(",", ".")), fonte: "manual" })}
+                              inputMode="decimal" placeholder="0,00" className="w-24 text-right text-sm border border-gray-200 rounded px-2 py-1 tabular-nums" />
+                          </td>
+                          <td className="px-2.5 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-dark font-medium">{total > 0 ? fmtR$(total) : "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot><tr className="bg-gray-50/60 font-semibold text-torg-dark"><td className="px-2.5 py-2" colSpan={4}>Total da remessa</td><td className="px-2.5 py-2 text-right tabular-nums">{fmtR$(totalGeral)}</td></tr></tfoot>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3 rounded-b-xl">
+          <p className="text-[11px] text-torg-gray">Cria o pedido no Omie como <strong>rascunho</strong> — você confere e fatura lá.</p>
+          <div className="flex gap-3">
+            <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">Cancelar</button>
+            <button onClick={gerar} disabled={gerando || !podeGerar} className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-dark text-sm font-medium flex items-center gap-2 disabled:opacity-50">
+              {gerando ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Gerar remessa no Omie
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Busca/seleção de produto do Omie (EstoqueItem) pra materiais sem código.
+function SeletorProduto({ onEscolher }) {
+  const [q, setQ] = useState("");
+  const [lista, setLista] = useState([]);
+  const [aberto, setAberto] = useState(false);
+  const [carregando, setCarregando] = useState(false);
+  useEffect(() => {
+    if (!aberto) return;
+    const termo = q.trim();
+    if (termo.length < 2) { setLista([]); return; }
+    setCarregando(true);
+    const t = setTimeout(() => {
+      fetch(`/api/fiscal/produtos-estoque?q=${encodeURIComponent(termo)}`)
+        .then((r) => r.json()).then((j) => setLista(j.produtos || [])).catch(() => setLista([])).finally(() => setCarregando(false));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q, aberto]);
+  return (
+    <div className="relative">
+      <div className="relative">
+        <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setAberto(true)} placeholder="Buscar produto do Omie…"
+          className="w-56 text-sm border border-amber-300 rounded pl-7 pr-2 py-1 focus:ring-2 focus:ring-torg-blue outline-none" />
+      </div>
+      {aberto && q.trim().length >= 2 && (
+        <div className="absolute z-20 mt-1 w-[420px] max-w-[80vw] bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+          {carregando ? (
+            <p className="px-3 py-2 text-xs text-torg-gray inline-flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Buscando…</p>
+          ) : lista.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-torg-gray">Nenhum produto encontrado.</p>
+          ) : lista.map((p) => (
+            <button key={p.codigoOmie} type="button" onClick={() => { onEscolher(p); setAberto(false); setQ(""); }}
+              className="w-full text-left px-3 py-1.5 text-xs hover:bg-torg-blue-50 border-b border-gray-50 last:border-0">
+              <span className="font-mono text-torg-dark">{p.codigoOmie}</span>
+              <span className="text-torg-gray"> · {p.unidade || "—"}</span>
+              {p.valorUnit > 0 && <span className="text-emerald-700"> · {fmtR$(p.valorUnit)}</span>}
+              <span className="block text-torg-dark truncate">{p.descricao}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
