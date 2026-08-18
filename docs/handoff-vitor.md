@@ -65,9 +65,20 @@ Já implementado:
 - `OMIE_REMESSA_VALOR_KG` = R$/kg pra valorar a mercadoria (ARM000001 está com valor 0).
 - Opcional `OMIE_PARCELA_REMESSA` (default `000`).
 
-🔜 Assim que o cenário estiver setado: criar **1 rascunho de teste** (reversível — é só excluir
-o pedido no Omie), ajustar 1–2 campos do `IncluirPedido` se o Omie reclamar (normal), e validar
-o faturamento manual → `ConsultarNF` puxando nº/chave de volta.
+**Análise da remessa real (NF 897 MACPROJ):** a conta Torg tem **um único cenário** ("Padrão"
+`618747071`) — não há cenário separado de remessa; a NF sai dele + categoria financeira **1.04.95**
+(Remessa de Produto). O código já usa esses defaults e **não força CFOP** (Omie deriva: ARM000001 → 5949).
+
+**Regra marca × matéria-prima:** ARM000001 só p/ **MARCAS** (peças fabricadas — galvanização/pintura/
+jato). **Matéria-prima** (perfis/chapas comprados) → **produtos reais do Omie**. Hoje o romaneio guarda
+só o texto do perfil → o caminho matéria-prima está **bloqueado** com mensagem clara.
+
+🔧 **Ação do VITOR:** ajustar os **romaneios de terceiro** pra virem **conforme a RM, com código Omie
++ descrição** em cada item (marca e material). Assim o portal consegue montar a NF com o produto certo
+e puxar o **custo de compra** (pedido de compra / RM / estoque Omie) pra valorar — em vez de um R$/kg fixo.
+
+🔜 **Depois do ajuste do Vitor:** testamos tudo — 1 rascunho reversível no Omie, ajustar 1–2 campos do
+`IncluirPedido` se reclamar, validar faturamento manual → `ConsultarNF` puxando nº/chave de volta.
 
 ---
 
