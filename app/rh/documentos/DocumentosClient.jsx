@@ -181,6 +181,23 @@ export default function DocumentosClient() {
     setModalAberto(true);
   };
 
+  // Abre o modal de UPLOAD já preenchido a partir de um item do checklist de
+  // conformidade (funcionário + categoria + tipo certos) — atalho pra não ter que
+  // caçar a categoria no dropdown.
+  const abrirAnexar = (funcionarioId, item) => {
+    setAbaAtiva("documentos");
+    setForm({
+      nome: item?.regra?.nome || "", tipo: item?.regra?.tipo || "", categoria: item?.regra?.categoria || "SAUDE_SEGURANCA",
+      descricao: "", funcionarioId: funcionarioId || "",
+      dataEmissao: "", dataValidade: "", orgaoEmissor: "", numeroDocumento: "", observacao: "",
+    });
+    setArquivoFile(null);
+    setUploadPct(null);
+    setAviso("");
+    setEditandoId(null);
+    setModalAberto(true);
+  };
+
   // Abre o modal para EDITAR um documento existente (corrigir tipo/categoria/
   // vínculo/validade). O arquivo só é trocado se selecionar um novo.
   const abrirEditar = (d) => {
@@ -458,6 +475,7 @@ export default function DocumentosClient() {
           expandido={complianceExpandido}
           toggleExpandido={toggleExpandido}
           onRecarregar={carregarCompliance}
+          onAnexar={abrirAnexar}
           onEnviar={(d) => { setEnviarDoc(d); setEnviarPara(""); setEnviarMsg(""); setEnviarErro(""); setEnviarOk(false); }}
         />
       )}
@@ -923,7 +941,7 @@ const STATUS_ICON = {
   DISPENSADO: { icon: MinusCircle, cor: "text-gray-500", bg: "bg-gray-100", label: "Dispensado" },
 };
 
-function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFiltro, expandido, toggleExpandido, onRecarregar, onEnviar }) {
+function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFiltro, expandido, toggleExpandido, onRecarregar, onAnexar, onEnviar }) {
   if (carregando) {
     return (
       <div className="flex items-center justify-center py-20 text-torg-gray">
@@ -1174,6 +1192,13 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
                             <span className="text-[10px] text-torg-gray tabular-nums hidden sm:block">
                               Val: {new Date(item.documento.dataValidade).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                             </span>
+                          )}
+                          {!dispensado && item.status !== "OK" && onAnexar && (
+                            <button onClick={() => onAnexar(f.funcionario.id, item)}
+                              title="Anexar este documento para o funcionário"
+                              className="text-[10px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-full px-2 py-0.5 inline-flex items-center gap-1 whitespace-nowrap">
+                              <UploadCloud size={11} /> Anexar
+                            </button>
                           )}
                           {podeDispensar && (
                             <button onClick={() => alterarDispensa(f.funcionario.id, item.regra.tipo, true)}
