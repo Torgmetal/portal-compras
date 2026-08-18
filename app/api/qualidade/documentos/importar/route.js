@@ -131,6 +131,13 @@ export async function POST(req) {
     numeroDocumento: l.numeroDocumento ? String(l.numeroDocumento).slice(0, 100) : null,
     fornecedor: l.fornecedor ? String(l.fornecedor).slice(0, 200) : null,
     observacao: l.observacao ? String(l.observacao).slice(0, 500) : null,
+    // Rastreabilidade/compra ESTRUTURADA (antes ia tudo em texto na observação) — é o que
+    // alimenta o status de compra por OP no PCP. Vitor 18/08.
+    pedidoCompra: l.pedidoCompra || null,
+    nfNumero: l.nfNumero || null,
+    dataRecebimento: l.dataRecebimento || null,
+    pesoKg: l.pesoKg ?? null,
+    quantidade: l.quantidade ?? null,
     origem: "importacao_planilha",
     importRef: l.importRef,
     createdById: user.id,

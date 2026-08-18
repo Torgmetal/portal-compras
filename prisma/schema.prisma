@@ -1597,6 +1597,13 @@ model DocumentoQualidade {
   numeroCorrida    String? // heat — certificados de material (rastreabilidade)
   numeroDocumento  String? // nº do certificado (ex.: importação CMR)
   fornecedor       String? // fornecedor do material (importação CMR)
+  // Rastreabilidade/COMPRA vinda do CMR (planilha do Almoxarifado). Estruturado — antes ia tudo
+  // como texto na observação e não dava pra somar/filtrar. Base do status de compra no PCP.
+  pedidoCompra     String? // nº do pedido de compra / orçamento
+  nfNumero         String? // nº da nota fiscal de entrada
+  dataRecebimento  DateTime? // quando o material entrou (lançado no recebimento)
+  pesoKg           Float? // peso recebido (kg) — soma por OP dá o total recebido
+  quantidade       Float? // quantidade em peças (material contado por peça: tinta, parafuso…)
   importRef        String? // índice na planilha de origem (dedupe do import, em código)
   dataEmissao      DateTime?
   dataValidade     DateTime? // null = sem validade

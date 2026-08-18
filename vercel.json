@@ -61,6 +61,10 @@
       "schedule": "15 6-20 * * *"
     },
     {
+      "path": "/api/qualidade/cmr/sincronizar",
+      "schedule": "0 12 * * *"
+    },
+    {
       "path": "/api/cron/monitor",
       "schedule": "0 10 * * *"
     }

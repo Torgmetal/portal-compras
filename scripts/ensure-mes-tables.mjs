@@ -226,6 +226,17 @@ async function main() {
   ]) await prisma.$executeRawUnsafe(`ALTER TABLE "PecaConjunto" ${c}`);
   console.log("[ensure-mes-tables] OK — PecaConjunto.destino* garantidas.");
 
+  // DocumentoQualidade: rastreabilidade/compra do CMR (base do status de compra no PCP).
+  for (const c of [
+    `ADD COLUMN IF NOT EXISTS "pedidoCompra" TEXT`,
+    `ADD COLUMN IF NOT EXISTS "nfNumero" TEXT`,
+    `ADD COLUMN IF NOT EXISTS "dataRecebimento" TIMESTAMP(3)`,
+    `ADD COLUMN IF NOT EXISTS "pesoKg" DOUBLE PRECISION`,
+    `ADD COLUMN IF NOT EXISTS "quantidade" DOUBLE PRECISION`,
+  ]) await prisma.$executeRawUnsafe(`ALTER TABLE "DocumentoQualidade" ${c}`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DocumentoQualidade_opNumero_categoria_idx" ON "DocumentoQualidade"("opNumero","categoria")`);
+  console.log("[ensure-mes-tables] OK — DocumentoQualidade rastreabilidade garantida.");
+
   // Romaneio de terceiro: 2º romaneio de MATERIAL (perfis a mandar) + etapa de envio.
   try {
     for (const c of [
