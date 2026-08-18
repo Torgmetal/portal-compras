@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Loader2, AlertCircle, Flag, ChevronUp, ChevronDown, Truck, RefreshCw, Inbox, CalendarClock, FileText, FileDown } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, Flag, ChevronUp, ChevronDown, Truck, RefreshCw, Inbox, CalendarClock, FileText, FileDown, X } from "lucide-react";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 
 const BLOCOS = [
@@ -53,6 +53,21 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
       });
       const jr = await r.json();
       if (!r.ok) throw new Error(jr.error || "Erro ao reordenar");
+      await carregar();
+    } catch (e) { setErro(e.message); } finally { setMovendo(""); }
+  }
+
+  // Remove a prioridade da peça (marcou errado) — as demais renumeram sozinhas (1,2,3…).
+  async function removerPrioridade(p) {
+    if (!confirm(`Tirar a prioridade #${p.prioridade} de ${p.marca}?\n\nA peça continua na fila do setor, só deixa de ser prioritária.`)) return;
+    setMovendo(p.id);
+    try {
+      const r = await fetch("/api/producao/prioridades", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ removerId: p.id }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao remover");
       await carregar();
     } catch (e) { setErro(e.message); } finally { setMovendo(""); }
   }
@@ -118,6 +133,8 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
       <td className="px-2 py-2 w-8">
         {prioritaria && podeEditar && (
           <div className="flex flex-col items-center">
+            <button onClick={() => removerPrioridade(p)} disabled={movendo === p.id} title="Tirar a prioridade desta peça (marcou errado)"
+              className="text-gray-300 hover:text-red-600 disabled:opacity-25 mb-0.5"><X size={14} /></button>
             <button onClick={() => mover(lista, i, -1)} disabled={i === 0 || movendo === p.id}
               className="text-gray-400 hover:text-torg-blue disabled:opacity-25" title="Subir prioridade">
               {movendo === p.id ? <Loader2 size={13} className="animate-spin" /> : <ChevronUp size={15} />}

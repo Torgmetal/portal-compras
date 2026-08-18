@@ -12,7 +12,7 @@ import { requireRole } from "@/lib/session";
 import { carregarPrioridadesPorObra } from "@/lib/prioridades-setor-data";
 import { setorRealIndex, FLUXO_SETORES, noTerceiroAgora, entregaDoSetor } from "@/lib/prioridades-setor";
 import { ehItemComprado } from "@/lib/item-comprado";
-import { dedupLpcLe } from "@/lib/pecas-producao";
+import { dedupLpcLe, renumerarPrioridades } from "@/lib/pecas-producao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -130,7 +130,22 @@ export async function POST(req) {
   try { user = await requireRole(ROLES_EDIT); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
-  const { aId, bId } = await req.json().catch(() => ({}));
+  const { aId, bId, removerId } = await req.json().catch(() => ({}));
+
+  // REMOVER prioridade (marcou errado): tira o número da peça e renumera a OP (1,2,3… sem buraco).
+  if (removerId) {
+    const pc = await prisma.pecaConjunto.findUnique({ where: { id: removerId }, select: { id: true, opId: true, marca: true, prioridade: true, destino: true } });
+    if (!pc) return NextResponse.json({ error: "Peça não encontrada." }, { status: 404 });
+    await prisma.pecaConjunto.update({
+      where: { id: pc.id },
+      // se o destino era PRIORIDADE (veio do painel de Liberar), limpa junto — é a mesma marcação.
+      data: { prioridade: null, ...(pc.destino === "PRIORIDADE" ? { destino: null, destinoEm: null, destinoPor: null } : {}) },
+    });
+    const total = await renumerarPrioridades(prisma, pc.opId);
+    await prisma.auditLog.create({ data: { userId: user.id, action: "REMOVER_PRIORIDADE", entity: "PecaConjunto", entityId: pc.id, diff: { marca: pc.marca, prioridadeAntiga: pc.prioridade, restantes: total } } }).catch(() => {});
+    return NextResponse.json({ ok: true, removida: pc.marca, restantes: total });
+  }
+
   if (!aId || !bId || aId === bId) return NextResponse.json({ error: "Informe duas peças distintas." }, { status: 400 });
 
   const [a, b] = await Promise.all([

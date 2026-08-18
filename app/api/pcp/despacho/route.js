@@ -12,7 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { whereSetorSyneco, normalizeSetorSyneco } from "@/lib/syneco-dia";
 import { ehItemComprado } from "@/lib/item-comprado";
-import { dedupLpcLe } from "@/lib/pecas-producao";
+import { dedupLpcLe, renumerarPrioridades } from "@/lib/pecas-producao";
 import { croquiCortado, setorRealIndex, mapaSetorReal, FLUXO_SETORES } from "@/lib/prioridades-setor";
 import { z } from "zod";
 
@@ -34,6 +34,7 @@ const schema = z.object({
   comPrioridade: z.boolean().optional(), // junto com o encaminhar: também numera como prioridade
   obs: z.string().max(500).optional().nullable(),
   reverter: z.boolean().optional(),
+  tirarPrioridade: z.boolean().optional(), // remove SÓ a marcação de prioridade (marcou errado)
   // Baixa PORTAL (não escreve no Syneco): grava baixaSetores[baixaSetor] = { qtd, em, por }.
   baixaSetor: z.enum(SETORES_BAIXA).optional(),
   baixas: z.array(z.object({ id: z.string(), qtd: z.number().nonnegative() })).optional(), // baixa por peça+qtd
@@ -193,7 +194,7 @@ export async function POST(req) {
   try { body = schema.parse(await req.json()); }
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
-  const { ids, destino, destinoTerceirizado, dataPrevRetorno, encaminharSetor, comPrioridade, obs, reverter, baixaSetor, baixas, reverterBaixa } = body;
+  const { ids, destino, destinoTerceirizado, dataPrevRetorno, encaminharSetor, comPrioridade, obs, reverter, tirarPrioridade, baixaSetor, baixas, reverterBaixa } = body;
 
   // ── Baixa PORTAL ──────────────────────────────────────────────────────────
   // Grava/remove a QUANTIDADE baixada da peça NAQUELE setor (PecaConjunto.baixaSetores[setor] =
@@ -282,7 +283,17 @@ export async function POST(req) {
     }
   }
 
-  if (reverter) {
+  if (tirarPrioridade) {
+    // Tira SÓ a prioridade das selecionadas (marcou errado) — não mexe em encaminhamento/terceiro/
+    // baixa. Se o destino era PRIORIDADE, limpa junto (é a mesma marcação) e renumera a OP.
+    const pcs = await prisma.pecaConjunto.findMany({ where: { id: { in: ids }, prioridade: { not: null } }, select: { id: true, opId: true, destino: true } });
+    if (!pcs.length) return NextResponse.json({ error: "Nenhuma das peças selecionadas está marcada como prioridade." }, { status: 400 });
+    await prisma.pecaConjunto.updateMany({ where: { id: { in: pcs.map((x) => x.id) } }, data: { prioridade: null } });
+    const eramPrio = pcs.filter((x) => x.destino === "PRIORIDADE").map((x) => x.id);
+    if (eramPrio.length) await prisma.pecaConjunto.updateMany({ where: { id: { in: eramPrio } }, data: { destino: null, destinoEm: null, destinoPor: null } });
+    for (const opIdUnico of [...new Set(pcs.map((x) => x.opId))]) await renumerarPrioridades(prisma, opIdUnico);
+    atualizados = pcs.length;
+  } else if (reverter) {
     // Volta pra EM ABERTO: limpa o despacho; se era terceirizado/encaminhada, volta pro fluxo normal.
     const r = await prisma.pecaConjunto.updateMany({
       where: { id: { in: ids } },

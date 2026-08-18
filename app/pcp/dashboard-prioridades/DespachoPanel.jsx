@@ -112,6 +112,13 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     if (!ids.length) return alert("Selecione peças em aberto (sem destino) para destinar.");
     await post({ ids, destino }, (j) => (j.duplicadasIgnoradas ? `${j.atualizados} peça(s) destinada(s).${avisoDup(j)}` : null));
   }
+  // Tira a prioridade das selecionadas (marcou errado) — renumera a OP sozinho.
+  async function tirarPrioridade() {
+    const ids = [...sel];
+    if (!ids.length) return alert("Selecione as peças para tirar a prioridade.");
+    if (!confirm(`Tirar a marcação de prioridade de ${ids.length} peça(s) selecionada(s)?`)) return;
+    await post({ ids, tirarPrioridade: true }, (j) => `Prioridade removida de ${j.atualizados} peça(s).`);
+  }
   // Encaminhar DIRETO pra um setor (ex.: Jato) — a peça pula as etapas anteriores e fica pendente
   // no setor escolhido; com "priorizar", também ganha o número de prioridade.
   async function encaminhar() {
@@ -366,6 +373,8 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                 <button key={d.key} onClick={() => (d.key === "TERCEIRO" ? abrirTerceiro() : despachar(d.key))} disabled={!sel.size || enviando} title={d.key === "TERCEIRO" ? "Escolher fornecedor + setor de retorno e gerar o romaneio do terceiro" : d.desc}
                   className={`text-[11px] font-semibold text-white rounded-lg px-2.5 py-2 inline-flex items-center gap-1 disabled:opacity-40 ${d.cor}`}><d.icon size={12} /> {d.label}</button>
               ))}
+              <button onClick={tirarPrioridade} disabled={!sel.size || enviando} title="Tira a marcação de prioridade das selecionadas (marcou errado)"
+                className="text-[11px] font-semibold text-torg-dark rounded-lg px-2.5 py-2 inline-flex items-center gap-1 disabled:opacity-40 bg-gray-100 hover:bg-gray-200"><Undo2 size={12} /> Tirar prioridade</button>
               <span className="w-px h-6 bg-gray-200 mx-1" />
               {/* Enviar DIRETO pra um setor (pula as etapas anteriores) — ex.: prioridade + direto pro Jato */}
               <span className="inline-flex items-center gap-1.5">
