@@ -193,7 +193,7 @@ function ModalItens({ remessa, onClose }) {
 
           {materiais.length > 0 && (
             <div>
-              <p className="text-[11px] font-semibold text-torg-dark uppercase tracking-wider mb-2 flex items-center gap-1.5"><Package size={13} className="text-torg-orange" /> Matéria-prima (produto do Omie)</p>
+              <p className="text-[11px] font-semibold text-torg-dark uppercase tracking-wider mb-2 flex items-center gap-1.5"><Package size={13} className="text-torg-orange" /> Itens da NF — matéria-prima enviada (produto do Omie)</p>
               {semCodigo > 0 && (
                 <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded px-2.5 py-1.5 mb-2 flex items-start gap-1.5"><AlertCircle size={13} className="mt-0.5 shrink-0" /> {semCodigo} item(ns) sem código do Omie — o casamento perfil→produto não achou correspondência segura. Ajustar antes de emitir a NF.</p>
               )}
@@ -224,7 +224,7 @@ function ModalItens({ remessa, onClose }) {
 
           {marcas.length > 0 && (
             <div>
-              <p className="text-[11px] font-semibold text-torg-dark uppercase tracking-wider mb-2 flex items-center gap-1.5"><Factory size={13} className="text-torg-blue" /> Marcas / peças (ARM000001 na NF)</p>
+              <p className="text-[11px] font-semibold text-torg-dark uppercase tracking-wider mb-2 flex items-center gap-1.5"><Factory size={13} className="text-torg-gray" /> Controle — o que o terceiro deve produzir <span className="normal-case font-normal text-torg-gray">(não vai na NF)</span></p>
               <div className="overflow-x-auto border border-gray-100 rounded-lg">
                 <table className="w-full text-xs min-w-[520px]">
                   <thead className="bg-gray-50/60"><tr className="text-[10px] text-gray-500 uppercase">
