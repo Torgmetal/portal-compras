@@ -52,6 +52,9 @@ async function main() {
 
   // OP.valorFaturarPorKg (R$/kg a faturar — base da previsão de faturamento). Idempotente.
   await prisma.$executeRawUnsafe(`ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "valorFaturarPorKg" DOUBLE PRECISION`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "emProducao" BOOLEAN NOT NULL DEFAULT false`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "emProducaoEm" TIMESTAMP(3)`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "emProducaoPor" TEXT`);
   console.log("[ensure-mes-tables] OK — OP.valorFaturarPorKg garantida.");
 
   // PlanejamentoCarga: situação (previsão de faturamento) + data original (detecta "alterada"). Idempotente.

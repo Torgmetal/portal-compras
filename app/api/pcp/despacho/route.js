@@ -56,6 +56,7 @@ export async function GET(req) {
   }
   if (!opId) return NextResponse.json({ error: "OP não encontrada" }, { status: 404 });
 
+  const opInfo = await prisma.oP.findUnique({ where: { id: opId }, select: { emProducao: true } });
   const setor = url.searchParams.get("setor"); // opcional: escopo do setor pela ROTA da peça
   const todasRaw = await prisma.pecaConjunto.findMany({
     where: { opId },
@@ -156,7 +157,7 @@ export async function GET(req) {
   const baixados = setor ? pecas.filter((p) => p.baixadoPortal).length : 0;
   const precisamSyneco = setor ? pecas.filter((p) => p.precisaSyneco).length : 0;
 
-  return NextResponse.json({ opId, setor: setor || null, total: pecas.length, placar, baixados, precisamSyneco, pecas });
+  return NextResponse.json({ opId, emProducao: !!opInfo?.emProducao, setor: setor || null, total: pecas.length, placar, baixados, precisamSyneco, pecas });
 }
 
 export async function POST(req) {

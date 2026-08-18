@@ -134,6 +134,11 @@ model OP {
   clienteUF            String?
   valorTotalContrato   Float?
   valorFaturarPorKg    Float? // R$/kg a faturar (Comercial) — base da previsão de faturamento por carga
+  // Enviada pra produção pelo PCP (botão no painel de Liberar). Só as em produção aparecem nas
+  // telas de Prioridades de Produção (as não enviadas somem).
+  emProducao           Boolean              @default(false)
+  emProducaoEm         DateTime?
+  emProducaoPor        String?
   // Definidos na abertura da OP
   estoqueMaterial      String? // "PROPRIO_TORG" | "CLIENTE_TERCEIRO"
   tipoDataBook         String? // "PADRAO_TORG" | "SNQC" | "RELATORIO_ACOMPANHAMENTO"

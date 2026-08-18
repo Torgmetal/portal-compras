@@ -1,22 +1,23 @@
 // Prioridades de PRODUÇÃO por bloco de setor (Painel de Produção).
-// GET  — as peças MARCADAS como prioridade (PecaConjunto.prioridade != null), agrupadas em 3
-//        blocos pelo SETOR REAL onde a peça está agora, por OP, na ordem da prioridade.
+// GET  — SÓ as OPs enviadas pra produção (OP.emProducao). Por bloco (Preparação / Montagem+Solda /
+//        Acabamento,Jato,Pintura) e por OP: PRIORITÁRIAS em cima (na ordem) + as DEMAIS pendentes
+//        embaixo, com o PRAZO do setor ("até quando"). O setor atual vem do realMap (Syneco+status).
 //          • Preparação            = Corte
 //          • Montagem + Solda
 //          • Acabamento, Jato e Pintura
-//        (Expedição/expedido sai — já não é "onde falar com o setor".)
 // POST — reordena: troca a prioridade entre DUAS peças da MESMA OP (↑/↓ na tela).
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { carregarPrioridadesPorObra } from "@/lib/prioridades-setor-data";
-import { setorRealIndex, FLUXO_SETORES, noTerceiroAgora } from "@/lib/prioridades-setor";
+import { setorRealIndex, FLUXO_SETORES, noTerceiroAgora, entregaDoSetor } from "@/lib/prioridades-setor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ROLES_VER = ["ADMIN", "PLANEJAMENTO", "PCP", "PRODUCAO", "COMERCIAL"];
 const ROLES_EDIT = ["ADMIN", "PLANEJAMENTO", "PCP"];
+const LIMITE_DEMAIS = 40; // teto de "demais" por OP/bloco na tela
 
 const BLOCOS = [
   { key: "preparacao", label: "Preparação", setores: ["CORTE"] },
@@ -35,20 +36,32 @@ function blocoDoIdx(idx) {
   return null; // Expedição/expedido → fora
 }
 
+// Prazo do bloco p/ uma OP = a data mais PRÓXIMA entre os setores do bloco (das datas por setor).
+function prazoDoBloco(datasSetor, setores, entregaFallback, now) {
+  let best = null;
+  for (const s of setores) {
+    const e = entregaDoSetor(datasSetor || {}, s, entregaFallback, now);
+    if (e.entrega && (!best || new Date(e.entrega) < new Date(best.entrega))) best = e;
+  }
+  if (!best) best = entregaDoSetor(datasSetor || {}, setores[0], entregaFallback, now);
+  return best.entrega ? { entrega: best.entrega, atrasoDias: best.atrasoDias, doSetor: best.doSetor } : null;
+}
+
 export async function GET() {
   try { await requireRole(ROLES_VER); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
-  const { porObra } = await carregarPrioridadesPorObra();
-  const opInfo = new Map(porObra.map((o) => [o.opId, o])); // opId → { realMap, obra, cliente, refCliente, opNumero }
+  const { porObra, now } = await carregarPrioridadesPorObra();
+  // SÓ as OPs enviadas pra produção (as não selecionadas somem da tela).
+  const emProd = porObra.filter((o) => o.emProducao);
+  const opInfo = new Map(emProd.map((o) => [o.opId, o]));
   const acc = Object.fromEntries(BLOCOS.map((b) => [b.key, new Map()])); // bloco → (opNumero → { info, pecas })
 
-  // Peças MARCADAS (prioridade != null) das OPs ativas — lidas DIRETO do banco, independente de
-  // LPC/LE. (O universo do TV usa só a LPC quando ela existe e descartaria prioridades marcadas na
-  // LE — ex.: as chapas/guarda-corpos da OP-089.) O setor atual vem do realMap (Syneco+status).
+  // Todas as peças (conjuntos + avulsas, sem croqui) das OPs em produção — direto do banco (LPC ou
+  // LE). O setor atual de cada uma sai do realMap (Syneco + status). Priorizadas + demais.
   const opIds = [...opInfo.keys()];
   const pecas = opIds.length ? await prisma.pecaConjunto.findMany({
-    where: { opId: { in: opIds }, prioridade: { not: null } },
+    where: { opId: { in: opIds }, tipoPeca: { not: "CROQUI" } },
     select: { id: true, opId: true, marca: true, descricao: true, pesoTotalKg: true, prioridade: true, status: true, terceirizado: true, destinoTerceirizado: true, terceirizadoRecebidoEm: true, terceiroRetornoPrevisto: true },
   }) : [];
 
@@ -57,10 +70,10 @@ export async function GET() {
     if (!o) continue;
     const idx = setorRealIndex(pc, o.realMap);
     const bloco = blocoDoIdx(idx);
-    if (!bloco) continue;
+    if (!bloco) continue; // já expedida
     const setorKey = idx < 0 ? "CORTE" : FLUXO_SETORES[idx]?.key || "CORTE";
     const m = acc[bloco];
-    if (!m.has(o.opNumero)) m.set(o.opNumero, { opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente, pecas: [] });
+    if (!m.has(o.opNumero)) m.set(o.opNumero, { opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, datasSetor: o.datasSetor, entrega: o.entrega, pecas: [] });
     const terc = noTerceiroAgora(pc);
     m.get(o.opNumero).pecas.push({
       id: pc.id, marca: pc.marca, descricao: pc.descricao || null, pesoTotalKg: Math.round(Number(pc.pesoTotalKg) || 0),
@@ -70,10 +83,24 @@ export async function GET() {
   }
 
   const blocos = BLOCOS.map((b) => {
-    const ops = [...acc[b.key].values()]
-      .map((op) => ({ ...op, pecas: op.pecas.sort((a, z) => a.prioridade - z.prioridade), pesoKg: op.pecas.reduce((s, x) => s + x.pesoTotalKg, 0) }))
-      .sort((a, z) => String(a.opNumero).localeCompare(String(z.opNumero), "pt-BR", { numeric: true }));
-    return { key: b.key, label: b.label, ops, total: ops.reduce((s, op) => s + op.pecas.length, 0) };
+    const ops = [...acc[b.key].values()].map((op) => {
+      const prioritarias = op.pecas.filter((p) => p.prioridade != null).sort((a, z) => a.prioridade - z.prioridade);
+      const demaisAll = op.pecas.filter((p) => p.prioridade == null).sort((a, z) => String(a.marca).localeCompare(String(z.marca), "pt-BR", { numeric: true }));
+      return {
+        opNumero: op.opNumero, obra: op.obra, cliente: op.cliente,
+        prazo: prazoDoBloco(op.datasSetor, b.setores, op.entrega, now),
+        prioritarias, demais: demaisAll.slice(0, LIMITE_DEMAIS), demaisTotal: demaisAll.length,
+        pesoKg: op.pecas.reduce((s, x) => s + x.pesoTotalKg, 0),
+      };
+    }).sort((a, z) => {
+      // urgência: atrasadas primeiro, depois prazo mais próximo, depois nº da OP
+      const aa = a.prazo?.atrasoDias > 0, za = z.prazo?.atrasoDias > 0;
+      if (aa !== za) return aa ? -1 : 1;
+      if (a.prazo?.entrega && z.prazo?.entrega && a.prazo.entrega !== z.prazo.entrega) return new Date(a.prazo.entrega) - new Date(z.prazo.entrega);
+      if (!!a.prazo?.entrega !== !!z.prazo?.entrega) return a.prazo?.entrega ? -1 : 1;
+      return String(a.opNumero).localeCompare(String(z.opNumero), "pt-BR", { numeric: true });
+    });
+    return { key: b.key, label: b.label, ops, total: ops.reduce((s, op) => s + op.prioritarias.length + op.demaisTotal, 0) };
   });
 
   return NextResponse.json({ blocos, geradoEm: new Date().toISOString() });

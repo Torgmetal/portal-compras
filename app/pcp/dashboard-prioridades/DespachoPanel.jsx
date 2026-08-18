@@ -8,7 +8,7 @@
 // Baixa é SÓ do portal (PecaConjunto.baixaSetores[setor] = { qtd, em, por }); não escreve no Syneco.
 // Reusa /api/pcp/despacho (GET peças+placar+reconciliação, POST despacha / dá baixa por qtd).
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
-import { X, Loader2, Star, Truck, RotateCcw, Ban, Package, FileDown, FileUp, CheckCircle2, Undo2, ClipboardList, ChevronRight, ChevronDown } from "lucide-react";
+import { X, Loader2, Star, Truck, RotateCcw, Ban, Package, FileDown, FileUp, CheckCircle2, Undo2, ClipboardList, ChevronRight, ChevronDown, Factory } from "lucide-react";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } from "@/lib/excel-relatorio";
 import TerceiroModal from "./TerceiroModal";
 
@@ -50,6 +50,20 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     } catch (e) { setErro(e.message); } finally { setLoading(false); }
   }, [obra, setor]);
   useEffect(() => { carregar(); }, [carregar]);
+
+  // Enviar a OP inteira pra produção (ação da OP, não das peças): liga/desliga OP.emProducao.
+  // Só as OPs em produção aparecem nas telas de Prioridades de Produção.
+  const enviarProducao = async () => {
+    if (!data?.opId) return;
+    const novo = !data.emProducao;
+    setEnviando(true); setErro("");
+    try {
+      const r = await fetch("/api/pcp/op-em-producao", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ opId: data.opId, emProducao: novo }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao enviar para produção");
+      setData((d) => ({ ...d, emProducao: novo }));
+    } catch (e) { setErro(e.message); } finally { setEnviando(false); }
+  };
 
   const pecas = data?.pecas || [];
   const filtrar = (arr) => { const q = filtro.trim().toLowerCase(); return q ? arr.filter((p) => `${p.marca} ${p.descricao || ""}`.toLowerCase().includes(q)) : arr; };
@@ -310,6 +324,15 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
           </div>
         ) : (
           <div className="border-t border-gray-100 px-5 py-3 space-y-2">
+            {/* Ação da OP inteira: enviar/tirar da produção (independe da seleção de peças). */}
+            <div className="flex items-center gap-2 flex-wrap pb-1">
+              <button onClick={enviarProducao} disabled={enviando || !data?.opId}
+                title="Envia a OP INTEIRA pra produção — só as OPs em produção aparecem nas telas de Prioridades de Produção"
+                className={`text-[12px] font-bold rounded-lg px-3 py-2 inline-flex items-center gap-1.5 disabled:opacity-40 ${data?.emProducao ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-torg-dark text-white hover:opacity-90"}`}>
+                <Factory size={13} /> {data?.emProducao ? "Em produção ✓" : "Enviar para produção"}
+              </button>
+              <span className="text-[11px] text-torg-gray">{data?.emProducao ? "Esta OP aparece nas telas de produção — clique p/ tirar." : "Esta OP NÃO aparece nas telas de produção ainda."}</span>
+            </div>
             <div className="flex items-center gap-2 flex-wrap">
               {podeBaixa && (
                 <button onClick={baixar} disabled={!sel.size || enviando} title="Dá baixa (peça inteira) nas selecionadas neste setor"

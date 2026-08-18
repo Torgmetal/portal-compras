@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Loader2, AlertCircle, Flag, ChevronUp, ChevronDown, Truck, RefreshCw, Inbox } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, Flag, ChevronUp, ChevronDown, Truck, RefreshCw, Inbox, CalendarClock } from "lucide-react";
 
 const BLOCOS = [
   { key: "preparacao", label: "Preparação" },
@@ -90,49 +90,86 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
         ) : !blocoAtual || blocoAtual.ops.length === 0 ? (
           <div className="border border-dashed border-gray-200 rounded-xl py-16 text-center bg-white">
             <Inbox size={30} className="mx-auto text-gray-300 mb-2" />
-            <p className="text-sm font-semibold text-torg-dark">Nenhuma peça prioritária neste bloco</p>
-            <p className="text-xs text-torg-gray mt-1">Marque prioridades em <Link href="/planejamento/prioridades/marcar" className="text-torg-blue hover:underline">Planejamento › Marcar prioridades</Link>.</p>
+            <p className="text-sm font-semibold text-torg-dark">Nada neste bloco</p>
+            <p className="text-xs text-torg-gray mt-1">Só aparecem as OPs <b>enviadas para produção</b> (botão no painel de Liberar do PCP). Se uma OP não está aqui, ela ainda não foi enviada.</p>
           </div>
         ) : (
           <div className="space-y-4">
-            {blocoAtual.ops.map((op) => (
+            {blocoAtual.ops.map((op) => {
+              const prazo = op.prazo;
+              const atrasado = prazo && prazo.atrasoDias > 0;
+              return (
               <div key={op.opNumero} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3 flex-wrap">
                   <span className="text-lg font-extrabold text-torg-dark tabular-nums">OP-{op.opNumero}</span>
-                  <span className="text-sm text-torg-gray truncate max-w-[280px]" title={op.obra}>{op.obra}</span>
-                  <span className="ml-auto text-xs text-torg-gray tabular-nums">{op.pecas.length} peça(s) · {fmtKg(op.pesoKg)}</span>
+                  <span className="text-sm text-torg-gray truncate max-w-[220px]" title={op.obra}>{op.obra}</span>
+                  {prazo && (
+                    <span className={`text-[11px] font-semibold inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${atrasado ? "bg-red-50 text-red-600" : "bg-torg-blue-50 text-torg-blue"}`}>
+                      <CalendarClock size={11} /> {atrasado ? `${prazo.atrasoDias}d de atraso` : `até ${fmtData(prazo.entrega)}`}
+                    </span>
+                  )}
+                  <span className="ml-auto text-xs text-torg-gray tabular-nums">{fmtKg(op.pesoKg)}</span>
                 </div>
-                <ul className="divide-y divide-gray-50">
-                  {op.pecas.map((p, i) => (
-                    <li key={p.id} className="px-4 py-2.5 flex items-center gap-3">
-                      <span className="w-7 h-7 shrink-0 rounded-full bg-torg-orange/10 text-torg-orange font-extrabold text-sm inline-flex items-center justify-center tabular-nums">{p.prioridade}</span>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-mono font-semibold text-torg-dark text-sm truncate">{p.marca}</p>
-                        {p.descricao && <p className="text-[11px] text-torg-gray truncate">{p.descricao}</p>}
-                      </div>
-                      {p.terceiro ? (
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium inline-flex items-center gap-1 shrink-0"><Truck size={11} /> no terceiro{p.retornoPrevisto ? ` · volta ${fmtData(p.retornoPrevisto)}` : ""}</span>
-                      ) : (
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-torg-gray font-medium shrink-0">{p.setor}</span>
-                      )}
-                      <span className="text-xs text-torg-gray tabular-nums w-20 text-right shrink-0">{fmtKg(p.pesoTotalKg)}</span>
-                      {podeEditar && (
-                        <div className="flex flex-col shrink-0">
-                          <button onClick={() => mover(op.pecas, i, -1)} disabled={i === 0 || movendo === p.id}
-                            className="text-gray-400 hover:text-torg-blue disabled:opacity-25 disabled:hover:text-gray-400" title="Subir prioridade">
-                            {movendo === p.id ? <Loader2 size={14} className="animate-spin" /> : <ChevronUp size={16} />}
-                          </button>
-                          <button onClick={() => mover(op.pecas, i, 1)} disabled={i === op.pecas.length - 1 || movendo === p.id}
-                            className="text-gray-400 hover:text-torg-blue disabled:opacity-25 disabled:hover:text-gray-400" title="Descer prioridade">
-                            <ChevronDown size={16} />
-                          </button>
+
+                {op.prioritarias.length > 0 && (
+                  <ul className="divide-y divide-gray-50">
+                    {op.prioritarias.map((p, i) => (
+                      <li key={p.id} className="px-4 py-2.5 flex items-center gap-3">
+                        <span className="w-7 h-7 shrink-0 rounded-full bg-torg-orange/10 text-torg-orange font-extrabold text-sm inline-flex items-center justify-center tabular-nums">{p.prioridade}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-mono font-semibold text-torg-dark text-sm truncate">{p.marca}</p>
+                          {p.descricao && <p className="text-[11px] text-torg-gray truncate">{p.descricao}</p>}
                         </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                        {p.terceiro ? (
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium inline-flex items-center gap-1 shrink-0"><Truck size={11} /> no terceiro{p.retornoPrevisto ? ` · volta ${fmtData(p.retornoPrevisto)}` : ""}</span>
+                        ) : (
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-torg-gray font-medium shrink-0">{p.setor}</span>
+                        )}
+                        <span className="text-xs text-torg-gray tabular-nums w-20 text-right shrink-0">{fmtKg(p.pesoTotalKg)}</span>
+                        {podeEditar && (
+                          <div className="flex flex-col shrink-0">
+                            <button onClick={() => mover(op.prioritarias, i, -1)} disabled={i === 0 || movendo === p.id}
+                              className="text-gray-400 hover:text-torg-blue disabled:opacity-25 disabled:hover:text-gray-400" title="Subir prioridade">
+                              {movendo === p.id ? <Loader2 size={14} className="animate-spin" /> : <ChevronUp size={16} />}
+                            </button>
+                            <button onClick={() => mover(op.prioritarias, i, 1)} disabled={i === op.prioritarias.length - 1 || movendo === p.id}
+                              className="text-gray-400 hover:text-torg-blue disabled:opacity-25 disabled:hover:text-gray-400" title="Descer prioridade">
+                              <ChevronDown size={16} />
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {op.demais.length > 0 && (
+                  <div className="border-t border-gray-100 bg-gray-50/40">
+                    <p className="px-4 pt-2 pb-1 text-[10px] uppercase font-semibold text-torg-gray tracking-wide">Demais pendentes ({op.demaisTotal})</p>
+                    <ul className="divide-y divide-gray-50">
+                      {op.demais.map((p) => (
+                        <li key={p.id} className="px-4 py-2 flex items-center gap-3">
+                          <span className="w-7 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-mono text-torg-dark text-[13px] truncate">{p.marca}</p>
+                            {p.descricao && <p className="text-[11px] text-torg-gray truncate">{p.descricao}</p>}
+                          </div>
+                          {p.terceiro ? (
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium inline-flex items-center gap-1 shrink-0"><Truck size={11} /> no terceiro</span>
+                          ) : (
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-torg-gray font-medium shrink-0">{p.setor}</span>
+                          )}
+                          <span className="text-xs text-torg-gray tabular-nums w-20 text-right shrink-0">{fmtKg(p.pesoTotalKg)}</span>
+                          {podeEditar && <span className="w-4 shrink-0" />}
+                        </li>
+                      ))}
+                    </ul>
+                    {op.demaisTotal > op.demais.length && <p className="px-4 py-2 text-[11px] text-torg-gray">+{op.demaisTotal - op.demais.length} peças</p>}
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
