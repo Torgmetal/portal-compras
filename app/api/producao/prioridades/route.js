@@ -143,6 +143,10 @@ export async function GET() {
       qte: Number(pc.qte) || 1, pesoUnitKg: Math.round((Number(pc.pesoUnitKg) || 0) * 10) / 10,
       pesoTotalKg: Math.round(Number(pc.pesoTotalKg) || 0),
       prioridade: pc.prioridade, setor: LABEL[setorKey] || setorKey,
+      // ÚLTIMA ETAPA CONCLUÍDA — o que a peça JÁ passou (a coluna "setor" repetia o nome da aba e
+      // não dizia se a peça estava parada esperando ou se já tinha sido apontada ali). Vitor 18/08.
+      ultimaEtapa: idx >= 0 ? (LABEL[FLUXO_SETORES[idx]?.key] || null) : null,
+      enviadaPeloPcp: pc.encaminhadoSetor ? (LABEL[pc.encaminhadoSetor] || pc.encaminhadoSetor) : null,
       terceiro: terc, retornoPrevisto: terc ? (pc.terceiroRetornoPrevisto || null) : null,
     });
   }

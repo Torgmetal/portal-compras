@@ -96,7 +96,7 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
     setExportando(true);
     try {
       const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, adicionarRodapeISO, downloadWorkbook } = await import("@/lib/excel-relatorio");
-      const headers = ["OP", "Prior.", "Marca", "Descrição", "Situação", "Qtd", "Peso un. (kg)", "Peso total (kg)"];
+      const headers = ["OP", "Prior.", "Marca", "Descrição", "Já passou por", "Qtd", "Peso un. (kg)", "Peso total (kg)"];
       const totalPecas = blocoAtual.ops.reduce((s, op) => s + op.prioritarias.length + op.demais.length, 0);
       const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
         titulo: `Prioridades de Produção — ${blocoAtual.label}`,
@@ -110,7 +110,7 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
       let pesoTot = 0;
       for (const op of blocoAtual.ops) {
         for (const p of [...op.prioritarias, ...op.demais]) {
-          const situacao = p.terceiro ? `No terceiro${p.retornoPrevisto ? ` · volta ${fmtData(p.retornoPrevisto)}` : ""}` : p.setor;
+          const situacao = p.terceiro ? `No terceiro${p.retornoPrevisto ? ` · volta ${fmtData(p.retornoPrevisto)}` : ""}` : p.enviadaPeloPcp ? `Enviada p/ ${p.enviadaPeloPcp} (PCP)` : p.ultimaEtapa ? `Concluída em ${p.ultimaEtapa}` : "Não iniciada";
           adicionarLinhaTabela(ws, row, [`OP-${op.opNumero}`, p.prioridade ?? "", p.marca, p.descricao || "", situacao, p.qte, p.pesoUnitKg, p.pesoTotalKg]); row++;
           pesoTot += p.pesoTotalKg || 0;
         }
@@ -153,10 +153,15 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
         )}
       </td>
       <td className="px-2 py-2 whitespace-nowrap">
+        {/* O que a peça JÁ passou — não repete o nome da aba (que é o que FALTA fazer). */}
         {p.terceiro ? (
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium inline-flex items-center gap-1"><Truck size={11} /> no terceiro{p.retornoPrevisto ? ` · volta ${fmtData(p.retornoPrevisto)}` : ""}</span>
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium inline-flex items-center gap-1" title="Está no terceiro"><Truck size={11} /> no terceiro{p.retornoPrevisto ? ` · volta ${fmtData(p.retornoPrevisto)}` : ""}</span>
+        ) : p.enviadaPeloPcp ? (
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium" title={`Enviada direto para ${p.enviadaPeloPcp} pelo PCP`}>enviada p/ {p.enviadaPeloPcp}</span>
+        ) : p.ultimaEtapa ? (
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium inline-flex items-center gap-1" title={`Última etapa concluída: ${p.ultimaEtapa}. Está aguardando ${p.setor}.`}><CheckCircle2 size={10} /> {p.ultimaEtapa}</span>
         ) : (
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-torg-gray font-medium">{p.setor}</span>
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-torg-gray font-medium" title={`Ainda não iniciada — aguardando ${p.setor}`}>não iniciada</span>
         )}
       </td>
       <td className="px-2 py-2 text-right tabular-nums text-[13px]">{fmtN(p.qte)}</td>
@@ -271,7 +276,7 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
                         <tr className="text-[10px] uppercase tracking-wide text-torg-gray">
                           <th className="px-3 py-2 w-10">#</th>
                           <th className="px-2 py-2">Marca</th>
-                          <th className="px-2 py-2">Situação</th>
+                          <th className="px-2 py-2" title="O que a peça já concluiu">Já passou por</th>
                           <th className="px-2 py-2 text-right">Qtd</th>
                           <th className="px-2 py-2 text-right">Peso un.</th>
                           <th className="px-2 py-2 text-right">Peso total</th>
