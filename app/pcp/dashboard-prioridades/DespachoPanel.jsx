@@ -450,7 +450,13 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                     {/* MATERIAL do perfil (CMR do Almoxarifado): o corte vê item a item se o
                         material já chegou. Sem perfil (conjunto/GC) não se aplica. */}
                     <td className={`${td} text-center`}>
-                      {!p.perfil ? <span className="text-gray-300" title="Peça sem perfil de corte (conjunto montado) — não tem material de matéria-prima.">—</span>
+                      {!p.perfil ? (
+                        (p._count?.conjuntoCroquis || 0) > 0 ? (
+                          <button type="button" onClick={(e) => { e.stopPropagation(); setRastroItem(p); }}
+                            className="text-slate-600 bg-slate-100 hover:bg-slate-200 text-[11px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold"
+                            title="Conjunto montado: ver as corridas/lotes dos croquis que o compõem">corridas</button>
+                        ) : <span className="text-gray-300" title="Peça sem perfil de corte — não tem matéria-prima própria.">—</span>
+                      )
                         : p.material ? (
                           <button type="button" onClick={(e) => { e.stopPropagation(); setRastroItem(p); }}
                             className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 text-[11px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold"
@@ -584,7 +590,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
       <DesenhoPecaModal opNumero={data.opNumero} opId={data?.opId} marca={desenhoMarca} setor="PCP" onClose={() => setDesenhoMarca(null)} />
     )}
     {rastroOp && data?.opNumero && <ModalRastreabilidade opNumero={data.opNumero} onClose={() => setRastroOp(false)} />}
-    {rastroItem && <RastroDoItem peca={rastroItem} onClose={() => setRastroItem(null)} />}
+    {rastroItem && <RastroDoItem peca={rastroItem} opNumero={data?.opNumero} onClose={() => setRastroItem(null)} />}
     {progItem && <OrdensDoItem peca={progItem} setor={setor} sincronizadoEm={data?.ordensSincronizadasEm} onClose={() => setProgItem(null)} />}
     </>
   );
@@ -663,60 +669,107 @@ function OrdensDoItem({ peca, setor, sincronizadoEm, onClose }) {
   );
 }
 
-// RASTREABILIDADE DO ITEM — o material daquela peça (perfil), com todas as entradas do CMR:
-// corrida/lote, certificado, norma, NF, pedido de compra, fornecedor, data e peso. É o mesmo dado
-// do modal da OP, recortado no que interessa pra peça que o PCP está olhando. (Vitor 18/08.)
-function RastroDoItem({ peca, onClose }) {
-  const m = peca?.material;
-  const linhas = m?.entradas?.length ? m.entradas : m ? [m] : [];
+// RASTREABILIDADE DO ITEM — qual CORRIDA/LOTE foi usada nesta peça. Para um CONJUNTO, lista os
+// croquis que o compõem, cada um com a corrida do seu perfil (Vitor 18/08: "quais rastreabilidades
+// foram usadas para cada perfil que compõe o conjunto"). O casamento é LPC × CMR pela data:
+// a peça só pode ter saído de material recebido ATÉ o dia em que foi cortada. Ver lib/rastreio-peca.js.
+const SIT = {
+  CERTA: { txt: "definida", cls: "bg-emerald-50 text-emerald-700", dica: "Só existe uma corrida desse material nesta OP (ou a data eliminou as outras) — não há dúvida." },
+  PROVAVEL: { txt: "provável", cls: "bg-sky-50 text-sky-700", dica: "Mais de uma corrida possível; o rateio FIFO por data e peso escolheu esta. As outras candidatas ficam listadas." },
+  SEM_CORRIDA: { txt: "sem corrida", cls: "bg-amber-50 text-amber-700", dica: "O material chegou, mas o CMR não tem a corrida/lote preenchida — falta lançar no Almoxarifado." },
+  ESTOQUE: { txt: "de estoque", cls: "bg-amber-50 text-amber-700", dica: "A peça foi cortada ANTES de qualquer entrega desta OP: saiu de sobra/estoque, o CMR desta OP não explica." },
+  SEM_MATERIAL: { txt: "sem material", cls: "bg-slate-100 text-slate-500", dica: "Nenhuma entrada desse perfil no CMR desta OP." },
+};
+
+function RastroDoItem({ peca, opNumero, onClose }) {
+  const [d, setD] = useState(null);
+  const [erro, setErro] = useState("");
+  useEffect(() => {
+    if (!opNumero) return setErro("OP sem número.");
+    fetch(`/api/qualidade/rastreio/${encodeURIComponent(opNumero)}?marca=${encodeURIComponent(peca.marca)}`)
+      .then((r) => r.json())
+      .then((j) => (j.error ? setErro(j.error) : setD(j)))
+      .catch(() => setErro("Não foi possível carregar."));
+  }, [opNumero, peca.marca]);
+
+  const itens = d?.itens || [];
+  const conjunto = itens.length > 1 || (itens.length === 1 && itens[0].marca !== peca.marca);
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div className="bg-white text-torg-dark rounded-2xl w-full max-w-3xl shadow-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white text-torg-dark rounded-2xl w-full max-w-5xl shadow-2xl max-h-[88vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 px-5 py-3 border-b border-gray-100">
           <div className="min-w-0">
             <h2 className="text-base font-bold inline-flex items-center gap-2"><Package size={16} className="text-torg-blue" /> Rastreabilidade · <span className="font-mono">{peca.marca}</span></h2>
-            <p className="text-[12px] text-torg-gray truncate">Perfil <b>{peca.perfil}</b>{m?.material ? ` · ${m.material}` : ""}</p>
+            <p className="text-[12px] text-torg-gray truncate">
+              {peca.perfil ? <>Perfil <b>{peca.perfil}</b></> : peca.descricao || "Conjunto"}
+              {conjunto ? ` · ${itens.length} peça(s) que o compõem` : ""}
+            </p>
           </div>
           <button onClick={onClose} className="text-torg-gray hover:text-red-600 shrink-0"><X size={18} /></button>
         </div>
+
         <div className="px-5 py-4 overflow-y-auto">
-          {linhas.length ? (
-            <div className="space-y-2">
-              {linhas.map((l, i) => (
-                <div key={i} className="border border-gray-100 rounded-xl p-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[12px]">
-                  <Campo rot="Recebido" val={fmtD(l.dataRecebimento)} />
-                  <Campo rot="Nota fiscal" val={l.nf} mono />
-                  <Campo rot="Pedido de compra" val={l.pedido} mono />
-                  <Campo rot="Fornecedor" val={l.fornecedor} />
-                  <Campo rot="Corrida / lote" val={l.corrida} mono alerta={!l.corrida} />
-                  <Campo rot="Certificado" val={l.certificado} mono />
-                  <Campo rot="Norma" val={l.norma} />
-                  <Campo rot="Peso recebido" val={l.pesoKg ? `${fmtKg(l.pesoKg)} kg` : l.quantidade ? `${fmtN(l.quantidade)} pç` : null} />
-                </div>
-              ))}
-              {m?.totalKg > 0 && linhas.length > 1 && (
-                <p className="text-[12px] text-torg-gray">Total recebido deste material nesta OP: <b className="text-torg-dark">{fmtKg(m.totalKg)} kg</b> em {linhas.length} entrada(s).</p>
-              )}
+          {erro && <p className="text-sm text-red-600">{erro}</p>}
+          {!d && !erro && <div className="py-10 text-center text-torg-gray"><Loader2 size={22} className="mx-auto animate-spin" /></div>}
+          {d && !itens.length && <p className="text-sm text-torg-gray py-6 text-center">Sem informação de material para esta peça.</p>}
+          {itens.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[12px] min-w-[860px]">
+                <thead>
+                  <tr className="text-[10px] uppercase text-torg-gray border-b border-gray-100">
+                    {conjunto && <th className="text-left py-1.5">Peça</th>}
+                    <th className="text-left py-1.5">Perfil</th>
+                    <th className="text-left py-1.5">Corrida / lote</th>
+                    <th className="text-left py-1.5">Certificado</th>
+                    <th className="text-left py-1.5">NF</th>
+                    <th className="text-left py-1.5">Fornecedor</th>
+                    <th className="text-left py-1.5">Recebido</th>
+                    <th className="text-left py-1.5">Cortada</th>
+                    <th className="text-left py-1.5">Situação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {itens.map((it, i) => {
+                    const u = it.usadas?.[0];
+                    const e = SIT[it.situacao] || SIT.SEM_MATERIAL;
+                    return (
+                      <Fragment key={i}>
+                        <tr>
+                          {conjunto && <td className="py-1.5 font-mono font-semibold whitespace-nowrap">{it.marca}</td>}
+                          <td className="py-1.5 whitespace-nowrap">{it.perfil || "—"}</td>
+                          <td className="py-1.5 whitespace-nowrap font-mono font-semibold">{u?.corrida || <span className="text-gray-300">—</span>}</td>
+                          <td className="py-1.5 whitespace-nowrap font-mono text-torg-gray">{u?.certificado || "—"}</td>
+                          <td className="py-1.5 whitespace-nowrap font-mono">{u?.nf || "—"}</td>
+                          <td className="py-1.5 whitespace-nowrap">{u?.fornecedor || "—"}</td>
+                          <td className="py-1.5 whitespace-nowrap tabular-nums">{fmtD(u?.recebidoEm)}</td>
+                          <td className="py-1.5 whitespace-nowrap tabular-nums">{it.cortadoEm ? new Date(it.cortadoEm + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : <span className="text-gray-300">não cortada</span>}</td>
+                          <td className="py-1.5 whitespace-nowrap">
+                            <span className={`text-[10px] rounded px-1.5 py-0.5 font-semibold ${e.cls}`} title={e.dica}>{e.txt}</span>
+                            {it.saldoEsgotado && <span className="ml-1 text-[10px] text-amber-700" title="Cortou-se mais desse material do que o CMR registra ter chegado — falta lançar recebimento.">⚠</span>}
+                          </td>
+                        </tr>
+                        {it.situacao === "PROVAVEL" && it.candidatas?.length > 1 && (
+                          <tr className="bg-sky-50/40">
+                            {conjunto && <td />}
+                            <td colSpan={8} className="py-1 px-1 text-[11px] text-torg-gray">
+                              outras corridas possíveis deste material: {it.candidatas.filter((c) => c.corrida !== u?.corrida).map((c) => `${c.corrida} (recebida ${fmtD(c.recebidoEm)})`).join(" · ")}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          ) : (
-            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-center gap-1.5">
-              <AlertTriangle size={14} /> Sem recebimento deste perfil no CMR desta OP.
-            </p>
           )}
         </div>
         <div className="px-5 py-2.5 border-t border-gray-100">
-          <p className="text-[11px] text-torg-gray">Fonte: CMR (planilha de rastreabilidade do Almoxarifado), sincronizado todo dia — o material é casado com o perfil da peça pela descrição do cadastro.</p>
+          <p className="text-[11px] text-torg-gray">
+            Casamento automático: <b>peças da LPC</b> × <b>entradas do CMR</b> daquela OP — a peça só pode ter saído de material recebido <b>até o dia em que foi cortada</b> (data do Syneco); havendo mais de uma corrida possível, o rateio é FIFO por peso. "definida" = não havia outra opção.
+          </p>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Campo({ rot, val, mono, alerta }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-[10px] uppercase text-torg-gray">{rot}</p>
-      <p className={`font-semibold truncate ${mono ? "font-mono" : ""} ${!val ? (alerta ? "text-amber-600" : "text-gray-300") : ""}`} title={val || ""}>{val || (alerta ? "sem corrida" : "—")}</p>
     </div>
   );
 }
