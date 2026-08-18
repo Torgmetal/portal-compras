@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarRomaneioTerceiroForm22 } from "@/lib/romaneio-terceiro-form22";
 import { computarMateriaisEnvio } from "@/lib/materiais-terceiro";
-import { uploadFileToFolder } from "@/lib/sharepoint";
+import { uploadFileToFolder, pastaRomaneiosTerceiro } from "@/lib/sharepoint";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -142,18 +142,25 @@ export async function POST(req) {
   const XLSX_CT = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
   const rt = `RT-${String(criado.numero).padStart(3, "0")}`;
   const sufOP = criado.opRefNumero ? `-OP-${criado.opRefNumero}` : "";
+  // Salva DENTRO da OP: {OP}/4. Expedição/4.7 Romaneios enviados a terceiros. Se não achar a pasta
+  // da OP (ou não houver OP), cai no fallback global. Não deriva a criação se o SharePoint falhar.
+  let pasta = PASTA_ROMANEIOS_TERCEIROS;
+  try {
+    const p = await pastaRomaneiosTerceiro(criado.opRefNumero);
+    if (p) pasta = p;
+  } catch {}
   try {
     const buf = await gerarRomaneioTerceiroForm22(criado);
-    const up = await uploadFileToFolder({ folderPath: PASTA_ROMANEIOS_TERCEIROS, fileName: `Romaneio-Terceiro-${rt}${sufOP}.xlsx`, buffer: buf, contentType: XLSX_CT });
+    const up = await uploadFileToFolder({ folderPath: pasta, fileName: `Romaneio-Terceiro-${rt}${sufOP}.xlsx`, buffer: buf, contentType: XLSX_CT });
     if (up?.webUrl) { await prisma.romaneioTerceiro.update({ where: { id: criado.id }, data: { arquivoUrl: up.webUrl } }); criado.arquivoUrl = up.webUrl; }
     if (Array.isArray(criado.materiais) && criado.materiais.length) {
       const bufM = await gerarRomaneioTerceiroForm22(criado, { material: true });
-      const upM = await uploadFileToFolder({ folderPath: PASTA_ROMANEIOS_TERCEIROS, fileName: `Romaneio-Terceiro-${rt}${sufOP}-MATERIAL.xlsx`, buffer: bufM, contentType: XLSX_CT });
+      const upM = await uploadFileToFolder({ folderPath: pasta, fileName: `Romaneio-Terceiro-${rt}${sufOP}-MATERIAL.xlsx`, buffer: bufM, contentType: XLSX_CT });
       if (upM?.webUrl) { await prisma.romaneioTerceiro.update({ where: { id: criado.id }, data: { arquivoMaterialUrl: upM.webUrl } }); criado.arquivoMaterialUrl = upM.webUrl; }
     }
   } catch (e) {
     console.error("[terceiros] SharePoint upload:", e?.message);
-    await prisma.auditLog.create({ data: { userId: user.id, action: "ROMANEIO_TERCEIRO_SHAREPOINT_ERRO", entity: "RomaneioTerceiro", entityId: criado.id, diff: { erro: String(e?.message || e).slice(0, 300), pasta: PASTA_ROMANEIOS_TERCEIROS } } }).catch(() => {});
+    await prisma.auditLog.create({ data: { userId: user.id, action: "ROMANEIO_TERCEIRO_SHAREPOINT_ERRO", entity: "RomaneioTerceiro", entityId: criado.id, diff: { erro: String(e?.message || e).slice(0, 300), pasta } } }).catch(() => {});
   }
 
   return NextResponse.json({ success: true, romaneio: criado });
