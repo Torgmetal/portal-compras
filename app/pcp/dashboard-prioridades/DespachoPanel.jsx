@@ -8,8 +8,9 @@
 // Baixa é SÓ do portal (PecaConjunto.baixaSetores[setor] = { qtd, em, por }); não escreve no Syneco.
 // Reusa /api/pcp/despacho (GET peças+placar+reconciliação, POST despacha / dá baixa por qtd).
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
-import { X, Loader2, Star, Truck, Package, FileDown, FileUp, CheckCircle2, Undo2, ClipboardList, ChevronRight, ChevronDown, Factory, FileText } from "lucide-react";
+import { X, Loader2, Star, Truck, Package, FileDown, FileUp, CheckCircle2, Undo2, ClipboardList, ChevronRight, ChevronDown, Factory, FileText, AlertTriangle } from "lucide-react";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
+import CompraChip, { ModalRastreabilidade } from "@/components/CompraChip";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } from "@/lib/excel-relatorio";
 import TerceiroModal from "./TerceiroModal";
 
@@ -26,6 +27,46 @@ const SETOR_LABEL = { CORTE: "Preparação", MONTAGEM: "Montagem", SOLDA: "Solda
 const LIMITE = 400;
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
 const fmtKg = (n) => Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—");
+
+// PROGRAMAÇÃO (Syneco): o programador já lançou a peça na produção? A ordem do Syneco nasce
+// quando ele lança — peça sem ordem nenhuma ainda não foi programada. (Vitor 18/08.)
+const PROG = {
+  INICIADA: { txt: "iniciada", cls: "bg-emerald-50 text-emerald-700", dica: "A ordem deste setor já rodou no Syneco (produzindo ou finalizada)." },
+  PROGRAMADA: { txt: "programada", cls: "bg-sky-50 text-sky-700", dica: "O programador já lançou a peça na produção (ordem aberta no Syneco), ainda não iniciada." },
+  OUTRO_SETOR: { txt: "lançada", cls: "bg-slate-100 text-slate-600", dica: "O programador lançou a peça na produção, mas o Syneco não tem ordem deste setor pra ela." },
+  NAO_LANCADA: { txt: "não lançada", cls: "bg-red-50 text-red-700", dica: "O programador ainda NÃO lançou esta peça na produção (sem ordem no Syneco)." },
+};
+// "Programada" pro filtro = o programador LANÇOU a peça (existe ordem no Syneco), mesmo que a
+// ordem deste setor específico não exista. A coluna mostra o detalhe.
+const foiProgramada = (p) => !!p?.programacao && p.programacao.situacao !== "NAO_LANCADA";
+// Botãozinho de filtro (segmentado) — "todos / com / sem", pra selecionar em bloco.
+function Seg({ valor, onChange, opcoes, titulo }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="text-[11px] text-torg-gray">{titulo}:</span>
+      <span className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+        {opcoes.map((o) => (
+          <button key={o.key} type="button" onClick={() => onChange(o.key)} title={o.dica}
+            className={`text-[11px] font-semibold px-2.5 py-1 border-r border-gray-200 last:border-r-0 ${valor === o.key ? o.ativo || "bg-torg-blue text-white" : "bg-white text-torg-gray hover:bg-gray-50"}`}>
+            {o.label}{o.n != null ? ` (${fmtN(o.n)})` : ""}
+          </button>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+// Textos usados nos Excel (material e programação) — mesma informação da tela, em texto.
+const textoMaterial = (p) => {
+  if (!p.perfil) return "";
+  const m = p.material;
+  if (!m) return "sem material";
+  const partes = [m.material, m.nf ? `NF ${m.nf}` : null, m.pedido ? `pedido ${m.pedido}` : null,
+    m.corrida ? `corrida ${m.corrida}` : null, m.fornecedor || null].filter(Boolean);
+  return partes.join(" · ");
+};
+const textoProg = (p) => (p.programacao ? PROG[p.programacao.situacao]?.txt || "" : "");
 
 export default function DespachoPanel({ obra, setor, onClose, abaInicial = "despacho" }) {
   const [data, setData] = useState(null);
@@ -36,7 +77,12 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const [terceiroVolta, setTerceiroVolta] = useState("MONTAGEM");
   const [aba, setAba] = useState(setor ? abaInicial : "despacho"); // "despacho"(Liberar) | "prontas"
   const [filtro, setFiltro] = useState("");
-  const [soSemMaterial, setSoSemMaterial] = useState(false); // filtro rápido: só o que está sem material
+  // Filtros de bloco (Vitor 18/08: "um seletor de com material e sem material" — a seleção em
+  // massa depende disso). Mesma ideia para a PROGRAMAÇÃO do Syneco.
+  const [fMaterial, setFMaterial] = useState("TODOS"); // TODOS | COM | SEM
+  const [fProg, setFProg] = useState("TODOS"); // TODOS | PROG | NAO
+  const [rastroOp, setRastroOp] = useState(false); // modal de rastreabilidade da OP inteira
+  const [rastroItem, setRastroItem] = useState(null); // peça com a rastreabilidade do material dela
   const [expandido, setExpandido] = useState(() => new Set()); // conjuntos abertos (ver croquis faltantes)
   const [terceiroPecas, setTerceiroPecas] = useState(null); // peças abertas no modal de terceiro
   const [desenhoMarca, setDesenhoMarca] = useState(null); // marca aberta no modal de desenhos (GRD)
@@ -74,7 +120,12 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const filtrar = (arr) => {
     const q = filtro.trim().toLowerCase();
     let r = q ? arr.filter((p) => `${p.marca} ${p.descricao || ""}`.toLowerCase().includes(q)) : arr;
-    if (soSemMaterial) r = r.filter((p) => p.perfil && !p.material); // só perfis sem recebimento no CMR
+    // Material (CMR): "com" = o perfil já tem recebimento nesta OP; "sem" = ainda não chegou.
+    // Peça sem perfil (conjunto/GC) não tem material de corte — fica fora dos dois.
+    if (fMaterial === "COM") r = r.filter((p) => p.perfil && p.material);
+    else if (fMaterial === "SEM") r = r.filter((p) => p.perfil && !p.material);
+    if (fProg === "PROG") r = r.filter(foiProgramada);
+    else if (fProg === "NAO") r = r.filter((p) => !foiProgramada(p));
     return r;
   };
   // "Feito" no setor = o maior entre o produzido no Syneco e a baixa do portal. Assim o que já
@@ -88,10 +139,14 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const pendentes = useMemo(() => pecas.filter((p) => !resolvida(p)), [pecas]);
   // Peças prontas: histórico do setor (concluídas aqui ou que já seguiram adiante).
   const prontas = useMemo(() => pecas.filter((p) => resolvida(p)), [pecas]);
-  const listaLiberar = useMemo(() => filtrar(pendentes), [pendentes, filtro, soSemMaterial]);
-  const listaProntas = useMemo(() => filtrar(prontas), [prontas, filtro, soSemMaterial]);
+  const listaLiberar = useMemo(() => filtrar(pendentes), [pendentes, filtro, fMaterial, fProg]);
+  const listaProntas = useMemo(() => filtrar(prontas), [prontas, filtro, fMaterial, fProg]);
   // Resumo do que está na tela (deixa o painel mais informativo: o setor vê o tamanho da carga).
+  const comMaterial = useMemo(() => pendentes.filter((p) => p.perfil && p.material).length, [pendentes]);
   const semMaterial = useMemo(() => pendentes.filter((p) => p.perfil && !p.material).length, [pendentes]);
+  const programadas = useMemo(() => pendentes.filter(foiProgramada).length, [pendentes]);
+  const naoProgramadas = pendentes.length - programadas;
+  const temColunaProg = useMemo(() => pecas.some((p) => p.programacao), [pecas]);
   const visiveis = aba === "prontas" ? listaProntas : listaLiberar;
   const visLimit = visiveis.slice(0, LIMITE);
   const pesoVisivel = useMemo(() => visiveis.reduce((a, p) => a + (Number(p.pesoTotalKg) || 0), 0), [visiveis]);
@@ -205,14 +260,14 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     const hoje = new Date().toISOString().split("T")[0];
     const nomeSetor = setor ? SETOR_LABEL[setor] || setor : "Geral";
     const tipoTxt = (t) => (t === "CONJUNTO" ? "Conjunto" : t === "CROQUI" ? "Croqui" : "Avulsa");
-    const headers = ["Marca", "Tipo", "Material", "Peso (kg)", "Observação"];
+    const headers = ["Marca", "Tipo", "Material", "Programação", "Peso (kg)", "Observação"];
     const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
       titulo: `Apontar no Syneco — ${obra}${setor ? ` (${nomeSetor})` : ""}`,
       subtitulo: `${obra} · Setor: ${nomeSetor} · baixadas manualmente no portal — dar baixa no Syneco`,
       kpis: [`${base.length} peça(s) p/ apontar no Syneco`],
       totalColunas: headers.length, nomePlanilha: "Apontar Syneco", codigoDoc: "REL-ENG-002",
     });
-    ws.columns = [{ width: 20 }, { width: 12 }, { width: 26 }, { width: 14 }, { width: 46 }];
+    ws.columns = [{ width: 20 }, { width: 12 }, { width: 32 }, { width: 16 }, { width: 14 }, { width: 46 }];
     let row = linhaInicio;
     adicionarHeaderTabela(ws, row, headers); row++;
     const first = row;
@@ -221,14 +276,47 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
       const obs = `Dar baixa no Syneco (${nomeSetor}): ${fmtN(p.baixadoQtd)} un — baixa manual no portal${p.baixadoPor ? ` por ${p.baixadoPor}` : ""}${quando}`;
       // Material do perfil (CMR): "ok · NF 234399 (20/07)" ou "sem material" — o setor leva a
       // informação junto da relação. (Vitor 18/08.)
-      const mat = !p.perfil ? "" : p.material
-        ? `ok${p.material.nf ? ` · NF ${p.material.nf}` : ""}${p.material.dataRecebimento ? ` (${new Date(p.material.dataRecebimento).toLocaleDateString("pt-BR")})` : ""}`
-        : "sem material";
-      adicionarLinhaTabela(ws, row, [p.marca, tipoTxt(p.tipoPeca), mat, p.pesoTotalKg ? Number(p.pesoTotalKg.toFixed(1)) : "", obs], { alinhamento: { 1: "center", 2: "center", 3: "right" } });
+      adicionarLinhaTabela(ws, row, [p.marca, tipoTxt(p.tipoPeca), textoMaterial(p), textoProg(p), p.pesoTotalKg ? Number(p.pesoTotalKg.toFixed(1)) : "", obs], { alinhamento: { 1: "center", 3: "center", 4: "right" } });
       row++;
     }
-    if (row > first) adicionarLinhaTotais(ws, row, ["TOTAL", "", "", { formula: `SUM(D${first}:D${row - 1})` }, ""]);
+    if (row > first) adicionarLinhaTotais(ws, row, ["TOTAL", "", "", "", { formula: `SUM(E${first}:E${row - 1})` }, ""]);
     await downloadWorkbook(workbook, `Apontar_Syneco_${obra}${setor ? "_" + nomeSetor : ""}_${hoje}.xlsx`);
+  }
+
+  // Exporta EXATAMENTE o que está na tela (filtros de material/programação inclusos) — é a lista
+  // que o PCP leva pro setor. Traz a rastreabilidade do material junto (NF, corrida, pedido) e se
+  // o programador já lançou a peça. (Vitor 18/08.)
+  async function exportarLista() {
+    if (!visiveis.length) return alert("Nada na tela para exportar.");
+    const hoje = new Date().toISOString().split("T")[0];
+    const nomeSetor = setor ? SETOR_LABEL[setor] || setor : "Geral";
+    const tipoTxt = (t) => (t === "CONJUNTO" ? "Conjunto" : t === "CROQUI" ? "Croqui" : "Avulsa");
+    const recorte = [fMaterial === "COM" ? "com material" : fMaterial === "SEM" ? "sem material" : null,
+      fProg === "PROG" ? "programadas" : fProg === "NAO" ? "não lançadas no Syneco" : null,
+      filtro.trim() ? `filtro "${filtro.trim()}"` : null].filter(Boolean).join(" · ");
+    const headers = ["Marca", "Descrição", "Tipo", "Perfil", "Qtd", "Peso un. (kg)", "Peso tot. (kg)", "Material", "NF", "Pedido", "Corrida / lote", "Recebido em", "Programação"];
+    const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+      titulo: `${aba === "prontas" ? "Peças prontas" : "Peças a liberar"} — ${obra}${setor ? ` (${nomeSetor})` : ""}`,
+      subtitulo: `${obra} · Setor: ${nomeSetor}${recorte ? ` · Recorte: ${recorte}` : ""}`,
+      kpis: [`${fmtN(visiveis.length)} peça(s)`, `${fmtKg(pesoVisivel)} kg`],
+      totalColunas: headers.length, nomePlanilha: "Peças", codigoDoc: "REL-PCP-004",
+    });
+    ws.columns = [{ width: 18 }, { width: 34 }, { width: 11 }, { width: 22 }, { width: 8 }, { width: 13 }, { width: 14 }, { width: 34 }, { width: 12 }, { width: 11 }, { width: 15 }, { width: 13 }, { width: 15 }];
+    let row = linhaInicio;
+    adicionarHeaderTabela(ws, row, headers); row++;
+    const first = row;
+    for (const p of [...visiveis].sort((a, b) => String(a.marca).localeCompare(String(b.marca), "pt-BR", { numeric: true }))) {
+      const m = p.material;
+      adicionarLinhaTabela(ws, row, [
+        p.marca, p.descricao || "", tipoTxt(p.tipoPeca), p.perfil || "",
+        p.qte || 1, p.pesoUnitKg ? Number(p.pesoUnitKg.toFixed(2)) : "", p.pesoTotalKg ? Number(p.pesoTotalKg.toFixed(1)) : "",
+        textoMaterial(p), m?.nf || "", m?.pedido || "", m?.corrida || "",
+        m?.dataRecebimento ? new Date(m.dataRecebimento).toLocaleDateString("pt-BR") : "", textoProg(p),
+      ], { alinhamento: { 2: "center", 4: "center", 5: "right", 6: "right", 8: "center", 9: "center", 10: "center", 11: "center", 12: "center" } });
+      row++;
+    }
+    if (row > first) adicionarLinhaTotais(ws, row, ["TOTAL", "", "", "", "", "", { formula: `SUM(G${first}:G${row - 1})` }, "", "", "", "", "", ""]);
+    await downloadWorkbook(workbook, `Pecas_${obra}${setor ? "_" + nomeSetor : ""}_${hoje}.xlsx`);
   }
 
   const th = "text-left px-2.5 py-2 font-semibold text-torg-gray";
@@ -236,15 +324,23 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
 
   return (
     <>
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3" onClick={onClose}>
-      <div className="bg-white text-torg-dark rounded-2xl w-full max-w-6xl max-h-[92vh] flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-3" onClick={onClose}>
+      <div className="bg-white text-torg-dark rounded-2xl w-[98vw] max-w-[1800px] h-[95vh] flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Cabeçalho */}
         <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-gray-100">
-          <div>
-            <h2 className="text-lg font-bold">{obra}{setor ? ` · ${SETOR_LABEL[setor] || setor}` : ""}</h2>
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold inline-flex items-center gap-2 flex-wrap">
+              {obra}{setor ? ` · ${SETOR_LABEL[setor] || setor}` : ""}
+              {/* Status de COMPRA da OP — clica e abre a RASTREABILIDADE completa (corrida/lote,
+                  certificado, NF, pedido, fornecedor). Vitor 18/08: "onde está a rastreabilidade". */}
+              {data?.compra && <CompraChip compra={data.compra} opNumero={data.opNumero} />}
+            </h2>
             {data && <p className="text-[12px] text-torg-gray">{fmtN(data.total)} peça(s){podeBaixa ? ` · ${fmtN(pendentes.length)} a liberar · ${fmtN(prontas.length)} prontas` : ""}{podeBaixa && data.precisamSyneco > 0 ? ` · ${fmtN(data.precisamSyneco)} p/ acertar no Syneco` : ""}</p>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
+            <button type="button" onClick={() => setRastroOp(true)} disabled={!data?.opNumero} title="Rastreabilidade do material desta OP: corrida/lote, certificado, NF, pedido de compra e fornecedor (CMR do Almoxarifado)"
+              className="text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 disabled:opacity-40 inline-flex items-center gap-1"><Package size={13} /> Rastreabilidade</button>
+            <button type="button" onClick={exportarLista} disabled={!data || !visiveis.length} title="Exporta a lista como está na tela (respeita os filtros), com material, rastreabilidade e programação" className="text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 disabled:opacity-40 inline-flex items-center gap-1"><FileDown size={13} /> Exportar lista</button>
             <button type="button" onClick={exportar} disabled={!data} title="Relação das peças baixadas manualmente p/ o setor de apontamento dar baixa no Syneco" className="text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 disabled:opacity-40 inline-flex items-center gap-1"><FileDown size={13} /> Relação Syneco</button>
             <button onClick={onClose} className="text-torg-gray hover:text-red-600"><X size={20} /></button>
           </div>
@@ -265,29 +361,45 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
               <input type="file" accept=".xlsx,.xls,.csv" className="hidden" disabled={enviando} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) importar(f); }} />
             </label>
           )}
-          {/* Quantas peças pendentes estão SEM material (CMR) — clica e filtra só elas. */}
-          {data && aba === "despacho" && semMaterial > 0 && (
-            <button onClick={() => setSoSemMaterial((v) => !v)}
-              title="Peças cujo perfil ainda não tem recebimento registrado no CMR desta OP"
-              className={`text-[11px] font-bold rounded-full px-2.5 py-1 border inline-flex items-center gap-1 ${soSemMaterial ? "bg-amber-500 text-white border-amber-500" : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"}`}>
-              <Package size={11} /> {fmtN(semMaterial)} sem material
-            </button>
-          )}
           {data && aba === "despacho" && Object.entries(data.placar).filter(([, v]) => v > 0).map(([k, v]) => (
             <span key={k} className="bg-gray-100 rounded-full px-2 py-0.5 text-[11px] font-medium">{ROTULO[k] || k}: {v}</span>
           ))}
         </div>
+
+        {/* Seletores de bloco: material (CMR) e programação (Syneco). Servem pra SELECIONAR em
+            massa — filtra, marca "selecionar todas" e despacha só aquele grupo. (Vitor 18/08.) */}
+        {data && aba === "despacho" && (
+          <div className="flex items-center gap-4 flex-wrap px-5 py-2 border-b border-gray-50 bg-gray-50/60">
+            {(comMaterial > 0 || semMaterial > 0) && (
+              <Seg titulo="Material" valor={fMaterial} onChange={setFMaterial} opcoes={[
+                { key: "TODOS", label: "Todos", dica: "Sem filtro de material" },
+                { key: "COM", label: "Com material", n: comMaterial, ativo: "bg-emerald-600 text-white", dica: "Perfis com recebimento registrado no CMR desta OP" },
+                { key: "SEM", label: "Sem material", n: semMaterial, ativo: "bg-amber-500 text-white", dica: "Perfis que ainda não têm recebimento no CMR desta OP" },
+              ]} />
+            )}
+            {temColunaProg && (
+              <Seg titulo="Programação" valor={fProg} onChange={setFProg} opcoes={[
+                { key: "TODOS", label: "Todas", dica: "Sem filtro de programação" },
+                { key: "PROG", label: "Programadas", n: programadas, ativo: "bg-sky-600 text-white", dica: "O programador já lançou a peça na produção (ordem no Syneco)" },
+                { key: "NAO", label: "Não lançadas", n: naoProgramadas, ativo: "bg-red-600 text-white", dica: "Ainda sem ordem no Syneco — o programador não lançou" },
+              ]} />
+            )}
+            {(fMaterial !== "TODOS" || fProg !== "TODOS") && (
+              <button type="button" onClick={() => { setFMaterial("TODOS"); setFProg("TODOS"); }} className="text-[11px] font-semibold text-torg-gray hover:text-red-600 underline">limpar filtros</button>
+            )}
+          </div>
+        )}
 
         {/* Tabela */}
         <div className="flex-1 overflow-auto px-5 py-2">
           {loading && <div className="py-10 text-center text-torg-gray"><Loader2 className="mx-auto animate-spin" /></div>}
           {erro && <p className="text-red-600 text-sm">{erro}</p>}
           {!loading && !erro && visiveis.length === 0 && (
-            <p className="text-torg-gray text-sm text-center py-10">{aba === "prontas" ? "Nenhuma peça com baixa ainda." : filtro ? "Nenhuma peça no filtro." : "Nada a liberar — tudo pronto. 🎉"}</p>
+            <p className="text-torg-gray text-sm text-center py-10">{aba === "prontas" && !filtro && fMaterial === "TODOS" && fProg === "TODOS" ? "Nenhuma peça com baixa ainda." : filtro || fMaterial !== "TODOS" || fProg !== "TODOS" ? "Nenhuma peça nos filtros escolhidos." : "Nada a liberar — tudo pronto. 🎉"}</p>
           )}
           {!loading && visiveis.length > 0 && (
-            <table className="w-full text-[13px] min-w-[820px]">
-              <thead className="sticky top-0 bg-white z-10">
+            <table className="w-full text-[13px] min-w-[1120px]">
+              <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_0_0_rgba(0,0,0,0.06)]">
                 <tr className="border-b border-gray-200 text-[11px] uppercase tracking-wide">
                   <th className="px-2 py-2 w-8"><input type="checkbox" checked={sel.size === visLimit.length && visLimit.length > 0} onChange={selTodas} /></th>
                   <th className={th}>Marca</th>
@@ -297,7 +409,8 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                   <th className={`${th} text-right`}>Produz. Syneco</th>
                   <th className={`${th} text-right`}>Peso un.</th>
                   <th className={`${th} text-right`}>Peso tot.</th>
-                  <th className={`${th} text-center`} title="Material do perfil já recebido? (CMR do Almoxarifado)">Material</th>
+                  <th className={`${th} text-center`} title="Material do perfil já recebido? (CMR do Almoxarifado). Clique no item p/ ver a rastreabilidade: corrida/lote, NF, pedido, fornecedor.">Material</th>
+                  {temColunaProg && <th className={`${th} text-center`} title="O programador já lançou a peça na produção? (ordem no Syneco)">Programação</th>}
                   <th className={`${th} text-center`}>Syneco</th>
                 </tr>
               </thead>
@@ -336,16 +449,28 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                     {/* MATERIAL do perfil (CMR do Almoxarifado): o corte vê item a item se o
                         material já chegou. Sem perfil (conjunto/GC) não se aplica. */}
                     <td className={`${td} text-center`}>
-                      {!p.perfil ? <span className="text-gray-300">—</span>
+                      {!p.perfil ? <span className="text-gray-300" title="Peça sem perfil de corte (conjunto montado) — não tem material de matéria-prima.">—</span>
                         : p.material ? (
-                          <span className="text-emerald-700 bg-emerald-50 text-[10px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold"
-                            title={`${p.material.material}\nNF ${p.material.nf || "—"}${p.material.corrida ? ` · corrida ${p.material.corrida}` : ""}${p.material.dataRecebimento ? ` · recebido em ${new Date(p.material.dataRecebimento).toLocaleDateString("pt-BR")}` : ""}`}>
-                            ok{p.material.dataRecebimento ? ` ${new Date(p.material.dataRecebimento).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}` : ""}
-                          </span>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); setRastroItem(p); }}
+                            className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 text-[11px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold"
+                            title={`${p.material.material}\nNF ${p.material.nf || "—"}${p.material.corrida ? ` · corrida ${p.material.corrida}` : ""}${p.material.pedido ? ` · pedido ${p.material.pedido}` : ""}\nClique para ver a rastreabilidade.`}>
+                            ok{p.material.dataRecebimento ? ` ${fmtD(p.material.dataRecebimento)}` : ""}
+                          </button>
                         ) : (
-                          <span className="text-amber-700 bg-amber-50 text-[10px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold" title={`Sem registro de recebimento do perfil ${p.perfil} no CMR desta OP.`}>sem material</span>
+                          <span className="text-amber-700 bg-amber-50 text-[11px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold" title={`Sem registro de recebimento do perfil ${p.perfil} no CMR desta OP.`}>sem material</span>
                         )}
                     </td>
+                    {/* PROGRAMAÇÃO — o programador já lançou a peça na produção? (ordem no Syneco) */}
+                    {temColunaProg && (
+                      <td className={`${td} text-center`}>
+                        {(() => {
+                          const g = p.programacao;
+                          const e = PROG[g?.situacao] || PROG.NAO_LANCADA;
+                          const rota = g?.setores?.length ? `\nRota no Syneco: ${g.setores.join(" · ")}` : "";
+                          return <span className={`text-[11px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold ${e.cls}`} title={`${e.dica}${rota}${g?.planejadoUn ? `\nPlanejado: ${fmtN(g.planejadoUn)} un` : ""}`}>{e.txt}</span>;
+                        })()}
+                      </td>
+                    )}
                     <td className={`${td} text-center`}>
                       {p.baixadoPortal
                         ? (p.precisaSyneco
@@ -357,7 +482,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                   {aberto && temFalta && (
                     <tr className="bg-amber-50/40">
                       <td></td>
-                      <td colSpan={9} className="px-2.5 pb-2 pt-0">
+                      <td colSpan={temColunaProg ? 10 : 9} className="px-2.5 pb-2 pt-0">
                         <div className="text-[11px] max-w-2xl">
                           <div className="text-amber-700 font-semibold mb-1">Faltam cortar ({p.faltamCroquis.length}):</div>
                           <div className="space-y-0.5">
@@ -385,7 +510,8 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
             <div className="mt-2 flex items-center gap-4 flex-wrap text-[11px] text-torg-gray border-t border-gray-100 pt-2">
               <span><b className="text-torg-dark">{fmtN(visiveis.length)}</b> peça(s) na tela · <b className="text-torg-dark">{fmtKg(pesoVisivel)} kg</b></span>
               {sel.size > 0 && <span className="text-torg-blue font-semibold">{fmtN(sel.size)} selecionada(s) · {fmtKg(pesoSelecionado)} kg</span>}
-              {soSemMaterial && <span className="text-amber-700 font-semibold">filtrando só sem material</span>}
+              {fMaterial !== "TODOS" && <span className={fMaterial === "SEM" ? "text-amber-700 font-semibold" : "text-emerald-700 font-semibold"}>filtrando {fMaterial === "SEM" ? "só sem material" : "só com material"}</span>}
+              {fProg !== "TODOS" && <span className={fProg === "NAO" ? "text-red-700 font-semibold" : "text-sky-700 font-semibold"}>filtrando {fProg === "NAO" ? "só não lançadas no Syneco" : "só programadas"}</span>}
             </div>
           )}
         </div>
@@ -448,6 +574,66 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     {desenhoMarca && data?.opNumero && (
       <DesenhoPecaModal opNumero={data.opNumero} opId={data?.opId} marca={desenhoMarca} setor="PCP" onClose={() => setDesenhoMarca(null)} />
     )}
+    {rastroOp && data?.opNumero && <ModalRastreabilidade opNumero={data.opNumero} onClose={() => setRastroOp(false)} />}
+    {rastroItem && <RastroDoItem peca={rastroItem} onClose={() => setRastroItem(null)} />}
     </>
+  );
+}
+
+// RASTREABILIDADE DO ITEM — o material daquela peça (perfil), com todas as entradas do CMR:
+// corrida/lote, certificado, norma, NF, pedido de compra, fornecedor, data e peso. É o mesmo dado
+// do modal da OP, recortado no que interessa pra peça que o PCP está olhando. (Vitor 18/08.)
+function RastroDoItem({ peca, onClose }) {
+  const m = peca?.material;
+  const linhas = m?.entradas?.length ? m.entradas : m ? [m] : [];
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className="bg-white text-torg-dark rounded-2xl w-full max-w-3xl shadow-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 px-5 py-3 border-b border-gray-100">
+          <div className="min-w-0">
+            <h2 className="text-base font-bold inline-flex items-center gap-2"><Package size={16} className="text-torg-blue" /> Rastreabilidade · <span className="font-mono">{peca.marca}</span></h2>
+            <p className="text-[12px] text-torg-gray truncate">Perfil <b>{peca.perfil}</b>{m?.material ? ` · ${m.material}` : ""}</p>
+          </div>
+          <button onClick={onClose} className="text-torg-gray hover:text-red-600 shrink-0"><X size={18} /></button>
+        </div>
+        <div className="px-5 py-4 overflow-y-auto">
+          {linhas.length ? (
+            <div className="space-y-2">
+              {linhas.map((l, i) => (
+                <div key={i} className="border border-gray-100 rounded-xl p-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[12px]">
+                  <Campo rot="Recebido" val={fmtD(l.dataRecebimento)} />
+                  <Campo rot="Nota fiscal" val={l.nf} mono />
+                  <Campo rot="Pedido de compra" val={l.pedido} mono />
+                  <Campo rot="Fornecedor" val={l.fornecedor} />
+                  <Campo rot="Corrida / lote" val={l.corrida} mono alerta={!l.corrida} />
+                  <Campo rot="Certificado" val={l.certificado} mono />
+                  <Campo rot="Norma" val={l.norma} />
+                  <Campo rot="Peso recebido" val={l.pesoKg ? `${fmtKg(l.pesoKg)} kg` : l.quantidade ? `${fmtN(l.quantidade)} pç` : null} />
+                </div>
+              ))}
+              {m?.totalKg > 0 && linhas.length > 1 && (
+                <p className="text-[12px] text-torg-gray">Total recebido deste material nesta OP: <b className="text-torg-dark">{fmtKg(m.totalKg)} kg</b> em {linhas.length} entrada(s).</p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-center gap-1.5">
+              <AlertTriangle size={14} /> Sem recebimento deste perfil no CMR desta OP.
+            </p>
+          )}
+        </div>
+        <div className="px-5 py-2.5 border-t border-gray-100">
+          <p className="text-[11px] text-torg-gray">Fonte: CMR (planilha de rastreabilidade do Almoxarifado), sincronizado todo dia — o material é casado com o perfil da peça pela descrição do cadastro.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Campo({ rot, val, mono, alerta }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] uppercase text-torg-gray">{rot}</p>
+      <p className={`font-semibold truncate ${mono ? "font-mono" : ""} ${!val ? (alerta ? "text-amber-600" : "text-gray-300") : ""}`} title={val || ""}>{val || (alerta ? "sem corrida" : "—")}</p>
+    </div>
   );
 }

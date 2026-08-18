@@ -35,7 +35,9 @@ export default function CompraChip({ compra, opNumero, mini }) {
   );
 }
 
-function ModalRastreabilidade({ opNumero, onClose }) {
+// Rastreabilidade completa da OP (corrida/lote, certificado, NF, pedido, fornecedor). Exportada
+// porque o painel de Liberar do PCP também abre ela direto, sem passar pelo chip.
+export function ModalRastreabilidade({ opNumero, onClose }) {
   const [d, setD] = useState(null);
   const [erro, setErro] = useState("");
   useEffect(() => {

@@ -13,7 +13,7 @@ import { requireRole } from "@/lib/session";
 import { whereSetorSyneco, normalizeSetorSyneco } from "@/lib/syneco-dia";
 import { ehItemComprado } from "@/lib/item-comprado";
 import { dedupLpcLe, renumerarPrioridades } from "@/lib/pecas-producao";
-import { materialPorPerfil } from "@/lib/status-compra";
+import { materialPorPerfil, statusCompraPorOp } from "@/lib/status-compra";
 import { croquiCortado, setorRealIndex, mapaSetorReal, FLUXO_SETORES } from "@/lib/prioridades-setor";
 import { z } from "zod";
 
@@ -161,9 +161,69 @@ export async function GET(req) {
   // MATERIAL por peça (do CMR do Almoxarifado): o corte precisa saber, item a item, se o
   // material daquele perfil já chegou. (Vitor 18/08 — antes só existia o resumo da OP.)
   let matPorPerfil = new Map();
+  let compraOp = null;
   try {
     if (opInfo?.numero) matPorPerfil = await materialPorPerfil(opInfo.numero, escopo.map((p) => p.perfil));
   } catch {}
+  // Status de COMPRA da OP inteira (pro chip do cabeçalho que abre a rastreabilidade completa).
+  try {
+    if (opInfo?.numero) compraOp = (await statusCompraPorOp([opInfo.numero])).get(String(opInfo.numero)) || null;
+  } catch {}
+
+  // PROGRAMAÇÃO — "o programador já lançou esta peça na produção?" (Vitor 18/08).
+  // Quando o programador lança a peça no Syneco, nascem as ORDENS de toda a rota dela de uma vez
+  // (10 Corte, 20 Preparação, 30 Montagem, 40 Solda, 50 Acabamento, 60 Jato, 70 Pintura) com
+  // status "Não Inicializada". Peça SEM ordem nenhuma = ainda não foi lançada. É o único sinal
+  // real de programação que temos — o portal não escreve no Syneco.
+  // Obs.: o Syneco separa "Corte" (op 10, laser/serra) de "Preparação" (op 20, furação/rosca);
+  // as duas são a Preparação do portal — por isso o setor do PORTAL casa com as duas aqui (sem
+  // mexer no whereSetorSyneco, que é usado pelos números de produção do dia).
+  const SYNECO_DO_SETOR = {
+    CORTE: /corte|prepara|serra|plasma|oxico/i,
+    MONTAGEM: /montag/i,
+    SOLDA: /solda|mig|mag|tig/i,
+    ACABAMENTO: /acabamento|esmeril|lixamento/i,
+    JATO: /jato|granalha/i,
+    PINTURA: /pintura|primer/i,
+    EXPEDICAO: /expedi|carregamento/i,
+  };
+  const progPorMarca = new Map(); // marca → { setores:[], statuses:Set, noSetor:bool, iniciado:bool }
+  try {
+    const ordens = await prisma.mesOrdem.groupBy({
+      by: ["item", "setor", "status"],
+      where: { opId },
+      _sum: { planejadoUn: true },
+      _min: { dataInicio: true },
+    });
+    const rxSetor = setor ? SYNECO_DO_SETOR[setor] : null;
+    for (const o of ordens) {
+      if (!o.item) continue;
+      const g = progPorMarca.get(o.item) || { setores: new Set(), statuses: new Set(), noSetor: false, planejadoUn: 0, iniciadoEm: null };
+      if (o.setor) g.setores.add(o.setor);
+      if (o.status) g.statuses.add(o.status);
+      const doSetor = rxSetor ? rxSetor.test(o.setor || "") : true;
+      if (doSetor) {
+        g.noSetor = true;
+        g.planejadoUn += Number(o._sum?.planejadoUn) || 0;
+        if (o.status && o.status !== "Não Inicializada") g.iniciado = true;
+        const di = o._min?.dataInicio;
+        if (di && (!g.iniciadoEm || di < g.iniciadoEm)) g.iniciadoEm = di;
+      }
+      progPorMarca.set(o.item, g);
+    }
+  } catch {}
+  // Situação da programação da peça NESTE setor:
+  //   NAO_LANCADA  → o programador ainda não lançou a peça no Syneco (nenhuma ordem)
+  //   OUTRO_SETOR  → tem ordem lançada, mas não pra este setor (rota diferente no Syneco)
+  //   PROGRAMADA   → ordem lançada e ainda não iniciada
+  //   INICIADA     → a ordem deste setor já rodou (produzindo/finalizada)
+  const programacaoDe = (marca) => {
+    const g = progPorMarca.get(marca);
+    if (!g) return { situacao: "NAO_LANCADA", setores: [], planejadoUn: 0, iniciadoEm: null };
+    const base = { setores: [...g.setores], planejadoUn: Math.round(g.planejadoUn || 0), iniciadoEm: g.iniciadoEm ? g.iniciadoEm.toISOString() : null };
+    if (!g.noSetor) return { situacao: "OUTRO_SETOR", ...base };
+    return { situacao: g.iniciado ? "INICIADA" : "PROGRAMADA", ...base };
+  };
 
   const pecas = escopo.map((p) => {
     const bx = p.baixaSetores && typeof p.baixaSetores === "object" ? p.baixaSetores : {};
@@ -179,7 +239,7 @@ export async function GET(req) {
     // avancouAlem: a peça JÁ está num setor à frente deste (Syneco/status/terceiro/encaminhada) —
     // não pode ficar pendente aqui atrás; o painel joga pro histórico (aba Peças prontas).
     const mat = p.perfil ? matPorPerfil.get(String(p.perfil).trim().toUpperCase()) || null : null;
-    return { ...p, material: mat, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
+    return { ...p, material: mat, programacao: programacaoDe(p.marca), baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
   });
 
   const emAberto = pecas.filter((p) => !p.destino && p.status === "PENDENTE");
@@ -188,7 +248,7 @@ export async function GET(req) {
   const baixados = setor ? pecas.filter((p) => p.baixadoPortal).length : 0;
   const precisamSyneco = setor ? pecas.filter((p) => p.precisaSyneco).length : 0;
 
-  return NextResponse.json({ opId, opNumero: opInfo?.numero || null, emProducao: !!opInfo?.emProducao, setor: setor || null, total: pecas.length, placar, baixados, precisamSyneco, pecas });
+  return NextResponse.json({ opId, opNumero: opInfo?.numero || null, emProducao: !!opInfo?.emProducao, setor: setor || null, total: pecas.length, placar, baixados, precisamSyneco, compra: compraOp, pecas });
 }
 
 export async function POST(req) {
