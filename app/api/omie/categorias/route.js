@@ -13,6 +13,26 @@ function prefixoNumerico(descricao) {
   return m ? m[1] : null;
 }
 
+// Famílias (número antes do 1º ponto) que NÃO fazem sentido num pedido de compra:
+// impostos, folha de pagamento e despesas financeiras. Ficam de fora do dropdown.
+//   2  = Impostos sobre Venda        6  = Mão de Obra Direta (MOD)
+//   7  = Mão de Obra Indireta (MOI)  14 = Despesas com Pessoal
+//   16 = Impostos, Taxas e Contrib.  17 = Impostos sobre o Lucro
+//   20 = Despesas Financeiras / Bancos
+const FAMILIAS_OCULTAS = new Set([2, 6, 7, 14, 16, 17, 20]);
+// Exceções mantidas mesmo dentro de família oculta (serviço comprável de verdade).
+//   7.6 = Prestadores de Serviço - Terceirizada MOI
+const EXCECOES_MANTIDAS = new Set(["7.6"]);
+
+// true se a categoria deve aparecer no dropdown de compra (não é imposto/folha/financeira).
+function familiaPermitida(descricao) {
+  const p = prefixoNumerico(descricao);
+  if (!p) return true; // sem número na descrição → não é família de imposto; mantém
+  if (EXCECOES_MANTIDAS.has(p)) return true;
+  const familia = Number(p.split(".")[0]);
+  return !FAMILIAS_OCULTAS.has(familia);
+}
+
 // Ordena igual ao Omie: pelo número da descrição, natural (2 < 3 < ... < 10 < 11),
 // e por nível (5.1 < 5.2 < 5.3). Categorias sem número na descrição vão pro fim.
 function compararComoOmie(a, b) {
@@ -103,7 +123,8 @@ export async function GET() {
           c.totalizadora !== "S" &&
           c.transferencia !== "S" &&
           c.conta_inativa !== "S" &&
-          c.nao_exibir !== "S"
+          c.nao_exibir !== "S" &&
+          familiaPermitida(c.descricao)
       )
       .sort(compararComoOmie);
 
