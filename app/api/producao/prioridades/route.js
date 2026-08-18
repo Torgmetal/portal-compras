@@ -12,6 +12,7 @@ import { requireRole } from "@/lib/session";
 import { carregarPrioridadesPorObra } from "@/lib/prioridades-setor-data";
 import { setorRealIndex, FLUXO_SETORES, noTerceiroAgora, entregaDoSetor } from "@/lib/prioridades-setor";
 import { ehItemComprado } from "@/lib/item-comprado";
+import { dedupLpcLe } from "@/lib/pecas-producao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,7 +68,13 @@ export async function GET() {
     select: { id: true, opId: true, marca: true, descricao: true, tipoPeca: true, perfil: true, qte: true, pesoUnitKg: true, pesoTotalKg: true, prioridade: true, status: true, terceirizado: true, destinoTerceirizado: true, terceirizadoRecebidoEm: true, terceiroRetornoPrevisto: true, encaminhadoSetor: true, _count: { select: { conjuntoCroquis: true } } },
   }) : [];
 
-  for (const pc of pecas) {
+  // dedupLpcLe: mesma marca com linha na LPC e na LE conta 1× (a da LPC) — senão a peça
+  // aparece duplicada na tela do setor. Aplicado POR OP (a regra é dentro da OP).
+  const porOp = new Map();
+  for (const pc of pecas) { if (!porOp.has(pc.opId)) porOp.set(pc.opId, []); porOp.get(pc.opId).push(pc); }
+  const pecasDedup = [...porOp.values()].flatMap((arr) => dedupLpcLe(arr));
+
+  for (const pc of pecasDedup) {
     const o = opInfo.get(pc.opId);
     if (!o) continue;
     // Itens comprados (sem peso; ou cobertura/piso: telha/rufo/calha/grade de piso) NÃO são

@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { whereSetorSyneco } from "@/lib/syneco-dia";
 import { ehItemComprado } from "@/lib/item-comprado";
+import { dedupLpcLe } from "@/lib/pecas-producao";
 import { croquiCortado } from "@/lib/prioridades-setor";
 import { z } from "zod";
 
@@ -73,7 +74,9 @@ export async function GET(req) {
   // fabricação) — não são feitos por nós, não entram no fluxo de produção. (Regra do Vitor; eles
   // seguem valendo em Engenharia/Compras/Planejamento/Expedição, a LE tem 100% dos itens.)
   const ehLixo = (p) => !p.marca || !String(p.marca).trim() || /^(total|soma|subtotal)\b/i.test(String(p.marca).trim());
-  const todas = todasRaw.filter((p) => !ehLixo(p) && !ehItemComprado(p));
+  // dedupLpcLe: a mesma marca pode ter linha na LPC e na LE — no fluxo de produção vale a da
+  // LPC (senão a peça aparece 2× e é despachada/encaminhada em dobro — caso da OP-67).
+  const todas = dedupLpcLe(todasRaw.filter((p) => !ehLixo(p) && !ehItemComprado(p)));
   // ROTA da peça pelos setores (regra de domínio do Vitor):
   //   • CROQUI (sub-peça "P")            → só CORTE.
   //   • CONJUNTO COMPOSTO (tem croquis)  → Montagem→Expedição (o corte é dos croquis dele).
@@ -234,6 +237,23 @@ export async function POST(req) {
   if (!ids?.length) return NextResponse.json({ error: "Selecione ao menos uma peça" }, { status: 400 });
   const marca = { destinoEm: new Date(), destinoPor: user.id, destinoObs: (obs || "").trim() || null };
   let atualizados = 0;
+  let duplicadasIgnoradas = 0; // ids da LE descartados por já existirem na LPC
+
+  // TRAVA ANTI-DUPLICIDADE (Vitor 18/08, OP-67): a mesma marca pode ter linha na LPC e na LE.
+  // No fluxo de produção vale a da LPC — se vier o id da LE e a marca existir na LPC da MESMA OP,
+  // esse id é DESCARTADO (senão a peça é enviada/priorizada 2× e o peso dobra).
+  async function semDuplicadas(idsAlvo) {
+    const pcs = await prisma.pecaConjunto.findMany({ where: { id: { in: idsAlvo } }, select: { id: true, opId: true, marca: true, fonte: true } });
+    const daLe = pcs.filter((p) => p.fonte === "LE_IMPORT");
+    if (!daLe.length) return { ids: idsAlvo, descartados: 0 };
+    const naLpc = await prisma.pecaConjunto.findMany({
+      where: { OR: daLe.map((p) => ({ opId: p.opId, marca: p.marca, fonte: "LPC_IMPORT" })) },
+      select: { opId: true, marca: true },
+    });
+    const chave = new Set(naLpc.map((p) => `${p.opId}|${String(p.marca).trim().toUpperCase()}`));
+    const bloquear = new Set(daLe.filter((p) => chave.has(`${p.opId}|${String(p.marca).trim().toUpperCase()}`)).map((p) => p.id));
+    return { ids: idsAlvo.filter((id) => !bloquear.has(id)), descartados: bloquear.size };
+  }
 
   // Numera como prioridade (append na fila de cada OP) as peças ainda SEM número — o que faz a
   // peça aparecer nas telas de Prioridades de Produção e na TV, já ordenável.
@@ -265,14 +285,18 @@ export async function POST(req) {
   } else if (encaminharSetor) {
     // ENCAMINHAR direto pro setor (ex.: Jato): a peça pula as etapas anteriores e fica pendente
     // no setor escolhido (motor: realIdx = setor-1). Com `comPrioridade`, também numera (1,2,3…).
+    const dedup = await semDuplicadas(ids);
+    duplicadasIgnoradas = dedup.descartados;
+    const alvo = dedup.ids;
+    if (!alvo.length) return NextResponse.json({ error: "Todas as peças selecionadas são duplicatas (linha da Lista de Expedição de marcas que já estão na LPC)." }, { status: 400 });
     const r = await prisma.pecaConjunto.updateMany({
-      where: { id: { in: ids }, status: { not: "EXPEDIDO" } },
+      where: { id: { in: alvo }, status: { not: "EXPEDIDO" } },
       data: { encaminhadoSetor: encaminharSetor, encaminhadoEm: new Date(), encaminhadoPor: user.id },
     });
     atualizados = r.count;
     if (comPrioridade) {
-      await prisma.pecaConjunto.updateMany({ where: { id: { in: ids }, status: { not: "EXPEDIDO" }, destino: null }, data: { ...marca, destino: "PRIORIDADE" } });
-      await numerarPrioridade(ids);
+      await prisma.pecaConjunto.updateMany({ where: { id: { in: alvo }, status: { not: "EXPEDIDO" }, destino: null }, data: { ...marca, destino: "PRIORIDADE" } });
+      await numerarPrioridade(alvo);
     }
   } else if (destino === "TERCEIRO") {
     if (!destinoTerceirizado) return NextResponse.json({ error: "Informe a volta do terceiro (Montagem/Pintura/Expedição)." }, { status: 400 });
@@ -291,11 +315,15 @@ export async function POST(req) {
     atualizados = r.count;
   } else {
     if (!destino) return NextResponse.json({ error: "Informe o destino." }, { status: 400 });
-    const r = await prisma.pecaConjunto.updateMany({ where: { id: { in: ids } }, data: { ...marca, destino } });
+    const dedup = await semDuplicadas(ids);
+    duplicadasIgnoradas = dedup.descartados;
+    const alvo = dedup.ids;
+    if (!alvo.length) return NextResponse.json({ error: "Todas as peças selecionadas são duplicatas (linha da Lista de Expedição de marcas que já estão na LPC)." }, { status: 400 });
+    const r = await prisma.pecaConjunto.updateMany({ where: { id: { in: alvo } }, data: { ...marca, destino } });
     atualizados = r.count;
     // "Prioridade" = UMA coisa só: além do destino, ganha o NÚMERO de prioridade (append na fila
     // da OP) — assim aparece nas telas de Prioridades de Produção e na TV, já reordenável.
-    if (destino === "PRIORIDADE") await numerarPrioridade(ids);
+    if (destino === "PRIORIDADE") await numerarPrioridade(alvo);
   }
 
   await prisma.auditLog.create({
@@ -306,5 +334,5 @@ export async function POST(req) {
     },
   }).catch(() => {});
 
-  return NextResponse.json({ ok: true, atualizados });
+  return NextResponse.json({ ok: true, atualizados, duplicadasIgnoradas });
 }

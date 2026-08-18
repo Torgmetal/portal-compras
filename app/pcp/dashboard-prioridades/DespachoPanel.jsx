@@ -98,21 +98,23 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
       await carregar();
-      if (okMsg) alert(okMsg(j));
+      if (okMsg) { const m = okMsg(j); if (m) alert(m); } // okMsg pode devolver null = não avisa
     } catch (e) { alert(e.message); } finally { setEnviando(false); }
   }
+
+  const avisoDup = (j) => (j.duplicadasIgnoradas ? `\n\n${j.duplicadasIgnoradas} linha(s) duplicada(s) ignorada(s) — a mesma marca existe na LPC e na Lista de Expedição; vale a da LPC.` : "");
 
   async function despachar(destino) {
     const ids = emAbertoSel();
     if (!ids.length) return alert("Selecione peças em aberto (sem destino) para destinar.");
-    await post({ ids, destino });
+    await post({ ids, destino }, (j) => (j.duplicadasIgnoradas ? `${j.atualizados} peça(s) destinada(s).${avisoDup(j)}` : null));
   }
   // Encaminhar DIRETO pra um setor (ex.: Jato) — a peça pula as etapas anteriores e fica pendente
   // no setor escolhido; com "priorizar", também ganha o número de prioridade.
   async function encaminhar() {
     const ids = [...sel];
     if (!ids.length) return alert("Selecione as peças para enviar ao setor.");
-    await post({ ids, encaminharSetor: encSetor, comPrioridade: encPrio }, (j) => `${j.atualizados} peça(s) enviada(s) para ${SETOR_LABEL[encSetor] || encSetor}${encPrio ? " (com prioridade)" : ""}.`);
+    await post({ ids, encaminharSetor: encSetor, comPrioridade: encPrio }, (j) => `${j.atualizados} peça(s) enviada(s) para ${SETOR_LABEL[encSetor] || encSetor}${encPrio ? " (com prioridade)" : ""}.${avisoDup(j)}`);
   }
   // Terceiro abre um modal (escolher fornecedor + retorno + gerar romaneio) em vez de despachar direto.
   function abrirTerceiro() {
