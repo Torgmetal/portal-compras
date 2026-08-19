@@ -57,17 +57,16 @@ function Seg({ valor, onChange, opcoes, titulo }) {
   );
 }
 
-// Textos usados nos Excel (material e programação) — mesma informação da tela, em texto.
+// Textos usados nos Excel. A coluna MATERIAL leva SÓ a descrição do material — rastreabilidade,
+// corrida, NF, pedido, fornecedor e data têm cada uma a sua coluna. (Vitor 18/08: "na coluna
+// material descrever apenas o material, não repetir a rastreabilidade, lote, NF, corrida, data".)
 const textoMaterial = (p) => {
   if (!p.perfil) return "";
-  const m = p.material;
-  if (!m) return "sem material";
-  const partes = [m.rastreio ? `R ${m.rastreio}` : null, m.material,
-    m.corrida ? `corrida ${m.corrida}` : "sem corrida",
-    m.nf ? `NF ${m.nf}` : null, m.pedido ? `pedido ${m.pedido}` : null, m.fornecedor || null].filter(Boolean);
-  return partes.join(" · ");
+  return p.material?.material || "sem material";
 };
 const textoProg = (p) => (p.programacao ? PROG[p.programacao.situacao]?.txt || "" : "");
+// Corrida em branco no CMR é informação, não vazio — o Vitor quer ver pra ir conferir.
+const textoCorrida = (p) => (!p.perfil || !p.material ? "" : p.material.corrida || "sem corrida");
 
 export default function DespachoPanel({ obra, setor, onClose, abaInicial = "despacho" }) {
   const [data, setData] = useState(null);
@@ -278,26 +277,27 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     const hoje = new Date().toISOString().split("T")[0];
     const nomeSetor = setor ? SETOR_LABEL[setor] || setor : "Geral";
     const tipoTxt = (t) => (t === "CONJUNTO" ? "Conjunto" : t === "CROQUI" ? "Croqui" : "Avulsa");
-    const headers = ["Marca", "Tipo", "Material", "Programação", "Peso (kg)", "Observação"];
+    const headers = ["Marca", "Tipo", "Material", "Rastreab. (R)", "Corrida / lote", "NF", "Programação", "Peso (kg)", "Observação"];
     const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
       titulo: `Apontar no Syneco — ${obra}${setor ? ` (${nomeSetor})` : ""}`,
       subtitulo: `${obra} · Setor: ${nomeSetor} · baixadas manualmente no portal — dar baixa no Syneco`,
       kpis: [`${base.length} peça(s) p/ apontar no Syneco`],
       totalColunas: headers.length, nomePlanilha: "Apontar Syneco", codigoDoc: "REL-ENG-002",
     });
-    ws.columns = [{ width: 20 }, { width: 12 }, { width: 32 }, { width: 16 }, { width: 14 }, { width: 46 }];
+    ws.columns = [{ width: 20 }, { width: 12 }, { width: 46 }, { width: 14 }, { width: 16 }, { width: 12 }, { width: 15 }, { width: 13 }, { width: 46 }];
     let row = linhaInicio;
     adicionarHeaderTabela(ws, row, headers); row++;
     const first = row;
     for (const p of base) {
       const quando = p.baixadoEm ? ` em ${new Date(p.baixadoEm).toLocaleDateString("pt-BR")}` : "";
+      // a Observação fala só da BAIXA — material/corrida/NF têm colunas próprias
       const obs = `Dar baixa no Syneco (${nomeSetor}): ${fmtN(p.baixadoQtd)} un — baixa manual no portal${p.baixadoPor ? ` por ${p.baixadoPor}` : ""}${quando}`;
-      // Material do perfil (CMR): "ok · NF 234399 (20/07)" ou "sem material" — o setor leva a
-      // informação junto da relação. (Vitor 18/08.)
-      adicionarLinhaTabela(ws, row, [p.marca, tipoTxt(p.tipoPeca), textoMaterial(p), textoProg(p), p.pesoTotalKg ? Number(p.pesoTotalKg.toFixed(1)) : "", obs], { alinhamento: { 1: "center", 3: "center", 4: "right" } });
+      // Material do perfil (CMR) — descrição na coluna Material; rastreabilidade, corrida e NF
+      // em colunas próprias, pro setor levar a informação junto da relação. (Vitor 18/08.)
+      adicionarLinhaTabela(ws, row, [p.marca, tipoTxt(p.tipoPeca), textoMaterial(p), p.material?.rastreio || "", textoCorrida(p), p.material?.nf || "", textoProg(p), p.pesoTotalKg ? Number(p.pesoTotalKg.toFixed(1)) : "", obs], { alinhamento: { 1: "center", 3: "center", 4: "center", 5: "center", 6: "center", 7: "right" } });
       row++;
     }
-    if (row > first) adicionarLinhaTotais(ws, row, ["TOTAL", "", "", "", { formula: `SUM(E${first}:E${row - 1})` }, ""]);
+    if (row > first) adicionarLinhaTotais(ws, row, ["TOTAL", "", "", "", "", "", "", { formula: `SUM(H${first}:H${row - 1})` }, ""]);
     await downloadWorkbook(workbook, `Apontar_Syneco_${obra}${setor ? "_" + nomeSetor : ""}_${hoje}.xlsx`);
   }
 
@@ -313,14 +313,16 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
       fMont === "LIBERADAS" ? "liberados p/ montar" : fMont === "AGUARDANDO" ? "aguardando componentes" : null,
       fProg === "PROG" ? "programadas" : fProg === "NAO" ? "não lançadas no Syneco" : null,
       filtro.trim() ? `filtro "${filtro.trim()}"` : null].filter(Boolean).join(" · ");
-    const headers = ["Marca", "Descrição", "Tipo", "Perfil", "Qtd", "Peso un. (kg)", "Peso tot. (kg)", "Material", "Rastreab. (R)", "Corrida / lote", "NF", "Pedido", "Recebido em", "Programação"];
+    const headers = ["Marca", "Descrição", "Tipo", "Perfil", "Qtd", "Peso un. (kg)", "Peso tot. (kg)",
+      "Material", "Rastreab. (R)", "Corrida / lote", "Certificado", "NF", "Pedido", "Fornecedor", "Recebido em", "Programação"];
     const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
       titulo: `${aba === "prontas" ? "Peças prontas" : "Peças a liberar"} — ${obra}${setor ? ` (${nomeSetor})` : ""}`,
       subtitulo: `${obra} · Setor: ${nomeSetor}${recorte ? ` · Recorte: ${recorte}` : ""}`,
       kpis: [`${fmtN(visiveis.length)} peça(s)`, `${fmtKg(pesoVisivel)} kg`],
       totalColunas: headers.length, nomePlanilha: "Peças", codigoDoc: "REL-PCP-004",
     });
-    ws.columns = [{ width: 18 }, { width: 34 }, { width: 11 }, { width: 22 }, { width: 8 }, { width: 13 }, { width: 14 }, { width: 34 }, { width: 14 }, { width: 16 }, { width: 12 }, { width: 11 }, { width: 13 }, { width: 15 }];
+    ws.columns = [{ width: 18 }, { width: 34 }, { width: 11 }, { width: 22 }, { width: 8 }, { width: 13 }, { width: 14 },
+      { width: 46 }, { width: 14 }, { width: 16 }, { width: 16 }, { width: 12 }, { width: 11 }, { width: 20 }, { width: 13 }, { width: 15 }];
     let row = linhaInicio;
     adicionarHeaderTabela(ws, row, headers); row++;
     const first = row;
@@ -329,12 +331,12 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
       adicionarLinhaTabela(ws, row, [
         p.marca, p.descricao || "", tipoTxt(p.tipoPeca), p.perfil || "",
         p.qte || 1, p.pesoUnitKg ? Number(p.pesoUnitKg.toFixed(2)) : "", p.pesoTotalKg ? Number(p.pesoTotalKg.toFixed(1)) : "",
-        textoMaterial(p), m?.rastreio || "", m ? m.corrida || "sem corrida" : "", m?.nf || "", m?.pedido || "",
+        textoMaterial(p), m?.rastreio || "", textoCorrida(p), m?.certificado || "", m?.nf || "", m?.pedido || "", m?.fornecedor || "",
         m?.dataRecebimento ? new Date(m.dataRecebimento).toLocaleDateString("pt-BR") : "", textoProg(p),
-      ], { alinhamento: { 2: "center", 4: "center", 5: "right", 6: "right", 8: "center", 9: "center", 10: "center", 11: "center", 12: "center", 13: "center" } });
+      ], { alinhamento: { 2: "center", 4: "center", 5: "right", 6: "right", 8: "center", 9: "center", 10: "center", 11: "center", 12: "center", 14: "center", 15: "center" } });
       row++;
     }
-    if (row > first) adicionarLinhaTotais(ws, row, ["TOTAL", "", "", "", "", "", { formula: `SUM(G${first}:G${row - 1})` }, "", "", "", "", "", "", ""]);
+    if (row > first) adicionarLinhaTotais(ws, row, ["TOTAL", "", "", "", "", "", { formula: `SUM(G${first}:G${row - 1})` }, "", "", "", "", "", "", "", "", ""]);
     await downloadWorkbook(workbook, `Pecas_${obra}${setor ? "_" + nomeSetor : ""}_${hoje}.xlsx`);
   }
 
