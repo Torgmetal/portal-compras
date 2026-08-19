@@ -9,9 +9,10 @@
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import {
   Loader2, FileDown, Printer, ChevronRight, ChevronDown, Search, RefreshCw,
-  ShieldCheck, AlertTriangle, ExternalLink, BookCheck,
+  ShieldCheck, AlertTriangle, ExternalLink, BookCheck, FileText,
 } from "lucide-react";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } from "@/lib/excel-relatorio";
+import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
 const fmtDH = (d) => (d ? `${new Date(d).toLocaleDateString("pt-BR")} ${new Date(d).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : "—");
@@ -23,6 +24,9 @@ export default function GrdClient() {
   const [aberta, setAberta] = useState(null); // opNumero expandida
   const [detalhe, setDetalhe] = useState({}); // opNumero → { linhas, cobertura, op }
   const [carregando, setCarregando] = useState("");
+  // Desenho aberto a partir da GRD: quando uma marca dá problema, é daqui que se abre pra ver
+  // do que se trata (croqui ou conjunto). (Vitor 19/08.)
+  const [desenho, setDesenho] = useState(null); // { opNumero, opId, marca, setor }
 
   const carregar = useCallback(async () => {
     setErro("");
@@ -197,7 +201,7 @@ export default function GrdClient() {
                         <td />
                         <td colSpan={8} className="px-3 pb-4 pt-1">
                           {carregando === o.opNumero && <p className="text-[12px] text-torg-gray py-3 inline-flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> Carregando…</p>}
-                          {det && <Detalhe det={det} abrirPdf={abrirPdf} />}
+                          {det && <Detalhe det={det} abrirPdf={abrirPdf} onVerDesenho={setDesenho} />}
                         </td>
                       </tr>
                     )}
@@ -211,7 +215,12 @@ export default function GrdClient() {
 
       <p className="text-[11px] text-torg-gray mt-3">
         A coluna <b>Rastreabilidade carimbada</b> é o <b>snapshot</b> gravado no momento da emissão — é o R que foi impresso no papel. Se o CMR mudar depois, o que o setor recebeu continua registrado aqui.
+        Clique na <b>marca</b> pra abrir o desenho (croqui ou conjunto) e ver do que se trata.
       </p>
+
+      {desenho && (
+        <DesenhoPecaModal opNumero={desenho.opNumero} opId={desenho.opId} marca={desenho.marca} setor={desenho.setor} onClose={() => setDesenho(null)} />
+      )}
     </div>
   );
 }
@@ -225,8 +234,14 @@ function Kpi({ rot, val }) {
   );
 }
 
-function Detalhe({ det, abrirPdf }) {
+function Detalhe({ det, abrirPdf, onVerDesenho }) {
   const c = det.cobertura;
+  const [q, setQ] = useState("");
+  const linhas = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return t ? det.linhas.filter((l) => `${l.marca} ${l.arquivo} ${l.setor || ""} ${l.resumoR?.texto || ""}`.toLowerCase().includes(t)) : det.linhas;
+  }, [det.linhas, q]);
+  const verDesenho = (l) => onVerDesenho({ opNumero: det.op.numero, opId: det.op.id || null, marca: l.marca, setor: l.setor || null });
   return (
     <div className="space-y-3">
       {/* Cobertura de rastreabilidade das PEÇAS da OP — o quadro geral, além do que já foi impresso */}
@@ -245,8 +260,16 @@ function Detalhe({ det, abrirPdf }) {
         </div>
       )}
 
-      {!det.linhas.length ? (
-        <p className="text-[12px] text-torg-gray py-2">Nenhuma liberação registrada nesta OP.</p>
+      {det.linhas.length > 8 && (
+        <div className="relative max-w-sm">
+          <Search size={13} className="absolute left-2.5 top-2 text-torg-gray" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Achar a marca…"
+            className="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-[12px]" />
+        </div>
+      )}
+
+      {!linhas.length ? (
+        <p className="text-[12px] text-torg-gray py-2">{q ? "Nenhuma marca no filtro." : "Nenhuma liberação registrada nesta OP."}</p>
       ) : (
         <div className="bg-white rounded-lg border border-gray-100 overflow-x-auto">
           <table className="w-full text-[12px] min-w-[1000px]">
@@ -265,9 +288,15 @@ function Detalhe({ det, abrirPdf }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {det.linhas.map((l) => (
+              {linhas.map((l) => (
                 <tr key={l.id} className="hover:bg-gray-50/60">
-                  <td className="px-2.5 py-1.5 font-mono font-semibold whitespace-nowrap">{l.marca}</td>
+                  <td className="px-2.5 py-1.5 whitespace-nowrap">
+                    {/* Abre o desenho da marca (croqui/conjunto) — é como se entende o problema. */}
+                    <button onClick={() => verDesenho(l)} title="Abrir os desenhos desta marca (croqui ou conjunto)"
+                      className="font-mono font-semibold text-torg-blue hover:underline inline-flex items-center gap-1">
+                      <FileText size={11} /> {l.marca}
+                    </button>
+                  </td>
                   <td className="px-2.5 py-1.5 truncate max-w-[240px]" title={l.arquivo}>{l.arquivo}</td>
                   <td className="px-2.5 py-1.5 whitespace-nowrap">{l.formato || "—"}</td>
                   <td className="px-2.5 py-1.5 whitespace-nowrap">{l.setor || "—"}</td>
@@ -283,8 +312,11 @@ function Detalhe({ det, abrirPdf }) {
                   <td className="px-2.5 py-1.5 text-center">
                     {l.impressoItemId ? (
                       <button onClick={() => abrirPdf(l.impressoItemId, `${l.marca} rastreado.pdf`)} title="Abrir o PDF carimbado que foi impresso (o mesmo do Data Book)"
-                        className="text-torg-blue hover:underline inline-flex items-center gap-1 font-semibold"><ExternalLink size={11} /> ver</button>
-                    ) : <span className="text-gray-300">—</span>}
+                        className="text-torg-blue hover:underline inline-flex items-center gap-1 font-semibold"><ExternalLink size={11} /> carimbado</button>
+                    ) : (
+                      <button onClick={() => verDesenho(l)} title="Esta liberação é anterior ao carimbo — abre os desenhos da marca"
+                        className="text-torg-gray hover:text-torg-blue hover:underline inline-flex items-center gap-1"><FileText size={11} /> desenhos</button>
+                    )}
                     {l.documentoId && <ShieldCheck size={11} className="inline ml-1 text-emerald-600" title="Amarrado na §02 do Data Book" />}
                   </td>
                 </tr>

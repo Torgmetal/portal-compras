@@ -54,7 +54,9 @@ export async function GET(req) {
     try { if (op?.id) cobertura = (await rastreioDaOp(op.numero, op.id)).resumo; } catch {}
 
     return NextResponse.json({
-      op: op ? { numero: op.numero, obra: op.obra, cliente: op.cliente } : { numero: num },
+      // opId vai junto: a tela abre o modal de desenhos da marca direto daqui (Vitor 19/08 —
+      // "preciso entender os que der problema e abrir ele para saber do que se trata").
+      op: op ? { id: op.id, numero: op.numero, obra: op.obra, cliente: op.cliente } : { numero: num },
       cobertura,
       linhas: linhas.map((l) => ({ ...l, resumoR: resumoRastreio(l.rastreio), rastreio: undefined })),
     });
