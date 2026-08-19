@@ -275,7 +275,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
       }
       if (j.semQuantidade?.length) avisos.push(`${j.semQuantidade.length} sem quantidade: ${j.semQuantidade.slice(0, 6).join(", ")}`);
       if (j.foraDoPortal?.length) {
-        avisos.push(`${j.foraDoPortal.length} fora do portal da Expedição (croqui/avulsa — a Expedição embarca CONJUNTOS):\n  ` +
+        avisos.push(`${j.foraDoPortal.length} croqui(s) ignorado(s) — croqui não se expede, quem embarca é o conjunto:\n  ` +
           j.foraDoPortal.slice(0, 8).map((x) => x.marca).join(", ") +
           (j.foraDoPortal.length > 8 ? ` … e mais ${j.foraDoPortal.length - 8}` : ""));
       }

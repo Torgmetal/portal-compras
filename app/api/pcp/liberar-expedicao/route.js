@@ -50,11 +50,15 @@ export async function POST(req) {
   });
   if (!todas.length) return NextResponse.json({ error: "Nenhuma peça encontrada nesta OP." }, { status: 404 });
 
-  // ⚠ O portal da Expedição só lê CONJUNTO (ou peça sem tipo) — ver /api/expedicao/pedidos. Croqui
-  // que recebesse destino ficaria com o dado gravado e invisível na tela de quem embarca: pior que
-  // não fazer nada, porque parece feito. Fica de fora e volta na resposta, dito com todas as
-  // letras. A raia de Expedição da OP-067 mistura os dois (2.594 croquis e 1.330 conjuntos), então
-  // isso não é hipótese.
+  // 🚫 CROQUI NÃO SE EXPEDE — nunca. Vitor (19/08/2026): "nesse caso da OP-67 não vai expedir
+  // nenhum croqui, aliás nunca vamos expedir um croqui". O croqui é peça de fabricação: vira parte
+  // de um conjunto, e é o CONJUNTO que embarca. Por isso o portal da Expedição lê só CONJUNTO (ou
+  // peça sem tipo, que é legado da LE antiga) — ver /api/expedicao/pedidos.
+  //
+  // Não é filtro defensivo, é a regra do negócio. Fica aqui porque a raia de Expedição lista os
+  // dois juntos (a OP-067 tem 2.594 croquis ao lado de 1.330 conjuntos): sem o corte, um croqui
+  // selecionado por engano ganharia destino gravado e invisível pra quem embarca — pior que não
+  // fazer nada, porque parece feito. Volta na resposta com marca e tudo.
   const foraDoPortal = todas.filter((p) => p.tipoPeca && p.tipoPeca !== "CONJUNTO");
   const pecas = todas.filter((p) => !p.tipoPeca || p.tipoPeca === "CONJUNTO");
 
