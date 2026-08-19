@@ -3765,6 +3765,10 @@ model GrdLiberacao {
   impressoItemId  String? // item do PDF CARIMBADO no SharePoint (é o que a pessoa abre/imprime)
   impressoUrl     String? // webUrl do carimbado
   documentoId     String? // DocumentoQualidade gerado (entra na §02 do Data Book)
+  // GRD só nasce quando o desenho é IMPRESSO (abrir/emitir não é GRD). Reimpressão da mesma
+  // marca/arquivo/setor NÃO cria outra GRD: soma aqui, com a data da última. (Vitor 19/08.)
+  impressoes      Int      @default(1)
+  ultimaImpressaoEm DateTime?
   liberadoPorId   String?
   liberadoPorNome String?
   createdAt       DateTime @default(now())

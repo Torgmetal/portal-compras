@@ -3,7 +3,10 @@
 //        (conjunto em .../2.5.2.3 Conjunto/{frente}/{A1..A4}/{marca}.pdf → formato = pasta-mãe;
 //         croqui em .../2.5.2.2 Croqui/{frente}/{marca} - CROQUI.pdf → A4) + as liberações GRD já
 //        registradas da marca. Ignora OBSOLETOS.
-// POST — registra a liberação/impressão (GRD): quem, quando, arquivo, formato, setor.
+// POST { acao } — EMITIR: carimba o PDF com a rastreabilidade + quem/quando, arquiva na pasta da
+//        OP e amarra na §02 do Data Book (SEM GRD — abrir o desenho não é controle de liberação).
+//        IMPRIMIR: o mesmo + registra a GRD; reimprimir a mesma marca/arquivo/setor soma no
+//        contador de impressões em vez de criar outra GRD. (Vitor 19/08.)
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -42,7 +45,7 @@ export async function GET(req) {
   const liberacoes = await prisma.grdLiberacao.findMany({
     where: { opNumero: String(opNumero).replace(/\D/g, "").padStart(3, "0"), marca },
     orderBy: { createdAt: "desc" },
-    select: { arquivo: true, formato: true, setor: true, liberadoPorNome: true, createdAt: true, impressoItemId: true, rastreio: true },
+    select: { id: true, arquivo: true, formato: true, setor: true, liberadoPorNome: true, createdAt: true, impressoItemId: true, impressoes: true, ultimaImpressaoEm: true },
   });
 
   let arquivos = [];
@@ -61,12 +64,23 @@ export async function GET(req) {
 
     // formato = nome da pasta-mãe (A1..A4); croqui identifica pelo nome. Resolve o pai por id
     // (o search não devolve o path) e descarta o que estiver em OBSOLETOS.
-    arquivos = (await Promise.all(pdfs.map(async (x) => {
-      let pastaMae = "";
+    // Os PDFs de uma marca quase sempre dividem a MESMA pasta — resolver por arquivo era uma ida
+    // ao Graph por item e deixava o modal lento. Resolve uma vez por pasta. (Vitor 19/08.)
+    const nomePasta = new Map();
+    const resolvePasta = async (id) => {
+      if (!id) return "";
+      if (nomePasta.has(id)) return nomePasta.get(id);
+      let nome = "";
       try {
-        const rp = await fetch(`${GRAPH}/drives/${driveId}/items/${x.parentReference?.id}?$select=name`, { headers: { Authorization: `Bearer ${token}` } });
-        if (rp.ok) pastaMae = (await rp.json()).name || "";
+        const rp = await fetch(`${GRAPH}/drives/${driveId}/items/${id}?$select=name`, { headers: { Authorization: `Bearer ${token}` } });
+        if (rp.ok) nome = (await rp.json()).name || "";
       } catch {}
+      nomePasta.set(id, nome);
+      return nome;
+    };
+    await Promise.all([...new Set(pdfs.map((x) => x.parentReference?.id).filter(Boolean))].map(resolvePasta));
+    arquivos = (await Promise.all(pdfs.map(async (x) => {
+      const pastaMae = await resolvePasta(x.parentReference?.id);
       if (/obsolet/i.test(pastaMae)) return null;
       const formato = /^A[1-4]$/i.test(pastaMae) ? pastaMae.toUpperCase() : (/croqui/i.test(x.name) ? "A4 (croqui)" : null);
       return { itemId: x.id, nome: x.name, formato, sizeKb: Math.round((x.size || 0) / 1024) };
@@ -86,6 +100,10 @@ const schema = z.object({
   formato: z.string().nullable().optional(),
   itemId: z.string().nullable().optional(),
   setor: z.string().nullable().optional(),
+  // EMITIR = gera/atualiza o PDF carimbado na pasta da OP e no Data Book, sem GRD (abrir o
+  // desenho não é controle de liberação). IMPRIMIR = isso + registra a GRD; reimpressão da mesma
+  // marca/arquivo/setor SOMA no contador em vez de criar outra GRD. (Vitor 19/08.)
+  acao: z.enum(["EMITIR", "IMPRIMIR"]).default("EMITIR"),
 });
 
 export async function POST(req) {
@@ -134,21 +152,45 @@ export async function POST(req) {
     } catch (e) { avisoCarimbo = e?.message || "Não consegui carimbar o desenho."; }
   }
 
-  const reg = await prisma.grdLiberacao.create({
-    data: {
-      opId, opNumero, marca,
-      arquivo: body.arquivo.trim(),
-      formato: body.formato || null,
-      setor: body.setor || null,
-      itemId: body.itemId || null,
-      // snapshot do casamento no momento da emissão — é a prova do que foi pro chão de fábrica
-      rastreio: itens.length ? itens : undefined,
-      impressoItemId: carimbado?.id || null,
-      impressoUrl: carimbado?.webUrl || null,
-      liberadoPorId: user.id,
-      liberadoPorNome: user.name || null,
-    },
-  });
+  // ── GRD só quando IMPRIME ─────────────────────────────────────────────────────────────────
+  // Abrir/emitir o desenho não é controle de liberação. E imprimir a mesma coisa duas ou três
+  // vezes não são três GRDs: é a mesma liberação, reimpressa — some no contador, com a data da
+  // última. (Vitor 19/08.)
+  let reg = null;
+  if (body.acao === "IMPRIMIR") {
+    const agora = new Date();
+    const jaTem = await prisma.grdLiberacao.findFirst({
+      where: { opNumero, marca, arquivo: body.arquivo.trim(), setor: body.setor || null },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, impressoes: true },
+    });
+    reg = jaTem
+      ? await prisma.grdLiberacao.update({
+          where: { id: jaTem.id },
+          data: {
+            impressoes: { increment: 1 }, ultimaImpressaoEm: agora,
+            rastreio: itens.length ? itens : undefined,
+            impressoItemId: carimbado?.id || undefined,
+            impressoUrl: carimbado?.webUrl || undefined,
+          },
+        })
+      : await prisma.grdLiberacao.create({
+          data: {
+            opId, opNumero, marca,
+            arquivo: body.arquivo.trim(),
+            formato: body.formato || null,
+            setor: body.setor || null,
+            itemId: body.itemId || null,
+            // snapshot do casamento na emissão — é a prova do que foi pro chão de fábrica
+            rastreio: itens.length ? itens : undefined,
+            impressoItemId: carimbado?.id || null,
+            impressoUrl: carimbado?.webUrl || null,
+            impressoes: 1, ultimaImpressaoEm: agora,
+            liberadoPorId: user.id,
+            liberadoPorNome: user.name || null,
+          },
+        });
+  }
 
   // 3) amarra no Data Book: o MESMO arquivo carimbado vira documento da §02 (Desenhos as-built).
   //    Um documento por marca+arquivo — reemitir atualiza o ponteiro pro PDF mais novo, em vez de
@@ -186,16 +228,22 @@ export async function POST(req) {
         });
         await prisma.dataBookSecao.update({ where: { id: secao.id }, data: { estado: "ANEXADO" } }).catch(() => {});
       }
-      await prisma.grdLiberacao.update({ where: { id: reg.id }, data: { documentoId } }).catch(() => {});
+      if (reg) await prisma.grdLiberacao.update({ where: { id: reg.id }, data: { documentoId } }).catch(() => {});
     } catch (e) { avisoCarimbo = avisoCarimbo || `Carimbou, mas não consegui amarrar no Data Book: ${e?.message || e}`; }
   }
 
-  await prisma.auditLog.create({ data: { userId: user.id, action: "GRD_LIBERAR_DESENHO", entity: "GrdLiberacao", entityId: reg.id, diff: { op: reg.opNumero, marca: reg.marca, arquivo: reg.arquivo, formato: reg.formato, setor: reg.setor, carimbado: !!carimbado, documentoId } } }).catch(() => {});
+  await prisma.auditLog.create({
+    data: {
+      userId: user.id, action: body.acao === "IMPRIMIR" ? "GRD_IMPRIMIR_DESENHO" : "EMITIR_DESENHO_RASTREADO",
+      entity: reg ? "GrdLiberacao" : "DocumentoQualidade", entityId: reg?.id || documentoId || opNumero,
+      diff: { op: opNumero, marca, arquivo: body.arquivo, formato: body.formato, setor: body.setor, carimbado: !!carimbado, documentoId, impressoes: reg?.impressoes ?? null },
+    },
+  }).catch(() => {});
 
   return NextResponse.json({
-    ok: true, avisoCarimbo,
-    liberacao: { arquivo: reg.arquivo, formato: reg.formato, setor: reg.setor, liberadoPorNome: reg.liberadoPorNome, createdAt: reg.createdAt, impressoItemId: reg.impressoItemId, rastreio: itens },
-    // é ESTE arquivo que a pessoa abre e imprime — o mesmo que foi pro Data Book
+    ok: true, avisoCarimbo, acao: body.acao,
+    liberacao: reg && { arquivo: reg.arquivo, formato: reg.formato, setor: reg.setor, liberadoPorNome: reg.liberadoPorNome, createdAt: reg.createdAt, impressoItemId: reg.impressoItemId, impressoes: reg.impressoes, ultimaImpressaoEm: reg.ultimaImpressaoEm },
+    // é ESTE arquivo que a pessoa abre/imprime — o mesmo que foi pro Data Book
     abrirItemId: carimbado?.id || body.itemId || null,
     abrirNome: carimbado?.name || body.arquivo,
   });

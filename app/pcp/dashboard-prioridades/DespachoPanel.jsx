@@ -505,7 +505,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                           const rota = g?.setores?.length ? `\nRota no Syneco: ${g.setores.join(" · ")}` : "";
                           const qtdRuim = g?.qtdOk === false;
                           const dica = `${e.dica}${rota}${g?.planejadoUn ? `\nPlanejado: ${fmtN(g.planejadoUn)} un` : ""}${qtdRuim ? `\n⚠ O Syneco planejou ${fmtN(g.planejadoUn)} un e a LPC pede ${fmtN(g.qtdLpc)} un.` : ""}\n\nClique para ver as ordens do Syneco.`;
-                          if (!g?.ordens?.length) return <span className={`text-[11px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold ${e.cls}`} title={dica}>{e.txt}</span>;
+                          if (!g?.nOrdens) return <span className={`text-[11px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold ${e.cls}`} title={dica}>{e.txt}</span>;
                           return (
                             <button type="button" onClick={(ev) => { ev.stopPropagation(); setProgItem(p); }} title={dica}
                               className={`text-[11px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold inline-flex items-center gap-1 hover:brightness-95 ${e.cls}`}>
@@ -621,7 +621,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     )}
     {rastroOp && data?.opNumero && <ModalRastreabilidade opNumero={data.opNumero} onClose={() => setRastroOp(false)} />}
     {rastroItem && <RastroDoItem peca={rastroItem} opNumero={data?.opNumero} onClose={() => setRastroItem(null)} />}
-    {progItem && <OrdensDoItem peca={progItem} setor={setor} sincronizadoEm={data?.ordensSincronizadasEm} onClose={() => setProgItem(null)} />}
+    {progItem && <OrdensDoItem peca={progItem} opId={data?.opId} setor={setor} sincronizadoEm={data?.ordensSincronizadasEm} onClose={() => setProgItem(null)} />}
     </>
   );
 }
@@ -629,13 +629,22 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
 // ORDENS DO SYNECO da peça — é aqui que o PCP CONFERE a programação: qual operação/setor o
 // programador lançou, em que máquina, quantas peças planejou (contra a qtd da LPC), o status e
 // as datas. Sem isso o chip "programada" era só uma afirmação do portal. (Vitor 18/08.)
-function OrdensDoItem({ peca, setor, sincronizadoEm, onClose }) {
+function OrdensDoItem({ peca, opId, setor, sincronizadoEm, onClose }) {
   const g = peca?.programacao;
-  const ordens = g?.ordens || [];
+  // As ordens vêm SOB DEMANDA — fora da listagem, que ficava pesada. (Vitor 19/08.)
+  const [ordens, setOrdens] = useState(null);
+  const [erroOrd, setErroOrd] = useState("");
+  useEffect(() => {
+    if (!opId) return setErroOrd("OP não identificada.");
+    fetch(`/api/pcp/despacho/ordens?opId=${encodeURIComponent(opId)}&marca=${encodeURIComponent(peca.marca)}`)
+      .then((r) => r.json())
+      .then((j) => (j.error ? setErroOrd(j.error) : setOrdens(j.ordens || [])))
+      .catch(() => setErroOrd("Não foi possível carregar as ordens."));
+  }, [opId, peca.marca]);
   const SETOR_SY = { CORTE: /corte|prepara|serra|plasma|oxico/i, MONTAGEM: /montag/i, SOLDA: /solda|mig|mag|tig/i, ACABAMENTO: /acabamento|esmeril|lixamento/i, JATO: /jato|granalha/i, PINTURA: /pintura|primer/i };
   const rx = setor ? SETOR_SY[setor] : null;
   const doSetor = (o) => (rx ? rx.test(o.setor || "") : true);
-  const nesteSetor = ordens.filter(doSetor);
+  const nesteSetor = (ordens || []).filter(doSetor);
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div className="bg-white text-torg-dark rounded-2xl w-full max-w-3xl shadow-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -649,7 +658,11 @@ function OrdensDoItem({ peca, setor, sincronizadoEm, onClose }) {
 
         {/* Veredito: dá pra afirmar que o programador lançou esta peça PARA ESTE SETOR? */}
         <div className="px-5 pt-3">
-          {!nesteSetor.length ? (
+          {ordens === null ? (
+            <p className="text-[12px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> Carregando as ordens do Syneco…</p>
+          ) : erroOrd ? (
+            <p className="text-[12px] text-red-600">{erroOrd}</p>
+          ) : !nesteSetor.length ? (
             <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-start gap-1.5">
               <AlertTriangle size={13} className="mt-0.5 shrink-0" /> O Syneco não tem ordem de {SETOR_LABEL[setor] || setor} para esta peça — o programador lançou a peça, mas não para este setor.
             </p>
@@ -665,6 +678,7 @@ function OrdensDoItem({ peca, setor, sincronizadoEm, onClose }) {
         </div>
 
         <div className="px-5 py-3 overflow-y-auto">
+          {ordens !== null && (
           <table className="w-full text-[12px]">
             <thead>
               <tr className="text-[10px] uppercase text-torg-gray border-b border-gray-100">
@@ -675,7 +689,7 @@ function OrdensDoItem({ peca, setor, sincronizadoEm, onClose }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {ordens.map((o, i) => (
+              {(ordens || []).map((o, i) => (
                 <tr key={i} className={doSetor(o) ? "bg-blue-50/40" : ""}>
                   <td className="py-1.5 font-mono">{o.operacao || "—"}</td>
                   <td className="py-1.5 whitespace-nowrap font-semibold">{o.setor || "—"}</td>
@@ -689,6 +703,7 @@ function OrdensDoItem({ peca, setor, sincronizadoEm, onClose }) {
               ))}
             </tbody>
           </table>
+          )}
           <p className="text-[11px] text-torg-gray mt-2">As linhas destacadas são as deste setor. O Syneco separa <b>Corte</b> (op. 10 — laser/serra) de <b>Preparação</b> (op. 20 — furação/rosca) — as duas são a Preparação do portal.</p>
         </div>
         <div className="px-5 py-2.5 border-t border-gray-100">

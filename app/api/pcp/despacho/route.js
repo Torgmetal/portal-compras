@@ -227,16 +227,17 @@ export async function GET(req) {
   //   OUTRO_SETOR  → tem ordem lançada, mas não pra este setor (rota diferente no Syneco)
   //   PROGRAMADA   → ordem lançada e ainda não iniciada
   //   INICIADA     → a ordem deste setor já rodou (produzindo/finalizada)
-  const ORDEM_SETOR = ["Corte", "Preparação", "Montagem", "Solda", "Acabamento", "Jato", "Pintura"];
   const programacaoDe = (marca, qte) => {
     const g = progPorMarca.get(marca);
-    if (!g) return { situacao: "NAO_LANCADA", setores: [], planejadoUn: 0, ordens: [] };
-    const ordens = [...g.ordens].sort((a, b) => String(a.operacao || "").localeCompare(String(b.operacao || ""), undefined, { numeric: true }) || ORDEM_SETOR.indexOf(a.setor) - ORDEM_SETOR.indexOf(b.setor));
+    if (!g) return { situacao: "NAO_LANCADA", setores: [], planejadoUn: 0, nOrdens: 0 };
     const planejadoUn = Math.round(g.planejadoUn || 0);
     // Confere a quantidade: o programador lançou a peça INTEIRA ou só parte dela? (a qtd da LPC
     // é a verdade do portal; divergência = programação parcial ou peça relançada no Syneco)
     const qtdOk = g.noSetor && qte != null ? planejadoUn === Number(qte) : null;
-    const base = { setores: [...g.setores], planejadoUn, qtdLpc: qte != null ? Number(qte) : null, qtdOk, ordens };
+    // As ORDENS cruas NÃO vão na listagem: numa OP grande são milhares de objetos repetidos e o
+    // painel ficava pesado (2 MB de JSON na OP-097). O modal busca as da marca sob demanda em
+    // /api/pcp/despacho/ordens. (Vitor 19/08: "senti que está ficando pesado/demorado pra abrir".)
+    const base = { setores: [...g.setores], planejadoUn, qtdLpc: qte != null ? Number(qte) : null, qtdOk, nOrdens: g.ordens.length };
     if (!g.noSetor) return { situacao: "OUTRO_SETOR", ...base };
     return { situacao: g.iniciado ? "INICIADA" : "PROGRAMADA", ...base };
   };
@@ -254,7 +255,10 @@ export async function GET(req) {
     const mont = prontoInfo ? (info || { prontoMontar: null, faltamCroquis: [], totalCroquis: 0 }) : null;
     // avancouAlem: a peça JÁ está num setor à frente deste (Syneco/status/terceiro/encaminhada) —
     // não pode ficar pendente aqui atrás; o painel joga pro histórico (aba Peças prontas).
-    const mat = p.perfil ? matPorPerfil.get(String(p.perfil).trim().toUpperCase()) || null : null;
+    // `entradas` (todas as linhas do CMR daquele material) sai fora da listagem — era repetida em
+    // cada peça e sozinha respondia pela maior parte do payload. O detalhe vem do modal.
+    const matFull = p.perfil ? matPorPerfil.get(String(p.perfil).trim().toUpperCase()) || null : null;
+    const mat = matFull ? (({ entradas, ...resto }) => resto)(matFull) : null;
     return { ...p, material: mat, programacao: programacaoDe(p.marca, p.qte), baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
   });
 
