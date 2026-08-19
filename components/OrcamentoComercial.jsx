@@ -1,66 +1,57 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { Folder, FolderTree, ChevronRight, Home, FileSpreadsheet, FileText, Loader2, AlertCircle, Check } from "lucide-react";
 
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// ORÇAMENTO DO COMERCIAL — busca a pasta do orçamento no SharePoint, vincula proposta e estudo,
-// e LÊ a planilha de estudo. Vitor (19/08): "o campo para importar isso deve aparecer logo quando
-// clicamos no botão de criarmos as OPs".
+// ORÇAMENTO DO COMERCIAL — vincula proposta e estudo à OP, e lê a planilha de estudo.
 //
-// Vincula pela PASTA do orçamento (não arquivo por arquivo): a estrutura é sempre a mesma
-// (5.Estudos / 6.Propostas), então o portal já sugere o estudo (LQC/EPC) e a proposta (PTC) mais
-// recentes — e quem cria só confirma. Obra com aditivo tem pasta própria e pode ser vinculada
-// depois, na OP.
+// NAVEGAÇÃO IGUAL À DOS DOCUMENTOS DO SGQ (Vitor 19/08: "quero que deixe igual ao da qualidade").
+// Trilha no topo, pastas primeiro, clique pra entrar. A primeira versão era um buscador com
+// sugestão automática — ele achou bagunçado, e faz sentido: o time já sabe navegar a pasta, e
+// sugestão por semelhança de nome erra feio aqui (a OP-112 casava 75% com "250-25-DANPOWER-0328-PE"
+// quando o estudo certo é o "249-26-DANPOWER-0328").
+//
+// Dentro da pasta do orçamento, os documentos ficam em `6.Propostas` (PTC, técnica, comercial) e
+// `5.Estudos` (a planilha LQC/EPC). Selecionar é um clique no arquivo.
+
+const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+const fmtTam = (b) => (b == null ? "" : b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+const ehPlanilha = (n) => /\.(xls[xmb]?|csv)$/i.test(n);
+
 export default function OrcamentoComercial({ valor, onChange, onPreencher, opId = null, onSalvar = null }) {
-  const [busca, setBusca] = useState("");
-  const [sugestoes, setSugestoes] = useState(null);
-  const [lista, setLista] = useState(null);
-  const [docs, setDocs] = useState(null);
+  const [path, setPath] = useState("");
+  const [dados, setDados] = useState(null);
   const [carregando, setCarregando] = useState(false);
-  const [lendo, setLendo] = useState(false);
   const [erro, setErro] = useState("");
+  const [lendo, setLendo] = useState(false);
+  const [aberto, setAberto] = useState(!valor.pasta);
 
-  // OP JÁ CRIADA: o portal ranqueia as pastas pelo nome, mas quem confirma é a pessoa —
-  // as pastas de um mesmo cliente e obra são quase idênticas (250-25 × 249-26 na DANPOWER).
-  const sugerir = async () => {
-    setCarregando(true); setErro(""); setSugestoes(null);
-    try {
-      const r = await fetch(`/api/comercial/orcamento-sharepoint?opId=${encodeURIComponent(opId)}`);
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro ao sugerir");
-      setSugestoes(j.sugestoes || []);
-    } catch (e) { setErro(e.message); } finally { setCarregando(false); }
-  };
+  const carregar = useCallback((p) => {
+    setCarregando(true); setErro("");
+    fetch(`/api/comercial/orcamento-sharepoint?path=${encodeURIComponent(p)}`)
+      .then((r) => r.json())
+      .then((j) => { if (j.error) setErro(j.error); else { setDados(j); if (j.erro) setErro(j.erro); } })
+      .catch(() => setErro("Erro ao carregar a pasta"))
+      .finally(() => setCarregando(false));
+  }, []);
+  useEffect(() => { if (aberto) carregar(path); }, [path, aberto, carregar]);
 
-  const procurar = async (e) => {
-    e?.preventDefault();
-    setCarregando(true); setErro(""); setLista(null);
-    try {
-      const r = await fetch(`/api/comercial/orcamento-sharepoint?q=${encodeURIComponent(busca)}`);
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro ao buscar");
-      setLista(j.orcamentos || []);
-    } catch (e) { setErro(e.message); } finally { setCarregando(false); }
-  };
+  const segmentos = path ? path.split("/") : [];
+  const itens = dados?.itens || [];
+  const pastas = itens.filter((i) => i.tipo === "folder");
+  const arquivos = itens.filter((i) => i.tipo === "file");
 
-  const abrir = async (o) => {
-    setCarregando(true); setErro(""); setDocs(null);
-    try {
-      const r = await fetch(`/api/comercial/orcamento-sharepoint?pasta=${encodeURIComponent(o.caminho)}`);
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro ao abrir a pasta");
-      setDocs(j);
-      const acha = (id, arr) => (id ? arr.find((f) => f.id === id) : null);
-      const ptc = acha(j.sugestao?.ptc, j.propostas);
-      onChange({
-        pasta: o.caminho, ref: o.nome,
-        // PTC é técnica e comercial no mesmo documento — entra nos dois campos
-        tecnica: acha(j.sugestao?.tecnica, j.propostas) || ptc || null,
-        comercial: acha(j.sugestao?.comercial, j.propostas) || ptc || null,
-        estudo: acha(j.sugestao?.estudo, j.estudos) || null,
-        dados: null,
-      });
-      setLista(null);
-    } catch (e) { setErro(e.message); } finally { setCarregando(false); }
+  // A pasta do orçamento é a que está DOIS níveis abaixo da raiz:
+  // ORÇAMENTOS_2026 / 2. Concluidos / <orçamento> — e é ela que fica gravada na OP.
+  const pastaOrcamento = segmentos.length >= 3 ? segmentos.slice(0, 3).join("/") : null;
+  const refOrcamento = segmentos.length >= 3 ? segmentos[2] : null;
+
+  const escolher = (campo, arq) => {
+    onChange({
+      ...valor,
+      pasta: pastaOrcamento || valor.pasta, ref: refOrcamento || valor.ref,
+      [campo]: { id: arq.id, nome: arq.nome },
+      ...(campo === "estudo" ? { dados: null } : {}),
+    });
   };
 
   const lerEstudo = async () => {
@@ -79,144 +70,163 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
 
   const d = valor.dados;
   const fmt = (n) => (n == null ? "—" : Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 0 }));
+  const marcado = (arq) => ["tecnica", "comercial", "estudo"].filter((c) => valor[c]?.id === arq.id);
+  const rotulo = { tecnica: "técnica", comercial: "comercial", estudo: "estudo" };
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h3 className="text-lg font-semibold text-torg-dark">Orçamento do Comercial</h3>
-          <p className="text-sm text-torg-gray">Vincula a proposta e o estudo, e traz as quantidades estimadas da planilha.</p>
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+            <FolderTree size={18} className="text-torg-blue" /> Orçamento do Comercial
+          </h3>
+          <p className="text-sm text-torg-gray">
+            Navegue até a pasta do orçamento e escolha os documentos. A proposta fica em <b>6.Propostas</b> e a planilha em <b>5.Estudos</b>.
+          </p>
         </div>
-        {valor.pasta && (
-          <button type="button" onClick={() => { onChange({ pasta: null, ref: null, tecnica: null, comercial: null, estudo: null, dados: null }); setDocs(null); }}
-            className="text-[12px] text-torg-gray hover:text-red-600 underline">trocar orçamento</button>
-        )}
+        <button type="button" onClick={() => setAberto((a) => !a)}
+          className="text-[12px] font-semibold text-torg-blue border border-torg-blue-200 rounded-lg px-2.5 py-1.5 shrink-0">
+          {aberto ? "fechar pasta" : "abrir pasta"}
+        </button>
       </div>
 
-      {erro && <p className="text-[13px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{erro}</p>}
+      {erro && <p className="text-[13px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 inline-flex items-center gap-2"><AlertCircle size={15} /> {erro}</p>}
 
-      {!valor.pasta ? (
-        <>
-          {opId && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <button type="button" onClick={sugerir} disabled={carregando}
-                className="bg-torg-dark text-white text-[12px] font-semibold rounded-lg px-3 py-1.5 disabled:opacity-50">
-                {carregando ? "Procurando…" : "Sugerir pelo cliente e obra"}
-              </button>
-              <span className="text-[11px] text-torg-gray">confira antes: pastas do mesmo cliente são quase iguais</span>
-            </div>
-          )}
-          {sugestoes && (
-            sugestoes.length === 0 ? <p className="text-[13px] text-torg-gray">Nenhuma pasta parecida — busque pelo nome.</p> : (
-              <div className="border border-gray-100 rounded-lg divide-y divide-gray-100">
-                {sugestoes.map((o) => (
-                  <button key={o.caminho} type="button" onClick={() => abrir(o)}
-                    className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center justify-between gap-3">
-                    <span className="text-[13px] font-medium text-torg-dark truncate">{o.nome}</span>
-                    <span className={`text-[11px] shrink-0 ${o.score >= 80 ? "text-emerald-700" : "text-amber-700"}`}>{o.score}% parecido</span>
-                  </button>
-                ))}
-              </div>
-            )
-          )}
-          <div className="flex gap-2">
-            <input value={busca} onChange={(e) => setBusca(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") procurar(e); }}
-              placeholder="Buscar por cliente, obra ou número (ex: danpower, 249)"
-              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-            <button type="button" onClick={procurar} disabled={carregando}
-              className="bg-torg-blue text-white text-sm font-semibold rounded-lg px-4 py-2 disabled:opacity-50">
-              {carregando ? "Buscando…" : "Buscar"}
-            </button>
-          </div>
-          {lista && (
-            lista.length === 0 ? <p className="text-[13px] text-torg-gray">Nenhum orçamento encontrado.</p> : (
-              <div className="border border-gray-100 rounded-lg divide-y divide-gray-100 max-h-64 overflow-y-auto">
-                {lista.map((o) => (
-                  <button key={o.caminho} type="button" onClick={() => abrir(o)}
-                    className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center justify-between gap-3">
-                    <span className="text-[13px] font-medium text-torg-dark truncate">{o.nome}</span>
-                    <span className="text-[11px] text-torg-gray shrink-0">{o.ano.replace(/^OR[ÇC]AMENTOS[_ ]/i, "")} · {o.fase.replace(/^\d+\.\s*/, "")}</span>
-                  </button>
-                ))}
-              </div>
-            )
-          )}
-        </>
-      ) : (
-        <div className="space-y-3">
-          <p className="text-[13px]"><b className="text-torg-blue">{valor.ref}</b></p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {[["Proposta técnica", "tecnica", docs?.propostas], ["Proposta comercial", "comercial", docs?.propostas], ["Planilha de estudo", "estudo", docs?.estudos]].map(([rot, campo, opcoes]) => (
-              <div key={campo}>
-                <label className="block text-[12px] font-medium text-torg-dark mb-1">{rot}</label>
-                <select value={valor[campo]?.id || ""} onChange={(e) => {
-                    const f = (opcoes || []).find((x) => x.id === e.target.value) || null;
-                    onChange({ ...valor, [campo]: f, ...(campo === "estudo" ? { dados: null } : {}) });
-                  }}
-                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-[12px]">
-                  <option value="">— não vincular —</option>
-                  {(opcoes || []).map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
-                </select>
-              </div>
-            ))}
-          </div>
+      {/* selecionados */}
+      {(valor.tecnica || valor.comercial || valor.estudo) && (
+        <div className="rounded-lg border border-torg-blue-100 bg-torg-blue-50/40 px-3 py-2.5 space-y-1">
+          {valor.ref && <p className="text-[12px] font-bold text-torg-blue">{valor.ref}</p>}
+          {[["Proposta técnica", "tecnica"], ["Proposta comercial", "comercial"], ["Planilha de estudo", "estudo"]].map(([rot, campo]) => (
+            <p key={campo} className="text-[12px] flex items-center gap-2">
+              <span className="text-torg-gray w-32 shrink-0">{rot}</span>
+              {valor[campo] ? (
+                <>
+                  <span className="font-medium truncate">{valor[campo].nome}</span>
+                  <button type="button" onClick={() => onChange({ ...valor, [campo]: null, ...(campo === "estudo" ? { dados: null } : {}) })}
+                    className="text-torg-gray hover:text-red-600 text-[11px] underline shrink-0">tirar</button>
+                </>
+              ) : <span className="text-torg-gray-light">—</span>}
+            </p>
+          ))}
           {valor.tecnica && valor.comercial && valor.tecnica.id === valor.comercial.id && (
             <p className="text-[11px] text-torg-gray">Técnica e comercial no mesmo documento (PTC).</p>
           )}
+        </div>
+      )}
 
-          {valor.estudo && !d && (
-            <button type="button" onClick={lerEstudo} disabled={lendo}
-              className="bg-torg-dark text-white text-sm font-semibold rounded-lg px-4 py-2 disabled:opacity-50">
-              {lendo ? "Lendo a planilha…" : "Ler o estudo"}
+      {aberto && (
+        <>
+          {/* trilha */}
+          <div className="flex items-center gap-1 flex-wrap text-sm">
+            <button type="button" onClick={() => setPath("")}
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-torg-blue-50 ${path === "" ? "text-torg-blue font-semibold" : "text-torg-gray"}`}>
+              <Home size={14} /> Orçamentos
             </button>
-          )}
+            {segmentos.map((s, i) => (
+              <span key={i} className="inline-flex items-center gap-1">
+                <ChevronRight size={13} className="text-gray-300" />
+                <button type="button" onClick={() => setPath(segmentos.slice(0, i + 1).join("/"))}
+                  className={`px-2 py-1 rounded-lg hover:bg-torg-blue-50 ${i === segmentos.length - 1 ? "text-torg-dark font-semibold" : "text-torg-gray"}`}>{s}</button>
+              </span>
+            ))}
+          </div>
 
-          {onSalvar && valor.pasta && (
-            <button type="button" onClick={() => onSalvar(valor)}
-              className="bg-torg-blue text-white text-sm font-semibold rounded-lg px-4 py-2">
-              Salvar vínculo na OP
-            </button>
-          )}
-
-          {d && (
-            <div className="bg-blue-50/60 border border-blue-100 rounded-lg p-4 space-y-3">
-              <p className="text-[12px] font-semibold text-torg-blue">
-                Estudo lido ({d.modelo}) — estimativa do Comercial
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[13px]">
-                <div><p className="text-torg-gray text-[11px]">Aço</p><p className="font-bold">{fmt(d.aco?.pesoKg)} kg</p></div>
-                <div><p className="text-torg-gray text-[11px]">Área de pintura</p><p className="font-bold">{fmt(d.aco?.areaPinturaM2)} m²</p></div>
-                <div><p className="text-torg-gray text-[11px]">Tinta</p><p className="font-bold">{fmt((d.pintura?.itens || []).reduce((a, x) => a + (x.litros || 0), 0))} L</p></div>
-                <div><p className="text-torg-gray text-[11px]">Áreas da obra</p><p className="font-bold">{d.aco?.itens?.length || d.aco?.perfis?.length || 0}</p></div>
-              </div>
-              {(d.familias?.familias || []).length > 0 && (
-                <div>
-                  <p className="text-[11px] text-torg-gray mb-1">Famílias do orçamento</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {d.familias.familias.map((f) => (
-                      <span key={f.nome} className="text-[11px] bg-white border border-blue-200 rounded-lg px-2 py-1">
-                        <b>{f.nome}</b> {fmt(f.total)} {f.unidade}
+          <div className="rounded-xl border border-gray-200 overflow-hidden max-h-80 overflow-y-auto">
+            {carregando ? (
+              <div className="py-10 text-center text-torg-gray"><Loader2 size={22} className="mx-auto animate-spin" /></div>
+            ) : itens.length === 0 ? (
+              <div className="py-10 text-center text-torg-gray text-sm">Pasta vazia.</div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {pastas.map((it) => (
+                  <button key={it.id} type="button" onClick={() => setPath(path ? `${path}/${it.nome}` : it.nome)}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50/70 text-left transition-colors">
+                    <Folder size={17} className="text-torg-blue shrink-0" />
+                    <span className="flex-1 min-w-0 truncate text-[13px] font-medium text-torg-dark">{it.nome}</span>
+                    {it.filhos != null && <span className="text-[11px] text-torg-gray tabular-nums">{it.filhos} {it.filhos === 1 ? "item" : "itens"}</span>}
+                    <ChevronRight size={15} className="text-gray-300 shrink-0" />
+                  </button>
+                ))}
+                {arquivos.map((it) => {
+                  const marcas = marcado(it);
+                  return (
+                    <div key={it.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50/70">
+                      {ehPlanilha(it.nome) ? <FileSpreadsheet size={17} className="text-emerald-700 shrink-0" /> : <FileText size={17} className="text-torg-gray shrink-0" />}
+                      <a href={it.webUrl || "#"} target="_blank" rel="noopener noreferrer"
+                        className="flex-1 min-w-0 truncate text-[13px] text-torg-dark hover:text-torg-blue" title={it.nome}>{it.nome}</a>
+                      <span className="text-[11px] text-torg-gray tabular-nums whitespace-nowrap hidden sm:inline">{fmtD(it.modificado)} · {fmtTam(it.tamanho)}</span>
+                      {marcas.length > 0 && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 shrink-0 inline-flex items-center gap-1">
+                          <Check size={11} /> {marcas.map((m) => rotulo[m]).join(" + ")}
+                        </span>
+                      )}
+                      <span className="flex gap-1 shrink-0">
+                        {(ehPlanilha(it.nome) ? ["estudo"] : ["tecnica", "comercial"]).map((campo) => (
+                          <button key={campo} type="button" onClick={() => escolher(campo, it)}
+                            className="text-[11px] font-semibold text-torg-blue border border-torg-blue-200 rounded px-1.5 py-0.5 hover:bg-torg-blue-50">
+                            usar como {rotulo[campo]}
+                          </button>
+                        ))}
                       </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {d.faltando?.length > 0 && (
-                <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
-                  Não consegui ler: {d.faltando.join(" · ")} — o resto foi importado.
-                </p>
-              )}
-              {onPreencher && (d.aco?.itens?.[0]?.area || valor.ref) && (
-                <button type="button"
-                  onClick={() => onPreencher({ obra: d.aco?.itens?.[0]?.area || "", descricao: (d.familias?.familias || []).map((f) => `${f.nome}: ${fmt(f.total)} ${f.unidade}`).join(" · ") })}
-                  className="text-[12px] font-semibold text-torg-blue underline">
-                  usar isto para preencher obra e descrição
-                </button>
-              )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <p className="text-[11px] text-torg-gray">
+            Clique na pasta pra navegar, no nome do arquivo pra abrir no servidor, ou em <b>usar como</b> pra vincular na OP.
+            O mesmo documento pode ser técnica e comercial ao mesmo tempo — é o caso do PTC.
+          </p>
+        </>
+      )}
+
+      {valor.estudo && !d && (
+        <button type="button" onClick={lerEstudo} disabled={lendo}
+          className="bg-torg-dark text-white text-sm font-semibold rounded-lg px-4 py-2 disabled:opacity-50">
+          {lendo ? "Lendo a planilha…" : "Ler o estudo"}
+        </button>
+      )}
+
+      {d && (
+        <div className="bg-blue-50/60 border border-blue-100 rounded-lg p-4 space-y-3">
+          <p className="text-[12px] font-semibold text-torg-blue">Estudo lido ({d.modelo}) — estimativa do Comercial</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[13px]">
+            <div><p className="text-torg-gray text-[11px]">Aço</p><p className="font-bold">{fmt(d.aco?.pesoKg)} kg</p></div>
+            <div><p className="text-torg-gray text-[11px]">Área de pintura</p><p className="font-bold">{fmt(d.aco?.areaPinturaM2)} m²</p></div>
+            <div><p className="text-torg-gray text-[11px]">Tinta</p><p className="font-bold">{fmt((d.pintura?.itens || []).reduce((a, x) => a + (x.litros || 0), 0))} L</p></div>
+            <div><p className="text-torg-gray text-[11px]">Áreas da obra</p><p className="font-bold">{d.aco?.itens?.length || d.aco?.perfis?.length || 0}</p></div>
+          </div>
+          {(d.familias?.familias || []).length > 0 && (
+            <div>
+              <p className="text-[11px] text-torg-gray mb-1">Famílias do orçamento</p>
+              <div className="flex flex-wrap gap-1.5">
+                {d.familias.familias.map((f) => (
+                  <span key={f.nome} className="text-[11px] bg-white border border-blue-200 rounded-lg px-2 py-1">
+                    <b>{f.nome}</b> {fmt(f.total)} {f.unidade}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
+          {d.faltando?.length > 0 && (
+            <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+              Não consegui ler: {d.faltando.join(" · ")} — o resto foi importado.
+            </p>
+          )}
+          {onPreencher && (
+            <button type="button"
+              onClick={() => onPreencher({ obra: d.aco?.itens?.[0]?.area || "", descricao: (d.familias?.familias || []).map((f) => `${f.nome}: ${fmt(f.total)} ${f.unidade}`).join(" · ") })}
+              className="text-[12px] font-semibold text-torg-blue underline">usar isto para preencher obra e descrição</button>
+          )}
         </div>
+      )}
+
+      {onSalvar && (valor.pasta || valor.estudo) && (
+        <button type="button" onClick={() => onSalvar(valor)}
+          className="bg-torg-blue text-white text-sm font-semibold rounded-lg px-4 py-2">
+          Salvar vínculo na OP
+        </button>
       )}
     </div>
   );
