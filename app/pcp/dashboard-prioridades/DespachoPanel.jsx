@@ -97,6 +97,8 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const [desenhoMarca, setDesenhoMarca] = useState(null); // marca aberta no modal de desenhos (GRD)
   const [encSetor, setEncSetor] = useState("JATO"); // setor do "enviar direto p/ setor"
   const [encPrio, setEncPrio] = useState(true); // enviar pro setor JÁ marcando prioridade
+  const [destinoExp, setDestinoExp] = useState(""); // destino do "liberar para expedição"
+  const [destinosUsados, setDestinosUsados] = useState([]); // sugestões: destinos já usados na obra
   const podeBaixa = !!setor;
   const toggleExpand = (id) => setExpandido((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
@@ -235,6 +237,61 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   }
   // Encaminhar DIRETO pra um setor (ex.: Jato) — a peça pula as etapas anteriores e fica pendente
   // no setor escolhido; com "priorizar", também ganha o número de prioridade.
+  // Destinos já usados na obra — sugerir em vez de digitar de novo evita "PÁTIO 1" e "Patio 1"
+  // virarem dois destinos no romaneio.
+  useEffect(() => {
+    if (setor !== "EXPEDICAO" || !data?.opId) return;
+    fetch(`/api/pcp/liberar-expedicao?opId=${data.opId}`)
+      .then((r) => r.json())
+      .then((j) => setDestinosUsados(j.destinos || []))
+      .catch(() => {});
+  }, [setor, data?.opId]);
+
+  // LIBERAR PARA EXPEDIÇÃO — direciona as selecionadas pro portal da Expedição.
+  async function liberarExpedicao() {
+    const ids = [...sel];
+    const destino = destinoExp.trim();
+    if (!ids.length) return alert("Selecione as peças para liberar.");
+    if (!destino) return alert("Informe o destino (obra, pátio, endereço).");
+    if (!data?.opId || !data?.opNumero) return alert("OP sem vínculo — não dá pra liberar.");
+    if (!confirm(`Liberar ${ids.length} peça(s) para a Expedição com destino "${destino}"?`)) return;
+
+    setEnviando(true);
+    try {
+      const res = await fetch("/api/pcp/liberar-expedicao", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opId: data.opId, opNumero: data.opNumero, destino, ids }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+
+      // o que NÃO foi feito é tão importante quanto o que foi — some silenciosamente, ninguém vê
+      const avisos = [];
+      if (j.jaTinhamDestino?.length) {
+        avisos.push(`${j.jaTinhamDestino.length} já tinha(m) destino definido e não foram mexidas:\n  ` +
+          j.jaTinhamDestino.slice(0, 8).map((x) => `${x.marca} → ${x.destinos.join(", ")}`).join("\n  ") +
+          (j.jaTinhamDestino.length > 8 ? `\n  … e mais ${j.jaTinhamDestino.length - 8}` : ""));
+      }
+      if (j.semQuantidade?.length) avisos.push(`${j.semQuantidade.length} sem quantidade: ${j.semQuantidade.slice(0, 6).join(", ")}`);
+      if (j.foraDoPortal?.length) {
+        avisos.push(`${j.foraDoPortal.length} fora do portal da Expedição (croqui/avulsa — a Expedição embarca CONJUNTOS):\n  ` +
+          j.foraDoPortal.slice(0, 8).map((x) => x.marca).join(", ") +
+          (j.foraDoPortal.length > 8 ? ` … e mais ${j.foraDoPortal.length - 8}` : ""));
+      }
+      alert(`${j.direcionadas} peça(s) liberada(s) para a Expedição (destino "${destino}").` +
+        (avisos.length ? `\n\n${avisos.join("\n\n")}` : ""));
+
+      setSel(new Set());
+      setDestinosUsados((prev) => (prev.includes(destino) ? prev : [...prev, destino].sort()));
+      carregar();
+    } catch (e) {
+      alert(`Não consegui liberar: ${e.message}`);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
   async function encaminhar() {
     const ids = [...sel];
     if (!ids.length) return alert("Selecione as peças para enviar ao setor.");
@@ -691,7 +748,28 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
               <button onClick={tirarPrioridade} disabled={!sel.size || enviando} title="Tira a marcação de prioridade das selecionadas (marcou errado)"
                 className="text-[11px] font-semibold text-torg-dark rounded-lg px-2.5 py-2 inline-flex items-center gap-1 disabled:opacity-40 bg-gray-100 hover:bg-gray-200"><Undo2 size={12} /> Tirar prioridade</button>
               <span className="w-px h-6 bg-gray-200 mx-1" />
-              {/* Enviar DIRETO pra um setor (pula as etapas anteriores) — ex.: prioridade + direto pro Jato */}
+              {/* NA EXPEDIÇÃO não se encaminha pra setor de produção — é a última etapa. Aqui a
+                  ação é DIRECIONAR a peça pro portal da Expedição. Vitor (19/08): "na página
+                  expedição já não é mais para liberar para produção e sim já liberar para
+                  expedição; é aqui que começamos a direcionar as peças que precisam ser enviadas". */}
+              {setor === "EXPEDICAO" ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="text-[11px] text-torg-gray">Destino:</span>
+                  <input
+                    list="destinos-op" value={destinoExp} onChange={(e) => setDestinoExp(e.target.value)}
+                    placeholder="obra, pátio, endereço…" disabled={enviando}
+                    className="text-[11px] border border-gray-300 rounded-lg px-2 py-[7px] w-52"
+                  />
+                  <datalist id="destinos-op">
+                    {destinosUsados.map((d) => <option key={d} value={d} />)}
+                  </datalist>
+                  <button onClick={liberarExpedicao} disabled={!sel.size || !destinoExp.trim() || enviando}
+                    title="Direciona as peças selecionadas pro portal da Expedição, com este destino"
+                    className="text-[11px] font-semibold text-white rounded-lg px-2.5 py-2 inline-flex items-center gap-1 disabled:opacity-40 bg-indigo-600 hover:bg-indigo-700">
+                    <Truck size={12} /> Liberar para expedição
+                  </button>
+                </span>
+              ) : (
               <span className="inline-flex items-center gap-1.5">
                 <span className="text-[11px] text-torg-gray">Enviar p/ setor:</span>
                 <select value={encSetor} onChange={(e) => setEncSetor(e.target.value)} disabled={enviando}
@@ -704,8 +782,12 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                 <button onClick={encaminhar} disabled={!sel.size || enviando} title="A peça pula as etapas anteriores e entra na fila do setor escolhido"
                   className="text-[11px] font-semibold text-white rounded-lg px-2.5 py-2 inline-flex items-center gap-1 disabled:opacity-40 bg-teal-600 hover:bg-teal-700"><ChevronRight size={12} /> Enviar</button>
               </span>
+              )}
             </div>
-            <p className="text-[11px] text-torg-gray">{sel.size} selecionada(s) · <b>Dar baixa</b> = concluída no setor (vai pro histórico). Destinar age só nas <b>em aberto</b>. A baixa é do portal; a coluna Syneco mostra o que falta acertar lá.</p>
+            <p className="text-[11px] text-torg-gray">
+              {sel.size} selecionada(s) · <b>Dar baixa</b> = concluída no setor (vai pro histórico). Destinar age só nas <b>em aberto</b>. A baixa é do portal; a coluna Syneco mostra o que falta acertar lá.
+              {setor === "EXPEDICAO" && <> · <b>Liberar para expedição</b> manda as peças pro portal da Expedição com o destino informado — peça que já tem destino definido não é mexida.</>}
+            </p>
           </div>
         )}
       </div>
