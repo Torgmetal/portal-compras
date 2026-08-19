@@ -67,7 +67,7 @@ export default function TerceiroModal({ obra, opId, setor, pecas, onClose, onDon
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div className="bg-white text-torg-dark rounded-2xl w-full max-w-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white text-torg-dark rounded-2xl w-full max-w-xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
           <h2 className="text-lg font-bold inline-flex items-center gap-2"><Truck size={18} className="text-indigo-600" /> Enviar para terceiro</h2>
           <button onClick={onClose} className="text-torg-gray hover:text-red-600"><X size={20} /></button>
@@ -114,12 +114,15 @@ export default function TerceiroModal({ obra, opId, setor, pecas, onClose, onDon
           )}
           {erro && <p className="text-red-600 text-sm">{erro}</p>}
         </div>
-        <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-gray-100">
+        {/* Rodapé em duas linhas: o texto explicativo espremia o botão e ele quebrava em três
+            linhas, com o ícone sozinho. (Vitor 19/08.) */}
+        <div className="px-5 py-3 border-t border-gray-100">
           <p className="text-[11px] text-torg-gray">Gera o romaneio RT-## (à parte da obra){setor === "CORTE" || setor === "MONTAGEM" ? " + o romaneio de material (perfis a mandar, p/ a NF)" : ""} e baixa o Excel.</p>
-          <div className="flex items-center gap-2">
-            <button onClick={onClose} className="text-[13px] font-semibold text-torg-gray px-3 py-2">Cancelar</button>
-            <button onClick={confirmar} disabled={enviando || !fornId} className="text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg px-4 py-2 inline-flex items-center gap-1.5 disabled:opacity-40">
-              {enviando ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} Criar romaneio + enviar
+          <div className="flex items-center justify-end gap-2 mt-2.5">
+            <button onClick={onClose} className="text-[13px] font-semibold text-torg-gray px-3 py-2 whitespace-nowrap">Cancelar</button>
+            <button onClick={confirmar} disabled={enviando || !fornId}
+              className="text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg px-4 py-2 inline-flex items-center gap-1.5 disabled:opacity-40 whitespace-nowrap shrink-0">
+              {enviando ? <Loader2 size={14} className="animate-spin shrink-0" /> : <FileSpreadsheet size={14} className="shrink-0" />} Criar romaneio + enviar
             </button>
           </div>
         </div>
