@@ -316,7 +316,9 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao emitir o lote");
       setLote(j);
-      for (const a of j.arquivos) window.open(`/api/producao/desenhos/arquivo?itemId=${encodeURIComponent(a.itemId)}&nome=${encodeURIComponent(a.nome)}`, "_blank");
+      // baixa tudo de uma vez, em pastas por impressora — abrir uma aba por arquivo era bloqueado
+      // pelo navegador e ainda deixava a pessoa imprimindo um por um. (Vitor 19/08.)
+      baixarZipLote(j, data.opNumero).catch(() => {});
     } catch (e) { setLote(null); alert(e.message); } finally { setEnviando(false); }
   }
 
@@ -728,6 +730,24 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
 }
 
 // Resultado da emissão em lote: um arquivo por formato + o que não tinha desenho.
+// Baixa o lote inteiro num ZIP com UMA PASTA POR IMPRESSORA — plotter (A1/A2) e impressora comum
+// (A3/A4). Vitor (19/08): "salva em pastas separadas na pasta download do usuário, assim ele
+// consegue já imprimir em duas impressoras ao mesmo tempo".
+async function baixarZipLote(lote, opNumero) {
+  const r = await fetch("/api/producao/desenhos/lote/zip", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ opNumero, arquivos: (lote.arquivos || []).map((a) => ({ itemId: a.itemId, nome: a.nome, formato: a.formato })) }),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Erro ao montar o ZIP");
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = (r.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/)?.[1] || `OP-${opNumero} - desenhos.zip`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
 function LoteDesenhos({ lote, onClose }) {
   const abrir = (a) => window.open(`/api/producao/desenhos/arquivo?itemId=${encodeURIComponent(a.itemId)}&nome=${encodeURIComponent(a.nome)}`, "_blank");
   return (
@@ -742,7 +762,15 @@ function LoteDesenhos({ lote, onClose }) {
             <p className="text-[13px] text-torg-gray inline-flex items-center gap-2 py-6"><Loader2 size={16} className="animate-spin" /> Baixando os desenhos, carimbando e juntando… pode levar alguns minutos.</p>
           ) : (
             <>
-              <p className="text-[13px] mb-3"><b>{fmtN(lote.emitidas)}</b> desenho(s) emitido(s){lote.grds ? ` · ${fmtN(lote.grds)} GRD registrada(s)` : ""}. Um arquivo por formato — imprima cada um no papel certo.</p>
+              <p className="text-[13px] mb-2"><b>{fmtN(lote.emitidas)}</b> desenho(s) emitido(s){lote.grds ? ` · ${fmtN(lote.grds)} GRD registrada(s)` : ""}. Um arquivo por formato — imprima cada um no papel certo.</p>
+              <div className="flex items-center gap-2 mb-3 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] font-semibold text-torg-blue">O ZIP já foi baixado, com uma pasta por impressora</p>
+                  <p className="text-[11px] text-torg-gray"><b>PLOTTER (A1-A2)</b> e <b>IMPRESSORA (A3-A4)</b> — dá pra mandar as duas ao mesmo tempo.</p>
+                </div>
+                <button onClick={() => baixarZipLote(lote, lote.op?.numero).catch((e) => alert(e.message))}
+                  className="text-[11px] font-semibold text-torg-blue border border-torg-blue/40 hover:bg-white rounded-lg px-2.5 py-1.5 shrink-0">Baixar de novo</button>
+              </div>
               <div className="space-y-2">
                 {lote.arquivos.map((a) => (
                   <div key={a.itemId} className="border border-gray-100 rounded-lg px-3 py-2 flex items-center gap-3">
@@ -769,7 +797,7 @@ function LoteDesenhos({ lote, onClose }) {
           )}
         </div>
         <div className="px-5 py-2.5 border-t border-gray-100">
-          <p className="text-[11px] text-torg-gray">Cada página sai com o carimbo da <b>sua</b> marca — mesmo carimbo da emissão avulsa. Os arquivos ficam em <b>2.5.2 Fabricação › Impressos rastreados</b>.</p>
+          <p className="text-[11px] text-torg-gray">Cada página sai com o carimbo da <b>sua</b> marca. Conjunto leva uma <b>folha A4 anexa</b> com o R de cada posição — ela vai no arquivo A4, não no meio dos A1. Os originais ficam na pasta dos desenhos da Engenharia.</p>
         </div>
       </div>
     </div>
