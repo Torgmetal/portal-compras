@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, ArrowLeft, Loader2, AlertCircle } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
+import { itensDaPlanilhaComercial } from "@/lib/op-categorias";
 import { ESTOQUE_MATERIAL_OPCOES, TIPO_DATABOOK_OPCOES } from "@/lib/op-opcoes";
 
 const fmtMoeda = (v) =>
@@ -78,6 +79,16 @@ export default function NovaOP() {
       if (junto && !f.descricao) novo.descricao = junto;
       return novo;
     });
+
+    // ITENS CONTRATADOS — as MESMAS linhas da planilha comercial (Vitor 19/08: "você precisa
+    // preencher os campos de itens contratados também; o ideal é trazer exatamente as mesmas
+    // linhas da planilha comercial"). Sem isso a OP não salvava: a tela exige ao menos um item.
+    //
+    // Só entra quando a lista ainda está em branco — não sobrescreve o que já foi digitado.
+    const daPlanilha = itensDaPlanilhaComercial(orc.dados?.comercial?.itens);
+    if (daPlanilha.length) {
+      setItens((prev) => (prev.some((i) => String(i.descricao || "").trim()) ? prev : daPlanilha));
+    }
   }, [propostaLida, orc.dados]);
 
   const updateItem = (i, novo) => {

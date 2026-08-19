@@ -294,6 +294,11 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
               Não consegui ler: {d.faltando.join(" · ")} — o resto foi importado.
             </p>
           )}
+          {(d.comercial?.itens || []).length > 0 && onPreencher && (
+            <p className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-2 py-1.5">
+              {d.comercial.itens.length} item(ns) contratado(s) preenchidos com as linhas da planilha comercial.
+            </p>
+          )}
           {onPreencher && (
             <button type="button"
               onClick={() => onPreencher({ obra: d.aco?.itens?.[0]?.area || "", descricao: (d.familias?.familias || []).map((f) => `${f.nome}: ${fmt(f.total)} ${f.unidade}`).join(" · ") })}
