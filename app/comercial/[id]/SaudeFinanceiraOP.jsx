@@ -149,7 +149,9 @@ export default function SaudeFinanceiraOP({ opId }) {
               {confrontos.map((c) => <Confronto key={c.rotulo} c={c} />)}
             </div>
             <p className="text-[10px] text-torg-gray mt-1.5">
-              O real vem da <b>lista de expedição</b>, que traz área e peso de cada marca
+              O real vem da <b>lista de expedição</b>, que traz área e peso de cada marca — contando
+              só as <b>peças fabricadas</b>: parafuso, telha, cumeeira e grade de piso estão na lista
+              mas não são estrutura nossa nem se pintam
               {expedicao?.listas?.length ? <> ({expedicao.listas.map((l) => l.frente).join(", ")})</> : null}.
               O custo é projetado ao <b>preço que o próprio orçamento usou</b> — mede o erro de
               orçamento sozinho, sem misturar com preço de compra. Desvio de preço se apura na cotação.
@@ -364,9 +366,16 @@ function Confronto({ c }) {
           )}
         </div>
       </div>
+      {c.foraDaConta?.length > 0 && (
+        <p className="text-[11px] text-torg-gray mt-1.5">
+          Fora desta conta, na mesma família:{" "}
+          {c.foraDaConta.map((i) => `${i.descricao}${i.qtd ? ` (${Number(i.qtd).toLocaleString("pt-BR")} ${i.unidade || ""})` : ""} ${fmtCurto(i.valor)}`).join(" · ")}
+          {" "}— outra unidade, não entra no preço por {c.unidade}.
+        </p>
+      )}
       {parcial && (
         <p className="text-[11px] text-torg-gray mt-1.5">
-          A lista tem <b>{c.cobertura.comArea} de {c.cobertura.marcas}</b> marcas medidas —{" "}
+          A lista tem <b>{c.cobertura.comArea} de {c.cobertura.pecas}</b> peças fabricadas medidas —{" "}
           {pra_cima
             ? "o desvio real é maior que o mostrado."
             : "parte da diferença pode ser medição que falta, não orçamento sobrando."}
