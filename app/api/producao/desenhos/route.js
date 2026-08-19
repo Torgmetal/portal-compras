@@ -142,7 +142,7 @@ export async function POST(req) {
       // consumível de solda vigente na data da emissão (muda quando entra lote novo no CMR)
       let consumivel = null;
       // pela data em que o conjunto foi SOLDADO — reemitir hoje não troca o arame de julho
-      try { consumivel = await consumivelDoConjunto({ opId: op.id, marca, quando }); } catch {}
+      try { consumivel = await consumivelDoConjunto({ opId: op.id, marca }); } catch {}
       const pdfOut = await carimbarDesenho(bytes, {
         opNumero, marca, setor: body.setor || null, formato: body.formato || null,
         arquivo: body.arquivo, usuario: user.name || user.email || "—", quando, itens, consumivel,
