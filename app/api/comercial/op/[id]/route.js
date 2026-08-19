@@ -186,9 +186,24 @@ export async function DELETE(req, { params }) {
     );
   }
 
-  // Cascateia: aditivos (e seus itens), revisoes, ajustes, itens da OP.
+  // Cascateia: cronograma, aditivos (e seus itens), revisoes, ajustes, itens da OP.
   // SolicitacaoVerba cascateia automatico via OPItem/AditivoItem (onDelete: Cascade no schema).
+  //
+  // ⚠ O CRONOGRAMA precisa sair aqui. A FK `Cronograma.opId` e ON DELETE **SET NULL**: a exclusao
+  // da OP nao falhava, ela deixava o cronograma ORFAO — com `opId` nulo, `opNumero` preservado e
+  // `ativo: true`, continuando na lista do Planejamento como se a obra existisse. Vitor (19/08):
+  // "quando eu excluir uma OP, exclua o cronograma dela tambem". Tarefas, revisoes, cobrancas,
+  // envios e registros vao junto por cascade do proprio Cronograma.
+  //
+  // Pega tambem o cronograma criado a mao que ficou sem `opId` mas aponta pro mesmo numero
+  // (a tela grava como "T116"); sem isso ele sobreviveria orfao e reapareceria na fila da TV.
+  const numeroT = /^T/i.test(op.numero) ? op.numero.toUpperCase() : `T${op.numero}`;
+  let cronogramasRemovidos = 0;
   await prisma.$transaction(async (tx) => {
+    const r = await tx.cronograma.deleteMany({
+      where: { OR: [{ opId: op.id }, { opId: null, opNumero: { in: [op.numero, numeroT] } }] },
+    });
+    cronogramasRemovidos = r.count;
     await tx.aditivoItem.deleteMany({ where: { aditivo: { opId: op.id } } });
     await tx.aditivo.deleteMany({ where: { opId: op.id } });
     await tx.revisao.deleteMany({ where: { opId: op.id } });
@@ -206,6 +221,7 @@ export async function DELETE(req, { params }) {
       diff: {
         numero: op.numero,
         cliente: op.cliente,
+        cronogramas: cronogramasRemovidos,
         aditivos: op._count.aditivos,
         revisoes: op._count.revisoes,
       },
