@@ -85,7 +85,7 @@ export default function NovaOP() {
     // linhas da planilha comercial"). Sem isso a OP não salvava: a tela exige ao menos um item.
     //
     // Só entra quando a lista ainda está em branco — não sobrescreve o que já foi digitado.
-    const daPlanilha = itensDaPlanilhaComercial(orc.dados?.comercial?.itens);
+    const daPlanilha = itensDaPlanilhaComercial(orc.dados?.comercial, orc.dados?.custos);
     if (daPlanilha.length) {
       setItens((prev) => (prev.some((i) => String(i.descricao || "").trim()) ? prev : daPlanilha));
     }

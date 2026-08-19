@@ -296,7 +296,9 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
           )}
           {(d.comercial?.itens || []).length > 0 && onPreencher && (
             <p className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-2 py-1.5">
-              {d.comercial.itens.length} item(ns) contratado(s) preenchidos com as linhas da planilha comercial.
+              Itens contratados preenchidos com o detalhe da planilha. A verba de cada um é o <b>custo de
+              compra</b> (material + serviço de terceiro) — {money((d.comercial.totalGeral?.material || 0) + (d.comercial.totalGeral?.mdoTerceirizada || 0))} no total.
+              Industrialização e BDI ficam de fora: não são compra.
             </p>
           )}
           {onPreencher && (
