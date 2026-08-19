@@ -1,18 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma, waitMesTables } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { obraParaNumeroOP } from "@/lib/syneco-obra";
 
 // GET /api/mes/apontamentos
 // Fonte: MesOrdem (dataset 150 — planejado vs produzido).
 // Retorna sumário por obra+setor, ou linhas individuais (detalhe=1).
 // Mantém o mesmo formato que a tela consome (produzidoKg, productionId…).
-
-function obraParaNumeroOP(obra) {
-  if (!obra) return obra;
-  const m = obra.match(/^T(\d+)/i);
-  if (!m) return obra;
-  return String(parseInt(m[1])).padStart(3, "0");
-}
 
 export async function GET(req) {
   await waitMesTables();

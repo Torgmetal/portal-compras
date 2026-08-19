@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma, prismaDirect, waitMesTables } from "@/lib/prisma";
+import { obraParaNumeroOP } from "@/lib/syneco-obra";
 
 // Recebe ordens planejadas do SKA dataset 150 (snapshot planejado vs produzido).
 // Upsert EM MASSA via INSERT ... ON CONFLICT (1 SQL por lote) — rápido.
@@ -36,12 +37,6 @@ const bodySchema = z.object({
   dataFim:    z.string().optional(),
   duracaoMs:  z.number().int().optional(),
 });
-
-function obraParaNumeroOP(obra) {
-  if (!obra) return obra;
-  const m = obra.match(/^T(\d+)/i);
-  return m ? String(parseInt(m[1])).padStart(3, "0") : obra;
-}
 
 // As datas do Syneco vêm em horário de Brasília (UTC-3). Interpretamos como BRT
 // (offset -03:00) para gravar o instante UTC correto — senão "08/06 00:00" BRT

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma, waitMesTables } from "@/lib/prisma";
+import { obraParaNumeroOP } from "@/lib/syneco-obra";
 
 // Endpoint de recebimento de dados do MES SKA/Syneco.
 // Chamado pelo agente local (scripts/mes-sync-agent.js) via HTTPS a cada hora.
@@ -38,13 +39,6 @@ const bodySchema = z.object({
 // Converte código Obra do SKA para número de OP do portal
 // T64 → 064 | T64E → 064 | T64A → 064 | T70 → 070 | T100 → 100
 // Sufixos de letra (A, B, C, E...) indicam partes do projeto — mesma OP
-function obraParaNumeroOP(obra) {
-  if (!obra) return obra;
-  const m = obra.match(/^T(\d+)/i);
-  if (!m) return obra;
-  return String(parseInt(m[1])).padStart(3, "0");
-}
-
 // Converte string "DD/MM/YYYY HH:mm:ss" ou ISO para Date
 function parseData(s) {
   if (!s) return null;
