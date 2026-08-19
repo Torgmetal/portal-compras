@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { receitasDaPlanilhaComercial } from "@/lib/op-categorias";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { criarCronogramaPadrao } from "@/lib/cronograma-padrao";
@@ -81,6 +82,11 @@ export async function POST(req) {
       estudoArquivo: body.estudoArquivo || null,
       estudoDados: body.estudoDados || null,
       createdById: user.id,
+      // RECEITAS DO CONTRATO — o lado da VENDA, derivado do estudo aqui no servidor (regra única,
+      // vale pra OP nova e pro aditivo). Vitor (19/08): "a receita do contrato seria o valor a ser
+      // faturado e itens de contrato seria o valor que o Compras deveria comprar".
+      // Os `itens` acima carregam a VERBA DE COMPRA; estas linhas carregam o que se fatura.
+      receitas: { create: receitasDaPlanilhaComercial(body.estudoDados?.comercial, body.estudoDados?.bdi) },
       itens: {
         create: body.itens.map((it, idx) => ({
           ordem: idx,

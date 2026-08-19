@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { receitasDaPlanilhaComercial } from "@/lib/op-categorias";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 
@@ -86,8 +87,23 @@ export async function POST(req, { params }) {
     },
   });
 
+  // O aditivo também traz RECEITA nova (o que passa a ser faturado a mais) — as linhas de venda
+  // do estudo do aditivo entram na OP, atrás das que já existem. Os itens do aditivo continuam
+  // sendo a VERBA DE COMPRA; são coisas diferentes e não podem se confundir (Vitor 19/08).
+  const receitasNovas = receitasDaPlanilhaComercial(body.estudoDados?.comercial, body.estudoDados?.bdi);
+  if (receitasNovas.length) {
+    const ultimaOrdem = await prisma.oPReceita.aggregate({ where: { opId: params.id }, _max: { ordem: true } });
+    const base = (ultimaOrdem._max.ordem ?? -1) + 1;
+    await prisma.oPReceita.createMany({
+      data: receitasNovas.map((r, i) => ({
+        ...r, opId: params.id, ordem: base + i, createdById: user.id,
+        observacao: `${r.observacao} · aditivo ${numero}`,
+      })),
+    });
+  }
+
   await prisma.auditLog.create({
-    data: { userId: user.id, action: "create_aditivo", entity: "Aditivo", entityId: ad.id, diff: { numero, itens: body.itens.length } },
+    data: { userId: user.id, action: "create_aditivo", entity: "Aditivo", entityId: ad.id, diff: { numero, itens: body.itens.length, receitas: receitasNovas.length } },
   });
 
   return NextResponse.json({ id: ad.id, numero });

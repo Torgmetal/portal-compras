@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { metasDeCompra } from "@/lib/op-categorias";
+import { metasDeCompra, resumoTributario } from "@/lib/op-categorias";
 import { Folder, FolderTree, ChevronRight, Home, FileSpreadsheet, FileText, Loader2, AlertCircle, Check } from "lucide-react";
 
 // ORÇAMENTO DO COMERCIAL — vincula proposta e estudo à OP, e lê a planilha de estudo.
@@ -90,6 +90,8 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
   const d = valor.dados;
   // META DE COMPRA por família — é o número que o setor de Compras persegue.
   const metas = useMemo(() => (d ? metasDeCompra(d.comercial, d.custos) : []), [d]);
+  // impostos destacados: alíquotas por CFOP, imposto na nota, crédito e líquido (aba BDI)
+  const trib = useMemo(() => (d ? resumoTributario(d.bdi) : null), [d]);
   const fmt = (n) => (n == null ? "—" : Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 0 }));
   const money = (n) => (n == null ? "—" : Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }));
 
@@ -238,6 +240,84 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
             <div><p className="text-torg-gray text-[11px]">Tinta</p><p className="font-bold">{fmt((d.pintura?.itens || []).reduce((a, x) => a + (x.litros || 0), 0))} L</p></div>
             <div><p className="text-torg-gray text-[11px]">Áreas da obra</p><p className="font-bold">{d.aco?.itens?.length || d.aco?.perfis?.length || 0}</p></div>
           </div>
+          {/* RECEITA × COMPRA × IMPOSTOS — os três números que estavam se confundindo.
+              Vitor (19/08): "a receita do contrato seria o valor a ser faturado e itens de
+              contrato seria o valor que o compras deveria comprar, isso que deve ser a confusão
+              que está fazendo"; e "também não estou vendo os valores de impostos destacados". */}
+          {(trib || metas.length > 0) && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="bg-white border border-torg-blue-200 rounded-lg px-3 py-2">
+                <p className="text-[10px] text-torg-gray uppercase tracking-wide">Receita do contrato</p>
+                <p className="text-lg font-extrabold text-torg-blue tabular-nums">{money(trib?.venda ?? d.comercial?.totalGeral?.valor)}</p>
+                <p className="text-[10px] text-torg-gray">o que vai ser faturado ao cliente</p>
+              </div>
+              <div className="bg-white border border-amber-300 rounded-lg px-3 py-2">
+                <p className="text-[10px] text-torg-gray uppercase tracking-wide">Verba de compra</p>
+                <p className="text-lg font-extrabold text-torg-orange-700 tabular-nums">{money(metas.reduce((a, m) => a + m.meta, 0))}</p>
+                <p className="text-[10px] text-torg-gray">teto do Compras — material + serviço terceirizado</p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
+                <p className="text-[10px] text-torg-gray uppercase tracking-wide">Impostos sobre a venda</p>
+                <p className="text-lg font-extrabold text-torg-dark tabular-nums">
+                  {trib?.liquido != null ? money(trib.liquido) : "—"}
+                  {trib?.liquidoPct ? <span className="text-[11px] font-semibold text-torg-gray ml-1">({(trib.liquidoPct * 100).toFixed(1)}%)</span> : null}
+                </p>
+                <p className="text-[10px] text-torg-gray">
+                  {trib?.naNota ? <>destacado na nota {money(trib.naNota)} − crédito {money(trib.credito)}</> : "sem tabela de impostos no estudo"}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {trib?.aliquotas && (
+            <div>
+              <p className="text-[11px] text-torg-gray mb-1">
+                Alíquotas do estudo — CFOP <b>{trib.cfop}</b>
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {[["ICMS", trib.aliquotas.icmsPct], ["PIS", trib.aliquotas.pisPct], ["COFINS", trib.aliquotas.cofinsPct],
+                  ["ISS", trib.aliquotas.issPct], ["CSLL", trib.aliquotas.csllPct], ["IRPJ", trib.aliquotas.irrfPct]]
+                  .filter(([, v]) => v > 0)
+                  .map(([rot, v]) => (
+                    <span key={rot} className="text-[11px] bg-white border border-gray-200 rounded-lg px-2 py-1">
+                      <b>{rot}</b> {(v * 100).toFixed(2).replace(".", ",")}%
+                    </span>
+                  ))}
+              </div>
+              {trib.linhas.length > 0 && (
+                <div className="rounded-lg border border-gray-200 overflow-hidden bg-white mt-1.5">
+                  <table className="w-full text-[12px]">
+                    <thead className="bg-gray-50 text-torg-gray">
+                      <tr>
+                        <th className="px-2 py-1.5 text-left font-medium">Natureza do faturamento</th>
+                        <th className="px-2 py-1.5 text-right font-medium">Valor</th>
+                        <th className="px-2 py-1.5 text-right font-medium">Imposto na nota</th>
+                        <th className="px-2 py-1.5 text-left font-medium">CFOP</th>
+                        <th className="px-2 py-1.5 text-left font-medium">Fatura</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {trib.linhas.map((f) => (
+                        <tr key={f.descricao}>
+                          <td className="px-2 py-1.5 text-torg-dark">{f.descricao}</td>
+                          <td className="px-2 py-1.5 text-right font-semibold tabular-nums">{money(f.valor)}</td>
+                          <td className="px-2 py-1.5 text-right text-torg-gray tabular-nums">{money(f.impostos)}</td>
+                          <td className="px-2 py-1.5 text-torg-gray">{f.cfop || "—"}</td>
+                          <td className="px-2 py-1.5 text-torg-gray">{f.faturadoPor || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {trib.faturamentoDireto > 0 && (
+                <p className="text-[10px] text-torg-gray mt-1">
+                  Faturamento direto ao cliente: <b>{money(trib.faturamentoDireto)}</b> — não passa pela nota da Torg.
+                </p>
+              )}
+            </div>
+          )}
+
           {metas.length > 0 && (
             <div>
               <p className="text-[11px] text-torg-gray mb-1">
