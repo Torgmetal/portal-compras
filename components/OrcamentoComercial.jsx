@@ -89,7 +89,7 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
 
   const d = valor.dados;
   // META DE COMPRA por família — é o número que o setor de Compras persegue.
-  const metas = useMemo(() => (d ? metasDeCompra(d.comercial, d.custos) : []), [d]);
+  const metas = useMemo(() => (d ? metasDeCompra(d.comercial, d.custos, d) : []), [d]);
   // impostos destacados: alíquotas por CFOP, imposto na nota, crédito e líquido (aba BDI)
   const trib = useMemo(() => (d ? resumoTributario(d.bdi) : null), [d]);
   const fmt = (n) => (n == null ? "—" : Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 0 }));

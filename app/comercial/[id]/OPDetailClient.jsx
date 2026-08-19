@@ -3263,7 +3263,7 @@ function ModalAditivo({ opId, proximoNumero, onClose, onSaved }) {
           valor={orcAd}
           onChange={(v) => {
             setOrcAd(v);
-            const daPlanilha = itensDaPlanilhaComercial(v.dados?.comercial, v.dados?.custos);
+            const daPlanilha = itensDaPlanilhaComercial(v.dados?.comercial, v.dados?.custos, v.dados);
             if (daPlanilha.length) setItens((prev) => (prev.some((i) => String(i.descricao || "").trim()) ? prev : daPlanilha));
             const prop = (v.propostas || []).find((p) => p.descricao);
             if (prop?.descricao) setDescricao((d) => d || `Aditivo ${proximoNumero} — ${prop.obra || prop.numeroProposta || ""}\n\n${prop.descricao}`);
