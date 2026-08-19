@@ -230,8 +230,10 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
       <div className="space-y-4">
         {/* Identidade da OP */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-5">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
+          {/* ⚠ items-start, não items-center: com a descrição longa vinda do estudo, o bloco de
+              datas/RMs/pedidos ficava boiando no meio do quadro. (Vitor 19/08.) */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
               <div>
                 <div className="flex items-center gap-3">
                   <h2 className="text-2xl font-extrabold text-torg-dark tracking-tight font-mono">
@@ -283,7 +285,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-5 text-sm shrink-0">
+            <div className="flex items-center gap-5 text-sm shrink-0 pt-1">
               <div className="text-center">
                 <p className="text-[10px] text-torg-gray uppercase tracking-wider font-medium">Início</p>
                 <p className="text-torg-dark font-semibold mt-0.5">{fmtData(op.dataInicio)}</p>
