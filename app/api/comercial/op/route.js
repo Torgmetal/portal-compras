@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { criarCronogramaPadrao } from "@/lib/cronograma-padrao";
 
 const itemSchema = z.object({
   categoria: z.string().min(1),
@@ -90,6 +91,16 @@ export async function POST(req) {
       },
     },
   });
+
+  // CRONOGRAMA AUTOMÁTICO — nasce junto da OP, com a data que o Comercial informou (Vitor 19/08:
+  // "abriu a OP, abre cronograma automático… o ideal seria o cálculo exatamente de acordo com as
+  // datas que vêm indicadas pelo comercial"). Nunca derruba a criação da OP.
+  try {
+    await criarCronogramaPadrao({
+      opId: op.id, opNumero: op.numero, titulo: op.obra || `OP-${op.numero}`,
+      dataInicio: op.dataInicio, dataFim: op.dataFimPrevista,
+    });
+  } catch {}
 
   await prisma.auditLog.create({
     data: {

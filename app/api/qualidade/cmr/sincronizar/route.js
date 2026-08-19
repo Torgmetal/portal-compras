@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/session";
 import { baixarCmrAtual } from "@/lib/sharepoint";
 import { parseCMR } from "@/lib/parse-cmr";
 import { conciliarRecebimentoCmr } from "@/lib/recebimento-cmr";
+import { aplicarAvancoSuprimentos } from "@/lib/cronograma-suprimentos";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // planilha de ~17MB: download + parse passam de 60s
@@ -90,7 +91,21 @@ export async function GET(req) {
     } catch (e) {
       conciliacao = { erro: e?.message || "falhou" };
     }
-    return NextResponse.json({ ok: true, ...r, conciliacao });
+    // Com o recebimento conciliado, as linhas de Suprimentos do cronograma andam sozinhas
+    // (Vitor 19/08: "isso deve ser automático"). Mesmo molde do avanço da Fabricação pelo Syneco.
+    let suprimentos = null;
+    try {
+      const ops = await prisma.cronograma.findMany({ where: { ativo: true, opId: { not: null } }, select: { opId: true }, distinct: ["opId"] });
+      let n = 0, linhas = 0;
+      for (const o of ops) {
+        const a = await aplicarAvancoSuprimentos(prisma, o.opId).catch(() => null);
+        if (a?.atualizadas) { n++; linhas += a.atualizadas; }
+      }
+      suprimentos = { ops: n, linhas };
+    } catch (e) {
+      suprimentos = { erro: e?.message || "falhou" };
+    }
+    return NextResponse.json({ ok: true, ...r, conciliacao, suprimentos });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 502 });
   }

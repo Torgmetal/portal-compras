@@ -3,25 +3,11 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { TEMPLATE_OP89, TEMPLATE_SUPRIMENTOS, DEPT_ORDER, DEPT_LABEL } from "@/lib/cronograma-template";
 
 // Modelo padrão de cronograma (baseado na OP-89): POR ÁREA. Cada área que o usuário informar
 // ganha esta sequência (na ordem = a cadeia de antecessoras FS). Setor → Área → Tarefa. As
 // durações são padrão e ficam editáveis depois. Ordem da lista = ordem do encadeamento.
-const TEMPLATE_OP89 = [
-  { nome: "Ordem de compra", dept: "COMERCIAL", dur: 1 },
-  { nome: "Modelo", dept: "ENGENHARIA", dur: 3 },
-  { nome: "Detalhamento", dept: "ENGENHARIA", dur: 3 },
-  { nome: "Diagrama de Montagem", dept: "ENGENHARIA", dur: 4 },
-  { nome: "Aprovação do projeto", dept: "ENGENHARIA", dur: 2 },
-  { nome: "Preparação", dept: "FABRICACAO", dur: 4 },
-  { nome: "Montagem", dept: "FABRICACAO", dur: 4 },
-  { nome: "Solda", dept: "FABRICACAO", dur: 4 },
-  { nome: "Pintura", dept: "FABRICACAO", dur: 6 },
-  { nome: "Expedição", dept: "EXPEDICAO", dur: 2 },
-];
-const DEPT_ORDER = ["COMERCIAL", "ENGENHARIA", "SUPRIMENTOS", "FABRICACAO", "EXPEDICAO", "MONTAGEM"];
-const DEPT_LABEL = { COMERCIAL: "Comercial", ENGENHARIA: "Engenharia", SUPRIMENTOS: "Suprimentos", FABRICACAO: "Fabricação", EXPEDICAO: "Expedição", MONTAGEM: "Montagem" };
-
 const createSchema = z.object({
   opNumero: z.string().min(1).transform((s) => s.trim().toUpperCase()),
   titulo: z.string().min(1).max(200),
@@ -75,12 +61,29 @@ export async function POST(req) {
   // Monta as tarefas do modelo OP-89, uma cópia por ÁREA (Setor → Área → Tarefa). Sem áreas,
   // gera um conjunto único (sem área). O encadeamento (antecessoras) é feito depois do create,
   // quando as tarefas já têm id.
+  // A linha "Pedido de compra do cliente" só existe quando há faturamento direto — é o cliente que
+  // emite o pedido ao fornecedor, e é isso que se acompanha.
+  const fdDaOp = op?.id
+    ? (await prisma.rM.count({ where: { opId: op.id, faturamentoDireto: true } })) > 0
+      || (await prisma.oPItem.count({ where: { opId: op.id, faturamentoDireto: true } }).catch(() => 0)) > 0
+    : false;
+
   const areasList = montarAreas(areas).map((a) => a.nome);
   const alvosAreas = areasList.length ? areasList : [null];
   const tarefas = [];
   if (usarTemplate) {
     let uid = 1;
     for (const dept of DEPT_ORDER) {
+      // SUPRIMENTOS não se repete por área — entra uma vez só, com as linhas por família.
+      if (dept === "SUPRIMENTOS") {
+        const linhas = TEMPLATE_SUPRIMENTOS.filter((t) => !t.so || (t.so === "fd" && fdDaOp));
+        if (!linhas.length) continue;
+        tarefas.push({ uidMpp: uid++, nome: DEPT_LABEL[dept], departamento: dept, isSummary: true, outlineLevel: 1 });
+        for (const t of linhas) {
+          tarefas.push({ uidMpp: uid++, nome: t.nome, departamento: dept, duracaoDias: t.dur, isSummary: false, outlineLevel: 2 });
+        }
+        continue;
+      }
       const doDept = TEMPLATE_OP89.filter((t) => t.dept === dept);
       if (!doDept.length) continue;
       tarefas.push({ uidMpp: uid++, nome: DEPT_LABEL[dept], departamento: dept, isSummary: true, outlineLevel: 1 });

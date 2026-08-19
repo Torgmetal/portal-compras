@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { dadosProposta } from "@/lib/proposta-servico-docx";
+import { criarCronogramaPadrao } from "@/lib/cronograma-padrao";
 
 export const runtime = "nodejs";
 
@@ -54,6 +55,16 @@ export async function POST(req, { params }) {
       itens: { create: itens.map((it, idx) => ({ ordem: idx, categoria: it.categoria, tipo: it.tipo, descricao: it.descricao, valorVerba: it.valorVerba, faturamentoDireto: it.faturamentoDireto, observacao: it.observacao })) },
     },
   });
+
+  // CRONOGRAMA AUTOMÁTICO — nasce junto da OP, com a data que o Comercial informou (Vitor 19/08:
+  // "abriu a OP, abre cronograma automático… o ideal seria o cálculo exatamente de acordo com as
+  // datas que vêm indicadas pelo comercial"). Nunca derruba a criação da OP.
+  try {
+    await criarCronogramaPadrao({
+      opId: op.id, opNumero: op.numero, titulo: op.obra || `OP-${op.numero}`,
+      dataInicio: op.dataInicio, dataFim: op.dataFimPrevista,
+    });
+  } catch {}
 
   await prisma.orcamentoServico.update({ where: { id: o.id }, data: { opCriadaId: op.id } });
   await prisma.auditLog.create({ data: { userId: user.id, action: "gerar_op_proposta", entity: "OrcamentoServico", entityId: o.id, diff: { op: op.numero, valor: soma || round2(o.valor) } } }).catch(() => {});
