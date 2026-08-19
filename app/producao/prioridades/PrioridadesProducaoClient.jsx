@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Loader2, AlertCircle, Flag, ChevronUp, ChevronDown, Truck, RefreshCw, Inbox, CalendarClock, FileText, FileDown, X, CheckCircle2, ChevronRight, ChevronsDownUp } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, Flag, ChevronUp, ChevronDown, Truck, RefreshCw, Inbox, CalendarClock, FileText, FileDown, X, CheckCircle2, ChevronRight, ChevronsDownUp, Star } from "lucide-react";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 
 // Uma aba por SETOR (Vitor 18/08). Deep-link: /producao/prioridades?bloco=jato
@@ -241,7 +241,12 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
           </div>
         ) : (
           <div className="space-y-4">
-            {blocoAtual.ops.map((op) => {
+            {[...blocoAtual.ops].sort((a, b) => {
+              // OP com peça marcada como prioridade vem primeiro; depois a mais atrasada.
+              const pa = a.prioritarias.length > 0, pb = b.prioritarias.length > 0;
+              if (pa !== pb) return pa ? -1 : 1;
+              return (b.prazo?.atrasoDias || 0) - (a.prazo?.atrasoDias || 0);
+            }).map((op) => {
               const prazo = op.prazo;
               const atrasado = prazo && prazo.atrasoDias > 0;
               const fechada = fechadas.has(op.opNumero);
@@ -253,6 +258,14 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
                     {fechada ? <ChevronRight size={16} className="text-torg-gray shrink-0" /> : <ChevronDown size={16} className="text-torg-gray shrink-0" />}
                     <span className="text-lg font-extrabold text-torg-dark tabular-nums">OP-{op.opNumero}</span>
                     <span className="text-sm text-torg-gray truncate max-w-[220px]" title={op.obra}>{op.obra}</span>
+                    {/* Selo de PRIORIDADE — sempre visível, aberta ou minimizada. Antes só aparecia
+                        no resumo da minimizada e passava batido. (Vitor 19/08.) */}
+                    {op.prioritarias.length > 0 && (
+                      <span className="text-[11px] font-bold inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500 text-white shrink-0"
+                        title={`${op.prioritarias.length} peça(s) marcada(s) como prioridade nesta OP`}>
+                        <Star size={11} fill="currentColor" /> {op.prioritarias.length} prioridade{op.prioritarias.length > 1 ? "s" : ""}
+                      </span>
+                    )}
                     {prazo && (
                       <span className={`text-[11px] font-semibold inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${atrasado ? "bg-red-50 text-red-600" : "bg-torg-blue-50 text-torg-blue"}`}>
                         <CalendarClock size={11} /> {atrasado ? `${prazo.atrasoDias}d de atraso` : `até ${fmtData(prazo.entrega)}`}
@@ -261,8 +274,6 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
                     {/* Minimizada: resumo do que tem dentro */}
                     {fechada && (
                       <span className="text-[11px] text-torg-gray">
-                        {op.prioritarias.length > 0 && <b className="text-torg-orange">{op.prioritarias.length} prioritária(s)</b>}
-                        {op.prioritarias.length > 0 && op.demaisTotal > 0 && " · "}
                         {op.demaisTotal > 0 && `${fmtN(op.demaisTotal)} pendente(s)`}
                       </span>
                     )}
