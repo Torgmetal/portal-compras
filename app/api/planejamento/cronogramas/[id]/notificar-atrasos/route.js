@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { gerarTokenForte } from "@/lib/token";
+import { dataBR } from "@/lib/data-br";
 
 // Mapeamento departamento do cronograma → modulo(s) do sistema
 const DEPT_TO_MODULOS = {
@@ -251,7 +252,7 @@ export async function POST(req, { params }) {
             Informar novas datas →
           </a>
           <p style="margin:12px 0 0;font-size:11px;color:#9ca3af;">
-            Cobrado por ${user.name || "Planejamento"} em ${new Date().toLocaleDateString("pt-BR")}
+            Cobrado por ${user.name || "Planejamento"} em ${dataBR(new Date())}
           </p>
         </div>
       </div>`;

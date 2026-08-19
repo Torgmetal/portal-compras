@@ -14,6 +14,7 @@ import { requireRole } from "@/lib/session";
 import { getAccessToken, acharPastaOp, uploadFileToFolder } from "@/lib/sharepoint";
 import { rastreioDoConjunto } from "@/lib/rastreio-peca";
 import { carimbarDesenho } from "@/lib/carimbo-desenho";
+import { dataHoraBR } from "@/lib/data-br";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -143,7 +144,8 @@ export async function POST(req) {
       });
       const base = await acharPastaOp(opNumero);
       const pasta = `${base || `/Ordem de Servico/01. OP/OP-${opNumero}`}/2. Engenharia/2.5 Projetos/2.5.2 Fabricação/Impressos rastreados`;
-      const carimbo = quando.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).replace(/[/:]/g, "-").replace(", ", " ");
+      // nome do arquivo com a hora de BRASÍLIA (o servidor é UTC)
+      const carimbo = dataHoraBR(quando).replace(/\/\d{4}/, "").replace(/[/:]/g, "-");
       carimbado = await uploadFileToFolder({
         folderPath: pasta,
         fileName: `${marca} - RASTREADO ${carimbo}.pdf`,
@@ -206,7 +208,7 @@ export async function POST(req) {
       const dados = {
         nome: nomeDoc, categoria: "PROJETO", tipo: "Desenho de fabricação (emissão rastreada)",
         norma: "NBR 16775", opNumero, vinculo: `OP-${opNumero} · ${marca}`,
-        observacao: `Emitido por ${user.name || "—"} em ${quando.toLocaleString("pt-BR")}${body.setor ? ` · setor ${body.setor}` : ""}.`,
+        observacao: `Emitido por ${user.name || "—"} em ${dataHoraBR(quando)}${body.setor ? ` · setor ${body.setor}` : ""}.`,
         origem: "impressao_rastreada",
         sharepointUrl: carimbado.webUrl, sharepointItemId: carimbado.id,
         arquivoNome: carimbado.name, arquivoTipo: "application/pdf",

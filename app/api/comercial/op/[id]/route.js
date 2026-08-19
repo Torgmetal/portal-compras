@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { dataBR } from "@/lib/data-br";
 
 // Aceita 2 modos:
 // 1. Status change: { acao: "finalizar" | "reabrir" | "cancelar" }
@@ -60,8 +61,8 @@ export async function PATCH(req, { params }) {
     // ativas dessa OP — qty volta pro estoque livre.
     if (parsed.acao === "finalizar" || parsed.acao === "cancelar") {
       const motivo = parsed.acao === "finalizar"
-        ? `OP encerrada em ${new Date().toLocaleDateString("pt-BR")}`
-        : `OP cancelada em ${new Date().toLocaleDateString("pt-BR")}`;
+        ? `OP encerrada em ${dataBR(new Date())}`
+        : `OP cancelada em ${dataBR(new Date())}`;
       await prisma.estoqueReserva.updateMany({
         where: { opId: op.id, status: "ATIVA" },
         data: { status: "CANCELADA", cancelMotivo: motivo },
