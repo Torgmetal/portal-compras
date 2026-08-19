@@ -166,6 +166,17 @@ export async function PATCH(req, { params }) {
     const novaDataBase = new Date(parsed.data.dataBase);
     const jaTemBaseline = !!cronograma.dataBase;
 
+    // ⚠ Baseline é uma FOTO das datas planejadas — sem data pra fotografar, ela não significa
+    // nada, e o único efeito é passar a exigir justificativa em cada ajuste. Foi o que aconteceu
+    // no cronograma "REFORÇO" da OP-84: baseline definida com as 22 tarefas sem data, snapshot
+    // vazio, e o Planejamento travado justificando o próprio rascunho (Vitor, 19/08/2026).
+    if (!cronograma.tarefas.some((t) => t.dataInicioPrevista || t.dataFimPrevista)) {
+      return NextResponse.json(
+        { success: false, error: "Sem datas planejadas pra congelar: gere ou preencha as datas antes de definir o baseline." },
+        { status: 400 }
+      );
+    }
+
     ops.push(
       prisma.cronograma.update({
         where: { id },
