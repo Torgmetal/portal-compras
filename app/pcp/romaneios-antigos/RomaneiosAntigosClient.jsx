@@ -20,6 +20,9 @@ export default function RomaneiosAntigosClient() {
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [gravando, setGravando] = useState(false);
+  // Quais romaneios REALMENTE embarcaram. Romaneio emitido não é romaneio embarcado — o da
+  // OP-104 saiu no papel antes de a peça existir. Começa TUDO DESMARCADO de propósito.
+  const [marcados, setMarcados] = useState(() => new Set());
 
   async function ver() {
     const n = opNumero.trim();
@@ -30,17 +33,18 @@ export default function RomaneiosAntigosClient() {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
       setPrevia(j);
+      setMarcados(new Set());
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
   }
 
   async function importar() {
-    if (!previa) return;
-    if (!confirm(`Importar ${previa.lidos} romaneio(s) da OP-${previa.op.numero}?\n\n${previa.casadas} marcas serão marcadas como EXPEDIDAS e sairão das filas de produção.`)) return;
+    if (!previa || !marcados.size) return;
+    if (!confirm(`Importar ${marcados.size} romaneio(s) da OP-${previa.op.numero}?\n\nAs peças deles serão marcadas como EXPEDIDAS e sairão das filas de produção.\n\nConfirme que esses romaneios REALMENTE EMBARCARAM.`)) return;
     setGravando(true); setErro("");
     try {
       const r = await fetch("/api/pcp/romaneios-antigos", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: previa.op.numero }),
+        body: JSON.stringify({ opNumero: previa.op.numero, romaneios: [...marcados] }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao importar");
@@ -104,33 +108,49 @@ export default function RomaneiosAntigosClient() {
                 </p>
               )}
 
+              <p className="text-[12px] text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-3 inline-flex items-start gap-1.5">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                <span><b>Marque só os que REALMENTE embarcaram.</b> Romaneio emitido não é romaneio embarcado — o nº 02 da OP-104 saiu no papel antes de a peça ser fabricada. Nada no arquivo distingue um do outro.</span>
+              </p>
+
               <div className="overflow-x-auto mt-3">
                 <table className="w-full text-[12px]">
                   <thead>
                     <tr className="text-[10px] uppercase text-torg-gray border-b border-gray-100">
+                      <th className="py-1.5 w-8">
+                        <input type="checkbox" title="Marcar todos"
+                          checked={marcados.size === previa.romaneios.length && previa.romaneios.length > 0}
+                          onChange={(e) => setMarcados(e.target.checked ? new Set(previa.romaneios.map((r) => String(r.numero))) : new Set())} />
+                      </th>
                       <th className="text-left py-1.5">Romaneio</th><th className="text-left py-1.5">Saída</th>
                       <th className="text-right py-1.5">Itens</th><th className="text-right py-1.5">Peso</th>
                       <th className="text-left py-1.5">Arquivo</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {previa.romaneios.map((r, i) => (
-                      <tr key={i}>
+                    {previa.romaneios.map((r, i) => {
+                      const on = marcados.has(String(r.numero));
+                      return (
+                      <tr key={i} className={on ? "bg-emerald-50/60" : ""}>
+                        <td className="py-1.5 text-center">
+                          <input type="checkbox" checked={on} onChange={() => setMarcados((s) => { const n = new Set(s); on ? n.delete(String(r.numero)) : n.add(String(r.numero)); return n; })} />
+                        </td>
                         <td className="py-1.5 font-mono font-semibold whitespace-nowrap">{r.numero}</td>
                         <td className={`py-1.5 whitespace-nowrap tabular-nums ${r.dataSaida ? "" : "text-amber-700"}`}>{fmtD(r.dataSaida)}</td>
                         <td className="py-1.5 text-right tabular-nums">{fmtN(r.itens)}</td>
                         <td className="py-1.5 text-right tabular-nums">{r.pesoKg != null ? `${fmtN(r.pesoKg)} kg` : "—"}</td>
                         <td className="py-1.5 text-torg-gray truncate max-w-[280px]" title={r.arquivo}><FileSpreadsheet size={11} className="inline -mt-0.5 text-emerald-600" /> {r.arquivo}</td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
 
               {!resultado && (
-                <button onClick={importar} disabled={gravando || !previa.lidos}
+                <button onClick={importar} disabled={gravando || !marcados.size}
                   className="mt-4 text-[13px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg px-4 py-2 inline-flex items-center gap-1.5 disabled:opacity-40">
-                  {gravando ? <Loader2 size={14} className="animate-spin" /> : <PackageCheck size={14} />} Importar e marcar {fmtN(previa.casadas)} peça(s) como expedidas
+                  {gravando ? <Loader2 size={14} className="animate-spin" /> : <PackageCheck size={14} />} Importar {marcados.size ? `${fmtN(marcados.size)} romaneio(s) embarcado(s)` : "— marque os embarcados"}
                 </button>
               )}
             </>

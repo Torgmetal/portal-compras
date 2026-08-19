@@ -30,7 +30,12 @@ export async function GET(req) {
   }
 }
 
-const schema = z.object({ opNumero: z.string().min(1), forcar: z.boolean().optional() });
+// `romaneios` = os que REALMENTE embarcaram. Obrigatório: romaneio emitido não é embarcado.
+const schema = z.object({
+  opNumero: z.string().min(1),
+  romaneios: z.array(z.string()).min(1),
+  forcar: z.boolean().optional(),
+});
 
 export async function POST(req) {
   let user;
@@ -42,7 +47,7 @@ export async function POST(req) {
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
   try {
-    const r = await importarRomaneiosDaOp(body.opNumero, { gravar: true, user, forcar: !!body.forcar });
+    const r = await importarRomaneiosDaOp(body.opNumero, { gravar: true, user, forcar: !!body.forcar, somente: body.romaneios });
     await prisma.auditLog.create({
       data: { userId: user.id, action: "IMPORTAR_ROMANEIOS_PASTA", entity: "Romaneio", entityId: r.op.numero,
         diff: { op: r.op.numero, arquivos: r.arquivos, lidos: r.lidos, semTabela: r.semTabela.length, ...r.gravado } },
