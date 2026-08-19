@@ -23,6 +23,16 @@ async function main() {
   // (lib/recebimento-cmr.js). Idempotente. 19/08/2026.
   await prisma.$executeRawUnsafe(`ALTER TYPE "RecebimentoOrigem" ADD VALUE IF NOT EXISTS 'CMR'`).catch(() => {});
 
+  // Vinculo da OP com o orcamento do Comercial (proposta + estudo). Idempotente. 19/08/2026.
+  for (const c of [
+    `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "orcamentoPasta" TEXT`,
+    `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "orcamentoRef" TEXT`,
+    `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "propostaTecnica" JSONB`,
+    `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "propostaComercial" JSONB`,
+    `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "estudoArquivo" JSONB`,
+    `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "estudoDados" JSONB`,
+  ]) await prisma.$executeRawUnsafe(c).catch(() => {});
+
   // MesInativo (setores feitos fora / inativos sem produção, p/ o relatório de
   // furos). Idempotente — sempre garante, sem depender do bloco abaixo.
   await prisma.$executeRawUnsafe(`

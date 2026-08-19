@@ -32,6 +32,13 @@ const opSchema = z.object({
   dataFimPrevista: z.string().optional().nullable(),
   estoqueMaterial: z.enum(["PROPRIO_TORG", "CLIENTE_TERCEIRO"]).optional().nullable(),
   tipoDataBook: z.enum(["PADRAO_TORG", "SNQC", "RELATORIO_ACOMPANHAMENTO"]).optional().nullable(),
+  // vínculo com o orçamento do Comercial (SharePoint) + o que foi lido da planilha de estudo
+  orcamentoPasta: z.string().optional().nullable(),
+  orcamentoRef: z.string().optional().nullable(),
+  propostaTecnica: z.any().optional().nullable(),
+  propostaComercial: z.any().optional().nullable(),
+  estudoArquivo: z.any().optional().nullable(),
+  estudoDados: z.any().optional().nullable(),
   itens: z.array(itemSchema).min(1),
 });
 
@@ -69,6 +76,12 @@ export async function POST(req) {
       dataFimPrevista: body.dataFimPrevista ? new Date(body.dataFimPrevista) : null,
       estoqueMaterial: body.estoqueMaterial || null,
       tipoDataBook: body.tipoDataBook || null,
+      orcamentoPasta: body.orcamentoPasta || null,
+      orcamentoRef: body.orcamentoRef || null,
+      propostaTecnica: body.propostaTecnica || null,
+      propostaComercial: body.propostaComercial || null,
+      estudoArquivo: body.estudoArquivo || null,
+      estudoDados: body.estudoDados || null,
       createdById: user.id,
       itens: {
         create: body.itens.map((it, idx) => ({

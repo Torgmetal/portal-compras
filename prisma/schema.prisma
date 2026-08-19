@@ -118,6 +118,15 @@ model OP {
   createdById          String
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
+  // VÍNCULO COM O ORÇAMENTO DO COMERCIAL (SharePoint) — a OP nasce sabendo de onde veio.
+  // `estudoDados` guarda o que foi LIDO da planilha (peso por área, pintura, tinta, famílias):
+  // é a estimativa contra a qual o realizado vai ser comparado. Ver lib/estudo-comercial.js.
+  orcamentoPasta       String? // caminho da pasta do orçamento (Comercial/1. Orçamento/...)
+  orcamentoRef         String? // "249-26-DANPOWER-0328-COBERTURA"
+  propostaTecnica      Json? // { id, nome } no SharePoint — ou o PTC, quando vem junto
+  propostaComercial    Json?
+  estudoArquivo        Json? // { id, nome, modelo, revisao }
+  estudoDados          Json? // saída de lerEstudoComercial()
   dataFimPrevista      DateTime?
   dataFimReal          DateTime?
   dataInicio           DateTime?
