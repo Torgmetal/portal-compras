@@ -19,6 +19,10 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("[ensure-mes-tables] Verificando tabelas MES...");
 
+  // Origem CMR do recebimento — conciliacao do material com o CMR do Almoxarifado
+  // (lib/recebimento-cmr.js). Idempotente. 19/08/2026.
+  await prisma.$executeRawUnsafe(`ALTER TYPE "RecebimentoOrigem" ADD VALUE IF NOT EXISTS 'CMR'`).catch(() => {});
+
   // MesInativo (setores feitos fora / inativos sem produção, p/ o relatório de
   // furos). Idempotente — sempre garante, sem depender do bloco abaixo.
   await prisma.$executeRawUnsafe(`

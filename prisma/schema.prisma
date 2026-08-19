@@ -3948,6 +3948,7 @@ enum TipoPintura {
 enum RecebimentoOrigem {
   MANUAL
   OMIE_SYNC
+  CMR // conciliacao com o CMR do Almoxarifado (lib/recebimento-cmr.js)
 }
 
 enum DepartamentoCronograma {

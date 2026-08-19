@@ -7,6 +7,7 @@ import { prisma, prismaDirect } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { baixarCmrAtual } from "@/lib/sharepoint";
 import { parseCMR } from "@/lib/parse-cmr";
+import { conciliarRecebimentoCmr } from "@/lib/recebimento-cmr";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // planilha de ~17MB: download + parse passam de 60s
@@ -79,7 +80,17 @@ export async function GET(req) {
   }
   try {
     const r = await sincronizar(null);
-    return NextResponse.json({ ok: true, ...r });
+    // Com o CMR recém-atualizado, concilia o recebimento do Portal de Compras: material que o
+    // Almoxarifado lançou hoje deixa de aparecer como "aguardando entrega". Nunca derruba a sync
+    // do CMR — se a conciliação falhar, o CMR já está gravado e ela tenta de novo amanhã.
+    let conciliacao = null;
+    try {
+      const c = await conciliarRecebimentoCmr({ simular: false });
+      conciliacao = c.resumo;
+    } catch (e) {
+      conciliacao = { erro: e?.message || "falhou" };
+    }
+    return NextResponse.json({ ok: true, ...r, conciliacao });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 502 });
   }
