@@ -15,7 +15,7 @@ import { getAccessToken, acharPastaOp, uploadFileToFolder } from "@/lib/sharepoi
 import { rastreioDoConjunto } from "@/lib/rastreio-peca";
 import { carimbarDesenho } from "@/lib/carimbo-desenho";
 import { dataHoraBR } from "@/lib/data-br";
-import { consumivelVigenteEm } from "@/lib/consumivel-solda";
+import { consumivelDoConjunto } from "@/lib/consumivel-solda";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -141,7 +141,8 @@ export async function POST(req) {
       const bytes = new Uint8Array(await res.arrayBuffer());
       // consumível de solda vigente na data da emissão (muda quando entra lote novo no CMR)
       let consumivel = null;
-      try { consumivel = await consumivelVigenteEm(quando); } catch {}
+      // pela data em que o conjunto foi SOLDADO — reemitir hoje não troca o arame de julho
+      try { consumivel = await consumivelDoConjunto({ opId: op.id, marca, quando }); } catch {}
       const pdfOut = await carimbarDesenho(bytes, {
         opNumero, marca, setor: body.setor || null, formato: body.formato || null,
         arquivo: body.arquivo, usuario: user.name || user.email || "—", quando, itens, consumivel,
