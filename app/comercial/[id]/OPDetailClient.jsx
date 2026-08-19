@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
+import SaudeFinanceiraOP from "./SaudeFinanceiraOP";
 import MateriaisOPSection from "@/components/MateriaisOPSection";
 import { pesoRealPecas } from "@/lib/peso-op";
 import RelatoriosOPSection from "@/components/RelatoriosOPSection";
@@ -938,6 +939,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
         const diasPlan = op.dataInicio && op.dataFimPrevista ? Math.max(0, Math.round((new Date(op.dataFimPrevista) - new Date(op.dataInicio)) / DIA)) : null;
         return (
           <div className="space-y-6">
+            <SaudeFinanceiraOP opId={op.id} />
             <MargemTransformacaoOP opId={op.id} />
             <PrevisaoObra opId={op.id} />
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
