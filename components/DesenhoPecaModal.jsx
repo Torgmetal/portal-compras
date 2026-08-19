@@ -1,10 +1,12 @@
 "use client";
 // Desenhos (projetos) da peça — modal compartilhado (telas de produção + painel do PCP).
 // Lista os PDFs da marca na pasta da Engenharia (2.5.2 Fabricação) com o FORMATO de impressão
-// (A1/A2/A3/A4 = pasta; croqui = A4), abre pra visualizar/imprimir e registra a liberação (GRD):
-// quem imprimiu, quando, pra qual setor. O histórico embaixo é o controle de liberação.
+// (A1/A2/A3/A4 = pasta; croqui = A4) e EMITE o desenho: o portal carimba no PDF a rastreabilidade
+// do material daquela marca + quem emitiu, data e hora, arquiva o carimbado no SharePoint e amarra
+// o MESMO arquivo na §02 do Data Book. O histórico embaixo é o controle de liberação (GRD).
+// (Vitor 18/08: hoje o nº da rastreabilidade é copiado da planilha e escrito no croqui à mão.)
 import { useState, useEffect } from "react";
-import { X, Loader2, FileText, Printer, ExternalLink, AlertCircle, CheckCircle2 } from "lucide-react";
+import { X, Loader2, FileText, Printer, ExternalLink, AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
 
 const fmtDataHora = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + " " + new Date(d).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—");
 
@@ -21,7 +23,8 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, onClose
       .catch(() => setErro("Não foi possível buscar os desenhos."));
   }, [opNumero, marca]);
 
-  const abrir = (a) => window.open(`/api/producao/desenhos/arquivo?itemId=${encodeURIComponent(a.itemId)}&nome=${encodeURIComponent(a.nome)}`, "_blank");
+  const abrirItem = (itemId, nome) => window.open(`/api/producao/desenhos/arquivo?itemId=${encodeURIComponent(itemId)}&nome=${encodeURIComponent(nome)}`, "_blank");
+  const abrir = (a) => abrirItem(a.itemId, a.nome); // original, sem carimbo (só visualizar)
 
   async function liberar(a) {
     setRegistrando(a.itemId); setErro("");
@@ -33,7 +36,9 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, onClose
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao registrar");
       setDados((d) => ({ ...d, liberacoes: [j.liberacao, ...(d?.liberacoes || [])] }));
-      abrir(a); // registrou → já abre pra imprimir
+      if (j.avisoCarimbo) setErro(`Liberação registrada, mas: ${j.avisoCarimbo}`);
+      // abre o CARIMBADO (o mesmo que foi pro Data Book); se o carimbo falhou, cai no original
+      abrirItem(j.abrirItemId || a.itemId, j.abrirNome || a.nome);
     } catch (e) { setErro(e.message); } finally { setRegistrando(""); }
   }
 
@@ -73,9 +78,9 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, onClose
                     </div>
                     <button onClick={() => abrir(a)} title="Abrir o PDF (visualizar)"
                       className="text-[11px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2 py-1.5 hover:bg-blue-50 inline-flex items-center gap-1 shrink-0"><ExternalLink size={12} /> Abrir</button>
-                    <button onClick={() => liberar(a)} disabled={registrando === a.itemId} title="Registra a liberação (GRD) e abre pra imprimir"
+                    <button onClick={() => liberar(a)} disabled={registrando === a.itemId} title="Carimba a rastreabilidade do material + quem emitiu, data e hora; registra a GRD, arquiva no SharePoint, amarra na §02 do Data Book e abre pra imprimir"
                       className="text-[11px] font-semibold text-white bg-torg-blue hover:bg-torg-blue/90 rounded-lg px-2 py-1.5 inline-flex items-center gap-1 shrink-0 disabled:opacity-50">
-                      {registrando === a.itemId ? <Loader2 size={12} className="animate-spin" /> : <Printer size={12} />} Imprimir + GRD
+                      {registrando === a.itemId ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Emitir rastreado
                     </button>
                   </div>
                 );
@@ -90,6 +95,10 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, onClose
                 {liberacoes.map((l, i) => (
                   <p key={i} className="text-[11px] text-torg-gray">
                     <CheckCircle2 size={10} className="inline text-emerald-600 -mt-0.5" /> {l.arquivo}{l.formato ? ` · ${l.formato}` : ""}{l.setor ? ` · ${l.setor}` : ""} — {l.liberadoPorNome || "—"} em {fmtDataHora(l.createdAt)}
+                    {l.impressoItemId && (
+                      <button onClick={() => abrirItem(l.impressoItemId, `${marca} rastreado.pdf`)} title="Abrir o PDF carimbado que foi emitido (o mesmo do Data Book)"
+                        className="ml-1 text-torg-blue font-semibold hover:underline">ver emitido</button>
+                    )}
                   </p>
                 ))}
               </div>
@@ -98,7 +107,7 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, onClose
         </div>
 
         <div className="px-5 py-3 border-t border-gray-100">
-          <p className="text-[11px] text-torg-gray">O formato (A1–A4) vem da pasta da Engenharia — imprima no papel indicado. "Imprimir + GRD" registra a liberação pro setor (controle de GRD) e abre o PDF.</p>
+          <p className="text-[11px] text-torg-gray">O formato (A1–A4) vem da pasta da Engenharia — imprima no papel indicado. <b>"Emitir rastreado"</b> carimba no PDF a rastreabilidade do material (nº R, corrida, certificado) e quem emitiu com data/hora, registra a GRD, arquiva o carimbado na pasta da OP e amarra o <b>mesmo arquivo</b> na §02 do Data Book. Onde a corrida está indefinida, o carimbo sai com as candidatas e um campo pra anotar a usada. "Abrir" mostra o original, sem carimbo e sem registro.</p>
         </div>
       </div>
     </div>

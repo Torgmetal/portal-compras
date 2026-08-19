@@ -86,6 +86,10 @@ async function main() {
     )
   `);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "GrdLiberacao_opNumero_marca_idx" ON "GrdLiberacao"("opNumero", "marca")`);
+  // Emissão carimbada (rastreabilidade no desenho + arquivo amarrado ao Data Book). Idempotente.
+  for (const col of [`"rastreio" JSONB`, `"impressoItemId" TEXT`, `"impressoUrl" TEXT`, `"documentoId" TEXT`]) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "GrdLiberacao" ADD COLUMN IF NOT EXISTS ${col}`);
+  }
   console.log("[ensure-mes-tables] OK — GrdLiberacao garantida.");
 
   // OP.valorFaturarPorKg (R$/kg a faturar — base da previsão de faturamento). Idempotente.

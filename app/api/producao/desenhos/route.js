@@ -8,10 +8,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { getAccessToken, acharPastaOp } from "@/lib/sharepoint";
+import { getAccessToken, acharPastaOp, uploadFileToFolder } from "@/lib/sharepoint";
+import { rastreioDoConjunto } from "@/lib/rastreio-peca";
+import { carimbarDesenho } from "@/lib/carimbo-desenho";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // baixar A1 do SharePoint + carimbar + subir
 
 const ROLES = ["ADMIN", "PLANEJAMENTO", "PCP", "PRODUCAO", "COMERCIAL"];
 const GRAPH = "https://graph.microsoft.com/v1.0";
@@ -39,7 +42,7 @@ export async function GET(req) {
   const liberacoes = await prisma.grdLiberacao.findMany({
     where: { opNumero: String(opNumero).replace(/\D/g, "").padStart(3, "0"), marca },
     orderBy: { createdAt: "desc" },
-    select: { arquivo: true, formato: true, setor: true, liberadoPorNome: true, createdAt: true },
+    select: { arquivo: true, formato: true, setor: true, liberadoPorNome: true, createdAt: true, impressoItemId: true, rastreio: true },
   });
 
   let arquivos = [];
@@ -93,19 +96,107 @@ export async function POST(req) {
   try { body = schema.parse(await req.json()); }
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
+  const opNumero = String(body.opNumero).replace(/\D/g, "").padStart(3, "0");
+  const marca = body.marca.trim();
+  const quando = new Date();
+
+  // OP (pra achar as peças e a pasta) — o opId pode não vir da tela.
+  const op = await prisma.oP.findFirst({ where: { numero: opNumero }, select: { id: true, numero: true } });
+  const opId = body.opId || op?.id || null;
+
+  // 1) rastreabilidade da marca AGORA (croqui = a própria peça; conjunto = os croquis dele)
+  let itens = [];
+  try { if (opId) itens = await rastreioDoConjunto(opNumero, opId, marca); } catch {}
+
+  // 2) baixa o desenho original, carimba e arquiva. Se qualquer passo falhar, a liberação (GRD)
+  //    ainda é registrada e a tela cai no PDF original — o controle não pode parar por causa do
+  //    carimbo.
+  let carimbado = null, avisoCarimbo = null;
+  if (body.itemId) {
+    try {
+      const token = await getAccessToken();
+      const driveId = process.env.SHAREPOINT_DRIVE_ID;
+      const res = await fetch(`${GRAPH}/drives/${driveId}/items/${body.itemId}/content`, { headers: { Authorization: `Bearer ${token}` }, redirect: "follow" });
+      if (!res.ok) throw new Error(`SharePoint HTTP ${res.status}`);
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      const pdfOut = await carimbarDesenho(bytes, {
+        opNumero, marca, setor: body.setor || null, formato: body.formato || null,
+        arquivo: body.arquivo, usuario: user.name || user.email || "—", quando, itens,
+      });
+      const base = await acharPastaOp(opNumero);
+      const pasta = `${base || `/Ordem de Servico/01. OP/OP-${opNumero}`}/2. Engenharia/2.5 Projetos/2.5.2 Fabricação/Impressos rastreados`;
+      const carimbo = quando.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).replace(/[/:]/g, "-").replace(", ", " ");
+      carimbado = await uploadFileToFolder({
+        folderPath: pasta,
+        fileName: `${marca} - RASTREADO ${carimbo}.pdf`,
+        buffer: Buffer.from(pdfOut), contentType: "application/pdf",
+      });
+    } catch (e) { avisoCarimbo = e?.message || "Não consegui carimbar o desenho."; }
+  }
+
   const reg = await prisma.grdLiberacao.create({
     data: {
-      opId: body.opId || null,
-      opNumero: String(body.opNumero).replace(/\D/g, "").padStart(3, "0"),
-      marca: body.marca.trim(),
+      opId, opNumero, marca,
       arquivo: body.arquivo.trim(),
       formato: body.formato || null,
       setor: body.setor || null,
       itemId: body.itemId || null,
+      // snapshot do casamento no momento da emissão — é a prova do que foi pro chão de fábrica
+      rastreio: itens.length ? itens : undefined,
+      impressoItemId: carimbado?.id || null,
+      impressoUrl: carimbado?.webUrl || null,
       liberadoPorId: user.id,
       liberadoPorNome: user.name || null,
     },
   });
-  await prisma.auditLog.create({ data: { userId: user.id, action: "GRD_LIBERAR_DESENHO", entity: "GrdLiberacao", entityId: reg.id, diff: { op: reg.opNumero, marca: reg.marca, arquivo: reg.arquivo, formato: reg.formato, setor: reg.setor } } }).catch(() => {});
-  return NextResponse.json({ ok: true, liberacao: { arquivo: reg.arquivo, formato: reg.formato, setor: reg.setor, liberadoPorNome: reg.liberadoPorNome, createdAt: reg.createdAt } });
+
+  // 3) amarra no Data Book: o MESMO arquivo carimbado vira documento da §02 (Desenhos as-built).
+  //    Um documento por marca+arquivo — reemitir atualiza o ponteiro pro PDF mais novo, em vez de
+  //    encher a seção com uma cópia por impressão (o histórico completo fica na GRD).
+  let documentoId = null;
+  if (carimbado) {
+    try {
+      const nomeDoc = `${marca} — ${body.arquivo.replace(/\.pdf$/i, "")} (rastreado)`;
+      const existente = await prisma.documentoQualidade.findFirst({
+        where: { opNumero, categoria: "PROJETO", origem: "impressao_rastreada", nome: nomeDoc },
+        select: { id: true },
+      });
+      const dados = {
+        nome: nomeDoc, categoria: "PROJETO", tipo: "Desenho de fabricação (emissão rastreada)",
+        norma: "NBR 16775", opNumero, vinculo: `OP-${opNumero} · ${marca}`,
+        observacao: `Emitido por ${user.name || "—"} em ${quando.toLocaleString("pt-BR")}${body.setor ? ` · setor ${body.setor}` : ""}.`,
+        origem: "impressao_rastreada",
+        sharepointUrl: carimbado.webUrl, sharepointItemId: carimbado.id,
+        arquivoNome: carimbado.name, arquivoTipo: "application/pdf",
+      };
+      const doc = existente
+        ? await prisma.documentoQualidade.update({ where: { id: existente.id }, data: dados })
+        : await prisma.documentoQualidade.create({ data: { ...dados, createdById: user.id } });
+      documentoId = doc.id;
+      // vincula na §02 do Data Book da OP, se ela já existir (não cria Data Book do nada)
+      const secao = await prisma.dataBookSecao.findFirst({
+        where: { numero: "02", dataBook: { opNumero } },
+        select: { id: true },
+      });
+      if (secao) {
+        await prisma.dataBookSecaoDoc.upsert({
+          where: { secaoId_documentoId: { secaoId: secao.id, documentoId: doc.id } },
+          create: { secaoId: secao.id, documentoId: doc.id },
+          update: {},
+        });
+        await prisma.dataBookSecao.update({ where: { id: secao.id }, data: { estado: "ANEXADO" } }).catch(() => {});
+      }
+      await prisma.grdLiberacao.update({ where: { id: reg.id }, data: { documentoId } }).catch(() => {});
+    } catch (e) { avisoCarimbo = avisoCarimbo || `Carimbou, mas não consegui amarrar no Data Book: ${e?.message || e}`; }
+  }
+
+  await prisma.auditLog.create({ data: { userId: user.id, action: "GRD_LIBERAR_DESENHO", entity: "GrdLiberacao", entityId: reg.id, diff: { op: reg.opNumero, marca: reg.marca, arquivo: reg.arquivo, formato: reg.formato, setor: reg.setor, carimbado: !!carimbado, documentoId } } }).catch(() => {});
+
+  return NextResponse.json({
+    ok: true, avisoCarimbo,
+    liberacao: { arquivo: reg.arquivo, formato: reg.formato, setor: reg.setor, liberadoPorNome: reg.liberadoPorNome, createdAt: reg.createdAt, impressoItemId: reg.impressoItemId, rastreio: itens },
+    // é ESTE arquivo que a pessoa abre e imprime — o mesmo que foi pro Data Book
+    abrirItemId: carimbado?.id || body.itemId || null,
+    abrirNome: carimbado?.name || body.arquivo,
+  });
 }

@@ -3759,6 +3759,12 @@ model GrdLiberacao {
   formato         String? // A1 | A2 | A3 | A4 | A4 (croqui)
   setor           String? // bloco/setor de onde foi liberado (preparacao|montagem|acabamento|PCP)
   itemId          String? // id do arquivo no drive (pra reabrir)
+  // Emissão CARIMBADA: o PDF sai do portal com a rastreabilidade do material daquela marca,
+  // quem emitiu, data e hora — e o MESMO arquivo é arquivado e amarrado ao Data Book (§02).
+  rastreio        Json? // snapshot do casamento de corrida no momento da emissão (prova)
+  impressoItemId  String? // item do PDF CARIMBADO no SharePoint (é o que a pessoa abre/imprime)
+  impressoUrl     String? // webUrl do carimbado
+  documentoId     String? // DocumentoQualidade gerado (entra na §02 do Data Book)
   liberadoPorId   String?
   liberadoPorNome String?
   createdAt       DateTime @default(now())
