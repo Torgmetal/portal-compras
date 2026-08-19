@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import OrcamentoComercial from "@/components/OrcamentoComercial";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -20,10 +20,43 @@ export default function NovaOP() {
   const [itens, setItens] = useState([novoItem()]);
   // vínculo com o orçamento do Comercial (proposta + estudo)
   const [orc, setOrc] = useState({ pasta: null, ref: null, propostas: [], estudo: null, dados: null });
+  // Nº da OP vem pronto (Vitor 19/08: "o número da OP deve ser preenchida automática").
+  const [numAuto, setNumAuto] = useState(null);
+  useEffect(() => {
+    fetch("/api/comercial/op/proximo-numero")
+      .then((r) => r.json())
+      .then((j) => { if (j.proximo) { setNumAuto(j); setForm((f) => (f.numero ? f : { ...f, numero: j.proximo })); } })
+      .catch(() => {});
+  }, []);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // CLIENTE, OBRA e DESCRIÇÃO saem do que foi LIDO — proposta (PDF) e estudo (planilha).
+  // Vitor (19/08): "na descrição da obra você traz apenas os itens da planilha; precisa ter a
+  // leitura do PDF para informar tudo que está descrito em ambos".
+  const propostaLida = (orc.propostas || []).find((p) => p.cliente || p.descricao) || null;
+  const temProposta = !!propostaLida;
+  useEffect(() => {
+    if (!propostaLida && !orc.dados) return;
+    setForm((f) => {
+      const novo = { ...f };
+      if (propostaLida?.cliente && !f.cliente) novo.cliente = propostaLida.cliente;
+      if (propostaLida?.obra && !f.obra) novo.obra = propostaLida.obra;
+      // a descrição junta os dois: o texto da proposta e as quantidades do estudo
+      const daProposta = propostaLida?.descricao || "";
+      const doEstudo = (orc.dados?.familias?.familias || [])
+        .map((x) => `${x.nome}: ${Number(x.total).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${x.unidade}`)
+        .join(" · ");
+      const aco = orc.dados?.aco?.pesoKg
+        ? `Aço: ${Math.round(orc.dados.aco.pesoKg).toLocaleString("pt-BR")} kg${orc.dados.aco.areaPinturaM2 ? ` · pintura ${Math.round(orc.dados.aco.areaPinturaM2).toLocaleString("pt-BR")} m²` : ""}`
+        : "";
+      const junto = [daProposta, [aco, doEstudo].filter(Boolean).join(" · ")].filter(Boolean).join("\n\n");
+      if (junto && !f.descricao) novo.descricao = junto;
+      return novo;
+    });
+  }, [propostaLida, orc.dados]);
 
   const updateItem = (i, novo) => {
     setItens((prev) => prev.map((it, idx) => (idx === i ? novo : it)));
@@ -39,8 +72,12 @@ export default function NovaOP() {
   const submit = async (e) => {
     e.preventDefault();
     setErro("");
-    if (!form.numero.trim() || !form.cliente.trim()) {
-      setErro("Número da OP e Cliente são obrigatórios.");
+    if (!form.numero.trim()) {
+      setErro("Número da OP ainda carregando — aguarde um instante.");
+      return;
+    }
+    if (!form.cliente.trim()) {
+      setErro("Sem cliente: anexe a proposta acima (ele é lido dela) ou preencha à mão.");
       return;
     }
     const validos = itens.filter((it) => it.descricao.trim());
@@ -97,22 +134,19 @@ export default function NovaOP() {
         <h3 className="text-lg font-semibold text-torg-dark">Dados gerais</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">Nº OP *</label>
-            <input
-              type="text" value={form.numero} required
-              onChange={(e) => set("numero", e.target.value.toUpperCase())}
-              placeholder="Ex: T083"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono font-semibold focus:ring-2 focus:ring-torg-blue focus:border-transparent"
-            />
+            <label className="block text-sm font-medium text-torg-dark mb-1">Nº OP</label>
+            <input type="text" value={form.numero} readOnly
+              className="w-full border border-gray-200 bg-gray-50 text-torg-gray rounded-lg px-3 py-2 text-sm cursor-not-allowed"
+              title="Numeração automática — o próximo número livre" />
+            <p className="text-[11px] text-torg-gray mt-1">{numAuto ? `automático (último: ${String(numAuto.maior).padStart(3, "0")})` : "carregando…"}</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">Cliente *</label>
-            <input
-              type="text" value={form.cliente} required
+            <label className="block text-sm font-medium text-torg-dark mb-1">Cliente</label>
+            <input type="text" value={form.cliente} readOnly={temProposta}
               onChange={(e) => set("cliente", e.target.value)}
-              placeholder="Ex: JHSF"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
-            />
+              placeholder={temProposta ? "" : "vincule a proposta acima"}
+              className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm ${temProposta ? "bg-gray-50 text-torg-gray cursor-not-allowed" : ""}`} />
+            <p className="text-[11px] text-torg-gray mt-1">{temProposta ? "lido da proposta" : "vem da proposta quando você anexar uma"}</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-torg-dark mb-1">Obra</label>
