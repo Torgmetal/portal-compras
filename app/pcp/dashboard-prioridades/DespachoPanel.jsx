@@ -8,7 +8,7 @@
 // Baixa é SÓ do portal (PecaConjunto.baixaSetores[setor] = { qtd, em, por }); não escreve no Syneco.
 // Reusa /api/pcp/despacho (GET peças+placar+reconciliação, POST despacha / dá baixa por qtd).
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
-import { X, Loader2, Star, Truck, Package, FileDown, FileUp, CheckCircle2, Undo2, ClipboardList, ChevronRight, ChevronDown, Factory, FileText, AlertTriangle } from "lucide-react";
+import { X, Loader2, Star, Truck, Package, FileDown, FileUp, CheckCircle2, Undo2, ClipboardList, ChevronRight, ChevronDown, Factory, FileText, AlertTriangle, Printer } from "lucide-react";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 import CompraChip, { ModalRastreabilidade } from "@/components/CompraChip";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } from "@/lib/excel-relatorio";
@@ -91,6 +91,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const [rastroItem, setRastroItem] = useState(null); // peça com a rastreabilidade do material dela
   const [progItem, setProgItem] = useState(null); // peça com as ordens do Syneco (conferir a programação)
   const [separacao, setSeparacao] = useState(null); // lista de separação de material (Almoxarifado)
+  const [lote, setLote] = useState(null); // resultado da emissão em lote dos desenhos
   const [expandido, setExpandido] = useState(() => new Set()); // conjuntos abertos (ver croquis faltantes)
   const [terceiroPecas, setTerceiroPecas] = useState(null); // peças abertas no modal de terceiro
   const [desenhoMarca, setDesenhoMarca] = useState(null); // marca aberta no modal de desenhos (GRD)
@@ -296,6 +297,27 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
       if (!confirm(`Dar baixa em ${baixas.length} peça(s) de ${SETOR_LABEL[setor] || setor}?${aviso ? "\n\n" + aviso : ""}`)) { setEnviando(false); return; }
       await post({ baixaSetor: setor, baixas }, (j) => `Baixa aplicada em ${j.atualizados} peça(s).${naoAchou.length ? ` ${naoAchou.length} não encontradas.` : ""}${jaSyneco.length ? ` ${jaSyneco.length} já no Syneco.` : ""}`);
     } catch (e) { alert(e.message); setEnviando(false); }
+  }
+
+  // EMITIR EM LOTE os desenhos das peças selecionadas, já carimbados. Sai um PDF POR FORMATO
+  // (A1/A2/A4) — cada um vai numa bandeja diferente da impressora. (Vitor 19/08.)
+  async function emitirLote(acao) {
+    const alvo = (data?.pecas || []).filter((p) => sel.has(p.id));
+    if (!alvo.length) return alert("Selecione as peças para emitir os desenhos.");
+    const marcas = [...new Set(alvo.map((p) => p.marca))];
+    if (marcas.length > 80) return alert(`Lote máximo de 80 marcas por vez (selecionadas: ${marcas.length}). Divida em blocos.`);
+    if (!confirm(`${acao === "IMPRIMIR" ? "Imprimir (GRD)" : "Emitir"} ${marcas.length} desenho(s) carimbado(s)?\n\nSai um PDF por formato. Pode levar alguns minutos.`)) return;
+    setEnviando(true); setLote({ carregando: true });
+    try {
+      const r = await fetch("/api/producao/desenhos/lote", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opNumero: data.opNumero, marcas, setor: setor || null, acao }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao emitir o lote");
+      setLote(j);
+      for (const a of j.arquivos) window.open(`/api/producao/desenhos/arquivo?itemId=${encodeURIComponent(a.itemId)}&nome=${encodeURIComponent(a.nome)}`, "_blank");
+    } catch (e) { setLote(null); alert(e.message); } finally { setEnviando(false); }
   }
 
   async function exportar() {
@@ -655,6 +677,15 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                 <button key={d.key} onClick={() => (d.key === "TERCEIRO" ? abrirTerceiro() : despachar(d.key))} disabled={!sel.size || enviando} title={d.key === "TERCEIRO" ? "Escolher fornecedor + setor de retorno e gerar o romaneio do terceiro" : d.desc}
                   className={`text-[11px] font-semibold text-white rounded-lg px-2.5 py-2 inline-flex items-center gap-1 disabled:opacity-40 ${d.cor}`}><d.icon size={12} /> {d.label}</button>
               ))}
+              <span className="inline-flex items-center gap-1">
+                <button onClick={() => emitirLote("EMITIR")} disabled={!sel.size || enviando}
+                  title="Gera os desenhos das peças selecionadas já carimbados (R, corrida, quem emitiu, data) — um PDF por formato. Não registra GRD."
+                  className="text-[11px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-2 inline-flex items-center gap-1 disabled:opacity-40 hover:bg-blue-50"><FileText size={12} /> Desenhos em lote</button>
+                <button onClick={() => emitirLote("IMPRIMIR")} disabled={!sel.size || enviando}
+                  title="O mesmo, e REGISTRA A GRD de cada marca (liberação pro setor)"
+                  className="text-[11px] font-semibold text-white bg-torg-blue hover:bg-torg-blue/90 rounded-lg px-2.5 py-2 inline-flex items-center gap-1 disabled:opacity-40"><Printer size={12} /> Imprimir lote (GRD)</button>
+              </span>
+              <span className="w-px h-6 bg-gray-200 mx-1" />
               <button onClick={tirarPrioridade} disabled={!sel.size || enviando} title="Tira a marcação de prioridade das selecionadas (marcou errado)"
                 className="text-[11px] font-semibold text-torg-dark rounded-lg px-2.5 py-2 inline-flex items-center gap-1 disabled:opacity-40 bg-gray-100 hover:bg-gray-200"><Undo2 size={12} /> Tirar prioridade</button>
               <span className="w-px h-6 bg-gray-200 mx-1" />
@@ -688,10 +719,60 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     {rastroOp && data?.opNumero && <ModalRastreabilidade opNumero={data.opNumero} onClose={() => setRastroOp(false)} />}
     {rastroItem && <RastroDoItem peca={rastroItem} opNumero={data?.opNumero} onClose={() => setRastroItem(null)} />}
     {progItem && <OrdensDoItem peca={progItem} opId={data?.opId} setor={setor} sincronizadoEm={data?.ordensSincronizadasEm} onClose={() => setProgItem(null)} />}
+    {lote && <LoteDesenhos lote={lote} onClose={() => setLote(null)} />}
     {separacao && data?.opId && (
       <SeparacaoModal opId={data.opId} obra={obra} setor={setor} ids={separacao.ids} onClose={() => setSeparacao(null)} />
     )}
     </>
+  );
+}
+
+// Resultado da emissão em lote: um arquivo por formato + o que não tinha desenho.
+function LoteDesenhos({ lote, onClose }) {
+  const abrir = (a) => window.open(`/api/producao/desenhos/arquivo?itemId=${encodeURIComponent(a.itemId)}&nome=${encodeURIComponent(a.nome)}`, "_blank");
+  return (
+    <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className="bg-white text-torg-dark rounded-2xl w-full max-w-2xl shadow-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+          <h2 className="text-base font-bold inline-flex items-center gap-2"><Printer size={16} className="text-torg-blue" /> Desenhos em lote</h2>
+          <button onClick={onClose} className="text-torg-gray hover:text-red-600"><X size={18} /></button>
+        </div>
+        <div className="px-5 py-4 overflow-y-auto">
+          {lote.carregando ? (
+            <p className="text-[13px] text-torg-gray inline-flex items-center gap-2 py-6"><Loader2 size={16} className="animate-spin" /> Baixando os desenhos, carimbando e juntando… pode levar alguns minutos.</p>
+          ) : (
+            <>
+              <p className="text-[13px] mb-3"><b>{fmtN(lote.emitidas)}</b> desenho(s) emitido(s){lote.grds ? ` · ${fmtN(lote.grds)} GRD registrada(s)` : ""}. Um arquivo por formato — imprima cada um no papel certo.</p>
+              <div className="space-y-2">
+                {lote.arquivos.map((a) => (
+                  <div key={a.itemId} className="border border-gray-100 rounded-lg px-3 py-2 flex items-center gap-3">
+                    <span className="text-sm font-extrabold text-torg-blue w-12 shrink-0">{a.formato}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[12px] font-semibold truncate" title={a.nome}>{a.nome}</p>
+                      <p className="text-[11px] text-torg-gray">{fmtN(a.paginas)} página(s) · {fmtN(a.marcas.length)} marca(s)</p>
+                    </div>
+                    <button onClick={() => abrir(a)} className="text-[11px] font-semibold text-white bg-torg-blue hover:bg-torg-blue/90 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1 shrink-0"><Printer size={12} /> Abrir</button>
+                  </div>
+                ))}
+              </div>
+              {lote.semDesenho?.length > 0 && (
+                <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
+                  <AlertTriangle size={13} className="inline -mt-0.5" /> <b>{lote.semDesenho.length} marca(s) sem desenho</b> na pasta da Engenharia: {lote.semDesenho.slice(0, 10).join(", ")}{lote.semDesenho.length > 10 ? "…" : ""}
+                </p>
+              )}
+              {lote.erros?.length > 0 && (
+                <p className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-2">
+                  {lote.erros.length} falharam: {lote.erros.slice(0, 6).map((e) => `${e.marca} (${e.erro})`).join(" · ")}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+        <div className="px-5 py-2.5 border-t border-gray-100">
+          <p className="text-[11px] text-torg-gray">Cada página sai com o carimbo da <b>sua</b> marca — mesmo carimbo da emissão avulsa. Os arquivos ficam em <b>2.5.2 Fabricação › Impressos rastreados</b>.</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
