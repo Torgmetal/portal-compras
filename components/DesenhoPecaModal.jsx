@@ -56,7 +56,7 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, onClose
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div className="bg-white text-torg-dark rounded-2xl w-full max-w-lg shadow-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white text-torg-dark rounded-2xl w-full max-w-3xl shadow-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
           <h2 className="text-lg font-bold inline-flex items-center gap-2"><FileText size={18} className="text-torg-blue" /> Desenhos — <span className="font-mono">{marca}</span></h2>
           <button onClick={onClose} className="text-torg-gray hover:text-red-600"><X size={20} /></button>
@@ -75,25 +75,34 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, onClose
               {arquivos.map((a) => {
                 const lib = jaLiberado(a.nome);
                 return (
-                  <div key={a.itemId} className="border border-gray-100 rounded-lg px-3 py-2.5 flex items-center gap-3">
-                    <FileText size={16} className="text-red-500 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-semibold truncate">{a.nome}</p>
-                      <p className="text-[11px] text-torg-gray">
-                        {a.formato ? <span className="font-bold text-torg-blue">Imprimir em {a.formato}</span> : "formato não identificado"} · {a.sizeKb} kb
-                        {lib && <span className="text-emerald-700"> · <CheckCircle2 size={10} className="inline -mt-0.5" /> impresso {lib.impressoes > 1 ? `${lib.impressoes}× (última ${fmtDataHora(lib.ultimaImpressaoEm || lib.createdAt)})` : fmtDataHora(lib.createdAt)} por {lib.liberadoPorNome || "—"}</span>}
-                      </p>
+                  <div key={a.itemId} className="border border-gray-100 rounded-lg px-3 py-2.5">
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <FileText size={16} className="text-red-500 shrink-0 mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-semibold truncate" title={a.nome}>{a.nome}</p>
+                        <p className="text-[11px] text-torg-gray">
+                          {a.formato ? <span className="font-bold text-torg-blue">Imprimir em {a.formato}</span> : "formato não identificado"} · {a.sizeKb} kb
+                        </p>
+                        {lib && (
+                          <p className="text-[11px] text-emerald-700 mt-0.5">
+                            <CheckCircle2 size={10} className="inline -mt-0.5" /> impresso {lib.impressoes > 1 ? `${lib.impressoes}× · última ${fmtDataHora(lib.ultimaImpressaoEm || lib.createdAt)}` : fmtDataHora(lib.createdAt)} por {lib.liberadoPorNome || "—"}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <button onClick={() => abrir(a)} title="Abrir o PDF original da Engenharia, sem carimbo e sem registro"
-                      className="text-[11px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2 py-1.5 hover:bg-blue-50 inline-flex items-center gap-1 shrink-0"><ExternalLink size={12} /> Ver original</button>
-                    <button onClick={() => emitir(a, "EMITIR")} disabled={!!registrando} title="Carimba a rastreabilidade + quem emitiu com data/hora, arquiva na pasta da OP e amarra na §02 do Data Book. NÃO registra GRD — é só consultar."
-                      className="text-[11px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2 py-1.5 hover:bg-blue-50 inline-flex items-center gap-1 shrink-0 disabled:opacity-50">
-                      {ocupado(a, "EMITIR") ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Emitir carimbado
-                    </button>
-                    <button onClick={() => emitir(a, "IMPRIMIR")} disabled={!!registrando} title="Emite o carimbado e REGISTRA A GRD (liberação pro setor). Reimprimir a mesma peça soma no contador, não cria outra GRD."
-                      className="text-[11px] font-semibold text-white bg-torg-blue hover:bg-torg-blue/90 rounded-lg px-2 py-1.5 inline-flex items-center gap-1 shrink-0 disabled:opacity-50">
-                      {ocupado(a, "IMPRIMIR") ? <Loader2 size={12} className="animate-spin" /> : <Printer size={12} />} Imprimir (GRD)
-                    </button>
+                    {/* Botões numa linha própria: com três ações eles espremiam o nome do arquivo. */}
+                    <div className="flex items-center gap-2 flex-wrap justify-end mt-2 pt-2 border-t border-gray-50">
+                      <button onClick={() => abrir(a)} title="Abrir o PDF original da Engenharia, sem carimbo e sem registro"
+                        className="text-[11px] font-semibold text-torg-gray border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 inline-flex items-center gap-1"><ExternalLink size={12} /> Ver original</button>
+                      <button onClick={() => emitir(a, "EMITIR")} disabled={!!registrando} title="Carimba a rastreabilidade + quem emitiu com data/hora, arquiva na pasta da OP e amarra na §02 do Data Book. NÃO registra GRD — é só consultar."
+                        className="text-[11px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 inline-flex items-center gap-1 disabled:opacity-50">
+                        {ocupado(a, "EMITIR") ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Emitir carimbado
+                      </button>
+                      <button onClick={() => emitir(a, "IMPRIMIR")} disabled={!!registrando} title="Emite o carimbado e REGISTRA A GRD (liberação pro setor). Reimprimir a mesma peça soma no contador, não cria outra GRD."
+                        className="text-[11px] font-semibold text-white bg-torg-blue hover:bg-torg-blue/90 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1 disabled:opacity-50">
+                        {ocupado(a, "IMPRIMIR") ? <Loader2 size={12} className="animate-spin" /> : <Printer size={12} />} Imprimir (GRD)
+                      </button>
+                    </div>
                   </div>
                 );
               })}
