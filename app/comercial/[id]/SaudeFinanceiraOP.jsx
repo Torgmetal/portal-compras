@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Loader2, AlertCircle, HeartPulse, Info, ChevronDown, ChevronRight, TriangleAlert } from "lucide-react";
+import { Loader2, AlertCircle, HeartPulse, Info, ChevronDown, ChevronRight, TriangleAlert, FileSpreadsheet } from "lucide-react";
 
 const fmtMoeda = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
 const fmtCurto = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -22,6 +22,7 @@ export default function SaudeFinanceiraOP({ opId }) {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [aberta, setAberta] = useState(null);
+  const [exportando, setExportando] = useState(false);
 
   useEffect(() => {
     setLoading(true); setErro("");
@@ -48,7 +49,8 @@ export default function SaudeFinanceiraOP({ opId }) {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-start justify-between gap-4">
+        <div className="min-w-0">
         <h3 className="text-lg font-semibold text-torg-dark inline-flex items-center gap-2">
           <HeartPulse size={18} className="text-torg-blue" /> Saúde financeira
         </h3>
@@ -57,6 +59,24 @@ export default function SaudeFinanceiraOP({ opId }) {
           do contrato e os pedidos que formaram os dois lados da conta.
           {op?.estudoArquivo ? <> Base do estudo: <span className="font-medium text-torg-dark">{op.estudoArquivo}</span>.</> : null}
         </p>
+        </div>
+        {/* Vitor (19/08): "pensei no excel por ser editável" — o setor abre, filtra, escreve ao
+            lado o que discorda e devolve. Por isso vai em abas, não num relatório fechado. */}
+        <button
+          type="button"
+          onClick={async () => {
+            setExportando(true);
+            try { await exportarExcel(data, op?.numero); }
+            catch (e) { alert(`Erro ao exportar: ${e.message}`); }
+            finally { setExportando(false); }
+          }}
+          disabled={exportando}
+          title="Baixa tudo em Excel — resumo, verba por família, itens, pedidos, orçado × real e o que conferir, cada um numa aba"
+          className="shrink-0 inline-flex items-center gap-1.5 text-[12px] font-semibold text-torg-blue border border-torg-blue-200 hover:bg-torg-blue-50 rounded-lg px-3 py-1.5 disabled:opacity-50"
+        >
+          {exportando ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
+          {exportando ? "Gerando..." : "Exportar Excel"}
+        </button>
       </div>
 
       {/* ── OS TRÊS CENÁRIOS DE MARGEM ───────────────────────────────────────────────────── */}
@@ -383,4 +403,188 @@ function Confronto({ c }) {
       )}
     </div>
   );
+}
+
+/**
+ * EXPORTA A SAÚDE FINANCEIRA PRA EXCEL, no padrão de planilha da casa.
+ *
+ * Vitor (19/08/2026): "na aba do financeiro é possível criar um botão para podermos exportar
+ * todas as informações em um excel para podermos apresentar aos setores e verificar as
+ * informações? Eu pensei no excel por ser editável".
+ *
+ * Editável é o ponto: a planilha não é um retrato pra arquivar, é material de reunião — o setor
+ * abre, filtra, escreve ao lado o que discorda e devolve. Por isso vai em ABAS separadas, cada
+ * uma uma tabela limpa com autofiltro, em vez de um relatório único e bonito que ninguém consegue
+ * mexer.
+ *
+ * As abas de detalhe (itens e pedidos) são o que torna o número discutível: sem elas o setor vê
+ * "Tinta estourou 155%" e não tem como conferir de onde veio.
+ */
+async function exportarExcel(data, opNumero) {
+  const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook, CORES } =
+    await import("@/lib/excel-relatorio");
+  const { familias, totais, receita, estudo, margem, alertas, confrontos, expedicao, op } = data;
+  const D = (n) => (n == null ? "—" : Number(n));
+  const pctTxt = (v) => (v == null ? "—" : `${Number(v).toFixed(1)}%`);
+
+  const { workbook: wb, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+    titulo: `Saúde Financeira — OP-${opNumero}`,
+    subtitulo: op?.estudoArquivo ? `Base do estudo: ${op.estudoArquivo}` : "Sem planilha de estudo vinculada",
+    nomePlanilha: "Resumo",
+    codigoDoc: "REL-FIN-001",
+    totalColunas: 4,
+    kpis: [
+      `Receita líquida: ${fmtMoeda(receita.liquida)}  |  Verba estimada: ${fmtMoeda(totais.estimado)}  |  Já comprado: ${fmtMoeda(totais.realizado)}  |  Margem corrente: ${fmtMoeda(margem.corrente)}`,
+    ],
+  });
+  [34, 20, 20, 46].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+  let r = linhaInicio;
+  const secao = (titulo) => {
+    adicionarLinhaTabela(ws, r, [titulo, "", "", ""], { bold: true, fillColor: "EEF2F7", fontSize: 10 });
+    r++;
+  };
+  const linha = (rot, valor, nota = "") => {
+    adicionarLinhaTabela(ws, r, [rot, valor, "", nota], { alinhamento: ["left", "right", "left", "left"] });
+    r++;
+  };
+
+  secao("MARGEM — os três cenários");
+  linha("Margem do estudo (BDI)", D(margem.estudo), "o que o Comercial previu");
+  linha("Margem da OP na abertura", D(margem.prevista), "receita líquida − verba dos itens");
+  linha("Margem corrente", D(margem.corrente), "já com o que foi comprado acima da verba");
+  r++;
+
+  secao("RECEITA — o que se fatura");
+  linha("Contrato", D(receita.contrato), receita.contratoExplicito ? "informado na OP" : "soma das receitas");
+  linha("Receita bruta", D(receita.bruta));
+  linha("Impostos", D(-receita.impostos));
+  linha("Receita líquida", D(receita.liquida));
+  linha("Já faturado", D(receita.faturado), receita.faturadoPct != null ? `${pctTxt(receita.faturadoPct)} do contrato` : "");
+  r++;
+
+  secao("VERBA — o que se compra");
+  linha("Verba estimada", D(totais.estimado));
+  linha("Já em pedidos", D(totais.realizado), totais.pct != null ? `${pctTxt(totais.pct)} consumido` : "");
+  linha("Saldo", D(totais.saldo));
+  if (totais.naoAtribuido > 0) linha("Pedidos sem família identificada", D(totais.naoAtribuido), "conferir — não se amarram a nenhum item da OP");
+  r++;
+
+  if (estudo) {
+    secao("CUSTOS INFORMADOS NA PLANILHA DO COMERCIAL");
+    linha("Venda do estudo", D(estudo.venda));
+    linha("Custo de compra", D(estudo.custoDeCompra), "material + serviço terceirizado");
+    linha("  · Material", D(estudo.material));
+    linha("  · Serviço terceirizado", D(estudo.mdoTerceirizada));
+    linha("Industrialização", D(estudo.industrializacao), "fabricação nossa — não se compra");
+    linha("BDI", D(estudo.bdi), "impostos, risco, margem");
+    linha("Imposto destacado na nota", D(estudo.impostoNota));
+    linha("Crédito recuperável nas compras", D(estudo.credito));
+    linha("Imposto líquido da obra", D(estudo.impostoLiquido), estudo.impostoLiquidoPct ? pctTxt(estudo.impostoLiquidoPct * 100) : "");
+  }
+
+  // ── ABA: verba por família ───────────────────────────────────────────────────────────────
+  const wsFam = wb.addWorksheet("Verba por família");
+  [28, 18, 18, 18, 12, 30].forEach((w, i) => { wsFam.getColumn(i + 1).width = w; });
+  adicionarHeaderTabela(wsFam, 1, ["Família", "Estimado", "Realizado", "Saldo", "Consumo", "Situação"]);
+  let rf = 2;
+  for (const f of familias) {
+    adicionarLinhaTabela(wsFam, rf, [
+      f.label, D(f.estimado), D(f.realizado), f.estimado > 0 ? D(f.saldo) : "—", pctTxt(f.pct),
+      f.semEstimativa ? "compra sem verba prevista" : f.estourou ? "ESTOUROU a verba" : "",
+    ], {
+      alinhamento: ["left", "right", "right", "right", "right", "left"],
+      fontColors: f.estourou || f.semEstimativa ? { 5: "C0392B" } : undefined,
+    });
+    rf++;
+  }
+  if (totais.naoAtribuido > 0) {
+    adicionarLinhaTabela(wsFam, rf, ["Sem família identificada", "—", D(totais.naoAtribuido), "—", "—", "conferir a origem"], { alinhamento: ["left", "right", "right", "right", "right", "left"] });
+    rf++;
+  }
+  adicionarLinhaTotais(wsFam, rf, ["TOTAL", D(totais.estimado), D(totais.realizado), D(totais.saldo), pctTxt(totais.pct), ""]);
+
+  // ── ABA: itens do contrato (o lado ESTIMADO, aberto) ─────────────────────────────────────
+  const wsIt = wb.addWorksheet("Itens do contrato");
+  [24, 52, 18, 16, 16].forEach((w, i) => { wsIt.getColumn(i + 1).width = w; });
+  adicionarHeaderTabela(wsIt, 1, ["Família", "Descrição", "Verba", "Origem", "Faturamento"]);
+  let ri = 2;
+  for (const f of familias) {
+    for (const i of f.itens) {
+      adicionarLinhaTabela(wsIt, ri, [f.label, i.descricao || "", D(i.valor), i.origem === "base" ? "contrato base" : i.origem, i.fd ? "direto ao cliente" : "Torg"], { alinhamento: ["left", "left", "right", "left", "left"] });
+      ri++;
+    }
+  }
+
+  // ── ABA: pedidos (o lado REALIZADO, aberto) ──────────────────────────────────────────────
+  const wsPd = wb.addWorksheet("Pedidos");
+  [24, 14, 34, 14, 18, 22].forEach((w, i) => { wsPd.getColumn(i + 1).width = w; });
+  adicionarHeaderTabela(wsPd, 1, ["Família", "Pedido", "Fornecedor", "RM", "Valor", "Como foi atribuído"]);
+  let rp = 2;
+  for (const f of familias) {
+    for (const p of f.pedidos) {
+      adicionarLinhaTabela(wsPd, rp, [f.label, p.pedido || "—", p.fornecedor || "—", p.rm || "—", D(p.valor), `${p.via || ""}${p.rateado ? " · rateado entre famílias" : ""}`], { alinhamento: ["left", "left", "left", "left", "right", "left"] });
+      rp++;
+    }
+  }
+  for (const p of totais.pedidosSemFamilia || []) {
+    adicionarLinhaTabela(wsPd, rp, ["(sem família)", p.pedido || "—", p.fornecedor || "—", "—", D(p.valor), "não se amarra a nenhum item da OP"], { alinhamento: ["left", "left", "left", "left", "right", "left"] });
+    rp++;
+  }
+
+  // ── ABA: orçado × real na quantidade ─────────────────────────────────────────────────────
+  if (confrontos?.length) {
+    const wsQt = wb.addWorksheet("Orçado x real");
+    [22, 8, 14, 14, 10, 16, 18, 18, 34].forEach((w, i) => { wsQt.getColumn(i + 1).width = w; });
+    adicionarHeaderTabela(wsQt, 1, ["Grandeza", "Un.", "Orçado", "Na lista", "Desvio", "Verba", "Preço orçado", "Custo na qtd real", "Observação"]);
+    let rq = 2;
+    for (const c of confrontos) {
+      if (c.semComparacao) {
+        adicionarLinhaTabela(wsQt, rq, [c.rotulo, c.unidade, "—", "—", "—", "—", "—", "—", `item do contrato está em ${c.unidadeErrada} — unidade não comparável`], { alinhamento: ["left", "center", "right", "right", "right", "right", "right", "right", "left"] });
+      } else {
+        const cob = c.cobertura?.pct != null && c.cobertura.pct < 99
+          ? `${c.cobertura.comArea} de ${c.cobertura.pecas} peças fabricadas medidas`
+          : "";
+        adicionarLinhaTabela(wsQt, rq, [
+          c.rotulo, c.unidade, D(c.estimado), D(c.real), `${c.desvioPct > 0 ? "+" : ""}${c.desvioPct.toFixed(0)}%`,
+          D(c.verba), D(c.precoOrcado), D(c.custoProjetado),
+          [c.faltaDeVerba > 0 ? `faltam ${fmtCurto(c.faltaDeVerba)} de verba` : c.faltaDeVerba < 0 ? `sobram ${fmtCurto(-c.faltaDeVerba)}` : "", cob].filter(Boolean).join(" · "),
+        ], {
+          alinhamento: ["left", "center", "right", "right", "right", "right", "right", "right", "left"],
+          fontColors: Math.abs(c.desvioPct) >= 10 ? { 4: "C0392B" } : undefined,
+        });
+      }
+      rq++;
+    }
+    if (expedicao) {
+      rq++;
+      adicionarLinhaTabela(wsQt, rq, [
+        "Lista de expedição", "", `${expedicao.pecas} peças fabricadas`, `${Math.round(expedicao.pesoKg)} kg`, `${expedicao.areaM2.toFixed(2)} m²`, "", "", "",
+        `${expedicao.compradas} itens comprados (${Math.round(expedicao.compradasKg)} kg) ficam fora da conta · frentes: ${(expedicao.listas || []).map((l) => l.frente).join(", ")}`,
+      ], { fontSize: 8, alinhamento: ["left", "left", "left", "left", "left", "left", "left", "left", "left"] });
+    }
+  }
+
+  // ── ABA: pontos pra conferir ─────────────────────────────────────────────────────────────
+  if (alertas?.length) {
+    const wsAl = wb.addWorksheet("Conferir");
+    [16, 120].forEach((w, i) => { wsAl.getColumn(i + 1).width = w; });
+    adicionarHeaderTabela(wsAl, 1, ["Nível", "O que conferir"]);
+    let ra = 2;
+    for (const a of alertas) {
+      adicionarLinhaTabela(wsAl, ra, [a.nivel === "alerta" ? "ALERTA" : a.nivel === "atencao" ? "Atenção" : "Informação", a.texto], {
+        wrapText: true,
+        fontColors: a.nivel === "alerta" ? { 0: "C0392B" } : undefined,
+      });
+      ra++;
+    }
+  }
+
+  // formato de moeda nas colunas de dinheiro (é planilha pra editar — número tem de ser número)
+  const moeda = '"R$" #,##0.00';
+  for (const [sheet, cols] of [[ws, [2]], [wsFam, [2, 3, 4]], [wsIt, [3]], [wsPd, [5]]]) {
+    for (const c of cols) sheet.getColumn(c).numFmt = moeda;
+  }
+
+  await downloadWorkbook(wb, `Torg_SaudeFinanceira_OP-${opNumero}_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
