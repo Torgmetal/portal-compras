@@ -22,6 +22,14 @@ const patchEditSchema = z.object({
   valorFaturarPorKg: z.number().min(0).nullable().optional(),
   estoqueMaterial: z.enum(["PROPRIO_TORG", "CLIENTE_TERCEIRO"]).nullable().optional(),
   tipoDataBook: z.enum(["PADRAO_TORG", "SNQC", "RELATORIO_ACOMPANHAMENTO"]).nullable().optional(),
+  // vínculo com o orçamento do Comercial — as OPs antigas também precisam ser ligadas
+  // (Vitor 19/08: "as OPs já criadas vamos conseguir vincular elas também?")
+  orcamentoPasta: z.string().nullable().optional(),
+  orcamentoRef: z.string().nullable().optional(),
+  propostaTecnica: z.any().nullable().optional(),
+  propostaComercial: z.any().nullable().optional(),
+  estudoArquivo: z.any().nullable().optional(),
+  estudoDados: z.any().nullable().optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -123,6 +131,9 @@ export async function PATCH(req, { params }) {
   }
   if (edit.estoqueMaterial !== undefined) dataUpdate.estoqueMaterial = edit.estoqueMaterial || null;
   if (edit.tipoDataBook !== undefined) dataUpdate.tipoDataBook = edit.tipoDataBook || null;
+  for (const c of ["orcamentoPasta", "orcamentoRef", "propostaTecnica", "propostaComercial", "estudoArquivo", "estudoDados"]) {
+    if (edit[c] !== undefined) dataUpdate[c] = edit[c] ?? null;
+  }
 
   if (Object.keys(dataUpdate).length === 0) {
     return NextResponse.json({ ok: true, semMudancas: true });

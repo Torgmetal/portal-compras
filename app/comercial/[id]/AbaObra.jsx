@@ -1,5 +1,7 @@
 "use client";
+import { useState } from "react";
 import { Building2, Pencil, Hash, MapPin, CalendarRange, Users, AlertCircle } from "lucide-react";
+import OrcamentoComercial from "@/components/OrcamentoComercial";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const fmtR$ = (v) => (v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }));
@@ -17,6 +19,27 @@ function Campo({ rotulo, valor, destaque, dica }) {
 }
 
 export default function AbaObra({ op, podeEditar, onEditar }) {
+  // Vínculo com o orçamento do Comercial — as OPs antigas também precisam ser ligadas
+  // (Vitor 19/08: "as OPs já criadas vamos conseguir vincular elas também?").
+  const [orc, setOrc] = useState({
+    pasta: op.orcamentoPasta || null, ref: op.orcamentoRef || null,
+    tecnica: op.propostaTecnica || null, comercial: op.propostaComercial || null,
+    estudo: op.estudoArquivo || null, dados: op.estudoDados || null,
+  });
+  const [salvandoOrc, setSalvandoOrc] = useState("");
+  const salvarOrc = async (v) => {
+    setSalvandoOrc("salvando");
+    try {
+      const r = await fetch(`/api/comercial/op/${op.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orcamentoPasta: v.pasta, orcamentoRef: v.ref, propostaTecnica: v.tecnica,
+          propostaComercial: v.comercial, estudoArquivo: v.estudo, estudoDados: v.dados }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Erro ao salvar");
+      setSalvandoOrc("salvo");
+    } catch (e) { setSalvandoOrc(e.message); }
+  };
+
   const contatos = Array.isArray(op.clienteContatos) ? op.clienteContatos : [];
   const endereco = [op.clienteEndereco, op.clienteCidade, op.clienteUF, op.clienteCep].filter(Boolean).join(" · ");
 
@@ -105,6 +128,14 @@ export default function AbaObra({ op, podeEditar, onEditar }) {
           </div>
         )}
       </div>
+
+      {/* Orçamento do Comercial: proposta, estudo e as quantidades estimadas */}
+      <OrcamentoComercial valor={orc} onChange={(v) => { setOrc(v); setSalvandoOrc(""); }} opId={op.id} onSalvar={salvarOrc} />
+      {salvandoOrc && (
+        <p className={`text-[12px] ${salvandoOrc === "salvo" ? "text-emerald-700" : salvandoOrc === "salvando" ? "text-torg-gray" : "text-red-700"}`}>
+          {salvandoOrc === "salvo" ? "Vínculo salvo na OP." : salvandoOrc === "salvando" ? "Salvando…" : salvandoOrc}
+        </p>
+      )}
     </div>
   );
 }

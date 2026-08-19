@@ -18,7 +18,10 @@ export const maxDuration = 60;
 
 const ROLES = ["ADMIN", "COMERCIAL", "PLANEJAMENTO", "PCP"];
 const GRAPH = "https://graph.microsoft.com/v1.0";
-const RAIZ = "/Comercial/1. Orçamento";
+// Caminho confirmado pelo Vitor (19/08), na biblioteca SERVIDOR do site TorgMetal:
+//   .../sites/TorgMetal/SERVIDOR/Comercial/1. Orçamento/ORÇAMENTOS_2026
+// Aqui é relativo à raiz do drive (SHAREPOINT_DRIVE_ID já aponta pra SERVIDOR).
+const RAIZ = process.env.SHAREPOINT_ORCAMENTOS_BASE || "/Comercial/1. Orçamento";
 // Solicitados vem primeiro: OP nova costuma nascer de orçamento recém-aprovado.
 const FASES = ["1. Solicitados", "2. Concluidos", "1.Solicitados", "2.Concluídos"];
 
@@ -63,6 +66,14 @@ export async function GET(req) {
   }
 
   // ── 1) busca de orçamentos ───────────────────────────────────────────────────────────────
+  // `opId` = modo SUGESTÃO: ranqueia as pastas pelo nome contra cliente+obra da OP.
+  //
+  // 🚫 A sugestão NUNCA é aplicada sozinha. Testei nas 24 OPs mais recentes: 21 casam com ≥50%,
+  // mas entre elas há erro grosseiro — a OP-114 (Actemiun/Replan) casa com "294-25-LAAGE-REPLAN",
+  // que é outro cliente, e a OP-112 casa 75% com "250-25-DANPOWER-0328-PE-COBERTURA" quando o
+  // estudo certo é o "249-26-DANPOWER-0328-COBERTURA". Duas pastas quase idênticas: aplicar
+  // automático ligaria a OP ao orçamento errado, e estudo errado é comparar produção com o número
+  // de outra obra. Por isso vêm os 5 melhores, pra pessoa escolher.
   const q = norm(sp.get("q") || "");
   const anoPedido = sp.get("ano");
   const anos = (await filhos(token, driveId, RAIZ))
@@ -83,6 +94,23 @@ export async function GET(req) {
       if (dirs.length) break; // a fase existe com um nome só; não repete a busca nas variantes
     }
   }
+  const opId = sp.get("opId");
+  if (opId) {
+    const { prisma } = await import("@/lib/prisma");
+    const op = await prisma.oP.findUnique({ where: { id: opId }, select: { numero: true, cliente: true, obra: true } });
+    const palavras = (s2) => norm(s2).replace(/[^a-z0-9]+/g, " ").split(" ").filter((w) => w.length > 2);
+    const alvo = [...palavras(op?.cliente), ...palavras(op?.obra)];
+    if (alvo.length) {
+      const ranked = achados.map((a) => {
+        const pt = palavras(a.nome);
+        const hits = alvo.filter((w) => pt.some((x) => x === w || x.includes(w) || w.includes(x))).length;
+        return { ...a, score: Math.round((hits / alvo.length) * 100) };
+      }).filter((a) => a.score >= 40).sort((x, y) => y.score - x.score).slice(0, 5);
+      return NextResponse.json({ op, sugestoes: ranked, total: achados.length });
+    }
+    return NextResponse.json({ op, sugestoes: [], total: achados.length });
+  }
+
   // mais recentes primeiro (o nome começa com o número do orçamento)
   achados.sort((a, b) => b.nome.localeCompare(a.nome, "pt-BR", { numeric: true }));
   return NextResponse.json({ anos, orcamentos: achados.slice(0, 60), total: achados.length });
