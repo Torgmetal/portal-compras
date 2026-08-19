@@ -2,8 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Wrench, Flame,
-  Wind, Paintbrush, Package, Target, ListOrdered, Sparkles, Gauge, FileText, Truck, Tv, FolderKanban, Printer, Truck as TruckIcon,
+  LayoutDashboard, Package, Target, ListOrdered, Gauge, FileText, Truck, Tv, FolderKanban, Printer,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -21,16 +20,18 @@ const menu = [
   { href: "/pcp/terceirizados", label: "Terceirizados",   icon: Truck },
   // Controle de liberação de desenhos: quem levou qual desenho, quando e com qual R carimbado.
   { href: "/pcp/grd",          label: "GRD",              icon: Printer },
-  // Migração das obras antigas: traz os romaneios da pasta da OP pro portal.
-  { href: "/pcp/romaneios-antigos", label: "Romaneios antigos", icon: TruckIcon },
   { href: "/pcp/carga-corte",  label: "Carga do Corte",   icon: Gauge },
   { href: "/pcp/fila-corte",   label: "Corte",            icon: ListOrdered },
-  { href: "/pcp/montagem",     label: "Montagem",         icon: Wrench },
-  { href: "/pcp/solda",        label: "Solda",            icon: Flame },
-  { href: "/pcp/acabamento",   label: "Acabamento",       icon: Sparkles },
-  { href: "/pcp/jato",         label: "Jato",             icon: Wind },
-  { href: "/pcp/pintura",      label: "Pintura",          icon: Paintbrush },
 ];
+
+// FORA DO MENU DO PCP (Vitor 19/08/2026) — as PÁGINAS continuam no ar, só saíram daqui:
+//   /pcp/montagem · /pcp/solda · /pcp/acabamento · /pcp/jato · /pcp/pintura
+//     São invólucros das mesmas telas da Produção (importam os Clients de
+//     /producao/programacao/…) e continuam no menu de lá. O PCP fica com o que é dele:
+//     programação, PMP, prioridades e corte.
+//   /pcp/romaneios-antigos
+//     Ferramenta de migração — trouxe os romaneios da pasta da OP pro portal. Cumprida a
+//     migração, vira ruído no menu do dia a dia.
 
 export default function SidebarPCP() {
   const pathname = usePathname();
