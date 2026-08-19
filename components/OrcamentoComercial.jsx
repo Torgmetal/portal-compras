@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { metasDeCompra } from "@/lib/op-categorias";
 import { Folder, FolderTree, ChevronRight, Home, FileSpreadsheet, FileText, Loader2, AlertCircle, Check } from "lucide-react";
 
 // ORÇAMENTO DO COMERCIAL — vincula proposta e estudo à OP, e lê a planilha de estudo.
@@ -87,6 +88,8 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
   };
 
   const d = valor.dados;
+  // META DE COMPRA por família — é o número que o setor de Compras persegue.
+  const metas = useMemo(() => (d ? metasDeCompra(d.comercial, d.custos) : []), [d]);
   const fmt = (n) => (n == null ? "—" : Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 0 }));
   const money = (n) => (n == null ? "—" : Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }));
 
@@ -235,6 +238,47 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
             <div><p className="text-torg-gray text-[11px]">Tinta</p><p className="font-bold">{fmt((d.pintura?.itens || []).reduce((a, x) => a + (x.litros || 0), 0))} L</p></div>
             <div><p className="text-torg-gray text-[11px]">Áreas da obra</p><p className="font-bold">{d.aco?.itens?.length || d.aco?.perfis?.length || 0}</p></div>
           </div>
+          {metas.length > 0 && (
+            <div>
+              <p className="text-[11px] text-torg-gray mb-1">
+                Meta de compra por família — <b>quanto dá pra gastar em cada coisa</b>
+              </p>
+              <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
+                <table className="w-full text-[12px]">
+                  <thead className="bg-gray-50 text-torg-gray">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left font-medium">Família</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Meta (pedido)</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Crédito de imposto</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Custo líquido</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {metas.map((m) => (
+                      <tr key={m.categoria}>
+                        <td className="px-2 py-1.5 text-torg-dark">{m.label}</td>
+                        <td className="px-2 py-1.5 text-right font-bold text-torg-dark tabular-nums">{money(m.meta)}</td>
+                        <td className="px-2 py-1.5 text-right text-torg-gray tabular-nums">{m.credito ? money(m.credito) : "—"}</td>
+                        <td className="px-2 py-1.5 text-right text-torg-gray tabular-nums">{money(m.liquido)}</td>
+                      </tr>
+                    ))}
+                    <tr className="bg-gray-50 font-bold">
+                      <td className="px-2 py-1.5 text-torg-dark">Total de compra</td>
+                      <td className="px-2 py-1.5 text-right text-torg-blue tabular-nums">{money(metas.reduce((a, m) => a + m.meta, 0))}</td>
+                      <td className="px-2 py-1.5 text-right text-torg-gray tabular-nums">{money(metas.reduce((a, m) => a + m.credito, 0))}</td>
+                      <td className="px-2 py-1.5 text-right text-torg-gray tabular-nums">{money(metas.reduce((a, m) => a + m.liquido, 0))}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[10px] text-torg-gray mt-1">
+                A meta é o valor <b>bruto do pedido</b> — é contra ela que o painel de Compras compara o que já foi comprado.
+                ICMS e PIS/COFINS são crédito recuperável, então o custo real é o líquido. Industrialização e BDI ficam de
+                fora: não são compra.
+              </p>
+            </div>
+          )}
+
           {d.comercial?.totalGeral && (
             <div>
               <p className="text-[11px] text-torg-gray mb-1">Resumo do orçamento</p>
