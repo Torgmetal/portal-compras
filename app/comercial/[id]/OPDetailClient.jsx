@@ -267,7 +267,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                 {op.descricao && (
                   // ⚠ whitespace-pre-line: a descrição vem do estudo/proposta COM quebras de linha
                   // (títulos e itens); sem isso o HTML achatava tudo num parágrafo só.
-                  <p className="text-xs text-torg-gray mt-1.5 max-w-xl whitespace-pre-line leading-relaxed line-clamp-[12]" title={op.descricao}>{op.descricao}</p>
+                  <p className="text-xs text-torg-gray mt-1.5 max-w-xl whitespace-pre-line leading-relaxed">{op.descricao}</p>
                 )}
                 {(op.estoqueMaterial || op.tipoDataBook) && (
                   <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -748,7 +748,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <h4 className="font-semibold text-torg-orange-700">Aditivo {ad.numero}</h4>
-                    <p className="text-sm text-torg-gray whitespace-pre-line leading-relaxed line-clamp-[10]" title={ad.descricao}>{ad.descricao}</p>
+                    <p className="text-sm text-torg-gray whitespace-pre-line leading-relaxed">{ad.descricao}</p>
                     {(ad.dataInicio || ad.dataFimPrevista || ad.orcamentoRef) && (
                       <p className="text-[11px] text-torg-gray mt-1">
                         {ad.dataInicio && `início ${fmtData(ad.dataInicio)}`}
@@ -2629,16 +2629,16 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
       <p className="px-6 pt-4 text-xs font-semibold text-torg-gray uppercase tracking-wide">{titulo}</p>
       <div className="overflow-x-auto">
         {/* larguras fixas: sem elas a Descrição ficava espremida em 5 linhas e o resto sobrando */}
-        <table className="w-full text-sm min-w-[900px] table-fixed">
+        <table className="w-full text-sm min-w-[1040px] table-fixed">
           <thead className="bg-gray-50">
             <tr>
-              <th className="w-[130px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
+              <th className="w-[120px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-              <th className="w-[150px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Detalhes</th>
+              <th className="w-[130px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Detalhes</th>
               <th className="w-[90px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Local</th>
               <th className="w-[190px] px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Verba</th>
               <th className="w-[110px] px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Fat. direto</th>
-              <th className="w-[150px] px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
+              <th className="w-[130px] px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -2654,9 +2654,12 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
               return (
                 <tr key={it.id}>
                   <td className="px-4 py-3 align-top text-torg-gray text-xs">{labelCategoria(it.categoria)}</td>
-                  <td className="px-4 py-3 align-top text-torg-dark font-medium leading-snug" title={it.descricao}>
-                    <span className="line-clamp-2">{it.descricao}</span>
-                    {it.observacao && <span className="block text-[11px] font-normal text-torg-gray truncate" title={it.observacao}>{it.observacao}</span>}
+                  {/* ⚠ NADA de line-clamp/truncate aqui: Vitor (19/08) — "consegue trazer todas as
+                      informações escritas, pois abreviar pode nos atrapalhar". A descrição do item
+                      e a origem dele na planilha precisam ser lidas por inteiro. */}
+                  <td className="px-4 py-3 align-top text-torg-dark font-medium leading-snug break-words">
+                    <span className="block">{it.descricao}</span>
+                    {it.observacao && <span className="block text-[11px] font-normal text-torg-gray mt-0.5">{it.observacao}</span>}
                   </td>
                   <td className="px-4 py-3 align-top text-torg-gray text-xs">{detalhesItem(it)}</td>
                   <td className="px-4 py-3 align-top text-torg-gray text-xs">{localLabel(it.localEstoque) || "—"}</td>
