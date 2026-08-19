@@ -19,7 +19,7 @@ export default function NovaOP() {
   });
   const [itens, setItens] = useState([novoItem()]);
   // vínculo com o orçamento do Comercial (proposta + estudo)
-  const [orc, setOrc] = useState({ pasta: null, ref: null, tecnica: null, comercial: null, estudo: null, dados: null });
+  const [orc, setOrc] = useState({ pasta: null, ref: null, propostas: [], estudo: null, dados: null });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
@@ -57,7 +57,7 @@ export default function NovaOP() {
         body: JSON.stringify({
           ...form, itens: validos,
           orcamentoPasta: orc.pasta, orcamentoRef: orc.ref,
-          propostaTecnica: orc.tecnica, propostaComercial: orc.comercial,
+          propostas: orc.propostas,
           estudoArquivo: orc.estudo, estudoDados: orc.dados,
         }),
       });

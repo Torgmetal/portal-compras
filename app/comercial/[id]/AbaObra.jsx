@@ -23,7 +23,7 @@ export default function AbaObra({ op, podeEditar, onEditar }) {
   // (Vitor 19/08: "as OPs já criadas vamos conseguir vincular elas também?").
   const [orc, setOrc] = useState({
     pasta: op.orcamentoPasta || null, ref: op.orcamentoRef || null,
-    tecnica: op.propostaTecnica || null, comercial: op.propostaComercial || null,
+    propostas: op.propostas || [],
     estudo: op.estudoArquivo || null, dados: op.estudoDados || null,
   });
   const [salvandoOrc, setSalvandoOrc] = useState("");
@@ -32,8 +32,7 @@ export default function AbaObra({ op, podeEditar, onEditar }) {
     try {
       const r = await fetch(`/api/comercial/op/${op.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orcamentoPasta: v.pasta, orcamentoRef: v.ref, propostaTecnica: v.tecnica,
-          propostaComercial: v.comercial, estudoArquivo: v.estudo, estudoDados: v.dados }),
+        body: JSON.stringify({ orcamentoPasta: v.pasta, orcamentoRef: v.ref, propostas: v.propostas, estudoArquivo: v.estudo, estudoDados: v.dados }),
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Erro ao salvar");
       setSalvandoOrc("salvo");

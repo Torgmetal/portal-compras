@@ -123,8 +123,11 @@ model OP {
   // é a estimativa contra a qual o realizado vai ser comparado. Ver lib/estudo-comercial.js.
   orcamentoPasta       String? // caminho da pasta do orçamento (Comercial/1. Orçamento/...)
   orcamentoRef         String? // "249-26-DANPOWER-0328-COBERTURA"
-  propostaTecnica      Json? // { id, nome } no SharePoint — ou o PTC, quando vem junto
-  propostaComercial    Json?
+  // Lista de propostas anexadas — quantas forem. Cada uma guarda o que a LEITURA do PDF disse que
+  // ela contém (técnica, comercial, PTC, prazo, validade), em vez de a pessoa rotular na mão.
+  // Vitor (19/08): "deixar anexar mais de uma proposta, assim você avalia e informa o que contém
+  // em cada uma". Ver lib/proposta-comercial.js.
+  propostas            Json?
   estudoArquivo        Json? // { id, nome, modelo, revisao }
   estudoDados          Json? // saída de lerEstudoComercial()
   dataFimPrevista      DateTime?

@@ -26,8 +26,7 @@ const patchEditSchema = z.object({
   // (Vitor 19/08: "as OPs já criadas vamos conseguir vincular elas também?")
   orcamentoPasta: z.string().nullable().optional(),
   orcamentoRef: z.string().nullable().optional(),
-  propostaTecnica: z.any().nullable().optional(),
-  propostaComercial: z.any().nullable().optional(),
+  propostas: z.any().nullable().optional(),
   estudoArquivo: z.any().nullable().optional(),
   estudoDados: z.any().nullable().optional(),
 });
@@ -131,7 +130,7 @@ export async function PATCH(req, { params }) {
   }
   if (edit.estoqueMaterial !== undefined) dataUpdate.estoqueMaterial = edit.estoqueMaterial || null;
   if (edit.tipoDataBook !== undefined) dataUpdate.tipoDataBook = edit.tipoDataBook || null;
-  for (const c of ["orcamentoPasta", "orcamentoRef", "propostaTecnica", "propostaComercial", "estudoArquivo", "estudoDados"]) {
+  for (const c of ["orcamentoPasta", "orcamentoRef", "propostas", "estudoArquivo", "estudoDados"]) {
     if (edit[c] !== undefined) dataUpdate[c] = edit[c] ?? null;
   }
 

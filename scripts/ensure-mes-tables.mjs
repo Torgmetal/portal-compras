@@ -27,8 +27,7 @@ async function main() {
   for (const c of [
     `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "orcamentoPasta" TEXT`,
     `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "orcamentoRef" TEXT`,
-    `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "propostaTecnica" JSONB`,
-    `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "propostaComercial" JSONB`,
+    `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "propostas" JSONB`,
     `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "estudoArquivo" JSONB`,
     `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "estudoDados" JSONB`,
   ]) await prisma.$executeRawUnsafe(c).catch(() => {});

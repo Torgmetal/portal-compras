@@ -45,14 +45,32 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
   const pastaOrcamento = segmentos.length >= 3 ? segmentos.slice(0, 3).join("/") : null;
   const refOrcamento = segmentos.length >= 3 ? segmentos[2] : null;
 
-  const escolher = (campo, arq) => {
-    onChange({
-      ...valor,
-      pasta: pastaOrcamento || valor.pasta, ref: refOrcamento || valor.ref,
-      [campo]: { id: arq.id, nome: arq.nome },
-      ...(campo === "estudo" ? { dados: null } : {}),
-    });
+  // ANEXA QUANTAS PROPOSTAS FOREM — sem rótulo à mão. O portal lê o PDF e diz o que tem em cada
+  // uma (Vitor 19/08: "não ter uma escolha, deixar anexar mais de uma proposta, assim você avalia
+  // e informa o que contém em cada uma").
+  const propostas = valor.propostas || [];
+  const anexarProposta = async (arq) => {
+    if (propostas.some((p) => p.id === arq.id)) return;
+    const nova = { id: arq.id, nome: arq.nome, lendo: true };
+    const base = { ...valor, pasta: pastaOrcamento || valor.pasta, ref: refOrcamento || valor.ref, propostas: [...propostas, nova] };
+    onChange(base);
+    try {
+      const r = await fetch("/api/comercial/ler-proposta", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: arq.id, nome: arq.nome }),
+      });
+      const j = await r.json();
+      onChange({ ...base, propostas: base.propostas.map((p) => (p.id === arq.id ? { ...p, lendo: false, ...(r.ok ? j : { erro: j.error }) } : p)) });
+    } catch {
+      onChange({ ...base, propostas: base.propostas.map((p) => (p.id === arq.id ? { ...p, lendo: false, erro: "não consegui ler" } : p)) });
+    }
   };
+  const tirarProposta = (id) => onChange({ ...valor, propostas: propostas.filter((p) => p.id !== id) });
+
+  const escolherEstudo = (arq) => onChange({
+    ...valor, pasta: pastaOrcamento || valor.pasta, ref: refOrcamento || valor.ref,
+    estudo: { id: arq.id, nome: arq.nome }, dados: null,
+  });
 
   const lerEstudo = async () => {
     if (!valor.estudo) return;
@@ -70,8 +88,6 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
 
   const d = valor.dados;
   const fmt = (n) => (n == null ? "—" : Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 0 }));
-  const marcado = (arq) => ["tecnica", "comercial", "estudo"].filter((c) => valor[c]?.id === arq.id);
-  const rotulo = { tecnica: "técnica", comercial: "comercial", estudo: "estudo" };
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
@@ -81,7 +97,7 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
             <FolderTree size={18} className="text-torg-blue" /> Orçamento do Comercial
           </h3>
           <p className="text-sm text-torg-gray">
-            Navegue até a pasta do orçamento e escolha os documentos. A proposta fica em <b>6.Propostas</b> e a planilha em <b>5.Estudos</b>.
+            Navegue até a pasta do orçamento e anexe os documentos. As propostas ficam em <b>6.Propostas</b> e a planilha em <b>5.Estudos</b>.
           </p>
         </div>
         <button type="button" onClick={() => setAberto((a) => !a)}
@@ -93,24 +109,47 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
       {erro && <p className="text-[13px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 inline-flex items-center gap-2"><AlertCircle size={15} /> {erro}</p>}
 
       {/* selecionados */}
-      {(valor.tecnica || valor.comercial || valor.estudo) && (
-        <div className="rounded-lg border border-torg-blue-100 bg-torg-blue-50/40 px-3 py-2.5 space-y-1">
+      {(propostas.length > 0 || valor.estudo) && (
+        <div className="rounded-lg border border-torg-blue-100 bg-torg-blue-50/40 px-3 py-2.5 space-y-2">
           {valor.ref && <p className="text-[12px] font-bold text-torg-blue">{valor.ref}</p>}
-          {[["Proposta técnica", "tecnica"], ["Proposta comercial", "comercial"], ["Planilha de estudo", "estudo"]].map(([rot, campo]) => (
-            <p key={campo} className="text-[12px] flex items-center gap-2">
-              <span className="text-torg-gray w-32 shrink-0">{rot}</span>
-              {valor[campo] ? (
-                <>
-                  <span className="font-medium truncate">{valor[campo].nome}</span>
-                  <button type="button" onClick={() => onChange({ ...valor, [campo]: null, ...(campo === "estudo" ? { dados: null } : {}) })}
-                    className="text-torg-gray hover:text-red-600 text-[11px] underline shrink-0">tirar</button>
-                </>
-              ) : <span className="text-torg-gray-light">—</span>}
-            </p>
-          ))}
-          {valor.tecnica && valor.comercial && valor.tecnica.id === valor.comercial.id && (
-            <p className="text-[11px] text-torg-gray">Técnica e comercial no mesmo documento (PTC).</p>
+
+          {propostas.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[11px] text-torg-gray uppercase tracking-wide">Propostas anexadas</p>
+              {propostas.map((p) => (
+                <div key={p.id} className="bg-white border border-gray-100 rounded-lg px-2.5 py-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <FileText size={14} className="text-torg-gray shrink-0" />
+                    <span className="text-[12px] font-medium truncate flex-1 min-w-0" title={p.nome}>{p.nome}</span>
+                    {p.lendo ? <span className="text-[11px] text-torg-gray inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> lendo…</span>
+                      : p.erro ? <span className="text-[11px] text-amber-700">{p.erro}</span>
+                      : <span className={`text-[10px] font-bold rounded px-1.5 py-0.5 border ${p.tipo === "PTC" ? "text-emerald-700 bg-emerald-50 border-emerald-200" : p.tipo === "INDEFINIDA" ? "text-amber-700 bg-amber-50 border-amber-200" : "text-torg-blue bg-torg-blue-50 border-torg-blue-200"}`}>{p.tipo}</span>}
+                    <button type="button" onClick={() => tirarProposta(p.id)} className="text-[11px] text-torg-gray hover:text-red-600 underline shrink-0">tirar</button>
+                  </div>
+                  {!p.lendo && !p.erro && (
+                    <p className="text-[11px] text-torg-gray mt-1">
+                      {p.tecnica && "técnica"}{p.tecnica && p.comercial && " + "}{p.comercial && "comercial"}
+                      {p.prazoDias ? ` · prazo ${p.prazoDias} dias` : ""}
+                      {p.validadeDias ? ` · validade ${p.validadeDias} dias` : ""}
+                      {p.paginas ? ` · ${p.paginas} pág.` : ""}
+                    </p>
+                  )}
+                  {p.escopo && <p className="text-[11px] text-torg-dark mt-1 line-clamp-2">{p.escopo}</p>}
+                </div>
+              ))}
+            </div>
           )}
+
+          <p className="text-[12px] flex items-center gap-2">
+            <span className="text-torg-gray w-32 shrink-0">Planilha de estudo</span>
+            {valor.estudo ? (
+              <>
+                <span className="font-medium truncate">{valor.estudo.nome}</span>
+                <button type="button" onClick={() => onChange({ ...valor, estudo: null, dados: null })}
+                  className="text-torg-gray hover:text-red-600 text-[11px] underline shrink-0">tirar</button>
+              </>
+            ) : <span className="text-torg-gray-light">—</span>}
+          </p>
         </div>
       )}
 
@@ -148,26 +187,24 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
                   </button>
                 ))}
                 {arquivos.map((it) => {
-                  const marcas = marcado(it);
+                  const jaEscolhido = valor.estudo?.id === it.id || propostas.some((p) => p.id === it.id);
                   return (
                     <div key={it.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50/70">
                       {ehPlanilha(it.nome) ? <FileSpreadsheet size={17} className="text-emerald-700 shrink-0" /> : <FileText size={17} className="text-torg-gray shrink-0" />}
                       <a href={it.webUrl || "#"} target="_blank" rel="noopener noreferrer"
                         className="flex-1 min-w-0 truncate text-[13px] text-torg-dark hover:text-torg-blue" title={it.nome}>{it.nome}</a>
                       <span className="text-[11px] text-torg-gray tabular-nums whitespace-nowrap hidden sm:inline">{fmtD(it.modificado)} · {fmtTam(it.tamanho)}</span>
-                      {marcas.length > 0 && (
+                      {jaEscolhido && (
                         <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 shrink-0 inline-flex items-center gap-1">
-                          <Check size={11} /> {marcas.map((m) => rotulo[m]).join(" + ")}
+                          <Check size={11} /> anexado
                         </span>
                       )}
-                      <span className="flex gap-1 shrink-0">
-                        {(ehPlanilha(it.nome) ? ["estudo"] : ["tecnica", "comercial"]).map((campo) => (
-                          <button key={campo} type="button" onClick={() => escolher(campo, it)}
-                            className="text-[11px] font-semibold text-torg-blue border border-torg-blue-200 rounded px-1.5 py-0.5 hover:bg-torg-blue-50">
-                            usar como {rotulo[campo]}
-                          </button>
-                        ))}
-                      </span>
+                      {!jaEscolhido && (
+                        <button type="button" onClick={() => (ehPlanilha(it.nome) ? escolherEstudo(it) : anexarProposta(it))}
+                          className="text-[11px] font-semibold text-torg-blue border border-torg-blue-200 rounded px-2 py-0.5 hover:bg-torg-blue-50 shrink-0">
+                          {ehPlanilha(it.nome) ? "usar como estudo" : "anexar proposta"}
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -176,7 +213,7 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
           </div>
           <p className="text-[11px] text-torg-gray">
             Clique na pasta pra navegar, no nome do arquivo pra abrir no servidor, ou em <b>usar como</b> pra vincular na OP.
-            O mesmo documento pode ser técnica e comercial ao mesmo tempo — é o caso do PTC.
+            Pode anexar quantas propostas quiser — o portal lê cada uma e diz se é técnica, comercial ou as duas (PTC).
           </p>
         </>
       )}
