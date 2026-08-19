@@ -66,7 +66,7 @@ const textoMaterial = (p) => {
 };
 const textoProg = (p) => (p.programacao ? PROG[p.programacao.situacao]?.txt || "" : "");
 // Corrida em branco no CMR é informação, não vazio — o Vitor quer ver pra ir conferir.
-const textoCorrida = (p) => (!p.perfil || !p.material ? "" : p.material.corrida || "sem corrida");
+const textoCorrida = (p) => (!p.perfil || !p.material ? "" : p.material.corrida || "sem corrida no CMR");
 
 export default function DespachoPanel({ obra, setor, onClose, abaInicial = "despacho" }) {
   const [data, setData] = useState(null);
@@ -703,10 +703,10 @@ function OrdensDoItem({ peca, setor, sincronizadoEm, onClose }) {
 // croquis que o compõem, cada um com a corrida do seu perfil (Vitor 18/08: "quais rastreabilidades
 // foram usadas para cada perfil que compõe o conjunto"). O casamento é LPC × CMR pela data:
 // a peça só pode ter saído de material recebido ATÉ o dia em que foi cortada. Ver lib/rastreio-peca.js.
+// O R é quem manda: ele puxa corrida/lote, certificado, NF, pedido e fornecedor. (Vitor 18/08.)
 const SIT = {
-  DEFINIDA: { txt: "definida", cls: "bg-emerald-50 text-emerald-700", dica: "Só uma corrida desse material tinha chegado nesta OP até o dia do corte — a dedução é fechada." },
-  INDEFINIDA: { txt: "indefinida", cls: "bg-amber-100 text-amber-800", dica: "Mais de uma corrida do mesmo material já estava na fábrica no dia do corte. O portal NÃO escolhe: lista todas. Só quem separou a barra pode dizer qual foi." },
-  SEM_CORRIDA: { txt: "sem corrida", cls: "bg-amber-50 text-amber-700", dica: "O material chegou e tem nº de rastreabilidade, mas o CMR está sem a corrida/lote — dá pra achar pelo R e completar no Almoxarifado." },
+  R_DEFINIDO: { txt: "R definido", cls: "bg-emerald-50 text-emerald-700", dica: "Peça cortada e R atribuído: era a única entrada disponível no dia do corte, ou o FIFO (entrega mais antiga primeiro) apontou esta." },
+  AGUARDANDO_CORTE: { txt: "aguarda corte", cls: "bg-slate-100 text-slate-500", dica: "Peça ainda em aberto — o R só é atribuído quando ela é cortada." },
   ESTOQUE: { txt: "de estoque", cls: "bg-amber-50 text-amber-700", dica: "A peça foi cortada ANTES de qualquer entrega desta OP: saiu de sobra/estoque, o CMR desta OP não explica." },
   SEM_MATERIAL: { txt: "sem material", cls: "bg-slate-100 text-slate-500", dica: "Nenhuma entrada desse perfil no CMR desta OP." },
 };
@@ -763,19 +763,21 @@ function RastroDoItem({ peca, opNumero, onClose }) {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {itens.map((it, i) => {
-                    const u = it.usadas?.[0]; // vazio de propósito quando a corrida é INDEFINIDA
+                    const u = it.usadas?.[0]; // vazio de propósito enquanto a peça não foi cortada
                     const e = SIT[it.situacao] || SIT.SEM_MATERIAL;
-                    const nCand = new Set((it.candidatas || []).map((c) => c.corrida)).size;
+                    const nCand = (it.candidatas || []).length;
+                    // explica POR QUE este R: FIFO entre várias entradas, ou era a única
+                    const porQue = it.situacao === "R_DEFINIDO" && it.criterio === "fifo" && nCand > 1;
                     return (
                       <Fragment key={i}>
                         <tr>
                           {conjunto && <td className="py-1.5 font-mono font-semibold whitespace-nowrap">{it.marca}</td>}
                           <td className="py-1.5 whitespace-nowrap">{it.perfil || "—"}</td>
-                          <td className="py-1.5 whitespace-nowrap font-mono font-bold">
-                            {u?.rastreio || (nCand > 1 ? <span className="text-amber-700 font-sans font-semibold">{nCand} possíveis</span> : <span className="text-gray-300">—</span>)}
+                          <td className="py-1.5 whitespace-nowrap font-mono font-bold text-torg-dark">
+                            {u?.rastreio || <span className="text-gray-300 font-sans">—</span>}
                           </td>
                           <td className="py-1.5 whitespace-nowrap font-mono font-semibold">
-                            {u?.corrida || (u ? <span className="text-amber-600 font-semibold">sem corrida</span> : nCand > 1 ? <span className="text-amber-700 font-sans">ver abaixo</span> : <span className="text-gray-300">—</span>)}
+                            {u?.corrida || (u ? <span className="text-amber-600 font-sans font-semibold">sem corrida no CMR</span> : <span className="text-gray-300">—</span>)}
                           </td>
                           <td className="py-1.5 whitespace-nowrap font-mono text-torg-gray">{u?.certificado || "—"}</td>
                           <td className="py-1.5 whitespace-nowrap font-mono">{u?.nf || "—"}</td>
@@ -787,15 +789,17 @@ function RastroDoItem({ peca, opNumero, onClose }) {
                             {it.saldoEsgotado && <span className="ml-1 text-[10px] text-amber-700" title="Cortou-se mais desse material do que o CMR registra ter chegado — falta lançar recebimento.">⚠</span>}
                           </td>
                         </tr>
-                        {nCand > 1 && (
-                          <tr className="bg-amber-50/50">
+                        {(porQue || it.situacao === "ESTOQUE") && nCand > 0 && (
+                          <tr className={it.situacao === "ESTOQUE" ? "bg-amber-50/50" : "bg-emerald-50/40"}>
                             {conjunto && <td />}
                             <td colSpan={9} className="py-1.5 px-1 text-[11px]">
-                              <span className="text-amber-800 font-semibold">
-                                {it.situacao === "ESTOQUE" ? "Cortada antes de qualquer entrega — o material desta OP não explica. Entradas da OP:" : `Saiu de UMA destas ${nCand} corridas — as duas já estavam na fábrica no dia do corte:`}
+                              <span className={it.situacao === "ESTOQUE" ? "text-amber-800 font-semibold" : "text-emerald-800 font-semibold"}>
+                                {it.situacao === "ESTOQUE"
+                                  ? "Cortada antes de qualquer entrega — o material desta OP não explica. Entradas da OP:"
+                                  : `FIFO — ${nCand} entradas estavam disponíveis no dia do corte; vale a de entrega mais antiga:`}
                               </span>
                               <span className="ml-1 text-torg-gray">
-                                {it.candidatas.map((c) => `R ${c.rastreio || "—"} · corrida ${c.corrida || "—"} · cert ${c.certificado || "—"} (recebida ${fmtD(c.recebidoEm)}, ${Math.round(c.pesoKg || 0)} kg)`).join("   |   ")}
+                                {it.candidatas.map((c, k) => `${k === 0 && it.situacao !== "ESTOQUE" ? "✓ " : ""}R ${c.rastreio || "—"} · ${c.corrida ? `corrida ${c.corrida}` : "sem corrida"} (recebida ${fmtD(c.recebidoEm)}, ${Math.round(c.pesoKg || 0)} kg)`).join("   |   ")}
                               </span>
                             </td>
                           </tr>
@@ -810,7 +814,7 @@ function RastroDoItem({ peca, opNumero, onClose }) {
         </div>
         <div className="px-5 py-2.5 border-t border-gray-100">
           <p className="text-[11px] text-torg-gray">
-            Casamento automático: <b>peças da LPC</b> × <b>entradas do CMR</b> daquela OP. Só duas coisas definem a corrida, e as duas são fatos do CMR: <b>(1)</b> o material teve uma corrida só nesta OP, ou <b>(2)</b> as outras chegaram <b>depois</b> do dia em que a peça foi cortada (data do Syneco). Fora disso fica <b>indefinida</b> e o portal lista todas as candidatas — <b>não escolhe</b>. Premissa: o material é comprado e recebido por OP; peça cortada antes de qualquer entrega cai em "de estoque".
+            Casamento automático: <b>peças da LPC</b> × <b>entradas do CMR</b> daquela OP. O <b>R</b> é quem manda — é ele que puxa corrida/lote, certificado, NF, pedido e fornecedor. Regra: só peça <b>cortada</b> ganha R; entre as entradas disponíveis no dia do corte (data do Syneco) vale a de <b>entrega mais antiga</b> — <b>FIFO</b>, gastando o peso recebido antes de passar à próxima. Premissa: o material é comprado e recebido por OP; peça cortada antes de qualquer entrega cai em "de estoque".
           </p>
         </div>
       </div>
