@@ -15,6 +15,7 @@ import { getAccessToken, acharPastaOp, uploadFileToFolder } from "@/lib/sharepoi
 import { rastreioDoConjunto } from "@/lib/rastreio-peca";
 import { carimbarDesenho } from "@/lib/carimbo-desenho";
 import { dataHoraBR } from "@/lib/data-br";
+import { consumivelVigenteEm } from "@/lib/consumivel-solda";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -138,12 +139,31 @@ export async function POST(req) {
       const res = await fetch(`${GRAPH}/drives/${driveId}/items/${body.itemId}/content`, { headers: { Authorization: `Bearer ${token}` }, redirect: "follow" });
       if (!res.ok) throw new Error(`SharePoint HTTP ${res.status}`);
       const bytes = new Uint8Array(await res.arrayBuffer());
+      // consumível de solda vigente na data da emissão (muda quando entra lote novo no CMR)
+      let consumivel = null;
+      try { consumivel = await consumivelVigenteEm(quando); } catch {}
       const pdfOut = await carimbarDesenho(bytes, {
         opNumero, marca, setor: body.setor || null, formato: body.formato || null,
-        arquivo: body.arquivo, usuario: user.name || user.email || "—", quando, itens,
+        arquivo: body.arquivo, usuario: user.name || user.email || "—", quando, itens, consumivel,
       });
-      const base = await acharPastaOp(opNumero);
-      const pasta = `${base || `/Ordem de Servico/01. OP/OP-${opNumero}`}/2. Engenharia/2.5 Projetos/2.5.2 Fabricação/Impressos rastreados`;
+      // ⚠ SALVA NA MESMA PASTA DO DESENHO ORIGINAL (onde a Engenharia guarda os PDFs e às vezes
+      // os DWGs) — não numa pasta separada. Nada é apagado: só entra o carimbado ao lado do
+      // original. (Vitor 19/08: "a pasta que você precisa salvar no servidor tem que ser a pasta
+      // onde temos os desenhos anexos da engenharia... você não vai excluir, só vai salvar lá".)
+      let pasta = null;
+      try {
+        const rp = await fetch(`${GRAPH}/drives/${driveId}/items/${body.itemId}?$select=parentReference,name`, { headers: { Authorization: `Bearer ${token}` } });
+        if (rp.ok) {
+          const info = await rp.json();
+          const path = info?.parentReference?.path || ""; // "/drive/root:/Ordem de Servico/..."
+          const rel = decodeURIComponent(path.replace(/^\/drive(s\/[^/]+)?\/root:/, ""));
+          if (rel) pasta = rel;
+        }
+      } catch {}
+      if (!pasta) {
+        const base = await acharPastaOp(opNumero);
+        pasta = `${base || `/Ordem de Servico/01. OP/OP-${opNumero}`}/2. Engenharia/2.5 Projetos/2.5.2 Fabricação`;
+      }
       // nome do arquivo com a hora de BRASÍLIA (o servidor é UTC)
       const carimbo = dataHoraBR(quando).replace(/\/\d{4}/, "").replace(/[/:]/g, "-");
       carimbado = await uploadFileToFolder({
