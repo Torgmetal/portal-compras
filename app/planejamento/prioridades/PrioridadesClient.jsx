@@ -167,6 +167,7 @@ function Hub({ setTela }) {
           <ErroBox erro={erro} onRetry={() => carregar(false)} />
         ) : modo === "setor" ? (
           <>
+            <AvisoSemCronograma ops={dadosSetor?.semCronograma} />
             {temSetor ? (
               <div className="flex gap-3 overflow-x-auto pb-2">
                 {lanes.map((l) => <LaneSetor key={l.setor} lane={l} onAbrir={() => setTela(slugDoSetor(l.setor))} />)}
@@ -304,6 +305,46 @@ function TelaSetorUnico({ tela, setTela }) {
 
 // Linha de OP no tema claro-Torg — leve, direta (posição · OP · barra · % · falta),
 // com uma linha discreta de peças (prioritárias em laranja, próximas em cinza).
+// A OP entrou na fila pela PROGRAMAÇÃO do Syneco, mas ninguém gerou o cronograma dela. Vitor
+// (19/08): "coloca apenas sem cronograma, assim eu consigo correr para gerar o cronograma, e assim
+// que for criado esse cronograma você já tira esse aviso". O aviso some sozinho: com o cronograma
+// ativo a OP passa a entrar pelo primeiro caminho e não vem mais marcada.
+function ChipSemCronograma() {
+  return (
+    <span title="OP sem cronograma — as datas por setor não existem, então ela não tem prazo nem posição real na fila. Gere o cronograma em Planejamento › Cronogramas."
+      className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-300 rounded-lg px-2 py-1 inline-flex items-center gap-1 shrink-0">
+      <CalendarClock size={12} /> sem cronograma
+    </span>
+  );
+}
+
+function AvisoSemCronograma({ ops }) {
+  if (!ops?.length) return null;
+  return (
+    <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+      <div className="flex items-start gap-3">
+        <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+        <div className="min-w-0">
+          <p className="text-[13px] font-bold text-amber-800">
+            {ops.length} OP{ops.length > 1 ? "s" : ""} na fila sem cronograma
+          </p>
+          <p className="text-[12px] text-amber-700 mt-0.5">
+            Estão aparecendo porque a programação foi lançada no Syneco, mas sem cronograma elas não têm data por
+            setor — nem prazo, nem posição real na fila. Gere em <b>Planejamento › Cronogramas</b> e o aviso some sozinho.
+          </p>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {ops.map((o) => (
+              <span key={o.opNumero} className="text-[12px] font-semibold text-amber-900 bg-white border border-amber-300 rounded-lg px-2 py-1">
+                OP-{o.opNumero}<span className="font-normal text-amber-700"> · {o.obra || "—"}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LinhaOp({ op, onDespachar }) {
   // Corte sem detalhamento (sem croqui) → linha de ALERTA, sem barra/peças. Dois níveis:
   // SEM_LISTA_PRODUZINDO = a fábrica JÁ está produzindo sem a lista no portal (crítico).
@@ -320,6 +361,7 @@ function LinhaOp({ op, onDespachar }) {
           <div className={`flex-1 text-[15px] font-bold ${produzindo ? "text-red-700" : "text-amber-700"}`}>
             {produzindo ? "⚠ PRODUZINDO SEM LISTA no portal — importar LPC urgente" : "aguardando lista de corte da Engenharia"}
           </div>
+          {op.semCronograma && <ChipSemCronograma />}
           {op.compra && <CompraChip compra={op.compra} opNumero={op.opNumero} />}
           {op.entrega && (
             <span className={`text-[13px] inline-flex items-center gap-1 ${produzindo ? "text-red-700" : "text-amber-700"}`}><CalendarClock size={13} /> {fmtData(op.entrega)}</span>

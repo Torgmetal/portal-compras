@@ -49,7 +49,7 @@ export async function GET(req, { params }) {
     if (setorKey === "CORTE" && !temDetalhe) {
       if (semPecas) continue; // sem nenhuma peça importada → fora da fila do corte
       ops.push({
-        opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente,
+        opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente, semCronograma: !!o.semCronograma, semCronograma: !!o.semCronograma,
         entrega: es.entrega, atrasoDias: es.atrasoDias, doSetor: es.doSetor, estado: produzindo ? "SEM_LISTA_PRODUZINDO" : "SEM_LISTA",
         compra: compra.get(o.opNumero) || null,
         totalKg: 0, feitoKg: 0, pendenteKg: 0, pct: null,
@@ -71,7 +71,7 @@ export async function GET(req, { params }) {
     }, null);
     const estado = setorKey === "CORTE" ? (es.doSetor ? "FILA" : "SEM_PROGRAMACAO") : "FILA";
     ops.push({
-      opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente,
+      opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente, semCronograma: !!o.semCronograma,
       entrega: es.entrega, atrasoDias: es.atrasoDias, doSetor: es.doSetor, estado,
       totalKg: st.totalKg, feitoKg: st.feitoKg, pendenteKg: st.pendenteKg, pct: st.pct ?? 0,
       qtdPecas: pend.length, qtdPrioritarias: prioritarias.length,

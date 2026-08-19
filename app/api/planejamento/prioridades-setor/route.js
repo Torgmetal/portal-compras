@@ -56,7 +56,7 @@ export async function GET() {
           opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente,
           entrega: es.entrega, atrasoDias: es.atrasoDias, doSetor: es.doSetor,
           estado: o.produzindo ? "SEM_LISTA_PRODUZINDO" : "SEM_LISTA", totalKg: 0, feitoKg: 0, pendenteKg: 0, pct: null,
-          compra: compra.get(o.opNumero) || null,
+          compra: compra.get(o.opNumero) || null, semCronograma: !!o.semCronograma,
         });
         continue;
       }
@@ -68,7 +68,7 @@ export async function GET() {
         opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente,
         entrega: es.entrega, atrasoDias: es.atrasoDias, doSetor: es.doSetor, estado,
         totalKg: st.totalKg, feitoKg: st.feitoKg, pendenteKg: st.pendenteKg, pct: st.pct ?? 0,
-        compra: s.key === "CORTE" ? compra.get(o.opNumero) || null : null,
+        compra: s.key === "CORTE" ? compra.get(o.opNumero) || null : null, semCronograma: !!o.semCronograma,
       });
     }
     // Fila real por urgência; alertas (sem lista) por último.
@@ -85,7 +85,16 @@ export async function GET() {
   // Compat: lista de obras sem lista (agora também sinalizadas como alerta na raia do Corte).
   const aguardando = obrasAguardandoLista(porObra);
 
-  return NextResponse.json({ lanes, aguardando, geradoEm: new Date().toISOString() });
+  // OPs que estão na tela SEM cronograma — pra correr e gerar. Some sozinho quando o cronograma
+  // é criado: aí a OP passa a entrar pelo primeiro caminho e o marcador não vem mais.
+  // (Vitor 19/08: "coloca apenas sem cronograma, assim eu consigo correr para gerar o cronograma,
+  // e assim que for criado esse cronograma você já tira esse aviso".)
+  const semCronograma = porObra
+    .filter((o) => o.semCronograma && (o.universo?.length || o.realMap?.size))
+    .map((o) => ({ opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, porProgramacao: !!o.porProgramacao }))
+    .sort((a, b) => String(a.opNumero).localeCompare(String(b.opNumero), "pt-BR", { numeric: true }));
+
+  return NextResponse.json({ lanes, aguardando, semCronograma, geradoEm: new Date().toISOString() });
 }
 
 export function obrasAguardandoLista(porObra) {
