@@ -13,7 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { getAccessToken, acharPastaOp, uploadFileToFolder } from "@/lib/sharepoint";
 import { rastreioDoConjunto } from "@/lib/rastreio-peca";
-import { carimbarComAnexo } from "@/lib/carimbo-desenho";
+import { carimbarDesenho } from "@/lib/carimbo-desenho";
 import { dataHoraBR } from "@/lib/data-br";
 import { consumivelDoConjunto } from "@/lib/consumivel-solda";
 
@@ -143,9 +143,7 @@ export async function POST(req) {
       let consumivel = null;
       // pela data em que o conjunto foi SOLDADO — reemitir hoje não troca o arame de julho
       try { consumivel = await consumivelDoConjunto({ opId: op.id, marca }); } catch {}
-      // conjunto sai com a FOLHA A4 ANEXA atrás do desenho (a tabela por posição não cabe na
-      // folha sem cobrir o projeto)
-      const pdfOut = await carimbarComAnexo(bytes, {
+      const pdfOut = await carimbarDesenho(bytes, {
         opNumero, marca, setor: body.setor || null, formato: body.formato || null,
         arquivo: body.arquivo, usuario: user.name || user.email || "—", quando, itens, consumivel,
       });

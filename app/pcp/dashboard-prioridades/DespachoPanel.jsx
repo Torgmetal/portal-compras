@@ -797,7 +797,7 @@ function LoteDesenhos({ lote, onClose }) {
           )}
         </div>
         <div className="px-5 py-2.5 border-t border-gray-100">
-          <p className="text-[11px] text-torg-gray">Cada página sai com o carimbo da <b>sua</b> marca. Conjunto leva uma <b>folha A4 anexa</b> com o R de cada posição — ela vai no arquivo A4, não no meio dos A1. Os originais ficam na pasta dos desenhos da Engenharia.</p>
+          <p className="text-[11px] text-torg-gray">Cada página sai com o carimbo da <b>sua</b> marca. No conjunto, o R do arame é escrito no campo <b>CONSUMÍVEL</b> do próprio desenho. Os originais ficam na pasta dos desenhos da Engenharia.</p>
         </div>
       </div>
     </div>
