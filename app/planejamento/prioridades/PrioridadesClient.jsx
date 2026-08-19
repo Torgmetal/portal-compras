@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Loader2, AlertCircle, RefreshCw, Maximize2, Minimize2, CalendarClock, Inbox, CheckCircle2, Lock, AlertTriangle, Truck, Columns3, LayoutGrid, ArrowLeft, RotateCw, Flag, ListOrdered, Maximize, X, Plus, Trash2 } from "lucide-react";
 import DespachoPanel from "@/app/pcp/dashboard-prioridades/DespachoPanel";
 import CompraChip from "@/components/CompraChip";
@@ -319,7 +320,31 @@ function ChipSemCronograma() {
 }
 
 function AvisoSemCronograma({ ops }) {
+  const router = useRouter();
+  const [ocultando, setOcultando] = useState(null);
   if (!ops?.length) return null;
+
+  // DISPENSAR: tira a OP da fonte "programação" da fila. Vitor (19/08): "essas OPs pode tirar o
+  // alerta por ora, vamos deixar apenas a OP-60 aparecendo". Não some de vez — volta sozinha se
+  // for fixada à mão ou enviada pra produção, e dá pra desfazer na API.
+  const dispensar = async (op) => {
+    if (!window.confirm(`Tirar a OP-${op.opNumero} da fila de prioridades?\n\nEla sai do aviso e da fila enquanto vier só pela programação do Syneco. Volta a aparecer se for fixada à mão ou enviada pra produção.`)) return;
+    setOcultando(op.opNumero);
+    try {
+      const res = await fetch("/api/planejamento/prioridade-op-oculta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opNumero: op.opNumero, motivo: "dispensada no aviso de sem cronograma" }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+      router.refresh();
+    } catch (e) {
+      alert(`Não consegui dispensar: ${e.message}`);
+    } finally {
+      setOcultando(null);
+    }
+  };
+
   return (
     <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
       <div className="flex items-start gap-3">
@@ -334,8 +359,17 @@ function AvisoSemCronograma({ ops }) {
           </p>
           <div className="flex flex-wrap gap-1.5 mt-2">
             {ops.map((o) => (
-              <span key={o.opNumero} className="text-[12px] font-semibold text-amber-900 bg-white border border-amber-300 rounded-lg px-2 py-1">
+              <span key={o.opNumero} className="text-[12px] font-semibold text-amber-900 bg-white border border-amber-300 rounded-lg pl-2 pr-1 py-1 inline-flex items-center gap-1.5">
                 OP-{o.opNumero}<span className="font-normal text-amber-700"> · {o.obra || "—"}</span>
+                <button
+                  type="button"
+                  onClick={() => dispensar(o)}
+                  disabled={ocultando === o.opNumero}
+                  title="Tirar da fila — some do aviso enquanto vier só pela programação do Syneco"
+                  className="text-amber-500 hover:text-amber-800 hover:bg-amber-100 rounded p-0.5 disabled:opacity-40"
+                >
+                  <X size={13} />
+                </button>
               </span>
             ))}
           </div>

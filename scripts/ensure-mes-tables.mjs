@@ -70,6 +70,22 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PrioridadeTvOp_opId_idx" ON "PrioridadeTvOp"("opId")`);
   console.log("[ensure-mes-tables] OK — PrioridadeTvOp garantida.");
 
+  // PrioridadeTvOculta (o contrário: OP dispensada da fila de prioridades). Idempotente.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "PrioridadeTvOculta" (
+      "id"          TEXT         NOT NULL,
+      "opNumero"    TEXT         NOT NULL,
+      "opId"        TEXT,
+      "motivo"      TEXT,
+      "criadoPorId" TEXT,
+      "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "PrioridadeTvOculta_pkey" PRIMARY KEY ("id")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PrioridadeTvOculta_opNumero_key" ON "PrioridadeTvOculta"("opNumero")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PrioridadeTvOculta_opId_idx" ON "PrioridadeTvOculta"("opId")`);
+  console.log("[ensure-mes-tables] OK — PrioridadeTvOculta garantida.");
+
   // ProdutoOmie (cache do cadastro de produtos do Omie — código do item nos romaneios). Idempotente.
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "ProdutoOmie" (

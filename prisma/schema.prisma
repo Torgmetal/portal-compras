@@ -3849,6 +3849,27 @@ model PrioridadeTvOp {
   @@index([opId])
 }
 
+// O CONTRÁRIO da PrioridadeTvOp: OP que NÃO deve aparecer na fila de prioridades.
+//
+// A fila puxa OP de quatro fontes, e uma delas é "o programador lançou no Syneco". Isso é certo
+// (senão a OP fica invisível pro PCP), mas traz de volta obra antiga que ainda tem peça em aberto
+// no dado — a OP-064 voltou com 2.441 peças. Não dá pra separar por status: todas estão ABERTA.
+// Vitor (19/08/2026): "essas OPs pode tirar o alerta por ora, vamos deixar apenas a OP-60
+// aparecendo".
+//
+// Dispensa é DECISÃO, não regra: fica gravada com quem dispensou e quando, e some ao ser
+// desfeita. Nada é apagado da OP.
+model PrioridadeTvOculta {
+  id          String   @id @default(cuid())
+  opNumero    String   @unique
+  opId        String?
+  motivo      String?
+  criadoPorId String?
+  createdAt   DateTime @default(now())
+
+  @@index([opId])
+}
+
 // Pedido de expedição: o Planejamento "envia para a Expedição" as entregas
 // (qtd + local) definidas por conjunto (ConjuntoEntrega). Uma por obra. A
 // Expedição lê as entregas vivas agrupadas por destino, monta o romaneio,
