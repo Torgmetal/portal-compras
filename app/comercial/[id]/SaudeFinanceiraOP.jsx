@@ -44,7 +44,7 @@ export default function SaudeFinanceiraOP({ opId }) {
   );
   if (!data) return null;
 
-  const { familias, totais, receita, estudo, margem, alertas, op } = data;
+  const { familias, totais, receita, estudo, margem, alertas, confrontos, expedicao, op } = data;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -138,6 +138,24 @@ export default function SaudeFinanceiraOP({ opId }) {
             — assim frete e desconto do pedido não somem da conta.
           </p>
         </div>
+
+        {/* ── ESTIMADO × REALIZADO NA QUANTIDADE ─────────────────────────────────────────── */}
+        {confrontos.length > 0 && (
+          <div>
+            <p className="text-sm font-semibold text-torg-dark mb-2">
+              Orçado × real, na quantidade
+            </p>
+            <div className="space-y-2">
+              {confrontos.map((c) => <Confronto key={c.rotulo} c={c} />)}
+            </div>
+            <p className="text-[10px] text-torg-gray mt-1.5">
+              O real vem da <b>lista de expedição</b>, que traz área e peso de cada marca
+              {expedicao?.listas?.length ? <> ({expedicao.listas.map((l) => l.frente).join(", ")})</> : null}.
+              O custo é projetado ao <b>preço que o próprio orçamento usou</b> — mede o erro de
+              orçamento sozinho, sem misturar com preço de compra. Desvio de preço se apura na cotação.
+            </p>
+          </div>
+        )}
 
         {/* ── CUSTOS INFORMADOS NA PLANILHA ──────────────────────────────────────────────── */}
         {estudo ? (
@@ -299,5 +317,61 @@ function FamiliaLinhas({ f, aberta, onToggle }) {
         </tr>
       )}
     </>
+  );
+}
+
+/** Uma grandeza confrontada: quanto se orçou, quanto a obra tem de verdade, e o que isso custa. */
+function Confronto({ c }) {
+  if (c.semComparacao) {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-[12px] text-amber-800 flex items-start gap-2">
+        <TriangleAlert size={13} className="mt-0.5 shrink-0" />
+        <span>
+          <b>{c.rotulo}</b> — o item do contrato está em <b>{c.unidadeErrada}</b>, não em {c.unidade}.
+          Sem unidade comparável não dá pra confrontar com a lista de expedição.
+        </span>
+      </div>
+    );
+  }
+
+  const pra_cima = c.desvioPct > 0;
+  const relevante = Math.abs(c.desvioPct) >= 10;
+  const parcial = c.cobertura?.pct != null && c.cobertura.pct < 99;
+  const num = (v, casas = 0) => Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: casas });
+
+  return (
+    <div className={`rounded-lg border px-3 py-2.5 ${relevante ? (pra_cima ? "border-red-200 bg-red-50/40" : "border-amber-200 bg-amber-50/40") : "border-gray-200"}`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <p className="text-[13px] font-semibold text-torg-dark">
+          {c.rotulo}
+          {c.fonte && <span className="font-normal text-torg-gray text-[11px]"> · orçado no {c.fonte}</span>}
+        </p>
+        <p className={`text-[13px] font-bold tabular-nums ${relevante ? (pra_cima ? "text-red-600" : "text-amber-700") : "text-torg-dark"}`}>
+          {pra_cima ? "+" : ""}{c.desvioPct.toFixed(0)}%
+        </p>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 mt-1.5 text-[12px]">
+        <div><span className="text-torg-gray">Orçado</span><br /><b className="tabular-nums">{num(c.estimado)} {c.unidade}</b></div>
+        <div><span className="text-torg-gray">Na lista</span><br /><b className="tabular-nums">{num(c.real)} {c.unidade}</b></div>
+        <div><span className="text-torg-gray">Verba</span><br /><b className="tabular-nums">{fmtMoeda(c.verba)}</b></div>
+        <div>
+          <span className="text-torg-gray">Custo na quantidade real</span><br />
+          <b className="tabular-nums">{c.custoProjetado == null ? "—" : fmtMoeda(c.custoProjetado)}</b>
+          {c.faltaDeVerba != null && Math.abs(c.faltaDeVerba) > 1 && (
+            <span className={`ml-1 text-[11px] font-semibold ${c.faltaDeVerba > 0 ? "text-red-600" : "text-green-700"}`}>
+              ({c.faltaDeVerba > 0 ? "falta " : "sobra "}{fmtCurto(Math.abs(c.faltaDeVerba))})
+            </span>
+          )}
+        </div>
+      </div>
+      {parcial && (
+        <p className="text-[11px] text-torg-gray mt-1.5">
+          A lista tem <b>{c.cobertura.comArea} de {c.cobertura.marcas}</b> marcas medidas —{" "}
+          {pra_cima
+            ? "o desvio real é maior que o mostrado."
+            : "parte da diferença pode ser medição que falta, não orçamento sobrando."}
+        </p>
+      )}
+    </div>
   );
 }
