@@ -24,6 +24,8 @@ import PrevisaoObra from "./PrevisaoObra";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
 import { ESTOQUE_MATERIAL_OPCOES, TIPO_DATABOOK_OPCOES, ESTOQUE_MATERIAL_LABEL, TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 import { fmtOP } from "@/lib/utils";
+import OrcamentoComercial from "@/components/OrcamentoComercial";
+import { itensDaPlanilhaComercial } from "@/lib/op-categorias";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -260,7 +262,11 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium border border-amber-100 whitespace-nowrap" title="Referência do cliente para esta obra">Ref. cliente: {op.refCliente}</span>
                   )}
                 </div>
-                {op.descricao && <p className="text-xs text-torg-gray mt-1.5 max-w-xl">{op.descricao}</p>}
+                {op.descricao && (
+                  // ⚠ whitespace-pre-line: a descrição vem do estudo/proposta COM quebras de linha
+                  // (títulos e itens); sem isso o HTML achatava tudo num parágrafo só.
+                  <p className="text-xs text-torg-gray mt-1.5 max-w-xl whitespace-pre-line leading-relaxed line-clamp-[12]" title={op.descricao}>{op.descricao}</p>
+                )}
                 {(op.estoqueMaterial || op.tipoDataBook) && (
                   <div className="flex flex-wrap items-center gap-1.5 mt-2">
                     {op.estoqueMaterial && (
@@ -740,7 +746,15 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <h4 className="font-semibold text-torg-orange-700">Aditivo {ad.numero}</h4>
-                    <p className="text-sm text-torg-gray">{ad.descricao}</p>
+                    <p className="text-sm text-torg-gray whitespace-pre-line leading-relaxed line-clamp-[10]" title={ad.descricao}>{ad.descricao}</p>
+                    {(ad.dataInicio || ad.dataFimPrevista || ad.orcamentoRef) && (
+                      <p className="text-[11px] text-torg-gray mt-1">
+                        {ad.dataInicio && `início ${fmtData(ad.dataInicio)}`}
+                        {ad.dataInicio && ad.dataFimPrevista && " · "}
+                        {ad.dataFimPrevista && `fim previsto ${fmtData(ad.dataFimPrevista)}`}
+                        {ad.orcamentoRef && ` · orçamento ${ad.orcamentoRef}`}
+                      </p>
+                    )}
                   </div>
                   <p className="text-xs text-torg-gray">
                     {ad.createdBy?.name} • {fmtData(ad.createdAt)}
@@ -2567,7 +2581,9 @@ function detalhesItem(it) {
   }
   if (it.tipo === "VERBA") return "Verba alocada";
   if (it.qtdContratada) {
-    const base = `${it.qtdContratada} ${it.unidade || ""}`.trim();
+    // ⚠ vinha "652.8800000000001 M²" na tela: número de ponto flutuante da planilha, sem formato
+    const qtd = Number(it.qtdContratada).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+    const base = `${qtd} ${it.unidade || ""}`.trim();
     if (it.cmcMedio) {
       return `${base} × ${fmtMoeda(it.cmcMedio)}/${it.unidade || "un"}`;
     }
@@ -2610,16 +2626,17 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
     <div>
       <p className="px-6 pt-4 text-xs font-semibold text-torg-gray uppercase tracking-wide">{titulo}</p>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[800px]">
+        {/* larguras fixas: sem elas a Descrição ficava espremida em 5 linhas e o resto sobrando */}
+        <table className="w-full text-sm min-w-[900px] table-fixed">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
+              <th className="w-[130px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Detalhes</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Local</th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Verba</th>
-              <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Fat. direto</th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
+              <th className="w-[150px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Detalhes</th>
+              <th className="w-[90px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Local</th>
+              <th className="w-[190px] px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Verba</th>
+              <th className="w-[110px] px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Fat. direto</th>
+              <th className="w-[150px] px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -2634,11 +2651,14 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
               const corSaldo = saldo < 0 ? "text-red-700" : pctUsado > 80 ? "text-amber-700" : "text-emerald-700";
               return (
                 <tr key={it.id}>
-                  <td className="px-4 py-2 text-torg-gray text-xs">{labelCategoria(it.categoria)}</td>
-                  <td className="px-4 py-2 text-torg-dark font-medium">{it.descricao}</td>
-                  <td className="px-4 py-2 text-torg-gray text-xs">{detalhesItem(it)}</td>
-                  <td className="px-4 py-2 text-torg-gray text-xs">{localLabel(it.localEstoque) || "—"}</td>
-                  <td className="px-4 py-2 text-right tabular-nums min-w-[200px]">
+                  <td className="px-4 py-3 align-top text-torg-gray text-xs">{labelCategoria(it.categoria)}</td>
+                  <td className="px-4 py-3 align-top text-torg-dark font-medium leading-snug" title={it.descricao}>
+                    <span className="line-clamp-2">{it.descricao}</span>
+                    {it.observacao && <span className="block text-[11px] font-normal text-torg-gray truncate" title={it.observacao}>{it.observacao}</span>}
+                  </td>
+                  <td className="px-4 py-3 align-top text-torg-gray text-xs">{detalhesItem(it)}</td>
+                  <td className="px-4 py-3 align-top text-torg-gray text-xs">{localLabel(it.localEstoque) || "—"}</td>
+                  <td className="px-4 py-3 align-top text-right tabular-nums">
                     <div className="flex items-baseline justify-end gap-1.5">
                       <span className="text-torg-dark font-semibold">{fmtMoeda(verba)}</span>
                       {consumido > 0 && (
@@ -3182,6 +3202,9 @@ function ModalAdicionarItens({ opId, onClose, onSaved }) {
 function ModalAditivo({ opId, proximoNumero, onClose, onSaved }) {
   const [descricao, setDescricao] = useState("");
   const [itens, setItens] = useState([novoItem()]);
+  const [orcAd, setOrcAd] = useState({ pasta: null, ref: null, propostas: [], estudo: null, dados: null });
+  const [dataInicioAd, setDataInicioAd] = useState("");
+  const [dataFimAd, setDataFimAd] = useState("");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
@@ -3210,6 +3233,10 @@ function ModalAditivo({ opId, proximoNumero, onClose, onSaved }) {
             valorPorMes: Number(it.valorPorMes) || null,
             valorVerba: Number(it.valorVerba),
           })),
+          dataInicio: dataInicioAd || null,
+          dataFimPrevista: dataFimAd || null,
+          orcamentoPasta: orcAd.pasta, orcamentoRef: orcAd.ref,
+          propostas: orcAd.propostas, estudoArquivo: orcAd.estudo, estudoDados: orcAd.dados,
         }),
       });
       const data = await res.json();
@@ -3225,6 +3252,32 @@ function ModalAditivo({ opId, proximoNumero, onClose, onSaved }) {
   return (
     <Modal titulo={`Novo Aditivo ${proximoNumero}`} onClose={onClose}>
       <div className="px-6 py-5 space-y-4">
+        {/* O aditivo nasce de OUTRA proposta e OUTRO estudo — e a informação precisa chegar a
+            todos os setores. Mesmo bloco da criação da OP. (Vitor 19/08.) */}
+        <OrcamentoComercial
+          valor={orcAd}
+          onChange={(v) => {
+            setOrcAd(v);
+            const daPlanilha = itensDaPlanilhaComercial(v.dados?.comercial, v.dados?.custos);
+            if (daPlanilha.length) setItens((prev) => (prev.some((i) => String(i.descricao || "").trim()) ? prev : daPlanilha));
+            const prop = (v.propostas || []).find((p) => p.descricao);
+            if (prop?.descricao) setDescricao((d) => d || `Aditivo ${proximoNumero} — ${prop.obra || prop.numeroProposta || ""}\n\n${prop.descricao}`);
+          }}
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">Data de início</label>
+            <input type="date" value={dataInicioAd} onChange={(e) => setDataInicioAd(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">Fim previsto</label>
+            <input type="date" value={dataFimAd} onChange={(e) => setDataFimAd(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+        </div>
+
         {erro && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
             <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>

@@ -8,11 +8,12 @@ const fmtR$ = (v) => (v == null ? "—" : Number(v).toLocaleString("pt-BR", { st
 const ESTOQUE = { PROPRIO_TORG: "Estoque próprio da Torg", CLIENTE_TERCEIRO: "Fornecido pelo cliente / terceiro" };
 const DATABOOK = { PADRAO_TORG: "Padrão Torg", SNQC: "SNQC", RELATORIO_ACOMPANHAMENTO: "Relatório de acompanhamento" };
 
-function Campo({ rotulo, valor, destaque, dica }) {
+function Campo({ rotulo, valor, destaque, dica, pre }) {
   return (
     <div>
       <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">{rotulo}</p>
-      <p className={`text-sm ${destaque ? "font-bold text-torg-dark" : valor ? "text-torg-dark" : "text-gray-300"}`}>{valor || "—"}</p>
+      {/* `pre` preserva as quebras de linha do escopo lido da proposta/estudo */}
+      <p className={`text-sm ${pre ? "whitespace-pre-line leading-relaxed" : ""} ${destaque ? "font-bold text-torg-dark" : valor ? "text-torg-dark" : "text-gray-300"}`}>{valor || "—"}</p>
       {dica && <p className="text-[10px] text-torg-gray mt-0.5">{dica}</p>}
     </div>
   );
@@ -78,7 +79,7 @@ export default function AbaObra({ op, podeEditar, onEditar }) {
 
         {op.descricao && (
           <div className="mt-4">
-            <Campo rotulo="Descrição / escopo" valor={op.descricao} />
+            <Campo rotulo="Descrição / escopo" valor={op.descricao} pre />
           </div>
         )}
       </div>

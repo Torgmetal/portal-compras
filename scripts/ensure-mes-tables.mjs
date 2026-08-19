@@ -30,6 +30,13 @@ async function main() {
     `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "propostas" JSONB`,
     `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "estudoArquivo" JSONB`,
     `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "estudoDados" JSONB`,
+    `ALTER TABLE "Aditivo" ADD COLUMN IF NOT EXISTS "dataInicio" TIMESTAMP(3)`,
+    `ALTER TABLE "Aditivo" ADD COLUMN IF NOT EXISTS "dataFimPrevista" TIMESTAMP(3)`,
+    `ALTER TABLE "Aditivo" ADD COLUMN IF NOT EXISTS "orcamentoPasta" TEXT`,
+    `ALTER TABLE "Aditivo" ADD COLUMN IF NOT EXISTS "orcamentoRef" TEXT`,
+    `ALTER TABLE "Aditivo" ADD COLUMN IF NOT EXISTS "propostas" JSONB`,
+    `ALTER TABLE "Aditivo" ADD COLUMN IF NOT EXISTS "estudoArquivo" JSONB`,
+    `ALTER TABLE "Aditivo" ADD COLUMN IF NOT EXISTS "estudoDados" JSONB`,
   ]) await prisma.$executeRawUnsafe(c).catch(() => {});
 
   // MesInativo (setores feitos fora / inativos sem produção, p/ o relatório de

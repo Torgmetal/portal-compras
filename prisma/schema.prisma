@@ -643,6 +643,17 @@ model Aditivo {
   opId        String
   numero      Int
   descricao   String
+  // Aditivo tem prazo PRÓPRIO e vínculo PRÓPRIO com o orçamento — ele nasce de outra proposta e
+  // de outro estudo, e a informação precisa chegar a todos os setores.
+  // Vitor (19/08): "quando criamos um aditivo precisa ser divulgado a todos os setores… teria que
+  // ter a mesma coisa, importar proposta e planilha de estudo… importante ter data de início e fim".
+  dataInicio       DateTime?
+  dataFimPrevista  DateTime?
+  orcamentoPasta   String?
+  orcamentoRef     String?
+  propostas        Json?
+  estudoArquivo    Json?
+  estudoDados      Json?
   createdById String
   createdAt   DateTime      @default(now())
   createdBy   User          @relation(fields: [createdById], references: [id])

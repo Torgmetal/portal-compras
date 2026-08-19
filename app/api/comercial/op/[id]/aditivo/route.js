@@ -23,6 +23,16 @@ const itemSchema = z.object({
 const schema = z.object({
   descricao: z.string().min(1),
   itens: z.array(itemSchema).min(1),
+  // Aditivo tem prazo e orçamento PRÓPRIOS — Vitor (19/08): "quando criamos um aditivo precisa ser
+  // divulgado a todos os setores as informações desse aditivo… importar proposta e planilha de
+  // estudo… importante ter data de início e fim também".
+  dataInicio: z.string().nullable().optional(),
+  dataFimPrevista: z.string().nullable().optional(),
+  orcamentoPasta: z.string().nullable().optional(),
+  orcamentoRef: z.string().nullable().optional(),
+  propostas: z.any().nullable().optional(),
+  estudoArquivo: z.any().nullable().optional(),
+  estudoDados: z.any().nullable().optional(),
 });
 
 export async function POST(req, { params }) {
@@ -46,6 +56,13 @@ export async function POST(req, { params }) {
       opId: params.id,
       numero,
       descricao: body.descricao,
+      dataInicio: body.dataInicio ? new Date(body.dataInicio) : null,
+      dataFimPrevista: body.dataFimPrevista ? new Date(body.dataFimPrevista) : null,
+      orcamentoPasta: body.orcamentoPasta || null,
+      orcamentoRef: body.orcamentoRef || null,
+      propostas: body.propostas || null,
+      estudoArquivo: body.estudoArquivo || null,
+      estudoDados: body.estudoDados || null,
       createdById: user.id,
       itens: {
         create: body.itens.map((it, idx) => ({
