@@ -10,6 +10,7 @@ import { requireRole } from "@/lib/session";
 import { carregarPrioridadesPorObra } from "@/lib/prioridades-setor-data";
 import { setorRealIndex, FLUXO_SETORES, noTerceiroAgora, entregaDoSetor, croquiCortado } from "@/lib/prioridades-setor";
 import { ehItemComprado } from "@/lib/item-comprado";
+import { ehLinhaLixo } from "@/lib/pecas-producao";
 import { dedupLpcLe, renumerarPrioridades } from "@/lib/pecas-producao";
 
 export const runtime = "nodejs";
@@ -121,7 +122,7 @@ export async function GET() {
     if (!o) continue;
     // Itens comprados (sem peso; ou cobertura/piso: telha/rufo/calha/grade de piso) NÃO são
     // produção — não aparecem em nenhum setor. (Regra do peso, lib/item-comprado.)
-    if (ehItemComprado(pc)) continue;
+    if (ehLinhaLixo(pc) || ehItemComprado(pc)) continue; // linha "TOTAL.:" da LE não é peça
     // Setor que precisa TRABALHAR a peça agora (o próximo da rota) — peça apontada na Solda já
     // aparece no Acabamento, e assim por diante.
     const composta = pc.tipoPeca === "CONJUNTO" && (pc._count?.conjuntoCroquis || 0) > 0;

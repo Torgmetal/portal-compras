@@ -12,7 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { whereSetorSyneco, normalizeSetorSyneco } from "@/lib/syneco-dia";
 import { ehItemComprado } from "@/lib/item-comprado";
-import { dedupLpcLe, renumerarPrioridades } from "@/lib/pecas-producao";
+import { dedupLpcLe, renumerarPrioridades, ehLinhaLixo } from "@/lib/pecas-producao";
 import { materialPorPerfil, statusCompraPorOp } from "@/lib/status-compra";
 import { croquiCortado, setorRealIndex, mapaSetorReal, FLUXO_SETORES } from "@/lib/prioridades-setor";
 import { z } from "zod";
@@ -75,7 +75,7 @@ export async function GET(req) {
   // e os ITENS COMPRADOS (parafuso/porca/arruela/chumbador/telha/calha/… sem estrutura de
   // fabricação) — não são feitos por nós, não entram no fluxo de produção. (Regra do Vitor; eles
   // seguem valendo em Engenharia/Compras/Planejamento/Expedição, a LE tem 100% dos itens.)
-  const ehLixo = (p) => !p.marca || !String(p.marca).trim() || /^(total|soma|subtotal)\b/i.test(String(p.marca).trim());
+  const ehLixo = ehLinhaLixo; // helper compartilhado (lib/pecas-producao) — mesma regra na TV
   // dedupLpcLe: a mesma marca pode ter linha na LPC e na LE — no fluxo de produção vale a da
   // LPC (senão a peça aparece 2× e é despachada/encaminhada em dobro — caso da OP-67).
   const todas = dedupLpcLe(todasRaw.filter((p) => !ehLixo(p) && !ehItemComprado(p)));
