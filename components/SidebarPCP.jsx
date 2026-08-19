@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Wrench, Flame,
-  Wind, Paintbrush, Package, Target, ListOrdered, Sparkles, Gauge, FileText, Truck, Tv, FolderKanban,
+  Wind, Paintbrush, Package, Target, ListOrdered, Sparkles, Gauge, FileText, Truck, Tv, FolderKanban, Printer,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -19,6 +19,8 @@ const menu = [
   { href: "/pcp/dashboard-prioridades", label: "Prioridades (TV)", icon: Tv },
   { href: "/pcp/pecas-corte",  label: "Programação",      icon: Package },
   { href: "/pcp/terceirizados", label: "Terceirizados",   icon: Truck },
+  // Controle de liberação de desenhos: quem levou qual desenho, quando e com qual R carimbado.
+  { href: "/pcp/grd",          label: "GRD",              icon: Printer },
   { href: "/pcp/carga-corte",  label: "Carga do Corte",   icon: Gauge },
   { href: "/pcp/fila-corte",   label: "Corte",            icon: ListOrdered },
   { href: "/pcp/montagem",     label: "Montagem",         icon: Wrench },
