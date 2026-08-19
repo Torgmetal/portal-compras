@@ -212,7 +212,7 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
             )}
           </div>
           <p className="text-[11px] text-torg-gray">
-            Clique na pasta pra navegar, no nome do arquivo pra abrir no servidor, ou em <b>usar como</b> pra vincular na OP.
+            Clique na pasta pra navegar, no nome do arquivo pra abrir no servidor, ou em <b>anexar proposta</b> / <b>usar como estudo</b> pra vincular na OP.
             Pode anexar quantas propostas quiser — o portal lê cada uma e diz se é técnica, comercial ou as duas (PTC).
           </p>
         </>

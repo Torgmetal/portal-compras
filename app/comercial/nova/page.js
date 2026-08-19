@@ -44,15 +44,25 @@ export default function NovaOP() {
       const novo = { ...f };
       if (propostaLida?.cliente && !f.cliente) novo.cliente = propostaLida.cliente;
       if (propostaLida?.obra && !f.obra) novo.obra = propostaLida.obra;
-      // a descrição junta os dois: o texto da proposta e as quantidades do estudo
-      const daProposta = propostaLida?.descricao || "";
-      const doEstudo = (orc.dados?.familias?.familias || [])
-        .map((x) => `${x.nome}: ${Number(x.total).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${x.unidade}`)
-        .join(" · ");
-      const aco = orc.dados?.aco?.pesoKg
-        ? `Aço: ${Math.round(orc.dados.aco.pesoKg).toLocaleString("pt-BR")} kg${orc.dados.aco.areaPinturaM2 ? ` · pintura ${Math.round(orc.dados.aco.areaPinturaM2).toLocaleString("pt-BR")} m²` : ""}`
-        : "";
-      const junto = [daProposta, [aco, doEstudo].filter(Boolean).join(" · ")].filter(Boolean).join("\n\n");
+      // A descrição junta as duas fontes, cada uma com seu título: o texto da PROPOSTA (o que foi
+      // vendido) e as quantidades do ESTUDO (a estimativa por trás do preço).
+      const partes = [];
+      if (propostaLida?.descricao) {
+        partes.push(`ESCOPO DA PROPOSTA${propostaLida.numeroProposta ? ` (${propostaLida.numeroProposta})` : ""}\n${propostaLida.descricao}`);
+      }
+      const est = orc.dados;
+      if (est?.aco?.pesoKg || est?.familias?.familias?.length) {
+        const l = [];
+        if (est.aco?.pesoKg) l.push(`  • Aço: ${Math.round(est.aco.pesoKg).toLocaleString("pt-BR")} kg`);
+        if (est.aco?.areaPinturaM2) l.push(`  • Área de pintura: ${Math.round(est.aco.areaPinturaM2).toLocaleString("pt-BR")} m²`);
+        const tinta = (est.pintura?.itens || []).reduce((a, x) => a + (x.litros || 0), 0);
+        if (tinta) l.push(`  • Tinta: ${Math.round(tinta).toLocaleString("pt-BR")} L`);
+        for (const fam of est.familias?.familias || []) {
+          l.push(`  • ${fam.nome}: ${Number(fam.total).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${fam.unidade || ""}`.trimEnd());
+        }
+        if (l.length) partes.push(`QUANTIDADES DO ESTUDO${est.modelo ? ` (${est.modelo})` : ""}\n${l.join("\n")}`);
+      }
+      const junto = partes.join("\n\n");
       if (junto && !f.descricao) novo.descricao = junto;
       return novo;
     });
