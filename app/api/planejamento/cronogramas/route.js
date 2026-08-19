@@ -92,8 +92,14 @@ export async function GET(req) {
         select: { id: true, nome: true, departamento: true, percentualRealizado: true, dataFimPrevista: true, isSummary: true, outlineLevel: true },
       },
     },
-    orderBy: { opNumero: "desc" },
+    // ⚠ ordenado no JS logo abaixo: `opNumero` é TEXTO, então o banco põe "T113" antes de "115"
+    // e a lista sai fora de ordem. (Vitor 19/08: "os cronogramas precisam ficar em ordem numérica".)
   });
+
+  // ORDEM NUMÉRICA, do mais novo pro mais antigo — ignorando o prefixo T e o zero à esquerda.
+  const numeroDaOp = (s) => { const m = String(s || "").match(/(\d+)/); return m ? parseInt(m[1], 10) : -1; };
+  cronogramas.sort((a, b) => numeroDaOp(b.op?.numero || b.opNumero) - numeroDaOp(a.op?.numero || a.opNumero)
+    || String(b.opNumero).localeCompare(String(a.opNumero), "pt-BR", { numeric: true }));
 
   const DEPT_ORDER = ["COMERCIAL", "ENGENHARIA", "SUPRIMENTOS", "FABRICACAO", "EXPEDICAO", "MONTAGEM"];
   const now = new Date();
