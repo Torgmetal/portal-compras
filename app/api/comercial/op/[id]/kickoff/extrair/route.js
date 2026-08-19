@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
+import { escopoDeCompraDoEstudo } from "@/lib/op-categorias";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 
@@ -77,8 +78,9 @@ export async function POST(req, { params }) {
   if (!pdfBase64) return NextResponse.json({ error: "pdfBase64 obrigatório" }, { status: 400 });
   if (pdfBase64.length > MAX_B64_LEN) return NextResponse.json({ error: "PDF grande demais para processar." }, { status: 413 });
 
-  const op = await prisma.oP.findUnique({ where: { id: params.id }, select: { id: true, numero: true, cliente: true, obra: true } });
+  const op = await prisma.oP.findUnique({ where: { id: params.id }, select: { id: true, numero: true, cliente: true, obra: true, estudoDados: true } });
   if (!op) return NextResponse.json({ error: "OP não encontrada" }, { status: 404 });
+  const escopoEstudo = escopoDeCompraDoEstudo(op.estudoDados);
 
   try {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -125,8 +127,12 @@ export async function POST(req, { params }) {
     };
     const out = {
       escopo:              limparEscopo(dados.escopo),
-      escopoIncluso:       strArr(dados.escopoIncluso, 40, 300),
-      escopoExcluso:       strArr(dados.escopoExcluso, 40, 300),
+      // ⚠ O escopo de COMPRA vem do ESTUDO, não da IA: família com verba entra como incluso, sem
+      // verba entra como excluso pra Engenharia e Compras confirmarem. Vitor (19/08): "temos obras
+      // que não vão ter compra de parafusos e isso pode ser um ponto de alerta, pois acaba
+      // passando". É determinístico — a planilha diz, não o modelo interpreta.
+      escopoIncluso:       strArr([...strArr(dados.escopoIncluso, 40, 300), ...escopoEstudo.incluso], 60, 300),
+      escopoExcluso:       strArr([...strArr(dados.escopoExcluso, 40, 300), ...escopoEstudo.excluso], 60, 300),
       // Qualquer linha com "total" no nome fica fora ("TOTAL", "Peso Total",
       // "Total Geral"...) — o total é calculado na tela
       resumoPesos:         Array.isArray(dados.resumoPesos)
