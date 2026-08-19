@@ -158,6 +158,33 @@ export async function GET(req) {
     }
   }
 
+  // CORTE — quantos CONJUNTOS cada croqui está TRAVANDO. Vitor (19/08): "não pode ignorar nenhuma
+  // peça que não dê sequência de montagem; se faltar uma peça de 1 kg você não deve ignorar".
+  // O peso engana: na OP-089, 42 croquis somando 1.144 kg seguram 17 guarda-corpos. Aqui a
+  // prioridade é POR QUANTO DESTRAVA, não por peso.
+  let travaPorCroqui = new Map();
+  if (setor === "CORTE") {
+    try {
+      const links = await prisma.conjuntoCroqui.findMany({
+        where: { conjunto: { opId } },
+        select: { conjunto: { select: { marca: true, status: true, baixaSetores: true } }, croqui: { select: { marca: true } } },
+      });
+      const montado = (c) => {
+        if (realMapOp.get(c.marca) && (IDX_SETOR[realMapOp.get(c.marca)] ?? -1) >= IDX_SETOR.MONTAGEM) return true;
+        const bx = c.baixaSetores && typeof c.baixaSetores === "object" ? c.baixaSetores : {};
+        return !!bx.MONTAGEM || c.status === "EXPEDIDO";
+      };
+      const croquiMap2 = new Map(todas.filter(ehCroqui).map((p) => [p.marca, p]));
+      for (const lk of links) {
+        if (montado(lk.conjunto)) continue;                       // conjunto já montado: não trava
+        if (croquiCortado(croquiMap2.get(lk.croqui.marca))) continue; // croqui já cortado: não trava
+        const g = travaPorCroqui.get(lk.croqui.marca) || { conjuntos: [] };
+        if (!g.conjuntos.includes(lk.conjunto.marca)) g.conjuntos.push(lk.conjunto.marca);
+        travaPorCroqui.set(lk.croqui.marca, g);
+      }
+    } catch {}
+  }
+
   // MATERIAL por peça (do CMR do Almoxarifado): o corte precisa saber, item a item, se o
   // material daquele perfil já chegou. (Vitor 18/08 — antes só existia o resumo da OP.)
   let matPorPerfil = new Map();
@@ -276,10 +303,17 @@ export async function GET(req) {
     // cada peça e sozinha respondia pela maior parte do payload. O detalhe vem do modal.
     const matFull = p.perfil ? matPorPerfil.get(String(p.perfil).trim().toUpperCase()) || null : null;
     const mat = matFull ? (({ entradas, ...resto }) => resto)(matFull) : null;
-    return { ...p, material: mat, programacao: programacaoDe(p.marca, p.qte), expedida, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
+    // trava: quantos conjuntos esperam ESTE croqui pra poder montar
+    const tr = travaPorCroqui.get(p.marca);
+    return { ...p, material: mat, programacao: programacaoDe(p.marca, p.qte), expedida,
+      travaConjuntos: tr ? tr.conjuntos.length : 0, travaMarcas: tr ? tr.conjuntos.slice(0, 12) : null, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
   });
 
-  const emAberto = pecas.filter((p) => !p.destino && p.status === "PENDENTE");
+  // "Em aberto" = ainda SEM DESTINO. Antes exigia status "PENDENTE" — mas o status diz onde a
+  // peça ESTÁ no fluxo (CORTE, MONTAGEM…), e quase nenhuma fica em PENDENTE depois que a
+  // produção começa. Resultado: marcar prioridade não fazia nada e o portal só dizia "selecione
+  // peças em aberto". (Vitor 19/08.) Peça expedida/cancelada não se destina.
+  const emAberto = pecas.filter((p) => !p.destino && !["EXPEDIDO", "CANCELADA"].includes(p.status));
   const placar = { ABERTO: emAberto.length, PRIORIDADE: 0, TERCEIRO: 0, REVISAO: 0, AGUARDANDO_MATERIAL: 0, CANCELADA: 0 };
   for (const p of pecas) if (p.destino && placar[p.destino] != null) placar[p.destino]++;
   const baixados = setor ? pecas.filter((p) => p.baixadoPortal).length : 0;

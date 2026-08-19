@@ -86,6 +86,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   // Falta lançar no Syneco: o portal sabe que a peça está pronta (baixa manual ou romaneio que
   // prova o embarque) e o Syneco não tem o apontamento. É a relação que o PCP leva pra lançar lá.
   const [fSyneco, setFSyneco] = useState(false);
+  const [fTrava, setFTrava] = useState(false); // só os croquis que travam conjunto na montagem
   const [rastroOp, setRastroOp] = useState(false); // modal de rastreabilidade da OP inteira
   const [rastroItem, setRastroItem] = useState(null); // peça com a rastreabilidade do material dela
   const [progItem, setProgItem] = useState(null); // peça com as ordens do Syneco (conferir a programação)
@@ -138,6 +139,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     if (fMont === "AGUARDANDO") r = r.filter((p) => p.prontoMontar === false);
     else if (fMont === "LIBERADAS") r = r.filter((p) => p.prontoMontar !== false);
     if (fSyneco) r = r.filter((p) => p.precisaSyneco);
+    if (fTrava) r = r.filter((p) => (p.travaConjuntos || 0) > 0);
     return r;
   };
   // "Feito" no setor = o maior entre o produzido no Syneco e a baixa do portal. Assim o que já
@@ -151,8 +153,19 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const pendentes = useMemo(() => pecas.filter((p) => !resolvida(p)), [pecas]);
   // Peças prontas: histórico do setor (concluídas aqui ou que já seguiram adiante).
   const prontas = useMemo(() => pecas.filter((p) => resolvida(p)), [pecas]);
-  const listaLiberar = useMemo(() => filtrar(pendentes), [pendentes, filtro, fMaterial, fProg, fMont, fSyneco]);
-  const listaProntas = useMemo(() => filtrar(prontas), [prontas, filtro, fMaterial, fProg, fMont, fSyneco]);
+  // As PRIORIDADES ficam no topo, na ordem 1,2,3… — é onde o setor olha primeiro. (Vitor 19/08:
+  // "pq quando marco uma obra como prioritária ela não fica na parte de cima da tela".)
+  const prioridadeNoTopo = (arr) => [...arr].sort((a, b) => {
+    const pa = a.prioridade ?? null, pb = b.prioridade ?? null;
+    if ((pa == null) !== (pb == null)) return pa == null ? 1 : -1;
+    if (pa != null && pb != null && pa !== pb) return pa - pb;
+    // depois das prioridades, quem TRAVA mais conjuntos vem primeiro — peso não decide fila.
+    const ta = a.travaConjuntos || 0, tb = b.travaConjuntos || 0;
+    if (ta !== tb) return tb - ta;
+    return String(a.marca).localeCompare(String(b.marca), "pt-BR", { numeric: true });
+  });
+  const listaLiberar = useMemo(() => prioridadeNoTopo(filtrar(pendentes)), [pendentes, filtro, fMaterial, fProg, fMont, fSyneco, fTrava]);
+  const listaProntas = useMemo(() => prioridadeNoTopo(filtrar(prontas)), [prontas, filtro, fMaterial, fProg, fMont, fSyneco, fTrava]);
   // Resumo do que está na tela (deixa o painel mais informativo: o setor vê o tamanho da carga).
   const comMaterial = useMemo(() => pendentes.filter((p) => p.perfil && p.material).length, [pendentes]);
   const semMaterial = useMemo(() => pendentes.filter((p) => p.perfil && !p.material).length, [pendentes]);
@@ -170,16 +183,20 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const mostraMont = setor === "MONTAGEM";
   // Quantas peças em TODA a OP (pendentes + prontas) esperam lançamento no Syneco.
   const faltaSyneco = useMemo(() => pecas.filter((p) => p.precisaSyneco).length, [pecas]);
+  // Croquis que seguram conjunto na montagem — a fila do corte deve olhar isto antes do peso.
+  const travando = useMemo(() => pendentes.filter((p) => (p.travaConjuntos || 0) > 0), [pendentes]);
   const expedidasSemSyneco = useMemo(() => pecas.filter((p) => p.expedida && !p.produzidoSyneco).length, [pecas]);
-  const temFiltros = (mostraMaterial && (comMaterial > 0 || semMaterial > 0)) || (mostraProg && temColunaProg) || mostraMont || faltaSyneco > 0;
-  const filtrandoAlgo = fMaterial !== "TODOS" || fProg !== "TODOS" || fMont !== "TODAS" || fSyneco;
+  const temFiltros = (mostraMaterial && (comMaterial > 0 || semMaterial > 0)) || (mostraProg && temColunaProg) || mostraMont || faltaSyneco > 0 || travando.length > 0;
+  const filtrandoAlgo = fMaterial !== "TODOS" || fProg !== "TODOS" || fMont !== "TODAS" || fSyneco || fTrava;
   const visiveis = aba === "prontas" ? listaProntas : listaLiberar;
   const visLimit = visiveis.slice(0, LIMITE);
   const pesoVisivel = useMemo(() => visiveis.reduce((a, p) => a + (Number(p.pesoTotalKg) || 0), 0), [visiveis]);
   const pesoSelecionado = useMemo(() => (data?.pecas || []).filter((p) => sel.has(p.id)).reduce((a, p) => a + (Number(p.pesoTotalKg) || 0), 0), [data, sel]);
 
   // em aberto (pra destinos) = sem destino e PENDENTE, dentro do que está selecionado
-  const emAbertoSel = () => [...sel].filter((id) => { const p = pecas.find((x) => x.id === id); return p && !p.destino && p.status === "PENDENTE"; });
+  // Mesma regra da API: em aberto = sem destino (o status é onde a peça ESTÁ, não se pode
+  // destinar). Peça já expedida ou cancelada fica fora.
+  const emAbertoSel = () => [...sel].filter((id) => { const p = pecas.find((x) => x.id === id); return p && !p.destino && !["EXPEDIDO", "CANCELADA"].includes(p.status); });
 
   const toggle = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const selTodas = () => setSel((s) => (s.size === visLimit.length && visLimit.length ? new Set() : new Set(visLimit.map((p) => p.id))));
@@ -200,8 +217,13 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
 
   async function despachar(destino) {
     const ids = emAbertoSel();
-    if (!ids.length) return alert("Selecione peças em aberto (sem destino) para destinar.");
-    await post({ ids, destino }, (j) => (j.duplicadasIgnoradas ? `${j.atualizados} peça(s) destinada(s).${avisoDup(j)}` : null));
+    if (!ids.length) {
+      const jaTem = [...sel].map((id) => pecas.find((x) => x.id === id)).filter((p) => p?.destino);
+      return alert(jaTem.length
+        ? `Essas ${jaTem.length} peça(s) já têm destino (${[...new Set(jaTem.map((p) => ROTULO[p.destino] || p.destino))].join(", ")}). Use "Tirar prioridade" antes de remarcar.`
+        : "Selecione peças para destinar.");
+    }
+    await post({ ids, destino }, (j) => `${j.atualizados} peça(s) marcada(s) como ${ROTULO[destino] || destino}.${avisoDup(j)}`);
   }
   // Tira a prioridade das selecionadas (marcou errado) — renumera a OP sozinho.
   async function tirarPrioridade() {
@@ -433,6 +455,14 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
             )}
             {/* Relação pro Syneco: o portal sabe que está pronta e o Syneco não. Sai no "Relação
                 Syneco" (Excel) pra o apontamento lançar lá. (Vitor 19/08.) */}
+            {/* O que DESTRAVA a montagem — independe de peso. (Vitor 19/08.) */}
+            {travando.length > 0 && (
+              <button type="button" onClick={() => setFTrava((v) => !v)}
+                title="Croquis que ainda não foram cortados e estão segurando conjunto na montagem. Cortar estes libera montagem — o peso não importa aqui."
+                className={`text-[11px] font-bold rounded-full px-2.5 py-1 border inline-flex items-center gap-1 ${fTrava ? "bg-amber-600 text-white border-amber-600" : "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100"}`}>
+                <AlertTriangle size={11} /> {fmtN(travando.length)} travando a montagem
+              </button>
+            )}
             {faltaSyneco > 0 && (
               <button type="button" onClick={() => setFSyneco((v) => !v)}
                 title="Peças que o portal dá como prontas (baixa no portal ou romaneio de embarque) e o Syneco ainda não registrou. Filtre e clique em “Relação Syneco” pra levar a lista."
@@ -441,7 +471,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
               </button>
             )}
             {filtrandoAlgo && (
-              <button type="button" onClick={() => { setFMaterial("TODOS"); setFProg("TODOS"); setFMont("TODAS"); setFSyneco(false); }} className="text-[11px] font-semibold text-torg-gray hover:text-red-600 underline">limpar filtros</button>
+              <button type="button" onClick={() => { setFMaterial("TODOS"); setFProg("TODOS"); setFMont("TODAS"); setFSyneco(false); setFTrava(false); }} className="text-[11px] font-semibold text-torg-gray hover:text-red-600 underline">limpar filtros</button>
             )}
           </div>
         )}
@@ -480,6 +510,10 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                     <td className="px-2 py-1.5"><input type="checkbox" checked={sel.has(p.id)} onChange={() => toggle(p.id)} onClick={(e) => e.stopPropagation()} /></td>
                     <td className={`${td} font-mono font-semibold whitespace-nowrap`}>
                       <span className="inline-flex items-center gap-1.5">
+                        {/* nº da prioridade: sem isto não dava pra ver se a marcação pegou */}
+                        {p.prioridade != null && (
+                          <span className="shrink-0 bg-amber-500 text-white text-[10px] font-bold rounded px-1.5 py-0.5 tabular-nums" title={`Prioridade ${p.prioridade} nesta OP`}>{p.prioridade}º</span>
+                        )}
                         {p.marca}
                         <button type="button" onClick={(e) => { e.stopPropagation(); setDesenhoMarca(p.marca); }} title="Ver os desenhos/projetos da Engenharia (imprimir + GRD)"
                           className="text-gray-300 hover:text-torg-blue shrink-0"><FileText size={13} /></button>
@@ -488,6 +522,12 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                     <td className={td}>
                       <div className="flex items-center gap-2">
                         <span className="text-torg-gray max-w-[240px] truncate" title={p.descricao || ""}>{p.descricao || "—"}</span>
+                        {(p.travaConjuntos || 0) > 0 && (
+                          <span className="shrink-0 text-amber-800 bg-amber-100 text-[10px] rounded px-1.5 py-0.5 font-bold inline-flex items-center gap-0.5"
+                            title={`Sem esta peça, ${p.travaConjuntos} conjunto(s) não montam: ${(p.travaMarcas || []).join(", ")}${p.travaConjuntos > 12 ? "…" : ""}`}>
+                            <AlertTriangle size={10} /> trava {p.travaConjuntos}
+                          </span>
+                        )}
                         {p.prontoMontar === true && <span className="shrink-0 text-emerald-700 bg-emerald-50 text-[10px] rounded px-1.5 py-0.5 inline-flex items-center gap-0.5"><CheckCircle2 size={10} /> pronto p/ montar</span>}
                         {p.prontoMontar === false && temFalta && (
                           <button type="button" onClick={(e) => { e.stopPropagation(); toggleExpand(p.id); }} title="Ver as peças que faltam cortar"
