@@ -62,6 +62,18 @@ export default function NovaOP() {
         }
         if (l.length) partes.push(`QUANTIDADES DO ESTUDO${est.modelo ? ` (${est.modelo})` : ""}\n${l.join("\n")}`);
       }
+      // resumo financeiro do estudo — total, quebra de custo e as verbas
+      const R$ = (n) => (n == null ? null : Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }));
+      const tg = est?.comercial?.totalGeral;
+      if (tg?.valor) {
+        const l = [`  • Total do orçamento: ${R$(tg.valor)}`];
+        if (tg.material) l.push(`  • Material: ${R$(tg.material)}`);
+        if (tg.mdoTerceirizada) l.push(`  • Mão de obra terceirizada: ${R$(tg.mdoTerceirizada)}`);
+        if (tg.industrializacao) l.push(`  • Industrialização: ${R$(tg.industrializacao)}`);
+        if (tg.bdi) l.push(`  • BDI: ${R$(tg.bdi)}`);
+        for (const v of est.comercial.verbas || []) l.push(`  • Verba — ${v.descricao}: ${R$(v.valor)}`);
+        partes.push(`RESUMO DO ORÇAMENTO\n${l.join("\n")}`);
+      }
       const junto = partes.join("\n\n");
       if (junto && !f.descricao) novo.descricao = junto;
       return novo;

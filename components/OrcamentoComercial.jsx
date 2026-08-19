@@ -88,6 +88,7 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
 
   const d = valor.dados;
   const fmt = (n) => (n == null ? "—" : Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 0 }));
+  const money = (n) => (n == null ? "—" : Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }));
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
@@ -234,6 +235,48 @@ export default function OrcamentoComercial({ valor, onChange, onPreencher, opId 
             <div><p className="text-torg-gray text-[11px]">Tinta</p><p className="font-bold">{fmt((d.pintura?.itens || []).reduce((a, x) => a + (x.litros || 0), 0))} L</p></div>
             <div><p className="text-torg-gray text-[11px]">Áreas da obra</p><p className="font-bold">{d.aco?.itens?.length || d.aco?.perfis?.length || 0}</p></div>
           </div>
+          {d.comercial?.totalGeral && (
+            <div>
+              <p className="text-[11px] text-torg-gray mb-1">Resumo do orçamento</p>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[12px]">
+                {[["Total", d.comercial.totalGeral.valor, true], ["Material", d.comercial.totalGeral.material],
+                  ["MDO terceirizada", d.comercial.totalGeral.mdoTerceirizada], ["Industrialização", d.comercial.totalGeral.industrializacao],
+                  ["BDI", d.comercial.totalGeral.bdi]].map(([rot, v, forte]) => (
+                  <div key={rot} className={`bg-white border rounded-lg px-2 py-1.5 ${forte ? "border-torg-blue-200" : "border-gray-100"}`}>
+                    <p className="text-[10px] text-torg-gray">{rot}</p>
+                    <p className={`font-bold ${forte ? "text-torg-blue" : "text-torg-dark"}`}>{money(v)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(d.comercial?.verbas || []).length > 0 && (
+            <div>
+              <p className="text-[11px] text-torg-gray mb-1">Verbas</p>
+              <div className="flex flex-wrap gap-1.5">
+                {d.comercial.verbas.map((v) => (
+                  <span key={v.item} className="text-[11px] bg-white border border-amber-200 rounded-lg px-2 py-1">
+                    <b>{v.descricao}</b> {money(v.valor)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(d.custos?.topo || []).length > 0 && (
+            <div>
+              <p className="text-[11px] text-torg-gray mb-1">Custo estimado ({money(d.custos.total)})</p>
+              <div className="flex flex-wrap gap-1.5">
+                {d.custos.topo.map((g) => (
+                  <span key={g.item} className="text-[11px] bg-white border border-gray-200 rounded-lg px-2 py-1">
+                    <b>{g.descricao}</b> {money(g.subtotal)}{g.precoKg ? ` · ${g.precoKg.toFixed(2)}/kg` : ""}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {(d.familias?.familias || []).length > 0 && (
             <div>
               <p className="text-[11px] text-torg-gray mb-1">Famílias do orçamento</p>
