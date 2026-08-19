@@ -83,6 +83,9 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const [fMaterial, setFMaterial] = useState("TODOS"); // TODOS | COM | SEM
   const [fProg, setFProg] = useState("TODOS"); // TODOS | PROG | NAO
   const [fMont, setFMont] = useState("TODAS"); // TODAS | LIBERADAS | AGUARDANDO (só na Montagem)
+  // Falta lançar no Syneco: o portal sabe que a peça está pronta (baixa manual ou romaneio que
+  // prova o embarque) e o Syneco não tem o apontamento. É a relação que o PCP leva pra lançar lá.
+  const [fSyneco, setFSyneco] = useState(false);
   const [rastroOp, setRastroOp] = useState(false); // modal de rastreabilidade da OP inteira
   const [rastroItem, setRastroItem] = useState(null); // peça com a rastreabilidade do material dela
   const [progItem, setProgItem] = useState(null); // peça com as ordens do Syneco (conferir a programação)
@@ -134,6 +137,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     // prontoMontar null = conjunto sem croqui na LPC (ex.: guarda-corpo) — não espera nada, é liberada.
     if (fMont === "AGUARDANDO") r = r.filter((p) => p.prontoMontar === false);
     else if (fMont === "LIBERADAS") r = r.filter((p) => p.prontoMontar !== false);
+    if (fSyneco) r = r.filter((p) => p.precisaSyneco);
     return r;
   };
   // "Feito" no setor = o maior entre o produzido no Syneco e a baixa do portal. Assim o que já
@@ -147,8 +151,8 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const pendentes = useMemo(() => pecas.filter((p) => !resolvida(p)), [pecas]);
   // Peças prontas: histórico do setor (concluídas aqui ou que já seguiram adiante).
   const prontas = useMemo(() => pecas.filter((p) => resolvida(p)), [pecas]);
-  const listaLiberar = useMemo(() => filtrar(pendentes), [pendentes, filtro, fMaterial, fProg, fMont]);
-  const listaProntas = useMemo(() => filtrar(prontas), [prontas, filtro, fMaterial, fProg, fMont]);
+  const listaLiberar = useMemo(() => filtrar(pendentes), [pendentes, filtro, fMaterial, fProg, fMont, fSyneco]);
+  const listaProntas = useMemo(() => filtrar(prontas), [prontas, filtro, fMaterial, fProg, fMont, fSyneco]);
   // Resumo do que está na tela (deixa o painel mais informativo: o setor vê o tamanho da carga).
   const comMaterial = useMemo(() => pendentes.filter((p) => p.perfil && p.material).length, [pendentes]);
   const semMaterial = useMemo(() => pendentes.filter((p) => p.perfil && !p.material).length, [pendentes]);
@@ -164,8 +168,11 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const mostraMaterial = !setor || setor === "CORTE";
   const mostraProg = !setor || setor === "CORTE";
   const mostraMont = setor === "MONTAGEM";
-  const temFiltros = (mostraMaterial && (comMaterial > 0 || semMaterial > 0)) || (mostraProg && temColunaProg) || mostraMont;
-  const filtrandoAlgo = fMaterial !== "TODOS" || fProg !== "TODOS" || fMont !== "TODAS";
+  // Quantas peças em TODA a OP (pendentes + prontas) esperam lançamento no Syneco.
+  const faltaSyneco = useMemo(() => pecas.filter((p) => p.precisaSyneco).length, [pecas]);
+  const expedidasSemSyneco = useMemo(() => pecas.filter((p) => p.expedida && !p.produzidoSyneco).length, [pecas]);
+  const temFiltros = (mostraMaterial && (comMaterial > 0 || semMaterial > 0)) || (mostraProg && temColunaProg) || mostraMont || faltaSyneco > 0;
+  const filtrandoAlgo = fMaterial !== "TODOS" || fProg !== "TODOS" || fMont !== "TODAS" || fSyneco;
   const visiveis = aba === "prontas" ? listaProntas : listaLiberar;
   const visLimit = visiveis.slice(0, LIMITE);
   const pesoVisivel = useMemo(() => visiveis.reduce((a, p) => a + (Number(p.pesoTotalKg) || 0), 0), [visiveis]);
@@ -274,32 +281,35 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     // não tem (precisaSyneco) — o apontamento deve dar baixa dessas no Syneco. Mesmo modelo da LPC
     // (Marca/Tipo/Peso) + coluna Observação. Some sozinho quando o Syneco sincroniza (a peça deixa
     // de ser precisaSyneco).
-    const base = (data?.pecas || []).filter((p) => p.precisaSyneco).sort((a, b) => String(a.marca).localeCompare(String(b.marca)));
-    if (!base.length) return alert("Nenhuma peça baixada manualmente pendente de apontamento no Syneco.");
+    const base = (data?.pecas || []).filter((p) => p.precisaSyneco).sort((a, b) => String(a.marca).localeCompare(String(b.marca), "pt-BR", { numeric: true }));
+    if (!base.length) return alert("Nada pendente de apontamento no Syneco nesta OP.");
     const hoje = new Date().toISOString().split("T")[0];
     const nomeSetor = setor ? SETOR_LABEL[setor] || setor : "Geral";
     const tipoTxt = (t) => (t === "CONJUNTO" ? "Conjunto" : t === "CROQUI" ? "Croqui" : "Avulsa");
-    const headers = ["Marca", "Tipo", "Material", "Rastreab. (R)", "Corrida / lote", "NF", "Programação", "Peso (kg)", "Observação"];
+    const headers = ["Marca", "Tipo", "Motivo", "Material", "Rastreab. (R)", "Corrida / lote", "NF", "Programação", "Peso (kg)", "Observação"];
     const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
       titulo: `Apontar no Syneco — ${obra}${setor ? ` (${nomeSetor})` : ""}`,
-      subtitulo: `${obra} · Setor: ${nomeSetor} · baixadas manualmente no portal — dar baixa no Syneco`,
-      kpis: [`${base.length} peça(s) p/ apontar no Syneco`],
+      subtitulo: `${obra} · Setor: ${nomeSetor} · o portal dá como pronta e o Syneco não tem — lançar lá`,
+      kpis: [`${base.length} peça(s) p/ apontar no Syneco`, `${base.filter((x) => !x.baixadoPortal).length} já expedida(s)`],
       totalColunas: headers.length, nomePlanilha: "Apontar Syneco", codigoDoc: "REL-ENG-002",
     });
-    ws.columns = [{ width: 20 }, { width: 12 }, { width: 46 }, { width: 14 }, { width: 16 }, { width: 12 }, { width: 15 }, { width: 13 }, { width: 46 }];
+    ws.columns = [{ width: 20 }, { width: 12 }, { width: 18 }, { width: 46 }, { width: 14 }, { width: 16 }, { width: 12 }, { width: 15 }, { width: 13 }, { width: 46 }];
     let row = linhaInicio;
     adicionarHeaderTabela(ws, row, headers); row++;
     const first = row;
     for (const p of base) {
       const quando = p.baixadoEm ? ` em ${new Date(p.baixadoEm).toLocaleDateString("pt-BR")}` : "";
-      // a Observação fala só da BAIXA — material/corrida/NF têm colunas próprias
-      const obs = `Dar baixa no Syneco (${nomeSetor}): ${fmtN(p.baixadoQtd)} un — baixa manual no portal${p.baixadoPor ? ` por ${p.baixadoPor}` : ""}${quando}`;
+      // A observação diz POR QUE a peça está na relação: baixa manual no portal, ou romaneio de
+      // embarque (a peça saiu da fábrica, logo passou por este setor). (Vitor 19/08.)
+      const obs = p.baixadoPortal
+        ? `Dar baixa no Syneco (${nomeSetor}): ${fmtN(p.baixadoQtd)} un — baixa manual no portal${p.baixadoPor ? ` por ${p.baixadoPor}` : ""}${quando}`
+        : `Dar baixa no Syneco (${nomeSetor}): ${fmtN(p.qte)} un — peça JÁ EXPEDIDA (consta em romaneio), sem apontamento neste setor`;
       // Material do perfil (CMR) — descrição na coluna Material; rastreabilidade, corrida e NF
       // em colunas próprias, pro setor levar a informação junto da relação. (Vitor 18/08.)
-      adicionarLinhaTabela(ws, row, [p.marca, tipoTxt(p.tipoPeca), textoMaterial(p), p.material?.rastreio || "", textoCorrida(p), p.material?.nf || "", textoProg(p), p.pesoTotalKg ? Number(p.pesoTotalKg.toFixed(1)) : "", obs], { alinhamento: { 1: "center", 3: "center", 4: "center", 5: "center", 6: "center", 7: "right" } });
+      adicionarLinhaTabela(ws, row, [p.marca, tipoTxt(p.tipoPeca), p.baixadoPortal ? "baixa no portal" : "expedida (romaneio)", textoMaterial(p), p.material?.rastreio || "", textoCorrida(p), p.material?.nf || "", textoProg(p), p.pesoTotalKg ? Number(p.pesoTotalKg.toFixed(1)) : "", obs], { alinhamento: { 1: "center", 2: "center", 4: "center", 5: "center", 6: "center", 7: "center", 8: "right" } });
       row++;
     }
-    if (row > first) adicionarLinhaTotais(ws, row, ["TOTAL", "", "", "", "", "", "", { formula: `SUM(H${first}:H${row - 1})` }, ""]);
+    if (row > first) adicionarLinhaTotais(ws, row, ["TOTAL", "", "", "", "", "", "", "", { formula: `SUM(I${first}:I${row - 1})` }, ""]);
     await downloadWorkbook(workbook, `Apontar_Syneco_${obra}${setor ? "_" + nomeSetor : ""}_${hoje}.xlsx`);
   }
 
@@ -369,7 +379,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
               title="Gera a lista de separação de material: tipo, barras, peso e o R de cada material — com opção de trocar o R no ato da separação"
               className="text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 disabled:opacity-40 inline-flex items-center gap-1"><ClipboardList size={13} /> Separação{sel.size ? ` (${fmtN(sel.size)})` : ""}</button>
             <button type="button" onClick={exportarLista} disabled={!data || !visiveis.length} title="Exporta a lista como está na tela (respeita os filtros), com material, rastreabilidade e programação" className="text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 disabled:opacity-40 inline-flex items-center gap-1"><FileDown size={13} /> Exportar lista</button>
-            <button type="button" onClick={exportar} disabled={!data} title="Relação das peças baixadas manualmente p/ o setor de apontamento dar baixa no Syneco" className="text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 disabled:opacity-40 inline-flex items-center gap-1"><FileDown size={13} /> Relação Syneco</button>
+            <button type="button" onClick={exportar} disabled={!data} title="Relação do que o portal dá como pronto e o Syneco não tem (baixa manual + peça já expedida em romaneio) — pro apontamento lançar lá" className="text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 disabled:opacity-40 inline-flex items-center gap-1"><FileDown size={13} /> Relação Syneco</button>
             <button onClick={onClose} className="text-torg-gray hover:text-red-600"><X size={20} /></button>
           </div>
         </div>
@@ -421,8 +431,17 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                 { key: "NAO", label: "Não lançadas", n: naoProgramadas, ativo: "bg-red-600 text-white", dica: "Ainda sem ordem no Syneco — o programador não lançou" },
               ]} />
             )}
+            {/* Relação pro Syneco: o portal sabe que está pronta e o Syneco não. Sai no "Relação
+                Syneco" (Excel) pra o apontamento lançar lá. (Vitor 19/08.) */}
+            {faltaSyneco > 0 && (
+              <button type="button" onClick={() => setFSyneco((v) => !v)}
+                title="Peças que o portal dá como prontas (baixa no portal ou romaneio de embarque) e o Syneco ainda não registrou. Filtre e clique em “Relação Syneco” pra levar a lista."
+                className={`text-[11px] font-bold rounded-full px-2.5 py-1 border inline-flex items-center gap-1 ${fSyneco ? "bg-red-600 text-white border-red-600" : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"}`}>
+                <FileDown size={11} /> {fmtN(faltaSyneco)} p/ lançar no Syneco{expedidasSemSyneco > 0 ? ` (${fmtN(expedidasSemSyneco)} já expedidas)` : ""}
+              </button>
+            )}
             {filtrandoAlgo && (
-              <button type="button" onClick={() => { setFMaterial("TODOS"); setFProg("TODOS"); setFMont("TODAS"); }} className="text-[11px] font-semibold text-torg-gray hover:text-red-600 underline">limpar filtros</button>
+              <button type="button" onClick={() => { setFMaterial("TODOS"); setFProg("TODOS"); setFMont("TODAS"); setFSyneco(false); }} className="text-[11px] font-semibold text-torg-gray hover:text-red-600 underline">limpar filtros</button>
             )}
           </div>
         )}

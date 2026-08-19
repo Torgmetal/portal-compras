@@ -242,6 +242,18 @@ export async function GET(req) {
     return { situacao: g.iniciado ? "INICIADA" : "PROGRAMADA", ...base };
   };
 
+  // EXPEDIDA POR ROMANEIO: o romaneio (importado da pasta ou do fluxo do portal) prova que a peça
+  // saiu da fábrica — logo foi produzida em TODOS os setores da rota dela. Onde o Syneco não tem
+  // o apontamento, é baixa a fazer lá. É essa relação que o PCP extrai. (Vitor 19/08.)
+  const expedidaPorRomaneio = new Set();
+  try {
+    const ri = await prisma.romaneioItem.findMany({
+      where: { pecaConjunto: { opId } },
+      select: { pecaConjunto: { select: { marca: true } } },
+    });
+    for (const x of ri) if (x.pecaConjunto?.marca) expedidaPorRomaneio.add(x.pecaConjunto.marca);
+  } catch {}
+
   const pecas = escopo.map((p) => {
     const bx = p.baixaSetores && typeof p.baixaSetores === "object" ? p.baixaSetores : {};
     const reg = setor ? bx[setor] : null;
@@ -249,7 +261,12 @@ export async function GET(req) {
     const baixadoQtd = reg ? (reg.qtd != null ? Number(reg.qtd) : p.qte) : 0;
     const baixadoPortal = baixadoQtd > 0;
     const produzidoSyneco = setor ? (synecoQtd.get(p.marca) || 0) : null;
-    const precisaSyneco = setor ? baixadoPortal && produzidoSyneco < baixadoQtd : null; // portal à frente do Syneco
+    // Portal à frente do Syneco: ou porque teve baixa manual, ou porque o romaneio prova que a
+    // peça já saiu (e o Syneco não registrou a produção daquele setor).
+    const expedida = expedidaPorRomaneio.has(p.marca) || p.status === "EXPEDIDO";
+    const precisaSyneco = setor
+      ? (baixadoPortal && produzidoSyneco < baixadoQtd) || (expedida && (produzidoSyneco || 0) <= 0)
+      : null;
     // Montagem: só conjuntos COM croquis têm status pronto/pendente; sem croquis (ex.: GC) = null (sem chip).
     const info = prontoInfo ? prontoInfo.get(p.marca) : null;
     const mont = prontoInfo ? (info || { prontoMontar: null, faltamCroquis: [], totalCroquis: 0 }) : null;
@@ -259,7 +276,7 @@ export async function GET(req) {
     // cada peça e sozinha respondia pela maior parte do payload. O detalhe vem do modal.
     const matFull = p.perfil ? matPorPerfil.get(String(p.perfil).trim().toUpperCase()) || null : null;
     const mat = matFull ? (({ entradas, ...resto }) => resto)(matFull) : null;
-    return { ...p, material: mat, programacao: programacaoDe(p.marca, p.qte), baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
+    return { ...p, material: mat, programacao: programacaoDe(p.marca, p.qte), expedida, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
   });
 
   const emAberto = pecas.filter((p) => !p.destino && p.status === "PENDENTE");
