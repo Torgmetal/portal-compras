@@ -13,6 +13,7 @@ import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 import CompraChip, { ModalRastreabilidade } from "@/components/CompraChip";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } from "@/lib/excel-relatorio";
 import TerceiroModal from "./TerceiroModal";
+import SeparacaoModal from "./SeparacaoModal";
 
 // Só os destinos que o PCP usa de fato. Revisão / Aguard. material / Cancelar saíram a pedido do
 // Vitor (18/08) — não faziam sentido no dia a dia e poluíam a barra. O status de material agora
@@ -85,6 +86,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const [rastroOp, setRastroOp] = useState(false); // modal de rastreabilidade da OP inteira
   const [rastroItem, setRastroItem] = useState(null); // peça com a rastreabilidade do material dela
   const [progItem, setProgItem] = useState(null); // peça com as ordens do Syneco (conferir a programação)
+  const [separacao, setSeparacao] = useState(null); // lista de separação de material (Almoxarifado)
   const [expandido, setExpandido] = useState(() => new Set()); // conjuntos abertos (ver croquis faltantes)
   const [terceiroPecas, setTerceiroPecas] = useState(null); // peças abertas no modal de terceiro
   const [desenhoMarca, setDesenhoMarca] = useState(null); // marca aberta no modal de desenhos (GRD)
@@ -361,6 +363,11 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
           <div className="flex items-center gap-2 shrink-0">
             <button type="button" onClick={() => setRastroOp(true)} disabled={!data?.opNumero} title="Rastreabilidade do material desta OP: corrida/lote, certificado, NF, pedido de compra e fornecedor (CMR do Almoxarifado)"
               className="text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 disabled:opacity-40 inline-flex items-center gap-1"><Package size={13} /> Rastreabilidade</button>
+            {/* Lista de separação: o que o Almoxarifado tira do estoque pra atender estes croquis,
+                com o R de cada material. Com peças selecionadas, sai só delas. (Vitor 19/08.) */}
+            <button type="button" onClick={() => setSeparacao({ ids: sel.size ? [...sel] : null })} disabled={!data?.opId}
+              title="Gera a lista de separação de material: tipo, barras, peso e o R de cada material — com opção de trocar o R no ato da separação"
+              className="text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 disabled:opacity-40 inline-flex items-center gap-1"><ClipboardList size={13} /> Separação{sel.size ? ` (${fmtN(sel.size)})` : ""}</button>
             <button type="button" onClick={exportarLista} disabled={!data || !visiveis.length} title="Exporta a lista como está na tela (respeita os filtros), com material, rastreabilidade e programação" className="text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 disabled:opacity-40 inline-flex items-center gap-1"><FileDown size={13} /> Exportar lista</button>
             <button type="button" onClick={exportar} disabled={!data} title="Relação das peças baixadas manualmente p/ o setor de apontamento dar baixa no Syneco" className="text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 disabled:opacity-40 inline-flex items-center gap-1"><FileDown size={13} /> Relação Syneco</button>
             <button onClick={onClose} className="text-torg-gray hover:text-red-600"><X size={20} /></button>
@@ -622,6 +629,9 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     {rastroOp && data?.opNumero && <ModalRastreabilidade opNumero={data.opNumero} onClose={() => setRastroOp(false)} />}
     {rastroItem && <RastroDoItem peca={rastroItem} opNumero={data?.opNumero} onClose={() => setRastroItem(null)} />}
     {progItem && <OrdensDoItem peca={progItem} opId={data?.opId} setor={setor} sincronizadoEm={data?.ordensSincronizadasEm} onClose={() => setProgItem(null)} />}
+    {separacao && data?.opId && (
+      <SeparacaoModal opId={data.opId} obra={obra} setor={setor} ids={separacao.ids} onClose={() => setSeparacao(null)} />
+    )}
     </>
   );
 }
