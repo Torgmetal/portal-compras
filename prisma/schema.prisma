@@ -3750,6 +3750,28 @@ model SolicitacaoProducao {
 // GRD — controle de liberação de desenhos pros setores: registro de cada impressão/liberação de
 // projeto (PDF da Engenharia no SharePoint) feita pelas telas de produção/PCP. Tabela criada via
 // SQL (db push bloqueado por drift); só client gerado a partir daqui.
+// TROCA DE RASTREABILIDADE na separação: o Almoxarifado tirou um fardo diferente do R que o
+// FIFO indicou (o mais acessível na prateleira). Só existe linha aqui quando houve TROCA — sem
+// alteração não há registro nem ação (Vitor 19/08). Uma linha por OP+perfil; regravar atualiza.
+// A partir dela o motor de rastreio para de usar o FIFO naquele material e passa a usar o R
+// registrado — deixa de ser regra de consumo e vira fato.
+model TrocaRastreabilidade {
+  id         String   @id @default(cuid())
+  opId       String?
+  opNumero   String
+  perfil     String
+  rIndicado  String? // o que o FIFO tinha apontado (fica pra auditoria)
+  rUsado     String // o R do fardo efetivamente separado
+  motivo     String?
+  trocadoPorId   String?
+  trocadoPorNome String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([opNumero, perfil])
+  @@index([opNumero])
+}
+
 model GrdLiberacao {
   id              String   @id @default(cuid())
   opId            String?

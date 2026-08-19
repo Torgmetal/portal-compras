@@ -93,6 +93,27 @@ async function main() {
   }
   console.log("[ensure-mes-tables] OK — GrdLiberacao garantida.");
 
+  // TrocaRastreabilidade (R trocado na separação de material). Idempotente.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "TrocaRastreabilidade" (
+      "id"             TEXT         NOT NULL,
+      "opId"           TEXT,
+      "opNumero"       TEXT         NOT NULL,
+      "perfil"         TEXT         NOT NULL,
+      "rIndicado"      TEXT,
+      "rUsado"         TEXT         NOT NULL,
+      "motivo"         TEXT,
+      "trocadoPorId"   TEXT,
+      "trocadoPorNome" TEXT,
+      "createdAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "TrocaRastreabilidade_pkey" PRIMARY KEY ("id")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "TrocaRastreabilidade_opNumero_perfil_key" ON "TrocaRastreabilidade"("opNumero", "perfil")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TrocaRastreabilidade_opNumero_idx" ON "TrocaRastreabilidade"("opNumero")`);
+  console.log("[ensure-mes-tables] OK — TrocaRastreabilidade garantida.");
+
   // OP.valorFaturarPorKg (R$/kg a faturar — base da previsão de faturamento). Idempotente.
   await prisma.$executeRawUnsafe(`ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "valorFaturarPorKg" DOUBLE PRECISION`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "emProducao" BOOLEAN NOT NULL DEFAULT false`);

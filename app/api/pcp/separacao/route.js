@@ -11,6 +11,7 @@
 // CMR (desta OP e das outras), pra a tela permitir trocar. Trocando o R, corrida/certificado/NF/
 // data/fornecedor vêm junto: quem manda é o R.
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { rastreioDaOp } from "@/lib/rastreio-peca";
@@ -36,6 +37,13 @@ export async function GET(req) {
 
   const op = await prisma.oP.findUnique({ where: { id: opId }, select: { id: true, numero: true, obra: true, cliente: true } });
   if (!op) return NextResponse.json({ error: "OP não encontrada." }, { status: 404 });
+
+  // Trocas já registradas nesta OP — a tela abre com elas aplicadas.
+  const trocas = await prisma.trocaRastreabilidade.findMany({
+    where: { opNumero: op.numero },
+    select: { perfil: true, rIndicado: true, rUsado: true, motivo: true, trocadoPorNome: true, createdAt: true },
+  });
+  const trocaPorPerfil = new Map(trocas.map((t) => [String(t.perfil).trim().toUpperCase(), t]));
 
   const brutas = await prisma.pecaConjunto.findMany({
     where: { opId, perfil: { not: null }, ...(ids.length ? { id: { in: ids } } : {}) },
@@ -95,8 +103,11 @@ export async function GET(req) {
     const rIndicado = maisApontado || daOpAntiga?.rastreio || null;
     const chapa = ehChapa(g.perfil);
     const metros = g.comprimentoTotalMm / 1000;
+    const jaTrocado = trocaPorPerfil.get(g.perfil.toUpperCase()) || null;
     return {
       perfil: g.perfil,
+      // troca já registrada (o Almoxarifado separou outro fardo) — a tela abre com ela aplicada
+      troca: jaTrocado ? { rUsado: jaTrocado.rUsado, rIndicado: jaTrocado.rIndicado, motivo: jaTrocado.motivo, por: jaTrocado.trocadoPorNome, em: jaTrocado.createdAt.toISOString() } : null,
       materialNorma: g.material,               // A36 · A572-GR.50 (o grau do aço)
       materialCmr: hit?.descricao || null,     // descrição do cadastro/CMR
       qtdPecas: g.qtdPecas,
@@ -126,6 +137,56 @@ export async function GET(req) {
       pesoKg: Math.round(itens.reduce((a, x) => a + x.pesoTotalKg, 0)),
       barras: itens.reduce((a, x) => a + (x.barras || 0), 0),
       semR: itens.filter((x) => !x.rIndicado).length,
+      trocados: itens.filter((x) => x.troca).length,
     },
   });
+}
+
+// POST — registra a TROCA do R feita na separação. Só chega aqui o que MUDOU: sem alteração não
+// há registro nem ação (Vitor 19/08). Onde existe registro, o motor de rastreio para de usar o
+// FIFO naquele material e passa a usar este R — vira fato observado, não regra de consumo.
+const schemaPost = z.object({
+  opId: z.string().min(1),
+  trocas: z.array(z.object({
+    perfil: z.string().min(1),
+    rIndicado: z.string().nullable().optional(),
+    rUsado: z.string().min(1),
+    motivo: z.string().max(300).nullable().optional(),
+  })).min(1),
+});
+
+export async function POST(req) {
+  let user;
+  try { user = await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO", "COMPRAS", "QUALIDADE"]); }
+  catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  let body;
+  try { body = schemaPost.parse(await req.json()); }
+  catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
+
+  const op = await prisma.oP.findUnique({ where: { id: body.opId }, select: { id: true, numero: true } });
+  if (!op) return NextResponse.json({ error: "OP não encontrada." }, { status: 404 });
+
+  const salvas = [];
+  for (const t of body.trocas) {
+    const perfil = t.perfil.trim();
+    const reg = await prisma.trocaRastreabilidade.upsert({
+      where: { opNumero_perfil: { opNumero: op.numero, perfil } },
+      create: {
+        opId: op.id, opNumero: op.numero, perfil,
+        rIndicado: t.rIndicado || null, rUsado: t.rUsado.trim(), motivo: t.motivo || null,
+        trocadoPorId: user.id, trocadoPorNome: user.name || null,
+      },
+      update: {
+        rIndicado: t.rIndicado || null, rUsado: t.rUsado.trim(), motivo: t.motivo || null,
+        trocadoPorId: user.id, trocadoPorNome: user.name || null,
+      },
+    });
+    salvas.push({ perfil: reg.perfil, rUsado: reg.rUsado, rIndicado: reg.rIndicado });
+  }
+  await prisma.auditLog.create({
+    data: { userId: user.id, action: "TROCAR_RASTREABILIDADE", entity: "TrocaRastreabilidade", entityId: op.numero, diff: { op: op.numero, trocas: salvas } },
+  }).catch(() => {});
+
+  return NextResponse.json({ ok: true, salvas: salvas.length });
 }

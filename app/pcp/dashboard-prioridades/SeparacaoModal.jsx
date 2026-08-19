@@ -10,7 +10,7 @@
 // indicado" — então cada linha permite TROCAR o R, e corrida/certificado/NF/data/fornecedor vêm
 // junto pelo R escolhido. A troca é registrada como tal (o papel mostra o indicado e o usado).
 import { useState, useEffect, useMemo } from "react";
-import { X, Loader2, FileDown, Package, AlertTriangle, RotateCcw } from "lucide-react";
+import { X, Loader2, FileDown, Package, AlertTriangle, RotateCcw, Check } from "lucide-react";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } from "@/lib/excel-relatorio";
 
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
@@ -22,12 +22,22 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
   const [d, setD] = useState(null);
   const [erro, setErro] = useState("");
   const [trocas, setTrocas] = useState({}); // perfil → R escolhido no lugar do indicado
+  const [salvando, setSalvando] = useState(false);
+  const [salvo, setSalvo] = useState(0); // quantas trocas já foram registradas
 
   useEffect(() => {
     const qs = new URLSearchParams({ opId, ...(setor ? { setor } : {}), ...(ids?.length ? { ids: ids.join(",") } : {}) });
     fetch(`/api/pcp/separacao?${qs}`)
       .then((r) => r.json())
-      .then((j) => (j.error ? setErro(j.error) : setD(j)))
+      .then((j) => {
+        if (j.error) return setErro(j.error);
+        setD(j);
+        // abre com as trocas JÁ REGISTRADAS aplicadas (elas mandam sobre o FIFO)
+        const jaTem = {};
+        for (const it of j.itens || []) if (it.troca?.rUsado) jaTem[it.perfil] = it.troca.rUsado;
+        setTrocas(jaTem);
+        setSalvo(Object.keys(jaTem).length);
+      })
       .catch(() => setErro("Não foi possível montar a lista."));
   }, [opId, setor, ids]);
 
@@ -36,11 +46,32 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
   const linhas = useMemo(() => itens.map((it) => {
     const rUsado = trocas[it.perfil] || it.rIndicado || null;
     const dados = it.opcoes.find((o) => o.rastreio === rUsado) || null;
-    return { ...it, rUsado, dados, trocado: !!(trocas[it.perfil] && trocas[it.perfil] !== it.rIndicado) };
+    const trocado = !!(trocas[it.perfil] && trocas[it.perfil] !== it.rIndicado);
+    // "pendente" = trocado na tela mas ainda não registrado (ou registrado com outro R)
+    const pendente = trocado && it.troca?.rUsado !== rUsado;
+    return { ...it, rUsado, dados, trocado, pendente };
   }), [itens, trocas]);
 
   const trocados = linhas.filter((l) => l.trocado).length;
+  const pendentes = linhas.filter((l) => l.pendente);
   const semR = linhas.filter((l) => !l.rUsado).length;
+
+  // Registra SÓ o que mudou. Sem alteração não há ação nenhuma. (Vitor 19/08.)
+  async function registrar() {
+    if (!pendentes.length) return;
+    setSalvando(true); setErro("");
+    try {
+      const r = await fetch("/api/pcp/separacao", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opId, trocas: pendentes.map((l) => ({ perfil: l.perfil, rIndicado: l.rIndicado || null, rUsado: l.rUsado })) }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao registrar a troca");
+      // marca como registradas (some o "pendente" sem precisar recarregar a lista toda)
+      setD((old) => ({ ...old, itens: old.itens.map((it) => (trocas[it.perfil] && trocas[it.perfil] !== it.rIndicado ? { ...it, troca: { ...(it.troca || {}), rUsado: trocas[it.perfil], rIndicado: it.rIndicado } } : it)) }));
+      setSalvo(trocados);
+    } catch (e) { setErro(e.message); } finally { setSalvando(false); }
+  }
 
   async function exportar() {
     const hoje = new Date().toISOString().split("T")[0];
@@ -91,11 +122,20 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
         </div>
 
         {(trocados > 0 || semR > 0) && (
-          <div className="px-5 pt-3 flex flex-wrap gap-2">
+          <div className="px-5 pt-3 flex flex-wrap items-center gap-2">
             {trocados > 0 && (
               <p className="text-[12px] text-sky-800 bg-sky-50 border border-sky-200 rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5">
                 <RotateCcw size={13} /> {trocados} R trocado(s) na separação — a lista sai com o R que foi realmente retirado.
+                {salvo > 0 && !pendentes.length && <b className="text-emerald-700 ml-1">registrado ✓</b>}
               </p>
+            )}
+            {/* Só aparece quando HÁ o que registrar. Sem alteração, nenhuma ação. */}
+            {pendentes.length > 0 && (
+              <button onClick={registrar} disabled={salvando}
+                title="Grava a troca: daqui pra frente o portal usa este R no lugar do indicado pelo FIFO — no painel, no carimbo do desenho e no Data Book"
+                className="text-[12px] font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-50">
+                {salvando ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Registrar {pendentes.length} troca(s)
+              </button>
             )}
             {semR > 0 && (
               <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5">
@@ -153,7 +193,11 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
                           ))}
                         </select>
                       ) : <span className="text-amber-700 text-[11px] font-semibold">sem material no CMR</span>}
-                      {l.trocado && <p className="text-[10px] text-sky-700 mt-0.5">trocado — indicado era R {l.rIndicado}</p>}
+                      {l.trocado && (
+                        <p className={`text-[10px] mt-0.5 ${l.pendente ? "text-amber-700 font-semibold" : "text-emerald-700"}`}>
+                          {l.pendente ? "trocado — falta registrar" : "troca registrada ✓"} · indicado era R {l.rIndicado || "—"}
+                        </p>
+                      )}
                       {!l.trocado && l.rsIndicados.length > 1 && <p className="text-[10px] text-torg-gray mt-0.5">peças apontam {l.rsIndicados.length} Rs diferentes</p>}
                     </td>
                     <td className="px-2.5 py-2 text-[11px]">
@@ -175,7 +219,7 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
           <p className="text-[11px] text-torg-gray">
             <b>Barras</b> é o mínimo pelo comprimento total em barra de 6 m — não considera perda de corte; chapa se separa por peso.
             O <b>R</b> indicado vem do casamento LPC × CMR (FIFO pela entrega mais antiga); trocando o R, <b>corrida, certificado, NF, fornecedor e data vêm junto</b>.
-            A troca vale para esta lista — o R gravado nas peças continua o indicado até alguém registrar o consumo.
+            Trocou o R? <b>Registrar</b> grava a troca e o portal passa a usar esse R no lugar do FIFO — no painel, no carimbo do desenho e no Data Book. <b>Sem alteração não há nada a fazer</b>: o R indicado já vale.
           </p>
         </div>
       </div>
