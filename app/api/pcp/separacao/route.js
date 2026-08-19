@@ -65,11 +65,35 @@ export async function GET(req) {
   // O matcher roda por PERFIL contra a lista de materiais; casar contra as 3.7 mil linhas seria
   // desperdício — são ~1,1 mil descrições DISTINTAS. Casa nas distintas e expande depois.
   const comoItens = [...new Set(cmr.map((c) => c.nome))].map((nome) => ({ codigo: null, descricao: nome }));
+
+  // SALDO DE CADA R desta OP = o que entrou no CMR menos o que as peças já comprometeram.
+  //
+  // Vitor (19/08): "na OP-84 você mostra os materiais como ok e data do dia 18/06; nesses casos o
+  // material foi usado para os projetos anteriores — precisa ficar como sem material, ou na
+  // separação informar qual R vai ser usado".
+  //
+  // O CMR é registro de ENTRADA, não de estoque: dizer "recebido em 18/06" não quer dizer que a
+  // barra está no pátio hoje. Na OP-084 o R 260788 entrou com 13.272 kg e tem **78 kg** de saldo;
+  // o 260789, 44 kg; o 260817, 48 kg. Quem vai separar precisa ver isso ANTES de procurar o fardo.
+  const consumido = new Map(); // R → kg já comprometido pelas peças desta OP
+  for (const [, r] of porMarca) {
+    for (const u of r?.usadas || []) {
+      if (!u?.rastreio) continue;
+      consumido.set(u.rastreio, (consumido.get(u.rastreio) || 0) + (Number(u.consumidoKg) || 0));
+    }
+  }
+  const saldoDoR = (c) => {
+    if (c.opNumero !== op.numero) return null; // R de outra OP: o consumo é calculado na OP dele
+    const kg = Number(c.pesoKg) || 0;
+    const usado = consumido.get(c.importRef) || 0;
+    return { entrouKg: Math.round(kg), consumidoKg: Math.round(usado), saldoKg: Math.round(kg - usado), esgotado: kg > 0 && kg - usado < kg * 0.05 };
+  };
   const opcaoR = (c) => ({
     rastreio: c.importRef, material: c.nome, corrida: c.numeroCorrida, certificado: c.numeroDocumento,
     norma: c.norma, fornecedor: c.fornecedor, pedido: c.pedidoCompra, nf: c.nfNumero,
     recebidoEm: c.dataRecebimento ? c.dataRecebimento.toISOString() : null,
     pesoKg: c.pesoKg, quantidade: c.quantidade, opNumero: c.opNumero, daOp: c.opNumero === op.numero,
+    saldo: saldoDoR(c),
   });
 
   // ── agrupa por PERFIL (é a unidade de separação no estoque) ────────────────────────────────
@@ -101,6 +125,16 @@ export async function GET(req) {
     const maisApontado = [...g.rs.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
     const daOpAntiga = [...opcoes].filter((o) => o.daOp).sort((a, b) => String(a.recebidoEm || "").localeCompare(String(b.recebidoEm || "")))[0];
     const rIndicado = maisApontado || daOpAntiga?.rastreio || null;
+    // O R indicado ainda tem material? Se não, a separação vai ter de sair de outro fardo — e a
+    // tela já sugere qual (o R com saldo, da OP ou de fora), pra não mandar ninguém procurar barra
+    // que não existe.
+    const indicado = opcoes.find((o) => o.rastreio === rIndicado) || null;
+    const rEsgotado = !!indicado?.saldo?.esgotado;
+    const alternativas = opcoes
+      .filter((o) => o.rastreio !== rIndicado && (o.saldo ? !o.saldo.esgotado : true))
+      .sort((a, b) => (b.daOp ? 1 : 0) - (a.daOp ? 1 : 0) || (b.saldo?.saldoKg || b.pesoKg || 0) - (a.saldo?.saldoKg || a.pesoKg || 0))
+      .slice(0, 3)
+      .map((o) => ({ rastreio: o.rastreio, saldoKg: o.saldo?.saldoKg ?? null, pesoKg: o.pesoKg, opNumero: o.opNumero, daOp: o.daOp }));
     const chapa = ehChapa(g.perfil);
     const metros = g.comprimentoTotalMm / 1000;
     const jaTrocado = trocaPorPerfil.get(g.perfil.toUpperCase()) || null;
@@ -121,6 +155,9 @@ export async function GET(req) {
       chapa,
       marcas: g.marcas,
       rIndicado,
+      rIndicadoSaldo: indicado?.saldo || null,
+      rEsgotado,
+      alternativas: rEsgotado ? alternativas : [],
       rsIndicados: [...g.rs.entries()].map(([r, n]) => ({ rastreio: r, pecas: n })).sort((a, b) => b.pecas - a.pecas),
       opcoes,
     };

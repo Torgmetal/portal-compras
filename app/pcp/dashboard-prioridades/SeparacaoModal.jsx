@@ -77,7 +77,7 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
     const hoje = new Date().toISOString().split("T")[0];
     const nomeSetor = setor ? SETOR_LABEL[setor] || setor : "Geral";
     const headers = ["Perfil / tipo de material", "Aço", "Peças", "Barras (6 m)", "Compr. total (m)", "Peso un. (kg)", "Peso total (kg)",
-      "Rastreab. (R)", "Corrida / lote", "Certificado", "NF", "Fornecedor", "Recebido em", "Conferido (visto)"];
+      "Rastreab. (R)", "Corrida / lote", "Certificado", "NF", "Fornecedor", "Recebido em", "Saldo do R", "Conferido (visto)"];
     const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
       titulo: `Lista de separação de material — ${obra}`,
       subtitulo: `${obra} · ${nomeSetor}${d?.escopo === "selecao" ? " · somente as peças selecionadas" : " · OP inteira"}${trocados ? ` · ${trocados} R trocado(s) na separação` : ""}`,
@@ -95,7 +95,8 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
         l.pesoUnitKg ?? "", Number(l.pesoTotalKg.toFixed(1)),
         l.rUsado ? `R ${l.rUsado}${l.trocado ? " (trocado)" : ""}` : "A DEFINIR",
         l.dados?.corrida || (l.rUsado ? "sem corrida no CMR" : ""), l.dados?.certificado || "", l.dados?.nf || "",
-        l.dados?.fornecedor || "", fmtD(l.dados?.recebidoEm), "",
+        l.dados?.fornecedor || "", fmtD(l.dados?.recebidoEm),
+        l.dados?.saldo ? `saldo ${l.dados.saldo.saldoKg} kg${l.dados.saldo.esgotado ? " (esgotado)" : ""}` : "",
       ], { alinhamento: { 1: "center", 2: "center", 3: "center", 4: "right", 5: "right", 6: "right", 7: "center", 8: "center", 9: "center", 10: "center", 12: "center" } });
       row++;
     }
@@ -188,7 +189,7 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
                           <option value="">— escolher R —</option>
                           {l.opcoes.map((o) => (
                             <option key={o.rastreio} value={o.rastreio}>
-                              R {o.rastreio}{o.corrida ? ` · ${o.corrida}` : " · sem corrida"} · {fmtD(o.recebidoEm)}{o.daOp ? "" : ` · OP-${o.opNumero}`}
+                              R {o.rastreio}{o.corrida ? ` · ${o.corrida}` : " · sem corrida"} · {fmtD(o.recebidoEm)}{o.saldo ? ` · saldo ${o.saldo.saldoKg} kg${o.saldo.esgotado ? " (esgotado)" : ""}` : ""}{o.daOp ? "" : ` · OP-${o.opNumero}`}
                             </option>
                           ))}
                         </select>
@@ -205,6 +206,17 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
                         <>
                           <p><b>corrida</b> {l.dados.corrida || <span className="text-amber-700">sem corrida no CMR</span>} · <b>cert.</b> {l.dados.certificado || "—"}</p>
                           <p className="text-torg-gray">NF {l.dados.nf || "—"} · {l.dados.fornecedor || "—"} · recebido {fmtD(l.dados.recebidoEm)}{!l.dados.daOp && <b className="text-sky-700"> · fardo da OP-{l.dados.opNumero}</b>}</p>
+                          {l.dados.saldo && (
+                            <p className={l.dados.saldo.esgotado ? "text-amber-700 font-semibold" : "text-torg-gray"}>
+                              entrou {l.dados.saldo.entrouKg} kg · comprometido {l.dados.saldo.consumidoKg} kg · <b>saldo {l.dados.saldo.saldoKg} kg</b>
+                              {l.dados.saldo.esgotado && " — material já usado; separar de outro fardo e registrar a troca"}
+                            </p>
+                          )}
+                          {!l.trocado && l.rEsgotado && l.alternativas?.length > 0 && (
+                            <p className="text-sky-800">
+                              com saldo: {l.alternativas.map((a) => `R ${a.rastreio}${a.saldoKg != null ? ` (${a.saldoKg} kg)` : ""}${a.daOp ? "" : ` · OP-${a.opNumero}`}`).join(" · ")}
+                            </p>
+                          )}
                         </>
                       ) : <span className="text-gray-300">—</span>}
                     </td>
