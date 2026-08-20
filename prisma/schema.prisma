@@ -3242,6 +3242,14 @@ model Cronograma {
   areas          Json                 @default("[]") // Áreas da obra: [{nome, cor}] — cor FIXA por área (índice da paleta), estável no rename; definível na criação
   ultimoSync     DateTime             @default(now())
   ativo          Boolean              @default(true)
+
+  // TAREFAS LIBERADAS PROS SETORES — ato deliberado, com botão, DEPOIS que o cronograma está
+  // fechado. Vitor (19/08/2026): "minha sugestão seria colocarmos um botão para enviar tarefas em
+  // cada cronograma; isso será enviado após a liberação do cronograma, não deve ser preenchido
+  // automático, pois algumas estruturas mudam de obra para obra".
+  // Enquanto for null, as tarefas existem no cronograma mas NÃO aparecem na Sequência dos setores.
+  tarefasEnviadasEm    DateTime?
+  tarefasEnviadasPorId String?
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
   op             OP?                  @relation(fields: [opId], references: [id])

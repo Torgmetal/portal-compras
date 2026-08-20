@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FileText, GitCompareArrows, RotateCcw, Gauge, FolderKanban, ListChecks } from "lucide-react";
+import { LayoutDashboard, FileText, GitCompareArrows, RotateCcw, Gauge, FolderKanban, ListChecks, ListOrdered } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -11,6 +11,8 @@ const ITENS = [
   { href: "/engenharia", label: "Visão Geral", icon: LayoutDashboard, exact: true },
   { href: "/engenharia/ops", label: "OPs", icon: FolderKanban },
   { href: "/engenharia/listas", label: "Listas (LE / LPC)", icon: ListChecks },
+  // Tarefas dos cronogramas em ordem de prazo — só as que o Planejamento enviou. (Vitor 19/08.)
+  { href: "/engenharia/sequencia", label: "Sequência", icon: ListOrdered },
 ];
 const EM_BREVE = [
   { label: "Detalhamento por OP", icon: FileText, hint: "abre clicando numa OP da carteira" },

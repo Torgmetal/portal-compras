@@ -86,6 +86,11 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PrioridadeTvOculta_opId_idx" ON "PrioridadeTvOculta"("opId")`);
   console.log("[ensure-mes-tables] OK — PrioridadeTvOculta garantida.");
 
+  // Cronograma.tarefasEnviadas* — libera as tarefas do cronograma pros setores (botão). Idempotente.
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Cronograma" ADD COLUMN IF NOT EXISTS "tarefasEnviadasEm" TIMESTAMP(3)`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Cronograma" ADD COLUMN IF NOT EXISTS "tarefasEnviadasPorId" TEXT`);
+  console.log("[ensure-mes-tables] OK — Cronograma.tarefasEnviadas* garantidas.");
+
   // ProdutoOmie (cache do cadastro de produtos do Omie — código do item nos romaneios). Idempotente.
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "ProdutoOmie" (

@@ -879,6 +879,32 @@ function CronogramaCard({ cronograma, onToggle }) {
 function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogramaId, onDeleted, onEncerrado, opStatus, readOnly }) {
   const [tab, setTab] = useState("cronograma");
   const [settingBase, setSettingBase] = useState(false);
+  const [enviandoTarefas, setEnviandoTarefas] = useState(false);
+
+  // ENVIAR TAREFAS PROS SETORES — ato deliberado, depois que o cronograma está fechado.
+  // Vitor (19/08/2026): "não deve ser preenchido automático, pois algumas estruturas mudam de obra
+  // para obra". Enquanto não é enviado, as linhas são rascunho e não aparecem na Sequência de
+  // ninguém. Recolher devolve pro rascunho — melhor sumir do que deixar o setor seguindo data que
+  // já não vale.
+  const enviarTarefas = async (recolher = false) => {
+    if (recolher && !window.confirm("Recolher as tarefas?\n\nElas somem da Sequência dos setores até serem enviadas de novo.")) return;
+    if (!recolher && !window.confirm("Enviar as tarefas deste cronograma aos setores?\n\nElas passam a aparecer na aba Sequência de cada setor.")) return;
+    setEnviandoTarefas(true);
+    try {
+      const res = await fetch(`/api/planejamento/cronogramas/${detail.id}/enviar-tarefas`, { method: recolher ? "DELETE" : "POST" });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      if (!recolher) {
+        const setores = Object.entries(j.porSetor || {}).map(([k, v]) => `${k}: ${v}`).join(" · ");
+        alert(`${j.tarefas} tarefa(s) enviada(s).\n${setores}` + (j.semData ? `\n\n${j.semData} sem data ficaram de fora.` : ""));
+      }
+      onRefreshDetail?.(cronogramaId);
+    } catch (e) {
+      alert(`Não consegui: ${e.message}`);
+    } finally {
+      setEnviandoTarefas(false);
+    }
+  };
   const [deleting, setDeleting] = useState(false);
   const [savingTipoDias, setSavingTipoDias] = useState(false);
   const [encerrando, setEncerrando] = useState(false);
@@ -1004,6 +1030,35 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
                 Datas do cronograma travadas
               </span>
             )}
+            {/* Libera as tarefas pros setores — só depois que o cronograma está fechado. */}
+            <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-gray-200">
+              <Send size={12} className={detail.tarefasEnviadasEm ? "text-green-600" : "text-torg-gray"} />
+              <span className="text-xs font-medium text-torg-dark">Tarefas:</span>
+              {detail.tarefasEnviadasEm ? (
+                <span className="text-[11px] font-semibold text-green-700"
+                  title="As tarefas deste cronograma aparecem na aba Sequência de cada setor">
+                  enviadas em {new Date(detail.tarefasEnviadasEm).toLocaleDateString("pt-BR")}
+                </span>
+              ) : (
+                <span className="text-[11px] text-torg-gray italic">não enviadas — os setores não veem</span>
+              )}
+              {!readOnly && (
+                <button
+                  onClick={() => enviarTarefas(!!detail.tarefasEnviadasEm)}
+                  disabled={enviandoTarefas}
+                  title={detail.tarefasEnviadasEm
+                    ? "Recolher: as tarefas somem da Sequência dos setores"
+                    : "Enviar as tarefas pros setores — elas passam a aparecer na aba Sequência"}
+                  className={`px-2 py-0.5 text-[10px] font-medium rounded border disabled:opacity-50 ${
+                    detail.tarefasEnviadasEm
+                      ? "text-torg-gray bg-gray-50 border-gray-200 hover:bg-gray-100"
+                      : "text-white bg-torg-blue border-torg-blue hover:bg-torg-blue/90"
+                  }`}
+                >
+                  {enviandoTarefas ? "..." : detail.tarefasEnviadasEm ? "Recolher" : "Enviar tarefas"}
+                </button>
+              )}
+            </div>
             {/* Toggle DU / DC */}
             <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-gray-200">
               <Calendar size={12} className="text-torg-gray" />
