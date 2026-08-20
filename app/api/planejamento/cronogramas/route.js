@@ -89,7 +89,7 @@ export async function GET(req) {
       op: { select: { id: true, numero: true, cliente: true, obra: true, status: true } },
       tarefas: {
         where: { outlineLevel: { gte: 1 } },
-        select: { id: true, nome: true, departamento: true, percentualRealizado: true, dataFimPrevista: true, isSummary: true, outlineLevel: true },
+        select: { id: true, nome: true, departamento: true, percentualRealizado: true, dataFimPrevista: true, isSummary: true, outlineLevel: true, duracaoDias: true, area: true },
       },
     },
     // ⚠ ordenado no JS logo abaixo: `opNumero` é TEXTO, então o banco põe "T113" antes de "115"
@@ -103,46 +103,78 @@ export async function GET(req) {
 
   const DEPT_ORDER = ["COMERCIAL", "ENGENHARIA", "SUPRIMENTOS", "FABRICACAO", "EXPEDICAO", "MONTAGEM"];
   const now = new Date();
-  const result = cronogramas.map((c) => {
-    const summaryTasks = c.tarefas.filter((t) => t.isSummary && t.outlineLevel === 1);
-    const realTasks = c.tarefas.filter((t) => !t.isSummary);
 
-    let deptSummary;
-    if (summaryTasks.length > 0) {
-      // Tem summaries — usa eles, mas valida atrasado pelas tarefas reais
-      deptSummary = summaryTasks.map((t) => ({
-        nome: t.nome,
-        departamento: t.departamento,
-        percentual: t.percentualRealizado,
-        atrasado: realTasks.some((r) => r.departamento === t.departamento && r.dataFimPrevista && r.dataFimPrevista < now && r.percentualRealizado < 100),
-      }));
-    } else {
-      // Sem summaries — calcula resumo a partir das tarefas reais agrupadas por departamento
-      const porDept = {};
-      for (const t of realTasks) {
-        const d = t.departamento || "OUTROS";
-        if (!porDept[d]) porDept[d] = { pcts: [], atrasado: false };
-        porDept[d].pcts.push(t.percentualRealizado || 0);
-        if (t.dataFimPrevista && t.dataFimPrevista < now && t.percentualRealizado < 100) {
-          porDept[d].atrasado = true;
+  // ── O RESUMO POR SETOR SAI DAS TAREFAS REAIS, SEMPRE ─────────────────────────────────────
+  //
+  // Vitor (19/08/2026): "esse resumo das áreas está ficando zerado ou errado, poderia verificar?".
+  // Estava, e por dois motivos que se somavam:
+  //
+  // 1. O chip lia o `percentualRealizado` GRAVADO na linha-resumo. Só que o avanço da Fabricação
+  //    é calculado NA LEITURA, a partir do Syneco (ver lib/cronograma-syneco.js) — nunca é
+  //    gravado. Resultado: filha em 45% e resumo em 0%, pra sempre. Suprimentos tinha o mesmo
+  //    problema ao contrário: só atualizava quando o sync do CMR rodava, então o número era o da
+  //    última vez que alguém sincronizou.
+  //
+  // 2. Quando não havia linha-resumo, a conta era média SIMPLES dos percentuais — uma tarefa de
+  //    1 dia pesando igual a uma de 10.
+  //
+  // Agora é sempre derivado: aplica o Syneco nas linhas de Fabricação e pondera por DURAÇÃO.
+  // A linha-resumo continua existindo no cronograma (é dela que sai o Gantt), mas deixou de ser
+  // fonte pro chip — quem manda são as tarefas.
+  //
+  // O arquivo já dizia isso no cálculo de atrasados ("não do summary que pode estar
+  // desatualizado"); faltava aplicar ao percentual.
+  const comOp = cronogramas.filter((c) => c.opId && (c.op?.numero || c.opNumero));
+  const syncPorOp = new Map(
+    await Promise.all(
+      comOp.map(async (c) => {
+        try {
+          const tarefasFab = c.tarefas.filter((t) => !t.isSummary && t.departamento === "FABRICACAO");
+          if (!tarefasFab.length) return [c.id, null];
+          const sync = await sincronizarCronogramaSyneco(prisma, c.opId, c.op?.numero || c.opNumero);
+          return [c.id, avancosDasTarefas(tarefasFab, sync)];
+        } catch {
+          return [c.id, null]; // Syneco fora do ar não pode derrubar a listagem
         }
-      }
-      deptSummary = DEPT_ORDER
-        .filter((d) => porDept[d])
-        .concat(Object.keys(porDept).filter((d) => !DEPT_ORDER.includes(d)))
-        .map((d) => ({
-          nome: d,
-          departamento: d,
-          percentual: porDept[d].pcts.length > 0
-            ? Math.round(porDept[d].pcts.reduce((a, b) => a + b, 0) / porDept[d].pcts.length)
-            : 0,
-          atrasado: porDept[d].atrasado,
-        }));
+      })
+    )
+  );
+
+  const result = cronogramas.map((c) => {
+    const realTasks = c.tarefas.filter((t) => !t.isSummary);
+    const avancos = syncPorOp.get(c.id);
+
+    // percentual efetivo da tarefa: Fabricação vem do Syneco quando há; o resto é o gravado
+    const pctDe = (t) => {
+      const av = avancos?.get(t.id);
+      if (av && !av.ambigua && av.realizado != null) return av.realizado;
+      return t.percentualRealizado || 0;
+    };
+
+    const porDept = {};
+    for (const t of realTasks) {
+      const d = t.departamento || "OUTROS";
+      const g = (porDept[d] ||= { peso: 0, soma: 0, n: 0, atrasado: false });
+      // ⚠ pondera por DURAÇÃO: tarefa sem duração entra com peso 1 pra não sumir da conta
+      const peso = Number(t.duracaoDias) > 0 ? Number(t.duracaoDias) : 1;
+      g.peso += peso;
+      g.soma += peso * pctDe(t);
+      g.n++;
+      if (t.dataFimPrevista && t.dataFimPrevista < now && pctDe(t) < 100) g.atrasado = true;
     }
 
-    // Conta tarefas reais atrasadas (não summaries)
-    const atrasados = realTasks.filter((t) => t.dataFimPrevista && t.dataFimPrevista < now && t.percentualRealizado < 100).length;
-    // Remove tarefas do response pra não pesar
+    const deptSummary = DEPT_ORDER
+      .filter((d) => porDept[d])
+      .concat(Object.keys(porDept).filter((d) => !DEPT_ORDER.includes(d)))
+      .map((d) => ({
+        nome: d,
+        departamento: d,
+        percentual: porDept[d].peso > 0 ? Math.round(porDept[d].soma / porDept[d].peso) : 0,
+        tarefas: porDept[d].n,
+        atrasado: porDept[d].atrasado,
+      }));
+
+    const atrasados = realTasks.filter((t) => t.dataFimPrevista && t.dataFimPrevista < now && pctDe(t) < 100).length;
     const { tarefas, ...rest } = c;
     return { ...rest, deptSummary, atrasados };
   });
