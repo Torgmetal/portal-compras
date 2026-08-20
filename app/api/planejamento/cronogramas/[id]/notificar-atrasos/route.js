@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
+import { CC_DIRECAO } from "@/lib/contatos-tarefas";
 import { gerarTokenForte } from "@/lib/token";
 import { dataBR } from "@/lib/data-br";
 
@@ -70,7 +71,8 @@ export async function GET(req, { params }) {
         modulo: u.modulos.map((m) => m.modulo).join(", "),
       }));
 
-    return NextResponse.json({ success: true, sugeridos });
+    // CC padrão: a direção, marcada mas desmarcável (Vitor 19/08).
+    return NextResponse.json({ success: true, sugeridos, ccPadrao: CC_DIRECAO });
   } catch (e) {
     console.error("[notificar-atrasos GET] erro:", e?.message);
     return NextResponse.json(
@@ -94,6 +96,8 @@ export async function POST(req, { params }) {
 
   let filtroDepts = null;
   let emailsManuais = [];
+  // null = usa o padrão (a direção); [] = o usuário desmarcou todos, manda sem cópia
+  let ccEscolhido = null;
   try {
     const body = await req.json();
     if (body.departamentos && Array.isArray(body.departamentos)) {
@@ -104,6 +108,7 @@ export async function POST(req, { params }) {
     if (body.emails && Array.isArray(body.emails)) {
       emailsManuais = body.emails.filter((e) => typeof e === "string" && e.includes("@"));
     }
+    if (Array.isArray(body.cc)) ccEscolhido = body.cc;
   } catch {
     // body vazio
   }
@@ -154,12 +159,23 @@ export async function POST(req, { params }) {
     });
   }
 
-  // Admins vao no CC
-  const adminUsers = await prisma.user.findMany({
-    where: { ativo: true, tipo: "ADMIN" },
-    select: { email: true },
-  });
-  const ccEmails = adminUsers.map((u) => u.email).filter(Boolean);
+  // ── CC: a DIREÇÃO, não "todo mundo que é ADMIN" ─────────────────────────────────────────
+  //
+  // Vitor (19/08/2026): "estamos copiando pessoas que não precisam quando vamos cobrar os setores.
+  // Deixar sempre o responsável do setor + eu, a Fabrine e o Guilherme, com opção de selecionar ou
+  // não".
+  //
+  // Antes o CC era `tipo: "ADMIN"` — cinco pessoas, incluindo Matheus e Caio, que não têm relação
+  // com cobrança de prazo. E ADMIN é permissão de SISTEMA, não cargo: quem ganhasse acesso
+  // administrativo passaria a receber cobrança de todo setor sem ninguém ter decidido isso.
+  //
+  // Agora o padrão é a direção e o cliente manda o que ficou marcado. Array vazio = sem cópia:
+  // por isso o teste é `Array.isArray`, não `?.length` — [] tem de significar "nenhum", e não
+  // "usa o padrão".
+  const ccEmails = (ccEscolhido ?? CC_DIRECAO.map((c) => c.email))
+    .filter((e) => typeof e === "string" && e.includes("@"))
+    // quem já está no "para" não precisa aparecer no CC também
+    .filter((e) => !emailsManuais.includes(e));
 
   const opLabel = cronograma.op
     ? `OP ${cronograma.op.numero} — ${cronograma.op.cliente} — ${cronograma.op.obra || ""}`

@@ -2078,6 +2078,9 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
   const [emailsSugeridos, setEmailsSugeridos] = useState([]);
   const [emailsSelecionados, setEmailsSelecionados] = useState([]);
   const [emailExtra, setEmailExtra] = useState("");
+  // CC da direção — vem marcado e dá pra desmarcar (Vitor 19/08: "com opção de selecionar ou não")
+  const [ccPadrao, setCcPadrao] = useState([]);
+  const [ccSelecionado, setCcSelecionado] = useState([]);
   const [loadingEmails, setLoadingEmails] = useState(false);
   const [addingTask, setAddingTask] = useState(false);
   const [newTaskName, setNewTaskName] = useState("");
@@ -2163,6 +2166,9 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
         setEmailsSugeridos(data.sugeridos);
         setEmailsSelecionados(data.sugeridos.map((u) => u.email));
       }
+      const cc = data.ccPadrao || [];
+      setCcPadrao(cc);
+      setCcSelecionado(cc.map((c) => c.email)); // marcados por padrão
     } catch { /* ignora */ }
     setLoadingEmails(false);
   };
@@ -2192,7 +2198,8 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
       const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/notificar-atrasos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ departamento: dept, emails: emailsSelecionados }),
+        // `cc` sempre vai, mesmo vazio: [] significa "sem cópia", não "usa o padrão"
+        body: JSON.stringify({ departamento: dept, emails: emailsSelecionados, cc: ccSelecionado }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao notificar");
@@ -2474,6 +2481,28 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
                 </button>
               </div>
             </div>
+            {ccPadrao.length > 0 && (
+              <div className="border border-gray-200 rounded-lg p-3">
+                <p className="text-xs text-torg-gray font-medium mb-2">
+                  Em cópia <span className="font-normal">— a direção. Desmarque quem não precisa.</span>
+                </p>
+                <div className="space-y-1">
+                  {ccPadrao.map((c) => (
+                    <label key={c.email} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={ccSelecionado.includes(c.email)}
+                        onChange={() => setCcSelecionado((prev) =>
+                          prev.includes(c.email) ? prev.filter((x) => x !== c.email) : [...prev, c.email]
+                        )}
+                      />
+                      <span className="text-xs text-torg-dark">{c.nome}</span>
+                      <span className="text-[10px] text-torg-gray">{c.email}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
               <p className="text-[10px] text-amber-700">
                 O email incluirá a lista de tarefas atrasadas e um link para o setor informar a nova data prevista de cada atividade.
