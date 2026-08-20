@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
-import { sincronizarCronogramaSyneco, avancoDaTarefa } from "@/lib/cronograma-syneco";
+import { sincronizarCronogramaSyneco, avancosDasTarefas } from "@/lib/cronograma-syneco";
 
 export async function GET(req, { params }) {
   try {
@@ -53,9 +53,13 @@ export async function GET(req, { params }) {
   if (cronograma.op?.id) {
     try {
       const sync = await sincronizarCronogramaSyneco(prisma, cronograma.op.id, cronograma.op.numero);
+      const avancos = avancosDasTarefas(cronograma.tarefas, sync);
       cronograma.tarefas = cronograma.tarefas.map((t) => {
-        const av = avancoDaTarefa(t, sync);
-        if (!av || av.realizado == null) return t; // não é fabricação, ou sem escopo (mantém manual)
+        const av = avancos.get(t.id);
+        if (!av) return t; // não é fase
+        // ambígua: duas tarefas disputando o mesmo escopo — mostra o motivo, não um número errado
+        if (av.ambigua) return { ...t, syncSyneco: { ambigua: true, motivo: av.motivo } };
+        if (av.realizado == null) return t; // sem escopo → mantém manual
         return {
           ...t,
           percentualRealizado: av.realizado,
