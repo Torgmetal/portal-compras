@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { marcasEntreguesAExpedicao, entregueAExpedicao } from "@/lib/entregue-expedicao";
 import { requireRole } from "@/lib/session";
 import { whereSetorSyneco, normalizeSetorSyneco } from "@/lib/syneco-dia";
 import { ehItemComprado } from "@/lib/item-comprado";
@@ -100,7 +101,16 @@ export async function GET(req) {
     if (vaiPraMontagem(p)) return s !== "CORTE";               // Montagem→Expedição
     return s === "CORTE" || !["MONTAGEM", "SOLDA"].includes(s); // solo/avulsa pula Mont./Solda
   };
-  const escopo = setor ? todas.filter((p) => passaNoSetor(p, setor)) : todas;
+  // FIM DE LINHA DO PCP: peça em romaneio (prévio ou emitido) já é da Expedição — sai da lista.
+  // Vitor (19/08): "fez o romaneio prévio, ou emitiu o romaneio, sim essa peça deve sair do portal
+  // do PCP e a responsabilidade passa a ser do próximo setor". Sem esse fim, a raia de Expedição
+  // virava depósito: a peça ficava lá pra sempre e o "a liberar" nunca fechava.
+  //
+  // Não some calada — o total sai no `entreguesAExpedicao` do placar, pra pessoa ver pra onde foi.
+  const marcasEntregues = await marcasEntreguesAExpedicao(prisma, opId);
+  const noSetor = setor ? todas.filter((p) => passaNoSetor(p, setor)) : todas;
+  const entregues = noSetor.filter((p) => entregueAExpedicao(p, marcasEntregues));
+  const escopo = entregues.length ? noSetor.filter((p) => !entregueAExpedicao(p, marcasEntregues)) : noSetor;
 
   // Reconciliação com o Syneco: quantidade PRODUZIDA no mesOrdem daquele setor, por marca
   // (extremo sincronismo portal×Syneco — o histórico e o export usam isto).
@@ -319,7 +329,14 @@ export async function GET(req) {
   const baixados = setor ? pecas.filter((p) => p.baixadoPortal).length : 0;
   const precisamSyneco = setor ? pecas.filter((p) => p.precisaSyneco).length : 0;
 
-  return NextResponse.json({ opId, opNumero: opInfo?.numero || null, emProducao: !!opInfo?.emProducao, setor: setor || null, total: pecas.length, placar, baixados, precisamSyneco, compra: compraOp, ordensSincronizadasEm: ordensSincronizadasEm ? ordensSincronizadasEm.toISOString() : null, pecas });
+  return NextResponse.json({
+    opId, opNumero: opInfo?.numero || null, emProducao: !!opInfo?.emProducao, setor: setor || null,
+    total: pecas.length, placar, baixados, precisamSyneco, compra: compraOp,
+    ordensSincronizadasEm: ordensSincronizadasEm ? ordensSincronizadasEm.toISOString() : null,
+    // quantas saíram da lista por já estarem em romaneio — o PCP se despediu delas
+    entreguesAExpedicao: entregues.length,
+    pecas,
+  });
 }
 
 export async function POST(req) {

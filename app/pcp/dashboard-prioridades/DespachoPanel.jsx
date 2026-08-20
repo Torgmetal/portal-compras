@@ -475,7 +475,14 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                   certificado, NF, pedido, fornecedor). Vitor 18/08: "onde está a rastreabilidade". */}
               {data?.compra && <CompraChip compra={data.compra} opNumero={data.opNumero} />}
             </h2>
-            {data && <p className="text-[12px] text-torg-gray">{fmtN(data.total)} peça(s){podeBaixa ? ` · ${fmtN(pendentes.length)} a liberar · ${fmtN(prontas.length)} prontas` : ""}{podeBaixa && data.precisamSyneco > 0 ? ` · ${fmtN(data.precisamSyneco)} p/ acertar no Syneco` : ""}</p>}
+            {data && <p className="text-[12px] text-torg-gray">{fmtN(data.total)} peça(s){podeBaixa ? ` · ${fmtN(pendentes.length)} a liberar · ${fmtN(prontas.length)} prontas` : ""}{podeBaixa && data.precisamSyneco > 0 ? ` · ${fmtN(data.precisamSyneco)} p/ acertar no Syneco` : ""}
+              {/* O PCP se despede da peça no romaneio — mas o número fica visível, senão a lista
+                  encolhe sozinha e ninguém sabe pra onde foi. (Vitor 19/08.) */}
+              {data.entreguesAExpedicao > 0 && (
+                <span title="Peças já em romaneio (prévio ou emitido): saíram da lista do PCP, a responsabilidade agora é da Expedição">
+                  {" · "}<span className="text-indigo-700 font-semibold">{fmtN(data.entreguesAExpedicao)} entregue(s) à Expedição</span>
+                </span>
+              )}</p>}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button type="button" onClick={() => setRastroOp(true)} disabled={!data?.opNumero} title="Rastreabilidade do material desta OP: corrida/lote, certificado, NF, pedido de compra e fornecedor (CMR do Almoxarifado)"
