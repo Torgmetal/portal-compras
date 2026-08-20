@@ -6,7 +6,7 @@ import {
   Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X, Search,
   FileText, CheckCircle2, Lock, BookCheck, FileDown, Upload, Send, Copy, Users,
 } from "lucide-react";
-import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, GRUPO_POR_SECAO, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO } from "@/lib/databook-secoes";
+import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, GRUPO_POR_SECAO, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO, docCasaSecao } from "@/lib/databook-secoes";
 import { STATUS_COR } from "@/lib/qualidade-status";
 import { TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 
@@ -163,9 +163,9 @@ export default function DataBookDetalheClient({ id, userId }) {
       const res = await fetch(`/api/qualidade/data-books/secao/${secao.id}/popular-procedimentos`, { method: "POST" });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || "Erro");
-      if (json.semDocs) {
-        alert("Nenhum procedimento aplicável a esta seção no Controle de Documentos. Importe pela aba “Importar do servidor” (pasta Procedimentos).");
-      }
+      // Diz o MOTIVO em vez de um "nenhum aplicável" genérico — o botão não está quebrado, a
+      // origem é que está vazia. (Vitor 19/08.)
+      if (json.semDocs) alert(json.motivo || "Nenhum procedimento aplicável a esta seção no Controle de Documentos.");
       await carregar();
     } catch (e) {
       alert(e.message);
@@ -482,6 +482,7 @@ function Campo({ label, v, onChange, type = "text" }) {
 }
 
 function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit, onGerarLpc, onPuxarProjetos, onReload }) {
+  const [verTodos, setVerTodos] = useState(false);
   const [picker, setPicker] = useState(false);
   const [codBusca, setCodBusca] = useState("");
   const [codResultados, setCodResultados] = useState(null);
@@ -490,7 +491,15 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
   const [progresso, setProgresso] = useState(""); // "2/5" durante o upload em lote
   const fileRef = useRef(null);
   const linkedIds = new Set(secao.documentos.map((d) => d.id));
-  const disponiveis = candidatos.filter((c) => !linkedIds.has(c.id));
+  const naoVinculados = candidatos.filter((c) => !linkedIds.has(c.id));
+  // Os que CABEM nesta seção vêm primeiro. O `tipo` do documento é o título da seção (com o
+  // prefixo "Anexo — "), então o casamento é direto — ver docCasaSecao em lib/databook-secoes.
+  // Vitor (19/08): abriu o seletor na §02 (Desenhos as-built) e o portal ofereceu certificados de
+  // aço, porque listava TODOS os documentos da OP.
+  const daSecao = naoVinculados.filter((c) => docCasaSecao(c, secao));
+  const outros = naoVinculados.filter((c) => !docCasaSecao(c, secao));
+  // ⚠ "ver todos" continua existindo: filtro sem saída troca lista inútil por parede.
+  const disponiveis = verTodos || daSecao.length === 0 ? naoVinculados : daSecao;
 
   // Anexa um OU VÁRIOS arquivos do computador direto à seção (Vercel Blob +
   // endpoint /anexar). Sobe em sequência, com progresso; uma falha num arquivo
@@ -631,13 +640,24 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
               <div className="flex items-center gap-2">
                 <select autoFocus onChange={(e) => { if (e.target.value) { onVincular(e.target.value); setPicker(false); } }} defaultValue=""
                   className="flex-1 text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue">
-                  <option value="" disabled>Selecione um documento da OP…</option>
+                  <option value="" disabled>
+                    {daSecao.length && !verTodos
+                      ? `Documentos desta seção (${daSecao.length})…`
+                      : "Selecione um documento da OP…"}
+                  </option>
                   {disponiveis.map((c) => (
                     <option key={c.id} value={c.id}>{c.nome}{c.numeroCorrida ? ` (corrida ${c.numeroCorrida})` : ""}{c.status !== "SEM_VALIDADE" ? ` — ${c.statusLabel}` : ""}</option>
                   ))}
                 </select>
                 <button onClick={() => { setPicker(false); setCodResultados(null); setCodBusca(""); }} className="text-torg-gray hover:text-torg-dark"><X size={14} /></button>
               </div>
+              {outros.length > 0 && daSecao.length > 0 && (
+                <button onClick={() => setVerTodos((v) => !v)} className="text-[10px] text-torg-blue hover:underline">
+                  {verTodos
+                    ? `Mostrar só os ${daSecao.length} desta seção`
+                    : `Ver todos os ${naoVinculados.length} documentos da OP (+${outros.length} de outras seções)`}
+                </button>
+              )}
               <form onSubmit={buscarPorCodigo} className="flex items-center gap-2">
                 <input value={codBusca} onChange={(e) => setCodBusca(e.target.value)} placeholder="ou buscar por código de rastreabilidade (ex.: 260001, nº do certificado)…"
                   className="flex-1 text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue" />

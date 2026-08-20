@@ -32,7 +32,17 @@ export async function POST(req, { params }) {
   });
   const aplicaveis = procs.filter((p) => procedimentoCasaSecao(p.nome, secao.numero));
   if (!aplicaveis.length) {
-    return NextResponse.json({ success: true, vinculados: 0, total: 0, semDocs: true });
+    // ⚠ DIZER POR QUE não veio nada. Vitor (19/08): "esses botões estão totalmente fora de
+    // funcionamento, não trazem nada de informação". O botão não estava quebrado — a ORIGEM está
+    // vazia: procura `categoria SISTEMA` com `tipo` contendo "Procedimento", e não existe nenhum
+    // documento assim cadastrado (os 6 SISTEMA de hoje são CERTIFICAÇÃO ISO e EPS-RQPS 01..05,
+    // todos sem `tipo`). Devolver "0 vinculados" calado faz parecer defeito do botão.
+    return NextResponse.json({
+      success: true, vinculados: 0, total: 0, semDocs: true,
+      motivo: procs.length === 0
+        ? "Nenhum procedimento cadastrado no Controle de Documentos. Cadastre com categoria SISTEMA e tipo começando por \"Procedimento\" — aí eles passam a aparecer aqui."
+        : `Há ${procs.length} procedimento(s) cadastrado(s), mas nenhum casa com esta seção pelo nome.`,
+    });
   }
 
   const res = await prisma.dataBookSecaoDoc.createMany({
