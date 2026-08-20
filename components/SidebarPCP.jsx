@@ -15,7 +15,7 @@ const menu = [
   { href: "/pcp",              label: "Painel",           icon: LayoutDashboard, exact: true },
   { href: "/pcp/relatorio-corte", label: "Relatório de Produção", icon: FileText },
   { href: "/pcp/pmp",          label: "PMP",              icon: Target },
-  { href: "/pcp/dashboard-prioridades", label: "Prioridades (TV)", icon: Tv },
+  { href: "/pcp/dashboard-prioridades", label: "Prioridades", icon: Tv },
   { href: "/pcp/pecas-corte",  label: "Programação",      icon: Package },
   { href: "/pcp/terceirizados", label: "Terceirizados",   icon: Truck },
   // Controle de liberação de desenhos: quem levou qual desenho, quando e com qual R carimbado.

@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/session";
 import PrioridadesClient from "@/app/planejamento/prioridades/PrioridadesClient";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "PCP — Prioridades (TV)" };
+export const metadata = { title: "PCP — Prioridades" };
 
 export default async function DashboardPrioridadesPage({ searchParams }) {
   await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]);
