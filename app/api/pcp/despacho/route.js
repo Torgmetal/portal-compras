@@ -9,7 +9,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { marcasEntreguesAExpedicao, entregueAExpedicao } from "@/lib/entregue-expedicao";
+import { marcasEntreguesAExpedicao, entregueAExpedicao, noRomaneioSemProducao } from "@/lib/entregue-expedicao";
 import { requireRole } from "@/lib/session";
 import { whereSetorSyneco, normalizeSetorSyneco } from "@/lib/syneco-dia";
 import { ehItemComprado } from "@/lib/item-comprado";
@@ -110,6 +110,9 @@ export async function GET(req) {
   const marcasEntregues = await marcasEntreguesAExpedicao(prisma, opId);
   const noSetor = setor ? todas.filter((p) => passaNoSetor(p, setor)) : todas;
   const entregues = noSetor.filter((p) => entregueAExpedicao(p, marcasEntregues));
+  // ⚠ No romaneio mas SEM produção no portal: contradição, não entrega. Fica na lista e é contada
+  // à parte — normalmente é lista faltando (a OP-071 está sem a LPC) ou apontamento que não chegou.
+  const romaneioSemProducao = noRomaneioSemProducao(noSetor, marcasEntregues);
   const escopo = entregues.length ? noSetor.filter((p) => !entregueAExpedicao(p, marcasEntregues)) : noSetor;
 
   // Reconciliação com o Syneco: quantidade PRODUZIDA no mesOrdem daquele setor, por marca
@@ -335,6 +338,7 @@ export async function GET(req) {
     ordensSincronizadasEm: ordensSincronizadasEm ? ordensSincronizadasEm.toISOString() : null,
     // quantas saíram da lista por já estarem em romaneio — o PCP se despediu delas
     entreguesAExpedicao: entregues.length,
+    romaneioSemProducao: romaneioSemProducao.length,
     pecas,
   });
 }

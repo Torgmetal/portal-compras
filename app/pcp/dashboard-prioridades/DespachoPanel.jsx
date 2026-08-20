@@ -479,8 +479,15 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
               {/* O PCP se despede da peça no romaneio — mas o número fica visível, senão a lista
                   encolhe sozinha e ninguém sabe pra onde foi. (Vitor 19/08.) */}
               {data.entreguesAExpedicao > 0 && (
-                <span title="Peças já em romaneio (prévio ou emitido): saíram da lista do PCP, a responsabilidade agora é da Expedição">
+                <span title="Peças já em romaneio (prévio ou emitido) e com produção registrada: saíram da lista do PCP, a responsabilidade agora é da Expedição">
                   {" · "}<span className="text-indigo-700 font-semibold">{fmtN(data.entreguesAExpedicao)} entregue(s) à Expedição</span>
+                </span>
+              )}
+              {/* O romaneio diz que embarca, a peça diz que nunca foi feita. Ficam na lista — some
+                  com elas e some com a contradição junto. (Vitor 19/08, sobre a OP-071.) */}
+              {data.romaneioSemProducao > 0 && (
+                <span title="Estão em romaneio mas o portal não registra produção nenhuma. Costuma ser lista faltando (LPC não importada) ou apontamento que não chegou. Continuam na lista até alguém resolver.">
+                  {" · "}<span className="text-amber-700 font-semibold">⚠ {fmtN(data.romaneioSemProducao)} em romaneio sem produção</span>
                 </span>
               )}</p>}
           </div>
