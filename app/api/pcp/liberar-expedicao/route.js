@@ -46,31 +46,84 @@ export async function POST(req) {
 
   const todas = await prisma.pecaConjunto.findMany({
     where: { id: { in: body.ids }, opId: body.opId },
-    select: { id: true, marca: true, qte: true, tipoPeca: true, entregas: { select: { id: true, destino: true, quantidade: true } } },
+    select: { id: true, marca: true, qte: true, tipoPeca: true, status: true, entregas: { select: { id: true, destino: true, quantidade: true } } },
   });
   if (!todas.length) return NextResponse.json({ error: "Nenhuma peça encontrada nesta OP." }, { status: 404 });
 
-  // 🚫 CROQUI NÃO SE EXPEDE — nunca. Vitor (19/08/2026): "nesse caso da OP-67 não vai expedir
-  // nenhum croqui, aliás nunca vamos expedir um croqui". O croqui é peça de fabricação: vira parte
-  // de um conjunto, e é o CONJUNTO que embarca. Por isso o portal da Expedição lê só CONJUNTO (ou
-  // peça sem tipo, que é legado da LE antiga) — ver /api/expedicao/pedidos.
+  // 🚫 CROQUI NÃO SE EXPEDE — nunca. Vitor (19/08/2026): "nunca vamos expedir um croqui". O croqui
+  // é peça de fabricação: vira parte de um conjunto, e é o CONJUNTO que embarca. Na base inteira há
+  // 19.398 relações conjunto↔croqui e só 9 croquis com status EXPEDIDO (esses 9 cheiram a erro de
+  // dado).
   //
-  // Não é filtro defensivo, é a regra do negócio. Fica aqui porque a raia de Expedição lista os
-  // dois juntos (a OP-067 tem 2.594 croquis ao lado de 1.330 conjuntos): sem o corte, um croqui
-  // selecionado por engano ganharia destino gravado e invisível pra quem embarca — pior que não
-  // fazer nada, porque parece feito. Volta na resposta com marca e tudo.
+  // ⚠ CROQUI ≠ AVULSA, e a diferença mora justamente no `tipoPeca` nulo. Vitor perguntou —
+  // "lembra que temos as peças avulsas, será que são essas que você está chamando de croqui?" — e a
+  // resposta é não:
+  //     tipoPeca "CONJUNTO" → conjunto, embarca
+  //     tipoPeca  null      → PEÇA AVULSA (solo da LPC), embarca — 2.728 já expedidas na base
+  //     tipoPeca "CROQUI"   → compõe conjunto, NÃO embarca
+  // Por isso a condição é `!tipoPeca || tipoPeca === "CONJUNTO"`: o nulo tem de PASSAR. Trocar por
+  // `tipoPeca === "CONJUNTO"` só, achando que nulo é lixo de dado, tiraria as avulsas do embarque.
+  // (É a mesma leitura de /api/producao/mapa: `conjOuAvulsa = CONJUNTO ou null`.)
+  //
+  // O corte fica aqui porque a raia de Expedição lista os três juntos (a OP-067 tem 2.594 croquis
+  // ao lado de 1.330 conjuntos e 860 avulsas): sem ele, um croqui selecionado por engano ganharia
+  // destino gravado e invisível pra quem embarca — pior que não fazer nada, porque parece feito.
   const foraDoPortal = todas.filter((p) => p.tipoPeca && p.tipoPeca !== "CONJUNTO");
   const pecas = todas.filter((p) => !p.tipoPeca || p.tipoPeca === "CONJUNTO");
 
-  const jaTinham = pecas.filter((p) => p.entregas.length > 0);
-  const novas = pecas.filter((p) => p.entregas.length === 0 && (p.qte || 0) > 0);
-  const semQtd = pecas.filter((p) => p.entregas.length === 0 && !(p.qte > 0));
+  // ── JÁ EMBARCOU? Três sinais, e vale QUALQUER um deles ───────────────────────────────────
+  //
+  // Vitor (19/08/2026): "nessa parte você está considerando o que já foi dado baixa dos romaneios
+  // do SharePoint?". Não estava — e era furo de verdade: a OP-067 tem 1.435 peças já expedidas na
+  // raia, e liberar de novo mandaria pro portal da Expedição carga que já saiu do pátio.
+  //
+  //   1. `status = "EXPEDIDO"` na peça — a baixa do portal;
+  //   2. `RomaneioItem` — a peça já entrou num romaneio emitido daqui;
+  //   3. marca baixada na LISTA DE EXPEDIÇÃO (`expedidoRomaneio`/`expedidoArquivo`) — é o
+  //      SharePoint, o registro do que fisicamente saiu, inclusive de obra antiga que foi
+  //      romaneada fora do portal.
+  //
+  // Os três porque cada um enxerga um pedaço: o status é do portal, o RomaneioItem é do romaneio
+  // daqui, e a lista é do que a Expedição fechou lá. Na OP-067 eles concordam (zero divergência),
+  // mas concordar hoje não é garantia — obra migrada tem baixa só na lista.
+  const idsEmbarcadas = new Set(pecas.filter((p) => p.status === "EXPEDIDO").map((p) => p.id));
+
+  for (const ri of await prisma.romaneioItem.findMany({
+    where: { pecaConjuntoId: { in: pecas.map((p) => p.id) } },
+    select: { pecaConjuntoId: true },
+    distinct: ["pecaConjuntoId"],
+  })) idsEmbarcadas.add(ri.pecaConjuntoId);
+
+  const cru = String(body.opNumero).replace(/^T/i, "").replace(/^0+/, "");
+  const listas = await prisma.listaExpedicao.findMany({
+    where: { OR: [{ opId: body.opId }, { opNumero: { in: [...new Set([body.opNumero, cru, cru.padStart(3, "0"), `T${cru}`, `T${cru.padStart(3, "0")}`])] } }] },
+    select: { marcasJson: true },
+  });
+  const marcasBaixadas = new Set();
+  for (const l of listas) {
+    for (const m of Array.isArray(l.marcasJson) ? l.marcasJson : []) {
+      if (m?.expedidoRomaneio || m?.expedidoArquivo) marcasBaixadas.add(String(m.marca || "").trim().toUpperCase());
+    }
+  }
+  for (const p of pecas) if (marcasBaixadas.has(String(p.marca || "").trim().toUpperCase())) idsEmbarcadas.add(p.id);
+
+  const jaEmbarcadas = pecas.filter((p) => idsEmbarcadas.has(p.id));
+  const disponiveis = pecas.filter((p) => !idsEmbarcadas.has(p.id));
+
+  const jaTinham = disponiveis.filter((p) => p.entregas.length > 0);
+  const novas = disponiveis.filter((p) => p.entregas.length === 0 && (p.qte || 0) > 0);
+  const semQtd = disponiveis.filter((p) => p.entregas.length === 0 && !(p.qte > 0));
 
   if (!novas.length && !jaTinham.length) {
+    const motivos = [
+      jaEmbarcadas.length ? `${jaEmbarcadas.length} já embarcada(s)` : null,
+      foraDoPortal.length ? `${foraDoPortal.length} croqui(s) (croqui não se expede)` : null,
+    ].filter(Boolean);
     return NextResponse.json({
-      error: foraDoPortal.length
-        ? `Nenhuma das ${todas.length} peça(s) pode ir pro portal da Expedição: são croquis/peças avulsas, e a Expedição embarca CONJUNTOS.`
+      error: motivos.length
+        ? `Nada a liberar nas ${todas.length} peça(s) selecionadas: ${motivos.join(" · ")}.`
         : "Nenhuma peça elegível na seleção.",
+      jaEmbarcadas: jaEmbarcadas.map((p) => p.marca),
       foraDoPortal: foraDoPortal.map((p) => p.marca),
     }, { status: 400 });
   }
@@ -100,7 +153,7 @@ export async function POST(req) {
   await prisma.auditLog.create({
     data: {
       userId: user.id, action: "liberar_expedicao", entity: "OP", entityId: body.opId,
-      diff: { opNumero: body.opNumero, destino: body.destino, direcionadas: novas.length, jaTinhamDestino: jaTinham.length, foraDoPortal: foraDoPortal.length },
+      diff: { opNumero: body.opNumero, destino: body.destino, direcionadas: novas.length, jaTinhamDestino: jaTinham.length, foraDoPortal: foraDoPortal.length, jaEmbarcadas: jaEmbarcadas.length },
     },
   });
 
@@ -115,6 +168,7 @@ export async function POST(req) {
     jaTinhamDestino: jaTinham.map((p) => ({ marca: p.marca, destinos: p.entregas.map((e) => `${e.destino} (${e.quantidade})`) })),
     semQuantidade: semQtd.map((p) => p.marca),
     foraDoPortal: foraDoPortal.map((p) => ({ marca: p.marca, tipo: p.tipoPeca })),
+    jaEmbarcadas: jaEmbarcadas.map((p) => p.marca),
   });
 }
 

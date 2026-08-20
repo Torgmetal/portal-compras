@@ -273,6 +273,10 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
           j.jaTinhamDestino.slice(0, 8).map((x) => `${x.marca} → ${x.destinos.join(", ")}`).join("\n  ") +
           (j.jaTinhamDestino.length > 8 ? `\n  … e mais ${j.jaTinhamDestino.length - 8}` : ""));
       }
+      if (j.jaEmbarcadas?.length) {
+        avisos.push(`${j.jaEmbarcadas.length} já embarcada(s) — status expedido, romaneio do portal ou baixa na lista do SharePoint:\n  ` +
+          j.jaEmbarcadas.slice(0, 8).join(", ") + (j.jaEmbarcadas.length > 8 ? ` … e mais ${j.jaEmbarcadas.length - 8}` : ""));
+      }
       if (j.semQuantidade?.length) avisos.push(`${j.semQuantidade.length} sem quantidade: ${j.semQuantidade.slice(0, 6).join(", ")}`);
       if (j.foraDoPortal?.length) {
         avisos.push(`${j.foraDoPortal.length} croqui(s) ignorado(s) — croqui não se expede, quem embarca é o conjunto:\n  ` +
