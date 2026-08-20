@@ -20,9 +20,27 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { grupoMarca } from "@/lib/expedicao-estrutura";
+import { mapaSetorReal } from "@/lib/prioridades-setor";
+import { normalizeSetorSyneco } from "@/lib/syneco-dia";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+// ONDE A PEÇA ESTÁ PARADA — Vitor (19/08/2026): "preciso que traga o status das peças como
+// expedido e informar, de acordo com o apontamento, o local que está parado".
+//
+// O setor vem do APONTAMENTO do Syneco, não do `status` da peça: o status automático só anda até
+// o CORTE, então usar ele diria "PENDENTE" para peça que já está pintada. `mapaSetorReal` devolve
+// o setor MAIS AVANÇADO com produção — é onde a peça chegou e onde ela está.
+//
+// Pra quem embarca isso é a diferença entre "posso carregar hoje" e "ainda está na fábrica":
+// marca parada na Pintura já pode sair; parada na Solda ainda tem duas etapas pela frente.
+const SETOR_LABEL = {
+  CORTE: "Preparação", MONTAGEM: "Montagem", SOLDA: "Solda",
+  ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura", EXPEDICAO: "Expedição",
+};
+// Depois da pintura a peça está pronta pro caminhão.
+const PRONTA = new Set(["PINTURA", "EXPEDICAO"]);
 
 const GRUPO_LABEL = {
   estrutura: "Estrutura",
@@ -54,6 +72,31 @@ export async function GET(req) {
     prisma.pedidoExpedicao.findMany({ select: { opNumero: true, status: true } }),
   ]);
 
+  // apontamentos do Syneco (só o que TEM produção) e status das peças, pra dizer onde cada marca
+  // parou. Uma consulta só pra base inteira — filtrar por OP daria N consultas.
+  const [syneco, pecas] = await Promise.all([
+    prisma.mesOrdem.groupBy({
+      by: ["opId", "item", "setor"],
+      where: { opId: { not: null }, produzidoUn: { gt: 0 } },
+      _count: { _all: true },
+    }),
+    prisma.pecaConjunto.findMany({
+      select: { opId: true, marca: true, status: true },
+    }),
+  ]);
+  const synPorOp = new Map();
+  for (const l of syneco) {
+    const arr = synPorOp.get(l.opId) || [];
+    arr.push({ item: l.item, setor: l.setor });
+    synPorOp.set(l.opId, arr);
+  }
+  const statusPorOp = new Map();
+  for (const p of pecas) {
+    const m = statusPorOp.get(p.opId) || new Map();
+    m.set(String(p.marca || "").trim().toUpperCase(), p.status);
+    statusPorOp.set(p.opId, m);
+  }
+
   const opPorId = new Map(ops.map((o) => [o.id, o]));
   const opPorNumero = new Map(ops.map((o) => [o.numero, o]));
   const statusPedido = new Map(pedidos.map((p) => [p.opNumero, p.status]));
@@ -77,10 +120,15 @@ export async function GET(req) {
       marcas: 0, faltantes: 0,
       totalKg: 0, expedidoKg: 0, faltanteKg: 0,
       porGrupo: {},
+      porSetor: {},
+      prontasMarcas: 0, prontasKg: 0,
       itensFaltantes: [],
       ultimaExpedicao: null,
       importadoEm: null,
     };
+
+    const setorDaMarca = op?.id ? mapaSetorReal(synPorOp.get(op.id) || [], normalizeSetorSyneco) : new Map();
+    const statusDaMarca = op?.id ? statusPorOp.get(op.id) || new Map() : new Map();
 
     const arr = Array.isArray(l.marcasJson) ? l.marcasJson : [];
     let faltaNaFrente = 0;
@@ -111,11 +159,28 @@ export async function GET(req) {
 
       // guarda o detalhe pra tela abrir sem uma segunda chamada — a lista da obra é curta o
       // bastante (a maior tem ~750 faltantes) e o corte evita payload absurdo
+      // ONDE PAROU: setor do apontamento; null = nunca apontada (ainda não entrou na fábrica,
+      // ou o apontamento não chegou). O status do portal vai junto porque quando ele diz EXPEDIDO
+      // e a lista diz que falta, é divergência que alguém precisa ver.
+      const setor = setorDaMarca.get(m.marca) || null;
+      const statusPortal = statusDaMarca.get(k) || null;
+      const sk = setor || "SEM_APONTAMENTO";
+      const ps = (g.porSetor[sk] ||= {
+        setor: sk, label: setor ? SETOR_LABEL[setor] || setor : "Sem apontamento",
+        pronta: !!setor && PRONTA.has(setor), marcas: 0, kg: 0,
+      });
+      ps.marcas++;
+      ps.kg += kg;
+      if (setor && PRONTA.has(setor)) { g.prontasMarcas++; g.prontasKg += kg; }
+
       if (g.itensFaltantes.length < 400) {
         g.itensFaltantes.push({
           marca: m.marca, descricao: m.descricao || null,
           qtd: Number(m.qte ?? m.qtd ?? 1) || 0, pesoKg: kg,
           grupo, frente: l.frente,
+          setor, setorLabel: setor ? SETOR_LABEL[setor] || setor : null,
+          pronta: !!setor && PRONTA.has(setor),
+          statusPortal,
         });
       }
     }
@@ -132,6 +197,8 @@ export async function GET(req) {
         ...g,
         pctExpedido: g.totalKg > 0 ? Math.round((g.expedidoKg / g.totalKg) * 100) : null,
         porGrupo: Object.values(g.porGrupo).sort((a, b) => b.kg - a.kg || b.marcas - a.marcas),
+        // prontas primeiro — é o que a Expedição pode carregar hoje
+        porSetor: Object.values(g.porSetor).sort((a, b) => (b.pronta ? 1 : 0) - (a.pronta ? 1 : 0) || b.kg - a.kg),
         itensFaltantes: g.itensFaltantes.sort((a, b) => b.pesoKg - a.pesoKg),
         // a lista pode ter mais faltantes do que o detalhe carregado
         detalheTruncado: g.faltantes > g.itensFaltantes.length,
@@ -149,6 +216,8 @@ export async function GET(req) {
       obras: obras.length,
       marcasFaltantes: obras.reduce((s, o) => s + o.faltantes, 0),
       faltanteKg: obras.reduce((s, o) => s + o.faltanteKg, 0),
+      prontasMarcas: obras.reduce((s, o) => s + o.prontasMarcas, 0),
+      prontasKg: obras.reduce((s, o) => s + o.prontasKg, 0),
     },
     geradoEm: new Date().toISOString(),
   });

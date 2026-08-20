@@ -67,7 +67,9 @@ export default function ListasExpedicaoClient() {
           </h2>
           <p className="text-sm text-torg-gray mt-1">
             Obras com peça <b>em aberto para envio</b>, pela lista que traz todos os itens da obra.
-            Uma marca sai da conta quando entra num romaneio do portal ou recebe baixa na planilha.
+            Uma marca sai da conta quando entra num <b>romaneio do portal</b> ou recebe <b>baixa na
+            planilha do SharePoint</b> — os dois jeitos contam, o antigo e o novo. O local vem do
+            apontamento do Syneco: é onde a peça de fato parou.
           </p>
         </div>
         <button onClick={() => carregar()} disabled={loading}
@@ -77,10 +79,13 @@ export default function ListasExpedicaoClient() {
       </div>
 
       {data?.totais && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100 border border-gray-100 rounded-xl overflow-hidden">
           <Kpi rotulo="Obras com pendência" valor={fmtN(data.totais.obras)} />
           <Kpi rotulo="Marcas a enviar" valor={fmtN(data.totais.marcasFaltantes)} />
           <Kpi rotulo="Peso parado" valor={fmtKg(data.totais.faltanteKg)} destaque />
+          {/* O número que a Expedição usa: já passou pela pintura, pode ir pro caminhão hoje. */}
+          <Kpi rotulo="Prontas p/ carregar" valor={fmtKg(data.totais.prontasKg)}
+            nota={`${fmtN(data.totais.prontasMarcas)} marcas já pintadas`} verde />
         </div>
       )}
 
@@ -128,11 +133,12 @@ export default function ListasExpedicaoClient() {
   );
 }
 
-function Kpi({ rotulo, valor, destaque }) {
+function Kpi({ rotulo, valor, nota, destaque, verde }) {
   return (
     <div className="bg-white p-4">
       <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">{rotulo}</p>
-      <p className={`text-xl font-extrabold tabular-nums ${destaque ? "text-torg-orange-700" : "text-torg-dark"}`}>{valor}</p>
+      <p className={`text-xl font-extrabold tabular-nums ${verde ? "text-green-700" : destaque ? "text-torg-orange-700" : "text-torg-dark"}`}>{valor}</p>
+      {nota && <p className="text-[10px] text-torg-gray mt-0.5">{nota}</p>}
     </div>
   );
 }
@@ -183,6 +189,25 @@ function ObraCard({ o, aberta, onToggle }) {
         </div>
       )}
 
+      {/* ONDE ESTÁ PARADO — Vitor (19/08): "informar, de acordo com o apontamento, o local que
+          está parado". Prontas em verde, primeiro: é o que dá pra carregar hoje. */}
+      {o.porSetor.length > 0 && (
+        <div className="px-5 pb-3 flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] text-torg-gray mr-0.5">parado em:</span>
+          {o.porSetor.map((sx) => (
+            <span key={sx.setor}
+              title={sx.pronta ? "Já passou pela pintura — pode carregar" : sx.setor === "SEM_APONTAMENTO" ? "Nenhum apontamento no Syneco — ainda não entrou na fábrica ou o apontamento não chegou" : "Ainda em fabricação"}
+              className={`text-[11px] rounded-lg border px-2 py-1 ${
+                sx.pronta ? "bg-green-50 text-green-700 border-green-200 font-semibold"
+                  : sx.setor === "SEM_APONTAMENTO" ? "bg-gray-50 text-torg-gray border-gray-200"
+                  : "bg-orange-50 text-torg-orange-700 border-orange-200"
+              }`}>
+              {sx.pronta && "✓ "}{sx.label} {fmtN(sx.marcas)}{sx.kg > 0 ? ` · ${fmtKg(sx.kg)}` : ""}
+            </span>
+          ))}
+        </div>
+      )}
+
       {aberta && (
         <div className="border-t border-gray-100 px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -202,6 +227,7 @@ function ObraCard({ o, aberta, onToggle }) {
                   <th className="px-3 py-2 text-left font-medium">Grupo</th>
                   <th className="px-3 py-2 text-right font-medium">Qtd</th>
                   <th className="px-3 py-2 text-right font-medium">Peso</th>
+                  <th className="px-3 py-2 text-left font-medium">Onde está</th>
                   <th className="px-3 py-2 text-left font-medium">Frente</th>
                 </tr>
               </thead>
@@ -213,6 +239,22 @@ function ObraCard({ o, aberta, onToggle }) {
                     <td className="px-3 py-1.5 text-torg-gray">{COR_GRUPO[i.grupo] ? (o.porGrupo.find((g) => g.grupo === i.grupo)?.label || i.grupo) : i.grupo}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{fmtN(i.qtd)}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{i.pesoKg > 0 ? fmtKg(i.pesoKg) : "—"}</td>
+                    <td className="px-3 py-1.5 whitespace-nowrap">
+                      {i.setorLabel ? (
+                        <span className={i.pronta ? "text-green-700 font-semibold" : "text-torg-orange-700"}>
+                          {i.pronta ? "✓ " : ""}{i.setorLabel}
+                        </span>
+                      ) : (
+                        <span className="text-torg-gray">sem apontamento</span>
+                      )}
+                      {/* Portal diz EXPEDIDO e a lista diz que falta: alguém precisa olhar. */}
+                      {i.statusPortal === "EXPEDIDO" && (
+                        <span className="ml-1 text-[10px] bg-amber-100 text-amber-800 rounded px-1 py-0.5"
+                          title="O portal marca esta peça como expedida, mas a lista de expedição ainda não deu baixa nela">
+                          ⚠ divergente
+                        </span>
+                      )}
+                    </td>
                     <td className="px-3 py-1.5 text-torg-gray">{i.frente}</td>
                   </tr>
                 ))}
