@@ -4306,6 +4306,10 @@ model FotoInspecao {
   marca       String? // peça (marca do Tekla). Nulo = foto de região/geral
   origemMarca String? // QR | BUSCA | LIVRE
   observacao  String? // legenda curta digitada no celular
+  // SNAPSHOT dos instrumentos que o inspetor marcou na hora: [{id,nome,certificado,validade}].
+  // É snapshot de propósito — quando o certificado for renovado, o relatório antigo tem de
+  // continuar mostrando o que estava valendo no dia da inspeção, não o de agora.
+  equipamentos Json?
   url         String // Vercel Blob (JPEG já reduzido no aparelho)
   tamanho     Int?
   autorId     String?
@@ -4341,6 +4345,8 @@ model RelatorioInspecao {
   titulo   String?
   // observações do inspetor, escritas no computador ao fechar o relatório
   observacoes String?
+  // instrumentos utilizados, consolidados das fotos (e ajustáveis na montagem)
+  equipamentos Json?
   status   String @default("RASCUNHO") // RASCUNHO | EMITIDO
   emitidoEm DateTime?
   inspetor      String? // quem executou a inspeção (nome que sai no documento)

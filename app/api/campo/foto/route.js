@@ -36,6 +36,20 @@ export async function POST(req) {
   const marca = String(form.get("marca") || "").trim() || null;
   const origemMarca = String(form.get("origemMarca") || "").trim() || null;
   const observacao = String(form.get("observacao") || "").trim().slice(0, 500) || null;
+  // instrumentos marcados no celular, em SNAPSHOT — ver o comentário do modelo
+  let equipamentos = null;
+  try {
+    const bruto = JSON.parse(String(form.get("equipamentos") || "[]"));
+    if (Array.isArray(bruto) && bruto.length) {
+      equipamentos = bruto.slice(0, 12).map((e) => ({
+        id: String(e?.id || ""),
+        nome: String(e?.nome || "").slice(0, 160),
+        certificado: e?.certificado ? String(e.certificado).slice(0, 60) : null,
+        validade: e?.validade ? String(e.validade).slice(0, 10) : null,
+        vencido: !!e?.vencido,
+      })).filter((e) => e.id && e.nome);
+    }
+  } catch { /* lista inválida não impede a foto: a evidência vale mais que o metadado */ }
 
   if (!file || typeof file === "string") return NextResponse.json({ error: "Campo 'file' obrigatório." }, { status: 400 });
   if (!opNumero) return NextResponse.json({ error: "Escolha a OP." }, { status: 400 });
@@ -54,12 +68,12 @@ export async function POST(req) {
 
   const foto = await prisma.fotoInspecao.create({
     data: {
-      opId, opNumero, tipo, marca, origemMarca, observacao,
+      opId, opNumero, tipo, marca, origemMarca, observacao, equipamentos,
       url: blob.url, tamanho: buf.length,
       // quem tirou é o que faz a foto valer como evidência — sem isso é só uma imagem
       autorId: user.id, autorNome: user.name || user.email || null,
     },
-    select: { id: true, url: true, marca: true, origemMarca: true, observacao: true, capturadaEm: true },
+    select: { id: true, url: true, marca: true, origemMarca: true, observacao: true, equipamentos: true, capturadaEm: true },
   });
 
   return NextResponse.json({ ok: true, foto });
@@ -76,7 +90,7 @@ export async function GET(req) {
 
   const fotos = await prisma.fotoInspecao.findMany({
     where: { opNumero, ...(tipo ? { tipo } : {}) },
-    select: { id: true, url: true, marca: true, origemMarca: true, observacao: true, capturadaEm: true, autorNome: true, tipo: true },
+    select: { id: true, url: true, marca: true, origemMarca: true, observacao: true, equipamentos: true, capturadaEm: true, autorNome: true, tipo: true },
     orderBy: { capturadaEm: "desc" },
     take: 60,
   });

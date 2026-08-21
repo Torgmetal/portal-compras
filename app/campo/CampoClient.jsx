@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { signOut } from "next-auth/react";
 import {
   Loader2, Camera, QrCode, Search, X, Check, ChevronLeft, HardHat,
-  LogOut, Trash2, AlertCircle, Tag, Upload,
+  LogOut, Trash2, AlertCircle, Tag, Upload, Ruler,
 } from "lucide-react";
 import { TIPOS_RELATORIO, TIPO_LABEL, marcaDoQR, marcaCasaOP } from "@/lib/qualidade-campo";
 import LeitorQR from "./LeitorQR";
@@ -56,6 +56,10 @@ export default function CampoClient({ nome }) {
   const [op, setOp] = useState(null);          // { id, numero }
   const [tipo, setTipo] = useState(null);      // id do tipo
   const [peca, setPeca] = useState(null);      // { marca, origem }
+  // Vitor (21/08/2026): "além de informar a peça e a OP, ele seleciona os equipamentos que está
+  // usando para compor no relatório". Fica fixo como a peça — o inspetor mede a manhã inteira com
+  // a mesma trena, e remarcar a cada foto seria trabalho à toa.
+  const [equipamentos, setEquipamentos] = useState([]);
   const [fotos, setFotos] = useState([]);
   // ── FILA: a foto ESPERA o envio ────────────────────────────────────────────────────────────
   //
@@ -78,12 +82,15 @@ export default function CampoClient({ nome }) {
   useEffect(() => {
     try {
       const s = JSON.parse(localStorage.getItem("campo:sessao") || "null");
-      if (s?.op?.numero) { setOp(s.op); setTipo(s.tipo || null); setPeca(s.peca || null); }
+      if (s?.op?.numero) {
+        setOp(s.op); setTipo(s.tipo || null); setPeca(s.peca || null);
+        setEquipamentos(Array.isArray(s.equipamentos) ? s.equipamentos : []);
+      }
     } catch { /* storage indisponível: segue sem retomar */ }
   }, []);
   useEffect(() => {
-    try { localStorage.setItem("campo:sessao", JSON.stringify({ op, tipo, peca })); } catch { /* ignora */ }
-  }, [op, tipo, peca]);
+    try { localStorage.setItem("campo:sessao", JSON.stringify({ op, tipo, peca, equipamentos })); } catch { /* ignora */ }
+  }, [op, tipo, peca, equipamentos]);
 
   const carregarFotos = useCallback(async () => {
     if (!op?.numero || !tipo) { setFotos([]); return; }
@@ -134,6 +141,7 @@ export default function CampoClient({ nome }) {
         fd.append("opNumero", op.numero);
         fd.append("tipo", tipo);
         if (peca?.marca) { fd.append("marca", peca.marca); fd.append("origemMarca", peca.origem); }
+        if (equipamentos.length) fd.append("equipamentos", JSON.stringify(equipamentos));
         const r = await fetch("/api/campo/foto", { method: "POST", body: fd });
         const j = await r.json();
         if (!r.ok) throw new Error(j.error || "Falha ao enviar");
@@ -185,6 +193,8 @@ export default function CampoClient({ nome }) {
         peca={peca} opNumero={op.numero} opId={op.id}
         onDefinir={(p, av) => { setPeca(p); setAviso(av || ""); }}
       />
+
+      <Equipamentos escolhidos={equipamentos} onMudar={setEquipamentos} />
 
       {aviso && (
         <p className="mt-2 text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-start gap-1.5">
@@ -361,6 +371,103 @@ function PecaAtual({ peca, opNumero, opId, onDefinir }) {
           onFechar={() => setBuscando(false)}
           onEscolher={(marca, origem) => { setBuscando(false); onDefinir({ marca, origem }, ""); }}
         />
+      )}
+    </div>
+  );
+}
+
+/**
+ * OS INSTRUMENTOS DA VEZ.
+ *
+ * Vitor (21/08/2026): "para os relatórios temos equipamentos calibrados... ele seleciona os
+ * equipamentos que está usando para compor no relatório".
+ *
+ * A lista vem do módulo de Calibração — os mesmos certificados, com validade. Ficam gravados na
+ * foto em SNAPSHOT: quando o certificado for renovado, o relatório antigo continua mostrando o que
+ * estava valendo no dia da inspeção.
+ *
+ * ⚠ Instrumento VENCIDO aparece na lista, marcado em vermelho. Sumir com ele faria o inspetor
+ * medir com o mesmo instrumento e não registrar nada — o relatório sairia sem dizer com o que foi
+ * medido, que é pior. Aparece, avisa, e quem decide é quem está lá.
+ */
+function Equipamentos({ escolhidos, onMudar }) {
+  const [abrir, setAbrir] = useState(false);
+  const [lista, setLista] = useState(null);
+
+  useEffect(() => {
+    if (!abrir || lista) return;
+    fetch("/api/campo/equipamentos").then((r) => r.json())
+      .then((j) => setLista(j.equipamentos || []))
+      .catch(() => setLista([]));
+  }, [abrir, lista]);
+
+  const marcados = new Set(escolhidos.map((e) => e.id));
+  const temVencido = escolhidos.some((e) => e.vencido);
+
+  const alternar = (eq) => {
+    onMudar(marcados.has(eq.id) ? escolhidos.filter((x) => x.id !== eq.id) : [...escolhidos, eq]);
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl p-3 mt-3">
+      <div className="flex items-center gap-2 min-w-0">
+        <Ruler size={16} className="text-torg-blue shrink-0" />
+        <div className="min-w-0 flex-1">
+          {escolhidos.length ? (
+            <>
+              <p className="text-[13px] font-semibold text-torg-dark leading-tight truncate">
+                {escolhidos.map((e) => e.nome).join(" · ")}
+              </p>
+              <p className="text-[11px] text-torg-gray leading-tight">
+                {escolhidos.length} instrumento(s) neste registro
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-torg-gray">Nenhum instrumento selecionado.</p>
+          )}
+        </div>
+        <button onClick={() => setAbrir(true)} className="text-[12px] font-semibold text-torg-blue shrink-0 px-2 py-1">
+          {escolhidos.length ? "trocar" : "escolher"}
+        </button>
+      </div>
+
+      {temVencido && (
+        <p className="mt-2 text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5 inline-flex items-start gap-1.5">
+          <AlertCircle size={13} className="mt-0.5 shrink-0" />
+          Instrumento com calibração VENCIDA selecionado — o relatório vai registrar isso.
+        </p>
+      )}
+
+      {abrir && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          <header className="bg-torg-dark text-white px-4 py-3 flex items-center gap-3">
+            <button onClick={() => setAbrir(false)} className="p-1 -ml-1"><ChevronLeft size={22} /></button>
+            <p className="font-semibold flex-1">Instrumentos utilizados</p>
+            <button onClick={() => setAbrir(false)} className="text-[13px] font-semibold px-2">pronto</button>
+          </header>
+          <div className="flex-1 overflow-y-auto">
+            {lista === null && <p className="p-4 text-sm text-torg-gray inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> carregando…</p>}
+            {lista?.map((eq) => {
+              const on = marcados.has(eq.id);
+              return (
+                <button key={eq.id} onClick={() => alternar(eq)}
+                  className={`w-full text-left px-4 py-3 border-b border-gray-50 flex items-center gap-3 ${on ? "bg-torg-blue/5" : ""}`}>
+                  <span className={`w-5 h-5 rounded border-2 shrink-0 flex items-center justify-center ${on ? "bg-torg-blue border-torg-blue" : "border-gray-300"}`}>
+                    {on && <Check size={13} className="text-white" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold text-torg-dark text-[13px] truncate">{eq.nome}</span>
+                    <span className={`block text-[11px] ${eq.vencido ? "text-red-600 font-semibold" : "text-torg-gray"}`}>
+                      {eq.certificado ? `cert ${eq.certificado}` : "sem certificado"}
+                      {eq.validade ? ` · ${eq.vencido ? "VENCIDO em" : "válido até"} ${eq.validade.split("-").reverse().join("/")}` : " · sem validade"}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+            {lista && !lista.length && <p className="p-4 text-sm text-torg-gray">Nenhum instrumento com certificado cadastrado.</p>}
+          </div>
+        </div>
       )}
     </div>
   );
