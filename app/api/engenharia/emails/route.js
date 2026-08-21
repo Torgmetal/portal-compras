@@ -2,18 +2,25 @@
 // POST — dispara a sincronização manual (pra testar sem esperar o cron).
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireUser } from "@/lib/session";
+import { temAcessoDiretoria } from "@/lib/diretoria";
 import { sincronizarEmailsEngenharia, caixasEngenharia } from "@/lib/ingest-emails-engenharia";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // sync manual pode puxar um bloco grande do histórico
-// Só ADMIN — a visualização por obra é na aba Resumo da OP (diretoria). Aqui fica só
-// o gatilho de sincronização/diagnóstico do admin.
-const ROLES = ["ADMIN"];
+
+// Conteúdo sensível (correspondência de projeto) → SÓ ADMIN ou DIRETORIA. Usado pela
+// aba Indicadores → Engenharia → E-mails e como gatilho de sync/diagnóstico.
+async function exigirDiretoria() {
+  const user = await requireUser(); // lança "Unauthorized" se não houver sessão
+  const diretor = user.tipo === "ADMIN" || (await temAcessoDiretoria(user.email).catch(() => false));
+  if (!diretor) { const e = new Error("Forbidden"); e.status = 403; throw e; }
+  return user;
+}
 
 export async function GET(req) {
-  try { await requireRole(ROLES); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  try { await exigirDiretoria(); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.status || (e.message === "Unauthorized" ? 401 : 403) }); }
 
   const sp = new URL(req.url).searchParams;
   const caixa = sp.get("caixa") || null;
@@ -51,7 +58,7 @@ export async function GET(req) {
 
 export async function POST() {
   let user;
-  try { user = await requireRole(ROLES); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  try { user = await exigirDiretoria(); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.status || (e.message === "Unauthorized" ? 401 : 403) }); }
   try {
     const r = await sincronizarEmailsEngenharia();
     await prisma.auditLog.create({ data: { userId: user.id, action: "SYNC_EMAILS_ENGENHARIA", entity: "ObraEmailEvento", entityId: "-", diff: { gravados: r.gravados } } }).catch(() => {});

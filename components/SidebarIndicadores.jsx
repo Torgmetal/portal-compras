@@ -5,6 +5,7 @@ import {
   Activity, TrendingUp,
   BarChart3, ChevronDown, ChevronRight, Target, DollarSign, Zap, Users, Briefcase,
   UserMinus, BedDouble, ShieldAlert, GraduationCap, Timer, CalendarRange, Factory,
+  Ruler, Mail,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
@@ -51,6 +52,15 @@ const setores = [
     sub: [
       { href: "/indicadores/producao", label: "Dashboard", icon: Activity, exact: true },
       { href: "/indicadores/producao/mensal", label: "Evolução Mensal", icon: CalendarRange },
+    ],
+  },
+  {
+    id: "engenharia",
+    label: "Engenharia",
+    icon: Ruler,
+    base: "/indicadores/engenharia",
+    sub: [
+      { href: "/indicadores/engenharia/emails", label: "E-mails", icon: Mail },
     ],
   },
 ];
