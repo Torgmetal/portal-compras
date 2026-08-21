@@ -47,7 +47,6 @@ export default function DataBookDetalheClient({ id, userId }) {
   }, [id]);
 
   useEffect(() => { carregar(); }, [carregar]);
-  useEffect(() => { carregarRevisoes(); }, [carregarRevisoes]);
   useEffect(() => {
     fetch(`/api/qualidade/data-books/${id}/rastreabilidade`)
       .then((r) => r.json())
@@ -246,6 +245,11 @@ export default function DataBookDetalheClient({ id, userId }) {
     fetch(`/api/qualidade/data-books/${id}/revisao`)
       .then((r) => r.json()).then((j) => { if (!j.error) setRevisoes(j); }).catch(() => {});
   }, [id]);
+  // ⚠ ESTE useEffect FICA DEPOIS DO useCallback. `carregarRevisoes` é um `const`: chamá-lo de um
+  // efeito declarado ACIMA da definição estoura em "Cannot access before initialization" durante o
+  // render — tela branca com "Application error". `next build` não pega, porque não renderiza o
+  // componente; só aparece no navegador.
+  useEffect(() => { carregarRevisoes(); }, [carregarRevisoes]);
 
   async function emitir() {
     if (!confirm("Emitir o data book? (a geração do PDF entra na próxima fase)")) return;
