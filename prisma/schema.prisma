@@ -4347,6 +4347,20 @@ model RelatorioInspecao {
   observacoes String?
   // instrumentos utilizados, consolidados das fotos (e ajustáveis na montagem)
   equipamentos Json?
+
+  // ── DIMENSIONAL ──────────────────────────────────────────────────────────────────────────
+  // Vitor (21/08/2026): "pode ser [um por conjunto], mas no caso das peças avulsas podemos
+  // agrupá-las para facilitar, pois senão iríamos gerar inúmeros relatórios".
+  escopo    String? // CONJUNTO (um desenho) | AVULSAS (várias peças num relatório só)
+  marcas    Json? // as marcas cobertas: ["T83A13"] ou ["T83A-P1","T83A-P2",…]
+  // linhas da tabela: { marca, descricao, projetoMm, tolerancia, encontradoMm, obs }
+  // `projetoMm` vem da LISTA DE MATERIAIS do DESENHO (não da LPC — divergem em 1 mm);
+  // `encontradoMm` nasce vazio, é o elaborador que preenche.
+  linhas    Json?
+  // { dimensional, alinhamento, acabamento, resultado } — os quadros de aprovação do modelo
+  resultados Json?
+  // desenhos embutidos no PDF: [{ marca, itemId, nome }] — o "CROQUI / FOTO DA PEÇA"
+  desenhos  Json?
   status   String @default("RASCUNHO") // RASCUNHO | EMITIDO
   emitidoEm DateTime?
   inspetor      String? // quem executou a inspeção (nome que sai no documento)

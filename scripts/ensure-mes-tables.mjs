@@ -137,6 +137,9 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RelatorioInspecao_status_idx" ON "RelatorioInspecao"("status")`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "FotoInspecao" ADD COLUMN IF NOT EXISTS "equipamentos" JSONB`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "RelatorioInspecao" ADD COLUMN IF NOT EXISTS "equipamentos" JSONB`);
+  for (const c of ["escopo TEXT", "marcas JSONB", "linhas JSONB", "resultados JSONB", "desenhos JSONB"]) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "RelatorioInspecao" ADD COLUMN IF NOT EXISTS "${c.split(" ")[0]}" ${c.split(" ")[1]}`);
+  }
   console.log("[ensure-mes-tables] OK — RelatorioInspecao garantida.");
 
   // ProdutoOmie (cache do cadastro de produtos do Omie — código do item nos romaneios). Idempotente.
