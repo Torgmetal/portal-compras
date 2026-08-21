@@ -138,11 +138,14 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
     setPendente(null);
   }
 
-  function confirmar(nome, espec, tol) {
+  function confirmar(espec, tol) {
     const letra = LETRAS[cotas.length] || `C${cotas.length + 1}`;
     onChange([...cotas, {
       letra,
-      descricao: `( ${letra} ) ${nome}`.trim(),
+      // ⚠ o rótulo é SÓ "Cota A". Vitor (21/08/2026): "nas marcações laterais você precisa trazer
+      // apenas isso: cota A, Cota B e Cota C". Quem diz o que medir é a marca no desenho, não um
+      // nome repetido na tabela.
+      descricao: `Cota ${letra}`,
       projetoMm: espec === "" ? null : Number(espec),
       tolerancia: tol ? `± ${tol}` : "",
       encontradoMm: null,
@@ -155,7 +158,7 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
     // ⚠ as letras se renumeram: buraco no meio (A, C, D) confunde quem mede
     const restantes = cotas.filter((_, k) => k !== i).map((c, k) => {
       const letra = LETRAS[k] || `C${k + 1}`;
-      return { ...c, letra, descricao: c.descricao.replace(/^\(\s*\w+\s*\)\s*/, `( ${letra} ) `) };
+      return { ...c, letra, descricao: `Cota ${letra}` };
     });
     onChange(restantes);
   }
@@ -181,7 +184,7 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
           {cotas.map((c, i) => (
             <li key={i} className="flex items-center gap-2 text-[12px]">
               <span className="w-5 h-5 rounded-full bg-torg-orange text-white font-bold text-[10px] inline-flex items-center justify-center shrink-0">{c.letra}</span>
-              <span className="text-torg-dark flex-1 truncate">{c.descricao.replace(/^\(\s*\w+\s*\)\s*/, "")}</span>
+              <span className="text-torg-dark flex-1">{c.descricao}</span>
               <span className="font-mono text-torg-dark">{c.projetoMm ?? "—"}</span>
               <span className="text-torg-gray w-14 text-right">{c.tolerancia || ""}</span>
               <button onClick={() => remover(i)} className="text-torg-gray hover:text-red-600"><Trash2 size={13} /></button>
@@ -194,20 +197,15 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
 }
 
 function FormCota({ onConfirmar, onCancelar, letra }) {
-  const [nome, setNome] = useState("");
   const [espec, setEspec] = useState("");
   const [tol, setTol] = useState("3");
   return (
     <div className="mt-2 p-2.5 bg-torg-blue-50 border border-torg-blue-200 rounded-lg flex items-end gap-2 flex-wrap">
-      <span className="w-6 h-6 rounded-full bg-torg-blue text-white font-bold text-[11px] inline-flex items-center justify-center">{letra}</span>
-      <label className="flex-1 min-w-[140px]">
-        <span className="block text-[10px] text-torg-gray mb-0.5">O que é esta cota</span>
-        <input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Interno, Externo, Altura total…"
-          className="w-full border border-gray-200 rounded px-2 py-1 text-[12px]" />
-      </label>
-      <label className="w-24">
+      <span className="w-6 h-6 rounded-full bg-torg-blue text-white font-bold text-[11px] inline-flex items-center justify-center shrink-0">{letra}</span>
+      <span className="text-[12px] font-semibold text-torg-dark self-center">Cota {letra}</span>
+      <label className="w-28">
         <span className="block text-[10px] text-torg-gray mb-0.5">Espec. (mm)</span>
-        <input type="number" value={espec} onChange={(e) => setEspec(e.target.value)}
+        <input autoFocus type="number" value={espec} onChange={(e) => setEspec(e.target.value)}
           className="w-full border border-gray-200 rounded px-2 py-1 text-[12px] font-mono" />
       </label>
       <label className="w-20">
@@ -215,7 +213,7 @@ function FormCota({ onConfirmar, onCancelar, letra }) {
         <input type="number" value={tol} onChange={(e) => setTol(e.target.value)}
           className="w-full border border-gray-200 rounded px-2 py-1 text-[12px] font-mono" />
       </label>
-      <button onClick={() => onConfirmar(nome, espec, tol)} disabled={!nome.trim()}
+      <button onClick={() => onConfirmar(espec, tol)} disabled={espec === ""}
         className="bg-torg-blue text-white rounded px-3 py-1.5 text-[12px] font-medium disabled:opacity-40">Criar cota</button>
       <button onClick={onCancelar} className="text-[12px] text-torg-gray px-2 py-1.5">Cancelar</button>
     </div>
