@@ -286,6 +286,10 @@ function NovoDimensional({ onFechar, onPronto }) {
   const [titulo, setTitulo] = useState("");
   const [inspetor, setInspetor] = useState("");
   const [previa, setPrevia] = useState(null); // { linhas, desenhos, erros, tolerancia }
+  // Vitor (21/08/2026): "traga eles no seletor para podermos escolher um deles para testarmos".
+  // A marca com NC1 sai com a dimensão exata; sem ele, o portal lê o desenho.
+  const [comNc1, setComNc1] = useState(null); // Set de marcas
+  const [soNc1, setSoNc1] = useState(false);
   const [pdfUrl, setPdfUrl] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -293,6 +297,18 @@ function NovoDimensional({ onFechar, onPronto }) {
   useEffect(() => {
     fetch("/api/qualidade/inspecoes/ops").then((r) => r.json()).then((j) => setOps(j.ops || [])).catch(() => setOps([]));
   }, []);
+
+  // quais peças desta OP têm NC1
+  useEffect(() => {
+    if (!op) { setComNc1(null); return; }
+    let vivo = true;
+    setComNc1(null);
+    fetch(`/api/qualidade/inspecoes/nc1?opNumero=${encodeURIComponent(op.numero)}`)
+      .then((r) => r.json())
+      .then((j) => { if (vivo) setComNc1(new Set(j.marcas || [])); })
+      .catch(() => vivo && setComNc1(new Set()));
+    return () => { vivo = false; };
+  }, [op]);
 
   // lista as peças da OP — CONJUNTO mostra conjuntos, AVULSAS mostra todas
   useEffect(() => {
@@ -402,20 +418,29 @@ function NovoDimensional({ onFechar, onPronto }) {
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="buscar marca…"
                   autoCapitalize="characters" autoCorrect="off" spellCheck={false}
                   className="w-full text-[12px] font-mono border border-gray-200 rounded-lg px-2 py-1.5 mb-1.5 focus:border-torg-blue outline-none" />
+                {comNc1 !== null && comNc1.size > 0 && (
+                  <label className="flex items-center gap-1.5 mb-1.5 text-[11px] text-torg-gray">
+                    <input type="checkbox" checked={soNc1} onChange={(e) => setSoNc1(e.target.checked)} />
+                    só peças com NC1 <span className="text-torg-gray/70">({comNc1.size} na OP)</span>
+                  </label>
+                )}
                 <div className="border border-gray-100 rounded-lg max-h-56 overflow-y-auto">
                   {pecas === null && <p className="p-2 text-[12px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> buscando…</p>}
-                  {pecas?.map((p) => {
+                  {(pecas || []).filter((p) => !soNc1 || comNc1?.has(String(p.marca).toUpperCase())).map((p) => {
                     const on = sel.includes(p.marca);
+                    const nc = comNc1?.has(String(p.marca).toUpperCase());
                     return (
                       <button key={p.marca} onClick={() => alternar(p.marca)}
                         className={`w-full text-left px-2 py-1.5 border-b border-gray-50 flex items-center gap-2 ${on ? "bg-torg-blue/5" : "hover:bg-gray-50"}`}>
                         <span className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center ${on ? "bg-torg-blue border-torg-blue" : "border-gray-300"}`}>
                           {on && <Check size={11} className="text-white" />}
                         </span>
-                        <span className="min-w-0">
+                        <span className="min-w-0 flex-1">
                           <span className="block text-[12px] font-semibold text-torg-dark">{p.marca}</span>
                           <span className="block text-[10px] text-torg-gray truncate">{[p.descricao, p.perfil].filter(Boolean).join(" · ") || "—"}</span>
                         </span>
+                        {/* NC1 = dimensão exata (comprimento e posição de furo); sem ele, lê o desenho */}
+                        {nc && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 shrink-0">NC1</span>}
                       </button>
                     );
                   })}
