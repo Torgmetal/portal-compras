@@ -16,7 +16,7 @@ const itemSchema = z.object({
   salarioBase: num,
   // horas do Ponto (RH ajusta)
   heHoras50: num, heHoras60: num, heHoras80: num, heHoras100: num, heHoras150: num,
-  faltasHoras: num, atrasosHoras: num, divisorHoras: num,
+  faltasHoras: num, atrasosHoras: num, adNoturnoHoras: num, divisorHoras: num,
   // valores em R$
   horasExtras: num, adicionais: num, descontos: num,
   inss: num, irrf: num, liquido: num, vr: num, ifood: num, kr: num, rescisao: num,

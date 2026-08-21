@@ -1407,6 +1407,7 @@ model FolhaItem {
   heHoras150    Float            @default(0)
   faltasHoras   Float            @default(0)
   atrasosHoras  Float            @default(0)
+  adNoturnoHoras Float           @default(0) // horas noturnas (Ponto) — portal calcula 20%
   divisorHoras  Float            @default(220) // divisor do valor-hora (jornada×5; 44h→220)
   // Digitados pelo RH (vêm do sistema de folha)
   horasExtras   Float            @default(0) // LEGADO: HE em R$ (competências antigas)

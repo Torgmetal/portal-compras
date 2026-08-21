@@ -24,6 +24,7 @@ const HORAS = [
   { k: "heHoras80", label: "HE 80%" },
   { k: "heHoras100", label: "HE 100%" },
   { k: "heHoras150", label: "HE 150%" },
+  { k: "adNoturnoHoras", label: "Ad. Not." },
   { k: "faltasHoras", label: "Faltas" },
   { k: "atrasosHoras", label: "Atrasos" },
 ];
@@ -253,6 +254,7 @@ export default function FolhaClient() {
                       {HORAS.map((c) => <th key={c.k} className="px-2 py-2 text-right font-medium text-torg-gray uppercase" title={`${c.label} (horas)`}>{c.label}<span className="block text-[9px] text-gray-400 normal-case">horas</span></th>)}
                       {VALORES.map((c) => <th key={c.k} className="px-2 py-2 text-right font-medium text-gray-500 uppercase">{c.label}</th>)}
                       <th className="px-2 py-2 text-right font-medium text-emerald-600 uppercase">Valor HE</th>
+                      <th className="px-2 py-2 text-right font-medium text-indigo-500 uppercase" title="Adicional noturno: horas × valor-hora × 20%">Ad. Not.</th>
                       <th className="px-2 py-2 text-right font-medium text-red-500 uppercase">Desc. F/A</th>
                       <th className="px-2 py-2 text-right font-semibold text-torg-blue uppercase bg-torg-blue-50/40">Salário Final</th>
                       {BENEF.map((c) => <th key={c.k} className="px-2 py-2 text-right font-medium text-gray-400 uppercase">{c.label}</th>)}
@@ -281,6 +283,7 @@ export default function FolhaClient() {
                           {HORAS.map((c) => inp(c, "h"))}
                           {VALORES.map((c) => inp(c))}
                           <td className="px-2 py-1 text-right tabular-nums text-emerald-700" title={`Valor-hora R$ ${fmt(d.valorHora)}`}>{fmt(d.heValorTotal)}</td>
+                          <td className="px-2 py-1 text-right tabular-nums text-indigo-600" title={`${fmtH(it.adNoturnoHoras)}h × R$ ${fmt(d.valorHora)} × 20%`}>{fmt(d.adNoturnoValor)}</td>
                           <td className="px-2 py-1 text-right tabular-nums text-red-600" title={`Faltas R$ ${fmt(d.faltasValor)} · Atrasos R$ ${fmt(d.atrasosValor)}`}>{fmt(d.faltasValor + d.atrasosValor)}</td>
                           <td className="px-2 py-1 text-right tabular-nums font-bold text-torg-dark bg-torg-blue-50/40">{fmt(d.salarioFinal)}</td>
                           {BENEF.map((c) => inp(c))}
@@ -292,7 +295,7 @@ export default function FolhaClient() {
                 </table>
               </div>
               <p className="px-3 py-2 text-[11px] text-torg-gray border-t border-gray-50">
-                <strong>Colunas em horas</strong> (fundo azul) vêm do Ponto — o RH pode ajustar. <strong>Valor HE</strong> = horas × valor-hora × adicional da % (50%→×1,5; 100%→×2). <strong>Salário Final</strong> = Salário + Valor HE + Adicionais − Faltas − Atrasos − Descontos − INSS − IRRF. VR/iFOOD/KR são benefícios à parte (não entram no salário).
+                <strong>Colunas em horas</strong> (fundo azul) vêm do Ponto — o RH pode ajustar. <strong>Valor HE</strong> = horas × valor-hora × adicional da % (50%→×1,5; 100%→×2). <strong>Ad. Noturno</strong> = horas noturnas × valor-hora × 20%. <strong>Salário Final</strong> = Salário + Valor HE + Ad. Noturno + Adicionais − Faltas − Atrasos − Descontos − INSS − IRRF. VR/iFOOD/KR são benefícios à parte (não entram no salário).
               </p>
             </div>
           ) : (

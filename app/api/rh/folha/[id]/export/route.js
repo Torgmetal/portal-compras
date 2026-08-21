@@ -28,14 +28,14 @@ export async function GET(_req, { params }) {
 
   // Aba Folha — horas (do Ponto) + valores calculados + Salário Final
   const head = ["Empresa", "Tipo", "Centro de Custo", "Nome", "CPF", "Salário Base",
-    "HE 50% (h)", "HE 60% (h)", "HE 80% (h)", "HE 100% (h)", "HE 150% (h)", "Faltas (h)", "Atrasos (h)",
-    "Valor-hora", "Valor HE", "Adicionais", "Desc. Faltas", "Desc. Atrasos", "Descontos",
+    "HE 50% (h)", "HE 60% (h)", "HE 80% (h)", "HE 100% (h)", "HE 150% (h)", "Ad. Noturno (h)", "Faltas (h)", "Atrasos (h)",
+    "Valor-hora", "Valor HE", "Ad. Noturno", "Adicionais", "Desc. Faltas", "Desc. Atrasos", "Descontos",
     "Base INSS", "INSS", "INSS Patronal", "Base IRRF", "IRRF", "FGTS", "Salário Final", "VR", "iFOOD", "KR", "Rescisão"];
   const linhas = folha.itens.map((it) => {
     const d = calcDerivados(it);
     return [it.empresa || "", it.tipoContrato, it.centroCusto || "", it.nome, it.cpf || "", r2(it.salarioBase),
-      r2(it.heHoras50), r2(it.heHoras60), r2(it.heHoras80), r2(it.heHoras100), r2(it.heHoras150), r2(it.faltasHoras), r2(it.atrasosHoras),
-      r2(d.valorHora), r2(d.heValorTotal), r2(it.adicionais), r2(d.faltasValor), r2(d.atrasosValor), r2(it.descontos),
+      r2(it.heHoras50), r2(it.heHoras60), r2(it.heHoras80), r2(it.heHoras100), r2(it.heHoras150), r2(it.adNoturnoHoras), r2(it.faltasHoras), r2(it.atrasosHoras),
+      r2(d.valorHora), r2(d.heValorTotal), r2(d.adNoturnoValor), r2(it.adicionais), r2(d.faltasValor), r2(d.atrasosValor), r2(it.descontos),
       r2(d.baseInss), r2(it.inss), r2(d.inssPatronal), r2(d.baseIrrf), r2(it.irrf), r2(d.fgts), r2(d.salarioFinal), r2(it.vr), r2(it.ifood), r2(it.kr), r2(it.rescisao)];
   });
   const wsFolha = XLSX.utils.aoa_to_sheet([[`FOLHA ${folha.competencia}`], head, ...linhas]);

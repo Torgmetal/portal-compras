@@ -36,6 +36,7 @@ export async function POST(_req, { params }) {
         heHoras50: pt.heHoras50, heHoras60: pt.heHoras60, heHoras80: pt.heHoras80,
         heHoras100: pt.heHoras100, heHoras150: pt.heHoras150,
         faltasHoras: pt.faltasHoras, atrasosHoras: pt.atrasosHoras,
+        adNoturnoHoras: pt.adNoturnoHoras,
       } });
     })
   );

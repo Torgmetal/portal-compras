@@ -90,6 +90,7 @@ export async function POST(req) {
             heHoras50: pt.heHoras50 || 0, heHoras60: pt.heHoras60 || 0, heHoras80: pt.heHoras80 || 0,
             heHoras100: pt.heHoras100 || 0, heHoras150: pt.heHoras150 || 0,
             faltasHoras: pt.faltasHoras || 0, atrasosHoras: pt.atrasosHoras || 0,
+            adNoturnoHoras: pt.adNoturnoHoras || 0,
           };
         }),
         skipDuplicates: true,
