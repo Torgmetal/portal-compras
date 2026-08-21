@@ -14,6 +14,10 @@ const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "");
  * O que existia era um botão que puxava a pasta inteira. Serve pra desenho, onde tudo da OP entra;
  * não serve pra qualificação de soldador, EPS ou calibração — ali entram só os que aquela obra
  * usou, e trazer tudo enche o data book de documento que não é dele.
+ *
+ * Vitor (21/08/2026), para a §02: "vou precisar poder selecionar pastas inteiras de projetos".
+ * Então a pasta também tem caixa de seleção, e quem varre as subpastas é o servidor — a §02 abre
+ * na Engenharia inteira e um projeto pode ter revisões e formatos em vários níveis.
  */
 export default function NavegadorServidor({ secaoId, titulo, onFechar, onAnexado }) {
   const [dados, setDados] = useState(null);
@@ -21,6 +25,9 @@ export default function NavegadorServidor({ secaoId, titulo, onFechar, onAnexado
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [sel, setSel] = useState(new Set());
+  // Vitor (21/08/2026): "vou precisar poder selecionar pastas inteiras de projetos". A pasta é
+  // marcada pelo CAMINHO (o servidor é quem varre as subpastas); o arquivo, pelo id.
+  const [selPastas, setSelPastas] = useState(new Set());
   const [anexando, setAnexando] = useState(false);
 
   const carregar = useCallback((p) => {
@@ -40,21 +47,46 @@ export default function NavegadorServidor({ secaoId, titulo, onFechar, onAnexado
     ? path.slice(raiz.path.length + 1).split("/").map((nome, i, arr) => ({ nome, path: `${raiz.path}/${arr.slice(0, i + 1).join("/")}` }))
     : [];
 
-  const anexar = async () => {
+  const anexar = async (confirmar = false) => {
     const escolhidos = (dados?.arquivos || []).filter((a) => sel.has(a.id));
-    if (!escolhidos.length) return;
+    const pastas = (dados?.pastas || []).filter((p) => selPastas.has(p.path));
+    if (!escolhidos.length && !pastas.length) return;
     setAnexando(true);
     try {
       const res = await fetch(`/api/qualidade/data-books/secao/${secaoId}/navegar`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ arquivos: escolhidos.map((a) => ({ id: a.id, nome: a.nome, url: a.url })) }),
+        body: JSON.stringify({
+          arquivos: escolhidos.map((a) => ({ id: a.id, nome: a.nome, url: a.url })),
+          pastas: pastas.map((p) => ({ path: p.path, nome: p.nome })),
+          confirmar,
+        }),
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "Erro");
+
+      // Pasta grande: o servidor conta antes de gravar e devolve a conta pra decidir. Desanexar é
+      // um clique por documento, então vale perguntar.
+      if (j.precisaConfirmar) {
+        const ok = confirm(
+          `Isso vai anexar ${j.arquivos.toLocaleString("pt-BR")} arquivos à seção.\n` +
+          (j.ignorados?.length ? `\nFicam de fora ${j.ignorados.map((i) => `${i.n} .${i.ext}`).join(", ")} — o data book só anexa PDF e imagem.\n` : "") +
+          (j.truncado ? `\n⚠ A pasta tem mais que o limite por vez; parte dela vai ficar de fora mesmo assim.\n` : "") +
+          `\nConfirma?`
+        );
+        setAnexando(false);
+        if (ok) await anexar(true);
+        return;
+      }
+
+      // ⚠ o teto da varredura é avisado, não escondido: "anexei tudo" quando faltou arquivo é o
+      // tipo de mentira que só aparece na auditoria.
+      if (j.truncado) alert(`Anexados ${j.arquivos} arquivos — o limite por vez foi atingido e parte da pasta ficou de fora. Entre nas subpastas e anexe o restante.`);
       onAnexado?.(j);
       onFechar?.();
     } catch (e) { alert(e.message); } finally { setAnexando(false); }
   };
+
+  const limpar = () => { setSel(new Set()); setSelPastas(new Set()); };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onFechar}>
@@ -62,7 +94,7 @@ export default function NavegadorServidor({ secaoId, titulo, onFechar, onAnexado
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-torg-dark">Anexar do servidor — {titulo}</p>
-            <p className="text-[11px] text-torg-gray">Escolha os arquivos. O portal aponta pro arquivo no SharePoint, sem copiar.</p>
+            <p className="text-[11px] text-torg-gray">Marque arquivos ou pastas inteiras. O portal aponta pro arquivo no SharePoint, sem copiar.</p>
           </div>
           <button onClick={onFechar} className="text-torg-gray hover:text-torg-dark shrink-0"><X size={18} /></button>
         </div>
@@ -70,7 +102,7 @@ export default function NavegadorServidor({ secaoId, titulo, onFechar, onAnexado
         {/* fontes (quando a seção tem mais de uma pasta) + trilha */}
         <div className="px-5 py-2 border-b border-gray-100 flex flex-wrap items-center gap-1.5 text-[11px]">
           {(dados?.fontes || []).map((f) => (
-            <button key={f.path} onClick={() => { setSel(new Set()); carregar(f.path); }}
+            <button key={f.path} onClick={() => { limpar(); carregar(f.path); }}
               className={`px-2 py-1 rounded-lg border inline-flex items-center gap-1 ${
                 raiz?.path === f.path ? "bg-torg-blue text-white border-torg-blue" : "text-torg-blue border-torg-blue-200 hover:bg-torg-blue-50"
               }`}>
@@ -80,7 +112,7 @@ export default function NavegadorServidor({ secaoId, titulo, onFechar, onAnexado
           {trilha.map((t) => (
             <span key={t.path} className="inline-flex items-center gap-1 text-torg-gray">
               <ChevronRight size={11} />
-              <button onClick={() => { setSel(new Set()); carregar(t.path); }} className="hover:text-torg-blue">{t.nome}</button>
+              <button onClick={() => { limpar(); carregar(t.path); }} className="hover:text-torg-blue">{t.nome}</button>
             </span>
           ))}
         </div>
@@ -98,12 +130,14 @@ export default function NavegadorServidor({ secaoId, titulo, onFechar, onAnexado
           {!loading && !erro && (
             <>
               {(dados?.pastas || []).map((p) => (
-                <button key={p.path} onClick={() => { setSel(new Set()); carregar(p.path); }}
-                  className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 flex items-center gap-2 text-[12px]">
+                <div key={p.path} className="w-full px-2 py-1.5 rounded hover:bg-gray-50 flex items-center gap-2 text-[12px]">
+                  {/* marcar a pasta leva ela inteira (com as subpastas); o nome continua entrando nela */}
+                  <input type="checkbox" checked={selPastas.has(p.path)} title="Anexar esta pasta inteira"
+                    onChange={() => setSelPastas((prev) => { const n = new Set(prev); n.has(p.path) ? n.delete(p.path) : n.add(p.path); return n; })} />
                   <Folder size={13} className="text-torg-blue shrink-0" />
-                  <span className="text-torg-dark">{p.nome}</span>
-                  <ChevronRight size={12} className="ml-auto text-torg-gray" />
-                </button>
+                  <button onClick={() => { limpar(); carregar(p.path); }} className="text-torg-dark text-left min-w-0 truncate hover:text-torg-blue">{p.nome}</button>
+                  <button onClick={() => { limpar(); carregar(p.path); }} className="ml-auto text-torg-gray hover:text-torg-blue shrink-0"><ChevronRight size={12} /></button>
+                </div>
               ))}
               {(dados?.arquivos || []).map((a) => (
                 <label key={a.id} className="w-full px-2 py-1.5 rounded hover:bg-gray-50 flex items-center gap-2 text-[12px] cursor-pointer">
@@ -123,15 +157,23 @@ export default function NavegadorServidor({ secaoId, titulo, onFechar, onAnexado
 
         <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between gap-3">
           <span className="text-[11px] text-torg-gray">
-            {sel.size ? `${sel.size} arquivo(s) selecionado(s)` : "Nenhum selecionado"}
-            {dados?.arquivos?.length > 1 && (
-              <button onClick={() => setSel(sel.size === dados.arquivos.length ? new Set() : new Set(dados.arquivos.map((a) => a.id)))}
+            {sel.size || selPastas.size
+              ? [sel.size ? `${sel.size} arquivo(s)` : null, selPastas.size ? `${selPastas.size} pasta(s) inteira(s)` : null].filter(Boolean).join(" + ")
+              : "Nenhum selecionado"}
+            {(dados?.arquivos?.length > 0 || dados?.pastas?.length > 0) && (
+              <button
+                onClick={() => {
+                  const tudo = sel.size === (dados.arquivos?.length || 0) && selPastas.size === (dados.pastas?.length || 0);
+                  if (tudo) { limpar(); return; }
+                  setSel(new Set((dados.arquivos || []).map((a) => a.id)));
+                  setSelPastas(new Set((dados.pastas || []).map((p) => p.path)));
+                }}
                 className="ml-2 text-torg-blue hover:underline">
-                {sel.size === dados.arquivos.length ? "limpar" : "selecionar todos desta pasta"}
+                {sel.size === (dados.arquivos?.length || 0) && selPastas.size === (dados.pastas?.length || 0) ? "limpar" : "selecionar tudo desta pasta"}
               </button>
             )}
           </span>
-          <button onClick={anexar} disabled={!sel.size || anexando}
+          <button onClick={() => anexar(false)} disabled={(!sel.size && !selPastas.size) || anexando}
             className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-40">
             {anexando ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Anexar selecionados
           </button>
