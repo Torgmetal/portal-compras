@@ -81,6 +81,22 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
     }
     g.stroke();
 
+    // o texto do desenho — as cotas do projeto e as marcas das peças.
+    // ⚠ é ele que diz QUAL valor digitar em "Espec."; sem isso a tela é um contorno mudo e a pessoa
+    // teria de abrir o desenho por fora para descobrir o número.
+    g.fillStyle = "#0f172a";
+    g.textAlign = "left"; g.textBaseline = "alphabetic";
+    for (const t of dados.textos || []) {
+      const [tx, ty] = paraTela([t.x, t.y], L);
+      const tam = Math.max(5, t.t * L.esc);
+      g.save();
+      g.translate(tx, ty);
+      if (t.v) g.rotate(-Math.PI / 2); // cota vertical vem girada no desenho
+      g.font = `${tam}px sans-serif`;
+      g.fillText(t.s, 0, 0);
+      g.restore();
+    }
+
     // as cotas já marcadas
     const desenhaCota = (co, cor, rotulo) => {
       const a = paraTela([co.ax, co.ay], L), b = paraTela([co.bx, co.by], L);
