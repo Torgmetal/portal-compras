@@ -74,21 +74,26 @@ New-DistributionGroup -Name "SG-Engenharia-GraphMail" -Type Security `
   -Members engenharia@torg.com.br,engenharia1@torg.com.br,engenharia2@torg.com.br,engenharia3@torg.com.br,engenharia4@torg.com.br,engenharia5@torg.com.br
 ```
 
-**(b) Azure Portal → App registrations → (o app do portal) → API permissions:**
+> **App do portal confirmado:** `Torg Portal SharePoint` — **AppId `1e76f3e9-2d81-4935-955e-da52fdbca442`**
+> (é o que tem as permissões Graph `Files.Read.All` / `Sites.Read.All` / `Sites.ReadWrite.All` já
+> concedidas; o `AZURE_CLIENT_ID` no Vercel é write-only, por isso não dá pra ler o valor lá).
+
+**(b) Azure Portal → App registrations → `Torg Portal SharePoint` → API permissions:**
 - Add permission → Microsoft Graph → **Application permissions** → **`Mail.Read`**
 - **Grant admin consent** (botão). *(Opcional: `Mail.ReadBasic` é ainda mais restrito — só
   metadados/headers, sem corpo. Como só guardamos snippet, dá pra avaliar `Mail.ReadBasic`.)*
 
 **(c) Exchange Online → travar o app só nesse grupo (ApplicationAccessPolicy):**
 ```powershell
-New-ApplicationAccessPolicy -AppId <AZURE_CLIENT_ID> `
+# AppId confirmado do "Torg Portal SharePoint"
+New-ApplicationAccessPolicy -AppId 1e76f3e9-2d81-4935-955e-da52fdbca442 `
   -PolicyScopeGroupId sg-engenharia-graphmail@torg.com.br `
   -AccessRight RestrictAccess `
   -Description "Portal Torg - Graph Mail so nas caixas da Engenharia"
 
 # testar (pode levar ~30 min pra propagar)
-Test-ApplicationAccessPolicy -Identity engenharia@torg.com.br -AppId <AZURE_CLIENT_ID>   # Granted
-Test-ApplicationAccessPolicy -Identity financeiro@torg.com.br  -AppId <AZURE_CLIENT_ID>   # Denied
+Test-ApplicationAccessPolicy -Identity engenharia@torg.com.br -AppId 1e76f3e9-2d81-4935-955e-da52fdbca442   # Granted
+Test-ApplicationAccessPolicy -Identity vitor@torg.com.br      -AppId 1e76f3e9-2d81-4935-955e-da52fdbca442   # Denied
 ```
 > Depois disso, qualquer chamada do app a uma caixa **fora** do grupo é negada pelo próprio
 > Exchange — garantia de que o portal só enxerga a Engenharia.
