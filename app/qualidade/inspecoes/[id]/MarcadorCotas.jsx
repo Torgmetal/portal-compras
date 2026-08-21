@@ -52,6 +52,10 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
   // juntos. Desfazer que só cobre uma das três não serve: a pessoa apaga uma linha por engano e o
   // botão devolve outra coisa.
   const [historico, setHistorico] = useState([]);
+  // ⚠ SELEÇÃO POR CAIXA. Vitor (21/08/2026): "tem como deixar a borracha como um seletor e você
+  // apagar tudo que for selecionado como uma box". Guardado em coordenadas do DESENHO, não da tela:
+  // assim o retângulo acompanha o zoom sem recalcular nada.
+  const [selecao, setSelecao] = useState(null); // { x0, y0, x1, y1 }
   const cv = useRef(null);
   // ⚠ A MEDIDA VEM DE FORA, NÃO DA CAIXA DO CANVAS.
   //
@@ -193,6 +197,17 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
       for (const pt of [a, b]) { g.beginPath(); g.arc(pt[0], pt[1], 3, 0, 7); g.fillStyle = "#006EAB"; g.fill(); }
     }
 
+    // o retângulo da borracha
+    if (selecao) {
+      const a = paraTela([Math.min(selecao.x0, selecao.x1), Math.min(selecao.y0, selecao.y1)], L);
+      const b = paraTela([Math.max(selecao.x0, selecao.x1), Math.max(selecao.y0, selecao.y1)], L);
+      g.fillStyle = "rgba(244,128,31,0.12)";
+      g.fillRect(a[0], b[1], b[0] - a[0], a[1] - b[1]);
+      g.strokeStyle = "#F4801F"; g.lineWidth = 1; g.setLineDash([4, 3]);
+      g.strokeRect(a[0], b[1], b[0] - a[0], a[1] - b[1]);
+      g.setLineDash([]);
+    }
+
     // o ponto pendente e a borracha do imã
     if (pendente) {
       const p = paraTela(pendente, L);
@@ -217,7 +232,7 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     // canvas ficava com a pintura antiga, num tamanho que não era o dele. Dava exatamente o que o
     // Vitor viu: desenho fora de proporção e com o topo faltando, variando conforme a hora em que a
     // página carregava.
-  }, [dados, cotas, pendente, hover, rascunho, layout, ocultos, linhasOcultas, borracha, tick]);
+  }, [dados, cotas, pendente, hover, rascunho, layout, ocultos, linhasOcultas, borracha, tick, selecao]);
 
   // ⚠ sem isto o canvas fica com o tamanho antigo ao abrir a tela cheia ou girar o aparelho, e o
   // clique passa a cair alguns pixels fora do traço.
@@ -386,16 +401,71 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
       .map((t) => caixaDoTexto(t));
   }
 
+  /** Ponto do evento em coordenadas do desenho, sem imã. */
+  function cru(e) {
+    const L = layout(); if (!L) return null;
+    const r = cv.current.getBoundingClientRect();
+    return paraDesenho(e.clientX - r.left, e.clientY - r.top, L);
+  }
+
+  /**
+   * Apaga TUDO dentro do retângulo: texto (com a moldura) e traço.
+   *
+   * ⚠ Só o que está INTEIRAMENTE dentro. Apagar o que apenas encosta faria a linha de cota, que
+   * atravessa a folha, sumir junto ao selecionar um canto qualquer — e aí a pessoa perde metade do
+   * desenho num arrasto.
+   */
+  function apagarNaCaixa(sel) {
+    const x0 = Math.min(sel.x0, sel.x1), x1 = Math.max(sel.x0, sel.x1);
+    const y0 = Math.min(sel.y0, sel.y1), y1 = Math.max(sel.y0, sel.y1);
+    const dentro = (px, py) => px >= x0 && px <= x1 && py >= y0 && py <= y1;
+
+    const textos = (dados.textos || []).filter((t) => {
+      const lg = t.v ? t.t : t.w, at = t.v ? t.w : t.t;
+      return dentro(t.x, t.y) && dentro(t.x + (lg || 0), t.y + (at || 0));
+    });
+    const jaApagadas = new Set((linhasOcultas || []).map((l) => l.join(",")));
+    const linhas = (dados.segs || []).filter(([a, b, c, d]) =>
+      dentro(a, b) && dentro(c, d) && !jaApagadas.has([a, b, c, d].join(",")));
+
+    if (!textos.length && !linhas.length) return;
+    registrar();
+    if (textos.length && onOcultos) onOcultos([...(ocultos || []), ...textos.map(caixaDoTexto)]);
+    if (linhas.length && onLinhas) onLinhas([...(linhasOcultas || []), ...linhas]);
+  }
+
+  function aoPressionar(e) {
+    if (!borracha) return;
+    const p = cru(e); if (!p) return;
+    setSelecao({ x0: p[0], y0: p[1], x1: p[0], y1: p[1] });
+  }
+
+  function aoSoltar(e) {
+    if (!borracha || !selecao) return;
+    const p = cru(e);
+    const sel = p ? { ...selecao, x1: p[0], y1: p[1] } : selecao;
+    setSelecao(null);
+    const L = layout();
+    const arrastou = L && (Math.abs(sel.x1 - sel.x0) * L.esc > 4 || Math.abs(sel.y1 - sel.y0) * L.esc > 4);
+    // arrasto curto é CLIQUE: apaga só o item sob o cursor
+    if (arrastou) apagarNaCaixa(sel);
+    else apagarNoPonto(e);
+  }
+
+  /** Apaga o item sob o cursor — texto primeiro, traço depois. */
+  function apagarNoPonto(e) {
+    // ⚠ texto primeiro: onde há rótulo há também o traço da moldura, e apagar a linha deixando o
+    // número no ar seria o contrário do que se quer.
+    const t = textoNoPonto(e);
+    if (t) { registrar(); if (onOcultos) onOcultos([...(ocultos || []), caixaDoTexto(t)]); return; }
+    const sg = linhaNoPonto(e);
+    if (sg && onLinhas) { registrar(); onLinhas([...(linhasOcultas || []), sg]); }
+  }
+
   function clique(e) {
-    if (borracha) {
-      // ⚠ texto primeiro: onde há rótulo há também o traço da moldura, e apagar a linha deixando o
-      // número no ar seria o contrário do que se quer.
-      const t = textoNoPonto(e);
-      if (t) { registrar(); if (onOcultos) onOcultos([...(ocultos || []), caixaDoTexto(t)]); return; }
-      const sg = linhaNoPonto(e);
-      if (sg && onLinhas) { registrar(); onLinhas([...(linhasOcultas || []), sg]); }
-      return;
-    }
+    // ⚠ na borracha quem manda é o soltar (`aoSoltar`): é lá que se sabe se houve arrasto — caixa —
+    // ou só um toque. Tratar aqui apagaria duas vezes.
+    if (borracha) return;
     const p = pontoDoEvento(e); if (!p) return;
     if (!pendente) { setPendente(p); return; }
     setRascunho({ ax: pendente[0], ay: pendente[1], bx: p[0], by: p[1] });
@@ -437,7 +507,7 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
       <div className="flex items-start justify-between gap-3 mb-1.5">
         <p className="text-[11px] text-torg-gray">
           {borracha
-            ? "Clique num número, numa marca ou numa linha para apagar — some aqui e no PDF."
+            ? "Arraste uma caixa para apagar tudo dentro dela, ou clique num item. Some aqui e no PDF."
             : pendente ? "Agora clique no segundo ponto da cota." : "Clique em dois pontos do desenho para criar uma cota. O clique gruda no traço."}
           {pendente && <button onClick={() => setPendente(null)} className="ml-2 text-torg-blue inline-flex items-center gap-1"><Undo2 size={11} /> cancelar</button>}
         </p>
@@ -480,7 +550,13 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
       <div ref={box} className="w-full">
       {/* ⚠ com zoom o canvas passa da área visível: a caixa rola em vez de cortar */}
       <div ref={caixa} className="border border-gray-200 rounded-lg overflow-auto bg-white max-w-full">
-        <canvas ref={cv} onClick={clique} onMouseMove={(e) => setHover(borracha ? null : pontoDoEvento(e))} onMouseLeave={() => setHover(null)}
+        <canvas ref={cv} onClick={clique}
+          onMouseDown={aoPressionar} onMouseUp={aoSoltar}
+          onMouseMove={(e) => {
+            if (borracha) { if (selecao) { const p = cru(e); if (p) setSelecao((s0) => ({ ...s0, x1: p[0], y1: p[1] })); } return; }
+            setHover(pontoDoEvento(e));
+          }}
+          onMouseLeave={() => { setHover(null); setSelecao(null); }}
           className={`block ${borracha ? "cursor-cell" : "cursor-crosshair"}`} />
       </div>
       </div>
