@@ -146,11 +146,25 @@ export default function InspecoesClient() {
         <FileText size={15} className="text-torg-blue" /> Relatórios
       </h2>
       {!dados.relatorios.length && <p className="text-[13px] text-torg-gray">Nenhum relatório montado ainda.</p>}
-      <div className="space-y-2">
-        {dados.relatorios.map((r) => (
-          <Relatorio key={r.id} r={r} onMudou={carregar} />
-        ))}
-      </div>
+      {agruparRelatorios(dados.relatorios).map((t) => (
+        <div key={t.tipo} className="mb-5">
+          <div className="flex items-baseline gap-2 border-b border-gray-200 pb-1 mb-2">
+            <h3 className="text-[13px] font-bold text-torg-dark">{TIPO_LABEL[t.tipo] || t.tipo}</h3>
+            <span className="text-[11px] text-torg-gray">{t.total} relatório{t.total > 1 ? "s" : ""}</span>
+          </div>
+          {t.ops.map((o) => (
+            <div key={o.opNumero} className="mb-2.5">
+              <p className="text-[11px] font-semibold text-torg-gray mb-1 pl-0.5">
+                OP-{o.opNumero}
+                <span className="font-normal"> · {o.relatorios.length}</span>
+              </p>
+              <div className="space-y-2">
+                {o.relatorios.map((r) => <Relatorio key={r.id} r={r} onMudou={carregar} />)}
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
 
       {montando && (
         <Montar grupo={montando} onFechar={() => setMontando(null)} onPronto={() => { setMontando(null); carregar(); }} />
@@ -158,6 +172,43 @@ export default function InspecoesClient() {
       {novoDim && <NovoDimensional onFechar={() => setNovoDim(false)} onPronto={() => { setNovoDim(false); carregar(); }} />}
     </div>
   );
+}
+
+/**
+ * Os relatórios em duas camadas: TIPO e, dentro dele, OP.
+ *
+ * Vitor (21/08/2026): "vamos deixar separado por tipo de relatórios e dentro dos tipos de relatórios
+ * deixar separado por OP". Faz sentido — a lista chapada repetia "OP-089 · Inspeção dimensional e
+ * visual" em toda linha, e o que distingue um relatório do outro (o código e as peças) ficava
+ * espremido no meio da repetição.
+ *
+ * A ordem dos tipos é a de `TIPOS_RELATORIO`, não alfabética: é a ordem em que a inspeção acontece
+ * (dimensional → solda → ensaio → pintura), e é a mesma que o data book usa.
+ */
+function agruparRelatorios(relatorios) {
+  const porTipo = new Map();
+  for (const r of relatorios) {
+    const t = porTipo.get(r.tipo) || { tipo: r.tipo, total: 0, ops: new Map() };
+    const o = t.ops.get(r.opNumero) || { opNumero: r.opNumero, relatorios: [] };
+    o.relatorios.push(r);
+    t.ops.set(r.opNumero, o);
+    t.total++;
+    porTipo.set(r.tipo, t);
+  }
+  const ordem = TIPOS_RELATORIO.map((t) => t.id);
+  return [...porTipo.values()]
+    .sort((a, b) => {
+      const ia = ordem.indexOf(a.tipo), ib = ordem.indexOf(b.tipo);
+      // tipo desconhecido (vindo de dado antigo) vai para o fim em vez de sumir
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    })
+    .map((t) => ({
+      ...t,
+      // OP mais recente primeiro; e o relatório mais novo no topo de cada OP
+      ops: [...t.ops.values()]
+        .sort((a, b) => String(b.opNumero).localeCompare(String(a.opNumero), "pt-BR", { numeric: true }))
+        .map((o) => ({ ...o, relatorios: o.relatorios.sort((x, y) => (y.numero || 0) - (x.numero || 0)) })),
+    }));
 }
 
 function Relatorio({ r, onMudou }) {
@@ -169,10 +220,12 @@ function Relatorio({ r, onMudou }) {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <Link href={`/qualidade/inspecoes/${r.id}`} className="font-semibold text-torg-blue hover:text-torg-dark text-sm">
-            <span className="font-mono">{r.codigo}</span> · OP-{r.opNumero} · {TIPO_LABEL[r.tipo] || r.tipo}
+            <span className="font-mono">{r.codigo}</span>
+            {r.marcas?.length ? <span className="font-normal text-torg-dark"> · {r.marcas.slice(0, 4).join(", ")}{r.marcas.length > 4 ? ` +${r.marcas.length - 4}` : ""}</span> : null}
           </Link>
           <p className="text-[11px] text-torg-gray">
-            {r.fotos} foto(s) · {r.titulo || "sem título"} · {r.inspetor || r.criadoPorNome || "—"}
+            {r.fotos > 0 ? `${r.fotos} foto${r.fotos > 1 ? "s" : ""} · ` : ""}
+            {r.titulo || "sem título"} · {r.inspetor || r.criadoPorNome || "—"}
             {r.emitidoEm ? ` · emitido ${fmtDT(r.emitidoEm)}` : " · rascunho"}
           </p>
         </div>
