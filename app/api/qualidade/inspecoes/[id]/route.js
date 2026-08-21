@@ -62,17 +62,34 @@ export async function PATCH(req, { params }) {
   if (body.observacoes !== undefined) dados.observacoes = String(body.observacoes || "").trim() || null;
   if (body.inspetor !== undefined) dados.inspetor = String(body.inspetor || "").trim() || null;
 
+  // ⚠ ESTE SANITIZADOR RECONSTRÓI A LINHA CAMPO A CAMPO, e por isso qualquer campo que não esteja
+  // listado aqui é PERDIDO no salvamento. Foi o que aconteceu com a cota: `letra` e as coordenadas
+  // da marcação não estavam na lista, então a pessoa marcava a Cota A, salvava, e o relatório
+  // voltava sem letra e sem posição — a marca sumia do desenho no PDF e a tabela perdia o rótulo.
+  // Campo novo na linha PRECISA ser acrescentado aqui.
+  // ⚠ VAZIO NÃO É ZERO. `Number(null)` e `Number("")` dão 0, e 0 é finito — a checagem ingênua
+  // gravava 0 na dimensão ENCONTRADA de toda linha que ninguém mediu. No relatório isso não fica
+  // discreto: aparece "0" na coluna e um desvio de -4332 em vermelho, como se a peça tivesse sido
+  // medida e reprovado. Mesma armadilha do NaN no holerite.
+  const num = (v) => {
+    if (v == null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
   if (Array.isArray(body.linhas)) {
     dados.linhas = body.linhas.slice(0, 400).map((l) => ({
       marca: String(l?.marca || "").slice(0, 60),
       conjunto: l?.conjunto ? String(l.conjunto).slice(0, 60) : null,
-      qtd: Number.isFinite(Number(l?.qtd)) ? Number(l.qtd) : null,
+      qtd: num(l?.qtd),
       descricao: l?.descricao ? String(l.descricao).slice(0, 120) : null,
       material: l?.material ? String(l.material).slice(0, 60) : null,
-      projetoMm: Number.isFinite(Number(l?.projetoMm)) ? Number(l.projetoMm) : null,
+      projetoMm: num(l?.projetoMm),
       tolerancia: l?.tolerancia ? String(l.tolerancia).slice(0, 40) : null,
-      encontradoMm: Number.isFinite(Number(l?.encontradoMm)) ? Number(l.encontradoMm) : null,
+      encontradoMm: num(l?.encontradoMm),
       obs: l?.obs ? String(l.obs).slice(0, 160) : null,
+      // ── a cota marcada no desenho ──
+      letra: l?.letra ? String(l.letra).slice(0, 3) : null,
+      ax: num(l?.ax), ay: num(l?.ay), bx: num(l?.bx), by: num(l?.by),
     }));
   }
 
@@ -86,6 +103,22 @@ export async function PATCH(req, { params }) {
       acabamento: ok(r.acabamento),
       resultado: ok(r.resultado),
     };
+
+    // ── O QUE FOI APAGADO NO DESENHO ────────────────────────────────────────────────────────────
+    //
+    // Mesma armadilha de cima: o espalhamento preserva o que JÁ estava gravado, mas o que vem novo
+    // no corpo precisa ser lido explicitamente. Sem estas duas linhas a pessoa apagava as marcas,
+    // salvava, e o PDF saía com tudo de volta.
+    if (Array.isArray(r.ocultosDesenho)) {
+      dados.resultados.ocultosDesenho = r.ocultosDesenho.slice(0, 800)
+        .map((o) => ({ x: num(o?.x), y: num(o?.y), w: num(o?.w), h: num(o?.h), tx: num(o?.tx), ty: num(o?.ty) }))
+        .filter((o) => o.x != null && o.y != null);
+    }
+    if (Array.isArray(r.linhasOcultasDesenho)) {
+      dados.resultados.linhasOcultasDesenho = r.linhasOcultasDesenho.slice(0, 4000)
+        .map((l) => (Array.isArray(l) ? l.slice(0, 4).map(num) : null))
+        .filter((l) => l && l.length === 4 && l.every((v) => v != null));
+    }
   }
 
   const atualizado = await prisma.relatorioInspecao.update({ where: { id }, data: dados });
