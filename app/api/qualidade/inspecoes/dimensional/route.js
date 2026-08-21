@@ -1,18 +1,21 @@
-// POST — monta o relatório dimensional a partir do(s) desenho(s).
+// POST — cria o relatório dimensional.  { opNumero, escopo, marcas[], titulo, inspetor }
 //
-//   { opNumero, escopo, marcas[] }                  → PRÉVIA (não grava nada)
-//   { ..., salvar: true, titulo, inspetor, ... }     → cria o relatório
+// ⚠ CRIAR É INSTANTÂNEO, DE PROPÓSITO. Vitor (21/08/2026): "vamos mudar esse caminho para criar o
+// relatório, pois está muito lento; como não vamos alterar nada das cotas, você só precisa trazer o
+// desenho".
 //
-// Vitor (21/08/2026): "onde você está deixando a prévia desses relatórios?" — não estava em lugar
-// nenhum. O motor lia o desenho, mas sem tela não havia como olhar antes de gravar. A prévia existe
-// pra isso: o dimensional puxa dado do servidor (desenho, lista de materiais) e é preciso conferir
-// o que veio ANTES de consumir um número de relatório, que não se reaproveita.
+// A rota já montou prévia aqui: procurava o desenho nas pastas da OP (varredura recursiva, dezenas
+// de chamadas ao Graph), baixava a folha, recortava a vista e gerava um PDF só para olhar. Fazia
+// sentido quando o relatório nascia preenchido pela lista de materiais. Não faz mais: hoje ele
+// nasce VAZIO e as dimensões só existem depois que alguém marca a Cota A no desenho.
+//
+// O caminho do desenho é resolvido na primeira vez que a marcação ou o PDF precisam dele
+// (`garantirDesenhos`) e fica gravado a partir dali.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { montarDimensional, procedimentoTolerancia, baixarDesenho } from "@/lib/relatorio-dimensional";
-import { gerarDimensionalPDF } from "@/lib/relatorio-dimensional-pdf";
-import { criarRelatorio, vincularNoDataBook } from "@/lib/relatorio-inspecao";
+import { procedimentoTolerancia } from "@/lib/relatorio-dimensional";
+import { vincularNoDataBook } from "@/lib/relatorio-inspecao";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -37,41 +40,19 @@ export async function POST(req) {
     return NextResponse.json({ error: "Relatório de conjunto é um por conjunto. Para agrupar, use o escopo de peças avulsas." }, { status: 400 });
   }
 
-  const { linhas, desenhos, erros } = await montarDimensional(opNumero, marcas);
+  // ⚠ NADA DE VARRER O SERVIDOR AQUI. Vitor (21/08/2026): "vamos mudar esse caminho para criar o
+  // relatório, pois está muito lento; como não vamos alterar nada das cotas, você só precisa trazer
+  // o desenho".
+  //
+  // Antes esta rota montava a prévia inteira antes de gravar: procurava o desenho nas pastas da OP
+  // (varredura recursiva, dezenas de chamadas ao Graph), baixava a folha, recortava a vista e ainda
+  // gerava um PDF de prévia. Tudo isso para um relatório que nasce VAZIO — as dimensões só existem
+  // depois que alguém marca a Cota A no desenho.
+  //
+  // O caminho do desenho passa a ser resolvido na primeira vez que a marcação ou o PDF precisarem
+  // dele (`garantirDesenhos`), e fica gravado no relatório a partir dali.
   const tolerancia = await procedimentoTolerancia();
-
-  if (!body?.salvar) {
-    // ⚠ PRÉVIA COMO DOCUMENTO. Vitor: "não consigo gerar a prévia o relatório para ver como vai
-    // ficar no data book". Uma tabela na tela não responde isso — o que ele precisa ver é a FOLHA,
-    // com o desenho no campo do croqui e os quadros de aprovação. Devolve o PDF de verdade, do
-    // relatório que ainda não existe.
-    // ⚠ UMA CHAMADA SÓ. A tela pedia os dados e depois o PDF — e cada pedido refaz a montagem, que
-    // varre o servidor. Eram 30 s de espera com a tela parada, que na prática lê como "não está
-    // gerando". Agora o PDF volta junto, em base64.
-    {
-      const op = await prisma.oP.findFirst({ where: { numero: opNumero }, select: { cliente: true, obra: true } });
-      const bytes = await gerarDimensionalPDF({
-        rel: {
-          codigo: `${escopo === "AVULSAS" ? "RID" : "RID"}-${opNumero.replace(/\D/g, "").padStart(3, "0")}-PRÉVIA`,
-          opNumero, tipo: "DIMENSIONAL", marcas, linhas, desenhos,
-          titulo: body?.titulo || null, inspetor: body?.inspetor || user.name || null,
-          observacoes: body?.observacoes || null,
-          resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia },
-          equipamentos: [],
-          emitidoEm: new Date(),
-        },
-        assinaturas: null,
-        desenhoBytes: (d) => baixarDesenho(d?.caminho),
-        cliente: op?.cliente || null, obra: op?.obra || null,
-      });
-      return NextResponse.json({
-        previa: true, escopo, marcas, linhas, desenhos, erros, tolerancia,
-        pdf: Buffer.from(bytes).toString("base64"),
-      });
-    }
-  }
-
-  if (!linhas.length) return NextResponse.json({ error: "Nada para gravar — nenhuma linha foi montada." }, { status: 400 });
+  const erros = [];
 
   const op = await prisma.oP.findFirst({ where: { numero: opNumero }, select: { id: true } });
   try {
@@ -89,9 +70,10 @@ export async function POST(req) {
         observacoes: String(body?.observacoes || "").trim() || null,
         inspetor: String(body?.inspetor || "").trim() || user.name || null,
         escopo, marcas,
-        // as linhas que o elaborador vai preencher (encontradoMm vem vazio de propósito)
-        linhas: Array.isArray(body?.linhas) && body.linhas.length ? body.linhas : linhas,
-        desenhos,
+        // nasce SEM linha: elas aparecem conforme as cotas A/B/C forem marcadas no desenho
+        linhas: [],
+        // e sem desenho: o caminho é resolvido na primeira abertura da marcação
+        desenhos: [],
         resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia },
         criadoPorId: user.id, criadoPorNome: user.name || null,
       },

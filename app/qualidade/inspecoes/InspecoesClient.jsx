@@ -148,15 +148,17 @@ export default function InspecoesClient() {
       {!dados.relatorios.length && <p className="text-[13px] text-torg-gray">Nenhum relatório montado ainda.</p>}
       {agruparRelatorios(dados.relatorios).map((t) => (
         <div key={t.tipo} className="mb-5">
-          <div className="flex items-baseline gap-2 border-b border-gray-200 pb-1 mb-2">
+          <div className="flex items-center gap-2 bg-torg-blue/5 border-l-[3px] border-torg-blue rounded-r-lg px-2.5 py-1.5 mb-2">
             <h3 className="text-[13px] font-bold text-torg-dark">{TIPO_LABEL[t.tipo] || t.tipo}</h3>
             <span className="text-[11px] text-torg-gray">{t.total} relatório{t.total > 1 ? "s" : ""}</span>
           </div>
           {t.ops.map((o) => (
             <div key={o.opNumero} className="mb-2.5">
-              <p className="text-[11px] font-semibold text-torg-gray mb-1 pl-0.5">
-                OP-{o.opNumero}
-                <span className="font-normal"> · {o.relatorios.length}</span>
+              <p className="mb-1 pl-0.5">
+                <span className="text-[11px] font-bold text-torg-dark bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5">
+                  OP-{o.opNumero}
+                </span>
+                <span className="text-[11px] text-torg-gray ml-1.5">{o.relatorios.length} relatório{o.relatorios.length > 1 ? "s" : ""}</span>
               </p>
               <div className="space-y-2">
                 {o.relatorios.map((r) => <Relatorio key={r.id} r={r} onMudou={carregar} />)}
@@ -213,7 +215,26 @@ function agruparRelatorios(relatorios) {
 
 function Relatorio({ r, onMudou }) {
   const [abrindo, setAbrindo] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
   const assinadas = r.assinaturas.filter((a) => a.assinadoEm).length;
+
+  async function excluir() {
+    // ⚠ o aviso diz o que ACONTECE, não só "tem certeza?": o relatório sai do data book e as fotos
+    // voltam para a fila. Sem isso, apagar parece mais destrutivo do que é — ou menos.
+    const aviso = `Apagar ${r.codigo}?\n\n`
+      + "· sai do data book (o anexo da seção é removido)\n"
+      + (r.fotos > 0 ? `· as ${r.fotos} foto(s) voltam para a fila de fotos soltas\n` : "")
+      + (r.envioAssinaturaId ? "\n⚠ Este relatório JÁ FOI ENVIADO para assinatura.\n" : "")
+      + "\nNão dá para desfazer.";
+    if (!confirm(aviso)) return;
+    setExcluindo(true);
+    try {
+      const res = await fetch(`/api/qualidade/inspecoes/${r.id}`, { method: "DELETE" });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Erro");
+      onMudou();
+    } catch (e) { alert(e.message); setExcluindo(false); }
+  }
 
   return (
     <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
@@ -244,6 +265,10 @@ function Relatorio({ r, onMudou }) {
           <button onClick={() => setAbrindo((v) => !v)}
             className="text-[12px] text-torg-blue border border-torg-blue-200 hover:bg-torg-blue-50 rounded-lg px-2.5 py-1 inline-flex items-center gap-1.5 font-medium">
             <Send size={13} /> {r.envioAssinaturaId ? "Assinaturas" : "Enviar p/ assinatura"}
+          </button>
+          <button onClick={excluir} disabled={excluindo} title="Apagar relatório"
+            className="text-torg-gray hover:text-red-600 disabled:opacity-40 p-1">
+            {excluindo ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
           </button>
         </div>
       </div>
@@ -347,6 +372,17 @@ function Montar({ grupo, onFechar, onPronto }) {
               );
             })}
           </div>
+          {/* ── o que vem depois ─────────────────────────────────────────────── */}
+          <div className="min-h-0 flex items-center justify-center bg-gray-50 p-6 text-center">
+            <div className="max-w-xs">
+              <Ruler size={22} className="text-torg-blue/40 mx-auto mb-2" />
+              <p className="text-[13px] text-torg-gray">
+                O relatório é criado vazio e na hora. Depois você abre ele e marca as
+                <strong className="text-torg-dark"> cotas A, B e C</strong> sobre o desenho — é ali que as
+                dimensões entram.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
@@ -378,14 +414,10 @@ function NovoDimensional({ onFechar, onPronto }) {
   const [sel, setSel] = useState([]);
   const [titulo, setTitulo] = useState("");
   const [inspetor, setInspetor] = useState("");
-  const [previa, setPrevia] = useState(null); // { linhas, desenhos, erros, tolerancia }
   // Vitor (21/08/2026): "traga eles no seletor para podermos escolher um deles para testarmos".
   // A marca com NC1 sai com a dimensão exata; sem ele, o portal lê o desenho.
   const [comNc1, setComNc1] = useState(null); // Set de marcas
   const [soNc1, setSoNc1] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState("");
-  const [carregando, setCarregando] = useState(false);
-  const [segundos, setSegundos] = useState(0);
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -417,8 +449,7 @@ function NovoDimensional({ onFechar, onPronto }) {
   }, [op, q, escopo]);
 
   // trocar de escopo/OP invalida a seleção e a prévia
-  useEffect(() => { setSel([]); setPrevia(null); setPdfUrl(""); }, [op, escopo]);
-  useEffect(() => () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); }, [pdfUrl]);
+  useEffect(() => { setSel([]); }, [op, escopo]);
 
   const alternar = (m) => setSel((p) => {
     if (p.includes(m)) return p.filter((x) => x !== m);
@@ -426,59 +457,19 @@ function NovoDimensional({ onFechar, onPronto }) {
     return escopo === "CONJUNTO" ? [m] : [...p, m];
   });
 
-  // relógio: montar varre o servidor e pode levar dezenas de segundos. Sem ver o tempo correndo,
-  // uma espera longa é indistinguível de tela travada — foi o que aconteceu com o Vitor.
-  useEffect(() => {
-    if (!carregando) { setSegundos(0); return; }
-    const t = setInterval(() => setSegundos((s) => s + 1), 1000);
-    return () => clearInterval(t);
-  }, [carregando]);
-
-  async function montar() {
-    if (!op || !sel.length) { alert("Escolha a OP e ao menos uma peça."); return; }
-    setCarregando(true); setPrevia(null); setPdfUrl("");
-    // ⚠ corta em 100 s: sem isto, quando a rota morre calada o botão fica girando para sempre.
-    const ctrl = new AbortController();
-    const corta = setTimeout(() => ctrl.abort(), 100000);
-    try {
-      // uma chamada só: dados + a folha em base64. Duas idas refaziam a montagem inteira (que varre
-      // o servidor) e a tela ficava meio minuto parada, parecendo travada.
-      const r = await fetch("/api/qualidade/inspecoes/dimensional", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: op.numero, escopo, marcas: sel, titulo, inspetor }),
-        signal: ctrl.signal,
-      });
-      // resposta que não é JSON (erro do gateway, timeout da plataforma) precisa aparecer como
-      // mensagem, não como "unexpected token" — ou o usuário fica sem saber o que houve
-      const bruto = await r.text();
-      let j;
-      try { j = JSON.parse(bruto); }
-      catch { throw new Error(r.ok ? "Resposta inesperada do servidor." : `Falha no servidor (${r.status}). Tente de novo.`); }
-      if (!r.ok) throw new Error(j.error || "Erro");
-      setPrevia(j);
-      if (j.pdf) {
-        const bin = Uint8Array.from(atob(j.pdf), (c) => c.charCodeAt(0));
-        setPdfUrl(URL.createObjectURL(new Blob([bin], { type: "application/pdf" })));
-      }
-    } catch (e) {
-      alert(e.name === "AbortError"
-        ? "A montagem passou de 100 segundos e foi interrompida. Tente de novo — a segunda vez costuma ser rápida, porque as pastas ficam em cache."
-        : e.message);
-    } finally { clearTimeout(corta); setCarregando(false); }
-  }
-
   async function gravar() {
     setSalvando(true);
     try {
       const r = await fetch("/api/qualidade/inspecoes/dimensional", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: op.numero, escopo, marcas: sel, salvar: true, titulo, inspetor, linhas: previa.linhas }),
+        body: JSON.stringify({ opNumero: op.numero, escopo, marcas: sel, titulo, inspetor }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
       alert(
         `Relatório ${j.relatorio.codigo} criado.\n\n` +
-        (j.vinculo?.vinculado ? `Entrou na seção ${j.vinculo.secao} do data book.` : `⚠ Não entrou no data book: ${j.vinculo?.motivo || "seção não encontrada"}.`)
+        (j.vinculo?.vinculado ? `Entrou na seção ${j.vinculo.secao} do data book.\n\n` : `⚠ Não entrou no data book: ${j.vinculo?.motivo || "seção não encontrada"}.\n\n`) +
+        "Abra o relatório para marcar as cotas A, B e C sobre o desenho."
       );
       onPronto();
     } catch (e) { alert(e.message); } finally { setSalvando(false); }
@@ -575,42 +566,13 @@ function NovoDimensional({ onFechar, onPronto }) {
                 className="w-full text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
             </label>
 
-            <button onClick={montar} disabled={carregando || !sel.length}
-              className="w-full text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-2 inline-flex items-center justify-center gap-1.5 disabled:opacity-40">
-              {carregando ? <Loader2 size={13} className="animate-spin" /> : <Ruler size={13} />} Gerar prévia
-            </button>
-
-            {previa?.erros?.length > 0 && (
-              <div className="rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1.5">
-                {previa.erros.map((e, i) => <p key={i} className="text-[11px] text-amber-800">{e}</p>)}
-              </div>
-            )}
-            {previa && (
-              <p className="text-[11px] text-torg-gray">
-                {previa.linhas.length} linha(s) · {previa.desenhos.length} desenho(s) · tolerâncias conforme {previa.tolerancia}
-              </p>
-            )}
           </div>
 
-          {/* ── a folha ──────────────────────────────────────────────────────── */}
-          <div className="min-h-0 flex flex-col bg-gray-50">
-            {pdfUrl ? (
-              <iframe src={pdfUrl} title="Prévia do relatório" className="flex-1 w-full" style={{ border: "none" }} />
-            ) : (
-              <div className="flex-1 flex items-center justify-center p-6 text-center">
-                <p className="text-[13px] text-torg-gray max-w-xs">
-                  {carregando
-                    ? `montando a folha… ${segundos}s${segundos > 12 ? " (a primeira peça da OP demora mais: o portal varre o servidor)" : ""}`
-                    : "Escolha a OP e a peça e toque em “Gerar prévia” — a folha aparece aqui, igual à que vai para o data book."}
-                </p>
-              </div>
-            )}
-          </div>
         </div>
 
         <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
           <button onClick={onFechar} className="text-[12px] text-torg-gray px-3 py-1.5">Cancelar</button>
-          <button onClick={gravar} disabled={!previa?.linhas?.length || salvando}
+          <button onClick={gravar} disabled={!op || !sel.length || salvando}
             className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-40">
             {salvando ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} Criar relatório
           </button>

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarRelatorioInspecaoPDF } from "@/lib/relatorio-inspecao-pdf";
-import { baixarDesenho } from "@/lib/relatorio-dimensional";
+import { baixarDesenho, garantirDesenhos } from "@/lib/relatorio-dimensional";
 import { gerarDimensionalPDF } from "@/lib/relatorio-dimensional-pdf";
 
 export const runtime = "nodejs";
@@ -15,6 +15,9 @@ export async function GET(req, { params }) {
 
   const { id } = await params;
   const rel = await prisma.relatorioInspecao.findUnique({ where: { id } });
+  // ⚠ idem à tela de marcação: se o relatório nasceu sem desenho (criação instantânea), resolve e
+  // grava aqui. Sem isto o PDF sairia com o campo do croqui em branco.
+  if (rel && rel.tipo === "DIMENSIONAL") rel.desenhos = await garantirDesenhos(rel);
   if (!rel) return NextResponse.json({ error: "Relatório não encontrado" }, { status: 404 });
 
   const fotos = await prisma.fotoInspecao.findMany({

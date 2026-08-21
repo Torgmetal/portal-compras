@@ -8,7 +8,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { baixarDesenho } from "@/lib/relatorio-dimensional";
+import { baixarDesenho, garantirDesenhos } from "@/lib/relatorio-dimensional";
 import { vetoresDaVista } from "@/lib/vista-desenho";
 
 export const runtime = "nodejs";
@@ -21,11 +21,13 @@ export async function GET(req, { params }) {
   const marca = String(new URL(req.url).searchParams.get("marca") || "").trim().toUpperCase();
   const rel = await prisma.relatorioInspecao.findUnique({
     where: { id: params.id },
-    select: { desenhos: true },
+    select: { id: true, opNumero: true, marcas: true, desenhos: true },
   });
   if (!rel) return NextResponse.json({ error: "Relatório não encontrado." }, { status: 404 });
 
-  const desenhos = Array.isArray(rel.desenhos) ? rel.desenhos : [];
+  // ⚠ o desenho é resolvido AQUI na primeira vez, não na criação do relatório: a varredura das
+  // pastas custa dezenas de chamadas ao servidor e travava o botão de criar.
+  const desenhos = await garantirDesenhos(rel);
   // sem marca, vale o primeiro — o relatório de conjunto só tem um
   const d = marca ? desenhos.find((x) => String(x.marca).toUpperCase() === marca) : desenhos[0];
   if (!d?.caminho) return NextResponse.json({ error: "Este relatório não tem desenho vinculado." }, { status: 404 });
