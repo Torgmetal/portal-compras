@@ -10,7 +10,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { montarDimensional, procedimentoTolerancia } from "@/lib/relatorio-dimensional";
+import { montarDimensional, procedimentoTolerancia, baixarDesenho } from "@/lib/relatorio-dimensional";
+import { gerarDimensionalPDF } from "@/lib/relatorio-dimensional-pdf";
 import { criarRelatorio, vincularNoDataBook } from "@/lib/relatorio-inspecao";
 
 export const runtime = "nodejs";
@@ -40,6 +41,30 @@ export async function POST(req) {
   const tolerancia = await procedimentoTolerancia();
 
   if (!body?.salvar) {
+    // ⚠ PRÉVIA COMO DOCUMENTO. Vitor: "não consigo gerar a prévia o relatório para ver como vai
+    // ficar no data book". Uma tabela na tela não responde isso — o que ele precisa ver é a FOLHA,
+    // com o desenho no campo do croqui e os quadros de aprovação. Devolve o PDF de verdade, do
+    // relatório que ainda não existe.
+    if (body?.formato === "pdf") {
+      const op = await prisma.oP.findFirst({ where: { numero: opNumero }, select: { cliente: true, obra: true } });
+      const bytes = await gerarDimensionalPDF({
+        rel: {
+          codigo: `${escopo === "AVULSAS" ? "RID" : "RID"}-${opNumero.replace(/\D/g, "").padStart(3, "0")}-PRÉVIA`,
+          opNumero, tipo: "DIMENSIONAL", marcas, linhas, desenhos,
+          titulo: body?.titulo || null, inspetor: body?.inspetor || user.name || null,
+          observacoes: body?.observacoes || null,
+          resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia },
+          equipamentos: [],
+          emitidoEm: new Date(),
+        },
+        assinaturas: null,
+        desenhoBytes: (d) => baixarDesenho(d?.caminho),
+        cliente: op?.cliente || null, obra: op?.obra || null,
+      });
+      return new NextResponse(Buffer.from(bytes), {
+        headers: { "Content-Type": "application/pdf", "Content-Disposition": "inline; filename=\"previa.pdf\"", "Cache-Control": "no-store" },
+      });
+    }
     return NextResponse.json({ previa: true, escopo, marcas, linhas, desenhos, erros, tolerancia });
   }
 

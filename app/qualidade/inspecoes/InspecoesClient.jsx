@@ -277,28 +277,62 @@ function Montar({ grupo, onFechar, onPronto }) {
  * desenho era outro deixaria um buraco na série.
  */
 function NovoDimensional({ onFechar, onPronto }) {
-  const [opNumero, setOp] = useState("");
+  const [ops, setOps] = useState(null);
+  const [op, setOp] = useState(null);
   const [escopo, setEscopo] = useState("CONJUNTO");
-  const [marcasTxt, setMarcas] = useState("");
-  const [previa, setPrevia] = useState(null);
-  const [carregando, setCarregando] = useState(false);
-  const [salvando, setSalvando] = useState(false);
+  const [q, setQ] = useState("");
+  const [pecas, setPecas] = useState(null);
+  const [sel, setSel] = useState([]);
   const [titulo, setTitulo] = useState("");
   const [inspetor, setInspetor] = useState("");
+  const [previa, setPrevia] = useState(null); // { linhas, desenhos, erros, tolerancia }
+  const [pdfUrl, setPdfUrl] = useState("");
+  const [carregando, setCarregando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
 
-  const marcas = marcasTxt.split(/[\s,;]+/).map((m) => m.trim().toUpperCase()).filter(Boolean);
+  useEffect(() => {
+    fetch("/api/qualidade/inspecoes/ops").then((r) => r.json()).then((j) => setOps(j.ops || [])).catch(() => setOps([]));
+  }, []);
+
+  // lista as peças da OP — CONJUNTO mostra conjuntos, AVULSAS mostra todas
+  useEffect(() => {
+    if (!op) { setPecas(null); return; }
+    let vivo = true;
+    setPecas(null);
+    const t = setTimeout(() => {
+      fetch(`/api/campo/pecas?opId=${op.id}&q=${encodeURIComponent(q)}${escopo === "AVULSAS" ? "&todas=1" : ""}`)
+        .then((r) => r.json()).then((j) => { if (vivo) setPecas(j.pecas || []); }).catch(() => vivo && setPecas([]));
+    }, 250);
+    return () => { vivo = false; clearTimeout(t); };
+  }, [op, q, escopo]);
+
+  // trocar de escopo/OP invalida a seleção e a prévia
+  useEffect(() => { setSel([]); setPrevia(null); setPdfUrl(""); }, [op, escopo]);
+  useEffect(() => () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); }, [pdfUrl]);
+
+  const alternar = (m) => setSel((p) => {
+    if (p.includes(m)) return p.filter((x) => x !== m);
+    // conjunto é UM por relatório — trocar em vez de somar
+    return escopo === "CONJUNTO" ? [m] : [...p, m];
+  });
 
   async function montar() {
-    if (!opNumero.trim() || !marcas.length) { alert("Informe a OP e ao menos uma peça."); return; }
-    setCarregando(true); setPrevia(null);
+    if (!op || !sel.length) { alert("Escolha a OP e ao menos uma peça."); return; }
+    setCarregando(true); setPrevia(null); setPdfUrl("");
     try {
+      const corpo = { opNumero: op.numero, escopo, marcas: sel, titulo, inspetor };
       const r = await fetch("/api/qualidade/inspecoes/dimensional", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: opNumero.trim(), escopo, marcas }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
       setPrevia(j);
+
+      // e a FOLHA de verdade, que é o que ele quer conferir
+      const rp = await fetch("/api/qualidade/inspecoes/dimensional", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...corpo, formato: "pdf" }),
+      });
+      if (rp.ok) setPdfUrl(URL.createObjectURL(await rp.blob()));
     } catch (e) { alert(e.message); } finally { setCarregando(false); }
   }
 
@@ -307,7 +341,7 @@ function NovoDimensional({ onFechar, onPronto }) {
     try {
       const r = await fetch("/api/qualidade/inspecoes/dimensional", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: opNumero.trim(), escopo, marcas, salvar: true, titulo, inspetor, linhas: previa.linhas }),
+        body: JSON.stringify({ opNumero: op.numero, escopo, marcas: sel, salvar: true, titulo, inspetor, linhas: previa.linhas }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
@@ -321,7 +355,7 @@ function NovoDimensional({ onFechar, onPronto }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onFechar}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[88vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-torg-dark">Novo relatório dimensional</p>
@@ -330,74 +364,106 @@ function NovoDimensional({ onFechar, onPronto }) {
           <button onClick={onFechar} className="text-torg-gray hover:text-torg-dark"><X size={18} /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
-          <div className="grid sm:grid-cols-3 gap-3">
+        <div className="flex-1 grid lg:grid-cols-[380px_1fr] min-h-0">
+          {/* ── escolhas ─────────────────────────────────────────────────────── */}
+          <div className="border-r border-gray-100 overflow-y-auto p-4 space-y-3">
             <label className="block">
               <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">OP</span>
-              <input value={opNumero} onChange={(e) => setOp(e.target.value)} placeholder="083"
-                className="w-full text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
-            </label>
-            <label className="block">
-              <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Escopo</span>
-              <select value={escopo} onChange={(e) => setEscopo(e.target.value)}
+              <select value={op?.id || ""} onChange={(e) => setOp((ops || []).find((o) => o.id === e.target.value) || null)}
                 className="w-full text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue">
-                <option value="CONJUNTO">Conjunto (um por relatório)</option>
-                <option value="AVULSAS">Peças avulsas (agrupadas)</option>
+                <option value="">{ops === null ? "carregando…" : "selecione a OP"}</option>
+                {(ops || []).map((o) => (
+                  <option key={o.id} value={o.id}>OP-{o.numero} — {o.cliente}{o.obra ? ` · ${o.obra}` : ""}</option>
+                ))}
               </select>
             </label>
+
+            <div>
+              <span className="block text-[10px] font-semibold text-torg-gray mb-1">Escopo</span>
+              <div className="grid grid-cols-2 gap-2">
+                {[["CONJUNTO", "Conjunto", "um por relatório"], ["AVULSAS", "Peças avulsas", "agrupadas"]].map(([v, t, sub]) => (
+                  <button key={v} onClick={() => setEscopo(v)}
+                    className={`text-left rounded-lg border px-2.5 py-1.5 ${escopo === v ? "border-torg-blue bg-torg-blue/5" : "border-gray-200"}`}>
+                    <span className="block text-[12px] font-semibold text-torg-dark">{t}</span>
+                    <span className="block text-[10px] text-torg-gray">{sub}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {op && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-semibold text-torg-gray">
+                    {escopo === "CONJUNTO" ? "Conjunto" : "Peças"} {sel.length ? `· ${sel.length} selecionada(s)` : ""}
+                  </span>
+                  {sel.length > 0 && <button onClick={() => setSel([])} className="text-[10px] text-torg-blue hover:underline">limpar</button>}
+                </div>
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="buscar marca…"
+                  autoCapitalize="characters" autoCorrect="off" spellCheck={false}
+                  className="w-full text-[12px] font-mono border border-gray-200 rounded-lg px-2 py-1.5 mb-1.5 focus:border-torg-blue outline-none" />
+                <div className="border border-gray-100 rounded-lg max-h-56 overflow-y-auto">
+                  {pecas === null && <p className="p-2 text-[12px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> buscando…</p>}
+                  {pecas?.map((p) => {
+                    const on = sel.includes(p.marca);
+                    return (
+                      <button key={p.marca} onClick={() => alternar(p.marca)}
+                        className={`w-full text-left px-2 py-1.5 border-b border-gray-50 flex items-center gap-2 ${on ? "bg-torg-blue/5" : "hover:bg-gray-50"}`}>
+                        <span className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center ${on ? "bg-torg-blue border-torg-blue" : "border-gray-300"}`}>
+                          {on && <Check size={11} className="text-white" />}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-[12px] font-semibold text-torg-dark">{p.marca}</span>
+                          <span className="block text-[10px] text-torg-gray truncate">{[p.descricao, p.perfil].filter(Boolean).join(" · ") || "—"}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {pecas && !pecas.length && <p className="p-2 text-[12px] text-torg-gray">Nada encontrado.</p>}
+                </div>
+              </div>
+            )}
+
             <label className="block">
               <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Inspetor</span>
               <input value={inspetor} onChange={(e) => setInspetor(e.target.value)}
                 className="w-full text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
             </label>
-          </div>
-          <label className="block">
-            <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">
-              {escopo === "CONJUNTO" ? "Marca do conjunto" : "Marcas das peças (separadas por espaço ou vírgula)"}
-            </span>
-            <input value={marcasTxt} onChange={(e) => setMarcas(e.target.value)}
-              placeholder={escopo === "CONJUNTO" ? "T83A13" : "T84A-P4, T84A-P5, T84A-P6"}
-              className="w-full text-[13px] font-mono border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
-          </label>
-          <label className="block">
-            <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Título (opcional)</span>
-            <input value={titulo} onChange={(e) => setTitulo(e.target.value)}
-              className="w-full text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
-          </label>
+            <label className="block">
+              <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Título (opcional)</span>
+              <input value={titulo} onChange={(e) => setTitulo(e.target.value)}
+                className="w-full text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
+            </label>
 
-          <button onClick={montar} disabled={carregando}
-            className="text-[12px] font-semibold text-torg-blue border border-torg-blue-200 hover:bg-torg-blue-50 rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-50">
-            {carregando ? <Loader2 size={13} className="animate-spin" /> : <Ruler size={13} />} Buscar no desenho
-          </button>
+            <button onClick={montar} disabled={carregando || !sel.length}
+              className="w-full text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-2 inline-flex items-center justify-center gap-1.5 disabled:opacity-40">
+              {carregando ? <Loader2 size={13} className="animate-spin" /> : <Ruler size={13} />} Gerar prévia
+            </button>
 
-          {previa && (
-            <div className="border border-gray-100 rounded-xl p-3">
-              {previa.erros?.length > 0 && (
-                <div className="mb-2 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1.5">
-                  {previa.erros.map((e, i) => <p key={i} className="text-[11px] text-amber-800">{e}</p>)}
-                </div>
-              )}
-              <p className="text-[11px] text-torg-gray mb-1">
+            {previa?.erros?.length > 0 && (
+              <div className="rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1.5">
+                {previa.erros.map((e, i) => <p key={i} className="text-[11px] text-amber-800">{e}</p>)}
+              </div>
+            )}
+            {previa && (
+              <p className="text-[11px] text-torg-gray">
                 {previa.linhas.length} linha(s) · {previa.desenhos.length} desenho(s) · tolerâncias conforme {previa.tolerancia}
               </p>
-              <table className="w-full text-[12px]">
-                <thead><tr className="text-[10px] text-torg-gray text-left">
-                  <th className="pb-1">Peça</th><th className="pb-1">Descrição</th>
-                  <th className="pb-1 text-right">Projeto (mm)</th><th className="pb-1 text-right">Encontrado</th>
-                </tr></thead>
-                <tbody>
-                  {previa.linhas.map((l, i) => (
-                    <tr key={i} className="border-t border-gray-50">
-                      <td className="py-1 font-medium text-torg-dark">{l.marca}</td>
-                      <td className="py-1 text-torg-gray">{l.descricao || "—"}</td>
-                      <td className="py-1 text-right font-mono">{l.projetoMm ?? "—"}</td>
-                      <td className="py-1 text-right text-torg-gray italic">a preencher</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+            )}
+          </div>
+
+          {/* ── a folha ──────────────────────────────────────────────────────── */}
+          <div className="min-h-0 flex flex-col bg-gray-50">
+            {pdfUrl ? (
+              <iframe src={pdfUrl} title="Prévia do relatório" className="flex-1 w-full" style={{ border: "none" }} />
+            ) : (
+              <div className="flex-1 flex items-center justify-center p-6 text-center">
+                <p className="text-[13px] text-torg-gray max-w-xs">
+                  {carregando ? "montando a folha…" : "Escolha a OP e a peça e toque em “Gerar prévia” — a folha aparece aqui, igual à que vai para o data book."}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2">

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarRelatorioInspecaoPDF } from "@/lib/relatorio-inspecao-pdf";
 import { baixarDesenho } from "@/lib/relatorio-dimensional";
+import { gerarDimensionalPDF } from "@/lib/relatorio-dimensional-pdf";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -30,7 +31,19 @@ export async function GET(req, { params }) {
       })
     : null;
 
-  const bytes = await gerarRelatorioInspecaoPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho) });
+  // ⚠ o DIMENSIONAL tem formulário próprio. Vitor: "quando gerar o relatório ele precisa ficar com
+  // a cara de relatório do excel" — os outros tipos seguem o layout de evidências fotográficas.
+  let bytes;
+  if (rel.tipo === "DIMENSIONAL") {
+    const op = await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { cliente: true, obra: true } });
+    bytes = await gerarDimensionalPDF({
+      rel, assinaturas,
+      desenhoBytes: (d) => baixarDesenho(d?.caminho),
+      cliente: op?.cliente || null, obra: op?.obra || null,
+    });
+  } else {
+    bytes = await gerarRelatorioInspecaoPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho) });
+  }
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       "Content-Type": "application/pdf",

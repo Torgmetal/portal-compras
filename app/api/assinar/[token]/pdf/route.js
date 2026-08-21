@@ -6,6 +6,7 @@ import { gerarPlanoTreinamentoPDF } from "@/lib/plano-treinamento-pdf";
 import { gerarCronogramaAuditoriaPDF } from "@/lib/cronograma-auditoria-pdf";
 import { gerarRelatorioInspecaoPDF } from "@/lib/relatorio-inspecao-pdf";
 import { baixarDesenho } from "@/lib/relatorio-dimensional";
+import { gerarDimensionalPDF } from "@/lib/relatorio-dimensional-pdf";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -41,7 +42,12 @@ export async function GET(_req, { params }) {
       orderBy: { capturadaEm: "asc" },
       select: { url: true, marca: true, origemMarca: true, observacao: true, capturadaEm: true, autorNome: true },
     });
-    bytes = await gerarRelatorioInspecaoPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho) });
+    if (rel.tipo === "DIMENSIONAL") {
+      const op = await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { cliente: true, obra: true } });
+      bytes = await gerarDimensionalPDF({ rel, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho), cliente: op?.cliente || null, obra: op?.obra || null });
+    } else {
+      bytes = await gerarRelatorioInspecaoPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho) });
+    }
   } else {
     return new NextResponse("Documento não suportado.", { status: 400 });
   }
