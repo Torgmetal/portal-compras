@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Loader2, AlertCircle, Trash2, Undo2 } from "lucide-react";
+import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X } from "lucide-react";
 
 /**
  * MARCAR AS COTAS NO DESENHO.
@@ -29,6 +29,7 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
   const [pendente, setPendente] = useState(null); // primeiro ponto já clicado
   const [hover, setHover] = useState(null);
   const [rascunho, setRascunho] = useState(null); // { ax, ay, bx, by } esperando nome/espec
+  const [amplo, setAmplo] = useState(false); // tela cheia — Vitor pediu mais área para marcar
   const cv = useRef(null);
   const box = useRef(null);
 
@@ -45,10 +46,13 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
   // escala e deslocamento para caber na largura disponível
   const layout = useCallback(() => {
     if (!dados || !box.current) return null;
-    const larg = box.current.clientWidth || 600;
-    const esc = larg / dados.largura;
-    return { esc, larg, alt: dados.altura * esc };
-  }, [dados]);
+    const dispL = box.current.clientWidth || 600;
+    // ⚠ em tela cheia a largura sozinha não serve: uma vista deitada estouraria a altura da janela
+    // e a peça sairia cortada embaixo, justamente onde ficam as cotas de nível.
+    const dispA = amplo ? Math.max(320, window.innerHeight - 230) : Infinity;
+    const esc = Math.min(dispL / dados.largura, dispA / dados.altura);
+    return { esc, larg: dados.largura * esc, alt: dados.altura * esc };
+  }, [dados, amplo]);
 
   // vértices para o imã
   const vertices = useCallback(() => {
@@ -133,6 +137,16 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
     }
   }, [dados, cotas, pendente, hover, rascunho, layout]);
 
+  // ⚠ sem isto o canvas fica com o tamanho antigo ao abrir a tela cheia ou girar o aparelho, e o
+  // clique passa a cair alguns pixels fora do traço.
+  const [, redesenhar] = useState(0);
+  useEffect(() => {
+    const f = () => redesenhar((v) => v + 1);
+    window.addEventListener("resize", f);
+    const t = setTimeout(f, 30); // a caixa só tem largura final depois de pintar
+    return () => { window.removeEventListener("resize", f); clearTimeout(t); };
+  }, [amplo]);
+
   function pontoDoEvento(e) {
     const L = layout(); if (!L) return null;
     const r = cv.current.getBoundingClientRect();
@@ -145,6 +159,56 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
       if (d < dist) { dist = d; melhor = v; }
     }
     return melhor || [dx, dy];
+  }
+
+  /**
+   * O VALOR DE PROJETO, SUGERIDO DO PRÓPRIO DESENHO.
+   *
+   * Vitor (21/08/2026), com a cota já traçada e o campo vazio: "nessa parte você não consegue já
+   * preencher isso?".
+   *
+   * Consegue — e só agora. O que me travava era escolher QUAL cota vale entre as dezenas da folha;
+   * ao traçar a linha, ele já respondeu isso. Sobra ler o número, e o desenho o declara.
+   *
+   * Três leituras, da mais firme para a mais frouxa:
+   *
+   *   1. NÍVEL NAS DUAS PONTAS. Cota de elevação traz o valor em cada extremidade (0 embaixo, 4332
+   *      em cima); a medida é a diferença. É a leitura mais confiável porque as duas pontas foram
+   *      escolhidas por quem traçou.
+   *   2. NÚMERO NO MEIO. Cota comum escreve o valor sobre a própria linha.
+   *   3. ESCALA DE UMA COTA ANTERIOR. Confirmada a primeira, a escala daquela vista está conhecida
+   *      e as seguintes saem por regra de três.
+   *
+   * ⚠ É SUGESTÃO, e a tela diz isso. Eu já errei feio tentando adivinhar cota sozinho; aqui o
+   * número entra preenchido para poupar digitação, não para ser aceito sem olhar.
+   */
+  function sugerir(r) {
+    const nums = (dados.textos || [])
+      .map((t) => ({ ...t, n: /^\d{1,5}$/.test(String(t.s).trim()) ? parseInt(t.s, 10) : null }))
+      .filter((t) => t.n != null);
+    const comp = Math.hypot(r.bx - r.ax, r.by - r.ay);
+    if (comp < 2) return null;
+
+    const perto = (px, py, raio = 34) => nums
+      .map((t) => ({ t, d: Math.hypot(t.x - px, t.y - py) }))
+      .filter((o) => o.d < raio)
+      .sort((a, b) => a.d - b.d)[0]?.t || null;
+
+    // 1) nível nas duas pontas
+    const a = perto(r.ax, r.ay), b = perto(r.bx, r.by);
+    if (a && b && a.n !== b.n) return Math.abs(b.n - a.n);
+
+    // 2) número sobre o meio da linha
+    const m = perto((r.ax + r.bx) / 2, (r.ay + r.by) / 2, 26);
+    if (m) return m.n;
+
+    // 3) escala de uma cota já confirmada nesta vista
+    const ant = cotas.find((c) => c.projetoMm > 0 && c.ax != null);
+    if (ant) {
+      const esc = ant.projetoMm / Math.hypot(ant.bx - ant.ax, ant.by - ant.ay);
+      if (Number.isFinite(esc) && esc > 0) return Math.round(comp * esc);
+    }
+    return null;
   }
 
   function clique(e) {
@@ -182,21 +246,28 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
   if (erro) return <p className="text-[12px] text-red-600 inline-flex items-center gap-1.5"><AlertCircle size={14} /> {erro}</p>;
   if (!dados) return <p className="text-[12px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={14} className="animate-spin" /> lendo o desenho…</p>;
 
-  return (
-    <div>
-      <p className="text-[11px] text-torg-gray mb-1.5">
-        {pendente ? "Agora clique no segundo ponto da cota." : "Clique em dois pontos do desenho para criar uma cota. O clique gruda no traço."}
-        {pendente && <button onClick={() => setPendente(null)} className="ml-2 text-torg-blue inline-flex items-center gap-1"><Undo2 size={11} /> cancelar</button>}
-      </p>
-      <div ref={box} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+  const conteudo = (
+    <div className={amplo ? "fixed inset-0 z-50 bg-white p-4 overflow-auto" : ""}>
+      <div className="flex items-start justify-between gap-3 mb-1.5">
+        <p className="text-[11px] text-torg-gray">
+          {pendente ? "Agora clique no segundo ponto da cota." : "Clique em dois pontos do desenho para criar uma cota. O clique gruda no traço."}
+          {pendente && <button onClick={() => setPendente(null)} className="ml-2 text-torg-blue inline-flex items-center gap-1"><Undo2 size={11} /> cancelar</button>}
+        </p>
+        <button onClick={() => setAmplo((v) => !v)}
+          className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium shrink-0">
+          {amplo ? <><X size={13} /> Fechar</> : <><Maximize2 size={13} /> Ampliar</>}
+        </button>
+      </div>
+      <div ref={box} className="border border-gray-200 rounded-lg overflow-hidden bg-white inline-block max-w-full">
         <canvas ref={cv} onClick={clique} onMouseMove={(e) => setHover(pontoDoEvento(e))} onMouseLeave={() => setHover(null)}
           className="block cursor-crosshair" />
       </div>
 
-      {rascunho && <FormCota onConfirmar={confirmar} onCancelar={() => setRascunho(null)} letra={LETRAS[cotas.length] || "?"} />}
+      {rascunho && <FormCota onConfirmar={confirmar} onCancelar={() => setRascunho(null)}
+        letra={LETRAS[cotas.length] || "?"} sugestao={sugerir(rascunho)} />}
 
       {cotas.length > 0 && (
-        <ul className="mt-2 space-y-1">
+        <ul className="mt-2 space-y-1 max-w-2xl">
           {cotas.map((c, i) => (
             <li key={i} className="flex items-center gap-2 text-[12px]">
               <span className="w-5 h-5 rounded-full bg-torg-orange text-white font-bold text-[10px] inline-flex items-center justify-center shrink-0">{c.letra}</span>
@@ -210,17 +281,27 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
       )}
     </div>
   );
+
+  // em tela cheia o bloco sai do fluxo; deixa um aviso no lugar para a página não "pular"
+  return amplo ? (
+    <>
+      <p className="text-[12px] text-torg-gray py-4">Marcando cotas em tela cheia…</p>
+      {conteudo}
+    </>
+  ) : conteudo;
 }
 
-function FormCota({ onConfirmar, onCancelar, letra }) {
-  const [espec, setEspec] = useState("");
+function FormCota({ onConfirmar, onCancelar, letra, sugestao = null }) {
+  const [espec, setEspec] = useState(sugestao != null ? String(sugestao) : "");
   const [tol, setTol] = useState("3");
   return (
     <div className="mt-2 p-2.5 bg-torg-blue-50 border border-torg-blue-200 rounded-lg flex items-end gap-2 flex-wrap">
       <span className="w-6 h-6 rounded-full bg-torg-blue text-white font-bold text-[11px] inline-flex items-center justify-center shrink-0">{letra}</span>
       <span className="text-[12px] font-semibold text-torg-dark self-center">Cota {letra}</span>
       <label className="w-28">
-        <span className="block text-[10px] text-torg-gray mb-0.5">Espec. (mm)</span>
+        <span className="block text-[10px] text-torg-gray mb-0.5">
+          Espec. (mm){sugestao != null && <span className="text-torg-orange font-medium"> · do desenho</span>}
+        </span>
         <input autoFocus type="number" value={espec} onChange={(e) => setEspec(e.target.value)}
           className="w-full border border-gray-200 rounded px-2 py-1 text-[12px] font-mono" />
       </label>
