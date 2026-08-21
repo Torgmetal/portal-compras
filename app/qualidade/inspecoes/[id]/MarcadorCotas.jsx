@@ -198,16 +198,21 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
     const a = perto(r.ax, r.ay), b = perto(r.bx, r.by);
     if (a && b && a.n !== b.n) return Math.abs(b.n - a.n);
 
-    // 2) número sobre o meio da linha
+    // 2) número escrito sobre o meio da linha — cota comum
     const m = perto((r.ax + r.bx) / 2, (r.ay + r.by) / 2, 26);
     if (m) return m.n;
 
-    // 3) escala de uma cota já confirmada nesta vista
-    const ant = cotas.find((c) => c.projetoMm > 0 && c.ax != null);
-    if (ant) {
-      const esc = ant.projetoMm / Math.hypot(ant.bx - ant.ax, ant.by - ant.ay);
-      if (Number.isFinite(esc) && esc > 0) return Math.round(comp * esc);
-    }
+    // 🚫 NÃO EXISTE REGRA 3. Tentei duas e as duas erram:
+    //
+    // · "maior número ao longo da linha" devolvia 16 numa cota de largura e 4132 numa de topo —
+    //   pega nível e cota vizinha junto;
+    // · "regra de três pela escala de uma cota já confirmada" parece sólida e não é: O EIXO DO
+    //   DESENHO PODE SER INTERROMPIDO. No T89A3 o trecho de cima é linear (5,46 e 5,48 mm/pt entre
+    //   os níveis 3431→4132→4332), mas a coluna inteira dá 15,2 mm/pt — a parte de baixo está
+    //   comprimida. Escala medida num trecho não vale no outro, e o erro seria enorme e silencioso.
+    //
+    // Sem leitura declarada, o campo fica VAZIO e a tela diz "não achei no desenho". Número errado
+    // que a pessoa aceita sem desconfiar é pior que campo em branco.
     return null;
   }
 
@@ -300,7 +305,10 @@ function FormCota({ onConfirmar, onCancelar, letra, sugestao = null }) {
       <span className="text-[12px] font-semibold text-torg-dark self-center">Cota {letra}</span>
       <label className="w-28">
         <span className="block text-[10px] text-torg-gray mb-0.5">
-          Espec. (mm){sugestao != null && <span className="text-torg-orange font-medium"> · do desenho</span>}
+          Espec. (mm)
+          {sugestao != null
+            ? <span className="text-torg-orange font-medium"> · do desenho</span>
+            : <span className="text-torg-gray"> · não achei no desenho</span>}
         </span>
         <input autoFocus type="number" value={espec} onChange={(e) => setEspec(e.target.value)}
           className="w-full border border-gray-200 rounded px-2 py-1 text-[12px] font-mono" />
