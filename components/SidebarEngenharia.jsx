@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FileText, GitCompareArrows, RotateCcw, Gauge, FolderKanban, ListChecks, ListOrdered } from "lucide-react";
+import { LayoutDashboard, FileText, GitCompareArrows, RotateCcw, Gauge, FolderKanban, ListChecks, ListOrdered, Mail } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -13,6 +13,8 @@ const ITENS = [
   { href: "/engenharia/listas", label: "Listas (LE / LPC)", icon: ListChecks },
   // Tarefas dos cronogramas em ordem de prazo — só as que o Planejamento enviou. (Vitor 19/08.)
   { href: "/engenharia/sequencia", label: "Sequência", icon: ListOrdered },
+  // Agente de e-mails (Fase 1 — validação da leitura das caixas da Engenharia).
+  { href: "/engenharia/emails", label: "E-mails (beta)", icon: Mail },
 ];
 const EM_BREVE = [
   { label: "Detalhamento por OP", icon: FileText, hint: "abre clicando numa OP da carteira" },

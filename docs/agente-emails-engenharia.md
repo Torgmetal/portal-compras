@@ -59,9 +59,12 @@ thread aberta sem nenhum outbound da engenharia (conta o tempo desde o recebido)
 
 ---
 
-## 3. 🔒 Fase 0 — o que Matheus/Vitor fazem como ADMIN (pré-requisito)
+## 3. ✅ Fase 0 — CONCLUÍDA (18/08/2026)
 
-Sem isso o portal não lê nada. Uma vez só.
+Feita como admin. Estado: `Mail.Read` concedido no app `Torg Portal SharePoint`
+(`1e76f3e9-2d81-4935-955e-da52fdbca442`); grupo `SG-Engenharia-GraphMail` criado com as 6 caixas;
+`ApplicationAccessPolicy` (RestrictAccess) aplicada. **Teste OK:** engenharia@ = *Concedido*,
+vitor@ = *Negado*. O app lê **só** as 6 caixas da Engenharia. Passos abaixo ficam de registro.
 
 **Caixas da Engenharia (6):** `engenharia@`, `engenharia1@`, `engenharia2@`, `engenharia3@`,
 `engenharia4@`, `engenharia5@` `torg.com.br`.

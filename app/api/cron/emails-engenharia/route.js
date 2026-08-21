@@ -1,0 +1,29 @@
+// Cron Vercel — sincroniza as caixas da Engenharia (MS Graph Mail) via delta query.
+// Fase 1: ingestão crua (grava ObraEmailEvento). Config em vercel.json.
+import { NextResponse } from "next/server";
+import { temCronSecret } from "@/lib/cron-auth";
+import { prisma } from "@/lib/prisma";
+import { sincronizarEmailsEngenharia } from "@/lib/ingest-emails-engenharia";
+import { registrarExecucao } from "@/lib/cron-monitor";
+import { aquecerBanco } from "@/lib/db-retry";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+export async function GET(req) {
+  const isCron = temCronSecret(req);
+  if (!isCron && process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const t0 = Date.now();
+  try {
+    await aquecerBanco(prisma);
+    const r = await sincronizarEmailsEngenharia();
+    await registrarExecucao("emails-engenharia", { ok: true, duracaoMs: Date.now() - t0 });
+    return NextResponse.json({ ok: true, ...r });
+  } catch (e) {
+    console.error("[cron emails-engenharia] erro:", e?.message);
+    await registrarExecucao("emails-engenharia", { ok: false, mensagem: e?.message, duracaoMs: Date.now() - t0 });
+    return NextResponse.json({ ok: false, error: e?.message }, { status: 500 });
+  }
+}

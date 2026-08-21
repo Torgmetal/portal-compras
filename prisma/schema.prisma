@@ -4377,3 +4377,58 @@ model RelatorioInspecao {
   @@index([opNumero])
   @@index([status])
 }
+
+// ─── Agente de E-mails da Engenharia (MS Graph Mail) ──────────────────────────
+// Lê as caixas da Engenharia (só as 6, travadas por ApplicationAccessPolicy) pra
+// saber o start do projeto (IFC etc.), tempo de resposta e quem respondeu.
+// Doc: docs/agente-emails-engenharia.md. Fase 1 = ingestão crua (sem casar com OP).
+model ObraEmailEvento {
+  id                String    @id @default(cuid())
+  opId              String? // vínculo com a OP (null enquanto não casou) — Fase 2
+  caixa             String // mailbox de origem (qual das 6 caixas da engenharia)
+  pasta             String // inbox | sentItems
+  conversationId    String? // thread do Graph (amarra 1º e-mail ↔ resposta)
+  internetMessageId String    @unique // dedupe idempotente
+  graphId           String? // id da mensagem no Graph (referência)
+  direcao           String // ENTRADA | SAIDA
+  de                String?
+  deNome            String?
+  para              Json      @default("[]") // [endereços]
+  cc                Json      @default("[]")
+  assunto           String?
+  snippet           String? // bodyPreview (sem corpo inteiro)
+  recebidoEm        DateTime?
+  enviadoEm         DateTime?
+  temAnexo          Boolean   @default(false)
+  temAnexoIfc       Boolean   @default(false)
+  anexos            Json      @default("[]") // [{ nome, tipo, tamanho }] — metadados só
+  tipoGatilho       String? // IFC_RECEBIDO | LIBERACAO_PROJETO | LEVANTAMENTO | OUTRO (Fase 2)
+  primeiroContato   Boolean   @default(false) // 1º inbound do cliente na thread (Fase 2)
+  matchConfianca    Float? // 0..1 (Fase 2)
+  matchMetodo       String? // REGRA_OP | CODIGO_OBRA | DOMINIO | NOME_OBRA | IA | MANUAL (Fase 2)
+  respondidoEm      DateTime? // 1ª resposta da eng na thread (SLA — Fase 2)
+  respondidoPor     String?
+  criadoEm          DateTime  @default(now())
+
+  @@index([opId])
+  @@index([conversationId])
+  @@index([caixa])
+  @@index([direcao])
+  @@index([recebidoEm])
+}
+
+// Controle de delta por caixa/pasta (bookkeeping não-fatal). Guarda o deltaLink do
+// Graph pra a próxima sync pegar só o que mudou.
+model ObraEmailSync {
+  id           String    @id @default(cuid())
+  caixa        String
+  pasta        String // inbox | sentItems
+  deltaLink    String?   @db.Text
+  ultimoEm     DateTime?
+  ultimoErro   String?
+  totalEventos Int       @default(0)
+  atualizadoEm DateTime  @updatedAt
+  criadoEm     DateTime  @default(now())
+
+  @@unique([caixa, pasta])
+}
