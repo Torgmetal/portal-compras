@@ -2,7 +2,7 @@ import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
 // Gates por módulo — cada rota só é acessível pelo módulo correspondente (ou ADMIN):
-//   /comercial  → COMERCIAL
+//   /comercial  → aberto a quem está logado (as sub-áreas em COMERCIAL_RESTRITO pedem COMERCIAL)
 //   /compras    → COMPRAS
 //   /financeiro → FINANCEIRO
 //   /expedicao  → EXPEDICAO
@@ -11,6 +11,51 @@ import { NextResponse } from "next/server";
 //   /admin      → apenas ADMIN
 // /fornecedores fica aberto (acesso por token único)
 // Redirect de domínios .vercel.app → workspace.torg.com.br via vercel.json (edge, mais rápido)
+// Sub-áreas do Comercial que continuam SÓ do Comercial. O resto de /comercial — a lista de OPs e
+// o detalhe da OP — é aberto a todo mundo logado, que é o que o seletor de módulos já anunciava
+// ("OPs · aberto a todos os setores"). O portão nunca foi atualizado junto, então o link aparecia
+// pra todos e derrubava quem clicasse. As ABAS é que limitam o que cada um vê lá dentro
+// (lib/op-abas.js).
+const COMERCIAL_RESTRITO = ["nova", "orcamentos", "aprovacoes", "kickoffs", "apresentacoes", "indicadores"];
+
+/**
+ * Falta módulo pra esta rota? Devolve o nome do que falta, ou null se pode passar.
+ */
+function moduloNegado(path, token) {
+  const isAdmin = token?.tipo === "ADMIN";
+  // ⚠ o /admin vem ANTES do atalho de ADMIN — é o único gate por TIPO, não por módulo, e
+  // esquecê-lo aqui abriria a administração pra qualquer pessoa logada.
+  if (path.startsWith("/admin") && !isAdmin) return "ADMIN";
+  if (isAdmin) return null;
+  const modulos = token?.modulos ?? [];
+  const tem = (...req) => req.some((m) => modulos.includes(m));
+  const nega = (...req) => (tem(...req) ? null : req[0]);
+
+  if (path.startsWith("/comercial")) {
+    const sub = path.split("/")[2] || "";
+    if (COMERCIAL_RESTRITO.includes(sub)) return nega("COMERCIAL");
+    return null; // lista de OPs e detalhe da OP
+  }
+  if (path.startsWith("/engenharia")) return nega("ENGENHARIA");
+  if (path.startsWith("/compras")) return nega("COMPRAS");
+  if (path.startsWith("/indicadores")) return nega("COMPRAS", "COMERCIAL", "RH");
+  if (path.startsWith("/financeiro")) return nega("FINANCEIRO");
+  if (path.startsWith("/expedicao")) return nega("EXPEDICAO");
+  // Consulta de estoque: além da Produção, a Engenharia também acessa (responde às consultas).
+  if (path.startsWith("/producao/consulta-estoque")) return nega("PRODUCAO", "ENGENHARIA");
+  if (path.startsWith("/producao")) return nega("PRODUCAO");
+  if (path.startsWith("/rh")) return nega("RH");
+  // Board de tarefas do Planejamento é compartilhado: QUALQUER setor logado vê e responde as
+  // tarefas do seu setor (a lista filtra por setor).
+  if (path.startsWith("/planejamento/tarefas")) return null;
+  if (path.startsWith("/planejamento")) return nega("PLANEJAMENTO", "PRODUCAO");
+  if (path.startsWith("/pcp")) return nega("PCP", "PLANEJAMENTO", "PRODUCAO");
+  if (path.startsWith("/qualidade")) return nega("QUALIDADE");
+  if (path.startsWith("/relatorios")) return nega("COMERCIAL", "PRODUCAO", "ENGENHARIA", "PCP", "QUALIDADE");
+  // /rm aberto para todos os modulos (historico visivel para todos)
+  return null;
+}
+
 export default withAuth(
   function middleware(req) {
     const token = req.nextauth?.token;
@@ -35,6 +80,23 @@ export default withAuth(
         return NextResponse.redirect(new URL("/campo/entrar", req.url));
       }
     }
+    // Funcionário (autoatendimento) não acessa o portal interno — vai pro portal dele, não pro
+    // login (ele ESTÁ logado; mandar pro /entrar é o mesmo engano de sempre).
+    if (token?.tipo === "FUNCIONARIO" && !path.startsWith("/meu-rh") && !path.startsWith("/api/meu-rh")) {
+      if (path.startsWith("/api/")) return NextResponse.json({ error: "Sem acesso" }, { status: 403 });
+      return NextResponse.redirect(new URL("/meu-rh", req.url));
+    }
+
+    // Falta de módulo: 403 na API, página explicativa no navegador. NUNCA o login.
+    const falta = token ? moduloNegado(path, token) : null;
+    if (falta) {
+      if (path.startsWith("/api/")) return NextResponse.json({ error: "Sem acesso a este módulo" }, { status: 403 });
+      const url = new URL("/sem-acesso", req.url);
+      url.searchParams.set("de", path);
+      url.searchParams.set("modulo", falta);
+      return NextResponse.redirect(url);
+    }
+
     // Retorno explícito necessário para que o Vercel sirva corretamente
     // tanto páginas dinâmicas (ƒ) quanto estáticas (○) após autorização.
     return NextResponse.next();
@@ -52,6 +114,7 @@ export default withAuth(
           path === "/entrar" ||
           path.startsWith("/colaborador") ||
           path === "/campo/entrar" ||
+          path === "/sem-acesso" ||
           path === "/trocar-senha" ||
           path === "/api/trocar-senha" ||
           path === "/esqueci-senha" ||
@@ -131,46 +194,13 @@ export default withAuth(
         // e em cada rota da API (PERFIS_CAMPO).
         if (path.startsWith("/campo") || path.startsWith("/api/campo")) return true;
 
-        // Demais rotas: precisa estar logado
-        if (!token) return false;
-
-        // Funcionário (autoatendimento) não acessa o portal interno.
-        if (token.tipo === "FUNCIONARIO") return false;
-
-        // Gates por tipo/módulo
-        const isAdmin = token.tipo === "ADMIN";
-        const modulos = token.modulos ?? [];
-
-        // Helper: bloqueia se não for admin e não tiver nenhum dos módulos exigidos
-        const temModulo = (...requeridos) =>
-          isAdmin || requeridos.some(m => modulos.includes(m));
-
-        if (path.startsWith("/comercial")  && !temModulo("COMERCIAL"))  return false;
-        if (path.startsWith("/engenharia") && !temModulo("ENGENHARIA")) return false;
-        if (path.startsWith("/compras")    && !temModulo("COMPRAS"))     return false;
-        if (path.startsWith("/indicadores") && !temModulo("COMPRAS", "COMERCIAL", "RH"))    return false;
-        if (path.startsWith("/financeiro") && !temModulo("FINANCEIRO"))  return false;
-        if (path.startsWith("/expedicao")  && !temModulo("EXPEDICAO"))   return false;
-        // Consulta de estoque: além da Produção, a Engenharia também acessa
-        // (responde às consultas e vê o estoque de matéria-prima).
-        if (path.startsWith("/producao/consulta-estoque"))
-          return temModulo("PRODUCAO", "ENGENHARIA");
-        if (path.startsWith("/producao")   && !temModulo("PRODUCAO"))    return false;
-        // /rm aberto para todos os modulos (historico visivel para todos)
-        if (path.startsWith("/rm")         && !token)  return false;
-        if (path.startsWith("/rh")         && !temModulo("RH"))            return false;
-        // Board de tarefas do Planejamento é compartilhado: QUALQUER setor logado
-        // vê e responde as tarefas do seu setor (a lista filtra por setor). Sem
-        // isto, quem não tem PLANEJAMENTO/PRODUCAO era rebatido pro /entrar e não
-        // conseguia responder às tarefas distribuídas.
-        if (path.startsWith("/planejamento/tarefas")) return true;
-        if (path.startsWith("/planejamento") && !temModulo("PLANEJAMENTO", "PRODUCAO")) return false;
-        if (path.startsWith("/pcp")        && !temModulo("PCP", "PLANEJAMENTO", "PRODUCAO")) return false;
-        if (path.startsWith("/qualidade")  && !temModulo("QUALIDADE"))   return false;
-        if (path.startsWith("/relatorios") && !temModulo("COMERCIAL", "PRODUCAO", "ENGENHARIA", "PCP", "QUALIDADE")) return false;
-        if (path.startsWith("/admin")      && !isAdmin)                  return false;
-
-        return true;
+        // Demais rotas: precisa estar LOGADO. Só isso.
+        //
+        // ⚠ Falta de MÓDULO não se responde aqui. Devolver false manda a pessoa pro /entrar, e
+        // quem está logado lê isso como "o sistema me deslogou" — foi exatamente a queixa da
+        // Pamela e da Eduarda (21/08/2026). Quem confere módulo é `moduloNegado`, dentro do
+        // middleware, que manda pro /sem-acesso dizendo o que falta.
+        return !!token;
       },
     },
     pages: {
