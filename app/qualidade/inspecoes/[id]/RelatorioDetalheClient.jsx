@@ -23,11 +23,8 @@ export default function RelatorioDetalheClient({ id }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
-  const [versao, setVersao] = useState(0); // força o iframe a recarregar depois de salvar
   // Vitor (21/08/2026): "na tela do gerador do projeto consegue trazer essa imagem do projeto para
   // ele conseguir conferir?" — o painel da direita abre NO DESENHO, que é o que ele olha enquanto
-  // digita a dimensão encontrada. A prévia do documento fica na outra aba.
-  const [aba, setAba] = useState("desenho");
   const [marcaVista, setMarcaVista] = useState(null);
 
   const carregar = useCallback(async () => {
@@ -81,7 +78,6 @@ export default function RelatorioDetalheClient({ id }) {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
-      setVersao((v) => v + 1); // a prévia recarrega com o que acabou de ser salvo
     } catch (e) { alert(e.message); } finally { setSalvando(false); }
   }
 
@@ -124,9 +120,20 @@ export default function RelatorioDetalheClient({ id }) {
           de metade da página; aqui usa tudo, e ainda tem o "Ampliar" para a tela cheia. */}
       {rel.tipo === "DIMENSIONAL" && desenhos.length > 0 && !travado && (
         <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm mt-4">
-          <p className="text-[12px] font-bold text-torg-dark inline-flex items-center gap-1.5 mb-1.5">
-            <Ruler size={13} className="text-torg-blue" /> Cotas do desenho
-          </p>
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            <p className="text-[12px] font-bold text-torg-dark inline-flex items-center gap-1.5">
+              <Ruler size={13} className="text-torg-blue" /> Cotas do desenho
+            </p>
+            {desenhos.length > 1 ? (
+              // relatório de avulsas agrupadas tem um desenho por peça
+              <select value={marcaAtual} onChange={(e) => setMarcaVista(e.target.value)}
+                className="text-[11px] border border-gray-200 rounded-lg px-1.5 py-1 focus:border-torg-blue">
+                {desenhos.map((d) => <option key={d.marca} value={d.marca}>{d.marca}</option>)}
+              </select>
+            ) : (
+              <span className="text-[10px] text-torg-gray">{desenhos[0]?.nome}</span>
+            )}
+          </div>
           <MarcadorCotas
             relatorioId={id}
             marca={marcaAtual}
@@ -142,8 +149,11 @@ export default function RelatorioDetalheClient({ id }) {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-2 gap-5 mt-4">
-        {/* ── preenchimento ─────────────────────────────────────────────────────────── */}
+      {/* ── preenchimento ───────────────────────────────────────────────────────────────
+          Vitor (21/08/2026): "pode tirar essa parte, não vamos mais precisar, pode deixar mais
+          espaço para a seleção das cotas". O painel da direita (abas Desenho | Prévia) saiu: o
+          desenho agora é o próprio quadro de marcação, e o PDF abre pelo botão do cabeçalho. */}
+      <div className="mt-4">
         <div className="space-y-3">
           <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm grid sm:grid-cols-2 gap-3">
             <Campo label="Título" v={rel.titulo || ""} onChange={(v) => setCampo("titulo", v)} disabled={travado} />
@@ -245,41 +255,6 @@ export default function RelatorioDetalheClient({ id }) {
           )}
         </div>
 
-        {/* ── painel da direita: DESENHO (para conferir) ou PRÉVIA (o documento) ───── */}
-        <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden flex flex-col lg:sticky lg:top-4 lg:self-start">
-          <div className="px-3 py-2 border-b border-gray-100 flex items-center gap-2 flex-wrap">
-            <button onClick={() => setAba("desenho")} disabled={!desenhos.length}
-              className={`text-[12px] font-bold px-2 py-1 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-40 ${aba === "desenho" ? "bg-torg-blue text-white" : "text-torg-blue hover:bg-torg-blue-50"}`}>
-              <Ruler size={13} /> Desenho
-            </button>
-            <button onClick={() => setAba("previa")}
-              className={`text-[12px] font-bold px-2 py-1 rounded-lg inline-flex items-center gap-1.5 ${aba === "previa" ? "bg-torg-blue text-white" : "text-torg-blue hover:bg-torg-blue-50"}`}>
-              <FileText size={13} /> Prévia
-            </button>
-            {aba === "desenho" && desenhos.length > 1 && (
-              // relatório de avulsas agrupadas tem um desenho por peça
-              <select value={marcaAtual} onChange={(e) => setMarcaVista(e.target.value)}
-                className="text-[11px] border border-gray-200 rounded-lg px-1.5 py-1 focus:border-torg-blue ml-auto">
-                {desenhos.map((d) => <option key={d.marca} value={d.marca}>{d.marca}</option>)}
-              </select>
-            )}
-            {aba === "previa" && <span className="text-[10px] text-torg-gray ml-auto">o mesmo PDF que vai para assinatura e para o data book</span>}
-            {aba === "desenho" && desenhos.length === 1 && <span className="text-[10px] text-torg-gray ml-auto">{desenhos[0].nome}</span>}
-          </div>
-
-          {aba === "desenho" ? (
-            desenhos.length ? (
-              <iframe key={marcaAtual} src={`/api/qualidade/inspecoes/${id}/desenho?marca=${encodeURIComponent(marcaAtual)}`}
-                title={`Desenho ${marcaAtual}`} className="w-full" style={{ height: "78vh", border: "none" }} />
-            ) : (
-              <p className="p-4 text-[13px] text-torg-gray">Este relatório não tem desenho vinculado.</p>
-            )
-          ) : (
-            // `versao` no src força o navegador a rebuscar depois de salvar, em vez de servir o cache
-            <iframe key={versao} src={`/api/qualidade/inspecoes/${id}/pdf?v=${versao}`} title="Prévia do relatório"
-              className="w-full" style={{ height: "78vh", border: "none" }} />
-          )}
-        </div>
       </div>
     </div>
   );
