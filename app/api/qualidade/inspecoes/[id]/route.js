@@ -101,3 +101,67 @@ export async function PATCH(req, { params }) {
 
   return NextResponse.json({ ok: true, relatorio: atualizado });
 }
+
+/**
+ * DELETE — apaga um relatório de inspeção.
+ *
+ * Vitor (21/08/2026): "preciso de permissão para poder apagar esses relatórios".
+ *
+ * ⚠ APAGAR TEM DE LIMPAR O DATA BOOK JUNTO. O relatório cria um DocumentoQualidade e o amarra na
+ * seção; deixar isso para trás encheria o data book de anexo apontando para relatório inexistente —
+ * e o data book é documento que vai ao cliente.
+ *
+ * ⚠ Já ENVIADO PARA ASSINATURA não se apaga. Ali existem convites por e-mail e possivelmente
+ * assinaturas de terceiros; sumir com o documento por baixo de quem assinou é o tipo de coisa que
+ * não se desfaz. Só ADMIN passa, e ainda assim o registro fica no log.
+ *
+ * ⚠ As FOTOS não são apagadas: voltam a ser fotos soltas, na tela de inspeções, e podem virar outro
+ * relatório. Quem tira foto na fábrica não deveria perder o trabalho por causa de um relatório
+ * montado errado.
+ */
+export async function DELETE(_req, { params }) {
+  let user;
+  try { user = await requireRole(PERFIS); }
+  catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  const rel = await prisma.relatorioInspecao.findUnique({
+    where: { id: params.id },
+    select: { id: true, codigo: true, opNumero: true, tipo: true, documentoId: true, envioAssinaturaId: true },
+  });
+  if (!rel) return NextResponse.json({ error: "Relatório não encontrado." }, { status: 404 });
+
+  const ehAdmin = user.tipo === "ADMIN" || user.role === "ADMIN";
+  if (rel.envioAssinaturaId && !ehAdmin) {
+    return NextResponse.json(
+      { error: "Este relatório já foi enviado para assinatura. Só um administrador pode apagá-lo." },
+      { status: 409 },
+    );
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      // 1) solta as fotos — elas voltam para a fila de fotos soltas
+      await tx.fotoInspecao.updateMany({ where: { relatorioId: rel.id }, data: { relatorioId: null } });
+
+      // 2) tira o anexo do data book e apaga o documento que este relatório criou
+      if (rel.documentoId) {
+        await tx.dataBookSecaoDoc.deleteMany({ where: { documentoId: rel.documentoId } });
+        await tx.documentoQualidade.deleteMany({ where: { id: rel.documentoId, origem: "inspecao_campo" } });
+      }
+
+      // 3) e o próprio relatório
+      await tx.relatorioInspecao.delete({ where: { id: rel.id } });
+    });
+  } catch (e) {
+    return NextResponse.json({ error: `Não consegui apagar: ${e.message}` }, { status: 500 });
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      userId: user.id, action: "EXCLUIR_RELATORIO_INSPECAO", entity: "RelatorioInspecao", entityId: rel.id,
+      diff: { codigo: rel.codigo, opNumero: rel.opNumero, tipo: rel.tipo, tinhaAssinatura: !!rel.envioAssinaturaId },
+    },
+  }).catch(() => {});
+
+  return NextResponse.json({ ok: true, codigo: rel.codigo });
+}
