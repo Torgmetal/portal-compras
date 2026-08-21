@@ -63,12 +63,15 @@ thread aberta sem nenhum outbound da engenharia (conta o tempo desde o recebido)
 
 Sem isso o portal não lê nada. Uma vez só.
 
+**Caixas da Engenharia (6):** `engenharia@`, `engenharia1@`, `engenharia2@`, `engenharia3@`,
+`engenharia4@`, `engenharia5@` `torg.com.br`.
+
 **(a) Definir as caixas da Engenharia** (grupo de segurança com correio):
 ```powershell
 # Exchange Online PowerShell (Connect-ExchangeOnline)
 New-DistributionGroup -Name "SG-Engenharia-GraphMail" -Type Security `
   -PrimarySmtpAddress sg-engenharia-graphmail@torg.com.br `
-  -Members engenharia@torg.com.br   # + as outras caixas da engenharia
+  -Members engenharia@torg.com.br,engenharia1@torg.com.br,engenharia2@torg.com.br,engenharia3@torg.com.br,engenharia4@torg.com.br,engenharia5@torg.com.br
 ```
 
 **(b) Azure Portal → App registrations → (o app do portal) → API permissions:**
@@ -195,7 +198,7 @@ Card por obra:
 
 ## 10. Decisões pendentes / próximos passos
 
-1. ⏳ **Lista exata das caixas** com `engenharia` no endereço (pra montar o grupo da seção 3a).
+1. ✅ **Caixas definidas:** `engenharia@`, `engenharia1@`…`engenharia5@` `torg.com.br` (6 caixas).
 2. ⏳ Avaliar **`Mail.ReadBasic`** (mais restrito) vs `Mail.Read` — como só guardamos snippet,
    ReadBasic pode bastar e é mais seguro.
 3. 🔜 Depois da Fase 0 no ar, começo a **Fase 1** (ingestão + tela de validação).
