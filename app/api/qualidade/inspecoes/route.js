@@ -98,3 +98,57 @@ export async function POST(req) {
     return NextResponse.json({ error: e.message }, { status: e.status || 500 });
   }
 }
+
+/**
+ * DELETE — apaga registros do celular que ainda não viraram relatório.
+ *
+ * Vitor (21/08/2026): "precisa ter a opção para excluir esses que foram emitidos na página da
+ * qualidade". Foto de teste, foto tremida, foto na OP errada — sem isso ficam empilhando na fila e
+ * a tela deixa de mostrar o que é trabalho de verdade.
+ *
+ * Aceita `{ ids: [...] }` (uma ou várias) ou `{ opNumero, tipo }` (o grupo inteiro).
+ *
+ * 🚫 FOTO QUE JÁ ESTÁ NUM RELATÓRIO NÃO SE APAGA POR AQUI. Ela virou evidência de um documento
+ * numerado — some da folha e o relatório passa a mostrar uma inspeção que não bate com o que foi
+ * assinado. Para tirar dali, é o relatório que tem de mudar.
+ */
+export async function DELETE(req) {
+  let user;
+  try { user = await requireRole(PERFIS); }
+  catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  const body = await req.json().catch(() => ({}));
+  const ids = Array.isArray(body?.ids) ? body.ids.filter(Boolean) : [];
+  const opNumero = String(body?.opNumero || "").trim();
+  const tipo = String(body?.tipo || "").trim();
+  if (!ids.length && !(opNumero && tipo)) {
+    return NextResponse.json({ error: "Informe as fotos ou o grupo (OP + tipo)." }, { status: 400 });
+  }
+
+  const alvo = await prisma.fotoInspecao.findMany({
+    where: {
+      relatorioId: null, // ⚠ a trava: só o que ainda não é documento
+      ...(ids.length ? { id: { in: ids } } : { opNumero, tipo }),
+    },
+    select: { id: true, url: true },
+  });
+  if (!alvo.length) return NextResponse.json({ error: "Nada para apagar (as fotos podem já estar num relatório)." }, { status: 409 });
+
+  await prisma.fotoInspecao.deleteMany({ where: { id: { in: alvo.map((f) => f.id) } } });
+
+  // o arquivo no Blob também sai — linha apagada com arquivo órfão é conta crescendo à toa
+  try {
+    const { del } = await import("@vercel/blob");
+    await del(alvo.map((f) => f.url));
+  } catch { /* o registro já saiu; o arquivo órfão não quebra nada */ }
+
+  await prisma.auditLog.create({
+    data: {
+      userId: user.id, action: "EXCLUIR_FOTO_INSPECAO", entity: "FotoInspecao",
+      entityId: ids.length ? ids.join(",").slice(0, 200) : `${opNumero}|${tipo}`,
+      diff: { apagadas: alvo.length, opNumero: opNumero || null, tipo: tipo || null },
+    },
+  }).catch(() => {});
+
+  return NextResponse.json({ ok: true, apagadas: alvo.length });
+}

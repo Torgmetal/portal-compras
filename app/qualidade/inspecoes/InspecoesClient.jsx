@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Loader2, ArrowLeft, Camera, FileText, Check, Send, AlertCircle,
-  ChevronRight, ExternalLink, Plus, X, ShieldCheck, Ruler,
+  ChevronRight, ExternalLink, Plus, X, ShieldCheck, Ruler, Trash2,
 } from "lucide-react";
 import { TIPO_LABEL, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
 
@@ -51,6 +51,32 @@ export default function InspecoesClient() {
   }
   const lista = [...grupos.values()].sort((a, b) => a.opNumero.localeCompare(b.opNumero));
 
+  async function excluirGrupo(g) {
+    if (!confirm(`Excluir ${g.fotos.length} registro(s) de OP-${g.opNumero} · ${TIPO_LABEL[g.tipo] || g.tipo}?\n\nAs fotos saem do portal. Isso não afeta relatórios já montados.`)) return;
+    try {
+      const r = await fetch("/api/qualidade/inspecoes", {
+        method: "DELETE", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opNumero: g.opNumero, tipo: g.tipo }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro");
+      carregar();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function excluirFoto(f) {
+    if (!confirm("Excluir esta foto?")) return;
+    try {
+      const r = await fetch("/api/qualidade/inspecoes", {
+        method: "DELETE", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [f.id] }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro");
+      carregar();
+    } catch (e) { alert(e.message); }
+  }
+
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto">
       <Link href="/qualidade" className="text-[12px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 mb-3"><ArrowLeft size={13} /> Qualidade</Link>
@@ -84,16 +110,30 @@ export default function InspecoesClient() {
                   {g.fotos.length} foto(s) · {[...new Set(g.fotos.map((f) => f.marca).filter(Boolean))].length} peça(s) · último em {fmtDT(g.fotos[0]?.capturadaEm)}
                 </p>
               </div>
-              <button onClick={() => setMontando(g)}
-                className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5">
-                <Plus size={13} /> Montar relatório
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button onClick={() => setMontando(g)}
+                  className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5">
+                  <Plus size={13} /> Montar relatório
+                </button>
+                {/* Vitor (21/08): "precisa ter a opção para excluir esses". Foto de teste ou na OP
+                    errada empilha na fila e esconde o trabalho de verdade. */}
+                <button onClick={() => excluirGrupo(g)} title="Excluir estes registros"
+                  className="text-[12px] text-torg-gray hover:text-red-600 border border-gray-200 hover:border-red-200 rounded-lg px-2 py-1.5 inline-flex items-center gap-1">
+                  <Trash2 size={13} />
+                </button>
+              </div>
             </div>
             <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
               {g.fotos.slice(0, 14).map((f) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={f.id} src={f.url} alt={f.marca || "foto"} title={`${f.marca || "sem peça"} · ${f.autorNome || ""}`}
-                  className="h-14 w-14 object-cover rounded shrink-0 border border-gray-100" />
+                <span key={f.id} className="relative shrink-0 group">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={f.url} alt={f.marca || "foto"} title={`${f.marca || "sem peça"} · ${f.autorNome || ""}`}
+                    className="h-14 w-14 object-cover rounded border border-gray-100" />
+                  <button onClick={() => excluirFoto(f)} title="Excluir esta foto"
+                    className="absolute top-0.5 right-0.5 bg-black/55 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 hover:bg-red-600">
+                    <X size={10} />
+                  </button>
+                </span>
               ))}
               {g.fotos.length > 14 && <span className="text-[11px] text-torg-gray self-center shrink-0">+{g.fotos.length - 14}</span>}
             </div>
