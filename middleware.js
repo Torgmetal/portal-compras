@@ -38,7 +38,9 @@ function moduloNegado(path, token) {
   }
   if (path.startsWith("/engenharia")) return nega("ENGENHARIA");
   if (path.startsWith("/compras")) return nega("COMPRAS");
-  if (path.startsWith("/indicadores")) return nega("COMPRAS", "COMERCIAL", "RH");
+  // Módulo Indicadores (visão gerencial consolidada) é só do ADMIN. Cada setor continua
+  // vendo os SEUS indicadores pela aba "Indicadores" dentro do próprio módulo.
+  if (path.startsWith("/indicadores")) return "ADMIN";
   if (path.startsWith("/financeiro")) return nega("FINANCEIRO");
   if (path.startsWith("/expedicao")) return nega("EXPEDICAO");
   // Consulta de estoque: além da Produção, a Engenharia também acessa (responde às consultas).
