@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { gerarPlanoTreinamentoPDF } from "@/lib/plano-treinamento-pdf";
 import { gerarCronogramaAuditoriaPDF } from "@/lib/cronograma-auditoria-pdf";
+import { gerarRelatorioInspecaoPDF } from "@/lib/relatorio-inspecao-pdf";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -27,6 +28,19 @@ export async function GET(_req, { params }) {
     bytes = await gerarPlanoTreinamentoPDF({ ano: snap.ano, revisao: snap.revisao, treinamentos: snap.treinamentos || [], assinaturas });
   } else if (a.envio.tipo === "CRONOGRAMA_AUDITORIA") {
     bytes = await gerarCronogramaAuditoriaPDF({ ano: snap.ano, revisao: snap.revisao, auditorias: snap.auditorias || [], assinaturas });
+  } else if (a.envio.tipo === "RELATORIO_INSPECAO") {
+    // ⚠ aqui o snapshot guarda só o ID: o corpo do relatório são FOTOS, e copiar dezenas de URLs
+    // pro snapshot só criaria uma segunda cópia pra desencontrar. O documento é relido do banco.
+    const rel = snap.relatorioId
+      ? await prisma.relatorioInspecao.findUnique({ where: { id: snap.relatorioId } })
+      : null;
+    if (!rel) return new NextResponse("Relatório não encontrado.", { status: 404 });
+    const fotos = await prisma.fotoInspecao.findMany({
+      where: { relatorioId: rel.id },
+      orderBy: { capturadaEm: "asc" },
+      select: { url: true, marca: true, origemMarca: true, observacao: true, capturadaEm: true, autorNome: true },
+    });
+    bytes = await gerarRelatorioInspecaoPDF({ rel, fotos, assinaturas });
   } else {
     return new NextResponse("Documento não suportado.", { status: 400 });
   }

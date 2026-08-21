@@ -119,6 +119,24 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "FotoInspecao_capturadaEm_idx" ON "FotoInspecao"("capturadaEm")`);
   console.log("[ensure-mes-tables] OK — FotoInspecao garantida.");
 
+  // Relatório de inspeção (fotos do celular viram documento numerado). Idempotente.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "RelatorioInspecao" (
+      "id" TEXT NOT NULL, "numero" INTEGER NOT NULL, "codigo" TEXT NOT NULL,
+      "opId" TEXT, "opNumero" TEXT NOT NULL, "tipo" TEXT NOT NULL,
+      "titulo" TEXT, "observacoes" TEXT,
+      "status" TEXT NOT NULL DEFAULT 'RASCUNHO', "emitidoEm" TIMESTAMP(3),
+      "inspetor" TEXT, "criadoPorId" TEXT, "criadoPorNome" TEXT,
+      "envioAssinaturaId" TEXT, "documentoId" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "RelatorioInspecao_pkey" PRIMARY KEY ("id"))`);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "RelatorioInspecao_codigo_key" ON "RelatorioInspecao"("codigo")`);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "RelatorioInspecao_opNumero_tipo_numero_key" ON "RelatorioInspecao"("opNumero","tipo","numero")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RelatorioInspecao_opNumero_idx" ON "RelatorioInspecao"("opNumero")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RelatorioInspecao_status_idx" ON "RelatorioInspecao"("status")`);
+  console.log("[ensure-mes-tables] OK — RelatorioInspecao garantida.");
+
   // ProdutoOmie (cache do cadastro de produtos do Omie — código do item nos romaneios). Idempotente.
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "ProdutoOmie" (

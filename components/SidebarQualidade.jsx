@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileCheck2, BookCheck, ScrollText, ClipboardCheck, ClipboardList, Gauge, AlertOctagon, FolderTree, Ruler } from "lucide-react";
+import { FileCheck2, BookCheck, ScrollText, ClipboardCheck, ClipboardList, Gauge, AlertOctagon, FolderTree, Ruler , Camera } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -10,6 +10,7 @@ const menu = [
   { href: "/qualidade/calibracao", label: "Calibração", icon: Ruler },
   { href: "/qualidade/sgq", label: "Documentos do SGQ", icon: FolderTree },
   { href: "/qualidade/rastreabilidade", label: "Rastreabilidade", icon: ScrollText },
+  { href: "/qualidade/inspecoes", label: "Inspeções", icon: Camera },
   { href: "/qualidade/data-books", label: "Data Books", icon: BookCheck },
   { href: "/qualidade/auditorias-internas", label: "Auditorias Internas", icon: ClipboardList },
   { href: "/qualidade/auditorias", label: "Auditorias Externas", icon: ClipboardCheck },

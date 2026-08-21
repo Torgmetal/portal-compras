@@ -4318,3 +4318,42 @@ model FotoInspecao {
   @@index([relatorioId])
   @@index([capturadaEm])
 }
+
+// RELATÓRIO DE INSPEÇÃO — o que a fábrica fotografou, virando documento.
+//
+// Vitor (21/08/2026): "não quero que só apareça no pdf, precisa aparecer na estruturação; e
+// lembre-se, precisamos solicitar assinatura desses relatórios".
+//
+// O celular captura (FotoInspecao); aqui as fotos viram um documento numerado, que entra na seção
+// do data book como qualquer outro anexo — por isso o `documentoId`: é o DocumentoQualidade que faz
+// o relatório aparecer na LISTA da seção, não só no PDF montado no fim.
+//
+// A assinatura reusa o fluxo genérico (EnvioAssinatura/AssinaturaDocumento + /assinar/[token]), o
+// mesmo do Plano de Treinamentos e do Cronograma de Auditoria.
+model RelatorioInspecao {
+  id       String @id @default(cuid())
+  // sequencial POR OBRA e POR TIPO ("de acordo com cada obra, e ser sequencial")
+  numero   Int
+  codigo   String @unique // RID-067-001
+  opId     String?
+  opNumero String
+  tipo     String // DIMENSIONAL | VISUAL_SOLDA | LP | PINTURA | MONTAGEM | GERAL
+  titulo   String?
+  // observações do inspetor, escritas no computador ao fechar o relatório
+  observacoes String?
+  status   String @default("RASCUNHO") // RASCUNHO | EMITIDO
+  emitidoEm DateTime?
+  inspetor      String? // quem executou a inspeção (nome que sai no documento)
+  criadoPorId   String?
+  criadoPorNome String?
+  // liga ao fluxo de assinatura genérico (null enquanto não foi enviado)
+  envioAssinaturaId String?
+  // DocumentoQualidade gerado — é ele que aparece na seção do data book
+  documentoId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([opNumero, tipo, numero])
+  @@index([opNumero])
+  @@index([status])
+}
