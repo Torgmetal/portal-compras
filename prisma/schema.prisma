@@ -4404,6 +4404,8 @@ model ObraEmailEvento {
   temAnexoIfc       Boolean   @default(false)
   anexos            Json      @default("[]") // [{ nome, tipo, tamanho }] — metadados só
   tipoGatilho       String? // marco: IFC_RECEBIDO | LIBERACAO_INICIO | PROJETO_ENVIADO | APROVADO_CLIENTE | OUTRO
+  marcoFonte        String? // KEYWORD | IA — como o marco foi classificado
+  iaChecado         Boolean   @default(false) // já passou pela classificação por IA
   primeiroContato   Boolean   @default(false) // 1º inbound do cliente na thread (Fase 2)
   matchConfianca    Float? // 0..1 (Fase 2)
   matchMetodo       String? // REGRA_OP | CODIGO_OBRA | DOMINIO | NOME_OBRA | IA | MANUAL (Fase 2)

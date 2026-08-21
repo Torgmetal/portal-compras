@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { temAcessoDiretoria } from "@/lib/diretoria";
 import { sincronizarEmailsEngenharia, caixasEngenharia } from "@/lib/ingest-emails-engenharia";
+import { casarEmailsPendentes } from "@/lib/match-email-op";
+import { classificarMarcosIA } from "@/lib/classificar-email-ia";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,8 +63,10 @@ export async function POST() {
   try { user = await exigirDiretoria(); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.status || (e.message === "Unauthorized" ? 401 : 403) }); }
   try {
     const r = await sincronizarEmailsEngenharia();
-    await prisma.auditLog.create({ data: { userId: user.id, action: "SYNC_EMAILS_ENGENHARIA", entity: "ObraEmailEvento", entityId: "-", diff: { gravados: r.gravados } } }).catch(() => {});
-    return NextResponse.json({ success: true, ...r });
+    const match = await casarEmailsPendentes().catch(() => ({ casados: 0 }));
+    const ia = await classificarMarcosIA().catch(() => ({ classificados: 0, marcos: 0 }));
+    await prisma.auditLog.create({ data: { userId: user.id, action: "SYNC_EMAILS_ENGENHARIA", entity: "ObraEmailEvento", entityId: "-", diff: { gravados: r.gravados, casados: match.casados, iaMarcos: ia.marcos } } }).catch(() => {});
+    return NextResponse.json({ success: true, ...r, match, ia });
   } catch (e) {
     return NextResponse.json({ success: false, error: e.message }, { status: 500 });
   }
