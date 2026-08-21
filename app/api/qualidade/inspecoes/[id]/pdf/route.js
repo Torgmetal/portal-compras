@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarRelatorioInspecaoPDF } from "@/lib/relatorio-inspecao-pdf";
+import { baixarDesenho } from "@/lib/relatorio-dimensional";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -29,7 +30,7 @@ export async function GET(req, { params }) {
       })
     : null;
 
-  const bytes = await gerarRelatorioInspecaoPDF({ rel, fotos, assinaturas });
+  const bytes = await gerarRelatorioInspecaoPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho) });
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       "Content-Type": "application/pdf",
