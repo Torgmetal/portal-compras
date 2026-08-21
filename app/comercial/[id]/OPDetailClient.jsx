@@ -70,17 +70,23 @@ const VISTAS = [
   { key: "financeiro", label: "Financeiro", icon: DollarSign },
 ];
 
-export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba = false, podeVerFinanceiro = false, isDiretoria = false, proposta = null, comprasSlot = null, pecas = [] }) {
+export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba = false, podeVerFinanceiro = false, isDiretoria = false, proposta = null, comprasSlot = null, pecas = [], abas = null }) {
   const router = useRouter();
   const isMaster = userRole === "ADMIN";
-  // Blindagem: Resumo e Financeiro só pra quem pode ver dinheiro (os dados
-  // financeiros já vêm removidos do payload no servidor pros demais).
-  const vistasVisiveis = podeVerFinanceiro ? VISTAS : VISTAS.filter((v) => v.key !== "resumo" && v.key !== "financeiro");
+  // As abas vêm do servidor, por módulo (lib/op-abas.js). Blindagem dupla: Resumo e Financeiro
+  // dependem TAMBÉM de poder ver dinheiro — os dados financeiros já saem do payload no servidor
+  // pros demais, e esconder a aba sozinho nunca foi proteção.
+  const permitidas = abas && abas.length ? VISTAS.filter((v) => abas.includes(v.key)) : VISTAS;
+  const vistasVisiveis = podeVerFinanceiro ? permitidas : permitidas.filter((v) => v.key !== "resumo" && v.key !== "financeiro");
   // Permissao pra aplicar alteracao de verba direto, sem virar solicitacao
   // pendente. Inclui ADMIN e COMERCIAL com a flag podeAlterarVerba.
   const podeAlterarVerbaDireto = isMaster || podeAlterarVerba;
 
-  const [vista, setVista] = useState(podeVerFinanceiro ? "resumo" : "obra");
+  // ⚠ a inicial precisa EXISTIR na lista: a Pamela (RH) só tem "obra", e abrir em "resumo"
+  // deixaria a tela em branco sem nenhum aviso.
+  const inicial = vistasVisiveis.find((v) => v.key === (podeVerFinanceiro ? "resumo" : "obra"))?.key
+    || vistasVisiveis[0]?.key || "obra";
+  const [vista, setVista] = useState(inicial);
   const [exportandoLPC, setExportandoLPC] = useState(false);
   const [modalAditivo, setModalAditivo] = useState(false);
   const [modalRevisao, setModalRevisao] = useState(false);
