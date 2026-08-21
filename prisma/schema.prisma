@@ -4390,6 +4390,7 @@ model ObraEmailEvento {
   conversationId    String? // thread do Graph (amarra 1º e-mail ↔ resposta)
   internetMessageId String    @unique // dedupe idempotente
   graphId           String? // id da mensagem no Graph (referência)
+  webLink           String? // link p/ abrir a mensagem no Outlook Web (Graph webLink)
   direcao           String // ENTRADA | SAIDA
   de                String?
   deNome            String?
@@ -4402,7 +4403,7 @@ model ObraEmailEvento {
   temAnexo          Boolean   @default(false)
   temAnexoIfc       Boolean   @default(false)
   anexos            Json      @default("[]") // [{ nome, tipo, tamanho }] — metadados só
-  tipoGatilho       String? // IFC_RECEBIDO | LIBERACAO_PROJETO | LEVANTAMENTO | OUTRO (Fase 2)
+  tipoGatilho       String? // marco: IFC_RECEBIDO | LIBERACAO_INICIO | PROJETO_ENVIADO | APROVADO_CLIENTE | OUTRO
   primeiroContato   Boolean   @default(false) // 1º inbound do cliente na thread (Fase 2)
   matchConfianca    Float? // 0..1 (Fase 2)
   matchMetodo       String? // REGRA_OP | CODIGO_OBRA | DOMINIO | NOME_OBRA | IA | MANUAL (Fase 2)

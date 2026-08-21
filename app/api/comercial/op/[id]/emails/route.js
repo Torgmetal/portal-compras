@@ -22,11 +22,27 @@ export async function GET(_req, { params }) {
     select: {
       id: true, direcao: true, de: true, deNome: true, para: true, assunto: true, snippet: true,
       recebidoEm: true, enviadoEm: true, temAnexoIfc: true, temAnexo: true, tipoGatilho: true,
-      caixa: true, matchMetodo: true, matchConfianca: true, conversationId: true,
+      caixa: true, matchMetodo: true, matchConfianca: true, conversationId: true, webLink: true,
     },
   });
 
   const dataDe = (e) => e.recebidoEm || e.enviadoEm;
+
+  // Marcos do projeto: 1ª ocorrência (mais antiga) de cada tipo → checklist no Resumo.
+  const primeiroMarco = (tipo) => {
+    const e = eventos.find((x) => x.tipoGatilho === tipo);
+    if (!e) return null;
+    return {
+      em: dataDe(e), de: e.de, deNome: e.deNome, por: e.deNome || e.de || e.caixa,
+      assunto: e.assunto, snippet: e.snippet, webLink: e.webLink || null, id: e.id, direcao: e.direcao,
+    };
+  };
+  const marcos = {
+    IFC_RECEBIDO: primeiroMarco("IFC_RECEBIDO"),
+    LIBERACAO_INICIO: primeiroMarco("LIBERACAO_INICIO"),
+    PROJETO_ENVIADO: primeiroMarco("PROJETO_ENVIADO"),
+    APROVADO_CLIENTE: primeiroMarco("APROVADO_CLIENTE"),
+  };
   const entradasCliente = eventos.filter((e) => e.direcao === "ENTRADA" && !INTERNO.test(e.de || ""));
   const primeiroContato = entradasCliente[0] || eventos.find((e) => e.direcao === "ENTRADA") || null;
   const ifcRecebido = eventos.find((e) => e.direcao === "ENTRADA" && e.temAnexoIfc) || null;
@@ -64,5 +80,5 @@ export async function GET(_req, { params }) {
     semRespostaHoras: semRespostaH,
   };
 
-  return NextResponse.json({ success: true, resumo, eventos });
+  return NextResponse.json({ success: true, resumo, marcos, eventos });
 }
