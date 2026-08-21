@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X, Eraser } from "lucide-react";
+import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X, Eraser, ZoomIn, ZoomOut } from "lucide-react";
 import { layoutCotas, setaEm, PADDING } from "@/lib/cota-marcacao";
 
 /**
@@ -30,7 +30,7 @@ const SNAP = 12; // px de imã
 // "(A.L.)" noutro. Apagar só o primeiro deixava parênteses soltos boiando no desenho.
 const RX_MARCA = /^([A-Z]?\d*[A-Z]+\d*-P\d+|\(\s*A\.?\s*L\.?\s*\)|TÍP\.?|TIP\.?)/i;
 
-export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocultos = [], onOcultos }) {
+export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocultos = [], onOcultos, linhasOcultas = [], onLinhas }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [pendente, setPendente] = useState(null); // primeiro ponto já clicado
@@ -47,6 +47,11 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
   // ⚠ CONTADOR DE REDESENHO. Precisa existir aqui em cima porque o efeito que pinta o canvas
   // depende dele — ver a nota na dependência.
   const [tick, setTick] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  // ⚠ HISTÓRICO. Guarda o estado ANTES de cada mudança — cotas, textos apagados e linhas apagadas
+  // juntos. Desfazer que só cobre uma das três não serve: a pessoa apaga uma linha por engano e o
+  // botão devolve outra coisa.
+  const [historico, setHistorico] = useState([]);
   const cv = useRef(null);
   // ⚠ A MEDIDA VEM DE FORA, NÃO DA CAIXA DO CANVAS.
   //
@@ -80,9 +85,9 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     // ⚠ a peça é desenhada com FOLGA em volta: o recorte é justo nela, e sem folga não há onde
     // colocar as linhas de cota, que por definição ficam FORA da peça.
     const W = dados.largura + PADDING * 2, H = dados.altura + PADDING * 2;
-    const esc = Math.min(dispL / W, dispA / H);
+    const esc = Math.min(dispL / W, dispA / H) * zoom;
     return { esc, larg: W * esc, alt: H * esc };
-  }, [dados, amplo]);
+  }, [dados, amplo, zoom]);
 
   // vértices para o imã
   const vertices = useCallback(() => {
@@ -116,7 +121,11 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
 
     // o desenho
     g.strokeStyle = "#334155"; g.lineWidth = 0.6; g.beginPath();
-    for (const [x1, y1, x2, y2] of dados.segs) {
+    // ⚠ compara por VALOR: o segmento apagado veio do banco e não é o mesmo objeto da lista
+    const apagadas = new Set((linhasOcultas || []).map((l) => l.join(",")));
+    for (const sg of dados.segs) {
+      const [x1, y1, x2, y2] = sg;
+      if (apagadas.has(sg.join(","))) continue;
       if (naCaixa(x1, y1) && naCaixa(x2, y2)) continue;
       const a = paraTela([x1, y1], L), b = paraTela([x2, y2], L);
       g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]);
@@ -208,7 +217,7 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     // canvas ficava com a pintura antiga, num tamanho que não era o dele. Dava exatamente o que o
     // Vitor viu: desenho fora de proporção e com o topo faltando, variando conforme a hora em que a
     // página carregava.
-  }, [dados, cotas, pendente, hover, rascunho, layout, ocultos, borracha, tick]);
+  }, [dados, cotas, pendente, hover, rascunho, layout, ocultos, linhasOcultas, borracha, tick]);
 
   // ⚠ sem isto o canvas fica com o tamanho antigo ao abrir a tela cheia ou girar o aparelho, e o
   // clique passa a cair alguns pixels fora do traço.
@@ -293,6 +302,40 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     }) || null;
   }
 
+  /** Guarda o estado atual antes de mexer nele. */
+  function registrar() {
+    setHistorico((h) => [...h.slice(-29), { cotas: [...cotas], ocultos: [...(ocultos || [])], linhas: [...(linhasOcultas || [])] }]);
+  }
+
+  function desfazer() {
+    if (!historico.length) return;
+    const ant = historico[historico.length - 1];
+    setHistorico((h) => h.slice(0, -1));
+    onChange(ant.cotas);
+    if (onOcultos) onOcultos(ant.ocultos);
+    if (onLinhas) onLinhas(ant.linhas);
+    setRascunho(null); setPendente(null);
+  }
+
+  /** O segmento sob o cursor (para apagar traço). */
+  function linhaNoPonto(e) {
+    const L = layout(); if (!L || !dados) return null;
+    const r = cv.current.getBoundingClientRect();
+    const [px, py] = paraDesenho(e.clientX - r.left, e.clientY - r.top, L);
+    const tol = 4 / L.esc;
+    let melhor = null, dist = tol;
+    for (const sg of dados.segs) {
+      const [x1, y1, x2, y2] = sg;
+      const dx = x2 - x1, dy = y2 - y1;
+      const len2 = dx * dx + dy * dy;
+      // ponto mais próximo DENTRO do segmento (não da reta infinita)
+      const t = len2 ? Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / len2)) : 0;
+      const d = Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+      if (d < dist) { dist = d; melhor = sg; }
+    }
+    return melhor;
+  }
+
   /**
    * A CAIXA DE UM TEXTO, INCLUINDO A MOLDURA QUE O TEKLA DESENHA EM VOLTA.
    *
@@ -345,8 +388,12 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
 
   function clique(e) {
     if (borracha) {
+      // ⚠ texto primeiro: onde há rótulo há também o traço da moldura, e apagar a linha deixando o
+      // número no ar seria o contrário do que se quer.
       const t = textoNoPonto(e);
-      if (t && onOcultos) onOcultos([...(ocultos || []), caixaDoTexto(t)]);
+      if (t) { registrar(); if (onOcultos) onOcultos([...(ocultos || []), caixaDoTexto(t)]); return; }
+      const sg = linhaNoPonto(e);
+      if (sg && onLinhas) { registrar(); onLinhas([...(linhasOcultas || []), sg]); }
       return;
     }
     const p = pontoDoEvento(e); if (!p) return;
@@ -356,6 +403,7 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
   }
 
   function confirmar(espec) {
+    registrar();
     const letra = LETRAS[cotas.length] || `C${cotas.length + 1}`;
     onChange([...cotas, {
       letra,
@@ -372,6 +420,7 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
   }
 
   function remover(i) {
+    registrar();
     // ⚠ as letras se renumeram: buraco no meio (A, C, D) confunde quem mede
     const restantes = cotas.filter((_, k) => k !== i).map((c, k) => {
       const letra = LETRAS[k] || `C${k + 1}`;
@@ -388,7 +437,7 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
       <div className="flex items-start justify-between gap-3 mb-1.5">
         <p className="text-[11px] text-torg-gray">
           {borracha
-            ? "Clique num número ou numa marca para apagá-lo do desenho — some aqui e no PDF."
+            ? "Clique num número, numa marca ou numa linha para apagar — some aqui e no PDF."
             : pendente ? "Agora clique no segundo ponto da cota." : "Clique em dois pontos do desenho para criar uma cota. O clique gruda no traço."}
           {pendente && <button onClick={() => setPendente(null)} className="ml-2 text-torg-blue inline-flex items-center gap-1"><Undo2 size={11} /> cancelar</button>}
         </p>
@@ -398,15 +447,30 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
               borracha ? "bg-torg-orange text-white border-torg-orange" : "text-torg-blue border-torg-blue-200 hover:bg-torg-blue-50"}`}>
             <Eraser size={12} /> {borracha ? "apagando" : "Apagar"}
           </button>
-          <button onClick={() => onOcultos && onOcultos(marcasDePeca())}
+          <button onClick={() => { registrar(); onOcultos && onOcultos(marcasDePeca()); }}
             className="text-[11px] text-torg-blue hover:text-torg-dark font-medium">
             esconder marcas
           </button>
-          {(ocultos || []).length > 0 && (
-            <button onClick={() => onOcultos && onOcultos([])} className="text-[11px] text-torg-gray hover:text-torg-dark">
-              restaurar ({ocultos.length})
+          {((ocultos || []).length > 0 || (linhasOcultas || []).length > 0) && (
+            <button onClick={() => { registrar(); onOcultos && onOcultos([]); onLinhas && onLinhas([]); }}
+              className="text-[11px] text-torg-gray hover:text-torg-dark">
+              restaurar ({(ocultos || []).length + (linhasOcultas || []).length})
             </button>
           )}
+          <span className="inline-flex items-center rounded border border-torg-blue-200 overflow-hidden">
+            <button onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))} title="Diminuir"
+              className="text-torg-blue hover:bg-torg-blue-50 px-1.5 py-0.5"><ZoomOut size={13} /></button>
+            <button onClick={() => setZoom(1)} title="Tamanho original"
+              className="text-[10px] text-torg-gray hover:bg-torg-blue-50 px-1 py-0.5 border-x border-torg-blue-200 min-w-[38px]">
+              {Math.round(zoom * 100)}%
+            </button>
+            <button onClick={() => setZoom((z) => Math.min(4, +(z + 0.25).toFixed(2)))} title="Aumentar"
+              className="text-torg-blue hover:bg-torg-blue-50 px-1.5 py-0.5"><ZoomIn size={13} /></button>
+          </span>
+          <button onClick={desfazer} disabled={!historico.length} title="Desfazer"
+            className="text-[11px] text-torg-blue hover:text-torg-dark disabled:opacity-30 inline-flex items-center gap-1 font-medium">
+            <Undo2 size={13} /> Desfazer
+          </button>
           <button onClick={() => setAmplo((v) => !v)}
             className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium">
             {amplo ? <><X size={13} /> Fechar</> : <><Maximize2 size={13} /> Ampliar</>}
@@ -414,7 +478,8 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
         </span>
       </div>
       <div ref={box} className="w-full">
-      <div ref={caixa} className="border border-gray-200 rounded-lg overflow-hidden bg-white inline-block max-w-full">
+      {/* ⚠ com zoom o canvas passa da área visível: a caixa rola em vez de cortar */}
+      <div ref={caixa} className="border border-gray-200 rounded-lg overflow-auto bg-white max-w-full">
         <canvas ref={cv} onClick={clique} onMouseMove={(e) => setHover(borracha ? null : pontoDoEvento(e))} onMouseLeave={() => setHover(null)}
           className={`block ${borracha ? "cursor-cell" : "cursor-crosshair"}`} />
       </div>

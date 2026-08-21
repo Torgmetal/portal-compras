@@ -145,6 +145,8 @@ export default function RelatorioDetalheClient({ id }) {
             }))}
             ocultos={res.ocultosDesenho || []}
             onOcultos={(o) => setResultado("ocultosDesenho", o)}
+            linhasOcultas={res.linhasOcultasDesenho || []}
+            onLinhas={(l) => setResultado("linhasOcultasDesenho", l)}
           />
         </div>
       )}
