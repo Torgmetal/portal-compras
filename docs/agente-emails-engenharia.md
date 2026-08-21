@@ -78,10 +78,10 @@ New-DistributionGroup -Name "SG-Engenharia-GraphMail" -Type Security `
 > (é o que tem as permissões Graph `Files.Read.All` / `Sites.Read.All` / `Sites.ReadWrite.All` já
 > concedidas; o `AZURE_CLIENT_ID` no Vercel é write-only, por isso não dá pra ler o valor lá).
 
-**(b) Azure Portal → App registrations → `Torg Portal SharePoint` → API permissions:**
-- Add permission → Microsoft Graph → **Application permissions** → **`Mail.Read`**
-- **Grant admin consent** (botão). *(Opcional: `Mail.ReadBasic` é ainda mais restrito — só
-  metadados/headers, sem corpo. Como só guardamos snippet, dá pra avaliar `Mail.ReadBasic`.)*
+**(b) ✅ FEITO — Azure Portal → App registrations → `Torg Portal SharePoint` → API permissions:**
+`Mail.Read` (Application) adicionado + **admin consent concedido** (✔ Concedido para Torg Metal).
+> ⚠️ Enquanto a política do Exchange (item c) não for aplicada, o `Mail.Read` é **org-wide** —
+> aplicar (c) é o que restringe a leitura só às 6 caixas da Engenharia. Fazer ANTES de usar.
 
 **(c) Exchange Online → travar o app só nesse grupo (ApplicationAccessPolicy):**
 ```powershell
