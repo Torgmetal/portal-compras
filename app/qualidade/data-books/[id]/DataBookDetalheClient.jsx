@@ -3,12 +3,12 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { upload } from "@vercel/blob/client";
 import Link from "next/link";
 import {
-  Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X, Search,
+  Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X,
   FileText, CheckCircle2, Lock, BookCheck, FileDown, Upload, Send, Copy, Users,
   FolderOpen, RotateCcw, History,
 } from "lucide-react";
 import NavegadorServidor from "./NavegadorServidor";
-import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, GRUPO_POR_SECAO, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO, docCasaSecao } from "@/lib/databook-secoes";
+import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, GRUPO_POR_SECAO, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO } from "@/lib/databook-secoes";
 import { secaoNavega } from "@/lib/databook-pastas-web";
 import { STATUS_COR } from "@/lib/qualidade-status";
 import { TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
@@ -59,23 +59,6 @@ export default function DataBookDetalheClient({ id, userId }) {
     try {
       const res = await fetch(`/api/qualidade/data-books/secao/${secao.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || "Erro");
-      await carregar();
-    } catch (e) {
-      alert(e.message);
-    } finally {
-      setAcao(null);
-    }
-  }
-
-  async function vincular(secao, documentoId) {
-    if (!documentoId) return;
-    setAcao(secao.id);
-    try {
-      const res = await fetch(`/api/qualidade/data-books/secao/${secao.id}/doc`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentoId }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || "Erro");
@@ -452,8 +435,8 @@ export default function DataBookDetalheClient({ id, userId }) {
       </p>
       <div className="space-y-2">
         {data.secoes.map((s) => (
-          <SecaoCard key={s.id} secao={s} candidatos={data.candidatos} acaoLoading={acao === s.id}
-            onEstado={(e) => setEstado(s, e)} onVincular={(docId) => vincular(s, docId)} onDesvincular={(docId) => desvincular(s, docId)}
+          <SecaoCard key={s.id} secao={s} acaoLoading={acao === s.id}
+            onEstado={(e) => setEstado(s, e)} onDesvincular={(docId) => desvincular(s, docId)}
             onPopularMaterial={() => popularMaterial(s)} onPopularEmpresa={() => popularEmpresa(s)} onPopularProcedimentos={() => popularProcedimentos(s)}
             onPuxarRelatorios={() => puxarRelatorios(s)} onSavePit={(itens) => savePit(s, itens)} onGerarLpc={() => gerarLpc(s)} onPuxarProjetos={() => puxarProjetos(s)} onReload={carregar} fechado={fechado} />
         ))}
@@ -571,13 +554,8 @@ function Campo({ label, v, onChange, type = "text" }) {
   );
 }
 
-function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit, onGerarLpc, onPuxarProjetos, onReload, fechado }) {
-  const [verTodos, setVerTodos] = useState(false);
+function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit, onGerarLpc, onPuxarProjetos, onReload, fechado }) {
   const [navegador, setNavegador] = useState(false);
-  const [picker, setPicker] = useState(false);
-  const [codBusca, setCodBusca] = useState("");
-  const [codResultados, setCodResultados] = useState(null);
-  const [codBuscando, setCodBuscando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [progresso, setProgresso] = useState(""); // "2/5" durante o upload em lote
   const fileRef = useRef(null);
@@ -595,17 +573,6 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
   const secaoDeCertificado = !!GRUPO_POR_SECAO[secao.numero];
   // Documentos que a API apontou como sendo de OUTRA seção (ex.: tinta na §04 de matéria-prima).
   const foraDoGrupo = secao.documentos.filter((d) => d.secaoCerta);
-  const linkedIds = new Set(secao.documentos.map((d) => d.id));
-  const naoVinculados = candidatos.filter((c) => !linkedIds.has(c.id));
-  // Os que CABEM nesta seção vêm primeiro. O `tipo` do documento é o título da seção (com o
-  // prefixo "Anexo — "), então o casamento é direto — ver docCasaSecao em lib/databook-secoes.
-  // Vitor (19/08): abriu o seletor na §02 (Desenhos as-built) e o portal ofereceu certificados de
-  // aço, porque listava TODOS os documentos da OP.
-  const daSecao = naoVinculados.filter((c) => docCasaSecao(c, secao));
-  const outros = naoVinculados.filter((c) => !docCasaSecao(c, secao));
-  // ⚠ "ver todos" continua existindo: filtro sem saída troca lista inútil por parede.
-  const disponiveis = verTodos || daSecao.length === 0 ? naoVinculados : daSecao;
-
   // Move os certificados que estão na seção errada pra seção certa deste mesmo data book.
   async function moverForaDoGrupo() {
     const destinos = [...new Set(foraDoGrupo.map((d) => d.secaoCerta))].sort();
@@ -656,24 +623,6 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
     if (fileRef.current) fileRef.current.value = "";
     await onReload?.();
     if (falhas.length) alert(`${falhas.length} de ${files.length} arquivo(s) não foram anexados:\n\n${falhas.join("\n")}`);
-  }
-
-  // Busca um certificado pelo código de rastreabilidade (Índice R / importRef) em
-  // todo o Controle de Documentos — não fica limitado aos candidatos da OP.
-  async function buscarPorCodigo(e) {
-    e?.preventDefault();
-    const q = codBusca.trim();
-    if (q.length < 2) return;
-    setCodBuscando(true);
-    try {
-      const res = await fetch(`/api/qualidade/documentos?busca=${encodeURIComponent(q)}`);
-      const j = await res.json();
-      setCodResultados((j.data || []).filter((d) => !linkedIds.has(d.id)).slice(0, 15));
-    } catch {
-      setCodResultados([]);
-    } finally {
-      setCodBuscando(false);
-    }
   }
 
   return (
@@ -753,9 +702,7 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
             <p className="text-[11px] text-red-700 mt-1 inline-flex items-center gap-1"><ShieldAlert size={12} /> Documento vencido vinculado — renove no Controle de Documentos.</p>
           )}
 
-          {!picker ? (
             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-              <button onClick={() => setPicker(true)} className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium"><Plus size={12} /> Vincular documento</button>
               {/* ── SEÇÃO NAVEGÁVEL = DOIS BOTÕES, SÓ ─────────────────────────────────────────
                   Vitor (20/08/2026): "deixar apenas o de vincular documento e o de navegar nas
                   pastas, igual o do portal da qualidade — estou dizendo das partes que mencionei
@@ -807,49 +754,6 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
               )}
               </>}
             </div>
-          ) : (
-            <div className="mt-1.5 space-y-2">
-              <div className="flex items-center gap-2">
-                <select autoFocus onChange={(e) => { if (e.target.value) { onVincular(e.target.value); setPicker(false); } }} defaultValue=""
-                  className="flex-1 text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue">
-                  <option value="" disabled>
-                    {daSecao.length && !verTodos
-                      ? `Documentos desta seção (${daSecao.length})…`
-                      : "Selecione um documento da OP…"}
-                  </option>
-                  {disponiveis.map((c) => (
-                    <option key={c.id} value={c.id}>{c.nome}{c.numeroCorrida ? ` (corrida ${c.numeroCorrida})` : ""}{c.status !== "SEM_VALIDADE" ? ` — ${c.statusLabel}` : ""}</option>
-                  ))}
-                </select>
-                <button onClick={() => { setPicker(false); setCodResultados(null); setCodBusca(""); }} className="text-torg-gray hover:text-torg-dark"><X size={14} /></button>
-              </div>
-              {outros.length > 0 && daSecao.length > 0 && (
-                <button onClick={() => setVerTodos((v) => !v)} className="text-[10px] text-torg-blue hover:underline">
-                  {verTodos
-                    ? `Mostrar só os ${daSecao.length} desta seção`
-                    : `Ver todos os ${naoVinculados.length} documentos da OP (+${outros.length} de outras seções)`}
-                </button>
-              )}
-              <form onSubmit={buscarPorCodigo} className="flex items-center gap-2">
-                <input value={codBusca} onChange={(e) => setCodBusca(e.target.value)} placeholder="ou buscar por código de rastreabilidade (ex.: 260001, nº do certificado)…"
-                  className="flex-1 text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue" />
-                <button type="submit" disabled={codBuscando} className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium disabled:opacity-50">
-                  {codBuscando ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />} Buscar
-                </button>
-              </form>
-              {codResultados && (codResultados.length ? (
-                <div className="border border-gray-100 rounded-lg divide-y divide-gray-50 max-h-52 overflow-y-auto">
-                  {codResultados.map((d) => (
-                    <button key={d.id} onClick={() => { onVincular(d.id); setPicker(false); setCodResultados(null); setCodBusca(""); }}
-                      className="w-full text-left px-2 py-1.5 text-[11px] hover:bg-torg-blue-50 flex items-center justify-between gap-2">
-                      <span className="min-w-0 truncate"><span className="font-mono font-semibold text-torg-blue">{d.importRef || "s/ código"}</span> · <span className="text-torg-dark">{d.nome}</span></span>
-                      <span className="text-torg-gray shrink-0 whitespace-nowrap">{d.numeroDocumento || ""}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : <p className="text-[10px] text-torg-gray">Nenhum documento com esse código.</p>)}
-            </div>
-          )}
           {navegador && (
             <NavegadorServidor
               secaoId={secao.id}
@@ -861,7 +765,6 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
               }}
             />
           )}
-          {picker && disponiveis.length === 0 && <p className="text-[10px] text-torg-gray mt-1">Nenhum documento desta OP no Controle de Documentos. Cadastre na aba “Controle de Documentos” com a OP no campo correspondente.</p>}
         </div>
       )}
 
