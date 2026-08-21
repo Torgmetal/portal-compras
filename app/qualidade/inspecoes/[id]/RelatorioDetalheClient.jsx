@@ -23,6 +23,11 @@ export default function RelatorioDetalheClient({ id }) {
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [versao, setVersao] = useState(0); // força o iframe a recarregar depois de salvar
+  // Vitor (21/08/2026): "na tela do gerador do projeto consegue trazer essa imagem do projeto para
+  // ele conseguir conferir?" — o painel da direita abre NO DESENHO, que é o que ele olha enquanto
+  // digita a dimensão encontrada. A prévia do documento fica na outra aba.
+  const [aba, setAba] = useState("desenho");
+  const [marcaVista, setMarcaVista] = useState(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -40,6 +45,8 @@ export default function RelatorioDetalheClient({ id }) {
   const rel = dados.relatorio;
   const linhas = Array.isArray(rel.linhas) ? rel.linhas : [];
   const res = rel.resultados || {};
+  const desenhos = Array.isArray(rel.desenhos) ? rel.desenhos : [];
+  const marcaAtual = marcaVista || desenhos[0]?.marca || "";
   // enviado para assinatura = documento fechado (mesma regra da revisão do data book)
   const travado = !!rel.envioAssinaturaId;
 
@@ -204,16 +211,40 @@ export default function RelatorioDetalheClient({ id }) {
           )}
         </div>
 
-        {/* ── prévia: o PDF de verdade ─────────────────────────────────────────────── */}
-        <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden flex flex-col">
-          <div className="px-3 py-2 border-b border-gray-100 flex items-center gap-1.5">
-            <FileText size={13} className="text-torg-blue" />
-            <p className="text-[12px] font-bold text-torg-dark">Prévia</p>
-            <span className="text-[10px] text-torg-gray">— o mesmo PDF que vai para assinatura e para o data book</span>
+        {/* ── painel da direita: DESENHO (para conferir) ou PRÉVIA (o documento) ───── */}
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden flex flex-col lg:sticky lg:top-4 lg:self-start">
+          <div className="px-3 py-2 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+            <button onClick={() => setAba("desenho")} disabled={!desenhos.length}
+              className={`text-[12px] font-bold px-2 py-1 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-40 ${aba === "desenho" ? "bg-torg-blue text-white" : "text-torg-blue hover:bg-torg-blue-50"}`}>
+              <Ruler size={13} /> Desenho
+            </button>
+            <button onClick={() => setAba("previa")}
+              className={`text-[12px] font-bold px-2 py-1 rounded-lg inline-flex items-center gap-1.5 ${aba === "previa" ? "bg-torg-blue text-white" : "text-torg-blue hover:bg-torg-blue-50"}`}>
+              <FileText size={13} /> Prévia
+            </button>
+            {aba === "desenho" && desenhos.length > 1 && (
+              // relatório de avulsas agrupadas tem um desenho por peça
+              <select value={marcaAtual} onChange={(e) => setMarcaVista(e.target.value)}
+                className="text-[11px] border border-gray-200 rounded-lg px-1.5 py-1 focus:border-torg-blue ml-auto">
+                {desenhos.map((d) => <option key={d.marca} value={d.marca}>{d.marca}</option>)}
+              </select>
+            )}
+            {aba === "previa" && <span className="text-[10px] text-torg-gray ml-auto">o mesmo PDF que vai para assinatura e para o data book</span>}
+            {aba === "desenho" && desenhos.length === 1 && <span className="text-[10px] text-torg-gray ml-auto">{desenhos[0].nome}</span>}
           </div>
-          {/* `versao` no src força o navegador a rebuscar depois de salvar, em vez de servir o cache */}
-          <iframe key={versao} src={`/api/qualidade/inspecoes/${id}/pdf?v=${versao}`} title="Prévia do relatório"
-            className="w-full" style={{ height: "78vh", border: "none" }} />
+
+          {aba === "desenho" ? (
+            desenhos.length ? (
+              <iframe key={marcaAtual} src={`/api/qualidade/inspecoes/${id}/desenho?marca=${encodeURIComponent(marcaAtual)}`}
+                title={`Desenho ${marcaAtual}`} className="w-full" style={{ height: "78vh", border: "none" }} />
+            ) : (
+              <p className="p-4 text-[13px] text-torg-gray">Este relatório não tem desenho vinculado.</p>
+            )
+          ) : (
+            // `versao` no src força o navegador a rebuscar depois de salvar, em vez de servir o cache
+            <iframe key={versao} src={`/api/qualidade/inspecoes/${id}/pdf?v=${versao}`} title="Prévia do relatório"
+              className="w-full" style={{ height: "78vh", border: "none" }} />
+          )}
         </div>
       </div>
     </div>
