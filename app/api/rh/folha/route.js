@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { comDerivados, resumo } from "@/lib/folha-calc";
+import { mapaPontoCompetencia, divisorPorJornada } from "@/lib/folha-ponto";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -68,19 +69,29 @@ export async function POST(req) {
   // Semeia a partir dos funcionários ativos (snapshot do cadastro)
   const ativos = await prisma.funcionario.findMany({
     where: { ativo: true },
-    select: { id: true, nome: true, cpf: true, empresa: true, centroCusto: true, tipoContrato: true, salario: true },
+    select: { id: true, nome: true, cpf: true, empresa: true, centroCusto: true, tipoContrato: true, salario: true, jornadaHoras: true },
     orderBy: { nome: "asc" },
   });
+
+  // Puxa HE por %, faltas e atrasos do Controle de Ponto da mesma competência (RH ajusta).
+  const ponto = await mapaPontoCompetencia(competencia);
 
   await prisma.$transaction(async (tx) => {
     if (!folha) folha = await tx.folhaCompetencia.create({ data: { competencia, criadoPorId: user.id } });
     if (ativos.length) {
       await tx.folhaItem.createMany({
-        data: ativos.map((f) => ({
-          folhaId: folha.id, funcionarioId: f.id, nome: f.nome, cpf: f.cpf || null,
-          empresa: f.empresa || null, centroCusto: f.centroCusto || null,
-          tipoContrato: tipoFolha(f.tipoContrato), salarioBase: f.salario ?? 0,
-        })),
+        data: ativos.map((f) => {
+          const pt = ponto.get(f.id) || {};
+          return {
+            folhaId: folha.id, funcionarioId: f.id, nome: f.nome, cpf: f.cpf || null,
+            empresa: f.empresa || null, centroCusto: f.centroCusto || null,
+            tipoContrato: tipoFolha(f.tipoContrato), salarioBase: f.salario ?? 0,
+            divisorHoras: divisorPorJornada(f.jornadaHoras),
+            heHoras50: pt.heHoras50 || 0, heHoras60: pt.heHoras60 || 0, heHoras80: pt.heHoras80 || 0,
+            heHoras100: pt.heHoras100 || 0, heHoras150: pt.heHoras150 || 0,
+            faltasHoras: pt.faltasHoras || 0, atrasosHoras: pt.atrasosHoras || 0,
+          };
+        }),
         skipDuplicates: true,
       });
     }

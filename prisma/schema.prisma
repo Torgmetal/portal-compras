@@ -1399,8 +1399,17 @@ model FolhaItem {
   centroCusto   String?
   tipoContrato  String           @default("CLT") // CLT | PJ
   salarioBase   Float            @default(0)
+  // Horas do Controle de Ponto (RH ajusta) — o portal calcula o R$ (valor-hora × %).
+  heHoras50     Float            @default(0)
+  heHoras60     Float            @default(0)
+  heHoras80     Float            @default(0)
+  heHoras100    Float            @default(0)
+  heHoras150    Float            @default(0)
+  faltasHoras   Float            @default(0)
+  atrasosHoras  Float            @default(0)
+  divisorHoras  Float            @default(220) // divisor do valor-hora (jornada×5; 44h→220)
   // Digitados pelo RH (vêm do sistema de folha)
-  horasExtras   Float            @default(0)
+  horasExtras   Float            @default(0) // LEGADO: HE em R$ (competências antigas)
   adicionais    Float            @default(0)
   descontos     Float            @default(0)
   inss          Float            @default(0)

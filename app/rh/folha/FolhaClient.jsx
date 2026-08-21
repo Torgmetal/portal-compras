@@ -2,12 +2,13 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Wallet, Loader2, AlertCircle, RefreshCw, Inbox, Play, Save, Download,
-  Lock, LockOpen, Table2, PieChart, Trash2,
+  Lock, LockOpen, Table2, PieChart, Trash2, Clock,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { calcDerivados, resumo as calcResumo } from "@/lib/folha-calc";
 
 const fmt = (v) => (Number(v) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtH = (v) => (Number(v) || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 const mesAtual = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 const extenso = (c) => {
   if (!c) return "";
@@ -16,19 +17,29 @@ const extenso = (c) => {
   return `${N[Number(m)] || m}/${a}`;
 };
 
-// Colunas digitáveis (CLT e PJ). PJ desabilita os campos de imposto.
-const EDIT = [
-  { k: "salarioBase", label: "Salário" },
-  { k: "horasExtras", label: "H. Extras" },
+// Inputs em HORAS (vêm do Controle de Ponto; o portal calcula o R$).
+const HORAS = [
+  { k: "heHoras50", label: "HE 50%" },
+  { k: "heHoras60", label: "HE 60%" },
+  { k: "heHoras80", label: "HE 80%" },
+  { k: "heHoras100", label: "HE 100%" },
+  { k: "heHoras150", label: "HE 150%" },
+  { k: "faltasHoras", label: "Faltas" },
+  { k: "atrasosHoras", label: "Atrasos" },
+];
+// Inputs em R$ (digitados pelo RH). INSS/IRRF só CLT.
+const VALORES = [
   { k: "adicionais", label: "Adicionais" },
+  { k: "descontos", label: "Descontos" },
   { k: "inss", label: "INSS", clt: true },
   { k: "irrf", label: "IRRF", clt: true },
-  { k: "descontos", label: "Descontos" },
-  { k: "liquido", label: "Líquido" },
+];
+const BENEF = [
   { k: "vr", label: "VR" },
   { k: "ifood", label: "iFOOD" },
   { k: "kr", label: "KR" },
 ];
+const CAMPOS_SALVAR = ["salarioBase", ...HORAS.map((c) => c.k), ...VALORES.map((c) => c.k), ...BENEF.map((c) => c.k), "rescisao"];
 
 export default function FolhaClient() {
   const { showToast } = useStore();
@@ -41,6 +52,7 @@ export default function FolhaClient() {
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [iniciando, setIniciando] = useState(false);
+  const [puxando, setPuxando] = useState(false);
   const [aba, setAba] = useState("folha");
 
   const carregar = useCallback(async () => {
@@ -67,12 +79,28 @@ export default function FolhaClient() {
       const r = await fetch("/api/rh/folha", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ competencia }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao iniciar");
-      showToast(d.jaExiste ? "Folha já existia" : `Folha iniciada com ${d.itens} funcionários`, "success");
+      showToast(d.jaExiste ? "Folha já existia" : `Folha iniciada com ${d.itens} funcionários (horas puxadas do Ponto)`, "success");
       await carregar();
     } catch (e) {
       showToast(e.message, "error");
     } finally {
       setIniciando(false);
+    }
+  };
+
+  const puxarPonto = async () => {
+    if (dirty.size > 0) { showToast("Salve as alterações antes de puxar do Ponto", "error"); return; }
+    setPuxando(true);
+    try {
+      const r = await fetch(`/api/rh/folha/${folha.id}/puxar-ponto`, { method: "POST" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Falha ao puxar do Ponto");
+      showToast(`Ponto puxado — ${d.atualizados} funcionário(s) atualizados`, "success");
+      await carregar();
+    } catch (e) {
+      showToast(e.message, "error");
+    } finally {
+      setPuxando(false);
     }
   };
 
@@ -86,10 +114,11 @@ export default function FolhaClient() {
     if (dirty.size === 0) return;
     setSalvando(true);
     try {
-      const payload = itens.filter((it) => dirty.has(it.id)).map((it) => ({
-        id: it.id, salarioBase: it.salarioBase, horasExtras: it.horasExtras, adicionais: it.adicionais,
-        descontos: it.descontos, inss: it.inss, irrf: it.irrf, liquido: it.liquido, vr: it.vr, ifood: it.ifood, kr: it.kr, rescisao: it.rescisao,
-      }));
+      const payload = itens.filter((it) => dirty.has(it.id)).map((it) => {
+        const o = { id: it.id };
+        for (const k of CAMPOS_SALVAR) o[k] = Number(it[k]) || 0;
+        return o;
+      });
       const r = await fetch(`/api/rh/folha/${folha.id}/itens`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itens: payload }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao salvar");
@@ -131,15 +160,16 @@ export default function FolhaClient() {
 
   const fechada = folha?.status === "FECHADA";
   const resumo = useMemo(() => calcResumo(itens), [itens]);
+  const totalFinal = useMemo(() => itens.reduce((s, it) => s + calcDerivados(it).salarioFinal, 0), [itens]);
 
   return (
-    <div className="space-y-6 max-w-[1600px]">
+    <div className="space-y-6 max-w-[1800px]">
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
             <Wallet className="text-torg-blue" /> Folha de Pagamento
           </h2>
-          <p className="text-sm text-torg-gray mt-1">Preencha a folha por competência. O portal calcula Base INSS, FGTS, INSS Patronal e Base IRRF; o RH digita os demais.</p>
+          <p className="text-sm text-torg-gray mt-1">Horas extras (por %), faltas e atrasos vêm do <strong>Controle de Ponto</strong> (em horas) — o portal calcula o valor e o <strong>Salário Final</strong>. INSS/IRRF e adicionais o RH digita em R$.</p>
         </div>
         <div className="flex items-center gap-2">
           <label className="text-sm text-torg-gray">Competência</label>
@@ -160,7 +190,7 @@ export default function FolhaClient() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center">
           <Inbox size={40} className="mx-auto text-gray-300 mb-3" />
           <p className="text-torg-gray mb-1">Nenhuma folha para <strong>{extenso(competencia)}</strong>.</p>
-          <p className="text-xs text-torg-gray mb-4">Iniciar cria a folha com todos os funcionários ativos (snapshot do cadastro).</p>
+          <p className="text-xs text-torg-gray mb-4">Iniciar cria a folha com todos os funcionários ativos (snapshot do cadastro) e já puxa as horas do Ponto.</p>
           <button onClick={iniciar} disabled={iniciando}
             className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-2 disabled:opacity-50">
             {iniciando ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />} Iniciar folha de {extenso(competencia)}
@@ -181,6 +211,7 @@ export default function FolhaClient() {
               <span className="font-semibold text-torg-dark">{extenso(folha.competencia)}</span>
               <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${fechada ? "bg-gray-200 text-gray-600" : "bg-green-100 text-green-700"}`}>{folha.status}</span>
               <span className="text-xs text-torg-gray">{itens.length} funcionários</span>
+              <span className="text-xs text-torg-blue font-semibold">Total final: R$ {fmt(totalFinal)}</span>
               {dirty.size > 0 && <span className="text-xs text-amber-600">{dirty.size} não salvos</span>}
             </div>
             <div className="flex items-center gap-2">
@@ -189,8 +220,13 @@ export default function FolhaClient() {
                 <button onClick={() => setAba("resumo")} className={`px-3 py-1.5 text-xs inline-flex items-center gap-1.5 ${aba === "resumo" ? "bg-torg-blue text-white" : "text-torg-gray"}`}><PieChart size={13} /> Resumo</button>
               </div>
               {!fechada && (
+                <button onClick={puxarPonto} disabled={puxando} title="Repuxar HE/faltas/atrasos do Controle de Ponto" className="px-3 py-2 text-xs text-torg-blue border border-torg-blue-200 rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-1.5 disabled:opacity-50">
+                  {puxando ? <Loader2 size={14} className="animate-spin" /> : <Clock size={14} />} Puxar do Ponto
+                </button>
+              )}
+              {!fechada && (
                 <button onClick={excluirFolha} className="px-3 py-2 text-xs text-red-600 border border-red-200 rounded-lg hover:bg-red-50 inline-flex items-center gap-1.5" title="Excluir a folha para refazer">
-                  <Trash2 size={14} /> Excluir folha
+                  <Trash2 size={14} /> Excluir
                 </button>
               )}
               <a href={`/api/rh/folha/${folha.id}/export`} className="px-3 py-2 text-xs text-torg-dark border border-gray-200 rounded-lg hover:bg-gray-50 inline-flex items-center gap-1.5"><Download size={14} /> Exportar</a>
@@ -213,37 +249,41 @@ export default function FolhaClient() {
                   <thead className="bg-gray-50 sticky top-0 z-10">
                     <tr>
                       <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase sticky left-0 bg-gray-50">Funcionário</th>
-                      <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Emp.</th>
-                      <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">CC</th>
-                      {EDIT.map((c) => <th key={c.k} className="px-2 py-2 text-right font-medium text-gray-500 uppercase">{c.label}</th>)}
-                      <th className="px-2 py-2 text-right font-medium text-torg-blue uppercase">Base INSS</th>
-                      <th className="px-2 py-2 text-right font-medium text-torg-blue uppercase">INSS Patr.</th>
-                      <th className="px-2 py-2 text-right font-medium text-torg-blue uppercase">Base IRRF</th>
-                      <th className="px-2 py-2 text-right font-medium text-torg-blue uppercase">FGTS</th>
+                      <th className="px-2 py-2 text-right font-medium text-gray-500 uppercase">Salário</th>
+                      {HORAS.map((c) => <th key={c.k} className="px-2 py-2 text-right font-medium text-torg-gray uppercase" title={`${c.label} (horas)`}>{c.label}<span className="block text-[9px] text-gray-400 normal-case">horas</span></th>)}
+                      {VALORES.map((c) => <th key={c.k} className="px-2 py-2 text-right font-medium text-gray-500 uppercase">{c.label}</th>)}
+                      <th className="px-2 py-2 text-right font-medium text-emerald-600 uppercase">Valor HE</th>
+                      <th className="px-2 py-2 text-right font-medium text-red-500 uppercase">Desc. F/A</th>
+                      <th className="px-2 py-2 text-right font-semibold text-torg-blue uppercase bg-torg-blue-50/40">Salário Final</th>
+                      {BENEF.map((c) => <th key={c.k} className="px-2 py-2 text-right font-medium text-gray-400 uppercase">{c.label}</th>)}
+                      <th className="px-2 py-2 text-right font-medium text-gray-400 uppercase">FGTS</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {itens.map((it) => {
                       const d = calcDerivados(it);
                       const pj = it.tipoContrato === "PJ";
+                      const inp = (c, unidade) => (
+                        <td key={c.k} className="px-1 py-1 text-right">
+                          <input type="number" step={unidade === "h" ? "0.5" : "0.01"} value={it[c.k] ?? 0}
+                            disabled={fechada || (c.clt && pj)}
+                            onChange={(e) => editar(it.id, c.k, e.target.value)}
+                            className={`w-16 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue disabled:bg-gray-50 disabled:text-gray-300 ${unidade === "h" ? "bg-torg-blue-50/20" : ""}`} />
+                        </td>
+                      );
                       return (
                         <tr key={it.id} className="hover:bg-gray-50/50">
                           <td className="px-2 py-1 sticky left-0 bg-white">
-                            <div className="font-medium text-torg-dark max-w-[180px] truncate" title={it.nome}>{it.nome}</div>
+                            <div className="font-medium text-torg-dark max-w-[170px] truncate" title={it.nome}>{it.nome}</div>
+                            <div className="text-[10px] text-torg-gray">{it.empresa || "—"}{it.centroCusto ? ` · ${it.centroCusto}` : ""}{pj ? " · PJ" : ""}</div>
                           </td>
-                          <td className="px-2 py-1 text-torg-gray">{it.empresa || "—"}</td>
-                          <td className="px-2 py-1 text-torg-gray">{it.centroCusto || "—"}</td>
-                          {EDIT.map((c) => (
-                            <td key={c.k} className="px-1 py-1 text-right">
-                              <input type="number" step="0.01" value={it[c.k] ?? 0}
-                                disabled={fechada || (c.clt && pj)}
-                                onChange={(e) => editar(it.id, c.k, e.target.value)}
-                                className="w-20 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue disabled:bg-gray-50 disabled:text-gray-300" />
-                            </td>
-                          ))}
-                          <td className="px-2 py-1 text-right tabular-nums text-torg-gray">{pj ? "—" : fmt(d.baseInss)}</td>
-                          <td className="px-2 py-1 text-right tabular-nums text-torg-gray">{pj ? "—" : fmt(d.inssPatronal)}</td>
-                          <td className="px-2 py-1 text-right tabular-nums text-torg-gray">{pj ? "—" : fmt(d.baseIrrf)}</td>
+                          {inp({ k: "salarioBase" })}
+                          {HORAS.map((c) => inp(c, "h"))}
+                          {VALORES.map((c) => inp(c))}
+                          <td className="px-2 py-1 text-right tabular-nums text-emerald-700" title={`Valor-hora R$ ${fmt(d.valorHora)}`}>{fmt(d.heValorTotal)}</td>
+                          <td className="px-2 py-1 text-right tabular-nums text-red-600" title={`Faltas R$ ${fmt(d.faltasValor)} · Atrasos R$ ${fmt(d.atrasosValor)}`}>{fmt(d.faltasValor + d.atrasosValor)}</td>
+                          <td className="px-2 py-1 text-right tabular-nums font-bold text-torg-dark bg-torg-blue-50/40">{fmt(d.salarioFinal)}</td>
+                          {BENEF.map((c) => inp(c))}
                           <td className="px-2 py-1 text-right tabular-nums text-torg-gray">{pj ? "—" : fmt(d.fgts)}</td>
                         </tr>
                       );
@@ -251,13 +291,16 @@ export default function FolhaClient() {
                   </tbody>
                 </table>
               </div>
+              <p className="px-3 py-2 text-[11px] text-torg-gray border-t border-gray-50">
+                <strong>Colunas em horas</strong> (fundo azul) vêm do Ponto — o RH pode ajustar. <strong>Valor HE</strong> = horas × valor-hora × adicional da % (50%→×1,5; 100%→×2). <strong>Salário Final</strong> = Salário + Valor HE + Adicionais − Faltas − Atrasos − Descontos − INSS − IRRF. VR/iFOOD/KR são benefícios à parte (não entram no salário).
+              </p>
             </div>
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
               <table className="w-full text-xs">
                 <thead className="bg-gray-50/60">
                   <tr>
-                    {["Empresa", "Centro de Custo", "Tipo", "Qtd", "Salário", "Horas Extras", "Adicionais", "Descontos", "Líquido (a pagar)", "FGTS", "INSS Patr."].map((h) => (
+                    {["Empresa", "Centro de Custo", "Tipo", "Qtd", "Salário", "Valor HE", "Adicionais", "Faltas", "Atrasos", "Descontos", "Salário Final", "FGTS", "INSS Patr."].map((h) => (
                       <th key={h} className={`px-3 py-2 font-medium text-gray-500 uppercase ${["Empresa", "Centro de Custo", "Tipo"].includes(h) ? "text-left" : "text-right"}`}>{h}</th>
                     ))}
                   </tr>
@@ -270,10 +313,12 @@ export default function FolhaClient() {
                       <td className="px-3 py-2 text-torg-gray">{g.tipoContrato}</td>
                       <td className="px-3 py-2 text-right">{g.qtd}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{fmt(g.salarioBase)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmt(g.horasExtras)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-emerald-700">{fmt(g.heValorTotal)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{fmt(g.adicionais)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-red-600">{fmt(g.faltasValor)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-red-600">{fmt(g.atrasosValor)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{fmt(g.descontos)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-torg-dark">{fmt(g.liquido)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-torg-dark">{fmt(g.salarioFinal)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{fmt(g.fgts)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{fmt(g.inssPatronal)}</td>
                     </tr>
@@ -283,10 +328,12 @@ export default function FolhaClient() {
                   <tr className="bg-torg-blue-50/40 border-t-2 border-torg-blue-100 font-semibold text-torg-dark">
                     <td className="px-3 py-2" colSpan={4}>TOTAL</td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmt(resumo.total.salarioBase)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmt(resumo.total.horasExtras)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmt(resumo.total.heValorTotal)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmt(resumo.total.adicionais)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmt(resumo.total.faltasValor)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmt(resumo.total.atrasosValor)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmt(resumo.total.descontos)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmt(resumo.total.liquido)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmt(resumo.total.salarioFinal)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmt(resumo.total.fgts)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmt(resumo.total.inssPatronal)}</td>
                   </tr>
