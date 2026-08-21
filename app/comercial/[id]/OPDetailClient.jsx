@@ -20,6 +20,7 @@ import ListaExpedicaoSection from "./ListaExpedicaoSection";
 import AbaObra from "./AbaObra";
 import AbaProducao from "./AbaProducao";
 import AbaTerceiros from "./AbaTerceiros";
+import EmailsObraCard from "./EmailsObraCard";
 import MargemTransformacaoOP from "./MargemTransformacaoOP";
 import PrevisaoObra from "./PrevisaoObra";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
@@ -69,7 +70,7 @@ const VISTAS = [
   { key: "financeiro", label: "Financeiro", icon: DollarSign },
 ];
 
-export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba = false, podeVerFinanceiro = false, proposta = null, comprasSlot = null, pecas = [] }) {
+export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba = false, podeVerFinanceiro = false, isDiretoria = false, proposta = null, comprasSlot = null, pecas = [] }) {
   const router = useRouter();
   const isMaster = userRole === "ADMIN";
   // Blindagem: Resumo e Financeiro só pra quem pode ver dinheiro (os dados
@@ -227,6 +228,8 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
       </div>
 
       {vista === "resumo" && (<>
+      {/* E-mails da Engenharia (Fase 2) — só diretoria */}
+      {isDiretoria && <EmailsObraCard opId={op.id} />}
       {/* Cabeçalho */}
       <div className="space-y-4">
         {/* Identidade da OP */}

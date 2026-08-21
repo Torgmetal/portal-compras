@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { temCronSecret } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";
 import { sincronizarEmailsEngenharia } from "@/lib/ingest-emails-engenharia";
+import { casarEmailsPendentes } from "@/lib/match-email-op";
 import { registrarExecucao } from "@/lib/cron-monitor";
 import { aquecerBanco } from "@/lib/db-retry";
 
@@ -19,8 +20,9 @@ export async function GET(req) {
   try {
     await aquecerBanco(prisma);
     const r = await sincronizarEmailsEngenharia();
+    const match = await casarEmailsPendentes().catch((e) => ({ erro: e.message }));
     await registrarExecucao("emails-engenharia", { ok: true, duracaoMs: Date.now() - t0 });
-    return NextResponse.json({ ok: true, ...r });
+    return NextResponse.json({ ok: true, ...r, match });
   } catch (e) {
     console.error("[cron emails-engenharia] erro:", e?.message);
     await registrarExecucao("emails-engenharia", { ok: false, mensagem: e?.message, duracaoMs: Date.now() - t0 });

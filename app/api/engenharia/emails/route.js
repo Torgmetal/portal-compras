@@ -8,7 +8,9 @@ import { sincronizarEmailsEngenharia, caixasEngenharia } from "@/lib/ingest-emai
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // sync manual pode puxar um bloco grande do histórico
-const ROLES = ["ADMIN", "ENGENHARIA"];
+// Só ADMIN — a visualização por obra é na aba Resumo da OP (diretoria). Aqui fica só
+// o gatilho de sincronização/diagnóstico do admin.
+const ROLES = ["ADMIN"];
 
 export async function GET(req) {
   try { await requireRole(ROLES); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }

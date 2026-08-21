@@ -360,7 +360,10 @@ export async function carregarDetalheOP(id, user) {
   // dados financeiros do payload — não basta esconder a aba no front. O Compras
   // mantém a verba (valorVerba nos itens), que é informação do comprador.
   const mods = user.modulos || [];
-  const podeVerFinanceiro = user.tipo === "ADMIN" || mods.includes("COMERCIAL") || mods.includes("FINANCEIRO") || (await temAcessoDiretoria(user.email));
+  // Diretoria = ADMIN ou allowlist. Usado pra blindar dados e pro card de e-mails
+  // (que é exclusivo da diretoria, mais restrito que o "pode ver financeiro").
+  const isDiretoria = user.tipo === "ADMIN" || (await temAcessoDiretoria(user.email));
+  const podeVerFinanceiro = isDiretoria || mods.includes("COMERCIAL") || mods.includes("FINANCEIRO");
   if (!podeVerFinanceiro) {
     delete opData.kpisFinanceiros;
     delete opData.resumoMedicoes;
@@ -370,13 +373,13 @@ export async function carregarDetalheOP(id, user) {
     delete opData.faturamento;
   }
 
-  return { opData, pecas, pedidos, propostaVinc, propostaPend, podeVerFinanceiro };
+  return { opData, pecas, pedidos, propostaVinc, propostaPend, podeVerFinanceiro, isDiretoria };
 }
 
 // UI do detalhe (compartilhada). O destino do "Voltar" muda por portal via
 // `voltarHref` — assim a OP abre dentro do portal atual, sem migrar pro Comercial.
 export function DetalheOPUI({ data, user, voltarHref = "/comercial" }) {
-  const { opData, pecas, pedidos, propostaVinc, propostaPend, podeVerFinanceiro } = data;
+  const { opData, pecas, pedidos, propostaVinc, propostaPend, podeVerFinanceiro, isDiretoria } = data;
   return (
     <div className="space-y-6 max-w-7xl">
       <Link href={voltarHref} className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1">
@@ -394,7 +397,7 @@ export function DetalheOPUI({ data, user, voltarHref = "/comercial" }) {
         </div>
       )}
 
-      <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} podeVerFinanceiro={podeVerFinanceiro} proposta={propostaVinc} pecas={pecas} comprasSlot={<PedidosOmieSection pedidos={pedidos} />} />
+      <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} podeVerFinanceiro={podeVerFinanceiro} isDiretoria={!!isDiretoria} proposta={propostaVinc} pecas={pecas} comprasSlot={<PedidosOmieSection pedidos={pedidos} />} />
     </div>
   );
 }
