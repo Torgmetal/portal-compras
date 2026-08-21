@@ -5,8 +5,11 @@ import Link from "next/link";
 import {
   Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X, Search,
   FileText, CheckCircle2, Lock, BookCheck, FileDown, Upload, Send, Copy, Users,
+  FolderOpen,
 } from "lucide-react";
+import NavegadorServidor from "./NavegadorServidor";
 import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, GRUPO_POR_SECAO, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO, docCasaSecao } from "@/lib/databook-secoes";
+import { secaoNavega } from "@/lib/databook-pastas-web";
 import { STATUS_COR } from "@/lib/qualidade-status";
 import { TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 
@@ -483,6 +486,7 @@ function Campo({ label, v, onChange, type = "text" }) {
 
 function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit, onGerarLpc, onPuxarProjetos, onReload }) {
   const [verTodos, setVerTodos] = useState(false);
+  const [navegador, setNavegador] = useState(false);
   const [picker, setPicker] = useState(false);
   const [codBusca, setCodBusca] = useState("");
   const [codResultados, setCodResultados] = useState(null);
@@ -628,6 +632,14 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
                   <FileText size={12} /> Trazer procedimentos aplicáveis
                 </button>
               )}
+              {/* Navegar a pasta do servidor e ESCOLHER — Vitor (19/08): "deixar navegar na
+                  pasta e selecionar os arquivos que quero colocar". */}
+              {secaoNavega(secao.numero) && (
+                <button onClick={() => setNavegador(true)} disabled={acaoLoading}
+                  className="text-[11px] text-torg-blue border border-torg-blue-200 hover:bg-torg-blue-50 rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
+                  <FolderOpen size={12} /> Buscar no servidor
+                </button>
+              )}
               {secaoUsaRelatoriosServidor(secao.numero) && (
                 <button onClick={onPuxarRelatorios} disabled={acaoLoading}
                   className="text-[11px] text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
@@ -677,6 +689,17 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
                 </div>
               ) : <p className="text-[10px] text-torg-gray">Nenhum documento com esse código.</p>)}
             </div>
+          )}
+          {navegador && (
+            <NavegadorServidor
+              secaoId={secao.id}
+              titulo={`§${secao.numero} ${secao.titulo}`}
+              onFechar={() => setNavegador(false)}
+              onAnexado={(j) => {
+                onReload?.();
+                if (j?.vinculados === 0) alert("Esses arquivos já estavam nesta seção.");
+              }}
+            />
           )}
           {picker && disponiveis.length === 0 && <p className="text-[10px] text-torg-gray mt-1">Nenhum documento desta OP no Controle de Documentos. Cadastre na aba “Controle de Documentos” com a OP no campo correspondente.</p>}
         </div>
