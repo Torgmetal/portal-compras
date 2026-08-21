@@ -34,9 +34,14 @@ export default function EmailsEngenhariaClient() {
     setSincronizando(true); setErro("");
     try {
       const res = await fetch("/api/engenharia/emails", { method: "POST" });
-      const j = await res.json();
+      const txt = await res.text();
+      let j;
+      try { j = JSON.parse(txt); } catch { throw new Error(res.status === 504 || /timeout/i.test(txt) ? "A sincronização demorou demais (timeout) — já puxou um bloco; clique de novo pra continuar." : `Resposta inesperada do servidor (${res.status}).`); }
       if (!j.success) throw new Error(j.error || "Erro");
-      showToast(`Sincronizado — ${j.gravados} e-mail(s) novo(s)/atualizado(s)`, "success");
+      const msg = j.pendente
+        ? `Bloco sincronizado — ${j.gravados} e-mail(s). Ainda há histórico: clique "Sincronizar agora" de novo pra continuar.`
+        : `Sincronizado — ${j.gravados} e-mail(s) novo(s)/atualizado(s).`;
+      showToast(msg, j.pendente ? "info" : "success");
       carregar();
     } catch (e) { setErro(e.message); showToast(e.message, "erro"); }
     finally { setSincronizando(false); }

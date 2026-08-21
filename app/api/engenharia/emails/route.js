@@ -7,7 +7,7 @@ import { sincronizarEmailsEngenharia, caixasEngenharia } from "@/lib/ingest-emai
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300; // sync manual pode puxar um bloco grande do histórico
 const ROLES = ["ADMIN", "ENGENHARIA"];
 
 export async function GET(req) {

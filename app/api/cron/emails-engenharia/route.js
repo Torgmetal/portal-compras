@@ -8,7 +8,7 @@ import { registrarExecucao } from "@/lib/cron-monitor";
 import { aquecerBanco } from "@/lib/db-retry";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300; // 1ª carga puxa histórico em blocos; dá folga
 
 export async function GET(req) {
   const isCron = temCronSecret(req);
