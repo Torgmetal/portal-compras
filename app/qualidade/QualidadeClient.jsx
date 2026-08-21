@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import PainelRastreabilidade from "./PainelRastreabilidade";
 import { upload } from "@vercel/blob/client";
 import {
   Loader2, AlertCircle, RefreshCw, Plus, Search, ShieldCheck, ShieldAlert,
@@ -147,6 +148,11 @@ export default function QualidadeClient({ escopo = "empresa", isAdmin = false })
             <Plus size={15} /> {material ? "Novo certificado" : "Novo documento"}
           </button>
         </div>
+
+      {/* O QUE FALTA DE CERTIFICADO — abre sozinho, lendo o servidor. Vitor (19/08): "queria tirar
+          isso [de anexar a pasta], quero algo dinâmico, e sempre que abro essa tela ficam
+          justamente os certificados que faltam alguma coisa". */}
+      {material && <PainelRastreabilidade />}
       </div>
 
       {/* KPIs */}
