@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X, Search,
   FileText, CheckCircle2, Lock, BookCheck, FileDown, Upload, Send, Copy, Users,
-  FolderOpen,
+  FolderOpen, RotateCcw, History,
 } from "lucide-react";
 import NavegadorServidor from "./NavegadorServidor";
 import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, GRUPO_POR_SECAO, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO, docCasaSecao } from "@/lib/databook-secoes";
@@ -23,6 +23,9 @@ export default function DataBookDetalheClient({ id, userId }) {
   const [erro, setErro] = useState("");
   const [acao, setAcao] = useState(null); // secaoId em ação
   const [emitindo, setEmitindo] = useState(false);
+  const [revisando, setRevisando] = useState(false);
+  const [revisoes, setRevisoes] = useState(null);
+  const [verHistorico, setVerHistorico] = useState(false);
   const [rastr, setRastr] = useState(null);
   const [aprovando, setAprovando] = useState(false);
   const [emailCliente, setEmailCliente] = useState("");
@@ -44,6 +47,7 @@ export default function DataBookDetalheClient({ id, userId }) {
   }, [id]);
 
   useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => { carregarRevisoes(); }, [carregarRevisoes]);
   useEffect(() => {
     fetch(`/api/qualidade/data-books/${id}/rastreabilidade`)
       .then((r) => r.json())
@@ -210,6 +214,39 @@ export default function DataBookDetalheClient({ id, userId }) {
     }
   }
 
+  // ── REVISÃO ────────────────────────────────────────────────────────────────────────────────
+  // Vitor (19/08/2026): "sempre depois de emitido você não deve permitir salvar sem gerar uma
+  // revisão; e se for revisão, fazer o histórico da revisão e enviar para assinatura de todos
+  // novamente". O aviso é explícito porque abrir revisão DERRUBA as assinaturas — inclusive a do
+  // cliente. É uma ação cara e a pessoa precisa saber disso antes, não depois.
+  async function abrirRevisao() {
+    const motivo = window.prompt(
+      "Gerar nova revisão deste data book.\n\n" +
+      "O que muda:\n" +
+      "· o documento volta para montagem e passa a ser " + proximaRev + "\n" +
+      "· TODAS as assinaturas são zeradas e precisam ser colhidas de novo\n" +
+      "· o aceite do cliente (se houver) deixa de valer\n\n" +
+      "Descreva o motivo (fica no histórico):"
+    );
+    if (motivo === null) return;
+    setRevisando(true);
+    try {
+      const res = await fetch(`/api/qualidade/data-books/${id}/revisao`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ motivo }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Erro");
+      alert(`Revisão ${j.rotulo} aberta. ${j.assinaturasZeradas} assinatura(s) voltaram a pendente.`);
+      carregar();
+      carregarRevisoes();
+    } catch (e) { alert(e.message); } finally { setRevisando(false); }
+  }
+
+  const carregarRevisoes = useCallback(() => {
+    fetch(`/api/qualidade/data-books/${id}/revisao`)
+      .then((r) => r.json()).then((j) => { if (!j.error) setRevisoes(j); }).catch(() => {});
+  }, [id]);
+
   async function emitir() {
     if (!confirm("Emitir o data book? (a geração do PDF entra na próxima fase)")) return;
     setEmitindo(true);
@@ -263,6 +300,12 @@ export default function DataBookDetalheClient({ id, userId }) {
   if (!data) return null;
 
   const r = data.resumo;
+  // R00 é a primeira emissão; cada mudança depois de emitido vira R01, R02…
+  const rev = data.revisao || 0;
+  const rotuloRev = `R${String(rev).padStart(2, "0")}`;
+  const proximaRev = `R${String(rev + 1).padStart(2, "0")}`;
+  // "fechado" = já é documento, não rascunho. Emitido, enviado ao cliente ou aceito.
+  const fechado = !!data.emitidoEm || ["EMITIDO", "ENVIADO_CLIENTE", "ACEITO"].includes(data.status);
   const aprov = data.aprovacoes || [];
   const jaAprovei = aprov.some((a) => a.userId === userId);
 
@@ -292,8 +335,21 @@ export default function DataBookDetalheClient({ id, userId }) {
               className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-3 py-1.5 hover:bg-torg-blue-50 inline-flex items-center gap-1.5">
               <FileDown size={13} /> Baixar PDF
             </a>
-            {data.status === "EMITIDO" ? (
-              <span className="text-[11px] px-2 py-1 rounded-full font-bold bg-emerald-100 text-emerald-700 inline-flex items-center gap-1"><CheckCircle2 size={12} /> Emitido</span>
+            {/* A revisão fica sempre à vista: é ela que diz QUAL documento é este. */}
+            <span className="text-[11px] px-2 py-1 rounded-full font-bold bg-gray-100 text-torg-dark" title="Revisão do data book">
+              {rotuloRev}
+            </span>
+            {fechado ? (
+              <>
+                <span className="text-[11px] px-2 py-1 rounded-full font-bold bg-emerald-100 text-emerald-700 inline-flex items-center gap-1">
+                  <CheckCircle2 size={12} /> {data.status === "EMITIDO" ? "Emitido" : data.status === "ACEITO" ? "Aceito" : "Enviado"}
+                </span>
+                <button onClick={abrirRevisao} disabled={revisando}
+                  title="Alterar um data book emitido exige nova revisão: o histórico fica registrado e as assinaturas são colhidas de novo"
+                  className="text-[12px] font-semibold text-amber-700 border border-amber-300 rounded-lg px-3 py-1.5 hover:bg-amber-50 disabled:opacity-50 inline-flex items-center gap-1.5">
+                  {revisando ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />} Gerar {proximaRev}
+                </button>
+              </>
             ) : (
               <button onClick={emitir} disabled={emitindo || !r.podeEmitir}
                 title={r.podeEmitir ? "Emitir data book" : `Faltam ${r.pendentes} seção(ões) e ${r.bloqueadas} com documento vencido`}
@@ -311,7 +367,34 @@ export default function DataBookDetalheClient({ id, userId }) {
             <span className="font-semibold text-torg-dark">{r.progresso}%</span>
           </div>
           <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-torg-blue rounded-full transition-all" style={{ width: `${r.progresso}%` }} /></div>
-          {(r.pendentes > 0 || r.bloqueadas > 0) && data.status !== "EMITIDO" && (
+          {/* HISTÓRICO DE REVISÃO — por que o documento mudou depois de emitido. Só aparece quando
+              existe: data book em R00 não tem história pra contar. */}
+          {revisoes?.revisoes?.length > 0 && (
+            <div className="mt-2">
+              <button onClick={() => setVerHistorico((v) => !v)}
+                className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1">
+                <History size={11} /> {revisoes.revisoes.length} revisão(ões) — {verHistorico ? "ocultar" : "ver histórico"}
+              </button>
+              {verHistorico && (
+                <div className="mt-1.5 border border-gray-100 rounded-lg divide-y divide-gray-50">
+                  {revisoes.revisoes.map((x) => (
+                    <div key={x.id} className="px-3 py-2 text-[11px]">
+                      <p className="font-semibold text-torg-dark">
+                        {x.rotuloAnterior} → {x.rotulo}
+                        <span className="font-normal text-torg-gray">
+                          {" · "}{new Date(x.createdAt).toLocaleDateString("pt-BR")}
+                          {x.criadoPorNome ? ` · ${x.criadoPorNome}` : ""}
+                          {x.assinaturasZeradas > 0 ? ` · ${x.assinaturasZeradas} assinatura(s) recolhida(s)` : ""}
+                        </span>
+                      </p>
+                      <p className="text-torg-gray mt-0.5">{x.motivo}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {(r.pendentes > 0 || r.bloqueadas > 0) && !fechado && (
             <p className="text-[11px] text-amber-700 mt-1.5 inline-flex items-center gap-1">
               <Lock size={11} /> Emissão travada: {r.pendentes} pendente(s){r.bloqueadas > 0 ? ` · ${r.bloqueadas} com documento vencido` : ""}.
             </p>

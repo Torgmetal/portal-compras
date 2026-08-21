@@ -75,6 +75,8 @@ async function montarDetalhe(id) {
     id: book.id, opNumero: book.opNumero, cliente: book.cliente, obra: book.obra,
     pesoTotalKg: book.pesoTotalKg, pecas: book.pecas, observacao: book.observacao, tipo: book.tipo,
     status: book.status, emitidoEm: book.emitidoEm, createdAt: book.createdAt,
+    // a revisão diz QUAL documento é este — o cabeçalho e o PDF mostram R00, R01…
+    revisao: book.revisao ?? 0,
     aprovacoes: book.aprovacoes.map((a) => ({ id: a.id, userId: a.userId, nome: a.nome, papel: a.papel, aprovadoEm: a.aprovadoEm })),
     clienteEmail: book.clienteEmail, enviadoClienteEm: book.enviadoClienteEm,
     aceiteEm: book.aceiteEm, aceiteNome: book.aceiteNome, tokenCliente: book.tokenCliente,
