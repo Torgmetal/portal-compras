@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X } from "lucide-react";
+import { layoutCotas, setaEm, PADDING } from "@/lib/cota-marcacao";
 
 /**
  * MARCAR AS COTAS NO DESENHO.
@@ -50,8 +51,11 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
     // ⚠ em tela cheia a largura sozinha não serve: uma vista deitada estouraria a altura da janela
     // e a peça sairia cortada embaixo, justamente onde ficam as cotas de nível.
     const dispA = amplo ? Math.max(320, window.innerHeight - 230) : Infinity;
-    const esc = Math.min(dispL / dados.largura, dispA / dados.altura);
-    return { esc, larg: dados.largura * esc, alt: dados.altura * esc };
+    // ⚠ a peça é desenhada com FOLGA em volta: o recorte é justo nela, e sem folga não há onde
+    // colocar as linhas de cota, que por definição ficam FORA da peça.
+    const W = dados.largura + PADDING * 2, H = dados.altura + PADDING * 2;
+    const esc = Math.min(dispL / W, dispA / H);
+    return { esc, larg: W * esc, alt: H * esc };
   }, [dados, amplo]);
 
   // vértices para o imã
@@ -62,8 +66,11 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
     return v;
   }, [dados]);
 
-  const paraTela = (p, L) => [p[0] * L.esc, L.alt - p[1] * L.esc];
-  const paraDesenho = (x, y, L) => [x / L.esc, (L.alt - y) / L.esc];
+  // coordenada JÁ com a folga (é o que `layoutCotas` devolve)
+  const telaPad = (p, L) => [p[0] * L.esc, L.alt - p[1] * L.esc];
+  // coordenada da VISTA (geometria e texto do desenho): soma a folga antes
+  const paraTela = (p, L) => telaPad([p[0] + PADDING, p[1] + PADDING], L);
+  const paraDesenho = (x, y, L) => [x / L.esc - PADDING, (L.alt - y) / L.esc - PADDING];
 
   useEffect(() => {
     const L = layout();
@@ -101,23 +108,45 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
       g.restore();
     }
 
-    // as cotas já marcadas
-    const desenhaCota = (co, cor, rotulo) => {
-      const a = paraTela([co.ax, co.ay], L), b = paraTela([co.bx, co.by], L);
-      g.strokeStyle = cor; g.lineWidth = 2;
-      g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
-      for (const p of [a, b]) { g.beginPath(); g.arc(p[0], p[1], 3, 0, 7); g.fillStyle = cor; g.fill(); }
-      if (rotulo) {
-        const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
-        g.fillStyle = cor;
-        g.beginPath(); g.arc(mx, my, 9, 0, 7); g.fill();
-        g.fillStyle = "#fff"; g.font = "bold 11px sans-serif";
-        g.textAlign = "center"; g.textBaseline = "middle";
-        g.fillText(rotulo, mx, my);
+    // ── AS COTAS A / B / C ──────────────────────────────────────────────────────────────────
+    //
+    // Linha de chamada clássica, FORA da peça, com as extensões descendo até os pontos marcados e
+    // a letra por cima — o desenho que o Vitor mandou. Ela mostra ONDE medir; o valor fica na
+    // tabela do relatório.
+    const traco = (a, b) => { g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); };
+    const marcas = layoutCotas(cotas, dados.largura, dados.altura);
+    marcas.forEach((m) => {
+      if (!m) return;
+      g.strokeStyle = "#F4801F";
+      // as extensões são finas: elas guiam o olho, não competem com o desenho
+      g.lineWidth = 0.8;
+      traco(telaPad(m.ext1.a, L), telaPad(m.ext1.b, L));
+      traco(telaPad(m.ext2.a, L), telaPad(m.ext2.b, L));
+      g.lineWidth = 1.4;
+      const la = telaPad(m.linha.a, L), lb = telaPad(m.linha.b, L);
+      traco(la, lb);
+      // setas apontando para FORA, como no desenho técnico
+      for (const [p, q] of [[la, lb], [lb, la]]) {
+        for (const [s1, s2] of setaEm(p, [q[0] - p[0], q[1] - p[1]], 6)) traco(s1, s2);
       }
-    };
-    for (const co of cotas) desenhaCota(co, "#F4801F", co.letra);
-    if (rascunho) desenhaCota(rascunho, "#006EAB", null);
+      const r = telaPad([m.rotulo.x, m.rotulo.y], L);
+      g.fillStyle = "#F4801F";
+      g.font = "bold 12px sans-serif";
+      g.textAlign = "center"; g.textBaseline = m.vertical ? "middle" : "bottom";
+      g.save();
+      g.translate(r[0], r[1]);
+      if (m.vertical) { g.rotate(-Math.PI / 2); g.textBaseline = "bottom"; }
+      g.fillText(String(m.letra || ""), 0, 0);
+      g.restore();
+    });
+
+    // o traço que está sendo criado agora: cru, sobre a peça, só para conferir as duas pontas
+    if (rascunho) {
+      const a = paraTela([rascunho.ax, rascunho.ay], L), b = paraTela([rascunho.bx, rascunho.by], L);
+      g.strokeStyle = "#006EAB"; g.lineWidth = 2; g.setLineDash([5, 3]);
+      traco(a, b); g.setLineDash([]);
+      for (const pt of [a, b]) { g.beginPath(); g.arc(pt[0], pt[1], 3, 0, 7); g.fillStyle = "#006EAB"; g.fill(); }
+    }
 
     // o ponto pendente e a borracha do imã
     if (pendente) {
