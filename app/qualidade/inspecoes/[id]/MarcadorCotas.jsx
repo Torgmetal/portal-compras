@@ -45,7 +45,14 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
   // PDF — é coberto de branco sobre a vista embutida, do mesmo jeito que as tabelas já eram.
   const [borracha, setBorracha] = useState(false);
   const cv = useRef(null);
-  const box = useRef(null);
+  // ⚠ A MEDIDA VEM DE FORA, NÃO DA CAIXA DO CANVAS.
+  //
+  // A caixa é `inline-block` (para a borda abraçar o desenho), então a largura DELA é decidida pelo
+  // conteúdo — que é o canvas, que eu dimensiono a partir dela. Medida circular: o canvas nascia
+  // pequeno e assim ficava, ocupando um terço da área disponível. Vitor: "por que você não deixa do
+  // tamanho dessa parte? tenho que ficar mexendo com lupa no projeto".
+  const box = useRef(null);   // referência de LARGURA — bloco, ocupa a linha inteira
+  const caixa = useRef(null); // a caixa com borda, que abraça o canvas
 
   useEffect(() => {
     let vivo = true;
@@ -63,7 +70,10 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     const dispL = box.current.clientWidth || 600;
     // ⚠ em tela cheia a largura sozinha não serve: uma vista deitada estouraria a altura da janela
     // e a peça sairia cortada embaixo, justamente onde ficam as cotas de nível.
-    const dispA = amplo ? Math.max(320, window.innerHeight - 230) : Infinity;
+    // ⚠ a altura ENTRA no cálculo mesmo fora da tela cheia. Só pela largura, numa página larga o
+    // desenho passava de mil pixels de altura e a pessoa rolava para ver a peça inteira — trocaria
+    // uma lupa por outra. Assim ele cresce até caber na janela.
+    const dispA = Math.max(360, window.innerHeight - (amplo ? 230 : 300));
     // ⚠ a peça é desenhada com FOLGA em volta: o recorte é justo nela, e sem folga não há onde
     // colocar as linhas de cota, que por definição ficam FORA da peça.
     const W = dados.largura + PADDING * 2, H = dados.altura + PADDING * 2;
@@ -342,9 +352,11 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
           </button>
         </span>
       </div>
-      <div ref={box} className="border border-gray-200 rounded-lg overflow-hidden bg-white inline-block max-w-full">
-        <canvas ref={cv} onClick={clique} onMouseMove={(e) => setHover(pontoDoEvento(e))} onMouseLeave={() => setHover(null)}
-          className="block cursor-crosshair" />
+      <div ref={box} className="w-full">
+      <div ref={caixa} className="border border-gray-200 rounded-lg overflow-hidden bg-white inline-block max-w-full">
+        <canvas ref={cv} onClick={clique} onMouseMove={(e) => setHover(borracha ? null : pontoDoEvento(e))} onMouseLeave={() => setHover(null)}
+          className={`block ${borracha ? "cursor-cell" : "cursor-crosshair"}`} />
+      </div>
       </div>
 
       {rascunho && (
