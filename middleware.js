@@ -27,6 +27,14 @@ export default withAuth(
         return NextResponse.redirect(new URL("/", req.url));
       }
     }
+    // Portal Qualidade Fábrica (/campo): login próprio em /campo/entrar, não /entrar.
+    // Vitor (21/08/2026) pediu porta separada — o inspetor externo não passa pelo portal interno.
+    if ((path.startsWith("/campo") && path !== "/campo/entrar") || path.startsWith("/api/campo")) {
+      if (!token) {
+        if (path.startsWith("/api/")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        return NextResponse.redirect(new URL("/campo/entrar", req.url));
+      }
+    }
     // Retorno explícito necessário para que o Vercel sirva corretamente
     // tanto páginas dinâmicas (ƒ) quanto estáticas (○) após autorização.
     return NextResponse.next();
@@ -43,6 +51,7 @@ export default withAuth(
           path.startsWith("/_next") ||
           path === "/entrar" ||
           path.startsWith("/colaborador") ||
+          path === "/campo/entrar" ||
           path === "/trocar-senha" ||
           path === "/api/trocar-senha" ||
           path === "/esqueci-senha" ||
@@ -115,6 +124,12 @@ export default withAuth(
         // /meu-rh (+ API) é tratado na função do middleware acima (login próprio
         // em /colaborador; isolamento por tipo). Deixa passar aqui.
         if (path.startsWith("/meu-rh") || path.startsWith("/api/meu-rh")) return true;
+
+        // ⚠ /campo idem: quem manda pro login é a função acima, que aponta pra /campo/entrar.
+        // Devolver false aqui faria o NextAuth redirecionar pro /entrar do portal interno — e o
+        // inspetor externo cairia numa tela que não é dele. O acesso em si é conferido na página
+        // e em cada rota da API (PERFIS_CAMPO).
+        if (path.startsWith("/campo") || path.startsWith("/api/campo")) return true;
 
         // Demais rotas: precisa estar logado
         if (!token) return false;

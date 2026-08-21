@@ -104,6 +104,21 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DataBookRevisao_dataBookId_idx" ON "DataBookRevisao"("dataBookId")`);
   console.log("[ensure-mes-tables] OK — DataBookRevisao garantida.");
 
+  // Foto de inspeção do Portal Qualidade Fábrica (celular). Idempotente.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "FotoInspecao" (
+      "id" TEXT NOT NULL, "opId" TEXT, "opNumero" TEXT NOT NULL, "tipo" TEXT NOT NULL,
+      "marca" TEXT, "origemMarca" TEXT, "observacao" TEXT, "url" TEXT NOT NULL, "tamanho" INTEGER,
+      "autorId" TEXT, "autorNome" TEXT,
+      "capturadaEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "relatorioId" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "FotoInspecao_pkey" PRIMARY KEY ("id"))`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "FotoInspecao_opNumero_tipo_idx" ON "FotoInspecao"("opNumero","tipo")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "FotoInspecao_relatorioId_idx" ON "FotoInspecao"("relatorioId")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "FotoInspecao_capturadaEm_idx" ON "FotoInspecao"("capturadaEm")`);
+  console.log("[ensure-mes-tables] OK — FotoInspecao garantida.");
+
   // ProdutoOmie (cache do cadastro de produtos do Omie — código do item nos romaneios). Idempotente.
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "ProdutoOmie" (

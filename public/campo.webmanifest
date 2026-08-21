@@ -1,0 +1,14 @@
+{
+  "name": "Qualidade Fábrica — Torg",
+  "short_name": "Qualidade",
+  "description": "Registro de inspeção pelo celular.",
+  "start_url": "/campo",
+  "scope": "/campo",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f9fafb",
+  "theme_color": "#0D1F3C",
+  "icons": [
+    { "src": "/torguinho.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

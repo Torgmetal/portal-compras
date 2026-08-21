@@ -4288,3 +4288,33 @@ model AssinaturaDocumento {
 
   @@index([envioId])
 }
+
+// PORTAL QUALIDADE FÁBRICA — a foto tirada no celular, no chão de fábrica.
+//
+// Vitor (21/08/2026): "preciso criar uma forma de que o pessoal da fábrica através de um celular
+// tire fotos e faça relatórios; hoje tudo é manual". O celular é só CAPTURA: escolhe a OP e o tipo,
+// fotografa e diz de qual peça é. O relatório em si é montado depois, no computador, e é lá que
+// começa o fluxo de assinaturas.
+//
+// ⚠ `origemMarca` não é detalhe. QR é o desenho identificando a peça; BUSCA é uma pessoa afirmando
+// qual é. Numa auditoria isso não vale a mesma coisa, então fica registrado qual dos dois foi.
+model FotoInspecao {
+  id          String   @id @default(cuid())
+  opId        String?
+  opNumero    String // snapshot: OP.numero é texto ("067", "T60B")
+  tipo        String // DIMENSIONAL | VISUAL_SOLDA | LP | PINTURA | MONTAGEM | GERAL
+  marca       String? // peça (marca do Tekla). Nulo = foto de região/geral
+  origemMarca String? // QR | BUSCA | LIVRE
+  observacao  String? // legenda curta digitada no celular
+  url         String // Vercel Blob (JPEG já reduzido no aparelho)
+  tamanho     Int?
+  autorId     String?
+  autorNome   String?
+  capturadaEm DateTime @default(now())
+  relatorioId String? // preenchido quando a foto entra num relatório montado no portal
+  createdAt   DateTime @default(now())
+
+  @@index([opNumero, tipo])
+  @@index([relatorioId])
+  @@index([capturadaEm])
+}
