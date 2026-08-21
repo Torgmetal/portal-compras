@@ -5,6 +5,7 @@ import {
   Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, FileText, Lock,
 } from "lucide-react";
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
+import MarcadorCotas from "./MarcadorCotas";
 
 /**
  * O RELATÓRIO ABERTO — é aqui que o elaborador preenche e VÊ A PRÉVIA.
@@ -43,7 +44,14 @@ export default function RelatorioDetalheClient({ id }) {
   if (!dados) return <div className="p-6"><p className="text-sm text-torg-gray inline-flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> carregando…</p></div>;
 
   const rel = dados.relatorio;
-  const linhas = Array.isArray(rel.linhas) ? rel.linhas : [];
+  const todas = Array.isArray(rel.linhas) ? rel.linhas : [];
+  // ⚠ COTA GANHA DA LISTA. Assim que existe uma cota marcada no desenho, a tabela passa a ser só
+  // dela — é o modelo do Vitor ("cota simples, referenciamos como A B C"), e conviver com as nove
+  // linhas da lista de materiais era exatamente a poluição que ele pediu para tirar. As linhas
+  // automáticas continuam gravadas; só saem de vista.
+  const cotas = todas.filter((l) => l.letra);
+  const linhas = cotas.length ? cotas : todas;
+  const idxReal = (i) => (cotas.length ? todas.indexOf(cotas[i]) : i);
   const res = rel.resultados || {};
   const desenhos = Array.isArray(rel.desenhos) ? rel.desenhos : [];
   const marcaAtual = marcaVista || desenhos[0]?.marca || "";
@@ -118,6 +126,24 @@ export default function RelatorioDetalheClient({ id }) {
             <Campo label="Inspetor" v={rel.inspetor || ""} onChange={(v) => setCampo("inspetor", v)} disabled={travado} />
           </div>
 
+          {rel.tipo === "DIMENSIONAL" && desenhos.length > 0 && !travado && (
+            <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
+              <p className="text-[12px] font-bold text-torg-dark inline-flex items-center gap-1.5 mb-1.5">
+                <Ruler size={13} className="text-torg-blue" /> Cotas do desenho
+              </p>
+              <MarcadorCotas
+                relatorioId={id}
+                marca={marcaAtual}
+                cotas={cotas}
+                onChange={(novas) => setDados((d) => ({
+                  ...d,
+                  // as automáticas ficam no fim, preservadas; as cotas assumem a frente
+                  relatorio: { ...d.relatorio, linhas: [...novas, ...(d.relatorio.linhas || []).filter((l) => !l.letra)] },
+                }))}
+              />
+            </div>
+          )}
+
           {linhas.length > 0 && (
             <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
               <div className="flex items-center justify-between mb-2">
@@ -146,7 +172,7 @@ export default function RelatorioDetalheClient({ id }) {
                           <td className="py-1 text-right">
                             {/* 🚫 nasce vazio: Vitor pediu que a dimensão encontrada seja do elaborador */}
                             <input type="number" step="0.1" disabled={travado}
-                              value={l.encontradoMm ?? ""} onChange={(e) => setLinha(i, "encontradoMm", e.target.value === "" ? null : Number(e.target.value))}
+                              value={l.encontradoMm ?? ""} onChange={(e) => setLinha(idxReal(i), "encontradoMm", e.target.value === "" ? null : Number(e.target.value))}
                               className="w-20 text-right text-[12px] font-mono border border-gray-200 rounded px-1.5 py-0.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
                             {dif != null && dif !== 0 && (
                               <span className={`ml-1 text-[10px] font-semibold ${Math.abs(dif) > 3 ? "text-red-600" : "text-amber-600"}`}>
@@ -155,7 +181,7 @@ export default function RelatorioDetalheClient({ id }) {
                             )}
                           </td>
                           <td className="py-1">
-                            <input value={l.obs || ""} disabled={travado} onChange={(e) => setLinha(i, "obs", e.target.value)}
+                            <input value={l.obs || ""} disabled={travado} onChange={(e) => setLinha(idxReal(i), "obs", e.target.value)}
                               className="w-full text-[12px] border border-gray-200 rounded px-1.5 py-0.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
                           </td>
                         </tr>
