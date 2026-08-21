@@ -31,6 +31,9 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
   const [hover, setHover] = useState(null);
   const [rascunho, setRascunho] = useState(null); // { ax, ay, bx, by } esperando nome/espec
   const [amplo, setAmplo] = useState(false); // tela cheia — Vitor pediu mais área para marcar
+  // ⚠ a tolerância SE LEMBRA entre as cotas: digitar "3" a cada uma é trabalho à toa. Vive aqui, e
+  // não dentro do formulário, justamente para sobreviver ao fecha-e-abre de cada cota.
+  const [tol, setTol] = useState("3");
   const cv = useRef(null);
   const box = useRef(null);
 
@@ -191,58 +194,50 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
   }
 
   /**
-   * O VALOR DE PROJETO, SUGERIDO DO PRÓPRIO DESENHO.
+   * OS VALORES QUE O DESENHO DECLARA JUNTO DESTA LINHA.
    *
-   * Vitor (21/08/2026), com a cota já traçada e o campo vazio: "nessa parte você não consegue já
-   * preencher isso?".
+   * Vitor (21/08/2026), vendo a coluna de dimensões vazia: "como podemos melhorar essa questão
+   * desse preenchimento?".
    *
-   * Consegue — e só agora. O que me travava era escolher QUAL cota vale entre as dezenas da folha;
-   * ao traçar a linha, ele já respondeu isso. Sobra ler o número, e o desenho o declara.
+   * Hoje ele lê o número na tela e digita o mesmo número — retrabalho puro, e é onde entra erro de
+   * digitação. Aqui o portal devolve os candidatos e ele toca em um.
    *
-   * Três leituras, da mais firme para a mais frouxa:
+   * ⚠ Continua sendo o USUÁRIO quem escolhe. Eu não acerto sozinho qual cota vale — já tentei por
+   * três caminhos e todos erram (inclusive porque o eixo do desenho pode ser interrompido, o que
+   * derruba qualquer regra de três). Oferecer as opções é honesto; decidir por ele não seria.
    *
-   *   1. NÍVEL NAS DUAS PONTAS. Cota de elevação traz o valor em cada extremidade (0 embaixo, 4332
-   *      em cima); a medida é a diferença. É a leitura mais confiável porque as duas pontas foram
-   *      escolhidas por quem traçou.
-   *   2. NÚMERO NO MEIO. Cota comum escreve o valor sobre a própria linha.
-   *   3. ESCALA DE UMA COTA ANTERIOR. Confirmada a primeira, a escala daquela vista está conhecida
-   *      e as seguintes saem por regra de três.
-   *
-   * ⚠ É SUGESTÃO, e a tela diz isso. Eu já errei feio tentando adivinhar cota sozinho; aqui o
-   * número entra preenchido para poupar digitação, não para ser aceito sem olhar.
+   * Ordem: primeiro a diferença entre os níveis das duas pontas (a leitura mais firme, porque as
+   * pontas foram escolhidas por quem marcou), depois os números escritos ao longo da linha, do
+   * maior para o menor — numa cadeia, o total costuma ser o que interessa.
    */
-  function sugerir(r) {
+  function candidatos(r) {
+    if (!r) return [];
     const nums = (dados.textos || [])
       .map((t) => ({ ...t, n: /^\d{1,5}$/.test(String(t.s).trim()) ? parseInt(t.s, 10) : null }))
       .filter((t) => t.n != null);
     const comp = Math.hypot(r.bx - r.ax, r.by - r.ay);
-    if (comp < 2) return null;
+    if (comp < 2) return [];
 
     const perto = (px, py, raio = 34) => nums
       .map((t) => ({ t, d: Math.hypot(t.x - px, t.y - py) }))
-      .filter((o) => o.d < raio)
-      .sort((a, b) => a.d - b.d)[0]?.t || null;
+      .filter((o) => o.d < raio).sort((a, b) => a.d - b.d)[0]?.t || null;
 
-    // 1) nível nas duas pontas
+    const out = [];
     const a = perto(r.ax, r.ay), b = perto(r.bx, r.by);
-    if (a && b && a.n !== b.n) return Math.abs(b.n - a.n);
+    if (a && b && a.n !== b.n) out.push(Math.abs(b.n - a.n));
 
-    // 2) número escrito sobre o meio da linha — cota comum
-    const m = perto((r.ax + r.bx) / 2, (r.ay + r.by) / 2, 26);
-    if (m) return m.n;
+    const ux = (r.bx - r.ax) / comp, uy = (r.by - r.ay) / comp;
+    const aoLongo = nums.filter((t) => {
+      const vx = t.x - r.ax, vy = t.y - r.ay;
+      const proj = vx * ux + vy * uy;
+      if (proj < -8 || proj > comp + 8) return false;
+      return Math.abs(vx * -uy + vy * ux) < 24;
+    }).map((t) => t.n).sort((x, y) => y - x);
 
-    // 🚫 NÃO EXISTE REGRA 3. Tentei duas e as duas erram:
-    //
-    // · "maior número ao longo da linha" devolvia 16 numa cota de largura e 4132 numa de topo —
-    //   pega nível e cota vizinha junto;
-    // · "regra de três pela escala de uma cota já confirmada" parece sólida e não é: O EIXO DO
-    //   DESENHO PODE SER INTERROMPIDO. No T89A3 o trecho de cima é linear (5,46 e 5,48 mm/pt entre
-    //   os níveis 3431→4132→4332), mas a coluna inteira dá 15,2 mm/pt — a parte de baixo está
-    //   comprimida. Escala medida num trecho não vale no outro, e o erro seria enorme e silencioso.
-    //
-    // Sem leitura declarada, o campo fica VAZIO e a tela diz "não achei no desenho". Número errado
-    // que a pessoa aceita sem desconfiar é pior que campo em branco.
-    return null;
+    for (const n of aoLongo) if (!out.includes(n)) out.push(n);
+    // ⚠ 8, não 6: numa cadeia longa (438, 373, 811, 152, 963, 750, 1714, 1771) o total costuma ser
+    // o último a entrar, e cortar antes esconderia justamente o que interessa.
+    return out.slice(0, 8);
   }
 
   function clique(e) {
@@ -252,7 +247,7 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
     setPendente(null);
   }
 
-  function confirmar(espec, tol) {
+  function confirmar(espec) {
     const letra = LETRAS[cotas.length] || `C${cotas.length + 1}`;
     onChange([...cotas, {
       letra,
@@ -297,8 +292,15 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
           className="block cursor-crosshair" />
       </div>
 
-      {rascunho && <FormCota onConfirmar={confirmar} onCancelar={() => setRascunho(null)}
-        letra={LETRAS[cotas.length] || "?"} sugestao={sugerir(rascunho)} />}
+      {rascunho && (
+        <BarraCota
+          letra={LETRAS[cotas.length] || "?"}
+          valores={candidatos(rascunho)}
+          tol={tol} onTol={setTol}
+          onConfirmar={confirmar}
+          onCancelar={() => setRascunho(null)}
+        />
+      )}
 
       {cotas.length > 0 && (
         <ul className="mt-2 space-y-1 max-w-2xl">
@@ -325,31 +327,61 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange }) {
   ) : conteudo;
 }
 
-function FormCota({ onConfirmar, onCancelar, letra, sugestao = null }) {
-  const [espec, setEspec] = useState(sugestao != null ? String(sugestao) : "");
-  const [tol, setTol] = useState("3");
+/**
+ * A BARRA DA COTA — um toque no valor e a cota está criada.
+ *
+ * Vitor pediu para melhorar o preenchimento. Antes era: ler o número na tela, digitar o mesmo
+ * número, ajustar a tolerância, confirmar. Agora os valores que o desenho declara junto da linha
+ * viram botões; tocar num deles CRIA a cota na hora, com a tolerância que já estava valendo.
+ *
+ * ⚠ Sem passo de confirmação de propósito — é o "modo em série" que ele pediu: clique, clique,
+ * toque; clique, clique, toque. Errou? A cota some com um clique na lixeira, ali embaixo.
+ *
+ * ⚠ O campo de digitar continua, para o desenho que não declara o número. Não dá para depender só
+ * da leitura: nem toda cota está escrita na folha.
+ */
+function BarraCota({ letra, valores, tol, onTol, onConfirmar, onCancelar }) {
+  const [outro, setOutro] = useState("");
   return (
-    <div className="mt-2 p-2.5 bg-torg-blue-50 border border-torg-blue-200 rounded-lg flex items-end gap-2 flex-wrap">
-      <span className="w-6 h-6 rounded-full bg-torg-blue text-white font-bold text-[11px] inline-flex items-center justify-center shrink-0">{letra}</span>
-      <span className="text-[12px] font-semibold text-torg-dark self-center">Cota {letra}</span>
-      <label className="w-28">
-        <span className="block text-[10px] text-torg-gray mb-0.5">
-          Espec. (mm)
-          {sugestao != null
-            ? <span className="text-torg-orange font-medium"> · do desenho</span>
-            : <span className="text-torg-gray"> · não achei no desenho</span>}
-        </span>
-        <input autoFocus type="number" value={espec} onChange={(e) => setEspec(e.target.value)}
-          className="w-full border border-gray-200 rounded px-2 py-1 text-[12px] font-mono" />
-      </label>
-      <label className="w-20">
-        <span className="block text-[10px] text-torg-gray mb-0.5">Tol. ±</span>
-        <input type="number" value={tol} onChange={(e) => setTol(e.target.value)}
-          className="w-full border border-gray-200 rounded px-2 py-1 text-[12px] font-mono" />
-      </label>
-      <button onClick={() => onConfirmar(espec, tol)} disabled={espec === ""}
-        className="bg-torg-blue text-white rounded px-3 py-1.5 text-[12px] font-medium disabled:opacity-40">Criar cota</button>
-      <button onClick={onCancelar} className="text-[12px] text-torg-gray px-2 py-1.5">Cancelar</button>
+    <div className="mt-2 p-2.5 bg-torg-blue-50 border border-torg-blue-200 rounded-lg">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="w-6 h-6 rounded-full bg-torg-blue text-white font-bold text-[11px] inline-flex items-center justify-center shrink-0">{letra}</span>
+        <span className="text-[12px] font-semibold text-torg-dark">Cota {letra}</span>
+
+        {valores.length > 0 ? (
+          <span className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-torg-gray">do desenho:</span>
+            {valores.map((v) => (
+              <button key={v} onClick={() => onConfirmar(v)}
+                className="text-[12px] font-mono font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded px-2 py-1">
+                {v}
+              </button>
+            ))}
+          </span>
+        ) : (
+          <span className="text-[10px] text-torg-gray">não achei número no desenho aqui</span>
+        )}
+
+        <span className="flex-1" />
+
+        <label className="inline-flex items-center gap-1">
+          <span className="text-[10px] text-torg-gray">Tol. ±</span>
+          <input type="number" value={tol} onChange={(e) => onTol(e.target.value)}
+            className="w-14 border border-gray-200 rounded px-1.5 py-1 text-[12px] font-mono" />
+        </label>
+      </div>
+
+      <div className="flex items-center gap-2 mt-1.5">
+        <input type="number" value={outro} onChange={(e) => setOutro(e.target.value)}
+          placeholder="outro valor (mm)"
+          onKeyDown={(e) => { if (e.key === "Enter" && outro !== "") onConfirmar(Number(outro)); }}
+          className="w-40 border border-gray-200 rounded px-2 py-1 text-[12px] font-mono" />
+        <button onClick={() => outro !== "" && onConfirmar(Number(outro))} disabled={outro === ""}
+          className="text-[12px] text-torg-blue font-medium disabled:opacity-40">usar este</button>
+        <span className="flex-1" />
+        <button onClick={onCancelar} className="text-[12px] text-torg-gray">Cancelar</button>
+      </div>
     </div>
   );
 }
+
