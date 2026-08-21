@@ -582,6 +582,17 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
   const [progresso, setProgresso] = useState(""); // "2/5" durante o upload em lote
   const fileRef = useRef(null);
   const navegavel = secaoNavega(secao.numero);
+  // ── SEÇÃO DE CERTIFICADO TEM OS DOIS CAMINHOS ───────────────────────────────────────────────
+  //
+  // Vitor, na especificação por seção: §04 "vincular com a planilha CMR e trazer os certificados
+  // correspondentes a essa OP"; §05 "trazer as peças que estão na planilha e anexar os
+  // certificados que estão na pasta"; §06 "mesmo caso dos parafusos e materiais"; §15 "trazer as
+  // informações da planilha CMR e anexar os certificados das tintas que estão nessa pasta".
+  //
+  // O "deixar apenas dois botões" era sobre as seções que ele listou PRA NAVEGAR (§02, §03, §07…),
+  // onde o conteúdo é uma pasta. Nestas quatro o conteúdo vem do CMR e a pasta é só onde mora o
+  // PDF — então trazer e navegar convivem, que é o que ele pediu desde o começo.
+  const secaoDeCertificado = !!GRUPO_POR_SECAO[secao.numero];
   // Documentos que a API apontou como sendo de OUTRA seção (ex.: tinta na §04 de matéria-prima).
   const foraDoGrupo = secao.documentos.filter((d) => d.secaoCerta);
   const linkedIds = new Set(secao.documentos.map((d) => d.id));
@@ -756,6 +767,12 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
                   os dois — e "Anexar arquivos" sai junto de propósito: nessas seções o arquivo mora
                   no servidor, e subir cópia do computador cria uma segunda verdade que a revisão da
                   pasta nunca alcança. */}
+              {secaoDeCertificado && (
+                <button onClick={onPopularMaterial} disabled={acaoLoading}
+                  className="text-[11px] text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
+                  <FileText size={12} /> Trazer {GRUPO_MATERIAL_LABEL[secao.numero]} desta OP
+                </button>
+              )}
               {/* Navegar a pasta do servidor e ESCOLHER — Vitor (19/08): "deixar navegar na
                   pasta e selecionar os arquivos que quero colocar". */}
               {navegavel && (
@@ -770,12 +787,6 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
                 className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium disabled:opacity-50">
                 {enviando ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} {enviando ? `Enviando${progresso ? " " + progresso : ""}…` : "Anexar arquivos"}
               </button>
-              {GRUPO_POR_SECAO[secao.numero] && (
-                <button onClick={onPopularMaterial} disabled={acaoLoading}
-                  className="text-[11px] text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
-                  <FileText size={12} /> Trazer {GRUPO_MATERIAL_LABEL[secao.numero]} desta OP
-                </button>
-              )}
               {secaoUsaEmpresa(secao.numero) && (
                 <button onClick={onPopularEmpresa} disabled={acaoLoading}
                   className="text-[11px] text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">

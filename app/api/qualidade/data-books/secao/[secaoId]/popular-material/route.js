@@ -9,6 +9,7 @@ import { requireRole } from "@/lib/session";
 import { estaFechado, erroPrecisaRevisao } from "@/lib/databook-revisao";
 import { classificarMaterial, GRUPO_POR_SECAO } from "@/lib/databook-secoes";
 import { enriquecerComFicha } from "@/lib/databook-ficha-r";
+import { consumiveisDaOP } from "@/lib/consumivel-solda";
 
 export const runtime = "nodejs";
 
@@ -36,7 +37,7 @@ export async function POST(req, { params }) {
 
   const secao = await prisma.dataBookSecao.findUnique({
     where: { id: params.secaoId },
-    select: { id: true, numero: true, dataBook: { select: { opNumero: true } } },
+    select: { id: true, numero: true, dataBook: { select: { opNumero: true, opId: true } } },
   });
   if (!secao) return NextResponse.json({ success: false, error: "Seção não encontrada" }, { status: 404 });
 
@@ -50,11 +51,35 @@ export async function POST(req, { params }) {
     where: { ativo: true, categoria: "MATERIAL", opNumero },
     select: { id: true, nome: true },
   });
-  // ⚠ classifica pela FICHA DO CMR, não pelo nome do vínculo. Certificado anexado se chama só
-  // "R 260527" — sem o material, `classificarMaterial` cai no padrão ESTRUTURAL e a tinta vai
-  // parar na §04. Ver lib/databook-ficha-r.js.
-  const enriquecidos = await enriquecerComFicha(todos, opNumero);
-  const docs = grupo ? enriquecidos.filter((d) => classificarMaterial(d.nome) === grupo) : enriquecidos;
+  // ── §06 NÃO SE RESOLVE POR OP ───────────────────────────────────────────────────────────────
+  //
+  // O arame entra no CMR SEM OP (é estoque geral, não é comprado por obra). A busca acima, que
+  // filtra por `opNumero`, volta vazia — era por isso que a §06 nunca trazia nada. E puxar as 17
+  // entradas do CMR colocaria no livro lotes que nunca encostaram nesta obra.
+  //
+  // Vitor (20/08/2026): "precisamos ter certeza desses certificados de acordo com o que está
+  // marcado nos croquis, conforme alinhamos na página do PCP". Então a §06 traz os lotes que o
+  // MESMO cálculo do carimbo do desenho aponta: para cada conjunto, o arame vigente na data em que
+  // ele foi soldado.
+  let docs;
+  if (secao.numero === "06") {
+    const opId = secao.dataBook?.opId || (await prisma.oP.findFirst({ where: { numero: opNumero }, select: { id: true } }))?.id;
+    const usados = await consumiveisDaOP(opId);
+    if (!usados.length) {
+      return NextResponse.json({ success: true, vinculados: 0, total: 0, semDocs: true });
+    }
+    const rs = usados.map((u) => u.rastreio);
+    docs = await prisma.documentoQualidade.findMany({
+      where: { ativo: true, categoria: "MATERIAL", importRef: { in: rs } },
+      select: { id: true, nome: true },
+    });
+  } else {
+    // ⚠ classifica pela FICHA DO CMR, não pelo nome do vínculo. Certificado anexado se chama só
+    // "R 260527" — sem o material, `classificarMaterial` cai no padrão ESTRUTURAL e a tinta vai
+    // parar na §04. Ver lib/databook-ficha-r.js.
+    const enriquecidos = await enriquecerComFicha(todos, opNumero);
+    docs = grupo ? enriquecidos.filter((d) => classificarMaterial(d.nome) === grupo) : enriquecidos;
+  }
   if (!docs.length) {
     return NextResponse.json({ success: true, vinculados: 0, total: 0, semDocs: true });
   }
