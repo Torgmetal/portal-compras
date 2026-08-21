@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { signOut } from "next-auth/react";
 import {
   Loader2, Camera, QrCode, Search, X, Check, ChevronLeft, HardHat,
-  LogOut, Trash2, AlertCircle, Tag,
+  LogOut, Trash2, AlertCircle, Tag, Upload,
 } from "lucide-react";
 import { TIPOS_RELATORIO, TIPO_LABEL, marcaDoQR, marcaCasaOP } from "@/lib/qualidade-campo";
 import LeitorQR from "./LeitorQR";
@@ -14,10 +14,14 @@ import LeitorQR from "./LeitorQR";
  * Vitor (21/08/2026): "seleciona a OP, tipo de relatório, tira a foto e informa qual peça; isso
  * sobe para o portal, e depois por computador começa o fluxo das assinaturas".
  *
- * A ORDEM AQUI NÃO É A DA FRASE, e é de propósito: a peça fica FIXA no topo e as fotos vão caindo
- * nela. Quem inspeciona fotografa a mesma peça três, quatro vezes seguidas (vista geral, solda,
- * detalhe) — perguntar a peça a cada foto seria o triplo de toques. Aponta no QR uma vez, fotografa
- * à vontade, aponta no próximo.
+ * AS DUAS ORDENS FUNCIONAM. A peça fica FIXA no topo e as fotos se acumulam numa fila até tocarem
+ * em enviar — então dá pra apontar no QR e depois fotografar, ou fotografar e depois dizer a peça.
+ * A peça fixa existe porque quem inspeciona fotografa a mesma peça três, quatro vezes seguidas
+ * (vista geral, solda, detalhe), e perguntar a cada foto seria o triplo de toques.
+ *
+ * A primeira versão subia a foto no ato, o que na prática obrigava a escolher a peça antes. Vitor,
+ * testando: "tirei a foto, escolhi a peça, mas não tem um botão de enviar" — e ele tinha feito
+ * exatamente na ordem que descreveu no começo. Daí a fila.
  *
  * 🚫 Nenhum nome de cliente nesta tela. Vitor: "pode deixar aberto, só não deixa o nome do cliente;
  * para esse acesso deixar apenas o número da OP" — dois dos cinco usuários são inspetores externos.
@@ -53,7 +57,17 @@ export default function CampoClient({ nome }) {
   const [tipo, setTipo] = useState(null);      // id do tipo
   const [peca, setPeca] = useState(null);      // { marca, origem }
   const [fotos, setFotos] = useState([]);
+  // ── FILA: a foto ESPERA o envio ────────────────────────────────────────────────────────────
+  //
+  // Vitor (21/08/2026), testando: "tirei a foto, escolhi a peça, mas não tem um botão de enviar".
+  // Estava subindo na hora, o que obrigava a escolher a peça ANTES — e a ordem que ele descreveu
+  // desde o começo foi a outra: "tira a foto e informa qual peça".
+  //
+  // Com a fila as duas ordens funcionam, dá pra conferir a foto antes de mandar, e dá pra descartar
+  // a que saiu tremida sem precisar apagar depois do envio.
+  const [fila, setFila] = useState([]); // { id, blob, preview }
   const [enviando, setEnviando] = useState(false);
+  const [progresso, setProgresso] = useState("");
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
   const fileRef = useRef(null);
@@ -81,16 +95,41 @@ export default function CampoClient({ nome }) {
   }, [op?.numero, tipo]);
   useEffect(() => { carregarFotos(); }, [carregarFotos]);
 
-  async function enviarFoto(e) {
+  /** A foto entra na fila (já reduzida). Nada sobe ainda. */
+  async function receberFotos(e) {
     const arquivos = Array.from(e.target.files || []);
     if (fileRef.current) fileRef.current.value = "";
     if (!arquivos.length) return;
-    setErro(""); setEnviando(true);
+    setErro("");
     try {
+      const novas = [];
       for (const arq of arquivos) {
-        const reduzida = await reduzImagem(arq);
+        const blob = await reduzImagem(arq);
+        novas.push({ id: `${Date.now()}-${novas.length}`, blob, preview: URL.createObjectURL(blob) });
+      }
+      setFila((p) => [...p, ...novas]);
+    } catch (err) { setErro(err.message); }
+  }
+
+  function descartar(id) {
+    setFila((p) => {
+      const alvo = p.find((f) => f.id === id);
+      if (alvo) URL.revokeObjectURL(alvo.preview);
+      return p.filter((f) => f.id !== id);
+    });
+  }
+
+  /** Sobe a fila inteira com a peça que está selecionada agora. */
+  async function enviar() {
+    if (!fila.length || enviando) return;
+    setErro(""); setEnviando(true);
+    const restantes = [...fila];
+    try {
+      for (let i = 0; i < restantes.length; i++) {
+        setProgresso(`${i + 1}/${restantes.length}`);
+        const item = restantes[i];
         const fd = new FormData();
-        fd.append("file", reduzida, "foto.jpg");
+        fd.append("file", item.blob, "foto.jpg");
         fd.append("opId", op.id || "");
         fd.append("opNumero", op.numero);
         fd.append("tipo", tipo);
@@ -99,10 +138,14 @@ export default function CampoClient({ nome }) {
         const j = await r.json();
         if (!r.ok) throw new Error(j.error || "Falha ao enviar");
         setFotos((p) => [{ ...j.foto, tipo }, ...p]);
+        // ⚠ tira da fila UMA A UMA. Se a conexão cair no meio (e no galpão cai), o que já subiu não
+        // volta pra fila e não sobe duas vezes — o inspetor toca em enviar de novo e segue do ponto.
+        URL.revokeObjectURL(item.preview);
+        setFila((p) => p.filter((f) => f.id !== item.id));
       }
     } catch (err) {
-      setErro(err.message);
-    } finally { setEnviando(false); }
+      setErro(`${err.message} — toque em enviar de novo para continuar de onde parou.`);
+    } finally { setEnviando(false); setProgresso(""); }
   }
 
   async function apagar(id) {
@@ -153,16 +196,48 @@ export default function CampoClient({ nome }) {
       )}
 
       {/* `capture` abre a câmera direto; `multiple` deixa mandar da galeria o que já foi tirado */}
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={enviarFoto} />
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={receberFotos} />
       <button onClick={() => fileRef.current?.click()} disabled={enviando}
-        className="mt-4 w-full bg-torg-blue active:bg-torg-dark text-white rounded-2xl py-5 text-lg font-semibold inline-flex items-center justify-center gap-2.5 disabled:opacity-60">
-        {enviando ? <Loader2 size={22} className="animate-spin" /> : <Camera size={24} />}
-        {enviando ? "enviando…" : "Tirar foto"}
+        className="mt-4 w-full bg-white border-2 border-torg-blue text-torg-blue active:bg-torg-blue/5 rounded-2xl py-5 text-lg font-semibold inline-flex items-center justify-center gap-2.5 disabled:opacity-60">
+        <Camera size={24} /> Tirar foto
       </button>
+
+      {/* ── A FILA ────────────────────────────────────────────────────────────────────────────
+          As fotas ficam aqui até tocarem em enviar. É o que permite fotografar primeiro e dizer a
+          peça depois — a ordem que o Vitor descreveu — e conferir antes de mandar. */}
+      {fila.length > 0 && (
+        <div className="mt-4 bg-white border border-gray-200 rounded-2xl p-3">
+          <p className="text-xs font-semibold text-torg-gray mb-2">
+            {fila.length} foto(s) para enviar {peca ? `em ${peca.marca}` : "sem peça (registro geral)"}
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            {fila.map((f) => (
+              <div key={f.id} className="relative rounded-lg overflow-hidden bg-gray-100 aspect-square">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={f.preview} alt="a enviar" className="w-full h-full object-cover" />
+                <button onClick={() => descartar(f.id)} disabled={enviando}
+                  className="absolute top-1 right-1 bg-black/55 text-white rounded-full p-1 active:bg-black/75 disabled:opacity-40">
+                  <X size={11} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button onClick={enviar} disabled={enviando}
+            className="mt-3 w-full bg-torg-blue active:bg-torg-dark text-white rounded-2xl py-4 text-lg font-semibold inline-flex items-center justify-center gap-2.5 disabled:opacity-60">
+            {enviando ? <Loader2 size={22} className="animate-spin" /> : <Upload size={22} />}
+            {enviando ? `enviando ${progresso}…` : `Enviar ${fila.length} foto(s)`}
+          </button>
+          {!peca && (
+            <p className="mt-2 text-[11px] text-torg-gray text-center">
+              Sem peça selecionada, elas entram como registro geral da inspeção.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="mt-5">
         <p className="text-xs font-semibold text-torg-gray mb-2">
-          {fotos.length ? `${fotos.length} foto(s) nesta inspeção` : "Nenhuma foto ainda."}
+          {fotos.length ? `${fotos.length} foto(s) já enviada(s)` : "Nenhuma foto enviada ainda."}
         </p>
         <div className="grid grid-cols-3 gap-2">
           {fotos.map((f) => (
