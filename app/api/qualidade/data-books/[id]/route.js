@@ -5,7 +5,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { calcStatusValidade, diasAlertaCategoria, usaMesInteiro } from "@/lib/qualidade-status";
-import { secaoUsaModulo1 } from "@/lib/databook-secoes";
+import { secaoUsaModulo1 , secaoCertaDoDoc } from "@/lib/databook-secoes";
+import { fichasPorR, comFicha } from "@/lib/databook-ficha-r";
 
 export const runtime = "nodejs";
 
@@ -51,8 +52,19 @@ async function montarDetalhe(id) {
     extra.forEach((d) => docsById.set(d.id, d));
   }
 
+  // ── O CERTIFICADO ANEXADO SÓ TEM O R NO NOME ────────────────────────────────────────────────
+  //
+  // "R 260527.pdf" vira um documento chamado "R 260527" e nada mais. A tela mostrava só isso, e a
+  // classificação por seção — que lê o nome — não tinha como saber se aquilo era aço, tinta,
+  // parafuso ou arame: caía no padrão ESTRUTURAL. Resolvendo a ficha do CMR pelo mesmo R, a tela
+  // passa a mostrar o material de verdade E a classificação passa a funcionar.
+  const fichas = await fichasPorR([...docsById.values()], book.opNumero);
+  for (const [id, d] of docsById) docsById.set(id, comFicha(d, fichas));
+
   const secoes = book.secoes.map((s) => {
-    const docs = s.documentos.map((ld) => docsById.get(ld.documentoId)).filter(Boolean).map(resolverDoc);
+    const docs = s.documentos.map((ld) => docsById.get(ld.documentoId)).filter(Boolean).map(resolverDoc)
+      // aponta (sem mexer) o documento que está na seção errada — ver secaoCertaDoDoc
+      .map((d) => ({ ...d, secaoCerta: secaoCertaDoDoc(d, s.numero) }));
     const temVencido = docs.some((d) => d.status === "VENCIDO");
     const usaM1 = secaoUsaModulo1(s.fonte);
     return {

@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { estaFechado, erroPrecisaRevisao } from "@/lib/databook-revisao";
 import { classificarMaterial, GRUPO_POR_SECAO } from "@/lib/databook-secoes";
+import { enriquecerComFicha } from "@/lib/databook-ficha-r";
 
 export const runtime = "nodejs";
 
@@ -49,7 +50,11 @@ export async function POST(req, { params }) {
     where: { ativo: true, categoria: "MATERIAL", opNumero },
     select: { id: true, nome: true },
   });
-  const docs = grupo ? todos.filter((d) => classificarMaterial(d.nome) === grupo) : todos;
+  // ⚠ classifica pela FICHA DO CMR, não pelo nome do vínculo. Certificado anexado se chama só
+  // "R 260527" — sem o material, `classificarMaterial` cai no padrão ESTRUTURAL e a tinta vai
+  // parar na §04. Ver lib/databook-ficha-r.js.
+  const enriquecidos = await enriquecerComFicha(todos, opNumero);
+  const docs = grupo ? enriquecidos.filter((d) => classificarMaterial(d.nome) === grupo) : enriquecidos;
   if (!docs.length) {
     return NextResponse.json({ success: true, vinculados: 0, total: 0, semDocs: true });
   }

@@ -455,7 +455,7 @@ export default function DataBookDetalheClient({ id, userId }) {
           <SecaoCard key={s.id} secao={s} candidatos={data.candidatos} acaoLoading={acao === s.id}
             onEstado={(e) => setEstado(s, e)} onVincular={(docId) => vincular(s, docId)} onDesvincular={(docId) => desvincular(s, docId)}
             onPopularMaterial={() => popularMaterial(s)} onPopularEmpresa={() => popularEmpresa(s)} onPopularProcedimentos={() => popularProcedimentos(s)}
-            onPuxarRelatorios={() => puxarRelatorios(s)} onSavePit={(itens) => savePit(s, itens)} onGerarLpc={() => gerarLpc(s)} onPuxarProjetos={() => puxarProjetos(s)} onReload={carregar} />
+            onPuxarRelatorios={() => puxarRelatorios(s)} onSavePit={(itens) => savePit(s, itens)} onGerarLpc={() => gerarLpc(s)} onPuxarProjetos={() => puxarProjetos(s)} onReload={carregar} fechado={fechado} />
         ))}
       </div>
     </div>
@@ -571,7 +571,7 @@ function Campo({ label, v, onChange, type = "text" }) {
   );
 }
 
-function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit, onGerarLpc, onPuxarProjetos, onReload }) {
+function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit, onGerarLpc, onPuxarProjetos, onReload, fechado }) {
   const [verTodos, setVerTodos] = useState(false);
   const [navegador, setNavegador] = useState(false);
   const [picker, setPicker] = useState(false);
@@ -581,6 +581,9 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
   const [enviando, setEnviando] = useState(false);
   const [progresso, setProgresso] = useState(""); // "2/5" durante o upload em lote
   const fileRef = useRef(null);
+  const navegavel = secaoNavega(secao.numero);
+  // Documentos que a API apontou como sendo de OUTRA seção (ex.: tinta na §04 de matéria-prima).
+  const foraDoGrupo = secao.documentos.filter((d) => d.secaoCerta);
   const linkedIds = new Set(secao.documentos.map((d) => d.id));
   const naoVinculados = candidatos.filter((c) => !linkedIds.has(c.id));
   // Os que CABEM nesta seção vêm primeiro. O `tipo` do documento é o título da seção (com o
@@ -591,6 +594,28 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
   const outros = naoVinculados.filter((c) => !docCasaSecao(c, secao));
   // ⚠ "ver todos" continua existindo: filtro sem saída troca lista inútil por parede.
   const disponiveis = verTodos || daSecao.length === 0 ? naoVinculados : daSecao;
+
+  // Move os certificados que estão na seção errada pra seção certa deste mesmo data book.
+  async function moverForaDoGrupo() {
+    const destinos = [...new Set(foraDoGrupo.map((d) => d.secaoCerta))].sort();
+    if (!confirm(
+      `Mover ${foraDoGrupo.length} certificado(s) desta seção para §${destinos.join(" / §")}?\n\n` +
+      foraDoGrupo.slice(0, 8).map((d) => `· ${d.nome} → §${d.secaoCerta}`).join("\n") +
+      (foraDoGrupo.length > 8 ? `\n· … e mais ${foraDoGrupo.length - 8}` : "")
+    )) return;
+    try {
+      const res = await fetch(`/api/qualidade/data-books/secao/${secao.id}/mover`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentoIds: foraDoGrupo.map((d) => d.id) }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Erro");
+      if (j.semSecao?.length) {
+        alert(`${j.total} movido(s).\n\nNão movi ${j.semSecao.map((x) => `${x.quantos} para §${x.numero}`).join(", ")}: essa seção não existe neste data book (ficaria sem lugar nenhum).`);
+      }
+      onReload?.();
+    } catch (e) { alert(e.message); }
+  }
 
   // Anexa um OU VÁRIOS arquivos do computador direto à seção (Vercel Blob +
   // endpoint /anexar). Sobe em sequência, com progresso; uma falha num arquivo
@@ -673,8 +698,14 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
                 <div key={d.id} className="flex items-center justify-between gap-3 py-1 text-[12px]">
                   <div className="min-w-0 flex items-center gap-2">
                     <FileText size={13} className="text-torg-blue shrink-0" />
-                    {d.importRef && <span className="font-mono text-[11px] font-semibold text-torg-blue shrink-0 whitespace-nowrap" title="Rastreabilidade (Índice R)">R {d.importRef}</span>}
-                    <span className="text-torg-dark truncate">{d.nome}</span>
+                    {(d.importRef || d.indiceR) && <span className="font-mono text-[11px] font-semibold text-torg-blue shrink-0 whitespace-nowrap" title="Rastreabilidade (Índice R)">R {d.importRef || d.indiceR}</span>}
+                    <span className="text-torg-dark truncate" title={d.nome}>{d.nome}</span>
+                    {d.secaoCerta && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-medium shrink-0 whitespace-nowrap"
+                        title={`Este certificado é de outro grupo — o lugar dele é a seção ${d.secaoCerta}`}>
+                        é da §{d.secaoCerta}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {d.numeroDocumento && <span className="text-torg-gray font-mono text-[11px] whitespace-nowrap" title="Nº do certificado">cert {d.numeroDocumento}</span>}
@@ -684,6 +715,24 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
                   </div>
                 </div>
               ))}
+              {/* Vitor (20/08): "você está trazendo certificados de tinta na aba de certificados de
+                  materiais". O portal não erra mais ao vincular, mas o que já está gravado continua
+                  ali — então aponta e deixa mover, em vez de sumir com o vínculo sem avisar. */}
+              {foraDoGrupo.length > 0 && (
+                <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5">
+                  <span className="text-[11px] text-amber-800">
+                    {foraDoGrupo.length === 1 ? "1 certificado é" : `${foraDoGrupo.length} certificados são`} de outro grupo (§{[...new Set(foraDoGrupo.map((d) => d.secaoCerta))].sort().join(", §")}).
+                  </span>
+                  {/* Livro fechado não se mexe — o botão só levaria ao erro de "gere uma revisão".
+                      O aviso continua: quem for revisar precisa saber que isto está aqui. */}
+                  {!fechado && (
+                    <button onClick={moverForaDoGrupo} disabled={acaoLoading}
+                      className="text-[11px] font-medium text-amber-900 border border-amber-300 hover:bg-amber-100 rounded-lg px-2 py-0.5 shrink-0 disabled:opacity-50">
+                      Mover para a seção certa
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-[11px] text-torg-gray italic">Nenhum documento vinculado.</p>
@@ -696,6 +745,26 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
           {!picker ? (
             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
               <button onClick={() => setPicker(true)} className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium"><Plus size={12} /> Vincular documento</button>
+              {/* ── SEÇÃO NAVEGÁVEL = DOIS BOTÕES, SÓ ─────────────────────────────────────────
+                  Vitor (20/08/2026): "deixar apenas o de vincular documento e o de navegar nas
+                  pastas, igual o do portal da qualidade — estou dizendo das partes que mencionei
+                  para navegar".
+
+                  Os "Trazer X" eram varredura cega: puxavam o lote inteiro sem deixar escolher, que
+                  é justamente o que ele reprovou ("esses botões estão totalmente fora de
+                  funcionamento... precisa ser funcional"). Onde dá pra navegar, navegar substitui
+                  os dois — e "Anexar arquivos" sai junto de propósito: nessas seções o arquivo mora
+                  no servidor, e subir cópia do computador cria uma segunda verdade que a revisão da
+                  pasta nunca alcança. */}
+              {/* Navegar a pasta do servidor e ESCOLHER — Vitor (19/08): "deixar navegar na
+                  pasta e selecionar os arquivos que quero colocar". */}
+              {navegavel && (
+                <button onClick={() => setNavegador(true)} disabled={acaoLoading}
+                  className="text-[11px] text-torg-blue border border-torg-blue-200 hover:bg-torg-blue-50 rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
+                  <FolderOpen size={12} /> Buscar no servidor
+                </button>
+              )}
+              {!navegavel && <>
               <input ref={fileRef} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" className="hidden" onChange={anexarArquivos} />
               <button onClick={() => fileRef.current?.click()} disabled={enviando || acaoLoading}
                 className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium disabled:opacity-50">
@@ -719,20 +788,13 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
                   <FileText size={12} /> Trazer procedimentos aplicáveis
                 </button>
               )}
-              {/* Navegar a pasta do servidor e ESCOLHER — Vitor (19/08): "deixar navegar na
-                  pasta e selecionar os arquivos que quero colocar". */}
-              {secaoNavega(secao.numero) && (
-                <button onClick={() => setNavegador(true)} disabled={acaoLoading}
-                  className="text-[11px] text-torg-blue border border-torg-blue-200 hover:bg-torg-blue-50 rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
-                  <FolderOpen size={12} /> Buscar no servidor
-                </button>
-              )}
               {secaoUsaRelatoriosServidor(secao.numero) && (
                 <button onClick={onPuxarRelatorios} disabled={acaoLoading}
                   className="text-[11px] text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
                   <FileText size={12} /> Trazer {SECAO_RELATORIOS_SERVIDOR[secao.numero].label} da OP (servidor)
                 </button>
               )}
+              </>}
             </div>
           ) : (
             <div className="mt-1.5 space-y-2">
