@@ -44,6 +44,9 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
   // remover algumas cotas, meio que apagando isso do desenho?". O que ele apaga aqui some TAMBÉM do
   // PDF — é coberto de branco sobre a vista embutida, do mesmo jeito que as tabelas já eram.
   const [borracha, setBorracha] = useState(false);
+  // ⚠ CONTADOR DE REDESENHO. Precisa existir aqui em cima porque o efeito que pinta o canvas
+  // depende dele — ver a nota na dependência.
+  const [tick, setTick] = useState(0);
   const cv = useRef(null);
   // ⚠ A MEDIDA VEM DE FORA, NÃO DA CAIXA DO CANVAS.
   //
@@ -197,13 +200,20 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
       g.strokeStyle = "#006EAB"; g.lineWidth = 1.5;
       g.beginPath(); g.arc(h[0], h[1], 5, 0, 7); g.stroke();
     }
-  }, [dados, cotas, pendente, hover, rascunho, layout, ocultos, borracha]);
+    // ⚠ `tick` ENTRA NA LISTA, e é o que conserta o desenho cortado.
+    //
+    // Na primeira pintura a caixa ainda não tem a largura final (o navegador só a decide depois de
+    // fazer o leiaute), então o canvas nascia com um tamanho provisório. O contador era incrementado
+    // depois — mas sem estar aqui, o efeito NÃO RODAVA DE NOVO: o componente re-renderizava e o
+    // canvas ficava com a pintura antiga, num tamanho que não era o dele. Dava exatamente o que o
+    // Vitor viu: desenho fora de proporção e com o topo faltando, variando conforme a hora em que a
+    // página carregava.
+  }, [dados, cotas, pendente, hover, rascunho, layout, ocultos, borracha, tick]);
 
   // ⚠ sem isto o canvas fica com o tamanho antigo ao abrir a tela cheia ou girar o aparelho, e o
   // clique passa a cair alguns pixels fora do traço.
-  const [, redesenhar] = useState(0);
   useEffect(() => {
-    const f = () => redesenhar((v) => v + 1);
+    const f = () => setTick((v) => v + 1);
     window.addEventListener("resize", f);
     const t = setTimeout(f, 30); // a caixa só tem largura final depois de pintar
     return () => { window.removeEventListener("resize", f); clearTimeout(t); };
@@ -299,14 +309,30 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
    */
   function caixaDoTexto(t) {
     const lg = t.v ? t.t : t.w, at = t.v ? t.w : t.t;
-    let x0 = t.x, y0 = t.y, x1 = t.x + (lg || 0), y1 = t.y + (at || 0);
+    const tx0 = t.x, ty0 = t.y, tx1 = t.x + (lg || 0), ty1 = t.y + (at || 0);
+
+    // ⚠ A VIZINHANÇA É FIXA, calculada sobre o TEXTO — nunca sobre a caixa em crescimento.
+    //
+    // Na primeira versão eu testava contra os limites que o próprio laço ia atualizando: cada
+    // segmento absorvido aumentava a área, que passava a alcançar segmentos mais distantes, que
+    // aumentavam de novo. Numa peça onde o traço encadeia, a caixa disparou e engoliu a viga
+    // inteira — o desenho apareceu sem o banzo superior ("quebrou novamente").
     const m = 5;
+    const dentro = (px, py) => px >= tx0 - m && px <= tx1 + m && py >= ty0 - m && py <= ty1 + m;
+
+    let x0 = tx0, y0 = ty0, x1 = tx1, y1 = ty1;
     for (const [a, b, c, d] of dados.segs || []) {
-      const dentro = (px, py) => px >= x0 - m && px <= x1 + m && py >= y0 - m && py <= y1 + m;
       if (!dentro(a, b) || !dentro(c, d)) continue;
       x0 = Math.min(x0, a, c); x1 = Math.max(x1, a, c);
       y0 = Math.min(y0, b, d); y1 = Math.max(y1, b, d);
     }
+
+    // ⚠ e um teto, por garantia: a moldura de um rótulo é do tamanho do rótulo. Se por algum motivo
+    // a caixa passar disso, ela não é moldura — melhor apagar só o texto do que comer o desenho.
+    const limite = (v0, v1, t0, t1) => (v1 - v0 > (t1 - t0) + 2 * m + 6 ? [t0, t1] : [v0, v1]);
+    [x0, x1] = limite(x0, x1, tx0, tx1);
+    [y0, y1] = limite(y0, y1, ty0, ty1);
+
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, v: false, tx: t.x, ty: t.y };
   }
 
