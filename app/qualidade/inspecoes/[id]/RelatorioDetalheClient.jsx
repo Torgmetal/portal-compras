@@ -118,6 +118,30 @@ export default function RelatorioDetalheClient({ id }) {
         </div>
       </div>
 
+      {/* ── marcação das cotas: LARGURA INTEIRA ───────────────────────────────────────────────
+          Vitor (21/08/2026): "tente aumentar a representatividade do desenho nessa seleção das
+          cotas, precisa ficar dando zoom na tela". Estava preso na coluna do formulário, com menos
+          de metade da página; aqui usa tudo, e ainda tem o "Ampliar" para a tela cheia. */}
+      {rel.tipo === "DIMENSIONAL" && desenhos.length > 0 && !travado && (
+        <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm mt-4">
+          <p className="text-[12px] font-bold text-torg-dark inline-flex items-center gap-1.5 mb-1.5">
+            <Ruler size={13} className="text-torg-blue" /> Cotas do desenho
+          </p>
+          <MarcadorCotas
+            relatorioId={id}
+            marca={marcaAtual}
+            cotas={cotas}
+            onChange={(novas) => setDados((d) => ({
+              ...d,
+              // as automáticas ficam no fim, preservadas; as cotas assumem a frente
+              relatorio: { ...d.relatorio, linhas: [...novas, ...(d.relatorio.linhas || []).filter((l) => !l.letra)] },
+            }))}
+            ocultos={res.ocultosDesenho || []}
+            onOcultos={(o) => setResultado("ocultosDesenho", o)}
+          />
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-2 gap-5 mt-4">
         {/* ── preenchimento ─────────────────────────────────────────────────────────── */}
         <div className="space-y-3">
@@ -126,23 +150,7 @@ export default function RelatorioDetalheClient({ id }) {
             <Campo label="Inspetor" v={rel.inspetor || ""} onChange={(v) => setCampo("inspetor", v)} disabled={travado} />
           </div>
 
-          {rel.tipo === "DIMENSIONAL" && desenhos.length > 0 && !travado && (
-            <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
-              <p className="text-[12px] font-bold text-torg-dark inline-flex items-center gap-1.5 mb-1.5">
-                <Ruler size={13} className="text-torg-blue" /> Cotas do desenho
-              </p>
-              <MarcadorCotas
-                relatorioId={id}
-                marca={marcaAtual}
-                cotas={cotas}
-                onChange={(novas) => setDados((d) => ({
-                  ...d,
-                  // as automáticas ficam no fim, preservadas; as cotas assumem a frente
-                  relatorio: { ...d.relatorio, linhas: [...novas, ...(d.relatorio.linhas || []).filter((l) => !l.letra)] },
-                }))}
-              />
-            </div>
-          )}
+
 
           {linhas.length > 0 && (
             <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
