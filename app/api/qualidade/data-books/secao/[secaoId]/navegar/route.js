@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { resolverPastasDaSecao, listarPasta, secaoNavega } from "@/lib/databook-pastas";
+import { estaFechado, erroPrecisaRevisao } from "@/lib/databook-revisao";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -27,7 +28,7 @@ async function carregarSecao(secaoId) {
     where: { id: secaoId },
     select: {
       id: true, numero: true, titulo: true,
-      dataBook: { select: { id: true, opNumero: true, status: true, emitidoEm: true } },
+      dataBook: { select: { id: true, opNumero: true, status: true, emitidoEm: true, revisao: true } },
     },
   });
 }
@@ -86,12 +87,7 @@ export async function POST(req, { params }) {
   // um documento". Alterar o conteúdo de um livro já emitido — e talvez já assinado e aceito pelo
   // cliente — faz o PDF deixar de corresponder ao que foi entregue. Mudança depois da emissão tem
   // de virar REVISÃO, com histórico e assinaturas de novo.
-  if (secao.dataBook?.emitidoEm || (secao.dataBook?.status && secao.dataBook.status !== "EM_MONTAGEM")) {
-    return NextResponse.json(
-      { error: "Este data book já foi emitido. Para incluir documentos, gere uma nova revisão." },
-      { status: 409 }
-    );
-  }
+  if (estaFechado(secao.dataBook)) return NextResponse.json(erroPrecisaRevisao(secao.dataBook), { status: 409 });
 
   let body;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Body inválido" }, { status: 400 }); }

@@ -1711,6 +1711,11 @@ model DataBookQualidade {
   observacao       String?
   status           String               @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO | ENVIADO_CLIENTE | ACEITO
   emitidoEm        DateTime?
+  // REVISÃO. Vitor (19/08/2026): "sempre depois de emitido você não deve permitir salvar sem gerar
+  // uma revisão; e se for revisão, fazer o histórico da revisão e enviar para assinatura de todos
+  // novamente". R00 é a primeira emissão; cada mudança depois vira R01, R02…
+  revisao          Int                  @default(0)
+  revisoes         DataBookRevisao[]
   // Envio e aceite pelo cliente (link público por token, sem login)
   tokenCliente     String?              @unique
   clienteEmail     String?
@@ -1731,6 +1736,29 @@ model DataBookQualidade {
 // Cadeia sequencial de assinaturas do data book (assinatura digital por link/e-mail,
 // sem login). Ordem: 1 Elaborador → 2 Inspetor → 3 Resp. Técnico → 4 Cliente.
 // Cada etapa recebe um e-mail com link; ao assinar (digita o nome), envia a próxima.
+// HISTÓRICO DE REVISÃO do data book — por que o documento mudou depois de emitido.
+//
+// Um data book emitido foi assinado e provavelmente entregue ao cliente. Se ele muda, o que o
+// cliente tem na mão deixa de ser o que o portal mostra. A revisão é o que reconcilia isso: fica
+// registrado o que mudou, quem mandou mudar e quando, e TODAS as assinaturas voltam a ser
+// colhidas — quem assinou a R00 não assinou a R01.
+model DataBookRevisao {
+  id           String            @id @default(cuid())
+  dataBookId   String
+  revisao      Int // a revisão que NASCEU aqui (1 = R01)
+  revisaoAnterior Int
+  motivo       String // obrigatório: revisão sem motivo é mudança sem rastro
+  statusAnterior String
+  emitidoEmAnterior DateTime?
+  assinaturasZeradas Int      @default(0)
+  criadoPorId  String?
+  criadoPorNome String?
+  createdAt    DateTime          @default(now())
+  dataBook     DataBookQualidade @relation(fields: [dataBookId], references: [id], onDelete: Cascade)
+
+  @@index([dataBookId])
+}
+
 model DataBookAssinatura {
   id           String            @id @default(cuid())
   dataBookId   String

@@ -121,8 +121,21 @@ export async function PATCH(req, { params }) {
   if (body.status === "EMITIDO" && atual.status !== "EMITIDO") {
     const det = await montarDetalhe(params.id);
     if (!det.resumo.podeEmitir) {
+      // ⚠ DIZER QUAL DOCUMENTO. Vitor (19/08), sobre a §19: "no caso de algum estiver vencido,
+      // alertar o usuário e não deixar emitir o data book". A trava já existia, mas a mensagem só
+      // dava a CONTAGEM — quem lia "2 com documento vencido" tinha de abrir seção por seção pra
+      // descobrir qual instrumento estava fora da validade. Agora vem nomeado, com a data.
+      const partes = [];
+      const pend = det.secoes.filter((x) => x.estado !== "NA" && x.estado !== "ANEXADO");
+      if (pend.length) partes.push(`${pend.length} seção(ões) pendente(s): ${pend.map((x) => `§${x.numero}`).join(", ")}`);
+
+      const vencidos = det.secoes
+        .filter((x) => x.bloqueada)
+        .flatMap((x) => x.documentos.filter((d) => d.status === "VENCIDO").map((d) => `§${x.numero} ${d.nome}${d.dataValidade ? ` (venceu ${new Date(d.dataValidade).toLocaleDateString("pt-BR")})` : ""}`));
+      if (vencidos.length) partes.push(`documento(s) vencido(s):\n  · ${vencidos.slice(0, 12).join("\n  · ")}${vencidos.length > 12 ? `\n  · … e mais ${vencidos.length - 12}` : ""}`);
+
       return NextResponse.json(
-        { success: false, error: `Não é possível emitir: ${det.resumo.pendentes} seção(ões) pendente(s) e ${det.resumo.bloqueadas} com documento vencido.` },
+        { success: false, error: `Não é possível emitir.\n\n${partes.join("\n\n")}`, vencidos, pendentes: pend.map((x) => x.numero) },
         { status: 400 }
       );
     }

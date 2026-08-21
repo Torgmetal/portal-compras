@@ -91,6 +91,19 @@ async function main() {
   await prisma.$executeRawUnsafe(`ALTER TABLE "Cronograma" ADD COLUMN IF NOT EXISTS "tarefasEnviadasPorId" TEXT`);
   console.log("[ensure-mes-tables] OK — Cronograma.tarefasEnviadas* garantidas.");
 
+  // Revisão do data book — emitido só muda gerando revisão (com histórico). Idempotente.
+  await prisma.$executeRawUnsafe(`ALTER TABLE "DataBookQualidade" ADD COLUMN IF NOT EXISTS "revisao" INTEGER NOT NULL DEFAULT 0`);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "DataBookRevisao" (
+      "id" TEXT NOT NULL, "dataBookId" TEXT NOT NULL, "revisao" INTEGER NOT NULL,
+      "revisaoAnterior" INTEGER NOT NULL, "motivo" TEXT NOT NULL, "statusAnterior" TEXT NOT NULL,
+      "emitidoEmAnterior" TIMESTAMP(3), "assinaturasZeradas" INTEGER NOT NULL DEFAULT 0,
+      "criadoPorId" TEXT, "criadoPorNome" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "DataBookRevisao_pkey" PRIMARY KEY ("id"))`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DataBookRevisao_dataBookId_idx" ON "DataBookRevisao"("dataBookId")`);
+  console.log("[ensure-mes-tables] OK — DataBookRevisao garantida.");
+
   // ProdutoOmie (cache do cadastro de produtos do Omie — código do item nos romaneios). Idempotente.
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "ProdutoOmie" (
