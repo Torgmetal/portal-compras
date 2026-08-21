@@ -332,6 +332,7 @@ function NovoDimensional({ onFechar, onPronto }) {
   const [soNc1, setSoNc1] = useState(false);
   const [pdfUrl, setPdfUrl] = useState("");
   const [carregando, setCarregando] = useState(false);
+  const [segundos, setSegundos] = useState(0);
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -372,24 +373,45 @@ function NovoDimensional({ onFechar, onPronto }) {
     return escopo === "CONJUNTO" ? [m] : [...p, m];
   });
 
+  // relógio: montar varre o servidor e pode levar dezenas de segundos. Sem ver o tempo correndo,
+  // uma espera longa é indistinguível de tela travada — foi o que aconteceu com o Vitor.
+  useEffect(() => {
+    if (!carregando) { setSegundos(0); return; }
+    const t = setInterval(() => setSegundos((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [carregando]);
+
   async function montar() {
     if (!op || !sel.length) { alert("Escolha a OP e ao menos uma peça."); return; }
     setCarregando(true); setPrevia(null); setPdfUrl("");
+    // ⚠ corta em 100 s: sem isto, quando a rota morre calada o botão fica girando para sempre.
+    const ctrl = new AbortController();
+    const corta = setTimeout(() => ctrl.abort(), 100000);
     try {
       // uma chamada só: dados + a folha em base64. Duas idas refaziam a montagem inteira (que varre
       // o servidor) e a tela ficava meio minuto parada, parecendo travada.
       const r = await fetch("/api/qualidade/inspecoes/dimensional", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ opNumero: op.numero, escopo, marcas: sel, titulo, inspetor }),
+        signal: ctrl.signal,
       });
-      const j = await r.json();
+      // resposta que não é JSON (erro do gateway, timeout da plataforma) precisa aparecer como
+      // mensagem, não como "unexpected token" — ou o usuário fica sem saber o que houve
+      const bruto = await r.text();
+      let j;
+      try { j = JSON.parse(bruto); }
+      catch { throw new Error(r.ok ? "Resposta inesperada do servidor." : `Falha no servidor (${r.status}). Tente de novo.`); }
       if (!r.ok) throw new Error(j.error || "Erro");
       setPrevia(j);
       if (j.pdf) {
         const bin = Uint8Array.from(atob(j.pdf), (c) => c.charCodeAt(0));
         setPdfUrl(URL.createObjectURL(new Blob([bin], { type: "application/pdf" })));
       }
-    } catch (e) { alert(e.message); } finally { setCarregando(false); }
+    } catch (e) {
+      alert(e.name === "AbortError"
+        ? "A montagem passou de 100 segundos e foi interrompida. Tente de novo — a segunda vez costuma ser rápida, porque as pastas ficam em cache."
+        : e.message);
+    } finally { clearTimeout(corta); setCarregando(false); }
   }
 
   async function gravar() {
@@ -524,7 +546,9 @@ function NovoDimensional({ onFechar, onPronto }) {
             ) : (
               <div className="flex-1 flex items-center justify-center p-6 text-center">
                 <p className="text-[13px] text-torg-gray max-w-xs">
-                  {carregando ? "montando a folha…" : "Escolha a OP e a peça e toque em “Gerar prévia” — a folha aparece aqui, igual à que vai para o data book."}
+                  {carregando
+                    ? `montando a folha… ${segundos}s${segundos > 12 ? " (a primeira peça da OP demora mais: o portal varre o servidor)" : ""}`
+                    : "Escolha a OP e a peça e toque em “Gerar prévia” — a folha aparece aqui, igual à que vai para o data book."}
                 </p>
               </div>
             )}
