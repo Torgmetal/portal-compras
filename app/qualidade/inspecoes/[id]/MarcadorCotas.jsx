@@ -107,9 +107,14 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     g.clearRect(0, 0, L.larg, L.alt);
     g.fillStyle = "#fff"; g.fillRect(0, 0, L.larg, L.alt);
 
+    // ⚠ o traço da moldura de um rótulo apagado some junto com ele — senão fica a "bandeira" vazia
+    const naCaixa = (px, py) => (ocultos || []).some((o) =>
+      px >= o.x - 0.5 && px <= o.x + (o.w || 0) + 0.5 && py >= o.y - 0.5 && py <= o.y + (o.h || 0) + 0.5);
+
     // o desenho
     g.strokeStyle = "#334155"; g.lineWidth = 0.6; g.beginPath();
     for (const [x1, y1, x2, y2] of dados.segs) {
+      if (naCaixa(x1, y1) && naCaixa(x2, y2)) continue;
       const a = paraTela([x1, y1], L), b = paraTela([x2, y2], L);
       g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]);
     }
@@ -120,7 +125,10 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     // teria de abrir o desenho por fora para descobrir o número.
     g.fillStyle = "#0f172a";
     g.textAlign = "left"; g.textBaseline = "alphabetic";
-    const apagado = (t) => (ocultos || []).some((o) => Math.abs(o.x - t.x) < 0.6 && Math.abs(o.y - t.y) < 0.6);
+    // ⚠ casa pela posição ORIGINAL do texto (`tx`/`ty`), não pela caixa: a caixa cresceu para
+    // engolir a moldura e já não coincide com o canto do texto. `o.x` cobre o dado antigo.
+    const apagado = (t) => (ocultos || []).some((o) =>
+      Math.abs((o.tx ?? o.x) - t.x) < 0.6 && Math.abs((o.ty ?? o.y) - t.y) < 0.6);
     for (const t of dados.textos || []) {
       if (apagado(t)) continue;
       const [tx, ty] = paraTela([t.x, t.y], L);
@@ -275,17 +283,44 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     }) || null;
   }
 
+  /**
+   * A CAIXA DE UM TEXTO, INCLUINDO A MOLDURA QUE O TEKLA DESENHA EM VOLTA.
+   *
+   * Vitor (21/08/2026): "essas bandeiras das marcas excluídas você consegue remover elas também
+   * quando eu peço para tirar as marcas, e quando eu apagar alguma cota sumir também".
+   *
+   * O rótulo do Tekla é texto DENTRO de um retângulo, e o retângulo é TRAÇO — apagar só o texto
+   * deixava a moldura vazia boiando, que foi o que ele viu. Aqui a caixa cresce até engolir
+   * qualquer segmento inteiramente colado no texto: é a moldura, e vai junto.
+   *
+   * ⚠ Só segmento CONTIDO na vizinhança entra. Se bastasse encostar, a própria linha de cota — que
+   * atravessa a folha e passa rente ao número — sairia junto, e o desenho perderia a cota inteira
+   * em vez do rótulo.
+   */
+  function caixaDoTexto(t) {
+    const lg = t.v ? t.t : t.w, at = t.v ? t.w : t.t;
+    let x0 = t.x, y0 = t.y, x1 = t.x + (lg || 0), y1 = t.y + (at || 0);
+    const m = 5;
+    for (const [a, b, c, d] of dados.segs || []) {
+      const dentro = (px, py) => px >= x0 - m && px <= x1 + m && py >= y0 - m && py <= y1 + m;
+      if (!dentro(a, b) || !dentro(c, d)) continue;
+      x0 = Math.min(x0, a, c); x1 = Math.max(x1, a, c);
+      y0 = Math.min(y0, b, d); y1 = Math.max(y1, b, d);
+    }
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, v: false, tx: t.x, ty: t.y };
+  }
+
   /** Todas as marcas de peça — o grosso do ruído, e nada que se meça. */
   function marcasDePeca() {
     return (dados.textos || [])
       .filter((t) => RX_MARCA.test(String(t.s).trim()))
-      .map((t) => ({ x: t.x, y: t.y, w: t.w, h: t.t, v: !!t.v }));
+      .map((t) => caixaDoTexto(t));
   }
 
   function clique(e) {
     if (borracha) {
       const t = textoNoPonto(e);
-      if (t && onOcultos) onOcultos([...(ocultos || []), { x: t.x, y: t.y, w: t.w, h: t.t, v: !!t.v }]);
+      if (t && onOcultos) onOcultos([...(ocultos || []), caixaDoTexto(t)]);
       return;
     }
     const p = pontoDoEvento(e); if (!p) return;
