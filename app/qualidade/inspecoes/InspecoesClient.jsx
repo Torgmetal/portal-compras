@@ -376,19 +376,19 @@ function NovoDimensional({ onFechar, onPronto }) {
     if (!op || !sel.length) { alert("Escolha a OP e ao menos uma peça."); return; }
     setCarregando(true); setPrevia(null); setPdfUrl("");
     try {
-      const corpo = { opNumero: op.numero, escopo, marcas: sel, titulo, inspetor };
+      // uma chamada só: dados + a folha em base64. Duas idas refaziam a montagem inteira (que varre
+      // o servidor) e a tela ficava meio minuto parada, parecendo travada.
       const r = await fetch("/api/qualidade/inspecoes/dimensional", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opNumero: op.numero, escopo, marcas: sel, titulo, inspetor }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
       setPrevia(j);
-
-      // e a FOLHA de verdade, que é o que ele quer conferir
-      const rp = await fetch("/api/qualidade/inspecoes/dimensional", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...corpo, formato: "pdf" }),
-      });
-      if (rp.ok) setPdfUrl(URL.createObjectURL(await rp.blob()));
+      if (j.pdf) {
+        const bin = Uint8Array.from(atob(j.pdf), (c) => c.charCodeAt(0));
+        setPdfUrl(URL.createObjectURL(new Blob([bin], { type: "application/pdf" })));
+      }
     } catch (e) { alert(e.message); } finally { setCarregando(false); }
   }
 

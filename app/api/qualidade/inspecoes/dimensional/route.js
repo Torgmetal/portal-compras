@@ -45,7 +45,10 @@ export async function POST(req) {
     // ficar no data book". Uma tabela na tela não responde isso — o que ele precisa ver é a FOLHA,
     // com o desenho no campo do croqui e os quadros de aprovação. Devolve o PDF de verdade, do
     // relatório que ainda não existe.
-    if (body?.formato === "pdf") {
+    // ⚠ UMA CHAMADA SÓ. A tela pedia os dados e depois o PDF — e cada pedido refaz a montagem, que
+    // varre o servidor. Eram 30 s de espera com a tela parada, que na prática lê como "não está
+    // gerando". Agora o PDF volta junto, em base64.
+    {
       const op = await prisma.oP.findFirst({ where: { numero: opNumero }, select: { cliente: true, obra: true } });
       const bytes = await gerarDimensionalPDF({
         rel: {
@@ -61,11 +64,11 @@ export async function POST(req) {
         desenhoBytes: (d) => baixarDesenho(d?.caminho),
         cliente: op?.cliente || null, obra: op?.obra || null,
       });
-      return new NextResponse(Buffer.from(bytes), {
-        headers: { "Content-Type": "application/pdf", "Content-Disposition": "inline; filename=\"previa.pdf\"", "Cache-Control": "no-store" },
+      return NextResponse.json({
+        previa: true, escopo, marcas, linhas, desenhos, erros, tolerancia,
+        pdf: Buffer.from(bytes).toString("base64"),
       });
     }
-    return NextResponse.json({ previa: true, escopo, marcas, linhas, desenhos, erros, tolerancia });
   }
 
   if (!linhas.length) return NextResponse.json({ error: "Nada para gravar — nenhuma linha foi montada." }, { status: 400 });
