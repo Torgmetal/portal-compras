@@ -42,6 +42,16 @@ export async function GET(_req, { params }) {
     LIBERACAO_INICIO: primeiroMarco("LIBERACAO_INICIO"),
     PROJETO_ENVIADO: primeiroMarco("PROJETO_ENVIADO"),
     APROVADO_CLIENTE: primeiroMarco("APROVADO_CLIENTE"),
+    REPROVADO_CLIENTE: primeiroMarco("REPROVADO_CLIENTE"),
+  };
+  // Tags recorrentes (podem ocorrer várias vezes na obra) → contagem + lista.
+  const listaTag = (tipo) => eventos
+    .filter((e) => e.tipoGatilho === tipo)
+    .map((e) => ({ em: dataDe(e), por: e.deNome || e.de || e.caixa, assunto: e.assunto, id: e.id, direcao: e.direcao, webLink: e.webLink || null }));
+  const tags = {
+    REVISAO_CLIENTE: listaTag("REVISAO_CLIENTE"),
+    PENDENCIA_CLIENTE: listaTag("PENDENCIA_CLIENTE"),
+    RFI_TECNICO: listaTag("RFI_TECNICO"),
   };
   const entradasCliente = eventos.filter((e) => e.direcao === "ENTRADA" && !INTERNO.test(e.de || ""));
   const primeiroContato = entradasCliente[0] || eventos.find((e) => e.direcao === "ENTRADA") || null;
@@ -80,5 +90,5 @@ export async function GET(_req, { params }) {
     semRespostaHoras: semRespostaH,
   };
 
-  return NextResponse.json({ success: true, resumo, marcos, eventos });
+  return NextResponse.json({ success: true, resumo, marcos, tags, eventos });
 }

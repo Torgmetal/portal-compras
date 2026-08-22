@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useStore } from "@/lib/store";
-import { Mail, Loader2, AlertCircle, RefreshCw, Search, Paperclip, FileBox, Inbox, Send, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { Mail, Loader2, AlertCircle, RefreshCw, Search, Paperclip, FileBox, Inbox, Send, ArrowDownLeft, ArrowUpRight, Sparkles } from "lucide-react";
 
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
 const caixaCurta = (c) => String(c || "").split("@")[0];
@@ -11,6 +11,7 @@ export default function EmailsEngenhariaClient() {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [sincronizando, setSincronizando] = useState(false);
+  const [reprocessando, setReprocessando] = useState(false);
   const [caixa, setCaixa] = useState("");
   const [direcao, setDirecao] = useState("");
   const [soIfc, setSoIfc] = useState(false);
@@ -47,6 +48,20 @@ export default function EmailsEngenhariaClient() {
     finally { setSincronizando(false); }
   }
 
+  async function reprocessar() {
+    if (!confirm("Reprocessar TODO o histórico? Re-vincula os e-mails às OPs (regras novas + thread) e reclassifica as tags com IA. Pode levar 1–2 min.")) return;
+    setReprocessando(true); setErro("");
+    try {
+      const res = await fetch("/api/engenharia/emails?reprocessar=1", { method: "POST" });
+      const j = await res.json();
+      if (!j.success) throw new Error(j.error || "Erro");
+      const rm = j.rematch || {}; const ia = j.ia || {};
+      showToast(`Reprocessado — ${rm.recasados ?? 0} re-vinculados, ${rm.propagados ?? 0} pela thread, ${ia.marcos ?? 0} tags pela IA.`, "success");
+      carregar();
+    } catch (e) { setErro(e.message); showToast(e.message, "erro"); }
+    finally { setReprocessando(false); }
+  }
+
   const eventos = dados?.eventos || [];
   const syncs = dados?.syncs || [];
   const caixas = dados?.caixas || [];
@@ -72,10 +87,16 @@ export default function EmailsEngenhariaClient() {
             <p className="text-sm text-torg-gray">Fase 1 — leitura das 6 caixas da Engenharia (só validação; o vínculo com a OP e o SLA vêm depois).</p>
           </div>
         </div>
-        <button onClick={sincronizar} disabled={sincronizando}
-          className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2 disabled:opacity-50">
-          {sincronizando ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Sincronizar agora
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={reprocessar} disabled={reprocessando || sincronizando}
+            className="px-4 py-2 bg-white text-torg-blue border border-torg-blue-200 text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2 disabled:opacity-50" title="Re-vincula às OPs e reclassifica as tags com IA (histórico todo)">
+            {reprocessando ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Reprocessar com IA
+          </button>
+          <button onClick={sincronizar} disabled={sincronizando || reprocessando}
+            className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2 disabled:opacity-50">
+            {sincronizando ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Sincronizar agora
+          </button>
+        </div>
       </div>
 
       {/* Status por caixa */}

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { temAcessoDiretoria } from "@/lib/diretoria";
 import { sincronizarEmailsEngenharia, caixasEngenharia } from "@/lib/ingest-emails-engenharia";
-import { casarEmailsPendentes } from "@/lib/match-email-op";
+import { casarEmailsPendentes, rematchTudo } from "@/lib/match-email-op";
 import { classificarMarcosIA } from "@/lib/classificar-email-ia";
 
 export const runtime = "nodejs";
@@ -58,10 +58,20 @@ export async function GET(req) {
   return NextResponse.json({ success: true, eventos, syncs, total, caixas: caixasEngenharia() });
 }
 
-export async function POST() {
+export async function POST(req) {
   let user;
   try { user = await exigirDiretoria(); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.status || (e.message === "Unauthorized" ? 401 : 403) }); }
+
+  // ?reprocessar=1 → backfill do histórico: re-casa TODOS (regras novas + thread) e
+  // reclassifica as TAGS por IA (taxonomia nova). Operação pesada, sob demanda.
+  const reprocessar = new URL(req.url).searchParams.get("reprocessar") === "1";
   try {
+    if (reprocessar) {
+      const rematch = await rematchTudo();
+      const ia = await classificarMarcosIA(200, 20, true).catch((e) => ({ classificados: 0, marcos: 0, erro: e.message }));
+      await prisma.auditLog.create({ data: { userId: user.id, action: "REPROCESSAR_EMAILS_ENGENHARIA", entity: "ObraEmailEvento", entityId: "-", diff: { rematch, iaMarcos: ia.marcos } } }).catch(() => {});
+      return NextResponse.json({ success: true, reprocessado: true, rematch, ia });
+    }
     const r = await sincronizarEmailsEngenharia();
     const match = await casarEmailsPendentes().catch(() => ({ casados: 0 }));
     const ia = await classificarMarcosIA().catch(() => ({ classificados: 0, marcos: 0 }));

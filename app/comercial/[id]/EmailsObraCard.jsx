@@ -1,11 +1,12 @@
 "use client";
-// Card na aba RESUMO da OP (só diretoria): marcos de projeto por e-mail — IFC recebido,
-// liberação p/ início, projeto enviado p/ aprovação, aprovado pelo cliente — + tempo de
-// resposta da Engenharia e a troca de e-mails (fácil de bater o olho e abrir cada e-mail).
-import { useState, useEffect } from "react";
+// Card na aba RESUMO da OP (só diretoria): marcos e TAGS do projeto por e-mail — IFC,
+// liberação, envio p/ aprovação, aprovação, reprovação, revisões, pendências do cliente e
+// RFIs — + tempo de resposta da Engenharia e a troca de e-mails com LEITOR dentro do portal.
+import { useState, useEffect, useCallback } from "react";
 import {
   Mail, Loader2, AlertCircle, ChevronDown, ChevronRight, FileBox, Paperclip,
   ArrowDownLeft, ArrowUpRight, Clock, CheckCircle2, PlayCircle, Send, ExternalLink, Circle,
+  XCircle, PencilRuler, HelpCircle, AlertTriangle, X,
 } from "lucide-react";
 
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
@@ -17,17 +18,34 @@ const fmtDur = (h) => {
   return r ? `${d}d ${r}h` : `${d}d`;
 };
 
-const MARCOS = [
-  { key: "IFC_RECEBIDO", label: "IFC recebido do cliente", Icon: FileBox, cor: "text-torg-orange", bg: "bg-torg-orange" },
-  { key: "LIBERACAO_INICIO", label: "Liberação p/ início do projeto", Icon: PlayCircle, cor: "text-torg-blue", bg: "bg-torg-blue" },
-  { key: "PROJETO_ENVIADO", label: "Projeto enviado p/ aprovação", Icon: Send, cor: "text-indigo-600", bg: "bg-indigo-600" },
-  { key: "APROVADO_CLIENTE", label: "Aprovado pelo cliente", Icon: CheckCircle2, cor: "text-emerald-600", bg: "bg-emerald-600" },
+// Metadados de cada TAG (rótulo, cor, ícone) — fonte única p/ badges e checklist.
+const TAG_META = {
+  IFC_RECEBIDO: { label: "IFC recebido", Icon: FileBox, txt: "text-torg-orange", bg: "bg-torg-orange", chip: "bg-orange-50 text-orange-700 border-orange-200" },
+  LIBERACAO_INICIO: { label: "Liberação p/ início", Icon: PlayCircle, txt: "text-torg-blue", bg: "bg-torg-blue", chip: "bg-sky-50 text-sky-700 border-sky-200" },
+  PROJETO_ENVIADO: { label: "Projeto enviado", Icon: Send, txt: "text-indigo-600", bg: "bg-indigo-600", chip: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  APROVADO_CLIENTE: { label: "Aprovado", Icon: CheckCircle2, txt: "text-emerald-600", bg: "bg-emerald-600", chip: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  REPROVADO_CLIENTE: { label: "Reprovado / ressalvas", Icon: XCircle, txt: "text-red-600", bg: "bg-red-600", chip: "bg-red-50 text-red-700 border-red-200" },
+  REVISAO_CLIENTE: { label: "Revisão do cliente", Icon: PencilRuler, txt: "text-amber-600", bg: "bg-amber-500", chip: "bg-amber-50 text-amber-700 border-amber-200" },
+  PENDENCIA_CLIENTE: { label: "Pendência / cobrança", Icon: AlertTriangle, txt: "text-rose-600", bg: "bg-rose-500", chip: "bg-rose-50 text-rose-700 border-rose-200" },
+  RFI_TECNICO: { label: "Dúvida / RFI", Icon: HelpCircle, txt: "text-cyan-600", bg: "bg-cyan-600", chip: "bg-cyan-50 text-cyan-700 border-cyan-200" },
+};
+
+// Checklist de marcos únicos (ordem do fluxo).
+const MARCOS = ["IFC_RECEBIDO", "LIBERACAO_INICIO", "PROJETO_ENVIADO", "APROVADO_CLIENTE"];
+// Ocorrências que podem se repetir na obra → contadores.
+const CONTADORES = [
+  { key: "REVISAO_CLIENTE", src: "tags" },
+  { key: "REPROVADO_CLIENTE", src: "marco" },
+  { key: "PENDENCIA_CLIENTE", src: "tags" },
+  { key: "RFI_TECNICO", src: "tags" },
 ];
 
 export default function EmailsObraCard({ opId }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [aberto, setAberto] = useState(false);
+  const [ver, setVer] = useState(null); // e-mail aberto no leitor { id }
+  const [corpo, setCorpo] = useState(null); // { carregando, erro, ...corpo }
 
   useEffect(() => {
     setDados(null); setErro("");
@@ -37,9 +55,19 @@ export default function EmailsObraCard({ opId }) {
       .catch(() => setErro("Não foi possível carregar."));
   }, [opId]);
 
+  const abrirEmail = useCallback((e) => {
+    setVer(e); setCorpo({ carregando: true });
+    fetch(`/api/comercial/op/${opId}/emails/${e.id}/corpo`)
+      .then((r) => r.json())
+      .then((j) => setCorpo(j.success ? { ...j } : { erro: j.error || "Falha ao abrir" }))
+      .catch(() => setCorpo({ erro: "Falha ao abrir o e-mail" }));
+  }, [opId]);
+
   const r = dados?.resumo;
   const marcos = dados?.marcos || {};
+  const tags = dados?.tags || {};
   const eventos = dados?.eventos || [];
+  const contarOcorrencia = (c) => (c.src === "tags" ? (tags[c.key] || []).length : (marcos[c.key] ? 1 : 0));
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-5">
@@ -47,7 +75,7 @@ export default function EmailsObraCard({ opId }) {
         <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2"><Mail size={18} className="text-indigo-600" /> E-mails do Projeto</h3>
         <span className="text-[10px] font-semibold text-torg-gray border border-gray-200 rounded px-1.5 py-0.5">diretoria</span>
       </div>
-      <p className="text-sm text-torg-gray mb-4">Marcos de projeto detectados nos e-mails da Engenharia — IFC, liberação, envio p/ aprovação e aprovação do cliente. Vínculo automático por nº da OP / código da obra.</p>
+      <p className="text-sm text-torg-gray mb-4">Marcos e tags detectados nos e-mails da Engenharia — IFC, liberação, envio/aprovação, revisões e pendências do cliente. Clique num e-mail para ler aqui dentro.</p>
 
       {dados === null && !erro ? (
         <div className="py-8 text-center text-torg-gray"><Loader2 size={20} className="mx-auto animate-spin" /></div>
@@ -57,31 +85,44 @@ export default function EmailsObraCard({ opId }) {
         <div className="border border-dashed border-gray-200 rounded-lg py-8 text-center">
           <Mail size={24} className="mx-auto text-gray-300 mb-2" />
           <p className="text-sm font-semibold text-torg-dark">Nenhum e-mail vinculado a esta obra ainda</p>
-          <p className="text-xs text-torg-gray mt-1">Os e-mails são casados automaticamente quando trazem o nº da OP ou o código da obra no assunto/corpo.</p>
+          <p className="text-xs text-torg-gray mt-1">Os e-mails são casados automaticamente pelo nº da OP, código/nome da obra ou pela thread.</p>
         </div>
       ) : (<>
         {/* Checklist de marcos — o destaque */}
         <div className="border border-gray-100 rounded-lg divide-y divide-gray-50 mb-3">
-          {MARCOS.map(({ key, label, Icon, cor, bg }) => {
+          {MARCOS.map((key) => {
+            const meta = TAG_META[key];
             const m = marcos[key];
             const ok = !!m;
             return (
               <div key={key} className="flex items-center gap-3 px-3 py-2.5">
-                <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${ok ? bg : "bg-gray-100"}`}>
-                  <Icon size={15} className={ok ? "text-white" : "text-gray-300"} />
+                <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${ok ? meta.bg : "bg-gray-100"}`}>
+                  <meta.Icon size={15} className={ok ? "text-white" : "text-gray-300"} />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className={`text-sm font-medium ${ok ? "text-torg-dark" : "text-gray-400"}`}>{label}</p>
+                  <p className={`text-sm font-medium ${ok ? "text-torg-dark" : "text-gray-400"}`}>{meta.label}</p>
                   {ok
-                    ? <p className="text-[11px] text-torg-gray truncate">{fmtDT(m.em)} · {m.direcao === "SAIDA" ? "por" : "de"} {m.por}{m.assunto ? ` · ${m.assunto}` : ""}</p>
+                    ? <button onClick={() => abrirEmail(m)} className="text-[11px] text-torg-gray hover:text-torg-blue truncate block max-w-full text-left">{fmtDT(m.em)} · {m.direcao === "SAIDA" ? "por" : "de"} {m.por}{m.assunto ? ` · ${m.assunto}` : ""}</button>
                     : <p className="text-[11px] text-gray-400">pendente / não identificado</p>}
                 </div>
-                {ok ? (
-                  <span className="inline-flex items-center gap-2 shrink-0">
-                    <CheckCircle2 size={16} className={cor} />
-                    {m.webLink && <a href={m.webLink} target="_blank" rel="noopener noreferrer" title="Abrir e-mail no Outlook" className="text-torg-gray hover:text-torg-blue"><ExternalLink size={14} /></a>}
-                  </span>
-                ) : <Circle size={16} className="text-gray-200 shrink-0" />}
+                {ok ? <CheckCircle2 size={16} className={`${meta.txt} shrink-0`} /> : <Circle size={16} className="text-gray-200 shrink-0" />}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Contadores de ocorrências (revisões, reprovações, pendências, RFIs) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+          {CONTADORES.map((c) => {
+            const meta = TAG_META[c.key];
+            const n = contarOcorrencia(c);
+            return (
+              <div key={c.key} className={`rounded-lg border px-3 py-2 ${n > 0 ? meta.chip : "border-gray-100 bg-gray-50/50 text-gray-400"}`}>
+                <div className="flex items-center gap-1.5">
+                  <meta.Icon size={13} className={n > 0 ? meta.txt : "text-gray-300"} />
+                  <span className="text-lg font-bold tabular-nums leading-none">{n}</span>
+                </div>
+                <p className="text-[10px] font-medium mt-1 leading-tight">{meta.label}</p>
               </div>
             );
           })}
@@ -110,31 +151,95 @@ export default function EmailsObraCard({ opId }) {
           {aberto ? <ChevronDown size={14} /> : <ChevronRight size={14} />} {aberto ? "Ocultar" : "Ver"} a troca de e-mails ({eventos.length})
         </button>
         {aberto && (
-          <div className="mt-2 border border-gray-100 rounded-lg divide-y divide-gray-50 max-h-80 overflow-y-auto">
+          <div className="mt-2 border border-gray-100 rounded-lg divide-y divide-gray-50 max-h-96 overflow-y-auto">
             {eventos.map((e) => {
               const entrada = e.direcao === "ENTRADA";
               const contraparte = entrada ? e.de : (Array.isArray(e.para) ? e.para[0] : null);
+              const meta = e.tipoGatilho && e.tipoGatilho !== "OUTRO" ? TAG_META[e.tipoGatilho] : null;
               return (
-                <div key={e.id} className="px-3 py-2 flex items-start gap-2.5 hover:bg-gray-50/60">
-                  {entrada ? <ArrowDownLeft size={14} className="text-emerald-600 mt-0.5 shrink-0" title="Entrada" /> : <ArrowUpRight size={14} className="text-torg-blue mt-0.5 shrink-0" title="Saída" />}
+                <button key={e.id} onClick={() => abrirEmail(e)} className="w-full text-left px-3 py-2 flex items-start gap-2.5 hover:bg-gray-50/60">
+                  {entrada ? <ArrowDownLeft size={14} className="text-emerald-600 mt-0.5 shrink-0" /> : <ArrowUpRight size={14} className="text-torg-blue mt-0.5 shrink-0" />}
                   <div className="min-w-0 flex-1">
-                    <p className="text-[13px] text-torg-dark truncate">{e.assunto || <span className="italic text-gray-400">(sem assunto)</span>}</p>
+                    <div className="flex items-center gap-1.5">
+                      {meta && <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border ${meta.chip} inline-flex items-center gap-0.5 shrink-0`}><meta.Icon size={9} /> {meta.label}</span>}
+                      <p className="text-[13px] text-torg-dark truncate">{e.assunto || <span className="italic text-gray-400">(sem assunto)</span>}</p>
+                    </div>
                     <p className="text-[11px] text-torg-gray truncate">{e.deNome || contraparte || "—"}{contraparte && e.deNome ? ` · ${contraparte}` : ""}{e.snippet ? ` — ${e.snippet}` : ""}</p>
                   </div>
                   <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
                     <p className="text-[11px] text-torg-gray whitespace-nowrap">{fmtDT(e.recebidoEm || e.enviadoEm)}</p>
-                    <span className="inline-flex items-center gap-1.5">
-                      {e.temAnexoIfc ? <span className="text-[10px] font-semibold text-torg-orange inline-flex items-center gap-0.5"><FileBox size={11} /> IFC</span>
-                        : e.temAnexo ? <Paperclip size={11} className="inline text-torg-gray" /> : null}
-                      {e.webLink && <a href={e.webLink} target="_blank" rel="noopener noreferrer" title="Abrir no Outlook" className="text-torg-gray hover:text-torg-blue"><ExternalLink size={12} /></a>}
-                    </span>
+                    {e.temAnexoIfc ? <span className="text-[10px] font-semibold text-torg-orange inline-flex items-center gap-0.5"><FileBox size={11} /> IFC</span>
+                      : e.temAnexo ? <Paperclip size={11} className="inline text-torg-gray" /> : null}
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
         )}
       </>)}
+
+      {ver && <LeitorEmail email={ver} corpo={corpo} onClose={() => { setVer(null); setCorpo(null); }} />}
+    </div>
+  );
+}
+
+// ── Modal leitor de e-mail (corpo puxado do Graph sob demanda) ─────────────────
+function LeitorEmail({ email, corpo, onClose }) {
+  useEffect(() => {
+    const onEsc = (ev) => ev.key === "Escape" && onClose();
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, [onClose]);
+
+  const meta = email.tipoGatilho && email.tipoGatilho !== "OUTRO" ? TAG_META[email.tipoGatilho] : null;
+  const c = corpo && !corpo.carregando && !corpo.erro ? corpo : null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col" onClick={(ev) => ev.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-gray-100">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              {meta && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${meta.chip} inline-flex items-center gap-0.5`}><meta.Icon size={10} /> {meta.label}</span>}
+              {email.direcao && <span className="text-[10px] text-torg-gray">{email.direcao === "ENTRADA" ? "recebido" : "enviado"}</span>}
+            </div>
+            <h4 className="text-base font-semibold text-torg-dark truncate">{c?.assunto || email.assunto || "(sem assunto)"}</h4>
+            <p className="text-xs text-torg-gray mt-0.5">
+              {c ? (<>{c.deNome ? `${c.deNome} <${c.de}>` : c.de}{c.para?.length ? ` → ${c.para.join(", ")}` : ""}</>) : (email.por || email.de || "")}
+              {c?.em ? ` · ${fmtDT(c.em)}` : (email.em ? ` · ${fmtDT(email.em)}` : "")}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-torg-gray hover:text-torg-dark shrink-0"><X size={18} /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {!corpo || corpo.carregando ? (
+            <div className="py-16 text-center text-torg-gray"><Loader2 size={22} className="mx-auto animate-spin mb-2" /> Abrindo o e-mail…</div>
+          ) : corpo.erro ? (
+            <div className="p-6">
+              <p className="text-sm text-red-600 inline-flex items-center gap-1 mb-3"><AlertCircle size={14} /> {corpo.erro}</p>
+              {(corpo.webLink || email.webLink) && <a href={corpo.webLink || email.webLink} target="_blank" rel="noopener noreferrer" className="text-sm text-torg-blue inline-flex items-center gap-1">Abrir no Outlook <ExternalLink size={13} /></a>}
+            </div>
+          ) : c.contentType === "html" ? (
+            <iframe title="corpo" sandbox="" className="w-full min-h-[45vh] border-0" srcDoc={`<!doctype html><meta charset="utf-8"><base target="_blank"><style>body{font-family:system-ui,Arial,sans-serif;font-size:13px;color:#1f2937;padding:16px;margin:0}img{max-width:100%;height:auto}</style>${c.corpo || ""}`} />
+          ) : (
+            <pre className="whitespace-pre-wrap break-words text-[13px] text-gray-800 p-5 font-sans">{c.corpo || "(sem conteúdo)"}</pre>
+          )}
+        </div>
+
+        {(c?.anexos?.length || c?.webLink || email.webLink) && (
+          <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              {(c?.anexos || []).map((a, i) => (
+                <span key={i} className="text-[11px] text-torg-gray border border-gray-200 rounded px-2 py-1 inline-flex items-center gap-1">
+                  <Paperclip size={11} /> {a.nome || "anexo"}
+                </span>
+              ))}
+            </div>
+            {(c?.webLink || email.webLink) && <a href={c?.webLink || email.webLink} target="_blank" rel="noopener noreferrer" className="text-xs text-torg-blue inline-flex items-center gap-1 shrink-0">Abrir no Outlook <ExternalLink size={12} /></a>}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
