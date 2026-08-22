@@ -2123,6 +2123,51 @@ model DocumentoInstitucional {
 }
 
 // Página de apresentação personalizada por cliente (link público por token).
+// ─── PORTAL DO CLIENTE ────────────────────────────────────────────────────────
+// Vitor (22/08/2026): "vamos fazer o painel do cliente; nesse painel vamos fornecer
+// documentos, listas de compras, cronograma, LPC, LE, certificados de qualidade,
+// relatórios — tudo que for de interesse nosso em mostrar e que seja interesse dele
+// receber... uma mensagem forte de agradecimento e parceria, mostrando o lado de
+// preocupação que carregamos em atender os mais altos padrões de qualidade".
+//
+// É o fecho do que o portal vinha construindo: cada módulo já sabe o que a obra tem —
+// cronograma, LPC, certificados, relatórios aprovados, data book. O que faltava era um
+// lugar onde o CLIENTE vê isso sem pedir por e-mail.
+//
+// ⚠ UM POR OBRA, e por isso `opNumero` é único. Portal é endereço: mudar de link a cada
+// envio faria o cliente perder o que já tinha salvo.
+//
+// ⚠ E O QUE APARECE É ESCOLHA NOSSA, seção por seção (`secoes`). Nem toda obra quer
+// mostrar tudo — e um portal que expõe algo que o contrato não previu é problema, não
+// cortesia.
+model PortalCliente {
+  id               String    @id @default(cuid())
+  opId             String?
+  opNumero         String    @unique
+  token            String?   @unique
+  status           String    @default("RASCUNHO") // RASCUNHO | PUBLICADO
+  contato          String?
+  empresa          String?
+  clienteEmail     String?
+  capaUrl          String?
+  // a mensagem de abertura — agradecimento e parceria, escrita por obra
+  mensagem         String?
+  // [{ url, legenda }] — as fotos da obra que o cliente vê
+  fotos            Json?
+  // quais seções aparecem; null = o padrão de lib/portal-cliente.js
+  secoes           Json?
+  publicadoEm      DateTime?
+  enviadoEm        DateTime?
+  primeiroAcessoEm DateTime?
+  ultimoAcessoEm   DateTime?
+  acessos          Int       @default(0)
+  criadoPorId      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([status])
+}
+
 model ApresentacaoCliente {
   id                    String            @id @default(cuid())
   contato               String // nome da pessoa

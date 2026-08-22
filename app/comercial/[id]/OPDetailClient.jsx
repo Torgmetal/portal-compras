@@ -2,7 +2,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Calendar, Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X, CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory, ShoppingCart, GanttChart, FileSpreadsheet, Building2, ShieldCheck } from "lucide-react";
+import { Calendar, Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X, CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory, ShoppingCart, GanttChart, FileSpreadsheet, Building2, ShieldCheck, Globe } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
 import SaudeFinanceiraOP from "./SaudeFinanceiraOP";
@@ -16,6 +16,7 @@ import DesenhosOPSection from "./DesenhosOPSection";
 import ListaExpedicaoSection from "./ListaExpedicaoSection";
 import AbaObra from "./AbaObra";
 import AbaQualidade from "./AbaQualidade";
+import AbaPortalCliente from "./AbaPortalCliente";
 import AbaProducao from "./AbaProducao";
 import AbaTerceiros from "./AbaTerceiros";
 import EmailsObraCard from "./EmailsObraCard";
@@ -69,6 +70,9 @@ const VISTAS = [
   // TRABALHO (todas as obras); aqui é a pergunta que se faz meses depois — "o que esta obra tem de
   // inspeção?" — e atravessar a fila inteira para respondê-la não é razoável.
   { key: "qualidade", label: "Qualidade", icon: ShieldCheck },
+  // ⚠ o portal do cliente é aba da OBRA, não de um módulo: quem publica é quem conhece o contrato
+  // daquela obra, e a decisão do que mostrar muda de cliente para cliente.
+  { key: "portal", label: "Portal do cliente", icon: Globe },
   { key: "terceiros", label: "Terceiros", icon: Truck },
   { key: "expedicao", label: "Expedição", icon: Truck },
   { key: "financeiro", label: "Financeiro", icon: DollarSign },
@@ -951,6 +955,8 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
       )}
 
       {vista === "qualidade" && <AbaQualidade opNumero={op.numero} />}
+
+      {vista === "portal" && <AbaPortalCliente opId={op.id} />}
 
       {vista === "terceiros" && <AbaTerceiros opId={op.id} opNumero={op.numero} />}
 

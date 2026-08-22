@@ -149,6 +149,23 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PlanoPintura_opNumero_key" ON "PlanoPintura"("opNumero")`);
   console.log("[ensure-mes-tables] OK — PlanoPintura garantida.");
 
+  // Portal do Cliente — um por obra (22/08/2026). Idempotente.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "PortalCliente" (
+      "id" TEXT NOT NULL, "opId" TEXT, "opNumero" TEXT NOT NULL, "token" TEXT,
+      "status" TEXT NOT NULL DEFAULT 'RASCUNHO', "contato" TEXT, "empresa" TEXT,
+      "clienteEmail" TEXT, "capaUrl" TEXT, "mensagem" TEXT, "fotos" JSONB, "secoes" JSONB,
+      "publicadoEm" TIMESTAMP(3), "enviadoEm" TIMESTAMP(3),
+      "primeiroAcessoEm" TIMESTAMP(3), "ultimoAcessoEm" TIMESTAMP(3),
+      "acessos" INTEGER NOT NULL DEFAULT 0, "criadoPorId" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "PortalCliente_pkey" PRIMARY KEY ("id"))`);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PortalCliente_opNumero_key" ON "PortalCliente"("opNumero")`);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PortalCliente_token_key" ON "PortalCliente"("token")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PortalCliente_status_idx" ON "PortalCliente"("status")`);
+  console.log("[ensure-mes-tables] OK — PortalCliente garantida.");
+
   // backup do relatório de inspeção na pasta da obra (22/08/2026)
   await prisma.$executeRawUnsafe(`ALTER TABLE "RelatorioInspecao" ADD COLUMN IF NOT EXISTS "arquivoUrl" TEXT`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "RelatorioInspecao" ADD COLUMN IF NOT EXISTS "arquivadoEm" TIMESTAMP(3)`);
