@@ -26,7 +26,7 @@ export default function InspecoesClient() {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [montando, setMontando] = useState(null); // { opNumero, tipo, opId }
-  const [novoDim, setNovoDim] = useState(false);
+  const [novoTipo, setNovoTipo] = useState(null); // qual tipo está sendo criado
 
   const carregar = useCallback(async () => {
     try {
@@ -87,11 +87,17 @@ export default function InspecoesClient() {
             O que a fábrica registrou pelo celular, virando relatório numerado e assinado.
           </p>
         </div>
-        {/* o dimensional não vem de foto: monta-se do desenho, então tem entrada própria */}
-        <button onClick={() => setNovoDim(true)}
-          className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5">
-          <Ruler size={13} /> Novo relatório dimensional
-        </button>
+        {/* ⚠ TODO TIPO PODE NASCER AQUI. Antes só o dimensional tinha entrada; os demais dependiam de
+            alguém mandar foto do celular primeiro, e quem trabalha no computador ficava sem começo. */}
+        <div className="relative">
+          <select value="" onChange={(e) => e.target.value && setNovoTipo(e.target.value)}
+            className="appearance-none text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg pl-8 pr-7 py-1.5 cursor-pointer outline-none">
+            <option value="">Novo relatório</option>
+            {TIPOS_RELATORIO.map((t) => <option key={t.id} value={t.id} className="text-torg-dark bg-white">{t.sigla} · {t.label}</option>)}
+          </select>
+          <Plus size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white pointer-events-none" />
+          <ChevronRight size={13} className="absolute right-2 top-1/2 -translate-y-1/2 rotate-90 text-white pointer-events-none" />
+        </div>
       </div>
 
       {/* ── fotos soltas ─────────────────────────────────────────────────────────────────── */}
@@ -171,7 +177,7 @@ export default function InspecoesClient() {
       {montando && (
         <Montar grupo={montando} onFechar={() => setMontando(null)} onPronto={() => { setMontando(null); carregar(); }} />
       )}
-      {novoDim && <NovoDimensional onFechar={() => setNovoDim(false)} onPronto={() => { setNovoDim(false); carregar(); }} />}
+      {novoTipo && <NovoRelatorio tipo={novoTipo} onFechar={() => setNovoTipo(null)} onPronto={() => { setNovoTipo(null); carregar(); }} />}
     </div>
   );
 }
@@ -377,9 +383,14 @@ function Montar({ grupo, onFechar, onPronto }) {
             <div className="max-w-xs">
               <Ruler size={22} className="text-torg-blue/40 mx-auto mb-2" />
               <p className="text-[13px] text-torg-gray">
-                O relatório é criado vazio e na hora. Depois você abre ele e marca as
-                <strong className="text-torg-dark"> cotas A, B e C</strong> sobre o desenho — é ali que as
-                dimensões entram.
+                {ehDimensional ? (
+                  <>O relatório é criado vazio e na hora. Depois você abre ele e marca as
+                  <strong className="text-torg-dark"> cotas A, B e C</strong> sobre o desenho — é ali que as
+                  dimensões entram.</>
+                ) : (
+                  <>O relatório é criado vazio e na hora, com o número da obra. O preenchimento é feito
+                  ao abrir o relatório.</>
+                )}
               </p>
             </div>
           </div>
@@ -405,7 +416,19 @@ function Montar({ grupo, onFechar, onPronto }) {
  * porque o número do relatório é sequencial e não se reaproveita: gravar pra depois descobrir que o
  * desenho era outro deixaria um buraco na série.
  */
-function NovoDimensional({ onFechar, onPronto }) {
+/**
+ * NOVO RELATÓRIO — de qualquer tipo.
+ *
+ * Vitor (21/08/2026): "não estou conseguindo criar outros tipos de relatório no portal". Não estava
+ * mesmo: só o dimensional tinha caminho de criação. Os demais (solda, ultrassom, pintura) nasciam
+ * apenas de foto do celular, e quem trabalha no computador não tinha por onde começar.
+ *
+ * ⚠ O DIMENSIONAL é o único que exige peça: o relatório é de UM conjunto, e é dele que sai o
+ * desenho onde as cotas são marcadas. Nos outros a peça é opcional — um EVS pode cobrir várias, e
+ * quais foram fica na tabela do próprio relatório.
+ */
+function NovoRelatorio({ tipo, onFechar, onPronto }) {
+  const ehDimensional = tipo === "DIMENSIONAL";
   const [ops, setOps] = useState(null);
   const [op, setOp] = useState(null);
   const [escopo, setEscopo] = useState("CONJUNTO");
@@ -462,7 +485,7 @@ function NovoDimensional({ onFechar, onPronto }) {
     try {
       const r = await fetch("/api/qualidade/inspecoes/dimensional", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: op.numero, escopo, marcas: sel, titulo, inspetor }),
+        body: JSON.stringify({ opNumero: op.numero, tipo, escopo, marcas: sel, titulo, inspetor }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
@@ -480,8 +503,12 @@ function NovoDimensional({ onFechar, onPronto }) {
       <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-torg-dark">Novo relatório dimensional</p>
-            <p className="text-[11px] text-torg-gray">As dimensões de projeto vêm do desenho; as encontradas ficam para o elaborador.</p>
+            <p className="text-sm font-semibold text-torg-dark">Novo relatório · {TIPO_LABEL[tipo] || tipo}</p>
+            <p className="text-[11px] text-torg-gray">
+              {ehDimensional
+                ? "As dimensões de projeto vêm do desenho; as encontradas ficam para o elaborador."
+                : "Escolha a OP. As peças podem ser informadas agora ou depois, no próprio relatório."}
+            </p>
           </div>
           <button onClick={onFechar} className="text-torg-gray hover:text-torg-dark"><X size={18} /></button>
         </div>
@@ -500,6 +527,7 @@ function NovoDimensional({ onFechar, onPronto }) {
               </select>
             </label>
 
+            {ehDimensional && (
             <div>
               <span className="block text-[10px] font-semibold text-torg-gray mb-1">Escopo</span>
               <div className="grid grid-cols-2 gap-2">
@@ -512,6 +540,8 @@ function NovoDimensional({ onFechar, onPronto }) {
                 ))}
               </div>
             </div>
+
+            )}
 
             {op && (
               <div>
@@ -572,7 +602,7 @@ function NovoDimensional({ onFechar, onPronto }) {
 
         <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
           <button onClick={onFechar} className="text-[12px] text-torg-gray px-3 py-1.5">Cancelar</button>
-          <button onClick={gravar} disabled={!op || !sel.length || salvando}
+          <button onClick={gravar} disabled={!op || (ehDimensional && !sel.length) || salvando}
             className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-40">
             {salvando ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} Criar relatório
           </button>

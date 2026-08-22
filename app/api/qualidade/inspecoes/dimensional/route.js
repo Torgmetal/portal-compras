@@ -30,13 +30,20 @@ export async function POST(req) {
   const body = await req.json().catch(() => ({}));
   const opNumero = String(body?.opNumero || "").trim();
   const escopo = body?.escopo === "AVULSAS" ? "AVULSAS" : "CONJUNTO";
+  // ⚠ a rota deixou de ser só do dimensional: qualquer tipo nasce por aqui. O que muda por tipo é a
+  // exigência da peça e o que se resolve depois (o desenho, só o dimensional usa).
+  const { tipoValido } = await import("@/lib/qualidade-campo");
+  const tipo = tipoValido(body?.tipo) ? body.tipo : "DIMENSIONAL";
+  const ehDimensional = tipo === "DIMENSIONAL";
   const marcas = [...new Set((Array.isArray(body?.marcas) ? body.marcas : []).map((m) => String(m || "").trim().toUpperCase()).filter(Boolean))];
 
   if (!opNumero) return NextResponse.json({ error: "Informe a OP." }, { status: 400 });
-  if (!marcas.length) return NextResponse.json({ error: "Escolha ao menos uma peça." }, { status: 400 });
+  // ⚠ só o dimensional exige peça: o relatório é de UM conjunto e é dele que sai o desenho das
+  // cotas. Um EVS pode cobrir várias peças, e quais foram fica na tabela do próprio relatório.
+  if (ehDimensional && !marcas.length) return NextResponse.json({ error: "Escolha ao menos uma peça." }, { status: 400 });
   // ⚠ conjunto é UM por relatório — é o que o modelo do Vitor prevê ("IDENTIFICAÇÃO DA PEÇA",
   // "Nº DESENHO", "FOLHA 1 DE 1"). Agrupar é privilégio da peça avulsa.
-  if (escopo === "CONJUNTO" && marcas.length > 1) {
+  if (ehDimensional && escopo === "CONJUNTO" && marcas.length > 1) {
     return NextResponse.json({ error: "Relatório de conjunto é um por conjunto. Para agrupar, use o escopo de peças avulsas." }, { status: 400 });
   }
 
@@ -91,13 +98,13 @@ export async function POST(req) {
     // dimensional não usa fotos (Vitor: "não vamos usar fotos"), então nasce sem elas —
     // `criarRelatorio` exige foto, por isso o dimensional cria direto.
     const { proximoNumero } = await import("@/lib/relatorio-inspecao");
-    const numero = await proximoNumero(opNumero, "DIMENSIONAL");
+    const numero = await proximoNumero(opNumero, tipo);
     const { codigoRelatorio } = await import("@/lib/qualidade-campo");
-    const codigo = codigoRelatorio("DIMENSIONAL", opNumero, numero);
+    const codigo = codigoRelatorio(tipo, opNumero, numero);
 
     const rel = await prisma.relatorioInspecao.create({
       data: {
-        numero, codigo, opId: op?.id || null, opNumero, tipo: "DIMENSIONAL",
+        numero, codigo, opId: op?.id || null, opNumero, tipo,
         titulo: String(body?.titulo || "").trim() || null,
         observacoes: String(body?.observacoes || "").trim() || null,
         inspetor: String(body?.inspetor || "").trim() || user.name || null,
