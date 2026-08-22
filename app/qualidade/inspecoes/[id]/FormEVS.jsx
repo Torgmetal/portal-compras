@@ -175,7 +175,7 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
                       <option value="">—</option>
                       {soldadores.map((s) => (
                         <option key={s.id || s.nome} value={s.nome}>
-                          {s.sinete ? `${s.sinete} · ` : ""}{s.nome}{s.qualificado ? ` (${s.processos.join("/")})` : " — sem qualificação"}
+                          {s.sinete ? `${s.sinete} · ` : ""}{s.nome}{s.qualificado ? "" : " — sem qualificação"}
                         </option>
                       ))}
                     </select>

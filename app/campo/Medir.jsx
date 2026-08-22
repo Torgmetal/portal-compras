@@ -305,7 +305,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
                         <option value="">—</option>
                         {listas.soldadores.map((x) => (
                           <option key={x.id} value={x.nome}>
-                            {x.sinete ? `${x.sinete} · ` : ""}{x.nome}{x.qualificado ? ` (${x.processos.join("/")})` : " — sem qualificação"}
+                            {x.sinete ? `${x.sinete} · ` : ""}{x.nome}{x.qualificado ? "" : " — sem qualificação"}
                           </option>
                         ))}
                       </select>
