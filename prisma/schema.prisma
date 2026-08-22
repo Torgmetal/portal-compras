@@ -4372,6 +4372,19 @@ model RelatorioInspecao {
   // desenhos embutidos no PDF: [{ marca, itemId, nome }] — o "CROQUI / FOTO DA PEÇA"
   desenhos  Json?
   status   String @default("RASCUNHO") // RASCUNHO | EMITIDO
+
+  // ── REINSPEÇÃO E REVISÃO ─────────────────────────────────────────────────────────────────
+  // Vitor (21/08/2026): "no caso de reprova o relatório deve ficar aberto; na reinspeção o inspetor
+  // abre o relatório que estava reprovado e analisa os pontos destacados que foram reprovados, e
+  // quando o relatório for aprovado salvar como R01, e se for reprovado novamente nova revisão".
+  //
+  // Cada RODADA de inspeção é uma revisão: R00 é a primeira. Reprovou, o relatório continua aberto
+  // e a rodada seguinte vira R01. Aprovou, fecha na revisão em que estava.
+  resultadoInspecao String? // APROVADO | REPROVADO | REC (null = ainda não julgado)
+  revisao           Int     @default(0) // 0 = R00
+  // as rodadas anteriores, congeladas: [{ revisao, resultadoInspecao, linhas, emEm, por }]
+  revisoes          Json?
+
   emitidoEm DateTime?
   inspetor      String? // quem executou a inspeção (nome que sai no documento)
   criadoPorId   String?

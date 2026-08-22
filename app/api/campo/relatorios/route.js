@@ -22,9 +22,15 @@ export async function GET(req) {
   const opNumero = String(new URL(req.url).searchParams.get("opNumero") || "").trim();
   if (!opNumero) return NextResponse.json({ error: "Informe a OP." }, { status: 400 });
 
+  // ⚠ RELATÓRIO REPROVADO CONTINUA NA LISTA. Vitor: "no caso de reprova o relatório deve ficar
+  // aberto". Some só quando é aprovado e enviado para assinatura — antes disso, ele é justamente o
+  // que o inspetor vem reinspecionar.
   const rs = await prisma.relatorioInspecao.findMany({
     where: { opNumero, envioAssinaturaId: null },
-    select: { id: true, codigo: true, tipo: true, titulo: true, marcas: true, linhas: true, inspetor: true, createdAt: true },
+    select: {
+      id: true, codigo: true, tipo: true, titulo: true, marcas: true, linhas: true,
+      inspetor: true, createdAt: true, revisao: true, resultadoInspecao: true,
+    },
     orderBy: { createdAt: "desc" },
     take: 60,
   });
@@ -39,6 +45,9 @@ export async function GET(req) {
       id: r.id, codigo: r.codigo, tipo: r.tipo, tipoLabel: TIPO_LABEL[r.tipo] || r.tipo,
       titulo: r.titulo, marcas: r.marcas || [], inspetor: r.inspetor,
       aMedir, medidas, completo: aMedir > 0 && medidas >= aMedir,
+      revisao: r.revisao ?? 0,
+      rotuloRevisao: `R${String(r.revisao ?? 0).padStart(2, "0")}`,
+      resultadoInspecao: r.resultadoInspecao || null,
     };
   });
 

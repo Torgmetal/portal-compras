@@ -137,6 +137,10 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RelatorioInspecao_status_idx" ON "RelatorioInspecao"("status")`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "FotoInspecao" ADD COLUMN IF NOT EXISTS "equipamentos" JSONB`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "RelatorioInspecao" ADD COLUMN IF NOT EXISTS "equipamentos" JSONB`);
+  // reinspeção e revisão: cada rodada é uma revisão (R00, R01…); reprovado mantém o relatório aberto
+  await prisma.$executeRawUnsafe(`ALTER TABLE "RelatorioInspecao" ADD COLUMN IF NOT EXISTS "revisao" INTEGER NOT NULL DEFAULT 0`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "RelatorioInspecao" ADD COLUMN IF NOT EXISTS "resultadoInspecao" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "RelatorioInspecao" ADD COLUMN IF NOT EXISTS "revisoes" JSONB`);
   for (const c of ["escopo TEXT", "marcas JSONB", "linhas JSONB", "resultados JSONB", "desenhos JSONB"]) {
     await prisma.$executeRawUnsafe(`ALTER TABLE "RelatorioInspecao" ADD COLUMN IF NOT EXISTS "${c.split(" ")[0]}" ${c.split(" ")[1]}`);
   }

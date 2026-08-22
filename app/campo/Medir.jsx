@@ -5,6 +5,7 @@ import LeitorQR from "./LeitorQR";
 import { marcaDoQR, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
 import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA } from "@/lib/evs-campos";
 import { criteriosDoDefeito, ONDE_VALE } from "@/lib/aws-d11";
+import { RESULTADO_LABEL } from "@/lib/revisao-inspecao";
 
 /**
  * O INSPETOR DE CAMPO MEDINDO, NO CELULAR.
@@ -62,9 +63,18 @@ export default function Medir({ op, onSair, Tela, Equipamentos }) {
                 className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3.5 active:bg-gray-50">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-mono font-bold text-torg-blue text-[15px]">{r.codigo}</span>
-                  {r.completo
-                    ? <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 inline-flex items-center gap-1"><Check size={11} /> medido</span>
-                    : <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">{r.medidas}/{r.aMedir}</span>}
+                  <span className="flex items-center gap-1.5 shrink-0">
+                    {r.revisao > 0 && <span className="text-[11px] font-mono font-bold text-torg-gray">{r.rotuloRevisao}</span>}
+                    {r.resultadoInspecao === "REPROVADO"
+                      ? <span className="text-[11px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">reprovado</span>
+                      : r.resultadoInspecao === "REC"
+                      ? <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">exame compl.</span>
+                      : r.resultadoInspecao === "APROVADO"
+                      ? <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 inline-flex items-center gap-1"><Check size={11} /> aprovado</span>
+                      : r.completo
+                      ? <span className="text-[11px] font-semibold text-torg-blue bg-torg-blue/10 border border-torg-blue-200 rounded-full px-2 py-0.5">medido</span>
+                      : <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">{r.medidas}/{r.aMedir}</span>}
+                  </span>
                 </div>
                 {r.marcas?.length > 0 && <p className="text-[13px] text-torg-dark font-mono mt-0.5">{r.marcas.join(", ")}</p>}
                 {r.titulo && <p className="text-[12px] text-torg-gray">{r.titulo}</p>}
@@ -104,6 +114,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   // no computador não tem como saber se a junta foi escovada ou está como soldada.
   const [cond, setCond] = useState({});
   const [salvando, setSalvando] = useState(false);
+  const [resultado, setResultado] = useState(null);
   // soldadores e EPS vêm juntos: são pedidos na mesma tela, e duas chamadas na fábrica é uma a mais
   const [listas, setListas] = useState({ soldadores: [], eps: [] });
   const [lendoQR, setLendoQR] = useState(false);
@@ -113,6 +124,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "Erro"); return j; })
       .then((j) => {
         setRel(j.relatorio);
+        setResultado(j.relatorio.resultadoInspecao || null);
         setLinhas(Array.isArray(j.relatorio.linhas) ? j.relatorio.linhas : []);
         setEquipamentos(Array.isArray(j.relatorio.equipamentos) ? j.relatorio.equipamentos : []);
         const r0 = j.relatorio.resultados || {};
@@ -162,6 +174,21 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
     novaJunta(m);
   }
 
+  async function reinspecionar() {
+    if (!confirm(`Abrir a próxima revisão?\n\nAs medidas de ${rel.rotuloRevisao} ficam guardadas e os campos voltam em branco para medir de novo.`)) return;
+    setSalvando(true);
+    try {
+      const r = await fetch(`/api/campo/relatorios/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reinspecionar: true }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro");
+      alert(`Reinspeção aberta: ${j.rotulo}.`);
+      onVoltar();
+    } catch (e) { alert(e.message); } finally { setSalvando(false); }
+  }
+
   async function salvar() {
     setSalvando(true);
     try {
@@ -177,7 +204,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       }));
       const r = await fetch(`/api/campo/relatorios/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ medidas, equipamentos, assumirInspetor: !rel.inspetor, condicoes: ehDim ? undefined : cond }),
+        body: JSON.stringify({ medidas, equipamentos, assumirInspetor: !rel.inspetor, condicoes: ehDim ? undefined : cond, resultadoInspecao: resultado }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
@@ -191,7 +218,24 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   const medir = linhas.filter((l) => l.letra || l.marca);
 
   return (
-    <Tela titulo={rel.codigo} sub={rel.tipoLabel} voltar={onVoltar}>
+    <Tela titulo={rel.codigo} sub={`${rel.tipoLabel} · ${rel.rotuloRevisao}`} voltar={onVoltar}>
+      {/* ⚠ reprovado NÃO se regrava por cima: abre a próxima revisão. O que se mediu antes do
+          reparo é evidência — é ela que mostra que a peça foi reprovada, reparada e reinspecionada. */}
+      {(rel.resultadoInspecao === "REPROVADO" || rel.resultadoInspecao === "REC") && (
+        <div className="mb-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-3">
+          <p className="text-[13px] font-semibold text-amber-900">
+            {rel.rotuloRevisao} {rel.resultadoInspecao === "REPROVADO" ? "reprovada" : "com exame complementar"}
+          </p>
+          <p className="text-[12px] text-amber-800 mt-0.5">
+            Para reinspecionar após o reparo, abra a próxima revisão. As medidas anteriores ficam guardadas.
+          </p>
+          <button onClick={reinspecionar} disabled={salvando}
+            className="mt-2 w-full bg-amber-600 text-white active:bg-amber-700 rounded-xl py-3 text-[15px] font-semibold disabled:opacity-60">
+            Abrir reinspeção
+          </button>
+        </div>
+      )}
+
       <Equipamentos escolhidos={equipamentos} onMudar={setEquipamentos} />
 
       {!ehDim && (
@@ -257,7 +301,10 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           const tol = parseFloat(String(l.tolerancia || "").replace(/[^\d.,]/g, "").replace(",", "."));
           const fora = dif != null && Number.isFinite(tol) && Math.abs(dif) > tol;
           return (
-            <div key={i} className="bg-white border border-gray-200 rounded-xl p-3">
+            <div key={i} className={`bg-white rounded-xl p-3 border ${l.reprovouAntes ? "border-2 border-amber-400" : "border-gray-200"}`}>
+              {l.reprovouAntes && (
+                <p className="text-[11px] font-semibold text-amber-800 mb-1">reprovado na revisão anterior</p>
+              )}
               <div className="flex items-baseline justify-between gap-2">
                 <span className="font-bold text-torg-dark text-[15px]">{l.marca}{l.descricao ? ` · ${l.descricao}` : ""}</span>
                 {!ehDim && (
@@ -408,6 +455,41 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           Este relatório ainda não tem {ehDim ? "cotas marcadas" : "juntas lançadas"}. Quem monta faz isso no computador.
         </p>
       )}
+
+      {/* ── O RESULTADO GERAL ───────────────────────────────────────────────────────────────
+          Vitor (21/08/2026): "essa questão de selecionar como aprovado, reprovado e o exame
+          complementar em todos os relatórios que o inspetor for preencher".
+
+          ⚠ Só APROVADO fecha o relatório. Reprovado volta para reparo e "exame complementar" ainda
+          vai ter ensaio — nos dois ele continua aberto e volta para a lista, à espera da
+          reinspeção. */}
+      <div className="mt-5">
+        <p className="text-[12px] font-semibold text-torg-gray mb-1.5">Resultado da inspeção</p>
+        <div className="grid grid-cols-3 gap-1.5">
+          {[["APROVADO", "A", "bg-emerald-600 border-emerald-600"],
+            ["REPROVADO", "R", "bg-red-600 border-red-600"],
+            ["REC", "REC", "bg-amber-500 border-amber-500"]].map(([v, sigla, cor]) => {
+            const on = resultado === v;
+            return (
+              <button key={v} onClick={() => setResultado(on ? null : v)}
+                className={`rounded-xl py-3 border leading-tight ${on ? `${cor} text-white` : "text-torg-dark border-gray-200 active:bg-gray-50"}`}>
+                <span className="block text-[15px] font-bold">{sigla}</span>
+                <span className={`block text-[10px] ${on ? "text-white/85" : "text-torg-gray"}`}>
+                  {v === "REC" ? "Exame complementar" : RESULTADO_LABEL[v]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {resultado === "APROVADO" && (
+          <p className="text-[12px] text-emerald-700 mt-1.5">O relatório fecha em {rel.rotuloRevisao}.</p>
+        )}
+        {(resultado === "REPROVADO" || resultado === "REC") && (
+          <p className="text-[12px] text-amber-700 mt-1.5">
+            O relatório continua aberto e volta para a lista, à espera da reinspeção.
+          </p>
+        )}
+      </div>
 
       <button onClick={salvar} disabled={salvando}
         className="mt-5 w-full bg-torg-blue text-white active:bg-torg-dark rounded-2xl py-5 text-lg font-semibold inline-flex items-center justify-center gap-2.5 disabled:opacity-60">

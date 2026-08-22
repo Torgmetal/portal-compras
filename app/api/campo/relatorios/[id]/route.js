@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { PERFIS_CAMPO, TIPO_LABEL } from "@/lib/qualidade-campo";
+import { RESULTADOS, proximaRevisao, linhasReprovadas, rotuloRevisao } from "@/lib/revisao-inspecao";
 
 export const runtime = "nodejs";
 
@@ -28,12 +29,24 @@ export async function GET(_req, { params }) {
     select: {
       id: true, codigo: true, tipo: true, titulo: true, opNumero: true, marcas: true,
       linhas: true, resultados: true, equipamentos: true, inspetor: true, envioAssinaturaId: true,
+      revisao: true, resultadoInspecao: true, revisoes: true,
     },
   });
   if (!rel) return NextResponse.json({ error: "Relatório não encontrado." }, { status: 404 });
   if (rel.envioAssinaturaId) return NextResponse.json({ error: "Este relatório já foi enviado para assinatura." }, { status: 409 });
 
-  return NextResponse.json({ relatorio: { ...rel, tipoLabel: TIPO_LABEL[rel.tipo] || rel.tipo } });
+  return NextResponse.json({
+    relatorio: {
+      ...rel,
+      tipoLabel: TIPO_LABEL[rel.tipo] || rel.tipo,
+      rotuloRevisao: rotuloRevisao(rel.revisao),
+      // ⚠ os índices reprovados na rodada anterior — é o que a tela destaca para o inspetor olhar
+      // primeiro na reinspeção, sem ele ter de comparar dois documentos
+      reprovadasAntes: (Array.isArray(rel.revisoes) && rel.revisoes.length)
+        ? rel.revisoes[rel.revisoes.length - 1].reprovadas || []
+        : [],
+    },
+  });
 }
 
 export async function PATCH(req, { params }) {
@@ -43,12 +56,38 @@ export async function PATCH(req, { params }) {
 
   const { id } = await params;
   const rel = await prisma.relatorioInspecao.findUnique({
-    where: { id }, select: { id: true, codigo: true, linhas: true, resultados: true, envioAssinaturaId: true },
+    where: { id },
+    select: {
+      id: true, codigo: true, linhas: true, resultados: true, envioAssinaturaId: true,
+      revisao: true, resultadoInspecao: true, revisoes: true, inspetor: true,
+    },
   });
   if (!rel) return NextResponse.json({ error: "Relatório não encontrado." }, { status: 404 });
   if (rel.envioAssinaturaId) return NextResponse.json({ error: "Este relatório já foi enviado para assinatura." }, { status: 409 });
 
   const body = await req.json().catch(() => ({}));
+
+  // ── REINSPEÇÃO ──────────────────────────────────────────────────────────────────────────────
+  //
+  // Vitor: "na reinspeção o inspetor abre o relatório que estava reprovado e analisa os pontos
+  // destacados que foram reprovados". Abrir a próxima revisão congela a rodada atual e limpa as
+  // medidas — reinspeção é medir de novo, e o valor velho ao lado do campo faria alguém confirmar
+  // sem medir.
+  if (body.reinspecionar) {
+    if (rel.resultadoInspecao !== "REPROVADO" && rel.resultadoInspecao !== "REC") {
+      return NextResponse.json({ error: "Só relatório reprovado (ou com exame complementar) entra em reinspeção." }, { status: 409 });
+    }
+    const dados = proximaRevisao(rel, { por: user.name || null });
+    const atualizado = await prisma.relatorioInspecao.update({ where: { id }, data: dados });
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id, action: "REINSPECIONAR_RELATORIO", entity: "RelatorioInspecao", entityId: id,
+        diff: { codigo: rel.codigo, de: rotuloRevisao(rel.revisao), para: rotuloRevisao(atualizado.revisao) },
+      },
+    }).catch(() => {});
+    return NextResponse.json({ ok: true, revisao: atualizado.revisao, rotulo: rotuloRevisao(atualizado.revisao) });
+  }
+
   const originais = Array.isArray(rel.linhas) ? rel.linhas : [];
   const medidas = Array.isArray(body.medidas) ? body.medidas : [];
 
@@ -98,6 +137,14 @@ export async function PATCH(req, { params }) {
   }
   // quem mediu assina o campo do inspetor, se ainda estiver vazio
   if (body.assumirInspetor) dados.inspetor = user.name || null;
+
+  // ⚠ O RESULTADO GERAL É QUEM FECHA (ou não) O RELATÓRIO. Só APROVADO fecha: reprovado volta para
+  // reparo e "exame complementar" ainda vai ter ensaio — nos dois o relatório continua aberto, que
+  // é o que o Vitor pediu.
+  if (body.resultadoInspecao !== undefined) {
+    const r = String(body.resultadoInspecao || "").toUpperCase();
+    dados.resultadoInspecao = RESULTADOS.includes(r) ? r : null;
+  }
   // ── CONDIÇÕES DO ENSAIO ─────────────────────────────────────────────────────────────────────
   //
   // Vitor: "você só trouxe a medida do luxímetro e o restante precisa ser preenchido também".
