@@ -55,6 +55,35 @@ export async function POST(req) {
   const erros = [];
 
   const op = await prisma.oP.findFirst({ where: { numero: opNumero }, select: { id: true } });
+  // ── O TIPO DA PEÇA ──────────────────────────────────────────────────────────────────────────
+  //
+  // Vitor (21/08/2026): "aqui trazer o tipo da peça — coluna, viga, tesoura, etc — conforme
+  // descrito na lista". O cabeçalho trazia só a marca ("T89A1"), que não diz nada a quem lê o
+  // relatório meses depois; "T89A1 · COLUNA" diz.
+  //
+  // ⚠ A BUSCA É POR opId, NÃO POR opNumero. `PecaConjunto.opNumero` guarda o código da Engenharia
+  // (T67B, T89A), não o número da OP — procurar por "089" ali não acha nada.
+  //
+  // ⚠ E o tipo é `descricao`. `tipoPeca` é outra coisa: vale "CONJUNTO" ou "CROQUI", e usá-lo como
+  // reserva encheria o cabeçalho de "CONJUNTO" no lugar de COLUNA.
+  //
+  // ⚠ Gravado na CRIAÇÃO, não lido na hora de gerar o PDF: a lista da Engenharia é reimportada a
+  // cada revisão, e o relatório deve continuar dizendo o que a peça era quando foi inspecionada.
+  const tiposPeca = {};
+  if (op?.id) {
+    try {
+      const pecas = await prisma.pecaConjunto.findMany({
+        where: { opId: op.id, marca: { in: marcas } },
+        select: { marca: true, descricao: true },
+        distinct: ["marca"],
+      });
+      for (const pc of pecas) {
+        const t = (pc.descricao || "").trim();
+        if (t) tiposPeca[String(pc.marca).toUpperCase()] = t.toUpperCase();
+      }
+    } catch { /* sem tipo, o cabeçalho mostra só a marca — como antes */ }
+  }
+
   try {
     // dimensional não usa fotos (Vitor: "não vamos usar fotos"), então nasce sem elas —
     // `criarRelatorio` exige foto, por isso o dimensional cria direto.
@@ -74,7 +103,7 @@ export async function POST(req) {
         linhas: [],
         // e sem desenho: o caminho é resolvido na primeira abertura da marcação
         desenhos: [],
-        resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia },
+        resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia, tiposPeca },
         criadoPorId: user.id, criadoPorNome: user.name || null,
       },
     });

@@ -38,11 +38,11 @@ export async function GET(req, { params }) {
   // a cara de relatório do excel" — os outros tipos seguem o layout de evidências fotográficas.
   let bytes;
   if (rel.tipo === "DIMENSIONAL") {
-    const op = await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { cliente: true, obra: true } });
+    const op = await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { cliente: true, obra: true, refCliente: true } });
     bytes = await gerarDimensionalPDF({
       rel, assinaturas,
       desenhoBytes: (d) => baixarDesenho(d?.caminho),
-      cliente: op?.cliente || null, obra: op?.obra || null,
+      cliente: op?.cliente || null, obra: op?.obra || null, refCliente: op?.refCliente || null,
     });
   } else {
     bytes = await gerarRelatorioInspecaoPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho) });
