@@ -49,7 +49,7 @@ export async function PATCH(req, { params }) {
 
     const rom = await prisma.romaneioTerceiro.findUnique({
       where: { id: atual.id },
-      select: { id: true, numero: true, itens: true, materiais: true, opRefNumero: true, servico: true, fornecedorId: true },
+      select: { id: true, numero: true, itens: true, materiais: true, opRefNumero: true, servico: true, fornecedorId: true, remessaCfop: true },
     });
     const forn = rom.fornecedorId
       ? await prisma.fornecedor.findUnique({ where: { id: rom.fornecedorId }, select: { cnpj: true, uf: true, nCodOmie: true } })
