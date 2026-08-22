@@ -24,11 +24,14 @@ import { TIPOS_ESTRUTURA, criteriosDoDefeito } from "@/lib/aws-d11";
  */
 export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResultado }) {
   const [soldadores, setSoldadores] = useState([]);
+  const [eps, setEps] = useState([]);
   const marcas = Array.isArray(rel.marcas) ? rel.marcas : [];
 
   useEffect(() => {
-    fetch("/api/qualidade/inspecoes/soldadores")
-      .then((r) => r.json()).then((j) => setSoldadores(j.soldadores || [])).catch(() => {});
+    // ⚠ mesma rota do celular: soldador vem do RH (todos, inclusive quem ainda não tem certificado)
+    // e as EPS vêm do SGQ. Duas fontes, uma chamada.
+    fetch("/api/qualidade/soldagem").then((r) => r.json())
+      .then((j) => { setSoldadores(j.soldadores || []); setEps(j.eps || []); }).catch(() => {});
   }, []);
 
   const lux = Number(res.iluminacao);
@@ -153,8 +156,11 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
                   </label>
                   <label className="block">
                     <span className="block text-[10px] text-torg-gray mb-0.5">EPS</span>
-                    <input value={l.eps || ""} disabled={travado} onChange={(e) => set(i, "eps", e.target.value)}
-                      className="w-full text-[12px] border border-gray-200 rounded px-1.5 py-1 font-mono disabled:bg-gray-50" />
+                    <select value={l.eps || ""} disabled={travado} onChange={(e) => set(i, "eps", e.target.value)}
+                      className="w-full text-[12px] border border-gray-200 rounded px-1.5 py-1 disabled:bg-gray-50">
+                      <option value="">—</option>
+                      {eps.map((x) => <option key={x.codigo} value={x.codigo}>{x.codigo} · {x.processo}</option>)}
+                    </select>
                   </label>
                   <label className="block">
                     <span className="block text-[10px] text-torg-gray mb-0.5">
@@ -163,7 +169,11 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
                     <select value={l.soldador || ""} disabled={travado} onChange={(e) => set(i, "soldador", e.target.value)}
                       className={`w-full text-[12px] border rounded px-1.5 py-1 disabled:bg-gray-50 ${sold?.vencido ? "border-red-400 bg-red-50" : "border-gray-200"}`}>
                       <option value="">—</option>
-                      {soldadores.map((s) => <option key={s.nome} value={s.nome}>{s.nome}{s.vencido ? " (vencido)" : ""}</option>)}
+                      {soldadores.map((s) => (
+                        <option key={s.id || s.nome} value={s.nome}>
+                          {s.nome}{s.vencido ? " (vencido)" : s.semCertificado ? " (sem cert.)" : ""}
+                        </option>
+                      ))}
                     </select>
                   </label>
                   {!travado && (

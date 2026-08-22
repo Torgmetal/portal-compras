@@ -54,7 +54,7 @@ export async function PATCH(req, { params }) {
 
   // ⚠ MESCLA POR ÍNDICE, não substitui a lista. Se o celular mandasse as linhas inteiras, uma versão
   // antiga aberta no bolso apagaria a cota que a Qualidade acabou de acrescentar no computador.
-  const linhas = originais.map((l, i) => {
+  const linhas = [...originais].map((l, i) => {
     const m = medidas.find((x) => x.i === i);
     if (!m) return l;
     const novo = { ...l };
@@ -62,8 +62,29 @@ export async function PATCH(req, { params }) {
     if (m.laudo !== undefined) novo.laudo = m.laudo ? String(m.laudo).slice(0, 10) : null;
     if (m.descontinuidade !== undefined) novo.descontinuidade = m.descontinuidade ? String(m.descontinuidade).slice(0, 40) : null;
     if (m.obs !== undefined) novo.obs = m.obs ? String(m.obs).slice(0, 160) : null;
+    // ⚠ campos da JUNTA: no visual de solda quem descobre a junta é quem está na frente dela, então
+    // o campo escreve peça, EPS e soldador. No dimensional isso não vem — as cotas são definidas no
+    // desenho, antes, e o celular só responde a medida.
+    for (const k of ["marca", "descricao", "eps", "soldador"]) {
+      if (m[k] !== undefined) novo[k] = m[k] ? String(m[k]).slice(0, 60) : null;
+    }
+    if (m.qtd !== undefined) novo.qtd = num(m.qtd);
     return novo;
   });
+
+  // ⚠ juntas ACRESCENTADAS no celular vêm com índice além da lista original
+  for (const m of medidas) {
+    if (m.i < originais.length) continue;
+    linhas[m.i] = {
+      marca: m.marca ? String(m.marca).slice(0, 60) : null,
+      qtd: num(m.qtd), descricao: m.descricao ? String(m.descricao).slice(0, 120) : null,
+      eps: m.eps ? String(m.eps).slice(0, 60) : null,
+      soldador: m.soldador ? String(m.soldador).slice(0, 60) : null,
+      descontinuidade: m.descontinuidade ? String(m.descontinuidade).slice(0, 40) : null,
+      laudo: m.laudo ? String(m.laudo).slice(0, 10) : null,
+      obs: m.obs ? String(m.obs).slice(0, 160) : null,
+    };
+  }
 
   const dados = { linhas };
   if (Array.isArray(body.equipamentos)) {

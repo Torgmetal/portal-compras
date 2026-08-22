@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Loader2, AlertCircle, Check, ChevronLeft, Save, Ruler } from "lucide-react";
+import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2 } from "lucide-react";
+import LeitorQR from "./LeitorQR";
+import { marcaDoQR } from "@/lib/qualidade-campo";
 import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA } from "@/lib/evs-campos";
 import { TIPOS_ESTRUTURA, criteriosDoDefeito } from "@/lib/aws-d11";
 
@@ -70,6 +72,9 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   // no computador não tem como saber se a junta foi escovada ou está como soldada.
   const [cond, setCond] = useState({});
   const [salvando, setSalvando] = useState(false);
+  // soldadores e EPS vêm juntos: são pedidos na mesma tela, e duas chamadas na fábrica é uma a mais
+  const [listas, setListas] = useState({ soldadores: [], eps: [] });
+  const [lendoQR, setLendoQR] = useState(false);
 
   useEffect(() => {
     fetch(`/api/campo/relatorios/${id}`)
@@ -87,6 +92,11 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       .catch((e) => setErro(e.message));
   }, [id]);
 
+  useEffect(() => {
+    fetch("/api/qualidade/soldagem").then((r) => r.json())
+      .then((j) => setListas({ soldadores: j.soldadores || [], eps: j.eps || [] })).catch(() => {});
+  }, []);
+
   if (erro) return <Tela titulo="Relatório" voltar={onVoltar}><p className="text-sm text-red-600 inline-flex items-center gap-2"><AlertCircle size={15} /> {erro}</p></Tela>;
   if (!rel) return <Tela titulo="Relatório" voltar={onVoltar}><p className="text-sm text-torg-gray inline-flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> abrindo…</p></Tela>;
 
@@ -100,6 +110,26 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
     setLinhas((p) => p.map((l, k) => (k === i ? { ...l, descontinuidade: novos.join(" "), laudo: sug || (novos.length ? l.laudo : "A") } : l)));
   }
 
+  /**
+   * Acrescenta uma junta.
+   *
+   * ⚠ A JUNTA NASCE NO CAMPO, não no computador. Vitor (21/08/2026): "ter a opção de ler o QR code
+   * ou digitar qual o número da peça". No dimensional as cotas são definidas antes, porque saem do
+   * desenho; na solda, quem descobre que existe uma junta a inspecionar é quem está na frente dela.
+   */
+  function novaJunta(marca) {
+    const m = String(marca || "").trim().toUpperCase();
+    if (!m) return;
+    setLinhas((p) => [...p, { marca: m, qtd: 1, descricao: "", eps: "", soldador: "", descontinuidade: "", laudo: "" }]);
+  }
+
+  function aoLerQR(texto) {
+    const m = marcaDoQR(texto);
+    setLendoQR(false);
+    if (!m) { alert("Não reconheci a marca neste QR."); return; }
+    novaJunta(m);
+  }
+
   async function salvar() {
     setSalvando(true);
     try {
@@ -107,7 +137,10 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       // lista inteira apagaria a cota que a Qualidade acrescentou enquanto o celular estava no bolso.
       const medidas = linhas.map((l, i) => ({
         i,
-        ...(ehDim ? { encontradoMm: l.encontradoMm } : { laudo: l.laudo, descontinuidade: l.descontinuidade }),
+        ...(ehDim
+          ? { encontradoMm: l.encontradoMm }
+          : { laudo: l.laudo, descontinuidade: l.descontinuidade, marca: l.marca, qtd: l.qtd,
+              descricao: l.descricao, eps: l.eps, soldador: l.soldador }),
         obs: l.obs ?? null,
       }));
       const r = await fetch(`/api/campo/relatorios/${id}`, {
@@ -206,7 +239,12 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           return (
             <div key={i} className="bg-white border border-gray-200 rounded-xl p-3">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="font-bold text-torg-dark text-[15px]">{l.descricao || l.marca}</span>
+                <span className="font-bold text-torg-dark text-[15px]">{l.marca}{l.descricao ? ` · ${l.descricao}` : ""}</span>
+                {!ehDim && (
+                  <button onClick={() => setLinhas((p) => p.filter((_, k) => k !== i))} className="text-torg-gray active:text-red-600 shrink-0">
+                    <Trash2 size={15} />
+                  </button>
+                )}
                 {ehDim && <span className="text-[13px] text-torg-gray">projeto <strong className="text-torg-dark font-mono">{l.projetoMm ?? "—"}</strong> {l.tolerancia || ""}</span>}
               </div>
 
@@ -225,6 +263,30 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
                 </div>
               ) : (
                 <>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <label className="block">
+                      <span className="block text-[11px] text-torg-gray mb-0.5">Soldador</span>
+                      <select value={l.soldador || ""} onChange={(e) => set(i, "soldador", e.target.value)}
+                        className={`w-full text-[14px] border-2 rounded-lg px-2 py-2 outline-none ${
+                          listas.soldadores.find((x) => x.nome === l.soldador)?.vencido ? "border-red-400 bg-red-50" : "border-gray-200"}`}>
+                        <option value="">—</option>
+                        {listas.soldadores.map((x) => (
+                          <option key={x.id} value={x.nome}>
+                            {x.nome}{x.vencido ? " (vencido)" : x.semCertificado ? " (sem cert.)" : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="block text-[11px] text-torg-gray mb-0.5">EPS</span>
+                      <select value={l.eps || ""} onChange={(e) => set(i, "eps", e.target.value)}
+                        className="w-full text-[14px] border-2 border-gray-200 rounded-lg px-2 py-2 outline-none">
+                        <option value="">—</option>
+                        {listas.eps.map((x) => <option key={x.codigo} value={x.codigo}>{x.codigo} · {x.processo}</option>)}
+                      </select>
+                    </label>
+                  </div>
+
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {DESCONTINUIDADES.map((d) => {
                       const on = marcados.includes(d.c);
@@ -278,6 +340,21 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           );
         })}
       </div>
+
+      {!ehDim && (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button onClick={() => setLendoQR(true)}
+            className="bg-white border-2 border-torg-blue text-torg-blue active:bg-torg-blue/5 rounded-xl py-3.5 text-[15px] font-semibold inline-flex items-center justify-center gap-2">
+            <QrCode size={19} /> Ler QR
+          </button>
+          <button onClick={() => { const m = prompt("Número da peça:"); if (m) novaJunta(m); }}
+            className="bg-white border border-gray-300 text-torg-dark active:bg-gray-50 rounded-xl py-3.5 text-[15px] font-semibold inline-flex items-center justify-center gap-2">
+            <Plus size={19} /> Digitar
+          </button>
+        </div>
+      )}
+
+      {lendoQR && <LeitorQR onLer={aoLerQR} onFechar={() => setLendoQR(false)} />}
 
       {!medir.length && (
         <p className="text-sm text-torg-gray">
