@@ -15,9 +15,13 @@ import { Ruler, AlertCircle, Loader2, Check, Search } from "lucide-react";
 // cadastro: instrumento em duas listas é instrumento que some de uma delas quando o
 // certificado é renovado.
 //
-// ⚠ VENCIDO APARECE, marcado em vermelho. Sumir com ele faria o inspetor medir com o
-// mesmo instrumento e não registrar nada — o relatório sairia sem dizer com o que foi
-// medido, que é pior. Aparece, avisa, e quem decide é quem assina.
+// ⚠ VENCIDO NÃO ENTRA NA LISTA. Eu tinha defendido o contrário — mostrar marcado em
+// vermelho, para o inspetor não medir com ele e deixar de registrar. Vitor (22/08/2026)
+// decidiu tirar: "os vencidos não listar, já vamos resolver essa questão". A razão dele
+// é mais forte — a lista existe para escolher o que USAR.
+//
+// O alerta de vencido no que JÁ foi escolhido continua: relatório antigo pode ter um
+// instrumento que venceu depois, e isso o documento tem de dizer.
 export default function Equipamentos({ escolhidos = [], onMudar, travado }) {
   const [lista, setLista] = useState(null);
   const [abrir, setAbrir] = useState(false);
@@ -101,7 +105,6 @@ export default function Equipamentos({ escolhidos = [], onMudar, travado }) {
                       <span className="block text-[12px] text-torg-dark truncate">{e.nome}</span>
                       <span className="block text-[10px] text-torg-gray">cert {e.certificado || "—"}</span>
                     </span>
-                    {e.vencido && <span className="text-[9px] font-bold text-red-600 shrink-0">VENCIDO</span>}
                   </button>
                 );
               })}

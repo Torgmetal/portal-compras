@@ -149,6 +149,8 @@ export async function PATCH(req, { params }) {
   if (Array.isArray(body.equipamentos)) {
     dados.equipamentos = body.equipamentos.slice(0, 20).map((e) => ({
       id: e?.id || null, nome: String(e?.nome || "").slice(0, 120),
+      // o código (TR 04, LX-01) vem do mapa de calibração — é a coluna "Código" do modelo
+      codigo: e?.codigo ? String(e.codigo).slice(0, 40) : null,
       certificado: e?.certificado ? String(e.certificado).slice(0, 60) : null,
       validade: e?.validade ? String(e.validade).slice(0, 10) : null,
       vencido: !!e?.vencido,

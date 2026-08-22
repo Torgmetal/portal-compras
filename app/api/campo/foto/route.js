@@ -49,6 +49,7 @@ export async function POST(req) {
       equipamentos = bruto.slice(0, 12).map((e) => ({
         id: String(e?.id || ""),
         nome: String(e?.nome || "").slice(0, 160),
+        codigo: e?.codigo ? String(e.codigo).slice(0, 40) : null,
         certificado: e?.certificado ? String(e.certificado).slice(0, 60) : null,
         validade: e?.validade ? String(e.validade).slice(0, 10) : null,
         vencido: !!e?.vencido,
