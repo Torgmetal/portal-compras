@@ -15,7 +15,7 @@ const inp = "w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ri
 
 const ST = {
   PENDENTE: { label: "Aguardando emissão", cls: "bg-amber-50 text-amber-700 border-amber-200" },
-  PEDIDO_CRIADO: { label: "Pedido no Omie (rascunho)", cls: "bg-torg-blue-50 text-torg-blue border-torg-blue-100" },
+  PEDIDO_CRIADO: { label: "Remessa no Omie (rascunho)", cls: "bg-torg-blue-50 text-torg-blue border-torg-blue-100" },
   EMITIDA: { label: "NF emitida", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
 };
 
@@ -137,14 +137,14 @@ export default function RemessaTerceiroClient() {
                       <td className="px-3 py-2 text-center text-xs font-mono text-torg-gray">{r.cfop}</td>
                       <td className="px-3 py-2">
                         <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border whitespace-nowrap ${st.cls}`}>{st.label}</span>
-                        {r.remessaStatus === "PEDIDO_CRIADO" && r.pedidoNumero && <span className="block text-[10px] text-torg-gray mt-0.5">Pedido nº {r.pedidoNumero} — confira e fature no Omie</span>}
+                        {r.remessaStatus === "PEDIDO_CRIADO" && r.pedidoNumero && <span className="block text-[10px] text-torg-gray mt-0.5">Remessa nº {r.pedidoNumero} — confira e fature no Omie</span>}
                         {r.remessaStatus === "EMITIDA" && r.nfNumero && <span className="block text-[10px] text-torg-gray mt-0.5">NF {r.nfNumero}{r.nfSerie ? `/${r.nfSerie}` : ""} · {fmtD(r.nfEmitidaEm)}</span>}
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                           {r.remessaStatus === "PENDENTE" && (
                             <>
-                              <button onClick={() => setPreparar(r)} title="Preparar e gerar o Pedido de Venda no Omie (rascunho)" className="text-xs font-semibold text-white bg-torg-blue hover:bg-torg-dark px-2.5 py-1 rounded-lg inline-flex items-center gap-1"><FilePlus2 size={12} /> Gerar pedido Omie</button>
+                              <button onClick={() => setPreparar(r)} title="Preparar e gerar a Remessa de Produto no Omie (rascunho)" className="text-xs font-semibold text-white bg-torg-blue hover:bg-torg-dark px-2.5 py-1 rounded-lg inline-flex items-center gap-1"><FilePlus2 size={12} /> Gerar remessa</button>
                               <button onClick={() => setEmitir(r)} title="Registrar NF já emitida no Omie" className="text-xs text-torg-blue hover:text-torg-dark border border-torg-blue-100 rounded-lg px-2 py-1 inline-flex items-center gap-1"><ReceiptText size={12} /> Registrar NF</button>
                               <button onClick={() => acao(r.id, { acao: "dispensar" }, "Remessa dispensada")} title="Não precisa de NF" className="text-torg-gray hover:text-red-600 p-1"><MinusCircle size={14} /></button>
                             </>
@@ -171,7 +171,7 @@ export default function RemessaTerceiroClient() {
 
       {emitir && <ModalEmitir remessa={emitir} onClose={() => setEmitir(null)} onSalvo={() => { setEmitir(null); carregar(); showToast("NF de remessa registrada", "success"); }} />}
       {verItens && <ModalItens remessa={verItens} onClose={() => setVerItens(null)} />}
-      {preparar && <ModalPrepararRemessa remessa={preparar} onClose={() => setPreparar(null)} onGerado={(msg) => { setPreparar(null); carregar(); showToast(msg || "Pedido de remessa criado no Omie (rascunho)", "success"); }} />}
+      {preparar && <ModalPrepararRemessa remessa={preparar} onClose={() => setPreparar(null)} onGerado={(msg) => { setPreparar(null); carregar(); showToast(msg || "Remessa criada no Omie (rascunho)", "success"); }} />}
     </div>
   );
 }
@@ -207,7 +207,7 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
       const res = await fetch(`/api/fiscal/remessa-terceiro/${remessa.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await res.json();
       if (!j.success) throw new Error(j.error || "Erro");
-      onGerado(j.numeroPedido ? `Pedido ${j.numeroPedido} criado no Omie (rascunho) — confira e fature lá` : undefined);
+      onGerado(j.numeroPedido ? `Remessa ${j.numeroPedido} criada no Omie (rascunho) — confira e fature lá` : undefined);
     } catch (e) { setErro(e.message); setGerando(false); }
   }
 
@@ -225,7 +225,7 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
             <p className="py-8 text-center text-sm text-torg-gray inline-flex items-center gap-2 justify-center w-full"><Loader2 size={16} className="animate-spin" /> Resolvendo custos…</p>
           ) : !temMateriais ? (
             <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-4 text-sm text-torg-dark">
-              Este romaneio não tem materiais — a remessa sai como <strong>peças (ARM000001)</strong>{dados.marcasCount ? ` · ${dados.marcasCount} marca(s)` : ""}. Ao gerar, o Omie cria o pedido rascunho pra você conferir e faturar.
+              Este romaneio não tem materiais — a remessa sai como <strong>peças (ARM000001)</strong>{dados.marcasCount ? ` · ${dados.marcasCount} marca(s)` : ""}. Ao gerar, o Omie cria a remessa rascunho pra você conferir e faturar.
             </div>
           ) : (
             <>
@@ -279,7 +279,7 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
           )}
         </div>
         <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3 rounded-b-xl">
-          <p className="text-[11px] text-torg-gray">Cria o pedido no Omie como <strong>rascunho</strong> — você confere e fatura lá.</p>
+          <p className="text-[11px] text-torg-gray">Cria a remessa no Omie como <strong>rascunho</strong> — você confere e fatura lá.</p>
           <div className="flex gap-3">
             <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">Cancelar</button>
             <button onClick={gerar} disabled={gerando || !podeGerar} className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-dark text-sm font-medium flex items-center gap-2 disabled:opacity-50">
@@ -485,7 +485,7 @@ function ModalEmitir({ remessa, onClose, onSalvo }) {
           </div>
           <div><label className="block text-xs font-medium text-torg-dark mb-1">Chave de acesso (44 díg.)</label><input value={f.nfChave} onChange={(e) => set("nfChave", e.target.value)} className={inp} /></div>
           <div><label className="block text-xs font-medium text-torg-dark mb-1">Observação</label><input value={f.observacao} onChange={(e) => set("observacao", e.target.value)} placeholder="Opcional" className={inp} /></div>
-          <p className="text-[11px] text-torg-gray bg-amber-50 border border-amber-100 rounded px-2.5 py-1.5">Fluxo integrado: use <strong>“Gerar pedido Omie”</strong> na lista pra criar o pedido de venda (rascunho) já com as marcas; confira e <strong>fature no Omie</strong> (emite a NF-e). Aqui você só registra o nº/série/chave da NF já emitida.</p>
+          <p className="text-[11px] text-torg-gray bg-amber-50 border border-amber-100 rounded px-2.5 py-1.5">Fluxo integrado: use <strong>“Gerar remessa”</strong> na lista pra criar a remessa de produto (rascunho) no Omie; confira e <strong>fature no Omie</strong> (emite a NF-e). Aqui você só registra o nº/série/chave da NF já emitida.</p>
         </div>
         <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 rounded-b-xl">
           <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">Cancelar</button>
