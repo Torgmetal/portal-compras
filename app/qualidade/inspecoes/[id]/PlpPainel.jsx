@@ -34,25 +34,6 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas, onPlp, res =
       .catch(() => setDados({ plp: null, tintas: [] }));
   }, [opNumero, onTintas, onPlp]);
 
-  // ⚠ RELATÓRIO QUE NASCEU ANTES DO PLP se preenche sozinho, UMA VEZ.
-  //
-  // O especificado é gravado na criação; relatório aberto antes de a obra ter PLP fica em
-  // branco para sempre e obriga um clique que ninguém adivinha. Só dispara quando NENHUM
-  // campo especificado está preenchido — ou seja, quando o relatório claramente antecede o
-  // plano. Se o inspetor já mexeu em algum, a decisão é dele e nada é tocado.
-  const jaAplicou = useRef(false);
-  useEffect(() => {
-    if (jaAplicou.current || !dados?.plp || !setResultado) return;
-    const especificados = ["prepProcedimento", "limpeza", "abrasivo", "rugEspec", "espessuraMinima"];
-    if (especificados.some((k) => res[k] !== undefined && res[k] !== null && res[k] !== "")) {
-      jaAplicou.current = true;
-      return;
-    }
-    jaAplicou.current = true;
-    const n = aplicar(dados.plp);
-    if (n) setAviso(`${n} campo(s) trazidos do PLP — salve para gravar.`);
-  }, [dados, res, setResultado, aplicar]);
-
   function abrir() {
     const p = dados?.plp;
     setF({
@@ -106,6 +87,25 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas, onPlp, res =
     }
     return n;
   }, [res, setResultado]);
+
+  // ⚠ RELATÓRIO QUE NASCEU ANTES DO PLP se preenche sozinho, UMA VEZ.
+  //
+  // O especificado é gravado na criação; relatório aberto antes de a obra ter PLP fica em
+  // branco para sempre e obriga um clique que ninguém adivinha. Só dispara quando NENHUM
+  // campo especificado está preenchido — ou seja, quando o relatório claramente antecede o
+  // plano. Se o inspetor já mexeu em algum, a decisão é dele e nada é tocado.
+  const jaAplicou = useRef(false);
+  useEffect(() => {
+    if (jaAplicou.current || !dados?.plp || !setResultado) return;
+    const especificados = ["prepProcedimento", "limpeza", "abrasivo", "rugEspec", "espessuraMinima"];
+    if (especificados.some((k) => res[k] !== undefined && res[k] !== null && res[k] !== "")) {
+      jaAplicou.current = true;
+      return;
+    }
+    jaAplicou.current = true;
+    const n = aplicar(dados.plp);
+    if (n) setAviso(`${n} campo(s) trazidos do PLP — salve para gravar.`);
+  }, [dados, res, setResultado, aplicar]);
 
   // ⚠ A PLANILHA É A FONTE. Vitor: "esse será sempre o caminho" — <OP>/8. Qualidade/PLP.
   // Importar é o caminho normal; o formulário abaixo é para a obra que ainda não tem
