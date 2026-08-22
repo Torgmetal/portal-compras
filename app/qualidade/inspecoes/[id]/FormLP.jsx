@@ -180,7 +180,24 @@ export default function FormLP({ rel, linhas, res, travado, setLinhas, setResult
         </table>
 
         {!linhas.length && (
-          <p className="text-[11px] text-torg-gray mt-1">Nenhuma junta lançada. Peça sem indicação também entra — com laudo A e traço nas demais colunas, como no modelo.</p>
+          <div className="mt-1">
+            <p className="text-[11px] text-torg-gray">
+              Nenhuma junta lançada. Peça sem indicação também entra — com laudo A e traço nas demais colunas, como no modelo.
+            </p>
+            {/* ⚠ RELATÓRIO ABERTO ANTES DESTA MUDANÇA nasceu sem linhas. As peças já foram
+                escolhidas na abertura; redigitá-las seria pedir de novo o que o portal sabe. */}
+            {!travado && (rel.marcas || []).length > 0 && (
+              <button
+                onClick={() => setLinhas((rel.marcas || []).map((m) => ({
+                  marca: m,
+                  descricao: res.tiposPeca?.[String(m).toUpperCase()] || null,
+                  indicacaoLp: "", local: "", tamanho: "", tipoDefeito: "", laudo: "",
+                })))}
+                className="mt-1.5 text-[11px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-2.5 py-1 hover:bg-torg-blue-50">
+                Trazer as {(rel.marcas || []).length} peça(s) selecionada(s) na abertura
+              </button>
+            )}
+          </div>
         )}
         <p className="text-[10px] text-torg-gray mt-2">
           IL — indicação linear · IA — arredondada · INR — não relevante (menor que 1,5 mm) · A aprovado · R reprovado · REC exame complementar

@@ -216,7 +216,7 @@ export default function RelatorioDetalheClient({ id }) {
 
 
 
-          {linhas.length > 0 && !["VISUAL_SOLDA", "ULTRASSOM", "PINTURA"].includes(rel.tipo) && (
+          {linhas.length > 0 && !["VISUAL_SOLDA", "ULTRASSOM", "PINTURA", "LP"].includes(rel.tipo) && (
             <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[12px] font-bold text-torg-dark inline-flex items-center gap-1.5"><Ruler size={13} className="text-torg-blue" /> Dimensões</p>

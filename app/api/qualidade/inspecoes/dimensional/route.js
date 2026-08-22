@@ -147,8 +147,23 @@ export async function POST(req) {
         observacoes: String(body?.observacoes || "").trim() || null,
         inspetor: String(body?.inspetor || "").trim() || user.name || null,
         escopo, marcas,
-        // nasce SEM linha: elas aparecem conforme as cotas A/B/C forem marcadas no desenho
-        linhas: [],
+        // ⚠ O LP NASCE COM AS PEÇAS. Vitor (22/08/2026): "precisa trazer as informações para o
+        // inspetor ir selecionando igual aos demais, trazer todos os pontos do relatório que
+        // precisa ser preenchido". O ensaio é POR PEÇA e as peças já foram escolhidas na
+        // abertura — abrir uma tabela vazia obriga a redigitar o que o portal já sabe.
+        //
+        // Diferente do visual de solda e do ultrassom, onde a junta nasce no campo ("quem
+        // descobre que existe uma junta a inspecionar é quem está na frente dela"): no LP o
+        // que se ensaia é a peça inteira, e ela veio da seleção.
+        //
+        // No dimensional continua vazio: ali as linhas são as cotas A/B/C, marcadas no desenho.
+        linhas: tipo === "LP"
+          ? marcas.map((m) => ({
+              marca: m,
+              descricao: tiposPeca[String(m).toUpperCase()] || null,
+              indicacaoLp: "", local: "", tamanho: "", tipoDefeito: "", laudo: "",
+            }))
+          : [],
         // e sem desenho: o caminho é resolvido na primeira abertura da marcação
         desenhos: [],
         resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia, tiposPeca, qtdPeca,

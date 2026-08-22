@@ -1,5 +1,6 @@
 "use client";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { LAUDOS } from "@/lib/evs-campos";
 import {
   TIPOS_PENETRANTE, METODOS, MARCAS, REMOVEDORES, CONDICOES_SUPERFICIE, TIPOS_INDICACAO,
   conferirEnsaio, tipoSugerido,
@@ -95,6 +96,23 @@ export function IndicacaoLP({ l, set }) {
       {sug && l.tipoDefeito !== sug && (
         <p className="text-[12px] text-amber-700">PO-15: abaixo de 1,5 mm a indicação não é relevante — marcar {sug}?</p>
       )}
+      {/* ⚠ O LAUDO É O PONTO PRINCIPAL e quase ficou de fora: os botões viviam no ramo do
+          visual de solda, que o LP não usa mais. Sem eles a peça não tem veredito — e é o
+          veredito que faz o documento existir. */}
+      <div className="grid grid-cols-3 gap-1.5">
+        {LAUDOS.map((v) => {
+          const on = l.laudo === v.c;
+          const cor = v.c === "A" ? "bg-emerald-600 border-emerald-600" : v.c === "R" ? "bg-red-600 border-red-600" : "bg-amber-500 border-amber-500";
+          return (
+            <button key={v.c} onClick={() => set("laudo", v.c)}
+              className={`rounded-lg py-2 border leading-tight ${on ? `${cor} text-white` : "text-torg-dark border-gray-200 active:bg-gray-50"}`}>
+              <span className="block text-[15px] font-bold">{v.c}</span>
+              <span className={`block text-[10px] ${on ? "text-white/85" : "text-torg-gray"}`}>{v.curto}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <p className="text-[11px] text-torg-gray">
         IL linear · IA arredondada · INR não relevante. Junta sem indicação: deixe em branco e marque o laudo A.
       </p>
