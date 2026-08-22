@@ -34,6 +34,11 @@ export async function POST(req) {
   const opNumero = String(form.get("opNumero") || "").trim();
   const tipo = String(form.get("tipo") || "").trim();
   const marca = String(form.get("marca") || "").trim() || null;
+  // ⚠ FOTO PODE NASCER JÁ AMARRADA A UM RELATÓRIO. Vitor (21/08/2026): "falta o botão para tirar
+  // foto no relatório". Sem isto ela cai na fila de fotos soltas e alguém precisa juntá-la depois,
+  // no computador — e a evidência de uma junta reprovada é justamente o que não pode se perder no
+  // caminho.
+  const relatorioId = String(form.get("relatorioId") || "").trim() || null;
   const origemMarca = String(form.get("origemMarca") || "").trim() || null;
   const observacao = String(form.get("observacao") || "").trim().slice(0, 500) || null;
   // instrumentos marcados no celular, em SNAPSHOT — ver o comentário do modelo
@@ -68,7 +73,7 @@ export async function POST(req) {
 
   const foto = await prisma.fotoInspecao.create({
     data: {
-      opId, opNumero, tipo, marca, origemMarca, observacao, equipamentos,
+      opId, opNumero, tipo, marca, origemMarca, observacao, equipamentos, relatorioId,
       url: blob.url, tamanho: buf.length,
       // quem tirou é o que faz a foto valer como evidência — sem isso é só uma imagem
       autorId: user.id, autorNome: user.name || user.email || null,
@@ -86,12 +91,15 @@ export async function GET(req) {
   const url = new URL(req.url);
   const opNumero = url.searchParams.get("opNumero");
   const tipo = url.searchParams.get("tipo");
-  if (!opNumero) return NextResponse.json({ fotos: [] });
+  // ⚠ por RELATÓRIO também: a tela de medição precisa mostrar as fotos daquele documento, e não
+  // todas as da OP — que são dezenas e de outros relatórios.
+  const relatorioId = url.searchParams.get("relatorioId");
+  if (!opNumero && !relatorioId) return NextResponse.json({ fotos: [] });
 
   const fotos = await prisma.fotoInspecao.findMany({
-    where: { opNumero, ...(tipo ? { tipo } : {}) },
+    where: relatorioId ? { relatorioId } : { opNumero, ...(tipo ? { tipo } : {}) },
     select: { id: true, url: true, marca: true, origemMarca: true, observacao: true, equipamentos: true, capturadaEm: true, autorNome: true, tipo: true },
-    orderBy: { capturadaEm: "desc" },
+    orderBy: { capturadaEm: relatorioId ? "asc" : "desc" },
     take: 60,
   });
   return NextResponse.json({ fotos });
@@ -107,8 +115,19 @@ export async function DELETE(req) {
 
   const foto = await prisma.fotoInspecao.findUnique({ where: { id }, select: { autorId: true, relatorioId: true } });
   if (!foto) return NextResponse.json({ error: "Foto não encontrada." }, { status: 404 });
-  // ⚠ foto que já entrou num relatório não se apaga por aqui: ela virou evidência de um documento
-  if (foto.relatorioId) return NextResponse.json({ error: "Esta foto já faz parte de um relatório." }, { status: 409 });
+
+  // ⚠ `FotoInspecao.relatorioId` é campo solto, sem relação declarada no schema — o relatório vem
+  // numa consulta à parte.
+  const rel = foto.relatorioId
+    ? await prisma.relatorioInspecao.findUnique({ where: { id: foto.relatorioId }, select: { envioAssinaturaId: true, codigo: true } })
+    : null;
+  // ⚠ FOTO DE RELATÓRIO JÁ ENVIADO PARA ASSINATURA não se apaga: ela virou evidência de um
+  // documento que alguém validou. Antes a regra barrava QUALQUER foto ligada a relatório — mas
+  // agora a foto nasce amarrada ao relatório na hora de medir, e errar o enquadramento no chão de
+  // fábrica é comum. Enquanto o documento é rascunho, quem tirou pode refazer.
+  if (rel?.envioAssinaturaId) {
+    return NextResponse.json({ error: `A foto faz parte do ${rel.codigo}, que já foi enviado para assinatura.` }, { status: 409 });
+  }
   // e cada um apaga a própria — engano na hora de fotografar é comum, apagar a do colega não
   if (foto.autorId && foto.autorId !== user.id && user.tipo !== "ADMIN") {
     return NextResponse.json({ error: "Só quem tirou a foto pode removê-la." }, { status: 403 });

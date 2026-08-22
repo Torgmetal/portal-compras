@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2 } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2, Camera, X } from "lucide-react";
 import LeitorQR from "./LeitorQR";
 import { marcaDoQR, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
 import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA } from "@/lib/evs-campos";
@@ -118,6 +118,11 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   // soldadores e EPS vêm juntos: são pedidos na mesma tela, e duas chamadas na fábrica é uma a mais
   const [listas, setListas] = useState({ soldadores: [], eps: [] });
   const [lendoQR, setLendoQR] = useState(false);
+  // ⚠ a foto é OPCIONAL nestes relatórios, mas quando existe é evidência: uma junta reprovada com
+  // foto vale muito mais na conversa com o cliente do que a mesma junta descrita em texto.
+  const [fotos, setFotos] = useState([]);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const fileRef = useRef(null);
 
   useEffect(() => {
     fetch(`/api/campo/relatorios/${id}`)
@@ -134,6 +139,12 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         });
       })
       .catch((e) => setErro(e.message));
+  }, [id]);
+
+  useEffect(() => {
+    // as fotos que já estão amarradas a este relatório
+    fetch(`/api/campo/foto?relatorioId=${id}`).then((r) => r.json())
+      .then((j) => setFotos(j.fotos || [])).catch(() => {});
   }, [id]);
 
   useEffect(() => {
@@ -172,6 +183,35 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
     setLendoQR(false);
     if (!m) { alert("Não reconheci a marca neste QR."); return; }
     novaJunta(m);
+  }
+
+  async function receberFotos(e) {
+    const arquivos = [...(e.target.files || [])];
+    e.target.value = "";
+    if (!arquivos.length) return;
+    setEnviandoFoto(true);
+    try {
+      for (const arq of arquivos) {
+        const fd = new FormData();
+        fd.append("file", arq);
+        fd.append("opNumero", op.numero);
+        fd.append("tipo", rel.tipo);
+        fd.append("relatorioId", id);
+        const r = await fetch("/api/campo/foto", { method: "POST", body: fd });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || "Erro ao enviar");
+        setFotos((p) => [...p, j.foto || j]);
+      }
+    } catch (err) { alert(err.message); } finally { setEnviandoFoto(false); }
+  }
+
+  async function apagarFoto(idFoto) {
+    if (!confirm("Apagar esta foto?")) return;
+    try {
+      const r = await fetch(`/api/campo/foto?id=${idFoto}`, { method: "DELETE" });
+      if (!r.ok) throw new Error((await r.json()).error || "Erro");
+      setFotos((p) => p.filter((f) => f.id !== idFoto));
+    } catch (e) { alert(e.message); }
   }
 
   async function reinspecionar() {
@@ -455,6 +495,35 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           Este relatório ainda não tem {ehDim ? "cotas marcadas" : "juntas lançadas"}. Quem monta faz isso no computador.
         </p>
       )}
+
+      {/* ── FOTOS (opcionais) ───────────────────────────────────────────────────────────────
+          Vitor (21/08/2026): "falta o botão para tirar foto no relatório". A foto nasce já amarrada
+          a este relatório — sem isso ela cairia na fila de fotos soltas e alguém teria de juntá-la
+          depois, no computador. A evidência de uma junta reprovada é o que menos pode se perder no
+          caminho. Quando há foto, o PDF ganha a página de registro fotográfico; sem foto, não. */}
+      <div className="mt-5">
+        <p className="text-[12px] font-semibold text-torg-gray mb-1.5">
+          Fotos {fotos.length > 0 && <span className="font-normal">· {fotos.length}</span>}
+        </p>
+        <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={receberFotos} />
+        <button onClick={() => fileRef.current?.click()} disabled={enviandoFoto}
+          className="w-full bg-white border-2 border-torg-blue text-torg-blue active:bg-torg-blue/5 rounded-xl py-3.5 text-[15px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60">
+          {enviandoFoto ? <Loader2 size={19} className="animate-spin" /> : <Camera size={19} />} Tirar foto
+        </button>
+        {fotos.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {fotos.map((ft) => (
+              <span key={ft.id} className="relative">
+                <img src={ft.url} alt="" className="w-20 h-20 object-cover rounded-lg border border-gray-200" />
+                <button onClick={() => apagarFoto(ft.id)}
+                  className="absolute -top-1.5 -right-1.5 bg-white border border-gray-300 rounded-full p-0.5 text-torg-gray active:text-red-600">
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* ── O RESULTADO GERAL ───────────────────────────────────────────────────────────────
           Vitor (21/08/2026): "essa questão de selecionar como aprovado, reprovado e o exame
