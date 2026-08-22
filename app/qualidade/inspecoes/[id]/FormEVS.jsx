@@ -159,7 +159,11 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
                     <select value={l.eps || ""} disabled={travado} onChange={(e) => set(i, "eps", e.target.value)}
                       className="w-full text-[12px] border border-gray-200 rounded px-1.5 py-1 disabled:bg-gray-50">
                       <option value="">—</option>
-                      {eps.map((x) => <option key={x.codigo} value={x.codigo}>{x.codigo} · {x.processo}</option>)}
+                      {(() => {
+                        const permitidas = soldadores.find((y) => y.nome === l.soldador)?.epsPermitidas;
+                        const lst = permitidas?.length ? eps.filter((x) => permitidas.includes(x.codigo)) : eps;
+                        return lst.map((x) => <option key={x.codigo} value={x.codigo}>{x.codigo}{x.processo ? ` · ${x.processo}` : ""}</option>);
+                      })()}
                     </select>
                   </label>
                   <label className="block">
@@ -169,7 +173,12 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
                     <select value={l.soldador || ""} disabled={travado}
                       onChange={(e) => {
                         const x = soldadores.find((y) => y.nome === e.target.value);
-                        setLinhas(linhas.map((ln, k) => (k === i ? { ...ln, soldador: e.target.value, sinete: x?.sinete || null } : ln)));
+                        // qualificado num processo só? a EPS se preenche sozinha
+                        const unica = x?.epsPermitidas?.length === 1 ? x.epsPermitidas[0] : null;
+                        setLinhas(linhas.map((ln, k) => (k === i ? {
+                          ...ln, soldador: e.target.value, sinete: x?.sinete || null,
+                          eps: unica || (x?.epsPermitidas?.includes(ln.eps) ? ln.eps : ""),
+                        } : ln)));
                       }}
                       className={`w-full text-[12px] border rounded px-1.5 py-1 disabled:bg-gray-50 ${sold && !sold.qualificado ? "border-amber-400 bg-amber-50" : "border-gray-200"}`}>
                       <option value="">—</option>

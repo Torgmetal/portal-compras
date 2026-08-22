@@ -272,7 +272,13 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
                       <select value={l.soldador || ""}
                         onChange={(e) => {
                           const x = listas.soldadores.find((y) => y.nome === e.target.value);
-                          setLinhas((p2) => p2.map((ln, k) => (k === i ? { ...ln, soldador: e.target.value, sinete: x?.sinete || null } : ln)));
+                          // ⚠ qualificado num processo só? a EPS se preenche. Em dois (GMAW e FCAW),
+                          // a escolha é dele — o portal não tem como saber qual junta é qual.
+                          const unica = x?.epsPermitidas?.length === 1 ? x.epsPermitidas[0] : null;
+                          setLinhas((p2) => p2.map((ln, k) => (k === i ? {
+                            ...ln, soldador: e.target.value, sinete: x?.sinete || null,
+                            eps: unica || (x?.epsPermitidas?.includes(ln.eps) ? ln.eps : ""),
+                          } : ln)));
                         }}
                         className={`w-full text-[14px] border-2 rounded-lg px-2 py-2 outline-none ${
                           listas.soldadores.find((x) => x.nome === l.soldador)?.qualificado === false ? "border-amber-400 bg-amber-50" : "border-gray-200"}`}>
@@ -289,7 +295,13 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
                       <select value={l.eps || ""} onChange={(e) => set(i, "eps", e.target.value)}
                         className="w-full text-[14px] border-2 border-gray-200 rounded-lg px-2 py-2 outline-none">
                         <option value="">—</option>
-                        {listas.eps.map((x) => <option key={x.codigo} value={x.codigo}>{x.codigo} · {x.processo}</option>)}
+                        {(() => {
+                          // ⚠ só as EPS do processo que o soldador cobre. Escolher uma fora disso é
+                          // junta soldada sob procedimento que ele não tem qualificação para usar.
+                          const permitidas = listas.soldadores.find((y) => y.nome === l.soldador)?.epsPermitidas;
+                          const lst = permitidas?.length ? listas.eps.filter((x) => permitidas.includes(x.codigo)) : listas.eps;
+                          return lst.map((x) => <option key={x.codigo} value={x.codigo}>{x.codigo}{x.processo ? ` · ${x.processo}` : ""}</option>);
+                        })()}
                       </select>
                     </label>
                   </div>
