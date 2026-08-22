@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { PERFIS_CAMPO } from "@/lib/qualidade-campo";
-import { normalizarPlp } from "@/lib/plp";
+import { normalizarPlp, tipoDoProduto } from "@/lib/plp";
 import { classificarMaterial } from "@/lib/databook-secoes";
 import { fichasPorR, comFicha } from "@/lib/databook-ficha-r";
 
@@ -65,6 +65,10 @@ async function tintasDaOP(opNumero) {
     .map((d) => ({
       id: d.id,
       produto: d.nome,
+      // ⚠ `tipo` é o nome SEM a cor: é ele que vai para o campo Produto do relatório.
+      // `produto` continua completo, porque é assim que está escrito na lata e é assim
+      // que o inspetor reconhece a opção na lista.
+      tipo: tipoDoProduto(d.nome),
       componente: componenteDaTinta(d.nome),
       fabricante: d.fornecedor || null,
       lote: d.numeroCorrida || null,

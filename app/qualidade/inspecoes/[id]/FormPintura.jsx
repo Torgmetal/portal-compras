@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, Check, ClipboardList } from "lucide-react";
 import { escopoDoTipo, amostragemDoTipo } from "@/lib/pit-escopo";
 import PlpPainel from "./PlpPainel";
+import { tipoDoProduto } from "@/lib/plp";
 import {
   GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, METODOS_APLICACAO, TEMPO, CAMPOS_DEMAO,
   RUGOSIDADE_MIN, RUGOSIDADE_MAX, mediaRugosidade, mediaEspessura, condicoesPermitemPintar,
@@ -79,7 +80,8 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
       bloco[k] = t.lote || "";
       if (t.validade) bloco[cfg.val] = String(t.validade).slice(0, 10);
       // a base manda no produto e no fabricante do relatório
-      if (cfg.comp === "A") { bloco.produto = t.produto; if (t.fabricante) bloco.fabricante = t.fabricante; }
+      // no campo Produto vai o TIPO, sem a cor — ela tem campo próprio
+      if (cfg.comp === "A") { bloco.produto = t.tipo || t.produto; if (t.fabricante) bloco.fabricante = t.fabricante; }
     }
     setResultado("demaos", { ...dem, [n]: bloco });
   }
@@ -88,8 +90,8 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
   function opcoesDoCampo(k) {
     if (k === "cor") return cores.length ? cores : null;
     if (k === "produto") {
-      const doCmr = [...new Set(porComponente("A").map((t) => t.produto))];
-      const doPlp = (plp?.demaos || []).map((d) => d.produto).filter(Boolean);
+      const doCmr = [...new Set(porComponente("A").map((t) => t.tipo || t.produto))];
+      const doPlp = (plp?.demaos || []).map((d) => tipoDoProduto(d.produto)).filter(Boolean);
       const todos = [...new Set([...doCmr, ...doPlp])];
       return todos.length ? todos : null;
     }

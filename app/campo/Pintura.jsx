@@ -57,7 +57,8 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
     else {
       bloco[campo] = t.lote || "";
       if (t.validade) bloco[campoVal] = String(t.validade).slice(0, 10);
-      if (comp === "A") { bloco.produto = t.produto; if (t.fabricante) bloco.fabricante = t.fabricante; }
+      // Produto recebe o TIPO, sem a cor — ela tem campo próprio logo abaixo
+      if (comp === "A") { bloco.produto = t.tipo || t.produto; if (t.fabricante) bloco.fabricante = t.fabricante; }
     }
     set("demaos", { ...dem, [aba]: bloco });
   }
