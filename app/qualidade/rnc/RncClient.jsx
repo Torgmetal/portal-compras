@@ -21,6 +21,7 @@ export default function RncClient() {
   const abaUrl = searchParams.get("aba");
   const [aba, setAba] = useState(["INTERNA", "PLANOS"].includes(abaUrl) ? abaUrl : "INTERNA");
   const [itens, setItens] = useState([]);
+  const [opFiltro, setOpFiltro] = useState("");
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [modal, setModal] = useState(false);
@@ -35,6 +36,12 @@ export default function RncClient() {
   useEffect(() => { carregar(); }, [carregar]);
 
   const StatusChip = ({ s }) => <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_RNC[s]?.cor || "bg-gray-100 text-gray-600"}`}>{statusRncLabel(s)}</span>;
+
+  // a OP vem escrita como "T69" ou "069" conforme quem abriu — normaliza para agrupar
+  const opDe = (r) => (r.opNumero ? String(r.opNumero).replace(/^[Tt]\s*/, "").trim() : "");
+  const opsComRnc = [...new Set(itens.map(opDe).filter(Boolean))]
+    .sort((a2, b2) => String(b2).localeCompare(String(a2), "pt-BR", { numeric: true }));
+  const visiveis = itens.filter((r) => !opFiltro || opDe(r) === opFiltro);
 
   return (
     <div className="space-y-5 max-w-6xl">
@@ -75,6 +82,18 @@ export default function RncClient() {
           <p className="text-sm text-torg-gray">Nenhuma RNC registrada.</p>
         </div>
       ) : (
+        <>
+        {/* ⚠ SEPARADO POR OP. Vitor (22/08/2026): "dentro da página de relatórios e RNCs, deixar
+            separado por OP, para facilitar na organização". Numa lista chapada de RNCs de várias
+            obras, quem cuida de uma obra específica lê tudo para achar as suas. */}
+        <div className="flex items-center gap-2 flex-wrap mb-3">
+          <select value={opFiltro} onChange={(e) => setOpFiltro(e.target.value)}
+            className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:border-torg-blue outline-none">
+            <option value="">Todas as obras</option>
+            {opsComRnc.map((n) => <option key={n} value={n}>OP-{n}</option>)}
+          </select>
+          <span className="text-[11px] text-torg-gray ml-auto">{visiveis.length} de {itens.length}</span>
+        </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-[12px]">
@@ -90,7 +109,7 @@ export default function RncClient() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {itens.map((r) => (
+                {visiveis.map((r) => (
                   <tr key={r.id} onClick={() => router.push(`/qualidade/rnc/${r.id}`)} className="hover:bg-torg-blue-50/40 cursor-pointer">
                     <td className="px-3 py-2 font-mono font-semibold text-torg-blue whitespace-nowrap">{numRNC(r.numero, r.ano)}<span className={`ml-1.5 text-[9px] font-sans font-bold rounded px-1 py-0.5 align-middle ${r.tipo === "CLIENTE" ? "text-torg-blue bg-torg-blue-50" : "text-gray-500 bg-gray-100"}`}>{r.tipo === "CLIENTE" ? "cliente" : "interna"}</span></td>
                     <td className="px-3 py-2 text-torg-dark whitespace-nowrap">{fmtD(r.data)}</td>
@@ -105,6 +124,7 @@ export default function RncClient() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {modal && <ModalNova onClose={() => setModal(false)} onCriada={(id) => router.push(`/qualidade/rnc/${id}`)} />}

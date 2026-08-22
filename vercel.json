@@ -79,6 +79,10 @@
     {
       "path": "/api/cron/data-book",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/rnc-abertas",
+      "schedule": "0 8 * * 1-5"
     }
   ]
 }
