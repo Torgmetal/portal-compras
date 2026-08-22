@@ -57,8 +57,10 @@ export default function Equipamentos({ escolhidos = [], onMudar, travado }) {
           {escolhidos.map((e) => (
             <p key={e.id || e.nome} className="text-[11px] text-torg-gray">
               <span className="text-torg-dark font-medium">{e.nome}</span>
+              {/* ⚠ SÓ O CERTIFICADO. Vitor (22/08/2026): "a validade não há necessidade, apenas o
+                  certificado". O aviso de VENCIDO fica: ele não é uma data, é um impedimento —
+                  medir com instrumento fora de calibração invalida o ensaio. */}
               {" · "}cert {e.certificado || "—"}
-              {e.validade ? ` · val. ${new Date(e.validade).toLocaleDateString("pt-BR", { timeZone: "UTC" })}` : ""}
               {e.vencido && <span className="text-red-600 font-semibold"> · VENCIDO</span>}
             </p>
           ))}
@@ -97,10 +99,7 @@ export default function Equipamentos({ escolhidos = [], onMudar, travado }) {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-[12px] text-torg-dark truncate">{e.nome}</span>
-                      <span className="block text-[10px] text-torg-gray">
-                        cert {e.certificado || "—"}
-                        {e.validade ? ` · val. ${new Date(e.validade).toLocaleDateString("pt-BR", { timeZone: "UTC" })}` : ""}
-                      </span>
+                      <span className="block text-[10px] text-torg-gray">cert {e.certificado || "—"}</span>
                     </span>
                     {e.vencido && <span className="text-[9px] font-bold text-red-600 shrink-0">VENCIDO</span>}
                   </button>

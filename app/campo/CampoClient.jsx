@@ -485,8 +485,10 @@ function Equipamentos({ escolhidos, onMudar }) {
                   <span className="min-w-0 flex-1">
                     <span className="block font-semibold text-torg-dark text-[13px] truncate">{eq.nome}</span>
                     <span className={`block text-[11px] ${eq.vencido ? "text-red-600 font-semibold" : "text-torg-gray"}`}>
+                      {/* ⚠ só o certificado (Vitor, 22/08/2026). "VENCIDO" fica: não é uma data,
+                          é um impedimento — instrumento fora de calibração invalida o ensaio. */}
                       {eq.certificado ? `cert ${eq.certificado}` : "sem certificado"}
-                      {eq.validade ? ` · ${eq.vencido ? "VENCIDO em" : "válido até"} ${eq.validade.split("-").reverse().join("/")}` : " · sem validade"}
+                      {eq.vencido ? " · VENCIDO" : ""}
                     </span>
                   </span>
                 </button>
