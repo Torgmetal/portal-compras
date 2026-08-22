@@ -145,7 +145,8 @@ export async function PATCH(req, { params }) {
       // critério; ver a nota em lib/evs-campos.js sobre a colisão de nomes
       "tipoPeca",
       // ensaio por ultrassom (PI-QUA-003)
-      "carregamento", "ganhoVarredura",
+      "carregamento", "ganhoVarredura", "acoplante", "blocoPadrao", "local",
+      "apModelo", "apSerie", "cbModelo", "cbSerie", "cbAngulo",
     ];
     for (const k of TEXTO_LIVRE) {
       if (r[k] !== undefined) dados.resultados[k] = r[k] == null ? null : String(r[k]).slice(0, 120);

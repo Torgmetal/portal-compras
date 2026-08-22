@@ -7,6 +7,7 @@ import {
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
 import MarcadorCotas from "./MarcadorCotas";
 import FormEVS from "./FormEVS";
+import FormUS from "./FormUS";
 
 /**
  * O RELATÓRIO ABERTO — é aqui que o elaborador preenche e VÊ A PRÉVIA.
@@ -156,6 +157,17 @@ export default function RelatorioDetalheClient({ id }) {
           Vitor (21/08/2026): "pode tirar essa parte, não vamos mais precisar, pode deixar mais
           espaço para a seleção das cotas". O painel da direita (abas Desenho | Prévia) saiu: o
           desenho agora é o próprio quadro de marcação, e o PDF abre pelo botão do cabeçalho. */}
+      {/* ── preenchimento do ensaio por ultrassom ────────────────────────────────────────── */}
+      {rel.tipo === "ULTRASSOM" && (
+        <div className="mt-4">
+          <FormUS
+            rel={rel} linhas={todas} res={res} travado={travado}
+            setLinhas={(ls) => setDados((d) => ({ ...d, relatorio: { ...d.relatorio, linhas: ls } }))}
+            setResultado={setResultado}
+          />
+        </div>
+      )}
+
       {/* ── preenchimento do ensaio visual de solda ──────────────────────────────────────── */}
       {rel.tipo === "VISUAL_SOLDA" && (
         <div className="mt-4">
@@ -176,7 +188,7 @@ export default function RelatorioDetalheClient({ id }) {
 
 
 
-          {linhas.length > 0 && rel.tipo !== "VISUAL_SOLDA" && (
+          {linhas.length > 0 && !["VISUAL_SOLDA", "ULTRASSOM"].includes(rel.tipo) && (
             <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[12px] font-bold text-torg-dark inline-flex items-center gap-1.5"><Ruler size={13} className="text-torg-blue" /> Dimensões</p>
