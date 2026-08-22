@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Loader2, Paintbrush, Pencil, Check, X, FolderSearch } from "lucide-react";
-import { METODOS_PREPARO, PLP_PADRAO, resumoPlp } from "@/lib/plp";
+import { useEffect, useState, useCallback } from "react";
+import { Loader2, Paintbrush, Pencil, Check, X, FolderSearch, Download } from "lucide-react";
+import { METODOS_PREPARO, PLP_PADRAO, resumoPlp, camposDoRelatorioPintura } from "@/lib/plp";
 import { GRAUS_LIMPEZA, METODOS_APLICACAO } from "@/lib/pintura-campos";
 
 // ─── O PLP DA OBRA, DENTRO DO RELATÓRIO ───────────────────────────────────────
@@ -18,7 +18,7 @@ import { GRAUS_LIMPEZA, METODOS_APLICACAO } from "@/lib/pintura-campos";
 
 const N = ["1ª", "2ª", "3ª"];
 
-export default function PlpPainel({ opNumero, podeEditar, onTintas }) {
+export default function PlpPainel({ opNumero, podeEditar, onTintas, res = {}, setResultado }) {
   const [dados, setDados] = useState(null);
   const [editando, setEditando] = useState(false);
   const [f, setF] = useState(null);
@@ -54,6 +54,40 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas }) {
     setEditando(true);
   }
 
+  // ─── APLICAR O PLP NESTE RELATÓRIO ──────────────────────────────────────────
+  // Vitor (22/08/2026): "consegui buscar o PLP, porém não trouxe as informações para os
+  // campos de aplicação".
+  //
+  // O especificado é gravado na CRIAÇÃO do relatório — e o dele nasceu antes de o PLP
+  // existir, então ficou em branco. A regra do snapshot continua certa (PLP revisado não
+  // reescreve relatório antigo), mas faltava a ponte: preencher o relatório que já está
+  // aberto.
+  //
+  // ⚠ SÓ CAMPO VAZIO. Nunca sobrescreve o que o inspetor já escreveu — inclusive se ele
+  // corrigiu um valor de propósito. E não toca em nada que se MEÇA.
+  const aplicar = useCallback((plp) => {
+    if (!plp || !setResultado) return 0;
+    const campos = camposDoRelatorioPintura(plp);
+    const vazio = (v) => v === undefined || v === null || v === "";
+    let n = 0;
+    for (const [k, v] of Object.entries(campos)) {
+      if (k === "demaos") continue;
+      if (vazio(res[k])) { setResultado(k, v); n++; }
+    }
+    if (campos.demaos) {
+      const atual = res.demaos || {};
+      const novo = { ...atual };
+      for (const [d, bloco] of Object.entries(campos.demaos)) {
+        const cur = atual[d] || {};
+        const merge = { ...cur };
+        for (const [k, v] of Object.entries(bloco)) if (vazio(cur[k])) { merge[k] = v; n++; }
+        novo[d] = merge;
+      }
+      if (n) setResultado("demaos", novo);
+    }
+    return n;
+  }, [res, setResultado]);
+
   // ⚠ A PLANILHA É A FONTE. Vitor: "esse será sempre o caminho" — <OP>/8. Qualidade/PLP.
   // Importar é o caminho normal; o formulário abaixo é para a obra que ainda não tem
   // planilha e para corrigir o que a leitura não entendeu.
@@ -64,7 +98,8 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas }) {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Não encontrei o PLP na pasta da obra.");
       setDados((d) => ({ ...d, plp: j.plp, temPlp: true }));
-      setAviso(`Importado de ${j.arquivo}. Confira antes de usar.`);
+      const n = aplicar(j.plp);
+      setAviso(`Importado de ${j.arquivo}${n ? ` · ${n} campo(s) preenchido(s) neste relatório — salve para gravar` : ""}.`);
       setEditando(false);
     } catch (e) { setErro(e.message); } finally { setImportando(false); }
   }
@@ -81,6 +116,8 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas }) {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Falha ao salvar");
       setDados((d) => ({ ...d, plp: j.plp, temPlp: true }));
+      const n = aplicar(j.plp);
+      if (n) setAviso(`${n} campo(s) preenchido(s) neste relatório — salve para gravar.`);
       setEditando(false);
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
   }
@@ -113,6 +150,16 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas }) {
               className="text-[11px] font-semibold text-white bg-torg-blue rounded-lg px-2.5 py-1 hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1">
               {importando ? <Loader2 size={11} className="animate-spin" /> : <FolderSearch size={11} />} Buscar na obra
             </button>
+            {dados.plp && setResultado && (
+              <button onClick={() => {
+                  const n = aplicar(dados.plp);
+                  setAviso(n ? `${n} campo(s) preenchido(s) — salve para gravar.` : "Os campos especificados já estão preenchidos.");
+                }}
+                title="Preenche os campos especificados deste relatório com o PLP, sem tocar no que já foi escrito"
+                className="text-[11px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-2.5 py-1 hover:bg-white inline-flex items-center gap-1">
+                <Download size={11} /> Preencher
+              </button>
+            )}
             <button onClick={abrir} className="text-[11px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-2.5 py-1 hover:bg-white inline-flex items-center gap-1">
               <Pencil size={11} /> {dados.plp ? "Editar" : "Definir"}
             </button>

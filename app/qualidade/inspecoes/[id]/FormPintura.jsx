@@ -95,7 +95,7 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
       </div>
 
       {/* ── preparação de superfície ──────────────────────────────────────────────── */}
-      <PlpPainel opNumero={rel.opNumero} podeEditar={!travado} onTintas={setTintas} />
+      <PlpPainel opNumero={rel.opNumero} podeEditar={!travado} onTintas={setTintas} res={res} setResultado={travado ? null : setResultado} />
 
       <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
         <p className="text-[12px] font-bold text-torg-dark mb-2">Preparação de superfície</p>
