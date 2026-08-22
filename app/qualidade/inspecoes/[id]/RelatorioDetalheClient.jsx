@@ -1,9 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import {
-  Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, FileText, Lock,
-} from "lucide-react";
+import { Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, FileText, Lock, FolderOpen } from "lucide-react";
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
 import MarcadorCotas from "./MarcadorCotas";
 import FormEVS from "./FormEVS";
@@ -12,6 +10,7 @@ import FormPintura from "./FormPintura";
 import FormLP from "./FormLP";
 import Equipamentos from "./Equipamentos";
 import AnexarProjeto from "./AnexarProjeto";
+import EscolherProjeto from "./EscolherProjeto";
 import Fotos from "./Fotos";
 import { usaCotas } from "@/lib/qualidade-campo";
 
@@ -34,6 +33,8 @@ export default function RelatorioDetalheClient({ id }) {
   // Vitor (21/08/2026): "na tela do gerador do projeto consegue trazer essa imagem do projeto para
   // ele conseguir conferir?" — o painel da direita abre NO DESENHO, que é o que ele olha enquanto
   const [marcaVista, setMarcaVista] = useState(null);
+  // painel de escolha do projeto no servidor (pasta Montagem / Conjunto da Engenharia)
+  const [escolhendo, setEscolhendo] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -144,16 +145,30 @@ export default function RelatorioDetalheClient({ id }) {
                 {desenhos[0]?.anexado && <span className="text-torg-blue"> · anexado</span>}
               </span>
             )}
-            {/* ⚠ o diagrama de montagem não tem marca de peça, então a varredura da pasta não o
-                acha. Esta é a porta manual — ver a nota em AnexarProjeto.jsx. */}
+            {/* ⚠ ESCOLHER vem antes de ANEXAR, e a ordem é a mensagem. O diagrama de montagem
+                não tem marca de peça, então a varredura automática não o acha — mas ele ESTÁ no
+                servidor, na pasta Montagem da Engenharia. Escolher aponta para o arquivo
+                original; anexar cria uma cópia solta do controle de revisão da Engenharia, e
+                serve só para o que realmente não está lá. */}
+            {!travado && (
+              <button onClick={() => setEscolhendo((v) => !v)}
+                className="text-[11px] font-semibold text-white bg-torg-blue rounded-lg px-2 py-0.5 hover:opacity-90 inline-flex items-center gap-1">
+                <FolderOpen size={11} /> escolher na pasta da obra
+              </button>
+            )}
             <AnexarProjeto relatorioId={id} anexado={!!desenhos[0]?.anexado} travado={travado}
               onMudou={carregar} />
           </div>
 
-          {!desenhos.length && (
+          {escolhendo && (
+            <EscolherProjeto relatorioId={id} onFechar={() => setEscolhendo(false)}
+              onEscolhido={() => { setEscolhendo(false); carregar(); }} />
+          )}
+
+          {!desenhos.length && !escolhendo && (
             <p className="text-[11px] text-torg-gray">
-              Nenhum projeto vinculado. O portal procura o desenho na pasta da OP pela marca da
-              peça; para diagrama de montagem, anexe o PDF acima.
+              Nenhum projeto vinculado. O portal procura o desenho pela marca da peça; para
+              conjunto ou diagrama de montagem, escolha na pasta da obra.
             </p>
           )}
           {desenhos.length > 0 && (
