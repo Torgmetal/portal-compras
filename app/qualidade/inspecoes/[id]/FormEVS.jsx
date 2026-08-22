@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Plus, Trash2, AlertTriangle, Check } from "lucide-react";
-import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES } from "@/lib/evs-campos";
+import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE } from "@/lib/evs-campos";
 import { TIPOS_ESTRUTURA, criteriosDoDefeito } from "@/lib/aws-d11";
 
 /**
@@ -76,7 +76,7 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
         <p className="text-[12px] font-bold text-torg-dark mb-2">Condições do ensaio</p>
         <div className="grid sm:grid-cols-3 gap-2.5">
           <Campo rot="Componente / parte" k="componente" />
-          <Campo rot="Metal base" k="metalBase" />
+          <Campo rot="Metal base" k="metalBase" opcoes={METAIS_BASE} />
           <label className="block">
             <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">
               Iluminação (lux) <span className="font-normal">· mínimo {LUX_MINIMO}</span>

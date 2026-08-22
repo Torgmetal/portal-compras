@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Loader2, AlertCircle, Check, ChevronLeft, Save, Ruler } from "lucide-react";
-import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES } from "@/lib/evs-campos";
+import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE } from "@/lib/evs-campos";
 import { TIPOS_ESTRUTURA, criteriosDoDefeito } from "@/lib/aws-d11";
 
 /**
@@ -161,9 +161,11 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
 
           <label className="block">
             <span className="block text-[12px] text-torg-gray mb-1">Metal base</span>
-            <input value={cond.metalBase || ""} onChange={(e) => setCond((c) => ({ ...c, metalBase: e.target.value }))}
-              placeholder="ASTM A572 Gr.50"
-              className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none" />
+            <select value={cond.metalBase || ""} onChange={(e) => setCond((c) => ({ ...c, metalBase: e.target.value }))}
+              className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none">
+              <option value="">—</option>
+              {METAIS_BASE.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
           </label>
 
           {/* ⚠ o tipo de estrutura decide QUAL limite vale para cada defeito — sem ele, os critérios
