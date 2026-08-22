@@ -413,7 +413,13 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
   const ehDimensional = usaCotas(tipo);
   const [ops, setOps] = useState(null);
   const [op, setOp] = useState(null);
-  const [escopo, setEscopo] = useState("CONJUNTO");
+  // ⚠ NA PRÉ-MONTAGEM NÃO SE ESCOLHE PEÇA, SE ESCOLHE PROJETO. Vitor (22/08/2026): "não trouxe os
+  // projetos de montagem". A lista de peças vem da LPC (marcas do Tekla) e o diagrama de montagem
+  // não está lá — ele é o desenho do arranjo, não de uma peça. Por isso o escopo muda de sentido
+  // aqui: "Diagrama de montagem" ou "Conjunto", e a lista traz PDFs da pasta da obra.
+  const ehPreMontagem = tipo === "PRE_MONTAGEM";
+  const [escopo, setEscopo] = useState(tipo === "PRE_MONTAGEM" ? "MONTAGEM" : "CONJUNTO");
+  const [projetos, setProjetos] = useState(null);
   const [q, setQ] = useState("");
   const [pecas, setPecas] = useState(null);
   const [sel, setSel] = useState([]);
@@ -456,6 +462,19 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
     return () => { vivo = false; clearTimeout(t); };
   }, [op, q, escopo]);
 
+  // os projetos da obra (pré-montagem): montagem ou conjunto, conforme o escopo
+  useEffect(() => {
+    if (!ehPreMontagem || !op) { setProjetos(null); return; }
+    let vivo = true;
+    setProjetos(null);
+    const familia = escopo === "CONJUNTO" ? "conjunto" : "montagem";
+    fetch(`/api/qualidade/inspecoes/projetos?opNumero=${encodeURIComponent(op.numero)}&familia=${familia}`)
+      .then((r) => r.json())
+      .then((j) => { if (vivo) setProjetos(j.projetos || []); })
+      .catch(() => vivo && setProjetos([]));
+    return () => { vivo = false; };
+  }, [ehPreMontagem, op, escopo]);
+
   // trocar de escopo/OP invalida a seleção e a prévia
   useEffect(() => { setSel([]); setListaAberta(true); }, [op, escopo]);
 
@@ -464,7 +483,7 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
   // regra de "um por relatório" estava presa ao valor de `escopo`, que nos outros tipos ficava em
   // CONJUNTO por ser o padrão — e travava a seleção em uma peça sem que nada na tela explicasse.
   // Um EVS cobre várias peças; um relatório de pintura, um lote inteiro.
-  const umaSo = ehDimensional && escopo === "CONJUNTO";
+  const umaSo = ehDimensional && !ehPreMontagem && escopo === "CONJUNTO";
   const alternar = (m) => setSel((p) => {
     if (p.includes(m)) return p.filter((x) => x !== m);
     // no conjunto, escolher troca em vez de somar — e a lista se fecha, porque não há mais o que
@@ -478,7 +497,15 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
     try {
       const r = await fetch("/api/qualidade/inspecoes/dimensional", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: op.numero, tipo, escopo, marcas: sel, inspetor }),
+        body: JSON.stringify({
+          opNumero: op.numero, tipo, escopo, marcas: sel, inspetor,
+          // ⚠ o CAMINHO vai junto: assim o relatório de pré-montagem nasce com o desenho
+          // vinculado, em vez de depender de uma varredura por marca que nunca acharia o
+          // diagrama de montagem (ele não é uma peça da LPC).
+          projetos: ehPreMontagem
+            ? (projetos || []).filter((pr) => sel.includes(pr.nome)).map((pr) => ({ nome: pr.nome, caminho: pr.caminho }))
+            : undefined,
+        }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
@@ -524,9 +551,14 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
 
             {ehDimensional && (
             <div>
-              <span className="block text-[10px] font-semibold text-torg-gray mb-1">Escopo</span>
+              <span className="block text-[10px] font-semibold text-torg-gray mb-1">
+                {ehPreMontagem ? "Projeto a inspecionar" : "Escopo"}
+              </span>
               <div className="grid grid-cols-2 gap-2">
-                {[["CONJUNTO", "Conjunto", "um por relatório"], ["AVULSAS", "Peças avulsas", "agrupadas"]].map(([v, t, sub]) => (
+                {(ehPreMontagem
+                  ? [["MONTAGEM", "Diagrama de montagem", "pasta Montagem"], ["CONJUNTO", "Conjunto", "pasta Conjunto"]]
+                  : [["CONJUNTO", "Conjunto", "um por relatório"], ["AVULSAS", "Peças avulsas", "agrupadas"]]
+                ).map(([v, t, sub]) => (
                   <button key={v} onClick={() => setEscopo(v)}
                     className={`text-left rounded-lg border px-2.5 py-1.5 ${escopo === v ? "border-torg-blue bg-torg-blue/5" : "border-gray-200"}`}>
                     <span className="block text-[12px] font-semibold text-torg-dark">{t}</span>
@@ -542,7 +574,7 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10px] font-semibold text-torg-gray">
-                    {escopo === "CONJUNTO" ? "Conjunto" : "Peças"} {sel.length ? `· ${sel.length} selecionada(s)` : ""}
+                    {ehPreMontagem ? "Projetos" : escopo === "CONJUNTO" ? "Conjunto" : "Peças"} {sel.length ? `· ${sel.length} selecionada(s)` : ""}
                   </span>
                   <span className="flex items-center gap-2">
                     {sel.length > 0 && (
@@ -565,7 +597,42 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
                     ))}
                   </div>
                 )}
-                {listaAberta && (<>
+                {/* ── pré-montagem: a lista é de PROJETOS da pasta da obra ── */}
+                {listaAberta && ehPreMontagem && (<>
+                {/* ⚠ a pasta de conjunto tem 435 PDFs na OP-067. Lista sem busca ali é uma lista
+                    que ninguém usa — rola-se até desistir. */}
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="buscar projeto…"
+                  autoCorrect="off" spellCheck={false}
+                  className="w-full text-[12px] font-mono border border-gray-200 rounded-lg px-2 py-1.5 mb-1.5 focus:border-torg-blue outline-none" />
+                  <div className="border border-gray-100 rounded-lg max-h-56 overflow-y-auto">
+                    {projetos === null && (
+                      <p className="p-2 text-[12px] text-torg-gray inline-flex items-center gap-1.5">
+                        <Loader2 size={12} className="animate-spin" /> procurando os projetos na pasta da obra…
+                      </p>
+                    )}
+                    {projetos?.filter((pr) => !q || pr.nome.toLowerCase().includes(q.toLowerCase())).slice(0, 300).map((pr) => {
+                      const on = sel.includes(pr.nome);
+                      return (
+                        <button key={pr.caminho} onClick={() => alternar(pr.nome)}
+                          className={`w-full text-left px-2 py-1.5 text-[12px] border-b border-gray-50 last:border-0 ${on ? "bg-torg-blue/10 font-semibold text-torg-dark" : "text-torg-dark hover:bg-gray-50"}`}>
+                          {pr.nome}
+                        </button>
+                      );
+                    })}
+                    {projetos && !projetos.length && (
+                      <p className="p-2 text-[12px] text-torg-gray">
+                        Nenhum PDF nessa pasta desta OP. Dá para anexar o projeto depois, dentro do relatório.
+                      </p>
+                    )}
+                    {projetos && projetos.length > 300 && !q && (
+                      <p className="p-2 text-[11px] text-torg-gray border-t border-gray-100">
+                        Mostrando 300 de {projetos.length} — use a busca para achar o projeto.
+                      </p>
+                    )}
+                  </div>
+                </>)}
+
+                {listaAberta && !ehPreMontagem && (<>
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="buscar marca…"
                   autoCapitalize="characters" autoCorrect="off" spellCheck={false}
                   className="w-full text-[12px] font-mono border border-gray-200 rounded-lg px-2 py-1.5 mb-1.5 focus:border-torg-blue outline-none" />

@@ -164,8 +164,17 @@ export async function POST(req) {
               indicacaoLp: "", local: "", tamanho: "", tipoDefeito: "", laudo: "",
             }))
           : [],
-        // e sem desenho: o caminho é resolvido na primeira abertura da marcação
-        desenhos: [],
+        // ⚠ A PRÉ-MONTAGEM NASCE COM O DESENHO. Os demais resolvem na primeira abertura da
+        // marcação, varrendo a pasta da OP pela MARCA da peça — e isso nunca acharia um diagrama
+        // de montagem, que não é peça da LPC. Aqui o caminho vem escolhido da tela.
+        desenhos: Array.isArray(body?.projetos) && body.projetos.length
+          ? body.projetos.slice(0, 12).map((pr) => ({
+              marca: String(pr?.nome || "").slice(0, 60),
+              nome: String(pr?.nome || "").slice(0, 120),
+              caminho: String(pr?.caminho || ""),
+              escolhido: true,
+            })).filter((d) => d.marca && d.caminho)
+          : [],
         resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia, tiposPeca, qtdPeca,
           procedimento: proc?.nome || null, procedimentoId: proc?.id || null,
           // o critério do ensaio visual de solda é fixado pelo PO-06, item 9.4
