@@ -100,7 +100,7 @@ export async function PATCH(req, { params }) {
       // ── a indicação (ensaio por ultrassom) ──
       ...Object.fromEntries(["peca", "indicacao", "angulo", "face", "comprimento", "db_indicacao",
         "db_referencia", "db_atenuacao", "db_classe", "reprovado", "percurso", "profundidade",
-        "dist_x", "dist_y", "sinete", "nivel"].map((k) => [k, l?.[k] ? String(l[k]).slice(0, 40) : null])),
+        "dist_x", "dist_y", "nivel"].map((k) => [k, l?.[k] ? String(l[k]).slice(0, 40) : null])),
     }));
   }
 
@@ -144,6 +144,8 @@ export async function PATCH(req, { params }) {
       // tipo da peça (Coluna, Viga, Suporte, Bandeja, Tesoura, Treliça) — DESCREVE, não decide
       // critério; ver a nota em lib/evs-campos.js sobre a colisão de nomes
       "tipoPeca",
+      // ensaio por ultrassom (PI-QUA-003)
+      "carregamento", "ganhoVarredura",
     ];
     for (const k of TEXTO_LIVRE) {
       if (r[k] !== undefined) dados.resultados[k] = r[k] == null ? null : String(r[k]).slice(0, 120);

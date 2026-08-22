@@ -6,6 +6,10 @@ import { marcaDoQR, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
 import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA } from "@/lib/evs-campos";
 import { criteriosDoDefeito, ONDE_VALE } from "@/lib/aws-d11";
 import { RESULTADO_LABEL } from "@/lib/revisao-inspecao";
+import {
+  APARELHOS, CABECOTES, ANGULOS, ACOPLANTES, BLOCOS_PADRAO, FACES,
+  TIPOS_CARREGAMENTO, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL,
+} from "@/lib/us-campos";
 
 /**
  * O INSPETOR DE CAMPO MEDINDO, NO CELULAR.
@@ -87,6 +91,104 @@ export default function Medir({ op, onSair, Tela, Equipamentos }) {
   );
 }
 
+/** Campo de seleção grande, para o dedo. */
+function Sel({ rot, v, opcoes, onMudar, destaque = false }) {
+  return (
+    <label className="block">
+      <span className="block text-[12px] text-torg-gray mb-1">{rot}</span>
+      <select value={v || ""} onChange={(e) => onMudar(e.target.value)}
+        className={`w-full text-base border-2 rounded-xl px-3 py-3 outline-none ${
+          destaque ? "border-amber-300 bg-amber-50" : "border-gray-200 focus:border-torg-blue"}`}>
+        <option value="">—</option>
+        {opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function Txt({ rot, v, onMudar, tipo = "text" }) {
+  return (
+    <label className="block">
+      <span className="block text-[12px] text-torg-gray mb-1">{rot}</span>
+      <input type={tipo} inputMode={tipo === "number" ? "decimal" : undefined} value={v ?? ""}
+        onChange={(e) => onMudar(e.target.value)}
+        className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-torg-blue" />
+    </label>
+  );
+}
+
+/**
+ * Uma indicação de ultrassom.
+ *
+ * ⚠ O "c" e o "d" são CALCULADOS na hora, conforme os itens 15.3 e 15.4 do PI-QUA-003. O inspetor
+ * informa o ganho da indicação (a), o de referência (b) e o percurso sônico; o resto é conta — e
+ * conta feita à mão em polegada, no chão de fábrica, é onde se erra.
+ *
+ * ⚠ O portal NÃO diz se passa. As tabelas 2 e 3 do procedimento estão como imagem no PDF e ainda
+ * não foram cadastradas; dizer "aprovado" a partir de uma tabela que não tenho seria a pior forma
+ * de errar aqui. Mostra o "d" e o laudo é do inspetor.
+ */
+function IndicacaoUS({ l, set }) {
+  const { c, d } = classificacaoIndicacao({ a: l.db_indicacao, b: l.db_referencia, percursoMm: l.percurso });
+  const num = (campo, rot) => (
+    <label className="block">
+      <span className="block text-[11px] text-torg-gray mb-0.5">{rot}</span>
+      <input type="number" inputMode="decimal" value={l[campo] ?? ""} onChange={(e) => set(campo, e.target.value)}
+        className="w-full text-[15px] border-2 border-gray-200 rounded-lg px-2 py-2 outline-none focus:border-torg-blue" />
+    </label>
+  );
+  return (
+    <div className="mt-2 space-y-2">
+      <div className="grid grid-cols-3 gap-2">
+        {num("indicacao", "Nº indicação")}
+        <label className="block">
+          <span className="block text-[11px] text-torg-gray mb-0.5">Ângulo</span>
+          <select value={l.angulo || ""} onChange={(e) => set("angulo", e.target.value)}
+            className="w-full text-[15px] border-2 border-gray-200 rounded-lg px-2 py-2 outline-none">
+            <option value="">—</option>
+            {ANGULOS.map((a) => <option key={a} value={a}>{a}°</option>)}
+          </select>
+        </label>
+        <label className="block">
+          <span className="block text-[11px] text-torg-gray mb-0.5">Face</span>
+          <select value={l.face || ""} onChange={(e) => set("face", e.target.value)}
+            className="w-full text-[15px] border-2 border-gray-200 rounded-lg px-2 py-2 outline-none">
+            <option value="">—</option>
+            {FACES.map((x) => <option key={x} value={x}>{x}</option>)}
+          </select>
+        </label>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        {num("db_indicacao", "a — indicação (dB)")}
+        {num("db_referencia", "b — referência (dB)")}
+        {num("percurso", "Percurso sônico (mm)")}
+      </div>
+
+      {/* ⚠ o resultado da conta fica À VISTA, com a fórmula: é ele que se compara com a tabela */}
+      <div className="rounded-lg bg-torg-blue/5 border border-torg-blue-200 px-2.5 py-2">
+        <p className="text-[12px] text-torg-dark">
+          <strong>c</strong> = {c ?? "—"} dB &nbsp;·&nbsp; <strong>d</strong> = <strong className="text-[15px]">{d ?? "—"}</strong> dB
+        </p>
+        <p className="text-[10px] text-torg-gray">d = a − b − c (PI-QUA-003, itens 15.3 e 15.4)</p>
+        {!TABELA_ACEITACAO_DISPONIVEL && (
+          <p className="text-[10px] text-amber-700 mt-0.5">Compare com a tabela do procedimento — o portal ainda não a tem cadastrada.</p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        {num("comprimento", "Compr. reprovado (mm)")}
+        {num("profundidade", "Profund. face A (mm)")}
+        {num("nivel", "Nível de defeito")}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {num("dist_x", "Distância X (mm)")}
+        {num("dist_y", "Distância Y (mm)")}
+      </div>
+    </div>
+  );
+}
+
 /** Agrupa os relatórios por tipo, na ordem em que a inspeção acontece. */
 function agruparPorTipo(lista) {
   const porTipo = new Map();
@@ -136,6 +238,10 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         setCond({
           iluminacao: r0.iluminacao ?? "", tecnica: r0.tecnica || "", condicoes: r0.condicoes || "",
           metalBase: r0.metalBase || "", tipoPeca: r0.tipoPeca || "",
+          carregamento: r0.carregamento || "", apModelo: r0.apModelo || "", apSerie: r0.apSerie || "",
+          cbModelo: r0.cbModelo || "", cbSerie: r0.cbSerie || "", cbAngulo: r0.cbAngulo || "",
+          acoplante: r0.acoplante || "", blocoPadrao: r0.blocoPadrao || "",
+          ganhoVarredura: r0.ganhoVarredura || "", local: r0.local || "",
         });
       })
       .catch((e) => setErro(e.message));
@@ -156,6 +262,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   if (!rel) return <Tela titulo="Relatório" voltar={onVoltar}><p className="text-sm text-torg-gray inline-flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> abrindo…</p></Tela>;
 
   const ehDim = rel.tipo === "DIMENSIONAL";
+  const ehUS = rel.tipo === "ULTRASSOM";
   const set = (i, campo, v) => setLinhas((p) => p.map((l, k) => (k === i ? { ...l, [campo]: v } : l)));
 
   function alternarDefeito(i, cod) {
@@ -238,6 +345,14 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         i,
         ...(ehDim
           ? { encontradoMm: l.encontradoMm }
+          : ehUS
+          ? {
+              laudo: l.laudo, marca: l.marca, indicacao: l.indicacao, angulo: l.angulo, face: l.face,
+              comprimento: l.comprimento, db_indicacao: l.db_indicacao, db_referencia: l.db_referencia,
+              db_atenuacao: l.db_atenuacao, db_classe: l.db_classe, percurso: l.percurso,
+              reprovado: l.reprovado, profundidade: l.profundidade, dist_x: l.dist_x, dist_y: l.dist_y,
+              soldador: l.soldador, sinete: l.sinete, nivel: l.nivel,
+            }
           : { laudo: l.laudo, descontinuidade: l.descontinuidade, marca: l.marca, qtd: l.qtd,
               descricao: l.descricao, eps: l.eps, soldador: l.soldador, sinete: l.sinete }),
         obs: l.obs ?? null,
@@ -278,7 +393,36 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
 
       <Equipamentos escolhidos={equipamentos} onMudar={setEquipamentos} />
 
-      {!ehDim && (
+      {ehUS && (
+        <div className="mt-3 space-y-2.5">
+          <p className="text-[12px] font-semibold text-torg-gray">Aparelhagem e ensaio</p>
+          <p className="text-[11px] text-torg-gray -mt-1.5">
+            Uma vez por ensaio — é a mesma aparelhagem a manhã inteira.
+          </p>
+
+          {/* ⚠ OBRIGATÓRIO aqui, ao contrário do visual de solda: o item 18.1 do PI-QUA-003 exige o
+              tipo de estrutura no conteúdo mínimo do relatório, e o critério muda com ele (15.6
+              estática, 15.7 dinâmica). */}
+          <Sel rot="Tipo de estrutura (PI-QUA-003)" v={cond.carregamento} opcoes={TIPOS_CARREGAMENTO.map((t) => t.nome)}
+            onMudar={(v) => setCond((c) => ({ ...c, carregamento: v }))} destaque={!cond.carregamento} />
+
+          <Sel rot="Aparelho" v={cond.apModelo} opcoes={APARELHOS} onMudar={(v) => setCond((c) => ({ ...c, apModelo: v }))} />
+          <Txt rot="Nº de série do aparelho" v={cond.apSerie} onMudar={(v) => setCond((c) => ({ ...c, apSerie: v }))} />
+
+          <Sel rot="Cabeçote" v={cond.cbModelo}
+            opcoes={CABECOTES.map((c) => `${c.modelo}${c.angulo ? ` · ${c.angulo}°` : ""} · ${c.mhz} MHz`)}
+            onMudar={(v) => setCond((c) => ({ ...c, cbModelo: v }))} />
+          <Txt rot="Nº de série do cabeçote" v={cond.cbSerie} onMudar={(v) => setCond((c) => ({ ...c, cbSerie: v }))} />
+          <Txt rot="Ângulo real (graus)" v={cond.cbAngulo} tipo="number" onMudar={(v) => setCond((c) => ({ ...c, cbAngulo: v }))} />
+
+          <Sel rot="Acoplante" v={cond.acoplante} opcoes={ACOPLANTES} onMudar={(v) => setCond((c) => ({ ...c, acoplante: v }))} />
+          <Sel rot="Bloco padrão" v={cond.blocoPadrao} opcoes={BLOCOS_PADRAO} onMudar={(v) => setCond((c) => ({ ...c, blocoPadrao: v }))} />
+          <Txt rot="Ganho de varredura (dB)" v={cond.ganhoVarredura} tipo="number" onMudar={(v) => setCond((c) => ({ ...c, ganhoVarredura: v }))} />
+          <Txt rot="Local de ensaio" v={cond.local} onMudar={(v) => setCond((c) => ({ ...c, local: v }))} />
+        </div>
+      )}
+
+      {!ehDim && !ehUS && (
         <div className="mt-3 space-y-2.5">
           <p className="text-[12px] font-semibold text-torg-gray">Condições do ensaio</p>
 
@@ -355,7 +499,9 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
                 {ehDim && <span className="text-[13px] text-torg-gray">projeto <strong className="text-torg-dark font-mono">{l.projetoMm ?? "—"}</strong> {l.tolerancia || ""}</span>}
               </div>
 
-              {ehDim ? (
+              {ehUS ? (
+                <IndicacaoUS l={l} set={(campo, v) => set(i, campo, v)} />
+              ) : ehDim ? (
                 <div className="mt-2">
                   <input type="number" inputMode="decimal" value={l.encontradoMm ?? ""}
                     onChange={(e) => set(i, "encontradoMm", e.target.value === "" ? null : Number(e.target.value))}
@@ -474,6 +620,13 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           );
         })}
       </div>
+
+      {ehUS && (
+        <p className="text-[12px] text-torg-gray mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+          Registre apenas as descontinuidades <strong>reprovadas</strong> (PI-QUA-003, item 15.1).
+          Em solda crítica à fratura, também as até 6 dB abaixo do nível de rejeição.
+        </p>
+      )}
 
       {!ehDim && (
         <div className="mt-3 grid grid-cols-2 gap-2">

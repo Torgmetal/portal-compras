@@ -113,7 +113,13 @@ export async function PATCH(req, { params }) {
     // ⚠ campos da JUNTA: no visual de solda quem descobre a junta é quem está na frente dela, então
     // o campo escreve peça, EPS e soldador. No dimensional isso não vem — as cotas são definidas no
     // desenho, antes, e o celular só responde a medida.
-    for (const k of ["marca", "descricao", "eps", "soldador", "sinete"]) {
+    // ⚠ campos da INDICAÇÃO de ultrassom entram junto — o `c` e o `d` também, calculados na tela e
+    // gravados: quem lê o relatório meses depois precisa do número que foi usado, não de refazer a
+    // conta com uma fórmula que pode ter mudado de revisão.
+    for (const k of ["marca", "descricao", "eps", "soldador", "sinete",
+                     "indicacao", "angulo", "face", "comprimento", "percurso",
+                     "db_indicacao", "db_referencia", "db_atenuacao", "db_classe",
+                     "reprovado", "profundidade", "dist_x", "dist_y", "nivel"]) {
       if (m[k] !== undefined) novo[k] = m[k] ? String(m[k]).slice(0, 60) : null;
     }
     if (m.qtd !== undefined) novo.qtd = num(m.qtd);
@@ -129,6 +135,10 @@ export async function PATCH(req, { params }) {
       eps: m.eps ? String(m.eps).slice(0, 60) : null,
       soldador: m.soldador ? String(m.soldador).slice(0, 60) : null,
       sinete: m.sinete ? String(m.sinete).slice(0, 20) : null,
+      ...Object.fromEntries(["indicacao", "angulo", "face", "comprimento", "percurso",
+        "db_indicacao", "db_referencia", "db_atenuacao", "db_classe",
+        "reprovado", "profundidade", "dist_x", "dist_y", "nivel"]
+        .map((k) => [k, m[k] ? String(m[k]).slice(0, 40) : null])),
       descontinuidade: m.descontinuidade ? String(m.descontinuidade).slice(0, 40) : null,
       laudo: m.laudo ? String(m.laudo).slice(0, 10) : null,
       obs: m.obs ? String(m.obs).slice(0, 160) : null,
@@ -165,7 +175,10 @@ export async function PATCH(req, { params }) {
   if (body.condicoes && typeof body.condicoes === "object") {
     const c = body.condicoes;
     dados.resultados = { ...(rel.resultados || {}) };
-    for (const k of ["iluminacao", "tecnica", "condicoes", "metalBase", "tipoEstrutura", "tipoPeca"]) {
+    for (const k of ["iluminacao", "tecnica", "condicoes", "metalBase", "tipoEstrutura", "tipoPeca",
+                     // ensaio por ultrassom (PI-QUA-003): aparelhagem e condição do ensaio
+                     "carregamento", "apModelo", "apSerie", "cbModelo", "cbSerie", "cbAngulo",
+                     "acoplante", "blocoPadrao", "ganhoVarredura", "local"]) {
       if (c[k] !== undefined) dados.resultados[k] = c[k] == null || c[k] === "" ? null : String(c[k]).slice(0, 120);
     }
   }
