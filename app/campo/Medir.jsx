@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Loader2, AlertCircle, Check, ChevronLeft, Save, Ruler } from "lucide-react";
-import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE } from "@/lib/evs-campos";
+import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA } from "@/lib/evs-campos";
 import { TIPOS_ESTRUTURA, criteriosDoDefeito } from "@/lib/aws-d11";
 
 /**
@@ -81,7 +81,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         const r0 = j.relatorio.resultados || {};
         setCond({
           iluminacao: r0.iluminacao ?? "", tecnica: r0.tecnica || "", condicoes: r0.condicoes || "",
-          metalBase: r0.metalBase || "", tipoEstrutura: r0.tipoEstrutura || "",
+          metalBase: r0.metalBase || "", tipoEstrutura: r0.tipoEstrutura || "", tipoPeca: r0.tipoPeca || "",
         });
       })
       .catch((e) => setErro(e.message));
@@ -160,6 +160,15 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           </label>
 
           <label className="block">
+            <span className="block text-[12px] text-torg-gray mb-1">Tipo de estrutura</span>
+            <select value={cond.tipoPeca || ""} onChange={(e) => setCond((c) => ({ ...c, tipoPeca: e.target.value }))}
+              className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none">
+              <option value="">—</option>
+              {TIPOS_PECA.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </label>
+
+          <label className="block">
             <span className="block text-[12px] text-torg-gray mb-1">Metal base</span>
             <select value={cond.metalBase || ""} onChange={(e) => setCond((c) => ({ ...c, metalBase: e.target.value }))}
               className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none">
@@ -172,7 +181,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
               não aparecem embaixo da descontinuidade e o inspetor julga de cabeça. */}
           <label className="block">
             <span className="block text-[12px] text-torg-gray mb-1">
-              Tipo de estrutura (AWS D1.1) {!cond.tipoEstrutura && <span className="text-amber-700">· defina para ver os limites</span>}
+              Carregamento (AWS D1.1) {!cond.tipoEstrutura && <span className="text-amber-700">· defina para ver os limites</span>}
             </span>
             <select value={cond.tipoEstrutura || ""} onChange={(e) => setCond((c) => ({ ...c, tipoEstrutura: e.target.value }))}
               className={`w-full text-base border-2 rounded-xl px-3 py-3 outline-none ${cond.tipoEstrutura ? "border-gray-200 focus:border-torg-blue" : "border-amber-300 bg-amber-50"}`}>

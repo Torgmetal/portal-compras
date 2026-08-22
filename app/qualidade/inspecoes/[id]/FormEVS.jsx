@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Plus, Trash2, AlertTriangle, Check } from "lucide-react";
-import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE } from "@/lib/evs-campos";
+import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA } from "@/lib/evs-campos";
 import { TIPOS_ESTRUTURA, criteriosDoDefeito } from "@/lib/aws-d11";
 
 /**
@@ -75,6 +75,7 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
       <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
         <p className="text-[12px] font-bold text-torg-dark mb-2">Condições do ensaio</p>
         <div className="grid sm:grid-cols-3 gap-2.5">
+          <Campo rot="Tipo de estrutura" k="tipoPeca" opcoes={TIPOS_PECA} />
           <Campo rot="Componente / parte" k="componente" />
           <Campo rot="Metal base" k="metalBase" opcoes={METAIS_BASE} />
           <label className="block">
@@ -94,7 +95,7 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
           <Campo rot="Técnica de inspeção" k="tecnica" opcoes={TECNICAS} />
           <Campo rot="Condições superficiais" k="condicoes" opcoes={CONDICOES} />
           <label className="block">
-            <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Tipo de estrutura (AWS D1.1)</span>
+            <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Carregamento (AWS D1.1) · define os limites</span>
             <select value={res.tipoEstrutura || ""} disabled={travado}
               onChange={(e) => setResultado("tipoEstrutura", e.target.value)}
               className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue disabled:bg-gray-50">

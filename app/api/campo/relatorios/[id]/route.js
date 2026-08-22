@@ -87,7 +87,7 @@ export async function PATCH(req, { params }) {
   if (body.condicoes && typeof body.condicoes === "object") {
     const c = body.condicoes;
     dados.resultados = { ...(rel.resultados || {}) };
-    for (const k of ["iluminacao", "tecnica", "condicoes", "metalBase", "tipoEstrutura"]) {
+    for (const k of ["iluminacao", "tecnica", "condicoes", "metalBase", "tipoEstrutura", "tipoPeca"]) {
       if (c[k] !== undefined) dados.resultados[k] = c[k] == null || c[k] === "" ? null : String(c[k]).slice(0, 120);
     }
   }
