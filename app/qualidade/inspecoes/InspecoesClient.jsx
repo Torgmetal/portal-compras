@@ -303,6 +303,10 @@ function Montar({ grupo, onFechar, onPronto }) {
   const [observacoes, setObs] = useState("");
   const [inspetor, setInspetor] = useState("");
   const [salvando, setSalvando] = useState(false);
+  // ⚠ A LISTA SE RECOLHE. Vitor (21/08/2026): "após eu selecionar as peças seria bom ter uma opção
+  // de ocultar as demais peças, pois fica ruim ter que ficar acertando scroll para baixar até a
+  // informação do inspetor". Uma OP tem centenas de marcas; depois de escolher, a lista só atrapalha.
+  const [listaAberta, setListaAberta] = useState(true);
 
   async function criar() {
     if (!sel.size) return;
@@ -472,12 +476,20 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
   }, [op, q, escopo]);
 
   // trocar de escopo/OP invalida a seleção e a prévia
-  useEffect(() => { setSel([]); }, [op, escopo]);
+  useEffect(() => { setSel([]); setListaAberta(true); }, [op, escopo]);
 
+  // ⚠ SÓ O DIMENSIONAL DE CONJUNTO É UMA PEÇA SÓ. Vitor (21/08/2026): "precisa me dar opção de
+  // selecionar mais de uma peça". O escopo (conjunto × avulsas) existe apenas no dimensional, mas a
+  // regra de "um por relatório" estava presa ao valor de `escopo`, que nos outros tipos ficava em
+  // CONJUNTO por ser o padrão — e travava a seleção em uma peça sem que nada na tela explicasse.
+  // Um EVS cobre várias peças; um relatório de pintura, um lote inteiro.
+  const umaSo = ehDimensional && escopo === "CONJUNTO";
   const alternar = (m) => setSel((p) => {
     if (p.includes(m)) return p.filter((x) => x !== m);
-    // conjunto é UM por relatório — trocar em vez de somar
-    return escopo === "CONJUNTO" ? [m] : [...p, m];
+    // no conjunto, escolher troca em vez de somar — e a lista se fecha, porque não há mais o que
+    // escolher
+    if (umaSo) { setListaAberta(false); return [m]; }
+    return [...p, m];
   });
 
   async function gravar() {
@@ -549,8 +561,28 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
                   <span className="text-[10px] font-semibold text-torg-gray">
                     {escopo === "CONJUNTO" ? "Conjunto" : "Peças"} {sel.length ? `· ${sel.length} selecionada(s)` : ""}
                   </span>
-                  {sel.length > 0 && <button onClick={() => setSel([])} className="text-[10px] text-torg-blue hover:underline">limpar</button>}
+                  <span className="flex items-center gap-2">
+                    {sel.length > 0 && (
+                      <button onClick={() => setListaAberta((v) => !v)} className="text-[10px] text-torg-blue hover:underline">
+                        {listaAberta ? "ocultar lista" : "escolher outra"}
+                      </button>
+                    )}
+                    {sel.length > 0 && <button onClick={() => { setSel([]); setListaAberta(true); }} className="text-[10px] text-torg-blue hover:underline">limpar</button>}
+                  </span>
                 </div>
+
+                {/* o que já foi escolhido fica à vista mesmo com a lista fechada */}
+                {sel.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-1.5">
+                    {sel.map((m) => (
+                      <span key={m} className="inline-flex items-center gap-1 text-[11px] font-semibold text-torg-dark bg-torg-blue/10 border border-torg-blue-200 rounded px-1.5 py-0.5">
+                        {m}
+                        <button onClick={() => alternar(m)} className="text-torg-gray hover:text-red-600"><X size={11} /></button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {listaAberta && (<>
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="buscar marca…"
                   autoCapitalize="characters" autoCorrect="off" spellCheck={false}
                   className="w-full text-[12px] font-mono border border-gray-200 rounded-lg px-2 py-1.5 mb-1.5 focus:border-torg-blue outline-none" />
@@ -582,6 +614,7 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
                   })}
                   {pecas && !pecas.length && <p className="p-2 text-[12px] text-torg-gray">Nada encontrado.</p>}
                 </div>
+                </>)}
               </div>
             )}
 
