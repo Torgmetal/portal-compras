@@ -62,6 +62,26 @@ export async function PATCH(req, { params }) {
   if (body.observacoes !== undefined) dados.observacoes = String(body.observacoes || "").trim() || null;
   if (body.inspetor !== undefined) dados.inspetor = String(body.inspetor || "").trim() || null;
 
+  // ⚠ OS INSTRUMENTOS TAMBÉM SE ESCOLHEM NO COMPUTADOR. Vitor (22/08/2026): "não são todos os
+  // relatórios que você está deixando o campo para selecionarmos os equipamentos calibrados para
+  // mencionar no relatório". No celular o seletor existia; aqui a rota nem aceitava o campo, então
+  // relatório montado na mesa saía com o bloco de instrumentos vazio — e um ensaio sem dizer com o
+  // que foi medido não vale como registro.
+  //
+  // ⚠ SNAPSHOT, como no celular: guarda nome, código, certificado e validade do jeito que estão
+  // hoje. Quando o certificado for renovado, o relatório antigo continua mostrando o que valia no
+  // dia da inspeção.
+  if (Array.isArray(body.equipamentos)) {
+    dados.equipamentos = body.equipamentos.slice(0, 12).map((e) => ({
+      id: String(e?.id || ""),
+      nome: String(e?.nome || "").slice(0, 160),
+      codigo: e?.codigo ? String(e.codigo).slice(0, 40) : null,
+      certificado: e?.certificado ? String(e.certificado).slice(0, 60) : null,
+      validade: e?.validade ? String(e.validade).slice(0, 10) : null,
+      vencido: !!e?.vencido,
+    })).filter((e) => e.id && e.nome);
+  }
+
   // ⚠ ESTE SANITIZADOR RECONSTRÓI A LINHA CAMPO A CAMPO, e por isso qualquer campo que não esteja
   // listado aqui é PERDIDO no salvamento. Foi o que aconteceu com a cota: `letra` e as coordenadas
   // da marcação não estavam na lista, então a pessoa marcava a Cota A, salvava, e o relatório

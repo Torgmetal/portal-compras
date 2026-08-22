@@ -10,6 +10,7 @@ import FormEVS from "./FormEVS";
 import FormUS from "./FormUS";
 import FormPintura from "./FormPintura";
 import FormLP from "./FormLP";
+import Equipamentos from "./Equipamentos";
 import Fotos from "./Fotos";
 
 /**
@@ -78,7 +79,7 @@ export default function RelatorioDetalheClient({ id }) {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           titulo: rel.titulo, observacoes: rel.observacoes, inspetor: rel.inspetor,
-          linhas: rel.linhas, resultados: rel.resultados,
+          linhas: rel.linhas, resultados: rel.resultados, equipamentos: rel.equipamentos,
         }),
       });
       const j = await r.json();
@@ -288,17 +289,14 @@ export default function RelatorioDetalheClient({ id }) {
               className="w-full text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
           </div>
 
-          {Array.isArray(rel.equipamentos) && rel.equipamentos.length > 0 && (
-            <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
-              <p className="text-[12px] font-bold text-torg-dark mb-1.5">Instrumentos utilizados</p>
-              {rel.equipamentos.map((e) => (
-                <p key={e.id || e.nome} className="text-[11px] text-torg-gray">
-                  {e.nome} · cert {e.certificado || "—"}
-                  {e.vencido && <span className="text-red-600 font-semibold"> · VENCIDO</span>}
-                </p>
-              ))}
-            </div>
-          )}
+          {/* ⚠ TODO TIPO DE RELATÓRIO ESCOLHE INSTRUMENTO. Fica fora dos blocos por tipo: os
+              cinco modelos têm o quadro "Instrumentos utilizados" na folha, e até aqui só o
+              celular sabia preenchê-lo. */}
+          <Equipamentos
+            escolhidos={Array.isArray(rel.equipamentos) ? rel.equipamentos : []}
+            travado={travado}
+            onMudar={(eqs) => setDados((d) => ({ ...d, relatorio: { ...d.relatorio, equipamentos: eqs } }))}
+          />
 
           {dados.assinaturas?.length > 0 && (
             <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
