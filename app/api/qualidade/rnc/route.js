@@ -53,10 +53,9 @@ export async function POST(req) {
 
   const dt = body.data ? new Date(body.data + "T12:00:00Z") : new Date();
   const ano = dt.getUTCFullYear();
-  const ultima = await prisma.naoConformidade.findFirst({ where: { ano }, orderBy: { numero: "desc" }, select: { numero: true } });
-  const numero = (ultima?.numero || 0) + 1;
-
-  const rnc = await prisma.naoConformidade.create({
+  // ⚠ retentativa: ler o último e somar 1 é corrida, e agora há dois caminhos criando RNC (este e
+  // a reprovação de inspeção). O índice único barra o duplicado; aqui se tenta o próximo.
+  const montar = (numero) => prisma.naoConformidade.create({
     data: {
       numero, ano, tipo: body.tipo, data: dt,
       cliente: body.cliente?.trim() || null, opNumero: body.opNumero?.trim() || null, opId: body.opId || null,
@@ -70,5 +69,15 @@ export async function POST(req) {
     },
     select: { id: true, numero: true, ano: true },
   });
+
+  const criar = async (tentativa = 0) => {
+    const ultima = await prisma.naoConformidade.findFirst({ where: { ano }, orderBy: { numero: "desc" }, select: { numero: true } });
+    try { return await montar((ultima?.numero || 0) + 1); }
+    catch (e) {
+      if (e?.code === "P2002" && tentativa < 5) return criar(tentativa + 1);
+      throw e;
+    }
+  };
+  const rnc = await criar();
   return NextResponse.json({ success: true, id: rnc.id, numero: rnc.numero, ano: rnc.ano });
 }

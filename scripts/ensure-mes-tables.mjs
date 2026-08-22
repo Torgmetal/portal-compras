@@ -145,6 +145,9 @@ async function main() {
   await prisma.$executeRawUnsafe(`ALTER TABLE "RelatorioInspecao" ADD COLUMN IF NOT EXISTS "rncId" TEXT`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "NaoConformidade" ADD COLUMN IF NOT EXISTS "relatorioInspecaoId" TEXT`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "NaoConformidade_relatorioInspecaoId_idx" ON "NaoConformidade"("relatorioInspecaoId")`);
+  // ⚠ numeração da RNC é ÚNICA por ano: duas aberturas simultâneas liam o mesmo "último" e gravavam
+  // o mesmo número. Virou risco real quando a reprovação passou a abrir RNC sozinha.
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "NaoConformidade_ano_numero_key" ON "NaoConformidade"("ano","numero")`);
   for (const c of ["escopo TEXT", "marcas JSONB", "linhas JSONB", "resultados JSONB", "desenhos JSONB"]) {
     await prisma.$executeRawUnsafe(`ALTER TABLE "RelatorioInspecao" ADD COLUMN IF NOT EXISTS "${c.split(" ")[0]}" ${c.split(" ")[1]}`);
   }

@@ -1972,6 +1972,10 @@ model NaoConformidade {
 
   @@index([tipo])
   @@index([status])
+  // ⚠ ÚNICO, não só índice: duas RNCs abertas no mesmo instante liam o mesmo "último número" e
+  // gravavam o mesmo. Passou a existir risco real quando a reprovação de inspeção começou a abrir
+  // RNC sozinha — dois inspetores reprovando ao mesmo tempo, no chão de fábrica, é rotina.
+  @@unique([ano, numero])
   @@index([ano, numero])
 }
 
