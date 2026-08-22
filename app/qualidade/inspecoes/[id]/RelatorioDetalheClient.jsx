@@ -9,6 +9,7 @@ import MarcadorCotas from "./MarcadorCotas";
 import FormEVS from "./FormEVS";
 import FormUS from "./FormUS";
 import FormPintura from "./FormPintura";
+import Fotos from "./Fotos";
 
 /**
  * O RELATÓRIO ABERTO — é aqui que o elaborador preenche e VÊ A PRÉVIA.
@@ -186,6 +187,13 @@ export default function RelatorioDetalheClient({ id }) {
           />
         </div>
       )}
+
+      {/* ── fotos do ensaio — TODO tipo de relatório ─────────────────────────────────────── */}
+      {/* Vitor (22/08): "posso colocar foto em qualquer relatório". Fica fora dos blocos por
+          tipo de propósito: é o mesmo campo para os quatro. */}
+      <div className="mt-4">
+        <Fotos rel={rel} travado={travado} />
+      </div>
 
       <div className="mt-4">
         <div className="space-y-3">

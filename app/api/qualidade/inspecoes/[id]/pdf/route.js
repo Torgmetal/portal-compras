@@ -72,7 +72,7 @@ export async function GET(req, { params }) {
       bytes = await gerarEVSPDF({ rel, fotos, assinaturas, ...dadosOP });
     } else if (rel.tipo === "ULTRASSOM") {
       const { gerarUSPDF } = await import("@/lib/relatorio-us-pdf");
-      bytes = await gerarUSPDF({ rel, assinaturas, ...dadosOP });
+      bytes = await gerarUSPDF({ rel, fotos, assinaturas, ...dadosOP });
     } else {
       const { gerarPinturaPDF } = await import("@/lib/relatorio-pintura-pdf");
       bytes = await gerarPinturaPDF({ rel, fotos, assinaturas, ...dadosOP });

@@ -44,7 +44,9 @@ export async function GET(_req, { params }) {
     });
     if (rel.tipo === "DIMENSIONAL") {
       const op = await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { cliente: true, obra: true } });
-      bytes = await gerarDimensionalPDF({ rel, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho), cliente: op?.cliente || null, obra: op?.obra || null });
+      // ⚠ as fotos vão TAMBÉM no PDF que segue para assinatura — quem assina precisa ver a
+      // mesma evidência que está no documento arquivado, e não uma versão sem as imagens.
+      bytes = await gerarDimensionalPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho), cliente: op?.cliente || null, obra: op?.obra || null });
     } else {
       bytes = await gerarRelatorioInspecaoPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho) });
     }
