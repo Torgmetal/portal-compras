@@ -76,8 +76,20 @@ export async function PATCH(req, { params }) {
   }
   // quem mediu assina o campo do inspetor, se ainda estiver vazio
   if (body.assumirInspetor) dados.inspetor = user.name || null;
-  if (body.iluminacao !== undefined) {
-    dados.resultados = { ...(rel.resultados || {}), iluminacao: body.iluminacao == null ? null : String(body.iluminacao).slice(0, 20) };
+  // ── CONDIÇÕES DO ENSAIO ─────────────────────────────────────────────────────────────────────
+  //
+  // Vitor: "você só trouxe a medida do luxímetro e o restante precisa ser preenchido também".
+  // Técnica, condições superficiais e metal base são OBSERVADOS com a peça na frente — quem monta o
+  // relatório no computador não tem como saber se a junta foi escovada ou está como soldada.
+  //
+  // ⚠ Lista fechada: só estes campos o campo escreve em `resultados`. O resto do cabeçalho
+  // (procedimento, critério, componente) é de quem monta, e um celular não deve poder mudá-lo.
+  if (body.condicoes && typeof body.condicoes === "object") {
+    const c = body.condicoes;
+    dados.resultados = { ...(rel.resultados || {}) };
+    for (const k of ["iluminacao", "tecnica", "condicoes", "metalBase", "tipoEstrutura"]) {
+      if (c[k] !== undefined) dados.resultados[k] = c[k] == null || c[k] === "" ? null : String(c[k]).slice(0, 120);
+    }
   }
 
   const atualizado = await prisma.relatorioInspecao.update({ where: { id }, data: dados });

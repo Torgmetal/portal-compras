@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Loader2, AlertCircle, Check, ChevronLeft, Save, Ruler } from "lucide-react";
-import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO } from "@/lib/evs-campos";
+import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES } from "@/lib/evs-campos";
+import { TIPOS_ESTRUTURA, criteriosDoDefeito } from "@/lib/aws-d11";
 
 /**
  * O INSPETOR DE CAMPO MEDINDO, NO CELULAR.
@@ -63,7 +64,11 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   const [erro, setErro] = useState("");
   const [linhas, setLinhas] = useState([]);
   const [equipamentos, setEquipamentos] = useState([]);
-  const [iluminacao, setIluminacao] = useState("");
+  // ⚠ AS CONDIÇÕES DO ENSAIO SÃO DO CAMPO. Vitor (21/08/2026): "você só trouxe a medida do
+  // luxímetro e o restante precisa ser preenchido também". Está certo — técnica, condições
+  // superficiais e metal base são OBSERVADOS na hora, com a peça na frente. Quem monta o relatório
+  // no computador não tem como saber se a junta foi escovada ou está como soldada.
+  const [cond, setCond] = useState({});
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -73,7 +78,11 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         setRel(j.relatorio);
         setLinhas(Array.isArray(j.relatorio.linhas) ? j.relatorio.linhas : []);
         setEquipamentos(Array.isArray(j.relatorio.equipamentos) ? j.relatorio.equipamentos : []);
-        setIluminacao(j.relatorio.resultados?.iluminacao ?? "");
+        const r0 = j.relatorio.resultados || {};
+        setCond({
+          iluminacao: r0.iluminacao ?? "", tecnica: r0.tecnica || "", condicoes: r0.condicoes || "",
+          metalBase: r0.metalBase || "", tipoEstrutura: r0.tipoEstrutura || "",
+        });
       })
       .catch((e) => setErro(e.message));
   }, [id]);
@@ -103,7 +112,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       }));
       const r = await fetch(`/api/campo/relatorios/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ medidas, equipamentos, assumirInspetor: !rel.inspetor, iluminacao: ehDim ? undefined : iluminacao }),
+        body: JSON.stringify({ medidas, equipamentos, assumirInspetor: !rel.inspetor, condicoes: ehDim ? undefined : cond }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
@@ -112,7 +121,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
     } catch (e) { alert(e.message); } finally { setSalvando(false); }
   }
 
-  const lux = Number(iluminacao);
+  const lux = Number(cond.iluminacao);
   const luxBaixo = Number.isFinite(lux) && lux > 0 && lux < LUX_MINIMO;
   const medir = linhas.filter((l) => l.letra || l.marca);
 
@@ -121,14 +130,55 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       <Equipamentos escolhidos={equipamentos} onMudar={setEquipamentos} />
 
       {!ehDim && (
-        <label className="block mt-3">
-          <span className="block text-[12px] font-semibold text-torg-gray mb-1">
-            Iluminação medida (lux) · mínimo {LUX_MINIMO}
-          </span>
-          <input type="number" inputMode="numeric" value={iluminacao} onChange={(e) => setIluminacao(e.target.value)}
-            className={`w-full text-lg border-2 rounded-xl px-3 py-3 outline-none ${luxBaixo ? "border-red-400 bg-red-50" : "border-gray-200 focus:border-torg-blue"}`} />
-          {luxBaixo && <span className="text-[12px] text-red-600 inline-flex items-center gap-1 mt-1"><AlertCircle size={12} /> abaixo do mínimo do PO-06</span>}
-        </label>
+        <div className="mt-3 space-y-2.5">
+          <p className="text-[12px] font-semibold text-torg-gray">Condições do ensaio</p>
+
+          <label className="block">
+            <span className="block text-[12px] text-torg-gray mb-1">Iluminação medida (lux) · mínimo {LUX_MINIMO}</span>
+            <input type="number" inputMode="numeric" value={cond.iluminacao ?? ""}
+              onChange={(e) => setCond((c) => ({ ...c, iluminacao: e.target.value }))}
+              className={`w-full text-lg border-2 rounded-xl px-3 py-3 outline-none ${luxBaixo ? "border-red-400 bg-red-50" : "border-gray-200 focus:border-torg-blue"}`} />
+            {luxBaixo && <span className="text-[12px] text-red-600 inline-flex items-center gap-1 mt-1"><AlertCircle size={12} /> abaixo do mínimo do PO-06</span>}
+          </label>
+
+          <label className="block">
+            <span className="block text-[12px] text-torg-gray mb-1">Técnica de inspeção</span>
+            <select value={cond.tecnica || ""} onChange={(e) => setCond((c) => ({ ...c, tecnica: e.target.value }))}
+              className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none">
+              <option value="">—</option>
+              {TECNICAS.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="block text-[12px] text-torg-gray mb-1">Condições superficiais</span>
+            <select value={cond.condicoes || ""} onChange={(e) => setCond((c) => ({ ...c, condicoes: e.target.value }))}
+              className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none">
+              <option value="">—</option>
+              {CONDICOES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="block text-[12px] text-torg-gray mb-1">Metal base</span>
+            <input value={cond.metalBase || ""} onChange={(e) => setCond((c) => ({ ...c, metalBase: e.target.value }))}
+              placeholder="ASTM A572 Gr.50"
+              className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none" />
+          </label>
+
+          {/* ⚠ o tipo de estrutura decide QUAL limite vale para cada defeito — sem ele, os critérios
+              não aparecem embaixo da descontinuidade e o inspetor julga de cabeça. */}
+          <label className="block">
+            <span className="block text-[12px] text-torg-gray mb-1">
+              Tipo de estrutura (AWS D1.1) {!cond.tipoEstrutura && <span className="text-amber-700">· defina para ver os limites</span>}
+            </span>
+            <select value={cond.tipoEstrutura || ""} onChange={(e) => setCond((c) => ({ ...c, tipoEstrutura: e.target.value }))}
+              className={`w-full text-base border-2 rounded-xl px-3 py-3 outline-none ${cond.tipoEstrutura ? "border-gray-200 focus:border-torg-blue" : "border-amber-300 bg-amber-50"}`}>
+              <option value="">—</option>
+              {TIPOS_ESTRUTURA.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
+            </select>
+          </label>
+        </div>
       )}
 
       <p className="text-[12px] font-semibold text-torg-gray mt-4 mb-1.5 inline-flex items-center gap-1.5">
@@ -177,6 +227,25 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
                       );
                     })}
                   </div>
+                  {/* o critério do defeito, para julgar com a regra à vista */}
+                  {marcados.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {marcados.map((c) => {
+                        const d = DESCONTINUIDADES.find((x) => x.c === c);
+                        const crit = criteriosDoDefeito(c, cond.tipoEstrutura);
+                        return (
+                          <div key={c} className="text-[12px] leading-snug">
+                            <span className="font-semibold text-torg-dark">{c} · {d?.nome}</span>
+                            {d?.grave && <span className="text-red-600 font-semibold"> — sem tolerância</span>}
+                            {crit.map((k) => (
+                              <p key={`${k.n}${k.letra || ""}`} className="text-torg-gray pl-2 border-l-2 border-gray-200 mt-0.5">{k.texto}</p>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <div className="mt-2 grid grid-cols-3 gap-1.5">
                     {LAUDOS.map((v) => {
                       const on = l.laudo === v.c;
