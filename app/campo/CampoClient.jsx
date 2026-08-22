@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import Medir from "./Medir";
+import RNCs from "./RNCs";
 import { signOut } from "next-auth/react";
 import {
   Loader2, Camera, QrCode, Search, X, Check, ChevronLeft, HardHat,
@@ -185,8 +186,16 @@ export default function CampoClient({ nome }) {
         <div className="space-y-2">
           <button onClick={() => setModo("medir")}
             className="w-full text-left bg-white border-2 border-torg-blue rounded-xl px-4 py-4 active:bg-torg-blue/5">
-            <span className="block text-base font-semibold text-torg-blue">Preencher relatório</span>
+            <span className="block text-base font-semibold text-torg-blue">Preenchimento de relatórios</span>
             <span className="block text-[13px] text-torg-gray">informar as medidas de um relatório já aberto</span>
+          </button>
+          {/* ⚠ RNC ao lado do preenchimento, a pedido do Vitor. Não é acessório: a reprovação de
+              uma inspeção abre RNC automaticamente, e quem reprovou é quem melhor sabe o que ela
+              descreve — deixá-la só no computador quebraria a linha que acabamos de ligar. */}
+          <button onClick={() => setModo("rnc")}
+            className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-4 active:bg-gray-50">
+            <span className="block text-base font-semibold text-torg-dark">RNC</span>
+            <span className="block text-[13px] text-torg-gray">não conformidades abertas nesta OP</span>
           </button>
           <button onClick={() => setModo("foto")}
             className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-4 active:bg-gray-50">
@@ -196,6 +205,10 @@ export default function CampoClient({ nome }) {
         </div>
       </Tela>
     );
+  }
+
+  if (modo === "rnc") {
+    return <RNCs op={op} onSair={() => setModo(null)} Tela={Tela} />;
   }
 
   if (modo === "medir") {

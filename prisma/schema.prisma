@@ -1952,6 +1952,11 @@ model NaoConformidade {
   pertinente          Boolean   @default(true) // conta no indicador de RNCs do cliente
   recorrente          Boolean   @default(false)
   rncAnteriorId       String?
+  // ⚠ RNC ABERTA POR REPROVAÇÃO DE INSPEÇÃO. Vitor (21/08/2026): "no caso do relatório reprovado
+  // deverá já ser aberta uma RNC inclusive". O vínculo é nos dois sentidos: daqui se chega ao
+  // relatório que reprovou, e de lá à RNC que a reprovação gerou.
+  relatorioInspecaoId String?
+
   // RNC de Cliente (RTNC)
   anexoUrl            String? // documento da RNC do cliente
   programa            String? // ASME…
@@ -4381,6 +4386,7 @@ model RelatorioInspecao {
   // Cada RODADA de inspeção é uma revisão: R00 é a primeira. Reprovou, o relatório continua aberto
   // e a rodada seguinte vira R01. Aprovou, fecha na revisão em que estava.
   resultadoInspecao String? // APROVADO | REPROVADO | REC (null = ainda não julgado)
+  rncId             String? // a RNC aberta pela reprovação (uma por relatório, reusada nas revisões)
   revisao           Int     @default(0) // 0 = R00
   // as rodadas anteriores, congeladas: [{ revisao, resultadoInspecao, linhas, emEm, por }]
   revisoes          Json?

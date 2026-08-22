@@ -60,7 +60,7 @@ export async function PATCH(req, { params }) {
     select: {
       id: true, codigo: true, linhas: true, resultados: true, envioAssinaturaId: true,
       revisao: true, resultadoInspecao: true, revisoes: true, inspetor: true,
-      tipo: true, opNumero: true,
+      tipo: true, opNumero: true, opId: true, marcas: true, rncId: true,
     },
   });
   if (!rel) return NextResponse.json({ error: "Relatório não encontrado." }, { status: 404 });
@@ -172,6 +172,24 @@ export async function PATCH(req, { params }) {
 
   const atualizado = await prisma.relatorioInspecao.update({ where: { id }, data: dados });
 
+  // ── REPROVOU? ABRE A RNC ────────────────────────────────────────────────────────────────────
+  //
+  // Vitor (21/08/2026): "no caso do relatório reprovado deverá já ser aberta uma RNC inclusive".
+  // Sem isso a reprovação vive só dentro do relatório, e quem trata não conformidade só fica
+  // sabendo se alguém contar.
+  //
+  // ⚠ Falhar aqui NÃO derruba a medição. O inspetor está no chão de fábrica com a peça na frente;
+  // perder a medida por causa do vínculo seria trocar o certo pelo acessório. O aviso volta na
+  // resposta e a RNC pode ser aberta depois.
+  let rnc = null;
+  if (dados.resultadoInspecao === "REPROVADO") {
+    const { abrirRNCdeReprovacao } = await import("@/lib/rnc-de-inspecao");
+    rnc = await abrirRNCdeReprovacao(
+      { ...rel, ...dados, id, codigo: rel.codigo },
+      { userId: user.id, elaborador: user.name || null },
+    ).catch((e) => ({ erro: e.message }));
+  }
+
   await prisma.auditLog.create({
     data: {
       userId: user.id, action: "MEDIR_RELATORIO_CAMPO", entity: "RelatorioInspecao", entityId: id,
@@ -179,5 +197,5 @@ export async function PATCH(req, { params }) {
     },
   }).catch(() => {});
 
-  return NextResponse.json({ ok: true, relatorio: { id: atualizado.id, codigo: atualizado.codigo } });
+  return NextResponse.json({ ok: true, relatorio: { id: atualizado.id, codigo: atualizado.codigo }, rnc });
 }
