@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2 } from "lucide-react";
 import LeitorQR from "./LeitorQR";
-import { marcaDoQR } from "@/lib/qualidade-campo";
+import { marcaDoQR, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
 import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA } from "@/lib/evs-campos";
 import { TIPOS_ESTRUTURA, criteriosDoDefeito } from "@/lib/aws-d11";
 
@@ -42,23 +42,55 @@ export default function Medir({ op, onSair, Tela, Equipamentos }) {
           Nenhum relatório aberto nesta OP. Eles são criados no computador, pela Qualidade.
         </p>
       )}
-      <div className="space-y-2">
-        {(lista || []).map((r) => (
-          <button key={r.id} onClick={() => setAbertoId(r.id)}
-            className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3.5 active:bg-gray-50">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-mono font-bold text-torg-blue text-[15px]">{r.codigo}</span>
-              {r.completo
-                ? <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 inline-flex items-center gap-1"><Check size={11} /> medido</span>
-                : <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">{r.medidas}/{r.aMedir}</span>}
-            </div>
-            <p className="text-[13px] text-torg-dark mt-0.5">{r.tipoLabel}</p>
-            {r.marcas?.length > 0 && <p className="text-[12px] text-torg-gray font-mono">{r.marcas.join(", ")}</p>}
-          </button>
-        ))}
-      </div>
+      {/* ── AGRUPADO POR TIPO ────────────────────────────────────────────────────────────────
+          Vitor (21/08/2026): "nessa página onde o inspetor entra, deixa organizado essas áreas por
+          tipo de relatórios". Numa OP com dezenas de relatórios abertos, a lista corrida obriga a
+          ler código por código para achar o dimensional no meio dos de solda.
+
+          ⚠ A ordem é a de TIPOS_RELATORIO, não alfabética: é a ordem em que a inspeção acontece
+          (dimensional → solda → ensaio → pintura), a mesma do data book e a mesma da tela do
+          computador. Duas ordens para a mesma lista confundem quem usa as duas. */}
+      {agruparPorTipo(lista || []).map((g) => (
+        <div key={g.tipo} className="mb-4">
+          <div className="flex items-baseline gap-2 mb-1.5 px-0.5">
+            <h3 className="text-[13px] font-bold text-torg-dark">{g.label}</h3>
+            <span className="text-[12px] text-torg-gray">{g.itens.length}</span>
+          </div>
+          <div className="space-y-2">
+            {g.itens.map((r) => (
+              <button key={r.id} onClick={() => setAbertoId(r.id)}
+                className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3.5 active:bg-gray-50">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono font-bold text-torg-blue text-[15px]">{r.codigo}</span>
+                  {r.completo
+                    ? <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 inline-flex items-center gap-1"><Check size={11} /> medido</span>
+                    : <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">{r.medidas}/{r.aMedir}</span>}
+                </div>
+                {r.marcas?.length > 0 && <p className="text-[13px] text-torg-dark font-mono mt-0.5">{r.marcas.join(", ")}</p>}
+                {r.titulo && <p className="text-[12px] text-torg-gray">{r.titulo}</p>}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
     </Tela>
   );
+}
+
+/** Agrupa os relatórios por tipo, na ordem em que a inspeção acontece. */
+function agruparPorTipo(lista) {
+  const porTipo = new Map();
+  for (const r of lista) {
+    const g = porTipo.get(r.tipo) || { tipo: r.tipo, label: r.tipoLabel || r.tipo, itens: [] };
+    g.itens.push(r);
+    porTipo.set(r.tipo, g);
+  }
+  const ordem = TIPOS_RELATORIO.map((t) => t.id);
+  return [...porTipo.values()].sort((a, b) => {
+    const ia = ordem.indexOf(a.tipo), ib = ordem.indexOf(b.tipo);
+    // tipo desconhecido, vindo de dado antigo, vai para o fim em vez de sumir
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
 }
 
 function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
