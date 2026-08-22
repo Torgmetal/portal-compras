@@ -83,6 +83,7 @@ export default function RelatorioDetalheClient({ id }) {
         body: JSON.stringify({
           titulo: rel.titulo, observacoes: rel.observacoes, inspetor: rel.inspetor,
           linhas: rel.linhas, resultados: rel.resultados, equipamentos: rel.equipamentos,
+          resultadoInspecao: rel.resultadoInspecao ?? null,
         }),
       });
       const j = await r.json();
@@ -248,8 +249,31 @@ export default function RelatorioDetalheClient({ id }) {
               O código (RLP-089-002) e o tipo já identificam o documento; o campo era espaço em
               branco pedindo para ser preenchido sem servir a nada. A coluna fica no banco: os
               relatórios que já têm título continuam mostrando o deles. */}
-          <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
+          <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm grid sm:grid-cols-2 gap-3">
             <Campo label="Inspetor" v={rel.inspetor || ""} onChange={(v) => setCampo("inspetor", v)} disabled={travado} />
+            {/* ⚠ APROVAR TAMBÉM SE FAZ AQUI. Até agora só o celular gravava o resultado geral, e
+                quem monta o relatório na mesa (LP, pintura) não tinha como fechá-lo — o documento
+                ficava para sempre "aguardando aprovação". Aprovar guarda o PDF na pasta da obra. */}
+            <label className="block">
+              <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Resultado da inspeção</span>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[["APROVADO", "A", "aprovado", "bg-emerald-600 border-emerald-600"],
+                  ["REPROVADO", "R", "reprovado", "bg-red-600 border-red-600"],
+                  ["REC", "REC", "exame compl.", "bg-amber-500 border-amber-500"]].map(([v, sig, rot, cor]) => {
+                  const on = rel.resultadoInspecao === v;
+                  return (
+                    <button key={v} disabled={travado} onClick={() => setCampo("resultadoInspecao", on ? null : v)}
+                      className={`rounded-lg py-1.5 border leading-tight disabled:opacity-50 ${on ? `${cor} text-white` : "text-torg-dark border-gray-200 hover:bg-gray-50"}`}>
+                      <span className="block text-[13px] font-bold">{sig}</span>
+                      <span className={`block text-[9px] ${on ? "text-white/85" : "text-torg-gray"}`}>{rot}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {rel.arquivadoEm && (
+                <span className="block text-[10px] text-emerald-700 mt-1">PDF guardado na pasta da obra</span>
+              )}
+            </label>
           </div>
 
 

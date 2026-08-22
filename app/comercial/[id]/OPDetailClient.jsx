@@ -2,10 +2,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  Calendar, Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X,
-  CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory, ShoppingCart, GanttChart, FileSpreadsheet, Building2,
-} from "lucide-react";
+import { Calendar, Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X, CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory, ShoppingCart, GanttChart, FileSpreadsheet, Building2, ShieldCheck } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
 import SaudeFinanceiraOP from "./SaudeFinanceiraOP";
@@ -18,6 +15,7 @@ import ConsultaExpedicao from "./ConsultaExpedicao";
 import DesenhosOPSection from "./DesenhosOPSection";
 import ListaExpedicaoSection from "./ListaExpedicaoSection";
 import AbaObra from "./AbaObra";
+import AbaQualidade from "./AbaQualidade";
 import AbaProducao from "./AbaProducao";
 import AbaTerceiros from "./AbaTerceiros";
 import EmailsObraCard from "./EmailsObraCard";
@@ -67,6 +65,10 @@ const VISTAS = [
   { key: "planejamento", label: "Planejamento", icon: GanttChart },
   { key: "compras", label: "Compras", icon: ShoppingCart },
   { key: "producao", label: "Produção", icon: Factory },
+  // ⚠ a Qualidade da obra: o que já foi aprovado e o que falta. A página de Inspeções é a fila de
+  // TRABALHO (todas as obras); aqui é a pergunta que se faz meses depois — "o que esta obra tem de
+  // inspeção?" — e atravessar a fila inteira para respondê-la não é razoável.
+  { key: "qualidade", label: "Qualidade", icon: ShieldCheck },
   { key: "terceiros", label: "Terceiros", icon: Truck },
   { key: "expedicao", label: "Expedição", icon: Truck },
   { key: "financeiro", label: "Financeiro", icon: DollarSign },
@@ -947,6 +949,8 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
           <AbaProducao opId={op.id} opNumero={op.numero} obra={op.obra} cliente={op.cliente} refCliente={op.refCliente} />
         </div>
       )}
+
+      {vista === "qualidade" && <AbaQualidade opNumero={op.numero} />}
 
       {vista === "terceiros" && <AbaTerceiros opId={op.id} opNumero={op.numero} />}
 

@@ -225,6 +225,15 @@ export async function PATCH(req, { params }) {
 
   const atualizado = await prisma.relatorioInspecao.update({ where: { id }, data: dados });
 
+  // ⚠ BACKUP NA PASTA DA OBRA quando o inspetor aprova pelo celular — mesma regra do computador
+  // (ver lib/relatorio-arquivo.js). Falhar aqui não desfaz a aprovação: o inspetor está no chão de
+  // fábrica, e perder a medição por causa do backup seria trocar o certo pelo acessório.
+  let arquivo = null;
+  if (dados.resultadoInspecao === "APROVADO" && rel.resultadoInspecao !== "APROVADO") {
+    const { arquivarRelatorioNaObra } = await import("@/lib/relatorio-arquivo");
+    arquivo = await arquivarRelatorioNaObra(id).catch(() => null);
+  }
+
   // ── REPROVOU? ABRE A RNC ────────────────────────────────────────────────────────────────────
   //
   // Vitor (21/08/2026): "no caso do relatório reprovado deverá já ser aberta uma RNC inclusive".
@@ -250,5 +259,5 @@ export async function PATCH(req, { params }) {
     },
   }).catch(() => {});
 
-  return NextResponse.json({ ok: true, relatorio: { id: atualizado.id, codigo: atualizado.codigo }, rnc });
+  return NextResponse.json({ ok: true, relatorio: { id: atualizado.id, codigo: atualizado.codigo }, rnc, arquivo });
 }

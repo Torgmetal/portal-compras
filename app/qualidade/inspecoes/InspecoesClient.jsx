@@ -32,7 +32,11 @@ export default function InspecoesClient() {
   // ⚠ RELATÓRIO APROVADO SAI DA FILA. Vitor (22/08/2026): "relatórios aprovados precisam sair da
   // aba de relatórios para preencher". Documento aprovado não é trabalho pendente — deixá-lo na
   // lista faz o que falta preencher desaparecer no meio do que já acabou.
-  const [verConcluidos, setVerConcluidos] = useState(false);
+  // ⚠ DUAS ABAS, não uma caixinha. Vitor (22/08/2026): "criar uma aba de Relatórios Aprovados e
+  // Relatórios aguardando aprovação no setor da qualidade". A caixinha "mostrar aprovados"
+  // misturava as duas coisas numa lista só; a aba separa o que ainda dá trabalho do que já é
+  // arquivo — e é assim que a Qualidade pensa a fila.
+  const [aba, setAba] = useState("PENDENTES");
 
   const carregar = useCallback(async () => {
     try {
@@ -67,11 +71,12 @@ export default function InspecoesClient() {
   // mesma regra que decide se o relatório fecha (lib/revisao-inspecao.js).
   const ehConcluido = (r) => r.resultadoInspecao === "APROVADO";
   const concluidos = dados.relatorios.filter(ehConcluido).length;
+  const pendentes = dados.relatorios.length - concluidos;
   const opsComRelatorio = [...new Set(dados.relatorios.map((r) => r.opNumero))]
     .sort((a, b) => String(b).localeCompare(String(a), "pt-BR", { numeric: true }));
   const visiveis = dados.relatorios
     .filter((r) => !opFiltro || r.opNumero === opFiltro)
-    .filter((r) => verConcluidos || !ehConcluido(r));
+    .filter((r) => (aba === "APROVADOS" ? ehConcluido(r) : !ehConcluido(r)));
 
   async function excluirGrupo(g) {
     if (!confirm(`Excluir ${g.fotos.length} registro(s) de OP-${g.opNumero} · ${TIPO_LABEL[g.tipo] || g.tipo}?\n\nAs fotos saem do portal. Isso não afeta relatórios já montados.`)) return;
@@ -134,23 +139,37 @@ export default function InspecoesClient() {
       {!dados.relatorios.length && <p className="text-[13px] text-torg-gray">Nenhum relatório montado ainda.</p>}
 
       {dados.relatorios.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap mb-3">
-          <select value={opFiltro} onChange={(e) => setOpFiltro(e.target.value)}
-            className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:border-torg-blue outline-none">
-            <option value="">Todas as obras</option>
-            {opsComRelatorio.map((n) => <option key={n} value={n}>OP-{n}</option>)}
-          </select>
-          <label className="flex items-center gap-1.5 text-[12px] text-torg-gray cursor-pointer">
-            <input type="checkbox" checked={verConcluidos} onChange={(e) => setVerConcluidos(e.target.checked)}
-              className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
-            mostrar aprovados {concluidos > 0 ? `(${concluidos})` : ""}
-          </label>
-          <span className="text-[11px] text-torg-gray ml-auto">
-            {visiveis.length} de {dados.relatorios.length}
-          </span>
-        </div>
+        <>
+          <div className="flex gap-1 border-b border-gray-200 mb-3">
+            {[["PENDENTES", "Aguardando aprovação", pendentes], ["APROVADOS", "Aprovados", concluidos]].map(([k, rot, n]) => (
+              <button key={k} onClick={() => setAba(k)}
+                className={`px-3 py-2 text-[13px] font-semibold border-b-2 -mb-px ${
+                  aba === k ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
+                {rot} <span className="font-normal">{n}</span>
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap mb-3">
+            <select value={opFiltro} onChange={(e) => setOpFiltro(e.target.value)}
+              className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:border-torg-blue outline-none">
+              <option value="">Todas as obras</option>
+              {opsComRelatorio.map((n) => <option key={n} value={n}>OP-{n}</option>)}
+            </select>
+            <span className="text-[11px] text-torg-gray ml-auto">
+              {aba === "APROVADOS"
+                ? "guardados também em 8. Qualidade / 3. Relatórios de Inspeção, na pasta da obra"
+                : `${visiveis.length} para preencher`}
+            </span>
+          </div>
+        </>
       )}
 
+      {dados.relatorios.length > 0 && !visiveis.length && (
+        <p className="text-[13px] text-torg-gray">
+          {aba === "APROVADOS" ? "Nenhum relatório aprovado ainda." : "Nada aguardando aprovação."}
+          {opFiltro ? " nesta obra." : ""}
+        </p>
+      )}
       {agruparRelatorios(visiveis).map((t) => (
         <div key={t.tipo} className="mb-5">
           <button onClick={() => setRecolhidos((p) => {

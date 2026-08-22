@@ -62,6 +62,16 @@ export async function PATCH(req, { params }) {
   if (body.observacoes !== undefined) dados.observacoes = String(body.observacoes || "").trim() || null;
   if (body.inspetor !== undefined) dados.inspetor = String(body.inspetor || "").trim() || null;
 
+  // ⚠ APROVAR TAMBÉM SE FAZ NO COMPUTADOR. Até aqui só o celular gravava o resultado geral —
+  // quem monta o relatório na mesa (LP, pintura) não tinha como aprová-lo, e sem resultado o
+  // documento nunca sai da fila de "aguardando".
+  //
+  // Só APROVADO fecha: reprovado volta para reparo e "exame complementar" ainda vai ter ensaio.
+  if (body.resultadoInspecao !== undefined) {
+    const r = String(body.resultadoInspecao || "").toUpperCase();
+    dados.resultadoInspecao = ["APROVADO", "REPROVADO", "REC"].includes(r) ? r : null;
+  }
+
   // ⚠ OS INSTRUMENTOS TAMBÉM SE ESCOLHEM NO COMPUTADOR. Vitor (22/08/2026): "não são todos os
   // relatórios que você está deixando o campo para selecionarmos os equipamentos calibrados para
   // mencionar no relatório". No celular o seletor existia; aqui a rota nem aceitava o campo, então
@@ -224,6 +234,18 @@ export async function PATCH(req, { params }) {
 
   const atualizado = await prisma.relatorioInspecao.update({ where: { id }, data: dados });
 
+  // ⚠ BACKUP NA PASTA DA OBRA, na APROVAÇÃO. Vitor (22/08/2026): "salvar os relatórios em PDF na
+  // pasta da qualidade de cada OP para podermos garantir o backup". Guarda quando o documento
+  // FECHA — rascunho que muda dez vezes por dia encheria a pasta de versões sem dizer qual vale.
+  //
+  // ⚠ Falhar aqui NÃO desfaz a aprovação: o arquivamento é consequência, não condição. O aviso
+  // volta na resposta para quem estiver na tela.
+  let arquivo = null;
+  if (dados.resultadoInspecao === "APROVADO" && rel.resultadoInspecao !== "APROVADO") {
+    const { arquivarRelatorioNaObra } = await import("@/lib/relatorio-arquivo");
+    arquivo = await arquivarRelatorioNaObra(id);
+  }
+
   // o nome do documento na seção acompanha o título
   if (dados.titulo !== undefined && atualizado.documentoId) {
     await vincularNoDataBook(atualizado, null).catch(() => {});
@@ -233,7 +255,7 @@ export async function PATCH(req, { params }) {
     data: { userId: user.id, action: "EDITAR_RELATORIO_INSPECAO", entity: "RelatorioInspecao", entityId: id, diff: { campos: Object.keys(dados) } },
   }).catch(() => {});
 
-  return NextResponse.json({ ok: true, relatorio: atualizado });
+  return NextResponse.json({ ok: true, relatorio: atualizado, arquivo });
 }
 
 /**

@@ -149,6 +149,9 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PlanoPintura_opNumero_key" ON "PlanoPintura"("opNumero")`);
   console.log("[ensure-mes-tables] OK — PlanoPintura garantida.");
 
+  // backup do relatório de inspeção na pasta da obra (22/08/2026)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "RelatorioInspecao" ADD COLUMN IF NOT EXISTS "arquivoUrl" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "RelatorioInspecao" ADD COLUMN IF NOT EXISTS "arquivadoEm" TIMESTAMP(3)`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "DataBookGeracao" ADD COLUMN IF NOT EXISTS "mapa" JSONB`);
   console.log("[ensure-mes-tables] OK — DataBookArquivo/DataBookGeracao garantidas.");
 

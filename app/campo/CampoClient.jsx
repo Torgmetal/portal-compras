@@ -1,15 +1,14 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Medir from "./Medir";
 import RNCs from "./RNCs";
 import NovoRelatorio from "./NovoRelatorio";
 import { signOut } from "next-auth/react";
 import {
-  Loader2, Camera, QrCode, Search, X, Check, ChevronLeft, HardHat,
-  LogOut, Trash2, AlertCircle, Tag, Upload, Ruler,
+  Loader2, QrCode, Search, X, Check, ChevronLeft, HardHat,
+  LogOut, AlertCircle, Tag, Ruler,
 } from "lucide-react";
-import { TIPOS_RELATORIO, TIPO_LABEL, marcaDoQR, marcaCasaOP } from "@/lib/qualidade-campo";
-import { reduzImagem } from "@/lib/imagem-cliente";
+import { marcaDoQR, marcaCasaOP } from "@/lib/qualidade-campo";
 import { instrumentosDoTipo, FONTE_POR_TIPO } from "@/lib/instrumentos-por-relatorio";
 import LeitorQR from "./LeitorQR";
 
@@ -19,136 +18,38 @@ import LeitorQR from "./LeitorQR";
  * Vitor (21/08/2026): "seleciona a OP, tipo de relatório, tira a foto e informa qual peça; isso
  * sobe para o portal, e depois por computador começa o fluxo das assinaturas".
  *
- * AS DUAS ORDENS FUNCIONAM. A peça fica FIXA no topo e as fotos se acumulam numa fila até tocarem
- * em enviar — então dá pra apontar no QR e depois fotografar, ou fotografar e depois dizer a peça.
- * A peça fixa existe porque quem inspeciona fotografa a mesma peça três, quatro vezes seguidas
- * (vista geral, solda, detalhe), e perguntar a cada foto seria o triplo de toques.
- *
- * A primeira versão subia a foto no ato, o que na prática obrigava a escolher a peça antes. Vitor,
- * testando: "tirei a foto, escolhi a peça, mas não tem um botão de enviar" — e ele tinha feito
- * exatamente na ordem que descreveu no começo. Daí a fila.
+ * Escolhida a OP, a tela abre um de três caminhos: preencher um relatório que já existe, abrir uma
+ * RNC ou criar um relatório na hora. A foto não tem caminho próprio — ela nasce dentro do
+ * relatório (ver a nota no fim do componente).
  *
  * 🚫 Nenhum nome de cliente nesta tela. Vitor: "pode deixar aberto, só não deixa o nome do cliente;
  * para esse acesso deixar apenas o número da OP" — dois dos cinco usuários são inspetores externos.
  */
 
-const hora = (d) => new Date(d).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-
 export default function CampoClient({ nome }) {
   const [op, setOp] = useState(null);          // { id, numero }
-  const [tipo, setTipo] = useState(null);      // id do tipo
-  // "foto" | "medir" — o que o inspetor veio fazer nesta OP
+  // "medir" | "rnc" | "novo" — o que o inspetor veio fazer nesta OP
   const [modo, setModo] = useState(null);
-  const [peca, setPeca] = useState(null);      // { marca, origem }
   // Vitor (21/08/2026): "além de informar a peça e a OP, ele seleciona os equipamentos que está
   // usando para compor no relatório". Fica fixo como a peça — o inspetor mede a manhã inteira com
   // a mesma trena, e remarcar a cada foto seria trabalho à toa.
   const [equipamentos, setEquipamentos] = useState([]);
-  const [fotos, setFotos] = useState([]);
-  // ── FILA: a foto ESPERA o envio ────────────────────────────────────────────────────────────
-  //
-  // Vitor (21/08/2026), testando: "tirei a foto, escolhi a peça, mas não tem um botão de enviar".
-  // Estava subindo na hora, o que obrigava a escolher a peça ANTES — e a ordem que ele descreveu
-  // desde o começo foi a outra: "tira a foto e informa qual peça".
-  //
-  // Com a fila as duas ordens funcionam, dá pra conferir a foto antes de mandar, e dá pra descartar
-  // a que saiu tremida sem precisar apagar depois do envio.
-  const [fila, setFila] = useState([]); // { id, blob, preview }
-  const [enviando, setEnviando] = useState(false);
-  const [progresso, setProgresso] = useState("");
-  const [erro, setErro] = useState("");
-  const [aviso, setAviso] = useState("");
-  const fileRef = useRef(null);
 
   // ── retoma onde parou ──────────────────────────────────────────────────────────────────────
   // O navegador do celular descarta a aba quando o aparelho fica no bolso ou abre a câmera. Sem
-  // isso, o inspetor volta pra tela inicial e refaz OP e tipo a cada foto.
+  // isso, o inspetor volta pra tela inicial e refaz a OP.
   useEffect(() => {
     try {
       const s = JSON.parse(localStorage.getItem("campo:sessao") || "null");
       if (s?.op?.numero) {
-        setOp(s.op); setTipo(s.tipo || null); setPeca(s.peca || null);
+        setOp(s.op);
         setEquipamentos(Array.isArray(s.equipamentos) ? s.equipamentos : []);
       }
     } catch { /* storage indisponível: segue sem retomar */ }
   }, []);
   useEffect(() => {
-    try { localStorage.setItem("campo:sessao", JSON.stringify({ op, tipo, peca, equipamentos })); } catch { /* ignora */ }
-  }, [op, tipo, peca, equipamentos]);
-
-  const carregarFotos = useCallback(async () => {
-    if (!op?.numero || !tipo) { setFotos([]); return; }
-    try {
-      const r = await fetch(`/api/campo/foto?opNumero=${encodeURIComponent(op.numero)}&tipo=${tipo}`);
-      const j = await r.json();
-      setFotos(j.fotos || []);
-    } catch { /* lista é conferência, não bloqueia fotografar */ }
-  }, [op?.numero, tipo]);
-  useEffect(() => { carregarFotos(); }, [carregarFotos]);
-
-  /** A foto entra na fila (já reduzida). Nada sobe ainda. */
-  async function receberFotos(e) {
-    const arquivos = Array.from(e.target.files || []);
-    if (fileRef.current) fileRef.current.value = "";
-    if (!arquivos.length) return;
-    setErro("");
-    try {
-      const novas = [];
-      for (const arq of arquivos) {
-        const blob = await reduzImagem(arq);
-        novas.push({ id: `${Date.now()}-${novas.length}`, blob, preview: URL.createObjectURL(blob) });
-      }
-      setFila((p) => [...p, ...novas]);
-    } catch (err) { setErro(err.message); }
-  }
-
-  function descartar(id) {
-    setFila((p) => {
-      const alvo = p.find((f) => f.id === id);
-      if (alvo) URL.revokeObjectURL(alvo.preview);
-      return p.filter((f) => f.id !== id);
-    });
-  }
-
-  /** Sobe a fila inteira com a peça que está selecionada agora. */
-  async function enviar() {
-    if (!fila.length || enviando) return;
-    setErro(""); setEnviando(true);
-    const restantes = [...fila];
-    try {
-      for (let i = 0; i < restantes.length; i++) {
-        setProgresso(`${i + 1}/${restantes.length}`);
-        const item = restantes[i];
-        const fd = new FormData();
-        fd.append("file", item.blob, "foto.jpg");
-        fd.append("opId", op.id || "");
-        fd.append("opNumero", op.numero);
-        fd.append("tipo", tipo);
-        if (peca?.marca) { fd.append("marca", peca.marca); fd.append("origemMarca", peca.origem); }
-        if (equipamentos.length) fd.append("equipamentos", JSON.stringify(equipamentos));
-        const r = await fetch("/api/campo/foto", { method: "POST", body: fd });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || "Falha ao enviar");
-        setFotos((p) => [{ ...j.foto, tipo }, ...p]);
-        // ⚠ tira da fila UMA A UMA. Se a conexão cair no meio (e no galpão cai), o que já subiu não
-        // volta pra fila e não sobe duas vezes — o inspetor toca em enviar de novo e segue do ponto.
-        URL.revokeObjectURL(item.preview);
-        setFila((p) => p.filter((f) => f.id !== item.id));
-      }
-    } catch (err) {
-      setErro(`${err.message} — toque em enviar de novo para continuar de onde parou.`);
-    } finally { setEnviando(false); setProgresso(""); }
-  }
-
-  async function apagar(id) {
-    if (!confirm("Apagar esta foto?")) return;
-    try {
-      const r = await fetch(`/api/campo/foto?id=${id}`, { method: "DELETE" });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro");
-      setFotos((p) => p.filter((f) => f.id !== id));
-    } catch (e) { alert(e.message); }
-  }
+    try { localStorage.setItem("campo:sessao", JSON.stringify({ op, equipamentos })); } catch { /* ignora */ }
+  }, [op, equipamentos]);
 
   // ── passo 1: a OP ──────────────────────────────────────────────────────────────────────────
   if (!op) return <EscolherOP onEscolher={setOp} nome={nome} />;
@@ -156,9 +57,9 @@ export default function CampoClient({ nome }) {
   // ── passo 2: o que ele veio fazer ──────────────────────────────────────────────────────────
   //
   // Vitor (21/08/2026): "não estou conseguindo acessar os relatórios na tela do inspetor de campo".
-  // O portal só sabia captar foto. Agora há dois caminhos, e eles são diferentes de verdade:
-  // FOTOGRAFAR é registro solto, que vira relatório depois; MEDIR é responder a um relatório que
-  // alguém já montou no computador, com as cotas e tolerâncias definidas.
+  // O portal só sabia captar foto. Hoje os três caminhos giram em torno do relatório: MEDIR é
+  // responder a um que alguém já montou no computador, com cotas e tolerâncias definidas; CRIAR
+  // abre um ali mesmo, sem esperar o computador; RNC é a não conformidade que sai da reprovação.
   if (!modo) {
     return (
       <Tela titulo={`OP-${op.numero}`} voltar={() => setOp(null)}>

@@ -4504,6 +4504,12 @@ model RelatorioInspecao {
   // desenhos embutidos no PDF: [{ marca, itemId, nome }] — o "CROQUI / FOTO DA PEÇA"
   desenhos  Json?
   status   String @default("RASCUNHO") // RASCUNHO | EMITIDO
+  // ⚠ BACKUP NA PASTA DA OBRA. Vitor (22/08/2026): "salvar os relatórios em PDF na pasta
+  // da qualidade de cada OP para podermos garantir o backup". O portal não é o arquivo da
+  // obra: aqui o PDF é gerado sob demanda, e sem cópia no servidor não sobra papel nenhum
+  // se o registro sumir. Guardado na APROVAÇÃO, em 8. Qualidade/3. Relatórios de Inspeção.
+  arquivoUrl   String?
+  arquivadoEm  DateTime?
 
   // ── REINSPEÇÃO E REVISÃO ─────────────────────────────────────────────────────────────────
   // Vitor (21/08/2026): "no caso de reprova o relatório deve ficar aberto; na reinspeção o inspetor
