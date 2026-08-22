@@ -378,22 +378,6 @@ function Montar({ grupo, onFechar, onPronto }) {
               );
             })}
           </div>
-          {/* ── o que vem depois ─────────────────────────────────────────────── */}
-          <div className="min-h-0 flex items-center justify-center bg-gray-50 p-6 text-center">
-            <div className="max-w-xs">
-              <Ruler size={22} className="text-torg-blue/40 mx-auto mb-2" />
-              <p className="text-[13px] text-torg-gray">
-                {ehDimensional ? (
-                  <>O relatório é criado vazio e na hora. Depois você abre ele e marca as
-                  <strong className="text-torg-dark"> cotas A, B e C</strong> sobre o desenho — é ali que as
-                  dimensões entram.</>
-                ) : (
-                  <>O relatório é criado vazio e na hora, com o número da obra. O preenchimento é feito
-                  ao abrir o relatório.</>
-                )}
-              </p>
-            </div>
-          </div>
         </div>
 
         <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
@@ -512,7 +496,10 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onFechar}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      {/* ⚠ largura de FORMULÁRIO, não de página. Vitor (21/08/2026): "tire esse espaço em branco".
+          O modal era largo porque tinha um painel de prévia ao lado; a prévia saiu quando a criação
+          passou a ser instantânea, e sobrou meia tela vazia. */}
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-torg-dark">Novo relatório · {TIPO_LABEL[tipo] || tipo}</p>
@@ -525,9 +512,8 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
           <button onClick={onFechar} className="text-torg-gray hover:text-torg-dark"><X size={18} /></button>
         </div>
 
-        <div className="flex-1 grid lg:grid-cols-[380px_1fr] min-h-0">
-          {/* ── escolhas ─────────────────────────────────────────────────────── */}
-          <div className="border-r border-gray-100 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="p-4 space-y-3">
             <label className="block">
               <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">OP</span>
               <select value={op?.id || ""} onChange={(e) => setOp((ops || []).find((o) => o.id === e.target.value) || null)}
