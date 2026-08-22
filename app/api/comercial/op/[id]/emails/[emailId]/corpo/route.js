@@ -27,7 +27,13 @@ export async function GET(_req, { params }) {
     const corpo = await lerCorpoMensagem(ev.caixa, ev.graphId);
     return NextResponse.json({ success: true, ...corpo, anexos: ev.anexos || [], temAnexoIfc: ev.temAnexoIfc, webLink: corpo.webLink || ev.webLink });
   } catch (e) {
-    const status = e.status === 404 ? 404 : 502;
-    return NextResponse.json({ error: `Falha ao ler o e-mail no Outlook: ${e.message}` }, { status });
+    const caixaCurta = String(ev.caixa || "").split("@")[0];
+    // RAOP = a ApplicationAccessPolicy do Microsoft 365 ainda não liberou ESTA caixa (propagação).
+    const raop = /RAOP|AppOnly AccessPolicy|Access to OData is disabled/i.test(e.message || "");
+    const msg = raop
+      ? `A caixa "${caixaCurta}" ainda está liberando o acesso no Microsoft 365 — os outros e-mails abrem normal. Use "Abrir no Outlook" ou tente de novo mais tarde.`
+      : `Não foi possível ler o e-mail (${caixaCurta}): ${e.message}`;
+    const status = e.status === 404 ? 404 : (raop ? 403 : 502);
+    return NextResponse.json({ error: msg, raop, webLink: ev.webLink || null }, { status });
   }
 }
