@@ -133,6 +133,21 @@ async function main() {
       CONSTRAINT "DataBookGeracao_pkey" PRIMARY KEY ("id"))`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DataBookGeracao_status_criadoEm_idx" ON "DataBookGeracao"("status","criadoEm")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DataBookGeracao_dataBookId_idx" ON "DataBookGeracao"("dataBookId")`);
+  // PLP — Plano de Pintura por obra (PO-05 item 3). 22/08/2026.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "PlanoPintura" (
+      "id" TEXT NOT NULL, "opId" TEXT, "opNumero" TEXT NOT NULL, "revisao" TEXT,
+      "preparoMetodo" TEXT, "grauLimpeza" TEXT, "abrasivo" TEXT,
+      "rugosidadeMin" DOUBLE PRECISION, "rugosidadeMax" DOUBLE PRECISION,
+      "metodoAplicacao" TEXT, "demaos" JSONB, "espessuraTotal" DOUBLE PRECISION,
+      "arquivoUrl" TEXT, "arquivoNome" TEXT, "observacoes" TEXT,
+      "criadoPorId" TEXT, "criadoPorNome" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "PlanoPintura_pkey" PRIMARY KEY ("id"))`);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PlanoPintura_opNumero_key" ON "PlanoPintura"("opNumero")`);
+  console.log("[ensure-mes-tables] OK — PlanoPintura garantida.");
+
   await prisma.$executeRawUnsafe(`ALTER TABLE "DataBookGeracao" ADD COLUMN IF NOT EXISTS "mapa" JSONB`);
   console.log("[ensure-mes-tables] OK — DataBookArquivo/DataBookGeracao garantidas.");
 

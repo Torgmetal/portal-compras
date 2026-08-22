@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Check, ClipboardList } from "lucide-react";
 import { escopoDoTipo, amostragemDoTipo } from "@/lib/pit-escopo";
+import PlpPainel from "./PlpPainel";
 import {
   GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, METODOS_APLICACAO, TEMPO, CAMPOS_DEMAO,
   RUGOSIDADE_MIN, RUGOSIDADE_MAX, mediaRugosidade, mediaEspessura, condicoesPermitemPintar,
@@ -29,6 +30,12 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
   // naquele relatório". Sem isso o formulário nasce com tudo, e campo em branco vira ambiguidade:
   // ninguém sabe se é "não se aplica" ou "esqueceram de medir".
   const [pit, setPit] = useState({ escopo: null, temPIT: false, carregando: true });
+  // ⚠ as tintas que a obra REALMENTE recebeu, do CMR. Vitor (22/08/2026): "se buscarmos na CMR
+  // vamos conseguir o registro das tintas que foram especificadas para cada obra... poderia deixar
+  // isso mais dinâmico e rápido, para apenas preencher os valores encontrados". Escolher a tinta
+  // preenche produto, fabricante, lote e validade de uma vez — quatro campos que o inspetor
+  // digitava do rótulo da lata, com o erro que isso implica.
+  const [tintas, setTintas] = useState([]);
   useEffect(() => {
     fetch(`/api/qualidade/pit?opNumero=${encodeURIComponent(rel.opNumero)}`)
       .then((r) => r.json())
@@ -88,6 +95,8 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
       </div>
 
       {/* ── preparação de superfície ──────────────────────────────────────────────── */}
+      <PlpPainel opNumero={rel.opNumero} podeEditar={!travado} onTintas={setTintas} />
+
       <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
         <p className="text-[12px] font-bold text-torg-dark mb-2">Preparação de superfície</p>
         <div className="grid sm:grid-cols-4 gap-2.5">
@@ -138,6 +147,37 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
             </tr>
           </thead>
           <tbody>
+              {/* escolher a tinta do CMR preenche produto, fabricante, lote e validade */}
+              {tintas.length > 0 && (
+                <tr className="border-b border-gray-50 bg-torg-blue-50/40">
+                  <td className="py-1 text-torg-blue font-semibold">Tinta do CMR</td>
+                  {[1, 2, 3].map((n) => (
+                    <td key={n} className="py-1 px-0.5">
+                      <select value="" disabled={travado}
+                        onChange={(e) => {
+                          const t = tintas.find((x) => x.id === e.target.value);
+                          if (!t) return;
+                          setResultado("demaos", {
+                            ...dem,
+                            [n]: {
+                              ...(dem[n] || {}),
+                              produto: t.produto,
+                              ...(t.fabricante ? { fabricante: t.fabricante } : {}),
+                              ...(t.lote ? { loteA: t.lote } : {}),
+                              ...(t.validade ? { valA: String(t.validade).slice(0, 10) } : {}),
+                            },
+                          });
+                        }}
+                        className="w-full text-[11px] border border-torg-blue-200 rounded px-1.5 py-1 text-torg-blue disabled:bg-gray-50">
+                        <option value="">escolher…</option>
+                        {tintas.map((t) => (
+                          <option key={t.id} value={t.id}>{t.produto}{t.lote ? ` · lote ${t.lote}` : ""}</option>
+                        ))}
+                      </select>
+                    </td>
+                  ))}
+                </tr>
+              )}
             {CAMPOS_DEMAO
               // ⚠ a linha de aderência some quando o ensaio X está fora do escopo da obra
               .filter(({ k }) => (k === "aderencia" ? esc.aderenciaX : true))

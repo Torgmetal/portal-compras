@@ -1766,6 +1766,48 @@ model DataBookQualidade {
 // livro (capa, sumário, listas mestras, assinaturas); os volumes seguintes são os
 // anexos, na ordem das seções. Cada volume é gerado, gravado no blob e nunca mais
 // refeito — o data book é documento controlado: a R00 vale para sempre.
+// ─── PLP — PLANO DE PINTURA DA OBRA ───────────────────────────────────────────
+// Vitor (22/08/2026), olhando "Tipo de abrasivo" e "Rugosidade especificada (PLP)"
+// em branco no relatório: "aqui já não podemos deixar definido? puxando do PLP de
+// cada obra".
+//
+// O PO-05 item 3 define o PLP como "documento que define o sistema de pintura, método
+// de preparação de superfície, tipos de tinta, número de demãos, espessuras, cores e
+// critérios de inspeção". Ou seja: tudo que o relatório chama de ESPECIFICADO sai
+// daqui — e por obra, não por procedimento.
+//
+// ⚠ SÓ O ESPECIFICADO. O que o inspetor MEDE (leituras de rugosidade e de espessura,
+// lote, validade, condições do dia) continua nascendo em branco. Vitor já barrou o
+// contrário uma vez: "esses números em vermelho não devem sair, o Inspetor é quem vai
+// preencher essa informação".
+model PlanoPintura {
+  id             String   @id @default(cuid())
+  opId           String?
+  opNumero       String   @unique
+  revisao        String? // revisão do PLP do cliente/projeto, como veio
+  // preparação de superfície (PO-05 item 5.4)
+  preparoMetodo  String? // Ferramentas manuais e/ou mecânicas | Jateamento abrasivo | Produtos químicos
+  grauLimpeza    String? // ST2 | ST3 | SA1 | SA2 | SA2.5 | SA3 | QUIMICO
+  abrasivo       String?
+  rugosidadeMin  Float? // µm — PO-05 usa 50 a 90 quando o PLP não diz outra coisa
+  rugosidadeMax  Float?
+  // sistema de pintura
+  metodoAplicacao String?
+  // [{ ordem, nome, produto, fabricante, cor, espessuraMin, espessuraMax }]
+  demaos         Json?
+  espessuraTotal Float? // µm, seca, do sistema todo
+  // o PLP em si (PDF do cliente/projeto), quando houver
+  arquivoUrl     String?
+  arquivoNome    String?
+  observacoes    String?
+  criadoPorId    String?
+  criadoPorNome  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([opNumero])
+}
+
 model DataBookArquivo {
   id           String            @id @default(cuid())
   dataBookId   String

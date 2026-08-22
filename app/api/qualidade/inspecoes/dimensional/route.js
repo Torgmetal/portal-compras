@@ -14,6 +14,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { tipoNoEscopo } from "@/lib/qualidade-escopo";
+import { camposDoRelatorioPintura } from "@/lib/plp";
 import { TIPO } from "@/lib/qualidade-campo";
 import { requireRole } from "@/lib/session";
 import { procedimentoTolerancia } from "@/lib/relatorio-dimensional";
@@ -112,6 +113,25 @@ export async function POST(req) {
     } catch { /* sem tipo, o cabeçalho mostra a marca — como antes */ }
   }
 
+  // ── O QUE O PLP JÁ DIZ ──────────────────────────────────────────────────────────────────────
+  //
+  // Vitor (22/08/2026): "aqui já não podemos deixar definido? puxando do PLP de cada obra".
+  //
+  // O relatório de pintura nasce com o ESPECIFICADO preenchido: método de preparo, grau de
+  // limpeza, abrasivo, faixa de rugosidade, espessura mínima e o produto/fabricante de cada
+  // demão. O que se MEDE continua em branco — é do inspetor.
+  //
+  // ⚠ SNAPSHOT. Grava no relatório em vez de consultar o PLP na hora de imprimir: o documento
+  // tem de registrar o que estava especificado NO DIA. PLP revisado depois não reescreve
+  // relatório antigo — mesma razão do tipo da peça ser gravado aqui e não lido no PDF.
+  let semente = {};
+  if (tipo === "PINTURA") {
+    try {
+      const plp = await prisma.planoPintura.findUnique({ where: { opNumero } });
+      semente = camposDoRelatorioPintura(plp);
+    } catch { /* sem PLP o formulário nasce em branco, como antes */ }
+  }
+
   try {
     // dimensional não usa fotos (Vitor: "não vamos usar fotos"), então nasce sem elas —
     // `criarRelatorio` exige foto, por isso o dimensional cria direto.
@@ -134,7 +154,9 @@ export async function POST(req) {
         resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia, tiposPeca, qtdPeca,
           procedimento: proc?.nome || null, procedimentoId: proc?.id || null,
           // o critério do ensaio visual de solda é fixado pelo PO-06, item 9.4
-          criterio: tipo === "VISUAL_SOLDA" ? CRITERIO_PADRAO : null },
+          criterio: tipo === "VISUAL_SOLDA" ? CRITERIO_PADRAO : null,
+          // o especificado do PLP (só na pintura; vazio quando a obra não tem PLP)
+          ...semente },
         criadoPorId: user.id, criadoPorNome: user.name || null,
       },
     });
