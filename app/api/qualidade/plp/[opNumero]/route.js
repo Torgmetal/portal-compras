@@ -72,6 +72,33 @@ export async function GET(_req, { params }) {
   return NextResponse.json({ plp, tintas, temPlp: !!plp });
 }
 
+// POST — importa o PLP da pasta da obra (<OP>/8. Qualidade/PLP).
+//
+// Vitor (22/08/2026): "esse será sempre o caminho... e também pode ser criado no
+// relatório como você deixou". Então esta é a via principal e o formulário é o reparo:
+// o PLP oficial é a planilha que a Qualidade emite, não um segundo cadastro no portal.
+export async function POST(_req, { params }) {
+  let user;
+  try { user = await requireRole(["ADMIN", "QUALIDADE"]); }
+  catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  const opNumero = String(params.opNumero || "").trim();
+  if (!opNumero) return NextResponse.json({ error: "OP obrigatória" }, { status: 400 });
+
+  const { lerPlpDaObra } = await import("@/lib/plp-servidor");
+  const r = await lerPlpDaObra(opNumero);
+  if (!r.achou) return NextResponse.json({ error: r.erro, caminho: r.caminho || null }, { status: 404 });
+
+  const dados = normalizarPlp(r.dados);
+  const op = await prisma.oP.findFirst({ where: { numero: opNumero }, select: { id: true } });
+  const plp = await prisma.planoPintura.upsert({
+    where: { opNumero },
+    create: { ...dados, opNumero, opId: op?.id || null, arquivoNome: r.arquivo, arquivoUrl: r.url || null, criadoPorId: user.id, criadoPorNome: user.name || user.email || null },
+    update: { ...dados, arquivoNome: r.arquivo, arquivoUrl: r.url || null },
+  });
+  return NextResponse.json({ ok: true, plp, arquivo: r.arquivo, caminho: r.caminho });
+}
+
 export async function PUT(req, { params }) {
   let user;
   try { user = await requireRole(["ADMIN", "QUALIDADE"]); }

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Loader2, Paintbrush, Pencil, Check, X } from "lucide-react";
+import { Loader2, Paintbrush, Pencil, Check, X, FolderSearch } from "lucide-react";
 import { METODOS_PREPARO, PLP_PADRAO, resumoPlp } from "@/lib/plp";
 import { GRAUS_LIMPEZA, METODOS_APLICACAO } from "@/lib/pintura-campos";
 
@@ -23,7 +23,9 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas }) {
   const [editando, setEditando] = useState(false);
   const [f, setF] = useState(null);
   const [salvando, setSalvando] = useState(false);
+  const [importando, setImportando] = useState(false);
   const [erro, setErro] = useState("");
+  const [aviso, setAviso] = useState("");
 
   useEffect(() => {
     fetch(`/api/qualidade/plp/${encodeURIComponent(opNumero)}`)
@@ -50,6 +52,21 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas }) {
       observacoes: p?.observacoes || "",
     });
     setEditando(true);
+  }
+
+  // ⚠ A PLANILHA É A FONTE. Vitor: "esse será sempre o caminho" — <OP>/8. Qualidade/PLP.
+  // Importar é o caminho normal; o formulário abaixo é para a obra que ainda não tem
+  // planilha e para corrigir o que a leitura não entendeu.
+  async function importar() {
+    setImportando(true); setErro(""); setAviso("");
+    try {
+      const r = await fetch(`/api/qualidade/plp/${encodeURIComponent(opNumero)}`, { method: "POST" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Não encontrei o PLP na pasta da obra.");
+      setDados((d) => ({ ...d, plp: j.plp, temPlp: true }));
+      setAviso(`Importado de ${j.arquivo}. Confira antes de usar.`);
+      setEditando(false);
+    } catch (e) { setErro(e.message); } finally { setImportando(false); }
   }
 
   async function salvar() {
@@ -85,11 +102,21 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas }) {
           <span className="font-semibold">Plano de Pintura (PLP)</span>
           <span className="text-torg-gray"> — {resumoPlp(dados.plp)}</span>
           {!dados.plp && <span className="block text-[11px] text-amber-700 mt-0.5">Sem PLP, os campos especificados nascem em branco em todo relatório desta obra.</span>}
+          {dados.plp?.arquivoNome && <span className="block text-[11px] text-torg-gray mt-0.5">lido de {dados.plp.arquivoNome}</span>}
+          {aviso && <span className="block text-[11px] text-emerald-700 mt-0.5">{aviso}</span>}
+          {erro && <span className="block text-[11px] text-red-600 mt-0.5">{erro}</span>}
         </p>
         {podeEditar && (
-          <button onClick={abrir} className="text-[11px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-2.5 py-1 hover:bg-white inline-flex items-center gap-1 shrink-0">
-            <Pencil size={11} /> {dados.plp ? "Editar" : "Definir"}
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button onClick={importar} disabled={importando}
+              title="Lê a planilha em 8. Qualidade/PLP na pasta da obra"
+              className="text-[11px] font-semibold text-white bg-torg-blue rounded-lg px-2.5 py-1 hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1">
+              {importando ? <Loader2 size={11} className="animate-spin" /> : <FolderSearch size={11} />} Buscar na obra
+            </button>
+            <button onClick={abrir} className="text-[11px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-2.5 py-1 hover:bg-white inline-flex items-center gap-1">
+              <Pencil size={11} /> {dados.plp ? "Editar" : "Definir"}
+            </button>
+          </div>
         )}
       </div>
     );
