@@ -104,6 +104,36 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DataBookRevisao_dataBookId_idx" ON "DataBookRevisao"("dataBookId")`);
   console.log("[ensure-mes-tables] OK — DataBookRevisao garantida.");
 
+  // Data book em VOLUMES gerados em segundo plano (22/08/2026). O PDF deixa de ser
+  // montado a cada clique e passa a ser arquivo gravado, um volume por arquivo —
+  // ver o comentário dos modelos no schema. Idempotente.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "DataBookArquivo" (
+      "id" TEXT NOT NULL, "dataBookId" TEXT NOT NULL, "revisao" INTEGER NOT NULL DEFAULT 0,
+      "volume" INTEGER NOT NULL, "totalVolumes" INTEGER, "titulo" TEXT,
+      "url" TEXT NOT NULL, "pathname" TEXT,
+      "paginas" INTEGER NOT NULL DEFAULT 0, "tamanho" INTEGER NOT NULL DEFAULT 0,
+      "geradoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "DataBookArquivo_pkey" PRIMARY KEY ("id"))`);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "DataBookArquivo_dataBookId_revisao_volume_key" ON "DataBookArquivo"("dataBookId","revisao","volume")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DataBookArquivo_dataBookId_revisao_idx" ON "DataBookArquivo"("dataBookId","revisao")`);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "DataBookGeracao" (
+      "id" TEXT NOT NULL, "dataBookId" TEXT NOT NULL, "revisao" INTEGER NOT NULL DEFAULT 0,
+      "status" TEXT NOT NULL DEFAULT 'NA_FILA', "etapa" TEXT,
+      "cursor" INTEGER NOT NULL DEFAULT 0, "volumeAtual" INTEGER NOT NULL DEFAULT 0,
+      "totalVolumes" INTEGER NOT NULL DEFAULT 0, "totalItens" INTEGER NOT NULL DEFAULT 0,
+      "paginas" INTEGER NOT NULL DEFAULT 0, "pendencias" JSONB, "mapa" JSONB, "erro" TEXT,
+      "solicitadoPor" TEXT,
+      "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "iniciadoEm" TIMESTAMP(3), "concluidoEm" TIMESTAMP(3),
+      "atualizadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "DataBookGeracao_pkey" PRIMARY KEY ("id"))`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DataBookGeracao_status_criadoEm_idx" ON "DataBookGeracao"("status","criadoEm")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DataBookGeracao_dataBookId_idx" ON "DataBookGeracao"("dataBookId")`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "DataBookGeracao" ADD COLUMN IF NOT EXISTS "mapa" JSONB`);
+  console.log("[ensure-mes-tables] OK — DataBookArquivo/DataBookGeracao garantidas.");
+
   // Foto de inspeção do Portal Qualidade Fábrica (celular). Idempotente.
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "FotoInspecao" (

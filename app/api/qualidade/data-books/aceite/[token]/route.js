@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 
 const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 
-function publico(book) {
+function publico(book, volumes = []) {
   return {
     opNumero: book.opNumero,
     op: fmtOP(book.opNumero),
@@ -23,13 +23,28 @@ function publico(book) {
     aceiteEm: book.aceiteEm,
     aceiteNome: book.aceiteNome,
     termo: montarTermoAceite(book),
+    // ⚠ O CLIENTE BAIXA VOLUME. Um data book de 10 mil páginas não é um arquivo: é um
+    // conjunto. A lista abaixo é o que a página oferece — e ela é a mesma coisa que o
+    // Volume 01 descreve no sumário, para o conjunto continuar sendo um documento só.
+    volumes: volumes.map((v) => ({
+      volume: v.volume, totalVolumes: v.totalVolumes, titulo: v.titulo,
+      paginas: v.paginas, tamanho: v.tamanho,
+    })),
   };
+}
+
+async function volumesDe(book) {
+  return prisma.dataBookArquivo.findMany({
+    where: { dataBookId: book.id, revisao: book.revisao },
+    orderBy: { volume: "asc" },
+    select: { volume: true, totalVolumes: true, titulo: true, paginas: true, tamanho: true },
+  });
 }
 
 export async function GET(_req, { params }) {
   const book = await prisma.dataBookQualidade.findUnique({ where: { tokenCliente: params.token } });
   if (!book) return NextResponse.json({ success: false, error: "Link inválido ou expirado." }, { status: 404 });
-  return NextResponse.json({ success: true, data: publico(book) });
+  return NextResponse.json({ success: true, data: publico(book, await volumesDe(book)) });
 }
 
 export async function POST(req, { params }) {
@@ -43,7 +58,7 @@ export async function POST(req, { params }) {
   const book = await prisma.dataBookQualidade.findUnique({ where: { tokenCliente: params.token } });
   if (!book) return NextResponse.json({ success: false, error: "Link inválido ou expirado." }, { status: 404 });
   if (book.status === "ACEITO") {
-    return NextResponse.json({ success: true, data: publico(book), jaAceito: true });
+    return NextResponse.json({ success: true, data: publico(book, await volumesDe(book)), jaAceito: true });
   }
   if (book.status !== "ENVIADO_CLIENTE") {
     return NextResponse.json({ success: false, error: "Este data book ainda não está disponível para aceite." }, { status: 400 });
@@ -59,5 +74,5 @@ export async function POST(req, { params }) {
     .create({ data: { userId: book.criadoPorId || null, action: "ACEITE_CLIENTE_DATABOOK", entity: "DataBookQualidade", entityId: book.id, diff: { nome: body.nome.trim(), ip } } })
     .catch(() => {});
 
-  return NextResponse.json({ success: true, data: publico(atualizado) });
+  return NextResponse.json({ success: true, data: publico(atualizado, await volumesDe(book)) });
 }

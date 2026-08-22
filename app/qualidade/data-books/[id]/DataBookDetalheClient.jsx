@@ -8,6 +8,7 @@ import {
   FolderOpen, RotateCcw, History,
 } from "lucide-react";
 import NavegadorServidor from "./NavegadorServidor";
+import Volumes from "./Volumes";
 import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, GRUPO_POR_SECAO, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO } from "@/lib/databook-secoes";
 import { secaoNavega } from "@/lib/databook-pastas-web";
 import { STATUS_COR } from "@/lib/qualidade-status";
@@ -295,6 +296,8 @@ export default function DataBookDetalheClient({ id, userId }) {
   const fechado = !!data.emitidoEm || ["EMITIDO", "ENVIADO_CLIENTE", "ACEITO"].includes(data.status);
   const aprov = data.aprovacoes || [];
   const jaAprovei = aprov.some((a) => a.userId === userId);
+  // quantos anexos o livro carrega — é o que decide se ainda cabe em arquivo único
+  const totalAnexos = (data.secoes || []).reduce((acc, s2) => acc + (s2.documentos?.length || 0), 0);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -317,11 +320,16 @@ export default function DataBookDetalheClient({ id, userId }) {
             )}
           </div>
           <div className="text-right shrink-0 flex items-center gap-2">
-            <a href={`/api/qualidade/data-books/${id}/pdf?inline=1`} target="_blank" rel="noreferrer"
-              title="Gerar e baixar o PDF do data book (rascunho se ainda incompleto)"
-              className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-3 py-1.5 hover:bg-torg-blue-50 inline-flex items-center gap-1.5">
-              <FileDown size={13} /> Baixar PDF
-            </a>
+            {/* ⚠ Arquivo único só até certo tamanho. Acima disso a rota devolve 409 e o
+                caminho é o card de Volumes — mostrar um botão que só falha é pior que
+                não mostrar. */}
+            {totalAnexos <= 300 && (
+              <a href={`/api/qualidade/data-books/${id}/pdf?inline=1`} target="_blank" rel="noreferrer"
+                title="Gerar e baixar o PDF do data book em arquivo único (rascunho se ainda incompleto)"
+                className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-3 py-1.5 hover:bg-torg-blue-50 inline-flex items-center gap-1.5">
+                <FileDown size={13} /> Baixar PDF
+              </a>
+            )}
             {/* A revisão fica sempre à vista: é ela que diz QUAL documento é este. */}
             <span className="text-[11px] px-2 py-1 rounded-full font-bold bg-gray-100 text-torg-dark" title="Revisão do data book">
               {rotuloRev}
@@ -388,6 +396,10 @@ export default function DataBookDetalheClient({ id, userId }) {
           )}
         </div>
       </div>
+
+
+      {/* Volumes — a entrega de verdade quando o data book é grande */}
+      <Volumes id={id} />
 
       {/* Fluxo de assinaturas — Elaborador → Inspetor → Resp. Técnico → Cliente (por e-mail/link) */}
       <FluxoAssinaturas id={id} cliente={data.cliente} clienteEmail={data.clienteEmail} onChange={carregar} />

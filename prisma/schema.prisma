@@ -1739,8 +1739,75 @@ model DataBookQualidade {
   secoes           DataBookSecao[]
   aprovacoes       DataBookAprovacao[]
   assinaturas      DataBookAssinatura[]
+  arquivos         DataBookArquivo[]
+  geracoes         DataBookGeracao[]
 
   @@index([opNumero])
+}
+
+// ─── O DATA BOOK COMO ARQUIVO, EM VOLUMES ─────────────────────────────────────
+// Vitor (22/08/2026): "pode ser que teremos data books com até 10 mil páginas,
+// precisamos ajustar isso já prevendo isso, até mesmo para o envio ao cliente".
+//
+// Até aqui o PDF era montado INTEIRO em memória a cada clique — inclusive no clique
+// do cliente — dentro de uma função de 120 s. Isso tem teto: um livro de 10 mil
+// páginas não cabe na memória de uma função nem termina no tempo dela, e o cliente
+// não abre um arquivo de 3 GB no leitor de PDF dele.
+//
+// Passa a funcionar como data book de papel: um VOLUME por arquivo. O Volume 1 é o
+// livro (capa, sumário, listas mestras, assinaturas); os volumes seguintes são os
+// anexos, na ordem das seções. Cada volume é gerado, gravado no blob e nunca mais
+// refeito — o data book é documento controlado: a R00 vale para sempre.
+model DataBookArquivo {
+  id           String            @id @default(cuid())
+  dataBookId   String
+  revisao      Int               @default(0)
+  volume       Int // 1 = o livro; 2..N = anexos
+  totalVolumes Int?
+  titulo       String? // "Anexos · §02 Desenhos as-built (2 de 4)"
+  url          String
+  pathname     String?
+  paginas      Int               @default(0)
+  tamanho      Int               @default(0)
+  geradoEm     DateTime          @default(now())
+  dataBook     DataBookQualidade @relation(fields: [dataBookId], references: [id], onDelete: Cascade)
+
+  @@unique([dataBookId, revisao, volume])
+  @@index([dataBookId, revisao])
+}
+
+// A GERAÇÃO É UM JOB RETOMÁVEL. Nenhuma invocação serverless dá conta de 10 mil
+// páginas: só o download dos anexos do SharePoint já passa de qualquer timeout. O job
+// guarda um CURSOR sobre o roteiro de impressão e fecha um volume por invocação; o
+// cron retoma de onde parou até acabar.
+model DataBookGeracao {
+  id           String            @id @default(cuid())
+  dataBookId   String
+  revisao      Int               @default(0)
+  status       String            @default("NA_FILA") // NA_FILA | GERANDO | CONCLUIDO | ERRO | CANCELADO
+  etapa        String?
+  cursor       Int               @default(0) // posição no roteiro de impressão
+  volumeAtual  Int               @default(0)
+  totalVolumes Int               @default(0)
+  totalItens   Int               @default(0)
+  paginas      Int               @default(0)
+  // ⚠ O QUE NÃO ENTROU TEM QUE APARECER. A trava antiga descartava anexo além da
+  // página 200 em silêncio — o livro dizia ter 1.336 desenhos e levava 200 páginas
+  // deles. Num documento controlado isso é pior que não gerar.
+  pendencias   Json?
+  // secaoId → { volumeIni, volumeFim, paginas }: onde os anexos de cada seção foram
+  // parar. O Volume 1 (o livro) é gerado POR ÚLTIMO justamente para poder apontar isso.
+  mapa         Json?
+  erro         String?
+  solicitadoPor String?
+  criadoEm     DateTime          @default(now())
+  iniciadoEm   DateTime?
+  concluidoEm  DateTime?
+  atualizadoEm DateTime          @updatedAt
+  dataBook     DataBookQualidade @relation(fields: [dataBookId], references: [id], onDelete: Cascade)
+
+  @@index([status, criadoEm])
+  @@index([dataBookId])
 }
 
 // Cadeia sequencial de assinaturas do data book (assinatura digital por link/e-mail,
