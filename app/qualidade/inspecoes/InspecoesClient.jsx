@@ -252,7 +252,11 @@ function Relatorio({ r, onMudou }) {
           </Link>
           <p className="text-[11px] text-torg-gray">
             {r.fotos > 0 ? `${r.fotos} foto${r.fotos > 1 ? "s" : ""} · ` : ""}
-            {r.titulo || "sem título"} · {r.inspetor || r.criadoPorNome || "—"}
+            {/* ⚠ o tipo identifica melhor que "sem título". Vitor (22/08/2026): "essa parte de
+                título não há necessidade de ter em nenhum dos relatórios... seria um campo a
+                mais para termos que pensar em preencher". Relatório antigo com título mantém
+                o dele. */}
+            {r.titulo || TIPO_LABEL[r.tipo] || r.tipo} · {r.inspetor || r.criadoPorNome || "—"}
             {r.emitidoEm ? ` · emitido ${fmtDT(r.emitidoEm)}` : " · rascunho"}
           </p>
         </div>
@@ -299,7 +303,6 @@ function Relatorio({ r, onMudou }) {
 
 function Montar({ grupo, onFechar, onPronto }) {
   const [sel, setSel] = useState(new Set(grupo.fotos.map((f) => f.id)));
-  const [titulo, setTitulo] = useState("");
   const [observacoes, setObs] = useState("");
   const [inspetor, setInspetor] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -312,7 +315,7 @@ function Montar({ grupo, onFechar, onPronto }) {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           opId: grupo.opId, opNumero: grupo.opNumero, tipo: grupo.tipo,
-          fotoIds: [...sel], titulo, observacoes, inspetor,
+          fotoIds: [...sel], observacoes, inspetor,
         }),
       });
       const j = await r.json();
@@ -342,11 +345,6 @@ function Montar({ grupo, onFechar, onPronto }) {
 
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
           <div className="grid sm:grid-cols-2 gap-3">
-            <label className="block">
-              <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Título (opcional)</span>
-              <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="ex.: Inspeção das longarinas do eixo 4"
-                className="w-full text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
-            </label>
             <label className="block">
               <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Inspetor</span>
               <input value={inspetor} onChange={(e) => setInspetor(e.target.value)} placeholder="quem executou a inspeção"
@@ -419,7 +417,6 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
   const [q, setQ] = useState("");
   const [pecas, setPecas] = useState(null);
   const [sel, setSel] = useState([]);
-  const [titulo, setTitulo] = useState("");
   const [inspetor, setInspetor] = useState("");
   // Vitor (21/08/2026): "traga eles no seletor para podermos escolher um deles para testarmos".
   // A marca com NC1 sai com a dimensão exata; sem ele, o portal lê o desenho.
@@ -481,7 +478,7 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
     try {
       const r = await fetch("/api/qualidade/inspecoes/dimensional", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: op.numero, tipo, escopo, marcas: sel, titulo, inspetor }),
+        body: JSON.stringify({ opNumero: op.numero, tipo, escopo, marcas: sel, inspetor }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
@@ -607,11 +604,6 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
             <label className="block">
               <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Inspetor</span>
               <input value={inspetor} onChange={(e) => setInspetor(e.target.value)}
-                className="w-full text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
-            </label>
-            <label className="block">
-              <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Título (opcional)</span>
-              <input value={titulo} onChange={(e) => setTitulo(e.target.value)}
                 className="w-full text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
             </label>
 

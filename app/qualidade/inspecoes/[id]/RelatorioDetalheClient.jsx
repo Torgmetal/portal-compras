@@ -209,8 +209,12 @@ export default function RelatorioDetalheClient({ id }) {
 
       <div className="mt-4">
         <div className="space-y-3">
-          <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm grid sm:grid-cols-2 gap-3">
-            <Campo label="Título" v={rel.titulo || ""} onChange={(v) => setCampo("titulo", v)} disabled={travado} />
+          {/* ⚠ SEM TÍTULO. Vitor (22/08/2026): "essa parte de título não há necessidade de ter em
+              nenhum dos relatórios... seria um campo a mais para termos que pensar em preencher".
+              O código (RLP-089-002) e o tipo já identificam o documento; o campo era espaço em
+              branco pedindo para ser preenchido sem servir a nada. A coluna fica no banco: os
+              relatórios que já têm título continuam mostrando o deles. */}
+          <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
             <Campo label="Inspetor" v={rel.inspetor || ""} onChange={(v) => setCampo("inspetor", v)} disabled={travado} />
           </div>
 
