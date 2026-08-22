@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Medir from "./Medir";
 import RNCs from "./RNCs";
+import NovoRelatorio from "./NovoRelatorio";
 import { signOut } from "next-auth/react";
 import {
   Loader2, Camera, QrCode, Search, X, Check, ChevronLeft, HardHat,
@@ -166,7 +167,7 @@ export default function CampoClient({ nome }) {
           <button onClick={() => setModo("medir")}
             className="w-full text-left bg-white border-2 border-torg-blue rounded-xl px-4 py-4 active:bg-torg-blue/5">
             <span className="block text-base font-semibold text-torg-blue">Preenchimento de relatórios</span>
-            <span className="block text-[13px] text-torg-gray">informar as medidas de um relatório já aberto</span>
+            <span className="block text-[13px] text-torg-gray">informar as medidas dos relatórios desta obra</span>
           </button>
           {/* ⚠ RNC ao lado do preenchimento, a pedido do Vitor. Não é acessório: a reprovação de
               uma inspeção abre RNC automaticamente, e quem reprovou é quem melhor sabe o que ela
@@ -176,10 +177,15 @@ export default function CampoClient({ nome }) {
             <span className="block text-base font-semibold text-torg-dark">RNC</span>
             <span className="block text-[13px] text-torg-gray">não conformidades abertas nesta OP</span>
           </button>
-          <button onClick={() => setModo("foto")}
+          {/* ⚠ "REGISTRAR FOTOS" SAIU. Vitor (22/08/2026): "pode tirar esse botão do painel do
+              Inspetor de Campo, pois ele vai registrar as imagens dentro do relatório; apenas
+              criar um botão para criar relatório". A foto solta era do tempo em que o relatório
+              nascia depois dela; hoje ela nasce amarrada ao documento, e um caminho que produz
+              foto sem dono só recria a fila que acabamos de eliminar. */}
+          <button onClick={() => setModo("novo")}
             className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-4 active:bg-gray-50">
-            <span className="block text-base font-semibold text-torg-dark">Registrar fotos</span>
-            <span className="block text-[13px] text-torg-gray">evidência fotográfica de uma peça</span>
+            <span className="block text-base font-semibold text-torg-dark">Criar relatório</span>
+            <span className="block text-[13px] text-torg-gray">abrir uma inspeção nova, sem esperar o computador</span>
           </button>
         </div>
       </Tela>
@@ -194,107 +200,20 @@ export default function CampoClient({ nome }) {
     return <Medir op={op} onSair={() => setModo(null)} Tela={Tela} Equipamentos={Equipamentos} />;
   }
 
-  // ── passo 3: o tipo (só no caminho da foto) ────────────────────────────────────────────────
-  if (!tipo) {
+  if (modo === "novo") {
     return (
-      <Tela titulo={`OP-${op.numero}`} voltar={() => setModo(null)}>
-        <p className="text-sm text-torg-gray mb-3">Que inspeção você está registrando?</p>
-        <div className="space-y-2">
-          {/* ⚠ só os tipos DESTA obra. Vitor (22/08): "pode ser que em alguns casos não
-              vamos fazer nada além de certificado de qualidade e relatório de pintura".
-              A OP traz a lista pronta de /api/campo/ops — quem decide é o escopo da OP. */}
-          {TIPOS_RELATORIO.filter((t) => !op.tipos || op.tipos.includes(t.id)).map((t) => (
-            <button key={t.id} onClick={() => setTipo(t.id)}
-              className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-4 text-base font-medium text-torg-dark active:bg-gray-50">
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </Tela>
+      <NovoRelatorio op={op} Tela={Tela} onSair={() => setModo(null)}
+        // criado, cai direto no preenchimento: o inspetor está com a peça na frente
+        onCriado={() => setModo("medir")} />
     );
   }
 
-  // ── passo 3: fotografar ────────────────────────────────────────────────────────────────────
-  return (
-    <Tela titulo={`OP-${op.numero}`} sub={TIPO_LABEL[tipo]} voltar={() => setTipo(null)}>
-      <PecaAtual
-        peca={peca} opNumero={op.numero} opId={op.id}
-        onDefinir={(p, av) => { setPeca(p); setAviso(av || ""); }}
-      />
-
-      <Equipamentos escolhidos={equipamentos} onMudar={setEquipamentos} />
-
-      {aviso && (
-        <p className="mt-2 text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-start gap-1.5">
-          <AlertCircle size={13} className="mt-0.5 shrink-0" /> {aviso}
-        </p>
-      )}
-      {erro && (
-        <p className="mt-2 text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{erro}</p>
-      )}
-
-      {/* `capture` abre a câmera direto; `multiple` deixa mandar da galeria o que já foi tirado */}
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={receberFotos} />
-      <button onClick={() => fileRef.current?.click()} disabled={enviando}
-        className="mt-4 w-full bg-white border-2 border-torg-blue text-torg-blue active:bg-torg-blue/5 rounded-2xl py-5 text-lg font-semibold inline-flex items-center justify-center gap-2.5 disabled:opacity-60">
-        <Camera size={24} /> Tirar foto
-      </button>
-
-      {/* ── A FILA ────────────────────────────────────────────────────────────────────────────
-          As fotas ficam aqui até tocarem em enviar. É o que permite fotografar primeiro e dizer a
-          peça depois — a ordem que o Vitor descreveu — e conferir antes de mandar. */}
-      {fila.length > 0 && (
-        <div className="mt-4 bg-white border border-gray-200 rounded-2xl p-3">
-          <p className="text-xs font-semibold text-torg-gray mb-2">
-            {fila.length} foto(s) para enviar {peca ? `em ${peca.marca}` : "sem peça (registro geral)"}
-          </p>
-          <div className="grid grid-cols-4 gap-2">
-            {fila.map((f) => (
-              <div key={f.id} className="relative rounded-lg overflow-hidden bg-gray-100 aspect-square">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={f.preview} alt="a enviar" className="w-full h-full object-cover" />
-                <button onClick={() => descartar(f.id)} disabled={enviando}
-                  className="absolute top-1 right-1 bg-black/55 text-white rounded-full p-1 active:bg-black/75 disabled:opacity-40">
-                  <X size={11} />
-                </button>
-              </div>
-            ))}
-          </div>
-          <button onClick={enviar} disabled={enviando}
-            className="mt-3 w-full bg-torg-blue active:bg-torg-dark text-white rounded-2xl py-4 text-lg font-semibold inline-flex items-center justify-center gap-2.5 disabled:opacity-60">
-            {enviando ? <Loader2 size={22} className="animate-spin" /> : <Upload size={22} />}
-            {enviando ? `enviando ${progresso}…` : `Enviar ${fila.length} foto(s)`}
-          </button>
-          {!peca && (
-            <p className="mt-2 text-[11px] text-torg-gray text-center">
-              Sem peça selecionada, elas entram como registro geral da inspeção.
-            </p>
-          )}
-        </div>
-      )}
-
-      <div className="mt-5">
-        <p className="text-xs font-semibold text-torg-gray mb-2">
-          {fotos.length ? `${fotos.length} foto(s) já enviada(s)` : "Nenhuma foto enviada ainda."}
-        </p>
-        <div className="grid grid-cols-3 gap-2">
-          {fotos.map((f) => (
-            <div key={f.id} className="relative rounded-lg overflow-hidden bg-gray-100 aspect-square">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={f.url} alt={f.marca || "foto"} className="w-full h-full object-cover" />
-              <button onClick={() => apagar(f.id)}
-                className="absolute top-1 right-1 bg-black/55 text-white rounded-full p-1 active:bg-black/75">
-                <Trash2 size={12} />
-              </button>
-              <span className="absolute bottom-0 inset-x-0 bg-black/55 text-white text-[9px] px-1 py-0.5 truncate">
-                {f.marca || "sem peça"} · {hora(f.capturadaEm)}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </Tela>
-  );
+  // ⚠ O CAMINHO DA FOTO SOLTA FOI REMOVIDO (22/08/2026). Ele existia de quando o relatório
+  // nascia DEPOIS da foto: o inspetor fotografava, a foto ia para uma fila e alguém montava o
+  // documento no computador. Hoje é o contrário — a foto nasce dentro do relatório, e o inspetor
+  // cria o próprio relatório aqui mesmo. Manter os dois caminhos recriaria a fila de fotos sem
+  // dono que acabamos de eliminar.
+  return null;
 }
 
 /** Moldura comum: cabeçalho fixo, conteúdo rolando. Sem menu — a tela é de uma coisa só. */

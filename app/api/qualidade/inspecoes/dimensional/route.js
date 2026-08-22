@@ -24,7 +24,14 @@ import { vincularNoDataBook } from "@/lib/relatorio-inspecao";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-const PERFIS = ["ADMIN", "QUALIDADE"];
+// ⚠ O INSPETOR DE CAMPO CRIA O PRÓPRIO RELATÓRIO. Vitor (22/08/2026): "podemos deixar ele criar
+// relatórios do celular dele, sem a necessidade de alguém criar antes — apenas o de dimensional
+// que ele seleciona a peça, e se caso precisar o responsável da nossa parte limpa as cotas".
+//
+// Antes o relatório tinha de nascer no computador e o inspetor só preenchia. Isso é uma espera
+// desnecessária: ele está na frente da peça e sabe o que vai inspecionar. Quem confere e emite
+// continua sendo a Qualidade — criar não é emitir.
+const PERFIS = ["ADMIN", "QUALIDADE", "QUALIDADE_CAMPO"];
 
 export async function POST(req) {
   let user;
