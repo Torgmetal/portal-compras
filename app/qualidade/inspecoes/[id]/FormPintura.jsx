@@ -36,6 +36,7 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
   // preenche produto, fabricante, lote e validade de uma vez — quatro campos que o inspetor
   // digitava do rótulo da lata, com o erro que isso implica.
   const [tintas, setTintas] = useState([]);
+  const [plp, setPlp] = useState(null);
   useEffect(() => {
     fetch(`/api/qualidade/pit?opNumero=${encodeURIComponent(rel.opNumero)}`)
       .then((r) => r.json())
@@ -51,6 +52,49 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
   const rug = Array.isArray(res.rugLeituras) ? res.rugLeituras : ["", "", "", "", ""];
 
   const setDemao = (n, k, v) => setResultado("demaos", { ...dem, [n]: { ...(dem[n] || {}), [k]: v } });
+
+  // ─── O QUE FOI APLICADO SE ESCOLHE, NÃO SE DIGITA ─────────────────────────────────────────────
+  //
+  // Vitor (22/08/2026): "aqui você vai precisar deixar selecionável também, pois temos peças que
+  // são de cores diferentes — o ideal seria criarmos a seleção e o Inspetor seleciona na hora o
+  // que foi aplicado". E: "era bom trazer todas as tintas recebidas da OP em questão".
+  //
+  // Produto e os três lotes saem do CMR (tudo que a obra recebeu, já separado em base,
+  // endurecedor e diluente); a cor sai do PLP. Escolher o lote preenche a validade junto — ela
+  // está no mesmo lançamento e digitá-la à mão é erro de transcrição esperando acontecer.
+  const porComponente = (c) => tintas.filter((t) => t.componente === c);
+  const cores = [...new Set([
+    ...((plp?.itens || []).map((i) => i.cor)),
+    ...((plp?.demaos || []).map((d) => d.cor)),
+  ].filter(Boolean))];
+
+  const CAMPO_LOTE = { loteA: { comp: "A", val: "valA" }, loteB: { comp: "B", val: "valB" }, loteD: { comp: "D", val: "valD" } };
+
+  function escolherLote(n, k, idTinta) {
+    const t = tintas.find((x) => x.id === idTinta);
+    const cfg = CAMPO_LOTE[k];
+    const bloco = { ...(dem[n] || {}) };
+    if (!t) { bloco[k] = ""; bloco[cfg.val] = ""; }
+    else {
+      bloco[k] = t.lote || "";
+      if (t.validade) bloco[cfg.val] = String(t.validade).slice(0, 10);
+      // a base manda no produto e no fabricante do relatório
+      if (cfg.comp === "A") { bloco.produto = t.produto; if (t.fabricante) bloco.fabricante = t.fabricante; }
+    }
+    setResultado("demaos", { ...dem, [n]: bloco });
+  }
+
+  /** As opções deste campo, ou null quando ele continua sendo texto livre. */
+  function opcoesDoCampo(k) {
+    if (k === "cor") return cores.length ? cores : null;
+    if (k === "produto") {
+      const doCmr = [...new Set(porComponente("A").map((t) => t.produto))];
+      const doPlp = (plp?.demaos || []).map((d) => d.produto).filter(Boolean);
+      const todos = [...new Set([...doCmr, ...doPlp])];
+      return todos.length ? todos : null;
+    }
+    return null;
+  }
   const setEsp = (n, i, v) => {
     const atual = Array.isArray(esp[n]) ? [...esp[n]] : ["", "", "", "", ""];
     atual[i] = v;
@@ -95,7 +139,7 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
       </div>
 
       {/* ── preparação de superfície ──────────────────────────────────────────────── */}
-      <PlpPainel opNumero={rel.opNumero} podeEditar={!travado} onTintas={setTintas} res={res} setResultado={travado ? null : setResultado} />
+      <PlpPainel opNumero={rel.opNumero} podeEditar={!travado} onTintas={setTintas} onPlp={setPlp} res={res} setResultado={travado ? null : setResultado} />
 
       <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
         <p className="text-[12px] font-bold text-torg-dark mb-2">Preparação de superfície</p>
@@ -184,20 +228,37 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
               .map(({ k, rot, tipo, opcoes }) => (
               <tr key={k} className="border-t border-gray-50">
                 <td className="py-1 text-torg-gray">{rot}</td>
-                {["1", "2", "3"].map((n) => (
+                {["1", "2", "3"].map((n) => {
+                  const dyn = opcoesDoCampo(k);
+                  const lote = CAMPO_LOTE[k];
+                  const listaLote = lote ? porComponente(lote.comp) : [];
+                  return (
                   <td key={n} className="py-1 px-0.5">
-                    {opcoes ? (
+                    {lote && listaLote.length ? (
+                      // ⚠ o valor guardado é o LOTE (texto); o seletor casa por ele para reabrir
+                      // marcado. Guardar o id do documento amarraria o relatório a um registro do
+                      // CMR que pode ser reimportado.
+                      <select value={listaLote.find((t) => t.lote === dem[n]?.[k])?.id || ""} disabled={travado}
+                        onChange={(e) => escolherLote(n, k, e.target.value)}
+                        className="w-full text-[11px] border border-gray-200 rounded px-1 py-0.5 disabled:bg-gray-50">
+                        <option value="">—</option>
+                        {listaLote.map((t) => (
+                          <option key={t.id} value={t.id}>{t.lote ? `${t.lote} · ` : ""}{t.produto}</option>
+                        ))}
+                      </select>
+                    ) : (opcoes || dyn) ? (
                       <select value={dem[n]?.[k] || ""} disabled={travado} onChange={(e) => setDemao(n, k, e.target.value)}
                         className="w-full text-[11px] border border-gray-200 rounded px-1 py-0.5 disabled:bg-gray-50">
                         <option value="">—</option>
-                        {opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
+                        {(opcoes || dyn).map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
                     ) : (
                       <input type={tipo || "text"} value={dem[n]?.[k] ?? ""} disabled={travado} onChange={(e) => setDemao(n, k, e.target.value)}
                         className="w-full text-[11px] border border-gray-200 rounded px-1 py-0.5 disabled:bg-gray-50" />
                     )}
                   </td>
-                ))}
+                  );
+                })}
               </tr>
             ))}
           </tbody>

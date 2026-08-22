@@ -25,7 +25,23 @@ export const maxDuration = 30;
  * indexada pelo mesmo R, que carrega produto, fabricante, lote e validade. Sem o
  * cruzamento a lista sairia como um punhado de códigos R sem significado.
  */
+// Qual parte do conjunto de pintura é este lançamento do CMR.
+//
+// A tinta chega em TRIO — base, endurecedor e diluente, cada um com o próprio lote
+// (na OP-067: 85596 / 85597 / 85598). O relatório tem exatamente esses três campos de
+// lote, então classificar aqui é o que permite cada um oferecer a lista certa em vez de
+// despejar as 27 linhas em todos.
+const componenteDaTinta = (nome) => {
+  const n = String(nome || "").toUpperCase();
+  if (/ENDURECEDOR|CATALIS|COMPONENTE B|COMP\.? ?B/.test(n)) return "B";
+  if (/DILUENTE|THINNER|TINNER|SOLVENTE|REDUTOR/.test(n)) return "D";
+  return "A";
+};
+
 async function tintasDaOP(opNumero) {
+  // ⚠ TODAS as tintas recebidas na obra. Vitor (22/08/2026): "era bom trazer todas as
+  // tintas recebidas da OP em questão". São os lançamentos do CMR — 27 na OP-067 —, e é
+  // deles que saem produto, fabricante, LOTE e validade sem ninguém digitar do rótulo.
   const docs = await prisma.documentoQualidade.findMany({
     where: { opNumero, ativo: true, categoria: "MATERIAL" },
     select: {
@@ -49,13 +65,15 @@ async function tintasDaOP(opNumero) {
     .map((d) => ({
       id: d.id,
       produto: d.nome,
+      componente: componenteDaTinta(d.nome),
       fabricante: d.fornecedor || null,
       lote: d.numeroCorrida || null,
       validade: d.dataValidade || null,
       certificado: d.numeroDocumento || null,
       r: d.indiceR || d.importRef || null,
     }))
-    .sort((a, b) => a.produto.localeCompare(b.produto));
+    // pelo LOTE dentro de cada produto: quem procura no galpão procura pelo número da lata
+    .sort((a, b) => a.produto.localeCompare(b.produto) || String(a.lote).localeCompare(String(b.lote)));
 }
 
 export async function GET(_req, { params }) {

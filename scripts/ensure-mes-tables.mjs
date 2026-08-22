@@ -145,6 +145,7 @@ async function main() {
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "PlanoPintura_pkey" PRIMARY KEY ("id"))`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "PlanoPintura" ADD COLUMN IF NOT EXISTS "itens" JSONB`);
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PlanoPintura_opNumero_key" ON "PlanoPintura"("opNumero")`);
   console.log("[ensure-mes-tables] OK — PlanoPintura garantida.");
 

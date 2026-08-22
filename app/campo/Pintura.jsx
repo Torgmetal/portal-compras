@@ -23,7 +23,7 @@ import {
 
 const DEMAOS = ["1", "2", "3"];
 
-export default function Pintura({ cond, setCond, tintas = [] }) {
+export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
   const [aba, setAba] = useState("1");
   const set = (k, v) => setCond((c) => ({ ...c, [k]: v }));
 
@@ -38,6 +38,40 @@ export default function Pintura({ cond, setCond, tintas = [] }) {
     set("espessuras", { ...esp, [d]: atual });
   };
   const setDem = (d, k, v) => set("demaos", { ...dem, [d]: { ...(dem[d] || {}), [k]: v } });
+
+  // ⚠ O QUE FOI APLICADO SE ESCOLHE. Vitor (22/08/2026): "temos peças que são de cores
+  // diferentes — o Inspetor seleciona na hora o que foi aplicado"; "era bom trazer todas
+  // as tintas recebidas da OP em questão". A tinta chega em trio (base, endurecedor,
+  // diluente), cada um com o próprio lote — por isso são três seletores, e escolher um
+  // traz a validade junto.
+  const porComp = (c) => tintas.filter((t) => t.componente === c);
+  const cores = [...new Set([
+    ...((plp?.itens || []).map((i) => i.cor)),
+    ...((plp?.demaos || []).map((x) => x.cor)),
+  ].filter(Boolean))];
+
+  function escolherLote(campo, campoVal, comp, id) {
+    const t = porComp(comp).find((x) => x.id === id);
+    const bloco = { ...(dem[aba] || {}) };
+    if (!t) { bloco[campo] = ""; bloco[campoVal] = ""; }
+    else {
+      bloco[campo] = t.lote || "";
+      if (t.validade) bloco[campoVal] = String(t.validade).slice(0, 10);
+      if (comp === "A") { bloco.produto = t.produto; if (t.fabricante) bloco.fabricante = t.fabricante; }
+    }
+    set("demaos", { ...dem, [aba]: bloco });
+  }
+
+  const SelLote = ({ rot, campo, campoVal, comp }) => {
+    const lista = porComp(comp);
+    if (!lista.length) return <Txt rot={rot} v={dem[aba]?.[campo]} onMudar={(v) => setDem(aba, campo, v)} />;
+    // o valor guardado é o LOTE; o seletor casa por ele para reabrir marcado
+    const atual = lista.find((t) => t.lote === dem[aba]?.[campo])?.id || "";
+    return (
+      <Sel rot={rot} v={atual} onMudar={(v) => escolherLote(campo, campoVal, comp, v)}
+        opcoes={lista.map((t) => ({ v: t.id, t: `${t.lote ? `${t.lote} · ` : ""}${t.produto}` }))} />
+    );
+  };
 
   const mRug = mediaRugosidade(rug);
   const rugFora = mRug != null && (mRug < RUGOSIDADE_MIN || mRug > RUGOSIDADE_MAX);
@@ -146,34 +180,23 @@ export default function Pintura({ cond, setCond, tintas = [] }) {
         </div>
 
         <div className="space-y-2.5">
-          {/* a tinta sai do CMR: escolher preenche produto, fabricante, lote e validade */}
-          {tintas.length > 0 && (
-            <Sel rot="Tinta (registro do CMR)" v={dem[aba]?.produto}
-              opcoes={tintas.map((t) => ({ v: t.produto, t: `${t.produto}${t.lote ? ` · lote ${t.lote}` : ""}` }))}
-              onMudar={(v) => {
-                const t = tintas.find((x) => x.produto === v);
-                setCond((c) => ({
-                  ...c,
-                  demaos: {
-                    ...(c.demaos || {}),
-                    [aba]: {
-                      ...((c.demaos || {})[aba] || {}),
-                      produto: v,
-                      ...(t?.fabricante ? { fabricante: t.fabricante } : {}),
-                      ...(t?.lote ? { loteA: t.lote } : {}),
-                      ...(t?.validade ? { valA: String(t.validade).slice(0, 10) } : {}),
-                    },
-                  },
-                }));
-              }} />
+          <SelLote rot="Tinta (base) — lote" campo="loteA" campoVal="valA" comp="A" />
+          <SelLote rot="Endurecedor — lote" campo="loteB" campoVal="valB" comp="B" />
+          <SelLote rot="Diluente — lote" campo="loteD" campoVal="valD" comp="D" />
+
+          {dem[aba]?.produto && (
+            <p className="text-[12px] text-torg-gray -mt-1">
+              Tinta: <strong className="text-torg-dark">{dem[aba].produto}</strong>
+              {dem[aba]?.fabricante ? ` · ${dem[aba].fabricante}` : ""}
+            </p>
           )}
-          {!tintas.length && <Txt rot="Produto / norma" v={dem[aba]?.produto} onMudar={(v) => setDem(aba, "produto", v)} />}
+
+          {cores.length > 0
+            ? <Sel rot="Cor aplicada" v={dem[aba]?.cor} onMudar={(v) => setDem(aba, "cor", v)}
+                opcoes={cores.map((c) => ({ v: c, t: c }))} />
+            : <Txt rot="Cor aplicada" v={dem[aba]?.cor} onMudar={(v) => setDem(aba, "cor", v)} />}
 
           <div className="grid grid-cols-2 gap-2">
-            <Txt rot="Lote — comp. A" v={dem[aba]?.loteA} onMudar={(v) => setDem(aba, "loteA", v)} />
-            <Txt rot="Lote — comp. B" v={dem[aba]?.loteB} onMudar={(v) => setDem(aba, "loteB", v)} />
-            <Txt rot="Validade — A" tipo="date" v={dem[aba]?.valA} onMudar={(v) => setDem(aba, "valA", v)} />
-            <Txt rot="Validade — B" tipo="date" v={dem[aba]?.valB} onMudar={(v) => setDem(aba, "valB", v)} />
             <Txt rot="Data de aplicação" tipo="date" v={dem[aba]?.data} onMudar={(v) => setDem(aba, "data", v)} />
             <Txt rot="Horário" tipo="time" v={dem[aba]?.hIni} onMudar={(v) => setDem(aba, "hIni", v)} />
           </div>

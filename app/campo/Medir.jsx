@@ -218,6 +218,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   const [cond, setCond] = useState({});
   // as tintas que a obra recebeu (CMR) — escolher preenche produto, fabricante, lote e validade
   const [tintas, setTintas] = useState([]);
+  const [plp, setPlp] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [resultado, setResultado] = useState(null);
   // soldadores e EPS vêm juntos: são pedidos na mesma tela, e duas chamadas na fábrica é uma a mais
@@ -272,7 +273,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   useEffect(() => {
     if (rel?.tipo !== "PINTURA" || !rel?.opNumero) return;
     fetch(`/api/qualidade/plp/${encodeURIComponent(rel.opNumero)}`)
-      .then((r) => r.json()).then((j) => setTintas(j.tintas || [])).catch(() => {});
+      .then((r) => r.json()).then((j) => { setTintas(j.tintas || []); setPlp(j.plp || null); }).catch(() => {});
   }, [rel?.tipo, rel?.opNumero]);
 
   useEffect(() => {
@@ -448,7 +449,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         </div>
       )}
 
-      {ehPintura && <Pintura cond={cond} setCond={setCond} tintas={tintas} />}
+      {ehPintura && <Pintura cond={cond} setCond={setCond} tintas={tintas} plp={plp} />}
 
       {!ehDim && !ehUS && !ehPintura && (
         <div className="mt-3 space-y-2.5">

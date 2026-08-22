@@ -1795,6 +1795,12 @@ model PlanoPintura {
   metodoAplicacao String?
   // [{ ordem, nome, produto, fabricante, cor, espessuraMin, espessuraMax }]
   demaos         Json?
+  // ⚠ AS CORES SÃO POR ITEM, NÃO POR DEMÃO. Vitor (22/08/2026): "temos peças que são de
+  // cores diferentes, então o ideal seria criarmos a seleção e o Inspetor seleciona na
+  // hora o que foi aplicado". Na PLP-T067 o mesmo sistema pinta plataformas de PRETO N1 e
+  // guarda-corpo de AMARELO 5Y 8/12 — uma cor fixa no esquema estaria errada em metade
+  // das peças. [{ item, sistema, cor, obs }], vindo da folha 3 do PLP.
+  itens          Json?
   espessuraTotal Float? // µm, seca, do sistema todo
   // o PLP em si (PDF do cliente/projeto), quando houver
   arquivoUrl     String?

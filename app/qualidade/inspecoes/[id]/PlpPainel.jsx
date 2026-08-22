@@ -18,7 +18,7 @@ import { GRAUS_LIMPEZA, METODOS_APLICACAO } from "@/lib/pintura-campos";
 
 const N = ["1ª", "2ª", "3ª"];
 
-export default function PlpPainel({ opNumero, podeEditar, onTintas, res = {}, setResultado }) {
+export default function PlpPainel({ opNumero, podeEditar, onTintas, onPlp, res = {}, setResultado }) {
   const [dados, setDados] = useState(null);
   const [editando, setEditando] = useState(false);
   const [f, setF] = useState(null);
@@ -30,9 +30,9 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas, res = {}, se
   useEffect(() => {
     fetch(`/api/qualidade/plp/${encodeURIComponent(opNumero)}`)
       .then((r) => r.json())
-      .then((j) => { setDados(j); onTintas?.(j.tintas || []); })
+      .then((j) => { setDados(j); onTintas?.(j.tintas || []); onPlp?.(j.plp || null); })
       .catch(() => setDados({ plp: null, tintas: [] }));
-  }, [opNumero, onTintas]);
+  }, [opNumero, onTintas, onPlp]);
 
   function abrir() {
     const p = dados?.plp;
@@ -98,6 +98,7 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas, res = {}, se
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Não encontrei o PLP na pasta da obra.");
       setDados((d) => ({ ...d, plp: j.plp, temPlp: true }));
+      onPlp?.(j.plp);
       const n = aplicar(j.plp);
       setAviso(`Importado de ${j.arquivo}${n ? ` · ${n} campo(s) preenchido(s) neste relatório — salve para gravar` : ""}.`);
       setEditando(false);
@@ -116,6 +117,7 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas, res = {}, se
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Falha ao salvar");
       setDados((d) => ({ ...d, plp: j.plp, temPlp: true }));
+      onPlp?.(j.plp);
       const n = aplicar(j.plp);
       if (n) setAviso(`${n} campo(s) preenchido(s) neste relatório — salve para gravar.`);
       setEditando(false);
