@@ -1,5 +1,7 @@
 "use client";
-import { AlertTriangle, Check } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertTriangle, Check, ClipboardList } from "lucide-react";
+import { escopoDoTipo, amostragemDoTipo } from "@/lib/pit-escopo";
 import {
   GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, METODOS_APLICACAO, TEMPO, CAMPOS_DEMAO,
   RUGOSIDADE_MIN, RUGOSIDADE_MAX, mediaRugosidade, mediaEspessura, condicoesPermitemPintar,
@@ -22,6 +24,21 @@ import {
  * especificada são digitados a partir dele; fixar no código seria inventar um esquema.
  */
 export default function FormPintura({ rel, res, travado, setResultado }) {
+  // ⚠ O PIT DA OBRA DIZ O QUE ESTE RELATÓRIO DEVE TER. Vitor (21/08/2026): "temos alguns campos como
+  // pull-off, salinidade, que nem sempre serão utilizados... o PIT é quem vai ditar o que vamos ter
+  // naquele relatório". Sem isso o formulário nasce com tudo, e campo em branco vira ambiguidade:
+  // ninguém sabe se é "não se aplica" ou "esqueceram de medir".
+  const [pit, setPit] = useState({ escopo: null, temPIT: false, carregando: true });
+  useEffect(() => {
+    fetch(`/api/qualidade/pit?opNumero=${encodeURIComponent(rel.opNumero)}`)
+      .then((r) => r.json())
+      .then((j) => setPit({ escopo: j.escopo, temPIT: !!j.temPIT, carregando: false }))
+      .catch(() => setPit({ escopo: null, temPIT: false, carregando: false }));
+  }, [rel.opNumero]);
+
+  const esc = escopoDoTipo("PINTURA", pit.escopo);
+  const amostragem = amostragemDoTipo(pit.escopo, "PINTURA");
+
   const dem = res.demaos || {};
   const esp = res.espessuras || {};
   const rug = Array.isArray(res.rugLeituras) ? res.rugLeituras : ["", "", "", "", ""];
@@ -53,8 +70,23 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
   const mediaRug = mediaRugosidade(rug);
   const rugFora = mediaRug != null && (mediaRug < RUGOSIDADE_MIN || mediaRug > RUGOSIDADE_MAX);
 
+  const desligados = Object.entries(esc).filter(([, v]) => !v).length;
+
   return (
     <div className="space-y-3">
+      {/* ⚠ dizer QUAL PIT está valendo é parte do controle: sem isso, o inspetor não sabe se o campo
+          que falta é "não se aplica" ou defeito da tela. */}
+      <div className="rounded-lg border border-torg-blue-200 bg-torg-blue/5 px-3 py-2 text-[11px] text-torg-dark inline-flex items-start gap-1.5 w-full">
+        <ClipboardList size={13} className="text-torg-blue mt-0.5 shrink-0" />
+        <span>
+          {pit.carregando ? "lendo o PIT da obra…"
+            : pit.temPIT
+            ? <>Campos conforme o <strong>PIT da OP-{rel.opNumero}</strong>{desligados > 0 ? ` · ${desligados} ensaio(s) fora do escopo desta obra` : ""}.</>
+            : <>Esta OP ainda não tem PIT na §10 do data book — valendo o escopo <strong>padrão</strong> do PO-05.</>}
+          {amostragem && <> Amostragem: <strong>{amostragem}</strong>.</>}
+        </span>
+      </div>
+
       {/* ── preparação de superfície ──────────────────────────────────────────────── */}
       <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
         <p className="text-[12px] font-bold text-torg-dark mb-2">Preparação de superfície</p>
@@ -64,14 +96,15 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
           <Campo rot="Horário inicial" k="prepIni" tipo="time" />
           <Campo rot="Horário final" k="prepFim" tipo="time" />
           <Campo rot="Grau de limpeza" k="limpeza" opcoes={GRAUS_LIMPEZA} />
-          <Campo rot="Grau de intemperismo" k="intemperismo" opcoes={GRAUS_INTEMPERISMO} />
+          {esc.intemperismo && <Campo rot="Grau de intemperismo" k="intemperismo" opcoes={GRAUS_INTEMPERISMO} />}
           <Campo rot="Tipo de abrasivo" k="abrasivo" />
           <Campo rot="Rugosidade especificada (PLP)" k="rugEspec" />
-          <Campo rot="Poeira (ISO 8502-3)" k="poeira" />
-          <Campo rot="Salinidade (ISO 8502-6/9)" k="salinidade" />
+          {esc.poeira && <Campo rot="Poeira (ISO 8502-3)" k="poeira" />}
+          {esc.salinidade && <Campo rot="Salinidade — Bresle (ISO 8502-6/9)" k="salinidade" />}
         </div>
 
         {/* ⚠ item 5.5.1.1: o perfil é a MÉDIA DE CINCO MEDIÇÕES, entre 50 e 90 µm ou conforme PLP */}
+        {esc.rugosidade && (
         <div className="mt-3">
           <p className="text-[10px] font-semibold text-torg-gray mb-1">
             Perfil de rugosidade · média de 5 medições (µm) — faixa {RUGOSIDADE_MIN} a {RUGOSIDADE_MAX} ou conforme PLP
@@ -88,6 +121,7 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
             </span>
           </div>
         </div>
+        )}
       </div>
 
       {/* ── condições ambientais ──────────────────────────────────────────────────── */}
@@ -104,7 +138,10 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
             </tr>
           </thead>
           <tbody>
-            {CAMPOS_DEMAO.map(({ k, rot, tipo, opcoes }) => (
+            {CAMPOS_DEMAO
+              // ⚠ a linha de aderência some quando o ensaio X está fora do escopo da obra
+              .filter(({ k }) => (k === "aderencia" ? esc.aderenciaX : true))
+              .map(({ k, rot, tipo, opcoes }) => (
               <tr key={k} className="border-t border-gray-50">
                 <td className="py-1 text-torg-gray">{rot}</td>
                 {["1", "2", "3"].map((n) => (
@@ -128,6 +165,7 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
       </div>
 
       {/* ── espessuras ────────────────────────────────────────────────────────────── */}
+      {esc.espessura && (
       <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm overflow-x-auto">
         <div className="flex items-baseline justify-between mb-2">
           <p className="text-[12px] font-bold text-torg-dark">Medições de espessura (µm)</p>
@@ -165,6 +203,20 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
           <Campo rot="Laudo final" k="laudo" opcoes={["Aprovado", "Reprovado"]} />
         </div>
       </div>
+      )}
+
+      {/* ── pull-off: só quando o PIT da obra pede ────────────────────────────────── */}
+      {esc.pullOff && (
+        <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
+          <p className="text-[12px] font-bold text-torg-dark mb-2">Aderência — pull-off</p>
+          <div className="grid sm:grid-cols-4 gap-2.5">
+            <Campo rot="Equipamento" k="pullOffEquip" />
+            <Campo rot="Valor obtido (MPa)" k="pullOffValor" tipo="number" />
+            <Campo rot="Mínimo exigido (MPa)" k="pullOffMin" tipo="number" />
+            <Campo rot="Tipo de ruptura" k="pullOffRuptura" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
