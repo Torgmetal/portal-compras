@@ -9,6 +9,7 @@ import MarcadorCotas from "./MarcadorCotas";
 import FormEVS from "./FormEVS";
 import FormUS from "./FormUS";
 import FormPintura from "./FormPintura";
+import FormLP from "./FormLP";
 import Fotos from "./Fotos";
 
 /**
@@ -170,6 +171,17 @@ export default function RelatorioDetalheClient({ id }) {
       {rel.tipo === "ULTRASSOM" && (
         <div className="mt-4">
           <FormUS
+            rel={rel} linhas={todas} res={res} travado={travado}
+            setLinhas={(ls) => setDados((d) => ({ ...d, relatorio: { ...d.relatorio, linhas: ls } }))}
+            setResultado={setResultado}
+          />
+        </div>
+      )}
+
+      {/* ── preenchimento do ensaio por líquido penetrante ───────────────────────────────── */}
+      {rel.tipo === "LP" && (
+        <div className="mt-4">
+          <FormLP
             rel={rel} linhas={todas} res={res} travado={travado}
             setLinhas={(ls) => setDados((d) => ({ ...d, relatorio: { ...d.relatorio, linhas: ls } }))}
             setResultado={setResultado}

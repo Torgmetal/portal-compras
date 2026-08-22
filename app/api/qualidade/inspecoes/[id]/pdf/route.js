@@ -60,7 +60,7 @@ export async function GET(req, { params }) {
   // ⚠ CADA MODELO TEM SEU FORMULÁRIO. Vitor: "quando gerar o relatório ele precisa ficar com a cara
   // de relatório do excel". Os tipos que ainda não têm modelo próprio seguem o layout de evidências
   // fotográficas, que é o que existia antes.
-  const TEM_FORMULARIO = ["DIMENSIONAL", "VISUAL_SOLDA", "ULTRASSOM", "PINTURA"];
+  const TEM_FORMULARIO = ["DIMENSIONAL", "VISUAL_SOLDA", "ULTRASSOM", "PINTURA", "LP"];
   let bytes;
   if (TEM_FORMULARIO.includes(rel.tipo)) {
     const op = await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { cliente: true, obra: true, refCliente: true } });
@@ -73,6 +73,9 @@ export async function GET(req, { params }) {
     } else if (rel.tipo === "ULTRASSOM") {
       const { gerarUSPDF } = await import("@/lib/relatorio-us-pdf");
       bytes = await gerarUSPDF({ rel, fotos, assinaturas, ...dadosOP });
+    } else if (rel.tipo === "LP") {
+      const { gerarLPPDF } = await import("@/lib/relatorio-lp-pdf");
+      bytes = await gerarLPPDF({ rel, fotos, assinaturas, ...dadosOP });
     } else {
       const { gerarPinturaPDF } = await import("@/lib/relatorio-pintura-pdf");
       bytes = await gerarPinturaPDF({ rel, fotos, assinaturas, ...dadosOP });

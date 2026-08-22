@@ -4,6 +4,7 @@ import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2, Camera,
 import LeitorQR from "./LeitorQR";
 import { marcaDoQR, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
 import Pintura from "./Pintura";
+import { ParametrosLP, IndicacaoLP } from "./Lp";
 import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA } from "@/lib/evs-campos";
 import { criteriosDoDefeito, ONDE_VALE } from "@/lib/aws-d11";
 import { RESULTADO_LABEL } from "@/lib/revisao-inspecao";
@@ -252,6 +253,13 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           prepTAmb: r0.prepTAmb ?? "", prepTSup: r0.prepTSup ?? "", prepOrvalho: r0.prepOrvalho ?? "",
           prepUmidade: r0.prepUmidade ?? "", tempo: r0.tempo || "",
           rugLeituras: Array.isArray(r0.rugLeituras) ? r0.rugLeituras : ["", "", "", "", ""],
+          // ── líquido penetrante ──
+          tipoPenetrante: r0.tipoPenetrante || "", metodo: r0.metodo || "",
+          penetranteMarca: r0.penetranteMarca || "", penetranteLote: r0.penetranteLote || "",
+          removedor: r0.removedor || "", removedorLote: r0.removedorLote || "",
+          revelador: r0.revelador || "", reveladorLote: r0.reveladorLote || "",
+          tempoPenetracao: r0.tempoPenetracao ?? "", tempoSecagem: r0.tempoSecagem ?? "",
+          tempoRevelador: r0.tempoRevelador ?? "", temperatura: r0.temperatura ?? "", uv: r0.uv ?? "",
           espessuras: r0.espessuras || {}, demaos: r0.demaos || {},
           // ⚠ o ESPECIFICADO vai junto, mas fora do que se salva: a tela mostra para
           // conferência e o `__espec` é descartado no envio (ver salvar()).
@@ -290,6 +298,9 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   // demão, não por peça. Sem esta separação ela caía nos controles do visual de solda e
   // o inspetor via descontinuidade, soldador e EPS num relatório de pintura.
   const ehPintura = rel.tipo === "PINTURA";
+  // ⚠ o LP tem junta como o visual de solda, mas o que se registra é OUTRA COISA: número
+  // da indicação, local, tamanho e tipo (IL/IA/INR) — não soldador, EPS e descontinuidade.
+  const ehLp = rel.tipo === "LP";
   const set = (i, campo, v) => setLinhas((p) => p.map((l, k) => (k === i ? { ...l, [campo]: v } : l)));
 
   function alternarDefeito(i, cod) {
@@ -380,6 +391,9 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
               reprovado: l.reprovado, profundidade: l.profundidade, dist_x: l.dist_x, dist_y: l.dist_y,
               soldador: l.soldador, sinete: l.sinete, nivel: l.nivel,
             }
+          : ehLp
+          ? { laudo: l.laudo, marca: l.marca, indicacaoLp: l.indicacaoLp, local: l.local,
+              tamanho: l.tamanho, tipoDefeito: l.tipoDefeito }
           : { laudo: l.laudo, descontinuidade: l.descontinuidade, marca: l.marca, qtd: l.qtd,
               descricao: l.descricao, eps: l.eps, soldador: l.soldador, sinete: l.sinete }),
         obs: l.obs ?? null,
@@ -451,7 +465,9 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
 
       {ehPintura && <Pintura cond={cond} setCond={setCond} tintas={tintas} plp={plp} />}
 
-      {!ehDim && !ehUS && !ehPintura && (
+      {ehLp && <ParametrosLP cond={cond} setCond={setCond} />}
+
+      {!ehDim && !ehUS && !ehPintura && !ehLp && (
         <div className="mt-3 space-y-2.5">
           <p className="text-[12px] font-semibold text-torg-gray">Condições do ensaio</p>
 
@@ -504,7 +520,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
 
       {!ehPintura && (
       <p className="text-[12px] font-semibold text-torg-gray mt-4 mb-1.5 inline-flex items-center gap-1.5">
-        <Ruler size={13} className="text-torg-blue" /> {ehDim ? "Cotas a medir" : "Juntas a inspecionar"} · {medir.length}
+        <Ruler size={13} className="text-torg-blue" /> {ehDim ? "Cotas a medir" : ehLp ? "Juntas ensaiadas" : "Juntas a inspecionar"} · {medir.length}
       </p>
       )}
 
@@ -532,6 +548,8 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
 
               {ehUS ? (
                 <IndicacaoUS l={l} set={(campo, v) => set(i, campo, v)} />
+              ) : ehLp ? (
+                <IndicacaoLP l={l} set={(campo, v) => set(i, campo, v)} />
               ) : ehDim ? (
                 <div className="mt-2">
                   <input type="number" inputMode="decimal" value={l.encontradoMm ?? ""}

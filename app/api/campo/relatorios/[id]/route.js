@@ -184,7 +184,11 @@ export async function PATCH(req, { params }) {
                      // na criação do relatório; o celular não reescreve isso.
                      "limpeza", "intemperismo", "prepData", "prepIni", "prepFim", "rugObtido",
                      "poeira", "salinidade", "tempo", "prepTAmb", "prepTSup", "prepOrvalho",
-                     "prepUmidade", "laudo"]) {
+                     "prepUmidade", "laudo",
+                     // líquido penetrante — o que o inspetor mede/registra no galpão
+                     "tipoPenetrante", "penetranteMarca", "penetranteLote", "tempoPenetracao",
+                     "metodo", "removedor", "removedorLote", "tempoSecagem", "temperatura",
+                     "revelador", "reveladorLote", "tempoRevelador", "uv", "dataInspecao"]) {
       if (c[k] !== undefined) dados.resultados[k] = c[k] == null || c[k] === "" ? null : String(c[k]).slice(0, 120);
     }
 

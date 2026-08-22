@@ -97,6 +97,14 @@ export async function PATCH(req, { params }) {
       sinete: l?.sinete ? String(l.sinete).slice(0, 20) : null,
       descontinuidade: l?.descontinuidade ? String(l.descontinuidade).slice(0, 40) : null,
       laudo: l?.laudo ? String(l.laudo).slice(0, 10) : null,
+      // ── a indicação (líquido penetrante) — FORM. SGQ - 012 ──
+      // ⚠ nomes próprios do LP: `indicacao` aqui é o NÚMERO da indicação na peça, e
+      // `tipoDefeito` é IL/IA/INR. Não dá para reaproveitar os campos do ultrassom, que
+      // guardam decibéis e distâncias.
+      indicacaoLp: l?.indicacaoLp ? String(l.indicacaoLp).slice(0, 20) : null,
+      local: l?.local ? String(l.local).slice(0, 60) : null,
+      tamanho: l?.tamanho ? String(l.tamanho).slice(0, 30) : null,
+      tipoDefeito: l?.tipoDefeito ? String(l.tipoDefeito).slice(0, 10) : null,
       // ── a indicação (ensaio por ultrassom) ──
       ...Object.fromEntries(["peca", "indicacao", "angulo", "face", "comprimento", "db_indicacao",
         "db_referencia", "db_atenuacao", "db_classe", "reprovado", "percurso", "profundidade",
@@ -137,6 +145,10 @@ export async function PATCH(req, { params }) {
       "prepTAmb", "prepTSup", "prepOrvalho", "rugEspec", "rugObtido", "abrasivo", "poeira",
       "salinidade", "intemperismo", "limpeza", "laudo", "espessuraMinima", "obsFotos", "tempo",
       "pullOffEquip", "pullOffValor", "pullOffMin", "pullOffRuptura",
+      // líquido penetrante (PO-15 / FORM. SGQ - 012)
+      "documentoInspecao", "dataInspecao", "revisaoDesenho", "tipoPenetrante", "penetranteMarca",
+      "penetranteLote", "tempoPenetracao", "metodo", "removedor", "removedorLote", "tempoSecagem",
+      "temperatura", "revelador", "reveladorLote", "tempoRevelador", "uv",
       // vínculo com o procedimento do Controle de Documentos
       "procedimentoId",
       // ⚠ tipo de estrutura da AWS D1.1 — é ele que decide QUAL limite vale para cada
