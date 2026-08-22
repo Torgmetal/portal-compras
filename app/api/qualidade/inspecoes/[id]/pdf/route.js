@@ -34,6 +34,29 @@ export async function GET(req, { params }) {
       })
     : null;
 
+  // ── UMA REVISÃO ANTERIOR? ───────────────────────────────────────────────────────────────────
+  //
+  // Vitor (21/08/2026): "nos casos dos relatórios que foram reprovados você deve mencionar no data
+  // book tanto o reprovado quanto o aprovado, evidenciando o retrabalho".
+  //
+  // ⚠ A REVISÃO ANTERIOR É RECONSTRUÍDA DO SNAPSHOT, não de um arquivo guardado. Congelar o PDF
+  // exigiria armazenar um binário por revisão e mantê-lo em pé para sempre; o dado já está em
+  // `revisoes`, e renderizar dali dá o mesmo documento sem nada para sincronizar — e sem risco de o
+  // arquivo e o registro contarem histórias diferentes.
+  const pedida = new URL(req.url).searchParams.get("revisao");
+  if (pedida != null && rel) {
+    const n = Number(pedida);
+    const antiga = (Array.isArray(rel.revisoes) ? rel.revisoes : []).find((r) => r.revisao === n);
+    if (!antiga) {
+      return NextResponse.json({ error: `Revisão R${String(n).padStart(2, "0")} não encontrada neste relatório.` }, { status: 404 });
+    }
+    rel.linhas = antiga.linhas || [];
+    rel.resultados = antiga.resultados || rel.resultados;
+    rel.inspetor = antiga.inspetor || rel.inspetor;
+    rel.revisao = antiga.revisao;
+    rel.resultadoInspecao = antiga.resultadoInspecao;
+  }
+
   // ⚠ CADA MODELO TEM SEU FORMULÁRIO. Vitor: "quando gerar o relatório ele precisa ficar com a cara
   // de relatório do excel". Os tipos que ainda não têm modelo próprio seguem o layout de evidências
   // fotográficas, que é o que existia antes.
@@ -43,10 +66,10 @@ export async function GET(req, { params }) {
     const op = await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { cliente: true, obra: true, refCliente: true } });
     const dadosOP = { cliente: op?.cliente || null, obra: op?.obra || null, refCliente: op?.refCliente || null };
     if (rel.tipo === "DIMENSIONAL") {
-      bytes = await gerarDimensionalPDF({ rel, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho), ...dadosOP });
+      bytes = await gerarDimensionalPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho), ...dadosOP });
     } else if (rel.tipo === "VISUAL_SOLDA") {
       const { gerarEVSPDF } = await import("@/lib/relatorio-evs-pdf");
-      bytes = await gerarEVSPDF({ rel, assinaturas, ...dadosOP });
+      bytes = await gerarEVSPDF({ rel, fotos, assinaturas, ...dadosOP });
     } else if (rel.tipo === "ULTRASSOM") {
       const { gerarUSPDF } = await import("@/lib/relatorio-us-pdf");
       bytes = await gerarUSPDF({ rel, assinaturas, ...dadosOP });

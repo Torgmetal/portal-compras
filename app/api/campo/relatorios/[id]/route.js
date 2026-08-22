@@ -60,6 +60,7 @@ export async function PATCH(req, { params }) {
     select: {
       id: true, codigo: true, linhas: true, resultados: true, envioAssinaturaId: true,
       revisao: true, resultadoInspecao: true, revisoes: true, inspetor: true,
+      tipo: true, opNumero: true,
     },
   });
   if (!rel) return NextResponse.json({ error: "Relatório não encontrado." }, { status: 404 });
@@ -79,13 +80,21 @@ export async function PATCH(req, { params }) {
     }
     const dados = proximaRevisao(rel, { por: user.name || null });
     const atualizado = await prisma.relatorioInspecao.update({ where: { id }, data: dados });
+
+    // ⚠ a revisão que acabou de fechar vai para o data book como documento PRÓPRIO, ao lado da
+    // vigente: é o que evidencia o retrabalho. Falhar aqui não pode impedir a reinspeção — o
+    // vínculo se refaz depois, a medição no chão de fábrica não.
+    const fechada = dados.revisoes[dados.revisoes.length - 1];
+    const { anexarRevisaoNoDataBook } = await import("@/lib/relatorio-inspecao");
+    const vinculo = await anexarRevisaoNoDataBook(rel, fechada)
+      .catch((e) => ({ vinculado: false, motivo: e.message }));
     await prisma.auditLog.create({
       data: {
         userId: user.id, action: "REINSPECIONAR_RELATORIO", entity: "RelatorioInspecao", entityId: id,
-        diff: { codigo: rel.codigo, de: rotuloRevisao(rel.revisao), para: rotuloRevisao(atualizado.revisao) },
+        diff: { codigo: rel.codigo, de: rotuloRevisao(rel.revisao), para: rotuloRevisao(atualizado.revisao), vinculo },
       },
     }).catch(() => {});
-    return NextResponse.json({ ok: true, revisao: atualizado.revisao, rotulo: rotuloRevisao(atualizado.revisao) });
+    return NextResponse.json({ ok: true, revisao: atualizado.revisao, rotulo: rotuloRevisao(atualizado.revisao), vinculo });
   }
 
   const originais = Array.isArray(rel.linhas) ? rel.linhas : [];
