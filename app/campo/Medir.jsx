@@ -4,7 +4,7 @@ import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2 } from "
 import LeitorQR from "./LeitorQR";
 import { marcaDoQR, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
 import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA } from "@/lib/evs-campos";
-import { TIPOS_ESTRUTURA, criteriosDoDefeito } from "@/lib/aws-d11";
+import { criteriosDoDefeito, ONDE_VALE } from "@/lib/aws-d11";
 
 /**
  * O INSPETOR DE CAMPO MEDINDO, NO CELULAR.
@@ -118,7 +118,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         const r0 = j.relatorio.resultados || {};
         setCond({
           iluminacao: r0.iluminacao ?? "", tecnica: r0.tecnica || "", condicoes: r0.condicoes || "",
-          metalBase: r0.metalBase || "", tipoEstrutura: r0.tipoEstrutura || "", tipoPeca: r0.tipoPeca || "",
+          metalBase: r0.metalBase || "", tipoPeca: r0.tipoPeca || "",
         });
       })
       .catch((e) => setErro(e.message));
@@ -242,18 +242,6 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
             </select>
           </label>
 
-          {/* ⚠ o tipo de estrutura decide QUAL limite vale para cada defeito — sem ele, os critérios
-              não aparecem embaixo da descontinuidade e o inspetor julga de cabeça. */}
-          <label className="block">
-            <span className="block text-[12px] text-torg-gray mb-1">
-              Carregamento (AWS D1.1) {!cond.tipoEstrutura && <span className="text-amber-700">· defina para ver os limites</span>}
-            </span>
-            <select value={cond.tipoEstrutura || ""} onChange={(e) => setCond((c) => ({ ...c, tipoEstrutura: e.target.value }))}
-              className={`w-full text-base border-2 rounded-xl px-3 py-3 outline-none ${cond.tipoEstrutura ? "border-gray-200 focus:border-torg-blue" : "border-amber-300 bg-amber-50"}`}>
-              <option value="">—</option>
-              {TIPOS_ESTRUTURA.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
-            </select>
-          </label>
         </div>
       )}
 
@@ -356,13 +344,15 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
                     <div className="mt-2 space-y-1">
                       {marcados.map((c) => {
                         const d = DESCONTINUIDADES.find((x) => x.c === c);
-                        const crit = criteriosDoDefeito(c, cond.tipoEstrutura);
+                        const crit = criteriosDoDefeito(c);
                         return (
                           <div key={c} className="text-[12px] leading-snug">
                             <span className="font-semibold text-torg-dark">{c} · {d?.nome}</span>
                             {d?.grave && <span className="text-red-600 font-semibold"> — sem tolerância</span>}
                             {crit.map((k) => (
-                              <p key={`${k.n}${k.letra || ""}`} className="text-torg-gray pl-2 border-l-2 border-gray-200 mt-0.5">{k.texto}</p>
+                              <p key={`${k.n}${k.letra || ""}`} className="text-torg-gray pl-2 border-l-2 border-gray-200 mt-0.5">
+                                {k.aplica.length < 3 && <strong>{ONDE_VALE(k)}: </strong>}{k.texto}
+                              </p>
                             ))}
                           </div>
                         );
