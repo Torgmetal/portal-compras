@@ -135,7 +135,7 @@ export async function PATCH(req, { params }) {
       // pintura
       "descricao", "pecas", "prepProcedimento", "prepData", "prepIni", "prepFim", "prepUmidade",
       "prepTAmb", "prepTSup", "prepOrvalho", "rugEspec", "rugObtido", "abrasivo", "poeira",
-      "salinidade", "intemperismo", "limpeza", "laudo", "espessuraMinima", "obsFotos",
+      "salinidade", "intemperismo", "limpeza", "laudo", "espessuraMinima", "obsFotos", "tempo",
       // vínculo com o procedimento do Controle de Documentos
       "procedimentoId",
       // ⚠ tipo de estrutura da AWS D1.1 — é ele que decide QUAL limite vale para cada
@@ -162,6 +162,11 @@ export async function PATCH(req, { params }) {
         for (const [k, v] of Object.entries(bloco).slice(0, 30)) limpo[String(k).slice(0, 20)] = v == null ? null : String(v).slice(0, 60);
         dados.resultados.demaos[d] = limpo;
       }
+    }
+    // ⚠ as cinco leituras de rugosidade são ESTRUTURA, como as de espessura — item 5.5.1.1 manda a
+    // média de cinco medições, e guardar só a média perderia a evidência de como ela se formou.
+    if (Array.isArray(r.rugLeituras)) {
+      dados.resultados.rugLeituras = r.rugLeituras.slice(0, 5).map(num);
     }
     if (r.espessuras && typeof r.espessuras === "object") {
       dados.resultados.espessuras = {};
