@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
+import Medir from "./Medir";
 import { signOut } from "next-auth/react";
 import {
   Loader2, Camera, QrCode, Search, X, Check, ChevronLeft, HardHat,
@@ -55,6 +56,8 @@ const hora = (d) => new Date(d).toLocaleTimeString("pt-BR", { hour: "2-digit", m
 export default function CampoClient({ nome }) {
   const [op, setOp] = useState(null);          // { id, numero }
   const [tipo, setTipo] = useState(null);      // id do tipo
+  // "foto" | "medir" — o que o inspetor veio fazer nesta OP
+  const [modo, setModo] = useState(null);
   const [peca, setPeca] = useState(null);      // { marca, origem }
   // Vitor (21/08/2026): "além de informar a peça e a OP, ele seleciona os equipamentos que está
   // usando para compor no relatório". Fica fixo como a peça — o inspetor mede a manhã inteira com
@@ -169,10 +172,40 @@ export default function CampoClient({ nome }) {
   // ── passo 1: a OP ──────────────────────────────────────────────────────────────────────────
   if (!op) return <EscolherOP onEscolher={setOp} nome={nome} />;
 
-  // ── passo 2: o tipo ────────────────────────────────────────────────────────────────────────
-  if (!tipo) {
+  // ── passo 2: o que ele veio fazer ──────────────────────────────────────────────────────────
+  //
+  // Vitor (21/08/2026): "não estou conseguindo acessar os relatórios na tela do inspetor de campo".
+  // O portal só sabia captar foto. Agora há dois caminhos, e eles são diferentes de verdade:
+  // FOTOGRAFAR é registro solto, que vira relatório depois; MEDIR é responder a um relatório que
+  // alguém já montou no computador, com as cotas e tolerâncias definidas.
+  if (!modo) {
     return (
       <Tela titulo={`OP-${op.numero}`} voltar={() => setOp(null)}>
+        <p className="text-sm text-torg-gray mb-3">O que você vai fazer?</p>
+        <div className="space-y-2">
+          <button onClick={() => setModo("medir")}
+            className="w-full text-left bg-white border-2 border-torg-blue rounded-xl px-4 py-4 active:bg-torg-blue/5">
+            <span className="block text-base font-semibold text-torg-blue">Preencher relatório</span>
+            <span className="block text-[13px] text-torg-gray">informar as medidas de um relatório já aberto</span>
+          </button>
+          <button onClick={() => setModo("foto")}
+            className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-4 active:bg-gray-50">
+            <span className="block text-base font-semibold text-torg-dark">Registrar fotos</span>
+            <span className="block text-[13px] text-torg-gray">evidência fotográfica de uma peça</span>
+          </button>
+        </div>
+      </Tela>
+    );
+  }
+
+  if (modo === "medir") {
+    return <Medir op={op} onSair={() => setModo(null)} Tela={Tela} Equipamentos={Equipamentos} />;
+  }
+
+  // ── passo 3: o tipo (só no caminho da foto) ────────────────────────────────────────────────
+  if (!tipo) {
+    return (
+      <Tela titulo={`OP-${op.numero}`} voltar={() => setModo(null)}>
         <p className="text-sm text-torg-gray mb-3">Que inspeção você está registrando?</p>
         <div className="space-y-2">
           {TIPOS_RELATORIO.map((t) => (
