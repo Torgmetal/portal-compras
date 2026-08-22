@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { PERFIS_CAMPO } from "@/lib/qualidade-campo";
+import { tiposDaOP } from "@/lib/qualidade-escopo";
 
 export const runtime = "nodejs";
 
@@ -18,10 +19,14 @@ export async function GET() {
   const ops = await prisma.oP.findMany({
     // encerrada e cancelada ficam de fora: obra entregue não recebe inspeção nova
     where: { status: { in: ["ABERTA", "EM_EXECUCAO", "ATRASADA"] } },
-    select: { id: true, numero: true },
+    // ⚠ o escopo vem junto — é ele que decide quais relatórios o inspetor vê nesta obra.
+    // Não fere a regra acima: são tipos de ensaio, não a carteira de clientes.
+    select: { id: true, numero: true, escopoQualidade: true },
     orderBy: { numero: "desc" },
     take: 300,
   });
 
-  return NextResponse.json({ ops });
+  return NextResponse.json({
+    ops: ops.map((o) => ({ id: o.id, numero: o.numero, tipos: tiposDaOP(o).map((t) => t.id) })),
+  });
 }

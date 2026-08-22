@@ -25,6 +25,8 @@ import MargemTransformacaoOP from "./MargemTransformacaoOP";
 import PrevisaoObra from "./PrevisaoObra";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
 import { ESTOQUE_MATERIAL_OPCOES, TIPO_DATABOOK_OPCOES, ESTOQUE_MATERIAL_LABEL, TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
+import EscopoQualidade from "../EscopoQualidade";
+import { resumoEscopo } from "@/lib/qualidade-escopo";
 import { fmtOP } from "@/lib/utils";
 import OrcamentoComercial from "@/components/OrcamentoComercial";
 import { itensDaPlanilhaComercial } from "@/lib/op-categorias";
@@ -279,7 +281,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                   // (títulos e itens); sem isso o HTML achatava tudo num parágrafo só.
                   <p className="text-xs text-torg-gray mt-1.5 max-w-xl whitespace-pre-line leading-relaxed">{op.descricao}</p>
                 )}
-                {(op.estoqueMaterial || op.tipoDataBook) && (
+                {(op.estoqueMaterial || op.tipoDataBook || op.escopoQualidade) && (
                   <div className="flex flex-wrap items-center gap-1.5 mt-2">
                     {op.estoqueMaterial && (
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-torg-blue-50 text-torg-blue font-medium">
@@ -289,6 +291,14 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                     {op.tipoDataBook && (
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-torg-blue-50 text-torg-blue font-medium">
                         Data Book: {TIPO_DATABOOK_LABEL[op.tipoDataBook] || op.tipoDataBook}
+                      </span>
+                    )}
+                    {/* aparece só quando a obra DEFINIU: sem definição não há restrição
+                        nenhuma, e uma etiqueta dizendo "todos" seria ruído em toda OP antiga */}
+                    {op.escopoQualidade && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium"
+                        title="Quais relatórios de inspeção esta obra exige">
+                        Qualidade: {resumoEscopo(op)}
                       </span>
                     )}
                   </div>
@@ -1648,6 +1658,8 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
     valorFaturarPorKg: op.valorFaturarPorKg != null ? String(op.valorFaturarPorKg) : "",
     estoqueMaterial: op.estoqueMaterial || "",
     tipoDataBook: op.tipoDataBook || "",
+    // lista de ids ou null (= não definido). Ver lib/qualidade-escopo.js.
+    escopoQualidade: Array.isArray(op.escopoQualidade?.tipos) ? op.escopoQualidade.tipos : null,
   });
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -1687,6 +1699,7 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
           valorFaturarPorKg: !isNaN(valorKgNum) && valorKgNum > 0 ? valorKgNum : null,
           estoqueMaterial: form.estoqueMaterial || null,
           tipoDataBook: form.tipoDataBook || null,
+          escopoQualidade: form.escopoQualidade,
         }),
       });
       const data = await res.json();
@@ -1844,6 +1857,11 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
               <option value="">Selecione…</option>
               {TIPO_DATABOOK_OPCOES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
+          </div>
+          {/* Nasce na abertura da OP, mas muda: contrato revisado, cliente que passou a
+              exigir ensaio. Editar aqui é o mesmo caminho do resto da obra. */}
+          <div className="sm:col-span-2">
+            <EscopoQualidade valor={form.escopoQualidade} onChange={(v) => set("escopoQualidade", v)} compacto />
           </div>
         </div>
       </div>

@@ -25,6 +25,8 @@ async function main() {
 
   // Vinculo da OP com o orcamento do Comercial (proposta + estudo). Idempotente. 19/08/2026.
   for (const c of [
+    // Escopo de qualidade da obra (quais relatórios ela exige). 22/08/2026.
+    `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "escopoQualidade" JSONB`,
     `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "orcamentoPasta" TEXT`,
     `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "orcamentoRef" TEXT`,
     `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "propostas" JSONB`,

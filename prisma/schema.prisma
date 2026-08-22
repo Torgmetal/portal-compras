@@ -154,6 +154,14 @@ model OP {
   // Definidos na abertura da OP
   estoqueMaterial      String? // "PROPRIO_TORG" | "CLIENTE_TERCEIRO"
   tipoDataBook         String? // "PADRAO_TORG" | "SNQC" | "RELATORIO_ACOMPANHAMENTO"
+  // ESCOPO DE QUALIDADE DA OBRA — quais relatórios esta OP exige.
+  // Vitor (22/08/2026): "pode ser que em alguns casos não vamos fazer nada além de
+  // certificado de qualidade e relatório de pintura; essa definição deve nascer da
+  // criação da OP".
+  // { preset, tipos: ["PINTURA"], definidoEm, definidoPor } — ver lib/qualidade-escopo.js.
+  // É um nível ACIMA do PIT: o PIT diz o que medir DENTRO de um relatório; isto diz
+  // quais relatórios existem na obra. Nulo = não definido, e aí tudo fica disponível.
+  escopoQualidade      Json?
   aditivos             Aditivo[]
   ajustesPrazo         AjustePrazo[]
   cronogramas          Cronograma[]

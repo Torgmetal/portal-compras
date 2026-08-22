@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { receitasDaPlanilhaComercial } from "@/lib/op-categorias";
 import { prisma } from "@/lib/prisma";
+import { normalizarEscopo } from "@/lib/qualidade-escopo";
 import { requireRole } from "@/lib/session";
 import { criarCronogramaPadrao } from "@/lib/cronograma-padrao";
 
@@ -33,6 +34,9 @@ const opSchema = z.object({
   dataFimPrevista: z.string().optional().nullable(),
   estoqueMaterial: z.enum(["PROPRIO_TORG", "CLIENTE_TERCEIRO"]).optional().nullable(),
   tipoDataBook: z.enum(["PADRAO_TORG", "SNQC", "RELATORIO_ACOMPANHAMENTO"]).optional().nullable(),
+  // Escopo de qualidade: quais relatórios esta obra exige. Chega como lista de ids;
+  // quem valida e casa com um preset é lib/qualidade-escopo.js — um só lugar.
+  escopoQualidade: z.array(z.string()).optional().nullable(),
   // vínculo com o orçamento do Comercial (SharePoint) + o que foi lido da planilha de estudo
   orcamentoPasta: z.string().optional().nullable(),
   orcamentoRef: z.string().optional().nullable(),
@@ -76,6 +80,7 @@ export async function POST(req) {
       dataFimPrevista: body.dataFimPrevista ? new Date(body.dataFimPrevista) : null,
       estoqueMaterial: body.estoqueMaterial || null,
       tipoDataBook: body.tipoDataBook || null,
+      escopoQualidade: normalizarEscopo(body.escopoQualidade),
       orcamentoPasta: body.orcamentoPasta || null,
       orcamentoRef: body.orcamentoRef || null,
       propostas: body.propostas || null,

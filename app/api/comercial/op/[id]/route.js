@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { normalizarEscopo } from "@/lib/qualidade-escopo";
 import { requireRole } from "@/lib/session";
 import { dataBR } from "@/lib/data-br";
 
@@ -22,6 +23,7 @@ const patchEditSchema = z.object({
   valorFaturarPorKg: z.number().min(0).nullable().optional(),
   estoqueMaterial: z.enum(["PROPRIO_TORG", "CLIENTE_TERCEIRO"]).nullable().optional(),
   tipoDataBook: z.enum(["PADRAO_TORG", "SNQC", "RELATORIO_ACOMPANHAMENTO"]).nullable().optional(),
+  escopoQualidade: z.array(z.string()).nullable().optional(),
   // vínculo com o orçamento do Comercial — as OPs antigas também precisam ser ligadas
   // (Vitor 19/08: "as OPs já criadas vamos conseguir vincular elas também?")
   orcamentoPasta: z.string().nullable().optional(),
@@ -130,6 +132,7 @@ export async function PATCH(req, { params }) {
   }
   if (edit.estoqueMaterial !== undefined) dataUpdate.estoqueMaterial = edit.estoqueMaterial || null;
   if (edit.tipoDataBook !== undefined) dataUpdate.tipoDataBook = edit.tipoDataBook || null;
+  if (edit.escopoQualidade !== undefined) dataUpdate.escopoQualidade = normalizarEscopo(edit.escopoQualidade);
   for (const c of ["orcamentoPasta", "orcamentoRef", "propostas", "estudoArquivo", "estudoDados"]) {
     if (edit[c] !== undefined) dataUpdate[c] = edit[c] ?? null;
   }

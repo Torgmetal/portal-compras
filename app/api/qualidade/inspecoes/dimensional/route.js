@@ -13,6 +13,8 @@
 // (`garantirDesenhos`) e fica gravado a partir dali.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { tipoNoEscopo } from "@/lib/qualidade-escopo";
+import { TIPO } from "@/lib/qualidade-campo";
 import { requireRole } from "@/lib/session";
 import { procedimentoTolerancia } from "@/lib/relatorio-dimensional";
 import { CRITERIO_PADRAO } from "@/lib/evs-campos";
@@ -68,7 +70,16 @@ export async function POST(req) {
   const proc = await procedimentoDoTipo(tipo).catch(() => null);
   const erros = [];
 
-  const op = await prisma.oP.findFirst({ where: { numero: opNumero }, select: { id: true } });
+  const op = await prisma.oP.findFirst({ where: { numero: opNumero }, select: { id: true, escopoQualidade: true } });
+  // ⚠ O ESCOPO DA OBRA MANDA, e a checagem tem que ser AQUI. Vitor (22/08/2026): "pode ser
+  // que em alguns casos não vamos fazer nada além de certificado de qualidade e relatório
+  // de pintura". A tela do celular já filtra os tipos, mas o relatório também nasce pelo
+  // computador e por link direto — é no servidor que a regra vale para todos os caminhos.
+  if (op && !tipoNoEscopo(op, tipo)) {
+    return NextResponse.json({
+      error: `A OP-${opNumero} não prevê ${TIPO[tipo]?.label || tipo}. Ajuste o escopo de qualidade na OP se isso mudou.`,
+    }, { status: 409 });
+  }
   // ── O TIPO DA PEÇA ──────────────────────────────────────────────────────────────────────────
   //
   // Vitor (21/08/2026): "aqui trazer o tipo da peça — coluna, viga, tesoura, etc — conforme

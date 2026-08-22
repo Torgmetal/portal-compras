@@ -221,7 +221,10 @@ export default function CampoClient({ nome }) {
       <Tela titulo={`OP-${op.numero}`} voltar={() => setModo(null)}>
         <p className="text-sm text-torg-gray mb-3">Que inspeção você está registrando?</p>
         <div className="space-y-2">
-          {TIPOS_RELATORIO.map((t) => (
+          {/* ⚠ só os tipos DESTA obra. Vitor (22/08): "pode ser que em alguns casos não
+              vamos fazer nada além de certificado de qualidade e relatório de pintura".
+              A OP traz a lista pronta de /api/campo/ops — quem decide é o escopo da OP. */}
+          {TIPOS_RELATORIO.filter((t) => !op.tipos || op.tipos.includes(t.id)).map((t) => (
             <button key={t.id} onClick={() => setTipo(t.id)}
               className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-4 text-base font-medium text-torg-dark active:bg-gray-50">
               {t.label}

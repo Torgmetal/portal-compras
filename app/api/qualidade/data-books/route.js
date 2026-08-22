@@ -5,6 +5,15 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { montaSecoesIniciais } from "@/lib/databook-secoes";
+import { secoesForaDoEscopo } from "@/lib/qualidade-escopo";
+
+// Marca como "não se aplica" as seções que só existem para guardar relatório que esta
+// obra não faz. Ver lib/qualidade-escopo.js — a lista de seções mora lá, não aqui.
+function aplicarEscopo(secoes, op) {
+  const fora = new Set(secoesForaDoEscopo(op));
+  if (!fora.size) return secoes;
+  return secoes.map((s) => (fora.has(s.numero) ? { ...s, estado: "NA" } : s));
+}
 
 export const runtime = "nodejs";
 
@@ -74,7 +83,7 @@ export async function POST(req) {
   const op = await prisma.oP.findUnique({
     where: { numero: opNumero },
     select: {
-      id: true, cliente: true, obra: true, tipoDataBook: true,
+      id: true, cliente: true, obra: true, tipoDataBook: true, escopoQualidade: true,
       pecasConjunto: {
         where: { OR: [{ tipoPeca: "CONJUNTO" }, { tipoPeca: null }] },
         select: { qte: true, pesoTotalKg: true },
@@ -97,7 +106,11 @@ export async function POST(req) {
       pesoTotalKg,
       pecas,
       criadoPorId: user.id,
-      secoes: { create: montaSecoesIniciais() },
+      // ⚠ SEÇÃO FORA DO ESCOPO NASCE "N/A". Se a obra só faz certificado e pintura, a
+      // §11 (dimensional) e a §12 (END) não são pendências — elas não existem nessa
+      // obra. Deixá-las PENDENTE faria o data book cobrar para sempre um relatório que
+      // ninguém vai fazer. Continua editável: é um ponto de partida, não uma trava.
+      secoes: { create: aplicarEscopo(montaSecoesIniciais(), op) },
     },
   });
 

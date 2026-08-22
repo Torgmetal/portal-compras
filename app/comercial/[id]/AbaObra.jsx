@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Building2, Pencil, Hash, MapPin, CalendarRange, Users, AlertCircle } from "lucide-react";
 import OrcamentoComercial from "@/components/OrcamentoComercial";
+import { resumoEscopo } from "@/lib/qualidade-escopo";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const fmtR$ = (v) => (v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }));
@@ -94,6 +95,9 @@ export default function AbaObra({ op, podeEditar, onEditar }) {
           <Campo rotulo="Valor do contrato" valor={fmtR$(op.valorTotalContrato)} />
           <Campo rotulo="Material" valor={ESTOQUE[op.estoqueMaterial] || null} />
           <Campo rotulo="Data Book" valor={DATABOOK[op.tipoDataBook] || null} />
+          {/* O que a obra exige de inspeção — decide o que o inspetor vê e o que o data
+              book cobra. Nasce na abertura da OP. */}
+          <Campo rotulo="Escopo de qualidade" valor={resumoEscopo(op)} />
         </div>
       </div>
 

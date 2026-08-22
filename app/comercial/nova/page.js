@@ -7,6 +7,7 @@ import { Plus, ArrowLeft, Loader2, AlertCircle } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import { itensDaPlanilhaComercial } from "@/lib/op-categorias";
 import { ESTOQUE_MATERIAL_OPCOES, TIPO_DATABOOK_OPCOES } from "@/lib/op-opcoes";
+import EscopoQualidade from "../EscopoQualidade";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -17,6 +18,8 @@ export default function NovaOP() {
     numero: "", cliente: "", obra: "", refCliente: "", descricao: "",
     dataInicio: "", dataFimPrevista: "",
     estoqueMaterial: "", tipoDataBook: "",
+    // null = não definido (todos os relatórios). Ver lib/qualidade-escopo.js.
+    escopoQualidade: null,
   });
   const [itens, setItens] = useState([novoItem()]);
   // vínculo com o orçamento do Comercial (proposta + estudo)
@@ -253,6 +256,11 @@ export default function NovaOP() {
               {TIPO_DATABOOK_OPCOES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
             <p className="text-[11px] text-torg-gray mt-1">Nível do dossiê de qualidade que o cliente exige para esta obra.</p>
+          </div>
+          {/* Vitor (22/08): "essa definição deve nascer da criação da OP". É o que decide
+              quais relatórios o inspetor vê e quais seções do data book nascem N/A. */}
+          <div className="md:col-span-2">
+            <EscopoQualidade valor={form.escopoQualidade} onChange={(v) => set("escopoQualidade", v)} />
           </div>
         </div>
       </div>
