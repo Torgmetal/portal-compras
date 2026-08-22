@@ -432,7 +432,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         </div>
       )}
 
-      <Equipamentos escolhidos={equipamentos} onMudar={setEquipamentos} />
+      <Equipamentos escolhidos={equipamentos} onMudar={setEquipamentos} tipo={rel.tipo} />
 
       {ehUS && (
         <div className="mt-3 space-y-2.5">

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Ruler, AlertCircle, Loader2, Check, Search } from "lucide-react";
+import { instrumentosDoTipo, FONTE_POR_TIPO } from "@/lib/instrumentos-por-relatorio";
 
 // ─── OS INSTRUMENTOS DO ENSAIO, NO COMPUTADOR ─────────────────────────────────
 // Vitor (22/08/2026): "não são todos os relatórios que você está deixando o campo para
@@ -22,10 +23,17 @@ import { Ruler, AlertCircle, Loader2, Check, Search } from "lucide-react";
 //
 // O alerta de vencido no que JÁ foi escolhido continua: relatório antigo pode ter um
 // instrumento que venceu depois, e isso o documento tem de dizer.
-export default function Equipamentos({ escolhidos = [], onMudar, travado }) {
+export default function Equipamentos({ escolhidos = [], onMudar, travado, tipo = null }) {
   const [lista, setLista] = useState(null);
   const [abrir, setAbrir] = useState(false);
   const [q, setQ] = useState("");
+  // ⚠ FILTRO, NÃO TRAVA. Vitor (22/08/2026): "deixar apenas os instrumentos necessários
+  // listados nos procedimentos de cada relatório, assim evita o erro de colocar
+  // equipamentos que não deveria". A lista de calibração é da fábrica inteira — tem
+  // máquina de solda e alicate voltímetro, que não medem nada num relatório de inspeção.
+  // Mas uma obra pode exigir algo que o procedimento não previu, e bloquear faria o
+  // inspetor não registrar nada: por isso "ver todos" fica a um clique.
+  const [todos, setTodos] = useState(false);
 
   useEffect(() => {
     if (!abrir || lista) return;
@@ -39,7 +47,9 @@ export default function Equipamentos({ escolhidos = [], onMudar, travado }) {
   const alternar = (eq) =>
     onMudar(marcados.has(eq.id) ? escolhidos.filter((x) => x.id !== eq.id) : [...escolhidos, eq]);
 
-  const filtrada = (lista || []).filter((e) => !q || e.nome.toLowerCase().includes(q.toLowerCase()));
+  const doProcedimento = tipo && !todos ? instrumentosDoTipo(lista || [], tipo) : (lista || []);
+  const filtrada = doProcedimento.filter((e) => !q || e.nome.toLowerCase().includes(q.toLowerCase()));
+  const escondidos = (lista || []).length - doProcedimento.length;
 
   return (
     <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
@@ -89,6 +99,18 @@ export default function Equipamentos({ escolhidos = [], onMudar, travado }) {
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="buscar instrumento…"
               className="w-full text-[12px] border border-gray-200 rounded-lg pl-6 pr-2 py-1.5 focus:border-torg-blue outline-none" />
           </div>
+          {tipo && FONTE_POR_TIPO[tipo] && (
+            <p className="text-[10px] text-torg-gray mb-1.5">
+              {todos
+                ? "Todos os instrumentos calibrados em dia."
+                : <>Instrumentos previstos no procedimento — {FONTE_POR_TIPO[tipo]}. Marque um ou mais.</>}
+              {(escondidos > 0 || todos) && (
+                <button onClick={() => setTodos((v) => !v)} className="ml-1.5 font-semibold text-torg-blue hover:underline">
+                  {todos ? "só os do procedimento" : `ver todos (+${escondidos})`}
+                </button>
+              )}
+            </p>
+          )}
           {lista === null ? (
             <p className="text-[11px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> carregando…</p>
           ) : (

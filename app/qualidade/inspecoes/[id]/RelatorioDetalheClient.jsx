@@ -295,6 +295,7 @@ export default function RelatorioDetalheClient({ id }) {
           <Equipamentos
             escolhidos={Array.isArray(rel.equipamentos) ? rel.equipamentos : []}
             travado={travado}
+            tipo={rel.tipo}
             onMudar={(eqs) => setDados((d) => ({ ...d, relatorio: { ...d.relatorio, equipamentos: eqs } }))}
           />
 

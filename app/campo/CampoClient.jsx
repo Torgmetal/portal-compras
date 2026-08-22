@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { TIPOS_RELATORIO, TIPO_LABEL, marcaDoQR, marcaCasaOP } from "@/lib/qualidade-campo";
 import { reduzImagem } from "@/lib/imagem-cliente";
+import { instrumentosDoTipo, FONTE_POR_TIPO } from "@/lib/instrumentos-por-relatorio";
 import LeitorQR from "./LeitorQR";
 
 /**
@@ -417,9 +418,13 @@ function PecaAtual({ peca, opNumero, opId, onDefinir }) {
  * medir com o mesmo instrumento e não registrar nada — o relatório sairia sem dizer com o que foi
  * medido, que é pior. Aparece, avisa, e quem decide é quem está lá.
  */
-function Equipamentos({ escolhidos, onMudar }) {
+function Equipamentos({ escolhidos, onMudar, tipo = null }) {
   const [abrir, setAbrir] = useState(false);
   const [lista, setLista] = useState(null);
+  // ⚠ só os do procedimento, com escape. Ver a nota em lib/instrumentos-por-relatorio.js:
+  // a lista de calibração é da fábrica inteira, e instrumento errado no relatório é pior
+  // que instrumento faltando — mas travar faria o inspetor não registrar nada.
+  const [todos, setTodos] = useState(false);
 
   useEffect(() => {
     if (!abrir || lista) return;
@@ -430,6 +435,8 @@ function Equipamentos({ escolhidos, onMudar }) {
 
   const marcados = new Set(escolhidos.map((e) => e.id));
   const temVencido = escolhidos.some((e) => e.vencido);
+  const doProc = tipo && !todos ? instrumentosDoTipo(lista || [], tipo) : (lista || []);
+  const escondidos = (lista || []).length - doProc.length;
 
   const alternar = (eq) => {
     onMudar(marcados.has(eq.id) ? escolhidos.filter((x) => x.id !== eq.id) : [...escolhidos, eq]);
@@ -474,7 +481,19 @@ function Equipamentos({ escolhidos, onMudar }) {
           </header>
           <div className="flex-1 overflow-y-auto">
             {lista === null && <p className="p-4 text-sm text-torg-gray inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> carregando…</p>}
-            {lista?.map((eq) => {
+            {lista && tipo && FONTE_POR_TIPO[tipo] && (
+              <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                <p className="text-[12px] text-torg-gray">
+                  {todos ? "Todos os instrumentos calibrados em dia." : `Previstos no procedimento — ${FONTE_POR_TIPO[tipo]}. Pode marcar mais de um.`}
+                </p>
+                {(escondidos > 0 || todos) && (
+                  <button onClick={() => setTodos((v) => !v)} className="mt-1 text-[12px] font-semibold text-torg-blue">
+                    {todos ? "só os do procedimento" : `ver todos (+${escondidos})`}
+                  </button>
+                )}
+              </div>
+            )}
+            {doProc.map((eq) => {
               const on = marcados.has(eq.id);
               return (
                 <button key={eq.id} onClick={() => alternar(eq)}
@@ -494,7 +513,7 @@ function Equipamentos({ escolhidos, onMudar }) {
                 </button>
               );
             })}
-            {lista && !lista.length && <p className="p-4 text-sm text-torg-gray">Nenhum instrumento com certificado cadastrado.</p>}
+            {lista && !doProc.length && <p className="p-4 text-sm text-torg-gray">Nenhum instrumento previsto para este relatório.</p>}
           </div>
         </div>
       )}
