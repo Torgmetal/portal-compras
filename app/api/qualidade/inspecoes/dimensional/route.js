@@ -59,6 +59,12 @@ export async function POST(req) {
   // O caminho do desenho passa a ser resolvido na primeira vez que a marcação ou o PDF precisarem
   // dele (`garantirDesenhos`), e fica gravado no relatório a partir dali.
   const tolerancia = await procedimentoTolerancia();
+  // ⚠ O PROCEDIMENTO VEM DO CONTROLE DE DOCUMENTOS, não de texto no código. Os 21 POs do SGQ foram
+  // importados em 21/08/2026; antes disso o relatório citava "PO-04" a partir de uma constante, e
+  // se a Qualidade revisasse o procedimento o documento emitido continuaria dizendo a revisão
+  // velha — sem ninguém perceber.
+  const { procedimentoDoTipo } = await import("@/lib/importar-procedimentos");
+  const proc = await procedimentoDoTipo(tipo).catch(() => null);
   const erros = [];
 
   const op = await prisma.oP.findFirst({ where: { numero: opNumero }, select: { id: true } });
@@ -113,7 +119,7 @@ export async function POST(req) {
         linhas: [],
         // e sem desenho: o caminho é resolvido na primeira abertura da marcação
         desenhos: [],
-        resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia, tiposPeca, qtdPeca },
+        resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia, tiposPeca, qtdPeca, procedimento: proc?.nome || null, procedimentoId: proc?.id || null },
         criadoPorId: user.id, criadoPorNome: user.name || null,
       },
     });

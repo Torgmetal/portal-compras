@@ -134,6 +134,8 @@ export async function PATCH(req, { params }) {
       "descricao", "pecas", "prepProcedimento", "prepData", "prepIni", "prepFim", "prepUmidade",
       "prepTAmb", "prepTSup", "prepOrvalho", "rugEspec", "rugObtido", "abrasivo", "poeira",
       "salinidade", "intemperismo", "limpeza", "laudo", "espessuraMinima", "obsFotos",
+      // vínculo com o procedimento do Controle de Documentos
+      "procedimentoId",
     ];
     for (const k of TEXTO_LIVRE) {
       if (r[k] !== undefined) dados.resultados[k] = r[k] == null ? null : String(r[k]).slice(0, 120);
