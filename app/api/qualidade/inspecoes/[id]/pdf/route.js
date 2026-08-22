@@ -34,16 +34,20 @@ export async function GET(req, { params }) {
       })
     : null;
 
-  // ⚠ o DIMENSIONAL tem formulário próprio. Vitor: "quando gerar o relatório ele precisa ficar com
-  // a cara de relatório do excel" — os outros tipos seguem o layout de evidências fotográficas.
+  // ⚠ CADA MODELO TEM SEU FORMULÁRIO. Vitor: "quando gerar o relatório ele precisa ficar com a cara
+  // de relatório do excel". Os tipos que ainda não têm modelo próprio seguem o layout de evidências
+  // fotográficas, que é o que existia antes.
+  const TEM_FORMULARIO = ["DIMENSIONAL", "VISUAL_SOLDA"];
   let bytes;
-  if (rel.tipo === "DIMENSIONAL") {
+  if (TEM_FORMULARIO.includes(rel.tipo)) {
     const op = await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { cliente: true, obra: true, refCliente: true } });
-    bytes = await gerarDimensionalPDF({
-      rel, assinaturas,
-      desenhoBytes: (d) => baixarDesenho(d?.caminho),
-      cliente: op?.cliente || null, obra: op?.obra || null, refCliente: op?.refCliente || null,
-    });
+    const dadosOP = { cliente: op?.cliente || null, obra: op?.obra || null, refCliente: op?.refCliente || null };
+    if (rel.tipo === "DIMENSIONAL") {
+      bytes = await gerarDimensionalPDF({ rel, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho), ...dadosOP });
+    } else {
+      const { gerarEVSPDF } = await import("@/lib/relatorio-evs-pdf");
+      bytes = await gerarEVSPDF({ rel, assinaturas, ...dadosOP });
+    }
   } else {
     bytes = await gerarRelatorioInspecaoPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho) });
   }

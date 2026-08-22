@@ -87,9 +87,14 @@ export async function PATCH(req, { params }) {
       tolerancia: l?.tolerancia ? String(l.tolerancia).slice(0, 40) : null,
       encontradoMm: num(l?.encontradoMm),
       obs: l?.obs ? String(l.obs).slice(0, 160) : null,
-      // ── a cota marcada no desenho ──
+      // ── a cota marcada no desenho (dimensional) ──
       letra: l?.letra ? String(l.letra).slice(0, 3) : null,
       ax: num(l?.ax), ay: num(l?.ay), bx: num(l?.bx), by: num(l?.by),
+      // ── a junta inspecionada (visual de solda) ──
+      eps: l?.eps ? String(l.eps).slice(0, 30) : null,
+      soldador: l?.soldador ? String(l.soldador).slice(0, 40) : null,
+      descontinuidade: l?.descontinuidade ? String(l.descontinuidade).slice(0, 40) : null,
+      laudo: l?.laudo ? String(l.laudo).slice(0, 10) : null,
     }));
   }
 
@@ -109,6 +114,15 @@ export async function PATCH(req, { params }) {
     // Mesma armadilha de cima: o espalhamento preserva o que JÁ estava gravado, mas o que vem novo
     // no corpo precisa ser lido explicitamente. Sem estas duas linhas a pessoa apagava as marcas,
     // salvava, e o PDF saía com tudo de volta.
+    // ── campos de cabeçalho dos outros modelos ─────────────────────────────────────────────────
+    //
+    // ⚠ MESMA ARMADILHA DE SEMPRE: o que não for lido aqui é descartado no salvamento. O bloco de
+    // `resultados` preserva o que já estava gravado, mas campo novo precisa ser lido explicitamente.
+    for (const k of ["encomenda", "quantidade", "desenho", "componente", "metalBase", "iluminacao",
+                     "tecnica", "condicoes", "procedimento", "criterio"]) {
+      if (r[k] !== undefined) dados.resultados[k] = r[k] == null ? null : String(r[k]).slice(0, 120);
+    }
+
     if (Array.isArray(r.ocultosDesenho)) {
       dados.resultados.ocultosDesenho = r.ocultosDesenho.slice(0, 800)
         .map((o) => ({ x: num(o?.x), y: num(o?.y), w: num(o?.w), h: num(o?.h), tx: num(o?.tx), ty: num(o?.ty) }))
