@@ -69,19 +69,22 @@ export async function POST(req) {
   //
   // ⚠ Gravado na CRIAÇÃO, não lido na hora de gerar o PDF: a lista da Engenharia é reimportada a
   // cada revisão, e o relatório deve continuar dizendo o que a peça era quando foi inspecionada.
-  const tiposPeca = {};
+  const tiposPeca = {}, qtdPeca = {};
   if (op?.id) {
     try {
       const pecas = await prisma.pecaConjunto.findMany({
         where: { opId: op.id, marca: { in: marcas } },
-        select: { marca: true, descricao: true },
-        distinct: ["marca"],
+        select: { marca: true, descricao: true, qte: true },
       });
       for (const pc of pecas) {
+        const k = String(pc.marca).toUpperCase();
         const t = (pc.descricao || "").trim();
-        if (t) tiposPeca[String(pc.marca).toUpperCase()] = t.toUpperCase();
+        if (t && !tiposPeca[k]) tiposPeca[k] = t.toUpperCase();
+        // ⚠ SOMA as ocorrências: a mesma marca aparece uma vez por conjunto na lista, e a
+        // quantidade do relatório é quantas peças daquela marca a OP tem.
+        qtdPeca[k] = (qtdPeca[k] || 0) + (pc.qte || 0);
       }
-    } catch { /* sem tipo, o cabeçalho mostra só a marca — como antes */ }
+    } catch { /* sem tipo, o cabeçalho mostra a marca — como antes */ }
   }
 
   try {
@@ -103,7 +106,7 @@ export async function POST(req) {
         linhas: [],
         // e sem desenho: o caminho é resolvido na primeira abertura da marcação
         desenhos: [],
-        resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia, tiposPeca },
+        resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia, tiposPeca, qtdPeca },
         criadoPorId: user.id, criadoPorNome: user.name || null,
       },
     });
