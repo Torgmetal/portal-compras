@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2, Camera, X } from "lucide-react";
 import LeitorQR from "./LeitorQR";
 import { marcaDoQR, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
+import Pintura from "./Pintura";
 import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA } from "@/lib/evs-campos";
 import { criteriosDoDefeito, ONDE_VALE } from "@/lib/aws-d11";
 import { RESULTADO_LABEL } from "@/lib/revisao-inspecao";
@@ -215,6 +216,8 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   // superficiais e metal base são OBSERVADOS na hora, com a peça na frente. Quem monta o relatório
   // no computador não tem como saber se a junta foi escovada ou está como soldada.
   const [cond, setCond] = useState({});
+  // as tintas que a obra recebeu (CMR) — escolher preenche produto, fabricante, lote e validade
+  const [tintas, setTintas] = useState([]);
   const [salvando, setSalvando] = useState(false);
   const [resultado, setResultado] = useState(null);
   // soldadores e EPS vêm juntos: são pedidos na mesma tela, e duas chamadas na fábrica é uma a mais
@@ -242,6 +245,19 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           cbModelo: r0.cbModelo || "", cbSerie: r0.cbSerie || "", cbAngulo: r0.cbAngulo || "",
           acoplante: r0.acoplante || "", blocoPadrao: r0.blocoPadrao || "",
           ganhoVarredura: r0.ganhoVarredura || "", local: r0.local || "",
+          // ── pintura: o que se MEDE ──
+          limpeza: r0.limpeza || "", intemperismo: r0.intemperismo || "",
+          prepData: r0.prepData || "", prepIni: r0.prepIni || "", prepFim: r0.prepFim || "",
+          prepTAmb: r0.prepTAmb ?? "", prepTSup: r0.prepTSup ?? "", prepOrvalho: r0.prepOrvalho ?? "",
+          prepUmidade: r0.prepUmidade ?? "", tempo: r0.tempo || "",
+          rugLeituras: Array.isArray(r0.rugLeituras) ? r0.rugLeituras : ["", "", "", "", ""],
+          espessuras: r0.espessuras || {}, demaos: r0.demaos || {},
+          // ⚠ o ESPECIFICADO vai junto, mas fora do que se salva: a tela mostra para
+          // conferência e o `__espec` é descartado no envio (ver salvar()).
+          __espec: {
+            prepProcedimento: r0.prepProcedimento || null, abrasivo: r0.abrasivo || null,
+            rugEspec: r0.rugEspec || null, espessuraMinima: r0.espessuraMinima || null,
+          },
         });
       })
       .catch((e) => setErro(e.message));
@@ -254,6 +270,12 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   }, [id]);
 
   useEffect(() => {
+    if (rel?.tipo !== "PINTURA" || !rel?.opNumero) return;
+    fetch(`/api/qualidade/plp/${encodeURIComponent(rel.opNumero)}`)
+      .then((r) => r.json()).then((j) => setTintas(j.tintas || [])).catch(() => {});
+  }, [rel?.tipo, rel?.opNumero]);
+
+  useEffect(() => {
     fetch("/api/qualidade/soldagem").then((r) => r.json())
       .then((j) => setListas({ soldadores: j.soldadores || [], eps: j.eps || [] })).catch(() => {});
   }, []);
@@ -263,6 +285,10 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
 
   const ehDim = rel.tipo === "DIMENSIONAL";
   const ehUS = rel.tipo === "ULTRASSOM";
+  // ⚠ a pintura não tem "junta a inspecionar": o ensaio é do REVESTIMENTO, medido por
+  // demão, não por peça. Sem esta separação ela caía nos controles do visual de solda e
+  // o inspetor via descontinuidade, soldador e EPS num relatório de pintura.
+  const ehPintura = rel.tipo === "PINTURA";
   const set = (i, campo, v) => setLinhas((p) => p.map((l, k) => (k === i ? { ...l, [campo]: v } : l)));
 
   function alternarDefeito(i, cod) {
@@ -359,7 +385,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       }));
       const r = await fetch(`/api/campo/relatorios/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ medidas, equipamentos, assumirInspetor: !rel.inspetor, condicoes: ehDim ? undefined : cond, resultadoInspecao: resultado }),
+        body: JSON.stringify({ medidas, equipamentos, assumirInspetor: !rel.inspetor, condicoes: ehDim ? undefined : (({ __espec, ...resto }) => resto)(cond), resultadoInspecao: resultado }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
@@ -422,7 +448,9 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         </div>
       )}
 
-      {!ehDim && !ehUS && (
+      {ehPintura && <Pintura cond={cond} setCond={setCond} tintas={tintas} />}
+
+      {!ehDim && !ehUS && !ehPintura && (
         <div className="mt-3 space-y-2.5">
           <p className="text-[12px] font-semibold text-torg-gray">Condições do ensaio</p>
 
@@ -473,9 +501,11 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         </div>
       )}
 
+      {!ehPintura && (
       <p className="text-[12px] font-semibold text-torg-gray mt-4 mb-1.5 inline-flex items-center gap-1.5">
         <Ruler size={13} className="text-torg-blue" /> {ehDim ? "Cotas a medir" : "Juntas a inspecionar"} · {medir.length}
       </p>
+      )}
 
       <div className="space-y-2.5">
         {linhas.map((l, i) => {
@@ -628,7 +658,9 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         </p>
       )}
 
-      {!ehDim && (
+      {/* ⚠ ler QR / digitar peça não existe na pintura: não se inspeciona junta, e sim o
+          revestimento, demão a demão. Botão que não leva a nada é pior que botão faltando. */}
+      {!ehDim && !ehPintura && (
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button onClick={() => setLendoQR(true)}
             className="bg-white border-2 border-torg-blue text-torg-blue active:bg-torg-blue/5 rounded-xl py-3.5 text-[15px] font-semibold inline-flex items-center justify-center gap-2">

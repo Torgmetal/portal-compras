@@ -178,8 +178,42 @@ export async function PATCH(req, { params }) {
     for (const k of ["iluminacao", "tecnica", "condicoes", "metalBase", "tipoEstrutura", "tipoPeca",
                      // ensaio por ultrassom (PI-QUA-003): aparelhagem e condição do ensaio
                      "carregamento", "apModelo", "apSerie", "cbModelo", "cbSerie", "cbAngulo",
-                     "acoplante", "blocoPadrao", "ganhoVarredura", "local"]) {
+                     "acoplante", "blocoPadrao", "ganhoVarredura", "local",
+                     // pintura (PO-05) — o que o inspetor MEDE no galpão. O especificado
+                     // (abrasivo, faixa de rugosidade, espessura mínima) vem do PLP e é gravado
+                     // na criação do relatório; o celular não reescreve isso.
+                     "limpeza", "intemperismo", "prepData", "prepIni", "prepFim", "rugObtido",
+                     "poeira", "salinidade", "tempo", "prepTAmb", "prepTSup", "prepOrvalho",
+                     "prepUmidade", "laudo"]) {
       if (c[k] !== undefined) dados.resultados[k] = c[k] == null || c[k] === "" ? null : String(c[k]).slice(0, 120);
+    }
+
+    // ⚠ ESTRUTURA NÃO PASSA POR String(). As leituras e as demãos são listas e objetos; o laço
+    // acima transformaria cada uma numa string ("[object Object]") e o relatório de pintura
+    // salvaria vazio pelo celular. Mesma armadilha que o formulário do computador já tinha.
+    const numOuNulo = (v) => {
+      if (v === "" || v === null || v === undefined) return null;
+      const n = Number(String(v).replace(",", "."));
+      return Number.isFinite(n) ? n : null;
+    };
+    if (Array.isArray(c.rugLeituras)) dados.resultados.rugLeituras = c.rugLeituras.slice(0, 5).map(numOuNulo);
+    if (c.espessuras && typeof c.espessuras === "object") {
+      dados.resultados.espessuras = { ...(rel.resultados?.espessuras || {}) };
+      for (const d of ["1", "2", "3"]) {
+        if (Array.isArray(c.espessuras[d])) dados.resultados.espessuras[d] = c.espessuras[d].slice(0, 5).map(numOuNulo);
+      }
+    }
+    if (c.demaos && typeof c.demaos === "object") {
+      dados.resultados.demaos = { ...(rel.resultados?.demaos || {}) };
+      for (const d of ["1", "2", "3"]) {
+        const bloco = c.demaos[d];
+        if (!bloco || typeof bloco !== "object") continue;
+        const limpo = { ...(dados.resultados.demaos[d] || {}) };
+        for (const [k, v] of Object.entries(bloco)) {
+          limpo[k] = v == null || v === "" ? null : String(v).slice(0, 120);
+        }
+        dados.resultados.demaos[d] = limpo;
+      }
     }
   }
 
