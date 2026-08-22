@@ -6,6 +6,7 @@
 // /gerar/continuar (chamado pela própria tela, um volume por vez) e o cron, que
 // recolhe job abandonado quando alguém fecha o navegador no meio.
 import { NextResponse } from "next/server";
+import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { montarRoteiro } from "@/lib/databook-volumes";
@@ -36,7 +37,18 @@ export async function POST(_req, { params }) {
   // Refazer apaga os volumes da revisão: o conjunto tem que ser coerente entre si.
   // Sobrar o Volume 07 de uma geração antiga ao lado de um novo Volume 03 é pior que
   // não ter nada — o cliente baixa dois pedaços de livros diferentes.
-  await prisma.dataBookArquivo.deleteMany({ where: { dataBookId: book.id, revisao: book.revisao } });
+  //
+  // ⚠ E APAGA O ARQUIVO, não só a linha. Um data book destes passa de 1,5 GB; deixar
+  // o blob órfão a cada "gerar de novo" acumula gigabyte de lixo pago em silêncio.
+  const antigos = await prisma.dataBookArquivo.findMany({
+    where: { dataBookId: book.id, revisao: book.revisao },
+    select: { url: true },
+  });
+  if (antigos.length) {
+    // falha ao apagar não pode impedir a nova geração — o pior caso é sobrar arquivo
+    await del(antigos.map((a) => a.url)).catch(() => {});
+    await prisma.dataBookArquivo.deleteMany({ where: { dataBookId: book.id, revisao: book.revisao } });
+  }
 
   const geracao = await prisma.dataBookGeracao.create({
     data: {

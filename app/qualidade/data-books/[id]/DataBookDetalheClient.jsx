@@ -17,6 +17,8 @@ import { TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 const fmtKg = (v) => (!v ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`);
 const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 const ESTADOS = ["PENDENTE", "ANEXADO", "NA"];
+// quantos documentos a seção mostra antes de pedir "ver todos"
+const LIMITE_LISTA = 40;
 
 export default function DataBookDetalheClient({ id, userId }) {
   const [data, setData] = useState(null);
@@ -570,6 +572,10 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
   const [navegador, setNavegador] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [progresso, setProgresso] = useState(""); // "2/5" durante o upload em lote
+  // ⚠ A §02 de uma obra grande tem MILHARES de desenhos. Jogar tudo no DOM trava a
+  // tela — e ninguém lê 1.336 linhas de uma vez; quem procura um desenho específico
+  // usa o índice do livro. Mostra as primeiras e abre sob demanda. (22/08/2026)
+  const [verTodos, setVerTodos] = useState(false);
   const fileRef = useRef(null);
   const navegavel = secaoNavega(secao.numero);
   // ── SEÇÃO DE CERTIFICADO TEM OS DOIS CAMINHOS ───────────────────────────────────────────────
@@ -666,7 +672,7 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
         <div className="mt-2 pt-2 border-t border-gray-50">
           {secao.documentos.length > 0 ? (
             <div className="divide-y divide-gray-50">
-              {secao.documentos.map((d) => (
+              {(verTodos ? secao.documentos : secao.documentos.slice(0, LIMITE_LISTA)).map((d) => (
                 <div key={d.id} className="flex items-center justify-between gap-3 py-1 text-[12px]">
                   <div className="min-w-0 flex items-center gap-2">
                     <FileText size={13} className="text-torg-blue shrink-0" />
@@ -687,6 +693,14 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
                   </div>
                 </div>
               ))}
+              {secao.documentos.length > LIMITE_LISTA && (
+                <button onClick={() => setVerTodos((v) => !v)}
+                  className="w-full text-[11px] font-semibold text-torg-blue py-1.5 hover:bg-torg-blue-50 rounded">
+                  {verTodos
+                    ? `Mostrar só os primeiros ${LIMITE_LISTA}`
+                    : `Ver todos os ${secao.documentos.length.toLocaleString("pt-BR")} documentos`}
+                </button>
+              )}
               {/* Vitor (20/08): "você está trazendo certificados de tinta na aba de certificados de
                   materiais". O portal não erra mais ao vincular, mas o que já está gravado continua
                   ali — então aponta e deixa mover, em vez de sumir com o vínculo sem avisar. */}
