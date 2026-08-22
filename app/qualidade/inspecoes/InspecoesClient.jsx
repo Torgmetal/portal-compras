@@ -303,10 +303,6 @@ function Montar({ grupo, onFechar, onPronto }) {
   const [observacoes, setObs] = useState("");
   const [inspetor, setInspetor] = useState("");
   const [salvando, setSalvando] = useState(false);
-  // ⚠ A LISTA SE RECOLHE. Vitor (21/08/2026): "após eu selecionar as peças seria bom ter uma opção
-  // de ocultar as demais peças, pois fica ruim ter que ficar acertando scroll para baixar até a
-  // informação do inspetor". Uma OP tem centenas de marcas; depois de escolher, a lista só atrapalha.
-  const [listaAberta, setListaAberta] = useState(true);
 
   async function criar() {
     if (!sel.size) return;
@@ -446,6 +442,10 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
   const [comNc1, setComNc1] = useState(null); // Set de marcas
   const [soNc1, setSoNc1] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  // ⚠ A LISTA SE RECOLHE. Vitor (21/08/2026): "após eu selecionar as peças seria bom ter uma opção
+  // de ocultar as demais peças, pois fica ruim ter que ficar acertando scroll para baixar até a
+  // informação do inspetor". Uma OP tem centenas de marcas; depois de escolher, a lista só atrapalha.
+  const [listaAberta, setListaAberta] = useState(true);
 
   useEffect(() => {
     fetch("/api/qualidade/inspecoes/ops").then((r) => r.json()).then((j) => setOps(j.ops || [])).catch(() => setOps([]));
