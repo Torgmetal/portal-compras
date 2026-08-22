@@ -27,6 +27,12 @@ export default function InspecoesClient() {
   const [erro, setErro] = useState("");
   const [montando, setMontando] = useState(null); // { opNumero, tipo, opId }
   const [novoTipo, setNovoTipo] = useState(null); // qual tipo está sendo criado
+  const [opFiltro, setOpFiltro] = useState("");   // "" = todas as obras
+  const [recolhidos, setRecolhidos] = useState(() => new Set());
+  // ⚠ RELATÓRIO APROVADO SAI DA FILA. Vitor (22/08/2026): "relatórios aprovados precisam sair da
+  // aba de relatórios para preencher". Documento aprovado não é trabalho pendente — deixá-lo na
+  // lista faz o que falta preencher desaparecer no meio do que já acabou.
+  const [verConcluidos, setVerConcluidos] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -42,6 +48,10 @@ export default function InspecoesClient() {
   if (!dados) return <div className="p-6"><p className="text-sm text-torg-gray inline-flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> carregando…</p></div>;
 
   // agrupa o que está solto por OP + tipo — é assim que vira um relatório
+  // ⚠ FILTRO POR OP e grupos que recolhem. Vitor (22/08/2026): "deixe as abas dos nomes dos
+  // relatórios com uma forma de minimizar para ficar mais clean a página de relatórios, e também
+  // um filtro para selecionar todos os relatórios de uma única OP". Com cinco tipos e várias
+  // obras, a página virava uma coluna de rolagem em que achar um relatório é sorte.
   const grupos = new Map();
   for (const f of dados.soltas) {
     const chave = `${f.opNumero}|${f.tipo}`;
@@ -50,6 +60,18 @@ export default function InspecoesClient() {
     grupos.set(chave, g);
   }
   const lista = [...grupos.values()].sort((a, b) => a.opNumero.localeCompare(b.opNumero));
+
+  // ── o que a lista mostra ──────────────────────────────────────────────────────────────────
+  // ⚠ APROVADO É CONCLUÍDO, e nada mais. Reprovado e "exame complementar" continuam na fila: os
+  // dois ainda vão receber trabalho — reparo e reinspeção num, ensaio complementar no outro. É a
+  // mesma regra que decide se o relatório fecha (lib/revisao-inspecao.js).
+  const ehConcluido = (r) => r.resultadoInspecao === "APROVADO";
+  const concluidos = dados.relatorios.filter(ehConcluido).length;
+  const opsComRelatorio = [...new Set(dados.relatorios.map((r) => r.opNumero))]
+    .sort((a, b) => String(b).localeCompare(String(a), "pt-BR", { numeric: true }));
+  const visiveis = dados.relatorios
+    .filter((r) => !opFiltro || r.opNumero === opFiltro)
+    .filter((r) => verConcluidos || !ehConcluido(r));
 
   async function excluirGrupo(g) {
     if (!confirm(`Excluir ${g.fotos.length} registro(s) de OP-${g.opNumero} · ${TIPO_LABEL[g.tipo] || g.tipo}?\n\nAs fotos saem do portal. Isso não afeta relatórios já montados.`)) return;
@@ -79,7 +101,6 @@ export default function InspecoesClient() {
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto">
-      <Link href="/qualidade" className="text-[12px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 mb-3"><ArrowLeft size={13} /> Qualidade</Link>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-extrabold text-torg-dark tracking-tight">Inspeções</h1>
@@ -100,65 +121,49 @@ export default function InspecoesClient() {
         </div>
       </div>
 
-      {/* ── fotos soltas ─────────────────────────────────────────────────────────────────── */}
-      <h2 className="text-sm font-bold text-torg-dark mt-6 mb-2 inline-flex items-center gap-1.5">
-        <Camera size={15} className="text-torg-blue" /> Registros do celular
-        <span className="text-[11px] font-normal text-torg-gray">({dados.soltas.length} foto(s) sem relatório)</span>
-      </h2>
-      {!lista.length && <p className="text-[13px] text-torg-gray">Nada pendente — todas as fotos já viraram relatório.</p>}
-      <div className="space-y-2">
-        {lista.map((g) => (
-          <div key={`${g.opNumero}|${g.tipo}`} className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="min-w-0">
-                <p className="font-semibold text-torg-dark text-sm">OP-{g.opNumero} · {TIPO_LABEL[g.tipo] || g.tipo}</p>
-                <p className="text-[11px] text-torg-gray">
-                  {g.fotos.length} foto(s) · {[...new Set(g.fotos.map((f) => f.marca).filter(Boolean))].length} peça(s) · último em {fmtDT(g.fotos[0]?.capturadaEm)}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button onClick={() => setMontando(g)}
-                  className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5">
-                  <Plus size={13} /> Montar relatório
-                </button>
-                {/* Vitor (21/08): "precisa ter a opção para excluir esses". Foto de teste ou na OP
-                    errada empilha na fila e esconde o trabalho de verdade. */}
-                <button onClick={() => excluirGrupo(g)} title="Excluir estes registros"
-                  className="text-[12px] text-torg-gray hover:text-red-600 border border-gray-200 hover:border-red-200 rounded-lg px-2 py-1.5 inline-flex items-center gap-1">
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            </div>
-            <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
-              {g.fotos.slice(0, 14).map((f) => (
-                <span key={f.id} className="relative shrink-0 group">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.url} alt={f.marca || "foto"} title={`${f.marca || "sem peça"} · ${f.autorNome || ""}`}
-                    className="h-14 w-14 object-cover rounded border border-gray-100" />
-                  <button onClick={() => excluirFoto(f)} title="Excluir esta foto"
-                    className="absolute top-0.5 right-0.5 bg-black/55 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 hover:bg-red-600">
-                    <X size={10} />
-                  </button>
-                </span>
-              ))}
-              {g.fotos.length > 14 && <span className="text-[11px] text-torg-gray self-center shrink-0">+{g.fotos.length - 14}</span>}
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* ⚠ O BLOCO "REGISTROS DO CELULAR" SAIU. Vitor (22/08/2026): "tire essa parte, pois agora
+          o registro fica dentro do servidor". Desde que a foto passou a nascer amarrada ao
+          relatório, a fila de fotos soltas virou um lugar por onde nada passa — e um painel que
+          vive vazio ensina a ignorar o painel. O fluxo agora é: cria o relatório e fotografa
+          dentro dele. */}
 
       {/* ── relatórios montados ──────────────────────────────────────────────────────────── */}
       <h2 className="text-sm font-bold text-torg-dark mt-7 mb-2 inline-flex items-center gap-1.5">
         <FileText size={15} className="text-torg-blue" /> Relatórios
       </h2>
       {!dados.relatorios.length && <p className="text-[13px] text-torg-gray">Nenhum relatório montado ainda.</p>}
-      {agruparRelatorios(dados.relatorios).map((t) => (
+
+      {dados.relatorios.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap mb-3">
+          <select value={opFiltro} onChange={(e) => setOpFiltro(e.target.value)}
+            className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:border-torg-blue outline-none">
+            <option value="">Todas as obras</option>
+            {opsComRelatorio.map((n) => <option key={n} value={n}>OP-{n}</option>)}
+          </select>
+          <label className="flex items-center gap-1.5 text-[12px] text-torg-gray cursor-pointer">
+            <input type="checkbox" checked={verConcluidos} onChange={(e) => setVerConcluidos(e.target.checked)}
+              className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
+            mostrar aprovados {concluidos > 0 ? `(${concluidos})` : ""}
+          </label>
+          <span className="text-[11px] text-torg-gray ml-auto">
+            {visiveis.length} de {dados.relatorios.length}
+          </span>
+        </div>
+      )}
+
+      {agruparRelatorios(visiveis).map((t) => (
         <div key={t.tipo} className="mb-5">
-          <div className="flex items-center gap-2 bg-torg-blue/5 border-l-[3px] border-torg-blue rounded-r-lg px-2.5 py-1.5 mb-2">
+          <button onClick={() => setRecolhidos((p) => {
+              const n = new Set(p);
+              if (n.has(t.tipo)) n.delete(t.tipo); else n.add(t.tipo);
+              return n;
+            })}
+            className="w-full flex items-center gap-2 bg-torg-blue/5 border-l-[3px] border-torg-blue rounded-r-lg px-2.5 py-1.5 mb-2 hover:bg-torg-blue/10">
+            <ChevronRight size={13} className={`text-torg-blue transition-transform ${recolhidos.has(t.tipo) ? "" : "rotate-90"}`} />
             <h3 className="text-[13px] font-bold text-torg-dark">{TIPO_LABEL[t.tipo] || t.tipo}</h3>
             <span className="text-[11px] text-torg-gray">{t.total} relatório{t.total > 1 ? "s" : ""}</span>
-          </div>
-          {t.ops.map((o) => (
+          </button>
+          {!recolhidos.has(t.tipo) && t.ops.map((o) => (
             <div key={o.opNumero} className="mb-2.5">
               <p className="mb-1 pl-0.5">
                 <span className="text-[11px] font-bold text-torg-dark bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5">
