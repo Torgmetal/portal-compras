@@ -45,20 +45,20 @@ export async function POST(req, { params }) {
   if (!opNumero) return NextResponse.json({ success: false, error: "Data book sem OP vinculada" }, { status: 400 });
 
   // Certificados de material da OP (rastreabilidade importada do CMR), filtrados pelo
-  // grupo da seção: §04 aço estrutural, §05 fixadores, §15 tintas. Outras seções: todos.
+  // grupo da seção: seção 04 aço estrutural, seção 05 fixadores, seção 15 tintas. Outras seções: todos.
   const grupo = GRUPO_POR_SECAO[secao.numero] || null;
   const todos = await prisma.documentoQualidade.findMany({
     where: { ativo: true, categoria: "MATERIAL", opNumero },
     select: { id: true, nome: true },
   });
-  // ── §06 NÃO SE RESOLVE POR OP ───────────────────────────────────────────────────────────────
+  // ── seção 06 NÃO SE RESOLVE POR OP ───────────────────────────────────────────────────────────────
   //
   // O arame entra no CMR SEM OP (é estoque geral, não é comprado por obra). A busca acima, que
-  // filtra por `opNumero`, volta vazia — era por isso que a §06 nunca trazia nada. E puxar as 17
+  // filtra por `opNumero`, volta vazia — era por isso que a seção 06 nunca trazia nada. E puxar as 17
   // entradas do CMR colocaria no livro lotes que nunca encostaram nesta obra.
   //
   // Vitor (20/08/2026): "precisamos ter certeza desses certificados de acordo com o que está
-  // marcado nos croquis, conforme alinhamos na página do PCP". Então a §06 traz os lotes que o
+  // marcado nos croquis, conforme alinhamos na página do PCP". Então a seção 06 traz os lotes que o
   // MESMO cálculo do carimbo do desenho aponta: para cada conjunto, o arame vigente na data em que
   // ele foi soldado.
   let docs;
@@ -76,7 +76,7 @@ export async function POST(req, { params }) {
   } else {
     // ⚠ classifica pela FICHA DO CMR, não pelo nome do vínculo. Certificado anexado se chama só
     // "R 260527" — sem o material, `classificarMaterial` cai no padrão ESTRUTURAL e a tinta vai
-    // parar na §04. Ver lib/databook-ficha-r.js.
+    // parar na seção 04. Ver lib/databook-ficha-r.js.
     const enriquecidos = await enriquecerComFicha(todos, opNumero);
     docs = grupo ? enriquecidos.filter((d) => classificarMaterial(d.nome) === grupo) : enriquecidos;
   }

@@ -429,7 +429,7 @@ export default function CargoMatrizClient({ cargoId }) {
                 <div><div className="text-[9.5px] tracking-wider uppercase">Emitido por</div><div className="text-torg-dark font-bold text-[12px]">{matriz.emitidoPor || "—"}</div></div>
                 <div><div className="text-[9.5px] tracking-wider uppercase">Aprovado por</div><div className="text-torg-dark font-bold text-[12px]">{matriz.aprovadoPor || "—"}</div></div>
               </div>
-              <div className="self-end">FORM-11 · documento controlado (ISO 9001 §7.2) · Torg Metal</div>
+              <div className="self-end">FORM-11 · documento controlado (ISO 9001 item 7.2) · Torg Metal</div>
             </div>
           </>
         )}

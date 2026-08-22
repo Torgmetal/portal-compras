@@ -42,7 +42,7 @@ export default function CompetenciasClient() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2.5"><Award className="text-torg-blue" size={28} /> Matriz de Competências</h2>
-          <p className="text-sm text-torg-gray mt-1">Competências e qualificações por cargo (FORM-11 · ISO 9001 §7.2). Clique num cargo para ver e editar a matriz.</p>
+          <p className="text-sm text-torg-gray mt-1">Competências e qualificações por cargo (FORM-11 · ISO 9001 item 7.2). Clique num cargo para ver e editar a matriz.</p>
         </div>
         {resumo && (
           <div className="flex gap-2.5">

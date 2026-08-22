@@ -1,7 +1,7 @@
 // POST — move documentos desta seção para a seção CERTA do mesmo data book.
 //
 // Vitor (20/08/2026): "você está trazendo certificados de tinta na aba de certificados de
-// materiais". Era o "ENDURECEDOR PARA INDUSTHANE 35.010" na §04 (matéria-prima) da OP-067 —
+// materiais". Era o "ENDURECEDOR PARA INDUSTHANE 35.010" na seção 04 (matéria-prima) da OP-067 —
 // vínculo automático feito antes de existir o filtro por grupo.
 //
 // O portal já não erra mais na hora de vincular, mas o que está gravado continua gravado. Em vez
@@ -51,7 +51,7 @@ export async function POST(req, { params }) {
   });
   const fichas = await fichasPorR(docs, secao.dataBook.opNumero);
 
-  // agrupa por seção-destino; um documento pode ir pra §15 e outro pra §06 na mesma tacada
+  // agrupa por seção-destino; um documento pode ir pra seção 15 e outro pra seção 06 na mesma tacada
   const porDestino = new Map();
   for (const d of docs) {
     const destino = secaoCertaDoDoc(comFicha(d, fichas), secao.numero);
@@ -72,7 +72,7 @@ export async function POST(req, { params }) {
   for (const [numero, ids] of porDestino) {
     const destino = idPorNumero.get(numero);
     // ⚠ a seção-destino pode não existir neste data book (marcada N/A e removida, modelo antigo).
-    // Nesse caso NÃO desvincula: tirar da §04 sem ter pra onde levar apagaria o certificado do livro.
+    // Nesse caso NÃO desvincula: tirar da seção 04 sem ter pra onde levar apagaria o certificado do livro.
     if (!destino) { semSecao.push({ numero, quantos: ids.length }); continue; }
     await prisma.$transaction([
       prisma.dataBookSecaoDoc.createMany({

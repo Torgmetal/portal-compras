@@ -162,7 +162,7 @@ export default function Volumes({ id }) {
           </p>
           <ul className="text-amber-900 space-y-0.5 max-h-32 overflow-y-auto">
             {pend.slice(0, 25).map((p, i) => (
-              <li key={i} className="truncate">§{p.secao} · {p.nome} — {p.motivo}</li>
+              <li key={i} className="truncate">Seção {p.secao} · {p.nome} — {p.motivo}</li>
             ))}
           </ul>
           {pend.length > 25 && <p className="text-amber-700 mt-1">… e mais {pend.length - 25}.</p>}

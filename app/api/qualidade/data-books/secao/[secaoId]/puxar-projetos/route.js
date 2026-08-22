@@ -36,7 +36,7 @@ export async function POST(_req, { params }) {
     select: { id: true, numero: true, dataBook: { select: { opNumero: true } } },
   });
   if (!secao) return NextResponse.json({ success: false, error: "Seção não encontrada" }, { status: 404 });
-  if (secao.numero !== "02") return NextResponse.json({ success: false, error: "Só a §02 puxa desenhos do servidor." }, { status: 400 });
+  if (secao.numero !== "02") return NextResponse.json({ success: false, error: "Só a Seção 02 puxa desenhos do servidor." }, { status: 400 });
   const opNumero = secao.dataBook?.opNumero;
   if (!opNumero) return NextResponse.json({ success: false, error: "Data book sem OP vinculada" }, { status: 400 });
 

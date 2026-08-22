@@ -108,7 +108,7 @@ export default function DataBookDetalheClient({ id, userId }) {
       const res = await fetch(`/api/qualidade/data-books/secao/${secao.id}/gerar-lpc`, { method: "POST" });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || "Erro");
-      if (json.semLpc) alert("Nenhuma peça da LPC encontrada para esta OP. Importe a LPC (Tekla) desta OP antes de gerar a §02.");
+      if (json.semLpc) alert("Nenhuma peça da LPC encontrada para esta OP. Importe a LPC (Tekla) desta OP antes de gerar a Seção 02.");
       await carregar();
     } catch (e) {
       alert(e.message);
@@ -406,7 +406,7 @@ export default function DataBookDetalheClient({ id, userId }) {
       {/* Fluxo de assinaturas — Elaborador → Inspetor → Resp. Técnico → Cliente (por e-mail/link) */}
       <FluxoAssinaturas id={id} cliente={data.cliente} clienteEmail={data.clienteEmail} onChange={carregar} />
 
-      {/* Rastreabilidade da obra — casamento LPC × certificados de material (§04) */}
+      {/* Rastreabilidade da obra — casamento LPC × certificados de material (seção 04) */}
       {rastr && rastr.totalMateriais > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
           <div className="flex items-center justify-between gap-2 mb-2">
@@ -572,7 +572,7 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
   const [navegador, setNavegador] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [progresso, setProgresso] = useState(""); // "2/5" durante o upload em lote
-  // ⚠ A §02 de uma obra grande tem MILHARES de desenhos. Jogar tudo no DOM trava a
+  // ⚠ A seção 02 de uma obra grande tem MILHARES de desenhos. Jogar tudo no DOM trava a
   // tela — e ninguém lê 1.336 linhas de uma vez; quem procura um desenho específico
   // usa o índice do livro. Mostra as primeiras e abre sob demanda. (22/08/2026)
   const [verTodos, setVerTodos] = useState(false);
@@ -580,23 +580,23 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
   const navegavel = secaoNavega(secao.numero);
   // ── SEÇÃO DE CERTIFICADO TEM OS DOIS CAMINHOS ───────────────────────────────────────────────
   //
-  // Vitor, na especificação por seção: §04 "vincular com a planilha CMR e trazer os certificados
-  // correspondentes a essa OP"; §05 "trazer as peças que estão na planilha e anexar os
-  // certificados que estão na pasta"; §06 "mesmo caso dos parafusos e materiais"; §15 "trazer as
+  // Vitor, na especificação por seção: seção 04 "vincular com a planilha CMR e trazer os certificados
+  // correspondentes a essa OP"; seção 05 "trazer as peças que estão na planilha e anexar os
+  // certificados que estão na pasta"; seção 06 "mesmo caso dos parafusos e materiais"; seção 15 "trazer as
   // informações da planilha CMR e anexar os certificados das tintas que estão nessa pasta".
   //
-  // O "deixar apenas dois botões" era sobre as seções que ele listou PRA NAVEGAR (§02, §03, §07…),
+  // O "deixar apenas dois botões" era sobre as seções que ele listou PRA NAVEGAR (seção 02, seção 03, seção 07…),
   // onde o conteúdo é uma pasta. Nestas quatro o conteúdo vem do CMR e a pasta é só onde mora o
   // PDF — então trazer e navegar convivem, que é o que ele pediu desde o começo.
   const secaoDeCertificado = !!GRUPO_POR_SECAO[secao.numero];
-  // Documentos que a API apontou como sendo de OUTRA seção (ex.: tinta na §04 de matéria-prima).
+  // Documentos que a API apontou como sendo de OUTRA seção (ex.: tinta na seção 04 de matéria-prima).
   const foraDoGrupo = secao.documentos.filter((d) => d.secaoCerta);
   // Move os certificados que estão na seção errada pra seção certa deste mesmo data book.
   async function moverForaDoGrupo() {
     const destinos = [...new Set(foraDoGrupo.map((d) => d.secaoCerta))].sort();
     if (!confirm(
-      `Mover ${foraDoGrupo.length} certificado(s) desta seção para §${destinos.join(" / §")}?\n\n` +
-      foraDoGrupo.slice(0, 8).map((d) => `· ${d.nome} → §${d.secaoCerta}`).join("\n") +
+      `Mover ${foraDoGrupo.length} certificado(s) desta seção para a seção ${destinos.join(" / ")}?\n\n` +
+      foraDoGrupo.slice(0, 8).map((d) => `· ${d.nome} → seção ${d.secaoCerta}`).join("\n") +
       (foraDoGrupo.length > 8 ? `\n· … e mais ${foraDoGrupo.length - 8}` : "")
     )) return;
     try {
@@ -607,7 +607,7 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "Erro");
       if (j.semSecao?.length) {
-        alert(`${j.total} movido(s).\n\nNão movi ${j.semSecao.map((x) => `${x.quantos} para §${x.numero}`).join(", ")}: essa seção não existe neste data book (ficaria sem lugar nenhum).`);
+        alert(`${j.total} movido(s).\n\nNão movi ${j.semSecao.map((x) => `${x.quantos} para a seção ${x.numero}`).join(", ")}: essa seção não existe neste data book (ficaria sem lugar nenhum).`);
       }
       onReload?.();
     } catch (e) { alert(e.message); }
@@ -665,9 +665,9 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
         </div>
       </div>
 
-      {/* Documentos vinculados — TODA seção de conteúdo (exceto §01 lista mestra, que é
+      {/* Documentos vinculados — TODA seção de conteúdo (exceto seção 01 lista mestra, que é
           gerada automaticamente). Além do que vem do portal, sempre permite anexar
-          arquivo do computador — inclusive na §10 (PIT), que ainda mostra o editor abaixo. */}
+          arquivo do computador — inclusive na seção 10 (PIT), que ainda mostra o editor abaixo. */}
       {secao.numero !== "01" && (
         <div className="mt-2 pt-2 border-t border-gray-50">
           {secao.documentos.length > 0 ? (
@@ -707,7 +707,7 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
               {foraDoGrupo.length > 0 && (
                 <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5">
                   <span className="text-[11px] text-amber-800">
-                    {foraDoGrupo.length === 1 ? "1 certificado é" : `${foraDoGrupo.length} certificados são`} de outro grupo (§{[...new Set(foraDoGrupo.map((d) => d.secaoCerta))].sort().join(", §")}).
+                    {foraDoGrupo.length === 1 ? "1 certificado é" : `${foraDoGrupo.length} certificados são`} de outro grupo (seção {[...new Set(foraDoGrupo.map((d) => d.secaoCerta))].sort().join(", ")}).
                   </span>
                   {/* Livro fechado não se mexe — o botão só levaria ao erro de "gere uma revisão".
                       O aviso continua: quem for revisar precisa saber que isto está aqui. */}
@@ -783,7 +783,7 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
           {navegador && (
             <NavegadorServidor
               secaoId={secao.id}
-              titulo={`§${secao.numero} ${secao.titulo}`}
+              titulo={`Seção ${secao.numero} · ${secao.titulo}`}
               onFechar={() => setNavegador(false)}
               onAnexado={(j) => {
                 onReload?.();
@@ -794,10 +794,10 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
         </div>
       )}
 
-      {/* §10 PIT — editor de tabela montado no portal */}
+      {/* seção 10 PIT — editor de tabela montado no portal */}
       {secao.numero === "10" && <PitEditor secao={secao} acaoLoading={acaoLoading} onSave={onSavePit} />}
 
-      {/* §02 Desenhos as-built — tabela LPC (conjunto → posições) + certificado por material */}
+      {/* seção 02 Desenhos as-built — tabela LPC (conjunto → posições) + certificado por material */}
       {secao.numero === "02" && <LpcSecao secao={secao} acaoLoading={acaoLoading} onGerar={onGerarLpc} onPuxarProjetos={onPuxarProjetos} />}
     </div>
   );
@@ -814,7 +814,7 @@ function LpcSecao({ secao, acaoLoading, onGerar, onPuxarProjetos }) {
         <div className="text-[11px] text-torg-gray">
           {c
             ? <>Tabela gerada da LPC · <b className="text-torg-dark">{conjuntos.length} conjuntos</b> · {c.totalPosicoes} posições{c.semCertificado > 0 ? <> · <span className="text-amber-600 font-medium">{c.semCertificado} sem certificado</span></> : <> · <span className="text-emerald-600 font-medium">todas com certificado</span></>}</>
-            : <>Monte a §02 a partir da LPC: cada conjunto → suas posições, com material, corrida (rastreabilidade) e nº do certificado.</>}
+            : <>Monte a seção 02 a partir da LPC: cada conjunto → suas posições, com material, corrida (rastreabilidade) e nº do certificado.</>}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={onGerar} disabled={acaoLoading}

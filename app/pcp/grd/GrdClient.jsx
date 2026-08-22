@@ -165,7 +165,7 @@ export default function GrdClient() {
                 <th className={`${th} text-right`}>GRDs</th>
                 <th className={`${th} text-right`}>Impressões</th>
                 <th className={th}>Setores</th>
-                <th className={`${th} text-center`} title="Liberações cujo PDF carimbado está amarrado na §02 do Data Book">Data Book</th>
+                <th className={`${th} text-center`} title="Liberações cujo PDF carimbado está amarrado na Seção 02 do Data Book">Data Book</th>
                 <th className={th}>Última impressão</th>
               </tr>
             </thead>
@@ -317,7 +317,7 @@ function Detalhe({ det, abrirPdf, onVerDesenho }) {
                       <button onClick={() => verDesenho(l)} title="Esta liberação é anterior ao carimbo — abre os desenhos da marca"
                         className="text-torg-gray hover:text-torg-blue hover:underline inline-flex items-center gap-1"><FileText size={11} /> desenhos</button>
                     )}
-                    {l.documentoId && <ShieldCheck size={11} className="inline ml-1 text-emerald-600" title="Amarrado na §02 do Data Book" />}
+                    {l.documentoId && <ShieldCheck size={11} className="inline ml-1 text-emerald-600" title="Amarrado na Seção 02 do Data Book" />}
                   </td>
                 </tr>
               ))}

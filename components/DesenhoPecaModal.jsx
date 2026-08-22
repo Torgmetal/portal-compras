@@ -3,7 +3,7 @@
 // Lista os PDFs da marca na pasta da Engenharia (2.5.2 Fabricação) com o FORMATO de impressão
 // (A1/A2/A3/A4 = pasta; croqui = A4) e EMITE o desenho: o portal carimba no PDF a rastreabilidade
 // do material daquela marca + quem emitiu, data e hora, arquiva o carimbado no SharePoint e amarra
-// o MESMO arquivo na §02 do Data Book. O histórico embaixo é o controle de liberação (GRD).
+// o MESMO arquivo na Seção 02 do Data Book. O histórico embaixo é o controle de liberação (GRD).
 // (Vitor 18/08: hoje o nº da rastreabilidade é copiado da planilha e escrito no croqui à mão.)
 import { useState, useEffect } from "react";
 import { X, Loader2, FileText, Printer, ExternalLink, AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
@@ -94,7 +94,7 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, onClose
                     <div className="flex items-center gap-2 flex-wrap justify-end mt-2 pt-2 border-t border-gray-50">
                       <button onClick={() => abrir(a)} title="Abrir o PDF original da Engenharia, sem carimbo e sem registro"
                         className="text-[11px] font-semibold text-torg-gray border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 inline-flex items-center gap-1"><ExternalLink size={12} /> Ver original</button>
-                      <button onClick={() => emitir(a, "EMITIR")} disabled={!!registrando} title="Carimba a rastreabilidade + quem emitiu com data/hora, arquiva na pasta da OP e amarra na §02 do Data Book. NÃO registra GRD — é só consultar."
+                      <button onClick={() => emitir(a, "EMITIR")} disabled={!!registrando} title="Carimba a rastreabilidade + quem emitiu com data/hora, arquiva na pasta da OP e amarra na Seção 02 do Data Book. NÃO registra GRD — é só consultar."
                         className="text-[11px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 inline-flex items-center gap-1 disabled:opacity-50">
                         {ocupado(a, "EMITIR") ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Emitir carimbado
                       </button>
@@ -129,7 +129,7 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, onClose
         </div>
 
         <div className="px-5 py-3 border-t border-gray-100">
-          <p className="text-[11px] text-torg-gray">O formato (A1–A4) vem da pasta da Engenharia — imprima no papel indicado. <b>"Emitir carimbado"</b> carimba no PDF o <b>R</b> do material (com corrida, certificado e fornecedor) + quem emitiu com data/hora, arquiva na pasta da OP e amarra o <b>mesmo arquivo</b> na §02 do Data Book — <b>sem</b> registrar GRD, porque abrir o desenho não é liberação. <b>"Imprimir (GRD)"</b> faz isso e registra a liberação; reimprimir a mesma peça <b>soma no contador</b> em vez de criar outra GRD. Peça ainda não cortada sai com "R a definir no corte" e o campo pra anotar. "Ver original" mostra o PDF da Engenharia, sem carimbo e sem registro.</p>
+          <p className="text-[11px] text-torg-gray">O formato (A1–A4) vem da pasta da Engenharia — imprima no papel indicado. <b>"Emitir carimbado"</b> carimba no PDF o <b>R</b> do material (com corrida, certificado e fornecedor) + quem emitiu com data/hora, arquiva na pasta da OP e amarra o <b>mesmo arquivo</b> na Seção 02 do Data Book — <b>sem</b> registrar GRD, porque abrir o desenho não é liberação. <b>"Imprimir (GRD)"</b> faz isso e registra a liberação; reimprimir a mesma peça <b>soma no contador</b> em vez de criar outra GRD. Peça ainda não cortada sai com "R a definir no corte" e o campo pra anotar. "Ver original" mostra o PDF da Engenharia, sem carimbo e sem registro.</p>
         </div>
       </div>
     </div>
