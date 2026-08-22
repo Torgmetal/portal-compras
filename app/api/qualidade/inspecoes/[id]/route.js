@@ -95,6 +95,10 @@ export async function PATCH(req, { params }) {
       soldador: l?.soldador ? String(l.soldador).slice(0, 40) : null,
       descontinuidade: l?.descontinuidade ? String(l.descontinuidade).slice(0, 40) : null,
       laudo: l?.laudo ? String(l.laudo).slice(0, 10) : null,
+      // ── a indicação (ensaio por ultrassom) ──
+      ...Object.fromEntries(["peca", "indicacao", "angulo", "face", "comprimento", "db_indicacao",
+        "db_referencia", "db_atenuacao", "db_classe", "reprovado", "percurso", "profundidade",
+        "dist_x", "dist_y", "sinete", "nivel"].map((k) => [k, l?.[k] ? String(l[k]).slice(0, 40) : null])),
     }));
   }
 
@@ -118,9 +122,41 @@ export async function PATCH(req, { params }) {
     //
     // ⚠ MESMA ARMADILHA DE SEMPRE: o que não for lido aqui é descartado no salvamento. O bloco de
     // `resultados` preserva o que já estava gravado, mas campo novo precisa ser lido explicitamente.
-    for (const k of ["encomenda", "quantidade", "desenho", "componente", "metalBase", "iluminacao",
-                     "tecnica", "condicoes", "procedimento", "criterio"]) {
+    const TEXTO_LIVRE = [
+      // visual de solda
+      "encomenda", "quantidade", "desenho", "componente", "metalBase", "iluminacao", "tecnica",
+      "condicoes", "procedimento", "criterio",
+      // ensaio por ultrassom
+      "tag", "local", "norma", "material", "espessura", "metalAdicao", "processoSolda", "acoplante",
+      "junta", "chanfro", "blocoPadrao", "apFabricante", "apModelo", "apSerie",
+      "cbFabricante", "cbModelo", "cbAngulo", "cbDimensoes", "cbFrequencia", "cbSerie",
+      // pintura
+      "descricao", "pecas", "prepProcedimento", "prepData", "prepIni", "prepFim", "prepUmidade",
+      "prepTAmb", "prepTSup", "prepOrvalho", "rugEspec", "rugObtido", "abrasivo", "poeira",
+      "salinidade", "intemperismo", "limpeza", "laudo", "espessuraMinima", "obsFotos",
+    ];
+    for (const k of TEXTO_LIVRE) {
       if (r[k] !== undefined) dados.resultados[k] = r[k] == null ? null : String(r[k]).slice(0, 120);
+    }
+    // ⚠ as demãos e as leituras de espessura são ESTRUTURA, não texto: guardadas como estão, com
+    // teto de tamanho. Sem isto o relatório de pintura salvaria vazio.
+    if (r.demaos && typeof r.demaos === "object") {
+      dados.resultados.demaos = {};
+      for (const d of ["1", "2", "3"]) {
+        const bloco = r.demaos[d];
+        if (!bloco || typeof bloco !== "object") continue;
+        const limpo = {};
+        for (const [k, v] of Object.entries(bloco).slice(0, 30)) limpo[String(k).slice(0, 20)] = v == null ? null : String(v).slice(0, 60);
+        dados.resultados.demaos[d] = limpo;
+      }
+    }
+    if (r.espessuras && typeof r.espessuras === "object") {
+      dados.resultados.espessuras = {};
+      for (const d of ["1", "2", "3"]) {
+        const lista = r.espessuras[d];
+        if (!Array.isArray(lista)) continue;
+        dados.resultados.espessuras[d] = lista.slice(0, 5).map(num);
+      }
     }
 
     if (Array.isArray(r.ocultosDesenho)) {
