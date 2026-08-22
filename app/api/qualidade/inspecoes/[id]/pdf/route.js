@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/session";
 import { gerarRelatorioInspecaoPDF } from "@/lib/relatorio-inspecao-pdf";
 import { baixarDesenho, garantirDesenhos } from "@/lib/relatorio-dimensional";
 import { gerarDimensionalPDF } from "@/lib/relatorio-dimensional-pdf";
+import { usaCotas } from "@/lib/qualidade-campo";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,7 +18,7 @@ export async function GET(req, { params }) {
   const rel = await prisma.relatorioInspecao.findUnique({ where: { id } });
   // ⚠ idem à tela de marcação: se o relatório nasceu sem desenho (criação instantânea), resolve e
   // grava aqui. Sem isto o PDF sairia com o campo do croqui em branco.
-  if (rel && rel.tipo === "DIMENSIONAL") rel.desenhos = await garantirDesenhos(rel);
+  if (rel && usaCotas(rel.tipo)) rel.desenhos = await garantirDesenhos(rel);
   if (!rel) return NextResponse.json({ error: "Relatório não encontrado" }, { status: 404 });
 
   const fotos = await prisma.fotoInspecao.findMany({
@@ -60,13 +61,13 @@ export async function GET(req, { params }) {
   // ⚠ CADA MODELO TEM SEU FORMULÁRIO. Vitor: "quando gerar o relatório ele precisa ficar com a cara
   // de relatório do excel". Os tipos que ainda não têm modelo próprio seguem o layout de evidências
   // fotográficas, que é o que existia antes.
-  const TEM_FORMULARIO = ["DIMENSIONAL", "VISUAL_SOLDA", "ULTRASSOM", "PINTURA", "LP"];
+  const TEM_FORMULARIO = ["DIMENSIONAL", "PRE_MONTAGEM", "VISUAL_SOLDA", "ULTRASSOM", "PINTURA", "LP"];
   let bytes;
   if (TEM_FORMULARIO.includes(rel.tipo)) {
     const op = await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { cliente: true, obra: true, refCliente: true } });
     const dadosOP = { cliente: op?.cliente || null, obra: op?.obra || null, refCliente: op?.refCliente || null };
-    if (rel.tipo === "DIMENSIONAL") {
-      bytes = await gerarDimensionalPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho), ...dadosOP });
+    if (usaCotas(rel.tipo)) {
+      bytes = await gerarDimensionalPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho || d?.url), ...dadosOP });
     } else if (rel.tipo === "VISUAL_SOLDA") {
       const { gerarEVSPDF } = await import("@/lib/relatorio-evs-pdf");
       bytes = await gerarEVSPDF({ rel, fotos, assinaturas, ...dadosOP });
@@ -81,7 +82,7 @@ export async function GET(req, { params }) {
       bytes = await gerarPinturaPDF({ rel, fotos, assinaturas, ...dadosOP });
     }
   } else {
-    bytes = await gerarRelatorioInspecaoPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho) });
+    bytes = await gerarRelatorioInspecaoPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho || d?.url) });
   }
   return new NextResponse(Buffer.from(bytes), {
     headers: {

@@ -30,9 +30,12 @@ export async function GET(req, { params }) {
   const desenhos = await garantirDesenhos(rel);
   // sem marca, vale o primeiro — o relatório de conjunto só tem um
   const d = marca ? desenhos.find((x) => String(x.marca).toUpperCase() === marca) : desenhos[0];
-  if (!d?.caminho) return NextResponse.json({ error: "Este relatório não tem desenho vinculado." }, { status: 404 });
+  // ⚠ `url` = projeto anexado à mão (diagrama de montagem, por exemplo); `caminho` = achado na
+  // pasta da OP. Os dois chegam em baixarDesenho.
+  const origem = d?.caminho || d?.url;
+  if (!origem) return NextResponse.json({ error: "Este relatório não tem desenho vinculado." }, { status: 404 });
 
-  const bytes = await baixarDesenho(d.caminho);
+  const bytes = await baixarDesenho(origem);
   if (!bytes) return NextResponse.json({ error: "Não consegui abrir o desenho no servidor." }, { status: 502 });
 
   const v = await vetoresDaVista(bytes).catch(() => null);

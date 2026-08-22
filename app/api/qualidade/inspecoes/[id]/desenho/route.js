@@ -28,9 +28,10 @@ export async function GET(req, { params }) {
   // ⚠ só serve desenho QUE ESTÁ NO RELATÓRIO. Aceitar um caminho pela URL transformaria esta rota
   // num leitor de arquivos do servidor.
   const alvo = marca ? desenhos.find((d) => String(d.marca).toUpperCase() === marca.toUpperCase()) : desenhos[0];
-  if (!alvo?.caminho) return NextResponse.json({ error: "Desenho não encontrado neste relatório." }, { status: 404 });
+  const origem = alvo?.caminho || alvo?.url;
+  if (!origem) return NextResponse.json({ error: "Desenho não encontrado neste relatório." }, { status: 404 });
 
-  const bytes = await baixarDesenho(alvo.caminho);
+  const bytes = await baixarDesenho(origem);
   if (!bytes) return NextResponse.json({ error: "Não consegui abrir o desenho no servidor." }, { status: 502 });
 
   return new NextResponse(bytes, {

@@ -11,7 +11,9 @@ import FormUS from "./FormUS";
 import FormPintura from "./FormPintura";
 import FormLP from "./FormLP";
 import Equipamentos from "./Equipamentos";
+import AnexarProjeto from "./AnexarProjeto";
 import Fotos from "./Fotos";
+import { usaCotas } from "@/lib/qualidade-campo";
 
 /**
  * O RELATÓRIO ABERTO — é aqui que o elaborador preenche e VÊ A PRÉVIA.
@@ -124,7 +126,7 @@ export default function RelatorioDetalheClient({ id }) {
           Vitor (21/08/2026): "tente aumentar a representatividade do desenho nessa seleção das
           cotas, precisa ficar dando zoom na tela". Estava preso na coluna do formulário, com menos
           de metade da página; aqui usa tudo, e ainda tem o "Ampliar" para a tela cheia. */}
-      {rel.tipo === "DIMENSIONAL" && desenhos.length > 0 && !travado && (
+      {usaCotas(rel.tipo) && !travado && (
         <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm mt-4">
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <p className="text-[12px] font-bold text-torg-dark inline-flex items-center gap-1.5">
@@ -137,9 +139,24 @@ export default function RelatorioDetalheClient({ id }) {
                 {desenhos.map((d) => <option key={d.marca} value={d.marca}>{d.marca}</option>)}
               </select>
             ) : (
-              <span className="text-[10px] text-torg-gray">{desenhos[0]?.nome}</span>
+              <span className="text-[10px] text-torg-gray">
+                {desenhos[0]?.nome || desenhos[0]?.marca || "nenhum projeto vinculado"}
+                {desenhos[0]?.anexado && <span className="text-torg-blue"> · anexado</span>}
+              </span>
             )}
+            {/* ⚠ o diagrama de montagem não tem marca de peça, então a varredura da pasta não o
+                acha. Esta é a porta manual — ver a nota em AnexarProjeto.jsx. */}
+            <AnexarProjeto relatorioId={id} anexado={!!desenhos[0]?.anexado} travado={travado}
+              onMudou={carregar} />
           </div>
+
+          {!desenhos.length && (
+            <p className="text-[11px] text-torg-gray">
+              Nenhum projeto vinculado. O portal procura o desenho na pasta da OP pela marca da
+              peça; para diagrama de montagem, anexe o PDF acima.
+            </p>
+          )}
+          {desenhos.length > 0 && (
           <MarcadorCotas
             relatorioId={id}
             marca={marcaAtual}
@@ -154,6 +171,7 @@ export default function RelatorioDetalheClient({ id }) {
             linhasOcultas={res.linhasOcultasDesenho || []}
             onLinhas={(l) => setResultado("linhasOcultasDesenho", l)}
           />
+          )}
         </div>
       )}
 

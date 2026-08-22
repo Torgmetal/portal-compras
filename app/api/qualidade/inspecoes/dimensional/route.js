@@ -36,9 +36,9 @@ export async function POST(req) {
   const escopo = body?.escopo === "AVULSAS" ? "AVULSAS" : "CONJUNTO";
   // ⚠ a rota deixou de ser só do dimensional: qualquer tipo nasce por aqui. O que muda por tipo é a
   // exigência da peça e o que se resolve depois (o desenho, só o dimensional usa).
-  const { tipoValido } = await import("@/lib/qualidade-campo");
+  const { tipoValido, usaCotas } = await import("@/lib/qualidade-campo");
   const tipo = tipoValido(body?.tipo) ? body.tipo : "DIMENSIONAL";
-  const ehDimensional = tipo === "DIMENSIONAL";
+  const ehDimensional = usaCotas(tipo);
   const marcas = [...new Set((Array.isArray(body?.marcas) ? body.marcas : []).map((m) => String(m || "").trim().toUpperCase()).filter(Boolean))];
 
   if (!opNumero) return NextResponse.json({ error: "Informe a OP." }, { status: 400 });

@@ -5,7 +5,7 @@ import {
   Loader2, ArrowLeft, Camera, FileText, Check, Send, AlertCircle,
   ChevronRight, ExternalLink, Plus, X, ShieldCheck, Ruler, Trash2,
 } from "lucide-react";
-import { TIPO_LABEL, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
+import { TIPO_LABEL, TIPOS_RELATORIO, usaCotas } from "@/lib/qualidade-campo";
 
 /**
  * INSPEÇÕES — as fotos do celular viram relatório aqui, no computador.
@@ -410,7 +410,7 @@ function Montar({ grupo, onFechar, onPronto }) {
  * quais foram fica na tabela do próprio relatório.
  */
 function NovoRelatorio({ tipo, onFechar, onPronto }) {
-  const ehDimensional = tipo === "DIMENSIONAL";
+  const ehDimensional = usaCotas(tipo);
   const [ops, setOps] = useState(null);
   const [op, setOp] = useState(null);
   const [escopo, setEscopo] = useState("CONJUNTO");

@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2, Camera, X } from "lucide-react";
 import LeitorQR from "./LeitorQR";
-import { marcaDoQR, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
+import { marcaDoQR, TIPOS_RELATORIO, usaCotas } from "@/lib/qualidade-campo";
 import Pintura from "./Pintura";
 import { ParametrosLP, IndicacaoLP } from "./Lp";
 import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA } from "@/lib/evs-campos";
@@ -292,7 +292,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   if (erro) return <Tela titulo="Relatório" voltar={onVoltar}><p className="text-sm text-red-600 inline-flex items-center gap-2"><AlertCircle size={15} /> {erro}</p></Tela>;
   if (!rel) return <Tela titulo="Relatório" voltar={onVoltar}><p className="text-sm text-torg-gray inline-flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> abrindo…</p></Tela>;
 
-  const ehDim = rel.tipo === "DIMENSIONAL";
+  const ehDim = usaCotas(rel.tipo);
   const ehUS = rel.tipo === "ULTRASSOM";
   // ⚠ a pintura não tem "junta a inspecionar": o ensaio é do REVESTIMENTO, medido por
   // demão, não por peça. Sem esta separação ela caía nos controles do visual de solda e

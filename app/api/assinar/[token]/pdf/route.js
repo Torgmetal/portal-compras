@@ -7,6 +7,7 @@ import { gerarCronogramaAuditoriaPDF } from "@/lib/cronograma-auditoria-pdf";
 import { gerarRelatorioInspecaoPDF } from "@/lib/relatorio-inspecao-pdf";
 import { baixarDesenho } from "@/lib/relatorio-dimensional";
 import { gerarDimensionalPDF } from "@/lib/relatorio-dimensional-pdf";
+import { usaCotas } from "@/lib/qualidade-campo";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -42,13 +43,13 @@ export async function GET(_req, { params }) {
       orderBy: { capturadaEm: "asc" },
       select: { url: true, marca: true, origemMarca: true, observacao: true, capturadaEm: true, autorNome: true },
     });
-    if (rel.tipo === "DIMENSIONAL") {
+    if (usaCotas(rel.tipo)) {
       const op = await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { cliente: true, obra: true } });
       // ⚠ as fotos vão TAMBÉM no PDF que segue para assinatura — quem assina precisa ver a
       // mesma evidência que está no documento arquivado, e não uma versão sem as imagens.
-      bytes = await gerarDimensionalPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho), cliente: op?.cliente || null, obra: op?.obra || null });
+      bytes = await gerarDimensionalPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho || d?.url), cliente: op?.cliente || null, obra: op?.obra || null });
     } else {
-      bytes = await gerarRelatorioInspecaoPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho) });
+      bytes = await gerarRelatorioInspecaoPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho || d?.url) });
     }
   } else {
     return new NextResponse("Documento não suportado.", { status: 400 });
