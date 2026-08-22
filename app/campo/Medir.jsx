@@ -326,15 +326,20 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
                     </label>
                   </div>
 
-                  <div className="mt-2 flex flex-wrap gap-1.5">
+                  {/* ⚠ CÓDIGO E NOME NO BOTÃO. Vitor (21/08/2026): "tem como colocar as legendas de
+                      cada botão desse?". Só a sigla obriga a decorar onze códigos ou a procurar a
+                      legenda no rodapé do formulário — e quem está de luva, com a peça na frente,
+                      não faz nem uma coisa nem outra: erra o botão. */}
+                  <div className="mt-2 grid grid-cols-2 gap-1.5">
                     {DESCONTINUIDADES.map((d) => {
                       const on = marcados.includes(d.c);
                       return (
-                        <button key={d.c} onClick={() => alternarDefeito(i, d.c)} title={d.nome}
-                          className={`text-[13px] font-bold rounded-lg px-2.5 py-2 border ${
+                        <button key={d.c} onClick={() => alternarDefeito(i, d.c)}
+                          className={`text-left rounded-lg px-2 py-1.5 border leading-tight ${
                             on ? (d.grave ? "bg-red-600 text-white border-red-600" : "bg-torg-orange text-white border-torg-orange")
-                               : "text-torg-gray border-gray-200 active:bg-gray-50"}`}>
-                          {d.c}
+                               : "text-torg-dark border-gray-200 active:bg-gray-50"}`}>
+                          <span className="block text-[13px] font-bold">{d.c}</span>
+                          <span className={`block text-[10px] ${on ? "text-white/85" : "text-torg-gray"}`}>{d.nome}</span>
                         </button>
                       );
                     })}

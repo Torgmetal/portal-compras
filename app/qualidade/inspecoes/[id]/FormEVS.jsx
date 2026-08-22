@@ -193,11 +193,12 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
                   {DESCONTINUIDADES.map((d) => {
                     const on = marcados.includes(d.c);
                     return (
-                      <button key={d.c} onClick={() => !travado && alternarDefeito(i, d.c)} title={d.nome}
-                        className={`text-[10px] font-bold rounded px-1.5 py-0.5 border ${
+                      <button key={d.c} onClick={() => !travado && alternarDefeito(i, d.c)}
+                        className={`text-[10px] rounded px-1.5 py-0.5 border inline-flex items-baseline gap-1 ${
                           on ? (d.grave ? "bg-red-600 text-white border-red-600" : "bg-torg-orange text-white border-torg-orange")
-                             : "text-torg-gray border-gray-200 hover:border-torg-blue"}`}>
-                        {d.c}
+                             : "text-torg-dark border-gray-200 hover:border-torg-blue"}`}>
+                        <span className="font-bold">{d.c}</span>
+                        <span className={on ? "text-white/85" : "text-torg-gray"}>{d.nome}</span>
                       </button>
                     );
                   })}
