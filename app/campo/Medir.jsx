@@ -140,7 +140,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         ...(ehDim
           ? { encontradoMm: l.encontradoMm }
           : { laudo: l.laudo, descontinuidade: l.descontinuidade, marca: l.marca, qtd: l.qtd,
-              descricao: l.descricao, eps: l.eps, soldador: l.soldador }),
+              descricao: l.descricao, eps: l.eps, soldador: l.soldador, sinete: l.sinete }),
         obs: l.obs ?? null,
       }));
       const r = await fetch(`/api/campo/relatorios/${id}`, {
@@ -266,13 +266,20 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <label className="block">
                       <span className="block text-[11px] text-torg-gray mb-0.5">Soldador</span>
-                      <select value={l.soldador || ""} onChange={(e) => set(i, "soldador", e.target.value)}
+                      {/* ⚠ escolher o soldador grava também o SINETE (S-01, S-04…), que é o que
+                          identifica quem soldou a junta no relatório de ultrassom. Ele vem da RSQ e
+                          não existe em nenhum outro cadastro do portal. */}
+                      <select value={l.soldador || ""}
+                        onChange={(e) => {
+                          const x = listas.soldadores.find((y) => y.nome === e.target.value);
+                          setLinhas((p2) => p2.map((ln, k) => (k === i ? { ...ln, soldador: e.target.value, sinete: x?.sinete || null } : ln)));
+                        }}
                         className={`w-full text-[14px] border-2 rounded-lg px-2 py-2 outline-none ${
-                          listas.soldadores.find((x) => x.nome === l.soldador)?.vencido ? "border-red-400 bg-red-50" : "border-gray-200"}`}>
+                          listas.soldadores.find((x) => x.nome === l.soldador)?.qualificado === false ? "border-amber-400 bg-amber-50" : "border-gray-200"}`}>
                         <option value="">—</option>
                         {listas.soldadores.map((x) => (
                           <option key={x.id} value={x.nome}>
-                            {x.nome}{x.vencido ? " (vencido)" : x.semCertificado ? " (sem cert.)" : ""}
+                            {x.sinete ? `${x.sinete} · ` : ""}{x.nome}{x.qualificado ? ` (${x.processos.join("/")})` : " — sem qualificação"}
                           </option>
                         ))}
                       </select>

@@ -164,14 +164,18 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
                   </label>
                   <label className="block">
                     <span className="block text-[10px] text-torg-gray mb-0.5">
-                      Soldador {sold?.vencido && <span className="text-red-600 font-semibold">· certificação vencida</span>}
+                      Soldador {sold && !sold.qualificado && <span className="text-amber-700 font-semibold">· sem qualificação na RSQ</span>}
                     </span>
-                    <select value={l.soldador || ""} disabled={travado} onChange={(e) => set(i, "soldador", e.target.value)}
-                      className={`w-full text-[12px] border rounded px-1.5 py-1 disabled:bg-gray-50 ${sold?.vencido ? "border-red-400 bg-red-50" : "border-gray-200"}`}>
+                    <select value={l.soldador || ""} disabled={travado}
+                      onChange={(e) => {
+                        const x = soldadores.find((y) => y.nome === e.target.value);
+                        setLinhas(linhas.map((ln, k) => (k === i ? { ...ln, soldador: e.target.value, sinete: x?.sinete || null } : ln)));
+                      }}
+                      className={`w-full text-[12px] border rounded px-1.5 py-1 disabled:bg-gray-50 ${sold && !sold.qualificado ? "border-amber-400 bg-amber-50" : "border-gray-200"}`}>
                       <option value="">—</option>
                       {soldadores.map((s) => (
                         <option key={s.id || s.nome} value={s.nome}>
-                          {s.nome}{s.vencido ? " (vencido)" : s.semCertificado ? " (sem cert.)" : ""}
+                          {s.sinete ? `${s.sinete} · ` : ""}{s.nome}{s.qualificado ? ` (${s.processos.join("/")})` : " — sem qualificação"}
                         </option>
                       ))}
                     </select>

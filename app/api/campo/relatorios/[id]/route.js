@@ -65,7 +65,7 @@ export async function PATCH(req, { params }) {
     // ⚠ campos da JUNTA: no visual de solda quem descobre a junta é quem está na frente dela, então
     // o campo escreve peça, EPS e soldador. No dimensional isso não vem — as cotas são definidas no
     // desenho, antes, e o celular só responde a medida.
-    for (const k of ["marca", "descricao", "eps", "soldador"]) {
+    for (const k of ["marca", "descricao", "eps", "soldador", "sinete"]) {
       if (m[k] !== undefined) novo[k] = m[k] ? String(m[k]).slice(0, 60) : null;
     }
     if (m.qtd !== undefined) novo.qtd = num(m.qtd);
@@ -80,6 +80,7 @@ export async function PATCH(req, { params }) {
       qtd: num(m.qtd), descricao: m.descricao ? String(m.descricao).slice(0, 120) : null,
       eps: m.eps ? String(m.eps).slice(0, 60) : null,
       soldador: m.soldador ? String(m.soldador).slice(0, 60) : null,
+      sinete: m.sinete ? String(m.sinete).slice(0, 20) : null,
       descontinuidade: m.descontinuidade ? String(m.descontinuidade).slice(0, 40) : null,
       laudo: m.laudo ? String(m.laudo).slice(0, 10) : null,
       obs: m.obs ? String(m.obs).slice(0, 160) : null,

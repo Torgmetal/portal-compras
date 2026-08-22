@@ -93,6 +93,8 @@ export async function PATCH(req, { params }) {
       // ── a junta inspecionada (visual de solda) ──
       eps: l?.eps ? String(l.eps).slice(0, 30) : null,
       soldador: l?.soldador ? String(l.soldador).slice(0, 40) : null,
+      // sinete do soldador (S-01, S-04…) — vem da RSQ; é o que identifica quem soldou
+      sinete: l?.sinete ? String(l.sinete).slice(0, 20) : null,
       descontinuidade: l?.descontinuidade ? String(l.descontinuidade).slice(0, 40) : null,
       laudo: l?.laudo ? String(l.laudo).slice(0, 10) : null,
       // ── a indicação (ensaio por ultrassom) ──
