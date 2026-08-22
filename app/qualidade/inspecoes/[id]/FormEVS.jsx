@@ -208,9 +208,11 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
                     const on = l.laudo === v.c;
                     const cor = v.c === "A" ? "bg-emerald-600 border-emerald-600" : v.c === "R" ? "bg-red-600 border-red-600" : "bg-amber-500 border-amber-500";
                     return (
-                      <button key={v.c} onClick={() => !travado && set(i, "laudo", v.c)} title={v.nome}
-                        className={`text-[10px] font-bold rounded px-2 py-0.5 border ${on ? `${cor} text-white` : "text-torg-gray border-gray-200 hover:border-torg-blue"}`}>
-                        {on && <Check size={9} className="inline mr-0.5" />}{v.c}
+                      <button key={v.c} onClick={() => !travado && set(i, "laudo", v.c)}
+                        className={`text-[10px] rounded px-2 py-0.5 border inline-flex items-baseline gap-1 ${on ? `${cor} text-white` : "text-torg-dark border-gray-200 hover:border-torg-blue"}`}>
+                        {on && <Check size={9} className="self-center" />}
+                        <span className="font-bold">{v.c}</span>
+                        <span className={on ? "text-white/85" : "text-torg-gray"}>{v.curto}</span>
                       </button>
                     );
                   })}

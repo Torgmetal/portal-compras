@@ -371,8 +371,9 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
                       const cor = v.c === "A" ? "bg-emerald-600 border-emerald-600" : v.c === "R" ? "bg-red-600 border-red-600" : "bg-amber-500 border-amber-500";
                       return (
                         <button key={v.c} onClick={() => set(i, "laudo", v.c)}
-                          className={`text-[14px] font-bold rounded-lg py-2.5 border ${on ? `${cor} text-white` : "text-torg-gray border-gray-200 active:bg-gray-50"}`}>
-                          {v.c}
+                          className={`rounded-lg py-2 border leading-tight ${on ? `${cor} text-white` : "text-torg-dark border-gray-200 active:bg-gray-50"}`}>
+                          <span className="block text-[15px] font-bold">{v.c}</span>
+                          <span className={`block text-[10px] ${on ? "text-white/85" : "text-torg-gray"}`}>{v.curto}</span>
                         </button>
                       );
                     })}
