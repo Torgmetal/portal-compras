@@ -2,9 +2,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { gerarRelatorioInspecaoPDF } from "@/lib/relatorio-inspecao-pdf";
 import { baixarDesenho, garantirDesenhos } from "@/lib/relatorio-dimensional";
-import { gerarDimensionalPDF } from "@/lib/relatorio-dimensional-pdf";
 import { usaCotas } from "@/lib/qualidade-campo";
 
 export const runtime = "nodejs";
@@ -61,29 +59,18 @@ export async function GET(req, { params }) {
   // ⚠ CADA MODELO TEM SEU FORMULÁRIO. Vitor: "quando gerar o relatório ele precisa ficar com a cara
   // de relatório do excel". Os tipos que ainda não têm modelo próprio seguem o layout de evidências
   // fotográficas, que é o que existia antes.
-  const TEM_FORMULARIO = ["DIMENSIONAL", "PRE_MONTAGEM", "VISUAL_SOLDA", "ULTRASSOM", "PINTURA", "LP"];
-  let bytes;
-  if (TEM_FORMULARIO.includes(rel.tipo)) {
-    const op = await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { cliente: true, obra: true, refCliente: true } });
-    const dadosOP = { cliente: op?.cliente || null, obra: op?.obra || null, refCliente: op?.refCliente || null };
-    if (usaCotas(rel.tipo)) {
-      bytes = await gerarDimensionalPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho || d?.url), ...dadosOP });
-    } else if (rel.tipo === "VISUAL_SOLDA") {
-      const { gerarEVSPDF } = await import("@/lib/relatorio-evs-pdf");
-      bytes = await gerarEVSPDF({ rel, fotos, assinaturas, ...dadosOP });
-    } else if (rel.tipo === "ULTRASSOM") {
-      const { gerarUSPDF } = await import("@/lib/relatorio-us-pdf");
-      bytes = await gerarUSPDF({ rel, fotos, assinaturas, ...dadosOP });
-    } else if (rel.tipo === "LP") {
-      const { gerarLPPDF } = await import("@/lib/relatorio-lp-pdf");
-      bytes = await gerarLPPDF({ rel, fotos, assinaturas, ...dadosOP });
-    } else {
-      const { gerarPinturaPDF } = await import("@/lib/relatorio-pintura-pdf");
-      bytes = await gerarPinturaPDF({ rel, fotos, assinaturas, ...dadosOP });
-    }
-  } else {
-    bytes = await gerarRelatorioInspecaoPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho || d?.url) });
-  }
+  // ⚠ o despacho por tipo mora em lib/relatorio-render.js, e não aqui: a rota pública do link de
+  // assinatura precisa EXATAMENTE do mesmo, e duas cópias divergiram — o LP nasceu numa e não na
+  // outra, e quem assinava recebia uma folha que não era o documento.
+  const op = await prisma.oP.findFirst({
+    where: { numero: rel.opNumero }, select: { cliente: true, obra: true, refCliente: true },
+  });
+  const bytes = await gerarPDFdoRelatorio({
+    rel, fotos, assinaturas,
+    cliente: op?.cliente || null, obra: op?.obra || null, refCliente: op?.refCliente || null,
+    desenhoBytes: (d) => baixarDesenho(d?.caminho || d?.url),
+  });
+
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       "Content-Type": "application/pdf",

@@ -4,10 +4,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { gerarPlanoTreinamentoPDF } from "@/lib/plano-treinamento-pdf";
 import { gerarCronogramaAuditoriaPDF } from "@/lib/cronograma-auditoria-pdf";
-import { gerarRelatorioInspecaoPDF } from "@/lib/relatorio-inspecao-pdf";
 import { baixarDesenho } from "@/lib/relatorio-dimensional";
-import { gerarDimensionalPDF } from "@/lib/relatorio-dimensional-pdf";
-import { usaCotas } from "@/lib/qualidade-campo";
+import { gerarPDFdoRelatorio } from "@/lib/relatorio-render";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -43,14 +41,17 @@ export async function GET(_req, { params }) {
       orderBy: { capturadaEm: "asc" },
       select: { url: true, marca: true, origemMarca: true, observacao: true, capturadaEm: true, autorNome: true },
     });
-    if (usaCotas(rel.tipo)) {
-      const op = await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { cliente: true, obra: true } });
-      // ⚠ as fotos vão TAMBÉM no PDF que segue para assinatura — quem assina precisa ver a
-      // mesma evidência que está no documento arquivado, e não uma versão sem as imagens.
-      bytes = await gerarDimensionalPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho || d?.url), cliente: op?.cliente || null, obra: op?.obra || null });
-    } else {
-      bytes = await gerarRelatorioInspecaoPDF({ rel, fotos, assinaturas, desenhoBytes: (d) => baixarDesenho(d?.caminho || d?.url) });
-    }
+    // ⚠ o MESMO despacho da tela interna (lib/relatorio-render.js). Antes esta rota mandava
+    // tudo que não fosse dimensional para o gerador antigo, e quem assinava recebia uma folha
+    // que não é o documento.
+    const op = await prisma.oP.findFirst({
+      where: { numero: rel.opNumero }, select: { cliente: true, obra: true, refCliente: true },
+    });
+    bytes = await gerarPDFdoRelatorio({
+      rel, fotos, assinaturas,
+      cliente: op?.cliente || null, obra: op?.obra || null, refCliente: op?.refCliente || null,
+      desenhoBytes: (d) => baixarDesenho(d?.caminho || d?.url),
+    });
   } else {
     return new NextResponse("Documento não suportado.", { status: 400 });
   }
