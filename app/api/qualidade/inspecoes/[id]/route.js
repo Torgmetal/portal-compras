@@ -136,6 +136,9 @@ export async function PATCH(req, { params }) {
       "salinidade", "intemperismo", "limpeza", "laudo", "espessuraMinima", "obsFotos",
       // vínculo com o procedimento do Controle de Documentos
       "procedimentoId",
+      // ⚠ tipo de estrutura da AWS D1.1 — é ele que decide QUAL limite vale para cada
+      // descontinuidade (1 mm de mordedura na estática, 0,25 mm em membro primário da cíclica).
+      "tipoEstrutura",
     ];
     for (const k of TEXTO_LIVRE) {
       if (r[k] !== undefined) dados.resultados[k] = r[k] == null ? null : String(r[k]).slice(0, 120);

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2, AlertTriangle, Check } from "lucide-react";
 import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES } from "@/lib/evs-campos";
+import { TIPOS_ESTRUTURA, criteriosDoDefeito } from "@/lib/aws-d11";
 
 /**
  * O PREENCHIMENTO DO ENSAIO VISUAL DE SOLDA.
@@ -92,6 +93,15 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
           </label>
           <Campo rot="Técnica de inspeção" k="tecnica" opcoes={TECNICAS} />
           <Campo rot="Condições superficiais" k="condicoes" opcoes={CONDICOES} />
+          <label className="block">
+            <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Tipo de estrutura (AWS D1.1)</span>
+            <select value={res.tipoEstrutura || ""} disabled={travado}
+              onChange={(e) => setResultado("tipoEstrutura", e.target.value)}
+              className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue disabled:bg-gray-50">
+              <option value="">— escolha para ver os limites</option>
+              {TIPOS_ESTRUTURA.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
+            </select>
+          </label>
           <Campo rot="Critério de aceitação" k="criterio" />
         </div>
         <p className="text-[10px] text-torg-gray mt-2">
@@ -189,10 +199,35 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
                     );
                   })}
                 </div>
+                {/* ── O LIMITE, AO LADO DO DEFEITO ────────────────────────────────────────
+                    Vitor pediu o critério na tela. Sem ele, o inspetor marca "mordedura" e decide
+                    de cabeça se passa — e o limite muda com o tipo de estrutura (1 mm na estática,
+                    0,25 mm em membro primário da cíclica). Ler a regra na hora de julgar é o que
+                    torna o laudo defensável numa auditoria. */}
                 {marcados.length > 0 && (
-                  <p className="text-[10px] text-torg-gray mt-1">
-                    {marcados.map((c) => DESCONTINUIDADES.find((d) => d.c === c)?.nome || c).join(" · ")}
-                  </p>
+                  <div className="mt-1.5 space-y-1">
+                    {marcados.map((c) => {
+                      const d = DESCONTINUIDADES.find((x) => x.c === c);
+                      const crit = criteriosDoDefeito(c, res.tipoEstrutura);
+                      return (
+                        <div key={c} className="text-[10px] leading-snug">
+                          <span className="font-semibold text-torg-dark">{c} · {d?.nome || c}</span>
+                          {d?.grave && <span className="text-red-600 font-semibold"> — sem tolerância na AWS D1.1</span>}
+                          {!res.tipoEstrutura && crit.length === 0 && !d?.grave && (
+                            <span className="text-torg-gray"> — escolha o tipo de estrutura para ver o limite</span>
+                          )}
+                          {crit.map((k) => (
+                            <p key={`${k.n}${k.letra || ""}`} className="text-torg-gray pl-2 border-l-2 border-gray-200 mt-0.5">
+                              <strong>({k.n}{k.letra ? k.letra : ""}) {k.titulo}:</strong> {k.texto}
+                            </p>
+                          ))}
+                          {crit.length === 0 && res.tipoEstrutura && !d?.grave && (
+                            <span className="text-torg-gray"> — a tabela 11 não fixa limite para esta descontinuidade; ver PO-06</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             );

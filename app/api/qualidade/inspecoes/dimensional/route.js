@@ -119,7 +119,10 @@ export async function POST(req) {
         linhas: [],
         // e sem desenho: o caminho é resolvido na primeira abertura da marcação
         desenhos: [],
-        resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia, tiposPeca, qtdPeca, procedimento: proc?.nome || null, procedimentoId: proc?.id || null },
+        resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia, tiposPeca, qtdPeca,
+          procedimento: proc?.nome || null, procedimentoId: proc?.id || null,
+          // o critério do ensaio visual de solda é fixado pelo PO-06, item 9.4
+          criterio: tipo === "VISUAL_SOLDA" ? "AWS D1.1 - tabela 11 do PO-06" : null },
         criadoPorId: user.id, criadoPorNome: user.name || null,
       },
     });
