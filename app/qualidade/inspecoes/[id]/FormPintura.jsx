@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, Check, ClipboardList } from "lucide-react";
 import { escopoDoTipo, amostragemDoTipo } from "@/lib/pit-escopo";
 import PlpPainel from "./PlpPainel";
-import { tipoDoProduto } from "@/lib/plp";
+import { tipoDoProduto, camposDoRelatorioPintura } from "@/lib/plp";
 import {
   GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, METODOS_APLICACAO, TEMPO, CAMPOS_DEMAO,
   RUGOSIDADE_MIN, RUGOSIDADE_MAX, mediaRugosidade, mediaEspessura, condicoesPermitemPintar,
@@ -71,6 +71,13 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
 
   const CAMPO_LOTE = { loteA: { comp: "A", val: "valA" }, loteB: { comp: "B", val: "valB" }, loteD: { comp: "D", val: "valD" } };
 
+  // ⚠ O QUE O PLP DIZ APARECE MESMO SEM CLIQUE. Vitor (22/08/2026): "qual a espessura que
+  // fala no PLP, você precisa trazer essa informação aqui também". O campo é do relatório
+  // (documento controlado, gravado na criação), mas deixá-lo em branco quando o plano da
+  // obra tem a resposta obriga o inspetor a procurar em outro lugar. Então o valor do PLP
+  // vira a dica do campo — e o "Preencher" do painel é que grava.
+  const doPlp = plp ? camposDoRelatorioPintura(plp) : {};
+
   function escolherLote(n, k, idTinta) {
     const t = tintas.find((x) => x.id === idTinta);
     const cfg = CAMPO_LOTE[k];
@@ -115,7 +122,12 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
         </select>
       ) : (
         <input type={tipo} value={res[k] ?? ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
+          placeholder={doPlp[k] != null && typeof doPlp[k] !== "object" ? String(doPlp[k]) : ""}
           className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
+      )}
+      {/* a dica só aparece enquanto o campo está vazio: depois de preenchido ela seria ruído */}
+      {doPlp[k] != null && typeof doPlp[k] !== "object" && (res[k] === undefined || res[k] === null || res[k] === "") && (
+        <span className="block text-[10px] text-torg-blue mt-0.5">PLP: {String(doPlp[k])}</span>
       )}
     </label>
   );

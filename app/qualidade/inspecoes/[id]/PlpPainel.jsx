@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Loader2, Paintbrush, Pencil, Check, X, FolderSearch, Download } from "lucide-react";
 import { METODOS_PREPARO, PLP_PADRAO, resumoPlp, camposDoRelatorioPintura } from "@/lib/plp";
 import { GRAUS_LIMPEZA, METODOS_APLICACAO } from "@/lib/pintura-campos";
@@ -33,6 +33,25 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas, onPlp, res =
       .then((j) => { setDados(j); onTintas?.(j.tintas || []); onPlp?.(j.plp || null); })
       .catch(() => setDados({ plp: null, tintas: [] }));
   }, [opNumero, onTintas, onPlp]);
+
+  // ⚠ RELATÓRIO QUE NASCEU ANTES DO PLP se preenche sozinho, UMA VEZ.
+  //
+  // O especificado é gravado na criação; relatório aberto antes de a obra ter PLP fica em
+  // branco para sempre e obriga um clique que ninguém adivinha. Só dispara quando NENHUM
+  // campo especificado está preenchido — ou seja, quando o relatório claramente antecede o
+  // plano. Se o inspetor já mexeu em algum, a decisão é dele e nada é tocado.
+  const jaAplicou = useRef(false);
+  useEffect(() => {
+    if (jaAplicou.current || !dados?.plp || !setResultado) return;
+    const especificados = ["prepProcedimento", "limpeza", "abrasivo", "rugEspec", "espessuraMinima"];
+    if (especificados.some((k) => res[k] !== undefined && res[k] !== null && res[k] !== "")) {
+      jaAplicou.current = true;
+      return;
+    }
+    jaAplicou.current = true;
+    const n = aplicar(dados.plp);
+    if (n) setAviso(`${n} campo(s) trazidos do PLP — salve para gravar.`);
+  }, [dados, res, setResultado, aplicar]);
 
   function abrir() {
     const p = dados?.plp;
