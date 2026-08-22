@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Plus, Trash2, AlertTriangle, Check } from "lucide-react";
-import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA } from "@/lib/evs-campos";
+import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA, CRITERIO_PADRAO } from "@/lib/evs-campos";
 import { criteriosDoDefeito, ONDE_VALE } from "@/lib/aws-d11";
 
 /**
@@ -97,7 +97,21 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
           </label>
           <Campo rot="Técnica de inspeção" k="tecnica" opcoes={TECNICAS} />
           <Campo rot="Condições superficiais" k="condicoes" opcoes={CONDICOES} />
-          <Campo rot="Critério de aceitação" k="criterio" />
+          {/* ⚠ o critério NÃO é texto livre à toa: vem do PO-06, item 9.4. Deixar em branco num
+              documento que vai ao cliente é dizer que a peça foi julgada contra nada. */}
+          <label className="block">
+            <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Critério de aceitação</span>
+            <input value={res.criterio ?? ""} disabled={travado}
+              onChange={(e) => setResultado("criterio", e.target.value)}
+              placeholder={CRITERIO_PADRAO}
+              className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
+            {!res.criterio && !travado && (
+              <button onClick={() => setResultado("criterio", CRITERIO_PADRAO)}
+                className="text-[10px] text-torg-blue hover:underline mt-0.5">
+                usar o do PO-06
+              </button>
+            )}
+          </label>
         </div>
         <p className="text-[10px] text-torg-gray mt-2">
           Procedimento: <strong className="text-torg-dark">{res.procedimento || "—"}</strong>

@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { procedimentoTolerancia } from "@/lib/relatorio-dimensional";
+import { CRITERIO_PADRAO } from "@/lib/evs-campos";
 import { vincularNoDataBook } from "@/lib/relatorio-inspecao";
 
 export const runtime = "nodejs";
@@ -122,7 +123,7 @@ export async function POST(req) {
         resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia, tiposPeca, qtdPeca,
           procedimento: proc?.nome || null, procedimentoId: proc?.id || null,
           // o critério do ensaio visual de solda é fixado pelo PO-06, item 9.4
-          criterio: tipo === "VISUAL_SOLDA" ? "AWS D1.1 - tabela 11 do PO-06" : null },
+          criterio: tipo === "VISUAL_SOLDA" ? CRITERIO_PADRAO : null },
         criadoPorId: user.id, criadoPorNome: user.name || null,
       },
     });
