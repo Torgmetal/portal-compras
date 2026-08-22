@@ -696,14 +696,15 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
 }
 
 function EnviarAssinatura({ relatorio, onFechar, onEnviado }) {
-  const [linhas, setLinhas] = useState([{ nome: "", email: "", papel: PAPEIS[0] }]);
+  const [linhas, setLinhas] = useState([{ nome: "", email: "", papel: PAPEIS[0], assina: true }]);
   const [enviando, setEnviando] = useState(false);
 
   const set = (i, campo, v) => setLinhas((p) => p.map((l, k) => (k === i ? { ...l, [campo]: v } : l)));
 
   async function enviar() {
     const dest = linhas.filter((l) => l.nome.trim() && /.+@.+\..+/.test(l.email.trim()));
-    if (!dest.length) { alert("Preencha nome e e-mail de ao menos um assinante."); return; }
+    if (!dest.length) { alert("Preencha nome e e-mail de ao menos um destinatário."); return; }
+    if (!dest.some((l) => l.assina)) { alert("Marque ao menos uma pessoa como assinante — só com cópias o documento nunca é assinado."); return; }
     setEnviando(true);
     try {
       const r = await fetch(`/api/qualidade/inspecoes/${relatorio.id}/assinatura`, {
@@ -712,7 +713,7 @@ function EnviarAssinatura({ relatorio, onFechar, onEnviado }) {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
-      alert(`${j.enviados} e-mail(s) enviado(s).${j.jaEstavam ? ` ${j.jaEstavam} já tinham sido convidados.` : ""}`);
+      alert(`${j.enviados} assinante(s) convidado(s)${j.emCopia ? ` e ${j.emCopia} em cópia` : ""}.${j.jaEstavam ? ` ${j.jaEstavam} já tinham sido convidados.` : ""}`);
       onEnviado();
     } catch (e) { alert(e.message); } finally { setEnviando(false); }
   }
@@ -724,7 +725,7 @@ function EnviarAssinatura({ relatorio, onFechar, onEnviado }) {
       </p>
       <div className="space-y-2">
         {linhas.map((l, i) => (
-          <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1.4fr_auto_auto] gap-2">
+          <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1.4fr_auto_auto_auto] gap-2 items-center">
             <input value={l.nome} onChange={(e) => set(i, "nome", e.target.value)} placeholder="nome"
               className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
             <input value={l.email} onChange={(e) => set(i, "email", e.target.value)} placeholder="e-mail" type="email"
@@ -733,14 +734,22 @@ function EnviarAssinatura({ relatorio, onFechar, onEnviado }) {
               className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue">
               {PAPEIS.map((p) => <option key={p}>{p}</option>)}
             </select>
+            {/* ⚠ quem não assina vai EM CÓPIA: recebe o PDF e não ganha link nem linha no quadro
+                de assinaturas. Sem isso o relatório ficaria eternamente "aguardando" alguém que
+                nunca deveria assinar. */}
+            <label className="flex items-center gap-1.5 text-[11px] text-torg-gray whitespace-nowrap cursor-pointer px-1">
+              <input type="checkbox" checked={l.assina !== false} onChange={(e) => set(i, "assina", e.target.checked)}
+                className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
+              {l.assina !== false ? "assina" : "cópia"}
+            </label>
             <button onClick={() => setLinhas((p) => p.filter((_, k) => k !== i))} disabled={linhas.length === 1}
               className="text-torg-gray hover:text-red-600 disabled:opacity-30 px-1"><X size={14} /></button>
           </div>
         ))}
       </div>
       <div className="flex items-center justify-between mt-2 gap-2 flex-wrap">
-        <button onClick={() => setLinhas((p) => [...p, { nome: "", email: "", papel: PAPEIS[Math.min(p.length, PAPEIS.length - 1)] }])}
-          className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={11} /> outro assinante</button>
+        <button onClick={() => setLinhas((p) => [...p, { nome: "", email: "", papel: PAPEIS[Math.min(p.length, PAPEIS.length - 1)], assina: true }])}
+          className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={11} /> outro destinatário</button>
         <div className="flex items-center gap-2">
           <button onClick={onFechar} className="text-[12px] text-torg-gray px-2 py-1">Fechar</button>
           <button onClick={enviar} disabled={enviando}
@@ -750,8 +759,9 @@ function EnviarAssinatura({ relatorio, onFechar, onEnviado }) {
         </div>
       </div>
       <p className="text-[10px] text-torg-gray mt-2">
-        Cada um recebe o PDF por e-mail e um link próprio. Ao assinar ficam registrados a confirmação, a data/hora e o IP —
-        é assinatura eletrônica, não certificado ICP-Brasil.
+        Quem está marcado como <strong>assina</strong> recebe o PDF e um link próprio; ao assinar ficam registrados a
+        confirmação, a data/hora e o IP — é assinatura eletrônica, não certificado ICP-Brasil. Quem está em
+        <strong> cópia</strong> recebe o mesmo PDF, sem link e sem entrar no quadro de assinaturas.
       </p>
     </div>
   );

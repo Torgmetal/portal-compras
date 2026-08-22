@@ -13,7 +13,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarTokenForte } from "@/lib/token";
-import { gerarRelatorioInspecaoPDF } from "@/lib/relatorio-inspecao-pdf";
+import { gerarPDFdoRelatorio } from "@/lib/relatorio-render";
 import { vincularNoDataBook } from "@/lib/relatorio-inspecao";
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
 import { sendEmail } from "@/lib/email";
@@ -42,10 +42,19 @@ export async function POST(req, { params }) {
           nome: String(d?.nome || "").trim(),
           email: String(d?.email || "").trim(),
           setor: String(d?.papel || d?.setor || "").trim() || null,
+          // ⚠ NEM TODO DESTINATÁRIO ASSINA. Vitor (22/08/2026): "deixar uma caixa para selecionar
+          // quais pessoas que estamos enviando vai assinar ou não, pois podemos apenas colocar
+          // pessoas em cópia". Quem vai em cópia recebe o documento e NÃO ganha link nem linha no
+          // quadro de assinaturas — senão o relatório fica eternamente "aguardando" alguém que
+          // nunca deveria assinar.
+          assina: d?.assina !== false,
         }))
         .filter((d) => d.nome && /.+@.+\..+/.test(d.email))
     : [];
-  if (!dest.length) return NextResponse.json({ error: "Informe ao menos um assinante (nome + e-mail válido)." }, { status: 400 });
+  if (!dest.length) return NextResponse.json({ error: "Informe ao menos um destinatário (nome + e-mail válido)." }, { status: 400 });
+  const assinantes = dest.filter((d) => d.assina);
+  const copias = dest.filter((d) => !d.assina);
+  if (!assinantes.length) return NextResponse.json({ error: "Marque ao menos uma pessoa como ASSINANTE — só com cópias o documento nunca é assinado." }, { status: 400 });
 
   // ⚠ Reenviar não recomeça: se já existe envio, o link de quem ainda não assinou continua valendo
   // e só entram os destinatários novos. Recriar o envio invalidaria assinatura já colhida.
@@ -80,13 +89,23 @@ export async function POST(req, { params }) {
   });
   const emails = new Set(jaTem.map((a) => a.email.toLowerCase()));
 
+  // ⚠ O ANEXO É O DOCUMENTO DE VERDADE. Aqui também estava o gerador antigo, que não conhece os
+  // modelos novos — quem recebia o e-mail lia uma folha que não é o relatório. Mesmo despacho da
+  // tela e do link (lib/relatorio-render.js).
+  const opDados = await prisma.oP.findFirst({
+    where: { numero: rel.opNumero }, select: { cliente: true, obra: true, refCliente: true },
+  });
   const pdfB64 = Buffer.from(
-    await gerarRelatorioInspecaoPDF({ rel: { ...rel, emitidoEm: rel.emitidoEm || new Date() }, fotos, assinaturas: null }),
+    await gerarPDFdoRelatorio({
+      rel: { ...rel, emitidoEm: rel.emitidoEm || new Date() },
+      fotos, assinaturas: null,
+      cliente: opDados?.cliente || null, obra: opDados?.obra || null, refCliente: opDados?.refCliente || null,
+    }),
   ).toString("base64");
   const base = baseUrlDe(req);
 
   let enviados = 0, novos = 0;
-  for (const d of dest) {
+  for (const d of assinantes) {
     if (emails.has(d.email.toLowerCase())) continue;
     const token = gerarTokenForte(24);
     await prisma.assinaturaDocumento.create({ data: { envioId, nome: d.nome, email: d.email, setor: d.setor, token } });
@@ -111,6 +130,25 @@ export async function POST(req, { params }) {
     if (r?.ok) enviados++;
   }
 
+  // ── CÓPIAS: recebem o documento, sem link e sem linha no quadro de assinaturas ──
+  let emCopia = 0;
+  for (const c of copias) {
+    const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#0D1F3C">
+      ${cabecalhoEmail("Relatório de Inspeção — cópia")}
+      <div style="border:1px solid #e7ecf2;border-top:none;border-radius:0 0 8px 8px;padding:20px 24px">
+        <p style="margin:0 0 10px">Olá, <strong>${c.nome}</strong>,</p>
+        <p style="margin:0 0 12px">Segue, <strong>para conhecimento</strong>, o <strong>${titulo}</strong>, com ${fotos.length} evidência(s) fotográfica(s). O documento está em anexo.</p>
+        <p style="margin:0;color:#5b6b7a;font-size:13px">Você está em cópia: não é necessário assinar.</p>
+      </div>
+    </div>`;
+    const r = await sendEmail({
+      to: c.email, subject: `${titulo} (cópia)`, html,
+      attachments: [{ filename: `${rel.codigo}.pdf`, content: pdfB64 }],
+      replyTo: user.email || undefined,
+    }).catch(() => ({ ok: false }));
+    if (r?.ok) emCopia++;
+  }
+
   // o documento na seção do data book passa a apontar pro PDF do relatório
   const atualizado = await prisma.relatorioInspecao.findUnique({ where: { id } });
   const vinculo = await vincularNoDataBook(atualizado, `${base}/api/qualidade/inspecoes/${id}/pdf`);
@@ -118,9 +156,9 @@ export async function POST(req, { params }) {
   await prisma.auditLog.create({
     data: {
       userId: user.id, action: "ENVIAR_RELATORIO_INSPECAO_ASSINATURA", entity: "RelatorioInspecao", entityId: id,
-      diff: { codigo: rel.codigo, destinatarios: dest.length, novos, enviados, vinculo },
+      diff: { codigo: rel.codigo, destinatarios: dest.length, assinantes: assinantes.length, copias: copias.length, novos, enviados, emCopia, vinculo },
     },
   }).catch(() => {});
 
-  return NextResponse.json({ ok: true, envioId, novos, enviados, jaEstavam: dest.length - novos, vinculo });
+  return NextResponse.json({ ok: true, envioId, novos, enviados, emCopia, jaEstavam: assinantes.length - novos, vinculo });
 }
