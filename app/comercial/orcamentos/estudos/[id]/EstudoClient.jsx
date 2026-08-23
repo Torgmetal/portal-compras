@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao } from "@/lib/lqc";
+import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa } from "@/lib/lqc";
 
 const fmtR$ = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -984,7 +984,10 @@ function Cenario({ e, res, mexer, fabrica }) {
       </div>
 
       {fabrica?.capacidadeKgMes > 0 && (
-        <PrazoDoLucro res={res} analise={analise} fabrica={fabrica} />
+        <>
+          <PrazoDoLucro res={res} analise={analise} fabrica={fabrica} />
+          <FluxoDoDinheiro res={res} base={analise.find((x) => x.key === "base")} fabrica={fabrica} cfg={cfg} mexer={mexer} />
+        </>
       )}
 
       <p className="text-[11px] text-torg-gray">
@@ -1076,6 +1079,105 @@ function PrazoDoLucro({ res, analise, fabrica }) {
           {" "}Ocupar menos da fábrica não resolve: dobra o prazo e corta o custo pela metade, na mesma proporção.
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * O DINHEIRO — quem paga o material até o cliente pagar.
+ *
+ * Vitor (23/08/2026): "só que você levou em consideração que vamos precisar comprar o material
+ * todo dessa obra?".
+ *
+ * ⚠ MATERIAL NÃO É SÓ VALOR, É MOMENTO. Os R$ 20,3 milhões de aço, tinta e fixador saem do nosso
+ * caixa antes de o cliente medir a primeira peça. A conta de prazo tratava isso como um custo
+ * qualquer, subtraído da receita — e um custo subtraído não mostra quanto tempo o dinheiro fica
+ * fora.
+ *
+ * ⚠ E O BDI JÁ RESERVA UMA LINHA PARA ISSO ("despesas financeiras / factoring"). Se ela for menor
+ * que o juro real do período, a diferença sai do lucro sem aparecer em lugar nenhum. É esse
+ * confronto que a tabela faz.
+ */
+function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer }) {
+  const set = (k, v) => mexer({ cenario: { ...cfg, [k]: v } });
+  const meses = numeroBr(cfg.mesesFabricacao) || Math.max(1, Math.round((res.pesoTotal / fabrica.capacidadeKgMes) * 10) / 10);
+  const reserva = (base?.preco || 0) * ((numeroBr(base?.alavancas?.factoring) || 0) / 100);
+  const f = fluxoDeCaixa({
+    meses,
+    preco: base?.preco || 0,
+    impostos: (base?.preco || 0) * ((numeroBr(base?.alavancas?.impostos) || 0) / 100),
+    material: res.totais?.material?.subtotal || 0,
+    terceiros: res.totais?.mdo?.subtotal || 0,
+    custoOperacionalMes: fabrica.custoOperacionalMes,
+    reservaFinanceira: reserva,
+  }, {
+    entradaPct: cfg.entradaPct ?? 10,
+    entregaPct: cfg.entregaPct ?? 10,
+    prazoFornecedorDias: cfg.prazoFornecedorDias ?? 30,
+    taxaMensalPct: cfg.taxaMensalPct ?? 1.5,
+    mesesCompraMaterial: cfg.mesesCompraMaterial,
+  });
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100">
+        <p className="text-[12px] font-bold text-torg-dark">O dinheiro: comprar o material antes de receber</p>
+        <p className="text-[11px] text-torg-gray mt-0.5">
+          São <strong className="text-torg-dark">{fmtR$(res.totais?.material?.subtotal)}</strong> de aço, tinta e
+          fixador que saem do nosso caixa antes de o cliente medir a primeira peça.
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-3">
+          {[["mesesFabricacao", "Prazo (meses)", String(meses)],
+            ["entradaPct", "Entrada (%)", "10"],
+            ["entregaPct", "Entrega (%)", "10"],
+            ["prazoFornecedorDias", "Fornecedor (dias)", "30"],
+            ["taxaMensalPct", "Custo do dinheiro (% a.m.)", "1,5"]].map(([k, r, ph]) => (
+            <label key={k} className="text-[11px] text-torg-dark">{r}
+              <Inp value={cfg[k] ?? ""} placeholder={ph} onChange={(e) => set(k, e.target.value)} className="block mt-1 w-full text-right" /></label>
+          ))}
+        </div>
+        <p className="text-[10px] text-torg-gray mt-1.5">
+          O saldo das medições é o que sobra de entrada e entrega. Sem entrada, a obra inteira é financiada por nós.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100">
+        <Kpi r="Capital de giro no pior mês" v={fmtR$(f.capitalDeGiro)} cor="text-torg-orange-700" />
+        <Kpi r="Custo financeiro do período" v={fmtR$(f.custoFinanceiro)} />
+        <Kpi r="Reservado no BDI" v={fmtR$(f.reservadoNoBdi)} />
+        <Kpi r={f.diferenca >= 0 ? "Sobra da reserva" : "Falta na reserva"} v={fmtR$(Math.abs(f.diferenca))}
+          cor={f.diferenca >= 0 ? "text-green-700" : "text-red-600"} />
+      </div>
+
+      {f.diferenca < 0 && (
+        <p className="text-[11px] text-torg-dark bg-[#FFF7ED] border-t border-[#F4801F]/30 px-4 py-2.5">
+          A linha de despesas financeiras do BDI reservou <strong>{fmtR$(f.reservadoNoBdi)}</strong> e o dinheiro
+          parado custa <strong>{fmtR$(f.custoFinanceiro)}</strong> em {meses} meses.
+          A diferença de <strong className="text-red-600">{fmtR$(Math.abs(f.diferenca))}</strong> sai do lucro
+          sem aparecer na composição — subir o factoring no BDI é o que traz esse custo para o preço.
+        </p>
+      )}
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-[12px]" style={{ minWidth: 560 }}>
+          <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
+            <tr><th className="text-left px-4 py-1.5">Mês</th><th className="text-right px-3 py-1.5">Recebimento</th>
+              <th className="text-right px-3 py-1.5">Desembolso</th><th className="text-right px-3 py-1.5">Juros</th>
+              <th className="text-right px-4 py-1.5">Saldo acumulado</th></tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {f.fluxo.filter((x) => x.entrada || x.saida || x.saldo).map((x) => (
+              <tr key={x.mes}>
+                <td className="px-4 py-1 whitespace-nowrap">{x.mes === 0 ? "assinatura" : `mês ${x.mes}`}</td>
+                <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-green-700">{x.entrada ? fmtR$(x.entrada) : "—"}</td>
+                <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-red-600">{x.saida ? `− ${fmtR$(x.saida)}` : "—"}</td>
+                <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-torg-gray">{x.juros ? `− ${fmtR$(x.juros)}` : "—"}</td>
+                <td className={`px-4 py-1 text-right tabular-nums whitespace-nowrap font-semibold ${x.saldo < 0 ? "text-red-600" : "text-torg-dark"}`}>{fmtR$(x.saldo)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

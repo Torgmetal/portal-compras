@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { calcularLqc, cenarioFinanceiro } from "@/lib/lqc";
+import { calcularLqc } from "@/lib/lqc";
 import { capacidadeDaFabrica } from "@/lib/fabrica-capacidade";
 
 export const runtime = "nodejs";
@@ -19,7 +19,7 @@ export async function GET(req, { params }) {
   // ⚠ cadência e custo operacional vêm do que a fábrica REALMENTE fez, não de um campo digitado:
   // número de capacidade digitado num orçamento envelhece e ninguém percebe.
   const fabrica = await capacidadeDaFabrica().catch(() => null);
-  return NextResponse.json({ estudo, resultado, fabrica, cenario: cenarioFinanceiro(resultado, estudo.cenario || {}) });
+  return NextResponse.json({ estudo, resultado, fabrica });
 }
 
 export async function PUT(req, { params }) {
@@ -52,7 +52,7 @@ export async function PUT(req, { params }) {
   await prisma.auditLog.create({
     data: { userId: user.id, action: "SALVAR_ESTUDO_FABRICACAO", entity: "EstudoFabricacao", entityId: id, diff: { preco: resultado.preco, custo: resultado.custo } },
   }).catch(() => {});
-  return NextResponse.json({ ok: true, estudo, resultado, cenario: cenarioFinanceiro(resultado, estudo.cenario || {}) });
+  return NextResponse.json({ ok: true, estudo, resultado });
 }
 
 export async function DELETE(req, { params }) {
