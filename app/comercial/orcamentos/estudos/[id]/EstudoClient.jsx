@@ -1339,7 +1339,7 @@ function Cenario({ e, res, mexer, fabrica }) {
     const parcelas = (comp.pagamento?.parcelas?.length ? comp.pagamento.parcelas : PAGAMENTO_PADRAO)
       .map((p) => (mods.recebimentoDias ? { ...p, dias: numeroBr(p.dias) + mods.recebimentoDias } : p));
     const f = fluxoDeCaixa({
-      meses: seco.meses, preco, impostos: seco.impostos, material: seco.material,
+      meses: seco.meses, preco, pesoKg: res.pesoTotal, impostos: seco.impostos, material: seco.material,
       mesesProjeto: comum.mesesProjeto, custoProjetoMes: comum.custoProjetoMes,
       terceiros: res.totais?.mdo?.subtotal || 0,
       custoOperacionalMes: fabrica?.custoOperacionalMes || 0,
@@ -1353,6 +1353,7 @@ function Cenario({ e, res, mexer, fabrica }) {
       compraMesesAntes: cfg.compraMesesAntes == null || cfg.compraMesesAntes === "" ? 1 : numeroBr(cfg.compraMesesAntes),
       parcelasFornecedor: String(cfg.parcelasFornecedor ?? "28/42/56").split(/[^\d]+/).map(Number).filter((d) => d >= 0 && Number.isFinite(d)),
       mesesSemMedicao: Array.isArray(cfg.mesesSemMedicao) ? cfg.mesesSemMedicao.map(Number) : [],
+      kgPorMes: Array.isArray(cfg.kgPorMes) ? cfg.kgPorMes.map((v) => numeroBr(v)) : [],
       // ⚠ só o cenário BASE usa a receita digitada: nos outros o preço muda, e um cronograma
       // digitado para outro preço mediria um contrato que não existe.
       receitaPorMes: (mods.precoPct || 0) === 0 && Array.isArray(cfg.receitaPorMes) ? cfg.receitaPorMes.map((v) => numeroBr(v)) : null,
@@ -2001,10 +2002,11 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
   // faz o resto. Pedir três campos numerados seria transcrever o que ele já sabe de cor.
   const parcelasFornecedor = String(cfg.parcelasFornecedor ?? "28/42/56").split(/[^\d]+/).map(Number).filter((d) => d >= 0 && Number.isFinite(d));
   const semMedicao = Array.isArray(cfg.mesesSemMedicao) ? cfg.mesesSemMedicao.map(Number) : [];
+  const kgPorMes = Array.isArray(cfg.kgPorMes) ? cfg.kgPorMes : [];
   const f = fluxoDeCaixa({
     meses, mesesProjeto: projeto,
     custoProjetoMes: numeroBr(cfg.custoProjetoMes),
-    preco: base?.preco || 0,
+    preco: base?.preco || 0, pesoKg: res.pesoTotal,
     impostos: (base?.preco || 0) * ((numeroBr(base?.alavancas?.impostos) || 0) / 100),
     material: res.totais?.material?.subtotal || 0,
     terceiros: res.totais?.mdo?.subtotal || 0,
@@ -2018,8 +2020,14 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
     compraMesesAntes: cfg.compraMesesAntes == null || cfg.compraMesesAntes === "" ? 1 : numeroBr(cfg.compraMesesAntes),
     parcelasFornecedor,
     mesesSemMedicao: semMedicao,
+    kgPorMes: kgPorMes.map((v) => numeroBr(v)),
     receitaPorMes: receita.map((v) => numeroBr(v)),
   });
+  const setKg = (m, v) => {
+    const novo = Array.from({ length: Math.max(f.meses + 2, kgPorMes.length) + 1 }, (_, i) => kgPorMes[i] ?? "");
+    novo[m] = v;
+    mexer({ cenario: { ...cfg, kgPorMes: novo } });
+  };
   // ⚠ marcar/desmarcar é por mês DA FABRICAÇÃO (1, 2, 3...), não por mês do contrato — é assim
   // que a obra é falada no chão: "no primeiro mês de fabricação não tem medição".
   const alternaMedicao = (mesFab) => {
@@ -2084,6 +2092,35 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
         )}
       </div>
 
+      {/* ⚠ MEDIÇÃO É O QUE SE PRODUZIU, NÃO FATIA IGUAL DO CONTRATO. Vitor (23/08/2026): "pegue o
+          valor que falta faturar e divida por kg — esse é o preço por kg fabricado, e aí nos meses
+          que marco que tem medição já teríamos o valor por mês". Entrada, projeto, entrega e
+          retenção saem por cima; o que sobra passa pela balança. */}
+      {f.medicao?.saldoAFaturar > 0 && (
+        <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+          <p className="text-[11px] text-torg-dark">
+            Fora da medição (entrada, projeto, entrega e retenção): <strong>{fmtR$(f.medicao.foraDaMedicao)}</strong>.
+            Sobram <strong>{fmtR$(f.medicao.saldoAFaturar)}</strong> para faturar por medição —
+            {" "}÷ <strong>{fmtKg(f.medicao.pesoKg)}</strong> dá{" "}
+            <strong className="text-torg-dark">{fmtR$(f.medicao.precoPorKg)}/kg fabricado</strong>.
+          </p>
+          <p className="text-[11px] text-torg-gray mt-1">
+            {f.medicao.porKgDigitado
+              ? <>Cada mês fatura o <strong className="text-torg-dark">kg que produziu</strong> × esse preço. O que fica pronto
+                 em mês sem medição não se perde: acumula e entra na medição seguinte.</>
+              : <>Preencha o <strong className="text-torg-dark">kg produzido</strong> mês a mês na tabela abaixo para o
+                 faturamento seguir a produção. Sem isso, a medição é dividida por partes iguais.</>}
+          </p>
+          {f.medicao.porKgDigitado && Math.abs(f.medicao.kgFaltando) > 1 && (
+            <p className="text-[11px] text-torg-dark bg-[#FFF7ED] border border-[#F4801F]/30 rounded-lg px-3 py-2 mt-2">
+              O kg informado soma <strong>{fmtKg(f.medicao.kgInformado)}</strong> e a obra tem <strong>{fmtKg(f.medicao.pesoKg)}</strong> —
+              {f.medicao.kgFaltando > 0 ? <> faltam <strong className="text-red-600">{fmtKg(f.medicao.kgFaltando)}</strong> sem mês para produzir, e esse pedaço não vai ser faturado por medição.</>
+                : <> sobram <strong className="text-red-600">{fmtKg(Math.abs(f.medicao.kgFaltando))}</strong> a mais do que a obra tem.</>}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100">
         <Kpi r={`Capital de giro — pior mês (${f.mesDoPico})`} v={fmtR$(f.capitalDeGiro)} cor="text-torg-orange-700" />
         <Kpi r="Custo financeiro do período" v={fmtR$(f.custoFinanceiro)} />
@@ -2105,9 +2142,10 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
           para que aí sim você calcule o cenário financeiro real". Quando o cronograma de medição
           já foi negociado, distribuir por regra é palpite ao lado do que está no contrato. */}
       <div className="overflow-x-auto">
-        <table className="w-full text-[12px]" style={{ minWidth: 640 }}>
+        <table className="w-full text-[12px]" style={{ minWidth: 760 }}>
           <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
             <tr><th className="text-left px-4 py-1.5">Mês</th><th className="text-left px-2 py-1.5">Fase</th>
+              <th className="text-right px-3 py-1.5">kg produzido</th>
               <th className="text-right px-3 py-1.5">Recebimento</th>
               <th className="text-right px-3 py-1.5">Desembolso</th><th className="text-right px-3 py-1.5">Juros</th>
               <th className="text-right px-4 py-1.5">Saldo acumulado</th></tr>
@@ -2131,6 +2169,12 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
                       </span>
                     </label>
                   ) : <span className="text-torg-gray">{x.fase}</span>}
+                </td>
+                <td className="px-3 py-1 text-right">
+                  {x.fase === "fabricação"
+                    ? <Inp value={kgPorMes[x.mes] ?? ""} placeholder="0"
+                        onChange={(e) => setKg(x.mes, e.target.value)} className="w-24 text-right tabular-nums" />
+                    : <span className="text-torg-gray">—</span>}
                 </td>
                 <td className="px-3 py-1 text-right">
                   <Inp value={receita[x.mes] ?? ""} placeholder={x.entrada ? Math.round(x.entrada).toLocaleString("pt-BR") : "—"}
