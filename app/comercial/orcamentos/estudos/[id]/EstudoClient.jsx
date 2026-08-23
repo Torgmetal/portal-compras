@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, TrendingDown } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { CLASSES, PERFIS, FATURAMENTO, ESTRUTURAS, METODOS, ITENS_COMERCIAIS, TERCEIRIZADOS, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, FATOR_DEMAO_EXTRA } from "@/lib/lqc";
+import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIRIZADOS, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem } from "@/lib/lqc";
 
 const fmtR$ = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -12,15 +12,19 @@ const num = (v) => { const n = Number(String(v ?? "").replace(",", ".")); return
 // geração de custo igual está na nossa LQC". Quem orça já sabe onde cada coisa fica; inventar uma
 // navegação "melhor" obrigaria a reaprender o que a casa faz há anos — e a conferir contra a
 // planilha ficaria impossível.
+// ⚠ O NOME DA ABA DA PLANILHA VIRA LEGENDA, NÃO TÍTULO. Vitor (23/08/2026): "melhore essas
+// escritas — sei que trouxe da planilha dessa maneira, mas deixe melhor isso". "RESUMOS_EM" e
+// "MC_TINTAS" são nomes de arquivo, não de assunto: servem para quem confere contra a LQC, e por
+// isso ficam embaixo, pequenos, em vez de ocupar o rótulo que a pessoa lê o dia inteiro.
 const ABAS = [
-  { k: "RESUMOS", r: "Quantitativo (RESUMOS_EM)" },
-  { k: "IND", r: "Industrialização" },
-  { k: "TINTAS", r: "MC_TINTAS" },
+  { k: "RESUMOS", r: "Quantitativo", planilha: "RESUMOS_EM" },
+  { k: "IND", r: "Industrialização", planilha: "INDUSTRIALIZAÇÃO" },
+  { k: "TINTAS", r: "Pintura e tintas", planilha: "MC_TINTAS" },
   { k: "PREMONT", r: "Pré-montagem" },
-  { k: "ENSAIOS", r: "Ensaios" },
-  { k: "COMERCIAIS", r: "Itens comerciais" },
-  { k: "BDI", r: "Impostos e BDI" },
-  { k: "COMERCIAL", r: "Planilha comercial" },
+  { k: "ENSAIOS", r: "Ensaios da qualidade" },
+  { k: "COMERCIAIS", r: "Itens comerciais", planilha: "ITENS COMERCIAIS" },
+  { k: "BDI", r: "Impostos e BDI", planilha: "BDI" },
+  { k: "COMERCIAL", r: "Planilha comercial", planilha: "PLANILHA COMERCIAL" },
   { k: "CENARIO", r: "Cenário financeiro" },
 ];
 
@@ -99,8 +103,9 @@ export default function EstudoClient({ id }) {
       <div className="flex flex-wrap gap-1 mb-4 border-b border-gray-100">
         {ABAS.map((a) => (
           <button key={a.k} onClick={() => setAba(a.k)}
-            className={`text-[12px] font-semibold px-3 py-2 -mb-px border-b-2 ${aba === a.k ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
-            {a.r}
+            className={`px-3 py-2 -mb-px border-b-2 text-left ${aba === a.k ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
+            <span className="block text-[12px] font-semibold whitespace-nowrap">{a.r}</span>
+            {a.planilha && <span className="block text-[9px] uppercase tracking-wider opacity-60 whitespace-nowrap">{a.planilha}</span>}
           </button>
         ))}
       </div>
@@ -128,10 +133,11 @@ function Kpi({ r, v, cor }) {
 }
 
 const Inp = (p) => <input {...p} className={`border border-gray-200 rounded px-2 py-1 text-[12px] ${p.className || ""}`} />;
-const Sel = ({ opcoes, ...p }) => (
+/** ⚠ `rotulos` mostra texto de gente sem mexer no VALOR — que é a chave que a planilha compara. */
+const Sel = ({ opcoes, rotulos, ...p }) => (
   <select {...p} className={`border border-gray-200 rounded px-2 py-1 text-[12px] bg-white ${p.className || ""}`}>
     <option value="">—</option>
-    {opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
+    {opcoes.map((o) => <option key={o} value={o}>{rotulos?.[o] || o}</option>)}
   </select>
 );
 
@@ -205,7 +211,7 @@ function CartaoLinha({ l, i, set, del, dup }) {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 bg-gray-50 border-b border-gray-100">
         <span className="text-[12px] font-bold text-torg-blue font-mono">{l.item || `1.${i + 1}`}</span>
         <span className="text-[12px] font-semibold text-torg-dark">{l.area || "sem área"}</span>
-        {l.estrutura && <span className="text-[12px] text-torg-gray">· {l.estrutura}</span>}
+        {l.estrutura && <span className="text-[12px] text-torg-gray">· {ESTRUTURA_ROTULO[l.estrutura] || l.estrutura}</span>}
         {l.elemento && <span className="text-[12px] text-torg-gray">· {l.elemento}</span>}
         <span className="ml-auto text-[13px] font-extrabold tabular-nums text-torg-dark whitespace-nowrap">{fmtKg(peso)}</span>
         <button onClick={() => dup(i)} title="duplicar" className="text-gray-300 hover:text-torg-blue"><Plus size={14} /></button>
@@ -219,14 +225,14 @@ function CartaoLinha({ l, i, set, del, dup }) {
           <Campo r="Área" ajuda="galpão, prédio, trecho">
             <Inp value={l.area || ""} onChange={(ev) => set(i, "area", ev.target.value)} className="w-full" /></Campo>
           <Campo r="Estrutura">
-            <Sel value={l.estrutura || ""} onChange={(ev) => set(i, "estrutura", ev.target.value)} opcoes={ESTRUTURAS} className="w-full" /></Campo>
+            <Sel value={l.estrutura || ""} onChange={(ev) => set(i, "estrutura", ev.target.value)} opcoes={ESTRUTURAS} rotulos={ESTRUTURA_ROTULO} className="w-full" /></Campo>
           <Campo r="Elemento" ajuda="tesoura, terça, pilar…">
             <Inp value={l.elemento || ""} onChange={(ev) => set(i, "elemento", ev.target.value)} className="w-full" /></Campo>
         </Bloco>
 
         <Bloco titulo="Como se mede" nota="Quantidade × Unidades × Peso unitário = peso do elemento">
           <Campo r="Método">
-            <Sel value={l.metodo || ""} onChange={(ev) => set(i, "metodo", ev.target.value)} opcoes={METODOS} className="w-full" /></Campo>
+            <Sel value={l.metodo || ""} onChange={(ev) => set(i, "metodo", ev.target.value)} opcoes={METODOS} rotulos={METODO_ROTULO} className="w-full" /></Campo>
           <Campo r="Unidade de medida" ajuda="define o peso unitário abaixo">
             <Sel value={l.un || ""} onChange={(ev) => set(i, "un", ev.target.value)} opcoes={["m", "m²", "unid"]} className="w-full" /></Campo>
           <Campo r="Quantidade" ajuda={l.un === "unid" ? "quantas peças" : `quantos ${l.un || "m"}`}>
@@ -249,7 +255,7 @@ function CartaoLinha({ l, i, set, del, dup }) {
             <select value={l.perfil || ""} onChange={(ev) => set(i, "perfil", ev.target.value)}
               className="border border-gray-200 rounded px-2 py-1 text-[12px] bg-white w-full">
               <option value="">—</option>
-              {PERFIS.map((p) => <option key={p.nome} value={p.nome}>{p.nome} · {fmtR$(p.preco)}/kg</option>)}
+              {PERFIS.map((p) => <option key={p.nome} value={p.nome}>{p.rotulo} · {fmtR$(p.preco)}/kg</option>)}
             </select>
           </Campo>
         </Bloco>
@@ -291,12 +297,12 @@ function Industrializacao({ c, res, setComp }) {
   const setFat = (k, v) => setComp({ faturamento: { ...fat, [k]: v } });
   const g = res.grupos || {};
   const grupos = [
-    ["1.1 MATÉRIA PRIMA", "materiaPrima", g.materiaPrima],
-    ["1.2 FIXADORES", "fixadores", g.fixadores],
-    ["1.3 TINTAS", "tintas", g.tintas],
-    ["3.1 FABRICAÇÃO", "fabricacao", g.fabricacao],
-    ["3.2 PINTURA", "pintura", g.pintura],
-    ["3.3 PRÉ-MONTAGEM", "preMontagem", g.preMontagem],
+    ["1.1 · Matéria-prima", "materiaPrima", g.materiaPrima],
+    ["1.2 · Fixadores", "fixadores", g.fixadores],
+    ["1.3 · Tintas", "tintas", g.tintas],
+    ["3.1 · Fabricação", "fabricacao", g.fabricacao],
+    ["3.2 · Pintura", "pintura", g.pintura],
+    ["3.3 · Pré-montagem", "preMontagem", g.preMontagem],
   ];
   return (
     <div className="space-y-4">
@@ -308,7 +314,7 @@ function Industrializacao({ c, res, setComp }) {
         <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {[["materiaPrima", "Matéria-prima"], ["fixadores", "Fixadores"], ["tintas", "Tintas"], ["fabricacao", "Fabricação"], ["pintura", "Pintura"], ["preMontagem", "Pré-montagem"], ...TERCEIRIZADOS.map((t) => [t.key, t.nome])].map(([k, r]) => (
             <label key={k} className="text-[11px] text-torg-dark">{r}
-              <Sel value={fat[k] || ""} onChange={(ev) => setFat(k, ev.target.value)} opcoes={FATURAMENTO} className="block mt-1 w-full" /></label>
+              <Sel value={fat[k] || ""} onChange={(ev) => setFat(k, ev.target.value)} opcoes={FATURAMENTO} rotulos={FATURAMENTO_ROTULO} className="block mt-1 w-full" /></label>
           ))}
         </div>
       </div>
@@ -317,7 +323,7 @@ function Industrializacao({ c, res, setComp }) {
         {/* ⚠ a pré-montagem mora AQUI porque é ela que escolhe a coluna de preço da linha 3.3 —
             é decisão de custo, não de quantitativo. */}
         <p className="text-[11px] text-torg-gray mb-4 pb-4 border-b border-gray-100">
-          Pintura: <strong className="text-torg-dark">{res.demaos || 1} {res.demaos === 1 ? "demão" : "demãos"}</strong> ·
+          Pintura em <strong className="text-torg-dark">{res.demaos || 1} {res.demaos === 1 ? "demão" : "demãos"}</strong> ·
           pré-montagem: <strong className="text-torg-dark">{res.preMontagemPct || 0}%</strong> — as duas têm aba própria.
         </p>
         <p className="text-[12px] font-bold text-torg-dark mb-3">Preços que a planilha não calcula</p>
@@ -336,7 +342,7 @@ function Industrializacao({ c, res, setComp }) {
       {grupos.filter(([, , grp]) => grp?.linhas?.some((l) => l.pesoKg > 0 || l.subtotal > 0)).map(([rot, , grp]) => (
         <Quadro key={rot} titulo={rot} grupo={grp} />
       ))}
-      {res.grupos?.terceirizados?.total?.subtotal > 0 && <Quadro titulo="2. MÃO DE OBRA TERCEIRIZADA" grupo={res.grupos.terceirizados} />}
+      {res.grupos?.terceirizados?.total?.subtotal > 0 && <Quadro titulo="2 · Mão de obra terceirizada" grupo={res.grupos.terceirizados} />}
     </div>
   );
 }
@@ -404,7 +410,7 @@ function Tintas({ c, setComp }) {
         Aqui entram o produto e o preço; o custo por kg alimenta a linha de TINTAS da industrialização.
       </p>
       <p className="text-[11px] text-torg-gray">
-        <strong className="text-torg-dark">O nº de demãos é a contagem destas camadas</strong> — é assim
+        <strong className="text-torg-dark">O número de demãos é a contagem destas camadas</strong> — é assim
         que a planilha faz. Os dois fatores de perda também não se escolhem: 85% é de guarda-corpo e
         escada marinheiro, 45% do resto, conforme a estrutura de cada elemento.
       </p>
@@ -446,9 +452,9 @@ function PreMontagem({ c, res, setComp }) {
         </div>
         <p className="text-[11px] text-torg-gray mt-3">
           {pctNum === 0
-            ? "Sem pré-montagem: a linha 3.3 da industrialização sai zerada."
+            ? "Sem pré-montagem: a linha 3.3 da industrialização fica zerada."
             : tabelado
-              ? `${pctNum}% é preço tabelado na PARÂMETROS da LQC.`
+              ? `${pctNum}% é preço tabelado na planilha de parâmetros.`
               : `${pctNum}% não está tabelado — o preço é interpolado entre as âncoras de 10% e 100%.`}
         </p>
       </div>
@@ -550,10 +556,10 @@ function Ensaios({ c, res, setComp }) {
 
       <p className="text-[11px] text-torg-gray">
         Área de pintura considerada: <strong className="text-torg-dark">{Number(res.areaM2 || 0).toLocaleString("pt-BR")} m²</strong> —
-        vem do coeficiente de superfície de cada linha do quantitativo, como a RESUMOS_EM calcula.
+        vem do coeficiente de superfície de cada linha do quantitativo, como a planilha calcula.
         {!res.areaM2 && " Sem coeficiente lançado, os ensaios por m² ficam zerados."}
         {" "}Equivale a <strong className="text-torg-dark">{fmtR$(res.ensaios?.porKg)}/kg</strong>, que é como
-        a linha 2.3 da LQC (Inspeção e Data Book) recebe esse custo.
+        a linha 2.3 da planilha (inspeção e data book) recebe esse custo.
       </p>
     </div>
   );
@@ -575,10 +581,10 @@ function Comerciais({ c, res, setComp }) {
             const qtd = num(it[i.key]?.qtd), preco = it[i.key]?.preco == null ? i.preco : num(it[i.key].preco);
             return (
               <tr key={i.key}>
-                <td className="px-4 py-1">{i.nome}</td><td className="px-2 py-1 text-torg-gray">{i.un}</td>
+                <td className="px-4 py-1">{i.rotulo}</td><td className="px-2 py-1 text-torg-gray">{i.un}</td>
                 <td className="px-2 py-1 text-right"><Inp value={it[i.key]?.qtd ?? ""} onChange={(e) => set(i.key, "qtd", e.target.value)} className="w-24 text-right" /></td>
                 <td className="px-2 py-1 text-right"><Inp value={it[i.key]?.preco ?? i.preco} onChange={(e) => set(i.key, "preco", e.target.value)} className="w-24 text-right" /></td>
-                <td className="px-2 py-1"><Sel value={it[i.key]?.faturamento || ""} onChange={(e) => set(i.key, "faturamento", e.target.value)} opcoes={FATURAMENTO} className="w-24" /></td>
+                <td className="px-2 py-1"><Sel value={it[i.key]?.faturamento || ""} onChange={(e) => set(i.key, "faturamento", e.target.value)} opcoes={FATURAMENTO} rotulos={FATURAMENTO_ROTULO} className="w-32" /></td>
                 <td className="px-4 py-1 text-right tabular-nums font-semibold whitespace-nowrap">{fmtR$(qtd * preco)}</td>
               </tr>
             );
@@ -703,16 +709,16 @@ function PlanilhaComercial({ res, e }) {
             <th className="text-right px-2 py-2">Unit. R$</th><th className="text-right px-4 py-2">Valor R$</th></tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
-          <tr><td className="px-4 py-2 font-semibold">1</td><td className="px-2 py-2 font-semibold" colSpan={5}>FORNECIMENTO DE ESTRUTURAS METÁLICAS</td></tr>
+          <tr><td className="px-4 py-2 font-semibold">1</td><td className="px-2 py-2 font-semibold" colSpan={5}>Fornecimento de estruturas metálicas</td></tr>
           <tr>
             <td className="px-4 py-2">1.1</td>
-            <td className="px-2 py-2">Fornecimento das estruturas metálicas — {e.obra || ""}</td>
+            <td className="px-2 py-2">Fornecimento das estruturas metálicas{e.obra ? ` — ${e.obra}` : ""}</td>
             <td className="px-2 py-2">kg</td>
             <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">{Number(res.pesoTotal || 0).toLocaleString("pt-BR")}</td>
             <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">{fmtR$(res.precoPorKg)}</td>
             <td className="px-4 py-2 text-right tabular-nums font-semibold whitespace-nowrap">{fmtR$(res.preco)}</td>
           </tr>
-          <tr className="bg-gray-50 font-bold"><td className="px-4 py-2" colSpan={5}>TOTAL GERAL</td>
+          <tr className="bg-gray-50 font-bold"><td className="px-4 py-2" colSpan={5}>Total geral</td>
             <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">{fmtR$(res.preco)}</td></tr>
         </tbody>
       </table>
