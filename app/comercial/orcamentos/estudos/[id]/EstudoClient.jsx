@@ -1346,9 +1346,13 @@ function Cenario({ e, res, mexer, fabrica }) {
       reservaFinanceira: preco * ((numeroBr(cen.alavancas?.factoring) || 0) / 100),
     }, {
       pagamento: { parcelas },
-      prazoFornecedorDias: cfg.prazoFornecedorDias ?? 30,
       taxaMensalPct: cfg.taxaMensalPct ?? 1.5,
       mesesCompraMaterial: cfg.mesesCompraMaterial,
+      // ⚠ o cronograma real do contrato vale em TODOS os cenários: compra antecipada, parcela de
+      // fornecedor e mês sem medição mudam o custo do dinheiro, e é ele que entra no resultado.
+      compraMesesAntes: cfg.compraMesesAntes == null || cfg.compraMesesAntes === "" ? 1 : numeroBr(cfg.compraMesesAntes),
+      parcelasFornecedor: String(cfg.parcelasFornecedor ?? "28/42/56").split(/[^\d]+/).map(Number).filter((d) => d >= 0 && Number.isFinite(d)),
+      mesesSemMedicao: Array.isArray(cfg.mesesSemMedicao) ? cfg.mesesSemMedicao.map(Number) : [],
       // ⚠ só o cenário BASE usa a receita digitada: nos outros o preço muda, e um cronograma
       // digitado para outro preço mediria um contrato que não existe.
       receitaPorMes: (mods.precoPct || 0) === 0 && Array.isArray(cfg.receitaPorMes) ? cfg.receitaPorMes.map((v) => numeroBr(v)) : null,
@@ -1993,6 +1997,10 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
   const projeto = cfg.mesesProjeto == null || cfg.mesesProjeto === "" ? 1 : Math.max(0, Math.round(numeroBr(cfg.mesesProjeto)));
   const reserva = (base?.preco || 0) * ((numeroBr(base?.alavancas?.factoring) || 0) / 100);
   const receita = Array.isArray(cfg.receitaPorMes) ? cfg.receitaPorMes : [];
+  // ⚠ "28/42/56" é como o comprador fala e como vem no pedido — o campo aceita assim e a conta
+  // faz o resto. Pedir três campos numerados seria transcrever o que ele já sabe de cor.
+  const parcelasFornecedor = String(cfg.parcelasFornecedor ?? "28/42/56").split(/[^\d]+/).map(Number).filter((d) => d >= 0 && Number.isFinite(d));
+  const semMedicao = Array.isArray(cfg.mesesSemMedicao) ? cfg.mesesSemMedicao.map(Number) : [];
   const f = fluxoDeCaixa({
     meses, mesesProjeto: projeto,
     custoProjetoMes: numeroBr(cfg.custoProjetoMes),
@@ -2007,8 +2015,17 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
     prazoFornecedorDias: cfg.prazoFornecedorDias ?? 30,
     taxaMensalPct: cfg.taxaMensalPct ?? 1.5,
     mesesCompraMaterial: cfg.mesesCompraMaterial,
+    compraMesesAntes: cfg.compraMesesAntes == null || cfg.compraMesesAntes === "" ? 1 : numeroBr(cfg.compraMesesAntes),
+    parcelasFornecedor,
+    mesesSemMedicao: semMedicao,
     receitaPorMes: receita.map((v) => numeroBr(v)),
   });
+  // ⚠ marcar/desmarcar é por mês DA FABRICAÇÃO (1, 2, 3...), não por mês do contrato — é assim
+  // que a obra é falada no chão: "no primeiro mês de fabricação não tem medição".
+  const alternaMedicao = (mesFab) => {
+    const tem = semMedicao.includes(mesFab);
+    mexer({ cenario: { ...cfg, mesesSemMedicao: tem ? semMedicao.filter((x) => x !== mesFab) : [...semMedicao, mesFab].sort((a, b) => a - b) } });
+  };
   // ⚠ a tabela de receita precisa cobrir o contrato inteiro MAIS a cauda da retenção, senão a
   // última parcela não tem onde ser digitada e some do fluxo.
   const linhasReceita = Math.max(f.meses + 2, receita.length);
@@ -2030,8 +2047,9 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
           {[["mesesProjeto", "Projeto (meses)", "1"],
             ["custoProjetoMes", "Custo do projeto (R$/mês)", "0"],
             ["mesesFabricacao", "Fabricação (meses)", String(meses)],
-            ["mesesCompraMaterial", "Compra do material (meses)", ""],
-            ["prazoFornecedorDias", "Fornecedor (dias)", "30"],
+            ["compraMesesAntes", "Compra começa (meses antes)", "1"],
+            ["mesesCompraMaterial", "Compra dura (meses)", ""],
+            ["parcelasFornecedor", "Pagamento do material (dias)", "28/42/56"],
             ["taxaMensalPct", "Custo do dinheiro (% a.m.)", "1,5"]].map(([k, r, ph]) => (
             <label key={k} className="text-[11px] text-torg-dark">{r}
               <Inp value={cfg[k] ?? ""} placeholder={ph} onChange={(e) => set(k, e.target.value)} className="block mt-1 w-full text-right" /></label>
@@ -2040,6 +2058,12 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
         {/* ⚠ OBRA NÃO COMEÇA PRODUZINDO. Vitor (23/08/2026): "no primeiro mês vamos fazer projeto
             apenas, no segundo é que vamos começar a produzir, e daí é que começa nosso prazo de
             fabricação". Um mês de erro no início desloca o pior mês inteiro do caixa. */}
+        <p className="text-[11px] text-torg-gray mt-2">
+          O aço é comprado a partir do <strong className="text-torg-dark">mês {f.compra.inicio}</strong> — antes de a
+          fábrica cortar — em {f.compra.meses} {f.compra.meses === 1 ? "mês" : "meses"}, e cada compra é paga em{" "}
+          {f.compra.parcelas.map((x) => `${x.dias} dias`).join(" · ")}
+          {" "}(no fluxo mensal isso cai {f.compra.parcelas.map((x) => `+${x.mes}`).join(" · ")} {f.compra.parcelas.length > 1 ? "meses" : "mês"} depois de cada compra).
+        </p>
         <p className="text-[11px] text-torg-dark mt-2">
           Contrato de <strong>{f.meses} meses</strong>: {f.mesesProjeto > 0 ? <>{f.mesesProjeto} de projeto, a fábrica corta a partir do <strong>mês {f.mesInicioFabricacao}</strong> e </> : null}
           entrega no <strong>mês {f.mesEntrega}</strong>. A medição acompanha a produção, então ela começa no mês {f.mesInicioFabricacao} — não na assinatura.
@@ -2092,8 +2116,21 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
             {Array.from({ length: linhasReceita + 1 }, (_, m) => f.fluxo[m] || { mes: m, entrada: 0, saida: 0, juros: 0, saldo: f.fluxo[f.fluxo.length - 1]?.saldo || 0, fase: "pós-entrega" }).map((x) => (
               <tr key={x.mes} className={x.fase === "projeto" ? "bg-gray-50" : x.mes === f.mesEntrega ? "bg-torg-blue-50/40" : ""}>
                 <td className="px-4 py-1 whitespace-nowrap">{x.mes === 0 ? "assinatura" : `mês ${x.mes}`}</td>
-                <td className="px-2 py-1 text-[10px] text-torg-gray whitespace-nowrap">
-                  {x.fase}{x.mes === f.mesEntrega ? " · entrega" : ""}
+                {/* ⚠ MEDIÇÃO SÓ NOS MESES QUE MEDEM. Vitor (23/08/2026): "no mês 1 da fabricação não
+                    teremos medição, e pode ser que o segundo também não". Espalhar a medição por
+                    igual desde o primeiro mês antecipa receita que não existe e esconde o buraco de
+                    caixa exatamente onde ele é maior. */}
+                <td className="px-2 py-1 text-[10px] whitespace-nowrap">
+                  {x.fase === "fabricação" ? (
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer" title="mês com medição">
+                      <input type="checkbox" checked={!semMedicao.includes(x.mes - f.mesesProjeto)}
+                        onChange={() => alternaMedicao(x.mes - f.mesesProjeto)}
+                        className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue h-3 w-3" />
+                      <span className={semMedicao.includes(x.mes - f.mesesProjeto) ? "text-torg-gray line-through" : "text-torg-dark"}>
+                        {x.mes === f.mesEntrega ? "entrega" : `mede · fab ${x.mes - f.mesesProjeto}`}
+                      </span>
+                    </label>
+                  ) : <span className="text-torg-gray">{x.fase}</span>}
                 </td>
                 <td className="px-3 py-1 text-right">
                   <Inp value={receita[x.mes] ?? ""} placeholder={x.entrada ? Math.round(x.entrada).toLocaleString("pt-BR") : "—"}
@@ -2109,8 +2146,10 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
         </table>
       </div>
       <p className="text-[10px] text-torg-gray px-4 py-2 border-t border-gray-100">
-        O campo de recebimento aceita o valor do contrato. Em branco, vale a distribuição da forma de pagamento
-        (mostrada em cinza). Basta um mês digitado para o cronograma inteiro passar a ser o seu.
+        Desmarque os meses de fabricação que <strong className="text-torg-dark">não medem</strong> — no primeiro mês
+        normalmente ainda não há peça pronta, e a medição se redistribui sozinha nos meses que restam.
+        O campo de recebimento aceita o valor do contrato: em branco vale a distribuição da forma de pagamento
+        (em cinza), e basta um mês digitado para o cronograma inteiro passar a ser o seu.
       </p>
     </div>
   );
