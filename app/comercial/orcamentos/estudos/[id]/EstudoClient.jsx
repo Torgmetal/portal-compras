@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, TrendingDown } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { CLASSES, PERFIS, FATURAMENTO, ESTRUTURAS, METODOS, DEMAOS, PRE_MONTAGEM, ITENS_COMERCIAIS, TERCEIRIZADOS, CAMADAS_TINTA } from "@/lib/lqc";
+import { CLASSES, PERFIS, FATURAMENTO, ESTRUTURAS, METODOS, DEMAOS, PRE_MONTAGEM, ITENS_COMERCIAIS, TERCEIRIZADOS, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, cargaDoCfop } from "@/lib/lqc";
 
 const fmtR$ = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -17,7 +17,7 @@ const ABAS = [
   { k: "IND", r: "Industrialização" },
   { k: "TINTAS", r: "MC_TINTAS" },
   { k: "COMERCIAIS", r: "Itens comerciais" },
-  { k: "BDI", r: "BDI" },
+  { k: "BDI", r: "Impostos e BDI" },
   { k: "COMERCIAL", r: "Planilha comercial" },
   { k: "CENARIO", r: "Cenário financeiro" },
 ];
@@ -81,10 +81,11 @@ export default function EstudoClient({ id }) {
       </div>
 
       {/* barra de resultado — sempre visível, porque é a pergunta que o orçamentista faz */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-px bg-gray-100 border border-gray-100 rounded-xl overflow-hidden mb-5">
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-px bg-gray-100 border border-gray-100 rounded-xl overflow-hidden mb-5">
         <Kpi r="Peso" v={fmtKg(res.pesoTotal)} />
         <Kpi r="Custo" v={fmtR$(res.custo)} />
         <Kpi r={`BDI ${res.bdiPct || 0}%`} v={fmtR$(res.bdiValor)} />
+        <Kpi r="Impostos" v={fmtR$(res.totalImpostos)} />
         <Kpi r="Preço" v={fmtR$(res.preco)} cor="text-torg-blue" />
         <Kpi r="R$/kg" v={fmtR$(res.precoPorKg)} cor="text-green-700" />
       </div>
@@ -399,7 +400,8 @@ function Comerciais({ c, res, setComp }) {
       <table className="w-full text-[12px]">
         <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
           <tr><th className="text-left px-4 py-1.5">Item</th><th className="text-left px-2 py-1.5">Un.</th>
-            <th className="text-right px-2 py-1.5">Quantidade</th><th className="text-right px-2 py-1.5">Preço unit.</th><th className="text-right px-4 py-1.5">Subtotal</th></tr>
+            <th className="text-right px-2 py-1.5">Quantidade</th><th className="text-right px-2 py-1.5">Preço unit.</th>
+            <th className="text-left px-2 py-1.5">Faturamento</th><th className="text-right px-4 py-1.5">Subtotal</th></tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
           {ITENS_COMERCIAIS.map((i) => {
@@ -409,11 +411,12 @@ function Comerciais({ c, res, setComp }) {
                 <td className="px-4 py-1">{i.nome}</td><td className="px-2 py-1 text-torg-gray">{i.un}</td>
                 <td className="px-2 py-1 text-right"><Inp value={it[i.key]?.qtd ?? ""} onChange={(e) => set(i.key, "qtd", e.target.value)} className="w-24 text-right" /></td>
                 <td className="px-2 py-1 text-right"><Inp value={it[i.key]?.preco ?? i.preco} onChange={(e) => set(i.key, "preco", e.target.value)} className="w-24 text-right" /></td>
+                <td className="px-2 py-1"><Sel value={it[i.key]?.faturamento || ""} onChange={(e) => set(i.key, "faturamento", e.target.value)} opcoes={FATURAMENTO} className="w-24" /></td>
                 <td className="px-4 py-1 text-right tabular-nums font-semibold">{fmtR$(qtd * preco)}</td>
               </tr>
             );
           })}
-          <tr className="bg-gray-50 font-bold"><td className="px-4 py-1.5" colSpan={4}>Total</td>
+          <tr className="bg-gray-50 font-bold"><td className="px-4 py-1.5" colSpan={5}>Total</td>
             <td className="px-4 py-1.5 text-right tabular-nums">{fmtR$(res.totais?.comerciais)}</td></tr>
         </tbody>
       </table>
@@ -421,23 +424,97 @@ function Comerciais({ c, res, setComp }) {
   );
 }
 
+/**
+ * IMPOSTOS E BDI — a aba que faltava.
+ *
+ * Vitor (23/08/2026): "não vi aba de impostos… o preço da planilha comercial está errado".
+ *
+ * ⚠ ERA A MESMA CAUSA. Na LQC o BDI não é um número solto: é composto
+ * `(1+adm+seguro+risco)/(1−(impostos+factoring+margem+comissões))−1`, e mora na aba BDI junto com
+ * a tabela de tributos por CFOP. O portal tinha um campo "BDI %" que não existia na planilha —
+ * então a planilha saía com BDI zero e imposto nenhum, e o preço vinha errado.
+ *
+ * ⚠ E O BDI SÓ INCIDE SOBRE O QUE PASSA PELA TORG: o que o cliente compra direto entra na venda
+ * pelo custo, sem margem. É o que a aba mostra separado.
+ */
 function Bdi({ c, res, setComp }) {
   const bdi = c.bdi || {};
+  const cfops = c.cfops || {};
+  const set = (k, v) => setComp({ bdi: { ...bdi, [k]: v } });
+  const noCusto = BDI_CAMPOS.filter((x) => x.onde === "custo");
+  const naVenda = BDI_CAMPOS.filter((x) => x.onde === "venda");
+
   return (
-    <div className="bg-white border border-gray-100 rounded-xl p-5 max-w-xl">
-      <label className="text-[12px] font-semibold text-torg-dark">BDI (%)
-        <Inp value={bdi.percentual ?? ""} onChange={(e) => setComp({ bdi: { ...bdi, percentual: e.target.value } })} className="block mt-1 w-32" /></label>
-      {/* ⚠ o BDI incide sobre a VENDA, não sobre o custo: preço = custo ÷ (1 − BDI). Somar
-          "custo × BDI" entrega margem menor do que a pretendida — é o erro clássico. */}
-      <p className="text-[11px] text-torg-gray mt-2">
-        Preço = custo ÷ (1 − BDI). O BDI incide sobre a venda, não sobre o custo.
-      </p>
-      <dl className="mt-4 space-y-1 text-[13px]">
-        <Linha r="Custo direto" v={fmtR$(res.custo)} />
-        <Linha r={`BDI (${res.bdiPct || 0}%)`} v={fmtR$(res.bdiValor)} />
-        <Linha r="Preço de venda" v={fmtR$(res.preco)} forte />
-        <Linha r="Preço por kg" v={fmtR$(res.precoPorKg)} />
-      </dl>
+    <div className="space-y-4">
+      <div className="bg-white border border-gray-100 rounded-xl p-5">
+        <p className="text-[12px] font-bold text-torg-dark mb-1">Composição do BDI</p>
+        <p className="text-[11px] text-torg-gray mb-4">
+          BDI = (1 + administração + seguro + risco) ÷ (1 − impostos − factoring − margem − comissões) − 1.
+          Os três primeiros são custo indireto; os quatro últimos incidem sobre a venda.
+        </p>
+        <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {[...noCusto, ...naVenda].map((campo) => (
+            <label key={campo.key} className="text-[11px] text-torg-dark">
+              {campo.nome} (%)
+              <Inp value={bdi[campo.key] ?? ""} onChange={(e) => set(campo.key, e.target.value)} className="block mt-1 w-full text-right" />
+              <span className="block text-[10px] text-torg-gray mt-0.5">{campo.onde === "custo" ? "sobre o custo" : "sobre a venda"}</span>
+            </label>
+          ))}
+        </div>
+        <dl className="mt-5 space-y-1 text-[13px] max-w-md">
+          <Linha r="Custo faturado pela Torg" v={fmtR$(res.custoTorg)} />
+          <Linha r="Custo em faturamento direto" v={fmtR$(res.custoDireto)} />
+          <Linha r={`BDI (${res.bdiPct || 0}%) — só sobre o que a Torg fatura`} v={fmtR$(res.bdiValor)} />
+          <Linha r="Preço de venda" v={fmtR$(res.preco)} forte />
+          <Linha r="Preço por kg" v={fmtR$(res.precoPorKg)} />
+        </dl>
+      </div>
+
+      <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100">
+          <p className="text-[12px] font-bold text-torg-dark">Impostos por linha de faturamento</p>
+          <p className="text-[11px] text-torg-gray mt-0.5">
+            O CFOP escolhe a coluna da tabela de tributos. PIS e COFINS entram sobre a base sem ICMS —
+            somar tudo direto infla a carga e encarece a proposta à toa.
+          </p>
+        </div>
+        <table className="w-full text-[12px]">
+          <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
+            <tr><th className="text-left px-5 py-1.5">Linha</th><th className="text-left px-2 py-1.5">CFOP / cód.</th>
+              <th className="text-right px-2 py-1.5">Base</th><th className="text-right px-2 py-1.5">Carga</th><th className="text-right px-5 py-1.5">Imposto</th></tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {(res.impostos || []).map((l) => (
+              <tr key={l.key}>
+                <td className="px-5 py-1.5">{l.nome}</td>
+                <td className="px-2 py-1.5">
+                  <select value={cfops[l.key] || l.padrao} onChange={(e) => setComp({ cfops: { ...cfops, [l.key]: e.target.value } })}
+                    className="border border-gray-200 rounded px-2 py-1 text-[12px] bg-white">
+                    {CFOPS.map((f) => <option key={f.cod} value={f.cod}>{f.rotulo}</option>)}
+                  </select>
+                </td>
+                <td className="px-2 py-1.5 text-right tabular-nums">{fmtR$(l.base)}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums text-torg-gray">{l.cargaPct}%</td>
+                <td className="px-5 py-1.5 text-right tabular-nums font-semibold">{fmtR$(l.valor)}</td>
+              </tr>
+            ))}
+            <tr className="bg-gray-50 font-bold"><td className="px-5 py-1.5" colSpan={4}>Total de impostos</td>
+              <td className="px-5 py-1.5 text-right tabular-nums">{fmtR$(res.totalImpostos)}</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="bg-white border border-gray-100 rounded-xl p-5">
+        <p className="text-[12px] font-bold text-torg-dark mb-3">Carga por CFOP</p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {CFOPS.map((f) => (
+            <div key={f.cod} className="flex justify-between gap-3 text-[11px] border border-gray-100 rounded px-2.5 py-1.5">
+              <span className="text-torg-gray truncate">{f.rotulo}</span>
+              <span className="font-semibold tabular-nums text-torg-dark shrink-0">{Math.round(cargaDoCfop(f.cod) * 10000) / 100}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
