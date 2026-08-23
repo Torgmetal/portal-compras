@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye } from "lucide-react";
-import { SECOES, situacao } from "@/lib/portal-cliente";
+import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye, Upload, X, ImagePlus } from "lucide-react";
+import { upload } from "@vercel/blob/client";
+import { SECOES, CAPAS, situacao } from "@/lib/portal-cliente";
 
 // ─── CONFIGURAR O PORTAL DO CLIENTE ───────────────────────────────────────────
 // Vitor (22/08/2026): "tudo que for de interesse nosso em mostrar e que seja interesse
@@ -41,6 +42,42 @@ export default function AbaPortalCliente({ opId }) {
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const st = situacao(d.portal);
   const link = d.portal.token ? `${typeof window !== "undefined" ? window.location.origin : ""}/portal/${d.portal.token}` : null;
+
+  // ⚠ SOBE DIRETO PARA O BLOB, com token. Foto de obra sai do celular com 8 a 12 MB — o dobro do
+  // teto em que a rota serverless trava, e ali o erro apareceria como "não anexa" sem dizer o
+  // motivo.
+  async function subir(arq) {
+    const b2 = await upload(arq.name, arq, {
+      access: "public",
+      handleUploadUrl: `/api/comercial/op/${opId}/portal/upload`,
+      contentType: arq.type,
+    });
+    return b2.url;
+  }
+
+  async function escolherArquivo(alvo) {
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = "image/*";
+    inp.multiple = alvo === "fotos";
+    inp.onchange = async () => {
+      const arqs = [...(inp.files || [])];
+      if (!arqs.length) return;
+      setSalvando(true); setErro(""); setAviso("");
+      try {
+        if (alvo === "fotos") {
+          const novas = [];
+          for (const a2 of arqs) novas.push({ url: await subir(a2), legenda: "" });
+          setF((p) => ({ ...p, fotos: [...(p.fotos || []), ...novas].slice(0, 24) }));
+        } else {
+          set(alvo, await subir(arqs[0]));
+        }
+        setAviso("Imagem carregada — salve para gravar.");
+      } catch (e) { setErro(e.message || "Falha ao subir a imagem."); }
+      finally { setSalvando(false); }
+    };
+    inp.click();
+  }
 
   async function salvar() {
     setSalvando(true); setErro(""); setAviso("");
