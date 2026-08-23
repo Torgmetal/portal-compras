@@ -146,6 +146,12 @@ export async function GET(_req, { params }) {
   // (conjuntos e peças a fabricar); LE_IMPORT é a lista de expedição (o que embarca). Confundir
   // as duas mostraria ao cliente a lista errada com o rótulo certo — o pior tipo de erro num
   // documento que ele usa para conferir o que vai receber.
+  // ⚠ PESO É PREÇO, e por isso o corte é no SERVIDOR. Vitor (22/08/2026): "a lista LPC e LE deixe
+  // a opção de divulgar com e sem peso". Esconder a coluna só na tela deixaria o número viajando na
+  // resposta da API — qualquer um que abrisse as ferramentas do navegador leria a base de cálculo
+  // do nosso preço por kg. O que não se divulga não sai daqui.
+  const comPeso = portal.mostrarPeso === true;
+
   const listaDe = async (fonte, so) => {
     const pecas = await prisma.pecaConjunto.findMany({
       where: { opId: op.id, fonte },
@@ -157,10 +163,12 @@ export async function GET(_req, { params }) {
     const lista = alvo.length ? alvo : pecas;
     return {
       total: lista.length,
-      pesoKg: Math.round(lista.reduce((sm, p) => sm + (p.pesoTotalKg || 0), 0)),
+      comPeso,
+      pesoKg: comPeso ? Math.round(lista.reduce((sm, p) => sm + (p.pesoTotalKg || 0), 0)) : null,
       itens: lista.slice(0, 500).map((p) => ({
         marca: p.marca, descricao: p.descricao || p.perfil || "—",
-        material: p.material || null, qtd: p.qte, pesoKg: Math.round(p.pesoTotalKg || 0),
+        material: p.material || null, qtd: p.qte,
+        ...(comPeso ? { pesoKg: Math.round(p.pesoTotalKg || 0) } : {}),
       })),
     };
   };
@@ -299,7 +307,7 @@ export async function GET(_req, { params }) {
   return NextResponse.json({
     op: op ? { numero: op.numero, cliente: op.cliente, obra: op.obra, refCliente: op.refCliente } : { numero: portal.opNumero },
     portal: {
-      contato: portal.contato, empresa: portal.empresa,
+      contato: portal.contato, empresa: portal.empresa, mostrarPeso: comPeso,
       // sem capa escolhida, entra a do repositório: portal que abre em branco passa a
       // impressão contrária à que ele existe para dar
       capaUrl: portal.capaUrl || CAPA_PADRAO,

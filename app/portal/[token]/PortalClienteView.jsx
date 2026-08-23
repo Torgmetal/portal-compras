@@ -62,6 +62,7 @@ export default function PortalClienteView({ token }) {
     dados.certificados?.length && { v: dados.certificados.length, r: "certificados de material" },
     dados.relatorios?.length && { v: dados.relatorios.length, r: "relatórios de inspeção aprovados" },
     dados.lpc?.totalConjuntos && { v: dados.lpc.totalConjuntos, r: "conjuntos fabricados" },
+    // ⚠ o peso total só entra quando a obra liberou o peso — ver mostrarPeso em lib/portal-cliente
     dados.lpc?.pesoKg && { v: fmtKg(dados.lpc.pesoKg), r: "de estrutura" },
   ].filter(Boolean);
 
@@ -158,11 +159,14 @@ export default function PortalClienteView({ token }) {
             cliente lê a obra na ordem em que ela acontece. */}
         {tem("LPC") && dados.lpc && (
           <Bloco icone={Layers} titulo="Lista de produção (LPC)" recolhida
-            sub={`${dados.lpc.total} itens · ${fmtKg(dados.lpc.pesoKg)}`}>
+            sub={`${dados.lpc.total} itens${dados.lpc.comPeso ? ` · ${fmtKg(dados.lpc.pesoKg)}` : ""}`}>
+            {/* ⚠ a coluna de peso só existe quando a obra liberou: estrutura se cota por R$/kg, e
+                o peso item a item entrega a base do nosso preço. */}
             <Tabela
-              cols={["Marca", "Descrição", "Material", "Qtd.", "Peso"]}
+              cols={["Marca", "Descrição", "Material", "Qtd.", ...(dados.lpc.comPeso ? ["Peso"] : [])]}
               linhas={dados.lpc.itens.slice(0, 200).map((p) => [
-                <span key="m" className="font-mono">{p.marca}</span>, p.descricao, p.material || "—", p.qtd, fmtKg(p.pesoKg),
+                <span key="m" className="font-mono">{p.marca}</span>, p.descricao, p.material || "—", p.qtd,
+                ...(dados.lpc.comPeso ? [fmtKg(p.pesoKg)] : []),
               ])}
               rodape={dados.lpc.itens.length > 200 ? `e mais ${dados.lpc.itens.length - 200} itens.` : null}
             />
@@ -171,11 +175,14 @@ export default function PortalClienteView({ token }) {
 
         {tem("LE") && dados.le && (
           <Bloco icone={Truck} titulo="Lista de expedição (LE)" recolhida
-            sub={`${dados.le.total} itens · ${fmtKg(dados.le.pesoKg)}`}>
+            sub={`${dados.le.total} itens${dados.le.comPeso ? ` · ${fmtKg(dados.le.pesoKg)}` : ""}`}>
+            {/* ⚠ a coluna de peso só existe quando a obra liberou: estrutura se cota por R$/kg, e
+                o peso item a item entrega a base do nosso preço. */}
             <Tabela
-              cols={["Marca", "Descrição", "Material", "Qtd.", "Peso"]}
+              cols={["Marca", "Descrição", "Material", "Qtd.", ...(dados.le.comPeso ? ["Peso"] : [])]}
               linhas={dados.le.itens.slice(0, 200).map((p) => [
-                <span key="m" className="font-mono">{p.marca}</span>, p.descricao, p.material || "—", p.qtd, fmtKg(p.pesoKg),
+                <span key="m" className="font-mono">{p.marca}</span>, p.descricao, p.material || "—", p.qtd,
+                ...(dados.le.comPeso ? [fmtKg(p.pesoKg)] : []),
               ])}
               rodape={dados.le.itens.length > 200 ? `e mais ${dados.le.itens.length - 200} itens.` : null}
             />

@@ -30,7 +30,7 @@ export default function AbaPortalCliente({ opId }) {
           clienteEmail: j.portal.clienteEmail || "", mensagem: j.portal.mensagem || "",
           capaUrl: j.portal.capaUrl || "", logoClienteUrl: j.portal.logoClienteUrl || "",
           fotos: Array.isArray(j.portal.fotos) ? j.portal.fotos : [],
-          secoes: j.portal.secoesAtivas || [],
+          secoes: j.portal.secoesAtivas || [], mostrarPeso: j.portal.mostrarPeso === true,
         });
       })
       .catch(() => setErro("Não consegui carregar o portal."));
@@ -256,6 +256,26 @@ export default function AbaPortalCliente({ opId }) {
           Cada seção lê os dados vivos do portal — cronograma do Planejamento, certificados do
           Controle de Documentos, relatórios aprovados da Qualidade. Nada é publicado duas vezes.
         </p>
+        {/* ⚠ PESO É PREÇO, e por isso o interruptor fica JUNTO das listas que ele afeta, não
+            perdido numa aba de configuração. Vitor (22/08/2026): "a lista LPC e LE deixe a opção
+            de divulgar com e sem peso, isso é importante para nós" — estrutura se cota por R$/kg,
+            e o peso item a item entrega a base do nosso preço a quem vai negociar o próximo
+            contrato. */}
+        {(f.secoes.includes("LPC") || f.secoes.includes("LE")) && (
+          <label className={`flex items-start gap-2.5 border rounded-lg px-3 py-2.5 mb-2 cursor-pointer ${f.mostrarPeso ? "border-amber-300 bg-amber-50" : "border-gray-200"}`}>
+            <input type="checkbox" checked={!!f.mostrarPeso} onChange={(e) => set("mostrarPeso", e.target.checked)}
+              className="mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500" />
+            <span className="min-w-0">
+              <span className="block text-[13px] font-semibold text-torg-dark">Divulgar o peso nas listas</span>
+              <span className="block text-[11px] text-torg-gray">
+                {f.mostrarPeso
+                  ? "A LPC e a LE saem com a coluna de peso e o total da obra — o cliente consegue calcular o R$/kg."
+                  : "As listas saem sem peso. O cliente vê marca, descrição, material e quantidade."}
+              </span>
+            </span>
+          </label>
+        )}
+
         <div className="grid sm:grid-cols-2 gap-2">
           {SECOES.map((s) => {
             const on = f.secoes.includes(s.id);

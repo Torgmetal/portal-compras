@@ -2160,6 +2160,12 @@ model PortalCliente {
   fotos            Json?
   // quais seções aparecem; null = o padrão de lib/portal-cliente.js
   secoes           Json?
+  // ⚠ PESO É PREÇO. Vitor (22/08/2026): "a lista LPC e LE deixe a opção de divulgar com e
+  // sem peso, isso é importante para nós". Estrutura metálica se cota por R$/kg — publicar
+  // o peso item a item entrega a base de cálculo do nosso preço a quem vai negociar o
+  // próximo contrato. Nasce DESLIGADO: ligar é uma decisão consciente da obra, e o
+  // contrário (descobrir depois que vazou) não tem volta.
+  mostrarPeso      Boolean   @default(false)
   publicadoEm      DateTime?
   enviadoEm        DateTime?
   primeiroAcessoEm DateTime?
