@@ -59,7 +59,10 @@ export default function PortalClienteView({ token }) {
 
   // os números que sustentam a mensagem — só entram os que existem de verdade
   const numeros = [
-    dados.certificados?.length && { v: dados.certificados.length, r: "certificados de material" },
+    // ⚠ contagem de certificado NAO entra aqui. Vitor (22/08/2026), apontando o "23 certificados
+    // de material" na capa: "tire essa informação". Numero de certificado na capa vira promessa
+    // — o cliente le como "a obra tem 23" e cobra os 23; e o que existe hoje e o que ja foi
+    // emitido, que cresce enquanto a obra anda. A seção de Certificados mostra a lista real.
     dados.relatorios?.length && { v: dados.relatorios.length, r: "relatórios de inspeção aprovados" },
     dados.lpc?.totalConjuntos && { v: dados.lpc.totalConjuntos, r: "conjuntos fabricados" },
     // ⚠ o peso total só entra quando a obra liberou o peso — ver mostrarPeso em lib/portal-cliente
