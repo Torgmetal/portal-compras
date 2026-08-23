@@ -984,7 +984,7 @@ function Cenario({ e, res, mexer, fabrica }) {
       </div>
 
       {fabrica?.capacidadeKgMes > 0 && (
-        <PrazoDoLucro res={res} analise={analise} fabrica={fabrica} cfg={cfg} mexer={mexer} />
+        <PrazoDoLucro res={res} analise={analise} fabrica={fabrica} />
       )}
 
       <p className="text-[11px] text-torg-gray">
@@ -996,85 +996,84 @@ function Cenario({ e, res, mexer, fabrica }) {
 }
 
 /**
- * PRAZO — em quantos meses isso ainda dá lucro.
+ * PRAZO — até quando a obra ainda dá lucro.
  *
- * Vitor (23/08/2026): "pensando em uma fabricação e os custos que colocamos, quantos meses temos
- * para fabricar isso para garantir esse lucro?".
+ * Vitor (23/08/2026): "para termos lucro, qual seria o prazo que poderíamos fazer?".
  *
- * ⚠ O PREÇO POR KG DE FABRICAÇÃO JÁ EMBUTE UM RATEIO DE CUSTO OPERACIONAL, e esse rateio supõe uma
- * cadência. A fábrica custa o mesmo todo mês, produzindo muito ou pouco: cada mês a mais que a obra
- * ocupa é despesa que ninguém cobrou do cliente. É por isso que proposta com margem boa no papel
- * vira prejuízo quando o prazo estica — e é a conta que ninguém fazia antes de assinar.
+ * ⚠ NÃO SE SOMA A INDUSTRIALIZAÇÃO COM O CUSTO OPERACIONAL — é a mesma despesa contada duas
+ * vezes, e foi o erro da primeira versão. O custo mensal da casa (R$ 784.270) É a folha dos oito
+ * setores mais todos os outros custos; a industrialização que o estudo cobra é justamente a mão
+ * de obra dessa casa. A conta certa separa o que SAI da empresa do que fica dentro:
  *
- * Cadência e custo do mês vêm do que a fábrica REALMENTE fez (Syneco) e da configuração de
- * custo-hora; digitados, envelheceriam sem ninguém perceber.
+ *   receita − impostos − material − terceiros = sobra para pagar a casa e lucrar
+ *   prazo máximo = sobra ÷ custo mensal da casa
+ *
+ * ⚠ E A OCUPAÇÃO NÃO MUDA NADA: metade da fábrica dobra o prazo e corta o custo atribuído pela
+ * metade. Quem muda se a obra fecha é o PREÇO ou a CADÊNCIA — nunca a fatia ocupada.
  */
-function PrazoDoLucro({ res, analise, fabrica, cfg, mexer }) {
-  const ocupacao = cfg.ocupacaoPct ?? 100;
+function PrazoDoLucro({ res, analise, fabrica }) {
   const prazos = analise.map((c) => ({
     ...c,
-    p: prazoDeFabricacao(res.pesoTotal, c.lucro, {
-      capacidadeKgMes: fabrica.capacidadeKgMes,
-      custoOperacionalMes: fabrica.custoOperacionalMes,
-      ocupacaoPct: ocupacao,
-    }),
-  }));
+    p: prazoDeFabricacao(
+      { pesoKg: res.pesoTotal, preco: c.preco, impostos: c.preco * ((numeroBr(c.alavancas?.impostos) || 0) / 100), custosExternos: res.custosExternos },
+      { capacidadeKgMes: fabrica.capacidadeKgMes, custoOperacionalMes: fabrica.custoOperacionalMes },
+    ),
+  })).filter((x) => x.p);
+  if (!prazos.length) return null;
   const base = prazos.find((x) => x.key === "base");
 
   return (
     <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-100">
-        <p className="text-[12px] font-bold text-torg-dark">Prazo que preserva o lucro</p>
-        {/* ⚠ CADÊNCIA É POR SETOR, E VALE O GARGALO. Vitor (23/08/2026): "696 t no mês não é uma
-            realidade; você deve estar somando a produção de cada setor". Estava — a mesma peça
-            passa por corte, montagem, solda, acabamento, jato e pintura, e somar os seis conta ela
-            seis vezes. A fábrica não entrega mais rápido que o setor mais lento. */}
+        <p className="text-[12px] font-bold text-torg-dark">Prazo em que a obra ainda dá lucro</p>
+        {/* ⚠ CADÊNCIA É POR SETOR, E VALE O GARGALO. Vitor: "696 t no mês não é uma realidade;
+            você deve estar somando a produção de cada setor". Estava — a mesma peça passa por
+            corte, montagem, solda, acabamento, jato e pintura. */}
         <p className="text-[11px] text-torg-gray mt-0.5">
           A fábrica entrega no ritmo do setor mais lento:{" "}
           <strong className="text-torg-dark">{fabrica.setorGargalo} — {fabrica.capacidadeKgMes.toLocaleString("pt-BR")} kg/mês</strong>{" "}
-          ({fabrica.mesesConsiderados} meses, {fabrica.periodo}) e custa{" "}
-          <strong className="text-torg-dark">{fmtR$(fabrica.custoOperacionalMes)}/mês</strong> para funcionar.
-          Cada mês a mais é despesa que não foi cobrada do cliente.
+          ({fabrica.mesesConsiderados} meses, {fabrica.periodo}). A casa custa{" "}
+          <strong className="text-torg-dark">{fmtR$(fabrica.custoOperacionalMes)}/mês</strong> — folha dos setores mais os demais custos.
         </p>
         <p className="text-[11px] text-torg-gray mt-1.5">
           {(fabrica.setores || []).map((x) => `${x.setor} ${x.kgMes.toLocaleString("pt-BR")}`).join(" · ")} kg/mês.
           <span className="block">Não se somam: a mesma peça passa por todos.</span>
         </p>
-        <label className="text-[11px] text-torg-dark inline-flex items-center gap-2 mt-3">
-          Fatia da fábrica que esta obra ocupa
-          <Inp value={cfg.ocupacaoPct ?? ""} placeholder="100"
-            onChange={(ev) => mexer({ cenario: { ...cfg, ocupacaoPct: ev.target.value } })} className="w-20 text-right" />
-          <span className="text-torg-gray">%</span>
-        </label>
       </div>
       <table className="w-full text-[12px]">
         <thead className="text-[10px] uppercase text-torg-gray">
-          <tr><th className="text-left px-4 py-1.5">Cenário</th><th className="text-right px-3 py-1.5">Lucro</th>
-            <th className="text-right px-3 py-1.5">Prazo previsto</th><th className="text-right px-3 py-1.5">Aguenta até</th>
-            <th className="text-right px-4 py-1.5">Cada mês de atraso</th></tr>
+          <tr><th className="text-left px-4 py-1.5">Cenário</th>
+            <th className="text-right px-3 py-1.5">Sobra p/ a casa</th>
+            <th className="text-right px-3 py-1.5">Prazo máximo</th>
+            <th className="text-right px-3 py-1.5">A fábrica leva</th>
+            <th className="text-right px-4 py-1.5">Resultado</th></tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
           {prazos.map((x) => (
             <tr key={x.key} className={x.key === "base" ? "bg-torg-blue-50/40 font-semibold" : ""}>
               <td className="px-4 py-1.5">{x.nome}</td>
-              <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(x.lucro)}</td>
-              <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{x.p?.mesesPrevistos} meses</td>
-              <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-dark">
-                {x.p?.mesesLimite == null ? "—" : `${x.p.mesesLimite} meses`}
-              </td>
-              <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap text-red-600">
-                {x.p?.custoDoMesDeAtraso ? `− ${fmtR$(x.p.custoDoMesDeAtraso)}` : "—"}
+              <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(x.p.sobra)}</td>
+              <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{x.p.mesesLimite} meses</td>
+              <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{x.p.mesesPrevistos} meses</td>
+              <td className={`px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold ${x.p.fecha ? "text-green-700" : "text-red-600"}`}>
+                {x.p.fecha ? `sobra ${x.p.folgaMeses} m` : `falta ${Math.abs(x.p.folgaMeses)} m`}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      {base?.p?.mesesLimite != null && (
+      {base && (
         <p className="text-[11px] text-torg-gray px-4 py-3 border-t border-gray-100">
-          No cenário base a obra é fabricada em <strong className="text-torg-dark">{base.p.mesesPrevistos} meses</strong> e
-          o lucro só acaba aos <strong className="text-torg-dark">{base.p.mesesLimite}</strong> —
-          são <strong className="text-torg-dark">{base.p.mesesExtras} meses</strong> de folga.
-          {ocupacao >= 100 && " Com a fábrica dedicada só a esta obra; dividindo, o prazo dobra e a folga também."}
+          {base.p.fecha
+            ? <>No cenário base a obra pode levar até <strong className="text-torg-dark">{base.p.mesesLimite} meses</strong> e
+               a fábrica leva {base.p.mesesPrevistos} — sobram {base.p.folgaMeses} meses.</>
+            : <>No cenário base a obra só dá lucro até <strong className="text-torg-dark">{base.p.mesesLimite} meses</strong>,
+               mas a fábrica leva <strong className="text-torg-dark">{base.p.mesesPrevistos}</strong>. Nesse prazo o resultado
+               é <strong className="text-red-600">{fmtR$(base.p.lucroNoPrazoReal)}</strong>. Para caber, o{" "}
+               <strong className="text-torg-dark">{fabrica.setorGargalo?.toLowerCase()}</strong> precisaria fazer{" "}
+               <strong className="text-torg-dark">{base.p.cadenciaNecessariaKgMes.toLocaleString("pt-BR")} kg/mês</strong>{" "}
+               ({((base.p.cadenciaNecessariaKgMes / fabrica.capacidadeKgMes - 1) * 100).toFixed(0)}% acima de hoje) — ou o preço subir.</>}
+          {" "}Ocupar menos da fábrica não resolve: dobra o prazo e corta o custo pela metade, na mesma proporção.
         </p>
       )}
     </div>
