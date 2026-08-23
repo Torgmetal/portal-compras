@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAPACIDADE_CARGA, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa } from "@/lib/lqc";
+import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAPACIDADE_CARGA, EVENTOS_PAGAMENTO, PAGAMENTO_PADRAO, conferirPagamento, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa } from "@/lib/lqc";
 
 const fmtR$ = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -33,6 +33,7 @@ const ABAS = [
   { k: "TERCEIROS", r: "Terceiros", ajuda: "o que vem de fora" },
   { k: "FRETE", r: "Frete", ajuda: "transporte até a obra" },
   { k: "ENSAIOS", r: "Ensaios", ajuda: "inspeção e data book" },
+  { k: "PAGAMENTO", r: "Forma de pagamento", ajuda: "quando o dinheiro entra" },
   { k: "BDI", r: "Impostos e BDI" },
   { k: "COMERCIAL", r: "Resumo", planilha: "PLANILHA COMERCIAL" },
   { k: "CENARIO", r: "Cenário financeiro" },
@@ -128,6 +129,7 @@ export default function EstudoClient({ id }) {
       {aba === "TERCEIROS" && <Terceiros c={c} res={res} setComp={setComp} />}
       {aba === "FRETE" && <Frete c={c} res={res} setComp={setComp} />}
       {aba === "ENSAIOS" && <Ensaios c={c} res={res} setComp={setComp} />}
+      {aba === "PAGAMENTO" && <Pagamento c={c} res={res} setComp={setComp} />}
       {aba === "BDI" && <Bdi c={c} res={res} setComp={setComp} />}
       {aba === "COMERCIAL" && <PlanilhaComercial res={res} e={e} />}
       {aba === "CENARIO" && <Cenario e={e} res={res} mexer={mexer} fabrica={d.fabrica} />}
@@ -1280,7 +1282,7 @@ function Cenario({ e, res, mexer, fabrica }) {
       {fabrica?.capacidadeKgMes > 0 && (
         <>
           <PrazoDoLucro res={res} analise={analise} fabrica={fabrica} />
-          <FluxoDoDinheiro res={res} base={analise.find((x) => x.key === "base")} fabrica={fabrica} cfg={cfg} mexer={mexer} />
+          <FluxoDoDinheiro res={res} base={analise.find((x) => x.key === "base")} fabrica={fabrica} cfg={cfg} mexer={mexer} c={e.composicao || {}} />
         </>
       )}
 
@@ -1392,7 +1394,7 @@ function PrazoDoLucro({ res, analise, fabrica }) {
  * que o juro real do período, a diferença sai do lucro sem aparecer em lugar nenhum. É esse
  * confronto que a tabela faz.
  */
-function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer }) {
+function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
   const set = (k, v) => mexer({ cenario: { ...cfg, [k]: v } });
   const meses = numeroBr(cfg.mesesFabricacao) || Math.max(1, Math.round((res.pesoTotal / fabrica.capacidadeKgMes) * 10) / 10);
   const reserva = (base?.preco || 0) * ((numeroBr(base?.alavancas?.factoring) || 0) / 100);
@@ -1405,8 +1407,7 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer }) {
     custoOperacionalMes: fabrica.custoOperacionalMes,
     reservaFinanceira: reserva,
   }, {
-    entradaPct: cfg.entradaPct ?? 10,
-    entregaPct: cfg.entregaPct ?? 10,
+    pagamento: c.pagamento || {},
     prazoFornecedorDias: cfg.prazoFornecedorDias ?? 30,
     taxaMensalPct: cfg.taxaMensalPct ?? 1.5,
     mesesCompraMaterial: cfg.mesesCompraMaterial,
@@ -1422,8 +1423,7 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer }) {
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-3">
           {[["mesesFabricacao", "Prazo (meses)", String(meses)],
-            ["entradaPct", "Entrada (%)", "10"],
-            ["entregaPct", "Entrega (%)", "10"],
+            ["mesesCompraMaterial", "Compra do material (meses)", ""],
             ["prazoFornecedorDias", "Fornecedor (dias)", "30"],
             ["taxaMensalPct", "Custo do dinheiro (% a.m.)", "1,5"]].map(([k, r, ph]) => (
             <label key={k} className="text-[11px] text-torg-dark">{r}
@@ -1431,7 +1431,8 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer }) {
           ))}
         </div>
         <p className="text-[10px] text-torg-gray mt-1.5">
-          O saldo das medições é o que sobra de entrada e entrega. Sem entrada, a obra inteira é financiada por nós.
+          O recebimento vem da aba <strong className="text-torg-dark">Forma de pagamento</strong>:{" "}
+          {(f.pagamento?.parcelas || []).map((p) => `${p.pct}% ${String(p.nome).toLowerCase()}`).join(" · ")}.
         </p>
       </div>
 
@@ -1917,6 +1918,112 @@ function CargasPorClasse({ c, res, setComp }) {
           {Math.round((1 - unica / cargas.totalCargas) * 100)}% mais barato do que a obra realmente exige.
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * FORMA DE PAGAMENTO — quando o dinheiro entra.
+ *
+ * Vitor (23/08/2026): "para essas formas de pagamento vamos criar uma tela para, antes dos
+ * impostos, calcular isso — colocar as formas de pagamento para podermos gerar o cenário
+ * financeiro".
+ *
+ * ⚠ A FORMA DE PAGAMENTO É METADE DO NEGÓCIO. Duas propostas com o mesmo preço valem coisas
+ * diferentes: 30% de entrada contra nenhuma entrada, com 5% retidos até 90 dias depois da
+ * entrega, separam milhões de capital de giro. É o que se negocia depois que o preço fecha.
+ *
+ * ⚠ E O QUE MANDA É QUANDO O DINHEIRO ENTRA, NÃO QUANDO SE FATURA. Medir no mês 3 e receber em 30
+ * dias é caixa no mês 4 — sem o prazo, o fluxo mente por um mês inteiro, e um mês de obra grande
+ * é o custo da casa por completo.
+ */
+function Pagamento({ c, res, setComp }) {
+  const cfg = c.pagamento || {};
+  const parcelas = Array.isArray(cfg.parcelas) && cfg.parcelas.length ? cfg.parcelas : PAGAMENTO_PADRAO;
+  const salvar = (novas) => setComp({ pagamento: { ...cfg, parcelas: novas } });
+  const set = (i, campo, v) => salvar(parcelas.map((p, j) => (j === i ? { ...p, [campo]: v } : p)));
+  const check = conferirPagamento({ parcelas });
+  const preco = res.preco || 0;
+
+  return (
+    <div className="space-y-4">
+      <p className="text-[12px] text-torg-gray">
+        É aqui que se desenha o recebimento da obra. O cenário financeiro usa exatamente isto — cada
+        parcela entra no mês do seu evento, mais o prazo da nota.
+      </p>
+
+      <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[12px]" style={{ minWidth: 660 }}>
+            <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
+              <tr><th className="text-left px-4 py-2">Parcela</th><th className="text-right px-2 py-2">%</th>
+                <th className="text-left px-2 py-2">Quando</th><th className="text-right px-2 py-2">Prazo (dias)</th>
+                <th className="text-right px-2 py-2">Valor</th><th /></tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {parcelas.map((p, i) => (
+                <tr key={i}>
+                  <td className="px-4 py-1.5"><Inp value={p.nome ?? ""} onChange={(e) => set(i, "nome", e.target.value)} className="w-44" /></td>
+                  <td className="px-2 py-1.5 text-right"><Inp value={p.pct ?? ""} onChange={(e) => set(i, "pct", e.target.value)} className="w-16 text-right" /></td>
+                  <td className="px-2 py-1.5">
+                    <Sel value={p.evento || "MEDICAO"} onChange={(e) => set(i, "evento", e.target.value)}
+                      opcoes={EVENTOS_PAGAMENTO.map((x) => x.key)}
+                      rotulos={Object.fromEntries(EVENTOS_PAGAMENTO.map((x) => [x.key, x.nome]))} className="w-40" />
+                    <span className="block text-[10px] text-torg-gray mt-0.5">
+                      {EVENTOS_PAGAMENTO.find((x) => x.key === (p.evento || "MEDICAO"))?.ajuda}
+                    </span>
+                  </td>
+                  <td className="px-2 py-1.5 text-right"><Inp value={p.dias ?? ""} onChange={(e) => set(i, "dias", e.target.value)} className="w-20 text-right" /></td>
+                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(preco * (num(p.pct) / 100))}</td>
+                  <td className="px-2 py-1.5">
+                    <button onClick={() => salvar(parcelas.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-600"><Trash2 size={13} /></button>
+                  </td>
+                </tr>
+              ))}
+              <tr className={check.fecha ? "bg-gray-50 font-bold" : "bg-[#FFF7ED] font-bold"}>
+                <td className="px-4 py-2">Total</td>
+                <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">
+                  {check.soma}%{!check.fecha && <span className="text-torg-orange-700"> ⚠</span>}
+                </td>
+                <td className="px-2 py-2 text-torg-gray" colSpan={2}>
+                  {check.fecha ? "fecha em 100%" : "as parcelas não somam 100% — o fluxo vai sair errado"}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">{fmtR$(preco * check.soma / 100)}</td>
+                <td />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="px-4 py-2.5 border-t border-gray-100 flex flex-wrap items-center gap-3">
+          <button onClick={() => salvar([...parcelas, { nome: "", pct: 0, evento: "MEDICAO", dias: 30 }])}
+            className="text-[11px] font-semibold text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={12} /> parcela</button>
+          <span className="text-gray-300">·</span>
+          <button onClick={() => salvar(PAGAMENTO_PADRAO.map((p) => ({ ...p })))}
+            className="text-[11px] font-semibold text-torg-gray hover:text-torg-dark">voltar ao padrão 10 / 80 / 10</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+        <Kpi r="Entra na assinatura" v={`${check.adiantadoPct}%`} cor={check.adiantadoPct > 0 ? "text-green-700" : "text-red-600"} />
+        <Kpi r="Adiantamento em R$" v={fmtR$(preco * check.adiantadoPct / 100)} />
+        <Kpi r="Retido para depois" v={`${check.retidoPct}%`} cor={check.retidoPct > 0 ? "text-torg-orange-700" : undefined} />
+        <Kpi r="Retido em R$" v={fmtR$(preco * check.retidoPct / 100)} />
+      </div>
+
+      {/* ⚠ é a entrada que compra o aço. Sem ela, a Torg financia a obra inteira do próprio caixa —
+          e na TMSA isso são R$ 20 milhões de material antes da primeira medição. */}
+      <p className="text-[12px] text-torg-gray bg-white border border-gray-100 rounded-xl px-4 py-3">
+        {check.adiantadoPct <= 0
+          ? <><strong className="text-torg-dark">Sem entrada</strong>, a compra do material
+             ({fmtR$(res.totais?.material?.subtotal)}) sai inteira do nosso caixa antes da primeira medição.
+             É o cenário que mais exige capital de giro — veja o efeito na aba de cenário.</>
+          : <>A entrada de <strong className="text-torg-dark">{fmtR$(preco * check.adiantadoPct / 100)}</strong> cobre{" "}
+             <strong className="text-torg-dark">
+               {res.totais?.material?.subtotal > 0
+                 ? `${Math.round((preco * check.adiantadoPct / 100) / res.totais.material.subtotal * 100)}%`
+                 : "—"}
+             </strong>{" "}da compra de material. O resto a Torg financia até as medições entrarem.</>}
+      </p>
     </div>
   );
 }
