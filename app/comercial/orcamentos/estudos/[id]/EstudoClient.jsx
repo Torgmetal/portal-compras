@@ -1314,6 +1314,11 @@ function Cenario({ e, res, mexer, fabrica }) {
   });
 
   const temFabrica = fabrica?.capacidadeKgMes > 0;
+  // ⚠ MÉDIA NÃO É CAPACIDADE. Vitor (23/08/2026): "nossa fábrica já teve alguns meses que entregou
+  // acima de 330 t". A média mede o que a fábrica ABSORVEU — nos últimos meses quem limitou foi a
+  // carteira, não a fábrica. Qual das leituras vale muda o prazo e, com ele, quanto da casa esta
+  // obra carrega. Por isso é escolha do estudo, e não um número fixo.
+  const cadencia = numeroBr(cfg.cadenciaKgMes) || fabrica?.capacidadeKgMes || 0;
 
   // ⚠ O CUSTO DO DINHEIRO ENTRA NO RESULTADO, NÃO SÓ NUM QUADRO À PARTE. Os meses entre pagar o
   // aço e receber a medição custam juro real; deixá-los fora do resultado é dar lucro de mentira.
@@ -1321,7 +1326,7 @@ function Cenario({ e, res, mexer, fabrica }) {
   const conta = (cen, mods = {}) => {
     const preco = numeroBr(cen.preco) * (1 + (mods.precoPct || 0) / 100);
     const comum = {
-      capacidadeKgMes: (fabrica?.capacidadeKgMes || 0) * (1 + (mods.cadenciaPct || 0) / 100),
+      capacidadeKgMes: cadencia * (1 + (mods.cadenciaPct || 0) / 100),
       custoOperacionalMes: fabrica?.custoOperacionalMes || 0,
       acoPct: mods.acoPct || 0,
       mesesExtra: mods.mesesExtra || 0,
@@ -1555,7 +1560,8 @@ function Cenario({ e, res, mexer, fabrica }) {
 
       {temFabrica && (
         <>
-          <PrazoDoLucro res={res} analise={analise} fabrica={fabrica} />
+          <Cadencia fabrica={fabrica} cfg={cfg} mexer={mexer} res={res} cadencia={cadencia} />
+          <PrazoDoLucro res={res} analise={analise} fabrica={fabrica} cadencia={cadencia} />
           <FluxoDoDinheiro res={res} base={analise.find((x) => x.key === "base")} fabrica={fabrica} cfg={cfg} mexer={mexer} c={comp} />
         </>
       )}
@@ -1570,6 +1576,150 @@ function Cenario({ e, res, mexer, fabrica }) {
       <p className="text-[11px] text-torg-gray">
         O BDI incide só sobre o que a Torg fatura ({fmtR$(res.custoTorg)}); o que o cliente compra
         direto ({fmtR$(res.custoDireto)}) entra na venda pelo custo.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * A CADÊNCIA DA FÁBRICA — e o que ela faz com o custo por quilo.
+ *
+ * Vitor (23/08/2026): "você pegou esse número da produção, porém eu acho que não é esse de fato,
+ * pois nossa fábrica já teve alguns meses que entregou um número acima de 330 t. Como podemos
+ * medir de fato para sabermos a quantidade de kg que é possível fabricarmos?".
+ *
+ * ⚠ MÉDIA E CAPACIDADE SÃO PERGUNTAS DIFERENTES. A média mede o que a fábrica ABSORVEU — e nos
+ * últimos meses quem limitou foi a carteira, não a fábrica. Capacidade é o que ela AGUENTA.
+ * Tratar uma como a outra faz toda obra parecer mais lenta e mais cara do que precisa ser.
+ *
+ * ⚠ E POR HORA NÃO DÁ PARA MEDIR COM O DADO DE HOJE: no Syneco o apontamento é um CARIMBO, não um
+ * intervalo — `dataFim` é igual a `dataInicio` nos 50.733 registros. Sem duração não existe
+ * kg/hora. Por operador-dia também não fecha: o acabamento registra 63 t num dia porque encerra
+ * um lote inteiro de uma vez, não porque produziu 63 t naquele dia.
+ *
+ * O que dá para medir com honestidade são três leituras do próprio apontamento, e o efeito de
+ * cada uma no custo — que é onde a pergunta realmente importa.
+ */
+function Cadencia({ fabrica, cfg, mexer, res, cadencia }) {
+  const L = fabrica.leituras || {};
+  const custoMes = fabrica.custoOperacionalMes || 0;
+  const set = (v) => mexer({ cenario: { ...cfg, cadenciaKgMes: v } });
+
+  // ⚠ o que a tabela COBRA de industrialização por quilo — é contra isto que a cadência se mede
+  const tabelaPorKg = res.pesoTotal > 0 ? (res.totais?.industrializacao?.subtotal || 0) / res.pesoTotal : 0;
+  const empata = tabelaPorKg > 0 ? Math.round(custoMes / tabelaPorKg) : 0;
+
+  const opcoes = [
+    { key: "media", nome: "Média de hoje", kg: L.mediaKgMes, ajuda: `o que a fábrica absorveu em ${fabrica.mesesConsiderados} meses` },
+    { key: "tri", nome: "Melhor trimestre", kg: L.melhorTrimestreKgMes, ajuda: L.melhorTrimestre ? `sustentado de ${L.melhorTrimestre}` : "três meses seguidos" },
+    { key: "pico", nome: "Melhor mês", kg: L.melhorMesKgMes, ajuda: L.melhorMes ? `atingido em ${L.melhorMes}` : "teto observado" },
+  ].filter((o) => o.kg > 0);
+
+  const linhas = [...opcoes.map((o) => ({ ...o, marca: false })),
+    ...(empata > 0 ? [{ key: "empata", nome: "Onde a tabela empata", kg: empata, ajuda: "a cadência que faz o preço de industrialização cobrir o custo", marca: true }] : [])]
+    .sort((a, b) => a.kg - b.kg);
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100">
+        <p className="text-[12px] font-bold text-torg-dark">A cadência da fábrica</p>
+        <p className="text-[11px] text-torg-gray mt-0.5">
+          Média não é capacidade. Nos últimos meses quem limitou a produção foi a carteira, não a fábrica — então
+          a média mede o que ela <strong className="text-torg-dark">absorveu</strong>, e o melhor trimestre é o piso
+          confiável do que ela <strong className="text-torg-dark">aguenta</strong>. A escolha aqui muda o prazo da obra
+          e, com ele, quanto do custo da casa esta obra carrega.
+        </p>
+        <div className="flex flex-wrap gap-2 mt-3">
+          {opcoes.map((o) => (
+            <button key={o.key} type="button" onClick={() => set(String(o.kg))}
+              className={`text-left border rounded-lg px-3 py-2 transition ${cadencia === o.kg ? "border-torg-blue bg-torg-blue-50/50" : "border-gray-200 hover:border-gray-300"}`}>
+              <span className="block text-[11px] font-semibold text-torg-dark whitespace-nowrap">{o.nome}</span>
+              <span className="block text-[13px] font-bold tabular-nums text-torg-dark whitespace-nowrap">{o.kg.toLocaleString("pt-BR")} kg/mês</span>
+              <span className="block text-[10px] text-torg-gray">{o.ajuda}</span>
+            </button>
+          ))}
+          <label className="text-[11px] text-torg-dark border border-gray-200 rounded-lg px-3 py-2">
+            <span className="block font-semibold">Outra</span>
+            <Inp value={cfg.cadenciaKgMes ?? ""} placeholder={String(L.mediaKgMes || "")}
+              onChange={(e) => set(e.target.value)} className="block mt-0.5 w-28 text-right" />
+            <span className="block text-[10px] text-torg-gray mt-0.5">kg/mês</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-[12px]" style={{ minWidth: 560 }}>
+          <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
+            <tr><th className="text-left px-4 py-1.5">Cadência</th>
+              <th className="text-right px-3 py-1.5">kg/mês</th>
+              <th className="text-right px-3 py-1.5">Custo da casa por kg</th>
+              <th className="text-right px-3 py-1.5">A tabela cobra</th>
+              <th className="text-right px-4 py-1.5">Cobre?</th></tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {linhas.map((o) => {
+              const porKg = o.kg > 0 ? custoMes / o.kg : 0;
+              const dif = tabelaPorKg - porKg;
+              return (
+                <tr key={o.key} className={o.marca ? "bg-torg-blue-50/40 font-semibold" : cadencia === o.kg ? "bg-gray-50" : ""}>
+                  <td className="px-4 py-1.5">{o.nome}
+                    <span className="block text-[10px] text-torg-gray font-normal leading-tight">{o.ajuda}</span></td>
+                  <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{o.kg.toLocaleString("pt-BR")}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">R$ {porKg.toFixed(2).replace(".", ",")}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">R$ {tabelaPorKg.toFixed(2).replace(".", ",")}</td>
+                  <td className={`px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold ${dif >= 0 ? "text-green-700" : "text-red-600"}`}>
+                    {dif >= 0 ? "+" : "−"} R$ {Math.abs(dif).toFixed(2).replace(".", ",")}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {empata > 0 && (
+        <p className="text-[11px] text-torg-dark bg-[#FFF7ED] border-t border-[#F4801F]/30 px-4 py-2.5">
+          A tabela de industrialização cobra <strong>R$ {tabelaPorKg.toFixed(2).replace(".", ",")}/kg</strong>, que é
+          o custo da casa quando a fábrica roda a <strong>{empata.toLocaleString("pt-BR")} kg/mês</strong>.
+          Hoje ela roda {(L.mediaKgMes || 0).toLocaleString("pt-BR")} — por isso o mesmo preço cobre{" "}
+          {Math.round((tabelaPorKg / (custoMes / (L.mediaKgMes || 1))) * 100)}% do custo. O preço não está errado:
+          está carregando uma fábrica mais cheia do que a de agora. Encher a fábrica é o caminho mais barato de
+          consertar a margem — mais barato que subir preço.
+        </p>
+      )}
+
+      {/* ⚠ picos por setor: o teto observado NÃO é o mesmo em toda a rota, e a menor peça manda. */}
+      {(fabrica.picos || []).length > 0 && (
+        <div className="overflow-x-auto border-t border-gray-100">
+          <table className="w-full text-[12px]" style={{ minWidth: 520 }}>
+            <caption className="text-[10px] uppercase text-torg-gray text-left px-4 py-2 bg-gray-50">
+              O que cada setor já provou fazer
+            </caption>
+            <thead className="text-[10px] uppercase text-torg-gray">
+              <tr><th className="text-left px-4 py-1.5">Setor</th>
+                <th className="text-right px-3 py-1.5">Média</th>
+                <th className="text-right px-3 py-1.5">Melhor trimestre</th>
+                <th className="text-right px-4 py-1.5">Melhor mês</th></tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {fabrica.picos.map((p) => (
+                <tr key={p.setor}>
+                  <td className="px-4 py-1 whitespace-nowrap">{p.setor}</td>
+                  <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-torg-gray">{(p.mediaKgMes || 0).toLocaleString("pt-BR")}</td>
+                  <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap">{(p.melhorTrimestreKgMes || 0).toLocaleString("pt-BR")}</td>
+                  <td className="px-4 py-1 text-right tabular-nums whitespace-nowrap font-semibold">{(p.melhorMesKgMes || 0).toLocaleString("pt-BR")}
+                    <span className="text-torg-gray font-normal"> · {p.melhorMes || "—"}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <p className="text-[11px] text-torg-gray px-4 py-2.5 border-t border-gray-100">
+        ⚠ Para medir capacidade de verdade faltaria a <strong className="text-torg-dark">duração</strong> do
+        apontamento: hoje o Syneco carimba o evento e grava fim igual ao início, então não existe kg/hora.
+        Enquanto isso, o melhor trimestre é o número mais defensável — a fábrica já o sustentou três meses seguidos.
       </p>
     </div>
   );
@@ -1591,12 +1741,12 @@ function Cenario({ e, res, mexer, fabrica }) {
  * ⚠ E A OCUPAÇÃO NÃO MUDA NADA: metade da fábrica dobra o prazo e corta o custo atribuído pela
  * metade. Quem muda se a obra fecha é o PREÇO ou a CADÊNCIA — nunca a fatia ocupada.
  */
-function PrazoDoLucro({ res, analise, fabrica }) {
+function PrazoDoLucro({ res, analise, fabrica, cadencia }) {
   const prazos = analise.map((c) => ({
     ...c,
     p: prazoDeFabricacao(
       { pesoKg: res.pesoTotal, preco: c.preco, impostos: c.preco * ((numeroBr(c.alavancas?.impostos) || 0) / 100), custosExternos: res.custosExternos },
-      { capacidadeKgMes: fabrica.capacidadeKgMes, custoOperacionalMes: fabrica.custoOperacionalMes },
+      { capacidadeKgMes: cadencia || fabrica.capacidadeKgMes, custoOperacionalMes: fabrica.custoOperacionalMes },
     ),
   })).filter((x) => x.p);
   if (!prazos.length) return null;
@@ -1611,7 +1761,7 @@ function PrazoDoLucro({ res, analise, fabrica }) {
             corte, montagem, solda, acabamento, jato e pintura. */}
         <p className="text-[11px] text-torg-gray mt-0.5">
           Tudo que se fabrica passa pelo corte, então a cadência da fábrica é o que entra por lá:{" "}
-          <strong className="text-torg-dark">{fabrica.setorEntrada} — {fabrica.capacidadeKgMes.toLocaleString("pt-BR")} kg/mês</strong>{" "}
+          <strong className="text-torg-dark">{fabrica.setorEntrada} — {(cadencia || fabrica.capacidadeKgMes).toLocaleString("pt-BR")} kg/mês</strong>{" "}
           ({fabrica.mesesConsiderados} meses, {fabrica.periodo}). O <strong className="text-torg-dark">custo da casa</strong> é{" "}
           <strong className="text-torg-dark">{fmtR$(fabrica.custoOperacionalMes)}/mês</strong>
           {fabrica.custoMedido > 0 ? <> — medido nas contas a pagar de {fabrica.custoPeriodo}, sem material, tinta, parafuso, frete, capex nem financeiro</> : null}.
@@ -1656,7 +1806,7 @@ function PrazoDoLucro({ res, analise, fabrica }) {
                é <strong className="text-red-600">{fmtR$(base.p.lucroNoPrazoReal)}</strong>. Para caber, a fábrica{" "}
                precisaria entrar com{" "}
                <strong className="text-torg-dark">{base.p.cadenciaNecessariaKgMes.toLocaleString("pt-BR")} kg/mês</strong>{" "}
-               ({((base.p.cadenciaNecessariaKgMes / fabrica.capacidadeKgMes - 1) * 100).toFixed(0)}% acima de hoje) — ou o preço subir.</>}
+               ({((base.p.cadenciaNecessariaKgMes / (cadencia || fabrica.capacidadeKgMes) - 1) * 100).toFixed(0)}% acima da cadência escolhida) — ou o preço subir.</>}
           {" "}Ocupar menos da fábrica não resolve: dobra o prazo e corta o custo pela metade, na mesma proporção.
         </p>
       )}
