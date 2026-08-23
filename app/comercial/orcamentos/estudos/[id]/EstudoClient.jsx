@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAPACIDADE_CARGA, EVENTOS_PAGAMENTO, PAGAMENTO_PADRAO, conferirPagamento, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa } from "@/lib/lqc";
+import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAPACIDADE_CARGA, EVENTOS_PAGAMENTO, PAGAMENTO_PADRAO, PRAZOS_PAGAMENTO, conferirPagamento, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa } from "@/lib/lqc";
 
 const fmtR$ = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -1970,10 +1970,36 @@ function Pagamento({ c, res, setComp }) {
                       opcoes={EVENTOS_PAGAMENTO.map((x) => x.key)}
                       rotulos={Object.fromEntries(EVENTOS_PAGAMENTO.map((x) => [x.key, x.nome]))} className="w-40" />
                     <span className="block text-[10px] text-torg-gray mt-0.5">
-                      {EVENTOS_PAGAMENTO.find((x) => x.key === (p.evento || "MEDICAO"))?.ajuda}
+                      {(() => {
+                        const ev = p.evento || "MEDICAO";
+                        const d = num(p.dias);
+                        const base = ev === "ASSINATURA" ? "da assinatura"
+                          : ev === "ENTREGA" || ev === "POS_ENTREGA" ? "da entrega" : "de cada medição";
+                        return d > 0 ? `${d} dias depois ${base}` : `à vista, ${base.replace("de cada", "na").replace("da ", "na ")}`;
+                      })()}
                     </span>
                   </td>
-                  <td className="px-2 py-1.5 text-right"><Inp value={p.dias ?? ""} onChange={(e) => set(i, "dias", e.target.value)} className="w-20 text-right" /></td>
+                  {/* ⚠ os prazos da casa a um clique: digitar 3 quando se quis 30 some no fluxo
+                      de caixa sem deixar rastro. Valor fora da lista continua aceito. */}
+                  <td className="px-2 py-1.5">
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-center gap-1.5">
+                        <Inp value={p.dias ?? ""} list={`prazos-${i}`} onChange={(e) => set(i, "dias", e.target.value)} className="w-16 text-right" />
+                        <span className="text-[10px] text-torg-gray">dias</span>
+                        <datalist id={`prazos-${i}`}>
+                          {PRAZOS_PAGAMENTO.map((d) => <option key={d} value={d} />)}
+                        </datalist>
+                      </div>
+                      <div className="flex flex-wrap justify-end gap-1">
+                        {PRAZOS_PAGAMENTO.map((d) => (
+                          <button key={d} onClick={() => set(i, "dias", d)}
+                            className={`text-[10px] rounded px-1.5 py-0.5 border ${num(p.dias) === d ? "border-torg-blue text-torg-blue bg-torg-blue-50 font-semibold" : "border-gray-200 text-torg-gray hover:border-torg-blue/40"}`}>
+                            {d}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </td>
                   <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(preco * (num(p.pct) / 100))}</td>
                   <td className="px-2 py-1.5">
                     <button onClick={() => salvar(parcelas.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-600"><Trash2 size={13} /></button>
