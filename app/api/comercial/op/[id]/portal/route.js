@@ -28,7 +28,7 @@ async function daOP(id) {
     portal = await prisma.portalCliente.create({
       data: {
         opNumero: op.numero, opId: op.id, status: "RASCUNHO",
-        mensagem: mensagemPadrao({ cliente: op.cliente, obra: op.obra }),
+        mensagem: mensagemPadrao({ cliente: op.cliente }),
       },
     });
   }

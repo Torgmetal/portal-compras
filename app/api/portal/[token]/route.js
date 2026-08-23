@@ -312,7 +312,7 @@ export async function GET(_req, { params }) {
       // impressão contrária à que ele existe para dar
       capaUrl: portal.capaUrl || CAPA_PADRAO,
       logoClienteUrl: portal.logoClienteUrl || null,
-      mensagem: portal.mensagem || mensagemPadrao({ cliente: op?.cliente, obra: op?.obra }),
+      mensagem: portal.mensagem || mensagemPadrao({ cliente: op?.cliente }),
       fotos: Array.isArray(portal.fotos) ? portal.fotos : [],
       secoes: ativas,
     },
