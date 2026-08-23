@@ -994,6 +994,28 @@ function Bdi({ c, res, setComp }) {
             O CFOP escolhe a coluna da tabela de tributos. PIS e COFINS entram sobre a base sem ICMS —
             somar tudo direto infla a carga e encarece a proposta à toa.
           </p>
+          {/* ⚠ O SPLIT É NEGOCIAÇÃO, NÃO CONSTANTE. Vitor (23/08/2026): "de onde você tirou o valor
+              de 5% de projeto? Temos acordos da forma de pagamento já negociados com o cliente".
+              Os 5% vieram da planilha dele e eu tinha copiado sem perguntar. Projeto sai como
+              SERVIÇO e industrialização como INDUSTRIALIZAÇÃO PARA TERCEIRO — o CFOP é outro e a
+              carga também, então o percentual move o imposto do contrato inteiro. */}
+          <div className="flex flex-wrap items-end gap-3 mt-3 pt-3 border-t border-gray-100">
+            <label className="text-[11px] font-semibold text-torg-dark">
+              Parcela faturada como projeto (%)
+              <Inp value={c.faturamentoSplit?.projetoPct ?? ""} placeholder="5"
+                onChange={(e) => setComp({ faturamentoSplit: { ...(c.faturamentoSplit || {}), projetoPct: e.target.value } })}
+                className="block mt-1 w-24 text-right" />
+            </label>
+            <p className="text-[11px] text-torg-gray flex-1 min-w-[240px]">
+              {res.splitFaturamento?.projetoHerdado
+                ? <span className="text-torg-orange-700">
+                    Está usando 5%, herdado da planilha de estudo — <strong>não é regra</strong>.
+                    Confirme com o acordo de pagamento negociado com este cliente.
+                  </span>
+                : <>Do faturamento Torg de {fmtR$(res.splitFaturamento?.vendaTorg)}, {res.splitFaturamento?.projetoPct}% sai
+                   como serviço de projeto e o restante como industrialização.</>}
+            </p>
+          </div>
         </div>
         <table className="w-full text-[12px]">
           <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
