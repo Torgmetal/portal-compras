@@ -1331,12 +1331,16 @@ function Cenario({ e, res, mexer, fabrica }) {
       custoOperacionalMes: fabrica?.custoOperacionalMes || 0,
       acoPct: mods.acoPct || 0,
       mesesExtra: mods.mesesExtra || 0,
+      // ⚠ a fase de projeto entra em TODOS os cenários: é custo, e desloca o caixa um mês inteiro
+      mesesProjeto: cfg.mesesProjeto == null || cfg.mesesProjeto === "" ? 1 : Math.max(0, Math.round(numeroBr(cfg.mesesProjeto))),
+      custoProjetoMes: numeroBr(cfg.custoProjetoMes),
     };
     const seco = resultadoDoCenario(res, { ...cen, preco }, { ...comum, custoFinanceiro: 0 });
     const parcelas = (comp.pagamento?.parcelas?.length ? comp.pagamento.parcelas : PAGAMENTO_PADRAO)
       .map((p) => (mods.recebimentoDias ? { ...p, dias: numeroBr(p.dias) + mods.recebimentoDias } : p));
     const f = fluxoDeCaixa({
       meses: seco.meses, preco, impostos: seco.impostos, material: seco.material,
+      mesesProjeto: comum.mesesProjeto, custoProjetoMes: comum.custoProjetoMes,
       terceiros: res.totais?.mdo?.subtotal || 0,
       custoOperacionalMes: fabrica?.custoOperacionalMes || 0,
       reservaFinanceira: preco * ((numeroBr(cen.alavancas?.factoring) || 0) / 100),
@@ -1345,6 +1349,9 @@ function Cenario({ e, res, mexer, fabrica }) {
       prazoFornecedorDias: cfg.prazoFornecedorDias ?? 30,
       taxaMensalPct: cfg.taxaMensalPct ?? 1.5,
       mesesCompraMaterial: cfg.mesesCompraMaterial,
+      // ⚠ só o cenário BASE usa a receita digitada: nos outros o preço muda, e um cronograma
+      // digitado para outro preço mediria um contrato que não existe.
+      receitaPorMes: (mods.precoPct || 0) === 0 && Array.isArray(cfg.receitaPorMes) ? cfg.receitaPorMes.map((v) => numeroBr(v)) : null,
     });
     return resultadoDoCenario(res, { ...cen, preco }, { ...comum, custoFinanceiro: f.custoFinanceiro });
   };
@@ -1394,6 +1401,7 @@ function Cenario({ e, res, mexer, fabrica }) {
                   ["Preço de venda", (r) => fmtR$(r.preco), "", "font-semibold"],
                   ["Impostos", (r) => `− ${fmtR$(r.impostos)}`, "das linhas de faturamento, com o CFOP de cada uma", "text-red-600"],
                   ["Material, terceiros e frete", (r) => `− ${fmtR$(r.externos)}`, "o que sai da empresa e vai para fora", "text-red-600"],
+                  ["Projeto", (r) => (r.projeto ? `− ${fmtR$(r.projeto)}` : "—"), "os meses de engenharia antes de a fábrica cortar", "text-red-600"],
                   ["Custo da casa", (r) => `− ${fmtR$(r.casa)}`, "o que a Torg paga por mês, medido nas contas a pagar, pelos meses de obra — não a tabela de industrialização", "text-red-600"],
                   ["Custo do dinheiro", (r) => `− ${fmtR$(r.financeiro)}`, "juro dos meses entre pagar o aço e receber a medição", "text-red-600"],
                   ["Resultado", (r) => fmtR$(r.resultado), "", "resultado"],
@@ -1401,6 +1409,7 @@ function Cenario({ e, res, mexer, fabrica }) {
                   ["Margem pretendida (BDI)", (r) => `${r.margemPretendidaPct}%`, "", "text-torg-gray"],
                   ["Preço por kg", (r) => `R$ ${numeroBr(r.precoPorKg).toFixed(2).replace(".", ",")}`, "", "text-torg-gray"],
                   ["Prazo de fábrica", (r) => `${r.meses} meses`, "", "text-torg-gray"],
+                  ["Prazo do contrato", (r) => `${r.mesesContrato} meses`, "projeto + fabricação", "text-torg-gray"],
                 ].map(([rot, fn, ajuda, tipo]) => (
                   <tr key={rot} className={tipo === "resultado" ? "bg-torg-blue-50/40 font-bold" : ""}>
                     <td className="px-4 py-1.5">
@@ -1981,9 +1990,12 @@ function PrazoDoLucro({ res, analise, fabrica, cadencia }) {
 function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
   const set = (k, v) => mexer({ cenario: { ...cfg, [k]: v } });
   const meses = numeroBr(cfg.mesesFabricacao) || Math.max(1, Math.round((res.pesoTotal / fabrica.capacidadeKgMes) * 10) / 10);
+  const projeto = cfg.mesesProjeto == null || cfg.mesesProjeto === "" ? 1 : Math.max(0, Math.round(numeroBr(cfg.mesesProjeto)));
   const reserva = (base?.preco || 0) * ((numeroBr(base?.alavancas?.factoring) || 0) / 100);
+  const receita = Array.isArray(cfg.receitaPorMes) ? cfg.receitaPorMes : [];
   const f = fluxoDeCaixa({
-    meses,
+    meses, mesesProjeto: projeto,
+    custoProjetoMes: numeroBr(cfg.custoProjetoMes),
     preco: base?.preco || 0,
     impostos: (base?.preco || 0) * ((numeroBr(base?.alavancas?.impostos) || 0) / 100),
     material: res.totais?.material?.subtotal || 0,
@@ -1995,7 +2007,16 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
     prazoFornecedorDias: cfg.prazoFornecedorDias ?? 30,
     taxaMensalPct: cfg.taxaMensalPct ?? 1.5,
     mesesCompraMaterial: cfg.mesesCompraMaterial,
+    receitaPorMes: receita.map((v) => numeroBr(v)),
   });
+  // ⚠ a tabela de receita precisa cobrir o contrato inteiro MAIS a cauda da retenção, senão a
+  // última parcela não tem onde ser digitada e some do fluxo.
+  const linhasReceita = Math.max(f.meses + 2, receita.length);
+  const setReceita = (m, v) => {
+    const novo = Array.from({ length: linhasReceita + 1 }, (_, i) => receita[i] ?? "");
+    novo[m] = v;
+    mexer({ cenario: { ...cfg, receitaPorMes: novo } });
+  };
 
   return (
     <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
@@ -2006,7 +2027,9 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
           fixador que saem do nosso caixa antes de o cliente medir a primeira peça.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-3">
-          {[["mesesFabricacao", "Prazo (meses)", String(meses)],
+          {[["mesesProjeto", "Projeto (meses)", "1"],
+            ["custoProjetoMes", "Custo do projeto (R$/mês)", "0"],
+            ["mesesFabricacao", "Fabricação (meses)", String(meses)],
             ["mesesCompraMaterial", "Compra do material (meses)", ""],
             ["prazoFornecedorDias", "Fornecedor (dias)", "30"],
             ["taxaMensalPct", "Custo do dinheiro (% a.m.)", "1,5"]].map(([k, r, ph]) => (
@@ -2014,14 +2037,31 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
               <Inp value={cfg[k] ?? ""} placeholder={ph} onChange={(e) => set(k, e.target.value)} className="block mt-1 w-full text-right" /></label>
           ))}
         </div>
-        <p className="text-[10px] text-torg-gray mt-1.5">
-          O recebimento vem da aba <strong className="text-torg-dark">Forma de pagamento</strong>:{" "}
-          {(f.pagamento?.parcelas || []).map((p) => `${p.pct}% ${String(p.nome).toLowerCase()}`).join(" · ")}.
+        {/* ⚠ OBRA NÃO COMEÇA PRODUZINDO. Vitor (23/08/2026): "no primeiro mês vamos fazer projeto
+            apenas, no segundo é que vamos começar a produzir, e daí é que começa nosso prazo de
+            fabricação". Um mês de erro no início desloca o pior mês inteiro do caixa. */}
+        <p className="text-[11px] text-torg-dark mt-2">
+          Contrato de <strong>{f.meses} meses</strong>: {f.mesesProjeto > 0 ? <>{f.mesesProjeto} de projeto, a fábrica corta a partir do <strong>mês {f.mesInicioFabricacao}</strong> e </> : null}
+          entrega no <strong>mês {f.mesEntrega}</strong>. A medição acompanha a produção, então ela começa no mês {f.mesInicioFabricacao} — não na assinatura.
         </p>
+        <p className="text-[10px] text-torg-gray mt-1.5">
+          {f.receitaDigitada
+            ? <>Recebimento <strong className="text-torg-dark">digitado mês a mês</strong> na tabela abaixo — ele manda na frente da forma de pagamento.</>
+            : <>O recebimento vem da aba <strong className="text-torg-dark">Forma de pagamento</strong>:{" "}
+              {(f.pagamento?.parcelas || []).map((p) => `${p.pct}% ${String(p.nome).toLowerCase()}`).join(" · ")}. Digite valores na tabela abaixo para usar o cronograma real do contrato.</>}
+        </p>
+        {f.receitaDigitada && Math.abs(f.diferencaFaturamento) > 1 && (
+          <p className="text-[11px] text-torg-dark bg-[#FFF7ED] border border-[#F4801F]/30 rounded-lg px-3 py-2 mt-2">
+            A receita digitada soma <strong>{fmtR$(f.faturado)}</strong> e o preço da proposta é <strong>{fmtR$(base?.preco || 0)}</strong> —
+            {f.diferencaFaturamento > 0 ? " sobrando " : " faltando "}
+            <strong className={f.diferencaFaturamento > 0 ? "text-green-700" : "text-red-600"}>{fmtR$(Math.abs(f.diferencaFaturamento))}</strong>.
+            Enquanto não fechar, o fluxo está medindo outro contrato.
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100">
-        <Kpi r="Capital de giro no pior mês" v={fmtR$(f.capitalDeGiro)} cor="text-torg-orange-700" />
+        <Kpi r={`Capital de giro — pior mês (${f.mesDoPico})`} v={fmtR$(f.capitalDeGiro)} cor="text-torg-orange-700" />
         <Kpi r="Custo financeiro do período" v={fmtR$(f.custoFinanceiro)} />
         <Kpi r="Reservado no BDI" v={fmtR$(f.reservadoNoBdi)} />
         <Kpi r={f.diferenca >= 0 ? "Sobra da reserva" : "Falta na reserva"} v={fmtR$(Math.abs(f.diferenca))}
@@ -2037,18 +2077,29 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
         </p>
       )}
 
+      {/* ⚠ A RECEITA É DIGITÁVEL AQUI, mês a mês. Vitor (23/08/2026): "mais as receitas nos meses
+          para que aí sim você calcule o cenário financeiro real". Quando o cronograma de medição
+          já foi negociado, distribuir por regra é palpite ao lado do que está no contrato. */}
       <div className="overflow-x-auto">
-        <table className="w-full text-[12px]" style={{ minWidth: 560 }}>
+        <table className="w-full text-[12px]" style={{ minWidth: 640 }}>
           <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
-            <tr><th className="text-left px-4 py-1.5">Mês</th><th className="text-right px-3 py-1.5">Recebimento</th>
+            <tr><th className="text-left px-4 py-1.5">Mês</th><th className="text-left px-2 py-1.5">Fase</th>
+              <th className="text-right px-3 py-1.5">Recebimento</th>
               <th className="text-right px-3 py-1.5">Desembolso</th><th className="text-right px-3 py-1.5">Juros</th>
               <th className="text-right px-4 py-1.5">Saldo acumulado</th></tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {f.fluxo.filter((x) => x.entrada || x.saida || x.saldo).map((x) => (
-              <tr key={x.mes}>
+            {Array.from({ length: linhasReceita + 1 }, (_, m) => f.fluxo[m] || { mes: m, entrada: 0, saida: 0, juros: 0, saldo: f.fluxo[f.fluxo.length - 1]?.saldo || 0, fase: "pós-entrega" }).map((x) => (
+              <tr key={x.mes} className={x.fase === "projeto" ? "bg-gray-50" : x.mes === f.mesEntrega ? "bg-torg-blue-50/40" : ""}>
                 <td className="px-4 py-1 whitespace-nowrap">{x.mes === 0 ? "assinatura" : `mês ${x.mes}`}</td>
-                <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-green-700">{x.entrada ? fmtR$(x.entrada) : "—"}</td>
+                <td className="px-2 py-1 text-[10px] text-torg-gray whitespace-nowrap">
+                  {x.fase}{x.mes === f.mesEntrega ? " · entrega" : ""}
+                </td>
+                <td className="px-3 py-1 text-right">
+                  <Inp value={receita[x.mes] ?? ""} placeholder={x.entrada ? Math.round(x.entrada).toLocaleString("pt-BR") : "—"}
+                    onChange={(e) => setReceita(x.mes, e.target.value)}
+                    className={`w-32 text-right tabular-nums ${receita[x.mes] ? "text-green-700 font-semibold" : ""}`} />
+                </td>
                 <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-red-600">{x.saida ? `− ${fmtR$(x.saida)}` : "—"}</td>
                 <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-torg-gray">{x.juros ? `− ${fmtR$(x.juros)}` : "—"}</td>
                 <td className={`px-4 py-1 text-right tabular-nums whitespace-nowrap font-semibold ${x.saldo < 0 ? "text-red-600" : "text-torg-dark"}`}>{fmtR$(x.saldo)}</td>
@@ -2057,6 +2108,10 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
           </tbody>
         </table>
       </div>
+      <p className="text-[10px] text-torg-gray px-4 py-2 border-t border-gray-100">
+        O campo de recebimento aceita o valor do contrato. Em branco, vale a distribuição da forma de pagamento
+        (mostrada em cinza). Basta um mês digitado para o cronograma inteiro passar a ser o seu.
+      </p>
     </div>
   );
 }
