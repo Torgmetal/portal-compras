@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Loader2, FileSpreadsheet, Plus, Trash2, Save, TrendingDown } from "lucide-react";
+import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios } from "@/lib/lqc";
 
@@ -88,6 +88,7 @@ export default function EstudoClient({ id }) {
             {salvando ? <span className="inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> salvando…</span>
               : sujo ? "alterações pendentes" : <span className="inline-flex items-center gap-1"><Save size={11} /> salvo</span>}
           </span>
+          <ImportarLqc id={id} onPronto={(j) => setD((p) => ({ ...p, estudo: j.estudo, resultado: j.resultado }))} showToast={showToast} />
           <a href={`/api/comercial/estudos/${id}/planilha`}
             className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5">
             <FileSpreadsheet size={14} /> Extrair planilha
@@ -129,6 +130,47 @@ export default function EstudoClient({ id }) {
       {aba === "COMERCIAL" && <PlanilhaComercial res={res} e={e} />}
       {aba === "CENARIO" && <Cenario e={e} res={res} mexer={mexer} />}
     </div>
+  );
+}
+
+/**
+ * IMPORTAR A LQC — trazer o quantitativo pronto em vez de redigitar.
+ *
+ * Vitor (23/08/2026): "importarmos áreas levantadas nessa planilha… para preencher apenas os
+ * custos". Medir a estrutura e tirar o coeficiente de superfície é trabalho de projeto, feito uma
+ * vez no Excel; o custo é o que muda toda semana. Redigitar 11 áreas para conferir um preço é o
+ * jeito mais rápido de a ferramenta nova não ser usada.
+ */
+function ImportarLqc({ id, onPronto, showToast }) {
+  const [enviando, setEnviando] = useState(false);
+  const ref = useRef(null);
+
+  const enviar = async (arquivo) => {
+    if (!arquivo) return;
+    setEnviando(true);
+    try {
+      const fd = new FormData();
+      fd.append("arquivo", arquivo);
+      const r = await fetch(`/api/comercial/estudos/${id}/importar`, { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro");
+      const s = j.resumo;
+      showToast(`${s.areas} áreas · ${s.pesoKg.toLocaleString("pt-BR")} kg${s.comPreco ? ` · ${s.comPreco} com preço` : ""}`, "success");
+      for (const a of j.avisos || []) showToast(a, "error");
+      onPronto(j);
+    } catch (e) { showToast(e.message, "error"); }
+    finally { setEnviando(false); if (ref.current) ref.current.value = ""; }
+  };
+
+  return (
+    <>
+      <input ref={ref} type="file" accept=".xlsx,.xlsm,.xlsb" className="hidden"
+        onChange={(e) => enviar(e.target.files?.[0])} />
+      <button onClick={() => ref.current?.click()} disabled={enviando}
+        className="text-[12px] font-semibold text-torg-blue border border-torg-blue/30 rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 hover:bg-torg-blue-50 disabled:opacity-50">
+        {enviando ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Importar LQC
+      </button>
+    </>
   );
 }
 
