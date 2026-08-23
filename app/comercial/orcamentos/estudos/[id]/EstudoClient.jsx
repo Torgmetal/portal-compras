@@ -2003,6 +2003,12 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
   const parcelasFornecedor = String(cfg.parcelasFornecedor ?? "28/42/56").split(/[^\d]+/).map(Number).filter((d) => d >= 0 && Number.isFinite(d));
   const semMedicao = Array.isArray(cfg.mesesSemMedicao) ? cfg.mesesSemMedicao.map(Number) : [];
   const kgPorMes = Array.isArray(cfg.kgPorMes) ? cfg.kgPorMes : [];
+  // ⚠ A RECEITA É RESULTADO, NÃO CAMPO. Vitor (23/08/2026): "você não puxou o valor unitário para
+  // dentro do cenário financeiro, você me fez preencher à mão o valor — quero colocar o peso e
+  // você já transformar na receita". A conta existia, mas a coluna era uma caixa vazia com o valor
+  // em cinza de sugestão: quem olha entende que ainda tem trabalho a fazer, e digita o que o
+  // portal já sabia. Agora o número aparece pronto; ajustar é a exceção, e é preciso clicar.
+  const [ajustando, setAjustando] = useState(null);
   const f = fluxoDeCaixa({
     meses, mesesProjeto: projeto,
     custoProjetoMes: numeroBr(cfg.custoProjetoMes),
@@ -2077,14 +2083,13 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
           entrega no <strong>mês {f.mesEntrega}</strong>. A medição acompanha a produção, então ela começa no mês {f.mesInicioFabricacao} — não na assinatura.
         </p>
         <p className="text-[10px] text-torg-gray mt-1.5">
-          {f.receitaDigitada
-            ? <>Recebimento <strong className="text-torg-dark">digitado mês a mês</strong> na tabela abaixo — ele manda na frente da forma de pagamento.</>
-            : <>O recebimento vem da aba <strong className="text-torg-dark">Forma de pagamento</strong>:{" "}
-              {(f.pagamento?.parcelas || []).map((p) => `${p.pct}% ${String(p.nome).toLowerCase()}`).join(" · ")}. Digite valores na tabela abaixo para usar o cronograma real do contrato.</>}
+          O recebimento vem da aba <strong className="text-torg-dark">Forma de pagamento</strong>:{" "}
+          {(f.pagamento?.parcelas || []).map((p) => `${p.pct}% ${String(p.nome).toLowerCase()}`).join(" · ")}.
+          {f.mesesAjustados?.length ? <> {f.mesesAjustados.length} {f.mesesAjustados.length === 1 ? "mês foi ajustado" : "meses foram ajustados"} à mão (mês {f.mesesAjustados.join(", ")}).</> : null}
         </p>
-        {f.receitaDigitada && Math.abs(f.diferencaFaturamento) > 1 && (
+        {Math.abs(f.diferencaFaturamento) > 1 && (
           <p className="text-[11px] text-torg-dark bg-[#FFF7ED] border border-[#F4801F]/30 rounded-lg px-3 py-2 mt-2">
-            A receita digitada soma <strong>{fmtR$(f.faturado)}</strong> e o preço da proposta é <strong>{fmtR$(base?.preco || 0)}</strong> —
+            O faturamento do cronograma soma <strong>{fmtR$(f.faturado)}</strong> e o preço da proposta é <strong>{fmtR$(base?.preco || 0)}</strong> —
             {f.diferencaFaturamento > 0 ? " sobrando " : " faltando "}
             <strong className={f.diferencaFaturamento > 0 ? "text-green-700" : "text-red-600"}>{fmtR$(Math.abs(f.diferencaFaturamento))}</strong>.
             Enquanto não fechar, o fluxo está medindo outro contrato.
@@ -2142,12 +2147,15 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
           para que aí sim você calcule o cenário financeiro real". Quando o cronograma de medição
           já foi negociado, distribuir por regra é palpite ao lado do que está no contrato. */}
       <div className="overflow-x-auto">
-        <table className="w-full text-[12px]" style={{ minWidth: 760 }}>
+        <table className="w-full text-[12px]" style={{ minWidth: 900 }}>
           <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
             <tr><th className="text-left px-4 py-1.5">Mês</th><th className="text-left px-2 py-1.5">Fase</th>
               <th className="text-right px-3 py-1.5">kg produzido</th>
               <th className="text-right px-3 py-1.5">Recebimento</th>
-              <th className="text-right px-3 py-1.5">Desembolso</th><th className="text-right px-3 py-1.5">Juros</th>
+              <th className="text-right px-3 py-1.5">Material</th>
+              <th className="text-right px-3 py-1.5">Fábrica</th>
+              <th className="text-right px-3 py-1.5">Impostos</th>
+              <th className="text-right px-3 py-1.5">Juros</th>
               <th className="text-right px-4 py-1.5">Saldo acumulado</th></tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -2177,11 +2185,29 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
                     : <span className="text-torg-gray">—</span>}
                 </td>
                 <td className="px-3 py-1 text-right">
-                  <Inp value={receita[x.mes] ?? ""} placeholder={x.entrada ? Math.round(x.entrada).toLocaleString("pt-BR") : "—"}
-                    onChange={(e) => setReceita(x.mes, e.target.value)}
-                    className={`w-32 text-right tabular-nums ${receita[x.mes] ? "text-green-700 font-semibold" : ""}`} />
+                  {ajustando === x.mes ? (
+                    <Inp autoFocus value={receita[x.mes] ?? ""} placeholder={x.entrada ? Math.round(x.entrada).toLocaleString("pt-BR") : "0"}
+                      onChange={(e) => setReceita(x.mes, e.target.value)}
+                      onBlur={() => setAjustando(null)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") setAjustando(null); }}
+                      className="w-32 text-right tabular-nums" />
+                  ) : (
+                    <button type="button" onClick={() => setAjustando(x.mes)} title="clique para ajustar"
+                      className={`tabular-nums whitespace-nowrap rounded px-1.5 py-0.5 hover:bg-gray-100 ${x.entrada ? "text-green-700 font-semibold" : "text-torg-gray"}`}>
+                      {x.entrada ? fmtR$(x.entrada) : "—"}
+                      {numeroBr(receita[x.mes]) > 0 ? <span className="ml-1 text-[9px] uppercase tracking-wider text-torg-orange-700">ajustado</span> : null}
+                    </button>
+                  )}
                 </td>
-                <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-red-600">{x.saida ? `− ${fmtR$(x.saida)}` : "—"}</td>
+                {/* ⚠ material tem coluna própria: é a maior saída da obra e a única com prazo de
+                    fornecedor. Somada dentro de um total, ninguém confere se a compra caiu no mês
+                    certo nem se as parcelas 28/42/56 pousaram onde deviam. */}
+                <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-red-600">{x.material ? `− ${fmtR$(x.material)}` : "—"}</td>
+                <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-red-600">
+                  {x.fabrica || x.projeto ? `− ${fmtR$(x.fabrica + x.projeto)}` : "—"}
+                  {x.projeto ? <span className="block text-[9px] text-torg-gray leading-none">projeto</span> : null}
+                </td>
+                <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-red-600">{x.impostos ? `− ${fmtR$(x.impostos)}` : "—"}</td>
                 <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-torg-gray">{x.juros ? `− ${fmtR$(x.juros)}` : "—"}</td>
                 <td className={`px-4 py-1 text-right tabular-nums whitespace-nowrap font-semibold ${x.saldo < 0 ? "text-red-600" : "text-torg-dark"}`}>{fmtR$(x.saldo)}</td>
               </tr>
@@ -2189,11 +2215,24 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
           </tbody>
         </table>
       </div>
+      {f.totais && (
+        <p className="text-[11px] text-torg-dark px-4 py-2 border-t border-gray-100 bg-gray-50">
+          Somando o fluxo: material <strong>{fmtR$(f.totais.material)}</strong> · fábrica e projeto{" "}
+          <strong>{fmtR$(f.totais.fabrica + f.totais.projeto)}</strong> · impostos <strong>{fmtR$(f.totais.impostos)}</strong>.
+          {Math.abs(f.totais.material - (res.totais?.material?.subtotal || 0)) > 1 && (
+            <span className="block text-torg-gray mt-0.5">
+              A composição tem {fmtR$(res.totais?.material?.subtotal)} de material — a diferença é o que a janela de
+              compra ainda não alcançou.
+            </span>
+          )}
+        </p>
+      )}
       <p className="text-[10px] text-torg-gray px-4 py-2 border-t border-gray-100">
-        Desmarque os meses de fabricação que <strong className="text-torg-dark">não medem</strong> — no primeiro mês
-        normalmente ainda não há peça pronta, e a medição se redistribui sozinha nos meses que restam.
-        O campo de recebimento aceita o valor do contrato: em branco vale a distribuição da forma de pagamento
-        (em cinza), e basta um mês digitado para o cronograma inteiro passar a ser o seu.
+        Preencha só o <strong className="text-torg-dark">kg produzido</strong>: o recebimento sai dele, pelo preço por
+        quilo do quadro acima. Desmarque os meses de fabricação que <strong className="text-torg-dark">não medem</strong> —
+        no primeiro mês normalmente ainda não há peça pronta, e o que ficou feito acumula para a medição seguinte.
+        Se um mês tiver valor combinado diferente, clique no recebimento para ajustar à mão; ele fica marcado como
+        ajustado e passa a mandar na frente da conta.
       </p>
     </div>
   );
