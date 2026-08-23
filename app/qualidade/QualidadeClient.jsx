@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import PainelRastreabilidade from "./PainelRastreabilidade";
+import PerfisSemMaterial from "./PerfisSemMaterial";
 import { upload } from "@vercel/blob/client";
 import {
   Loader2, AlertCircle, RefreshCw, Plus, Search, ShieldCheck, ShieldAlert,
@@ -153,6 +154,7 @@ export default function QualidadeClient({ escopo = "empresa", isAdmin = false })
           isso [de anexar a pasta], quero algo dinâmico, e sempre que abro essa tela ficam
           justamente os certificados que faltam alguma coisa". */}
       {material && <PainelRastreabilidade />}
+      {material && <PerfisSemMaterial />}
       </div>
 
       {/* KPIs */}
