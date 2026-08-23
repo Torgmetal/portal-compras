@@ -644,13 +644,25 @@ function Terceiros({ c, res, setComp }) {
               <Campo r="Faturamento">
                 <Sel value={t.faturamento || ""} onChange={(e) => set(i, "faturamento", e.target.value)}
                   opcoes={FATURAMENTO} rotulos={FATURAMENTO_ROTULO} className="w-full" /></Campo>
+              {t.base === "verba" && !t.area && (
+                <Campo r="Escopo" ajuda={t.escopoFixo ? "não encolhe" : "encolhe com o escopo"}>
+                  <label className="flex items-center gap-2 text-[11px] text-torg-dark mt-1">
+                    <input type="checkbox" checked={!!t.escopoFixo} onChange={(e) => set(i, "escopoFixo", e.target.checked)}
+                      className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
+                    travar valor
+                  </label>
+                </Campo>
+              )}
             </div>
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
               <p className="text-[11px] text-torg-gray">
                 {l.foraDoEscopo
                   ? <span className="text-torg-orange-700 font-semibold">área fora do escopo — zerado</span>
                   : <>{fmtKg(l.pesoKg)} × {fmtR$(l.precoKg)} = <strong className="text-torg-dark">{fmtR$(l.subtotal)}</strong></>}
-                {l.naoAcompanha && <span className="block text-torg-orange-700">valor fechado da obra toda — não encolheu com o escopo, confira</span>}
+                {l.naoAcompanha && <span className="block text-torg-orange-700">travado — não encolheu com o corte de escopo, confira</span>}
+                {!l.escopoFixo && l.fracaoEscopo < 0.999 && l.base === "verba" && !l.area && (
+                  <span className="block">valor do levantamento inteiro, ajustado para {(l.fracaoEscopo * 100).toFixed(0)}% do peso</span>
+                )}
                 {l.icms > 0 && <> · ICMS {fmtR$(l.icms)}</>}
                 {l.pisCofins > 0 && <> · PIS/COFINS {fmtR$(l.pisCofins)}</>}
               </p>
@@ -1490,6 +1502,38 @@ function Frete({ c, res, setComp }) {
             <Campo r="Valor fechado (R$)"><Inp value={f.verba ?? ""} onChange={(e) => set("verba", e.target.value)} className="w-full text-right" /></Campo>
           )}
         </div>
+
+        {/* ⚠ DESMARCAR É EXCLUIR. Vitor (23/08/2026): "quando eu desmarcar uma área do quantitativo
+            é como se eu tivesse excluído ela do escopo, só não estou fazendo isso para garantir o
+            histórico". Então valor digitado vale para o levantamento inteiro e encolhe junto —
+            frete é fisicamente proporcional ao que embarca. Quem já cotou para o escopo reduzido
+            trava aqui. */}
+        {(modo === "verba" || (modo === "viagem" && f.viagens)) && (
+          <label className="flex items-start gap-2.5 mt-3 pt-3 border-t border-gray-100 cursor-pointer">
+            <input type="checkbox" checked={!!f.escopoFixo} onChange={(e) => set("escopoFixo", e.target.checked)}
+              className="mt-0.5 rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
+            <span className="min-w-0">
+              <span className="block text-[12px] font-semibold text-torg-dark">Travar o valor — já cotado para este escopo</span>
+              <span className="block text-[11px] text-torg-gray">
+                Sem travar, o valor digitado vale para o levantamento inteiro e encolhe na proporção
+                do peso quando você desmarca uma área.
+              </span>
+            </span>
+          </label>
+        )}
+
+        {r.fracaoEscopo < 0.999 && !r.escopoFixo && r.valorCheio > 0 && (
+          <p className="text-[11px] text-torg-dark bg-torg-blue-50 border border-torg-blue/20 rounded-lg px-3 py-2 mt-3">
+            Lançado <strong>{fmtR$(r.valorCheio)}</strong> para o levantamento inteiro. No escopo de{" "}
+            <strong>{fmtKg(res.pesoTotal)}</strong> ({(r.fracaoEscopo * 100).toFixed(0)}% do peso),
+            equivale a <strong>{fmtR$(r.total)}</strong>.
+          </p>
+        )}
+        {r.escopoFixo && r.fracaoEscopo < 0.999 && (
+          <p className="text-[11px] text-torg-orange-700 bg-[#FFF7ED] border border-[#F4801F]/30 rounded-lg px-3 py-2 mt-3">
+            Travado: o valor não encolheu com o corte de escopo. Confira se a cotação é mesmo deste escopo.
+          </p>
+        )}
       </div>
 
       <CargasPorClasse c={c} res={res} setComp={setComp} />
