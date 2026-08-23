@@ -1388,7 +1388,7 @@ function Cenario({ e, res, mexer, fabrica }) {
                   ["Preço de venda", (r) => fmtR$(r.preco), "", "font-semibold"],
                   ["Impostos", (r) => `− ${fmtR$(r.impostos)}`, "das linhas de faturamento, com o CFOP de cada uma", "text-red-600"],
                   ["Material, terceiros e frete", (r) => `− ${fmtR$(r.externos)}`, "o que sai da empresa e vai para fora", "text-red-600"],
-                  ["A fábrica", (r) => `− ${fmtR$(r.casa)}`, "o custo mensal da casa pelos meses de obra — não a tabela de industrialização", "text-red-600"],
+                  ["Custo da casa", (r) => `− ${fmtR$(r.casa)}`, "o que a Torg paga por mês, medido nas contas a pagar, pelos meses de obra — não a tabela de industrialização", "text-red-600"],
                   ["Custo do dinheiro", (r) => `− ${fmtR$(r.financeiro)}`, "juro dos meses entre pagar o aço e receber a medição", "text-red-600"],
                   ["Resultado", (r) => fmtR$(r.resultado), "", "resultado"],
                   ["Margem real", (r) => `${r.margemRealPct}%`, "", "pct"],
@@ -1418,8 +1418,8 @@ function Cenario({ e, res, mexer, fabrica }) {
                 ? <>O BDI pede <strong>{base.r.margemPretendidaPct}%</strong> e sobra <strong className="text-green-700">{base.r.margemRealPct}%</strong>:
                     a tabela de preços recupera mais do que a fábrica custa. Essa diferença é espaço de desconto que a composição não mostrava.</>
                 : <>O BDI pede <strong>{base.r.margemPretendidaPct}%</strong> mas sobra <strong className="text-red-600">{base.r.margemRealPct}%</strong>.
-                    A conta do BDI cobra a fábrica pela tabela de industrialização; esta cobra pelo que a casa custa em {base.r.meses} meses
-                    ({fmtR$(fabrica.custoOperacionalMes)}/mês). Enquanto a obra ocupar a fábrica esse tempo, é este o número que vale.</>}
+                    A conta do BDI cobra a fábrica pela tabela de industrialização; esta cobra o <strong>custo da casa</strong> em {base.r.meses} meses
+                    ({fmtR$(fabrica.custoOperacionalMes)}/mês, medido nas contas a pagar de {fabrica.custoPeriodo}). Enquanto a obra ocupar a fábrica esse tempo, é este o número que vale.</>}
             </p>
           )}
         </div>
@@ -1581,9 +1581,9 @@ function Cenario({ e, res, mexer, fabrica }) {
  * Vitor (23/08/2026): "para termos lucro, qual seria o prazo que poderíamos fazer?".
  *
  * ⚠ NÃO SE SOMA A INDUSTRIALIZAÇÃO COM O CUSTO OPERACIONAL — é a mesma despesa contada duas
- * vezes, e foi o erro da primeira versão. O custo mensal da casa (R$ 784.270) É a folha dos oito
- * setores mais todos os outros custos; a industrialização que o estudo cobra é justamente a mão
- * de obra dessa casa. A conta certa separa o que SAI da empresa do que fica dentro:
+ * vezes, e foi o erro da primeira versão. O CUSTO DA CASA (R$ 1.052.966/mês, medido nas contas a
+ * pagar) já é a folha mais todos os outros custos; a industrialização que o estudo cobra é
+ * justamente a mão de obra dessa casa. A conta certa separa o que SAI da empresa do que fica dentro:
  *
  *   receita − impostos − material − terceiros = sobra para pagar a casa e lucrar
  *   prazo máximo = sobra ÷ custo mensal da casa
@@ -1610,20 +1610,24 @@ function PrazoDoLucro({ res, analise, fabrica }) {
             você deve estar somando a produção de cada setor". Estava — a mesma peça passa por
             corte, montagem, solda, acabamento, jato e pintura. */}
         <p className="text-[11px] text-torg-gray mt-0.5">
-          A fábrica entrega no ritmo do setor mais lento:{" "}
-          <strong className="text-torg-dark">{fabrica.setorGargalo} — {fabrica.capacidadeKgMes.toLocaleString("pt-BR")} kg/mês</strong>{" "}
-          ({fabrica.mesesConsiderados} meses, {fabrica.periodo}). A casa custa{" "}
-          <strong className="text-torg-dark">{fmtR$(fabrica.custoOperacionalMes)}/mês</strong> — folha dos setores mais os demais custos.
+          Tudo que se fabrica passa pelo corte, então a cadência da fábrica é o que entra por lá:{" "}
+          <strong className="text-torg-dark">{fabrica.setorEntrada} — {fabrica.capacidadeKgMes.toLocaleString("pt-BR")} kg/mês</strong>{" "}
+          ({fabrica.mesesConsiderados} meses, {fabrica.periodo}). O <strong className="text-torg-dark">custo da casa</strong> é{" "}
+          <strong className="text-torg-dark">{fmtR$(fabrica.custoOperacionalMes)}/mês</strong>
+          {fabrica.custoMedido > 0 ? <> — medido nas contas a pagar de {fabrica.custoPeriodo}, sem material, tinta, parafuso, frete, capex nem financeiro</> : null}.
         </p>
+        {/* ⚠ ISTO É ROTA, NÃO VELOCIDADE. A solda faz 71% do que o corte faz porque nem toda peça é
+            soldada — não porque a solda seja gargalo. Se fosse fila, o estoque em processo antes
+            dela teria crescido 39 t/mês por 11 meses; não existe no chão. */}
         <p className="text-[11px] text-torg-gray mt-1.5">
-          {(fabrica.setores || []).map((x) => `${x.setor} ${x.kgMes.toLocaleString("pt-BR")}`).join(" · ")} kg/mês.
-          <span className="block">Não se somam: a mesma peça passa por todos.</span>
+          {(fabrica.setores || []).map((x) => `${x.setor} ${x.pctDaEntrada}%`).join(" · ")} do peso cortado.
+          <span className="block">É a rota da peça, não a velocidade de cada setor: nem tudo é soldado, e galvanizado pula jato e pintura.</span>
         </p>
       </div>
       <table className="w-full text-[12px]">
         <thead className="text-[10px] uppercase text-torg-gray">
           <tr><th className="text-left px-4 py-1.5">Cenário</th>
-            <th className="text-right px-3 py-1.5">Sobra p/ a casa</th>
+            <th className="text-right px-3 py-1.5">Sobra p/ o custo da casa</th>
             <th className="text-right px-3 py-1.5">Prazo máximo</th>
             <th className="text-right px-3 py-1.5">A fábrica leva</th>
             <th className="text-right px-4 py-1.5">Resultado</th></tr>
@@ -1649,8 +1653,8 @@ function PrazoDoLucro({ res, analise, fabrica }) {
                a fábrica leva {base.p.mesesPrevistos} — sobram {base.p.folgaMeses} meses.</>
             : <>No cenário base a obra só dá lucro até <strong className="text-torg-dark">{base.p.mesesLimite} meses</strong>,
                mas a fábrica leva <strong className="text-torg-dark">{base.p.mesesPrevistos}</strong>. Nesse prazo o resultado
-               é <strong className="text-red-600">{fmtR$(base.p.lucroNoPrazoReal)}</strong>. Para caber, o{" "}
-               <strong className="text-torg-dark">{fabrica.setorGargalo?.toLowerCase()}</strong> precisaria fazer{" "}
+               é <strong className="text-red-600">{fmtR$(base.p.lucroNoPrazoReal)}</strong>. Para caber, a fábrica{" "}
+               precisaria entrar com{" "}
                <strong className="text-torg-dark">{base.p.cadenciaNecessariaKgMes.toLocaleString("pt-BR")} kg/mês</strong>{" "}
                ({((base.p.cadenciaNecessariaKgMes / fabrica.capacidadeKgMes - 1) * 100).toFixed(0)}% acima de hoje) — ou o preço subir.</>}
           {" "}Ocupar menos da fábrica não resolve: dobra o prazo e corta o custo pela metade, na mesma proporção.
