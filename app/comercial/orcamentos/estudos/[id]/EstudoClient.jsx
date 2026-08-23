@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa } from "@/lib/lqc";
@@ -444,6 +444,9 @@ const Campo = ({ r, ajuda, children }) => (
  * que não existe.
  */
 function Material({ c, res, setComp }) {
+  const [expandido, setExpandido] = useState(null);
+  // ⚠ só as áreas NO ESCOPO: lançar telha numa área desmarcada seria orçar o que não se vende
+  const areas = [...new Set((c.resumos || []).filter((l) => l.ativo !== false).map((l) => l.area || l.item).filter(Boolean))];
   const fat = c.faturamento || {};
   const setFat = (k, v) => setComp({ faturamento: { ...fat, [k]: v } });
   const it = c.itensComerciais || {};
@@ -472,6 +475,10 @@ function Material({ c, res, setComp }) {
       <Quadro titulo="Aço por categoria de perfil" grupo={g.materiaPrima} vazio="Lance o perfil predominante nas linhas do quantitativo." />
       <Quadro titulo="Fixadores" grupo={g.fixadores} vazio="Informe o R$/kg dos fixadores acima." />
 
+      {/* ⚠ QUANTIDADE POR ÁREA, senão não acompanha o escopo. Vitor (23/08/2026): "a soma sai como
+          se fosse para a obra toda ainda". Telha e calha eram número absoluto e continuavam
+          inteiros com 70% da obra fora. Lançando por área, desmarcar um pacote tira a telha dele
+          junto — que é o que acontece na obra. */}
       <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
         <p className="text-[12px] font-bold text-torg-dark px-4 py-2 bg-gray-50">Itens comerciais</p>
         <table className="w-full text-[12px]">
@@ -482,14 +489,51 @@ function Material({ c, res, setComp }) {
           </thead>
           <tbody className="divide-y divide-gray-50">
             {ITENS_COMERCIAIS.map((i) => {
-              const qtd = num(it[i.key]?.qtd), preco = it[i.key]?.preco == null ? i.preco : num(it[i.key].preco);
+              const calc = (res.grupos ? null : null) || (res.comerciaisDetalhe || []).find((x) => x.key === i.key);
+              const cfg = it[i.key] || {};
+              const porArea = cfg.porArea || {};
+              const temPorArea = Object.values(porArea).some((v) => num(v) > 0);
+              const somaAreas = areas.reduce((a2, ar) => a2 + num(porArea[ar]), 0);
+              const qtd = temPorArea ? somaAreas : num(cfg.qtd);
+              const preco = cfg.preco == null ? i.preco : num(cfg.preco);
+              const aberta = expandido === i.key;
               return (
-                <tr key={i.key}>
-                  <td className="px-4 py-1">{i.rotulo}</td><td className="px-2 py-1 text-torg-gray">{i.un}</td>
-                  <td className="px-2 py-1 text-right"><Inp value={it[i.key]?.qtd ?? ""} onChange={(e) => setIt(i.key, "qtd", e.target.value)} className="w-24 text-right" /></td>
-                  <td className="px-2 py-1 text-right"><Inp value={it[i.key]?.preco ?? i.preco} onChange={(e) => setIt(i.key, "preco", e.target.value)} className="w-24 text-right" /></td>
-                  <td className="px-4 py-1 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(qtd * preco)}</td>
-                </tr>
+                <Fragment key={i.key}>
+                  <tr>
+                    <td className="px-4 py-1">
+                      <button onClick={() => setExpandido(aberta ? null : i.key)} className="text-left hover:text-torg-blue">
+                        {i.rotulo} <span className="text-[10px] text-torg-blue">{aberta ? "▾" : "▸"} por área</span>
+                      </button>
+                      {!temPorArea && num(cfg.qtd) > 0 && (
+                        <span className="block text-[10px] text-torg-orange-700">lançado para a obra toda — não acompanha o escopo</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1 text-torg-gray">{i.un}</td>
+                    <td className="px-2 py-1 text-right">
+                      {temPorArea
+                        ? <span className="tabular-nums whitespace-nowrap font-semibold">{Number(qtd).toLocaleString("pt-BR")}</span>
+                        : <Inp value={cfg.qtd ?? ""} onChange={(e) => setIt(i.key, "qtd", e.target.value)} className="w-24 text-right" />}
+                    </td>
+                    <td className="px-2 py-1 text-right"><Inp value={cfg.preco ?? i.preco} onChange={(e) => setIt(i.key, "preco", e.target.value)} className="w-24 text-right" /></td>
+                    <td className="px-4 py-1 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(qtd * preco)}</td>
+                  </tr>
+                  {aberta && (
+                    <tr className="bg-gray-50/60">
+                      <td colSpan={5} className="px-4 py-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                          {areas.map((ar) => (
+                            <label key={ar} className="text-[11px] text-torg-dark flex items-center gap-2">
+                              <span className="truncate flex-1" title={ar}>{ar}</span>
+                              <Inp value={porArea[ar] ?? ""} onChange={(e) => setIt(i.key, "porArea", { ...porArea, [ar]: e.target.value })}
+                                className="w-20 text-right" />
+                            </label>
+                          ))}
+                        </div>
+                        {!areas.length && <p className="text-[11px] text-torg-gray">Lance as áreas no quantitativo primeiro.</p>}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
             <tr className="bg-gray-50 font-bold"><td className="px-4 py-1.5" colSpan={4}>Total</td>
@@ -599,7 +643,10 @@ function Terceiros({ c, res, setComp }) {
             </div>
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
               <p className="text-[11px] text-torg-gray">
-                {fmtKg(l.pesoKg)} × {fmtR$(l.precoKg)} = <strong className="text-torg-dark">{fmtR$(l.subtotal)}</strong>
+                {l.foraDoEscopo
+                  ? <span className="text-torg-orange-700 font-semibold">área fora do escopo — zerado</span>
+                  : <>{fmtKg(l.pesoKg)} × {fmtR$(l.precoKg)} = <strong className="text-torg-dark">{fmtR$(l.subtotal)}</strong></>}
+                {l.naoAcompanha && <span className="block text-torg-orange-700">valor fechado da obra toda — não encolheu com o escopo, confira</span>}
                 {l.icms > 0 && <> · ICMS {fmtR$(l.icms)}</>}
                 {l.pisCofins > 0 && <> · PIS/COFINS {fmtR$(l.pisCofins)}</>}
               </p>
