@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { calcularLqc, cenarioFinanceiro } from "@/lib/lqc";
+import { capacidadeDaFabrica } from "@/lib/fabrica-capacidade";
 
 export const runtime = "nodejs";
 const PERFIS = ["ADMIN", "COMERCIAL"];
@@ -15,7 +16,10 @@ export async function GET(req, { params }) {
   // ⚠ o cálculo vem SEMPRE do servidor, nunca do que a tela mandou: é o mesmo número que vai pra
   // planilha e pra proposta, e duas contas em lugares diferentes acabam divergindo.
   const resultado = calcularLqc({ ...estudo.composicao, demaos: estudo.demaos, preMontagem: estudo.preMontagem });
-  return NextResponse.json({ estudo, resultado, cenario: cenarioFinanceiro(resultado, estudo.cenario || {}) });
+  // ⚠ cadência e custo operacional vêm do que a fábrica REALMENTE fez, não de um campo digitado:
+  // número de capacidade digitado num orçamento envelhece e ninguém percebe.
+  const fabrica = await capacidadeDaFabrica().catch(() => null);
+  return NextResponse.json({ estudo, resultado, fabrica, cenario: cenarioFinanceiro(resultado, estudo.cenario || {}) });
 }
 
 export async function PUT(req, { params }) {

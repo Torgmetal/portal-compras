@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios } from "@/lib/lqc";
+import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao } from "@/lib/lqc";
 
 const fmtR$ = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -128,7 +128,7 @@ export default function EstudoClient({ id }) {
       {aba === "ENSAIOS" && <Ensaios c={c} res={res} setComp={setComp} />}
       {aba === "BDI" && <Bdi c={c} res={res} setComp={setComp} />}
       {aba === "COMERCIAL" && <PlanilhaComercial res={res} e={e} />}
-      {aba === "CENARIO" && <Cenario e={e} res={res} mexer={mexer} />}
+      {aba === "CENARIO" && <Cenario e={e} res={res} mexer={mexer} fabrica={d.fabrica} />}
     </div>
   );
 }
@@ -909,7 +909,7 @@ function PlanilhaComercial({ res, e }) {
  * sabendo quanto pode ceder antes de a obra virar prejuízo. Na TMSA/VALE, margem de 5% dá BDI
  * 33,9% e preço R$ 51,2 mi; 15% dá 54,6% e R$ 59,1 mi — R$ 6,3 milhões de lucro entre os extremos.
  */
-function Cenario({ e, res, mexer }) {
+function Cenario({ e, res, mexer, fabrica }) {
   const cfg = e.cenario || {};
   const set = (cen, k, v) => mexer({ cenario: { ...cfg, [cen]: { ...(cfg[cen] || {}), [k]: v } } });
   const analise = analiseDeCenarios(res.custoTorg, res.custoDireto, {
@@ -983,10 +983,91 @@ function Cenario({ e, res, mexer }) {
         </table>
       </div>
 
+      {fabrica?.capacidadeKgMes > 0 && (
+        <PrazoDoLucro res={res} analise={analise} fabrica={fabrica} cfg={cfg} mexer={mexer} />
+      )}
+
       <p className="text-[11px] text-torg-gray">
         O BDI incide só sobre o que a Torg fatura ({fmtR$(res.custoTorg)}); o que o cliente compra
         direto ({fmtR$(res.custoDireto)}) entra na venda pelo custo.
       </p>
+    </div>
+  );
+}
+
+/**
+ * PRAZO — em quantos meses isso ainda dá lucro.
+ *
+ * Vitor (23/08/2026): "pensando em uma fabricação e os custos que colocamos, quantos meses temos
+ * para fabricar isso para garantir esse lucro?".
+ *
+ * ⚠ O PREÇO POR KG DE FABRICAÇÃO JÁ EMBUTE UM RATEIO DE CUSTO OPERACIONAL, e esse rateio supõe uma
+ * cadência. A fábrica custa o mesmo todo mês, produzindo muito ou pouco: cada mês a mais que a obra
+ * ocupa é despesa que ninguém cobrou do cliente. É por isso que proposta com margem boa no papel
+ * vira prejuízo quando o prazo estica — e é a conta que ninguém fazia antes de assinar.
+ *
+ * Cadência e custo do mês vêm do que a fábrica REALMENTE fez (Syneco) e da configuração de
+ * custo-hora; digitados, envelheceriam sem ninguém perceber.
+ */
+function PrazoDoLucro({ res, analise, fabrica, cfg, mexer }) {
+  const ocupacao = cfg.ocupacaoPct ?? 100;
+  const prazos = analise.map((c) => ({
+    ...c,
+    p: prazoDeFabricacao(res.pesoTotal, c.lucro, {
+      capacidadeKgMes: fabrica.capacidadeKgMes,
+      custoOperacionalMes: fabrica.custoOperacionalMes,
+      ocupacaoPct: ocupacao,
+    }),
+  }));
+  const base = prazos.find((x) => x.key === "base");
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100">
+        <p className="text-[12px] font-bold text-torg-dark">Prazo que preserva o lucro</p>
+        <p className="text-[11px] text-torg-gray mt-0.5">
+          A fábrica fez <strong className="text-torg-dark">{fabrica.capacidadeKgMes.toLocaleString("pt-BR")} kg/mês</strong> em
+          média ({fabrica.mesesConsiderados} meses, {fabrica.periodo}) e custa{" "}
+          <strong className="text-torg-dark">{fmtR$(fabrica.custoOperacionalMes)}/mês</strong> para funcionar.
+          Cada mês a mais é despesa que não foi cobrada do cliente.
+        </p>
+        <label className="text-[11px] text-torg-dark inline-flex items-center gap-2 mt-3">
+          Fatia da fábrica que esta obra ocupa
+          <Inp value={cfg.ocupacaoPct ?? ""} placeholder="100"
+            onChange={(ev) => mexer({ cenario: { ...cfg, ocupacaoPct: ev.target.value } })} className="w-20 text-right" />
+          <span className="text-torg-gray">%</span>
+        </label>
+      </div>
+      <table className="w-full text-[12px]">
+        <thead className="text-[10px] uppercase text-torg-gray">
+          <tr><th className="text-left px-4 py-1.5">Cenário</th><th className="text-right px-3 py-1.5">Lucro</th>
+            <th className="text-right px-3 py-1.5">Prazo previsto</th><th className="text-right px-3 py-1.5">Aguenta até</th>
+            <th className="text-right px-4 py-1.5">Cada mês de atraso</th></tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {prazos.map((x) => (
+            <tr key={x.key} className={x.key === "base" ? "bg-torg-blue-50/40 font-semibold" : ""}>
+              <td className="px-4 py-1.5">{x.nome}</td>
+              <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(x.lucro)}</td>
+              <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{x.p?.mesesPrevistos} meses</td>
+              <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-dark">
+                {x.p?.mesesLimite == null ? "—" : `${x.p.mesesLimite} meses`}
+              </td>
+              <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap text-red-600">
+                {x.p?.custoDoMesDeAtraso ? `− ${fmtR$(x.p.custoDoMesDeAtraso)}` : "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {base?.p?.mesesLimite != null && (
+        <p className="text-[11px] text-torg-gray px-4 py-3 border-t border-gray-100">
+          No cenário base a obra é fabricada em <strong className="text-torg-dark">{base.p.mesesPrevistos} meses</strong> e
+          o lucro só acaba aos <strong className="text-torg-dark">{base.p.mesesLimite}</strong> —
+          são <strong className="text-torg-dark">{base.p.mesesExtras} meses</strong> de folga.
+          {ocupacao >= 100 && " Com a fábrica dedicada só a esta obra; dividindo, o prazo dobra e a folga também."}
+        </p>
+      )}
     </div>
   );
 }
