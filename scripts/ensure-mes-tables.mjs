@@ -188,6 +188,22 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PortalListaRevisao_opId_fonte_seq_key" ON "PortalListaRevisao" ("opId", "fonte", "seq")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PortalListaRevisao_opId_fonte_idx" ON "PortalListaRevisao" ("opId", "fonte")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PortalListaRevisao_opNumero_idx" ON "PortalListaRevisao" ("opNumero")`);
+
+  // Tratativa de rastreabilidade por R (material de estoque, certificado em arquivo fisico…).
+  await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "RastreioTratativa" (
+    "id" TEXT PRIMARY KEY,
+    "importRef" TEXT NOT NULL,
+    "opNumero" TEXT,
+    "situacao" TEXT NOT NULL,
+    "rOrigem" TEXT,
+    "observacao" TEXT,
+    "registradoPorId" TEXT,
+    "registradoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "RastreioTratativa_importRef_key" ON "RastreioTratativa" ("importRef")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RastreioTratativa_opNumero_idx" ON "RastreioTratativa" ("opNumero")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RastreioTratativa_situacao_idx" ON "RastreioTratativa" ("situacao")`);
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PortalCliente_opNumero_key" ON "PortalCliente"("opNumero")`);
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PortalCliente_token_key" ON "PortalCliente"("token")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PortalCliente_status_idx" ON "PortalCliente"("status")`);

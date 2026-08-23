@@ -2154,6 +2154,37 @@ model DocumentoInstitucional {
 //
 // A foto e tirada quando o cliente abre o portal e o conteudo difere da ultima — nao ha cron, e
 // nao ha janela em que o portal mostre uma lista que ninguem registrou.
+// ─── TRATATIVA DE RASTREABILIDADE (por R) ─────────────────────────────────────
+// Vitor (22/08/2026): "o que precisamos garantir e que todos os materiais listados para as ops
+// estejam com as informacoes em dia... alguns materiais usamos de estoque".
+//
+// ⚠ NEM TODA PENDENCIA SE RESOLVE BUSCANDO O ARQUIVO. Material que saiu do estoque nao gera
+// certificado novo: o certificado dele e o da compra ORIGINAL, com outro R. Sem um lugar para
+// registrar isso, esses itens ficariam vermelhos para sempre e a tela viraria ruido — que e
+// exatamente o que faz uma conferencia deixar de ser usada.
+//
+// ⚠ E O VOCABULARIO E FECHADO, DE PROPOSITO. Vitor: "nao podemos em hipotese alguma mencionar
+// que o fornecedor nao entrega certificado". Registrar isso seria deixar escrito, num documento
+// que auditor e cliente podem ler, que a Torg recebeu material sabendo que o certificado nao
+// viria. As situacoes possiveis descrevem ONDE o certificado esta (estoque, arquivo fisico) ou
+// que ele ainda nao chegou — nunca uma decisao de dispensar certificado. Ver lib/rastreio-tratativa.
+model RastreioTratativa {
+  id              String   @id @default(cuid())
+  importRef       String   @unique // o R do material no CMR
+  opNumero        String?
+  // ESTOQUE | ARQUIVO_FISICO | AGUARDANDO_CERTIFICADO — lista fechada em lib/rastreio-tratativa.js
+  situacao        String
+  // Caso ESTOQUE: o R da compra original, de onde vem o certificado deste material.
+  rOrigem         String?
+  observacao      String?
+  registradoPorId String?
+  registradoEm    DateTime @default(now())
+  atualizadoEm    DateTime @updatedAt
+
+  @@index([opNumero])
+  @@index([situacao])
+}
+
 model PortalListaRevisao {
   id          String    @id @default(cuid())
   opId        String
