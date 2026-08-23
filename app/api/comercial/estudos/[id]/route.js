@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { calcularLqc } from "@/lib/lqc";
 import { capacidadeDaFabrica } from "@/lib/fabrica-capacidade";
+import { custoDeFabricacao, custoPorKgDaRota, mixDeClasses, calibrarTabela, SETORES_ROTA } from "@/lib/custo-fabricacao";
+import { CLASSES } from "@/lib/lqc";
 
 export const runtime = "nodejs";
 const PERFIS = ["ADMIN", "COMERCIAL"];
@@ -19,7 +21,25 @@ export async function GET(req, { params }) {
   // ⚠ cadência e custo operacional vêm do que a fábrica REALMENTE fez, não de um campo digitado:
   // número de capacidade digitado num orçamento envelhece e ninguém percebe.
   const fabrica = await capacidadeDaFabrica().catch(() => null);
-  return NextResponse.json({ estudo, resultado, fabrica });
+
+  // ⚠ O CUSTO DE FABRICAR VEM DA EMPRESA, NÃO DE UMA TABELA. Vitor (23/08/2026): "não quero que
+  // use minha planilha como bengala sua, quero que monte a sistemática que deve ser essa parte do
+  // comercial". Então o portal calcula quanto custa processar um quilo em cada setor — custo
+  // mensal do setor dividido pelo que ele produz — e mostra a tabela ao lado, calibrada pelo mix
+  // real da fábrica. Ver lib/custo-fabricacao.
+  let custoFabrica = null;
+  try {
+    const base = await custoDeFabricacao();
+    if (base) {
+      const rota = estudo.composicao?.rotaFabricacao || SETORES_ROTA.filter((s) => s.padrao).map((s) => s.key);
+      const daRota = custoPorKgDaRota(base, rota);
+      const mix = await mixDeClasses();
+      const iDemaos = Math.max(0, Math.min(2, (resultado.demaos || 1) - 1));
+      custoFabrica = { ...base, rota, ...daRota, mix, calibracao: calibrarTabela(CLASSES, daRota.custoPorKg, mix, iDemaos) };
+    }
+  } catch { /* sem base de custo, a tela cai na tabela */ }
+
+  return NextResponse.json({ estudo, resultado, fabrica, custoFabrica });
 }
 
 export async function PUT(req, { params }) {

@@ -124,7 +124,7 @@ export default function EstudoClient({ id }) {
       {aba === "RESUMOS" && <Resumos e={e} c={c} setComp={setComp} mexer={mexer} res={res} />}
       {aba === "MATERIAL" && <Material c={c} res={res} setComp={setComp} />}
       {aba === "PINTURA" && <Pintura c={c} res={res} setComp={setComp} />}
-      {aba === "FABRICACAO" && <Fabricacao c={c} res={res} setComp={setComp} />}
+      {aba === "FABRICACAO" && <Fabricacao c={c} res={res} setComp={setComp} custoFabrica={d.custoFabrica} />}
       {aba === "TERCEIROS" && <Terceiros c={c} res={res} setComp={setComp} />}
       {aba === "FRETE" && <Frete c={c} res={res} setComp={setComp} />}
       {aba === "ENSAIOS" && <Ensaios c={c} res={res} setComp={setComp} />}
@@ -548,7 +548,7 @@ function Material({ c, res, setComp }) {
 }
 
 /** FABRICAÇÃO — o que a fábrica faz. Sempre Torg, então não há o que escolher. */
-function Fabricacao({ c, res, setComp }) {
+function Fabricacao({ c, res, setComp, custoFabrica }) {
   const pct = c.preMontagemPct ?? "";
   const pctNum = num(pct);
   const tabelado = pctNum === 10 || pctNum === 100;
@@ -556,6 +556,8 @@ function Fabricacao({ c, res, setComp }) {
 
   return (
     <div className="space-y-4">
+      {custoFabrica && <CustoDaFabrica cf={custoFabrica} c={c} setComp={setComp} />}
+
       <Quadro titulo="Fabricação por classe" grupo={g.fabricacao}
         vazio="Lance a classificação nas linhas do quantitativo — é ela que escolhe o preço." />
 
@@ -1523,6 +1525,137 @@ function Frete({ c, res, setComp }) {
                R$/kg das áreas fica <strong className="text-torg-dark">{fmtR$(r.porKg)}</strong> mais baixo.
                O cliente consegue comparar com o transportador dele.</>}
         </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * O CUSTO DE FABRICAR, MEDIDO NA EMPRESA.
+ *
+ * Vitor (23/08/2026): "não quero que use minha planilha como bengala sua, quero que monte a
+ * sistemática que deve ser essa parte do comercial".
+ *
+ * ⚠ A TABELA É UM PREÇO QUE ALGUÉM ESCREVEU UM DIA. Ela não sabe se a fábrica contratou gente, se
+ * a energia subiu ou se a produção caiu — enquanto ela for a fonte, o orçamento repete o passado,
+ * e o erro só aparece no fechamento da obra, quando não dá mais para corrigir.
+ *
+ * A sistemática é a outra: o custo por quilo de cada setor é o que ele custa por mês dividido pelo
+ * que ele produz por mês. Os dois números o portal já tem e ambos se atualizam sozinhos.
+ *
+ * ⚠ O QUE NÃO DÁ PARA MEDIR: custo por CLASSE de peso. O apontamento do Syneco grava a descrição
+ * da peça, não a marca, e sem isso não há como ligar setor a peça e à sua classe. Então a tabela
+ * dá a FORMA (peça leve custa mais por quilo — é física) e a medição dá o NÍVEL: calibrar é
+ * escalar a tabela até a média dela, pesada pelo mix real, bater com o custo medido.
+ */
+function CustoDaFabrica({ cf, c, setComp }) {
+  const [aberto, setAberto] = useState(false);
+  const cal = cf.calibracao || {};
+  const rota = c.rotaFabricacao || cf.rota || [];
+  const adotar = () => setComp({
+    precos: {
+      ...(c.precos || {}),
+      classe: Object.fromEntries((cal.linhas || []).map((l) => [l.key, { fabricacao: l.calibrado }])),
+    },
+    baseFabricacao: { origem: "medido", em: new Date().toISOString(), custoPorKg: cf.custoPorKg, periodo: cf.periodo },
+  });
+  const adotada = c.baseFabricacao?.origem === "medido";
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-[12px] font-bold text-torg-dark">O que custa fabricar um quilo, medido na empresa</p>
+          <button onClick={() => setAberto((v) => !v)} className="text-[11px] font-semibold text-torg-blue hover:underline">
+            {aberto ? "ocultar a conta" : "ver a conta"}
+          </button>
+        </div>
+        <p className="text-[11px] text-torg-gray mt-0.5">
+          Custo mensal de cada setor ÷ o que ele produz por mês. {cf.mesesConsiderados} meses ({cf.periodo}).
+          Não é a tabela — é a folha, o rateio da casa e o apontamento do Syneco.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100">
+        <Kpi r="Custo de industrialização" v={`${fmtR$(cf.custoPorKg)}/kg`} />
+        <Kpi r={`Preço a ${cf.margemPct}% de margem`} v={`${fmtR$(cf.custoPorKg * (1 + cf.margemPct / 100) / (1 - cf.impostosVendaPct / 100))}/kg`} />
+        <Kpi r="Média da tabela (pelo mix)" v={`${fmtR$(cal.mediaTabela)}/kg`} />
+        <Kpi r="A tabela cobra" v={`${cal.diferencaPct > 0 ? "+" : ""}${cal.diferencaPct}%`}
+          cor={cal.diferencaPct > 0 ? "text-green-700" : "text-red-600"} />
+      </div>
+
+      {aberto && (
+        <div className="p-4 space-y-4 border-t border-gray-100">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-torg-blue mb-2">Por setor da rota</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[12px]" style={{ minWidth: 520 }}>
+                <thead className="text-[10px] uppercase text-torg-gray">
+                  <tr><th className="text-left px-2 py-1.5">Setor</th><th className="text-right px-2 py-1.5">Custo/mês</th>
+                    <th className="text-right px-2 py-1.5">kg/mês</th><th className="text-right px-2 py-1.5">R$/kg</th>
+                    <th className="text-center px-2 py-1.5">Na rota</th></tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {(cf.linhas || []).map((l) => (
+                    <tr key={l.key} className={rota.includes(l.key) ? "" : "opacity-50"}>
+                      <td className="px-2 py-1.5">{l.nome}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(l.custoMes)}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtKg(l.kgMes)}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">
+                        {l.semDados ? <span className="text-torg-gray">sem apontamento</span> : `${fmtR$(l.custoPorKg)}`}
+                      </td>
+                      <td className="px-2 py-1.5 text-center">
+                        <input type="checkbox" checked={rota.includes(l.key)}
+                          onChange={(e) => setComp({ rotaFabricacao: e.target.checked ? [...rota, l.key] : rota.filter((x) => x !== l.key) })}
+                          className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[10px] text-torg-gray mt-1.5">
+              Galvanizado pula jato e pintura; peça solta não é montada. Por isso a rota se escolhe.
+              A produção de cada setor não se soma — a mesma peça passa por todos.
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-torg-blue mb-2">Tabela × custo medido</p>
+            <table className="w-full text-[12px]">
+              <thead className="text-[10px] uppercase text-torg-gray">
+                <tr><th className="text-left px-2 py-1.5">Classe</th><th className="text-right px-2 py-1.5">% do peso</th>
+                  <th className="text-right px-2 py-1.5">Tabela</th><th className="text-right px-2 py-1.5">Calibrado</th></tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {(cal.linhas || []).map((l) => (
+                  <tr key={l.key}>
+                    <td className="px-2 py-1.5">{l.nome} <span className="text-torg-gray">· {l.faixa}</span></td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{(l.peso * 100).toFixed(0)}%</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(l.tabela)}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(l.calibrado)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-[11px] text-torg-gray mt-2">
+              O mix vem da LPC: {cf.mix?.pecas?.toLocaleString("pt-BR")} peças, classe pelo kg/m de cada uma.
+              Custo por classe não se mede — o apontamento não liga setor a peça —, então a tabela dá a
+              forma e a medição dá o nível.
+            </p>
+            <button onClick={adotar}
+              className="mt-3 text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-4 py-2">
+              {adotada ? "Reaplicar o custo medido" : "Usar o custo medido neste estudo"}
+            </button>
+            {adotada && (
+              <p className="text-[11px] text-torg-gray mt-2">
+                Este estudo está com o custo medido de {fmtR$(c.baseFabricacao?.custoPorKg)}/kg,
+                adotado em {new Date(c.baseFabricacao.em).toLocaleDateString("pt-BR")} sobre {c.baseFabricacao?.periodo}.
+                Fica congelado: refazer a medição não muda proposta já enviada.
+              </p>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
