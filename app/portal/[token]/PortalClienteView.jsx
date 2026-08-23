@@ -349,6 +349,7 @@ function Certificados({ token, lista }) {
   const [erro, setErro] = useState("");
 
   const baixaveis = lista.filter((c) => c.baixavel);
+  const todosMarcados = baixaveis.length > 0 && sel.size === baixaveis.length;
   const alternar = (id) => setSel((p) => {
     const n = new Set(p);
     if (n.has(id)) n.delete(id); else n.add(id);
@@ -384,10 +385,9 @@ function Certificados({ token, lista }) {
           baixar {sel.size}
         </button>
       )}
-      <button onClick={() => setSel(sel.size === baixaveis.length ? new Set() : new Set(baixaveis.map((c) => c.id)))}
-        className="text-[12px] font-medium text-[#006EAB] hover:underline">
-        {sel.size === baixaveis.length ? "limpar" : "selecionar todos"}
-      </button>
+      <span className="text-[12px] text-gray-500">
+        {sel.size ? `${sel.size} de ${baixaveis.length}` : `${baixaveis.length} disponíveis`}
+      </span>
     </div>
   );
 
@@ -399,7 +399,21 @@ function Certificados({ token, lista }) {
         <table className="w-full text-[13px] min-w-[540px]">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wide text-gray-400">
-              <th className="w-6" />
+              {/* ⚠ A CAIXA MESTRA FICA NO CABEÇALHO DA COLUNA, onde a pessoa procura. Vitor
+                  (22/08/2026): "coloque a caixa para poder selecionar todos certificados". Existia
+                  só o link "selecionar todos" no canto do bloco — longe da coluna e escrito, quando
+                  o gesto natural é marcar a caixa de cima. */}
+              <th className="w-6 pb-2 px-1">
+                <button onClick={() => setSel(todosMarcados ? new Set() : new Set(baixaveis.map((c) => c.id)))}
+                  title={todosMarcados ? "limpar seleção" : "selecionar todos"} aria-label="selecionar todos"
+                  className={`w-4 h-4 rounded border flex items-center justify-center ${
+                    todosMarcados ? "bg-[#006EAB] border-[#006EAB]"
+                    : sel.size ? "bg-[#006EAB]/20 border-[#006EAB]" : "border-gray-300 hover:border-[#006EAB]"}`}>
+                  {/* parcial ganha um traço, não um tique: marcar o que está meio marcado engana */}
+                  {todosMarcados ? <Check size={11} className="text-white" />
+                    : sel.size ? <span className="block w-2 h-[2px] bg-[#006EAB] rounded" /> : null}
+                </button>
+              </th>
               <th className="font-semibold pb-2 px-1">Rastreio</th>
               <th className="font-semibold pb-2 px-1">Material</th>
               <th className="font-semibold pb-2 px-1">Corrida</th>
