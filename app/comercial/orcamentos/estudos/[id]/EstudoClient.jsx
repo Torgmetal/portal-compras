@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, TrendingDown } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIRIZADOS, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem } from "@/lib/lqc";
+import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIRIZADOS, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada } from "@/lib/lqc";
 
 const fmtR$ = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -243,6 +243,27 @@ function CartaoLinha({ l, i, set, del, dup }) {
             <Inp value={l.pesoUnit ?? ""} onChange={(ev) => set(i, "pesoUnit", ev.target.value)} className="w-full text-right" /></Campo>
         </Bloco>
 
+        {/* ⚠ ÁREA INFORMADA MANDA. Vitor (23/08/2026): "deixar o campo para preencher caso
+            tenhamos essa informação da área de pintura, ou veja se conseguimos fazer uma
+            estimativa de área de acordo com o peso". As duas coisas, nesta ordem: quando existe
+            medição, ela vence; o coeficiente é o plano B, e a tela diz qual dos dois está valendo. */}
+        <Bloco titulo="Área de pintura" nota="é ela que precifica tinta e ensaio por m²">
+          <Campo r="Área informada (m²)" ajuda="tem o levantamento? preencha e o resto é ignorado">
+            <Inp value={l.areaM2 ?? ""} onChange={(ev) => set(i, "areaM2", ev.target.value)} className="w-full text-right" /></Campo>
+          <Campo r="Coeficiente (m²/kg)" ajuda={`vazio usa ${coefSugerido(l.perfil).toFixed(4)} — média das nossas obras neste perfil`}>
+            <Inp value={l.coef ?? ""} onChange={(ev) => set(i, "coef", ev.target.value)} className="w-full text-right" /></Campo>
+          <div className="col-span-2 sm:col-span-3 lg:col-span-3 flex items-end">
+            <p className="text-[11px] text-torg-gray">
+              {num(l.areaM2) > 0
+                ? <>Usando a área informada: <strong className="text-torg-dark">{Number(num(l.areaM2)).toLocaleString("pt-BR")} m²</strong>.</>
+                : peso > 0
+                  ? <>Estimando <strong className="text-torg-dark">{Math.round(peso * (num(l.coef) || coefSugerido(l.perfil))).toLocaleString("pt-BR")} m²</strong>{" "}
+                      ({(num(l.coef) || coefSugerido(l.perfil)).toFixed(4)} m²/kg × peso){num(l.coef) > 0 ? "" : " — coeficiente sugerido, confira"}.</>
+                  : "Lance o peso para estimar a área."}
+            </p>
+          </div>
+        </Bloco>
+
         <Bloco titulo="De que é feito" nota={`as duas escolhas que definem o preço · perda de tinta ${perdaDaEstrutura(l.estrutura)}% (vem da estrutura)`}>
           <Campo r="Classificação" ajuda={classe ? `${classe.faixa} · fabricação ${fmtR$(classe.fabricacao)}/kg` : "faixa de peso por metro do perfil"}>
             <select value={l.classificacao || ""} onChange={(ev) => set(i, "classificacao", ev.target.value)}
@@ -381,7 +402,7 @@ function Quadro({ titulo, grupo }) {
 }
 
 /** MC_TINTAS — as duas linhas de tinta do modelo, uma por fator de perda. */
-function Tintas({ c, setComp }) {
+function Tintas({ c, setComp, res }) {
   const t = Array.isArray(c.tintas) ? c.tintas : [];
   const linha = (i) => t[i] || {};
   // ⚠ o nº de demãos é a contagem destas camadas — não há seletor de demãos em lugar nenhum.
@@ -392,19 +413,37 @@ function Tintas({ c, setComp }) {
   };
   return (
     <div className="space-y-4">
-      {[0, 1].map((i) => (
+      {[0, 1].map((i) => {
+        const t = { ...linha(i), perda: i === 0 ? 45 : 85 };
+        const areaCamada = num(t.areaM2) > 0 ? num(t.areaM2) : (res?.areaM2 || 0);
+        const rend = rendimentoTinta(t);
+        const calc = custoCamada(t, areaCamada);
+        const pesoTinta = num(t.pesoKg) > 0 ? num(t.pesoKg) : (res?.pesoTotal || 0);
+        return (
         <div key={i} className="bg-white border border-gray-100 rounded-xl p-4">
           <p className="text-[12px] font-bold text-torg-dark mb-3">Estrutura — fator de perda: {i === 0 ? "45%" : "85%"}</p>
           <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-3">
             <label className="text-[11px] text-torg-dark">Camada
               <Sel value={linha(i).camada || ""} onChange={(e) => set(i, "camada", e.target.value)} opcoes={CAMADAS_TINTA} className="block mt-1 w-full" /></label>
-            {[["produto", "Produto"], ["cor", "Cor"], ["solidos", "Sólidos por volume (%)"], ["peliculaSeca", "Película seca (µm)"], ["precoLitro", "Preço/litro (R$)"], ["pesoKg", "Peso atingido (kg)"], ["precoKg", "Custo (R$/kg)"]].map(([k, r]) => (
+            {[["produto", "Produto"], ["cor", "Cor"], ["solidos", "Sólidos por volume (%)"], ["peliculaSeca", "Película seca (µm)"], ["precoLitro", "Preço/litro (R$)"], ["areaM2", "Área desta camada (m²)"], ["pesoKg", "Peso pintado (kg)"], ["precoKg", "Custo (R$/kg) — deixe vazio para calcular"]].map(([k, r]) => (
               <label key={k} className="text-[11px] text-torg-dark">{r}
                 <Inp value={linha(i)[k] ?? ""} onChange={(e) => set(i, k, e.target.value)} className="block mt-1 w-full" /></label>
             ))}
           </div>
+          {/* ⚠ os passos aparecem para o número poder ser conferido: rendimento errado é o tipo de
+              engano que só se descobre quando a tinta acaba no meio da obra. */}
+          {rend.teorico > 0 && (
+            <p className="text-[11px] text-torg-gray mt-3 pt-3 border-t border-gray-100">
+              Rendimento teórico <strong className="text-torg-dark">{rend.teorico} m²/L</strong>
+              {" "}({t.solidos}% × 10 ÷ {t.peliculaSeca} µm) · com {i === 0 ? 45 : 85}% de perda,
+              prático <strong className="text-torg-dark">{rend.pratico} m²/L</strong> ·
+              {" "}<strong className="text-torg-dark">{Number(areaCamada).toLocaleString("pt-BR")} m²</strong> pedem
+              {" "}<strong className="text-torg-dark">{Number(calc.litros).toLocaleString("pt-BR")} L</strong>
+              {t.precoLitro ? <> = <strong className="text-torg-dark">{fmtR$(calc.total)}</strong>{pesoTinta > 0 ? <> ({fmtR$(calc.total / pesoTinta)}/kg)</> : null}</> : null}
+            </p>
+          )}
         </div>
-      ))}
+      ); })}
       <p className="text-[11px] text-torg-gray">
         Na planilha, área de pintura, rendimento e litros saem de fórmula a partir do quantitativo.
         Aqui entram o produto e o preço; o custo por kg alimenta a linha de TINTAS da industrialização.
