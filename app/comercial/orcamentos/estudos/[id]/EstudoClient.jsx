@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, TrendingDown } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { CLASSES, PERFIS, FATURAMENTO, ESTRUTURAS, METODOS, PRE_MONTAGEM, ITENS_COMERCIAIS, TERCEIRIZADOS, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, cargaDoCfop, perdaDaEstrutura } from "@/lib/lqc";
+import { CLASSES, PERFIS, FATURAMENTO, ESTRUTURAS, METODOS, ITENS_COMERCIAIS, TERCEIRIZADOS, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, FATOR_DEMAO_EXTRA } from "@/lib/lqc";
 
 const fmtR$ = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -16,6 +16,8 @@ const ABAS = [
   { k: "RESUMOS", r: "Quantitativo (RESUMOS_EM)" },
   { k: "IND", r: "Industrialização" },
   { k: "TINTAS", r: "MC_TINTAS" },
+  { k: "PREMONT", r: "Pré-montagem" },
+  { k: "ENSAIOS", r: "Ensaios" },
   { k: "COMERCIAIS", r: "Itens comerciais" },
   { k: "BDI", r: "Impostos e BDI" },
   { k: "COMERCIAL", r: "Planilha comercial" },
@@ -104,8 +106,10 @@ export default function EstudoClient({ id }) {
       </div>
 
       {aba === "RESUMOS" && <Resumos e={e} c={c} setComp={setComp} mexer={mexer} />}
-      {aba === "IND" && <Industrializacao c={c} res={res} setComp={setComp} e={e} mexer={mexer} />}
-      {aba === "TINTAS" && <Tintas c={c} setComp={setComp} />}
+      {aba === "IND" && <Industrializacao c={c} res={res} setComp={setComp} />}
+      {aba === "TINTAS" && <Tintas c={c} setComp={setComp} res={res} />}
+      {aba === "PREMONT" && <PreMontagem c={c} res={res} setComp={setComp} />}
+      {aba === "ENSAIOS" && <Ensaios c={c} res={res} setComp={setComp} />}
       {aba === "COMERCIAIS" && <Comerciais c={c} res={res} setComp={setComp} />}
       {aba === "BDI" && <Bdi c={c} res={res} setComp={setComp} />}
       {aba === "COMERCIAL" && <PlanilhaComercial res={res} e={e} />}
@@ -282,7 +286,7 @@ const Campo = ({ r, ajuda, children }) => (
 );
 
 /** INDUSTRIALIZAÇÃO — faturamento por grupo, preços de entrada e o quadro calculado. */
-function Industrializacao({ c, res, setComp, e, mexer }) {
+function Industrializacao({ c, res, setComp }) {
   const fat = c.faturamento || {};
   const setFat = (k, v) => setComp({ faturamento: { ...fat, [k]: v } });
   const g = res.grupos || {};
@@ -312,14 +316,10 @@ function Industrializacao({ c, res, setComp, e, mexer }) {
       <div className="bg-white border border-gray-100 rounded-xl p-4">
         {/* ⚠ a pré-montagem mora AQUI porque é ela que escolhe a coluna de preço da linha 3.3 —
             é decisão de custo, não de quantitativo. */}
-        <div className="flex flex-wrap items-end gap-4 mb-4 pb-4 border-b border-gray-100">
-          <label className="text-[11px] font-semibold text-torg-dark">Pré-montagem
-            <Sel value={e.preMontagem || ""} onChange={(ev) => mexer({ preMontagem: ev.target.value })} opcoes={PRE_MONTAGEM} className="block mt-1" /></label>
-          <p className="text-[11px] text-torg-gray">
-            Demãos de pintura: <strong className="text-torg-dark">{res.demaos || 1}</strong> —
-            contadas das camadas lançadas na aba MC_TINTAS, como a planilha faz.
-          </p>
-        </div>
+        <p className="text-[11px] text-torg-gray mb-4 pb-4 border-b border-gray-100">
+          Pintura: <strong className="text-torg-dark">{res.demaos || 1} {res.demaos === 1 ? "demão" : "demãos"}</strong> ·
+          pré-montagem: <strong className="text-torg-dark">{res.preMontagemPct || 0}%</strong> — as duas têm aba própria.
+        </p>
         <p className="text-[12px] font-bold text-torg-dark mb-3">Preços que a planilha não calcula</p>
         <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-3">
           <label className="text-[11px] text-torg-dark">Fixadores (R$/kg)
@@ -407,6 +407,153 @@ function Tintas({ c, setComp }) {
         <strong className="text-torg-dark">O nº de demãos é a contagem destas camadas</strong> — é assim
         que a planilha faz. Os dois fatores de perda também não se escolhem: 85% é de guarda-corpo e
         escada marinheiro, 45% do resto, conforme a estrutura de cada elemento.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * PRÉ-MONTAGEM — quanto da obra se pré-monta, e quanto isso custa.
+ *
+ * Vitor (23/08/2026): "deixar selecionável a % da quantidade que precisamos pré-montar, e com
+ * isso vamos formar o preço".
+ *
+ * ⚠ A LQC SÓ TEM DUAS ÂNCORAS: 10% e 100%. Entre elas o preço é interpolado reto — dois pontos
+ * não dão curva, e fingir precisão que não existe é pior que assumir a reta. Por isso a tela diz
+ * quando o número é tabelado e quando é interpolado: quem orça precisa saber a diferença antes de
+ * defender o preço numa reunião.
+ */
+function PreMontagem({ c, res, setComp }) {
+  const pct = c.preMontagemPct ?? "";
+  const grupo = res.grupos?.preMontagem;
+  const pctNum = Number(String(pct).replace(",", ".")) || 0;
+  const tabelado = pctNum === 10 || pctNum === 100;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white border border-gray-100 rounded-xl p-5">
+        <label className="text-[12px] font-semibold text-torg-dark">
+          Percentual da obra a pré-montar (%)
+          <Inp value={pct} onChange={(e) => setComp({ preMontagemPct: e.target.value })} className="block mt-1 w-32 text-right" />
+        </label>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {[0, 10, 25, 50, 75, 100].map((v) => (
+            <button key={v} onClick={() => setComp({ preMontagemPct: v })}
+              className={`text-[11px] font-semibold rounded px-2.5 py-1 border ${pctNum === v ? "border-torg-blue text-torg-blue bg-torg-blue-50" : "border-gray-200 text-torg-gray hover:border-torg-blue/40"}`}>
+              {v}%
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-torg-gray mt-3">
+          {pctNum === 0
+            ? "Sem pré-montagem: a linha 3.3 da industrialização sai zerada."
+            : tabelado
+              ? `${pctNum}% é preço tabelado na PARÂMETROS da LQC.`
+              : `${pctNum}% não está tabelado — o preço é interpolado entre as âncoras de 10% e 100%.`}
+        </p>
+      </div>
+
+      {grupo && (
+        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+          <table className="w-full text-[12px]">
+            <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
+              <tr><th className="text-left px-4 py-1.5">Classe</th><th className="text-right px-2 py-1.5">Peso</th>
+                <th className="text-right px-2 py-1.5">10%</th><th className="text-right px-2 py-1.5">100%</th>
+                <th className="text-right px-2 py-1.5">Aplicado</th><th className="text-right px-4 py-1.5">Custo</th></tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {CLASSES.map((cl, i) => {
+                const l = grupo.linhas[i] || {};
+                return (
+                  <tr key={cl.key}>
+                    <td className="px-4 py-1.5">{cl.nome} <span className="text-torg-gray">· {cl.faixa}</span></td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtKg(l.pesoKg)}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{fmtR$(cl.preMont10)}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{fmtR$(cl.preMont100)}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(precoPreMontagem(cl, pctNum))}</td>
+                    <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(l.subtotal)}</td>
+                  </tr>
+                );
+              })}
+              <tr className="bg-gray-50 font-bold"><td className="px-4 py-1.5" colSpan={5}>Total da pré-montagem</td>
+                <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(grupo.total?.subtotal)}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * ENSAIOS DA QUALIDADE — quantos e quanto.
+ *
+ * Vitor (23/08/2026): "Pull-off, Salinidade, Ultrassom, Dimensional N1, Visual de Solda N1 — para
+ * esses testes verificar na norma a quantidade que precisamos fazer por kg ou por m²".
+ *
+ * ⚠ A FREQUÊNCIA VEM PREENCHIDA MAS NÃO É A NORMA. A referência de cada ensaio está escrita ao
+ * lado, mas a quantidade que se faz numa obra sai do CONTRATO e do procedimento dela — a mesma
+ * norma admite planos de amostragem diferentes, e o cliente costuma apertar. Errar aqui custa dos
+ * dois lados: a mais, perde-se a proposta; a menos, assume-se ensaio que não foi orçado. Por isso
+ * o campo é editável e a tela pede a conferência em vez de afirmar.
+ */
+function Ensaios({ c, res, setComp }) {
+  const cfg = c.ensaios || {};
+  const set = (k, campo, v) => setComp({ ensaios: { ...cfg, [k]: { ...(cfg[k] || {}), [campo]: v } } });
+  const linhas = res.ensaios?.linhas || [];
+
+  return (
+    <div className="space-y-4">
+      <p className="text-[12px] text-torg-gray bg-[#FFF7ED] border border-[#F4801F]/30 rounded-lg px-3 py-2">
+        A frequência abaixo é ponto de partida, <strong className="text-torg-dark">não a norma</strong>.
+        Confira contra a especificação da obra antes de fechar o preço: a mesma norma admite planos de
+        amostragem diferentes, e o cliente costuma apertar.
+      </p>
+
+      <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+        <table className="w-full text-[12px]">
+          <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
+            <tr><th className="text-left px-4 py-1.5">Ensaio</th><th className="text-left px-2 py-1.5">Base</th>
+              <th className="text-right px-2 py-1.5">1 a cada</th><th className="text-right px-2 py-1.5">Universo</th>
+              <th className="text-right px-2 py-1.5">Qtd.</th><th className="text-right px-2 py-1.5">Custo unit.</th>
+              <th className="text-right px-4 py-1.5">Total</th></tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {ENSAIOS.map((e) => {
+              const l = linhas.find((x) => x.key === e.key) || {};
+              return (
+                <tr key={e.key}>
+                  <td className="px-4 py-1.5">
+                    <span className="block font-semibold text-torg-dark">{e.nome}</span>
+                    <span className="block text-[10px] text-torg-gray">{e.norma}</span>
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <Sel value={cfg[e.key]?.base || e.base} onChange={(ev) => set(e.key, "base", ev.target.value)}
+                      opcoes={["kg", "m2"]} className="w-20" />
+                    <span className="block text-[10px] text-torg-gray mt-0.5">{BASES_ENSAIO[l.base || e.base]}</span>
+                  </td>
+                  <td className="px-2 py-1.5 text-right"><Inp value={cfg[e.key]?.cada ?? e.cada} onChange={(ev) => set(e.key, "cada", ev.target.value)} className="w-20 text-right" /></td>
+                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">
+                    {(l.base || e.base) === "m2" ? `${Number(l.universo || 0).toLocaleString("pt-BR")} m²` : fmtKg(l.universo)}
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{l.qtd || 0}</td>
+                  <td className="px-2 py-1.5 text-right"><Inp value={cfg[e.key]?.custo ?? ""} onChange={(ev) => set(e.key, "custo", ev.target.value)} className="w-24 text-right" /></td>
+                  <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(l.total)}</td>
+                </tr>
+              );
+            })}
+            <tr className="bg-gray-50 font-bold"><td className="px-4 py-1.5" colSpan={6}>Total dos ensaios</td>
+              <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(res.ensaios?.total)}</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-[11px] text-torg-gray">
+        Área de pintura considerada: <strong className="text-torg-dark">{Number(res.areaM2 || 0).toLocaleString("pt-BR")} m²</strong> —
+        vem do coeficiente de superfície de cada linha do quantitativo, como a RESUMOS_EM calcula.
+        {!res.areaM2 && " Sem coeficiente lançado, os ensaios por m² ficam zerados."}
+        {" "}Equivale a <strong className="text-torg-dark">{fmtR$(res.ensaios?.porKg)}/kg</strong>, que é como
+        a linha 2.3 da LQC (Inspeção e Data Book) recebe esse custo.
       </p>
     </div>
   );
