@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa } from "@/lib/lqc";
+import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa } from "@/lib/lqc";
 
 const fmtR$ = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -31,6 +31,7 @@ const ABAS = [
   { k: "PINTURA", r: "Pintura", ajuda: "camadas, tinta e mão de obra" },
   { k: "FABRICACAO", r: "Fabricação", ajuda: "fábrica e pré-montagem" },
   { k: "TERCEIROS", r: "Terceiros", ajuda: "o que vem de fora" },
+  { k: "FRETE", r: "Frete", ajuda: "transporte até a obra" },
   { k: "ENSAIOS", r: "Ensaios", ajuda: "inspeção e data book" },
   { k: "BDI", r: "Impostos e BDI" },
   { k: "COMERCIAL", r: "Resumo", planilha: "PLANILHA COMERCIAL" },
@@ -125,6 +126,7 @@ export default function EstudoClient({ id }) {
       {aba === "PINTURA" && <Pintura c={c} res={res} setComp={setComp} />}
       {aba === "FABRICACAO" && <Fabricacao c={c} res={res} setComp={setComp} />}
       {aba === "TERCEIROS" && <Terceiros c={c} res={res} setComp={setComp} />}
+      {aba === "FRETE" && <Frete c={c} res={res} setComp={setComp} />}
       {aba === "ENSAIOS" && <Ensaios c={c} res={res} setComp={setComp} />}
       {aba === "BDI" && <Bdi c={c} res={res} setComp={setComp} />}
       {aba === "COMERCIAL" && <PlanilhaComercial res={res} e={e} />}
@@ -1095,6 +1097,19 @@ function PlanilhaComercial({ res, e }) {
                   <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(t.comerciais * (1 + (res.bdiPct || 0) / 100))}</td>
                 </tr>
               )}
+              {/* ⚠ frete separado é LINHA PRÓPRIA — foi para isso que o cliente pediu a separação. */}
+              {res.frete?.apresentacao === "separado" && res.frete?.total > 0 && (
+                <tr>
+                  <td className="px-4 py-1.5">{t.comerciais > 0 ? 3 : 2}</td>
+                  <td className="px-2 py-1.5" colSpan={3}>
+                    Transporte até a obra
+                    {res.frete.destino ? <span className="text-torg-gray"> — {res.frete.destino}</span> : null}
+                    {res.frete.modo === "viagem" ? <span className="text-torg-gray"> · {res.frete.viagens} viagens</span> : null}
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{fmtR$(res.frete.porKg)}/kg</td>
+                  <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(res.frete.total * (1 + (res.bdiPct || 0) / 100))}</td>
+                </tr>
+              )}
               <tr className="bg-torg-blue-50/50 font-bold text-torg-dark">
                 <td className="px-4 py-2" colSpan={5}>Total geral</td>
                 <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">{fmtR$(res.preco)}</td>
@@ -1421,6 +1436,94 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+/**
+ * FRETE — aba própria, com o seletor de apresentação.
+ *
+ * Vitor (23/08/2026): "frete precisa ter uma aba dedicada para ele, e um seletor para apresentar
+ * ele separado do preço por kg ou diluído no preço unitário, pois isso cada cliente pede essa
+ * informação".
+ *
+ * ⚠ A APRESENTAÇÃO NÃO MUDA O CUSTO — MUDA O QUE O CLIENTE VÊ, e isso vale dinheiro. Diluído, o
+ * R$/kg da estrutura fica mais alto e o frete não vira alvo de corte; separado, o cliente compara
+ * o nosso frete com o transportador dele — e às vezes leva o frete por conta. A proposta tem de
+ * sair dos dois jeitos sem refazer conta nenhuma.
+ */
+function Frete({ c, res, setComp }) {
+  const f = c.frete || {};
+  const set = (k, v) => setComp({ frete: { ...f, [k]: v } });
+  const r = res.frete || {};
+  const modo = r.modo || "kg";
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white border border-gray-100 rounded-xl p-5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Campo r="Origem"><Inp value={f.origem ?? ""} onChange={(e) => set("origem", e.target.value)} className="w-full" /></Campo>
+          <Campo r="Destino" ajuda="cidade / UF da obra">
+            <Inp value={f.destino ?? ""} onChange={(e) => set("destino", e.target.value)} className="w-full" /></Campo>
+          <Campo r="Cobrança">
+            <Sel value={modo} onChange={(e) => set("modo", e.target.value)} opcoes={MODOS_FRETE.map((x) => x.key)}
+              rotulos={Object.fromEntries(MODOS_FRETE.map((x) => [x.key, x.nome]))} className="w-full" /></Campo>
+          <Campo r="Faturamento" ajuda="direto = o cliente contrata o transporte">
+            <Sel value={f.faturamento || "TORG"} onChange={(e) => set("faturamento", e.target.value)}
+              opcoes={FATURAMENTO} rotulos={FATURAMENTO_ROTULO} className="w-full" /></Campo>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 pt-3 border-t border-gray-100">
+          {modo === "kg" && (
+            <Campo r="Preço por kg (R$)"><Inp value={f.precoKg ?? ""} onChange={(e) => set("precoKg", e.target.value)} className="w-full text-right" /></Campo>
+          )}
+          {modo === "viagem" && (<>
+            <Campo r="Preço por viagem (R$)"><Inp value={f.precoViagem ?? ""} onChange={(e) => set("precoViagem", e.target.value)} className="w-full text-right" /></Campo>
+            <Campo r="Capacidade da carreta (kg)" ajuda="vazio usa 27.000">
+              <Inp value={f.capacidadeKg ?? ""} placeholder="27000" onChange={(e) => set("capacidadeKg", e.target.value)} className="w-full text-right" /></Campo>
+            <Campo r="Viagens" ajuda="vazio calcula pelo peso">
+              <Inp value={f.viagens ?? ""} placeholder={String(r.viagens || 0)} onChange={(e) => set("viagens", e.target.value)} className="w-full text-right" /></Campo>
+          </>)}
+          {modo === "verba" && (
+            <Campo r="Valor fechado (R$)"><Inp value={f.verba ?? ""} onChange={(e) => set("verba", e.target.value)} className="w-full text-right" /></Campo>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-100 rounded-xl p-5">
+        <p className="text-[12px] font-bold text-torg-dark mb-1">Como o frete aparece na proposta</p>
+        <p className="text-[11px] text-torg-gray mb-3">Não muda o custo — muda o que o cliente vê, e o que ele consegue cortar.</p>
+        <div className="grid sm:grid-cols-2 gap-2">
+          {APRESENTACAO_FRETE.map((a) => (
+            <label key={a.key} className={`flex items-start gap-2.5 border rounded-lg px-3 py-2.5 cursor-pointer ${r.apresentacao === a.key ? "border-torg-blue bg-torg-blue-50" : "border-gray-200"}`}>
+              <input type="radio" name="apres" checked={r.apresentacao === a.key} onChange={() => set("apresentacao", a.key)} className="mt-0.5" />
+              <span className="min-w-0">
+                <span className="block text-[13px] font-semibold text-torg-dark">{a.nome}</span>
+                <span className="block text-[11px] text-torg-gray">{a.ajuda}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+        <Kpi r="Peso do escopo" v={fmtKg(res.pesoTotal)} />
+        {modo === "viagem" && <Kpi r="Viagens" v={`${r.viagens || 0} × ${fmtKg(r.capacidadeKg)}`} />}
+        <Kpi r="Frete total" v={fmtR$(r.total)} />
+        <Kpi r="Equivale a" v={`${fmtR$(r.porKg)}/kg`} />
+        <Kpi r="Na proposta" v={r.apresentacao === "separado" ? "Item separado" : "No R$/kg"} cor="text-torg-blue" />
+      </div>
+
+      {r.total > 0 && (
+        <p className="text-[12px] text-torg-gray bg-white border border-gray-100 rounded-xl px-4 py-3">
+          {r.apresentacao === "diluido"
+            ? <>O R$/kg de cada área carrega <strong className="text-torg-dark">{fmtR$(r.porKg)}</strong> de frete.
+               O cliente não vê o transporte na proposta — e também não tem como cortá-lo.</>
+            : <>O frete sai como item próprio de <strong className="text-torg-dark">{fmtR$(r.total)}</strong>, e o
+               R$/kg das áreas fica <strong className="text-torg-dark">{fmtR$(r.porKg)}</strong> mais baixo.
+               O cliente consegue comparar com o transportador dele.</>}
+        </p>
+      )}
     </div>
   );
 }
