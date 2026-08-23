@@ -2,11 +2,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, TrendingDown } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIRIZADOS, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada } from "@/lib/lqc";
+import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr } from "@/lib/lqc";
 
 const fmtR$ = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
-const num = (v) => { const n = Number(String(v ?? "").replace(",", ".")); return Number.isFinite(n) ? n : 0; };
+// ⚠ mesma leitura de número do cálculo — tela e conta não podem discordar do que "0,15" vale.
+const num = numeroBr;
 
 // ⚠ AS ABAS SÃO AS DA LQC, NA ORDEM DA LQC. Vitor (22/08/2026): "que você transforme cada aba da
 // geração de custo igual está na nossa LQC". Quem orça já sabe onde cada coisa fica; inventar uma
@@ -16,15 +17,23 @@ const num = (v) => { const n = Number(String(v ?? "").replace(",", ".")); return
 // escritas — sei que trouxe da planilha dessa maneira, mas deixe melhor isso". "RESUMOS_EM" e
 // "MC_TINTAS" são nomes de arquivo, não de assunto: servem para quem confere contra a LQC, e por
 // isso ficam embaixo, pequenos, em vez de ocupar o rótulo que a pessoa lê o dia inteiro.
+// ⚠ UMA ABA, UM ASSUNTO. Vitor (23/08/2026): "está confuso demais essa sua leitura para compor
+// esses custos, não tem como simplificar? Falamos de pintura em uma área, você joga para outra
+// nada a ver para preencher o custo".
+//
+// Antes as abas eram as da planilha, e a planilha organiza por FÓRMULA, não por assunto: a área
+// pintada ficava no quantitativo, a tinta na MC_TINTAS e o preço da pintura na industrialização —
+// três lugares para uma pergunta só. Agora cada aba responde uma pergunta inteira, e quem monta o
+// custo não precisa saber como a LQC guarda as coisas por dentro.
 const ABAS = [
-  { k: "RESUMOS", r: "Quantitativo", planilha: "RESUMOS_EM" },
-  { k: "IND", r: "Industrialização", planilha: "INDUSTRIALIZAÇÃO" },
-  { k: "TINTAS", r: "Pintura e tintas", planilha: "MC_TINTAS" },
-  { k: "PREMONT", r: "Pré-montagem" },
-  { k: "ENSAIOS", r: "Ensaios da qualidade" },
-  { k: "COMERCIAIS", r: "Itens comerciais", planilha: "ITENS COMERCIAIS" },
-  { k: "BDI", r: "Impostos e BDI", planilha: "BDI" },
-  { k: "COMERCIAL", r: "Planilha comercial", planilha: "PLANILHA COMERCIAL" },
+  { k: "RESUMOS", r: "Quantitativo", ajuda: "o que tem na obra: peso e área" },
+  { k: "MATERIAL", r: "Material", ajuda: "aço, fixadores e itens comerciais" },
+  { k: "PINTURA", r: "Pintura", ajuda: "camadas, tinta e mão de obra" },
+  { k: "FABRICACAO", r: "Fabricação", ajuda: "fábrica e pré-montagem" },
+  { k: "TERCEIROS", r: "Terceiros", ajuda: "o que vem de fora" },
+  { k: "ENSAIOS", r: "Ensaios", ajuda: "inspeção e data book" },
+  { k: "BDI", r: "Impostos e BDI" },
+  { k: "COMERCIAL", r: "Resumo", planilha: "PLANILHA COMERCIAL" },
   { k: "CENARIO", r: "Cenário financeiro" },
 ];
 
@@ -105,17 +114,17 @@ export default function EstudoClient({ id }) {
           <button key={a.k} onClick={() => setAba(a.k)}
             className={`px-3 py-2 -mb-px border-b-2 text-left ${aba === a.k ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
             <span className="block text-[12px] font-semibold whitespace-nowrap">{a.r}</span>
-            {a.planilha && <span className="block text-[9px] uppercase tracking-wider opacity-60 whitespace-nowrap">{a.planilha}</span>}
+            {(a.ajuda || a.planilha) && <span className="block text-[9px] opacity-60 whitespace-nowrap">{a.ajuda || a.planilha}</span>}
           </button>
         ))}
       </div>
 
       {aba === "RESUMOS" && <Resumos e={e} c={c} setComp={setComp} mexer={mexer} />}
-      {aba === "IND" && <Industrializacao c={c} res={res} setComp={setComp} />}
-      {aba === "TINTAS" && <Tintas c={c} setComp={setComp} res={res} />}
-      {aba === "PREMONT" && <PreMontagem c={c} res={res} setComp={setComp} />}
+      {aba === "MATERIAL" && <Material c={c} res={res} setComp={setComp} />}
+      {aba === "PINTURA" && <Pintura c={c} res={res} setComp={setComp} />}
+      {aba === "FABRICACAO" && <Fabricacao c={c} res={res} setComp={setComp} />}
+      {aba === "TERCEIROS" && <Terceiros c={c} res={res} setComp={setComp} />}
       {aba === "ENSAIOS" && <Ensaios c={c} res={res} setComp={setComp} />}
-      {aba === "COMERCIAIS" && <Comerciais c={c} res={res} setComp={setComp} />}
       {aba === "BDI" && <Bdi c={c} res={res} setComp={setComp} />}
       {aba === "COMERCIAL" && <PlanilhaComercial res={res} e={e} />}
       {aba === "CENARIO" && <Cenario e={e} cen={d.cenario} res={res} mexer={mexer} />}
@@ -312,63 +321,196 @@ const Campo = ({ r, ajuda, children }) => (
   </label>
 );
 
-/** INDUSTRIALIZAÇÃO — faturamento por grupo, preços de entrada e o quadro calculado. */
-function Industrializacao({ c, res, setComp }) {
+/**
+ * MATERIAL — o que se compra: aço, fixadores e itens comerciais.
+ *
+ * ⚠ É AQUI QUE "TORG OU DIRETO" FAZ SENTIDO, e só aqui (com os Terceiros). Vitor (23/08/2026):
+ * "fabricação, pré-montagem, pintura, data book — tudo isso não precisa estar lá, pois sempre será
+ * para a Torg". Exato: o cliente não compra fabricação de ninguém. Perguntar era pedir uma decisão
+ * que não existe.
+ */
+function Material({ c, res, setComp }) {
   const fat = c.faturamento || {};
   const setFat = (k, v) => setComp({ faturamento: { ...fat, [k]: v } });
+  const it = c.itensComerciais || {};
+  const setIt = (k, campo, v) => setComp({ itensComerciais: { ...it, [k]: { ...(it[k] || {}), [campo]: v } } });
   const g = res.grupos || {};
-  const grupos = [
-    ["1.1 · Matéria-prima", "materiaPrima", g.materiaPrima],
-    ["1.2 · Fixadores", "fixadores", g.fixadores],
-    ["1.3 · Tintas", "tintas", g.tintas],
-    ["3.1 · Fabricação", "fabricacao", g.fabricacao],
-    ["3.2 · Pintura", "pintura", g.pintura],
-    ["3.3 · Pré-montagem", "preMontagem", g.preMontagem],
-  ];
+
   return (
     <div className="space-y-4">
-      {/* ⚠ o faturamento não é rótulo: na LQC, ICMS e PIS/COFINS só entram quando é TORG.
-          Material que o cliente compra direto não passa pelo nosso faturamento. */}
+      <p className="text-[12px] text-torg-gray">
+        Quem fatura o material define o imposto: <strong className="text-torg-dark">Torg fatura</strong> carrega
+        ICMS e PIS/COFINS na linha; <strong className="text-torg-dark">cliente compra direto</strong> não passa pelo
+        nosso faturamento — e também não recebe BDI.
+      </p>
+
       <div className="bg-white border border-gray-100 rounded-xl p-4">
-        <p className="text-[12px] font-bold text-torg-dark mb-1">Faturamento por grupo</p>
-        <p className="text-[11px] text-torg-gray mb-3">TORG = passa pelo nosso faturamento e carrega ICMS e PIS/COFINS. DIRETO = o cliente compra do fornecedor.</p>
-        <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {[["materiaPrima", "Matéria-prima"], ["fixadores", "Fixadores"], ["tintas", "Tintas"], ["fabricacao", "Fabricação"], ["pintura", "Pintura"], ["preMontagem", "Pré-montagem"], ...TERCEIRIZADOS.map((t) => [t.key, t.nome])].map(([k, r]) => (
-            <label key={k} className="text-[11px] text-torg-dark">{r}
-              <Sel value={fat[k] || ""} onChange={(ev) => setFat(k, ev.target.value)} opcoes={FATURAMENTO} rotulos={FATURAMENTO_ROTULO} className="block mt-1 w-full" /></label>
+        <div className="flex flex-wrap items-end gap-4">
+          {[["materiaPrima", "Aço (matéria-prima)"], ["fixadores", "Fixadores"], ["tintas", "Tintas"], ["itensComerciais", "Itens comerciais"]].map(([k, r]) => (
+            <label key={k} className="text-[11px] font-semibold text-torg-dark">{r}
+              <Sel value={fat[k] || ""} onChange={(ev) => setFat(k, ev.target.value)} opcoes={FATURAMENTO} rotulos={FATURAMENTO_ROTULO} className="block mt-1 w-44" /></label>
           ))}
+          <label className="text-[11px] font-semibold text-torg-dark">Fixadores (R$/kg da obra)
+            <Inp value={c.fixadoresRsKg ?? ""} onChange={(ev) => setComp({ fixadoresRsKg: ev.target.value })} className="block mt-1 w-32 text-right" /></label>
         </div>
       </div>
 
-      <div className="bg-white border border-gray-100 rounded-xl p-4">
-        {/* ⚠ a pré-montagem mora AQUI porque é ela que escolhe a coluna de preço da linha 3.3 —
-            é decisão de custo, não de quantitativo. */}
-        <p className="text-[11px] text-torg-gray mb-4 pb-4 border-b border-gray-100">
-          Pintura em <strong className="text-torg-dark">{res.demaos || 1} {res.demaos === 1 ? "demão" : "demãos"}</strong> ·
-          pré-montagem: <strong className="text-torg-dark">{res.preMontagemPct || 0}%</strong> — as duas têm aba própria.
-        </p>
-        <p className="text-[12px] font-bold text-torg-dark mb-3">Preços que a planilha não calcula</p>
-        <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          <label className="text-[11px] text-torg-dark">Fixadores (R$/kg)
-            <Inp value={c.fixadoresRsKg ?? ""} onChange={(ev) => setComp({ fixadoresRsKg: ev.target.value })} className="block mt-1 w-full" /></label>
-          {TERCEIRIZADOS.map((t) => (
-            <label key={t.key} className="text-[11px] text-torg-dark">{t.nome} (R$/kg)
-              <Inp value={c.terceirizados?.[t.key]?.precoKg ?? ""}
-                onChange={(ev) => setComp({ terceirizados: { ...(c.terceirizados || {}), [t.key]: { precoKg: ev.target.value } } })}
-                className="block mt-1 w-full" /></label>
-          ))}
-        </div>
-      </div>
+      <Quadro titulo="Aço por categoria de perfil" grupo={g.materiaPrima} vazio="Lance o perfil predominante nas linhas do quantitativo." />
+      <Quadro titulo="Fixadores" grupo={g.fixadores} vazio="Informe o R$/kg dos fixadores acima." />
 
-      {grupos.filter(([, , grp]) => grp?.linhas?.some((l) => l.pesoKg > 0 || l.subtotal > 0)).map(([rot, , grp]) => (
-        <Quadro key={rot} titulo={rot} grupo={grp} />
-      ))}
-      {res.grupos?.terceirizados?.total?.subtotal > 0 && <Quadro titulo="2 · Mão de obra terceirizada" grupo={res.grupos.terceirizados} />}
+      <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+        <p className="text-[12px] font-bold text-torg-dark px-4 py-2 bg-gray-50">Itens comerciais</p>
+        <table className="w-full text-[12px]">
+          <thead className="text-[10px] uppercase text-torg-gray">
+            <tr><th className="text-left px-4 py-1.5">Item</th><th className="text-left px-2 py-1.5">Un.</th>
+              <th className="text-right px-2 py-1.5">Quantidade</th><th className="text-right px-2 py-1.5">Preço unit.</th>
+              <th className="text-right px-4 py-1.5">Subtotal</th></tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {ITENS_COMERCIAIS.map((i) => {
+              const qtd = num(it[i.key]?.qtd), preco = it[i.key]?.preco == null ? i.preco : num(it[i.key].preco);
+              return (
+                <tr key={i.key}>
+                  <td className="px-4 py-1">{i.rotulo}</td><td className="px-2 py-1 text-torg-gray">{i.un}</td>
+                  <td className="px-2 py-1 text-right"><Inp value={it[i.key]?.qtd ?? ""} onChange={(e) => setIt(i.key, "qtd", e.target.value)} className="w-24 text-right" /></td>
+                  <td className="px-2 py-1 text-right"><Inp value={it[i.key]?.preco ?? i.preco} onChange={(e) => setIt(i.key, "preco", e.target.value)} className="w-24 text-right" /></td>
+                  <td className="px-4 py-1 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(qtd * preco)}</td>
+                </tr>
+              );
+            })}
+            <tr className="bg-gray-50 font-bold"><td className="px-4 py-1.5" colSpan={4}>Total</td>
+              <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(res.totais?.comerciais)}</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
-function Quadro({ titulo, grupo }) {
+/** FABRICAÇÃO — o que a fábrica faz. Sempre Torg, então não há o que escolher. */
+function Fabricacao({ c, res, setComp }) {
+  const pct = c.preMontagemPct ?? "";
+  const pctNum = num(pct);
+  const tabelado = pctNum === 10 || pctNum === 100;
+  const g = res.grupos || {};
+
+  return (
+    <div className="space-y-4">
+      <Quadro titulo="Fabricação por classe" grupo={g.fabricacao}
+        vazio="Lance a classificação nas linhas do quantitativo — é ela que escolhe o preço." />
+
+      <div className="bg-white border border-gray-100 rounded-xl p-5">
+        <p className="text-[12px] font-bold text-torg-dark mb-1">Pré-montagem</p>
+        <p className="text-[11px] text-torg-gray mb-3">Quanto da obra sai pré-montada da fábrica.</p>
+        <div className="flex flex-wrap items-end gap-3">
+          <Inp value={pct} onChange={(e) => setComp({ preMontagemPct: e.target.value })} className="w-24 text-right" />
+          <span className="text-[12px] text-torg-gray pb-1">%</span>
+          <div className="flex flex-wrap gap-2">
+            {[0, 10, 25, 50, 75, 100].map((v) => (
+              <button key={v} onClick={() => setComp({ preMontagemPct: v })}
+                className={`text-[11px] font-semibold rounded px-2.5 py-1 border ${pctNum === v ? "border-torg-blue text-torg-blue bg-torg-blue-50" : "border-gray-200 text-torg-gray hover:border-torg-blue/40"}`}>
+                {v}%
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="text-[11px] text-torg-gray mt-3">
+          {pctNum === 0 ? "Sem pré-montagem."
+            : tabelado ? `${pctNum}% é preço tabelado.`
+              : `${pctNum}% não é tabelado — interpolado entre as âncoras de 10% e 100%.`}
+        </p>
+      </div>
+
+      {pctNum > 0 && <Quadro titulo="Pré-montagem por classe" grupo={g.preMontagem} />}
+    </div>
+  );
+}
+
+/**
+ * TERCEIROS — o que vem de fora.
+ *
+ * Vitor (23/08/2026): "se criar uma nova aba e colocar terceiros, para podermos fabricar alguns
+ * itens, e aí ter a opção de faturamento direto ou Torg, aí tudo bem". A lista é livre porque cada
+ * obra terceiriza uma coisa diferente; os atalhos cobrem o que se repete.
+ */
+function Terceiros({ c, res, setComp }) {
+  const lista = Array.isArray(c.terceiros) ? c.terceiros : [];
+  const set = (i, campo, v) => setComp({ terceiros: lista.map((t, j) => (j === i ? { ...t, [campo]: v } : t)) });
+  const add = (base = {}) => setComp({ terceiros: [...lista, { descricao: "", base: "kg", faturamento: "TORG", ...base }] });
+  const del = (i) => setComp({ terceiros: lista.filter((_, j) => j !== i) });
+  const usados = new Set(lista.map((t) => t.chave).filter(Boolean));
+
+  return (
+    <div className="space-y-4">
+      <p className="text-[12px] text-torg-gray">
+        Serviço contratado fora. É onde <strong className="text-torg-dark">Torg fatura</strong> ou{" "}
+        <strong className="text-torg-dark">cliente compra direto</strong> muda o preço: o que o cliente contrata
+        direto não carrega nosso imposto nem recebe BDI.
+      </p>
+
+      <div className="flex flex-wrap gap-2">
+        {TERCEIROS_SUGESTOES.filter((t) => !usados.has(t.chave)).map((t) => (
+          <button key={t.chave} onClick={() => add(t)}
+            className="text-[11px] font-semibold text-torg-blue border border-torg-blue/30 rounded-lg px-2.5 py-1 hover:bg-torg-blue-50 inline-flex items-center gap-1">
+            <Plus size={12} /> {t.descricao}
+          </button>
+        ))}
+        <button onClick={() => add()} className="text-[11px] font-semibold text-torg-gray border border-dashed border-gray-300 rounded-lg px-2.5 py-1 hover:border-torg-blue/40 inline-flex items-center gap-1">
+          <Plus size={12} /> Outro serviço
+        </button>
+      </div>
+
+      {lista.length === 0 && <p className="text-[13px] text-torg-gray">Nada terceirizado nesta obra.</p>}
+
+      {lista.map((t, i) => {
+        const l = res.grupos?.terceirizados?.linhas?.[i] || {};
+        return (
+          <div key={i} className="bg-white border border-gray-100 rounded-xl p-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="col-span-2">
+                <Campo r="Serviço">
+                  <Inp value={t.descricao ?? ""} onChange={(e) => set(i, "descricao", e.target.value)} className="w-full" /></Campo>
+              </div>
+              <Campo r="Cobrança" ajuda={BASES_TERCEIRO[t.base || "kg"]}>
+                <Sel value={t.base || "kg"} onChange={(e) => set(i, "base", e.target.value)} opcoes={["kg", "m2", "verba"]}
+                  rotulos={{ kg: "Por kg", m2: "Por m²", verba: "Valor fechado" }} className="w-full" /></Campo>
+              <Campo r={t.base === "verba" ? "Valor (R$)" : "Preço unitário (R$)"}>
+                <Inp value={t.precoUnit ?? ""} onChange={(e) => set(i, "precoUnit", e.target.value)} className="w-full text-right" /></Campo>
+              <Campo r="Faturamento">
+                <Sel value={t.faturamento || ""} onChange={(e) => set(i, "faturamento", e.target.value)}
+                  opcoes={FATURAMENTO} rotulos={FATURAMENTO_ROTULO} className="w-full" /></Campo>
+            </div>
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+              <p className="text-[11px] text-torg-gray">
+                {fmtKg(l.pesoKg)} × {fmtR$(l.precoKg)} = <strong className="text-torg-dark">{fmtR$(l.subtotal)}</strong>
+                {l.icms > 0 && <> · ICMS {fmtR$(l.icms)}</>}
+                {l.pisCofins > 0 && <> · PIS/COFINS {fmtR$(l.pisCofins)}</>}
+              </p>
+              <button onClick={() => del(i)} className="text-gray-300 hover:text-red-600"><Trash2 size={14} /></button>
+            </div>
+          </div>
+        );
+      })}
+
+      {lista.length > 0 && (
+        <p className="text-[13px] font-bold text-torg-dark text-right">
+          Total de terceiros: <span className="tabular-nums whitespace-nowrap">{fmtR$(res.grupos?.terceirizados?.total?.subtotal)}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Quadro({ titulo, grupo, vazio }) {
+  const temLinha = grupo?.linhas?.some((l) => l.pesoKg > 0 || l.subtotal > 0);
+  if (!temLinha) {
+    return (
+      <div className="bg-white border border-gray-100 rounded-xl px-4 py-3">
+        <p className="text-[12px] font-bold text-torg-dark">{titulo}</p>
+        <p className="text-[11px] text-torg-gray mt-1">{vazio || "Sem valor lançado."}</p>
+      </div>
+    );
+  }
   return (
     <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
       <p className="text-[12px] font-bold text-torg-dark px-4 py-2 bg-gray-50">{titulo}</p>
@@ -401,131 +543,85 @@ function Quadro({ titulo, grupo }) {
   );
 }
 
-/** MC_TINTAS — as duas linhas de tinta do modelo, uma por fator de perda. */
-function Tintas({ c, setComp, res }) {
+/**
+ * PINTURA — tudo de tinta num lugar só.
+ *
+ * ⚠ ESTAVA ESPALHADO EM TRÊS ABAS. Vitor (23/08/2026): "falamos de pintura em uma área, você joga
+ * para outra nada a ver para preencher o custo". Era verdade: a área pintada ficava no
+ * quantitativo, a tinta na MC_TINTAS e o preço da mão de obra na industrialização. A planilha
+ * organiza assim porque as fórmulas dela precisam; quem monta o custo, não.
+ */
+function Pintura({ c, res, setComp }) {
   const t = Array.isArray(c.tintas) ? c.tintas : [];
   const linha = (i) => t[i] || {};
-  // ⚠ o nº de demãos é a contagem destas camadas — não há seletor de demãos em lugar nenhum.
   const set = (i, campo, v) => {
     const novo = [...t];
-    novo[i] = { ...linha(i), [campo]: v, nome: i === 0 ? "ESTRUTURA — FATOR DE PERDA: 45%" : "ESTRUTURA — FATOR DE PERDA: 85%", perda: i === 0 ? 45 : 85 };
+    for (let k = 0; k <= i; k++) if (!novo[k]) novo[k] = {};
+    novo[i] = { ...linha(i), [campo]: v, perda: i === 0 ? 45 : 85,
+      nome: i === 0 ? "ESTRUTURA — FATOR DE PERDA: 45%" : "ESTRUTURA — FATOR DE PERDA: 85%" };
     setComp({ tintas: novo });
   };
-  return (
-    <div className="space-y-4">
-      {[0, 1].map((i) => {
-        const t = { ...linha(i), perda: i === 0 ? 45 : 85 };
-        const areaCamada = num(t.areaM2) > 0 ? num(t.areaM2) : (res?.areaM2 || 0);
-        const rend = rendimentoTinta(t);
-        const calc = custoCamada(t, areaCamada);
-        const pesoTinta = num(t.pesoKg) > 0 ? num(t.pesoKg) : (res?.pesoTotal || 0);
-        return (
-        <div key={i} className="bg-white border border-gray-100 rounded-xl p-4">
-          <p className="text-[12px] font-bold text-torg-dark mb-3">Estrutura — fator de perda: {i === 0 ? "45%" : "85%"}</p>
-          <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            <label className="text-[11px] text-torg-dark">Camada
-              <Sel value={linha(i).camada || ""} onChange={(e) => set(i, "camada", e.target.value)} opcoes={CAMADAS_TINTA} className="block mt-1 w-full" /></label>
-            {[["produto", "Produto"], ["cor", "Cor"], ["solidos", "Sólidos por volume (%)"], ["peliculaSeca", "Película seca (µm)"], ["precoLitro", "Preço/litro (R$)"], ["areaM2", "Área desta camada (m²)"], ["pesoKg", "Peso pintado (kg)"], ["precoKg", "Custo (R$/kg) — deixe vazio para calcular"]].map(([k, r]) => (
-              <label key={k} className="text-[11px] text-torg-dark">{r}
-                <Inp value={linha(i)[k] ?? ""} onChange={(e) => set(i, k, e.target.value)} className="block mt-1 w-full" /></label>
-            ))}
-          </div>
-          {/* ⚠ os passos aparecem para o número poder ser conferido: rendimento errado é o tipo de
-              engano que só se descobre quando a tinta acaba no meio da obra. */}
-          {rend.teorico > 0 && (
-            <p className="text-[11px] text-torg-gray mt-3 pt-3 border-t border-gray-100">
-              Rendimento teórico <strong className="text-torg-dark">{rend.teorico} m²/L</strong>
-              {" "}({t.solidos}% × 10 ÷ {t.peliculaSeca} µm) · com {i === 0 ? 45 : 85}% de perda,
-              prático <strong className="text-torg-dark">{rend.pratico} m²/L</strong> ·
-              {" "}<strong className="text-torg-dark">{Number(areaCamada).toLocaleString("pt-BR")} m²</strong> pedem
-              {" "}<strong className="text-torg-dark">{Number(calc.litros).toLocaleString("pt-BR")} L</strong>
-              {t.precoLitro ? <> = <strong className="text-torg-dark">{fmtR$(calc.total)}</strong>{pesoTinta > 0 ? <> ({fmtR$(calc.total / pesoTinta)}/kg)</> : null}</> : null}
-            </p>
-          )}
-        </div>
-      ); })}
-      <p className="text-[11px] text-torg-gray">
-        Na planilha, área de pintura, rendimento e litros saem de fórmula a partir do quantitativo.
-        Aqui entram o produto e o preço; o custo por kg alimenta a linha de TINTAS da industrialização.
-      </p>
-      <p className="text-[11px] text-torg-gray">
-        <strong className="text-torg-dark">O número de demãos é a contagem destas camadas</strong> — é assim
-        que a planilha faz. Os dois fatores de perda também não se escolhem: 85% é de guarda-corpo e
-        escada marinheiro, 45% do resto, conforme a estrutura de cada elemento.
-      </p>
-    </div>
-  );
-}
-
-/**
- * PRÉ-MONTAGEM — quanto da obra se pré-monta, e quanto isso custa.
- *
- * Vitor (23/08/2026): "deixar selecionável a % da quantidade que precisamos pré-montar, e com
- * isso vamos formar o preço".
- *
- * ⚠ A LQC SÓ TEM DUAS ÂNCORAS: 10% e 100%. Entre elas o preço é interpolado reto — dois pontos
- * não dão curva, e fingir precisão que não existe é pior que assumir a reta. Por isso a tela diz
- * quando o número é tabelado e quando é interpolado: quem orça precisa saber a diferença antes de
- * defender o preço numa reunião.
- */
-function PreMontagem({ c, res, setComp }) {
-  const pct = c.preMontagemPct ?? "";
-  const grupo = res.grupos?.preMontagem;
-  const pctNum = Number(String(pct).replace(",", ".")) || 0;
-  const tabelado = pctNum === 10 || pctNum === 100;
 
   return (
     <div className="space-y-4">
-      <div className="bg-white border border-gray-100 rounded-xl p-5">
-        <label className="text-[12px] font-semibold text-torg-dark">
-          Percentual da obra a pré-montar (%)
-          <Inp value={pct} onChange={(e) => setComp({ preMontagemPct: e.target.value })} className="block mt-1 w-32 text-right" />
-        </label>
-        <div className="flex flex-wrap gap-2 mt-2">
-          {[0, 10, 25, 50, 75, 100].map((v) => (
-            <button key={v} onClick={() => setComp({ preMontagemPct: v })}
-              className={`text-[11px] font-semibold rounded px-2.5 py-1 border ${pctNum === v ? "border-torg-blue text-torg-blue bg-torg-blue-50" : "border-gray-200 text-torg-gray hover:border-torg-blue/40"}`}>
-              {v}%
-            </button>
-          ))}
+      <div className="bg-white border border-gray-100 rounded-xl p-4">
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+          <p className="text-[12px] text-torg-dark">
+            Área a pintar: <strong className="tabular-nums whitespace-nowrap">{Number(res.areaM2 || 0).toLocaleString("pt-BR")} m²</strong>
+          </p>
+          <p className="text-[12px] text-torg-dark">
+            Demãos: <strong>{res.demaos || 1}</strong> <span className="text-torg-gray">(uma por camada preenchida abaixo)</span>
+          </p>
         </div>
-        <p className="text-[11px] text-torg-gray mt-3">
-          {pctNum === 0
-            ? "Sem pré-montagem: a linha 3.3 da industrialização fica zerada."
-            : tabelado
-              ? `${pctNum}% é preço tabelado na planilha de parâmetros.`
-              : `${pctNum}% não está tabelado — o preço é interpolado entre as âncoras de 10% e 100%.`}
+        <p className="text-[11px] text-torg-gray mt-1">
+          A área vem do quantitativo — informada por linha, ou estimada pelo perfil. Para mudá-la,
+          é lá que se mexe.
         </p>
       </div>
 
-      {grupo && (
-        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-          <table className="w-full text-[12px]">
-            <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
-              <tr><th className="text-left px-4 py-1.5">Classe</th><th className="text-right px-2 py-1.5">Peso</th>
-                <th className="text-right px-2 py-1.5">10%</th><th className="text-right px-2 py-1.5">100%</th>
-                <th className="text-right px-2 py-1.5">Aplicado</th><th className="text-right px-4 py-1.5">Custo</th></tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {CLASSES.map((cl, i) => {
-                const l = grupo.linhas[i] || {};
-                return (
-                  <tr key={cl.key}>
-                    <td className="px-4 py-1.5">{cl.nome} <span className="text-torg-gray">· {cl.faixa}</span></td>
-                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtKg(l.pesoKg)}</td>
-                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{fmtR$(cl.preMont10)}</td>
-                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{fmtR$(cl.preMont100)}</td>
-                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(precoPreMontagem(cl, pctNum))}</td>
-                    <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(l.subtotal)}</td>
-                  </tr>
-                );
-              })}
-              <tr className="bg-gray-50 font-bold"><td className="px-4 py-1.5" colSpan={5}>Total da pré-montagem</td>
-                <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(grupo.total?.subtotal)}</td></tr>
-            </tbody>
-          </table>
-        </div>
-      )}
+      {[0, 1].map((i) => {
+        const cam = { ...linha(i), perda: i === 0 ? 45 : 85 };
+        const areaCamada = num(cam.areaM2) > 0 ? num(cam.areaM2) : (res?.areaM2 || 0);
+        const rend = rendimentoTinta(cam);
+        const calc = custoCamada(cam, areaCamada);
+        const pesoTinta = num(cam.pesoKg) > 0 ? num(cam.pesoKg) : (res?.pesoTotal || 0);
+        return (
+          <div key={i} className="bg-white border border-gray-100 rounded-xl p-4">
+            <p className="text-[12px] font-bold text-torg-dark mb-1">
+              {i === 0 ? "Estrutura em geral" : "Guarda-corpo e escada marinheiro"}
+            </p>
+            <p className="text-[11px] text-torg-gray mb-3">
+              Fator de perda {i === 0 ? "45%" : "85%"} — vem da estrutura de cada linha, não se escolhe.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              <Campo r="Camada"><Sel value={cam.camada || ""} onChange={(e) => set(i, "camada", e.target.value)} opcoes={CAMADAS_TINTA} className="w-full" /></Campo>
+              {[["produto", "Produto", ""], ["cor", "Cor", ""], ["solidos", "Sólidos por volume (%)", ""],
+                ["peliculaSeca", "Película seca (µm)", ""], ["precoLitro", "Preço por litro (R$)", ""],
+                ["areaM2", "Área desta camada (m²)", "vazio usa a área da obra"],
+                ["precoKg", "Custo (R$/kg)", "vazio calcula pelo rendimento"]].map(([k, r, ajuda]) => (
+                <Campo key={k} r={r} ajuda={ajuda}>
+                  <Inp value={linha(i)[k] ?? ""} onChange={(e) => set(i, k, e.target.value)} className="w-full text-right" /></Campo>
+              ))}
+            </div>
+            {/* ⚠ os passos aparecem para o número poder ser conferido: rendimento errado é o tipo de
+                engano que só se descobre quando a tinta acaba no meio da obra. */}
+            {rend.teorico > 0 && (
+              <p className="text-[11px] text-torg-gray mt-3 pt-3 border-t border-gray-100">
+                Rendimento teórico <strong className="text-torg-dark">{rend.teorico} m²/L</strong>
+                {" "}({cam.solidos}% × 10 ÷ {cam.peliculaSeca} µm) · com {i === 0 ? 45 : 85}% de perda,
+                prático <strong className="text-torg-dark">{rend.pratico} m²/L</strong> ·
+                {" "}<strong className="text-torg-dark">{Number(areaCamada).toLocaleString("pt-BR")} m²</strong> pedem
+                {" "}<strong className="text-torg-dark">{Number(calc.litros).toLocaleString("pt-BR")} L</strong>
+                {cam.precoLitro ? <> = <strong className="text-torg-dark">{fmtR$(calc.total)}</strong>{pesoTinta > 0 ? <> ({fmtR$(calc.total / pesoTinta)}/kg)</> : null}</> : null}
+              </p>
+            )}
+          </div>
+        );
+      })}
+
+      <Quadro titulo="Tinta (material)" grupo={res.grupos?.tintas} vazio="Preencha uma camada acima." />
+      <Quadro titulo={`Mão de obra de pintura — ${res.demaos || 1} ${res.demaos === 1 ? "demão" : "demãos"}`}
+        grupo={res.grupos?.pintura} vazio="Lance a classificação nas linhas do quantitativo." />
     </div>
   );
 }
@@ -600,38 +696,6 @@ function Ensaios({ c, res, setComp }) {
         {" "}Equivale a <strong className="text-torg-dark">{fmtR$(res.ensaios?.porKg)}/kg</strong>, que é como
         a linha 2.3 da planilha (inspeção e data book) recebe esse custo.
       </p>
-    </div>
-  );
-}
-
-function Comerciais({ c, res, setComp }) {
-  const it = c.itensComerciais || {};
-  const set = (k, campo, v) => setComp({ itensComerciais: { ...it, [k]: { ...(it[k] || {}), [campo]: v } } });
-  return (
-    <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-      <table className="w-full text-[12px]">
-        <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
-          <tr><th className="text-left px-4 py-1.5">Item</th><th className="text-left px-2 py-1.5">Un.</th>
-            <th className="text-right px-2 py-1.5">Quantidade</th><th className="text-right px-2 py-1.5">Preço unit.</th>
-            <th className="text-left px-2 py-1.5">Faturamento</th><th className="text-right px-4 py-1.5">Subtotal</th></tr>
-        </thead>
-        <tbody className="divide-y divide-gray-50">
-          {ITENS_COMERCIAIS.map((i) => {
-            const qtd = num(it[i.key]?.qtd), preco = it[i.key]?.preco == null ? i.preco : num(it[i.key].preco);
-            return (
-              <tr key={i.key}>
-                <td className="px-4 py-1">{i.rotulo}</td><td className="px-2 py-1 text-torg-gray">{i.un}</td>
-                <td className="px-2 py-1 text-right"><Inp value={it[i.key]?.qtd ?? ""} onChange={(e) => set(i.key, "qtd", e.target.value)} className="w-24 text-right" /></td>
-                <td className="px-2 py-1 text-right"><Inp value={it[i.key]?.preco ?? i.preco} onChange={(e) => set(i.key, "preco", e.target.value)} className="w-24 text-right" /></td>
-                <td className="px-2 py-1"><Sel value={it[i.key]?.faturamento || ""} onChange={(e) => set(i.key, "faturamento", e.target.value)} opcoes={FATURAMENTO} rotulos={FATURAMENTO_ROTULO} className="w-32" /></td>
-                <td className="px-4 py-1 text-right tabular-nums font-semibold whitespace-nowrap">{fmtR$(qtd * preco)}</td>
-              </tr>
-            );
-          })}
-          <tr className="bg-gray-50 font-bold"><td className="px-4 py-1.5" colSpan={5}>Total</td>
-            <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(res.totais?.comerciais)}</td></tr>
-        </tbody>
-      </table>
     </div>
   );
 }
