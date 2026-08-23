@@ -2150,6 +2150,10 @@ model PortalCliente {
   empresa          String?
   clienteEmail     String?
   capaUrl          String?
+  // ⚠ O LOGO DO CLIENTE AO LADO DO NOSSO. Vitor (22/08/2026): "quero que tenha o logo da
+  // torg e logo do cliente". Não é enfeite: o portal é o documento de uma PARCERIA, e uma
+  // página que só carrega a marca de quem fabrica parece propaganda, não prestação de contas.
+  logoClienteUrl   String?
   // a mensagem de abertura — agradecimento e parceria, escrita por obra
   mensagem         String?
   // [{ url, legenda }] — as fotos da obra que o cliente vê

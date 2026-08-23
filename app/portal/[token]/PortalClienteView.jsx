@@ -71,14 +71,38 @@ export default function PortalClienteView({ token }) {
         {portal.capaUrl && (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={portal.capaUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-25" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0D1F3C] via-[#0D1F3C]/85 to-[#0D1F3C]/60" />
+            <img src={portal.capaUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-[0.28]" />
+            {/* ⚠ o degradê existe para o TEXTO, não para a foto: sem ele o nome da obra briga com
+                o que estiver na imagem e fica ilegível justamente na primeira tela. */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0D1F3C] via-[#0D1F3C]/90 to-[#0D1F3C]/55" />
           </>
         )}
         <div className="relative max-w-5xl mx-auto px-6 sm:px-8 pt-14 pb-16">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/torg-logo-white.png" alt="Torg Metal" className="h-9 mb-10"
-            onError={(e) => { e.currentTarget.style.display = "none"; }} />
+          {/* ── AS DUAS MARCAS, LADO A LADO ───────────────────────────────────────────────
+              Vitor (22/08/2026): "quero que tenha o logo da Torg e logo do cliente".
+
+              ⚠ Não é enfeite: o portal é o documento de uma PARCERIA. Página que carrega só a
+              marca de quem fabrica parece propaganda; com as duas, parece o que é — prestação de
+              contas de um trabalho feito a quatro mãos.
+
+              ⚠ O logo do cliente vem em FUNDO CLARO. Marca de cliente costuma ser colorida e
+              sumiria no navy; a lâmina branca garante que ela apareça como ela é, em vez de a
+              gente "adaptar" a marca dos outros. */}
+          <div className="flex items-center gap-5 mb-10">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/torg-logo-white.png" alt="Torg Metal" className="h-9"
+              onError={(e) => { e.currentTarget.style.display = "none"; }} />
+            {portal.logoClienteUrl && (
+              <>
+                <span className="h-8 w-px bg-white/25" />
+                <span className="bg-white rounded-lg px-3 py-2 inline-flex items-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={portal.logoClienteUrl} alt={op.cliente || "Cliente"} className="h-7 object-contain"
+                    onError={(e) => { e.currentTarget.parentElement.style.display = "none"; }} />
+                </span>
+              </>
+            )}
+          </div>
 
           <p className="text-[11px] tracking-[0.22em] font-semibold text-[#9fc0dd] uppercase">
             Portal da obra

@@ -27,7 +27,9 @@ export default function AbaPortalCliente({ opId }) {
         setF({
           contato: j.portal.contato || "", empresa: j.portal.empresa || j.op.cliente || "",
           clienteEmail: j.portal.clienteEmail || "", mensagem: j.portal.mensagem || "",
-          capaUrl: j.portal.capaUrl || "", secoes: j.portal.secoesAtivas || [],
+          capaUrl: j.portal.capaUrl || "", logoClienteUrl: j.portal.logoClienteUrl || "",
+          fotos: Array.isArray(j.portal.fotos) ? j.portal.fotos : [],
+          secoes: j.portal.secoesAtivas || [],
         });
       })
       .catch(() => setErro("Não consegui carregar o portal."));
@@ -98,11 +100,105 @@ export default function AbaPortalCliente({ opId }) {
           <Campo rot="Contato no cliente" v={f.contato} on={(v) => set("contato", v)} ph="nome de quem recebe" />
           <Campo rot="Empresa" v={f.empresa} on={(v) => set("empresa", v)} />
           <Campo rot="E-mail" v={f.clienteEmail} on={(v) => set("clienteEmail", v)} tipo="email" />
-          <div className="sm:col-span-3">
-            <Campo rot="Imagem de capa (URL)" v={f.capaUrl} on={(v) => set("capaUrl", v)}
-              ph="https://… — a foto que abre o portal" />
+
+        </div>
+      </div>
+
+      {/* ── AS ARTES ─────────────────────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <h4 className="text-sm font-semibold text-torg-dark mb-1">Identidade do portal</h4>
+        <p className="text-[11px] text-torg-gray mb-3">
+          A capa e as duas marcas. Sem capa escolhida, o portal usa uma das nossas — ele nunca abre
+          em branco.
+        </p>
+
+        <p className="text-[11px] font-semibold text-torg-gray mb-1.5">Capa</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+          {CAPAS.map((c) => {
+            const on = (f.capaUrl || CAPAS[0].url) === c.url;
+            return (
+              <button key={c.url} onClick={() => set("capaUrl", c.url)}
+                className={`relative rounded-lg overflow-hidden border-2 ${on ? "border-torg-blue" : "border-transparent hover:border-gray-200"}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={c.url} alt={c.nome} className="w-full h-20 object-cover" />
+                <span className="absolute inset-x-0 bottom-0 bg-black/55 text-white text-[10px] px-1.5 py-1 text-left truncate">{c.nome}</span>
+                {on && <span className="absolute top-1 right-1 bg-torg-blue text-white rounded-full p-0.5"><Check size={11} /></span>}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <button onClick={() => escolherArquivo("capaUrl")} disabled={salvando}
+            className="text-[11px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-2.5 py-1 hover:bg-torg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">
+            <Upload size={12} /> subir outra capa
+          </button>
+          {f.capaUrl && !CAPAS.some((c) => c.url === f.capaUrl) && (
+            <span className="text-[11px] text-torg-gray inline-flex items-center gap-1.5">
+              capa própria
+              <button onClick={() => set("capaUrl", "")} className="text-torg-gray hover:text-red-600"><X size={11} /></button>
+            </span>
+          )}
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <p className="text-[11px] font-semibold text-torg-gray mb-1.5">Marca da Torg</p>
+            <div className="bg-[#0D1F3C] rounded-lg px-3 py-3 inline-flex">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/torg-logo-white.png" alt="Torg Metal" className="h-7" />
+            </div>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-torg-gray mb-1.5">Marca do cliente</p>
+            {f.logoClienteUrl ? (
+              <div className="flex items-center gap-2">
+                <span className="bg-white border border-gray-200 rounded-lg px-3 py-3 inline-flex">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={f.logoClienteUrl} alt="" className="h-7 object-contain" />
+                </span>
+                <button onClick={() => set("logoClienteUrl", "")} className="text-torg-gray hover:text-red-600"><X size={13} /></button>
+              </div>
+            ) : (
+              <button onClick={() => escolherArquivo("logoClienteUrl")} disabled={salvando}
+                className="text-[11px] font-semibold text-torg-blue border border-dashed border-torg-blue-300 rounded-lg px-3 py-3 hover:bg-torg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">
+                <ImagePlus size={13} /> subir o logo do cliente
+              </button>
+            )}
           </div>
         </div>
+      </div>
+
+      {/* ── FOTOS DA OBRA ────────────────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <h4 className="text-sm font-semibold text-torg-dark">Registro fotográfico</h4>
+          <button onClick={() => escolherArquivo("fotos")} disabled={salvando}
+            className="text-[11px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-2.5 py-1 hover:bg-torg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">
+            <Upload size={12} /> subir fotos
+          </button>
+        </div>
+        <p className="text-[11px] text-torg-gray mb-3">
+          A obra em imagens — fabricação, pintura, expedição. A legenda é o que dá sentido à foto.
+        </p>
+        {!(f.fotos || []).length ? (
+          <p className="text-[12px] text-torg-gray">Nenhuma foto ainda.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {f.fotos.map((foto, i) => (
+              <div key={i} className="border border-gray-100 rounded-lg overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={foto.url} alt="" className="w-full h-24 object-cover" />
+                <div className="p-1.5 flex items-center gap-1">
+                  <input value={foto.legenda || ""} placeholder="legenda"
+                    onChange={(e) => set("fotos", f.fotos.map((x, j) => (j === i ? { ...x, legenda: e.target.value } : x)))}
+                    className="w-full text-[11px] border border-gray-200 rounded px-1.5 py-1 outline-none focus:border-torg-blue" />
+                  <button onClick={() => set("fotos", f.fotos.filter((_, j) => j !== i))}
+                    className="text-torg-gray hover:text-red-600 shrink-0"><X size={12} /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ⚠ A MENSAGEM É O CORAÇÃO. Vitor pediu "uma mensagem forte de agradecimento e parceria" —

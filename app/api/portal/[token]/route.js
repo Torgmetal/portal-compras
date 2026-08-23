@@ -9,7 +9,7 @@
 // não vazar o que o contrato não previu, evita pagar dez consultas para mostrar três blocos.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { secoesDoPortal, mensagemPadrao } from "@/lib/portal-cliente";
+import { secoesDoPortal, mensagemPadrao, CAPA_PADRAO } from "@/lib/portal-cliente";
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
 
 export const runtime = "nodejs";
@@ -190,7 +190,11 @@ export async function GET(_req, { params }) {
   return NextResponse.json({
     op: op ? { numero: op.numero, cliente: op.cliente, obra: op.obra, refCliente: op.refCliente } : { numero: portal.opNumero },
     portal: {
-      contato: portal.contato, empresa: portal.empresa, capaUrl: portal.capaUrl,
+      contato: portal.contato, empresa: portal.empresa,
+      // sem capa escolhida, entra a do repositório: portal que abre em branco passa a
+      // impressão contrária à que ele existe para dar
+      capaUrl: portal.capaUrl || CAPA_PADRAO,
+      logoClienteUrl: portal.logoClienteUrl || null,
       mensagem: portal.mensagem || mensagemPadrao({ cliente: op?.cliente, obra: op?.obra }),
       fotos: Array.isArray(portal.fotos) ? portal.fotos : [],
       secoes: ativas,

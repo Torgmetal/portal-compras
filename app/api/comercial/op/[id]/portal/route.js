@@ -56,7 +56,7 @@ export async function PUT(req, { params }) {
     where: { id: r.portal.id },
     data: {
       contato: txt(b.contato, 120), empresa: txt(b.empresa, 160), clienteEmail: txt(b.clienteEmail, 160),
-      mensagem: txt(b.mensagem, 4000), capaUrl: txt(b.capaUrl, 600),
+      mensagem: txt(b.mensagem, 4000), capaUrl: txt(b.capaUrl, 600), logoClienteUrl: txt(b.logoClienteUrl, 600),
       secoes: normalizarSecoes(b.secoes),
       fotos: Array.isArray(b.fotos)
         ? b.fotos.slice(0, 24).map((f) => ({ url: String(f?.url || "").slice(0, 600), legenda: txt(f?.legenda, 140) }))
