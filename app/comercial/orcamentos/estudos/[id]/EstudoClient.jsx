@@ -219,6 +219,14 @@ function Resumos({ e, c, setComp, mexer, res }) {
   const fora = linhas.filter((l) => l.ativo === false).reduce((a, l) => a + pesoDe(l), 0);
   const ativas = linhas.filter((l) => l.ativo !== false).length;
   const porArea = res?.porArea || [];
+  // ⚠ A COR É CHAVE, NÃO ENFEITE. Vitor (23/08/2026): "o ideal seria já mencionar a cor de cada
+  // tipo de estrutura". É ela que decide qual demão de acabamento cai naquele trecho — digitada
+  // com um espaço a mais, a área fica sem acabamento e ninguém vê. Por isso a lista sugere as
+  // cores que já existem no esquema de pintura, em vez de deixar cada um escrever do seu jeito.
+  const coresDoEsquema = [...new Set((c.tintas || [])
+    .filter((t) => String(t.camada || "").toUpperCase() === "ACABAMENTO" && t.cor)
+    .map((t) => String(t.cor).trim()))];
+  const coresConhecidas = [...new Set([...coresDoEsquema, ...linhas.map((l) => String(l.cor || "").trim()).filter(Boolean)])];
 
   return (
     <div>
@@ -255,7 +263,7 @@ function Resumos({ e, c, setComp, mexer, res }) {
       </div>
 
       <div className="space-y-3">
-        {linhas.map((l, i) => <CartaoLinha key={i} l={l} i={i} set={set} del={del} dup={dup} porArea={porArea} />)}
+        {linhas.map((l, i) => <CartaoLinha key={i} l={l} i={i} set={set} del={del} dup={dup} porArea={porArea} cores={coresConhecidas} doEsquema={coresDoEsquema} />)}
       </div>
 
       <button onClick={add}
@@ -267,9 +275,12 @@ function Resumos({ e, c, setComp, mexer, res }) {
 }
 
 /** Um elemento do quantitativo, com a consequência de cada escolha à vista. */
-function CartaoLinha({ l, i, set, del, dup, porArea }) {
+function CartaoLinha({ l, i, set, del, dup, porArea, cores, doEsquema }) {
   const dentro = l.ativo !== false;
   const custo = (porArea || []).find((x) => x.area === (l.area || l.item));
+  // null = ainda não há esquema de acabamento para comparar
+  const norma = (x) => String(x || "").trim().toUpperCase();
+  const corCasa = !doEsquema?.length ? null : !l.cor ? null : doEsquema.some((x) => norma(x) === norma(l.cor));
   const classe = CLASSES.find((x) => x.nome.toUpperCase() === String(l.classificacao || "").toUpperCase());
   const perfil = PERFIS.find((p) => p.nome === l.perfil);
   const peso = num(l.quantidade) * num(l.unidades || 1) * num(l.pesoUnit);
@@ -288,6 +299,11 @@ function CartaoLinha({ l, i, set, del, dup, porArea }) {
         <span className="text-[12px] font-semibold text-torg-dark">{l.area || "sem área"}</span>
         {l.estrutura && <span className="text-[12px] text-torg-gray">· {ESTRUTURA_ROTULO[l.estrutura] || l.estrutura}</span>}
         {l.elemento && <span className="text-[12px] text-torg-gray">· {l.elemento}</span>}
+        {l.cor && (
+          <span className={`text-[10px] font-semibold rounded px-1.5 py-0.5 ${corCasa === false ? "bg-[#FFF7ED] text-torg-orange-700 border border-[#F4801F]/40" : "bg-white text-torg-gray border border-gray-200"}`}>
+            {l.cor}{corCasa === false ? " · sem acabamento" : ""}
+          </span>
+        )}
         <span className={`ml-auto text-[13px] font-extrabold tabular-nums whitespace-nowrap ${dentro ? "text-torg-dark" : "text-torg-gray line-through"}`}>{fmtKg(peso)}</span>
         {!dentro && <span className="text-[10px] font-semibold text-torg-gray uppercase tracking-wide">fora do escopo</span>}
         <button onClick={() => dup(i)} title="duplicar" className="text-gray-300 hover:text-torg-blue"><Plus size={14} /></button>
@@ -347,8 +363,17 @@ function CartaoLinha({ l, i, set, del, dup, porArea }) {
         <Bloco titulo="Preço e acabamento desta área" nota="o R$/kg do aço deste trecho e a cor que ele recebe">
           <Campo r="Aço (R$/kg)" ajuda="preço cotado para esta área">
             <Inp value={l.precoKg ?? ""} onChange={(ev) => set(i, "precoKg", ev.target.value)} className="w-full text-right" /></Campo>
-          <Campo r="Cor" ajuda="agrupa a demão de acabamento">
-            <Inp value={l.cor ?? ""} onChange={(ev) => set(i, "cor", ev.target.value)} className="w-full" /></Campo>
+          <Campo r="Cor da estrutura"
+            ajuda={corCasa === false ? "⚠ não há acabamento nesta cor — esta área fica sem a demão final"
+              : corCasa === true ? "recebe o acabamento desta cor" : "define qual acabamento vai nesta área"}>
+            <>
+              <Inp value={l.cor ?? ""} list={`cores-${i}`} onChange={(ev) => set(i, "cor", ev.target.value)}
+                className={`w-full ${corCasa === false ? "border-torg-orange-700" : ""}`} />
+              <datalist id={`cores-${i}`}>
+                {(cores || []).map((x) => <option key={x} value={x} />)}
+              </datalist>
+            </>
+          </Campo>
           <div className="col-span-2 sm:col-span-1 lg:col-span-3 flex items-end">
             <p className="text-[11px] text-torg-gray">
               {num(l.precoKg) > 0 && peso > 0
