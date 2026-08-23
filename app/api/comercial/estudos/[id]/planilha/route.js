@@ -15,7 +15,7 @@ export async function GET(req, { params }) {
   if (!estudo) return new NextResponse("Estudo não encontrado.", { status: 404 });
 
   try {
-    const { buffer, nome, avisos } = await gerarPlanilhaLqc(estudo);
+    const { buffer, nome, avisos, modelo } = await gerarPlanilhaLqc(estudo);
     const ascii = nome.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\x20-\x7E]/g, "-");
     return new NextResponse(buffer, {
       headers: {
@@ -23,6 +23,8 @@ export async function GET(req, { params }) {
         "Content-Disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(nome)}`,
         // ⚠ o que não coube viaja no cabeçalho: a tela avisa em vez de o arquivo sair mudo.
         ...(avisos.length ? { "X-Avisos": encodeURIComponent(avisos.join(" | ")) } : {}),
+        // qual modelo virou este arquivo — rastreável sem precisar abrir o servidor
+        ...(modelo?.caminho ? { "X-Modelo": encodeURIComponent(`${modelo.caminho}/${modelo.nome}`) } : {}),
         "Cache-Control": "no-store",
       },
     });
