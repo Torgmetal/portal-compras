@@ -102,7 +102,7 @@ export default function EstudoClient({ id }) {
           número que se lê errado, e num painel de preço isso é grave. A grade abre em 3 colunas
           antes de ir pra 6: espremer seis valores de moeda numa linha só é o que causa a quebra. */}
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-px bg-gray-100 border border-gray-100 rounded-xl overflow-hidden mb-5">
-        <Kpi r="Peso" v={fmtKg(res.pesoTotal)} />
+        <Kpi r={res.escopo?.total > res.escopo?.selecionadas ? `Peso · ${res.escopo.selecionadas} de ${res.escopo.total} áreas` : "Peso"} v={fmtKg(res.pesoTotal)} />
         <Kpi r="Custo" v={fmtR$(res.custo)} />
         <Kpi r={`BDI ${res.bdiPct || 0}%`} v={fmtR$(res.bdiValor)} />
         <Kpi r="Impostos" v={fmtR$(res.totalImpostos)} />
@@ -120,7 +120,7 @@ export default function EstudoClient({ id }) {
         ))}
       </div>
 
-      {aba === "RESUMOS" && <Resumos e={e} c={c} setComp={setComp} mexer={mexer} />}
+      {aba === "RESUMOS" && <Resumos e={e} c={c} setComp={setComp} mexer={mexer} res={res} />}
       {aba === "MATERIAL" && <Material c={c} res={res} setComp={setComp} />}
       {aba === "PINTURA" && <Pintura c={c} res={res} setComp={setComp} />}
       {aba === "FABRICACAO" && <Fabricacao c={c} res={res} setComp={setComp} />}
@@ -208,13 +208,17 @@ const Sel = ({ opcoes, rotulos, ...p }) => (
  * kg/m ao lado da classificação, o R$/kg ao lado do perfil, e o peso e o custo da linha
  * calculados na hora — porque um número que aparece na hora ensina mais que qualquer legenda.
  */
-function Resumos({ e, c, setComp, mexer }) {
+function Resumos({ e, c, setComp, mexer, res }) {
   const linhas = Array.isArray(c.resumos) ? c.resumos : [];
   const set = (i, campo, v) => setComp({ resumos: linhas.map((l, j) => (j === i ? { ...l, [campo]: v } : l)) });
   const add = () => setComp({ resumos: [...linhas, { item: `1.${linhas.length + 1}`, metodo: e.metodo || "ESTIMATIVA", un: "unid", quantidade: 1, unidades: 1 }] });
   const del = (i) => setComp({ resumos: linhas.filter((_, j) => j !== i) });
   const dup = (i) => setComp({ resumos: [...linhas.slice(0, i + 1), { ...linhas[i], item: `1.${linhas.length + 1}` }, ...linhas.slice(i + 1)] });
-  const total = linhas.reduce((a, l) => a + num(l.quantidade) * num(l.unidades || 1) * num(l.pesoUnit), 0);
+  const pesoDe = (l) => num(l.quantidade) * num(l.unidades || 1) * num(l.pesoUnit);
+  const total = linhas.filter((l) => l.ativo !== false).reduce((a, l) => a + pesoDe(l), 0);
+  const fora = linhas.filter((l) => l.ativo === false).reduce((a, l) => a + pesoDe(l), 0);
+  const ativas = linhas.filter((l) => l.ativo !== false).length;
+  const porArea = res?.porArea || [];
 
   return (
     <div>
@@ -227,16 +231,31 @@ function Resumos({ e, c, setComp, mexer }) {
         {/* ⚠ nada de seletor global aqui. Método é por linha (é assim na RESUMOS_EM), demãos a
             planilha CONTA das camadas da MC_TINTAS, e pré-montagem é decisão de preço — foi pra
             aba Industrialização, junto do faturamento dela. */}
-        <div className="flex flex-wrap items-center gap-4">
+        {/* ⚠ ESCOPO SE MARCA, NÃO SE APAGA. Vitor (23/08/2026): "pode ser que ele exclua alguns
+            pacotes… precisa deixar uma forma de selecionar e desselecionar, pois pode ser que ele
+            peça para deixar alguma outra área, e aí evitaria de termos que refazer todo o
+            levantamento". Negociação vai e volta: o cliente corta a galeria e depois pede a
+            treliça. A linha desmarcada some da conta e continua guardada. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <span className="text-[12px] text-torg-gray">
-            {linhas.length} {linhas.length === 1 ? "elemento" : "elementos"} ·
-            total <strong className="text-torg-dark tabular-nums whitespace-nowrap">{fmtKg(total)}</strong>
+            <strong className="text-torg-dark">{ativas} de {linhas.length}</strong> {linhas.length === 1 ? "área" : "áreas"} no escopo ·
+            <strong className="text-torg-dark tabular-nums whitespace-nowrap"> {fmtKg(total)}</strong>
+            {fora > 0 && <span> · {fmtKg(fora)} fora</span>}
           </span>
+          {linhas.length > 1 && (
+            <span className="flex items-center gap-2">
+              <button onClick={() => setComp({ resumos: linhas.map((l) => ({ ...l, ativo: true })) })}
+                className="text-[11px] font-semibold text-torg-blue hover:underline">marcar todas</button>
+              <span className="text-gray-300">·</span>
+              <button onClick={() => setComp({ resumos: linhas.map((l) => ({ ...l, ativo: false })) })}
+                className="text-[11px] font-semibold text-torg-gray hover:text-torg-dark">desmarcar todas</button>
+            </span>
+          )}
         </div>
       </div>
 
       <div className="space-y-3">
-        {linhas.map((l, i) => <CartaoLinha key={i} l={l} i={i} set={set} del={del} dup={dup} />)}
+        {linhas.map((l, i) => <CartaoLinha key={i} l={l} i={i} set={set} del={del} dup={dup} porArea={porArea} />)}
       </div>
 
       <button onClick={add}
@@ -248,7 +267,9 @@ function Resumos({ e, c, setComp, mexer }) {
 }
 
 /** Um elemento do quantitativo, com a consequência de cada escolha à vista. */
-function CartaoLinha({ l, i, set, del, dup }) {
+function CartaoLinha({ l, i, set, del, dup, porArea }) {
+  const dentro = l.ativo !== false;
+  const custo = (porArea || []).find((x) => x.area === (l.area || l.item));
   const classe = CLASSES.find((x) => x.nome.toUpperCase() === String(l.classificacao || "").toUpperCase());
   const perfil = PERFIS.find((p) => p.nome === l.perfil);
   const peso = num(l.quantidade) * num(l.unidades || 1) * num(l.pesoUnit);
@@ -258,13 +279,17 @@ function CartaoLinha({ l, i, set, del, dup }) {
   const unPeso = l.un === "m" ? "kg/m" : l.un === "m²" ? "kg/m²" : "kg/un";
 
   return (
-    <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 bg-gray-50 border-b border-gray-100">
+    <div className={`bg-white border rounded-xl overflow-hidden ${dentro ? "border-gray-100" : "border-gray-200 opacity-60"}`}>
+      <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 border-b border-gray-100 ${dentro ? "bg-gray-50" : "bg-gray-100"}`}>
+        <input type="checkbox" checked={dentro} onChange={(e) => set(i, "ativo", e.target.checked)}
+          title={dentro ? "no escopo — desmarque para tirar da conta" : "fora do escopo — o levantamento continua guardado"}
+          className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
         <span className="text-[12px] font-bold text-torg-blue font-mono">{l.item || `1.${i + 1}`}</span>
         <span className="text-[12px] font-semibold text-torg-dark">{l.area || "sem área"}</span>
         {l.estrutura && <span className="text-[12px] text-torg-gray">· {ESTRUTURA_ROTULO[l.estrutura] || l.estrutura}</span>}
         {l.elemento && <span className="text-[12px] text-torg-gray">· {l.elemento}</span>}
-        <span className="ml-auto text-[13px] font-extrabold tabular-nums text-torg-dark whitespace-nowrap">{fmtKg(peso)}</span>
+        <span className={`ml-auto text-[13px] font-extrabold tabular-nums whitespace-nowrap ${dentro ? "text-torg-dark" : "text-torg-gray line-through"}`}>{fmtKg(peso)}</span>
+        {!dentro && <span className="text-[10px] font-semibold text-torg-gray uppercase tracking-wide">fora do escopo</span>}
         <button onClick={() => dup(i)} title="duplicar" className="text-gray-300 hover:text-torg-blue"><Plus size={14} /></button>
         <button onClick={() => del(i)} title="remover" className="text-gray-300 hover:text-red-600"><Trash2 size={14} /></button>
       </div>
@@ -355,6 +380,10 @@ function CartaoLinha({ l, i, set, del, dup }) {
             <strong className="text-torg-dark">{fmtKg(peso)}</strong>
             {perfil && <> · matéria-prima <strong className="text-torg-dark">{fmtR$(custoMat)}</strong></>}
             {classe && <> · fabricação <strong className="text-torg-dark">{fmtR$(custoFab)}</strong></>}
+            {custo?.custoPorKg > 0 && (
+              <> · custo <strong className="text-torg-dark">{fmtR$(custo.custo)}</strong>
+                {" "}(<strong className="text-torg-dark">{fmtR$(custo.custoPorKg)}/kg</strong>)</>
+            )}
             {(!perfil || !classe) && <span className="text-torg-orange-700"> · falta {[!perfil && "o perfil", !classe && "a classificação"].filter(Boolean).join(" e ")} para esta linha custar</span>}
           </p>
         )}
