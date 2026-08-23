@@ -1334,6 +1334,10 @@ function Cenario({ e, res, mexer, fabrica }) {
       // ⚠ a fase de projeto entra em TODOS os cenários: é custo, e desloca o caixa um mês inteiro
       mesesProjeto: cfg.mesesProjeto == null || cfg.mesesProjeto === "" ? 1 : Math.max(0, Math.round(numeroBr(cfg.mesesProjeto))),
       custoProjetoMes: numeroBr(cfg.custoProjetoMes),
+      // ⚠ o PRAZO DIGITADO vale aqui também. Antes a cascata cobrava a casa por peso ÷ cadência e
+      // o fluxo pelos meses do contrato — dois números na mesma tela, e ninguém via a diferença.
+      mesesFabricacao: numeroBr(cfg.mesesFabricacao),
+      ocupacaoPct: cfg.ocupacaoPct,
     };
     const seco = resultadoDoCenario(res, { ...cen, preco }, { ...comum, custoFinanceiro: 0 });
     const parcelas = (comp.pagamento?.parcelas?.length ? comp.pagamento.parcelas : PAGAMENTO_PADRAO)
@@ -1342,7 +1346,9 @@ function Cenario({ e, res, mexer, fabrica }) {
       meses: seco.meses, preco, pesoKg: res.pesoTotal, impostos: seco.impostos, material: seco.material,
       mesesProjeto: comum.mesesProjeto, custoProjetoMes: comum.custoProjetoMes,
       terceiros: res.totais?.mdo?.subtotal || 0,
-      custoOperacionalMes: fabrica?.custoOperacionalMes || 0,
+      // ⚠ o fluxo cobra o MESMO custo mensal que a cascata: sem o rateio pela ocupação, o caixa
+      // pagaria a fábrica inteira e o resultado só a fatia — e os dois quadros brigariam.
+      custoOperacionalMes: (fabrica?.custoOperacionalMes || 0) * (numeroBr(seco.ocupacaoPct) / 100),
       reservaFinanceira: preco * ((numeroBr(cen.alavancas?.factoring) || 0) / 100),
     }, {
       pagamento: { parcelas },
@@ -1415,6 +1421,7 @@ function Cenario({ e, res, mexer, fabrica }) {
                   ["Preço por kg", (r) => `R$ ${numeroBr(r.precoPorKg).toFixed(2).replace(".", ",")}`, "", "text-torg-gray"],
                   ["Prazo de fábrica", (r) => `${r.meses} meses`, "", "text-torg-gray"],
                   ["Prazo do contrato", (r) => `${r.mesesContrato} meses`, "projeto + fabricação", "text-torg-gray"],
+                  ["Fábrica que a obra come", (r) => `${r.mesesConsumo} meses · ${r.ocupacaoPct}%`, "quanto da fábrica esta obra ocupa no prazo", "text-torg-gray"],
                 ].map(([rot, fn, ajuda, tipo]) => (
                   <tr key={rot} className={tipo === "resultado" ? "bg-torg-blue-50/40 font-bold" : ""}>
                     <td className="px-4 py-1.5">
@@ -1996,6 +2003,14 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
   const set = (k, v) => mexer({ cenario: { ...cfg, [k]: v } });
   const meses = numeroBr(cfg.mesesFabricacao) || Math.max(1, Math.round((res.pesoTotal / fabrica.capacidadeKgMes) * 10) / 10);
   const projeto = cfg.mesesProjeto == null || cfg.mesesProjeto === "" ? 1 : Math.max(0, Math.round(numeroBr(cfg.mesesProjeto)));
+  // ⚠ QUANTO DA FÁBRICA ESTA OBRA OCUPA. Vitor (23/08/2026): "nos meses que de fato eu começo a
+  // produção, o ideal não seria trazer os custos da operação integral nesse caso?". Depende de a
+  // fábrica ser dedicada: se o contrato dá 4 meses e a obra come 2,4, a diferença é fábrica livre
+  // para outra obra — ou ociosidade que esta obra vai pagar sozinha.
+  const mesesConsumo = fabrica.capacidadeKgMes > 0 ? Math.round((res.pesoTotal / fabrica.capacidadeKgMes) * 10) / 10 : meses;
+  const ocupacao = cfg.ocupacaoPct == null || cfg.ocupacaoPct === ""
+    ? (meses > 0 ? Math.min(1, mesesConsumo / meses) : 1)
+    : Math.max(0, numeroBr(cfg.ocupacaoPct) / 100);
   const reserva = (base?.preco || 0) * ((numeroBr(base?.alavancas?.factoring) || 0) / 100);
   const receita = Array.isArray(cfg.receitaPorMes) ? cfg.receitaPorMes : [];
   // ⚠ "28/42/56" é como o comprador fala e como vem no pedido — o campo aceita assim e a conta
@@ -2016,7 +2031,7 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
     impostos: (base?.preco || 0) * ((numeroBr(base?.alavancas?.impostos) || 0) / 100),
     material: res.totais?.material?.subtotal || 0,
     terceiros: res.totais?.mdo?.subtotal || 0,
-    custoOperacionalMes: fabrica.custoOperacionalMes,
+    custoOperacionalMes: fabrica.custoOperacionalMes * ocupacao,
     reservaFinanceira: reserva,
   }, {
     pagamento: c.pagamento || {},
@@ -2072,6 +2087,35 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
         {/* ⚠ OBRA NÃO COMEÇA PRODUZINDO. Vitor (23/08/2026): "no primeiro mês vamos fazer projeto
             apenas, no segundo é que vamos começar a produzir, e daí é que começa nosso prazo de
             fabricação". Um mês de erro no início desloca o pior mês inteiro do caixa. */}
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <p className="text-[11px] font-semibold text-torg-dark">Quanto da fábrica esta obra ocupa</p>
+          <div className="flex flex-wrap gap-2 mt-2 items-stretch">
+            {[{ v: "", r: "Rateada", a: `${Math.round(Math.min(1, meses > 0 ? mesesConsumo / meses : 1) * 100)}% — só o que a obra come` },
+              { v: "100", r: "Fábrica dedicada", a: "a obra paga a casa inteira" }].map((o) => (
+              <button key={o.r} type="button" onClick={() => set("ocupacaoPct", o.v)}
+                className={`text-left border rounded-lg px-3 py-2 transition ${(cfg.ocupacaoPct ?? "") === o.v ? "border-torg-blue bg-torg-blue-50/50" : "border-gray-200 hover:border-gray-300"}`}>
+                <span className="block text-[11px] font-semibold text-torg-dark whitespace-nowrap">{o.r}</span>
+                <span className="block text-[10px] text-torg-gray">{o.a}</span>
+              </button>
+            ))}
+            <label className="text-[11px] text-torg-dark border border-gray-200 rounded-lg px-3 py-2">
+              <span className="block font-semibold">Outra</span>
+              <Inp value={cfg.ocupacaoPct ?? ""} placeholder={String(Math.round(ocupacao * 100))}
+                onChange={(e) => set("ocupacaoPct", e.target.value)} className="block mt-0.5 w-16 text-right" />
+              <span className="block text-[10px] text-torg-gray mt-0.5">% da fábrica</span>
+            </label>
+          </div>
+          <p className="text-[11px] text-torg-gray mt-2">
+            A obra come <strong className="text-torg-dark">{mesesConsumo} meses</strong> de fábrica e o contrato dá{" "}
+            <strong className="text-torg-dark">{meses}</strong>.
+            {meses - mesesConsumo > 0.05
+              ? <> Sobram {Math.round((meses - mesesConsumo) * 10) / 10} meses de fábrica no prazo: <strong className="text-torg-dark">rateada</strong>,
+                  essa folga fica livre para outra obra e esta paga só o que consome; <strong className="text-torg-dark">dedicada</strong>, esta obra
+                  banca a ociosidade sozinha — {fmtR$(fabrica.custoOperacionalMes * (meses - mesesConsumo))} a mais no custo.</>
+              : <> A obra enche o prazo, então rateada e dedicada dão no mesmo.</>}
+          </p>
+        </div>
+
         <p className="text-[11px] text-torg-gray mt-2">
           O aço é comprado a partir do <strong className="text-torg-dark">mês {f.compra.inicio}</strong> — antes de a
           fábrica cortar — em {f.compra.meses} {f.compra.meses === 1 ? "mês" : "meses"}, e cada compra é paga em{" "}
