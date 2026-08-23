@@ -1136,6 +1136,12 @@ function Bdi({ c, res, setComp }) {
               ⚠ crédito só do que a <strong className="text-torg-dark">Torg</strong> compra: material que o cliente compra
               direto do fornecedor nunca entrou por nota nossa, e não gera crédito nenhum.
             </span>
+            {res.creditoIcms?.semCredito?.length ? (
+              <span className="block mt-1 text-torg-orange-700">
+                Sem crédito nesta obra porque está em nome do cliente:{" "}
+                <strong>{res.creditoIcms.semCredito.join(", ")}</strong>.
+              </span>
+            ) : null}
           </p>
         </div>
       </div>
@@ -2080,7 +2086,7 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
     receitaPorMes: receita.map((v) => numeroBr(v)),
   });
   const setKg = (m, v) => {
-    const novo = Array.from({ length: Math.max(f.meses + 2, kgPorMes.length) + 1 }, (_, i) => kgPorMes[i] ?? "");
+    const novo = Array.from({ length: tamanho }, (_, i) => kgPorMes[i] ?? "");
     novo[m] = v;
     mexer({ cenario: { ...cfg, kgPorMes: novo } });
   };
@@ -2090,11 +2096,18 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
     const tem = semMedicao.includes(mesFab);
     mexer({ cenario: { ...cfg, mesesSemMedicao: tem ? semMedicao.filter((x) => x !== mesFab) : [...semMedicao, mesFab].sort((a, b) => a - b) } });
   };
-  // ⚠ a tabela de receita precisa cobrir o contrato inteiro MAIS a cauda da retenção, senão a
-  // última parcela não tem onde ser digitada e some do fluxo.
-  const linhasReceita = Math.max(f.meses + 2, receita.length);
+  // ⚠ A TABELA TERMINA COM A OBRA. Vitor (23/08/2026): "hoje estamos repetindo até 57 meses,
+  // deixar a projeção apenas até o mês que finaliza a obra, não ficar repetido".
+  //
+  // ⚠⚠ E O MOTIVO ERA UM LAÇO MEU: o tamanho da tabela vinha de `Math.max(prazo, receita.length)`,
+  // e cada tecla digitada gravava um array UM maior — que na volta esticava a tabela, que esticava
+  // o array. Vinte edições, vinte meses a mais. O tamanho agora sai só do fluxo, que já sabe onde
+  // a obra acaba: último mês com movimento, e nada depois.
+  const ultimoMes = f.fluxo.reduce((a, x) => (x.entrada || x.saida ? x.mes : a), 0);
+  const linhas = f.fluxo.slice(0, ultimoMes + 1);
+  const tamanho = f.fluxo.length;
   const setReceita = (m, v) => {
-    const novo = Array.from({ length: linhasReceita + 1 }, (_, i) => receita[i] ?? "");
+    const novo = Array.from({ length: tamanho }, (_, i) => receita[i] ?? "");
     novo[m] = v;
     mexer({ cenario: { ...cfg, receitaPorMes: novo } });
   };
@@ -2166,6 +2179,12 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
           {(f.pagamento?.parcelas || []).map((p) => `${p.pct}% ${String(p.nome).toLowerCase()}`).join(" · ")}.
           {f.mesesAjustados?.length ? <> {f.mesesAjustados.length} {f.mesesAjustados.length === 1 ? "mês foi ajustado" : "meses foram ajustados"} à mão (mês {f.mesesAjustados.join(", ")}).</> : null}
         </p>
+        {f.receitaForaDoPrazo > 1 && (
+          <p className="text-[11px] text-torg-dark bg-[#FFF7ED] border border-[#F4801F]/30 rounded-lg px-3 py-2 mt-2">
+            Há <strong>{fmtR$(f.receitaForaDoPrazo)}</strong> digitados em meses que não existem mais no prazo da obra —
+            provavelmente sobra de um prazo maior. Esse valor saiu da conta.
+          </p>
+        )}
         {Math.abs(f.diferencaFaturamento) > 1 && (
           <p className="text-[11px] text-torg-dark bg-[#FFF7ED] border border-[#F4801F]/30 rounded-lg px-3 py-2 mt-2">
             O faturamento do cronograma soma <strong>{fmtR$(f.faturado)}</strong> e o preço da proposta é <strong>{fmtR$(base?.preco || 0)}</strong> —
@@ -2238,7 +2257,7 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
               <th className="text-right px-4 py-1.5">Saldo acumulado</th></tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {Array.from({ length: linhasReceita + 1 }, (_, m) => f.fluxo[m] || { mes: m, entrada: 0, saida: 0, juros: 0, saldo: f.fluxo[f.fluxo.length - 1]?.saldo || 0, fase: "pós-entrega" }).map((x) => (
+            {linhas.map((x) => (
               <tr key={x.mes} className={x.fase === "projeto" ? "bg-gray-50" : x.mes === f.mesEntrega ? "bg-torg-blue-50/40" : ""}>
                 <td className="px-4 py-1 whitespace-nowrap">{x.mes === 0 ? "assinatura" : `mês ${x.mes}`}</td>
                 {/* ⚠ MEDIÇÃO SÓ NOS MESES QUE MEDEM. Vitor (23/08/2026): "no mês 1 da fabricação não
