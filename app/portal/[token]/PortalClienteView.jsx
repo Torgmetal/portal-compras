@@ -188,6 +188,7 @@ export default function PortalClienteView({ token }) {
           <Bloco icone={ShoppingCart} titulo="Materiais da obra" recolhida
             sub={`${dados.compras.recebidos} de ${dados.compras.total} recebidos`}>
             <Tabela
+              quebra={[0]} larguraMin={780}
               cols={["Material", "Qtd.", "Situação", "Pedido", "Chegou em", "NF", "Rastreio"]}
               linhas={dados.compras.itens.slice(0, 200).map((c) => [
                 c.material, c.qtd,
@@ -231,6 +232,7 @@ export default function PortalClienteView({ token }) {
             {/* ⚠ SÓ OS APROVADOS. Relatório em rascunho ou reprovado é trabalho em curso;
                 mostrá-lo sem o reparo ao lado seria entregar meia história. */}
             <Tabela
+              quebra={[2]} larguraMin={520}
               cols={["Documento", "Ensaio", "Peças", "Data"]}
               linhas={dados.relatorios.map((r) => [
                 <span key="c" className="font-mono font-semibold text-[#006EAB]">{r.codigo}</span>,
@@ -592,6 +594,7 @@ function BlocoLista({ icone, titulo, fonte, d, token }) {
         </p>
       )}
       <Tabela
+        quebra={[1]} larguraMin={d.comPeso ? 620 : 520}
         cols={["Marca", "Descrição", "Material", "Qtd.", ...(d.comPeso ? ["Peso"] : [])]}
         linhas={d.itens.slice(0, 200).map((p) => [
           <span key="m" className="font-mono">{p.marca}</span>, p.descricao, p.material || "—", p.qtd,
@@ -633,21 +636,34 @@ function Bloco({ icone: Icone, titulo, sub, children, recolhida = false, acao = 
   );
 }
 
-/** ⚠ rolagem horizontal PRÓPRIA: no celular a tabela não pode empurrar a página inteira. */
-function Tabela({ cols, linhas, rodape }) {
+/**
+ * ⚠ rolagem horizontal PRÓPRIA: no celular a tabela não pode empurrar a página inteira.
+ *
+ * ⚠ E SÓ UMA COLUNA QUEBRA. Vitor (22/08/2026), sobre a tabela de materiais: "nessa parte está
+ * quebrada" — o "R 260787" saía partido em duas linhas e o "Atendido do estoque" também. A causa é
+ * o próprio HTML: com uma descrição de material longa disputando espaço, o navegador espreme as
+ * colunas curtas até elas partirem no meio. Rastreio partido é grave: o R é o número que amarra a
+ * peça ao certificado, e lido em duas linhas ele parece dois.
+ *
+ * A regra: `quebra` diz quais colunas PODEM quebrar (a descrição). Todas as outras ficam inteiras,
+ * e quando não couber a tabela rola de lado — que é o comportamento certo, porque rolar mostra o
+ * número inteiro e quebrar não.
+ */
+function Tabela({ cols, linhas, rodape, quebra = null, larguraMin = 420 }) {
+  const inteiro = (j) => (quebra && !quebra.includes(j) ? " whitespace-nowrap" : "");
   return (
     <>
       <div className="overflow-x-auto -mx-1">
-        <table className="w-full text-[13px] min-w-[420px]">
+        <table className="w-full text-[13px]" style={{ minWidth: larguraMin }}>
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wide text-gray-400">
-              {cols.map((c) => <th key={c} className="font-semibold pb-2 px-1">{c}</th>)}
+              {cols.map((c, j) => <th key={c} className={`font-semibold pb-2 px-1${inteiro(j)}`}>{c}</th>)}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {linhas.map((l, i) => (
               <tr key={i}>
-                {l.map((c, j) => <td key={j} className="py-2 px-1 align-top">{c}</td>)}
+                {l.map((c, j) => <td key={j} className={`py-2 px-1 align-top${inteiro(j)}`}>{c}</td>)}
               </tr>
             ))}
           </tbody>
