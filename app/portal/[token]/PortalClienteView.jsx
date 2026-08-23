@@ -90,16 +90,20 @@ export default function PortalClienteView({ token }) {
               ⚠ O logo do cliente vem em FUNDO CLARO. Marca de cliente costuma ser colorida e
               sumiria no navy; a lâmina branca garante que ela apareça como ela é, em vez de a
               gente "adaptar" a marca dos outros. */}
-          <div className="flex items-center gap-5 mb-10">
+          {/* ⚠ TAMANHO DA MARCA. Vitor (22/08/2026): "aumente a projeção do logo da Torg para
+              ficar mais visível" — no navy da capa, a marca em h-9 sumia. As duas crescem JUNTAS:
+              encolher a do cliente pra destacar a nossa contradiz o motivo delas estarem lado a
+              lado. A sombra é pra capa com foto clara no topo, onde o logo branco encostava no céu. */}
+          <div className="flex items-center gap-6 mb-10">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/torg-logo-white.png" alt="Torg Metal" className="h-9"
+            <img src="/torg-logo-white.png" alt="Torg Metal" className="h-14 sm:h-[72px] w-auto drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
               onError={(e) => { e.currentTarget.style.display = "none"; }} />
             {portal.logoClienteUrl && (
               <>
-                <span className="h-8 w-px bg-white/25" />
-                <span className="bg-white rounded-lg px-3 py-2 inline-flex items-center">
+                <span className="h-12 sm:h-16 w-px bg-white/25" />
+                <span className="bg-white rounded-xl px-4 py-3 inline-flex items-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={portal.logoClienteUrl} alt={op.cliente || "Cliente"} className="h-7 object-contain"
+                  <img src={portal.logoClienteUrl} alt={op.cliente || "Cliente"} className="h-10 sm:h-12 w-auto object-contain"
                     onError={(e) => { e.currentTarget.parentElement.style.display = "none"; }} />
                 </span>
               </>
