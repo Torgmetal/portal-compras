@@ -1026,35 +1026,116 @@ const Linha = ({ r, v, forte }) => (
   </div>
 );
 
+/**
+ * RESUMO — uma linha por área, como na PLANILHA COMERCIAL da LQC.
+ *
+ * Vitor (23/08/2026): "você trouxe o total da obra, não trouxe o peso separado por área que
+ * selecionei, não trouxe o total somente das áreas que mencionei".
+ *
+ * ⚠ UMA LINHA SÓ NÃO SERVE PARA NEGOCIAR. O cliente corta pacote por pacote, e a proposta precisa
+ * dizer quanto custa cada um — é o que a PLANILHA COMERCIAL da LQC faz, uma linha por área com o
+ * R$/kg dela. Aqui só entram as áreas do escopo; as desmarcadas ficam listadas abaixo, apagadas,
+ * para não sumirem da vista de quem negocia.
+ *
+ * ⚠ E O R$/kg DE CADA ÁREA CARREGA TUDO: aço, tinta pela cor, fabricação, pintura, mais o rateio
+ * por peso de fixador, ensaio e frete. A soma das áreas fecha com o custo do estudo ao centavo —
+ * é o que garante que nada se perdeu nem foi contado duas vezes no caminho.
+ */
 function PlanilhaComercial({ res, e }) {
   const t = res.totais || {};
+  const dentro = (res.porArea || []).filter((a) => a.ativo);
+  const fora = (res.porArea || []).filter((a) => !a.ativo);
+  const pesoDentro = dentro.reduce((a, x) => a + x.pesoKg, 0);
+  const precoDentro = dentro.reduce((a, x) => a + x.preco, 0);
+
   return (
-    <div className="bg-white border border-gray-100 rounded-xl overflow-hidden max-w-4xl">
-      <table className="w-full text-[13px]">
-        <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
-          <tr><th className="text-left px-4 py-2">Item</th><th className="text-left px-2 py-2">Descrição</th>
-            <th className="text-left px-2 py-2">un.</th><th className="text-right px-2 py-2">Quant.</th>
-            <th className="text-right px-2 py-2">Unit. R$</th><th className="text-right px-4 py-2">Valor R$</th></tr>
-        </thead>
-        <tbody className="divide-y divide-gray-50">
-          <tr><td className="px-4 py-2 font-semibold">1</td><td className="px-2 py-2 font-semibold" colSpan={5}>Fornecimento de estruturas metálicas</td></tr>
-          <tr>
-            <td className="px-4 py-2">1.1</td>
-            <td className="px-2 py-2">Fornecimento das estruturas metálicas{e.obra ? ` — ${e.obra}` : ""}</td>
-            <td className="px-2 py-2">kg</td>
-            <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">{Number(res.pesoTotal || 0).toLocaleString("pt-BR")}</td>
-            <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">{fmtR$(res.precoPorKg)}</td>
-            <td className="px-4 py-2 text-right tabular-nums font-semibold whitespace-nowrap">{fmtR$(res.preco)}</td>
-          </tr>
-          <tr className="bg-gray-50 font-bold"><td className="px-4 py-2" colSpan={5}>Total geral</td>
-            <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">{fmtR$(res.preco)}</td></tr>
-        </tbody>
-      </table>
-      <div className="p-4 border-t border-gray-100 grid sm:grid-cols-4 gap-3 text-[12px]">
-        <Kpi r="Material" v={fmtR$(t.material?.subtotal)} />
-        <Kpi r="MDO terceirizada" v={fmtR$(t.mdo?.subtotal)} />
-        <Kpi r="Industrialização" v={fmtR$(t.industrializacao?.subtotal)} />
-        <Kpi r="Itens comerciais" v={fmtR$(t.comerciais)} />
+    <div className="space-y-4 max-w-5xl">
+      <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-[12px] font-bold text-torg-dark">
+            Fornecimento de estruturas metálicas{e.obra ? ` — ${e.obra}` : ""}
+          </p>
+          <p className="text-[11px] text-torg-gray">
+            {dentro.length} {dentro.length === 1 ? "área" : "áreas"} no escopo
+            {fora.length > 0 && <> · {fora.length} fora</>}
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[12px]" style={{ minWidth: 700 }}>
+            <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
+              <tr><th className="text-left px-4 py-2">Item</th><th className="text-left px-2 py-2">Área</th>
+                <th className="text-left px-2 py-2">un.</th><th className="text-right px-2 py-2">Quant.</th>
+                <th className="text-right px-2 py-2">Unit. R$/kg</th><th className="text-right px-4 py-2">Valor R$</th></tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {dentro.map((a, i) => (
+                <tr key={a.area}>
+                  <td className="px-4 py-1.5 whitespace-nowrap">1.{i + 1}</td>
+                  <td className="px-2 py-1.5">
+                    {a.area}
+                    {a.cor && <span className="text-torg-gray"> · {a.cor}</span>}
+                  </td>
+                  <td className="px-2 py-1.5 text-torg-gray">kg</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{Number(a.pesoKg).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(a.precoPorKg)}</td>
+                  <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(a.preco)}</td>
+                </tr>
+              ))}
+              {!dentro.length && <tr><td colSpan={6} className="px-4 py-6 text-center text-torg-gray">Nenhuma área no escopo.</td></tr>}
+              <tr className="bg-gray-50 font-bold">
+                <td className="px-4 py-2" colSpan={3}>Subtotal</td>
+                <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">{Number(pesoDentro).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</td>
+                <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">{fmtR$(pesoDentro > 0 ? precoDentro / pesoDentro : 0)}</td>
+                <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">{fmtR$(precoDentro)}</td>
+              </tr>
+              {t.comerciais > 0 && (
+                <tr>
+                  <td className="px-4 py-1.5">2</td>
+                  <td className="px-2 py-1.5" colSpan={4}>Fornecimento de itens comerciais</td>
+                  <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(t.comerciais * (1 + (res.bdiPct || 0) / 100))}</td>
+                </tr>
+              )}
+              <tr className="bg-torg-blue-50/50 font-bold text-torg-dark">
+                <td className="px-4 py-2" colSpan={5}>Total geral</td>
+                <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">{fmtR$(res.preco)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {fora.length > 0 && (
+        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden opacity-70">
+          <p className="text-[12px] font-bold text-torg-gray px-4 py-2 bg-gray-50">Fora do escopo</p>
+          <table className="w-full text-[12px]">
+            <tbody className="divide-y divide-gray-50">
+              {fora.map((a) => (
+                <tr key={a.area} className="text-torg-gray">
+                  <td className="px-4 py-1.5">{a.area}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{Number(a.pesoKg).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg</td>
+                  <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap line-through">{fmtR$(a.preco)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-[11px] text-torg-gray px-4 py-2 border-t border-gray-100">
+            Continuam no estudo com o levantamento inteiro — basta remarcar no quantitativo.
+          </p>
+        </div>
+      )}
+
+      <div className="bg-white border border-gray-100 rounded-xl p-4">
+        <p className="text-[12px] font-bold text-torg-dark mb-3">Custo do escopo, por natureza</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Kpi r="Material" v={fmtR$(t.material?.subtotal)} />
+          <Kpi r="Terceiros" v={fmtR$(t.mdo?.subtotal)} />
+          <Kpi r="Industrialização" v={fmtR$(t.industrializacao?.subtotal)} />
+          <Kpi r="Itens comerciais" v={fmtR$(t.comerciais)} />
+        </div>
+        <p className="text-[11px] text-torg-gray mt-3">
+          O R$/kg de cada área carrega tudo: aço, tinta pela cor, fabricação e pintura, mais o
+          rateio por peso de fixador, ensaio e frete. A soma das áreas fecha com o custo do estudo.
+        </p>
       </div>
     </div>
   );
