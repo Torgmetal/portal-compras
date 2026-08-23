@@ -2238,12 +2238,34 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
               : <>Preencha o <strong className="text-torg-dark">kg produzido</strong> mês a mês na tabela abaixo para o
                  faturamento seguir a produção. Sem isso, a medição é dividida por partes iguais.</>}
           </p>
+          {/* ⚠ O CRONOGRAMA DE PRODUÇÃO NÃO ACOMPANHA O ESCOPO. Vitor (23/08/2026): "você está
+              considerando o valor de faturamento de 37 milhões". Desmarcada uma área, o preço e o
+              peso caem — mas o kg digitado mês a mês continua o do levantamento inteiro, e a
+              receita (kg × saldo ÷ peso) estoura duas vezes. A conta agora trava no peso da obra,
+              e o botão aqui do lado reajusta o cronograma na proporção. */}
           {f.medicao.porKgDigitado && Math.abs(f.medicao.kgFaltando) > 1 && (
-            <p className="text-[11px] text-torg-dark bg-[#FFF7ED] border border-[#F4801F]/30 rounded-lg px-3 py-2 mt-2">
-              O kg informado soma <strong>{fmtKg(f.medicao.kgInformado)}</strong> e a obra tem <strong>{fmtKg(f.medicao.pesoKg)}</strong> —
-              {f.medicao.kgFaltando > 0 ? <> faltam <strong className="text-red-600">{fmtKg(f.medicao.kgFaltando)}</strong> sem mês para produzir, e esse pedaço não vai ser faturado por medição.</>
-                : <> sobram <strong className="text-red-600">{fmtKg(Math.abs(f.medicao.kgFaltando))}</strong> a mais do que a obra tem.</>}
-            </p>
+            <div className="text-[11px] text-torg-dark bg-[#FFF7ED] border border-[#F4801F]/30 rounded-lg px-3 py-2 mt-2 flex flex-wrap items-center gap-3">
+              <span className="flex-1 min-w-[260px]">
+                O cronograma de produção soma <strong>{fmtKg(f.medicao.kgInformado)}</strong> e a obra tem <strong>{fmtKg(f.medicao.pesoKg)}</strong> —
+                {f.medicao.kgFaltando > 0
+                  ? <> faltam <strong className="text-red-600">{fmtKg(f.medicao.kgFaltando)}</strong> sem mês para produzir, e esse pedaço não vai ser faturado por medição.</>
+                  : <> sobram <strong className="text-red-600">{fmtKg(Math.abs(f.medicao.kgFaltando))}</strong>. Provavelmente o escopo encolheu depois que o cronograma foi preenchido.</>}
+                {f.medicao.kgExcedente > 1 && (
+                  <span className="block mt-0.5">
+                    <strong className="text-red-600">{fmtKg(f.medicao.kgExcedente)}</strong> ficaram de fora do faturamento: a medição não fatura quilo que a obra não tem.
+                  </span>
+                )}
+              </span>
+              <button type="button" onClick={() => {
+                const soma = f.medicao.kgInformado;
+                if (!(soma > 0)) return;
+                const fator = f.medicao.pesoKg / soma;
+                mexer({ cenario: { ...cfg, kgPorMes: Array.from({ length: tamanho }, (_, i) => (numeroBr(kgPorMes[i]) > 0 ? String(Math.round(numeroBr(kgPorMes[i]) * fator)) : "")) } });
+              }}
+                className="text-[11px] rounded-lg px-3 py-1.5 border border-torg-blue text-torg-blue hover:bg-torg-blue-50 whitespace-nowrap">
+                Ajustar ao peso da obra
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -2302,10 +2324,14 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
                   ) : <span className="text-torg-gray">{x.fase}</span>}
                 </td>
                 <td className="px-3 py-1 text-right">
-                  {x.fase.includes("fabricação")
-                    ? <Inp value={kgPorMes[x.mes] ?? ""} placeholder="0"
-                        onChange={(e) => setKg(x.mes, e.target.value)} className="w-24 text-right tabular-nums" />
-                    : <span className="text-torg-gray">—</span>}
+                  {x.fase.includes("fabricação") ? (<>
+                    <Inp value={kgPorMes[x.mes] ?? ""} placeholder="0"
+                      onChange={(e) => setKg(x.mes, e.target.value)} className="w-24 text-right tabular-nums" />
+                    {/* ⚠ digitado além do peso da obra não produz — e precisa mostrar quanto valeu */}
+                    {numeroBr(kgPorMes[x.mes]) - x.kgProduzido > 1 && (
+                      <span className="block text-[9px] text-torg-orange-700 leading-tight">vale {fmtKg(x.kgProduzido)}</span>
+                    )}
+                  </>) : <span className="text-torg-gray">—</span>}
                 </td>
                 {/* ⚠ kg MEDIDO é escolha, não consequência: o que ficou pronto e não foi medido fica
                     EM ABERTO, e o comercial distribui como o cliente aprova. */}
