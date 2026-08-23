@@ -126,56 +126,155 @@ const Sel = ({ opcoes, ...p }) => (
   </select>
 );
 
-/** RESUMOS_EM — o quantitativo. É daqui que sai o peso por classe e por perfil. */
+/**
+ * RESUMOS_EM — o quantitativo. É daqui que sai o peso por classe e por perfil.
+ *
+ * ⚠ CADA LINHA É UM CARTÃO, NÃO UMA LINHA DE TABELA. Vitor (22/08/2026): "precisa melhorar essa
+ * projeção dessa linha, ser mais explicativo, pois está confuso e difícil de preencher".
+ *
+ * Ele tem razão: doze campos numa linha só cabem rolando de lado, e rolando de lado some o
+ * cabeçalho — a pessoa digita sem saber em que coluna está. Pior: os campos que MAIS precisam de
+ * explicação (classificação e perfil predominante) são justamente os que definem o preço, e
+ * apareciam como duas palavras soltas.
+ *
+ * Então cada linha vira um bloco com três perguntas na ordem em que o orçamentista pensa:
+ * ONDE fica · COMO se mede · DE QUE é feito. E cada escolha mostra a consequência: a faixa de
+ * kg/m ao lado da classificação, o R$/kg ao lado do perfil, e o peso e o custo da linha
+ * calculados na hora — porque um número que aparece na hora ensina mais que qualquer legenda.
+ */
 function Resumos({ e, c, setComp, mexer }) {
   const linhas = Array.isArray(c.resumos) ? c.resumos : [];
   const set = (i, campo, v) => setComp({ resumos: linhas.map((l, j) => (j === i ? { ...l, [campo]: v } : l)) });
   const add = () => setComp({ resumos: [...linhas, { item: `1.${linhas.length + 1}`, metodo: e.metodo || "ESTIMATIVA", un: "unid", quantidade: 1, unidades: 1 }] });
   const del = (i) => setComp({ resumos: linhas.filter((_, j) => j !== i) });
+  const dup = (i) => setComp({ resumos: [...linhas.slice(0, i + 1), { ...linhas[i], item: `1.${linhas.length + 1}` }, ...linhas.slice(i + 1)] });
+  const total = linhas.reduce((a, l) => a + num(l.quantidade) * num(l.unidades || 1) * num(l.pesoUnit), 0);
 
   return (
     <div>
-      <div className="flex flex-wrap items-end gap-3 mb-3">
-        <label className="text-[11px] font-semibold text-torg-dark">Método
-          <Sel value={e.metodo || ""} onChange={(ev) => mexer({ metodo: ev.target.value })} opcoes={METODOS} className="block mt-1" /></label>
-        <label className="text-[11px] font-semibold text-torg-dark">Demãos
-          <Sel value={e.demaos || ""} onChange={(ev) => mexer({ demaos: ev.target.value })} opcoes={DEMAOS} className="block mt-1" /></label>
-        <label className="text-[11px] font-semibold text-torg-dark">Pré-montagem
-          <Sel value={e.preMontagem || ""} onChange={(ev) => mexer({ preMontagem: ev.target.value })} opcoes={PRE_MONTAGEM} className="block mt-1" /></label>
-        <button onClick={add} className="ml-auto text-[12px] font-semibold text-torg-blue inline-flex items-center gap-1"><Plus size={13} /> linha</button>
+      <div className="bg-white border border-gray-100 rounded-xl p-4 mb-4">
+        <p className="text-[12px] text-torg-gray mb-3">
+          Cada bloco é um pedaço da obra. O peso lançado aqui é o que alimenta a industrialização:
+          a <strong className="text-torg-dark">classificação</strong> escolhe o preço de fabricação e pintura,
+          e o <strong className="text-torg-dark">perfil predominante</strong> escolhe o preço da matéria-prima.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-[11px] font-semibold text-torg-dark">Método
+            <Sel value={e.metodo || ""} onChange={(ev) => mexer({ metodo: ev.target.value })} opcoes={METODOS} className="block mt-1" /></label>
+          <label className="text-[11px] font-semibold text-torg-dark">Demãos de tinta
+            <Sel value={e.demaos || ""} onChange={(ev) => mexer({ demaos: ev.target.value })} opcoes={DEMAOS} className="block mt-1" /></label>
+          <label className="text-[11px] font-semibold text-torg-dark">Pré-montagem
+            <Sel value={e.preMontagem || ""} onChange={(ev) => mexer({ preMontagem: ev.target.value })} opcoes={PRE_MONTAGEM} className="block mt-1" /></label>
+          <span className="ml-auto text-[12px] text-torg-gray">Total do quantitativo: <strong className="text-torg-dark tabular-nums">{fmtKg(total)}</strong></span>
+        </div>
       </div>
-      <div className="overflow-x-auto bg-white border border-gray-100 rounded-xl">
-        <table className="w-full text-[12px]" style={{ minWidth: 1050 }}>
-          <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
-            <tr>{["Item", "Área", "Estrutura", "Elemento", "Classificação", "Un.", "Qtd.", "Unid.", "Peso unit.", "Perfil predominante", "Peso total", ""].map((h) => <th key={h} className="text-left px-2 py-1.5 whitespace-nowrap">{h}</th>)}</tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {linhas.map((l, i) => {
-              const peso = num(l.quantidade) * num(l.unidades || 1) * num(l.pesoUnit);
-              return (
-                <tr key={i}>
-                  <td className="px-2 py-1"><Inp value={l.item || ""} onChange={(ev) => set(i, "item", ev.target.value)} className="w-14" /></td>
-                  <td className="px-2 py-1"><Inp value={l.area || ""} onChange={(ev) => set(i, "area", ev.target.value)} className="w-24" /></td>
-                  <td className="px-2 py-1"><Sel value={l.estrutura || ""} onChange={(ev) => set(i, "estrutura", ev.target.value)} opcoes={ESTRUTURAS} className="w-40" /></td>
-                  <td className="px-2 py-1"><Inp value={l.elemento || ""} onChange={(ev) => set(i, "elemento", ev.target.value)} className="w-32" /></td>
-                  <td className="px-2 py-1"><Sel value={l.classificacao || ""} onChange={(ev) => set(i, "classificacao", ev.target.value)} opcoes={CLASSES.map((x) => x.nome.toUpperCase())} className="w-32" /></td>
-                  <td className="px-2 py-1"><Inp value={l.un || ""} onChange={(ev) => set(i, "un", ev.target.value)} className="w-14" /></td>
-                  <td className="px-2 py-1"><Inp value={l.quantidade ?? ""} onChange={(ev) => set(i, "quantidade", ev.target.value)} className="w-20 text-right" /></td>
-                  <td className="px-2 py-1"><Inp value={l.unidades ?? ""} onChange={(ev) => set(i, "unidades", ev.target.value)} className="w-16 text-right" /></td>
-                  <td className="px-2 py-1"><Inp value={l.pesoUnit ?? ""} onChange={(ev) => set(i, "pesoUnit", ev.target.value)} className="w-24 text-right" /></td>
-                  <td className="px-2 py-1"><Sel value={l.perfil || ""} onChange={(ev) => set(i, "perfil", ev.target.value)} opcoes={PERFIS.map((p) => p.nome)} className="w-40" /></td>
-                  <td className="px-2 py-1 text-right tabular-nums font-semibold whitespace-nowrap">{fmtKg(peso)}</td>
-                  <td className="px-2 py-1"><button onClick={() => del(i)} className="text-gray-300 hover:text-red-600"><Trash2 size={13} /></button></td>
-                </tr>
-              );
-            })}
-            {!linhas.length && <tr><td colSpan={12} className="px-3 py-6 text-center text-torg-gray">Sem linhas. O peso da obra entra aqui.</td></tr>}
-          </tbody>
-        </table>
+
+      <div className="space-y-3">
+        {linhas.map((l, i) => <CartaoLinha key={i} l={l} i={i} set={set} del={del} dup={dup} />)}
+      </div>
+
+      <button onClick={add}
+        className="mt-3 text-[12px] font-semibold text-torg-blue border border-dashed border-torg-blue/40 rounded-xl px-4 py-2.5 w-full hover:bg-torg-blue-50 inline-flex items-center justify-center gap-1.5">
+        <Plus size={14} /> {linhas.length ? "Adicionar outro elemento" : "Adicionar o primeiro elemento"}
+      </button>
+    </div>
+  );
+}
+
+/** Um elemento do quantitativo, com a consequência de cada escolha à vista. */
+function CartaoLinha({ l, i, set, del, dup }) {
+  const classe = CLASSES.find((x) => x.nome.toUpperCase() === String(l.classificacao || "").toUpperCase());
+  const perfil = PERFIS.find((p) => p.nome === l.perfil);
+  const peso = num(l.quantidade) * num(l.unidades || 1) * num(l.pesoUnit);
+  const custoMat = perfil ? peso * perfil.preco : 0;
+  const custoFab = classe ? peso * classe.fabricacao : 0;
+  // a unidade do peso unitário SEGUE a unidade de medida — é o que evita lançar kg/m num item "unid"
+  const unPeso = l.un === "m" ? "kg/m" : l.un === "m²" ? "kg/m²" : "kg/un";
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 bg-gray-50 border-b border-gray-100">
+        <span className="text-[12px] font-bold text-torg-blue font-mono">{l.item || `1.${i + 1}`}</span>
+        <span className="text-[12px] font-semibold text-torg-dark">{l.area || "sem área"}</span>
+        {l.estrutura && <span className="text-[12px] text-torg-gray">· {l.estrutura}</span>}
+        {l.elemento && <span className="text-[12px] text-torg-gray">· {l.elemento}</span>}
+        <span className="ml-auto text-[13px] font-extrabold tabular-nums text-torg-dark">{fmtKg(peso)}</span>
+        <button onClick={() => dup(i)} title="duplicar" className="text-gray-300 hover:text-torg-blue"><Plus size={14} /></button>
+        <button onClick={() => del(i)} title="remover" className="text-gray-300 hover:text-red-600"><Trash2 size={14} /></button>
+      </div>
+
+      <div className="p-4 space-y-4">
+        <Bloco titulo="Onde fica">
+          <Campo r="Item" ajuda="numeração da proposta">
+            <Inp value={l.item || ""} onChange={(ev) => set(i, "item", ev.target.value)} className="w-full" /></Campo>
+          <Campo r="Área" ajuda="galpão, prédio, trecho">
+            <Inp value={l.area || ""} onChange={(ev) => set(i, "area", ev.target.value)} className="w-full" /></Campo>
+          <Campo r="Estrutura">
+            <Sel value={l.estrutura || ""} onChange={(ev) => set(i, "estrutura", ev.target.value)} opcoes={ESTRUTURAS} className="w-full" /></Campo>
+          <Campo r="Elemento" ajuda="tesoura, terça, pilar…">
+            <Inp value={l.elemento || ""} onChange={(ev) => set(i, "elemento", ev.target.value)} className="w-full" /></Campo>
+        </Bloco>
+
+        <Bloco titulo="Como se mede" nota="Quantidade × Unidades × Peso unitário = peso do elemento">
+          <Campo r="Método">
+            <Sel value={l.metodo || ""} onChange={(ev) => set(i, "metodo", ev.target.value)} opcoes={METODOS} className="w-full" /></Campo>
+          <Campo r="Unidade de medida" ajuda="define o peso unitário abaixo">
+            <Sel value={l.un || ""} onChange={(ev) => set(i, "un", ev.target.value)} opcoes={["m", "m²", "unid"]} className="w-full" /></Campo>
+          <Campo r="Quantidade" ajuda={l.un === "unid" ? "quantas peças" : `quantos ${l.un || "m"}`}>
+            <Inp value={l.quantidade ?? ""} onChange={(ev) => set(i, "quantidade", ev.target.value)} className="w-full text-right" /></Campo>
+          <Campo r="Unidades" ajuda="repetições iguais (ex.: 12 pórticos)">
+            <Inp value={l.unidades ?? ""} onChange={(ev) => set(i, "unidades", ev.target.value)} className="w-full text-right" /></Campo>
+          <Campo r={`Peso unitário (${unPeso})`} ajuda="peso de cada unidade de medida">
+            <Inp value={l.pesoUnit ?? ""} onChange={(ev) => set(i, "pesoUnit", ev.target.value)} className="w-full text-right" /></Campo>
+        </Bloco>
+
+        <Bloco titulo="De que é feito" nota="as duas escolhas que definem o preço da linha">
+          <Campo r="Classificação" ajuda={classe ? `${classe.faixa} · fabricação ${fmtR$(classe.fabricacao)}/kg` : "faixa de peso por metro do perfil"}>
+            <select value={l.classificacao || ""} onChange={(ev) => set(i, "classificacao", ev.target.value)}
+              className="border border-gray-200 rounded px-2 py-1 text-[12px] bg-white w-full">
+              <option value="">—</option>
+              {CLASSES.map((x) => <option key={x.key} value={x.nome.toUpperCase()}>{x.nome} · {x.faixa}</option>)}
+            </select>
+          </Campo>
+          <Campo r="Perfil predominante" ajuda={perfil ? `matéria-prima ${fmtR$(perfil.preco)}/kg` : "define o preço do aço desta linha"}>
+            <select value={l.perfil || ""} onChange={(ev) => set(i, "perfil", ev.target.value)}
+              className="border border-gray-200 rounded px-2 py-1 text-[12px] bg-white w-full">
+              <option value="">—</option>
+              {PERFIS.map((p) => <option key={p.nome} value={p.nome}>{p.nome} · {fmtR$(p.preco)}/kg</option>)}
+            </select>
+          </Campo>
+        </Bloco>
+
+        {peso > 0 && (
+          <p className="text-[11px] text-torg-gray border-t border-gray-100 pt-3">
+            <strong className="text-torg-dark">{fmtKg(peso)}</strong>
+            {perfil && <> · matéria-prima <strong className="text-torg-dark">{fmtR$(custoMat)}</strong></>}
+            {classe && <> · fabricação <strong className="text-torg-dark">{fmtR$(custoFab)}</strong></>}
+            {(!perfil || !classe) && <span className="text-torg-orange-700"> · falta {[!perfil && "o perfil", !classe && "a classificação"].filter(Boolean).join(" e ")} para esta linha custar</span>}
+          </p>
+        )}
       </div>
     </div>
   );
 }
+
+const Bloco = ({ titulo, nota, children }) => (
+  <div>
+    <div className="flex flex-wrap items-baseline gap-2 mb-2">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-torg-blue">{titulo}</p>
+      {nota && <p className="text-[10px] text-torg-gray">{nota}</p>}
+    </div>
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">{children}</div>
+  </div>
+);
+
+const Campo = ({ r, ajuda, children }) => (
+  <label className="block min-w-0">
+    <span className="block text-[11px] font-semibold text-torg-dark mb-1 truncate">{r}</span>
+    {children}
+    {ajuda && <span className="block text-[10px] text-torg-gray mt-0.5 leading-tight">{ajuda}</span>}
+  </label>
+);
 
 /** INDUSTRIALIZAÇÃO — faturamento por grupo, preços de entrada e o quadro calculado. */
 function Industrializacao({ c, res, setComp }) {
