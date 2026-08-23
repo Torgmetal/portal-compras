@@ -1374,6 +1374,7 @@ function Cenario({ e, res, mexer, fabrica }) {
       // ⚠ o PRAZO DIGITADO vale aqui também. Antes a cascata cobrava a casa por peso ÷ cadência e
       // o fluxo pelos meses do contrato — dois números na mesma tela, e ninguém via a diferença.
       mesesFabricacao: numeroBr(cfg.mesesFabricacao),
+      mesInicioFabricacao: numeroBr(cfg.mesInicioFabricacao),
       ocupacaoPct: cfg.ocupacaoPct,
     };
     const seco = resultadoDoCenario(res, { ...cen, preco }, { ...comum, custoFinanceiro: 0 });
@@ -1382,6 +1383,7 @@ function Cenario({ e, res, mexer, fabrica }) {
     const f = fluxoDeCaixa({
       meses: seco.meses, preco, pesoKg: res.pesoTotal, impostos: seco.impostos, material: seco.material,
       mesesProjeto: comum.mesesProjeto, custoProjetoMes: comum.custoProjetoMes,
+      mesInicioFabricacao: comum.mesInicioFabricacao,
       terceiros: res.totais?.mdo?.subtotal || 0,
       // ⚠ o fluxo cobra o MESMO custo mensal que a cascata: sem o rateio pela ocupação, o caixa
       // pagaria a fábrica inteira e o resultado só a fatia — e os dois quadros brigariam.
@@ -2063,6 +2065,7 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
   const [ajustando, setAjustando] = useState(null);
   const f = fluxoDeCaixa({
     meses, mesesProjeto: projeto,
+    mesInicioFabricacao: numeroBr(cfg.mesInicioFabricacao),
     custoProjetoMes: numeroBr(cfg.custoProjetoMes),
     preco: base?.preco || 0, pesoKg: res.pesoTotal,
     // ⚠ IMPOSTO CALCULADO, NÃO A ALAVANCA DO BDI. Vitor (23/08/2026): "os impostos não estão sendo
@@ -2123,6 +2126,9 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-3">
           {[["mesesProjeto", "Projeto (meses)", "1"],
             ["custoProjetoMes", "Custo do projeto (R$/mês)", "0"],
+            // ⚠ o início da fabricação é campo PRÓPRIO, e pode cair dentro do projeto: a engenharia
+            // libera um pacote e a fábrica já corta enquanto o resto é detalhado.
+            ["mesInicioFabricacao", "Fabricação começa no mês", String(projeto + 1)],
             ["mesesFabricacao", "Fabricação (meses)", String(meses)],
             ["compraMesesAntes", "Compra começa (meses antes)", "1"],
             ["mesesCompraMaterial", "Compra dura (meses)", ""],
@@ -2173,6 +2179,13 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
         <p className="text-[11px] text-torg-dark mt-2">
           Contrato de <strong>{f.meses} meses</strong>: {f.mesesProjeto > 0 ? <>{f.mesesProjeto} de projeto, a fábrica corta a partir do <strong>mês {f.mesInicioFabricacao}</strong> e </> : null}
           entrega no <strong>mês {f.mesEntrega}</strong>. A medição acompanha a produção, então ela começa no mês {f.mesInicioFabricacao} — não na assinatura.
+          {f.mesesSobrepostos > 0 && (
+            <span className="block mt-1">
+              ⚠ {f.mesesSobrepostos} {f.mesesSobrepostos === 1 ? "mês roda" : "meses rodam"} com projeto e fabricação ao
+              mesmo tempo — {f.mesesSobrepostos === 1 ? "esse mês carrega" : "esses meses carregam"} os dois custos, que é o
+              certo: a engenharia ainda detalha enquanto a fábrica já corta o pacote liberado.
+            </span>
+          )}
         </p>
         <p className="text-[10px] text-torg-gray mt-1.5">
           O recebimento vem da aba <strong className="text-torg-dark">Forma de pagamento</strong>:{" "}
@@ -2265,19 +2278,19 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
                     igual desde o primeiro mês antecipa receita que não existe e esconde o buraco de
                     caixa exatamente onde ele é maior. */}
                 <td className="px-2 py-1 text-[10px] whitespace-nowrap">
-                  {x.fase === "fabricação" ? (
+                  {x.fase.includes("fabricação") ? (
                     <label className="inline-flex items-center gap-1.5 cursor-pointer" title="mês com medição">
-                      <input type="checkbox" checked={!semMedicao.includes(x.mes - f.mesesProjeto)}
-                        onChange={() => alternaMedicao(x.mes - f.mesesProjeto)}
+                      <input type="checkbox" checked={!semMedicao.includes(x.mes - f.mesInicioFabricacao + 1)}
+                        onChange={() => alternaMedicao(x.mes - f.mesInicioFabricacao + 1)}
                         className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue h-3 w-3" />
-                      <span className={semMedicao.includes(x.mes - f.mesesProjeto) ? "text-torg-gray line-through" : "text-torg-dark"}>
-                        {x.mes === f.mesEntrega ? "entrega" : `mede · fab ${x.mes - f.mesesProjeto}`}
+                      <span className={semMedicao.includes(x.mes - f.mesInicioFabricacao + 1) ? "text-torg-gray line-through" : "text-torg-dark"}>
+                        {x.mes === f.mesEntrega ? "entrega" : `mede · fab ${x.mes - f.mesInicioFabricacao + 1}`}
                       </span>
                     </label>
                   ) : <span className="text-torg-gray">{x.fase}</span>}
                 </td>
                 <td className="px-3 py-1 text-right">
-                  {x.fase === "fabricação"
+                  {x.fase.includes("fabricação")
                     ? <Inp value={kgPorMes[x.mes] ?? ""} placeholder="0"
                         onChange={(e) => setKg(x.mes, e.target.value)} className="w-24 text-right tabular-nums" />
                     : <span className="text-torg-gray">—</span>}
@@ -2303,7 +2316,7 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
                 <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-red-600">{x.material ? `− ${fmtR$(x.material)}` : "—"}</td>
                 <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-red-600">
                   {x.fabrica || x.projeto ? `− ${fmtR$(x.fabrica + x.projeto)}` : "—"}
-                  {x.projeto ? <span className="block text-[9px] text-torg-gray leading-none">projeto</span> : null}
+                  {x.projeto ? <span className="block text-[9px] text-torg-gray leading-none">inclui projeto {fmtR$(x.projeto)}</span> : null}
                 </td>
                 <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-red-600">{x.impostos ? `− ${fmtR$(x.impostos)}` : "—"}</td>
                 <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-torg-gray">{x.juros ? `− ${fmtR$(x.juros)}` : "—"}</td>
