@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, TrendingDown } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr } from "@/lib/lqc";
+import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios } from "@/lib/lqc";
 
 const fmtR$ = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -127,7 +127,7 @@ export default function EstudoClient({ id }) {
       {aba === "ENSAIOS" && <Ensaios c={c} res={res} setComp={setComp} />}
       {aba === "BDI" && <Bdi c={c} res={res} setComp={setComp} />}
       {aba === "COMERCIAL" && <PlanilhaComercial res={res} e={e} />}
-      {aba === "CENARIO" && <Cenario e={e} cen={d.cenario} res={res} mexer={mexer} />}
+      {aba === "CENARIO" && <Cenario e={e} res={res} mexer={mexer} />}
     </div>
   );
 }
@@ -273,7 +273,25 @@ function CartaoLinha({ l, i, set, del, dup }) {
           </div>
         </Bloco>
 
-        <Bloco titulo="De que é feito" nota={`as duas escolhas que definem o preço · perda de tinta ${perdaDaEstrutura(l.estrutura)}% (vem da estrutura)`}>
+        {/* ⚠ O AÇO É COTADO POR ÁREA. Descoberto na LQC-081-26-TMSA-VALE: num estudo de verdade a
+            coluna "Perfil predominante" fica vazia e cada trecho tem seu R$/kg — apoios 7,62,
+            treliça 6,50, galeria 7,55. O comprador cota o pacote do trecho, não "quantos quilos de
+            chapa lisa tem na obra". O perfil vira plano B, para quem orçar do outro jeito. */}
+        <Bloco titulo="Preço e acabamento desta área" nota="o R$/kg do aço deste trecho e a cor que ele recebe">
+          <Campo r="Aço (R$/kg)" ajuda="preço cotado para esta área">
+            <Inp value={l.precoKg ?? ""} onChange={(ev) => set(i, "precoKg", ev.target.value)} className="w-full text-right" /></Campo>
+          <Campo r="Cor" ajuda="agrupa a demão de acabamento">
+            <Inp value={l.cor ?? ""} onChange={(ev) => set(i, "cor", ev.target.value)} className="w-full" /></Campo>
+          <div className="col-span-2 sm:col-span-1 lg:col-span-3 flex items-end">
+            <p className="text-[11px] text-torg-gray">
+              {num(l.precoKg) > 0 && peso > 0
+                ? <>Aço desta área: <strong className="text-torg-dark">{fmtR$(num(l.precoKg) * peso)}</strong></>
+                : "Sem o R$/kg, o aço desta área não entra no custo."}
+            </p>
+          </div>
+        </Bloco>
+
+        <Bloco titulo="De que é feito" nota={`opcional — só para quem orça por categoria de perfil · perda de tinta ${perdaDaEstrutura(l.estrutura)}%`}>
           <Campo r="Classificação" ajuda={classe ? `${classe.faixa} · fabricação ${fmtR$(classe.fabricacao)}/kg` : "faixa de peso por metro do perfil"}>
             <select value={l.classificacao || ""} onChange={(ev) => set(i, "classificacao", ev.target.value)}
               className="border border-gray-200 rounded px-2 py-1 text-[12px] bg-white w-full">
@@ -466,11 +484,14 @@ function Terceiros({ c, res, setComp }) {
         const l = res.grupos?.terceirizados?.linhas?.[i] || {};
         return (
           <div key={i} className="bg-white border border-gray-100 rounded-xl p-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <div className="col-span-2">
                 <Campo r="Serviço">
                   <Inp value={t.descricao ?? ""} onChange={(e) => set(i, "descricao", e.target.value)} className="w-full" /></Campo>
               </div>
+              <Campo r="Área" ajuda="vazio = obra inteira">
+                <Sel value={t.area || ""} onChange={(e) => set(i, "area", e.target.value)}
+                  opcoes={[...new Set((c.resumos || []).map((x) => x.area).filter(Boolean))]} className="w-full" /></Campo>
               <Campo r="Cobrança" ajuda={BASES_TERCEIRO[t.base || "kg"]}>
                 <Sel value={t.base || "kg"} onChange={(e) => set(i, "base", e.target.value)} opcoes={["kg", "m2", "verba"]}
                   rotulos={{ kg: "Por kg", m2: "Por m²", verba: "Valor fechado" }} className="w-full" /></Campo>
@@ -836,84 +857,94 @@ function PlanilhaComercial({ res, e }) {
 }
 
 /**
- * CENÁRIO FINANCEIRO — a aba que o Vitor pediu.
+ * CENÁRIO FINANCEIRO — os três cenários, como o Comercial já faz.
  *
- * ⚠ É AQUI QUE O ORÇAMENTO GANHA OU PERDE DEPOIS DE FECHADO. Com material por nossa conta, a Torg
- * compra o aço no começo e recebe ao longo da obra: no meio há meses em que o nosso caixa financia
- * o cliente. Margem boa no papel não salva proposta que exige capital de giro que não temos.
+ * ⚠ REFEITO CONTRA A LQC REAL (LQC-081-26-TMSA-VALE, 23/08/2026). Eu tinha inventado um fluxo de
+ * caixa; a aba que o Comercial usa é outra coisa — as mesmas sete alavancas do BDI em três
+ * colunas, e quanto de lucro se ganha ou se perde entre elas.
+ *
+ * É assim que uma proposta é defendida: ninguém entra numa reunião com "a margem é 10%", entra
+ * sabendo quanto pode ceder antes de a obra virar prejuízo. Na TMSA/VALE, margem de 5% dá BDI
+ * 33,9% e preço R$ 51,2 mi; 15% dá 54,6% e R$ 59,1 mi — R$ 6,3 milhões de lucro entre os extremos.
  */
-function Cenario({ e, cen, res, mexer }) {
+function Cenario({ e, res, mexer }) {
   const cfg = e.cenario || {};
-  const set = (k, v) => mexer({ cenario: { ...cfg, [k]: v } });
-  const parcelas = Array.isArray(cfg.parcelas) ? cfg.parcelas : [];
-  const setP = (i, campo, v) => set("parcelas", parcelas.map((p, j) => (j === i ? { ...p, [campo]: v } : p)));
-  const somaPct = parcelas.reduce((a, p) => a + num(p.pct), 0);
+  const set = (cen, k, v) => mexer({ cenario: { ...cfg, [cen]: { ...(cfg[cen] || {}), [k]: v } } });
+  const analise = analiseDeCenarios(res.custoTorg, res.custoDireto, {
+    base: { ...(res.bdiCampos || {}), ...(cfg.base || {}) },
+    conservador: cfg.conservador || {},
+    otimista: cfg.otimista || {},
+  });
 
   return (
     <div className="space-y-4">
-      <div className="bg-white border border-gray-100 rounded-xl p-4">
-        <div className="grid sm:grid-cols-4 gap-3">
-          {[["prazoFabricacaoMeses", "Prazo de fabricação (meses)"], ["pagamentoFornecedorDias", "Pagamento ao fornecedor (dias)"], ["taxaMensalPct", "Custo do dinheiro (% a.m.)"]].map(([k, r]) => (
-            <label key={k} className="text-[11px] text-torg-dark">{r}
-              <Inp value={cfg[k] ?? ""} onChange={(ev) => set(k, ev.target.value)} className="block mt-1 w-full" /></label>
-          ))}
-        </div>
-        <div className="mt-4">
-          <div className="flex items-center gap-2 mb-2">
-            <p className="text-[12px] font-bold text-torg-dark">Recebimento</p>
-            <button onClick={() => set("parcelas", [...parcelas, { pct: 0, dias: 30 }])} className="text-[11px] font-semibold text-torg-blue inline-flex items-center gap-1"><Plus size={12} /> parcela</button>
-            {parcelas.length > 0 && somaPct !== 100 && (
-              <span className="text-[11px] font-semibold text-torg-orange-700">as parcelas somam {somaPct}%, não 100%</span>
-            )}
-          </div>
-          {parcelas.map((p, i) => (
-            <div key={i} className="flex items-center gap-2 mb-1">
-              <Inp value={p.pct ?? ""} onChange={(ev) => setP(i, "pct", ev.target.value)} className="w-20 text-right" /><span className="text-[11px] text-torg-gray">% em</span>
-              <Inp value={p.dias ?? ""} onChange={(ev) => setP(i, "dias", ev.target.value)} className="w-20 text-right" /><span className="text-[11px] text-torg-gray">dias</span>
-              <button onClick={() => set("parcelas", parcelas.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-600"><Trash2 size={13} /></button>
-            </div>
-          ))}
-          {!parcelas.length && <p className="text-[11px] text-torg-gray">Sem parcela definida, o cenário assume tudo no fim da obra — o pior caso, que é o que serve pra decidir.</p>}
-        </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+        <Kpi r="Material" v={fmtR$(res.totais?.material?.subtotal)} />
+        <Kpi r="Terceiros" v={fmtR$(res.totais?.mdo?.subtotal)} />
+        <Kpi r="Industrialização" v={fmtR$(res.totais?.industrializacao?.subtotal)} />
+        <Kpi r="Custo total" v={fmtR$(res.custo)} />
       </div>
 
-      {cen && (
-        <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100 border border-gray-100 rounded-xl overflow-hidden">
-            <Kpi r="Capital de giro" v={fmtR$(cen.capitalDeGiro)} cor="text-torg-orange-700" />
-            <Kpi r="Custo financeiro" v={fmtR$(cen.custoFinanceiro)} />
-            <Kpi r="Margem bruta" v={fmtR$(cen.margemBruta)} />
-            <Kpi r={`Margem líquida (${cen.margemLiquidaPct}%)`} v={fmtR$(cen.margemLiquida)} cor={cen.margemLiquida > 0 ? "text-green-700" : "text-red-600"} />
-          </div>
-          {cen.capitalDeGiro > 0 && (
-            <p className="text-[12px] text-torg-dark bg-[#FFF7ED] border border-[#F4801F]/30 rounded-lg px-3 py-2 inline-flex items-start gap-2">
-              <TrendingDown size={14} className="text-[#F4801F] mt-0.5 shrink-0" />
-              <span>No pior mês a obra exige <strong>{fmtR$(cen.capitalDeGiro)}</strong> do nosso caixa — é dinheiro nosso financiando o cliente
-                até o recebimento. Material por conta do cliente (faturamento DIRETO) derruba esse número.</span>
-            </p>
-          )}
-          <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-            <table className="w-full text-[12px]">
-              <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
-                <tr><th className="text-left px-4 py-1.5">Mês</th><th className="text-right px-2 py-1.5">Desembolso</th>
-                  <th className="text-right px-2 py-1.5">Recebimento</th><th className="text-right px-2 py-1.5">Juros</th><th className="text-right px-4 py-1.5">Saldo</th></tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {cen.fluxo.filter((f) => f.saida || f.entrada || f.saldo).map((f) => (
-                  <tr key={f.mes}>
-                    <td className="px-4 py-1">{f.mes === 0 ? "início" : `mês ${f.mes}`}</td>
-                    <td className="px-2 py-1 text-right tabular-nums text-red-600 whitespace-nowrap">{f.saida ? `- ${fmtR$(f.saida)}` : "—"}</td>
-                    <td className="px-2 py-1 text-right tabular-nums text-green-700 whitespace-nowrap">{f.entrada ? fmtR$(f.entrada) : "—"}</td>
-                    <td className="px-2 py-1 text-right tabular-nums text-torg-gray whitespace-nowrap">{f.juros ? fmtR$(f.juros) : "—"}</td>
-                    <td className={`px-4 py-1 text-right tabular-nums font-semibold ${f.saldo < 0 ? "text-red-600" : "text-torg-dark"}`}>{fmtR$(f.saldo)}</td>
-                  </tr>
+      <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+        <p className="text-[12px] font-bold text-torg-dark px-4 py-2 bg-gray-50">Alavancas, por cenário</p>
+        <table className="w-full text-[12px]">
+          <thead className="text-[10px] uppercase text-torg-gray">
+            <tr><th className="text-left px-4 py-1.5">Alavanca</th>
+              {CENARIOS.map((c) => <th key={c.key} className="text-right px-3 py-1.5">{c.nome}</th>)}</tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {BDI_CAMPOS.map((campo) => (
+              <tr key={campo.key}>
+                <td className="px-4 py-1">{campo.nome} <span className="text-torg-gray">(%)</span></td>
+                {CENARIOS.map((c) => (
+                  <td key={c.key} className="px-3 py-1 text-right">
+                    <Inp value={cfg[c.key]?.[campo.key] ?? ""}
+                      placeholder={String(analise.find((x) => x.key === c.key)?.alavancas?.[campo.key] ?? "0")}
+                      onChange={(ev) => set(c.key, campo.key, ev.target.value)} className="w-20 text-right" />
+                  </td>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-      <p className="text-[11px] text-torg-gray">Preço de venda considerado: {fmtR$(res.preco)}.</p>
+              </tr>
+            ))}
+            <tr>
+              <td className="px-4 py-1">Fator de custo <span className="text-torg-gray">(% do custo base)</span></td>
+              {CENARIOS.map((c) => (
+                <td key={c.key} className="px-3 py-1 text-right">
+                  <Inp value={cfg[c.key]?.fatorCusto ?? ""} placeholder="100"
+                    onChange={(ev) => set(c.key, "fatorCusto", ev.target.value)} className="w-20 text-right" /></td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+        <p className="text-[12px] font-bold text-torg-dark px-4 py-2 bg-gray-50">Resultado</p>
+        <table className="w-full text-[12px]">
+          <thead className="text-[10px] uppercase text-torg-gray">
+            <tr><th className="text-left px-4 py-1.5" />{CENARIOS.map((c) => <th key={c.key} className="text-right px-3 py-1.5">{c.nome}</th>)}</tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {[["Custo ajustado", (x) => fmtR$(x.custo)], ["BDI", (x) => `${x.bdiPct}%`],
+              ["BDI (R$)", (x) => fmtR$(x.bdiValor)], ["Preço de venda", (x) => fmtR$(x.preco)],
+              ["Lucro estimado", (x) => fmtR$(x.lucro)],
+              ["Δ lucro vs. base", (x) => (x.key === "base" ? "—" : fmtR$(x.deltaLucro))]].map(([r, fn]) => (
+              <tr key={r} className={r === "Preço de venda" ? "bg-torg-blue-50/40 font-bold" : ""}>
+                <td className="px-4 py-1.5">{r}</td>
+                {analise.map((x) => (
+                  <td key={x.key} className={`px-3 py-1.5 text-right tabular-nums whitespace-nowrap ${r === "Δ lucro vs. base" && x.deltaLucro < 0 ? "text-red-600" : r === "Δ lucro vs. base" && x.deltaLucro > 0 ? "text-green-700" : ""}`}>
+                    {fn(x)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-[11px] text-torg-gray">
+        O BDI incide só sobre o que a Torg fatura ({fmtR$(res.custoTorg)}); o que o cliente compra
+        direto ({fmtR$(res.custoDireto)}) entra na venda pelo custo.
+      </p>
     </div>
   );
 }
