@@ -2165,6 +2165,55 @@ function Frete({ c, res, setComp }) {
           )}
         </div>
 
+        {/* ⚠ DE ONDE VEIO O NÚMERO DO FRETE — E ISSO NÃO É BUROCRACIA. Vitor (23/08/2026): "no frete
+            precisamos um campo para colocarmos o valor orçado para ficar registrado, e informar o
+            nome da transportadora ou se foi apenas na tabela de fretes".
+            Seis meses depois, olhando uma proposta perdida, a pergunta é sempre a mesma: esse frete
+            era cotação de verdade ou chute de tabela? Sem o registro, ninguém sabe — e o comercial
+            defende na reunião um número que não tem dono. Com o registro, dá para cobrar a
+            transportadora do que ela prometeu, e dá para saber se a tabela está velha. */}
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <p className="text-[11px] font-semibold text-torg-dark">De onde veio este valor</p>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {[{ k: "COTACAO", r: "Cotado com transportadora", a: "tem nome e valor de quem cotou" },
+              { k: "TABELA", r: "Tabela de fretes", a: "referência interna, sem cotação" }].map((o) => (
+              <button key={o.k} type="button" onClick={() => set("fonte", o.k)}
+                className={`text-left border rounded-lg px-3 py-2 transition ${(f.fonte || "TABELA") === o.k ? "border-torg-blue bg-torg-blue-50/50" : "border-gray-200 hover:border-gray-300"}`}>
+                <span className="block text-[11px] font-semibold text-torg-dark whitespace-nowrap">{o.r}</span>
+                <span className="block text-[10px] text-torg-gray">{o.a}</span>
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+            {f.fonte === "COTACAO" && (<>
+              <Campo r="Transportadora"><Inp value={f.transportadora ?? ""} onChange={(e) => set("transportadora", e.target.value)} className="w-full" /></Campo>
+              <Campo r="Data da cotação"><Inp type="date" value={f.dataOrcamento ?? ""} onChange={(e) => set("dataOrcamento", e.target.value)} className="w-full" /></Campo>
+            </>)}
+            {/* ⚠ o ORÇADO fica guardado como veio, mesmo quando a composição usa outro número —
+                é o que permite, depois, saber se a obra andou por cima ou por baixo da cotação. */}
+            <Campo r="Valor orçado (R$)" ajuda="como veio da cotação, mesmo que a composição use outro">
+              <Inp value={f.orcado ?? ""} onChange={(e) => set("orcado", e.target.value)} className="w-full text-right" /></Campo>
+          </div>
+          {numeroBr(f.orcado) > 0 && r.total > 0 && (() => {
+            const dif = r.total - numeroBr(f.orcado);
+            const pct = (dif / numeroBr(f.orcado)) * 100;
+            return (
+              <p className={`text-[11px] rounded-lg px-3 py-2 mt-3 ${Math.abs(pct) < 0.5 ? "text-torg-gray bg-gray-50 border border-gray-100" : "text-torg-dark bg-[#FFF7ED] border border-[#F4801F]/30"}`}>
+                Orçado <strong>{fmtR$(numeroBr(f.orcado))}</strong>
+                {f.fonte === "COTACAO" && f.transportadora ? <> com <strong>{f.transportadora}</strong></> : f.fonte === "COTACAO" ? " (transportadora não informada)" : " pela tabela de fretes"}.
+                A composição está usando <strong>{fmtR$(r.total)}</strong>
+                {Math.abs(pct) < 0.5 ? " — igual." : <>, {dif > 0 ? "acima" : "abaixo"} em <strong className={dif > 0 ? "text-red-600" : "text-green-700"}>{fmtR$(Math.abs(dif))}</strong> ({Math.abs(pct).toFixed(1)}%).</>}
+              </p>
+            );
+          })()}
+          {(f.fonte || "TABELA") === "TABELA" && (
+            <p className="text-[11px] text-torg-gray mt-2">
+              Sem cotação, o frete entra como estimativa. Vale cotar antes de fechar preço em obra
+              longe: é a linha da composição que mais se move entre o estudo e a entrega.
+            </p>
+          )}
+        </div>
+
         {/* ⚠ DESMARCAR É EXCLUIR. Vitor (23/08/2026): "quando eu desmarcar uma área do quantitativo
             é como se eu tivesse excluído ela do escopo, só não estou fazendo isso para garantir o
             histórico". Então valor digitado vale para o levantamento inteiro e encolhe junto —
