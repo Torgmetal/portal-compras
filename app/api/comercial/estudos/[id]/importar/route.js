@@ -39,7 +39,10 @@ export async function POST(req, { params }) {
   // sobrescrito: a importação traz o quantitativo, não apaga trabalho.
   const c = estudo.composicao || {};
   const resumos = lido.resumos.map((r) => ({ ...r, precoKg: lido.precosPorArea[r.area] ?? null }));
-  const composicao = { ...c, resumos };
+  // ⚠ o esquema de pintura também vem do estudo — produto, cor, sólidos e película são decisão de
+  // PROJETO, não de custo. Só entra se o portal ainda não tiver um: importação não apaga trabalho.
+  const tintas = (c.tintas?.length ? c.tintas : lido.tintas) || [];
+  const composicao = { ...c, resumos, tintas };
   const resultado = calcularLqc({ ...composicao, preMontagem: estudo.preMontagem });
 
   const salvo = await prisma.estudoFabricacao.update({
@@ -48,7 +51,7 @@ export async function POST(req, { params }) {
   });
   await prisma.auditLog.create({
     data: { userId: user.id, action: "IMPORTAR_LQC", entity: "EstudoFabricacao", entityId: id,
-      diff: { arquivo: arquivo.name || null, areas: lido.resumo.areas, pesoKg: lido.resumo.pesoKg } },
+      diff: { arquivo: arquivo.name || null, areas: lido.resumo.areas, pesoKg: lido.resumo.pesoKg, camadas: lido.tintas?.length || 0 } },
   }).catch(() => {});
 
   return NextResponse.json({ ok: true, estudo: salvo, resultado, resumo: lido.resumo, avisos: lido.avisos });

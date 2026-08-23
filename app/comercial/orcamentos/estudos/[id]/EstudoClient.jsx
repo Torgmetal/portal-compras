@@ -649,8 +649,9 @@ function Pintura({ c, res, setComp }) {
   const set = (i, campo, v) => {
     const novo = [...t];
     for (let k = 0; k <= i; k++) if (!novo[k]) novo[k] = {};
-    novo[i] = { ...linha(i), [campo]: v, perda: i === 0 ? 45 : 85,
-      nome: i === 0 ? "ESTRUTURA — FATOR DE PERDA: 45%" : "ESTRUTURA — FATOR DE PERDA: 85%" };
+    const perda = linha(i).perda ?? (i === 0 ? 45 : 85);
+    novo[i] = { ...linha(i), [campo]: v, perda,
+      nome: perda === 85 ? "ESTRUTURA — FATOR DE PERDA: 85%" : "ESTRUTURA — FATOR DE PERDA: 45%" };
     setComp({ tintas: novo });
   };
 
@@ -671,8 +672,10 @@ function Pintura({ c, res, setComp }) {
         </p>
       </div>
 
-      {[0, 1].map((i) => {
-        const cam = { ...linha(i), perda: i === 0 ? 45 : 85 };
+      {/* ⚠ as camadas vêm do estudo (produto, cor, sólidos, película): projeto define, custo não.
+          Importando a LQC, elas chegam prontas — inclusive um acabamento por cor da obra. */}
+      {Array.from({ length: Math.max(2, t.length) }, (_, i) => i).map((i) => {
+        const cam = { ...linha(i), perda: linha(i).perda ?? (i === 0 ? 45 : 85) };
         const areaCamada = num(cam.areaM2) > 0 ? num(cam.areaM2) : (res?.areaM2 || 0);
         const rend = rendimentoTinta(cam);
         const calc = custoCamada(cam, areaCamada);
@@ -680,10 +683,11 @@ function Pintura({ c, res, setComp }) {
         return (
           <div key={i} className="bg-white border border-gray-100 rounded-xl p-4">
             <p className="text-[12px] font-bold text-torg-dark mb-1">
-              {i === 0 ? "Estrutura em geral" : "Guarda-corpo e escada marinheiro"}
+              {cam.camada ? `${cam.camada.charAt(0) + cam.camada.slice(1).toLowerCase()}` : `Camada ${i + 1}`}
+              {cam.cor ? <span className="text-torg-gray"> · {cam.cor}</span> : null}
             </p>
             <p className="text-[11px] text-torg-gray mb-3">
-              Fator de perda {i === 0 ? "45%" : "85%"} — vem da estrutura de cada linha, não se escolhe.
+              Perda {cam.perda}% — {cam.perda === 85 ? "guarda-corpo e escada marinheiro" : "estrutura em geral"}; vem da área, não se escolhe.
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               <Campo r="Camada"><Sel value={cam.camada || ""} onChange={(e) => set(i, "camada", e.target.value)} opcoes={CAMADAS_TINTA} className="w-full" /></Campo>
@@ -711,7 +715,64 @@ function Pintura({ c, res, setComp }) {
         );
       })}
 
+      {/* ⚠ A TINTA POR ÁREA, que é como a obra é comprada e aplicada. Vitor (23/08/2026): "trazer
+          as áreas de pintura mencionadas na primeira parte e trazer a quantidade de tinta que
+          vamos usar em cada área". Quem compra tinta compra por cor e por trecho, não um número
+          único da obra — e é aqui que se vê que o guarda-corpo, com 8% da área, leva 25% da tinta. */}
+      {res.pinturaPorArea?.length > 0 && (
+        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+          <p className="text-[12px] font-bold text-torg-dark px-4 py-2 bg-gray-50">Tinta por área da obra</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px]" style={{ minWidth: 720 }}>
+              <thead className="text-[10px] uppercase text-torg-gray">
+                <tr><th className="text-left px-4 py-1.5">Área</th><th className="text-left px-2 py-1.5">Cor</th>
+                  <th className="text-right px-2 py-1.5">Área</th><th className="text-left px-2 py-1.5">Esquema</th>
+                  <th className="text-right px-2 py-1.5">Película</th><th className="text-right px-2 py-1.5">Tinta</th>
+                  <th className="text-right px-2 py-1.5">Diluente</th><th className="text-right px-4 py-1.5">Custo</th></tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {res.pinturaPorArea.map((a2, i) => (
+                  <tr key={i}>
+                    <td className="px-4 py-1.5">{a2.area} <span className="text-torg-gray">· perda {a2.perda}%</span></td>
+                    <td className="px-2 py-1.5 text-torg-gray">{a2.cor || "—"}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{Number(a2.areaM2).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m²</td>
+                    <td className="px-2 py-1.5 text-torg-gray">
+                      {a2.camadas.length ? a2.camadas.map((x) => `${x.camada.toLowerCase()}${x.produto ? ` (${x.produto})` : ""}`).join(" + ") : "—"}
+                    </td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{a2.peliculaTotal || "—"} µm</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{Number(a2.litros).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} L</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{Number(a2.litrosDiluente).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} L</td>
+                    <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(a2.custo)}</td>
+                  </tr>
+                ))}
+                <tr className="bg-gray-50 font-bold">
+                  <td className="px-4 py-1.5" colSpan={5}>Total</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                    {Number(res.pinturaPorArea.reduce((a2, x) => a2 + x.litros, 0)).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} L
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                    {Number(res.pinturaPorArea.reduce((a2, x) => a2 + x.litrosDiluente, 0)).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} L
+                  </td>
+                  <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap">
+                    {fmtR$(res.pinturaPorArea.reduce((a2, x) => a2 + x.custo, 0))}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[11px] text-torg-gray px-4 py-2.5 border-t border-gray-100">
+            Primer e intermediário cobrem todas as áreas do mesmo fator de perda; o acabamento vai
+            só nas áreas da sua cor. A cor de cada área se define no quantitativo.
+          </p>
+        </div>
+      )}
+
       <Quadro titulo="Tinta (material)" grupo={res.grupos?.tintas} vazio="Preencha uma camada acima." />
+      <button onClick={() => setComp({ tintas: [...t, { perda: 45, camada: "" }] })}
+        className="text-[12px] font-semibold text-torg-blue border border-dashed border-torg-blue/40 rounded-xl px-4 py-2 w-full hover:bg-torg-blue-50 inline-flex items-center justify-center gap-1.5">
+        <Plus size={14} /> Acrescentar camada
+      </button>
+
       <Quadro titulo={`Mão de obra de pintura — ${res.demaos || 1} ${res.demaos === 1 ? "demão" : "demãos"}`}
         grupo={res.grupos?.pintura} vazio="Lance a classificação nas linhas do quantitativo." />
     </div>
