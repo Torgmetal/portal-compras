@@ -1561,6 +1561,43 @@ model RelatorioStatus {
 // Orçamento de Serviço (Comercial → Central de Orçamentos) — separado do
 // Orcamento de estrutura. servicos = JSON de chaves (CORTE_FURACAO, JATEAMENTO,
 // PINTURA, SOLDA). Criado por SQL; abas da proposta virão depois.
+// ─── ESTUDO DE FABRICACAO (a LQC dentro do portal) ────────────────────────────
+// Vitor (22/08/2026): "que voce transforme cada aba da geracao de custo igual esta na nossa LQC, e
+// quando eu pedir para extrair uma planilha voce iria trazer exatamente o mesmo modelo preenchido".
+//
+// ⚠ NAO E O ORCAMENTO DE SERVICO. Sao produtos diferentes: o de servico vende hora/kg de corte,
+// jato, pintura e solda no material do CLIENTE; este vende estrutura fabricada, com materia-prima,
+// tintas, terceirizados e itens comerciais (telha, calha, rufo) — que e o que a LQC calcula.
+//
+// `composicao` guarda a entrada de cada aba (RESUMOS_EM, faturamento por grupo, precos, tintas,
+// terceirizados, itens comerciais, BDI); `resultado` guarda o calculo da vez que gerou a proposta
+// — sem isso, mudar um preco no futuro reescreveria a historia do que foi cotado.
+model EstudoFabricacao {
+  id            String   @id @default(cuid())
+  numero        Int? // sequencial do ano → LQC-nnn-aa
+  ano           Int
+  revisao       Int      @default(0)
+  cliente       String
+  obra          String?
+  orcamentoId   String? // liga ao Orcamento do pipeline comercial
+  metodo        String   @default("ESTIMATIVA") // ESTIMATIVA | PESO DE PROJETO
+  demaos        String? // 01 DEMAO | 02 DEMAOS | 03 DEMAOS | N/A
+  preMontagem   String?
+  composicao    Json     @default("{}")
+  cenario       Json? // parametros do cenario financeiro (prazos, parcelas, taxa)
+  resultado     Json? // ultimo calculo congelado
+  status        String   @default("RASCUNHO")
+  observacoes   String?
+  criadoPorId   String?
+  criadoPorNome String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([ano])
+  @@index([orcamentoId])
+  @@index([status])
+}
+
 model OrcamentoServico {
   id            String   @id @default(cuid())
   numero        Int? // sequencial (OS-001)

@@ -17,6 +17,7 @@ const menu = [
       { href: "/comercial/orcamentos", label: "Propostas", icon: FileSpreadsheet },
       { href: "/comercial/orcamentos/propostas", label: "Propostas Estruturas", icon: Building2 },
       { href: "/comercial/orcamentos/servicos", label: "Propostas Serviço", icon: Wrench },
+      { href: "/comercial/orcamentos/estudos", label: "Estudos (LQC)", icon: FileSpreadsheet },
       { href: "/comercial/orcamentos/acompanhamento", label: "Acompanhamento", icon: CalendarClock },
       { href: "/comercial/orcamentos/pipeline", label: "Pipeline", icon: GitBranchPlus },
       { href: "/comercial/orcamentos/kpis", label: "KPIs de Vendas", icon: BarChart3 },

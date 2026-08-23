@@ -9,6 +9,7 @@ const TABS = [
   { href: "/comercial/orcamentos", label: "Propostas", icon: FileSpreadsheet, exact: true },
   { href: "/comercial/orcamentos/propostas", label: "Propostas Estruturas", icon: Building2 },
   { href: "/comercial/orcamentos/servicos", label: "Propostas Serviço", icon: Wrench },
+  { href: "/comercial/orcamentos/estudos", label: "Estudos (LQC)", icon: FileSpreadsheet },
 ];
 
 export default function OrcamentosTabs() {

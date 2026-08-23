@@ -204,6 +204,32 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "RastreioTratativa_importRef_key" ON "RastreioTratativa" ("importRef")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RastreioTratativa_opNumero_idx" ON "RastreioTratativa" ("opNumero")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RastreioTratativa_situacao_idx" ON "RastreioTratativa" ("situacao")`);
+
+  // Estudo de fabricacao (a LQC dentro do portal).
+  await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "EstudoFabricacao" (
+    "id" TEXT PRIMARY KEY,
+    "numero" INTEGER,
+    "ano" INTEGER NOT NULL,
+    "revisao" INTEGER NOT NULL DEFAULT 0,
+    "cliente" TEXT NOT NULL,
+    "obra" TEXT,
+    "orcamentoId" TEXT,
+    "metodo" TEXT NOT NULL DEFAULT 'ESTIMATIVA',
+    "demaos" TEXT,
+    "preMontagem" TEXT,
+    "composicao" JSONB NOT NULL DEFAULT '{}',
+    "cenario" JSONB,
+    "resultado" JSONB,
+    "status" TEXT NOT NULL DEFAULT 'RASCUNHO',
+    "observacoes" TEXT,
+    "criadoPorId" TEXT,
+    "criadoPorNome" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "EstudoFabricacao_ano_idx" ON "EstudoFabricacao" ("ano")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "EstudoFabricacao_orcamentoId_idx" ON "EstudoFabricacao" ("orcamentoId")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "EstudoFabricacao_status_idx" ON "EstudoFabricacao" ("status")`);
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PortalCliente_opNumero_key" ON "PortalCliente"("opNumero")`);
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PortalCliente_token_key" ON "PortalCliente"("token")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PortalCliente_status_idx" ON "PortalCliente"("status")`);
