@@ -1494,7 +1494,14 @@ function Frete({ c, res, setComp }) {
 
       <CargasPorClasse c={c} res={res} setComp={setComp} />
 
-      <ConsultaQualp c={c} res={res} setComp={setComp} />
+      {/* ⚠ DESLIGADA POR ORA. Vitor (23/08/2026): "vamos deixar o cálculo da QualP por hora, vamos
+          retirar a opção da tela do frete por hora". A consulta depende de assinatura paga
+          (R$ 390 a R$ 702/mês), e botão que não funciona é pior que botão que não existe — quem
+          abre a tela tenta, não vai, e passa a duvidar do resto.
+          O código está pronto e intacto: <ConsultaQualp /> logo abaixo, lib/qualp.js e a rota
+          /api/comercial/frete/qualp. Contratado o plano, é descomentar esta linha e pôr a chave
+          em QUALP_TOKEN. */}
+      {/* <ConsultaQualp c={c} res={res} setComp={setComp} /> */}
 
       <div className="bg-white border border-gray-100 rounded-xl p-5">
         <p className="text-[12px] font-bold text-torg-dark mb-1">Como o frete aparece na proposta</p>
@@ -1676,9 +1683,13 @@ function CustoDaFabrica({ cf, c, setComp }) {
  * quilo, de cabeça" pode cair abaixo do piso, e aí ou a proposta é refeita ou a margem paga a
  * diferença.
  *
- * ⚠ PRECISA DE ASSINATURA. A API é paga e a chave sai do painel da QualP. Sem ela, a tela diz o
- * que falta em vez de falhar sem explicação.
+ * ⚠ PRECISA DE ASSINATURA. A API é paga e a chave sai do painel da QualP.
+ *
+ * ⚠ NÃO ESTÁ NA TELA HOJE. Vitor (23/08/2026) pediu para tirar a opção enquanto a assinatura não
+ * existe — botão que não funciona é pior que botão que não existe. Fica aqui inteiro: contratado
+ * o plano, é descomentar a chamada na aba de Frete e pôr a chave em QUALP_TOKEN.
  */
+// eslint-disable-next-line no-unused-vars
 function ConsultaQualp({ c, res, setComp }) {
   const { showToast } = useStore();
   const f = c.frete || {};
