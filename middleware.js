@@ -156,6 +156,13 @@ export default withAuth(
           // Portal do cliente (auditorias externas) — publico via token unico
           path.startsWith("/portal-cliente/") ||
           path.startsWith("/api/qualidade/auditorias/portal/") ||
+          // Portal da OBRA (o mural do cliente: LPC, LE, compras, cronograma, certificados,
+          // relatorios, data book) — publico via token unico.
+          // ⚠ "/portal/" com a barra: "/portal-cliente/" acima e OUTRA coisa (auditoria) e
+          // continua com a regra dele. Sem esta entrada o link cai no /entrar e o cliente,
+          // que nao tem login nenhum, nunca ve o portal.
+          path.startsWith("/portal/") ||
+          path.startsWith("/api/portal/") ||
           // Resposta do cliente a tarefas do Planejamento — publico via token unico
           path.startsWith("/cliente/tarefa/") ||
           path.startsWith("/api/cliente/tarefa/") ||
