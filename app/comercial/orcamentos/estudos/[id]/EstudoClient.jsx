@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAPACIDADE_CARGA, EVENTOS_PAGAMENTO, PAGAMENTO_PADRAO, PRAZOS_PAGAMENTO, conferirPagamento, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa, resultadoDoCenario, sensibilidade, ALAVANCAS_SENSIVEIS, equilibrioConvergido } from "@/lib/lqc";
+import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAPACIDADE_CARGA, EVENTOS_PAGAMENTO, PAGAMENTO_PADRAO, PRAZOS_PAGAMENTO, conferirPagamento, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa, resultadoDoCenario, sensibilidade, ALAVANCAS_SENSIVEIS, equilibrioConvergido, impostosDoCenario } from "@/lib/lqc";
 import { capacidadePorHora } from "@/lib/fabrica-horas";
 
 const fmtR$ = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -1103,10 +1103,41 @@ function Bdi({ c, res, setComp }) {
                 <td className="px-5 py-1.5 text-right tabular-nums font-semibold whitespace-nowrap">{fmtR$(l.valor)}</td>
               </tr>
             ))}
-            <tr className="bg-gray-50 font-bold"><td className="px-5 py-1.5" colSpan={4}>Total de impostos</td>
+            <tr className="bg-gray-50 font-semibold"><td className="px-5 py-1.5" colSpan={4}>Débito — o que a venda gera</td>
+              <td className="px-5 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(res.debitoImpostos)}</td></tr>
+            {/* ⚠ ICMS É NÃO CUMULATIVO. Vitor (23/08/2026): "teremos o crédito referente às compras,
+                considerar 12% de ICMS — transporte, parafusos, tinta, material e acessórios comprados
+                devem ser calculados e dado crédito". Ignorar isso joga milhões de imposto que não
+                existem dentro do preço, e o concorrente que conta certo ganha com a mesma margem. */}
+            {(res.creditoIcms?.linhas || []).filter((l) => l.base > 0).map((l) => (
+              <tr key={l.key} className="text-green-700">
+                <td className="px-5 py-1.5">Crédito · {l.nome}</td>
+                <td className="px-2 py-1.5 text-torg-gray">ICMS na entrada</td>
+                <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(l.base)}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{l.aliquotaPct}%</td>
+                <td className="px-5 py-1.5 text-right tabular-nums font-semibold whitespace-nowrap">− {fmtR$(l.valor)}</td>
+              </tr>
+            ))}
+            <tr className="bg-torg-blue-50/50 font-bold"><td className="px-5 py-1.5" colSpan={4}>
+              Imposto a recolher <span className="font-normal text-torg-gray">— débito menos crédito</span></td>
               <td className="px-5 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(res.totalImpostos)}</td></tr>
           </tbody>
         </table>
+        <div className="px-5 py-3 border-t border-gray-100 flex flex-wrap items-end gap-4">
+          <Campo r="ICMS de crédito nas compras (%)" ajuda="alíquota da entrada; vazio usa 12%">
+            <Inp value={c.creditoIcmsPct ?? ""} placeholder="12"
+              onChange={(e) => setComp({ creditoIcmsPct: e.target.value })} className="w-24 text-right" /></Campo>
+          <p className="text-[11px] text-torg-gray flex-1 min-w-[240px]">
+            A carga cai de <strong className="text-torg-dark">{res.splitFaturamento?.cargaBrutaPct}%</strong> para{" "}
+            <strong className="text-torg-dark">{res.splitFaturamento?.cargaEfetivaPct}%</strong> do preço —
+            são <strong className="text-green-700">{fmtR$(res.creditoIcms?.total)}</strong> que a obra não paga de imposto
+            porque já pagou na compra.
+            <span className="block mt-1">
+              ⚠ crédito só do que a <strong className="text-torg-dark">Torg</strong> compra: material que o cliente compra
+              direto do fornecedor nunca entrou por nota nossa, e não gera crédito nenhum.
+            </span>
+          </p>
+        </div>
       </div>
 
       <div className="bg-white border border-gray-100 rounded-xl p-5">
@@ -2028,7 +2059,11 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
     meses, mesesProjeto: projeto,
     custoProjetoMes: numeroBr(cfg.custoProjetoMes),
     preco: base?.preco || 0, pesoKg: res.pesoTotal,
-    impostos: (base?.preco || 0) * ((numeroBr(base?.alavancas?.impostos) || 0) / 100),
+    // ⚠ IMPOSTO CALCULADO, NÃO A ALAVANCA DO BDI. Vitor (23/08/2026): "os impostos não estão sendo
+    // calculados". Estavam — na cascata. Aqui o fluxo usava o campo `impostos` do BDI, que é uma
+    // RESERVA de projeto: se estiver em branco o caixa rodava sem imposto nenhum, e o pior mês
+    // saía otimista justamente na obra em que o imposto pesa mais.
+    impostos: impostosDoCenario(res, (base?.preco || 0) - (res.custoDireto || 0)).total,
     material: res.totais?.material?.subtotal || 0,
     terceiros: res.totais?.mdo?.subtotal || 0,
     custoOperacionalMes: fabrica.custoOperacionalMes * ocupacao,
