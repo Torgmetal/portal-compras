@@ -1609,9 +1609,15 @@ function Cadencia({ fabrica, cfg, mexer, res, cadencia }) {
   const tabelaPorKg = res.pesoTotal > 0 ? (res.totais?.industrializacao?.subtotal || 0) / res.pesoTotal : 0;
   const empata = tabelaPorKg > 0 ? Math.round(custoMes / tabelaPorKg) : 0;
 
+  // ⚠ O SEMESTRE É O NÚMERO DEFENSÁVEL, e não o trimestre. Vitor (23/08/2026): "temos um furo
+  // enorme nos números de expedição, pintura e jato". O furo aparece no kg por apontamento: o
+  // acabamento salta de 129 kg (847 lançamentos em set/2025) para 400 kg (476 lançamentos para
+  // 190 t em fev/2026) — é lote atrasado fechado de uma vez, seguido da ressaca de mai/2026 com
+  // 45 t. Um trimestre cabe inteiro dentro de um ciclo desses; um semestre, não.
   const opcoes = [
     { key: "media", nome: "Média de hoje", kg: L.mediaKgMes, ajuda: `o que a fábrica absorveu em ${fabrica.mesesConsiderados} meses` },
-    { key: "tri", nome: "Melhor trimestre", kg: L.melhorTrimestreKgMes, ajuda: L.melhorTrimestre ? `sustentado de ${L.melhorTrimestre}` : "três meses seguidos" },
+    { key: "sem", nome: "Melhor semestre", kg: L.melhorSemestreKgMes, ajuda: L.melhorSemestre ? `sustentado de ${L.melhorSemestre}` : "seis meses seguidos", recomendado: true },
+    { key: "tri", nome: "Melhor trimestre", kg: L.melhorTrimestreKgMes, ajuda: L.melhorTrimestre ? `${L.melhorTrimestre} — curto para o registro em lote` : "três meses seguidos" },
     { key: "pico", nome: "Melhor mês", kg: L.melhorMesKgMes, ajuda: L.melhorMes ? `atingido em ${L.melhorMes}` : "teto observado" },
   ].filter((o) => o.kg > 0);
 
@@ -1633,7 +1639,9 @@ function Cadencia({ fabrica, cfg, mexer, res, cadencia }) {
           {opcoes.map((o) => (
             <button key={o.key} type="button" onClick={() => set(String(o.kg))}
               className={`text-left border rounded-lg px-3 py-2 transition ${cadencia === o.kg ? "border-torg-blue bg-torg-blue-50/50" : "border-gray-200 hover:border-gray-300"}`}>
-              <span className="block text-[11px] font-semibold text-torg-dark whitespace-nowrap">{o.nome}</span>
+              <span className="block text-[11px] font-semibold text-torg-dark whitespace-nowrap">
+                {o.nome}{o.recomendado ? <span className="ml-1 text-[9px] uppercase tracking-wider text-torg-orange-700">recomendado</span> : null}
+              </span>
               <span className="block text-[13px] font-bold tabular-nums text-torg-dark whitespace-nowrap">{o.kg.toLocaleString("pt-BR")} kg/mês</span>
               <span className="block text-[10px] text-torg-gray">{o.ajuda}</span>
             </button>
@@ -1698,17 +1706,37 @@ function Cadencia({ fabrica, cfg, mexer, res, cadencia }) {
             <thead className="text-[10px] uppercase text-torg-gray">
               <tr><th className="text-left px-4 py-1.5">Setor</th>
                 <th className="text-right px-3 py-1.5">Média</th>
-                <th className="text-right px-3 py-1.5">Melhor trimestre</th>
-                <th className="text-right px-4 py-1.5">Melhor mês</th></tr>
+                <th className="text-right px-3 py-1.5">Melhor semestre</th>
+                <th className="text-right px-3 py-1.5">Melhor mês</th>
+                <th className="text-left px-4 py-1.5">Registro</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {fabrica.picos.map((p) => (
-                <tr key={p.setor}>
-                  <td className="px-4 py-1 whitespace-nowrap">{p.setor}</td>
-                  <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-torg-gray">{(p.mediaKgMes || 0).toLocaleString("pt-BR")}</td>
-                  <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap">{(p.melhorTrimestreKgMes || 0).toLocaleString("pt-BR")}</td>
-                  <td className="px-4 py-1 text-right tabular-nums whitespace-nowrap font-semibold">{(p.melhorMesKgMes || 0).toLocaleString("pt-BR")}
-                    <span className="text-torg-gray font-normal"> · {p.melhorMes || "—"}</span></td>
+              {fabrica.picos.map((p) => {
+                const falha = [p.registroFalho && `só ${p.mesesCheios} de ${p.mesesComDado} meses com registro cheio`,
+                  p.registroIrregular && "fecha lote atrasado de uma vez"].filter(Boolean);
+                return (
+                  <tr key={p.setor}>
+                    <td className="px-4 py-1 whitespace-nowrap">{p.setor}</td>
+                    <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-torg-gray">{(p.mediaKgMes || 0).toLocaleString("pt-BR")}</td>
+                    <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap font-semibold">{p.melhorSemestreKgMes ? p.melhorSemestreKgMes.toLocaleString("pt-BR") : "—"}</td>
+                    <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap">{(p.melhorMesKgMes || 0).toLocaleString("pt-BR")}
+                      <span className="text-torg-gray"> · {p.melhorMes || "—"}</span></td>
+                    <td className={`px-4 py-1 text-[10px] leading-tight ${falha.length ? "text-torg-orange-700" : "text-torg-gray"}`}>
+                      {falha.length ? falha.join(" · ") : "regular"}
+                    </td>
+                  </tr>
+                );
+              })}
+              {/* ⚠ setor que sumiu da rota quase nunca parou de produzir — parou de APONTAR. */}
+              {(fabrica.setoresIgnorados || []).filter((x) => x.ultimoMes).map((x) => (
+                <tr key={x.setor} className="bg-[#FFF7ED]">
+                  <td className="px-4 py-1 whitespace-nowrap">{x.setor}</td>
+                  <td className="px-3 py-1 text-right text-torg-gray">—</td>
+                  <td className="px-3 py-1 text-right text-torg-gray">—</td>
+                  <td className="px-3 py-1 text-right text-torg-gray">—</td>
+                  <td className="px-4 py-1 text-[10px] leading-tight text-torg-orange-700">
+                    sem apontamento desde {x.ultimoMes} — não dá para medir
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1719,7 +1747,10 @@ function Cadencia({ fabrica, cfg, mexer, res, cadencia }) {
       <p className="text-[11px] text-torg-gray px-4 py-2.5 border-t border-gray-100">
         ⚠ Para medir capacidade de verdade faltaria a <strong className="text-torg-dark">duração</strong> do
         apontamento: hoje o Syneco carimba o evento e grava fim igual ao início, então não existe kg/hora.
-        Enquanto isso, o melhor trimestre é o número mais defensável — a fábrica já o sustentou três meses seguidos.
+        Enquanto isso, o <strong className="text-torg-dark">melhor semestre</strong> é o número mais defensável.
+        Seis meses comem a distorção do registro em lote que três não comem — e o semestre do corte
+        ({(L.melhorSemestreKgMes || 0).toLocaleString("pt-BR")}) bate com o do acabamento a menos de 10%,
+        medindo setores diferentes com registros de qualidade diferente.
       </p>
     </div>
   );
