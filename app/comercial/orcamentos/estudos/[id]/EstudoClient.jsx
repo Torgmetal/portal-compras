@@ -1399,6 +1399,7 @@ function Cenario({ e, res, mexer, fabrica }) {
       parcelasFornecedor: String(cfg.parcelasFornecedor ?? "28/42/56").split(/[^\d]+/).map(Number).filter((d) => d >= 0 && Number.isFinite(d)),
       mesesSemMedicao: Array.isArray(cfg.mesesSemMedicao) ? cfg.mesesSemMedicao.map(Number) : [],
       kgPorMes: Array.isArray(cfg.kgPorMes) ? cfg.kgPorMes.map((v) => numeroBr(v)) : [],
+      kgMedidoPorMes: Array.isArray(cfg.kgMedidoPorMes) ? cfg.kgMedidoPorMes.map((v) => numeroBr(v)) : [],
       // ⚠ só o cenário BASE usa a receita digitada: nos outros o preço muda, e um cronograma
       // digitado para outro preço mediria um contrato que não existe.
       receitaPorMes: (mods.precoPct || 0) === 0 && Array.isArray(cfg.receitaPorMes) ? cfg.receitaPorMes.map((v) => numeroBr(v)) : null,
@@ -2057,6 +2058,7 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
   const parcelasFornecedor = String(cfg.parcelasFornecedor ?? "28/42/56").split(/[^\d]+/).map(Number).filter((d) => d >= 0 && Number.isFinite(d));
   const semMedicao = Array.isArray(cfg.mesesSemMedicao) ? cfg.mesesSemMedicao.map(Number) : [];
   const kgPorMes = Array.isArray(cfg.kgPorMes) ? cfg.kgPorMes : [];
+  const kgMedidoPorMes = Array.isArray(cfg.kgMedidoPorMes) ? cfg.kgMedidoPorMes : [];
   // ⚠ A RECEITA É RESULTADO, NÃO CAMPO. Vitor (23/08/2026): "você não puxou o valor unitário para
   // dentro do cenário financeiro, você me fez preencher à mão o valor — quero colocar o peso e
   // você já transformar na receita". A conta existia, mas a coluna era uma caixa vazia com o valor
@@ -2086,12 +2088,21 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
     parcelasFornecedor,
     mesesSemMedicao: semMedicao,
     kgPorMes: kgPorMes.map((v) => numeroBr(v)),
+    kgMedidoPorMes: kgMedidoPorMes.map((v) => numeroBr(v)),
     receitaPorMes: receita.map((v) => numeroBr(v)),
   });
   const setKg = (m, v) => {
     const novo = Array.from({ length: tamanho }, (_, i) => kgPorMes[i] ?? "");
     novo[m] = v;
     mexer({ cenario: { ...cfg, kgPorMes: novo } });
+  };
+  // ⚠ o que se PRODUZ e o que se MEDE são duas coisas. Vitor (23/08/2026): "nos meses que eu marcar
+  // como não mede, você deve deixar esse valor em aberto e eu posso distribuir isso em um mês ou em
+  // alguns meses". Digitar aqui ganha da caixinha — e nunca se mede mais do que está em aberto.
+  const setKgMedido = (m, v) => {
+    const novo = Array.from({ length: tamanho }, (_, i) => kgMedidoPorMes[i] ?? "");
+    novo[m] = v;
+    mexer({ cenario: { ...cfg, kgMedidoPorMes: novo } });
   };
   // ⚠ marcar/desmarcar é por mês DA FABRICAÇÃO (1, 2, 3...), não por mês do contrato — é assim
   // que a obra é falada no chão: "no primeiro mês de fabricação não tem medição".
@@ -2258,15 +2269,16 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
           para que aí sim você calcule o cenário financeiro real". Quando o cronograma de medição
           já foi negociado, distribuir por regra é palpite ao lado do que está no contrato. */}
       <div className="overflow-x-auto">
-        <table className="w-full text-[12px]" style={{ minWidth: 900 }}>
+        <table className="w-full text-[12px]" style={{ minWidth: 1040 }}>
           <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
             <tr><th className="text-left px-4 py-1.5">Mês</th><th className="text-left px-2 py-1.5">Fase</th>
               <th className="text-right px-3 py-1.5">kg produzido</th>
+              <th className="text-right px-3 py-1.5">kg medido</th>
+              <th className="text-right px-3 py-1.5">Em aberto</th>
               <th className="text-right px-3 py-1.5">Recebimento</th>
               <th className="text-right px-3 py-1.5">Material</th>
               <th className="text-right px-3 py-1.5">Fábrica</th>
               <th className="text-right px-3 py-1.5">Impostos</th>
-              <th className="text-right px-3 py-1.5">Juros</th>
               <th className="text-right px-4 py-1.5">Saldo acumulado</th></tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -2295,6 +2307,17 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
                         onChange={(e) => setKg(x.mes, e.target.value)} className="w-24 text-right tabular-nums" />
                     : <span className="text-torg-gray">—</span>}
                 </td>
+                {/* ⚠ kg MEDIDO é escolha, não consequência: o que ficou pronto e não foi medido fica
+                    EM ABERTO, e o comercial distribui como o cliente aprova. */}
+                <td className="px-3 py-1 text-right">
+                  {x.fase.includes("fabricação")
+                    ? <Inp value={kgMedidoPorMes[x.mes] ?? ""} placeholder={x.kgMedido ? Math.round(x.kgMedido).toLocaleString("pt-BR") : "0"}
+                        onChange={(e) => setKgMedido(x.mes, e.target.value)} className="w-24 text-right tabular-nums" />
+                    : <span className="text-torg-gray">—</span>}
+                </td>
+                <td className={`px-3 py-1 text-right tabular-nums whitespace-nowrap ${x.emAberto > 0 ? "text-torg-orange-700 font-semibold" : "text-torg-gray"}`}>
+                  {x.emAberto > 0 ? fmtKg(x.emAberto) : "—"}
+                </td>
                 <td className="px-3 py-1 text-right">
                   {ajustando === x.mes ? (
                     <Inp autoFocus value={receita[x.mes] ?? ""} placeholder={x.entrada ? Math.round(x.entrada).toLocaleString("pt-BR") : "0"}
@@ -2307,6 +2330,16 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
                       className={`tabular-nums whitespace-nowrap rounded px-1.5 py-0.5 hover:bg-gray-100 ${x.entrada ? "text-green-700 font-semibold" : "text-torg-gray"}`}>
                       {x.entrada ? fmtR$(x.entrada) : "—"}
                       {numeroBr(receita[x.mes]) > 0 ? <span className="ml-1 text-[9px] uppercase tracking-wider text-torg-orange-700">ajustado</span> : null}
+                      {/* ⚠ num mês de projeto + fabricação o número precisa dizer de que é feito:
+                          ver só a parcela do projeto parece medição esquecida. */}
+                      {x.entrada > 0 && [x.de?.projeto, x.de?.medicao, x.de?.entrada, x.de?.entrega].filter((v) => v > 0).length > 1 && (
+                        <span className="block text-[9px] font-normal text-torg-gray leading-tight">
+                          {[x.de.entrada > 0 && `entrada ${fmtR$(x.de.entrada)}`,
+                            x.de.projeto > 0 && `projeto ${fmtR$(x.de.projeto)}`,
+                            x.de.medicao > 0 && `medição ${fmtR$(x.de.medicao)}`,
+                            x.de.entrega > 0 && `entrega ${fmtR$(x.de.entrega)}`].filter(Boolean).join(" · ")}
+                        </span>
+                      )}
                     </button>
                   )}
                 </td>
@@ -2319,8 +2352,10 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
                   {x.projeto ? <span className="block text-[9px] text-torg-gray leading-none">inclui projeto {fmtR$(x.projeto)}</span> : null}
                 </td>
                 <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-red-600">{x.impostos ? `− ${fmtR$(x.impostos)}` : "—"}</td>
-                <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap text-torg-gray">{x.juros ? `− ${fmtR$(x.juros)}` : "—"}</td>
-                <td className={`px-4 py-1 text-right tabular-nums whitespace-nowrap font-semibold ${x.saldo < 0 ? "text-red-600" : "text-torg-dark"}`}>{fmtR$(x.saldo)}</td>
+                <td className={`px-4 py-1 text-right tabular-nums whitespace-nowrap font-semibold ${x.saldo < 0 ? "text-red-600" : "text-torg-dark"}`}>
+                  {fmtR$(x.saldo)}
+                  {x.juros ? <span className="block text-[9px] font-normal text-torg-gray leading-tight">juro do mês − {fmtR$(x.juros)}</span> : null}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -2342,6 +2377,9 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
         Preencha só o <strong className="text-torg-dark">kg produzido</strong>: o recebimento sai dele, pelo preço por
         quilo do quadro acima. Desmarque os meses de fabricação que <strong className="text-torg-dark">não medem</strong> —
         no primeiro mês normalmente ainda não há peça pronta, e o que ficou feito acumula para a medição seguinte.
+        O que ficou pronto e não foi medido aparece em <strong className="text-torg-dark">Em aberto</strong>: digite
+        em <strong className="text-torg-dark">kg medido</strong> quanto entra na medição de cada mês para repartir esse
+        saldo como o cliente aprova — num mês só ou em vários. O que sobrar no fim fecha na entrega.
         Se um mês tiver valor combinado diferente, clique no recebimento para ajustar à mão; ele fica marcado como
         ajustado e passa a mandar na frente da conta.
       </p>
