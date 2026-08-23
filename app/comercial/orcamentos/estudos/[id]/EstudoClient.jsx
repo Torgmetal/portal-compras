@@ -1025,11 +1025,20 @@ function PrazoDoLucro({ res, analise, fabrica, cfg, mexer }) {
     <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-100">
         <p className="text-[12px] font-bold text-torg-dark">Prazo que preserva o lucro</p>
+        {/* ⚠ CADÊNCIA É POR SETOR, E VALE O GARGALO. Vitor (23/08/2026): "696 t no mês não é uma
+            realidade; você deve estar somando a produção de cada setor". Estava — a mesma peça
+            passa por corte, montagem, solda, acabamento, jato e pintura, e somar os seis conta ela
+            seis vezes. A fábrica não entrega mais rápido que o setor mais lento. */}
         <p className="text-[11px] text-torg-gray mt-0.5">
-          A fábrica fez <strong className="text-torg-dark">{fabrica.capacidadeKgMes.toLocaleString("pt-BR")} kg/mês</strong> em
-          média ({fabrica.mesesConsiderados} meses, {fabrica.periodo}) e custa{" "}
+          A fábrica entrega no ritmo do setor mais lento:{" "}
+          <strong className="text-torg-dark">{fabrica.setorGargalo} — {fabrica.capacidadeKgMes.toLocaleString("pt-BR")} kg/mês</strong>{" "}
+          ({fabrica.mesesConsiderados} meses, {fabrica.periodo}) e custa{" "}
           <strong className="text-torg-dark">{fmtR$(fabrica.custoOperacionalMes)}/mês</strong> para funcionar.
           Cada mês a mais é despesa que não foi cobrada do cliente.
+        </p>
+        <p className="text-[11px] text-torg-gray mt-1.5">
+          {(fabrica.setores || []).map((x) => `${x.setor} ${x.kgMes.toLocaleString("pt-BR")}`).join(" · ")} kg/mês.
+          <span className="block">Não se somam: a mesma peça passa por todos.</span>
         </p>
         <label className="text-[11px] text-torg-dark inline-flex items-center gap-2 mt-3">
           Fatia da fábrica que esta obra ocupa
