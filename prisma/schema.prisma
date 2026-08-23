@@ -2140,6 +2140,50 @@ model DocumentoInstitucional {
 // ⚠ E O QUE APARECE É ESCOLHA NOSSA, seção por seção (`secoes`). Nem toda obra quer
 // mostrar tudo — e um portal que expõe algo que o contrato não previu é problema, não
 // cortesia.
+// ─── O QUE O CLIENTE JA VIU DA LPC E DA LE ────────────────────────────────────
+// Vitor (22/08/2026): "a LE e LPC deve ter permissao para o cliente baixar e nos casos de uma
+// revisao disponibilizar uma lista nova para Download, informa a revisao atual e deixar com um
+// alerta quando ele entrar para saber o que mudou".
+//
+// ⚠ NAO DA PRA CONTAR "O QUE MUDOU" SEM GUARDAR O QUE ELE VIU. A LPC e a LE vivem na
+// PecaConjunto, que so tem o estado de AGORA: quando a engenharia reimporta, o que existia antes
+// simplesmente deixa de existir. Sem esta foto, a unica coisa honesta a dizer ao cliente seria
+// "a lista mudou" — que e o mesmo que nao dizer nada, porque ele teria de conferir marca por
+// marca de novo. Cada linha e uma revisao publicada: a impressao digital das marcas na epoca e o
+// diff contra a anterior.
+//
+// A foto e tirada quando o cliente abre o portal e o conteudo difere da ultima — nao ha cron, e
+// nao ha janela em que o portal mostre uma lista que ninguem registrou.
+model PortalListaRevisao {
+  id          String    @id @default(cuid())
+  opId        String
+  opNumero    String
+  fonte       String // "LPC" | "LE"
+  seq         Int       @default(1)
+  // Revisao da ENGENHARIA quando existe ("R02", "T89A R02 - T89B R00"): e o numero que o cliente
+  // ve no rodape do projeto. Quando nao existe, a tela cai no seq.
+  rotulo      String?
+  itens       Int       @default(0)
+  pesoKg      Float     @default(0)
+  hash        String
+  // { marca: [qte, pesoKg] } — a base do PROXIMO diff. Sem ela, a revisao seguinte nao teria
+  // contra o que comparar.
+  impressao   Json?
+  incluidas   Json      @default("[]")
+  excluidas   Json      @default("[]")
+  alteradas   Json      @default("[]") // mesma marca, qtd ou peso diferente
+  nIncluidas  Int       @default(0)
+  nExcluidas  Int       @default(0)
+  nAlteradas  Int       @default(0)
+  publicadaEm DateTime  @default(now())
+  // O cliente clicou "entendi" — o alerta para de aparecer pra ele. Nulo = ainda nao viu.
+  vistoEm     DateTime?
+
+  @@unique([opId, fonte, seq])
+  @@index([opId, fonte])
+  @@index([opNumero])
+}
+
 model PortalCliente {
   id               String    @id @default(cuid())
   opId             String?

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
   Loader2, AlertCircle, ShieldCheck, CalendarRange, FileText, Award,
   BookCheck, Layers, Image as ImageIcon, ChevronRight, ChevronDown,
-  Download, Package, ShoppingCart, Truck, Check,
+  Download, Package, ShoppingCart, Truck, Check, FileSpreadsheet, History,
 } from "lucide-react";
 
 // ─── O PORTAL DA OBRA, PELO LADO DO CLIENTE ───────────────────────────────────
@@ -159,41 +159,29 @@ export default function PortalClienteView({ token }) {
         </div>
       </section>
 
+      {/* ── O QUE MUDOU NAS LISTAS ────────────────────────────────────────
+          Vitor (22/08/2026): "deixar com um alerta quando ele entrar para saber o que mudou".
+
+          ⚠ O AVISO FICA AQUI FORA, e não dentro do bloco da lista: os blocos abrem fechados, e
+          um alerta que só aparece depois de dois cliques não é alerta. Uma revisão de lista é a
+          notícia mais importante que o portal pode dar — é ela que muda o que o cliente vai
+          receber. */}
+      <AvisoDeRevisao token={token} listas={[
+        dados.lpc?.revisao && { fonte: "LPC", titulo: "Lista de produção (LPC)", rev: dados.lpc.revisao },
+        dados.le?.revisao && { fonte: "LE", titulo: "Lista de expedição (LE)", rev: dados.le.revisao },
+      ].filter(Boolean)} />
+
       <div className="max-w-5xl mx-auto px-6 sm:px-8 py-14 space-y-12">
         {/* ⚠ A ORDEM É A DO PROCESSO. Vitor (22/08/2026): "sempre começar com os documentos da
             Engenharia LPC e LE, depois Tabela de compras". Faz sentido: a Engenharia define o que
             será fabricado, o Compras traz o material, a Qualidade prova que está conforme. O
             cliente lê a obra na ordem em que ela acontece. */}
         {tem("LPC") && dados.lpc && (
-          <Bloco icone={Layers} titulo="Lista de produção (LPC)" recolhida
-            sub={`${dados.lpc.total} itens${dados.lpc.comPeso ? ` · ${fmtKg(dados.lpc.pesoKg)}` : ""}`}>
-            {/* ⚠ a coluna de peso só existe quando a obra liberou: estrutura se cota por R$/kg, e
-                o peso item a item entrega a base do nosso preço. */}
-            <Tabela
-              cols={["Marca", "Descrição", "Material", "Qtd.", ...(dados.lpc.comPeso ? ["Peso"] : [])]}
-              linhas={dados.lpc.itens.slice(0, 200).map((p) => [
-                <span key="m" className="font-mono">{p.marca}</span>, p.descricao, p.material || "—", p.qtd,
-                ...(dados.lpc.comPeso ? [fmtKg(p.pesoKg)] : []),
-              ])}
-              rodape={dados.lpc.itens.length > 200 ? `e mais ${dados.lpc.itens.length - 200} itens.` : null}
-            />
-          </Bloco>
+          <BlocoLista icone={Layers} titulo="Lista de produção (LPC)" fonte="LPC" d={dados.lpc} token={token} />
         )}
 
         {tem("LE") && dados.le && (
-          <Bloco icone={Truck} titulo="Lista de expedição (LE)" recolhida
-            sub={`${dados.le.total} itens${dados.le.comPeso ? ` · ${fmtKg(dados.le.pesoKg)}` : ""}`}>
-            {/* ⚠ a coluna de peso só existe quando a obra liberou: estrutura se cota por R$/kg, e
-                o peso item a item entrega a base do nosso preço. */}
-            <Tabela
-              cols={["Marca", "Descrição", "Material", "Qtd.", ...(dados.le.comPeso ? ["Peso"] : [])]}
-              linhas={dados.le.itens.slice(0, 200).map((p) => [
-                <span key="m" className="font-mono">{p.marca}</span>, p.descricao, p.material || "—", p.qtd,
-                ...(dados.le.comPeso ? [fmtKg(p.pesoKg)] : []),
-              ])}
-              rodape={dados.le.itens.length > 200 ? `e mais ${dados.le.itens.length - 200} itens.` : null}
-            />
-          </Bloco>
+          <BlocoLista icone={Truck} titulo="Lista de expedição (LE)" fonte="LE" d={dados.le} token={token} />
         )}
 
         {tem("COMPRAS") && dados.compras?.itens?.length > 0 && (
@@ -476,7 +464,146 @@ function Certificados({ token, lista }) {
   );
 }
 
-function Bloco({ icone: Icone, titulo, sub, children, recolhida = false, acao = null }) {
+/**
+ * ⚠ A REVISÃO É O ASSUNTO MAIS SENSÍVEL DE UMA LISTA. Vitor (22/08/2026): "nos casos de uma
+ * revisão disponibilizar uma lista nova para Download, informa a revisão atual e deixar com um
+ * alerta quando ele entrar para saber o que mudou".
+ *
+ * O cliente confere o que vai receber contra a lista que ele tem na mão. Quando a engenharia
+ * reimporta e as marcas mudam, quem está do outro lado não tem como saber — e a conversa vira
+ * "mas na minha lista estava assim". Dizer só "a lista mudou" seria quase o mesmo que não dizer
+ * nada: ele teria de conferir marca por marca de novo. Por isso o aviso é específico.
+ *
+ * O "Entendi" fecha o aviso PARA ELE (grava no portal, não no navegador): trocar de aparelho não
+ * pode ressuscitar um alerta que ele já leu, nem apagar um que ele nunca viu.
+ */
+function AvisoDeRevisao({ token, listas }) {
+  const [ocultas, setOcultas] = useState([]);
+  const pendentes = listas.filter((l) => l.rev?.mudou && !l.rev.vista && !ocultas.includes(l.fonte));
+  if (!pendentes.length) return null;
+  const entendi = (l) => {
+    setOcultas((v) => [...v, l.fonte]);
+    fetch(`/api/portal/${token}/lista`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fonte: l.fonte, seq: l.rev.seq }),
+    }).catch(() => {});
+  };
+  return (
+    <section className="max-w-3xl mx-auto px-6 sm:px-8 mt-6 space-y-3">
+      {pendentes.map((l) => <CartaoRevisao key={l.fonte} l={l} onEntendi={() => entendi(l)} />)}
+    </section>
+  );
+}
+
+const plural = (n, um, muitos) => `${n} ${n === 1 ? um : muitos}`;
+
+function CartaoRevisao({ l, onEntendi }) {
+  const [aberto, setAberto] = useState(false);
+  const r = l.rev;
+  const resumo = [
+    r.nIncluidas && plural(r.nIncluidas, "marca incluída", "marcas incluídas"),
+    r.nExcluidas && plural(r.nExcluidas, "excluída", "excluídas"),
+    r.nAlteradas && plural(r.nAlteradas, "alterada", "alteradas"),
+  ].filter(Boolean).join(" · ");
+  return (
+    <div className="bg-[#FFF7ED] border border-[#F4801F]/35 rounded-2xl p-5 sm:p-6">
+      <div className="flex items-start gap-3">
+        <History size={18} className="text-[#F4801F] shrink-0 mt-0.5" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[14px] font-bold text-[#0D1F3C]">
+            {l.titulo} — {r.daEngenharia ? `revisão ${r.rotulo}` : r.rotulo}
+          </p>
+          <p className="text-[13px] text-gray-600 mt-1">
+            Atualizada em {new Date(r.publicadaEm).toLocaleDateString("pt-BR")}. {resumo}.
+          </p>
+          <div className="flex flex-wrap items-center gap-2 mt-3">
+            <button onClick={() => setAberto((v) => !v)}
+              className="text-[12px] font-semibold text-[#006EAB] hover:underline">
+              {aberto ? "Ocultar o que mudou" : "Ver o que mudou"}
+            </button>
+            <span className="text-gray-300">·</span>
+            <button onClick={onEntendi} className="text-[12px] font-semibold text-gray-500 hover:text-[#0D1F3C]">
+              Entendi
+            </button>
+          </div>
+          {aberto && (
+            <div className="mt-4 space-y-3 border-t border-[#F4801F]/25 pt-4">
+              <GrupoMarcas titulo="Incluídas" n={r.nIncluidas} itens={r.incluidas} cor="text-emerald-700" fundo="bg-emerald-50 text-emerald-800 border-emerald-200" />
+              <GrupoMarcas titulo="Excluídas" n={r.nExcluidas} itens={r.excluidas} cor="text-red-700" fundo="bg-red-50 text-red-800 border-red-200" />
+              <GrupoMarcas titulo="Alteradas" n={r.nAlteradas} itens={r.alteradas} cor="text-amber-700" fundo="bg-amber-50 text-amber-900 border-amber-200" />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** ⚠ o detalhe gravado é limitado; quando a revisão é enorme, o contador continua sendo o total
+    real e a diferença aparece como "+N" em vez de sumir sem aviso. */
+function GrupoMarcas({ titulo, n, itens, cor, fundo }) {
+  if (!n) return null;
+  const rotulo = (x) => {
+    if (!x.para) return x.marca;
+    const q = x.de?.qtd !== x.para?.qtd ? ` ${x.de?.qtd}→${x.para?.qtd} un` : "";
+    const p = x.de?.pesoKg != null && x.de?.pesoKg !== x.para?.pesoKg ? ` ${x.de.pesoKg}→${x.para.pesoKg} kg` : "";
+    return `${x.marca}${q}${p}`;
+  };
+  return (
+    <div>
+      <p className={`text-[11px] font-bold uppercase tracking-wide ${cor} mb-1.5`}>{titulo} · {n}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {itens.map((x, i) => (
+          <span key={i} className={`text-[11px] font-mono border rounded px-1.5 py-0.5 ${fundo}`}>{rotulo(x)}</span>
+        ))}
+        {n > itens.length && (
+          <span className="text-[11px] text-gray-500 px-1.5 py-0.5">+{n - itens.length} na planilha</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A LPC e a LE do cliente: a tabela para reconhecer, a planilha para conferir.
+ *
+ * ⚠ a coluna de peso só existe quando a obra liberou (mostrarPeso): estrutura se cota por R$/kg,
+ * e o peso item a item entrega a base do nosso preço.
+ */
+function BlocoLista({ icone, titulo, fonte, d, token }) {
+  const r = d.revisao;
+  const sub = [
+    plural(d.total, "item", "itens"),
+    d.comPeso ? fmtKg(d.pesoKg) : null,
+    r ? (r.daEngenharia ? `rev. ${r.rotulo}` : r.rotulo) : null,
+  ].filter(Boolean).join(" · ");
+  return (
+    <Bloco icone={icone} titulo={titulo} recolhida sub={sub}
+      acaoFixa={
+        <a href={`/api/portal/${token}/lista?fonte=${fonte}`}
+          className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#006EAB] border border-[#006EAB]/30 rounded-lg px-3 py-1.5 hover:bg-[#006EAB]/5">
+          <FileSpreadsheet size={14} /> Baixar planilha
+        </a>
+      }>
+      {r?.mudou && (
+        <p className="text-[12px] text-gray-600 bg-[#FFF7ED] border border-[#F4801F]/30 rounded-lg px-3 py-2 mb-4">
+          Esta é a {r.daEngenharia ? `revisão ${r.rotulo}` : r.rotulo.toLowerCase()}, de{" "}
+          {new Date(r.publicadaEm).toLocaleDateString("pt-BR")} — a planilha acima já sai atualizada.
+        </p>
+      )}
+      <Tabela
+        cols={["Marca", "Descrição", "Material", "Qtd.", ...(d.comPeso ? ["Peso"] : [])]}
+        linhas={d.itens.slice(0, 200).map((p) => [
+          <span key="m" className="font-mono">{p.marca}</span>, p.descricao, p.material || "—", p.qtd,
+          ...(d.comPeso ? [fmtKg(p.pesoKg)] : []),
+        ])}
+        rodape={d.total > 200 ? `A tela mostra as primeiras 200 marcas — a planilha traz as ${d.total}.` : null}
+      />
+    </Bloco>
+  );
+}
+
+function Bloco({ icone: Icone, titulo, sub, children, recolhida = false, acao = null, acaoFixa = null }) {
   const [aberta, setAberta] = useState(!recolhida);
   return (
     <section>
@@ -489,7 +616,13 @@ function Bloco({ icone: Icone, titulo, sub, children, recolhida = false, acao = 
           <h2 className="text-xl font-bold group-hover:text-[#006EAB] transition-colors">{titulo}</h2>
           {sub && <span className="text-[12px] text-gray-500 truncate">{sub}</span>}
         </button>
-        {aberta && acao && <div className="ml-auto shrink-0">{acao}</div>}
+        {/* ⚠ `acaoFixa` aparece com o bloco FECHADO. É onde mora o botão de baixar a lista:
+            esconder o download atrás de um clique de "abrir" é esconder o download. `acao` (a
+            seleção de certificados) continua só com o bloco aberto — ela depende do que está
+            marcado na tabela, que fechada não existe. */}
+        {(acaoFixa || (aberta && acao)) && (
+          <div className="ml-auto shrink-0 flex items-center gap-2">{acaoFixa}{aberta ? acao : null}</div>
+        )}
       </div>
       {aberta && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_12px_rgba(13,31,60,0.05)] p-5 sm:p-6">

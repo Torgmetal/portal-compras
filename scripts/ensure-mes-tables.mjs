@@ -163,6 +163,31 @@ async function main() {
       CONSTRAINT "PortalCliente_pkey" PRIMARY KEY ("id"))`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "PortalCliente" ADD COLUMN IF NOT EXISTS "logoClienteUrl" TEXT`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "PortalCliente" ADD COLUMN IF NOT EXISTS "mostrarPeso" BOOLEAN NOT NULL DEFAULT false`);
+
+  // Revisoes das listas publicadas ao cliente (LPC / LE) — base do "o que mudou".
+  await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "PortalListaRevisao" (
+    "id" TEXT PRIMARY KEY,
+    "opId" TEXT NOT NULL,
+    "opNumero" TEXT NOT NULL,
+    "fonte" TEXT NOT NULL,
+    "seq" INTEGER NOT NULL DEFAULT 1,
+    "rotulo" TEXT,
+    "itens" INTEGER NOT NULL DEFAULT 0,
+    "pesoKg" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "hash" TEXT NOT NULL,
+    "impressao" JSONB,
+    "incluidas" JSONB NOT NULL DEFAULT '[]',
+    "excluidas" JSONB NOT NULL DEFAULT '[]',
+    "alteradas" JSONB NOT NULL DEFAULT '[]',
+    "nIncluidas" INTEGER NOT NULL DEFAULT 0,
+    "nExcluidas" INTEGER NOT NULL DEFAULT 0,
+    "nAlteradas" INTEGER NOT NULL DEFAULT 0,
+    "publicadaEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "vistoEm" TIMESTAMP(3)
+  )`);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PortalListaRevisao_opId_fonte_seq_key" ON "PortalListaRevisao" ("opId", "fonte", "seq")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PortalListaRevisao_opId_fonte_idx" ON "PortalListaRevisao" ("opId", "fonte")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PortalListaRevisao_opNumero_idx" ON "PortalListaRevisao" ("opNumero")`);
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PortalCliente_opNumero_key" ON "PortalCliente"("opNumero")`);
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PortalCliente_token_key" ON "PortalCliente"("token")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PortalCliente_status_idx" ON "PortalCliente"("status")`);

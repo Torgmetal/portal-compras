@@ -10,6 +10,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { secoesDoPortal, mensagemPadrao, CAPA_PADRAO } from "@/lib/portal-cliente";
+import { pecasDaLista, sincronizarRevisao, revisaoParaOCliente } from "@/lib/portal-listas";
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
 
 export const runtime = "nodejs";
@@ -152,28 +153,30 @@ export async function GET(_req, { params }) {
   // do nosso preço por kg. O que não se divulga não sai daqui.
   const comPeso = portal.mostrarPeso === true;
 
-  const listaDe = async (fonte, so) => {
-    const pecas = await prisma.pecaConjunto.findMany({
-      where: { opId: op.id, fonte },
-      select: { marca: true, descricao: true, qte: true, pesoTotalKg: true, tipoPeca: true, perfil: true, material: true },
-      orderBy: { marca: "asc" },
-      take: 3000,
-    });
-    const alvo = so ? pecas.filter((p) => String(p.tipoPeca || "").toUpperCase() === so) : pecas;
-    const lista = alvo.length ? alvo : pecas;
+  // ⚠ A TELA MOSTRA UM PEDAÇO, O ARQUIVO TEM TUDO. Vitor (22/08/2026): "a LE e LPC deve ter
+  // permissão para o cliente baixar". Uma LPC de obra grande passa de mil marcas: rolar isso numa
+  // página não é conferir nada. A tela dá as primeiras 200 pra ele reconhecer a lista; conferir de
+  // verdade é na planilha, que sai completa em /api/portal/[token]/lista.
+  const listaDe = async (chave) => {
+    const pecas = await pecasDaLista(prisma, op.id, chave);
+    // A foto da revisão é tirada aqui, na visita do cliente — ver lib/portal-listas.
+    const rev = await sincronizarRevisao(prisma, {
+      opId: op.id, opNumero: portal.opNumero, chave, pecas,
+    }).catch(() => null);
     return {
-      total: lista.length,
+      total: pecas.length,
       comPeso,
-      pesoKg: comPeso ? Math.round(lista.reduce((sm, p) => sm + (p.pesoTotalKg || 0), 0)) : null,
-      itens: lista.slice(0, 500).map((p) => ({
+      pesoKg: comPeso ? Math.round(pecas.reduce((sm, p) => sm + (p.pesoTotalKg || 0), 0)) : null,
+      itens: pecas.slice(0, 500).map((p) => ({
         marca: p.marca, descricao: p.descricao || p.perfil || "—",
         material: p.material || null, qtd: p.qte,
         ...(comPeso ? { pesoKg: Math.round(p.pesoTotalKg || 0) } : {}),
       })),
+      revisao: revisaoParaOCliente(rev, comPeso),
     };
   };
-  if (tem("LPC") && op?.id) dados.lpc = await listaDe("LPC_IMPORT", "CONJUNTO");
-  if (tem("LE") && op?.id) dados.le = await listaDe("LE_IMPORT", null);
+  if (tem("LPC") && op?.id) dados.lpc = await listaDe("LPC");
+  if (tem("LE") && op?.id) dados.le = await listaDe("LE");
 
   // ── COMPRAS: o andamento do material da obra ──
   //
