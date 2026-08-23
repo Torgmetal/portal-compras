@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import {
   Loader2, AlertCircle, ShieldCheck, CalendarRange, FileText, Award,
-  BookCheck, Layers, Image as ImageIcon, ChevronRight,
+  BookCheck, Layers, Image as ImageIcon, ChevronRight, ChevronDown,
+  Download, Package, ShoppingCart, Truck, Check,
 } from "lucide-react";
 
 // ─── O PORTAL DA OBRA, PELO LADO DO CLIENTE ───────────────────────────────────
@@ -151,6 +152,52 @@ export default function PortalClienteView({ token }) {
       </section>
 
       <div className="max-w-5xl mx-auto px-6 sm:px-8 py-14 space-y-12">
+        {/* ⚠ A ORDEM É A DO PROCESSO. Vitor (22/08/2026): "sempre começar com os documentos da
+            Engenharia LPC e LE, depois Tabela de compras". Faz sentido: a Engenharia define o que
+            será fabricado, o Compras traz o material, a Qualidade prova que está conforme. O
+            cliente lê a obra na ordem em que ela acontece. */}
+        {tem("LPC") && dados.lpc && (
+          <Bloco icone={Layers} titulo="Lista de produção (LPC)" recolhida
+            sub={`${dados.lpc.total} itens · ${fmtKg(dados.lpc.pesoKg)}`}>
+            <Tabela
+              cols={["Marca", "Descrição", "Material", "Qtd.", "Peso"]}
+              linhas={dados.lpc.itens.slice(0, 200).map((p) => [
+                <span key="m" className="font-mono">{p.marca}</span>, p.descricao, p.material || "—", p.qtd, fmtKg(p.pesoKg),
+              ])}
+              rodape={dados.lpc.itens.length > 200 ? `e mais ${dados.lpc.itens.length - 200} itens.` : null}
+            />
+          </Bloco>
+        )}
+
+        {tem("LE") && dados.le && (
+          <Bloco icone={Truck} titulo="Lista de expedição (LE)" recolhida
+            sub={`${dados.le.total} itens · ${fmtKg(dados.le.pesoKg)}`}>
+            <Tabela
+              cols={["Marca", "Descrição", "Material", "Qtd.", "Peso"]}
+              linhas={dados.le.itens.slice(0, 200).map((p) => [
+                <span key="m" className="font-mono">{p.marca}</span>, p.descricao, p.material || "—", p.qtd, fmtKg(p.pesoKg),
+              ])}
+              rodape={dados.le.itens.length > 200 ? `e mais ${dados.le.itens.length - 200} itens.` : null}
+            />
+          </Bloco>
+        )}
+
+        {tem("COMPRAS") && dados.compras?.itens?.length > 0 && (
+          <Bloco icone={ShoppingCart} titulo="Materiais da obra" recolhida
+            sub={`${dados.compras.recebidos} de ${dados.compras.total} recebidos`}>
+            <Tabela
+              cols={["Material", "Qtd.", "Situação", "Pedido", "Chegou em", "NF", "Rastreio"]}
+              linhas={dados.compras.itens.slice(0, 200).map((c) => [
+                c.material, c.qtd,
+                <span key="s" className={c.status === "Recebido" ? "text-emerald-700 font-semibold" : ""}>{c.status}</span>,
+                c.pedido || "—", fmtD(c.chegouEm), c.nf || "—",
+                c.rastreio ? <span key="r" className="font-mono text-[#006EAB]">R {c.rastreio}</span> : "—",
+              ])}
+              rodape={dados.compras.itens.length > 200 ? `e mais ${dados.compras.itens.length - 200} itens.` : null}
+            />
+          </Bloco>
+        )}
+
         {tem("CRONOGRAMA") && dados.cronograma && (
           <Bloco icone={CalendarRange} titulo="Cronograma da obra"
             sub={`${fmtD(dados.cronograma.inicio)} a ${fmtD(dados.cronograma.fim)}`}>
@@ -172,9 +219,12 @@ export default function PortalClienteView({ token }) {
             </div>
           </Bloco>
         )}
+        {tem("CERTIFICADOS") && dados.certificados?.length > 0 && (
+          <Certificados token={token} lista={dados.certificados} />
+        )}
 
         {tem("RELATORIOS") && dados.relatorios?.length > 0 && (
-          <Bloco icone={FileText} titulo="Relatórios de inspeção"
+          <Bloco icone={FileText} titulo="Relatórios de inspeção" recolhida
             sub={`${dados.relatorios.length} aprovados`}>
             {/* ⚠ SÓ OS APROVADOS. Relatório em rascunho ou reprovado é trabalho em curso;
                 mostrá-lo sem o reparo ao lado seria entregar meia história. */}
@@ -189,20 +239,6 @@ export default function PortalClienteView({ token }) {
             />
           </Bloco>
         )}
-
-        {tem("CERTIFICADOS") && dados.certificados?.length > 0 && (
-          <Bloco icone={Award} titulo="Certificados de qualidade"
-            sub={`${dados.certificados.length} materiais com rastreabilidade`}>
-            <Tabela
-              cols={["Material", "Certificado", "Corrida", "Fornecedor"]}
-              linhas={dados.certificados.slice(0, 60).map((c) => [
-                c.material, c.certificado || "—", c.corrida || "—", c.fornecedor || "—",
-              ])}
-              rodape={dados.certificados.length > 60 ? `e mais ${dados.certificados.length - 60} — a lista completa está no Data Book.` : null}
-            />
-          </Bloco>
-        )}
-
         {tem("DATABOOK") && dados.databook?.volumes?.length > 0 && (
           <Bloco icone={BookCheck} titulo="Data Book da obra"
             sub={`${dados.databook.volumes.length} volume(s) · R${String(dados.databook.revisao).padStart(2, "0")}`}>
@@ -226,22 +262,8 @@ export default function PortalClienteView({ token }) {
             </p>
           </Bloco>
         )}
-
-        {tem("LPC") && dados.lpc && (
-          <Bloco icone={Layers} titulo="Lista de peças"
-            sub={`${dados.lpc.totalConjuntos || dados.lpc.totalPecas} itens · ${fmtKg(dados.lpc.pesoKg)}`}>
-            <Tabela
-              cols={["Marca", "Descrição", "Qtd.", "Peso"]}
-              linhas={dados.lpc.itens.slice(0, 60).map((p) => [
-                <span key="m" className="font-mono">{p.marca}</span>, p.descricao || "—", p.qtd, fmtKg(p.pesoKg),
-              ])}
-              rodape={dados.lpc.itens.length > 60 ? `e mais ${dados.lpc.itens.length - 60} itens.` : null}
-            />
-          </Bloco>
-        )}
-
         {tem("DOCUMENTOS") && dados.documentos?.length > 0 && (
-          <Bloco icone={FileText} titulo="Documentos da obra"
+          <Bloco icone={FileText} titulo="Documentos da obra" recolhida
             sub={`${dados.documentos.length} assuntos`}>
             {/* ⚠ agrupado por assunto, não uma lista chapada: a obra tem centenas de documentos e o
                 que o cliente quer saber é QUE TIPO de controle existe — PIT, EPS, qualificação de
@@ -254,10 +276,15 @@ export default function PortalClienteView({ token }) {
                   </p>
                   <div className="grid sm:grid-cols-2 gap-1.5">
                     {g.itens.map((doc) => (
-                      <div key={doc.id} className="flex items-center gap-2 border border-gray-100 rounded-lg px-3 py-1.5">
-                        <ChevronRight size={12} className="text-[#006EAB] shrink-0" />
+                      // ⚠ o documento é para BAIXAR. Vitor (22/08/2026): "esses documentos devem
+                      // ser possíveis de baixar também, para que o cliente possa ver tudo que ele
+                      // precisa". Lista que só mostra o nome prova que o documento existe e não
+                      // deixa lê-lo — é pior que não listar.
+                      <a key={doc.id} href={`/api/portal/${token}/doc?id=${doc.id}`} target="_blank" rel="noreferrer"
+                        className="flex items-center gap-2 border border-gray-100 rounded-lg px-3 py-1.5 hover:border-[#006EAB] hover:bg-[#006EAB]/5 transition-colors">
+                        <Download size={12} className="text-[#006EAB] shrink-0" />
                         <span className="text-[12px] truncate">{doc.nome}</span>
-                      </div>
+                      </a>
                     ))}
                   </div>
                   {g.total > g.itens.length && (
@@ -268,7 +295,6 @@ export default function PortalClienteView({ token }) {
             </div>
           </Bloco>
         )}
-
         {tem("FOTOS") && portal.fotos?.length > 0 && (
           <Bloco icone={ImageIcon} titulo="A obra em imagens" sub={`${portal.fotos.length} registros`}>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -298,17 +324,150 @@ export default function PortalClienteView({ token }) {
   );
 }
 
-function Bloco({ icone: Icone, titulo, sub, children }) {
+/**
+ * ⚠ CADA SEÇÃO RECOLHE. Vitor (22/08/2026): "cada seção pode ficar minimizada para poder ficar
+ * fácil a navegação". Com LPC, LE, compras, certificados e relatórios, a página passa de mil
+ * linhas — e uma página que só se navega rolando obriga o cliente a passar pelo que não quer para
+ * chegar ao que quer.
+ *
+ * Abre fechada quando é lista longa (`recolhida`): o cliente escolhe o que abrir, em vez de fechar
+ * o que não pediu.
+ */
+/**
+ * ─── OS CERTIFICADOS, COM O R NA FRENTE ─────────────────────────────────────────
+ * Vitor (22/08/2026): "o certificado deve ficar de acesso para ele poder visualizar, baixar e até
+ * mesmo baixar em lote todos os certificados que ele escolher"; e "o mais importante precisa ter o
+ * número da rastreabilidade".
+ *
+ * ⚠ O R É A PRIMEIRA COLUNA porque é ele que amarra a peça ao material: da peça chega-se ao R, do
+ * R à corrida, da corrida ao certificado e à nota. Uma lista de certificados sem o R é uma pilha de
+ * PDFs — o cliente não consegue partir de uma peça montada no canteiro e provar de que aço ela é.
+ */
+function Certificados({ token, lista }) {
+  const [sel, setSel] = useState(() => new Set());
+  const [baixando, setBaixando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const baixaveis = lista.filter((c) => c.baixavel);
+  const alternar = (id) => setSel((p) => {
+    const n = new Set(p);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+
+  async function baixarLote() {
+    setBaixando(true); setErro("");
+    try {
+      const r = await fetch(`/api/portal/${token}/lote`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...sel] }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Falha ao gerar o pacote.");
+      const falhas = Number(r.headers.get("X-Falhas") || 0);
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a2 = document.createElement("a");
+      a2.href = url; a2.download = "certificados.zip"; a2.click();
+      URL.revokeObjectURL(url);
+      // ⚠ zip com menos arquivos do que o pedido, em silêncio, é o cliente achando que tem tudo
+      if (falhas) setErro(`${falhas} certificado(s) não puderam ser incluídos — fale com a nossa Qualidade.`);
+      setSel(new Set());
+    } catch (e) { setErro(e.message); } finally { setBaixando(false); }
+  }
+
+  const acao = baixaveis.length > 0 && (
+    <div className="flex items-center gap-2">
+      {sel.size > 0 && (
+        <button onClick={baixarLote} disabled={baixando}
+          className="text-[12px] font-semibold text-white bg-[#006EAB] rounded-lg px-3 py-1.5 hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5">
+          {baixando ? <Loader2 size={13} className="animate-spin" /> : <Package size={13} />}
+          baixar {sel.size}
+        </button>
+      )}
+      <button onClick={() => setSel(sel.size === baixaveis.length ? new Set() : new Set(baixaveis.map((c) => c.id)))}
+        className="text-[12px] font-medium text-[#006EAB] hover:underline">
+        {sel.size === baixaveis.length ? "limpar" : "selecionar todos"}
+      </button>
+    </div>
+  );
+
+  return (
+    <Bloco icone={Award} titulo="Certificados de qualidade" recolhida acao={acao}
+      sub={`${lista.length} materiais com rastreabilidade`}>
+      {erro && <p className="text-[12px] text-red-600 mb-2">{erro}</p>}
+      <div className="overflow-x-auto -mx-1">
+        <table className="w-full text-[13px] min-w-[540px]">
+          <thead>
+            <tr className="text-left text-[11px] uppercase tracking-wide text-gray-400">
+              <th className="w-6" />
+              <th className="font-semibold pb-2 px-1">Rastreio</th>
+              <th className="font-semibold pb-2 px-1">Material</th>
+              <th className="font-semibold pb-2 px-1">Corrida</th>
+              <th className="font-semibold pb-2 px-1">Certificado</th>
+              <th className="font-semibold pb-2 px-1">Fornecedor</th>
+              <th className="w-8" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {lista.slice(0, 300).map((c) => (
+              <tr key={c.id} className={sel.has(c.id) ? "bg-[#006EAB]/5" : ""}>
+                <td className="py-2 px-1">
+                  {c.baixavel && (
+                    <button onClick={() => alternar(c.id)} aria-label="selecionar"
+                      className={`w-4 h-4 rounded border flex items-center justify-center ${sel.has(c.id) ? "bg-[#006EAB] border-[#006EAB]" : "border-gray-300"}`}>
+                      {sel.has(c.id) && <Check size={11} className="text-white" />}
+                    </button>
+                  )}
+                </td>
+                <td className="py-2 px-1 font-mono font-semibold text-[#006EAB] whitespace-nowrap">
+                  {c.r ? `R ${c.r}` : "—"}
+                </td>
+                <td className="py-2 px-1">{c.material}</td>
+                <td className="py-2 px-1 whitespace-nowrap">{c.corrida || "—"}</td>
+                <td className="py-2 px-1 whitespace-nowrap">{c.certificado || "—"}</td>
+                <td className="py-2 px-1 whitespace-nowrap">{c.fornecedor || "—"}</td>
+                <td className="py-2 px-1">
+                  {c.baixavel && (
+                    <a href={`/api/portal/${token}/doc?id=${c.id}`} target="_blank" rel="noreferrer"
+                      title="abrir o certificado" className="text-gray-400 hover:text-[#006EAB] inline-flex">
+                      <Download size={14} />
+                    </a>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {lista.length > 300 && (
+        <p className="text-[12px] text-gray-500 mt-3">
+          Mostrando 300 de {lista.length} — os demais estão no Data Book.
+        </p>
+      )}
+    </Bloco>
+  );
+}
+
+function Bloco({ icone: Icone, titulo, sub, children, recolhida = false, acao = null }) {
+  const [aberta, setAberta] = useState(!recolhida);
   return (
     <section>
-      <div className="flex items-baseline gap-2.5 mb-4">
-        <Icone size={18} className="text-[#006EAB] shrink-0 translate-y-0.5" />
-        <h2 className="text-xl font-bold">{titulo}</h2>
-        {sub && <span className="text-[12px] text-gray-500">{sub}</span>}
+      <div className="flex items-center gap-2.5 mb-4">
+        <button onClick={() => setAberta((v) => !v)} className="flex items-center gap-2.5 min-w-0 text-left group">
+          {aberta
+            ? <ChevronDown size={17} className="text-[#006EAB] shrink-0" />
+            : <ChevronRight size={17} className="text-[#006EAB] shrink-0" />}
+          <Icone size={18} className="text-[#006EAB] shrink-0" />
+          <h2 className="text-xl font-bold group-hover:text-[#006EAB] transition-colors">{titulo}</h2>
+          {sub && <span className="text-[12px] text-gray-500 truncate">{sub}</span>}
+        </button>
+        {aberta && acao && <div className="ml-auto shrink-0">{acao}</div>}
       </div>
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_12px_rgba(13,31,60,0.05)] p-5 sm:p-6">
-        {children}
-      </div>
+      {aberta && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_12px_rgba(13,31,60,0.05)] p-5 sm:p-6">
+          {children}
+        </div>
+      )}
     </section>
   );
 }

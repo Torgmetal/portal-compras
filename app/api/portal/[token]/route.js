@@ -96,16 +96,28 @@ export async function GET(_req, { params }) {
   }
 
   // ── certificados de qualidade ──
+  // ⚠ O R VEM NA FRENTE. Vitor (22/08/2026): "o mais importante precisa ter o número da
+  // rastreabilidade; na descrição dos certificados hoje você traz lote e corrida".
+  //
+  // Ele está certo, e a razão é do processo: o R é o que amarra a peça ao material. Da peça
+  // chega-se ao R, do R à corrida, da corrida ao certificado e à nota fiscal. Sem ele, o cliente
+  // tem uma lista de certificados solta — não consegue partir de uma peça montada no canteiro e
+  // provar de que aço ela é.
   if (tem("CERTIFICADOS")) {
     const certs = await prisma.documentoQualidade.findMany({
       where: { opNumero: portal.opNumero, ativo: true, categoria: "MATERIAL" },
-      select: { id: true, nome: true, numeroDocumento: true, numeroCorrida: true, fornecedor: true, norma: true },
-      orderBy: { nome: "asc" },
+      select: {
+        id: true, nome: true, importRef: true, numeroDocumento: true, numeroCorrida: true,
+        fornecedor: true, norma: true, sharepointItemId: true, arquivoUrl: true,
+      },
+      orderBy: [{ importRef: "asc" }, { nome: "asc" }],
       take: 500,
     });
     dados.certificados = certs.map((c) => ({
-      id: c.id, material: c.nome, certificado: c.numeroDocumento, corrida: c.numeroCorrida,
-      fornecedor: c.fornecedor, norma: c.norma,
+      id: c.id, r: c.importRef || null, material: c.nome, certificado: c.numeroDocumento,
+      corrida: c.numeroCorrida, fornecedor: c.fornecedor, norma: c.norma,
+      // só oferece download do que tem arquivo de verdade atrás
+      baixavel: !!(c.sharepointItemId || c.arquivoUrl),
     }));
   }
 
@@ -128,22 +140,119 @@ export async function GET(_req, { params }) {
     }
   }
 
-  // ── LPC: conjuntos e peças ──
-  if (tem("LPC") && op?.id) {
+  // ── LPC e LE: as duas listas da Engenharia ──
+  //
+  // ⚠ SÃO DUAS LISTAS DIFERENTES, e o que separa é a `fonte`: LPC_IMPORT é a lista de produção
+  // (conjuntos e peças a fabricar); LE_IMPORT é a lista de expedição (o que embarca). Confundir
+  // as duas mostraria ao cliente a lista errada com o rótulo certo — o pior tipo de erro num
+  // documento que ele usa para conferir o que vai receber.
+  const listaDe = async (fonte, so) => {
     const pecas = await prisma.pecaConjunto.findMany({
-      where: { opId: op.id },
-      select: { marca: true, descricao: true, qte: true, pesoTotalKg: true, tipoPeca: true },
+      where: { opId: op.id, fonte },
+      select: { marca: true, descricao: true, qte: true, pesoTotalKg: true, tipoPeca: true, perfil: true, material: true },
       orderBy: { marca: "asc" },
-      take: 2000,
+      take: 3000,
     });
-    const conjuntos = pecas.filter((p) => String(p.tipoPeca || "").toUpperCase() === "CONJUNTO");
-    dados.lpc = {
-      totalPecas: pecas.length,
-      totalConjuntos: conjuntos.length,
-      pesoKg: Math.round(pecas.reduce((s, p) => s + (p.pesoTotalKg || 0), 0)),
-      itens: (conjuntos.length ? conjuntos : pecas).slice(0, 400).map((p) => ({
-        marca: p.marca, descricao: p.descricao, qtd: p.qte, pesoKg: Math.round(p.pesoTotalKg || 0),
+    const alvo = so ? pecas.filter((p) => String(p.tipoPeca || "").toUpperCase() === so) : pecas;
+    const lista = alvo.length ? alvo : pecas;
+    return {
+      total: lista.length,
+      pesoKg: Math.round(lista.reduce((sm, p) => sm + (p.pesoTotalKg || 0), 0)),
+      itens: lista.slice(0, 500).map((p) => ({
+        marca: p.marca, descricao: p.descricao || p.perfil || "—",
+        material: p.material || null, qtd: p.qte, pesoKg: Math.round(p.pesoTotalKg || 0),
       })),
+    };
+  };
+  if (tem("LPC") && op?.id) dados.lpc = await listaDe("LPC_IMPORT", "CONJUNTO");
+  if (tem("LE") && op?.id) dados.le = await listaDe("LE_IMPORT", null);
+
+  // ── COMPRAS: o andamento do material da obra ──
+  //
+  // ⚠ O QUE O CLIENTE QUER SABER É "CHEGOU?". Vitor (22/08/2026): "Tabela de compras onde traz as
+  // informações do status de compra da obra, data que chegou, número do pedido e a
+  // rastreabilidade". Por isso a tabela não repete a cozinha do Compras (cotação, fornecedor,
+  // preço): mostra material, status, pedido, data de chegada e o R que rastreia até o certificado.
+  if (tem("COMPRAS") && op?.id) {
+    const rms = await prisma.rM.findMany({
+      where: { opId: op.id },
+      select: {
+        numero: true,
+        itens: {
+          select: {
+            descricao: true, qtd: true, peso: true, unidade: true, status: true,
+            recebimentos: {
+              select: { qtdRecebida: true, nfNumero: true, dataRecebimento: true },
+              orderBy: { dataRecebimento: "desc" }, take: 1,
+            },
+            pedidoOmie: { select: { numeroPedido: true, dataEntregaReal: true, statusEntrega: true, status: true } },
+          },
+        },
+      },
+      take: 200,
+    });
+
+    // ⚠ O R NÃO MORA NA RM. A RM é o pedido de compra; o R nasce no CMR, quando o material é
+    // recebido e o certificado entra. O elo entre os dois é o NOME DO MATERIAL — imperfeito, mas
+    // é o que existe, e uma coluna vazia ensinaria que a obra não tem rastreabilidade quando ela
+    // tem. Sem casamento, sai "—" em vez de um R errado.
+    const normal = (t) => String(t || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const certsDaOP = await prisma.documentoQualidade.findMany({
+      where: { opNumero: portal.opNumero, ativo: true, categoria: "MATERIAL", importRef: { not: null } },
+      select: { nome: true, importRef: true, numeroCorrida: true },
+      take: 800,
+    });
+    const rPorMaterial = new Map();
+    for (const c of certsDaOP) {
+      const k = normal(c.nome);
+      if (k && !rPorMaterial.has(k)) rPorMaterial.set(k, { r: c.importRef, corrida: c.numeroCorrida });
+    }
+    const acharR = (desc) => {
+      const k = normal(desc);
+      if (!k) return null;
+      if (rPorMaterial.has(k)) return rPorMaterial.get(k);
+      // casamento por prefixo: "CHAPA ACO CARBONO A36 ESP 4,75" vs "CHAPA ACO CARBONO A36"
+      for (const [chave, v] of rPorMaterial) {
+        if (chave.length > 12 && (k.startsWith(chave) || chave.startsWith(k))) return v;
+      }
+      return null;
+    };
+
+    const ROTULO = {
+      RECEBIDO: "Recebido", COMPRADO: "Comprado", ESTOQUE: "Atendido do estoque",
+      EM_COTACAO: "Em cotação", NAO_COMPRADO: "A comprar", CANCELADO: "Cancelado",
+    };
+    const linhas = [];
+    for (const rm of rms) {
+      for (const it of rm.itens) {
+        const ped = it.pedidoOmie;
+        const receb = (it.recebimentos || [])[0] || null;
+        const revertido = ped?.status === "REVERTIDO";
+        const chegou = !!receb?.dataRecebimento || !!ped?.dataEntregaReal
+          || ["ENTREGUE", "ATRASADO", "RECEBIDO"].includes(ped?.statusEntrega);
+        let st;
+        if (it.status === "CANCELADO") st = "CANCELADO";
+        else if (it.status === "ATENDIDO_ESTOQUE") st = "ESTOQUE";
+        else if (it.status === "PEDIDO_GERADO" && !revertido) st = chegou ? "RECEBIDO" : "COMPRADO";
+        else if (["EM_COTACAO", "COTADO"].includes(it.status)) st = "EM_COTACAO";
+        else st = "NAO_COMPRADO";
+        if (st === "CANCELADO") continue; // item cancelado não é informação para o cliente
+        linhas.push({
+          material: it.descricao,
+          qtd: it.peso > 0 ? `${Math.round(it.peso)} kg` : `${it.qtd} ${it.unidade || ""}`.trim(),
+          status: ROTULO[st] || st,
+          pedido: ped?.numeroPedido || null,
+          chegouEm: fmt(receb?.dataRecebimento || ped?.dataEntregaReal),
+          nf: receb?.nfNumero || null,
+          ...(() => { const m = acharR(it.descricao); return { rastreio: m?.r || null, corrida: m?.corrida || null }; })(),
+        });
+      }
+    }
+    const conta = (r) => linhas.filter((l) => l.status === r).length;
+    dados.compras = {
+      total: linhas.length,
+      recebidos: conta("Recebido"),
+      itens: linhas.sort((a2, b2) => String(a2.material).localeCompare(String(b2.material), "pt-BR")).slice(0, 400),
     };
   }
 
