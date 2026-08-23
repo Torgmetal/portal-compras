@@ -55,12 +55,31 @@ export default function EstudoClient({ id }) {
   const [salvando, setSalvando] = useState(false);
   const [sujo, setSujo] = useState(false);
   const timer = useRef(null);
+  // ⚠⚠ DUAS EDIÇÕES EM MENOS DE 900 ms E A PRIMEIRA SUMIA. Vitor (23/08/2026), sobre o escopo do
+  // cenário financeiro: "onde que é 1.900 é 836 toneladas".
+  //
+  // O autosave mandava só o ÚLTIMO patch — o `clearTimeout` cancelava o salvamento do anterior — e
+  // a resposta do servidor então sobrescrevia a tela com um estudo que nunca recebeu a primeira
+  // edição. Desmarcar sete áreas em sequência gravava uma e revertia as outras seis, sem aviso: a
+  // tela voltava sozinha para um escopo maior do que o escolhido, e o cenário calculava em cima
+  // dele. Por isso o faturamento aparecia como se fosse a obra inteira.
+  //
+  // Agora as edições se ACUMULAM numa fila até o salvamento sair, e a volta do servidor só
+  // substitui a tela quando não há nada novo esperando.
+  const pendente = useRef({});
+  const estudoRef = useRef(null);
 
   useEffect(() => {
-    fetch(`/api/comercial/estudos/${id}`).then((r) => r.json()).then(setD);
+    fetch(`/api/comercial/estudos/${id}`).then((r) => r.json()).then((j) => {
+      estudoRef.current = j?.estudo || null;
+      setD(j);
+    });
   }, [id]);
 
-  const salvar = useCallback(async (patch) => {
+  const salvar = useCallback(async () => {
+    const patch = pendente.current;
+    if (!Object.keys(patch).length) return;
+    pendente.current = {};
     setSalvando(true);
     try {
       const r = await fetch(`/api/comercial/estudos/${id}`, {
@@ -68,23 +87,39 @@ export default function EstudoClient({ id }) {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
-      setD((p) => ({ ...p, estudo: j.estudo, resultado: j.resultado, cenario: j.cenario }));
-      setSujo(false);
-    } catch (e) { showToast(e.message, "error"); } finally { setSalvando(false); }
+      // ⚠ se algo foi digitado enquanto a resposta viajava, o estudo da tela é mais novo que o do
+      // servidor: aproveita só o resultado recalculado e preserva o que a pessoa acabou de mexer.
+      const temNovo = Object.keys(pendente.current).length > 0;
+      setD((p) => (temNovo
+        ? { ...p, resultado: j.resultado, cenario: j.cenario }
+        : { ...p, estudo: j.estudo, resultado: j.resultado, cenario: j.cenario }));
+      if (!temNovo) { estudoRef.current = j.estudo; setSujo(false); }
+    } catch (e) {
+      // ⚠ falhou: o patch volta para a fila, senão a edição some no erro de rede
+      pendente.current = { ...patch, ...pendente.current };
+      showToast(e.message, "error");
+    } finally { setSalvando(false); }
   }, [id, showToast]);
 
   // ⚠ salva sozinho, com atraso: composição de custo se mexe campo a campo, e obrigar a clicar
   // "salvar" a cada número é o caminho mais curto pra alguém perder meia hora de trabalho.
+  // Aceita função para quem precisa do estado MAIS RECENTE — dois cliques seguidos em caixas
+  // diferentes não podem partir do mesmo retrato.
   const mexer = useCallback((patch) => {
-    setD((p) => ({ ...p, estudo: { ...p.estudo, ...patch } }));
+    const real = typeof patch === "function" ? patch(estudoRef.current || {}) : patch;
+    estudoRef.current = { ...(estudoRef.current || {}), ...real };
+    pendente.current = { ...pendente.current, ...real };
+    setD((p) => ({ ...p, estudo: { ...p.estudo, ...real } }));
     setSujo(true);
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => salvar(patch), 900);
+    timer.current = setTimeout(salvar, 900);
   }, [salvar]);
 
   if (!d?.estudo) return <div className="p-6"><Loader2 className="animate-spin text-torg-blue" size={22} /></div>;
   const e = d.estudo, res = d.resultado || {}, c = e.composicao || {};
-  const setComp = (patch) => mexer({ composicao: { ...c, ...patch } });
+  // ⚠ SEMPRE a partir do estudo mais recente: marcar/desmarcar áreas em sequência partia do mesmo
+  // retrato e uma escolha apagava a outra.
+  const setComp = (patch) => mexer((atual) => ({ composicao: { ...(atual.composicao || {}), ...patch } }));
   const codigo = `LQC-${String(e.numero || 0).padStart(3, "0")}-${String(e.ano).slice(-2)}-R${String(e.revisao || 0).padStart(2, "0")}`;
 
   return (
@@ -1343,7 +1378,7 @@ function PlanilhaComercial({ res, e }) {
 function Cenario({ e, res, mexer, fabrica }) {
   const cfg = e.cenario || {};
   const comp = e.composicao || {};
-  const set = (cen, k, v) => mexer({ cenario: { ...cfg, [cen]: { ...(cfg[cen] || {}), [k]: v } } });
+  const set = (cen, k, v) => mexer((a) => ({ cenario: { ...(a.cenario || {}), [cen]: { ...((a.cenario || {})[cen] || {}), [k]: v } } }));
   const analise = analiseDeCenarios(res.custoTorg, res.custoDireto, {
     base: { ...(res.bdiCampos || {}), ...(cfg.base || {}) },
     conservador: cfg.conservador || {},
@@ -1662,7 +1697,7 @@ function Cenario({ e, res, mexer, fabrica }) {
  * PINTURA, com 3 pessoas.
  */
 function FabricaPorHora({ fabrica, cfg, mexer, cadencia }) {
-  const set = (k, v) => mexer({ cenario: { ...cfg, [k]: v } });
+  const set = (k, v) => mexer((a) => ({ cenario: { ...(a.cenario || {}), [k]: v } }));
   const rota = fabrica.rota || [];
   if (!rota.length) return null;
 
@@ -1747,7 +1782,7 @@ function FabricaPorHora({ fabrica, cfg, mexer, cadencia }) {
       )}
 
       <div className="px-4 py-2.5 border-t border-gray-100 flex flex-wrap items-center gap-3">
-        <button type="button" onClick={() => mexer({ cenario: { ...cfg, cadenciaKgMes: String(cap.capacidadeKgMes) } })}
+        <button type="button" onClick={() => mexer((a) => ({ cenario: { ...(a.cenario || {}), cadenciaKgMes: String(cap.capacidadeKgMes) } }))}
           disabled={usando || !cap.capacidadeKgMes}
           className={`text-[11px] rounded-lg px-3 py-1.5 border ${usando ? "border-gray-200 text-torg-gray" : "border-torg-blue text-torg-blue hover:bg-torg-blue-50"}`}>
           {usando ? "Esta capacidade já é a cadência do estudo" : "Usar esta capacidade como cadência do estudo"}
@@ -1782,7 +1817,7 @@ function FabricaPorHora({ fabrica, cfg, mexer, cadencia }) {
 function Cadencia({ fabrica, cfg, mexer, res, cadencia }) {
   const L = fabrica.leituras || {};
   const custoMes = fabrica.custoOperacionalMes || 0;
-  const set = (v) => mexer({ cenario: { ...cfg, cadenciaKgMes: v } });
+  const set = (v) => mexer((a) => ({ cenario: { ...(a.cenario || {}), cadenciaKgMes: v } }));
 
   // ⚠ o que a tabela COBRA de industrialização por quilo — é contra isto que a cadência se mede
   const tabelaPorKg = res.pesoTotal > 0 ? (res.totais?.industrializacao?.subtotal || 0) / res.pesoTotal : 0;
@@ -2040,7 +2075,7 @@ function PrazoDoLucro({ res, analise, fabrica, cadencia }) {
  * confronto que a tabela faz.
  */
 function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
-  const set = (k, v) => mexer({ cenario: { ...cfg, [k]: v } });
+  const set = (k, v) => mexer((a) => ({ cenario: { ...(a.cenario || {}), [k]: v } }));
   const meses = numeroBr(cfg.mesesFabricacao) || Math.max(1, Math.round((res.pesoTotal / fabrica.capacidadeKgMes) * 10) / 10);
   const projeto = cfg.mesesProjeto == null || cfg.mesesProjeto === "" ? 1 : Math.max(0, Math.round(numeroBr(cfg.mesesProjeto)));
   // ⚠ QUANTO DA FÁBRICA ESTA OBRA OCUPA. Vitor (23/08/2026): "nos meses que de fato eu começo a
@@ -2094,7 +2129,7 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
   const setKg = (m, v) => {
     const novo = Array.from({ length: tamanho }, (_, i) => kgPorMes[i] ?? "");
     novo[m] = v;
-    mexer({ cenario: { ...cfg, kgPorMes: novo } });
+    mexer((atual) => ({ cenario: { ...(atual.cenario || {}), kgPorMes: novo } }));
   };
   // ⚠ o que se PRODUZ e o que se MEDE são duas coisas. Vitor (23/08/2026): "nos meses que eu marcar
   // como não mede, você deve deixar esse valor em aberto e eu posso distribuir isso em um mês ou em
@@ -2102,13 +2137,13 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
   const setKgMedido = (m, v) => {
     const novo = Array.from({ length: tamanho }, (_, i) => kgMedidoPorMes[i] ?? "");
     novo[m] = v;
-    mexer({ cenario: { ...cfg, kgMedidoPorMes: novo } });
+    mexer((atual) => ({ cenario: { ...(atual.cenario || {}), kgMedidoPorMes: novo } }));
   };
   // ⚠ marcar/desmarcar é por mês DA FABRICAÇÃO (1, 2, 3...), não por mês do contrato — é assim
   // que a obra é falada no chão: "no primeiro mês de fabricação não tem medição".
   const alternaMedicao = (mesFab) => {
     const tem = semMedicao.includes(mesFab);
-    mexer({ cenario: { ...cfg, mesesSemMedicao: tem ? semMedicao.filter((x) => x !== mesFab) : [...semMedicao, mesFab].sort((a, b) => a - b) } });
+    mexer((atual) => ({ cenario: { ...(atual.cenario || {}), mesesSemMedicao: tem ? semMedicao.filter((x) => x !== mesFab) : [...semMedicao, mesFab].sort((x, y) => x - y) } }));
   };
   // ⚠ A TABELA TERMINA COM A OBRA. Vitor (23/08/2026): "hoje estamos repetindo até 57 meses,
   // deixar a projeção apenas até o mês que finaliza a obra, não ficar repetido".
@@ -2123,7 +2158,7 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
   const setReceita = (m, v) => {
     const novo = Array.from({ length: tamanho }, (_, i) => receita[i] ?? "");
     novo[m] = v;
-    mexer({ cenario: { ...cfg, receitaPorMes: novo } });
+    mexer((atual) => ({ cenario: { ...(atual.cenario || {}), receitaPorMes: novo } }));
   };
 
   return (
@@ -2260,7 +2295,7 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
                 const soma = f.medicao.kgInformado;
                 if (!(soma > 0)) return;
                 const fator = f.medicao.pesoKg / soma;
-                mexer({ cenario: { ...cfg, kgPorMes: Array.from({ length: tamanho }, (_, i) => (numeroBr(kgPorMes[i]) > 0 ? String(Math.round(numeroBr(kgPorMes[i]) * fator)) : "")) } });
+                mexer((atual) => ({ cenario: { ...(atual.cenario || {}), kgPorMes: Array.from({ length: tamanho }, (_, i) => (numeroBr(kgPorMes[i]) > 0 ? String(Math.round(numeroBr(kgPorMes[i]) * fator)) : "")) } }));
               }}
                 className="text-[11px] rounded-lg px-3 py-1.5 border border-torg-blue text-torg-blue hover:bg-torg-blue-50 whitespace-nowrap">
                 Ajustar ao peso da obra
