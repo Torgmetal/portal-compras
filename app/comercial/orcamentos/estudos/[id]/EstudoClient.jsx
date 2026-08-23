@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, TrendingDown } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { CLASSES, PERFIS, FATURAMENTO, ESTRUTURAS, METODOS, DEMAOS, PRE_MONTAGEM, ITENS_COMERCIAIS, TERCEIRIZADOS, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, cargaDoCfop } from "@/lib/lqc";
+import { CLASSES, PERFIS, FATURAMENTO, ESTRUTURAS, METODOS, PRE_MONTAGEM, ITENS_COMERCIAIS, TERCEIRIZADOS, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, cargaDoCfop, perdaDaEstrutura } from "@/lib/lqc";
 
 const fmtR$ = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -81,7 +81,11 @@ export default function EstudoClient({ id }) {
       </div>
 
       {/* barra de resultado — sempre visível, porque é a pergunta que o orçamentista faz */}
-      <div className="grid grid-cols-2 sm:grid-cols-6 gap-px bg-gray-100 border border-gray-100 rounded-xl overflow-hidden mb-5">
+      {/* ⚠ VALOR NÃO QUEBRA. Vitor (23/08/2026): "não deixe quebrar essas coisas" — "R$
+          12.096.000,00" saía com o "R$" numa linha e o número na outra. Número partido ao meio é
+          número que se lê errado, e num painel de preço isso é grave. A grade abre em 3 colunas
+          antes de ir pra 6: espremer seis valores de moeda numa linha só é o que causa a quebra. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-px bg-gray-100 border border-gray-100 rounded-xl overflow-hidden mb-5">
         <Kpi r="Peso" v={fmtKg(res.pesoTotal)} />
         <Kpi r="Custo" v={fmtR$(res.custo)} />
         <Kpi r={`BDI ${res.bdiPct || 0}%`} v={fmtR$(res.bdiValor)} />
@@ -112,9 +116,9 @@ export default function EstudoClient({ id }) {
 
 function Kpi({ r, v, cor }) {
   return (
-    <div className="bg-white p-3">
-      <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider">{r}</p>
-      <p className={`text-[15px] font-extrabold tabular-nums ${cor || "text-torg-dark"}`}>{v}</p>
+    <div className="bg-white p-3 min-w-0">
+      <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider truncate">{r}</p>
+      <p className={`text-[14px] font-extrabold tabular-nums whitespace-nowrap overflow-hidden text-ellipsis ${cor || "text-torg-dark"}`} title={String(v)}>{v}</p>
     </div>
   );
 }
@@ -159,14 +163,14 @@ function Resumos({ e, c, setComp, mexer }) {
           a <strong className="text-torg-dark">classificação</strong> escolhe o preço de fabricação e pintura,
           e o <strong className="text-torg-dark">perfil predominante</strong> escolhe o preço da matéria-prima.
         </p>
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="text-[11px] font-semibold text-torg-dark">Método
-            <Sel value={e.metodo || ""} onChange={(ev) => mexer({ metodo: ev.target.value })} opcoes={METODOS} className="block mt-1" /></label>
-          <label className="text-[11px] font-semibold text-torg-dark">Demãos de tinta
-            <Sel value={e.demaos || ""} onChange={(ev) => mexer({ demaos: ev.target.value })} opcoes={DEMAOS} className="block mt-1" /></label>
-          <label className="text-[11px] font-semibold text-torg-dark">Pré-montagem
-            <Sel value={e.preMontagem || ""} onChange={(ev) => mexer({ preMontagem: ev.target.value })} opcoes={PRE_MONTAGEM} className="block mt-1" /></label>
-          <span className="ml-auto text-[12px] text-torg-gray">Total do quantitativo: <strong className="text-torg-dark tabular-nums">{fmtKg(total)}</strong></span>
+        {/* ⚠ nada de seletor global aqui. Método é por linha (é assim na RESUMOS_EM), demãos a
+            planilha CONTA das camadas da MC_TINTAS, e pré-montagem é decisão de preço — foi pra
+            aba Industrialização, junto do faturamento dela. */}
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="text-[12px] text-torg-gray">
+            {linhas.length} {linhas.length === 1 ? "elemento" : "elementos"} ·
+            total <strong className="text-torg-dark tabular-nums whitespace-nowrap">{fmtKg(total)}</strong>
+          </span>
         </div>
       </div>
 
@@ -199,7 +203,7 @@ function CartaoLinha({ l, i, set, del, dup }) {
         <span className="text-[12px] font-semibold text-torg-dark">{l.area || "sem área"}</span>
         {l.estrutura && <span className="text-[12px] text-torg-gray">· {l.estrutura}</span>}
         {l.elemento && <span className="text-[12px] text-torg-gray">· {l.elemento}</span>}
-        <span className="ml-auto text-[13px] font-extrabold tabular-nums text-torg-dark">{fmtKg(peso)}</span>
+        <span className="ml-auto text-[13px] font-extrabold tabular-nums text-torg-dark whitespace-nowrap">{fmtKg(peso)}</span>
         <button onClick={() => dup(i)} title="duplicar" className="text-gray-300 hover:text-torg-blue"><Plus size={14} /></button>
         <button onClick={() => del(i)} title="remover" className="text-gray-300 hover:text-red-600"><Trash2 size={14} /></button>
       </div>
@@ -229,7 +233,7 @@ function CartaoLinha({ l, i, set, del, dup }) {
             <Inp value={l.pesoUnit ?? ""} onChange={(ev) => set(i, "pesoUnit", ev.target.value)} className="w-full text-right" /></Campo>
         </Bloco>
 
-        <Bloco titulo="De que é feito" nota="as duas escolhas que definem o preço da linha">
+        <Bloco titulo="De que é feito" nota={`as duas escolhas que definem o preço · perda de tinta ${perdaDaEstrutura(l.estrutura)}% (vem da estrutura)`}>
           <Campo r="Classificação" ajuda={classe ? `${classe.faixa} · fabricação ${fmtR$(classe.fabricacao)}/kg` : "faixa de peso por metro do perfil"}>
             <select value={l.classificacao || ""} onChange={(ev) => set(i, "classificacao", ev.target.value)}
               className="border border-gray-200 rounded px-2 py-1 text-[12px] bg-white w-full">
@@ -278,7 +282,7 @@ const Campo = ({ r, ajuda, children }) => (
 );
 
 /** INDUSTRIALIZAÇÃO — faturamento por grupo, preços de entrada e o quadro calculado. */
-function Industrializacao({ c, res, setComp }) {
+function Industrializacao({ c, res, setComp, e, mexer }) {
   const fat = c.faturamento || {};
   const setFat = (k, v) => setComp({ faturamento: { ...fat, [k]: v } });
   const g = res.grupos || {};
@@ -306,6 +310,16 @@ function Industrializacao({ c, res, setComp }) {
       </div>
 
       <div className="bg-white border border-gray-100 rounded-xl p-4">
+        {/* ⚠ a pré-montagem mora AQUI porque é ela que escolhe a coluna de preço da linha 3.3 —
+            é decisão de custo, não de quantitativo. */}
+        <div className="flex flex-wrap items-end gap-4 mb-4 pb-4 border-b border-gray-100">
+          <label className="text-[11px] font-semibold text-torg-dark">Pré-montagem
+            <Sel value={e.preMontagem || ""} onChange={(ev) => mexer({ preMontagem: ev.target.value })} opcoes={PRE_MONTAGEM} className="block mt-1" /></label>
+          <p className="text-[11px] text-torg-gray">
+            Demãos de pintura: <strong className="text-torg-dark">{res.demaos || 1}</strong> —
+            contadas das camadas lançadas na aba MC_TINTAS, como a planilha faz.
+          </p>
+        </div>
         <p className="text-[12px] font-bold text-torg-dark mb-3">Preços que a planilha não calcula</p>
         <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-3">
           <label className="text-[11px] text-torg-dark">Fixadores (R$/kg)
@@ -341,18 +355,18 @@ function Quadro({ titulo, grupo }) {
           {grupo.linhas.filter((l) => l.pesoKg > 0 || l.subtotal > 0).map((l, i) => (
             <tr key={i}>
               <td className="px-4 py-1">{l.nome}</td><td className="px-2 py-1 text-torg-gray">{l.espec || "—"}</td>
-              <td className="px-2 py-1 text-right tabular-nums">{fmtKg(l.pesoKg)}</td>
-              <td className="px-2 py-1 text-right tabular-nums">{fmtR$(l.precoKg)}</td>
-              <td className="px-2 py-1 text-right tabular-nums font-semibold">{fmtR$(l.subtotal)}</td>
-              <td className="px-2 py-1 text-right tabular-nums text-torg-gray">{fmtR$(l.icms)}</td>
-              <td className="px-4 py-1 text-right tabular-nums text-torg-gray">{fmtR$(l.pisCofins)}</td>
+              <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">{fmtKg(l.pesoKg)}</td>
+              <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">{fmtR$(l.precoKg)}</td>
+              <td className="px-2 py-1 text-right tabular-nums font-semibold whitespace-nowrap">{fmtR$(l.subtotal)}</td>
+              <td className="px-2 py-1 text-right tabular-nums text-torg-gray whitespace-nowrap">{fmtR$(l.icms)}</td>
+              <td className="px-4 py-1 text-right tabular-nums text-torg-gray whitespace-nowrap">{fmtR$(l.pisCofins)}</td>
             </tr>
           ))}
           <tr className="bg-gray-50 font-bold">
             <td className="px-4 py-1.5" colSpan={4}>Total</td>
-            <td className="px-2 py-1.5 text-right tabular-nums">{fmtR$(grupo.total.subtotal)}</td>
-            <td className="px-2 py-1.5 text-right tabular-nums">{fmtR$(grupo.total.icms)}</td>
-            <td className="px-4 py-1.5 text-right tabular-nums">{fmtR$(grupo.total.pisCofins)}</td>
+            <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(grupo.total.subtotal)}</td>
+            <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(grupo.total.icms)}</td>
+            <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(grupo.total.pisCofins)}</td>
           </tr>
         </tbody>
       </table>
@@ -364,6 +378,7 @@ function Quadro({ titulo, grupo }) {
 function Tintas({ c, setComp }) {
   const t = Array.isArray(c.tintas) ? c.tintas : [];
   const linha = (i) => t[i] || {};
+  // ⚠ o nº de demãos é a contagem destas camadas — não há seletor de demãos em lugar nenhum.
   const set = (i, campo, v) => {
     const novo = [...t];
     novo[i] = { ...linha(i), [campo]: v, nome: i === 0 ? "ESTRUTURA — FATOR DE PERDA: 45%" : "ESTRUTURA — FATOR DE PERDA: 85%", perda: i === 0 ? 45 : 85 };
@@ -387,6 +402,11 @@ function Tintas({ c, setComp }) {
       <p className="text-[11px] text-torg-gray">
         Na planilha, área de pintura, rendimento e litros saem de fórmula a partir do quantitativo.
         Aqui entram o produto e o preço; o custo por kg alimenta a linha de TINTAS da industrialização.
+      </p>
+      <p className="text-[11px] text-torg-gray">
+        <strong className="text-torg-dark">O nº de demãos é a contagem destas camadas</strong> — é assim
+        que a planilha faz. Os dois fatores de perda também não se escolhem: 85% é de guarda-corpo e
+        escada marinheiro, 45% do resto, conforme a estrutura de cada elemento.
       </p>
     </div>
   );
@@ -412,12 +432,12 @@ function Comerciais({ c, res, setComp }) {
                 <td className="px-2 py-1 text-right"><Inp value={it[i.key]?.qtd ?? ""} onChange={(e) => set(i.key, "qtd", e.target.value)} className="w-24 text-right" /></td>
                 <td className="px-2 py-1 text-right"><Inp value={it[i.key]?.preco ?? i.preco} onChange={(e) => set(i.key, "preco", e.target.value)} className="w-24 text-right" /></td>
                 <td className="px-2 py-1"><Sel value={it[i.key]?.faturamento || ""} onChange={(e) => set(i.key, "faturamento", e.target.value)} opcoes={FATURAMENTO} className="w-24" /></td>
-                <td className="px-4 py-1 text-right tabular-nums font-semibold">{fmtR$(qtd * preco)}</td>
+                <td className="px-4 py-1 text-right tabular-nums font-semibold whitespace-nowrap">{fmtR$(qtd * preco)}</td>
               </tr>
             );
           })}
           <tr className="bg-gray-50 font-bold"><td className="px-4 py-1.5" colSpan={5}>Total</td>
-            <td className="px-4 py-1.5 text-right tabular-nums">{fmtR$(res.totais?.comerciais)}</td></tr>
+            <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(res.totais?.comerciais)}</td></tr>
         </tbody>
       </table>
     </div>
@@ -493,13 +513,13 @@ function Bdi({ c, res, setComp }) {
                     {CFOPS.map((f) => <option key={f.cod} value={f.cod}>{f.rotulo}</option>)}
                   </select>
                 </td>
-                <td className="px-2 py-1.5 text-right tabular-nums">{fmtR$(l.base)}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums text-torg-gray">{l.cargaPct}%</td>
-                <td className="px-5 py-1.5 text-right tabular-nums font-semibold">{fmtR$(l.valor)}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(l.base)}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums text-torg-gray whitespace-nowrap">{l.cargaPct}%</td>
+                <td className="px-5 py-1.5 text-right tabular-nums font-semibold whitespace-nowrap">{fmtR$(l.valor)}</td>
               </tr>
             ))}
             <tr className="bg-gray-50 font-bold"><td className="px-5 py-1.5" colSpan={4}>Total de impostos</td>
-              <td className="px-5 py-1.5 text-right tabular-nums">{fmtR$(res.totalImpostos)}</td></tr>
+              <td className="px-5 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(res.totalImpostos)}</td></tr>
           </tbody>
         </table>
       </div>
@@ -510,7 +530,7 @@ function Bdi({ c, res, setComp }) {
           {CFOPS.map((f) => (
             <div key={f.cod} className="flex justify-between gap-3 text-[11px] border border-gray-100 rounded px-2.5 py-1.5">
               <span className="text-torg-gray truncate">{f.rotulo}</span>
-              <span className="font-semibold tabular-nums text-torg-dark shrink-0">{Math.round(cargaDoCfop(f.cod) * 10000) / 100}%</span>
+              <span className="font-semibold tabular-nums text-torg-dark shrink-0 whitespace-nowrap">{Math.round(cargaDoCfop(f.cod) * 10000) / 100}%</span>
             </div>
           ))}
         </div>
@@ -521,7 +541,7 @@ function Bdi({ c, res, setComp }) {
 
 const Linha = ({ r, v, forte }) => (
   <div className={`flex justify-between gap-4 ${forte ? "font-bold text-torg-dark border-t border-gray-100 pt-1" : "text-torg-gray"}`}>
-    <dt>{r}</dt><dd className="tabular-nums">{v}</dd>
+    <dt>{r}</dt><dd className="tabular-nums whitespace-nowrap">{v}</dd>
   </div>
 );
 
@@ -541,12 +561,12 @@ function PlanilhaComercial({ res, e }) {
             <td className="px-4 py-2">1.1</td>
             <td className="px-2 py-2">Fornecimento das estruturas metálicas — {e.obra || ""}</td>
             <td className="px-2 py-2">kg</td>
-            <td className="px-2 py-2 text-right tabular-nums">{Number(res.pesoTotal || 0).toLocaleString("pt-BR")}</td>
-            <td className="px-2 py-2 text-right tabular-nums">{fmtR$(res.precoPorKg)}</td>
-            <td className="px-4 py-2 text-right tabular-nums font-semibold">{fmtR$(res.preco)}</td>
+            <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">{Number(res.pesoTotal || 0).toLocaleString("pt-BR")}</td>
+            <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">{fmtR$(res.precoPorKg)}</td>
+            <td className="px-4 py-2 text-right tabular-nums font-semibold whitespace-nowrap">{fmtR$(res.preco)}</td>
           </tr>
           <tr className="bg-gray-50 font-bold"><td className="px-4 py-2" colSpan={5}>TOTAL GERAL</td>
-            <td className="px-4 py-2 text-right tabular-nums">{fmtR$(res.preco)}</td></tr>
+            <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">{fmtR$(res.preco)}</td></tr>
         </tbody>
       </table>
       <div className="p-4 border-t border-gray-100 grid sm:grid-cols-4 gap-3 text-[12px]">
@@ -626,9 +646,9 @@ function Cenario({ e, cen, res, mexer }) {
                 {cen.fluxo.filter((f) => f.saida || f.entrada || f.saldo).map((f) => (
                   <tr key={f.mes}>
                     <td className="px-4 py-1">{f.mes === 0 ? "início" : `mês ${f.mes}`}</td>
-                    <td className="px-2 py-1 text-right tabular-nums text-red-600">{f.saida ? `- ${fmtR$(f.saida)}` : "—"}</td>
-                    <td className="px-2 py-1 text-right tabular-nums text-green-700">{f.entrada ? fmtR$(f.entrada) : "—"}</td>
-                    <td className="px-2 py-1 text-right tabular-nums text-torg-gray">{f.juros ? fmtR$(f.juros) : "—"}</td>
+                    <td className="px-2 py-1 text-right tabular-nums text-red-600 whitespace-nowrap">{f.saida ? `- ${fmtR$(f.saida)}` : "—"}</td>
+                    <td className="px-2 py-1 text-right tabular-nums text-green-700 whitespace-nowrap">{f.entrada ? fmtR$(f.entrada) : "—"}</td>
+                    <td className="px-2 py-1 text-right tabular-nums text-torg-gray whitespace-nowrap">{f.juros ? fmtR$(f.juros) : "—"}</td>
                     <td className={`px-4 py-1 text-right tabular-nums font-semibold ${f.saldo < 0 ? "text-red-600" : "text-torg-dark"}`}>{fmtR$(f.saldo)}</td>
                   </tr>
                 ))}

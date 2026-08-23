@@ -78,9 +78,9 @@ export default function EstudosClient() {
                     <Link href={`/comercial/orcamentos/estudos/${e.id}`}>{cod(e)}</Link>
                   </td>
                   <td className="px-4 py-2">{e.cliente}{e.obra ? <span className="text-torg-gray"> · {e.obra}</span> : null}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{Number(e.resultado?.pesoTotal || 0).toLocaleString("pt-BR")} kg</td>
-                  <td className="px-4 py-2 text-right tabular-nums font-semibold">{fmtR$(e.resultado?.preco)}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{fmtR$(e.resultado?.precoPorKg)}</td>
+                  <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">{Number(e.resultado?.pesoTotal || 0).toLocaleString("pt-BR")} kg</td>
+                  <td className="px-4 py-2 text-right tabular-nums font-semibold whitespace-nowrap">{fmtR$(e.resultado?.preco)}</td>
+                  <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">{fmtR$(e.resultado?.precoPorKg)}</td>
                   <td className="px-4 py-2 text-torg-gray whitespace-nowrap">{fmtD(e.updatedAt)}</td>
                   <td className="px-4 py-2 text-right">
                     <a href={`/api/comercial/estudos/${e.id}/planilha`}
