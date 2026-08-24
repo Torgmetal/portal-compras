@@ -3,7 +3,8 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Gauge, PlusCircle, FolderKanban, Bell, Building2, Boxes, Layers, Truck, ClipboardList, RailSymbol, ShoppingCart, Forklift, Hammer, Star } from "lucide-react";
+import { Gauge, PlusCircle, FolderKanban, Bell, Building2, Boxes, Layers, Truck, ClipboardList, RailSymbol, ShoppingCart, Forklift, Hammer, Star, PackageCheck
+} from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -21,6 +22,10 @@ const menu = [
   { href: "/compras/saldo-materiais", label: "Saldo Materiais", icon: ClipboardList },
   { href: "/compras/estoque", label: "Estoque", icon: Boxes },
   { href: "/compras/materiais", label: "Materiais por OP", icon: Layers },
+  // ⚠ ENTRA NO MENU JUNTO COM A TELA. A auditoria de 23/08 encontrou 11 páginas órfãs — tela sem
+  // link é tela que ninguém usa, e a lista dos itens que não casaram com o CMR existia calculada
+  // e jogada fora justamente por não ter para onde aparecer.
+  { href: "/compras/recebimento-cmr", label: "Recebimento (CMR)", icon: PackageCheck },
   { href: "/compras/vendorlist", label: "Vendor List", icon: Building2 },
   { href: "/compras/indicadores/fornecedores", label: "Avaliação Fornecedores (IQF)", icon: Star },
   { href: "/compras/notificacoes", label: "Notificações", icon: Bell, masterOnly: true },
