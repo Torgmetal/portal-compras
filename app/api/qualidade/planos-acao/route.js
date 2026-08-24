@@ -44,9 +44,15 @@ export async function POST(req) {
   try { body = schema.parse(await req.json()); }
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
-  // Planos criados aqui (auditoria) numeram na própria sequência — os de RNC seguem
-  // a numeração da RNC (ver importar/route.js), então ficam fora deste máximo.
-  const ultima = await prisma.planoAcao.findFirst({ where: { NOT: { origem: { startsWith: "RNC-" } } }, orderBy: { numero: "desc" }, select: { numero: true } });
+  // ⚠⚠ O NÚMERO SÓ PODE SER ÚNICO SE OLHAR TODOS OS PLANOS. A regra anterior excluía os de origem
+  // RNC do máximo, "porque eles seguem a numeração da RNC" — e o resultado é colisão garantida:
+  // hoje TODOS os 10 planos vieram de RNC, então o filtro devolve null e o próximo plano manual
+  // nasceria com numero = 1, em cima do PA-001 que já existe. E `PlanoAcao` não tem `@@unique` em
+  // `numero` (só `@@index([status])`), então o banco aceita calado e saem dois PA-001 impressos.
+  //
+  // ⚠ o mesmo cuidado que a `NaoConformidade` já teve: lá o `@@unique([ano, numero])` foi posto
+  // depois de uma colisão real, com o incidente registrado no schema. Aqui a lição não foi aplicada.
+  const ultima = await prisma.planoAcao.findFirst({ orderBy: { numero: "desc" }, select: { numero: true } });
   const numero = (ultima?.numero || 0) + 1;
 
   const p = await prisma.planoAcao.create({
