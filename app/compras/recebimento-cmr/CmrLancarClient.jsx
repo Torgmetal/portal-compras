@@ -23,6 +23,8 @@ export default function CmrLancarClient() {
   const [form, setForm] = useState(VAZIO);
   const [massa, setMassa] = useState([]); // linhas coladas (array de objetos)
   const [salvando, setSalvando] = useState(false);
+  const [pedido, setPedido] = useState(null); // itens puxados do pedido de compra
+  const [buscandoPed, setBuscandoPed] = useState(false);
 
   const carregar = useCallback(async () => {
     const p = new URLSearchParams({ ano: String(ano) });
@@ -33,6 +35,22 @@ export default function CmrLancarClient() {
   useEffect(() => { const t = setTimeout(carregar, 250); return () => clearTimeout(t); }, [carregar]);
 
   const setF = (k, v) => setForm((s) => ({ ...s, [k]: v }));
+
+  async function puxarPedido() {
+    const num = (form.pedidoCompra || "").trim();
+    if (!num) { showToast("Digite o nº do pedido de compra", "erro"); return; }
+    setBuscandoPed(true); setPedido(null);
+    try {
+      const j = await fetch(`/api/compras/cmr/pedido?numero=${encodeURIComponent(num)}`).then((r) => r.json());
+      if (!j.success) throw new Error(j.error || "Pedido não encontrado");
+      setPedido(j);
+      // preenche fornecedor/obra/NF do pedido de uma vez
+      setForm((s) => ({ ...s, fornecedor: j.fornecedor || s.fornecedor, obra: (j.obra || s.obra || "").replace(/^OP\s*/i, "OP "), nf: j.nf || s.nf }));
+    } catch (e) { showToast(e.message, "erro"); } finally { setBuscandoPed(false); }
+  }
+  function escolherItemPedido(it) {
+    setForm((s) => ({ ...s, descricao: it.descricao, qtd: it.qtd ? String(it.qtd) : s.qtd }));
+  }
 
   async function salvarForm() {
     if (!form.descricao.trim()) { showToast("Informe a descrição do material", "erro"); return; }
@@ -101,6 +119,28 @@ export default function CmrLancarClient() {
       {/* Formulário 1 item (celular) */}
       {modo === "form" && (
         <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-3">
+          {pedido && (
+            <div className="border border-torg-blue-100 bg-torg-blue-50/40 rounded-lg overflow-hidden">
+              <div className="px-3 py-2 flex items-center justify-between">
+                <p className="text-[12px] font-semibold text-torg-dark">Pedido {pedido.pedido} · {pedido.fornecedor || "—"}{pedido.obra ? ` · ${pedido.obra}` : ""} <span className="font-normal text-torg-gray">— toque no item que chegou</span></p>
+                <button onClick={() => setPedido(null)} className="text-torg-gray hover:text-red-600"><X size={15} /></button>
+              </div>
+              <div className="max-h-44 overflow-y-auto divide-y divide-torg-blue-100/60">
+                {pedido.itens.length === 0 ? <p className="px-3 py-2 text-xs text-torg-gray">Pedido sem itens.</p>
+                  : pedido.itens.map((it) => {
+                    const escolhido = form.descricao === it.descricao;
+                    return (
+                      <button key={it.idx} type="button" onClick={() => escolherItemPedido(it)}
+                        className={`w-full text-left px-3 py-2 text-xs hover:bg-white/70 flex items-center gap-2 ${escolhido ? "bg-white" : ""}`}>
+                        <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${escolhido ? "bg-torg-blue border-torg-blue" : "border-gray-300"}`}>{escolhido && <Check size={11} className="text-white" />}</span>
+                        <span className="flex-1 min-w-0"><span className="text-torg-dark block truncate">{it.descricao}</span>
+                          <span className="text-torg-gray">{fmtNum(it.qtd)} {it.unidade || ""}{it.qtdRecebida > 0 ? ` · já receb. ${fmtNum(it.qtdRecebida)}` : ""}</span></span>
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div><span className={lbl}>R / RC</span>
               <div className="flex gap-1">
@@ -113,7 +153,12 @@ export default function CmrLancarClient() {
               <Autocomplete campo="norma" value={form.especificacao} onChange={(v) => setF("especificacao", v)} placeholder="ex.: ASTM A572" /></div>
             <div><span className={lbl}>Nº certificado</span><input value={form.certificado} onChange={(e) => setF("certificado", e.target.value)} className={inp} /></div>
             <div><span className={lbl}>Lote / corrida</span><input value={form.loteCorrida} onChange={(e) => setF("loteCorrida", e.target.value)} className={inp} /></div>
-            <div><span className={lbl}>Pedido compra</span><input value={form.pedidoCompra} onChange={(e) => setF("pedidoCompra", e.target.value)} className={inp} /></div>
+            <div><span className={lbl}>Pedido compra</span>
+              <div className="flex gap-1">
+                <input value={form.pedidoCompra} onChange={(e) => setF("pedidoCompra", e.target.value)} onKeyDown={(e) => e.key === "Enter" && puxarPedido()} placeholder="nº" className={inp} />
+                <button type="button" onClick={puxarPedido} disabled={buscandoPed} title="Puxar os itens do pedido" className="px-3 rounded-lg bg-torg-blue text-white hover:bg-torg-dark disabled:opacity-50 shrink-0">{buscandoPed ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}</button>
+              </div>
+            </div>
             <div><span className={lbl}>Data receb.</span><input type="date" value={form.dataRecebimento} onChange={(e) => setF("dataRecebimento", e.target.value)} className={inp} /></div>
             <div><span className={lbl}>Nº NF</span><input value={form.nf} onChange={(e) => setF("nf", e.target.value)} inputMode="numeric" className={inp} /></div>
             <div><span className={lbl}>Fornecedor</span><input value={form.fornecedor} onChange={(e) => setF("fornecedor", e.target.value)} className={inp} /></div>
