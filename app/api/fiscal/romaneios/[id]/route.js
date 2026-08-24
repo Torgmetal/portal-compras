@@ -25,11 +25,32 @@ const schema = z.object({
   acao: z.enum(["gerar_remessa_omie", "conferir_omie", "emitir_omie", "atualizar_status"]).optional(),
   cfop: z.string().max(10).nullable().optional(),
   frete: freteSchema,
+  valorKg: z.number().positive().nullable().optional(), // valor R$/kg da remessa (ARM000001)
+  infoAdic: z.string().max(500).nullable().optional(), // Informações Adicionais da NF
   // registro manual (fluxo antigo)
   nfNumero: z.string().max(60).nullable().optional(),
   nfTipo: z.enum(["VENDA", "SERVICO", "REMESSA"]).nullable().optional(),
   nfObservacao: z.string().max(1000).nullable().optional(),
 });
+
+// GET — detalhe do romaneio p/ o modal Faturar (itens, cliente, estado da NF/Omie).
+export async function GET(_req, { params }) {
+  try { await requireRole(ROLES); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  const r = await prisma.romaneioPrevio.findUnique({
+    where: { id: params.id },
+    select: {
+      id: true, numero: true, opNumero: true, pesoKg: true, itens: true,
+      nfNumero: true, nfTipo: true, nfPedidoOmie: true, nfPedidoNumero: true, nfChave: true, nfErroEmissao: true, nfFrete: true, nfObservacao: true,
+      op: { select: { numero: true, obra: true, cliente: true, clienteCnpj: true, clienteUF: true } },
+    },
+  });
+  if (!r) return NextResponse.json({ error: "Romaneio não encontrado" }, { status: 404 });
+  const itens = (Array.isArray(r.itens) ? r.itens : []).map((it) => ({
+    marca: it.marca || null, descricao: it.descricao || null, frente: it.frente || null,
+    qte: Number(it.qte || 0) || 0, pesoTotal: Number(it.pesoTotal || 0) || 0,
+  }));
+  return NextResponse.json({ success: true, romaneio: { ...r, itens } });
+}
 
 export async function PATCH(req, { params }) {
   let user;
@@ -65,7 +86,7 @@ export async function PATCH(req, { params }) {
       remessaCfop: body.cfop || null, // o Fiscal escolhe o CFOP da remessa ao cliente
     };
     let resultado;
-    try { resultado = await criarPedidoRemessa(romAdapt, cli, { frete: body.frete || null }); }
+    try { resultado = await criarPedidoRemessa(romAdapt, cli, { frete: body.frete || null, valorKg: body.valorKg || null, infoAdic: body.infoAdic || null }); }
     catch (e) { return NextResponse.json({ error: `Falha ao criar remessa no Omie: ${e.message}` }, { status: 502 }); }
     if (resultado.erro) return NextResponse.json({ error: resultado.erro }, { status: 400 });
 

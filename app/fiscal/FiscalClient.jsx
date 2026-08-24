@@ -164,9 +164,9 @@ export default function FiscalClient() {
                         {r.nfPedidoOmie ? (
                           <button onClick={() => setRemessaOmie(r)} className="text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1"><ReceiptText size={12} /> Emitir NF</button>
                         ) : (
-                          <button onClick={() => setRemessaOmie(r)} title="Gerar e emitir NF de Remessa pelo Omie" className="text-xs font-semibold text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1"><FilePlus2 size={12} /> NF Remessa</button>
+                          <button onClick={() => setRemessaOmie(r)} title="Faturar — gerar e emitir a NF pelo Omie" className="text-xs font-semibold text-white bg-torg-blue hover:bg-torg-dark px-3 py-1.5 rounded-lg inline-flex items-center gap-1"><ReceiptText size={12} /> Faturar</button>
                         )}
-                        <button onClick={() => setEditar(r)} title="Registrar NF manualmente (venda/serviço/remessa)" className="text-xs text-torg-blue hover:text-torg-dark border border-torg-blue-100 rounded-lg px-2 py-1.5 inline-flex items-center gap-1"><Pencil size={12} /> Manual</button>
+                        <button onClick={() => setEditar(r)} title="Registrar NF manualmente" className="text-xs text-torg-blue hover:text-torg-dark border border-torg-blue-100 rounded-lg px-2 py-1.5 inline-flex items-center gap-1"><Pencil size={12} /> Manual</button>
                       </div>
                     )}
                     {r.nfErroEmissao && !r.finalizado && <p className="text-[10px] text-red-600 mt-1 max-w-[200px] ml-auto text-right" title={r.nfErroEmissao}><AlertTriangle size={9} className="inline mr-0.5" /> {r.nfErroEmissao.length > 60 ? "aguardando/erro — ver detalhe" : r.nfErroEmissao}</p>}
@@ -234,10 +234,22 @@ function BadgeTipo({ tipo }) {
 const TP_FRETE = [["0", "0 - CIF (remetente)"], ["1", "1 - FOB (destinatário)"], ["2", "2 - Terceiros"], ["9", "9 - Sem transporte"]];
 const finp = "w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-torg-blue outline-none";
 
-// Modal — NF de Remessa via Omie: gera a remessa (CFOP + frete) e emite a NF-e (confere DANFE).
+const MODALIDADES = [
+  { v: "VENDA", label: "NF Venda" },
+  { v: "SERVICO", label: "NF Serviço" },
+  { v: "REMESSA", label: "NF Remessa" },
+];
+
+// Modal FATURAR — escolhe a modalidade (Venda/Serviço/Remessa) e, na Remessa, gera no Omie
+// (itens/conferência + frete + info adicional) e emite a NF-e (confere DANFE).
 function NFRemessaOmieModal({ romaneio, onClose, onFim, onAtualizar }) {
   const gerado = !!romaneio.nfPedidoOmie;
+  const [det, setDet] = useState(null); // detalhe do romaneio (itens)
+  const [modalidade, setModalidade] = useState(romaneio.nfTipo || "REMESSA");
+  const [aba, setAba] = useState("itens"); // itens | frete | info
   const [cfop, setCfop] = useState("");
+  const [valorKg, setValorKg] = useState("");
+  const [infoAdic, setInfoAdic] = useState("");
   const [frete, setFrete] = useState({ tpFrete: "0", especie: "PEÇAS", pesoBruto: romaneio.pesoKg || "", pesoLiq: romaneio.pesoKg || "" });
   const [busy, setBusy] = useState(false);
   const [erro, setErro] = useState("");
@@ -245,7 +257,15 @@ function NFRemessaOmieModal({ romaneio, onClose, onFim, onAtualizar }) {
   const setF = (k, v) => setFrete((s) => ({ ...s, [k]: v }));
   const num = (v) => (v === "" || v == null ? null : parseFloat(String(v).replace(",", ".")));
 
-  useEffect(() => { if (gerado) conferir(); /* eslint-disable-next-line */ }, [gerado]);
+  useEffect(() => {
+    fetch(`/api/fiscal/romaneios/${romaneio.id}`).then((r) => r.json()).then((j) => { if (j.success) setDet(j.romaneio); }).catch(() => {});
+    if (gerado) conferir(); /* eslint-disable-next-line */
+  }, [gerado]);
+
+  const itens = det?.itens || [];
+  const pesoTotal = itens.reduce((s, it) => s + (Number(it.pesoTotal) || 0), 0);
+  const vKg = num(valorKg) || 0;
+  const valorTotal = pesoTotal * vKg;
 
   async function patch(payload) {
     const res = await fetch(`/api/fiscal/romaneios/${romaneio.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -257,13 +277,17 @@ function NFRemessaOmieModal({ romaneio, onClose, onFim, onAtualizar }) {
     setConf(j.success ? { estado: "ok", mensagem: j.mensagem } : { estado: "erro", mensagem: j.error });
   }
   async function gerar() {
-    if (!cfop.trim()) { setErro("Informe o CFOP da remessa ao cliente."); return; }
+    if (!cfop.trim()) { setErro("Informe o CFOP (aba Itens)."); setAba("itens"); return; }
+    if (!(vKg > 0)) { setErro("Informe o valor por kg (aba Itens)."); setAba("itens"); return; }
     setErro(""); setBusy(true);
-    const j = await patch({ acao: "gerar_remessa_omie", cfop: cfop.trim(), frete: {
-      tpFrete: frete.tpFrete || "0", nCodTransp: frete.nCodTransp || null, transpNome: frete.transpNome || null,
-      placa: frete.placa || null, uf: frete.uf || null, qtdVol: num(frete.qtdVol), especie: frete.especie || null,
-      pesoLiq: num(frete.pesoLiq), pesoBruto: num(frete.pesoBruto), valorFrete: num(frete.valorFrete),
-    } }).catch(() => ({ error: "Falha ao gerar" }));
+    const j = await patch({
+      acao: "gerar_remessa_omie", cfop: cfop.trim(), valorKg: vKg, infoAdic: infoAdic.trim() || null,
+      frete: {
+        tpFrete: frete.tpFrete || "0", nCodTransp: frete.nCodTransp || null, transpNome: frete.transpNome || null,
+        placa: frete.placa || null, uf: frete.uf || null, qtdVol: num(frete.qtdVol), especie: frete.especie || null,
+        pesoLiq: num(frete.pesoLiq), pesoBruto: num(frete.pesoBruto), valorFrete: num(frete.valorFrete),
+      },
+    }).catch(() => ({ error: "Falha ao gerar" }));
     if (!j.success) { setErro(j.error); setBusy(false); return; }
     onFim(`Remessa ${j.numeroPedido || ""} criada no Omie — agora emita a NF.`, "success");
   }
@@ -284,12 +308,13 @@ function NFRemessaOmieModal({ romaneio, onClose, onFim, onAtualizar }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg my-8" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl my-8" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><ReceiptText size={16} className="text-emerald-600" /> NF Remessa — R{romaneio.numero} · OP {fmtOP(romaneio.op?.numero)}</h3>
+          <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><ReceiptText size={16} className="text-emerald-600" /> Faturar — R{romaneio.numero} · OP {fmtOP(romaneio.op?.numero)}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
-        <div className="px-5 py-4 space-y-4">
+
+        <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
           <div className="bg-gray-50 rounded-lg p-3 text-xs text-torg-gray">
             <p><strong className="text-torg-dark">{romaneio.op?.cliente}</strong>{romaneio.op?.clienteUF ? ` · ${romaneio.op.clienteUF}` : ""} · {fmtKg(romaneio.pesoKg)}</p>
             <p className="mt-0.5">{romaneio.op?.clienteCnpj || "sem CNPJ na OP"}{romaneio.op?.obra ? ` · ${romaneio.op.obra}` : ""}</p>
@@ -297,25 +322,7 @@ function NFRemessaOmieModal({ romaneio, onClose, onFim, onAtualizar }) {
           {erro && <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded px-3 py-2 flex items-start gap-1.5"><AlertTriangle size={13} className="mt-0.5 shrink-0" /><span>{erro}</span></div>}
           {romaneio.nfErroEmissao && <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded px-3 py-2">{romaneio.nfErroEmissao}</div>}
 
-          {!gerado ? (
-            <>
-              <div>
-                <label className="block text-xs font-medium text-torg-dark mb-1">CFOP da remessa *</label>
-                <input value={cfop} onChange={(e) => setCfop(e.target.value)} placeholder="ex.: 5.949 / 6.949" className={finp} />
-                <p className="text-[11px] text-torg-gray mt-1">Confirme com o contador o CFOP correto da remessa ao cliente (formato pontuado, ex.: 5.949).</p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs font-medium text-torg-dark mb-1">Tipo do frete</label>
-                  <select value={frete.tpFrete} onChange={(e) => setF("tpFrete", e.target.value)} className={finp}>{TP_FRETE.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
-                <div><label className="block text-xs font-medium text-torg-dark mb-1">Transportadora</label>
-                  <SeletorTransp onEscolher={(t) => setFrete((s) => ({ ...s, nCodTransp: t?.nCodTransp || null, transpNome: t?.nome || null, uf: t?.uf || s.uf }))} /></div>
-                <div><label className="block text-xs font-medium text-torg-dark mb-1">Placa</label><input value={frete.placa || ""} onChange={(e) => setF("placa", e.target.value.toUpperCase())} className={finp} /></div>
-                <div><label className="block text-xs font-medium text-torg-dark mb-1">UF</label><input value={frete.uf || ""} onChange={(e) => setF("uf", e.target.value.toUpperCase().slice(0, 2))} className={finp} /></div>
-                <div><label className="block text-xs font-medium text-torg-dark mb-1">Qtd. volumes</label><input value={frete.qtdVol ?? ""} onChange={(e) => setF("qtdVol", e.target.value)} inputMode="numeric" className={finp} /></div>
-                <div><label className="block text-xs font-medium text-torg-dark mb-1">Peso bruto (kg)</label><input value={frete.pesoBruto ?? ""} onChange={(e) => setFrete((s) => ({ ...s, pesoBruto: e.target.value, pesoLiq: e.target.value }))} inputMode="decimal" className={finp} /></div>
-              </div>
-            </>
-          ) : (
+          {gerado ? (
             <>
               <p className="text-xs text-torg-gray">Remessa nº <strong>{romaneio.nfPedidoNumero || romaneio.nfPedidoOmie}</strong> no Omie.</p>
               <div className="border border-gray-100 rounded-lg p-3">
@@ -326,16 +333,103 @@ function NFRemessaOmieModal({ romaneio, onClose, onFim, onAtualizar }) {
               </div>
               <p className="text-xs text-torg-gray">Ao emitir, a NF-e vai ao <strong>SEFAZ</strong> — o portal confere a autorização real (DANFE) e só finaliza quando autoriza. Pode levar até ~1 min.</p>
             </>
+          ) : (
+            <>
+              {/* Modalidade */}
+              <div>
+                <p className="text-[11px] font-medium text-torg-gray uppercase tracking-wide mb-1.5">Modalidade da NF</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {MODALIDADES.map((m) => (
+                    <button key={m.v} type="button" onClick={() => setModalidade(m.v)}
+                      className={`py-2 rounded-lg text-sm font-medium border ${modalidade === m.v ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-dark border-gray-300 hover:border-torg-blue"}`}>{m.label}</button>
+                  ))}
+                </div>
+              </div>
+
+              {modalidade !== "REMESSA" ? (
+                <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-4 text-sm text-torg-dark">
+                  <strong>{tipoLabel(modalidade)}</strong> ainda não está integrada — em construção. Por enquanto use <strong>NF Remessa</strong> (integrada) ou o botão <strong>Manual</strong>.
+                  {modalidade === "VENDA" && <p className="text-xs text-torg-gray mt-1">A Venda vai faturar parcialmente o pedido das medições já existente no Omie.</p>}
+                </div>
+              ) : (
+                <>
+                  {/* Abas */}
+                  <div className="flex gap-1 border-b border-gray-100">
+                    {[["itens", "Itens"], ["frete", "Frete"], ["info", "Info. adicionais"]].map(([v, l]) => (
+                      <button key={v} onClick={() => setAba(v)} className={`px-3 py-2 text-xs font-medium rounded-t-lg border-b-2 -mb-px ${aba === v ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>{l}</button>
+                    ))}
+                  </div>
+
+                  {aba === "itens" && (
+                    <div className="space-y-3">
+                      <p className="text-[11px] text-torg-gray">Os itens vão na NF como <strong>ARMAÇÃO (ARM000001)</strong>, com a descrição de cada marca na observação do item. A tabela é para <strong>conferência</strong> (peso e valor).</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div><label className="block text-xs font-medium text-torg-dark mb-1">CFOP *</label><input value={cfop} onChange={(e) => setCfop(e.target.value)} placeholder="ex.: 5.949" className={finp} /></div>
+                        <div><label className="block text-xs font-medium text-torg-dark mb-1">Valor por kg (R$) *</label><input value={valorKg} onChange={(e) => setValorKg(e.target.value)} inputMode="decimal" placeholder="0,00" className={finp} /></div>
+                      </div>
+                      <div className="overflow-x-auto border border-gray-100 rounded-lg max-h-56 overflow-y-auto">
+                        <table className="w-full text-xs">
+                          <thead className="bg-gray-50/60 sticky top-0"><tr className="text-[10px] text-gray-500 uppercase">
+                            <th className="px-2.5 py-1.5 text-left font-medium">Marca</th>
+                            <th className="px-2.5 py-1.5 text-left font-medium">Descrição</th>
+                            <th className="px-2.5 py-1.5 text-right font-medium">Qtd</th>
+                            <th className="px-2.5 py-1.5 text-right font-medium">Peso</th>
+                            <th className="px-2.5 py-1.5 text-right font-medium">Valor</th>
+                          </tr></thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {!det ? <tr><td colSpan={5} className="px-2.5 py-3 text-center text-torg-gray"><Loader2 size={14} className="animate-spin inline" /></td></tr>
+                              : itens.map((it, i) => (
+                                <tr key={i}>
+                                  <td className="px-2.5 py-1.5 font-mono text-torg-dark whitespace-nowrap">{it.marca || "—"}</td>
+                                  <td className="px-2.5 py-1.5 text-torg-gray truncate max-w-[220px]" title={it.descricao || ""}>{it.descricao || "—"}</td>
+                                  <td className="px-2.5 py-1.5 text-right tabular-nums">{it.qte}</td>
+                                  <td className="px-2.5 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtKg(it.pesoTotal)}</td>
+                                  <td className="px-2.5 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-dark">{vKg > 0 ? (Number(it.pesoTotal) * vKg).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"}</td>
+                                </tr>
+                              ))}
+                          </tbody>
+                          <tfoot><tr className="bg-gray-50/60 font-semibold text-torg-dark"><td className="px-2.5 py-2" colSpan={3}>Total</td><td className="px-2.5 py-2 text-right tabular-nums">{fmtKg(pesoTotal)}</td><td className="px-2.5 py-2 text-right tabular-nums">{valorTotal > 0 ? valorTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"}</td></tr></tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {aba === "frete" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><label className="block text-xs font-medium text-torg-dark mb-1">Tipo do frete</label>
+                        <select value={frete.tpFrete} onChange={(e) => setF("tpFrete", e.target.value)} className={finp}>{TP_FRETE.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+                      <div><label className="block text-xs font-medium text-torg-dark mb-1">Transportadora</label>
+                        <SeletorTransp onEscolher={(t) => setFrete((s) => ({ ...s, nCodTransp: t?.nCodTransp || null, transpNome: t?.nome || null, uf: t?.uf || s.uf }))} /></div>
+                      <div><label className="block text-xs font-medium text-torg-dark mb-1">Placa</label><input value={frete.placa || ""} onChange={(e) => setF("placa", e.target.value.toUpperCase())} className={finp} /></div>
+                      <div><label className="block text-xs font-medium text-torg-dark mb-1">UF</label><input value={frete.uf || ""} onChange={(e) => setF("uf", e.target.value.toUpperCase().slice(0, 2))} className={finp} /></div>
+                      <div><label className="block text-xs font-medium text-torg-dark mb-1">Qtd. volumes</label><input value={frete.qtdVol ?? ""} onChange={(e) => setF("qtdVol", e.target.value)} inputMode="numeric" className={finp} /></div>
+                      <div><label className="block text-xs font-medium text-torg-dark mb-1">Peso bruto (kg)</label><input value={frete.pesoBruto ?? ""} onChange={(e) => setFrete((s) => ({ ...s, pesoBruto: e.target.value, pesoLiq: e.target.value }))} inputMode="decimal" className={finp} /></div>
+                    </div>
+                  )}
+
+                  {aba === "info" && (
+                    <div>
+                      <label className="block text-xs font-medium text-torg-dark mb-1">Informações adicionais da NF</label>
+                      <textarea value={infoAdic} onChange={(e) => setInfoAdic(e.target.value)} rows={4} maxLength={500}
+                        placeholder="Texto que aparece nas informações complementares da NF (obra, pedido do cliente, observações fiscais…)"
+                        className={`${finp} resize-none`} />
+                      <p className="text-[11px] text-torg-gray mt-1">Vai no campo de dados adicionais da NF. A OP/obra já é incluída automaticamente.</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
           )}
         </div>
+
         <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2 rounded-b-xl">
           <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">Fechar</button>
-          {!gerado ? (
-            <button onClick={gerar} disabled={busy} className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-dark text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50">{busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Gerar remessa no Omie</button>
-          ) : (<>
+          {gerado ? (<>
             <button onClick={atualizar} disabled={busy} className="px-3 py-2 text-torg-blue border border-torg-blue-200 rounded-lg hover:bg-torg-blue-50 text-sm inline-flex items-center gap-1.5 disabled:opacity-50"><RefreshCw size={14} /> Atualizar status</button>
             <button onClick={emitir} disabled={busy || conf?.estado !== "ok"} className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50">{busy ? <Loader2 size={14} className="animate-spin" /> : <ReceiptText size={14} />} Emitir NF-e</button>
-          </>)}
+          </>) : (
+            <button onClick={gerar} disabled={busy || modalidade !== "REMESSA"} title={modalidade !== "REMESSA" ? "Só Remessa está integrada por enquanto" : undefined} className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-dark text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50">{busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Gerar remessa no Omie</button>
+          )}
         </div>
       </div>
     </div>
