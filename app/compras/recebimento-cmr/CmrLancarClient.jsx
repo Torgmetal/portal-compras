@@ -180,7 +180,7 @@ export default function CmrLancarClient() {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
+    <div className="p-4 sm:p-6 max-w-[1600px] mx-auto space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-torg-dark flex items-center gap-2"><PackagePlus size={22} className="text-torg-blue" /> Recebimentos (CMR)</h1>
@@ -328,9 +328,9 @@ export default function CmrLancarClient() {
             <button onClick={() => { setFiltros({}); setOrdenar(null); }} className="ml-auto text-torg-blue hover:underline inline-flex items-center gap-1"><X size={12} /> Limpar filtros ({visiveis.length} de {linhas.length})</button>
           )}
         </div>
-        <div className="overflow-x-auto">
-          <table className="text-[12px] whitespace-nowrap" style={{ minWidth: 1500 }}>
-            <thead className="bg-gray-100"><tr className="text-[10px] text-gray-600 uppercase">
+        <div className="overflow-auto max-h-[68vh]">
+          <table className="text-[11px] whitespace-nowrap" style={{ minWidth: 1500 }}>
+            <thead className="bg-gray-100 sticky top-0 z-10"><tr className="text-[10px] text-gray-600 uppercase">
               {COLUNAS.map((col) => {
                 const ativo = !!filtros[col.key];
                 const ord = ordenar?.key === col.key ? ordenar.dir : null;
@@ -350,21 +350,21 @@ export default function CmrLancarClient() {
               {dados === null ? <tr><td colSpan={14} className="px-3 py-8 text-center text-torg-gray"><Loader2 size={16} className="animate-spin inline" /></td></tr>
                 : visiveis.length === 0 ? <tr><td colSpan={14} className="px-3 py-8 text-center text-torg-gray">{linhas.length === 0 ? `Nenhum lançamento em ${ano}.` : "Nenhuma linha com os filtros atuais."}</td></tr>
                 : visiveis.map((l) => (
-                  <tr key={l.id} className={l.certOk ? "bg-yellow-50 hover:bg-yellow-100/70" : "bg-red-50 hover:bg-red-100/60"}>
-                    <td className="px-2.5 py-1.5 font-mono font-semibold">{l.rc}</td>
-                    <td className="px-2.5 py-1.5 font-mono text-torg-blue">{l.importRef}</td>
-                    <td className="px-2.5 py-1.5 min-w-[280px] max-w-[420px] whitespace-normal break-words" title={l.nome}>{l.nome}</td>
-                    <td className="px-2.5 py-1.5">{l.certOk ? l.numeroDocumento : <span className="text-red-600 font-medium">falta</span>}</td>
-                    <td className="px-2.5 py-1.5 text-torg-gray">{l.numeroCorrida || "—"}</td>
-                    <td className="px-2.5 py-1.5">{l.norma || "—"}</td>
-                    <td className="px-2.5 py-1.5">{l.pedidoCompra || "—"}</td>
-                    <td className="px-2.5 py-1.5 text-torg-gray">{l.dataFmt}</td>
-                    <td className="px-2.5 py-1.5">{l.nfNumero || "—"}</td>
-                    <td className="px-2.5 py-1.5">{l.fornecedor || "—"}</td>
-                    <td className="px-2.5 py-1.5 font-mono">{l.opNumero || "—"}</td>
-                    <td className="px-2.5 py-1.5 text-right tabular-nums">{fmtNum(l.quantidade)}</td>
-                    <td className="px-2.5 py-1.5 text-right tabular-nums">{fmtNum(l.pesoKg)}</td>
-                    <td className="px-2.5 py-1.5 min-w-[200px] max-w-[360px] whitespace-normal break-words text-torg-gray" title={l.obs}>{l.obs || "—"}</td>
+                  <tr key={l.id} className={`align-top ${l.certOk ? "bg-yellow-50 hover:bg-yellow-100/70" : "bg-red-50 hover:bg-red-100/60"}`}>
+                    <td className="px-2.5 py-1 font-mono font-semibold">{l.rc}</td>
+                    <td className="px-2.5 py-1 font-mono text-torg-blue">{l.importRef}</td>
+                    <td className="px-2.5 py-1 min-w-[360px] max-w-[560px] whitespace-normal break-words leading-snug" title={l.nome}>{l.nome}</td>
+                    <td className="px-2.5 py-1">{l.certOk ? l.numeroDocumento : <span className="text-red-600 font-medium">falta</span>}</td>
+                    <td className="px-2.5 py-1 text-torg-gray">{l.numeroCorrida || "—"}</td>
+                    <td className="px-2.5 py-1">{l.norma || "—"}</td>
+                    <td className="px-2.5 py-1">{l.pedidoCompra || "—"}</td>
+                    <td className="px-2.5 py-1 text-torg-gray">{l.dataFmt}</td>
+                    <td className="px-2.5 py-1">{l.nfNumero || "—"}</td>
+                    <td className="px-2.5 py-1">{l.fornecedor || "—"}</td>
+                    <td className="px-2.5 py-1 font-mono">{l.opNumero || "—"}</td>
+                    <td className="px-2.5 py-1 text-right tabular-nums">{fmtNum(l.quantidade)}</td>
+                    <td className="px-2.5 py-1 text-right tabular-nums">{fmtNum(l.pesoKg)}</td>
+                    <td className="px-2.5 py-1 min-w-[220px] max-w-[340px] whitespace-normal break-words leading-snug text-torg-gray" title={l.obs}>{l.obs || "—"}</td>
                   </tr>
                 ))}
             </tbody>
