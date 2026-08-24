@@ -195,6 +195,7 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
   const [itens, setItens] = useState([]);
   const [frete, setFrete] = useState({ tpFrete: "0" });
   const [aba, setAba] = useState("itens");
+  const [freteVisto, setFreteVisto] = useState(false); // obriga conferir a aba Frete antes de gerar
   const [erro, setErro] = useState("");
   const [gerando, setGerando] = useState(false);
 
@@ -216,7 +217,8 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
   const totalGeral = itens.reduce((s, it) => s + (Number(it.valorUnit) || 0) * (Number(it.qtd) || 0), 0);
   const pendentes = itens.filter((it) => !it.codigoOmie || !(Number(it.valorUnit) > 0));
   const temMateriais = dados?.temMateriais;
-  const podeGerar = temMateriais ? (itens.length > 0 && pendentes.length === 0) : (dados?.marcasCount > 0);
+  const itensOk = temMateriais ? (itens.length > 0 && pendentes.length === 0) : (dados?.marcasCount > 0);
+  const podeGerar = itensOk && freteVisto; // só libera depois de conferir a aba Frete
   const num = (v) => (v === "" || v == null ? null : parseFloat(String(v).replace(",", ".")));
 
   async function gerar() {
@@ -257,8 +259,8 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
         {dados && (
           <div className="px-5 pt-3 flex gap-1 border-b border-gray-100">
             {[["itens", "Itens e valores"], ["frete", "Frete"]].map(([v, l]) => (
-              <button key={v} onClick={() => setAba(v)} className={`px-3 py-2 text-xs font-medium rounded-t-lg border-b-2 -mb-px ${aba === v ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
-                {l === "Frete" ? <span className="inline-flex items-center gap-1"><Truck size={13} /> {l}</span> : l}
+              <button key={v} onClick={() => { setAba(v); if (v === "frete") setFreteVisto(true); }} className={`px-3 py-2 text-xs font-medium rounded-t-lg border-b-2 -mb-px ${aba === v ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
+                {l === "Frete" ? <span className="inline-flex items-center gap-1"><Truck size={13} /> {l}{!freteVisto && <span className="w-1.5 h-1.5 rounded-full bg-torg-orange" title="Confira o frete antes de gerar" />}</span> : l}
               </button>
             ))}
           </div>
@@ -359,10 +361,14 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
           )}
         </div>
         <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3 rounded-b-xl">
-          <p className="text-[11px] text-torg-gray">Cria a remessa no Omie como <strong>rascunho</strong> — você confere e fatura lá.</p>
+          {itensOk && !freteVisto ? (
+            <button onClick={() => { setAba("frete"); setFreteVisto(true); }} className="text-[11px] text-torg-orange font-medium inline-flex items-center gap-1 hover:underline"><AlertCircle size={13} /> Confira a aba <strong>Frete</strong> para liberar a geração</button>
+          ) : (
+            <p className="text-[11px] text-torg-gray">Cria a remessa no Omie como <strong>rascunho</strong> — você confere e fatura lá.</p>
+          )}
           <div className="flex gap-3">
             <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">Cancelar</button>
-            <button onClick={gerar} disabled={gerando || !podeGerar} className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-dark text-sm font-medium flex items-center gap-2 disabled:opacity-50">
+            <button onClick={gerar} disabled={gerando || !podeGerar} title={itensOk && !freteVisto ? "Confira a aba Frete antes de gerar" : undefined} className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-dark text-sm font-medium flex items-center gap-2 disabled:opacity-50">
               {gerando ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Gerar remessa no Omie
             </button>
           </div>
