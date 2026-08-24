@@ -306,6 +306,15 @@ export async function POST(req, { params }) {
       pedidoOmie = await prisma.$transaction(async (tx) => {
         const pedido = await tx.pedidoOmie.create({
           data: {
+            // ⚠⚠ SEM `opId` AQUI, O CARD DE VERBA DIZ QUE CABE. `calcularVerbaOP` lê os pedidos por
+            // `where: { opId }` — e os dois geradores eram os únicos lugares que não gravavam.
+            // Medido em 23/08: 198 de 213 pedidos com `opId` nulo, e **11 obras já estouradas
+            // exibindo "✓ Cabe na verba disponível"** para quem decide comprar. Na OP-060: verba
+            // R$ 131.914, card acusando R$ 0,00 de comprometido, comprometido real R$ 943.782.
+            //
+            // ⚠ o dinheiro nunca esteve perdido — as outras quatro telas financeiras chegam nele
+            // por `cotacao.rm.opId`. O que faltava era a chave direta, e é ela que o card usa.
+            opId: params.id,
             cotacaoId: cotacao.id,
             fornecedorNome: cotacao.fornecedorNome,
             nCodFor: pedidoCriado?.nCodFor_resolvido?.toString() || cotacao.nCodOmie || null,
