@@ -259,11 +259,13 @@ export default function CmrLancarClient() {
               {dados === null ? <tr><td colSpan={14} className="px-3 py-8 text-center text-torg-gray"><Loader2 size={16} className="animate-spin inline" /></td></tr>
                 : itens.length === 0 ? <tr><td colSpan={14} className="px-3 py-8 text-center text-torg-gray">Nenhum lançamento em {ano}.</td></tr>
                 : itens.map((it) => {
-                  const { rc, obs } = parseObs(it.observacao);
+                  const { rc: rcSalvo, obs } = parseObs(it.observacao);
+                  // R = material por peso (aço/arame); RC = consumível por peça/litro (tinta).
+                  const rc = rcSalvo || (Number(it.pesoKg) > 0 ? "R" : Number(it.quantidade) > 0 ? "RC" : "R");
                   const temCert = !!(it.numeroDocumento && String(it.numeroDocumento).trim());
                   return (
                     <tr key={it.id} className={temCert ? "bg-yellow-50 hover:bg-yellow-100/70" : "bg-red-50 hover:bg-red-100/60"}>
-                      <td className="px-2.5 py-1.5 font-mono font-semibold">{rc || "—"}</td>
+                      <td className="px-2.5 py-1.5 font-mono font-semibold">{rc}</td>
                       <td className="px-2.5 py-1.5 font-mono text-torg-blue">{it.importRef}</td>
                       <td className="px-2.5 py-1.5 max-w-[320px] truncate" title={it.nome}>{it.nome}</td>
                       <td className="px-2.5 py-1.5">{temCert ? it.numeroDocumento : <span className="text-red-600 font-medium">falta</span>}</td>
