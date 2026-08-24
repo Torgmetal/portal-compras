@@ -3,6 +3,7 @@
 // real (kg/dia, 30d), os dias de carga e o próximo slot livre (data). Mostra
 // onde há espaço para encaixar uma obra.
 import { NextResponse } from "next/server";
+import { OP_VIVA } from "@/lib/op-viva";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { MAQUINAS, MAQUINA_LABEL } from "@/lib/maquina-corte";
@@ -41,7 +42,9 @@ export async function GET() {
     const [backlogRaw, capacidadeRaw, emAndamentoRaw, pendentes] = await Promise.all([
       // Backlog: peças em CORTE ainda não concluídas (a baixa total no Syneco é filtrada em JS)
       prisma.pecaConjunto.findMany({
-        where: { status: "CORTE", corteConcluidoEm: null },
+        // ⚠ sem o filtro de OP viva, 2.631 peças / 399.178 kg de obra ENCERRADA entravam no
+        // backlog e inflavam os "dias de carga" em 66 dias. Ver lib/op-viva.js.
+        where: { status: "CORTE", corteConcluidoEm: null, ...OP_VIVA },
         select: { maquina: true, qte: true, qteProduzida: true, pesoTotalKg: true, corteIniciadoEm: true },
       }),
       // Capacidade média kg/dia por máquina (30 dias)

@@ -4,6 +4,7 @@
 //   (backlog ÷ capacidade média 30d) e o ao-vivo do Syneco (agora / hoje).
 // PATCH /api/pcp/painel-corte — atualiza a meta mensal { metaKg }
 import { NextResponse } from "next/server";
+import { OP_VIVA } from "@/lib/op-viva";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -45,7 +46,8 @@ export async function GET() {
         // Aguardando liberação, por situação de estoque
         prisma.pecaConjunto.groupBy({
           by: ["statusEstoque"],
-          where: { status: "PENDENTE" },
+          // ⚠ obra encerrada fora do painel — ver lib/op-viva.js
+          where: { status: "PENDENTE", ...OP_VIVA },
           _count: { id: true },
           _sum: { pesoTotalKg: true },
         }),
@@ -54,7 +56,7 @@ export async function GET() {
         // Syneco — qteProduzida >= qte — é filtrada em JS: Prisma não compara
         // coluna com coluna no where)
         prisma.pecaConjunto.findMany({
-          where: { status: "CORTE", corteConcluidoEm: null },
+          where: { status: "CORTE", corteConcluidoEm: null, ...OP_VIVA },
           select: {
             maquina: true, qte: true, qteProduzida: true, pesoTotalKg: true, opNumero: true,
             corteDataMetaInicio: true, corteDataMetaFim: true, corteIniciadoEm: true,
@@ -96,7 +98,7 @@ export async function GET() {
         // Pendentes (aguardando liberação) por obra — a parte da fila entra em JS
         prisma.pecaConjunto.groupBy({
           by: ["opNumero"],
-          where: { status: "PENDENTE" },
+          where: { status: "PENDENTE", ...OP_VIVA },
           _count: { id: true },
           _sum: { pesoTotalKg: true },
         }),
