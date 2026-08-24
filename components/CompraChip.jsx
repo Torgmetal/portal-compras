@@ -5,11 +5,23 @@
 import { useState, useEffect } from "react";
 import { X, Loader2, Package, AlertTriangle } from "lucide-react";
 
+// ⚠⚠ O CHIP DIZ "RECEBIMENTO DE MATERIAL", COM A % NA FRENTE.
+// Vitor (24/08/2026): "mude para Recebimento de material e coloque a % na frente". Saía "recebido
+// parcial 34%" — o rótulo repetia em palavra o que o número já dizia, e a palavra mudava de obra
+// para obra ("material recebido", "recebido parcial", "aguardando entrega") num lugar onde o que
+// se procura é sempre a mesma coisa: quanto do material já chegou.
+//
+// ⚠ O QUE NÃO É PERCENTUAL MANTÉM O RÓTULO. "sem requisição lançada" e "sem informação" não são um
+// estágio do recebimento — são a ausência dele, e cada uma pede uma ação diferente. Trocar as duas
+// por "0% Recebimento de material" esconderia justamente o que precisa ser resolvido.
+//
+// ⚠ E o estágio não se perde: vai na dica, junto com os kg. A cor continua contando a história de
+// longe (verde cheio, âmbar parcial, vermelho falta comprar).
 const ESTILO = {
-  RECEBIDO_TOTAL: { label: "material recebido", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  PARCIAL: { label: "recebido parcial", cls: "bg-amber-50 text-amber-700 border-amber-200" },
-  AGUARDANDO_ENTREGA: { label: "aguardando entrega", cls: "bg-sky-50 text-sky-700 border-sky-200" },
-  FALTA_COMPRAR: { label: "falta comprar", cls: "bg-red-50 text-red-700 border-red-200" },
+  RECEBIDO_TOTAL: { label: "material recebido", cls: "bg-emerald-50 text-emerald-700 border-emerald-200", pct: true },
+  PARCIAL: { label: "recebido parcial", cls: "bg-amber-50 text-amber-700 border-amber-200", pct: true },
+  AGUARDANDO_ENTREGA: { label: "aguardando entrega", cls: "bg-sky-50 text-sky-700 border-sky-200", pct: true },
+  FALTA_COMPRAR: { label: "falta comprar", cls: "bg-red-50 text-red-700 border-red-200", pct: true },
   SEM_RM: { label: "sem requisição lançada", cls: "bg-slate-100 text-slate-600 border-slate-300" },
   SEM_DADOS: { label: "sem informação", cls: "bg-slate-100 text-slate-500 border-slate-200" },
 };
@@ -21,12 +33,12 @@ export default function CompraChip({ compra, opNumero, mini }) {
   if (!compra) return null;
   const e = ESTILO[compra.status] || ESTILO.SEM_DADOS;
   const alerta = compra.status === "SEM_RM" || compra.status === "SEM_DADOS";
-  const texto = compra.pct != null ? `${e.label} ${compra.pct}%` : e.label;
+  const texto = e.pct && compra.pct != null ? `${compra.pct}% Recebimento de material` : e.label;
 
   return (
     <>
       <button onClick={(ev) => { ev.stopPropagation(); setAberto(true); }}
-        title={`Material: ${fmtKg(compra.recebidoKg)} recebido${compra.solicitadoKg ? ` de ${fmtKg(compra.solicitadoKg)} solicitados` : ""}. Clique para ver a rastreabilidade.`}
+        title={`${e.label[0].toUpperCase()}${e.label.slice(1)} — ${fmtKg(compra.recebidoKg)} recebido${compra.solicitadoKg ? ` de ${fmtKg(compra.solicitadoKg)} solicitados` : ""}. Clique para ver a rastreabilidade.`}
         className={`inline-flex items-center gap-1 rounded-full border font-semibold whitespace-nowrap hover:brightness-95 ${e.cls} ${mini ? "text-[10px] px-1.5 py-0.5" : "text-[11px] px-2 py-0.5"}`}>
         {alerta ? <AlertTriangle size={mini ? 9 : 11} /> : <Package size={mini ? 9 : 11} />} {texto}
       </button>
