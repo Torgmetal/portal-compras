@@ -162,6 +162,9 @@ export async function PATCH(req, { params }) {
   } else if (body.acao === "reabrir") {
     data.remessaStatus = "PENDENTE";
     data.remessaNfNumero = null; data.remessaNfSerie = null; data.remessaNfChave = null; data.remessaNfEmitidaEm = null;
+    // Desvincula a remessa/pedido do Omie — senão "Gerar remessa" acusa que já existe.
+    // (O rascunho no Omie deve ser cancelado lá; aqui só soltamos o vínculo pra regerar.)
+    data.remessaPedidoOmie = null; data.remessaPedidoNumero = null;
   }
 
   const rom = await prisma.romaneioTerceiro.update({ where: { id: atual.id }, data });
