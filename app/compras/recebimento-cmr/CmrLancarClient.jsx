@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useStore } from "@/lib/store";
-import { Loader2, Plus, ClipboardPaste, Save, Trash2, Search, Check, X, PackagePlus, Filter, ChevronDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Loader2, Plus, ClipboardPaste, Save, Trash2, Search, Check, X, PackagePlus, Filter, ChevronDown, ArrowUp, ArrowDown, FileDown } from "lucide-react";
 
 const anoAtual = new Date().getFullYear();
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -157,6 +157,28 @@ export default function CmrLancarClient() {
 
   const itens = dados?.itens || [];
 
+  // Exporta pra .xlsx o que está VISÍVEL (respeita filtros/ordenação/busca) — todas as colunas da planilha.
+  const [exportando, setExportando] = useState(false);
+  async function exportarExcel() {
+    if (!visiveis.length) { showToast("Nada para exportar", "erro"); return; }
+    setExportando(true);
+    try {
+      const XLSX = await import("xlsx");
+      const header = COLUNAS.map((c) => c.label);
+      const rows = visiveis.map((l) => COLUNAS.map((c) => {
+        const v = c.get(l);
+        if (v == null || v === "") return "";
+        return c.num ? Number(v) : String(v);
+      }));
+      const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+      ws["!cols"] = COLUNAS.map((c) => ({ wch: c.w ? Math.min(70, Math.round(c.w / 6.5)) : Math.max(11, c.label.length + 3) }));
+      ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length, c: COLUNAS.length - 1 } }) };
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, `CMR ${ano}`);
+      XLSX.writeFile(wb, `CMR-TORG-${ano}.xlsx`);
+    } catch (e) { showToast("Falha ao gerar Excel: " + e.message, "erro"); } finally { setExportando(false); }
+  }
+
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -287,9 +309,15 @@ export default function CmrLancarClient() {
       <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
           <p className="text-[12px] font-bold text-torg-dark">Lançados em {ano} <span className="font-normal text-torg-gray">· {dados?.total ?? "…"} itens</span></p>
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar descrição, fornecedor, OP, NF…" className="w-64 pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm" />
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar descrição, fornecedor, OP, NF…" className="w-64 pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </div>
+            <button onClick={exportarExcel} disabled={exportando || !visiveis.length} title="Baixar a planilha em Excel (.xlsx) com o que está na tela"
+              className="text-sm font-medium rounded-lg px-3 py-2 inline-flex items-center gap-2 bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
+              {exportando ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />} <span className="hidden sm:inline">Exportar Excel</span>
+            </button>
           </div>
         </div>
         {/* Legenda + filtros ativos */}
@@ -325,7 +353,7 @@ export default function CmrLancarClient() {
                   <tr key={l.id} className={l.certOk ? "bg-yellow-50 hover:bg-yellow-100/70" : "bg-red-50 hover:bg-red-100/60"}>
                     <td className="px-2.5 py-1.5 font-mono font-semibold">{l.rc}</td>
                     <td className="px-2.5 py-1.5 font-mono text-torg-blue">{l.importRef}</td>
-                    <td className="px-2.5 py-1.5 max-w-[320px] truncate" title={l.nome}>{l.nome}</td>
+                    <td className="px-2.5 py-1.5 min-w-[280px] max-w-[420px] whitespace-normal break-words" title={l.nome}>{l.nome}</td>
                     <td className="px-2.5 py-1.5">{l.certOk ? l.numeroDocumento : <span className="text-red-600 font-medium">falta</span>}</td>
                     <td className="px-2.5 py-1.5 text-torg-gray">{l.numeroCorrida || "—"}</td>
                     <td className="px-2.5 py-1.5">{l.norma || "—"}</td>
@@ -336,7 +364,7 @@ export default function CmrLancarClient() {
                     <td className="px-2.5 py-1.5 font-mono">{l.opNumero || "—"}</td>
                     <td className="px-2.5 py-1.5 text-right tabular-nums">{fmtNum(l.quantidade)}</td>
                     <td className="px-2.5 py-1.5 text-right tabular-nums">{fmtNum(l.pesoKg)}</td>
-                    <td className="px-2.5 py-1.5 max-w-[200px] truncate text-torg-gray" title={l.obs}>{l.obs || "—"}</td>
+                    <td className="px-2.5 py-1.5 min-w-[200px] max-w-[360px] whitespace-normal break-words text-torg-gray" title={l.obs}>{l.obs || "—"}</td>
                   </tr>
                 ))}
             </tbody>
