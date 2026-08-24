@@ -497,6 +497,8 @@ model KickoffAceite {
   enviadoEm DateTime  @default(now())
   aceitoEm  DateTime?
   aceitoIp  String?   // IP de quem confirmou — o aceite vai impresso no PDF, tem de ser provável
+  cobradoEm DateTime? // última cobrança do aceite pendente (reenvio) — `enviadoEm` fica com o 1º envio
+  cobrancas Int       @default(0)
   kickoff   OPKickOff @relation(fields: [kickoffId], references: [id], onDelete: Cascade)
 
   @@index([kickoffId])

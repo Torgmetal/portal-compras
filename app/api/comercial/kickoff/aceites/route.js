@@ -14,7 +14,7 @@ export async function GET() {
 
   const aceites = await prisma.kickoffAceite.findMany({
     select: {
-      tipo: true, email: true, enviadoEm: true, aceitoEm: true,
+      tipo: true, email: true, enviadoEm: true, aceitoEm: true, cobradoEm: true, cobrancas: true,
       kickoff: { select: { opId: true, enviadoEm: true, op: { select: { numero: true, cliente: true, obra: true } } } },
     },
     orderBy: { enviadoEm: "asc" },
@@ -37,7 +37,7 @@ export async function GET() {
     const t = a.tipo === "FISCAL" ? "FISCAL" : "GERAL";
     const bucket = t === "FISCAL" ? o.fiscal : o.geral;
     if (a.aceitoEm) { bucket.ok++; o.confirmados.push({ email: a.email, tipo: t, aceitoEm: a.aceitoEm, dias: dias(a.aceitoEm) }); }
-    else { bucket.pend++; o.pendentes.push({ email: a.email, tipo: t, enviadoEm: a.enviadoEm, dias: dias(a.enviadoEm) }); }
+    else { bucket.pend++; o.pendentes.push({ email: a.email, tipo: t, enviadoEm: a.enviadoEm, dias: dias(a.enviadoEm), cobrancas: a.cobrancas || 0, cobradoEm: a.cobradoEm }); }
   }
 
   const ops = [...porOp.values()].map((o) => ({
