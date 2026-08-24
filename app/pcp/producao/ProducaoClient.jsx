@@ -40,11 +40,18 @@ const PROG = {
   NAO_LANCADA: { txt: "não lançada", cls: "bg-red-50 text-red-700 border-red-200", dica: "O programador ainda NÃO lançou esta peça no Syneco." },
 };
 
-// Nome do setor como a fábrica chama. Mesma tabela do FLUXO_SETORES do servidor.
-const SETOR_LABEL = {
-  CORTE: "Preparação", MONTAGEM: "Montagem", SOLDA: "Solda",
-  ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura", EXPEDICAO: "Expedição",
-};
+// ⚠⚠ A ORDEM É A DA FÁBRICA, NÃO A DO BANCO.
+// Vitor (24/08/2026): "deixe aqui no fluxo que deve ser dos setores: prep, monta, solda, acab,
+// jato, pint, exp". Os botões de filtro nasciam da ordem em que os setores apareciam nas OPs
+// carregadas — ou seja, sorteada: saía "Preparação · Acabamento · Jato · Pintura · Expedição ·
+// Montagem · Solda". Quem trabalha lê a barra como a rota da peça; fora de ordem, ela mente sobre
+// o caminho. Mesma sequência do FLUXO_SETORES do servidor (lib/prioridades-setor.js).
+const FLUXO = [
+  ["CORTE", "Preparação"], ["MONTAGEM", "Montagem"], ["SOLDA", "Solda"],
+  ["ACABAMENTO", "Acabamento"], ["JATO", "Jato"], ["PINTURA", "Pintura"], ["EXPEDICAO", "Expedição"],
+];
+const SETOR_LABEL = Object.fromEntries(FLUXO);
+const ORDEM_SETOR = Object.fromEntries(FLUXO.map(([k], i) => [k, i]));
 
 // ⚠ "Não iniciadas" é a UNIÃO das duas primeiras — é a pergunta que o Vitor faz ("o que não
 // iniciou"), e as parcelas continuam separadas porque a ação é diferente: uma se cobra do
@@ -141,7 +148,9 @@ export default function ProducaoClient() {
   const setoresDisponiveis = useMemo(() => {
     const m = new Map();
     for (const o of dados?.ops || []) for (const s of o.setores) if (s.pendenteKg > 0) m.set(s.setor, s.label);
-    return [...m.entries()].map(([setor, label]) => ({ setor, label }));
+    return [...m.entries()]
+      .map(([setor, label]) => ({ setor, label }))
+      .sort((a, b) => (ORDEM_SETOR[a.setor] ?? 99) - (ORDEM_SETOR[b.setor] ?? 99));
   }, [dados]);
 
   // ── peças da OP aberta, já filtradas ──
