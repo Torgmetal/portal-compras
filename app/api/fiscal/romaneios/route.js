@@ -20,13 +20,18 @@ export async function GET(req) {
     where,
     orderBy: [{ emitidoEm: "desc" }],
     select: {
-      id: true, numero: true, revisao: true, pesoKg: true, emitidoEm: true, arquivoUrl: true,
+      id: true, numero: true, revisao: true, pesoKg: true, emitidoEm: true, arquivoUrl: true, itens: true,
       nfNumero: true, nfTipo: true, nfEmitidaEm: true, nfObservacao: true,
-      op: { select: { id: true, numero: true, cliente: true, obra: true } },
+      nfPedidoOmie: true, nfPedidoNumero: true, nfSerie: true, nfChave: true, nfErroEmissao: true,
+      op: { select: { id: true, numero: true, cliente: true, obra: true, clienteCnpj: true, clienteUF: true } },
       lote: { select: { nome: true, transportadora: true, placaVeiculo: true, placaCarreta: true } },
     },
   });
 
-  const romaneios = rows.map((r) => ({ ...r, finalizado: !!(r.nfNumero && r.nfTipo) }));
+  const romaneios = rows.map(({ itens, ...r }) => ({
+    ...r,
+    itensCount: Array.isArray(itens) ? itens.length : 0,
+    finalizado: !!(r.nfNumero && r.nfTipo),
+  }));
   return NextResponse.json({ success: true, romaneios });
 }

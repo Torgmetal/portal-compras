@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import { fmtOP } from "@/lib/utils";
 import {
   ReceiptText, FileSpreadsheet, Loader2, CheckCircle2, Clock, Truck, Weight,
-  X, Pencil, ExternalLink, AlertTriangle, Search,
+  X, Pencil, ExternalLink, AlertTriangle, Search, FilePlus2, RefreshCw, Check,
 } from "lucide-react";
 
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -23,6 +23,7 @@ export default function FiscalClient() {
   const [aba, setAba] = useState("aguardando"); // aguardando | finalizado
   const [busca, setBusca] = useState("");
   const [editar, setEditar] = useState(null); // romaneio em edição de NF
+  const [remessaOmie, setRemessaOmie] = useState(null); // romaneio no fluxo NF Remessa (Omie)
   const [toast, setToast] = useState(null);
 
   const carregar = () => {
@@ -155,14 +156,20 @@ export default function FiscalClient() {
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                  <td className="px-3 py-2.5 text-right whitespace-nowrap">
                     {r.finalizado ? (
                       <button onClick={() => setEditar(r)} className="text-gray-400 hover:text-torg-blue" title="Editar NF"><Pencil size={15} /></button>
                     ) : (
-                      <button onClick={() => setEditar(r)} className="text-xs font-semibold text-white bg-torg-blue hover:bg-torg-dark px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5">
-                        <ReceiptText size={13} /> Registrar NF
-                      </button>
+                      <div className="inline-flex items-center gap-1.5">
+                        {r.nfPedidoOmie ? (
+                          <button onClick={() => setRemessaOmie(r)} className="text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1"><ReceiptText size={12} /> Emitir NF</button>
+                        ) : (
+                          <button onClick={() => setRemessaOmie(r)} title="Gerar e emitir NF de Remessa pelo Omie" className="text-xs font-semibold text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1"><FilePlus2 size={12} /> NF Remessa</button>
+                        )}
+                        <button onClick={() => setEditar(r)} title="Registrar NF manualmente (venda/serviço/remessa)" className="text-xs text-torg-blue hover:text-torg-dark border border-torg-blue-100 rounded-lg px-2 py-1.5 inline-flex items-center gap-1"><Pencil size={12} /> Manual</button>
+                      </div>
                     )}
+                    {r.nfErroEmissao && !r.finalizado && <p className="text-[10px] text-red-600 mt-1 max-w-[200px] ml-auto text-right" title={r.nfErroEmissao}><AlertTriangle size={9} className="inline mr-0.5" /> {r.nfErroEmissao.length > 60 ? "aguardando/erro — ver detalhe" : r.nfErroEmissao}</p>}
                   </td>
                 </tr>
               ))}
@@ -176,6 +183,15 @@ export default function FiscalClient() {
           romaneio={editar}
           onClose={() => setEditar(null)}
           onSalvo={(msg) => { setEditar(null); showToast(msg); carregar(); }}
+        />
+      )}
+
+      {remessaOmie && (
+        <NFRemessaOmieModal
+          romaneio={remessaOmie}
+          onClose={() => setRemessaOmie(null)}
+          onFim={(msg, tipo = "success") => { setRemessaOmie(null); showToast(msg, tipo); carregar(); }}
+          onAtualizar={carregar}
         />
       )}
 
@@ -213,6 +229,141 @@ function BadgeTipo({ tipo }) {
     : tipo === "SERVICO" ? "bg-purple-50 text-purple-700 border-purple-200"
     : "bg-slate-50 text-slate-600 border-slate-200";
   return <span className={`inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${cor}`}>{tipoLabel(tipo)}</span>;
+}
+
+const TP_FRETE = [["0", "0 - CIF (remetente)"], ["1", "1 - FOB (destinatário)"], ["2", "2 - Terceiros"], ["9", "9 - Sem transporte"]];
+const finp = "w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-torg-blue outline-none";
+
+// Modal — NF de Remessa via Omie: gera a remessa (CFOP + frete) e emite a NF-e (confere DANFE).
+function NFRemessaOmieModal({ romaneio, onClose, onFim, onAtualizar }) {
+  const gerado = !!romaneio.nfPedidoOmie;
+  const [cfop, setCfop] = useState("");
+  const [frete, setFrete] = useState({ tpFrete: "0", especie: "PEÇAS", pesoBruto: romaneio.pesoKg || "", pesoLiq: romaneio.pesoKg || "" });
+  const [busy, setBusy] = useState(false);
+  const [erro, setErro] = useState("");
+  const [conf, setConf] = useState(gerado ? { estado: "conferindo" } : null);
+  const setF = (k, v) => setFrete((s) => ({ ...s, [k]: v }));
+  const num = (v) => (v === "" || v == null ? null : parseFloat(String(v).replace(",", ".")));
+
+  useEffect(() => { if (gerado) conferir(); /* eslint-disable-next-line */ }, [gerado]);
+
+  async function patch(payload) {
+    const res = await fetch(`/api/fiscal/romaneios/${romaneio.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    return res.json();
+  }
+  async function conferir() {
+    setConf({ estado: "conferindo" });
+    const j = await patch({ acao: "conferir_omie" }).catch(() => ({ error: "Falha ao conferir" }));
+    setConf(j.success ? { estado: "ok", mensagem: j.mensagem } : { estado: "erro", mensagem: j.error });
+  }
+  async function gerar() {
+    if (!cfop.trim()) { setErro("Informe o CFOP da remessa ao cliente."); return; }
+    setErro(""); setBusy(true);
+    const j = await patch({ acao: "gerar_remessa_omie", cfop: cfop.trim(), frete: {
+      tpFrete: frete.tpFrete || "0", nCodTransp: frete.nCodTransp || null, transpNome: frete.transpNome || null,
+      placa: frete.placa || null, uf: frete.uf || null, qtdVol: num(frete.qtdVol), especie: frete.especie || null,
+      pesoLiq: num(frete.pesoLiq), pesoBruto: num(frete.pesoBruto), valorFrete: num(frete.valorFrete),
+    } }).catch(() => ({ error: "Falha ao gerar" }));
+    if (!j.success) { setErro(j.error); setBusy(false); return; }
+    onFim(`Remessa ${j.numeroPedido || ""} criada no Omie — agora emita a NF.`, "success");
+  }
+  async function emitir() {
+    setErro(""); setBusy(true);
+    const j = await patch({ acao: "emitir_omie" }).catch(() => ({ error: "Falha ao emitir" }));
+    if (!j.success) { setErro(j.error); setBusy(false); return; }
+    onFim(j.nf?.numero ? `NF-e ${j.nf.numero} autorizada!` : "NF-e autorizada!", "success");
+  }
+  async function atualizar() {
+    setBusy(true);
+    const j = await patch({ acao: "atualizar_status" }).catch(() => ({ error: "Falha" }));
+    setBusy(false);
+    if (j.success && j.estado === "AUTORIZADA") return onFim(`NF-e ${j.nf?.numero || ""} autorizada!`, "success");
+    onAtualizar();
+    setErro("Ainda sem confirmação da autorização. Se autorizou no Omie, aguarde o DANFE e tente de novo; se rejeitou, veja o motivo no Omie.");
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg my-8" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><ReceiptText size={16} className="text-emerald-600" /> NF Remessa — R{romaneio.numero} · OP {fmtOP(romaneio.op?.numero)}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          <div className="bg-gray-50 rounded-lg p-3 text-xs text-torg-gray">
+            <p><strong className="text-torg-dark">{romaneio.op?.cliente}</strong>{romaneio.op?.clienteUF ? ` · ${romaneio.op.clienteUF}` : ""} · {fmtKg(romaneio.pesoKg)}</p>
+            <p className="mt-0.5">{romaneio.op?.clienteCnpj || "sem CNPJ na OP"}{romaneio.op?.obra ? ` · ${romaneio.op.obra}` : ""}</p>
+          </div>
+          {erro && <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded px-3 py-2 flex items-start gap-1.5"><AlertTriangle size={13} className="mt-0.5 shrink-0" /><span>{erro}</span></div>}
+          {romaneio.nfErroEmissao && <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded px-3 py-2">{romaneio.nfErroEmissao}</div>}
+
+          {!gerado ? (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-torg-dark mb-1">CFOP da remessa *</label>
+                <input value={cfop} onChange={(e) => setCfop(e.target.value)} placeholder="ex.: 5.949 / 6.949" className={finp} />
+                <p className="text-[11px] text-torg-gray mt-1">Confirme com o contador o CFOP correto da remessa ao cliente (formato pontuado, ex.: 5.949).</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="block text-xs font-medium text-torg-dark mb-1">Tipo do frete</label>
+                  <select value={frete.tpFrete} onChange={(e) => setF("tpFrete", e.target.value)} className={finp}>{TP_FRETE.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+                <div><label className="block text-xs font-medium text-torg-dark mb-1">Transportadora</label>
+                  <SeletorTransp onEscolher={(t) => setFrete((s) => ({ ...s, nCodTransp: t?.nCodTransp || null, transpNome: t?.nome || null, uf: t?.uf || s.uf }))} /></div>
+                <div><label className="block text-xs font-medium text-torg-dark mb-1">Placa</label><input value={frete.placa || ""} onChange={(e) => setF("placa", e.target.value.toUpperCase())} className={finp} /></div>
+                <div><label className="block text-xs font-medium text-torg-dark mb-1">UF</label><input value={frete.uf || ""} onChange={(e) => setF("uf", e.target.value.toUpperCase().slice(0, 2))} className={finp} /></div>
+                <div><label className="block text-xs font-medium text-torg-dark mb-1">Qtd. volumes</label><input value={frete.qtdVol ?? ""} onChange={(e) => setF("qtdVol", e.target.value)} inputMode="numeric" className={finp} /></div>
+                <div><label className="block text-xs font-medium text-torg-dark mb-1">Peso bruto (kg)</label><input value={frete.pesoBruto ?? ""} onChange={(e) => setFrete((s) => ({ ...s, pesoBruto: e.target.value, pesoLiq: e.target.value }))} inputMode="decimal" className={finp} /></div>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-torg-gray">Remessa nº <strong>{romaneio.nfPedidoNumero || romaneio.nfPedidoOmie}</strong> no Omie.</p>
+              <div className="border border-gray-100 rounded-lg p-3">
+                <p className="text-[11px] font-semibold text-torg-gray uppercase mb-1.5">Conferência</p>
+                {!conf || conf.estado === "conferindo" ? <p className="text-sm text-torg-gray inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Conferindo…</p>
+                  : conf.estado === "ok" ? <p className="text-sm text-emerald-700 inline-flex items-center gap-1.5"><Check size={14} /> {conf.mensagem || "Validada."}</p>
+                  : <p className="text-sm text-red-600 inline-flex items-start gap-1.5"><AlertTriangle size={14} className="mt-0.5" /> {conf.mensagem}</p>}
+              </div>
+              <p className="text-xs text-torg-gray">Ao emitir, a NF-e vai ao <strong>SEFAZ</strong> — o portal confere a autorização real (DANFE) e só finaliza quando autoriza. Pode levar até ~1 min.</p>
+            </>
+          )}
+        </div>
+        <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2 rounded-b-xl">
+          <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">Fechar</button>
+          {!gerado ? (
+            <button onClick={gerar} disabled={busy} className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-dark text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50">{busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Gerar remessa no Omie</button>
+          ) : (<>
+            <button onClick={atualizar} disabled={busy} className="px-3 py-2 text-torg-blue border border-torg-blue-200 rounded-lg hover:bg-torg-blue-50 text-sm inline-flex items-center gap-1.5 disabled:opacity-50"><RefreshCw size={14} /> Atualizar status</button>
+            <button onClick={emitir} disabled={busy || conf?.estado !== "ok"} className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50">{busy ? <Loader2 size={14} className="animate-spin" /> : <ReceiptText size={14} />} Emitir NF-e</button>
+          </>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Autocomplete de transportadora (reusa /api/fiscal/transportadoras).
+function SeletorTransp({ onEscolher }) {
+  const [q, setQ] = useState(""); const [lista, setLista] = useState([]); const [aberto, setAberto] = useState(false);
+  useEffect(() => {
+    if (!aberto || q.trim().length < 2) { setLista([]); return; }
+    const t = setTimeout(() => { fetch(`/api/fiscal/transportadoras?q=${encodeURIComponent(q.trim())}`).then((r) => r.json()).then((j) => setLista(j.transportadoras || [])).catch(() => setLista([])); }, 300);
+    return () => clearTimeout(t);
+  }, [q, aberto]);
+  return (
+    <div className="relative">
+      <input value={q} onChange={(e) => { setQ(e.target.value); setAberto(true); if (!e.target.value) onEscolher(null); }} onFocus={() => setAberto(true)} placeholder="Buscar…" className={finp} />
+      {aberto && q.trim().length >= 2 && lista.length > 0 && (
+        <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          {lista.map((t) => (
+            <button key={t.nCodTransp} type="button" onClick={() => { onEscolher(t); setQ(t.nome); setAberto(false); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-torg-blue-50 border-b border-gray-50 last:border-0">
+              <span className="text-torg-dark font-medium">{t.nome}</span>{t.uf && <span className="text-torg-gray"> · {t.uf}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Modal — registra/edita a NF de um romaneio emitido.

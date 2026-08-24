@@ -3950,6 +3950,13 @@ model RomaneioPrevio {
   nfEmitidaEm       DateTime? // quando o dept registrou a NF (= finalizado)
   nfObservacao      String?
   nfRegistradoPorId String?
+  // ── Emissão integrada com o Omie (NF Remessa — mesmo fluxo da Remessa Terceiro) ──
+  nfPedidoOmie      String? // nCodRem da remessa no Omie
+  nfPedidoNumero    String? // cNumeroRemessa no Omie
+  nfSerie           String?
+  nfChave           String? // chave de acesso da NF-e (44 díg.)
+  nfErroEmissao     String? // última msg de erro/aguardando da emissão
+  nfFrete           Json? // dados do frete p/ a NF (mesma estrutura da remessa terceiro)
   criadoPorId   String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
