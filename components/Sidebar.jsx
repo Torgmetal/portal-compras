@@ -13,6 +13,10 @@ import SidebarUserFooter from "@/components/SidebarUserFooter";
 // manter o item certo ativo (sem o parâmetro, vale RMs Materiais).
 const menu = [
   { href: "/compras/painel-ops", label: "Painel de OPs", icon: FolderKanban },
+  // ⚠ ENTRA NO MENU JUNTO COM A TELA. A auditoria de 23/08 encontrou 11 páginas órfãs — tela sem
+  // link é tela que ninguém usa, e a lista dos itens que não casaram com o CMR existia calculada
+  // e jogada fora justamente por não ter para onde aparecer.
+  { href: "/compras/recebimento-cmr", label: "Recebimento (CMR)", icon: PackageCheck },
   { href: "/compras", label: "RMs Materiais", icon: RailSymbol, exact: true, matchAlso: "/compras/rm/" },
   { href: "/compras/consumiveis", label: "RMs Consumíveis", icon: ShoppingCart },
   { href: "/compras/aluguel", label: "Aluguel de Equipamentos", icon: Forklift, matchPainel: "aluguel" },
@@ -22,10 +26,6 @@ const menu = [
   { href: "/compras/saldo-materiais", label: "Saldo Materiais", icon: ClipboardList },
   { href: "/compras/estoque", label: "Estoque", icon: Boxes },
   { href: "/compras/materiais", label: "Materiais por OP", icon: Layers },
-  // ⚠ ENTRA NO MENU JUNTO COM A TELA. A auditoria de 23/08 encontrou 11 páginas órfãs — tela sem
-  // link é tela que ninguém usa, e a lista dos itens que não casaram com o CMR existia calculada
-  // e jogada fora justamente por não ter para onde aparecer.
-  { href: "/compras/recebimento-cmr", label: "Recebimento (CMR)", icon: PackageCheck },
   { href: "/compras/vendorlist", label: "Vendor List", icon: Building2 },
   { href: "/compras/indicadores/fornecedores", label: "Avaliação Fornecedores (IQF)", icon: Star },
   { href: "/compras/notificacoes", label: "Notificações", icon: Bell, masterOnly: true },
