@@ -4,7 +4,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { assertBlobUrlSegura } from "@/lib/blob-url";
+import { isBlobUrlSegura } from "@/lib/blob-url";
 import { fetchRhItemResponse } from "@/lib/sharepoint";
 
 export const runtime = "nodejs";
@@ -25,13 +25,26 @@ export async function GET(req, { params }) {
     return NextResponse.json({ error: "Documento sem arquivo" }, { status: 404 });
   }
 
+  // ⚠⚠ `arquivoUrl` NEM SEMPRE É BLOB — E O CAMINHO FALHAVA ANTES DE TENTAR O SHAREPOINT.
+  // Vitor (23/08/2026): "os arquivos não estão sendo possíveis de baixar nem visualizar".
+  //
+  // O certificado importado da planilha de rastreabilidade guarda em `arquivoUrl` a URL WEB do
+  // SharePoint (…/SERVIDOR/Almoxarifado/01. Rastreabilidade/Certificados 2025/R 251768 a 775.pdf),
+  // não uma URL do Blob. O código validava com `assertBlobUrlSegura`, que lança, e o `catch`
+  // devolvia 400 "Arquivo inválido" — SEM NUNCA CHEGAR no ramo do SharePoint, mesmo com o
+  // `sharepointItemId` gravado ao lado. Medido: 2.790 dos 3.177 documentos com `arquivoUrl` são
+  // do SharePoint, e TODOS os 2.790 têm o itemId. Nenhum deles baixava.
+  //
+  // ⚠ a defesa de SSRF continua inteira: URL que não é do Blob não é buscada por URL nenhuma — vai
+  // pelo item do SharePoint, que é id opaco no drive da empresa. O que muda é que agora ela cai
+  // para o SharePoint em vez de morrer em 400.
   let res;
-  if (doc.arquivoUrl) {
-    try { assertBlobUrlSegura(doc.arquivoUrl); }
-    catch { return NextResponse.json({ error: "Arquivo inválido" }, { status: 400 }); }
+  if (isBlobUrlSegura(doc.arquivoUrl)) {
     res = await fetch(doc.arquivoUrl);
-  } else {
+  } else if (doc.sharepointItemId) {
     res = await fetchRhItemResponse(doc.sharepointItemId); // genérico: baixa item por id no drive padrão
+  } else {
+    return NextResponse.json({ error: "Arquivo inválido" }, { status: 400 });
   }
   if (!res.ok || !res.body) return NextResponse.json({ error: "Falha ao buscar arquivo" }, { status: 502 });
 

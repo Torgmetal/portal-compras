@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { assertBlobUrlSegura } from "@/lib/blob-url";
+import { isBlobUrlSegura } from "@/lib/blob-url";
 import { fetchRhItemResponse } from "@/lib/sharepoint";
 
 export const runtime = "nodejs";
@@ -27,13 +27,17 @@ export async function GET(req, { params }) {
   }
 
   // Documentos importados são servidos direto do SharePoint (sem cópia no Blob).
+  // ⚠ MESMO FURO DA QUALIDADE (23/08/2026): `arquivoUrl` nem sempre é Blob — documento importado
+  // guarda a URL WEB do SharePoint, e validar com `assertBlobUrlSegura` fazia a rota morrer em 400
+  // ANTES de tentar o item do SharePoint que está gravado ao lado. Cai para o SharePoint em vez de
+  // rejeitar; a defesa de SSRF continua inteira, porque URL que não é do Blob nunca é buscada.
   let res;
-  if (doc.arquivoUrl) {
-    try { assertBlobUrlSegura(doc.arquivoUrl); }
-    catch { return NextResponse.json({ error: "Arquivo inválido" }, { status: 400 }); }
+  if (isBlobUrlSegura(doc.arquivoUrl)) {
     res = await fetch(doc.arquivoUrl);
-  } else {
+  } else if (doc.sharepointItemId) {
     res = await fetchRhItemResponse(doc.sharepointItemId);
+  } else {
+    return NextResponse.json({ error: "Arquivo inválido" }, { status: 400 });
   }
   if (!res.ok || !res.body) return NextResponse.json({ error: "Falha ao buscar arquivo" }, { status: 502 });
 
