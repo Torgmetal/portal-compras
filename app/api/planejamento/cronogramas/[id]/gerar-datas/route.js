@@ -14,6 +14,8 @@ export const maxDuration = 20;
 const schema = z.object({
   dataInicioProjeto: z.string().datetime().optional(),
   aplicar: z.boolean().default(false),
+  // ⚠ segunda confirmação, só quando há baseline — ver o guard mais abaixo
+  confirmarSobreBaseline: z.boolean().default(false),
   encadearSetor: z.boolean().default(false), // encadeia tarefas do mesmo setor em sequência (quando sem antecessora)
 });
 
@@ -36,10 +38,16 @@ export async function POST(req, { params }) {
   const cronograma = await prisma.cronograma.findUnique({
     where: { id },
     select: {
-      id: true, dataInicio: true, tipoDias: true,
+      // ⚠ `dataBase` decide se há baseline a proteger; as datas ATUAIS de cada tarefa são o que a
+      // revisão precisa guardar para que dê para desfazer.
+      id: true, dataInicio: true, tipoDias: true, dataBase: true,
       tarefas: {
         orderBy: { uidMpp: "asc" },
-        select: { id: true, nome: true, uidMpp: true, departamento: true, isSummary: true, antecessoraIds: true, duracaoDias: true, defasagemDias: true },
+        select: {
+          id: true, nome: true, uidMpp: true, departamento: true, isSummary: true,
+          antecessoraIds: true, duracaoDias: true, defasagemDias: true,
+          dataInicioPrevista: true, dataFimPrevista: true,
+        },
       },
     },
   });
@@ -67,8 +75,39 @@ export async function POST(req, { params }) {
     return NextResponse.json({ success: true, preview, semDuracao });
   }
 
+  // ⚠⚠ CRONOGRAMA COM BASELINE NÃO SE REGERA POR ACIDENTE. O "Gerar Datas" ignora `dataLiberacao`,
+  // ignora bloqueio e não pede justificativa — e para tarefa com `duracaoDias = 0` ele põe início
+  // igual ao fim. Rodado hoje na OP-083, transformaria 14/04→12/10 em **14/04→23/04**: as 46 de 46
+  // tarefas estão com duração zero. A OP-085 iria de 06/04→04/08 para 06/04→10/04.
+  //
+  // A tela já avisa em âmbar e obriga calcular a prévia antes — o risco é clicar através do aviso.
+  // E em OP-083, OP-067 e OP-071 **não há baseline nem snapshot**: ali a perda é definitiva.
+  //
+  // Com baseline definido, exige confirmação explícita. Sem baseline, segue como era.
+  if (cronograma.dataBase && !parsed.data.confirmarSobreBaseline) {
+    return NextResponse.json({
+      success: false,
+      precisaConfirmar: true,
+      semDuracao,
+      error: `Este cronograma tem baseline definido${semDuracao ? ` e ${semDuracao} tarefa${semDuracao > 1 ? "s" : ""} sem duração — elas ficariam com início igual ao fim` : ""}. Gerar datas reescreve tudo por cima da baseline. Confirme para prosseguir.`,
+    }, { status: 409 });
+  }
+
   // Aplicar — grava as datas de cada tarefa + data início/fim do cronograma
   const fimProjeto = preview.reduce((max, p) => (!max || p.fim > max ? p.fim : max), null);
+
+  // ⚠ GUARDA O ANTES. O recálculo grava `CronogramaRevisao` com data velha e nova de cada tarefa;
+  // o Gerar Datas gravava só uma contagem no AuditLog — sem as datas antigas não há como desfazer.
+  const porId = new Map(cronograma.tarefas.map((t) => [t.id, t]));
+  const alteracoes = preview.map((p) => {
+    const antes = porId.get(p.id);
+    return {
+      id: p.id, nome: antes?.nome || null,
+      inicioAntes: antes?.dataInicioPrevista || null, inicioDepois: p.inicio,
+      fimAntes: antes?.dataFimPrevista || null, fimDepois: p.fim,
+      semDuracao: !!p.semDuracao,
+    };
+  });
   const ops = preview.map((p) =>
     prisma.cronogramaTarefa.update({
       where: { id: p.id },
@@ -79,6 +118,17 @@ export async function POST(req, { params }) {
     prisma.cronograma.update({
       where: { id },
       data: { dataInicio: inicioProjeto, ...(fimProjeto ? { dataFim: fimProjeto } : {}) },
+    })
+  );
+  ops.push(
+    prisma.cronogramaRevisao.create({
+      data: {
+        cronogramaId: id,
+        tipo: "TAREFA_ALTERADA",
+        descricao: `Gerar Datas (${cronograma.tipoDias || "DU"}): ${preview.length} tarefa${preview.length > 1 ? "s" : ""} reescrita${preview.length > 1 ? "s" : ""}${semDuracao ? `, ${semDuracao} sem duração` : ""}`,
+        diff: { alteracoes, semDuracao, tipoDias: cronograma.tipoDias || "DU", sobreBaseline: !!cronograma.dataBase },
+        createdById: user.id,
+      },
     })
   );
   ops.push(
