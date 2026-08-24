@@ -30,10 +30,27 @@ const schema = z.object({
 export async function PATCH(req, { params }) {
   let user;
   try { user = await requireRole(ROLES); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
-  const atual = await prisma.romaneioPrevio.findFirst({ where: { id: params.previoId, opId: params.id }, select: { id: true, status: true } });
+  const atual = await prisma.romaneioPrevio.findFirst({
+    where: { id: params.previoId, opId: params.id },
+    select: { id: true, status: true, numero: true, emitidoEm: true, nfNumero: true, itens: true, pesoKg: true },
+  });
   if (!atual) return NextResponse.json({ error: "Romaneio prévio não encontrado" }, { status: 404 });
   let body;
   try { body = schema.parse(await req.json()); } catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
+
+  // ⚠⚠ ROMANEIO EMITIDO É DOCUMENTO, NÃO RASCUNHO. Depois de emitido existe um FORM 22 arquivado
+  // no SharePoint com este conteúdo, o Fiscal já pode ter lançado a NF (os campos `nf*` moram
+  // nesta mesma linha) e o "expedido" da obra é derivado daqui — mexer nos itens devolve para
+  // pendente peça que já embarcou. Quinze pessoas de cinco perfis têm acesso a esta rota.
+  //
+  // Mudar a carga de um romaneio emitido exige REVISÃO, que é o caminho que já existe e grava
+  // motivo, histórico e nova versão do arquivo (`.../lotes-expedicao/[loteId]/romaneio`).
+  if (atual.emitidoEm && (body.itens !== undefined || body.status !== undefined || body.aprovado !== undefined)) {
+    return NextResponse.json(
+      { error: `Romaneio ${atual.numero} já foi emitido${atual.nfNumero ? ` e tem a NF ${atual.nfNumero}` : ""}. Para mudar a carga, emita uma revisão — ela registra o motivo e guarda a versão anterior.` },
+      { status: 409 },
+    );
+  }
 
   const data = {};
   if (body.dataPrevista !== undefined) data.dataPrevista = body.dataPrevista ? new Date(body.dataPrevista) : null;
@@ -64,14 +81,40 @@ export async function PATCH(req, { params }) {
   }
 
   const previo = await prisma.romaneioPrevio.update({ where: { id: atual.id }, data });
-  if (body.aprovado !== undefined) {
-    await prisma.auditLog.create({ data: { userId: user.id, action: body.aprovado ? "APROVAR_ROMANEIO_PREVIO" : "REABRIR_ROMANEIO_PREVIO", entity: "OP", entityId: params.id, diff: { numero: previo.numero, pesoKg: previo.pesoKg } } }).catch(() => {});
-  }
+  // ⚠ AUDITAR TODA MUDANÇA, não só a aprovação. Tirar ou pôr peça numa carga é bem mais provável
+  // que aprovar, e era justamente o que não deixava rastro nenhum.
+  const acao = body.aprovado !== undefined
+    ? (body.aprovado ? "APROVAR_ROMANEIO_PREVIO" : "REABRIR_ROMANEIO_PREVIO")
+    : "EDITAR_ROMANEIO_PREVIO";
+  await prisma.auditLog.create({ data: {
+    userId: user.id, action: acao, entity: "OP", entityId: params.id,
+    diff: { numero: previo.numero, pesoAntes: atual.pesoKg, pesoDepois: previo.pesoKg, campos: Object.keys(data) },
+  } }).catch(() => {});
   return NextResponse.json({ success: true, previo });
 }
 
 export async function DELETE(_req, { params }) {
-  try { await requireRole(ROLES); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
-  await prisma.romaneioPrevio.deleteMany({ where: { id: params.previoId, opId: params.id } });
+  let user;
+  try { user = await requireRole(ROLES); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  // ⚠⚠ APAGAR ROMANEIO EMITIDO É APAGAR REGISTRO FISCAL. Os campos `nf*` moram nesta linha: some
+  // o romaneio, some a nota, e o Fiscal perde o título da fila sem que nada registre que existiu.
+  const atual = await prisma.romaneioPrevio.findFirst({
+    where: { id: params.previoId, opId: params.id },
+    select: { id: true, numero: true, pesoKg: true, emitidoEm: true, nfNumero: true },
+  });
+  if (!atual) return NextResponse.json({ error: "Romaneio prévio não encontrado" }, { status: 404 });
+  if (atual.emitidoEm) {
+    return NextResponse.json(
+      { error: `Romaneio ${atual.numero} já foi emitido${atual.nfNumero ? ` e tem a NF ${atual.nfNumero}` : ""} — não pode ser apagado. Cancele por revisão, que deixa o histórico.` },
+      { status: 409 },
+    );
+  }
+
+  await prisma.romaneioPrevio.delete({ where: { id: atual.id } });
+  await prisma.auditLog.create({ data: {
+    userId: user.id, action: "EXCLUIR_ROMANEIO_PREVIO", entity: "OP", entityId: params.id,
+    diff: { numero: atual.numero, pesoKg: atual.pesoKg },
+  } }).catch(() => {});
   return NextResponse.json({ success: true });
 }
