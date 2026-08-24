@@ -191,7 +191,10 @@ export async function PATCH(req) {
         prazoEntrega: true,
         cotacao: {
           select: {
-            pedidosOmie: { select: { id: true }, take: 1 },
+            // ⚠ `take: 1` pegava um pedido ARBITRÁRIO quando a cotação gerou mais de um (split de
+            // faturamento direto). Traz todos e decide com regra, não com sorte.
+            pedidosOmie: { select: { id: true } },
+            itens: { select: { id: true, entregaRealEm: true } },
           },
         },
       },
@@ -201,19 +204,33 @@ export async function PATCH(req) {
       return NextResponse.json({ success: false, error: "Item nao encontrado" }, { status: 404 });
     }
 
-    const pedido = cotItem.cotacao?.pedidosOmie?.[0];
-    if (pedido) {
-      const dataReal = dataEntregaReal ? new Date(dataEntregaReal) : new Date();
-      const prazo = cotItem.prazoEntrega;
-      const atrasado = prazo && dataReal > new Date(prazo);
+    // ⚠⚠ UM ITEM NÃO FECHA O PEDIDO INTEIRO. A média é de 9,6 itens por cotação: marcar uma linha
+    // entregue dava baixa nas outras 8,6 sem que ninguém tivesse conferido nada. É o caminho mais
+    // usado dos três (67 vezes contra 37 do outro), e era o mais destrutivo.
+    //
+    // ⚠ e a data vinha CRUA do navegador, sem validação — e é ela que alimenta o indicador de
+    // pontualidade do fornecedor. Data inválida agora vira "agora", não `Invalid Date`.
+    const bruta = dataEntregaReal ? new Date(dataEntregaReal) : null;
+    const dataReal = bruta && !Number.isNaN(bruta.getTime()) ? bruta : new Date();
+    const prazo = cotItem.prazoEntrega;
+    const atrasado = prazo && dataReal > new Date(prazo);
 
-      await prisma.pedidoOmie.update({
-        where: { id: pedido.id },
-        data: {
-          dataEntregaReal: dataReal,
-          statusEntrega: atrasado ? "ATRASADO" : "ENTREGUE",
-        },
-      });
+    // o item que a pessoa marcou
+    await prisma.cotacaoItem.update({
+      where: { id: cotacaoItemId },
+      data: { entregaRealEm: dataReal },
+    });
+
+    // o pedido só fecha quando TODOS os itens da cotação estiverem entregues
+    const irmaos = cotItem.cotacao?.itens || [];
+    const faltam = irmaos.filter((i) => i.id !== cotacaoItemId && !i.entregaRealEm);
+    if (!faltam.length) {
+      for (const pedido of cotItem.cotacao?.pedidosOmie || []) {
+        await prisma.pedidoOmie.update({
+          where: { id: pedido.id },
+          data: { dataEntregaReal: dataReal, statusEntrega: atrasado ? "ATRASADO" : "ENTREGUE" },
+        });
+      }
     }
 
     await prisma.auditLog.create({

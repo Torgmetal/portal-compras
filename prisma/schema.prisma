@@ -939,6 +939,10 @@ model CotacaoItem {
   observacao        String?
   vencedor          Boolean   @default(false)
   prazoEntrega      DateTime?
+  // ⚠ ENTREGA É POR ITEM, NÃO POR PEDIDO. A cotação tem em média 9,6 itens; marcar uma linha como
+  // entregue fechava o pedido inteiro e dava baixa nas outras 8,6 sem ninguém conferir. O pedido
+  // só fecha quando TODOS os itens tiverem esta data.
+  entregaRealEm     DateTime?
   semEstoque        Boolean   @default(false)
   cotacao           Cotacao   @relation(fields: [cotacaoId], references: [id], onDelete: Cascade)
   rmItem            RMItem    @relation(fields: [rmItemId], references: [id])
