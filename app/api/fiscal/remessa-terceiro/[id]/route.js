@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { criarPedidoRemessa, conferirRemessaOmie, concluirRemessaOmie } from "@/lib/omie-remessa-industrializacao";
+import { criarPedidoRemessa, conferirRemessaOmie, concluirRemessaOmie, statusNfDaRemessa } from "@/lib/omie-remessa-industrializacao";
 
 export const runtime = "nodejs";
 export const maxDuration = 120; // emitir_omie espera a autorização do SEFAZ (poll)
@@ -36,7 +36,7 @@ const freteSchema = z.object({
 }).strict().optional();
 
 const schema = z.object({
-  acao: z.enum(["gerar_pedido_omie", "conferir_omie", "emitir_omie", "registrar", "dispensar", "reabrir"]),
+  acao: z.enum(["gerar_pedido_omie", "conferir_omie", "emitir_omie", "atualizar_status", "registrar", "dispensar", "reabrir"]),
   // gerar_pedido_omie: materiais já resolvidos na tela de preparação (código + valor)
   materiais: z.array(materialResolvidoSchema).optional(),
   frete: freteSchema,
@@ -128,16 +128,40 @@ export async function PATCH(req, { params }) {
     if (!atual.remessaPedidoOmie) return NextResponse.json({ error: "Gere a remessa no Omie antes de emitir." }, { status: 400 });
     const r = await concluirRemessaOmie(atual.remessaPedidoOmie);
     if (!r.ok) {
-      // Guarda o erro (aparece no portal) e mantém PEDIDO_CRIADO p/ reenviar.
+      // Rejeitada/erro/processando → guarda o motivo, NÃO marca EMITIDA, mantém p/ reenviar.
       await prisma.romaneioTerceiro.update({ where: { id: atual.id }, data: { remessaErroEmissao: (r.erro || "Falha na emissão").substring(0, 900) } }).catch(() => {});
-      await prisma.auditLog.create({ data: { userId: user.id, action: "REMESSA_TERCEIRO_EMITIR_ERRO", entity: "RomaneioTerceiro", entityId: atual.id, diff: { numero: atual.numero, pedidoOmie: atual.remessaPedidoOmie, erro: r.erro } } }).catch(() => {});
-      return NextResponse.json({ error: r.erro }, { status: 502 });
+      await prisma.auditLog.create({ data: { userId: user.id, action: "REMESSA_TERCEIRO_EMITIR_ERRO", entity: "RomaneioTerceiro", entityId: atual.id, diff: { numero: atual.numero, pedidoOmie: atual.remessaPedidoOmie, erro: r.erro, rejeitada: !!r.rejeitada } } }).catch(() => {});
+      return NextResponse.json({ error: r.erro, rejeitada: !!r.rejeitada }, { status: 502 });
     }
-    // Enviado ao SEFAZ. A API do Omie NÃO informa se autorizou ou rejeitou → NÃO marcamos
-    // EMITIDA aqui. Devolvemos o nº SUGERIDO pra o Fiscal conferir no Omie e registrar.
-    await prisma.romaneioTerceiro.update({ where: { id: atual.id }, data: { remessaErroEmissao: null } }).catch(() => {});
-    await prisma.auditLog.create({ data: { userId: user.id, action: "REMESSA_TERCEIRO_ENVIAR_SEFAZ", entity: "RomaneioTerceiro", entityId: atual.id, diff: { numero: atual.numero, pedidoOmie: atual.remessaPedidoOmie, nfSugerida: r.nfSugerida } } }).catch(() => {});
-    return NextResponse.json({ success: true, enviado: true, nfSugerida: r.nfSugerida || null });
+    // AUTORIZADA (confirmado via DANFE) → marca EMITIDA com o nº real.
+    const upd = await prisma.romaneioTerceiro.update({
+      where: { id: atual.id },
+      data: {
+        remessaStatus: "EMITIDA",
+        remessaNfNumero: r.nf?.numero || null, remessaNfSerie: r.nf?.serie || null, remessaNfChave: r.nf?.chave || null,
+        remessaNfEmitidaEm: new Date(), remessaErroEmissao: null, remessaPorNome: user.name || null,
+      },
+    });
+    await prisma.auditLog.create({ data: { userId: user.id, action: "REMESSA_TERCEIRO_EMITIR_NF", entity: "RomaneioTerceiro", entityId: upd.id, diff: { numero: upd.numero, pedidoOmie: atual.remessaPedidoOmie, nf: r.nf } } }).catch(() => {});
+    return NextResponse.json({ success: true, remessaStatus: "EMITIDA", nf: r.nf });
+  }
+
+  // ── Atualizar o status da NF direto do SEFAZ (DANFE = autorizada) ──
+  if (body.acao === "atualizar_status") {
+    if (!atual.remessaPedidoOmie) return NextResponse.json({ error: "Remessa ainda não gerada no Omie." }, { status: 400 });
+    const s = await statusNfDaRemessa(atual.remessaPedidoOmie);
+    if (s.estado === "AUTORIZADA") {
+      await prisma.romaneioTerceiro.update({ where: { id: atual.id }, data: {
+        remessaStatus: "EMITIDA", remessaNfNumero: s.nf?.numero || null, remessaNfSerie: s.nf?.serie || null,
+        remessaNfChave: s.nf?.chave || null, remessaNfEmitidaEm: new Date(), remessaErroEmissao: null,
+      } }).catch(() => {});
+      return NextResponse.json({ success: true, estado: "AUTORIZADA", nf: s.nf });
+    }
+    if (s.estado === "REJEITADA") {
+      await prisma.romaneioTerceiro.update({ where: { id: atual.id }, data: { remessaErroEmissao: `NF-e ${s.nf?.numero || ""} rejeitada pelo SEFAZ — veja o motivo no Omie, corrija e reenvie.` } }).catch(() => {});
+      return NextResponse.json({ success: true, estado: "REJEITADA", nf: s.nf });
+    }
+    return NextResponse.json({ success: true, estado: s.estado }); // SEM_NF / CANCELADA
   }
 
   const data = {};

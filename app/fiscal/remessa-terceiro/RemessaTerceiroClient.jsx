@@ -4,7 +4,7 @@ import { useStore } from "@/lib/store";
 import { fmtOP } from "@/lib/utils";
 import {
   Factory, Loader2, AlertCircle, X, FileText, Search,
-  PackageOpen, ReceiptText, MinusCircle, Undo2, Truck, FilePlus2, Eye, Boxes, Package, Check, Pencil,
+  PackageOpen, ReceiptText, MinusCircle, Undo2, Truck, FilePlus2, Eye, Boxes, Package, Check, Pencil, RefreshCw,
 } from "lucide-react";
 
 const fmtR$ = (n) => (n == null ? "—" : Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
@@ -64,6 +64,17 @@ export default function RemessaTerceiroClient() {
     const j = await res.json();
     if (j.success) { carregar(); showToast(msgOk, "success"); }
     else showToast(j.error || "Erro", "erro");
+  }
+
+  async function atualizarStatus(id) {
+    showToast("Consultando o status no SEFAZ…", "info");
+    const res = await fetch(`/api/fiscal/remessa-terceiro/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao: "atualizar_status" }) });
+    const j = await res.json();
+    if (!j.success) return showToast(j.error || "Erro", "erro");
+    carregar();
+    if (j.estado === "AUTORIZADA") showToast(`NF-e ${j.nf?.numero || ""} autorizada — marcada como emitida.`, "success");
+    else if (j.estado === "REJEITADA") showToast("NF-e rejeitada no SEFAZ — veja o motivo no Omie, corrija e reenvie.", "erro");
+    else showToast("Ainda sem NF autorizada — se acabou de reenviar no Omie, aguarde e tente de novo.", "info");
   }
 
   return (
@@ -153,8 +164,9 @@ export default function RemessaTerceiroClient() {
                           )}
                           {r.remessaStatus === "PEDIDO_CRIADO" && (
                             <>
-                              <button onClick={() => setFaturar(r)} title="Conferir e emitir a NF-e pelo portal (SEFAZ)" className="text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1 rounded-lg inline-flex items-center gap-1"><ReceiptText size={12} /> Emitir NF</button>
-                              <button onClick={() => setEmitir(r)} title="Registrar manualmente a NF (se faturou direto no Omie)" className="text-xs text-torg-blue hover:text-torg-dark border border-torg-blue-100 rounded-lg px-2 py-1 inline-flex items-center gap-1"><Pencil size={12} /> Registrar manual</button>
+                              {!r.erroEmissao && <button onClick={() => setFaturar(r)} title="Conferir e emitir a NF-e pelo portal (SEFAZ)" className="text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1 rounded-lg inline-flex items-center gap-1"><ReceiptText size={12} /> Emitir NF</button>}
+                              <button onClick={() => atualizarStatus(r.id)} title="Consultar o status da NF no SEFAZ (use após reenviar no Omie)" className="text-xs text-torg-blue hover:text-torg-dark border border-torg-blue-100 rounded-lg px-2 py-1 inline-flex items-center gap-1"><RefreshCw size={12} /> Atualizar status</button>
+                              <button onClick={() => setEmitir(r)} title="Registrar manualmente a NF" className="text-xs text-torg-blue hover:text-torg-dark border border-torg-blue-100 rounded-lg px-2 py-1 inline-flex items-center gap-1"><Pencil size={12} /> Registrar</button>
                               <button onClick={() => acao(r.id, { acao: "reabrir" }, "Remessa reaberta")} title="Reabrir (desvincula do fluxo — o rascunho no Omie precisa ser removido lá)" className="text-torg-gray hover:text-red-600 p-1"><Undo2 size={14} /></button>
                             </>
                           )}
@@ -175,12 +187,7 @@ export default function RemessaTerceiroClient() {
       {emitir && <ModalEmitir remessa={emitir} onClose={() => setEmitir(null)} onSalvo={() => { setEmitir(null); carregar(); showToast("NF de remessa registrada", "success"); }} />}
       {verItens && <ModalItens remessa={verItens} onClose={() => setVerItens(null)} />}
       {preparar && <ModalPrepararRemessa remessa={preparar} onClose={() => setPreparar(null)} onGerado={(msg) => { setPreparar(null); carregar(); showToast(msg || "Remessa criada no Omie (rascunho)", "success"); }} />}
-      {faturar && <ModalFaturar remessa={faturar} onClose={() => setFaturar(null)} onEmitido={(nfSugerida) => {
-        const r = { ...faturar };
-        if (nfSugerida) { r.nfNumero = nfSugerida.numero; r.nfSerie = nfSugerida.serie; r.nfChave = nfSugerida.chave; }
-        setFaturar(null); setEmitir(r); carregar();
-        showToast("NF enviada ao SEFAZ. Confira no Omie se autorizou e confirme o registro.", "info");
-      }} />}
+      {faturar && <ModalFaturar remessa={faturar} onClose={() => setFaturar(null)} onEmitido={(msg) => { setFaturar(null); carregar(); showToast(msg || "NF-e emitida", "success"); }} />}
     </div>
   );
 }
@@ -453,7 +460,7 @@ function ModalFaturar({ remessa, onClose, onEmitido }) {
       const res = await fetch(`/api/fiscal/remessa-terceiro/${remessa.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao: "emitir_omie" }) });
       const j = await res.json();
       if (!j.success) throw new Error(j.error || "Falha ao emitir");
-      onEmitido(j.nfSugerida || null); // enviado ao SEFAZ → parent abre o Registrar pra confirmar
+      onEmitido(j.nf?.numero ? `NF-e ${j.nf.numero} autorizada pelo SEFAZ!` : "NF-e autorizada!");
     } catch (e) { setErroEmit(e.message); setEmitindo(false); }
   }
 
@@ -493,8 +500,8 @@ function ModalFaturar({ remessa, onClose, onEmitido }) {
           {/* Passo 2: emissão */}
           <div className={`border rounded-lg p-3 ${conf.estado === "ok" ? "border-amber-200 bg-amber-50/40" : "border-gray-100 opacity-60"}`}>
             <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wider mb-1.5">2. Emitir NF-e</p>
-            <p className="text-xs text-torg-gray">Ao emitir, a NF-e é enviada ao <strong>SEFAZ</strong>. <strong className="text-amber-700">Essa ação não pode ser desfeita.</strong> Como a API do Omie não informa aqui se a nota <strong>autorizou ou rejeitou</strong>, confira no Omie (aba <em>Comunicação com a SEFAZ</em>) — o portal já abre o <strong>registro</strong> com o número sugerido pra você confirmar.</p>
-            {emitindo && <p className="mt-2 text-sm text-torg-blue inline-flex items-center gap-1.5"><Loader2 size={14} className="animate-spin" /> Enviando ao SEFAZ…</p>}
+            <p className="text-xs text-torg-gray">Ao emitir, a NF-e é enviada ao <strong>SEFAZ</strong>. <strong className="text-amber-700">Essa ação não pode ser desfeita.</strong> O portal <strong>confere a autorização real</strong> (via DANFE) — só marca emitida quando o SEFAZ autoriza; se rejeitar, mostra o motivo. Pode levar até ~1 min.</p>
+            {emitindo && <p className="mt-2 text-sm text-torg-blue inline-flex items-center gap-1.5"><Loader2 size={14} className="animate-spin" /> Enviando ao SEFAZ e conferindo a autorização…</p>}
             {erroEmit && <p className="mt-2 text-sm text-red-600 inline-flex items-start gap-1.5"><AlertCircle size={14} className="mt-0.5 shrink-0" /> {erroEmit}</p>}
           </div>
         </div>
