@@ -131,7 +131,8 @@ export default withAuth(
           path.startsWith("/api/estudo-cotacao/") ||
           // Sync MES — autenticado por Bearer API key própria (não NextAuth)
           path.startsWith("/api/mes/") ||
-          // Sync LPC SharePoint — auth própria (Bearer MES_SYNC_API_KEY ou sessão no handler)
+          // Sync LPC SharePoint — auth própria no handler. ⚠ o bearer do MES só CONSULTA ali:
+          // importar apaga e recria 15.066 peças e exige sessão ADMIN/PRODUÇÃO + ?obra=.
           path.startsWith("/api/producao/pecas/sync-lpc-sharepoint") ||
           // Crons da Vercel — chegam SEM sessão NextAuth; cada rota valida o
           // CRON_SECRET no handler. Sem isto o middleware redirecionava o cron

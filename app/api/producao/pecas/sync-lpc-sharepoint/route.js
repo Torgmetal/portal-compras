@@ -64,13 +64,35 @@ export async function POST(req) {
 }
 
 async function handle(req, { permitirImport }) {
-  // Auth: sessão (ADMIN/PRODUCAO) OU Bearer MES_SYNC_API_KEY (automação/testes)
+  // ⚠⚠⚠ ESTA ROTA APAGA E RECRIA AS PEÇAS DA LPC. `importarLpcParsed` faz `deleteMany`
+  // INCONDICIONAL e recria tudo em PENDENTE — some status, prioridade, ordem e meta de corte,
+  // baixa por setor, máquina e destino. Medido no banco: são 15.066 peças, e **15.066 de 15.066**
+  // estão em algum status de produção (9.768 CORTE, 3.164 EXPEDIDO, 1.667 TERCEIRIZADO, 452
+  // MONTAGEM, 13 PINTURA, 2 SOLDA). Rodar isto zera 100% do avanço da fábrica. Não há undo.
+  //
+  // ⚠⚠ E COM A CHAVE DO MES NÃO SOBRAVA NEM RASTRO: o bearer entrava com `user = { id: null }`, e
+  // `importarLpcParsed` só grava AuditLog dentro de `if (userId)`. Conferido: não existe uma linha
+  // `IMPORTAR_LPC_SHAREPOINT` no AuditLog. Essa chave vive num PC da fábrica (C:\MesSync).
+  //
+  // Três travas, todas necessárias:
+  //   1. o bearer do MES LÊ, mas não IMPORTA — importar exige sessão ADMIN/PRODUÇÃO de gente;
+  //   2. importar exige `?obra=` — sem ela a rota varre a pasta base inteira, OP por OP;
+  //   3. quem importa fica registrado (o AuditLog dentro da lib depende de `userId`).
   const auth = req.headers.get("authorization") || "";
   const bearerOk = process.env.MES_SYNC_API_KEY && auth.startsWith("Bearer ") && auth.slice(7) === process.env.MES_SYNC_API_KEY;
+  const { searchParams } = new URL(req.url);
+  const querImportar = permitirImport && searchParams.get("importar") === "1";
+
   let user;
-  if (bearerOk) {
-    user = { id: null };
+  if (bearerOk && !querImportar) {
+    user = { id: null }; // automação só consulta
   } else {
+    if (bearerOk) {
+      return NextResponse.json(
+        { error: "A chave do MES não importa LPC — importação apaga e recria as peças e precisa de sessão ADMIN/PRODUÇÃO." },
+        { status: 403 },
+      );
+    }
     try {
       user = await requireRole(["ADMIN", "PRODUCAO"]);
     } catch (e) {
@@ -78,11 +100,18 @@ async function handle(req, { permitirImport }) {
     }
   }
 
-  const { searchParams } = new URL(req.url);
-  const importar  = permitirImport && searchParams.get("importar") === "1";
-  const dryRun    = !importar; // padrão seguro: só lista
   const opFiltro  = (searchParams.get("op") || "").trim();
   const obraFiltro = (searchParams.get("obra") || "").trim().toUpperCase(); // importar só esta obra
+
+  // ⚠ importar SEM obra varreria a base inteira e recriaria a produção de todas as OPs de uma vez
+  if (querImportar && !obraFiltro) {
+    return NextResponse.json(
+      { error: "Informe ?obra= para importar. Sem ela a importação alcançaria todas as OPs de uma vez, e ela apaga e recria as peças." },
+      { status: 400 },
+    );
+  }
+  const importar = querImportar;
+  const dryRun   = !importar; // padrão seguro: só lista
 
   const driveId = await resolveServidorDriveId();
   if (!driveId) {
