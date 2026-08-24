@@ -4516,6 +4516,7 @@ model RomaneioTerceiro {
   // A remessa é PRÉ-CRIADA junto do romaneio (remessaStatus PENDENTE) e emitida no Fiscal.
   remessaStatus     String    @default("PENDENTE") // PENDENTE | EMITIDA | CANCELADA | DISPENSADA
   remessaCfop       String? // 5901 (dentro do estado) / 6901 (fora) — remessa p/ industrialização
+  remessaFrete      Json? // dados do frete p/ a NF: { tpFrete, nCodTransp, transpNome, placa, uf, qtdVol, especie, pesoLiq, pesoBruto, valorFrete, valorSeguro, valorOutras }
   remessaNatureza   String? // natureza da operação (ex.: "Remessa para industrialização")
   remessaNfNumero   String?
   remessaNfSerie    String?

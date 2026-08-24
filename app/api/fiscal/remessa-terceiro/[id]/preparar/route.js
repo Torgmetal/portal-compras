@@ -15,7 +15,7 @@ export async function GET(_req, { params }) {
 
   const rom = await prisma.romaneioTerceiro.findUnique({
     where: { id: params.id },
-    select: { id: true, numero: true, materiais: true, itens: true, remessaStatus: true },
+    select: { id: true, numero: true, materiais: true, itens: true, remessaStatus: true, remessaFrete: true },
   });
   if (!rom) return NextResponse.json({ error: "Romaneio não encontrado" }, { status: 404 });
 
@@ -44,13 +44,27 @@ export async function GET(_req, { params }) {
   });
 
   const pronto = itens.length > 0 && itens.every((it) => it.codigoOmie && it.valorUnit > 0 && it.qtd > 0);
+
+  // Sugestões p/ o frete: peso bruto = soma dos pesos; volumes = nº de peças (marcas).
+  const marcas = Array.isArray(rom.itens) ? rom.itens : [];
+  const pesoMateriais = materiais.reduce((s, m) => s + (Number(m.pesoKg || 0) || 0), 0);
+  const pesoMarcas = marcas.reduce((s, m) => s + (Number(m.pesoTotal || 0) || 0), 0);
+  const qtdMarcas = marcas.reduce((s, m) => s + (Number(m.qte || 0) || 0), 0);
+  const freteSugestao = {
+    pesoBruto: Math.round((pesoMateriais + pesoMarcas) * 1000) / 1000,
+    qtdVol: qtdMarcas || marcas.length || null,
+    especie: "PEÇAS",
+  };
+
   return NextResponse.json({
     success: true,
     numero: rom.numero,
     remessaStatus: rom.remessaStatus,
     temMateriais: materiais.length > 0,
-    marcasCount: Array.isArray(rom.itens) ? rom.itens.length : 0,
+    marcasCount: marcas.length,
     itens,
     pronto,
+    frete: rom.remessaFrete || null, // frete já salvo (se regerando)
+    freteSugestao,
   });
 }

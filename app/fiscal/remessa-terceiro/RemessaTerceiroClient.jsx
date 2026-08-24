@@ -182,9 +182,19 @@ export default function RemessaTerceiroClient() {
 // Preparação da remessa de MATERIAIS antes de gerar o pedido no Omie: resolve o custo
 // (preço de compra → estoque) de cada material e permite escolher manualmente o produto
 // dos que estão sem código. Só libera "Gerar remessa" quando todo item tem código + valor.
+const TP_FRETE = [
+  ["0", "0 - CIF (conta do remetente)"],
+  ["1", "1 - FOB (conta do destinatário)"],
+  ["2", "2 - Por conta de terceiros"],
+  ["9", "9 - Sem transporte"],
+];
+const finp = "w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-torg-blue outline-none";
+
 function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
   const [dados, setDados] = useState(null);
   const [itens, setItens] = useState([]);
+  const [frete, setFrete] = useState({ tpFrete: "0" });
+  const [aba, setAba] = useState("itens");
   const [erro, setErro] = useState("");
   const [gerando, setGerando] = useState(false);
 
@@ -192,21 +202,42 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
     setErro("");
     fetch(`/api/fiscal/remessa-terceiro/${remessa.id}/preparar`)
       .then((r) => r.json())
-      .then((j) => { if (j.success) { setDados(j); setItens(j.itens || []); } else setErro(j.error || "Erro"); })
+      .then((j) => {
+        if (!j.success) { setErro(j.error || "Erro"); return; }
+        setDados(j); setItens(j.itens || []);
+        const sug = j.freteSugestao || {};
+        setFrete(j.frete || { tpFrete: "0", especie: sug.especie || "PEÇAS", pesoBruto: sug.pesoBruto || "", qtdVol: sug.qtdVol || "" });
+      })
       .catch(() => setErro("Erro ao preparar"));
   }, [remessa.id]);
 
   const setItem = (idx, patch) => setItens((arr) => arr.map((it) => (it.idx === idx ? { ...it, ...patch } : it)));
+  const setF = (k, v) => setFrete((s) => ({ ...s, [k]: v }));
   const totalGeral = itens.reduce((s, it) => s + (Number(it.valorUnit) || 0) * (Number(it.qtd) || 0), 0);
   const pendentes = itens.filter((it) => !it.codigoOmie || !(Number(it.valorUnit) > 0));
   const temMateriais = dados?.temMateriais;
   const podeGerar = temMateriais ? (itens.length > 0 && pendentes.length === 0) : (dados?.marcasCount > 0);
+  const num = (v) => (v === "" || v == null ? null : parseFloat(String(v).replace(",", ".")));
 
   async function gerar() {
     setErro(""); setGerando(true);
     try {
       const payload = { acao: "gerar_pedido_omie" };
       if (temMateriais) payload.materiais = itens.map((it) => ({ idx: it.idx, codigoOmie: it.codigoOmie, descricao: it.descricao || null, qtd: Number(it.qtd), valorUnit: Number(it.valorUnit) }));
+      payload.frete = {
+        tpFrete: frete.tpFrete || "0",
+        nCodTransp: frete.nCodTransp || null,
+        transpNome: frete.transpNome || null,
+        placa: frete.placa || null,
+        uf: frete.uf || null,
+        qtdVol: num(frete.qtdVol),
+        especie: frete.especie || null,
+        pesoLiq: num(frete.pesoLiq),
+        pesoBruto: num(frete.pesoBruto),
+        valorFrete: num(frete.valorFrete),
+        valorSeguro: num(frete.valorSeguro),
+        valorOutras: num(frete.valorOutras),
+      };
       const res = await fetch(`/api/fiscal/remessa-terceiro/${remessa.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await res.json();
       if (!j.success) throw new Error(j.error || "Erro");
@@ -221,11 +252,57 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
           <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><FilePlus2 size={16} className="text-torg-blue" /> Preparar remessa — RT-{String(remessa.numero).padStart(3, "0")}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
-        <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
+
+        {/* Abas */}
+        {dados && (
+          <div className="px-5 pt-3 flex gap-1 border-b border-gray-100">
+            {[["itens", "Itens e valores"], ["frete", "Frete"]].map(([v, l]) => (
+              <button key={v} onClick={() => setAba(v)} className={`px-3 py-2 text-xs font-medium rounded-t-lg border-b-2 -mb-px ${aba === v ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
+                {l === "Frete" ? <span className="inline-flex items-center gap-1"><Truck size={13} /> {l}</span> : l}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="px-5 py-4 space-y-4 max-h-[65vh] overflow-y-auto">
           {erro && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2"><AlertCircle size={14} className="mt-0.5 shrink-0" /><span>{erro}</span></div>}
 
           {!dados ? (
             <p className="py-8 text-center text-sm text-torg-gray inline-flex items-center gap-2 justify-center w-full"><Loader2 size={16} className="animate-spin" /> Resolvendo custos…</p>
+          ) : aba === "frete" ? (
+            <div className="space-y-4">
+              <p className="text-xs text-torg-gray">Preencha o transporte só <strong>quando houver transportadora</strong>. A <strong>modalidade do frete</strong> é obrigatória p/ o SEFAZ (o resto é opcional).</p>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-torg-dark mb-1">Transportadora</label>
+                  <SeletorTransportadora valor={frete.transpNome} onEscolher={(t) => setFrete((s) => ({ ...s, nCodTransp: t?.nCodTransp || null, transpNome: t?.nome || null, uf: t?.uf || s.uf }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-torg-dark mb-1">Tipo do frete *</label>
+                  <select value={frete.tpFrete || "0"} onChange={(e) => setF("tpFrete", e.target.value)} className={finp}>
+                    {TP_FRETE.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="block text-xs font-medium text-torg-dark mb-1">Placa</label><input value={frete.placa || ""} onChange={(e) => setF("placa", e.target.value.toUpperCase())} placeholder="ABC1D23" className={finp} /></div>
+                  <div><label className="block text-xs font-medium text-torg-dark mb-1">UF</label><input value={frete.uf || ""} onChange={(e) => setF("uf", e.target.value.toUpperCase().slice(0, 2))} placeholder="SP" className={finp} /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="block text-xs font-medium text-torg-dark mb-1">Qtd. volumes</label><input value={frete.qtdVol ?? ""} onChange={(e) => setF("qtdVol", e.target.value)} inputMode="numeric" placeholder="0" className={finp} /></div>
+                  <div><label className="block text-xs font-medium text-torg-dark mb-1">Espécie</label><input value={frete.especie || ""} onChange={(e) => setF("especie", e.target.value)} placeholder="PEÇAS" className={finp} /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="block text-xs font-medium text-torg-dark mb-1">Peso líquido (kg)</label><input value={frete.pesoLiq ?? ""} onChange={(e) => setF("pesoLiq", e.target.value)} inputMode="decimal" placeholder="0,000" className={finp} /></div>
+                  <div><label className="block text-xs font-medium text-torg-dark mb-1">Peso bruto (kg)</label><input value={frete.pesoBruto ?? ""} onChange={(e) => setF("pesoBruto", e.target.value)} inputMode="decimal" placeholder="0,000" className={finp} /></div>
+                </div>
+                <div className="grid grid-cols-3 gap-3 sm:col-span-2">
+                  <div><label className="block text-xs font-medium text-torg-dark mb-1">Valor frete</label><input value={frete.valorFrete ?? ""} onChange={(e) => setF("valorFrete", e.target.value)} inputMode="decimal" placeholder="0,00" className={finp} /></div>
+                  <div><label className="block text-xs font-medium text-torg-dark mb-1">Seguro</label><input value={frete.valorSeguro ?? ""} onChange={(e) => setF("valorSeguro", e.target.value)} inputMode="decimal" placeholder="0,00" className={finp} /></div>
+                  <div><label className="block text-xs font-medium text-torg-dark mb-1">Outras desp.</label><input value={frete.valorOutras ?? ""} onChange={(e) => setF("valorOutras", e.target.value)} inputMode="decimal" placeholder="0,00" className={finp} /></div>
+                </div>
+              </div>
+              {frete.nCodTransp && <p className="text-[11px] text-emerald-700 inline-flex items-center gap-1"><Check size={12} /> Transportadora vinculada (o RNTRC/ANTT vem do cadastro dela no Omie).</p>}
+            </div>
           ) : !temMateriais ? (
             <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-4 text-sm text-torg-dark">
               Este romaneio não tem materiais — a remessa sai como <strong>peças (ARM000001)</strong>{dados.marcasCount ? ` · ${dados.marcasCount} marca(s)` : ""}. Ao gerar, o Omie cria a remessa rascunho pra você conferir e faturar.
@@ -291,6 +368,50 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Autocomplete de transportadora (busca clientes do Omie por nome via /api/fiscal/transportadoras).
+function SeletorTransportadora({ valor, onEscolher }) {
+  const [q, setQ] = useState(valor || "");
+  const [lista, setLista] = useState([]);
+  const [aberto, setAberto] = useState(false);
+  const [carregando, setCarregando] = useState(false);
+  useEffect(() => { setQ(valor || ""); }, [valor]);
+  useEffect(() => {
+    if (!aberto) return;
+    const termo = q.trim();
+    if (termo.length < 2) { setLista([]); return; }
+    setCarregando(true);
+    const t = setTimeout(() => {
+      fetch(`/api/fiscal/transportadoras?q=${encodeURIComponent(termo)}`)
+        .then((r) => r.json()).then((j) => setLista(j.transportadoras || [])).catch(() => setLista([])).finally(() => setCarregando(false));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q, aberto]);
+  return (
+    <div className="relative">
+      <div className="relative">
+        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input value={q} onChange={(e) => { setQ(e.target.value); setAberto(true); if (!e.target.value) onEscolher(null); }} onFocus={() => setAberto(true)}
+          placeholder="Buscar transportadora pelo nome…" className={`${finp} pl-8`} />
+      </div>
+      {aberto && q.trim().length >= 2 && (
+        <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+          {carregando ? (
+            <p className="px-3 py-2 text-xs text-torg-gray inline-flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Buscando…</p>
+          ) : lista.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-torg-gray">Nenhuma transportadora encontrada.</p>
+          ) : lista.map((t) => (
+            <button key={t.nCodTransp} type="button" onClick={() => { onEscolher(t); setQ(t.nome); setAberto(false); }}
+              className="w-full text-left px-3 py-1.5 text-xs hover:bg-torg-blue-50 border-b border-gray-50 last:border-0">
+              <span className="text-torg-dark font-medium">{t.nome}</span>
+              {t.cnpj && <span className="text-torg-gray"> · {t.cnpj}</span>}{t.uf && <span className="text-torg-gray"> · {t.uf}</span>}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

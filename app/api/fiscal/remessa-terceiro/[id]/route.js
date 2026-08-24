@@ -20,10 +20,26 @@ const materialResolvidoSchema = z.object({
   valorUnit: z.number().positive(),
 });
 
+const freteSchema = z.object({
+  tpFrete: z.string().max(1).optional(),
+  nCodTransp: z.number().int().positive().nullable().optional(),
+  transpNome: z.string().max(120).nullable().optional(),
+  placa: z.string().max(10).nullable().optional(),
+  uf: z.string().max(2).nullable().optional(),
+  qtdVol: z.number().nonnegative().nullable().optional(),
+  especie: z.string().max(60).nullable().optional(),
+  pesoLiq: z.number().nonnegative().nullable().optional(),
+  pesoBruto: z.number().nonnegative().nullable().optional(),
+  valorFrete: z.number().nonnegative().nullable().optional(),
+  valorSeguro: z.number().nonnegative().nullable().optional(),
+  valorOutras: z.number().nonnegative().nullable().optional(),
+}).strict().optional();
+
 const schema = z.object({
   acao: z.enum(["gerar_pedido_omie", "conferir_omie", "emitir_omie", "registrar", "dispensar", "reabrir"]),
   // gerar_pedido_omie: materiais já resolvidos na tela de preparação (código + valor)
   materiais: z.array(materialResolvidoSchema).optional(),
+  frete: freteSchema,
   cfop: z.string().max(10).nullable().optional(),
   natureza: z.string().max(120).nullable().optional(),
   nfNumero: z.string().max(60).nullable().optional(),
@@ -74,9 +90,10 @@ export async function PATCH(req, { params }) {
       await prisma.romaneioTerceiro.update({ where: { id: atual.id }, data: { materiais: novosMateriais } }).catch(() => {});
     }
 
+    const frete = body.frete || null;
     let resultado;
     try {
-      resultado = await criarPedidoRemessa(rom, { cnpj: forn.cnpj, uf: forn.uf, nCodOmie: forn.nCodOmie }, { materiaisResolvidos });
+      resultado = await criarPedidoRemessa(rom, { cnpj: forn.cnpj, uf: forn.uf, nCodOmie: forn.nCodOmie }, { materiaisResolvidos, frete });
     } catch (e) {
       return NextResponse.json({ error: `Falha ao criar pedido no Omie: ${e.message}` }, { status: 502 });
     }
@@ -88,6 +105,7 @@ export async function PATCH(req, { params }) {
         remessaStatus: "PEDIDO_CRIADO",
         remessaPedidoOmie: String(resultado.codigoPedido),
         remessaPedidoNumero: resultado.numeroPedido || null,
+        remessaFrete: frete || undefined,
         remessaNatureza: "Remessa de Produto",
         remessaPorNome: user.name || null,
       },
