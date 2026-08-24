@@ -73,8 +73,7 @@ export default function RemessaTerceiroClient() {
     if (!j.success) return showToast(j.error || "Erro", "erro");
     carregar();
     if (j.estado === "AUTORIZADA") showToast(`NF-e ${j.nf?.numero || ""} autorizada — marcada como emitida.`, "success");
-    else if (j.estado === "REJEITADA") showToast("NF-e rejeitada no SEFAZ — veja o motivo no Omie, corrija e reenvie.", "erro");
-    else showToast("Ainda sem NF autorizada — se acabou de reenviar no Omie, aguarde e tente de novo.", "info");
+    else showToast("Ainda sem confirmação da autorização. Se autorizou no Omie, aguarde o DANFE e tente de novo; se rejeitou, veja o motivo no Omie e reenvie.", "info");
   }
 
   return (

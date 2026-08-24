@@ -128,10 +128,11 @@ export async function PATCH(req, { params }) {
     if (!atual.remessaPedidoOmie) return NextResponse.json({ error: "Gere a remessa no Omie antes de emitir." }, { status: 400 });
     const r = await concluirRemessaOmie(atual.remessaPedidoOmie);
     if (!r.ok) {
-      // Rejeitada/erro/processando → guarda o motivo, NÃO marca EMITIDA, mantém p/ reenviar.
+      // Não confirmou autorização (pendente/erro) → guarda a mensagem, NÃO marca EMITIDA.
+      // O Fiscal usa "Atualizar status" pra confirmar depois (ou vê o motivo no Omie).
       await prisma.romaneioTerceiro.update({ where: { id: atual.id }, data: { remessaErroEmissao: (r.erro || "Falha na emissão").substring(0, 900) } }).catch(() => {});
-      await prisma.auditLog.create({ data: { userId: user.id, action: "REMESSA_TERCEIRO_EMITIR_ERRO", entity: "RomaneioTerceiro", entityId: atual.id, diff: { numero: atual.numero, pedidoOmie: atual.remessaPedidoOmie, erro: r.erro, rejeitada: !!r.rejeitada } } }).catch(() => {});
-      return NextResponse.json({ error: r.erro, rejeitada: !!r.rejeitada }, { status: 502 });
+      await prisma.auditLog.create({ data: { userId: user.id, action: "REMESSA_TERCEIRO_EMITIR_PENDENTE", entity: "RomaneioTerceiro", entityId: atual.id, diff: { numero: atual.numero, pedidoOmie: atual.remessaPedidoOmie, msg: r.erro, pendente: !!r.pendente } } }).catch(() => {});
+      return NextResponse.json({ error: r.erro, pendente: !!r.pendente }, { status: 502 });
     }
     // AUTORIZADA (confirmado via DANFE) → marca EMITIDA com o nº real.
     const upd = await prisma.romaneioTerceiro.update({
@@ -157,11 +158,8 @@ export async function PATCH(req, { params }) {
       } }).catch(() => {});
       return NextResponse.json({ success: true, estado: "AUTORIZADA", nf: s.nf });
     }
-    if (s.estado === "REJEITADA") {
-      await prisma.romaneioTerceiro.update({ where: { id: atual.id }, data: { remessaErroEmissao: `NF-e ${s.nf?.numero || ""} rejeitada pelo SEFAZ — veja o motivo no Omie, corrija e reenvie.` } }).catch(() => {});
-      return NextResponse.json({ success: true, estado: "REJEITADA", nf: s.nf });
-    }
-    return NextResponse.json({ success: true, estado: s.estado }); // SEM_NF / CANCELADA
+    // PENDENTE = NF existe mas sem DANFE ainda (autorizando OU rejeitada — não dá pra afirmar aqui).
+    return NextResponse.json({ success: true, estado: s.estado }); // PENDENTE / SEM_NF / CANCELADA
   }
 
   const data = {};
