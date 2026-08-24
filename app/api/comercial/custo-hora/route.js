@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole, requireUser } from "@/lib/session";
 import { temAcessoDiretoria } from "@/lib/diretoria";
 import { z } from "zod";
+import { ABSENTEISMO_MAX } from "@/lib/custo-hora-calc";
 
 export const runtime = "nodejs";
 const ID = "default";
@@ -62,7 +63,8 @@ const schema = z.object({
   impostosVendaPct: z.number().min(0).max(90).default(15),
   horasDia: z.number().min(1).max(24).default(8),
   diasUteis: z.number().min(1).max(31).default(22),
-  ocupacaoPct: z.number().min(0).max(100).default(8),
+  // "Absenteísmo (%)" na tela — acima de 40 a jornada vira ficção. Ver lib/custo-hora-calc.js.
+  ocupacaoPct: z.number().min(0).max(ABSENTEISMO_MAX).default(8),
   setores: z.array(setorSchema).max(50),
   // Overhead não-folha (custos operacionais da DRE): material auxiliar, energia, gás, aluguéis, etc.
   outrosCustos: z.array(z.object({

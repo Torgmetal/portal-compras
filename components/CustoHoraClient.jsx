@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Calculator, Loader2, AlertCircle, RefreshCw, Save, Plus, Trash2, Info, Upload } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { ABSENTEISMO_MAX } from "@/lib/custo-hora-calc";
 
 const num = (v) => { const n = Number(v); return isFinite(n) ? n : 0; };
 const fmtBRL = (v) => num(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -105,7 +106,14 @@ export default function CustoHoraClient() {
         impostosVendaPct: num(impostosVenda),
         horasDia: num(horasDia) || 8.75,
         diasUteis: num(diasUteis) || 22,
-        ocupacaoPct: num(ocupacao) || 80,
+        // ⚠⚠ ESTE FALLBACK ERA 80 — e é assim que o banco ficou com 80% de absenteísmo.
+        // O campo é "Absenteísmo (%)": entra na conta como (1 − absenteísmo), então 80 diz que
+        // cada pessoa falta 4 dias em 5 e a jornada cai de 177 h/mês para 38,5 h — menos de uma
+        // hora e meia por dia. O custo-hora sai 4,6× alto (SOLDAGEM a R$ 889/h em vez de R$ 193/h)
+        // e vai direto para o preço das propostas de serviço.
+        // O campo limpo vira num("")=0, e `0 || 80` gravava 80. O default é 8, como no carregamento
+        // (`c.ocupacaoPct ?? 8`) e na rota. Zero é resposta legítima — só o vazio cai no default.
+        ocupacaoPct: ocupacao === "" || ocupacao == null ? 8 : num(ocupacao),
         setores: setores.map((s) => ({ id: s.id, nome: s.nome, empresa: s.empresa || "", faturaHora: s.faturaHora !== false, salarios: num(s.salarios), mod: num(s.mod), headcount: num(s.headcount), horasMes: num(s.horasMes), cifDireto: num(s.cifDireto) })),
         outrosCustos: outrosCustos.map((c) => ({ id: c.id, nome: c.nome, valor: num(c.valor) })),
       };
@@ -119,6 +127,7 @@ export default function CustoHoraClient() {
   // ─── Cálculo ao vivo ───
   const f = num(fator);
   const horasPorPessoa = num(horasDia) * num(diasUteis) * (1 - num(ocupacao) / 100);
+  const absurdo = num(ocupacao) > ABSENTEISMO_MAX; // ver lib/custo-hora-calc.js
   const fatura = (s) => s.faturaHora !== false; // fábrica/externa faturam hora; ADM/apoio = overhead (rateado)
   const horasMes = (s) => (num(s.horasMes) > 0 ? num(s.horasMes) : num(s.headcount) * horasPorPessoa);
   const mod = (s) => (num(s.mod) > 0 ? num(s.mod) : num(s.salarios) * f); // CET real (importado) ou salários × fator
@@ -215,6 +224,11 @@ export default function CustoHoraClient() {
             <label className="text-xs text-torg-gray">Absenteísmo (%)</label>
             <input type="number" step="0.5" value={ocupacao} onChange={(e) => { setOcupacao(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
             <p className="text-[10px] text-torg-gray mt-1">faltas médias</p>
+            {absurdo && (
+              <p className="text-[10px] text-red-600 mt-1">
+                {num(ocupacao)}% de faltas deixa {Math.round(horasPorPessoa)} h/pessoa por mês. Acima de {ABSENTEISMO_MAX}% o custo-hora não é usado nas propostas.
+              </p>
+            )}
           </div>
         </div>
         <p className="text-[11px] text-torg-gray mt-1">Horas/mês são <strong>lançadas manualmente</strong> por setor. Vazio usa a estimativa de <strong>{Math.round(horasPorPessoa)} h/pessoa</strong> (horas/dia × dias úteis × (1 − absenteísmo)) como sugestão.</p>
