@@ -49,12 +49,16 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
     const trocado = !!(trocas[it.perfil] && trocas[it.perfil] !== it.rIndicado);
     // "pendente" = trocado na tela mas ainda não registrado (ou registrado com outro R)
     const pendente = trocado && it.troca?.rUsado !== rUsado;
-    return { ...it, rUsado, dados, trocado, pendente };
+    // ⚠ PREVISTO ≠ APONTADO. `rPrevisto` vem da API quando ninguém carimbou aquele R ainda e o
+    // FIFO só está dizendo qual vai sair. Troca manual manda: se a pessoa escolheu, não é previsão.
+    const previsto = !!it.rPrevisto && !trocado;
+    return { ...it, rUsado, dados, trocado, pendente, previsto };
   }), [itens, trocas]);
 
   const trocados = linhas.filter((l) => l.trocado).length;
   const pendentes = linhas.filter((l) => l.pendente);
   const semR = linhas.filter((l) => !l.rUsado).length;
+  const previstos = linhas.filter((l) => l.previsto).length;
 
   // Registra SÓ o que mudou. Sem alteração não há ação nenhuma. (Vitor 19/08.)
   async function registrar() {
@@ -80,7 +84,9 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
       "Rastreab. (R)", "Corrida / lote", "Certificado", "NF", "Fornecedor", "Recebido em", "Saldo do R", "Conferido (visto)"];
     const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
       titulo: `Lista de separação de material — ${obra}`,
-      subtitulo: `${obra} · ${nomeSetor}${d?.escopo === "selecao" ? " · somente as peças selecionadas" : " · OP inteira"}${trocados ? ` · ${trocados} R trocado(s) na separação` : ""}`,
+      // ⚠ o papel tem de dizer o que é previsão. Quem separa lê "R 251768" e vai buscar o fardo; se
+      // aquilo era só o FIFO chutando, ele precisa saber que confirma na hora, não que está fechado.
+      subtitulo: `${obra} · ${nomeSetor}${d?.escopo === "selecao" ? " · somente as peças selecionadas" : " · OP inteira"}${trocados ? ` · ${trocados} R trocado(s) na separação` : ""}${previstos ? ` · ${previstos} R previsto(s) pelo FIFO (confirmar na separação)` : ""}`,
       kpis: [`${fmtN(d?.totais?.linhas)} materiais`, `${fmtN(d?.totais?.pecas)} peças`, `${fmtKg(d?.totais?.pesoKg)} kg`],
       totalColunas: headers.length, nomePlanilha: "Separação", codigoDoc: "REL-PCP-006",
     });
@@ -93,7 +99,7 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
       adicionarLinhaTabela(ws, row, [
         l.perfil, l.materialNorma || "", l.qtdPecas, l.barras ?? (l.chapa ? "chapa" : ""), l.comprimentoTotalM || "",
         l.pesoUnitKg ?? "", Number(l.pesoTotalKg.toFixed(1)),
-        l.rUsado ? `R ${l.rUsado}${l.trocado ? " (trocado)" : ""}` : "A DEFINIR",
+        l.rUsado ? `R ${l.rUsado}${l.trocado ? " (trocado)" : l.previsto ? " (previsto)" : ""}` : "A DEFINIR",
         l.dados?.corrida || (l.rUsado ? "sem corrida no CMR" : ""), l.dados?.certificado || "", l.dados?.nf || "",
         l.dados?.fornecedor || "", fmtD(l.dados?.recebidoEm),
         l.dados?.saldo ? `saldo ${l.dados.saldo.saldoKg} kg${l.dados.saldo.esgotado ? " (esgotado)" : ""}` : "",
@@ -122,7 +128,7 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
           </div>
         </div>
 
-        {(trocados > 0 || semR > 0) && (
+        {(trocados > 0 || semR > 0 || previstos > 0) && (
           <div className="px-5 pt-3 flex flex-wrap items-center gap-2">
             {trocados > 0 && (
               <p className="text-[12px] text-sky-800 bg-sky-50 border border-sky-200 rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5">
@@ -137,6 +143,11 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
                 className="text-[12px] font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-50">
                 {salvando ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Registrar {pendentes.length} troca(s)
               </button>
+            )}
+            {previstos > 0 && (
+              <span className="text-[11px] text-sky-800 bg-sky-50 border border-sky-200 rounded-lg px-2 py-1 inline-flex items-center gap-1">
+                <Package size={13} /> {previstos} material com R <b>previsto</b> — nada cortado ainda; sai pela ordem de chegada
+              </span>
             )}
             {semR > 0 && (
               <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5">
@@ -197,6 +208,11 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
                       {l.trocado && (
                         <p className={`text-[10px] mt-0.5 ${l.pendente ? "text-amber-700 font-semibold" : "text-emerald-700"}`}>
                           {l.pendente ? "trocado — falta registrar" : "troca registrada ✓"} · indicado era R {l.rIndicado || "—"}
+                        </p>
+                      )}
+                      {l.previsto && (
+                        <p className="text-[10px] text-sky-700 mt-0.5" title="Nenhuma peça deste material foi cortada ainda, então nenhum R está carimbado. Este é o que sai pela ordem de chegada (FIFO) — confirme na separação.">
+                          previsto pelo FIFO — ainda não apontado
                         </p>
                       )}
                       {!l.trocado && l.rsIndicados.length > 1 && <p className="text-[10px] text-torg-gray mt-0.5">peças apontam {l.rsIndicados.length} Rs diferentes</p>}

@@ -23,6 +23,7 @@ import {
 import { fmtOP } from "@/lib/utils";
 import CompraChip from "@/components/CompraChip";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
+import SeparacaoModal from "@/components/SeparacaoModal";
 
 const MAX_LOTE = 80; // teto do /api/producao/desenhos/lote
 
@@ -96,6 +97,10 @@ export default function ProducaoClient() {
   const [filtroProg, setFiltroProg] = useState("TODAS");
   const [baixando, setBaixando] = useState(false);
   const [exportando, setExportando] = useState(false);
+  // ⚠ a lista de separação é o papel do ALMOXARIFADO, não do PCP: sai por material, com barras,
+  // peso e o R de cada um. Mesmo componente da TV — duas versões do mesmo papel divergiriam, e é
+  // ele que garante que o material separado é o R certo.
+  const [separacao, setSeparacao] = useState(null);
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
@@ -470,6 +475,14 @@ export default function ProducaoClient() {
                               <span className="text-[11px] text-torg-blue font-semibold">· {marcasSel.length} selecionada(s)</span>
                             )}
                             <span className="flex-1" />
+                            {/* ⚠ com peça marcada, a lista sai SÓ das marcadas; sem marcar, da OP
+                                inteira — igual ao painel da TV. É o que deixa separar por lote. */}
+                            <button onClick={() => setSeparacao({ opId: aberta, obra: `${fmtOP(detalhe.opNumero)}${o.obra ? ` — ${o.obra}` : ""}`, setor: setorAba || null, ids: sel.size ? [...sel] : null })}
+                              disabled={!detalhe}
+                              title={sel.size ? `Lista de separação das ${sel.size} peça(s) marcadas` : "Lista de separação da OP inteira — material, barras, peso e o R de cada um"}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-torg-blue-200 text-torg-blue hover:bg-torg-blue-50 disabled:opacity-40">
+                              <Package size={13} /> Separação{sel.size ? ` (${sel.size})` : ""}
+                            </button>
                             <button onClick={exportar} disabled={!pecas.length || exportando}
                               title="Baixa a lista filtrada em Excel, no padrão das planilhas da Torg"
                               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-torg-gray hover:bg-gray-50 disabled:opacity-40">
@@ -602,6 +615,10 @@ export default function ProducaoClient() {
       )}
 
       {desenho && <DesenhoPecaModal opNumero={desenho.opNumero} marca={desenho.marca} onClose={() => setDesenho(null)} />}
+      {separacao && (
+        <SeparacaoModal opId={separacao.opId} obra={separacao.obra} setor={separacao.setor}
+          ids={separacao.ids} onClose={() => setSeparacao(null)} />
+      )}
     </div>
   );
 }

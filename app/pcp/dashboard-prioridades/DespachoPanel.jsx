@@ -13,7 +13,7 @@ import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 import CompraChip, { ModalRastreabilidade } from "@/components/CompraChip";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } from "@/lib/excel-relatorio";
 import TerceiroModal from "./TerceiroModal";
-import SeparacaoModal from "./SeparacaoModal";
+import SeparacaoModal from "@/components/SeparacaoModal";
 
 // Só os destinos que o PCP usa de fato. Revisão / Aguard. material / Cancelar saíram a pedido do
 // Vitor (18/08) — não faziam sentido no dia a dia e poluíam a barra. O status de material agora

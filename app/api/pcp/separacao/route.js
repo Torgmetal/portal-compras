@@ -124,7 +124,23 @@ export async function GET(req) {
     // R indicado = o mais apontado pelas peças do grupo; sem isso, a entrada mais antiga da OP
     const maisApontado = [...g.rs.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
     const daOpAntiga = [...opcoes].filter((o) => o.daOp).sort((a, b) => String(a.recebidoEm || "").localeCompare(String(b.recebidoEm || "")))[0];
-    const rIndicado = maisApontado || daOpAntiga?.rastreio || null;
+    // ⚠⚠ PEÇA SEM R AINDA PRECISA DIZER QUAL VAI USAR.
+    // Vitor (24/08/2026): "no caso das peças que estiverem sem o R deve ser informado qual será
+    // usado". Só peça CORTADA ganha R carimbado — então material que ainda não foi cortado e cujas
+    // entradas do CMR não são desta OP caía nos dois primeiros critérios e saía em branco. Papel de
+    // separação com o R vazio manda o Almoxarifado escolher o fardo por conta, que é exatamente o
+    // que o R existe para impedir.
+    //
+    // ⚠ A previsão é FIFO — a entrada mais antiga COM SALDO, mesmo que de outra OP —, a mesma regra
+    // do motor de rastreio. E vai marcada como previsão (`rPrevisto`): no papel, "vai usar" e "usou"
+    // não podem parecer a mesma coisa.
+    const previsto = !maisApontado && !daOpAntiga
+      ? [...opcoes]
+          .filter((o) => (o.saldo ? !o.saldo.esgotado : true))
+          .sort((a, b) => String(a.recebidoEm || "").localeCompare(String(b.recebidoEm || "")))[0] || null
+      : null;
+    const rIndicado = maisApontado || daOpAntiga?.rastreio || previsto?.rastreio || null;
+    const rPrevisto = !maisApontado && !daOpAntiga && !!previsto;
     // O R indicado ainda tem material? Se não, a separação vai ter de sair de outro fardo — e a
     // tela já sugere qual (o R com saldo, da OP ou de fora), pra não mandar ninguém procurar barra
     // que não existe.
@@ -155,6 +171,8 @@ export async function GET(req) {
       chapa,
       marcas: g.marcas,
       rIndicado,
+      // true = ninguém apontou este R ainda; é o que o FIFO diz que vai sair
+      rPrevisto,
       rIndicadoSaldo: indicado?.saldo || null,
       rEsgotado,
       alternativas: rEsgotado ? alternativas : [],
@@ -173,7 +191,10 @@ export async function GET(req) {
       pecas: itens.reduce((a, x) => a + x.qtdPecas, 0),
       pesoKg: Math.round(itens.reduce((a, x) => a + x.pesoTotalKg, 0)),
       barras: itens.reduce((a, x) => a + (x.barras || 0), 0),
+      // ⚠ "sem R" agora é só o material que NÃO TEM ENTRADA NENHUMA no CMR — nem para prever.
+      // Antes contava também o que só faltava previsão, e o número assustava sem motivo.
       semR: itens.filter((x) => !x.rIndicado).length,
+      previstos: itens.filter((x) => x.rPrevisto).length,
       trocados: itens.filter((x) => x.troca).length,
     },
   });
