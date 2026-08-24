@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, AlertCircle, FileDown, CheckCircle2, Clock, PenLine } from "lucide-react";
+import { Loader2, AlertCircle, FileDown, CheckCircle2, Clock, PenLine, RotateCcw, X } from "lucide-react";
 
 const fmtDataHora = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
 
@@ -10,6 +10,13 @@ export default function AssinarClient({ token }) {
   const [erro, setErro] = useState("");
   const [nome, setNome] = useState("");
   const [enviando, setEnviando] = useState(false);
+  // ⚠ pedir revisão é caminho à parte da assinatura: nome e motivo próprios, para ninguém recusar
+  // por engano no campo que existe para assinar.
+  const [revisando, setRevisando] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [nomeRev, setNomeRev] = useState("");
+  const [enviandoRev, setEnviandoRev] = useState(false);
+  const [feito, setFeito] = useState(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -33,6 +40,29 @@ export default function AssinarClient({ token }) {
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao registrar");
       setData(j.data);
     } catch (e) { alert(e.message); } finally { setEnviando(false); }
+  }
+
+  // ⚠⚠ PEDIR REVISÃO EM VEZ DE ASSINAR.
+  // Vitor (24/08/2026): "um dos assinantes pediu uma revisão, mas não conseguimos, pois ele deve
+  // assinar para depois começar novamente". Sem este caminho, quem achava erro tinha de ASSINAR —
+  // atestar com nome, data e IP um documento que sabia estar errado — só para o fluxo andar até dar
+  // para abrir revisão. Qualquer um da cadeia pode, a qualquer momento, tenha assinado ou não.
+  async function pedirRevisao() {
+    if (nomeRev.trim().length < 3) { alert("Informe seu nome completo."); return; }
+    if (motivo.trim().length < 5) { alert("Descreva o que precisa ser corrigido."); return; }
+    if (!confirm("Pedir revisão deste Data Book?\n\nO fluxo volta ao início: TODAS as assinaturas já dadas deixam de valer e o dossiê sobe de revisão. A Qualidade corrige e reinicia.")) return;
+    setEnviandoRev(true);
+    try {
+      const r = await fetch(`/api/qualidade/data-books/assinar/${token}/revisao`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome: nomeRev.trim(), motivo: motivo.trim() }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro ao pedir revisão");
+      setFeito(j);
+      setRevisando(false);
+      await carregar();
+    } catch (e) { alert(e.message); } finally { setEnviandoRev(false); }
   }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="animate-spin text-torg-blue" size={28} /></div>;
@@ -78,6 +108,17 @@ export default function AssinarClient({ token }) {
             <FileDown size={16} /> Abrir / baixar o Data Book (PDF)
           </a>
 
+          {feito && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-900">
+              <p className="font-semibold flex items-center gap-2"><RotateCcw size={16} /> Revisão pedida — o dossiê passou para a {feito.revisao}.</p>
+              <p className="text-[12px] mt-1">
+                {feito.assinaturasZeradas > 0 ? `${feito.assinaturasZeradas} assinatura(s) do fluxo foram zeradas. ` : ""}
+                {feito.avisados > 0 ? `${feito.avisados} pessoa(s) da cadeia foram avisadas por e-mail. ` : ""}
+                A Qualidade vai corrigir o que você apontou e reiniciar o fluxo.
+              </p>
+            </div>
+          )}
+
           {/* Ação da etapa */}
           {jaAssinado ? (
             <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-sm text-emerald-800 flex items-center gap-2">
@@ -99,6 +140,46 @@ export default function AssinarClient({ token }) {
           ) : (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
               <Clock size={18} /> Aguardando a etapa anterior do fluxo ser assinada. Você receberá um e-mail quando for a sua vez.
+            </div>
+          )}
+
+          {/* ⚠ SEMPRE DISPONÍVEL, inclusive para quem já assinou e para quem ainda não é a vez.
+              Erro visto depois continua sendo erro, e quem recebeu o dossiê não precisa esperar a
+              fila chegar para avisar. Fica discreto, embaixo e em texto: é a saída de exceção do
+              fluxo, não uma alternativa de mesmo peso ao "assinar". */}
+          {!feito && (
+            <div className="border-t border-gray-100 pt-4">
+              {!revisando ? (
+                <button onClick={() => { setRevisando(true); setNomeRev(nome); }}
+                  className="text-[13px] text-amber-700 hover:text-amber-800 hover:underline inline-flex items-center gap-1.5 font-medium">
+                  <RotateCcw size={14} /> Encontrei algo errado — pedir revisão
+                </button>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold text-amber-900 flex items-center gap-2"><RotateCcw size={16} /> Pedir revisão</p>
+                    <button onClick={() => setRevisando(false)} className="text-amber-700 hover:text-amber-900"><X size={15} /></button>
+                  </div>
+                  <p className="text-[12px] text-amber-800 mt-1 mb-3">
+                    O fluxo volta ao início: <b>todas as assinaturas já dadas deixam de valer</b> e o dossiê sobe de revisão.
+                    A Qualidade corrige o que você apontar e reinicia.
+                  </p>
+                  <label className="block text-xs font-medium text-amber-900 mb-1">Seu nome completo</label>
+                  <input value={nomeRev} onChange={(e) => setNomeRev(e.target.value)} placeholder="Nome completo"
+                    className="w-full px-3 py-2 text-sm border border-amber-200 rounded-lg bg-white focus:ring-2 focus:ring-amber-300/40 focus:border-amber-400 outline-none" />
+                  <label className="block text-xs font-medium text-amber-900 mt-3 mb-1">O que precisa ser corrigido</label>
+                  <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={3}
+                    placeholder="Ex.: falta o certificado da corrida 12345 na seção 02; a ART está vencida."
+                    className="w-full px-3 py-2 text-sm border border-amber-200 rounded-lg bg-white focus:ring-2 focus:ring-amber-300/40 focus:border-amber-400 outline-none resize-y" />
+                  {/* ⚠ o motivo é o que a Qualidade vai ler para saber o que refazer — vago aqui
+                      significa uma volta a mais depois. */}
+                  <p className="text-[10px] text-amber-700 mt-1">Escreva o suficiente para quem for corrigir não precisar te procurar.</p>
+                  <button onClick={pedirRevisao} disabled={enviandoRev || nomeRev.trim().length < 3 || motivo.trim().length < 5}
+                    className="mt-3 inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 text-white text-sm font-semibold rounded-lg hover:bg-amber-700 disabled:opacity-50">
+                    {enviandoRev ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />} Pedir revisão e voltar o fluxo
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
