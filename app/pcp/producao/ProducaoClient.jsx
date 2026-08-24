@@ -574,14 +574,6 @@ export default function ProducaoClient() {
                       })}
                     </div>
                   </div>
-                  <div className="hidden md:flex items-center gap-1.5 shrink-0 flex-wrap justify-end max-w-[46%]">
-                    {o.setores.filter((s) => s.pendenteKg > 0).map((s) => (
-                      <span key={s.setor} title={`${s.label}: ${fmtKg(s.pendenteKg)} de ${fmtKg(s.totalKg)} · ${s.pct}%`}
-                        className={`text-[10px] px-1.5 py-1 rounded-lg border tabular-nums ${s.atrasoDias > 0 ? "border-red-200 bg-red-50 text-red-700" : "border-gray-200 text-torg-gray"}`}>
-                        <span className="font-bold">{s.label}</span> {fmtKg(s.pendenteKg)}
-                      </span>
-                    ))}
-                  </div>
                 </div>
 
                 {open && (
@@ -595,8 +587,14 @@ export default function ProducaoClient() {
                           Montagem a Expedição; avulsa é cortada e pula Montagem/Solda. */}
                       {o.setores.map((s) => (
                         <button key={s.setor} onClick={() => trocarSetor(o, s.setor)}
-                          title={`${s.label}: falta passar ${fmtKg(s.pendenteKg)} de ${fmtKg(s.totalKg)} (${s.pct}% pronto). A mesma peça conta em cada setor por onde ainda vai passar — não some as abas.`}
-                          className={`text-[11px] px-2.5 py-1 rounded-lg border font-semibold ${setorAba === s.setor ? "bg-torg-blue text-white border-torg-blue" : "border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
+                          title={`${s.label}: falta passar ${fmtKg(s.pendenteKg)} de ${fmtKg(s.totalKg)} (${s.pct}% pronto).${s.atrasoDias > 0 ? ` Atrasado ${s.atrasoDias} dia(s).` : s.entrega ? ` Até ${fmtD(s.entrega)}.` : ""} A mesma peça conta em cada setor por onde ainda vai passar — não some as abas.`}
+                          className={`text-[11px] px-2.5 py-1 rounded-lg border font-semibold ${
+                            setorAba === s.setor ? "bg-torg-blue text-white border-torg-blue"
+                            /* ⚠ o atraso POR SETOR vivia nos chips do cabeçalho, que saíram. Sem
+                               trazê-lo para cá, a informação sumiria junto — e é ela que diz QUAL
+                               setor está segurando a obra, não o atraso da OP inteira. */
+                            : s.atrasoDias > 0 ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                            : "border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
                           {s.label} <span className="font-normal opacity-80">{fmtKg(s.pendenteKg)}</span>
                         </button>
                       ))}
