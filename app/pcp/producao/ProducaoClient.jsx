@@ -18,7 +18,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, Printer, Search,
-  Factory, Monitor, CalendarClock, Package, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet,
+  Factory, Monitor, CalendarClock, Package, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet, Send, Flag,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import CompraChip from "@/components/CompraChip";
@@ -65,6 +65,34 @@ const FILTROS = [
   { key: "INICIADA", label: "Iniciadas" },
 ];
 
+// ⚠⚠ A SITUAÇÃO DA PEÇA NO SETOR — não iniciado → em produção → finalizado.
+// Vitor (24/08/2026): "deixar como uma marcação mais clara do que estava com status de não iniciado
+// em relação ao iniciado ou finalizados, e conforme for dado baixa nesse material você vai marcando
+// dando como finalizado".
+//
+// ⚠ É DERIVADO, não é campo. Finalizado é o que a fábrica fechou (Syneco atingiu a quantidade) OU o
+// que alguém baixou no portal — as duas coisas querem dizer a mesma: aqui acabou. Guardar um campo
+// à parte criaria uma terceira verdade para brigar com essas duas.
+function situacaoDaPeca(p) {
+  if (p.expedida) return "EXPEDIDA";
+  const qtd = Number(p.qte) || 0;
+  const feito = Math.max(Number(p.produzidoSyneco) || 0, Number(p.baixadoQtd) || 0);
+  if (p.baixadoPortal && (Number(p.baixadoQtd) || 0) >= qtd) return "FINALIZADO";
+  if (qtd > 0 && feito >= qtd) return "FINALIZADO";
+  if (feito > 0) return "PARCIAL";
+  if (p.programacao?.situacao === "INICIADA") return "PARCIAL";
+  return "NAO_INICIADO";
+}
+// ⚠ `barra` é a classe INTEIRA, escrita à mão. O Tailwind varre o código como TEXTO: classe montada
+// em tempo de execução (`"bg-" + cor`, ou um `.replace()`) não existe no CSS gerado e a faixa
+// simplesmente não aparece — sem erro nenhum, que é o pior jeito de descobrir.
+const SIT = {
+  NAO_INICIADO: { txt: "não iniciado", cls: "bg-gray-100 text-gray-600 border-gray-200", barra: "border-l-gray-200", dica: "Nada apontado no Syneco e sem baixa no portal." },
+  PARCIAL:      { txt: "em produção",  cls: "bg-sky-50 text-sky-700 border-sky-200",     barra: "border-l-sky-400",  dica: "A fábrica começou e ainda não fechou a quantidade." },
+  FINALIZADO:   { txt: "finalizado",   cls: "bg-emerald-50 text-emerald-700 border-emerald-200", barra: "border-l-emerald-500", dica: "Quantidade fechada no Syneco ou baixa dada no portal." },
+  EXPEDIDA:     { txt: "expedida",     cls: "bg-emerald-100 text-emerald-800 border-emerald-300", barra: "border-l-emerald-600", dica: "Já saiu em romaneio — a Expedição assumiu." },
+};
+
 const ALERTA = {
   SEM_LISTA: { txt: "sem lista", cls: "bg-red-50 text-red-700 border-red-200", dica: "Nenhuma peça importada (nem LPC nem LE) — não há o que programar." },
   PRODUZINDO_SEM_LISTA: { txt: "produzindo sem lista", cls: "bg-red-50 text-red-700 border-red-200", dica: "A fábrica já apontou produção e o portal não tem o detalhamento." },
@@ -97,6 +125,7 @@ export default function ProducaoClient() {
   const [filtroProg, setFiltroProg] = useState("TODAS");
   const [baixando, setBaixando] = useState(false);
   const [exportando, setExportando] = useState(false);
+  const [mandando, setMandando] = useState(false);
   // ⚠ a lista de separação é o papel do ALMOXARIFADO, não do PCP: sai por material, com barras,
   // peso e o R de cada um. Mesmo componente da TV — duas versões do mesmo papel divergiriam, e é
   // ele que garante que o material separado é o R certo.
@@ -262,6 +291,57 @@ export default function ProducaoClient() {
       carregar();
     } catch (e) { setAviso({ ok: false, texto: e.message }); }
     finally { setBaixando(false); }
+  }
+
+  // ── MANDAR PARA PRODUÇÃO ───────────────────────────────────────────────────────────────────
+  // Vitor (24/08/2026): "para eu formar a linha do que eu quero que a produção fabrique para ficar
+  // lá no painel da produção... mas não pode tirar isso da minha tela".
+  //
+  // ⚠ NÃO É ESTADO NOVO: é a FILA DE PRIORIDADE que já existe. A peça ganha número na fila da OP e
+  // sobe para o topo da aba do setor em /producao/prioridades. Inventar um "enviado para produção"
+  // à parte daria duas listas para a fábrica olhar, e ela ia olhar a errada.
+  //
+  // ⚠ A PEÇA CONTINUA AQUI. Marcar prioridade não tira ninguém desta tela — some da lista só quem
+  // entrou em romaneio, porque aí a Expedição assumiu. O que muda é a marcação.
+  //
+  // ⚠ E A OP PRECISA ESTAR "EM PRODUÇÃO", senão o painel da fábrica nem mostra a obra e a fila vai
+  // para o vazio. Ligar junto evita o silêncio; o aviso diz que ligou.
+  async function mandarParaProducao() {
+    const alvo = pecas.filter((p) => sel.has(p.id));
+    if (!alvo.length || !detalhe) return;
+    const novas = alvo.filter((p) => p.prioridade == null);
+    if (!novas.length) {
+      setAviso({ ok: false, texto: "Todas as selecionadas já estão na fila da produção." });
+      return;
+    }
+    const op = ops.find((o) => o.opId === aberta);
+    const precisaLigar = !detalhe.emProducao;
+    if (!confirm(`Mandar ${novas.length} peça(s) para a produção?\n\nElas entram na fila da ${SETOR_LABEL[setorAba] || setorAba} no Painel de Produção, na ordem, e continuam nesta tela.${precisaLigar ? "\n\nA OP ainda não está marcada como \"em produção\" — vou ligar, senão o painel da fábrica não mostra a obra." : ""}`)) return;
+    setMandando(true); setAviso(null);
+    try {
+      if (precisaLigar) {
+        await fetch("/api/pcp/op-em-producao", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ opId: aberta, emProducao: true }),
+        });
+      }
+      const r = await fetch("/api/pcp/despacho", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: novas.map((p) => p.id), destino: "PRIORIDADE" }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao mandar para produção");
+      setAviso({
+        ok: true,
+        texto: `${j.atualizados ?? novas.length} peça(s) na fila da ${SETOR_LABEL[setorAba] || setorAba}${op ? ` da ${fmtOP(op.opNumero)}` : ""}.`
+          + (precisaLigar ? " A OP foi marcada como em produção." : "")
+          + (j.descartados ? ` ${j.descartados} da lista de expedição foram descartadas (já estão na LPC).` : ""),
+      });
+      setSel(new Set());
+      await carregarDetalhe(aberta, setorAba);
+      carregar();
+    } catch (e) { setAviso({ ok: false, texto: e.message }); }
+    finally { setMandando(false); }
   }
 
   // ⚠ Excel no PADRÃO DAS PLANILHAS (lib/excel-relatorio.js): cabeçalho ISO 9001 com logo. Import
@@ -496,6 +576,14 @@ export default function ProducaoClient() {
                               {baixando ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
                               Baixa manual{setorAba ? ` · ${SETOR_LABEL[setorAba] || setorAba}` : ""}
                             </button>
+                            {/* ⚠ é a fila da produção: as peças sobem para o topo da aba do setor
+                                em /producao/prioridades e CONTINUAM aqui, só com a marcação nova. */}
+                            <button onClick={mandarParaProducao} disabled={!sel.size || mandando}
+                              title={sel.size ? `Põe ${sel.size} peça(s) na fila da ${SETOR_LABEL[setorAba] || setorAba} no Painel de Produção` : "Selecione as peças"}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-torg-blue text-white hover:opacity-90 disabled:opacity-40">
+                              {mandando ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                              Mandar p/ produção
+                            </button>
                             <button onClick={imprimirELiberar} disabled={!marcasSel.length || imprimindo}
                               title={marcasSel.length ? `Imprime o desenho carimbado e registra a GRD de ${marcasSel.length} marca(s)` : "Selecione as peças"}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-torg-orange text-white hover:opacity-90 disabled:opacity-40">
@@ -520,11 +608,14 @@ export default function ProducaoClient() {
                                     onChange={() => marcarTodas(pecas)} className="accent-torg-orange" />
                                 </th>
                                 <th className="px-2 py-2 text-left font-bold w-[17%]">Marca</th>
-                                <th className="px-2 py-2 text-left font-bold w-[17%]">Perfil</th>
+                                <th className="px-2 py-2 text-left font-bold w-[15%]">Perfil</th>
                                 <th className="px-2 py-2 text-right font-bold w-[7%]">Qtd</th>
                                 <th className="px-2 py-2 text-right font-bold w-[10%]">Peso</th>
                                 <th className="px-2 py-2 text-left font-bold w-[14%]">Programação</th>
-                                <th className="px-2 py-2 text-left font-bold w-[13%]">Onde está</th>
+                                <th className="px-2 py-2 text-left font-bold w-[15%]"
+                                  title="Não iniciado → em produção → finalizado. Finalizado é o que o Syneco fechou ou o que recebeu baixa no portal.">
+                                  Situação
+                                </th>
                                 <th className="px-2 py-2 text-left font-bold w-[11%]">Material</th>
                                 <th className="px-2 py-2 text-left font-bold w-[11%]"
                                   title="Data em que o desenho foi impresso pelo portal e a GRD registrada — é o que prova que a peça desceu para a fábrica.">
@@ -535,8 +626,14 @@ export default function ProducaoClient() {
                             <tbody className="divide-y divide-gray-50">
                               {pecas.map((p) => {
                                 const prog = PROG[p.programacao?.situacao] || PROG.NAO_LANCADA;
+                                const sit = SIT[situacaoDaPeca(p)];
+                                const pronto = sit === SIT.FINALIZADO || sit === SIT.EXPEDIDA;
                                 return (
-                                  <tr key={p.id} className={sel.has(p.id) ? "bg-torg-blue-50/40" : "hover:bg-gray-50/60"}>
+                                  /* ⚠ a faixa de cor na borda esquerda é o que se lê ROLANDO a lista: chip
+                                     exige parar e ler, faixa não. Linha pronta fica esmaecida — o que
+                                     interessa numa lista de trabalho é o que ainda falta. */
+                                  <tr key={p.id}
+                                    className={`border-l-4 ${sit.barra} ${sel.has(p.id) ? "bg-torg-blue-50/40" : pronto ? "bg-emerald-50/20 text-torg-gray" : "hover:bg-gray-50/60"}`}>
                                     <td className="px-2 py-1.5">
                                       <input type="checkbox" checked={sel.has(p.id)} onChange={() => alternar(p.id)} className="accent-torg-orange" />
                                     </td>
@@ -549,6 +646,15 @@ export default function ProducaoClient() {
                                         <FileText size={11} className="text-torg-gray-light shrink-0" />
                                         <span className="truncate">{p.marca}</span>
                                       </button>
+                                      {/* ⚠ o número é a POSIÇÃO NA FILA da OP — é assim que a peça aparece
+                                          ordenada no Painel de Produção, e é o que prova que ela foi
+                                          mandada. Sem número, não foi. */}
+                                      {p.prioridade != null && (
+                                        <span className="ml-1 text-[9px] font-bold text-torg-orange bg-torg-orange/10 rounded px-1 py-0.5 align-middle"
+                                          title={`Na fila da produção, posição ${p.prioridade} desta OP`}>
+                                          <Flag size={8} className="inline -mt-0.5" /> {p.prioridade}
+                                        </span>
+                                      )}
                                     </td>
                                     <td className="px-2 py-1.5 text-torg-gray truncate" title={p.descricao || ""}>{p.descricao || "—"}</td>
                                     <td className="px-2 py-1.5 text-right tabular-nums">{fmtN(p.qte)}</td>
@@ -556,25 +662,20 @@ export default function ProducaoClient() {
                                     <td className="px-2 py-1.5 truncate">
                                       <span title={prog.dica} className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold whitespace-nowrap ${prog.cls}`}>{prog.txt}</span>
                                     </td>
-                                    {/* ⚠ ONDE ESTÁ = setor mais adiantado COM APONTAMENTO. Não é o status da
-                                        peça (só confiável até o corte) nem a rota dela. A rota — os setores
-                                        por onde vai passar — fica na dica, que é onde ela ajuda. */}
-                                    <td className="px-2 py-1.5 text-torg-gray truncate"
-                                      title={p.programacao?.setores?.length ? `Rota no Syneco: ${p.programacao.setores.join(" · ")}` : "Sem ordem no Syneco."}>
-                                      {p.expedida ? <span className="text-emerald-700 font-semibold">expedida</span>
-                                        /* ⚠ MONTADO ganha do setor: a peça solta deixou de existir quando
-                                           entrou no conjunto, e dizer "Preparação" mandaria alguém
-                                           procurar na fábrica o que já virou outra coisa. */
-                                        : p.montadoEm ? (
-                                          <span className={p.montadoEm.montados >= p.montadoEm.total ? "text-indigo-700 font-semibold" : "text-indigo-600"}
-                                            title={`Entrou em ${p.montadoEm.montados} de ${p.montadoEm.total} conjunto(s) que usam esta peça: ${p.montadoEm.conjuntos.slice(0, 12).join(", ")}${p.montadoEm.conjuntos.length > 12 ? "…" : ""}`}>
-                                            {p.montadoEm.montados >= p.montadoEm.total
-                                              ? "montado"
-                                              : `montado ${p.montadoEm.montados}/${p.montadoEm.total}`}
-                                          </span>
-                                        )
-                                        : p.setorReal ? SETOR_LABEL[p.setorReal] || p.setorReal
-                                        : <span className="text-torg-gray-light" title="Nenhum apontamento no Syneco: ainda não passou por setor nenhum.">não começou</span>}
+                                    {/* ⚠ A SITUAÇÃO GANHA DO SETOR. O que o PCP pergunta olhando a linha é
+                                        "isso está feito?", não "em que sala está" — o setor vira o
+                                        complemento, e a rota do Syneco fica na dica. */}
+                                    <td className="px-2 py-1.5 truncate"
+                                      title={`${sit.dica}${p.produzidoSyneco != null ? ` Syneco: ${fmtN(p.produzidoSyneco)} de ${fmtN(p.qte)}.` : ""}${p.baixadoPortal ? ` Baixa no portal por ${p.baixadoPor || "—"}.` : ""}${p.programacao?.setores?.length ? ` Rota: ${p.programacao.setores.join(" · ")}.` : ""}`}>
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold whitespace-nowrap ${sit.cls}`}>{sit.txt}</span>
+                                      {/* ⚠ MONTADO é informação da peça solta que virou conjunto — e em
+                                          parte não é montado (ver /api/pcp/despacho). */}
+                                      {p.montadoEm && (
+                                        <span className="text-[10px] text-indigo-700 ml-1"
+                                          title={`Entrou em ${p.montadoEm.montados} de ${p.montadoEm.total} conjunto(s): ${p.montadoEm.conjuntos.slice(0, 12).join(", ")}${p.montadoEm.conjuntos.length > 12 ? "…" : ""}`}>
+                                          {p.montadoEm.montados >= p.montadoEm.total ? "montado" : `montado ${p.montadoEm.montados}/${p.montadoEm.total}`}
+                                        </span>
+                                      )}
                                     </td>
                                     <td className="px-2 py-1.5 truncate">
                                       {p.material?.recebido ? (
