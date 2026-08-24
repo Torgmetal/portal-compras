@@ -128,10 +128,20 @@ export async function GET(_req, { params }) {
   }
 
   // ── data book: os volumes prontos ──
+  //
+  // ⚠⚠ SÓ DEPOIS DO ACEITE — e antes desta trava não havia trava nenhuma.
+  // A consulta não filtrava status: bastava existir volume gerado para o portal listar. Medido em
+  // 24/08/2026: a OP-067 estava mostrando ao cliente 18 volumes de um data book EM_MONTAGEM, sem
+  // uma assinatura sequer na cadeia. Não vazava conteúdo (não havia download), mas dizia que o
+  // livro existe e o tamanho dele enquanto ainda estava sendo montado.
+  //
+  // Vitor (24/08/2026) escolheu liberar no portal DEPOIS do aceite, com download. `ACEITO` é
+  // gravado pela última assinatura da cadeia (Elaborador → Inspetor → Resp. Técnico → Cliente),
+  // então checar o status aqui é checar as quatro de uma vez.
   if (tem("DATABOOK")) {
     const book = await prisma.dataBookQualidade.findFirst({
-      where: { opNumero: portal.opNumero },
-      select: { id: true, revisao: true, status: true, emitidoEm: true },
+      where: { opNumero: portal.opNumero, status: "ACEITO" },
+      select: { id: true, revisao: true, status: true, emitidoEm: true, aceiteEm: true },
     });
     if (book) {
       const vols = await prisma.dataBookArquivo.findMany({
@@ -141,6 +151,7 @@ export async function GET(_req, { params }) {
       });
       dados.databook = {
         revisao: book.revisao, status: book.status, emitidoEm: fmt(book.emitidoEm),
+        aceiteEm: fmt(book.aceiteEm),
         volumes: vols,
       };
     }

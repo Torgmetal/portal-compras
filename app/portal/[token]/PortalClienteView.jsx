@@ -243,12 +243,18 @@ export default function PortalClienteView({ token }) {
             />
           </Bloco>
         )}
+        {/* ⚠⚠ O VOLUME É PARA BAIXAR — antes esta lista só provava que o dossiê existe.
+            O bloco mostrava número, título, páginas e tamanho, sem link nenhum, e mandava o
+            cliente esperar o e-mail do aceite. Vitor (24/08/2026) escolheu liberar aqui depois do
+            aceite: a rota só serve com o livro `ACEITO`, então o que aparece nesta tela já passou
+            pelas quatro assinaturas da cadeia — inclusive a dele. */}
         {tem("DATABOOK") && dados.databook?.volumes?.length > 0 && (
           <Bloco icone={BookCheck} titulo="Data Book da obra"
             sub={`${dados.databook.volumes.length} volume(s) · R${String(dados.databook.revisao).padStart(2, "0")}`}>
             <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
               {dados.databook.volumes.map((v) => (
-                <div key={v.volume} className="flex items-center gap-3 px-4 py-3">
+                <a key={v.volume} href={`/api/portal/${token}/databook?volume=${v.volume}`}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-[#006EAB]/5 transition-colors">
                   <span className="text-[11px] font-bold text-white bg-[#0D1F3C] rounded px-2 py-1 shrink-0">
                     {String(v.volume).padStart(2, "0")}
                   </span>
@@ -258,11 +264,16 @@ export default function PortalClienteView({ token }) {
                       {Number(v.paginas).toLocaleString("pt-BR")} páginas · {fmtMB(v.tamanho)}
                     </span>
                   </span>
-                </div>
+                  <Download size={14} className="text-[#006EAB] shrink-0" />
+                </a>
               ))}
             </div>
+            {/* ⚠ a data do aceite é o que dá autoridade ao arquivo: diz que este é o dossiê que a
+                obra fechou, não uma cópia de trabalho. Sem ela, um PDF baixado de um portal é só
+                mais um PDF. */}
             <p className="text-[12px] text-gray-500 mt-3">
-              O dossiê completo é entregue pelo link de aceite, ao fim da obra.
+              Dossiê aceito{dados.databook.aceiteEm ? ` em ${dados.databook.aceiteEm}` : ""} · revisão R{String(dados.databook.revisao).padStart(2, "0")}.
+              Cada volume abre em PDF.
             </p>
           </Bloco>
         )}
