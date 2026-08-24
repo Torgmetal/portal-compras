@@ -3572,6 +3572,19 @@ model Recebimento {
   @@index([dataRecebimento])
 }
 
+// Listas de referência do CMR (autocomplete): DESCRICAO (Descrição Padrão) e NORMA (Normas
+// Padrão). Semeadas do import da planilha e crescem com o que o estoque lança.
+model CmrReferencia {
+  id        String   @id @default(cuid())
+  tipo      String // DESCRICAO | NORMA
+  valor     String
+  usos      Int      @default(0) // quantas vezes foi usado (ordena o autocomplete)
+  createdAt DateTime @default(now())
+
+  @@unique([tipo, valor])
+  @@index([tipo])
+}
+
 model Cronograma {
   id             String               @id @default(cuid())
   opNumero       String
