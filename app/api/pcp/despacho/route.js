@@ -294,6 +294,29 @@ export async function GET(req) {
     for (const x of ri) if (x.pecaConjunto?.marca) expedidaPorRomaneio.add(x.pecaConjunto.marca);
   } catch {}
 
+  // ── JÁ FOI LIBERADO PARA A FÁBRICA? ────────────────────────────────────────────────────────
+  // Vitor (24/08/2026): liberar É imprimir a GRD. Então "liberado" não é campo novo — é a GRD
+  // daquela marca, que já guarda quem emitiu, quando e quantas impressões. Sem isto na listagem, o
+  // PCP não tem como saber o que já desceu e reimprime o que já está na fábrica.
+  const grdPorMarca = new Map();
+  if (opInfo?.numero) {
+    try {
+      const gs = await prisma.grdLiberacao.findMany({
+        where: { opNumero: opInfo.numero },
+        select: { marca: true, formato: true, impressoes: true, ultimaImpressaoEm: true, createdAt: true, liberadoPorNome: true },
+      });
+      for (const g of gs) {
+        const k = String(g.marca || "").toUpperCase();
+        const em = g.ultimaImpressaoEm || g.createdAt;
+        const atual = grdPorMarca.get(k);
+        // mesma marca pode ter GRD por setor: vale a mais recente, que é a que está na mão da fábrica
+        if (!atual || new Date(em) > new Date(atual.em)) {
+          grdPorMarca.set(k, { em: em ? new Date(em).toISOString() : null, por: g.liberadoPorNome || null, impressoes: g.impressoes || 1, formato: g.formato || null });
+        }
+      }
+    } catch { /* GRD é informação, não pode derrubar a listagem */ }
+  }
+
   const pecas = escopo.map((p) => {
     const bx = p.baixaSetores && typeof p.baixaSetores === "object" ? p.baixaSetores : {};
     const reg = setor ? bx[setor] : null;
@@ -319,6 +342,7 @@ export async function GET(req) {
     // trava: quantos conjuntos esperam ESTE croqui pra poder montar
     const tr = travaPorCroqui.get(p.marca);
     return { ...p, material: mat, programacao: programacaoDe(p.marca, p.qte), expedida,
+      grd: grdPorMarca.get(String(p.marca || "").toUpperCase()) || null,
       travaConjuntos: tr ? tr.conjuntos.length : 0, travaMarcas: tr ? tr.conjuntos.slice(0, 12) : null, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
   });
 

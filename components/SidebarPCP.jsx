@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Package, Target, ListOrdered, Gauge, FileText, Truck, Tv, FolderKanban, Printer,
+  LayoutDashboard, Package, Target, ListOrdered, Gauge, FileText, Truck, Tv, FolderKanban, Printer, Factory,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -13,9 +13,13 @@ const menu = [
   // a página /pcp/corte segue existindo, linkada por lá ("detalhes").
   { href: "/comercial",        label: "OPs",              icon: FolderKanban },
   { href: "/pcp",              label: "Painel",           icon: LayoutDashboard, exact: true },
+  // ⚠ "Produção" é a tela de TRABALHO; "Prioridades" é a TV da parede. Vitor (24/08/2026): "da
+  // forma que está como painel não está funcionando" — as duas convivem, mas quem opera entra
+  // aqui: lista de OPs, peças, o que o programador lançou e o botão de imprimir/liberar em lote.
+  { href: "/pcp/producao",     label: "Produção",         icon: Factory },
   { href: "/pcp/relatorio-corte", label: "Relatório de Produção", icon: FileText },
   { href: "/pcp/pmp",          label: "PMP",              icon: Target },
-  { href: "/pcp/dashboard-prioridades", label: "Prioridades", icon: Tv },
+  { href: "/pcp/dashboard-prioridades", label: "Prioridades (TV)", icon: Tv },
   { href: "/pcp/pecas-corte",  label: "Programação",      icon: Package },
   { href: "/pcp/terceirizados", label: "Terceirizados",   icon: Truck },
   // Controle de liberação de desenhos: quem levou qual desenho, quando e com qual R carimbado.
