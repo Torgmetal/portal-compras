@@ -7,6 +7,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { vincularNoDataBook } from "@/lib/relatorio-inspecao";
+import { garantirDesenhos } from "@/lib/relatorio-dimensional";
+import { usaCotas } from "@/lib/qualidade-campo";
 
 export const runtime = "nodejs";
 
@@ -20,6 +22,20 @@ export async function GET(_req, { params }) {
   const { id } = await params;
   const rel = await prisma.relatorioInspecao.findUnique({ where: { id } });
   if (!rel) return NextResponse.json({ error: "Relatório não encontrado" }, { status: 404 });
+
+  // ⚠⚠ É AQUI QUE O DESENHO É RESOLVIDO — e não era em lugar nenhum que a tela alcançasse.
+  // Vitor (24/08/2026): "quando vou abrir o novo relatório que já selecionou uma peça na abertura,
+  // não está importando para o relatório direto".
+  //
+  // O relatório nasce sem desenho de propósito (a varredura na pasta da OP é cara e segurava o
+  // clique de criar), e `garantirDesenhos` existe para resolver na primeira vez que alguém abre.
+  // Só que quem o chamava era `/vetor` e `/pdf` — e `/vetor` só é buscado pelo `MarcadorCotas`,
+  // que a tela só monta quando JÁ existe desenho. Ovo e galinha: nascia vazio e ficava vazio,
+  // mostrando "nenhum projeto vinculado" para uma peça cujo PDF está lá na pasta.
+  //
+  // ⚠ escolher/anexar à mão continua ganhando: `garantirDesenhos` devolve o que já está gravado
+  // sem varrer nada, então a escolha do inspetor nunca é sobrescrita pela busca automática.
+  if (usaCotas(rel.tipo)) rel.desenhos = await garantirDesenhos(rel);
 
   const [fotos, assinaturas] = await Promise.all([
     prisma.fotoInspecao.findMany({
