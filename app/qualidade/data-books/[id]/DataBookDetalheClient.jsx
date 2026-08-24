@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X,
   FileText, CheckCircle2, Lock, BookCheck, FileDown, Upload, Send, Copy, Users,
-  FolderOpen, RotateCcw, History,
+  FolderOpen, RotateCcw, History, Download, Eye,
 } from "lucide-react";
 import NavegadorServidor from "./NavegadorServidor";
 import Volumes from "./Volumes";
@@ -689,6 +689,18 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
                     {d.numeroDocumento && <span className="text-torg-gray font-mono text-[11px] whitespace-nowrap" title="Nº do certificado">cert {d.numeroDocumento}</span>}
                     {d.numeroCorrida && <span className="text-torg-gray font-mono text-[11px] whitespace-nowrap" title="Corrida">corrida {d.numeroCorrida}</span>}
                     {d.status !== "SEM_VALIDADE" && <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${STATUS_COR[d.status]}`}>{d.statusLabel}</span>}
+                    {/* ⚠ O CERTIFICADO AVULSO É PEDIDO O TEMPO TODO. Vitor (23/08/2026): "deixar os
+                        relatórios e certificados que importarmos possíveis de baixarmos os arquivos
+                        individuais para podermos mandar para o cliente caso queira". O cliente pede
+                        UM certificado — o de uma corrida, o de um lote — e sem isto a única saída
+                        era gerar o data book inteiro e recortar o PDF, ou ir procurar no SharePoint.
+                        Passa pelo mesmo proxy autenticado dos documentos: o link do Blob nunca sai. */}
+                    {d.temArquivo && (<>
+                      <a href={`/api/qualidade/documentos/${d.id}/download?inline=1`} target="_blank" rel="noreferrer"
+                        title="Abrir o arquivo" className="text-torg-gray hover:text-torg-blue"><Eye size={14} /></a>
+                      <a href={`/api/qualidade/documentos/${d.id}/download`} download
+                        title={`Baixar ${d.nome}`} className="text-torg-gray hover:text-torg-blue"><Download size={14} /></a>
+                    </>)}
                     <button onClick={() => onDesvincular(d.id)} disabled={acaoLoading} className="text-torg-gray hover:text-red-600 disabled:opacity-50"><X size={14} /></button>
                   </div>
                 </div>
