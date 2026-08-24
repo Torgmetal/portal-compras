@@ -496,6 +496,7 @@ model KickoffAceite {
   token     String    @unique
   enviadoEm DateTime  @default(now())
   aceitoEm  DateTime?
+  aceitoIp  String?   // IP de quem confirmou — o aceite vai impresso no PDF, tem de ser provável
   kickoff   OPKickOff @relation(fields: [kickoffId], references: [id], onDelete: Cascade)
 
   @@index([kickoffId])
