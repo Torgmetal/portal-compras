@@ -175,7 +175,12 @@ export default function RemessaTerceiroClient() {
       {emitir && <ModalEmitir remessa={emitir} onClose={() => setEmitir(null)} onSalvo={() => { setEmitir(null); carregar(); showToast("NF de remessa registrada", "success"); }} />}
       {verItens && <ModalItens remessa={verItens} onClose={() => setVerItens(null)} />}
       {preparar && <ModalPrepararRemessa remessa={preparar} onClose={() => setPreparar(null)} onGerado={(msg) => { setPreparar(null); carregar(); showToast(msg || "Remessa criada no Omie (rascunho)", "success"); }} />}
-      {faturar && <ModalFaturar remessa={faturar} onClose={() => setFaturar(null)} onEmitido={(msg) => { setFaturar(null); carregar(); showToast(msg || "NF-e emitida", "success"); }} />}
+      {faturar && <ModalFaturar remessa={faturar} onClose={() => setFaturar(null)} onEmitido={(nfSugerida) => {
+        const r = { ...faturar };
+        if (nfSugerida) { r.nfNumero = nfSugerida.numero; r.nfSerie = nfSugerida.serie; r.nfChave = nfSugerida.chave; }
+        setFaturar(null); setEmitir(r); carregar();
+        showToast("NF enviada ao SEFAZ. Confira no Omie se autorizou e confirme o registro.", "info");
+      }} />}
     </div>
   );
 }
@@ -448,7 +453,7 @@ function ModalFaturar({ remessa, onClose, onEmitido }) {
       const res = await fetch(`/api/fiscal/remessa-terceiro/${remessa.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao: "emitir_omie" }) });
       const j = await res.json();
       if (!j.success) throw new Error(j.error || "Falha ao emitir");
-      onEmitido(j.nf?.numero ? `NF-e ${j.nf.numero} emitida com sucesso` : "NF-e emitida — confira o número no Omie");
+      onEmitido(j.nfSugerida || null); // enviado ao SEFAZ → parent abre o Registrar pra confirmar
     } catch (e) { setErroEmit(e.message); setEmitindo(false); }
   }
 
@@ -488,8 +493,8 @@ function ModalFaturar({ remessa, onClose, onEmitido }) {
           {/* Passo 2: emissão */}
           <div className={`border rounded-lg p-3 ${conf.estado === "ok" ? "border-amber-200 bg-amber-50/40" : "border-gray-100 opacity-60"}`}>
             <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wider mb-1.5">2. Emitir NF-e</p>
-            <p className="text-xs text-torg-gray">Ao emitir, a NF-e é enviada ao <strong>SEFAZ</strong> e a nota é gerada de verdade. <strong className="text-amber-700">Essa ação não pode ser desfeita.</strong> O portal <strong>espera a autorização real</strong> — só marca como emitida quando o SEFAZ autoriza (pode levar até ~1 min).</p>
-            {emitindo && <p className="mt-2 text-sm text-torg-blue inline-flex items-center gap-1.5"><Loader2 size={14} className="animate-spin" /> Enviando ao SEFAZ e aguardando a autorização…</p>}
+            <p className="text-xs text-torg-gray">Ao emitir, a NF-e é enviada ao <strong>SEFAZ</strong>. <strong className="text-amber-700">Essa ação não pode ser desfeita.</strong> Como a API do Omie não informa aqui se a nota <strong>autorizou ou rejeitou</strong>, confira no Omie (aba <em>Comunicação com a SEFAZ</em>) — o portal já abre o <strong>registro</strong> com o número sugerido pra você confirmar.</p>
+            {emitindo && <p className="mt-2 text-sm text-torg-blue inline-flex items-center gap-1.5"><Loader2 size={14} className="animate-spin" /> Enviando ao SEFAZ…</p>}
             {erroEmit && <p className="mt-2 text-sm text-red-600 inline-flex items-start gap-1.5"><AlertCircle size={14} className="mt-0.5 shrink-0" /> {erroEmit}</p>}
           </div>
         </div>

@@ -128,25 +128,16 @@ export async function PATCH(req, { params }) {
     if (!atual.remessaPedidoOmie) return NextResponse.json({ error: "Gere a remessa no Omie antes de emitir." }, { status: 400 });
     const r = await concluirRemessaOmie(atual.remessaPedidoOmie);
     if (!r.ok) {
-      // NÃO marca EMITIDA — guarda o erro (aparece no portal) e mantém PEDIDO_CRIADO p/ reenviar.
+      // Guarda o erro (aparece no portal) e mantém PEDIDO_CRIADO p/ reenviar.
       await prisma.romaneioTerceiro.update({ where: { id: atual.id }, data: { remessaErroEmissao: (r.erro || "Falha na emissão").substring(0, 900) } }).catch(() => {});
       await prisma.auditLog.create({ data: { userId: user.id, action: "REMESSA_TERCEIRO_EMITIR_ERRO", entity: "RomaneioTerceiro", entityId: atual.id, diff: { numero: atual.numero, pedidoOmie: atual.remessaPedidoOmie, erro: r.erro } } }).catch(() => {});
-      return NextResponse.json({ error: r.erro, pendente: !!r.pendente }, { status: 502 });
+      return NextResponse.json({ error: r.erro }, { status: 502 });
     }
-    const upd = await prisma.romaneioTerceiro.update({
-      where: { id: atual.id },
-      data: {
-        remessaStatus: "EMITIDA",
-        remessaNfNumero: r.nf?.numero || null,
-        remessaNfSerie: r.nf?.serie || null,
-        remessaNfChave: r.nf?.chave || null,
-        remessaNfEmitidaEm: new Date(),
-        remessaErroEmissao: null,
-        remessaPorNome: user.name || null,
-      },
-    });
-    await prisma.auditLog.create({ data: { userId: user.id, action: "REMESSA_TERCEIRO_EMITIR_NF", entity: "RomaneioTerceiro", entityId: upd.id, diff: { numero: upd.numero, pedidoOmie: atual.remessaPedidoOmie, nf: r.nf } } }).catch(() => {});
-    return NextResponse.json({ success: true, remessaStatus: "EMITIDA", nf: r.nf });
+    // Enviado ao SEFAZ. A API do Omie NÃO informa se autorizou ou rejeitou → NÃO marcamos
+    // EMITIDA aqui. Devolvemos o nº SUGERIDO pra o Fiscal conferir no Omie e registrar.
+    await prisma.romaneioTerceiro.update({ where: { id: atual.id }, data: { remessaErroEmissao: null } }).catch(() => {});
+    await prisma.auditLog.create({ data: { userId: user.id, action: "REMESSA_TERCEIRO_ENVIAR_SEFAZ", entity: "RomaneioTerceiro", entityId: atual.id, diff: { numero: atual.numero, pedidoOmie: atual.remessaPedidoOmie, nfSugerida: r.nfSugerida } } }).catch(() => {});
+    return NextResponse.json({ success: true, enviado: true, nfSugerida: r.nfSugerida || null });
   }
 
   const data = {};
