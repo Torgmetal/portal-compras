@@ -34,11 +34,17 @@ const fmtDH = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digi
 
 // A programação do Syneco, na linguagem do PCP. Mesmos quatro estados do painel de despacho —
 // se divergissem, a mesma peça teria dois nomes em duas telas.
+//
+// ⚠⚠ NA TELA SE DIZ "PROGRAMAR", NÃO "LANÇAR". Vitor (24/08/2026) pediu a troca, e ela conserta uma
+// incoerência: o estado bom já se chamava "programada" e o ruim "não lançada" — duas palavras para
+// os dois lados da MESMA pergunta, que é o que faz alguém achar que são coisas diferentes. Quem faz
+// é o programador; o que ele faz é programar. As chaves internas seguem com LANCADA porque são o
+// contrato com a API; o que muda é o que a pessoa lê.
 const PROG = {
   INICIADA: { txt: "iniciada", cls: "bg-emerald-50 text-emerald-700 border-emerald-200", dica: "A ordem deste setor já rodou no Syneco." },
-  PROGRAMADA: { txt: "programada", cls: "bg-sky-50 text-sky-700 border-sky-200", dica: "O programador lançou a peça e a ordem ainda não iniciou — é o que pode descer para a fábrica." },
-  OUTRO_SETOR: { txt: "lançada", cls: "bg-slate-100 text-slate-600 border-slate-200", dica: "Lançada no Syneco, mas sem ordem deste setor." },
-  NAO_LANCADA: { txt: "não lançada", cls: "bg-red-50 text-red-700 border-red-200", dica: "O programador ainda NÃO lançou esta peça no Syneco." },
+  PROGRAMADA: { txt: "programada", cls: "bg-sky-50 text-sky-700 border-sky-200", dica: "O programador programou a peça e a ordem ainda não iniciou — é o que pode descer para a fábrica." },
+  OUTRO_SETOR: { txt: "outro setor", cls: "bg-slate-100 text-slate-600 border-slate-200", dica: "Programada no Syneco, mas sem ordem deste setor." },
+  NAO_LANCADA: { txt: "não programada", cls: "bg-red-50 text-red-700 border-red-200", dica: "O programador ainda NÃO programou esta peça no Syneco." },
 };
 
 // ⚠⚠ A ORDEM É A DA FÁBRICA, NÃO A DO BANCO.
@@ -60,7 +66,7 @@ const ORDEM_SETOR = Object.fromEntries(FLUXO.map(([k], i) => [k, i]));
 const FILTROS = [
   { key: "TODAS", label: "Todas" },
   { key: "NAO_INICIADAS", label: "Não iniciadas" },
-  { key: "NAO_LANCADA", label: "Não lançadas" },
+  { key: "NAO_LANCADA", label: "Não programadas" },
   { key: "PROGRAMADA", label: "Programadas" },
   { key: "INICIADA", label: "Iniciadas" },
 ];
@@ -117,7 +123,7 @@ const ALERTA = {
   PRODUZINDO_SEM_LISTA: { txt: "produzindo sem lista", cls: "bg-red-50 text-red-700 border-red-200", dica: "A fábrica já apontou produção e o portal não tem o detalhamento." },
   SEM_DETALHE_CORTE: { txt: "sem detalhe de corte", cls: "bg-amber-50 text-amber-700 border-amber-200", dica: "Sem croqui no portal: não há o que cortar nem rastrear." },
   SEM_CRONOGRAMA: { txt: "sem cronograma", cls: "bg-amber-50 text-amber-700 border-amber-200", dica: "Sem cronograma a OP não tem data por setor — nem prazo, nem posição real na fila." },
-  NADA_LANCADO: { txt: "nada lançado", cls: "bg-slate-100 text-slate-600 border-slate-200", dica: "Nenhuma peça desta OP tem ordem no Syneco." },
+  NADA_LANCADO: { txt: "nada programado", cls: "bg-slate-100 text-slate-600 border-slate-200", dica: "Nenhuma peça desta OP tem ordem no Syneco — o programador ainda não programou nada." },
 };
 
 export default function ProducaoClient() {
@@ -138,7 +144,7 @@ export default function ProducaoClient() {
   const [desenho, setDesenho] = useState(null);
   const [filtroPecas, setFiltroPecas] = useState("");
   // ⚠ Vitor (24/08/2026): "preciso ter o filtro para selecionar o que não iniciou". "Não iniciou"
-  // é união de duas situações — a que o programador nem lançou e a que ele lançou e a fábrica não
+  // é união de duas situações — a que o programador nem programou e a que ele programou e a fábrica não
   // pegou. As duas separadas também servem, porque a ação é diferente: uma se cobra do programador,
   // a outra se desce para a fábrica.
   const [filtroProg, setFiltroProg] = useState("TODAS");
@@ -427,7 +433,7 @@ export default function ProducaoClient() {
         + (filtrosAtivos ? ` · filtrado por ${Object.entries(filtroCol).filter(([, v]) => v?.size).map(([k]) => COL[k].label.toLowerCase()).join(", ")}` : "")
         + (filtroPecas.trim() ? ` · busca "${filtroPecas.trim()}"` : ""),
       kpis: [
-        `${lista.filter((p) => p.programacao?.situacao === "NAO_LANCADA").length} não lançada(s)`,
+        `${lista.filter((p) => p.programacao?.situacao === "NAO_LANCADA").length} não programada(s)`,
         `${lista.filter((p) => p.programacao?.situacao === "PROGRAMADA").length} programada(s)`,
         `${lista.filter((p) => p.grd).length} liberada(s)`,
       ],
@@ -466,7 +472,7 @@ export default function ProducaoClient() {
             <Factory size={22} className="text-torg-orange" /> Produção
           </h1>
           <p className="text-sm text-torg-gray mt-1">
-            As obras na fábrica. Clique numa OP para ver as peças, o que o programador já lançou e liberar para fabricar.
+            As obras na fábrica. Clique numa OP para ver as peças, o que o programador já programou e liberar para fabricar.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -554,10 +560,10 @@ export default function ProducaoClient() {
                         </span>
                       )}
                       <span className="text-[11px] text-torg-gray tabular-nums">{fmtKg(o.kg.pendente)} na fila</span>
-                      {/* ⚠ os três números que decidem o dia do PCP: o que o programador lançou, o
-                          que falta lançar e o que já desceu para a fábrica (GRD impressa). */}
-                      <Conta n={o.pecas.lancadas} de={o.pecas.total} label="lançadas" cor="text-sky-700" />
-                      {o.pecas.naoLancadas > 0 && <Conta n={o.pecas.naoLancadas} label="a lançar" cor="text-red-600" />}
+                      {/* ⚠ os três números que decidem o dia do PCP: o que o programador programou, o
+                          que falta programar e o que já desceu para a fábrica (GRD impressa). */}
+                      <Conta n={o.pecas.lancadas} de={o.pecas.total} label="programadas" cor="text-sky-700" />
+                      {o.pecas.naoLancadas > 0 && <Conta n={o.pecas.naoLancadas} label="não programadas" cor="text-red-600" />}
                       <Conta n={o.pecas.liberadas} label="liberadas" cor="text-emerald-700" />
                       {o.compra && <CompraChip compra={o.compra} opNumero={o.opNumero} mini />}
                       {o.alertas.map((a) => {
