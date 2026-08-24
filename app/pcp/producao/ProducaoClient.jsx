@@ -18,10 +18,10 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, Printer, Search,
-  Factory, Monitor, CalendarClock, Package, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet, Send, Flag, Filter, X,
+  Factory, Monitor, CalendarClock, Package, CheckCircle2, FileText, FileSpreadsheet, Send, Flag, Filter, X,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
-import CompraChip from "@/components/CompraChip";
+import CompraChip, { ModalRastreabilidade } from "@/components/CompraChip";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 import SeparacaoModal from "@/components/SeparacaoModal";
 
@@ -121,7 +121,7 @@ const COLUNAS_FILTRO = [
   { key: "perfil", label: "Perfil", valor: (p) => p.descricao || "—" },
   { key: "programacao", label: "Programação", valor: (p) => (PROG[p.programacao?.situacao] || PROG.NAO_LANCADA).txt },
   { key: "situacao", label: "Situação", valor: (p) => SIT[situacaoDaPeca(p)].txt },
-  { key: "material", label: "Material", valor: (p) => (p.material?.recebido ? (p.material.rastreio ? `R ${p.material.rastreio}` : "recebido") : p.perfil ? "sem entrada" : "—") },
+  { key: "material", label: "Material", valor: (p) => (p.material?.recebido ? (p.material.rastreio ? `R ${p.material.rastreio}` : "recebido") : "sem R") },
   { key: "grd", label: "Liberado (GRD)", valor: (p) => (p.grd ? "liberado" : "não liberado") },
 ];
 const COL = Object.fromEntries(COLUNAS_FILTRO.map((c) => [c.key, c]));
@@ -166,6 +166,7 @@ export default function ProducaoClient() {
   // peso e o R de cada um. Mesmo componente da TV — duas versões do mesmo papel divergiriam, e é
   // ele que garante que o material separado é o R certo.
   const [separacao, setSeparacao] = useState(null);
+  const [rastro, setRastro] = useState(null); // opNumero com a rastreabilidade aberta
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
@@ -457,7 +458,7 @@ export default function ProducaoClient() {
         p.expedida ? "expedida"
           : p.montadoEm ? (p.montadoEm.montados >= p.montadoEm.total ? "montado" : `montado ${p.montadoEm.montados}/${p.montadoEm.total}`)
           : p.setorReal ? SETOR_LABEL[p.setorReal] || p.setorReal : "não começou",
-        p.material?.rastreio || (p.material?.recebido ? "recebido" : ""),
+        p.material?.rastreio || (p.material?.recebido ? "recebido" : "sem R"),
         p.material?.nf || "", p.material?.corrida || "",
         p.grd ? fmtDH(p.grd.em) : "", p.grd?.por || "",
       ]);
@@ -776,17 +777,32 @@ export default function ProducaoClient() {
                                         </span>
                                       )}
                                     </td>
+                                    {/* ⚠⚠ "SEM ENTRADA" AFIRMAVA O QUE O PORTAL NÃO SABE.
+                                        O casamento peça↔material é por DESCRIÇÃO, e a Engenharia escreve
+                                        o perfil de um jeito ("FRØ1/2\"") e o cadastro de outro ("BARRA
+                                        REDONDA ACO CARBONO LAMINADA"). Não casar quer dizer duas coisas
+                                        muito diferentes — material que não chegou, ou material que
+                                        chegou e ninguém liga uma escrita à outra — e o chip escolhia a
+                                        pior das duas, em âmbar, com triângulo de alerta, mandando gente
+                                        procurar material que está no pátio.
+                                        ⚠ Agora diz o que é FATO: esta peça não tem R. Em cinza, porque
+                                        peça não cortada não tem R mesmo — é o estado normal, não um
+                                        problema. E clica para abrir a rastreabilidade da OP, que é onde
+                                        se descobre qual dos dois casos é. */}
                                     <td className="px-2 py-1.5 truncate">
-                                      {p.material?.recebido ? (
-                                        <span title={`Recebido em ${fmtDH(p.material.dataRecebimento)}${p.material.nf ? ` · NF ${p.material.nf}` : ""}${p.material.corrida ? ` · corrida ${p.material.corrida}` : ""}`}
-                                          className="text-[10px] px-1.5 py-0.5 rounded border font-semibold bg-emerald-50 text-emerald-700 border-emerald-200 inline-flex items-center gap-1">
-                                          <Package size={9} /> {p.material.rastreio ? `R ${p.material.rastreio}` : "recebido"}
+                                      <button onClick={() => setRastro(detalhe.opNumero)}
+                                        title={p.material?.recebido
+                                          ? `Recebido em ${fmtDH(p.material.dataRecebimento)}${p.material.nf ? ` · NF ${p.material.nf}` : ""}${p.material.corrida ? ` · corrida ${p.material.corrida}` : ""}. Clique para a rastreabilidade da OP.`
+                                          : "Nenhum R casado com este perfil no CMR desta OP. Pode ser material que ainda não chegou, ou descrição que não bate com o cadastro do Almoxarifado. Clique para conferir a rastreabilidade."}
+                                        className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold inline-flex items-center gap-1 max-w-full hover:brightness-95 ${
+                                          p.material?.recebido
+                                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                            : "bg-gray-50 text-torg-gray border-gray-200"}`}>
+                                        <Package size={9} className="shrink-0" />
+                                        <span className="truncate">
+                                          {p.material?.recebido ? (p.material.rastreio ? `R ${p.material.rastreio}` : "recebido") : "sem R"}
                                         </span>
-                                      ) : p.perfil ? (
-                                        <span title="O CMR do Almoxarifado não tem entrada deste material nesta OP." className="text-[10px] px-1.5 py-0.5 rounded border font-semibold bg-amber-50 text-amber-700 border-amber-200 inline-flex items-center gap-1">
-                                          <AlertTriangle size={9} /> sem entrada
-                                        </span>
-                                      ) : <span className="text-torg-gray-light">—</span>}
+                                      </button>
                                     </td>
                                     <td className="px-2 py-1.5 truncate">
                                       {p.grd ? (
@@ -815,6 +831,7 @@ export default function ProducaoClient() {
       )}
 
       {desenho && <DesenhoPecaModal opNumero={desenho.opNumero} marca={desenho.marca} onClose={() => setDesenho(null)} />}
+      {rastro && <ModalRastreabilidade opNumero={rastro} onClose={() => setRastro(null)} />}
       {separacao && (
         <SeparacaoModal opId={separacao.opId} obra={separacao.obra} setor={separacao.setor}
           ids={separacao.ids} onClose={() => setSeparacao(null)} />
