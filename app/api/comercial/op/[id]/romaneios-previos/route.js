@@ -12,8 +12,15 @@ const ROLES = ["ADMIN", "COMERCIAL", "PLANEJAMENTO", "PCP", "ENGENHARIA"];
 
 /** maior nº entre os romaneios já EMITIDOS (marcasJson) e os prévios existentes */
 async function proximoNumero(opId, opNumero) {
+  // ⚠⚠ O NÚMERO DA OP NÃO É ESCRITO IGUAL EM TODA PARTE. A `ListaExpedicao` guarda "70", "84",
+  // "97" enquanto a OP se chama "070", "084", "097" — e duas listas nem têm `opId`. Casando só por
+  // igualdade exata, os romaneios JÁ EMITIDOS daquela obra ficavam invisíveis aqui e o prévio
+  // recomeçava a numeração por cima de romaneio que já existe no papel. Por isso as variantes.
+  const n0 = String(opNumero).trim();
+  const semZero = n0.replace(/^0+/, "");
+  const variantes = [...new Set([n0, semZero, semZero.padStart(3, "0"), semZero.padStart(2, "0")])].filter(Boolean);
   const listas = await prisma.listaExpedicao.findMany({
-    where: { OR: [{ opId }, { opNumero: String(opNumero) }] },
+    where: { OR: [{ opId }, { opNumero: { in: variantes } }] },
     select: { marcasJson: true },
   });
   // Os nº vêm com sufixo/prefixo de revisão ("01 R1", "12.R1", "R07", "R3").
