@@ -207,7 +207,7 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
         if (!j.success) { setErro(j.error || "Erro"); return; }
         setDados(j); setItens(j.itens || []);
         const sug = j.freteSugestao || {};
-        setFrete(j.frete || { tpFrete: "0", especie: sug.especie || "PEÇAS", pesoBruto: sug.pesoBruto || "", qtdVol: sug.qtdVol || "" });
+        setFrete(j.frete || { tpFrete: "0", especie: sug.especie || "PEÇAS", pesoBruto: sug.pesoBruto || "", pesoLiq: sug.pesoBruto || "", qtdVol: sug.qtdVol || "" });
       })
       .catch(() => setErro("Erro ao preparar"));
   }, [remessa.id]);
@@ -295,7 +295,7 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div><label className="block text-xs font-medium text-torg-dark mb-1">Peso líquido (kg)</label><input value={frete.pesoLiq ?? ""} onChange={(e) => setF("pesoLiq", e.target.value)} inputMode="decimal" placeholder="0,000" className={finp} /></div>
-                  <div><label className="block text-xs font-medium text-torg-dark mb-1">Peso bruto (kg)</label><input value={frete.pesoBruto ?? ""} onChange={(e) => setF("pesoBruto", e.target.value)} inputMode="decimal" placeholder="0,000" className={finp} /></div>
+                  <div><label className="block text-xs font-medium text-torg-dark mb-1">Peso bruto (kg)</label><input value={frete.pesoBruto ?? ""} onChange={(e) => setFrete((s) => ({ ...s, pesoBruto: e.target.value, pesoLiq: e.target.value }))} inputMode="decimal" placeholder="0,000" className={finp} /></div>
                 </div>
                 <div className="grid grid-cols-3 gap-3 sm:col-span-2">
                   <div><label className="block text-xs font-medium text-torg-dark mb-1">Valor frete</label><input value={frete.valorFrete ?? ""} onChange={(e) => setF("valorFrete", e.target.value)} inputMode="decimal" placeholder="0,00" className={finp} /></div>
