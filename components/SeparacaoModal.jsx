@@ -86,7 +86,7 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
       titulo: `Lista de separação de material — ${obra}`,
       // ⚠ o papel tem de dizer o que é previsão. Quem separa lê "R 251768" e vai buscar o fardo; se
       // aquilo era só o FIFO chutando, ele precisa saber que confirma na hora, não que está fechado.
-      subtitulo: `${obra} · ${nomeSetor}${d?.escopo === "selecao" ? " · somente as peças selecionadas" : " · OP inteira"}${trocados ? ` · ${trocados} R trocado(s) na separação` : ""}${previstos ? ` · ${previstos} R previsto(s) pelo FIFO (confirmar na separação)` : ""}`,
+      subtitulo: `${obra} · ${nomeSetor}${d?.escopo === "selecao" ? " · somente as peças selecionadas" : " · OP inteira"}${trocados ? ` · ${trocados} R trocado(s) na separação` : ""}${previstos ? ` · ${previstos} R previsto(s) — material desta OP ainda não cortado, confirmar na separação` : ""}`,
       kpis: [`${fmtN(d?.totais?.linhas)} materiais`, `${fmtN(d?.totais?.pecas)} peças`, `${fmtKg(d?.totais?.pesoKg)} kg`],
       totalColunas: headers.length, nomePlanilha: "Separação", codigoDoc: "REL-PCP-006",
     });
@@ -146,7 +146,7 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
             )}
             {previstos > 0 && (
               <span className="text-[11px] text-sky-800 bg-sky-50 border border-sky-200 rounded-lg px-2 py-1 inline-flex items-center gap-1">
-                <Package size={13} /> {previstos} material com R <b>previsto</b> — nada cortado ainda; sai pela ordem de chegada
+                <Package size={13} /> {previstos} material com R <b>previsto</b> — é o desta OP, mas nada foi cortado ainda
               </span>
             )}
             {semR > 0 && (
@@ -211,8 +211,8 @@ export default function SeparacaoModal({ opId, obra, setor, ids, onClose }) {
                         </p>
                       )}
                       {l.previsto && (
-                        <p className="text-[10px] text-sky-700 mt-0.5" title="Nenhuma peça deste material foi cortada ainda, então nenhum R está carimbado. Este é o que sai pela ordem de chegada (FIFO) — confirme na separação.">
-                          previsto pelo FIFO — ainda não apontado
+                        <p className="text-[10px] text-sky-700 mt-0.5" title="É o material desta OP, o mais antigo que entrou. Nenhuma peça dele foi cortada ainda, então ninguém carimbou este R — confirme na separação.">
+                          previsto — material desta OP, ainda não cortado
                         </p>
                       )}
                       {!l.trocado && l.rsIndicados.length > 1 && <p className="text-[10px] text-torg-gray mt-0.5">peças apontam {l.rsIndicados.length} Rs diferentes</p>}

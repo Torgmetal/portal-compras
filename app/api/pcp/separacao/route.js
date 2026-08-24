@@ -65,6 +65,10 @@ export async function GET(req) {
   // O matcher roda por PERFIL contra a lista de materiais; casar contra as 3.7 mil linhas seria
   // desperdício — são ~1,1 mil descrições DISTINTAS. Casa nas distintas e expande depois.
   const comoItens = [...new Set(cmr.map((c) => c.nome))].map((nome) => ({ codigo: null, descricao: nome }));
+  // ⚠ as descrições QUE ENTRARAM NESTA OP, à parte: é contra elas que o matcher roda primeiro, para
+  // o perfil casar com o material da própria obra antes de olhar a prateleira da empresa inteira.
+  const comoItensOp = [...new Set(cmr.filter((c) => c.opNumero === op.numero).map((c) => c.nome))]
+    .map((nome) => ({ codigo: null, descricao: nome }));
 
   // SALDO DE CADA R desta OP = o que entrou no CMR menos o que as peças já comprometeram.
   //
@@ -118,8 +122,19 @@ export async function GET(req) {
   }
 
   const itens = [...grupos.values()].map((g) => {
-    // opções de R daquele material (o matcher fala a língua do cadastro)
-    const hit = comoItens.length ? casarPerfilComOmie(g.perfil, comoItens) : null;
+    // ── OPÇÕES DE R DAQUELE MATERIAL ───────────────────────────────────────────────────────
+    // ⚠⚠ O MATERIAL DESTA OP TEM DE GANHAR NO CASAMENTO.
+    // O matcher escolhe UMA descrição do cadastro e as opções são as linhas do CMR com aquela
+    // descrição EXATA. Rodando contra o CMR inteiro, ele casava com a redação de outra obra: o
+    // TBØ42.40X2.65 da OP-089 ia para "TUBO AC CC 42,4 X 2,65mm" (OP-028, 2025) enquanto a própria
+    // OP-089 tinha "TUBO REDONDO (42,40) X 2,65MM" (R 260810) na prateleira dela. A OP saía do
+    // conjunto de opções e a lista de separação mandava buscar fardo de obra de um ano e meio atrás.
+    //
+    // ⚠ Por isso o casamento é feito DUAS VEZES: primeiro só com o que entrou nesta OP; e só quando
+    // aqui não há nada é que vale o CMR da empresa (sobra de outra obra é uso legítimo — mas é a
+    // segunda escolha, nunca a primeira).
+    const hitOp = comoItensOp.length ? casarPerfilComOmie(g.perfil, comoItensOp) : null;
+    const hit = hitOp || (comoItens.length ? casarPerfilComOmie(g.perfil, comoItens) : null);
     const opcoes = hit ? cmr.filter((c) => c.nome === hit.descricao).map(opcaoR) : [];
     // R indicado = o mais apontado pelas peças do grupo; sem isso, a entrada mais antiga da OP
     const maisApontado = [...g.rs.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
@@ -131,16 +146,18 @@ export async function GET(req) {
     // separação com o R vazio manda o Almoxarifado escolher o fardo por conta, que é exatamente o
     // que o R existe para impedir.
     //
-    // ⚠ A previsão é FIFO — a entrada mais antiga COM SALDO, mesmo que de outra OP —, a mesma regra
-    // do motor de rastreio. E vai marcada como previsão (`rPrevisto`): no papel, "vai usar" e "usou"
-    // não podem parecer a mesma coisa.
-    const previsto = !maisApontado && !daOpAntiga
-      ? [...opcoes]
-          .filter((o) => (o.saldo ? !o.saldo.esgotado : true))
-          .sort((a, b) => String(a.recebidoEm || "").localeCompare(String(b.recebidoEm || "")))[0] || null
-      : null;
-    const rIndicado = maisApontado || daOpAntiga?.rastreio || previsto?.rastreio || null;
-    const rPrevisto = !maisApontado && !daOpAntiga && !!previsto;
+    // ⚠ A previsão é a entrada mais antiga DESTA OP (`daOpAntiga`) — FIFO dentro do que foi comprado
+    // para a obra. Ela já existia; o que faltava era DIZER que é previsão: ninguém apontou aquele R
+    // ainda, é só o que deve sair. No papel, "vai usar" e "usou" não podem parecer a mesma coisa.
+    //
+    // 🚫 NÃO SE PREVÊ FARDO DE OUTRA OBRA. Tentei estender o FIFO ao CMR inteiro e o resultado foi
+    // apontar R de 2025, de OPs encerradas, como se fosse o material a separar — o saldo de R de
+    // outra OP é `null` (o consumo é contado na OP dele), então nem dava para saber se ainda existe.
+    // Sem material desta OP, o certo é "A DEFINIR": manda o Almoxarifado escolher e registrar a
+    // troca, que é o caminho que já existe, em vez de mandá-lo procurar um fardo que talvez não
+    // exista mais.
+    const rIndicado = maisApontado || daOpAntiga?.rastreio || null;
+    const rPrevisto = !maisApontado && !!daOpAntiga;
     // O R indicado ainda tem material? Se não, a separação vai ter de sair de outro fardo — e a
     // tela já sugere qual (o R com saldo, da OP ou de fora), pra não mandar ninguém procurar barra
     // que não existe.
@@ -191,8 +208,7 @@ export async function GET(req) {
       pecas: itens.reduce((a, x) => a + x.qtdPecas, 0),
       pesoKg: Math.round(itens.reduce((a, x) => a + x.pesoTotalKg, 0)),
       barras: itens.reduce((a, x) => a + (x.barras || 0), 0),
-      // ⚠ "sem R" agora é só o material que NÃO TEM ENTRADA NENHUMA no CMR — nem para prever.
-      // Antes contava também o que só faltava previsão, e o número assustava sem motivo.
+      // "sem R" = material que esta OP não tem no CMR; sai "A DEFINIR" e o Almoxarifado escolhe.
       semR: itens.filter((x) => !x.rIndicado).length,
       previstos: itens.filter((x) => x.rPrevisto).length,
       trocados: itens.filter((x) => x.troca).length,
