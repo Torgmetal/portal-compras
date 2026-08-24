@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { PackageSearch, Search, Loader2, FileSpreadsheet, CheckCircle2, Clock, AlertCircle, X, Truck, Trash2, Copy, CalendarDays, MapPin, Upload, Plus, ThumbsUp, RotateCcw } from "lucide-react";
 import { exportarListaExpedicao } from "@/lib/export-lista-expedicao";
+import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`;
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -79,7 +80,21 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
   const pendQ = (m) => { const t = totQ(m); if (t == null) return null; if (expedidaFull(m)) return 0; return Math.max(0, t - expQ(m)); };
   const pesoExpM = (m) => (expedidaFull(m) ? (m.pesoTotal || 0) : unitPeso(m) * expQ(m));
 
-  const filtradas = useMemo(() => {
+  // ⚠⚠ FILTRO POR COLUNA (o funil), igual ao da lista do PCP — mesmo componente.
+  // Cada coluna vira TEXTO pela mesma leitura que a célula faz; se divergisse, a pessoa marcaria
+  // "expedida" e veria linha dizendo outra coisa, e passaria a não confiar no filtro.
+  //
+  // ⚠ Qtd, Expedido e Peso ficam de fora: são contínuos, e caixinha com centenas de números não
+  // filtra nada — para eles vale a busca por texto, que já existe acima.
+  const COLUNAS_FILTRO = useMemo(() => [
+    { key: "marca", label: "Marca", valor: (m) => m.marca || "—" },
+    { key: "descricao", label: "Descrição", valor: (m) => m.descricao || "—" },
+    { key: "situacao", label: "Situação", valor: (m) => ({ expedida: "expedida", parcial: "parcial", baixa: "baixa manual", pendente: "pendente" })[situacaoM(m)] },
+    { key: "romaneio", label: "Romaneio", valor: (m) => (String(m.romaneio || "").trim() || "sem romaneio") },
+    { key: "frente", label: "Frente", valor: (m) => m.frente || "—" },
+  ], []);
+
+  const preFiltradas = useMemo(() => {
     const b = norm(busca);
     return todas.filter((m) => {
       if (frente && m.frente !== frente) return false;
@@ -92,6 +107,18 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
       return norm(m.marca).includes(b) || norm(m.descricao).includes(b) || norm(m.romaneio).includes(b);
     });
   }, [todas, busca, situacao, frente]);
+
+  const { filtros: filtroCol, setFiltros: setFiltroCol, filtradas, opcoesDaColuna, ativos: filtrosAtivos, limpar: limparColunas } =
+    useFiltroColunas(preFiltradas, COLUNAS_FILTRO);
+  const [colAberta, setColAberta] = useState(null);
+  const fp = { filtros: filtroCol, setFiltros: setFiltroCol, opcoesDaColuna, aberta: colAberta, setAberta: setColAberta };
+
+  // ⚠⚠ "TODOS" É O QUE ESTÁ NA TELA, não a lista inteira. A tabela mostra as LIMITE primeiras: uma
+  // OP grande passa de mil marcas, e um clique marcando 1.443 peças que a pessoa não viu é o tipo de
+  // seleção que só se descobre errada depois do romaneio montado.
+  const visiveis = useMemo(() => filtradas.slice(0, LIMITE), [filtradas]);
+  // ⚠ e só as que dá para expedir: marca totalmente expedida tem a caixinha desabilitada.
+  const selecionaveis = useMemo(() => visiveis.filter((m) => { const p = pendQ(m); return !(p != null && p <= 0); }), [visiveis]);
 
   const contratado = frentes.reduce((s, f) => s + (f.pesoContratado || 0), 0);
   const nFull = todas.filter((m) => situacaoM(m) === "expedida").length;
@@ -189,11 +216,16 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
   async function exportar() {
     setExportando(true); setErro("");
     try {
-      const filtrando = busca.trim() || situacao !== "todas" || frente;
+      // ⚠ o filtro de COLUNA conta como filtro aqui. Sem isto, quem filtrasse só pelo funil
+      // exportaria a lista inteira achando que exportou o que estava vendo.
+      const rotulosCol = Object.entries(filtroCol).filter(([, v]) => v?.size).map(([k]) => COLUNAS_FILTRO.find((c) => c.key === k)?.label || k);
+      const filtrando = busca.trim() || situacao !== "todas" || frente || rotulosCol.length > 0;
       await exportarListaExpedicao({
         op: dados.op, frentes,
         marcasFiltradas: filtrando ? filtradas : null,
-        sufixo: filtrando ? `filtro: ${[frente, situacao !== "todas" ? situacao : null, busca.trim() ? `"${busca.trim()}"` : null].filter(Boolean).join(" / ")}` : null,
+        sufixo: filtrando
+          ? `filtro: ${[frente, situacao !== "todas" ? situacao : null, busca.trim() ? `"${busca.trim()}"` : null, ...rotulosCol.map((r) => r.toLowerCase())].filter(Boolean).join(" / ")}`
+          : null,
       });
     } catch (e) { setErro(e.message); } finally { setExportando(false); }
   }
@@ -285,6 +317,11 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
               </select>
             )}
             <span className="text-[11px] text-torg-gray whitespace-nowrap">{filtradas.length} de {todas.length} · {fmtKg(pesoFiltrado)}</span>
+            {filtrosAtivos > 0 && (
+              <button onClick={limparColunas} className="text-[11px] text-torg-orange hover:underline font-semibold whitespace-nowrap">
+                limpar {filtrosAtivos} filtro(s) de coluna
+              </button>
+            )}
           </div>
 
           {!readOnly && marcadas.length > 0 && (
@@ -300,19 +337,37 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
             <table className="w-full text-sm min-w-[760px]">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr className="text-[11px] text-torg-gray uppercase">
-                  {!readOnly && <th className="px-2 py-2 w-8"></th>}
-                  <th className="text-left px-3 py-2 font-medium">Marca</th>
-                  <th className="text-left px-3 py-2 font-medium">Descrição</th>
+                  {/* ⚠ SELECIONAR TODOS = as que dá para selecionar, entre as VISÍVEIS.
+                      Marca totalmente expedida tem a caixinha desabilitada (não há o que pôr em
+                      romaneio), então marcar "todas" incluindo essas encheria a seleção de peça que
+                      o botão de montar carga descarta depois — e o número da seleção mentiria. */}
+                  {!readOnly && (
+                    <th className="px-2 py-2 w-8">
+                      <input type="checkbox" checked={selecionaveis.length > 0 && selecionaveis.every((m) => sel[chave(m)])}
+                        onChange={() => {
+                          const todasMarcadas = selecionaveis.length > 0 && selecionaveis.every((m) => sel[chave(m)]);
+                          setSel((s) => {
+                            const n = { ...s };
+                            for (const m of selecionaveis) { if (todasMarcadas) delete n[chave(m)]; else n[chave(m)] = true; }
+                            return n;
+                          });
+                        }}
+                        title={`Selecionar as ${selecionaveis.length} peça(s) com saldo a expedir nesta lista`}
+                        className="accent-torg-blue" />
+                    </th>
+                  )}
+                  <ThFiltro col="marca" label="Marca" className="text-left px-3 py-2 font-medium" {...fp} />
+                  <ThFiltro col="descricao" label="Descrição" className="text-left px-3 py-2 font-medium" {...fp} />
                   <th className="text-right px-3 py-2 font-medium w-16">Qtd</th>
                   <th className="text-right px-3 py-2 font-medium w-24">Expedido</th>
                   <th className="text-right px-3 py-2 font-medium w-24">Peso</th>
-                  <th className="text-left px-3 py-2 font-medium w-32">Situação</th>
-                  <th className="text-left px-3 py-2 font-medium w-24">Romaneio</th>
+                  <ThFiltro col="situacao" label="Situação" larg="w-32" className="text-left px-3 py-2 font-medium" {...fp} />
+                  <ThFiltro col="romaneio" label="Romaneio" larg="w-24" className="text-left px-3 py-2 font-medium" {...fp} />
                   <th className="text-left px-3 py-2 font-medium w-28">Expedida em</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filtradas.slice(0, LIMITE).map((m, i) => {
+                {visiveis.map((m, i) => {
                   const k = chave(m);
                   const exp = expQ(m), tot = totQ(m), pend = pendQ(m), sit = situacaoM(m);
                   const semPendente = pend != null && pend <= 0;
