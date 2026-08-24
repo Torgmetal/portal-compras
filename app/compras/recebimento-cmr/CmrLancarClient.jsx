@@ -6,6 +6,13 @@ import { Loader2, Plus, ClipboardPaste, Save, Trash2, Search, Check, X, PackageP
 const anoAtual = new Date().getFullYear();
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const fmtNum = (v) => (v == null || v === "" ? "—" : Number(v).toLocaleString("pt-BR"));
+// R/RC é guardado no início da observação como "Tipo: R" — separa pra exibir na coluna própria.
+function parseObs(observacao) {
+  const s = String(observacao || "");
+  const m = s.match(/^Tipo:\s*(RC|R)\b\s*(\|\s*)?/i);
+  if (!m) return { rc: "", obs: s };
+  return { rc: m[1].toUpperCase(), obs: s.slice(m[0].length).trim() };
+}
 const inp = "w-full text-sm border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-torg-blue outline-none";
 const lbl = "block text-[11px] font-medium text-torg-gray uppercase tracking-wide mb-1";
 
@@ -225,27 +232,54 @@ export default function CmrLancarClient() {
             <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar descrição, fornecedor, OP, NF…" className="w-64 pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm" />
           </div>
         </div>
+        {/* Legenda das cores */}
+        <div className="px-4 py-1.5 flex items-center gap-4 text-[11px] text-torg-gray border-b border-gray-50">
+          <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-yellow-200 border border-yellow-300" /> com certificado</span>
+          <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-100 border border-red-300" /> falta certificado</span>
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-[12px] whitespace-nowrap">
-            <thead className="bg-gray-50/60"><tr className="text-[10px] text-gray-500 uppercase">
-              <th className="px-3 py-2 text-left">R</th><th className="px-3 py-2 text-left">Descrição</th><th className="px-3 py-2 text-left">Corrida</th><th className="px-3 py-2 text-left">Forn.</th><th className="px-3 py-2 text-left">Obra</th><th className="px-3 py-2 text-left">Data</th><th className="px-3 py-2 text-left">NF</th><th className="px-3 py-2 text-right">Qtd</th><th className="px-3 py-2 text-right">Peso</th>
+          <table className="text-[12px] whitespace-nowrap" style={{ minWidth: 1500 }}>
+            <thead className="bg-gray-100"><tr className="text-[10px] text-gray-600 uppercase">
+              <th className="px-2.5 py-2 text-left">R/RC</th>
+              <th className="px-2.5 py-2 text-left">Índice R</th>
+              <th className="px-2.5 py-2 text-left">Descrição do material</th>
+              <th className="px-2.5 py-2 text-left">Nº certificado</th>
+              <th className="px-2.5 py-2 text-left">Lote / corrida</th>
+              <th className="px-2.5 py-2 text-left">Especificação</th>
+              <th className="px-2.5 py-2 text-left">Pedido compra</th>
+              <th className="px-2.5 py-2 text-left">Data receb.</th>
+              <th className="px-2.5 py-2 text-left">Nº NF</th>
+              <th className="px-2.5 py-2 text-left">Fornecedor</th>
+              <th className="px-2.5 py-2 text-left">Obra</th>
+              <th className="px-2.5 py-2 text-right">Qtd pçs</th>
+              <th className="px-2.5 py-2 text-right">Peso/litro</th>
+              <th className="px-2.5 py-2 text-left">Observação</th>
             </tr></thead>
-            <tbody className="divide-y divide-gray-50">
-              {dados === null ? <tr><td colSpan={9} className="px-3 py-8 text-center text-torg-gray"><Loader2 size={16} className="animate-spin inline" /></td></tr>
-                : itens.length === 0 ? <tr><td colSpan={9} className="px-3 py-8 text-center text-torg-gray">Nenhum lançamento em {ano}.</td></tr>
-                : itens.map((it) => (
-                  <tr key={it.id} className="hover:bg-gray-50/50">
-                    <td className="px-3 py-1.5 font-mono text-torg-blue">{it.importRef}</td>
-                    <td className="px-3 py-1.5 max-w-[300px] truncate" title={it.nome}>{it.nome}</td>
-                    <td className="px-3 py-1.5 text-torg-gray">{it.numeroCorrida || "—"}</td>
-                    <td className="px-3 py-1.5">{it.fornecedor || "—"}</td>
-                    <td className="px-3 py-1.5 font-mono">{it.opNumero || "—"}</td>
-                    <td className="px-3 py-1.5 text-torg-gray">{fmtData(it.dataRecebimento)}</td>
-                    <td className="px-3 py-1.5">{it.nfNumero || "—"}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">{fmtNum(it.quantidade)}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">{fmtNum(it.pesoKg)}</td>
-                  </tr>
-                ))}
+            <tbody className="divide-y divide-gray-100">
+              {dados === null ? <tr><td colSpan={14} className="px-3 py-8 text-center text-torg-gray"><Loader2 size={16} className="animate-spin inline" /></td></tr>
+                : itens.length === 0 ? <tr><td colSpan={14} className="px-3 py-8 text-center text-torg-gray">Nenhum lançamento em {ano}.</td></tr>
+                : itens.map((it) => {
+                  const { rc, obs } = parseObs(it.observacao);
+                  const temCert = !!(it.numeroDocumento && String(it.numeroDocumento).trim());
+                  return (
+                    <tr key={it.id} className={temCert ? "bg-yellow-50 hover:bg-yellow-100/70" : "bg-red-50 hover:bg-red-100/60"}>
+                      <td className="px-2.5 py-1.5 font-mono font-semibold">{rc || "—"}</td>
+                      <td className="px-2.5 py-1.5 font-mono text-torg-blue">{it.importRef}</td>
+                      <td className="px-2.5 py-1.5 max-w-[320px] truncate" title={it.nome}>{it.nome}</td>
+                      <td className="px-2.5 py-1.5">{temCert ? it.numeroDocumento : <span className="text-red-600 font-medium">falta</span>}</td>
+                      <td className="px-2.5 py-1.5 text-torg-gray">{it.numeroCorrida || "—"}</td>
+                      <td className="px-2.5 py-1.5">{it.norma || "—"}</td>
+                      <td className="px-2.5 py-1.5">{it.pedidoCompra || "—"}</td>
+                      <td className="px-2.5 py-1.5 text-torg-gray">{fmtData(it.dataRecebimento)}</td>
+                      <td className="px-2.5 py-1.5">{it.nfNumero || "—"}</td>
+                      <td className="px-2.5 py-1.5">{it.fornecedor || "—"}</td>
+                      <td className="px-2.5 py-1.5 font-mono">{it.opNumero || "—"}</td>
+                      <td className="px-2.5 py-1.5 text-right tabular-nums">{fmtNum(it.quantidade)}</td>
+                      <td className="px-2.5 py-1.5 text-right tabular-nums">{fmtNum(it.pesoKg)}</td>
+                      <td className="px-2.5 py-1.5 max-w-[200px] truncate text-torg-gray" title={obs}>{obs || "—"}</td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>
