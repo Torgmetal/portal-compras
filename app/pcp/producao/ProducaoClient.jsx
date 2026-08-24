@@ -40,6 +40,12 @@ const PROG = {
   NAO_LANCADA: { txt: "não lançada", cls: "bg-red-50 text-red-700 border-red-200", dica: "O programador ainda NÃO lançou esta peça no Syneco." },
 };
 
+// Nome do setor como a fábrica chama. Mesma tabela do FLUXO_SETORES do servidor.
+const SETOR_LABEL = {
+  CORTE: "Preparação", MONTAGEM: "Montagem", SOLDA: "Solda",
+  ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura", EXPEDICAO: "Expedição",
+};
+
 const ALERTA = {
   SEM_LISTA: { txt: "sem lista", cls: "bg-red-50 text-red-700 border-red-200", dica: "Nenhuma peça importada (nem LPC nem LE) — não há o que programar." },
   PRODUZINDO_SEM_LISTA: { txt: "produzindo sem lista", cls: "bg-red-50 text-red-700 border-red-200", dica: "A fábrica já apontou produção e o portal não tem o detalhamento." },
@@ -327,23 +333,28 @@ export default function ProducaoClient() {
                           </button>
                         </div>
 
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-[12px]">
+                        {/* ⚠⚠ `table-fixed` COM LARGURA EM %, e não `overflow-x-auto`.
+                            Vitor (24/08/2026): "precisamos que você deixe a tela completa sem haver a
+                            necessidade de ficarmos andando para o lado". Rolagem lateral numa tabela
+                            de trabalho esconde justamente as colunas da direita — material e liberado —,
+                            que são as que dizem se a peça pode descer. Com largura automática, um perfil
+                            comprido ("TBØ42.40X2.65 - INDUSTRIAL") empurrava tudo; fixa, ele corta e o
+                            resto fica no lugar. O nome inteiro segue na dica. */}
+                        <table className="w-full table-fixed text-[12px]">
                             <thead className="bg-gray-50 text-torg-gray">
                               <tr>
-                                <th className="px-2 py-2 w-8">
+                                <th className="px-2 py-2 w-9">
                                   <input type="checkbox" checked={pecas.length > 0 && pecas.every((p) => sel.has(p.id))}
                                     onChange={() => marcarTodas(pecas)} className="accent-torg-orange" />
                                 </th>
-                                <th className="px-2 py-2 text-left font-bold">Marca</th>
-                                <th className="px-2 py-2 text-left font-bold">Descrição</th>
-                                <th className="px-2 py-2 text-right font-bold">Qtd</th>
-                                <th className="px-2 py-2 text-right font-bold">Peso</th>
-                                <th className="px-2 py-2 text-left font-bold">Programação</th>
-                                <th className="px-2 py-2 text-left font-bold">Onde está</th>
-                                <th className="px-2 py-2 text-left font-bold">Material</th>
-                                <th className="px-2 py-2 text-left font-bold">Liberado</th>
-                                <th className="px-2 py-2 w-8" />
+                                <th className="px-2 py-2 text-left font-bold w-[17%]">Marca</th>
+                                <th className="px-2 py-2 text-left font-bold w-[17%]">Perfil</th>
+                                <th className="px-2 py-2 text-right font-bold w-[7%]">Qtd</th>
+                                <th className="px-2 py-2 text-right font-bold w-[10%]">Peso</th>
+                                <th className="px-2 py-2 text-left font-bold w-[14%]">Programação</th>
+                                <th className="px-2 py-2 text-left font-bold w-[13%]">Onde está</th>
+                                <th className="px-2 py-2 text-left font-bold w-[11%]">Material</th>
+                                <th className="px-2 py-2 text-left font-bold w-[11%]">Liberado</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
@@ -354,21 +365,32 @@ export default function ProducaoClient() {
                                     <td className="px-2 py-1.5">
                                       <input type="checkbox" checked={sel.has(p.id)} onChange={() => alternar(p.id)} className="accent-torg-orange" />
                                     </td>
-                                    <td className="px-2 py-1.5 font-semibold text-torg-dark whitespace-nowrap">{p.marca}</td>
-                                    <td className="px-2 py-1.5 text-torg-gray max-w-[22ch] truncate" title={p.descricao || ""}>{p.descricao || "—"}</td>
+                                    {/* ⚠ a marca É o link do desenho — uma coluna a menos e o alvo de clique
+                                        é o que a pessoa já procura com o olho. */}
+                                    <td className="px-2 py-1.5 truncate">
+                                      <button onClick={() => setDesenho({ opNumero: detalhe.opNumero, marca: p.marca })}
+                                        title={`Ver o desenho de ${p.marca}`}
+                                        className="font-semibold text-torg-dark hover:text-torg-blue hover:underline inline-flex items-center gap-1 max-w-full">
+                                        <FileText size={11} className="text-torg-gray-light shrink-0" />
+                                        <span className="truncate">{p.marca}</span>
+                                      </button>
+                                    </td>
+                                    <td className="px-2 py-1.5 text-torg-gray truncate" title={p.descricao || ""}>{p.descricao || "—"}</td>
                                     <td className="px-2 py-1.5 text-right tabular-nums">{fmtN(p.qte)}</td>
                                     <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtKg(p.pesoTotalKg)}</td>
-                                    <td className="px-2 py-1.5">
+                                    <td className="px-2 py-1.5 truncate">
                                       <span title={prog.dica} className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold whitespace-nowrap ${prog.cls}`}>{prog.txt}</span>
                                     </td>
-                                    {/* ⚠ ONDE ESTÁ ≠ STATUS. O status da peça só é confiável até o corte; o setor
-                                        real vem do apontamento do Syneco. Ver lib/prioridades-setor.js. */}
-                                    <td className="px-2 py-1.5 text-torg-gray whitespace-nowrap">
+                                    {/* ⚠ ONDE ESTÁ = setor mais adiantado COM APONTAMENTO. Não é o status da
+                                        peça (só confiável até o corte) nem a rota dela. A rota — os setores
+                                        por onde vai passar — fica na dica, que é onde ela ajuda. */}
+                                    <td className="px-2 py-1.5 text-torg-gray truncate"
+                                      title={p.programacao?.setores?.length ? `Rota no Syneco: ${p.programacao.setores.join(" · ")}` : "Sem ordem no Syneco."}>
                                       {p.expedida ? <span className="text-emerald-700 font-semibold">expedida</span>
-                                        : p.programacao?.setores?.length ? p.programacao.setores.join(" · ")
-                                        : <span className="text-torg-gray-light">—</span>}
+                                        : p.setorReal ? SETOR_LABEL[p.setorReal] || p.setorReal
+                                        : <span className="text-torg-gray-light" title="Nenhum apontamento no Syneco: ainda não passou por setor nenhum.">não começou</span>}
                                     </td>
-                                    <td className="px-2 py-1.5 whitespace-nowrap">
+                                    <td className="px-2 py-1.5 truncate">
                                       {p.material?.recebido ? (
                                         <span title={`Recebido em ${fmtDH(p.material.dataRecebimento)}${p.material.nf ? ` · NF ${p.material.nf}` : ""}${p.material.corrida ? ` · corrida ${p.material.corrida}` : ""}`}
                                           className="text-[10px] px-1.5 py-0.5 rounded border font-semibold bg-emerald-50 text-emerald-700 border-emerald-200 inline-flex items-center gap-1">
@@ -380,7 +402,7 @@ export default function ProducaoClient() {
                                         </span>
                                       ) : <span className="text-torg-gray-light">—</span>}
                                     </td>
-                                    <td className="px-2 py-1.5 whitespace-nowrap">
+                                    <td className="px-2 py-1.5 truncate">
                                       {p.grd ? (
                                         <span title={`GRD impressa por ${p.grd.por || "—"}${p.grd.impressoes > 1 ? ` · ${p.grd.impressoes} impressões` : ""}`}
                                           className="text-[10px] text-emerald-700 font-semibold inline-flex items-center gap-1">
@@ -388,21 +410,14 @@ export default function ProducaoClient() {
                                         </span>
                                       ) : <span className="text-torg-gray-light">—</span>}
                                     </td>
-                                    <td className="px-2 py-1.5">
-                                      <button onClick={() => setDesenho({ opNumero: detalhe.opNumero, marca: p.marca })}
-                                        title="Ver o desenho desta peça" className="text-torg-gray hover:text-torg-blue">
-                                        <FileText size={13} />
-                                      </button>
-                                    </td>
                                   </tr>
                                 );
                               })}
                               {!pecas.length && (
-                                <tr><td colSpan={10} className="px-3 py-8 text-center text-torg-gray">Nenhuma peça pendente neste setor.</td></tr>
+                                <tr><td colSpan={9} className="px-3 py-8 text-center text-torg-gray">Nenhuma peça pendente neste setor.</td></tr>
                               )}
                             </tbody>
-                          </table>
-                        </div>
+                        </table>
                       </>
                     )}
                   </div>

@@ -343,6 +343,15 @@ export async function GET(req) {
     const tr = travaPorCroqui.get(p.marca);
     return { ...p, material: mat, programacao: programacaoDe(p.marca, p.qte), expedida,
       grd: grdPorMarca.get(String(p.marca || "").toUpperCase()) || null,
+      // ⚠⚠ ONDE A PEÇA ESTÁ ≠ POR ONDE ELA PASSA.
+      // `programacao.setores` é a ROTA: todos os setores que têm ordem no Syneco para aquela marca.
+      // Serve para saber o caminho, não o lugar. A tela nova do PCP saiu mostrando essa rota numa
+      // coluna chamada "Onde está" e o resultado era "Preparação · Corte" alternando com "Corte ·
+      // Preparação" — a ordem de um Set, que não quer dizer nada.
+      // O lugar é o `realMapOp`: o setor MAIS ADIANTADO com apontamento (`produzidoUn > 0`). Já era
+      // calculado aqui para não deixar peça adiantada aparecer na fila de um setor atrás; só não
+      // estava saindo na listagem.
+      setorReal: realMapOp.get(p.marca) || null,
       travaConjuntos: tr ? tr.conjuntos.length : 0, travaMarcas: tr ? tr.conjuntos.slice(0, 12) : null, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
   });
 
