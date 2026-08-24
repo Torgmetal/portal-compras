@@ -18,7 +18,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, Printer, Search,
-  Factory, Monitor, CalendarClock, Package, CheckCircle2, AlertTriangle, FileText,
+  Factory, Monitor, CalendarClock, Package, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import CompraChip from "@/components/CompraChip";
@@ -46,6 +46,17 @@ const SETOR_LABEL = {
   ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura", EXPEDICAO: "Expedição",
 };
 
+// ⚠ "Não iniciadas" é a UNIÃO das duas primeiras — é a pergunta que o Vitor faz ("o que não
+// iniciou"), e as parcelas continuam separadas porque a ação é diferente: uma se cobra do
+// programador, a outra se desce para a fábrica.
+const FILTROS = [
+  { key: "TODAS", label: "Todas" },
+  { key: "NAO_INICIADAS", label: "Não iniciadas" },
+  { key: "NAO_LANCADA", label: "Não lançadas" },
+  { key: "PROGRAMADA", label: "Programadas" },
+  { key: "INICIADA", label: "Iniciadas" },
+];
+
 const ALERTA = {
   SEM_LISTA: { txt: "sem lista", cls: "bg-red-50 text-red-700 border-red-200", dica: "Nenhuma peça importada (nem LPC nem LE) — não há o que programar." },
   PRODUZINDO_SEM_LISTA: { txt: "produzindo sem lista", cls: "bg-red-50 text-red-700 border-red-200", dica: "A fábrica já apontou produção e o portal não tem o detalhamento." },
@@ -71,6 +82,12 @@ export default function ProducaoClient() {
   const [aviso, setAviso] = useState(null);
   const [desenho, setDesenho] = useState(null);
   const [filtroPecas, setFiltroPecas] = useState("");
+  // ⚠ Vitor (24/08/2026): "preciso ter o filtro para selecionar o que não iniciou". "Não iniciou"
+  // é união de duas situações — a que o programador nem lançou e a que ele lançou e a fábrica não
+  // pegou. As duas separadas também servem, porque a ação é diferente: uma se cobra do programador,
+  // a outra se desce para a fábrica.
+  const [filtroProg, setFiltroProg] = useState("TODAS");
+  const [baixando, setBaixando] = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
@@ -101,12 +118,12 @@ export default function ProducaoClient() {
     // ⚠ abre no setor que o filtro já escolheu; sem filtro, no primeiro que tem fila — é onde a
     // obra está parada, e é a pergunta que o PCP faz ao clicar.
     const setor = setorFiltro || op.setores.find((s) => s.pendenteKg > 0)?.setor || op.setores[0]?.setor || "";
-    setAberta(op.opId); setSetorAba(setor); setDetalhe(null); setFiltroPecas("");
+    setAberta(op.opId); setSetorAba(setor); setDetalhe(null); setFiltroPecas(""); setFiltroProg("TODAS");
     carregarDetalhe(op.opId, setor);
   }
 
   function trocarSetor(op, setor) {
-    setSetorAba(setor); setDetalhe(null); setFiltroPecas("");
+    setSetorAba(setor); setDetalhe(null); setFiltroPecas(""); setFiltroProg("TODAS");
     carregarDetalhe(op.opId, setor);
   }
 
@@ -128,11 +145,30 @@ export default function ProducaoClient() {
 
   // ── peças da OP aberta, já filtradas ──
   const pecas = useMemo(() => {
-    const base = detalhe?.pecas || [];
+    let base = detalhe?.pecas || [];
+    if (filtroProg !== "TODAS") {
+      base = base.filter((p) => {
+        const sit = p.programacao?.situacao || "NAO_LANCADA";
+        if (filtroProg === "NAO_INICIADAS") return sit !== "INICIADA";
+        return sit === filtroProg;
+      });
+    }
     const q = filtroPecas.trim().toLowerCase();
     if (!q) return base;
     return base.filter((p) => [p.marca, p.descricao, p.perfil].some((x) => String(x || "").toLowerCase().includes(q)));
-  }, [detalhe, filtroPecas]);
+  }, [detalhe, filtroPecas, filtroProg]);
+
+  // Contadores do filtro — o número ao lado do rótulo evita clicar para descobrir que está vazio.
+  const contas = useMemo(() => {
+    const t = { TODAS: 0, NAO_INICIADAS: 0, NAO_LANCADA: 0, PROGRAMADA: 0, INICIADA: 0 };
+    for (const p of detalhe?.pecas || []) {
+      const sit = p.programacao?.situacao || "NAO_LANCADA";
+      t.TODAS++;
+      if (sit !== "INICIADA") t.NAO_INICIADAS++;
+      if (t[sit] != null) t[sit]++;
+    }
+    return t;
+  }, [detalhe]);
 
   const marcasSel = useMemo(() => [...new Set(pecas.filter((p) => sel.has(p.id)).map((p) => p.marca))], [pecas, sel]);
 
@@ -177,6 +213,79 @@ export default function ProducaoClient() {
       carregar();
     } catch (e) { setAviso({ ok: false, texto: e.message }); }
     finally { setImprimindo(false); }
+  }
+
+  // ── BAIXA MANUAL ───────────────────────────────────────────────────────────────────────────
+  // Vitor (24/08/2026): "ser possível de extrair uma planilha e de dar baixa manual".
+  //
+  // ⚠ A BAIXA É SÓ DO PORTAL — não escreve no Syneco. Serve para o setor que produziu e não
+  // apontou, para o portal parar de cobrar o que já está feito. Por isso peça que JÁ TEM
+  // apontamento no Syneco é recusada: baixar por cima criaria duas verdades para a mesma peça.
+  async function darBaixa() {
+    const alvo = pecas.filter((p) => sel.has(p.id));
+    if (!alvo.length || !setorAba) return;
+    const jaNoSyneco = alvo.filter((p) => (p.produzidoSyneco || 0) > 0);
+    const baixaveis = alvo.filter((p) => !((p.produzidoSyneco || 0) > 0));
+    if (!baixaveis.length) {
+      setAviso({ ok: false, texto: "Essas peças já têm apontamento no Syneco — não precisa dar baixa pelo portal." });
+      return;
+    }
+    const nome = SETOR_LABEL[setorAba] || setorAba;
+    const extra = jaNoSyneco.length ? `\n\n${jaNoSyneco.length} já tem apontamento no Syneco e vai ser ignorada.` : "";
+    if (!confirm(`Dar baixa em ${baixaveis.length} peça(s) na ${nome}?${extra}\n\nA baixa é do portal: não escreve no Syneco.`)) return;
+    setBaixando(true); setAviso(null);
+    try {
+      const r = await fetch("/api/pcp/despacho", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baixaSetor: setorAba, baixas: baixaveis.map((p) => ({ id: p.id, qtd: p.qte || 1 })) }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao dar baixa");
+      setAviso({ ok: true, texto: `Baixa em ${j.atualizados} peça(s) na ${nome}.` + (jaNoSyneco.length ? ` ${jaNoSyneco.length} ignorada(s) por já estarem no Syneco.` : "") });
+      setSel(new Set());
+      await carregarDetalhe(aberta, setorAba);
+      carregar();
+    } catch (e) { setAviso({ ok: false, texto: e.message }); }
+    finally { setBaixando(false); }
+  }
+
+  // ⚠ Excel no PADRÃO DAS PLANILHAS (lib/excel-relatorio.js): cabeçalho ISO 9001 com logo. Import
+  // dinâmico porque o exceljs é pesado e só quem clica precisa dele.
+  async function exportar() {
+    if (!detalhe) return;
+    const lista = pecas;
+    if (!lista.length) return setAviso({ ok: false, texto: "Nada para exportar com este filtro." });
+    const op = ops.find((o) => o.opId === aberta);
+    const nomeSetor = SETOR_LABEL[setorAba] || setorAba || "Geral";
+    const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } =
+      await import("@/lib/excel-relatorio");
+    const headers = ["Marca", "Perfil", "Qtd", "Peso (kg)", "Programação", "Onde está", "Material (R)", "NF", "Corrida", "Liberado em", "Liberado por"];
+    const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+      titulo: `Produção — ${fmtOP(detalhe.opNumero)} · ${nomeSetor}`,
+      subtitulo: `${op?.cliente || ""}${op?.obra ? ` — ${op.obra}` : ""} · ${lista.length} peça(s)${filtroProg !== "TODAS" ? ` · filtro: ${FILTROS.find((f) => f.key === filtroProg)?.label || filtroProg}` : ""}`,
+      kpis: [
+        `${lista.filter((p) => p.programacao?.situacao === "NAO_LANCADA").length} não lançada(s)`,
+        `${lista.filter((p) => p.programacao?.situacao === "PROGRAMADA").length} programada(s)`,
+        `${lista.filter((p) => p.grd).length} liberada(s)`,
+      ],
+      totalColunas: headers.length, nomePlanilha: "Produção", codigoDoc: "REL-PCP-001",
+    });
+    ws.columns = [{ width: 18 }, { width: 22 }, { width: 8 }, { width: 12 }, { width: 15 }, { width: 16 }, { width: 14 }, { width: 12 }, { width: 16 }, { width: 14 }, { width: 22 }];
+    let linha = adicionarHeaderTabela(ws, linhaInicio, headers);
+    for (const p of lista) {
+      linha = adicionarLinhaTabela(ws, linha, [
+        p.marca, p.descricao || "", Number(p.qte) || 0, Number(p.pesoTotalKg) || 0,
+        PROG[p.programacao?.situacao]?.txt || "—",
+        p.expedida ? "expedida"
+          : p.montadoEm ? (p.montadoEm.montados >= p.montadoEm.total ? "montado" : `montado ${p.montadoEm.montados}/${p.montadoEm.total}`)
+          : p.setorReal ? SETOR_LABEL[p.setorReal] || p.setorReal : "não começou",
+        p.material?.rastreio || (p.material?.recebido ? "recebido" : ""),
+        p.material?.nf || "", p.material?.corrida || "",
+        p.grd ? fmtDH(p.grd.em) : "", p.grd?.por || "",
+      ]);
+    }
+    adicionarLinhaTotais(ws, linha, ["TOTAL", "", lista.reduce((a, p) => a + (Number(p.qte) || 0), 0), lista.reduce((a, p) => a + (Number(p.pesoTotalKg) || 0), 0), "", "", "", "", "", "", ""]);
+    await downloadWorkbook(workbook, `Producao ${fmtOP(detalhe.opNumero)} - ${nomeSetor}.xlsx`);
   }
 
   return (
@@ -317,20 +426,43 @@ export default function ProducaoClient() {
                       <div className="px-4 py-8 text-sm text-torg-gray">Não consegui abrir as peças desta OP.</div>
                     ) : (
                       <>
-                        <div className="flex items-center gap-2 px-3 py-2.5 flex-wrap border-b border-gray-100">
-                          <input value={filtroPecas} onChange={(e) => setFiltroPecas(e.target.value)} placeholder="filtrar marca, descrição ou perfil"
-                            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 w-56 focus:border-torg-blue" />
-                          <span className="text-[11px] text-torg-gray">{fmtN(pecas.length)} peça(s)</span>
-                          <span className="flex-1" />
-                          {marcasSel.length > 0 && (
-                            <span className="text-[11px] text-torg-blue font-semibold">{marcasSel.length} marca(s) selecionada(s)</span>
-                          )}
-                          <button onClick={imprimirELiberar} disabled={!marcasSel.length || imprimindo}
-                            title={marcasSel.length ? `Imprime o desenho carimbado e registra a GRD de ${marcasSel.length} marca(s)` : "Selecione as peças"}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-torg-orange text-white hover:opacity-90 disabled:opacity-40">
-                            {imprimindo ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />}
-                            Imprimir e liberar
-                          </button>
+                        <div className="px-3 py-2.5 border-b border-gray-100 space-y-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {FILTROS.map((f) => (
+                              <button key={f.key} onClick={() => setFiltroProg(f.key)}
+                                className={`text-[11px] px-2 py-1 rounded-lg border font-semibold ${filtroProg === f.key ? "bg-torg-blue text-white border-torg-blue" : "border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
+                                {f.label} <span className="font-normal opacity-75 tabular-nums">{fmtN(contas[f.key])}</span>
+                              </button>
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <input value={filtroPecas} onChange={(e) => setFiltroPecas(e.target.value)} placeholder="filtrar marca, perfil…"
+                              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 w-44 focus:border-torg-blue" />
+                            <span className="text-[11px] text-torg-gray">{fmtN(pecas.length)} peça(s)</span>
+                            {marcasSel.length > 0 && (
+                              <span className="text-[11px] text-torg-blue font-semibold">· {marcasSel.length} selecionada(s)</span>
+                            )}
+                            <span className="flex-1" />
+                            <button onClick={exportar} disabled={!pecas.length}
+                              title="Baixa a lista filtrada em Excel, no padrão das planilhas da Torg"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-torg-gray hover:bg-gray-50 disabled:opacity-40">
+                              <FileSpreadsheet size={13} /> Planilha
+                            </button>
+                            {/* ⚠ a baixa é do PORTAL, não do Syneco — o rótulo diz o setor para ninguém
+                                baixar na aba errada achando que baixou na fábrica inteira. */}
+                            <button onClick={darBaixa} disabled={!sel.size || baixando || !setorAba}
+                              title={sel.size ? `Marca como feita na ${SETOR_LABEL[setorAba] || setorAba} — registro do portal, não escreve no Syneco` : "Selecione as peças"}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-40">
+                              {baixando ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                              Baixa manual{setorAba ? ` · ${SETOR_LABEL[setorAba] || setorAba}` : ""}
+                            </button>
+                            <button onClick={imprimirELiberar} disabled={!marcasSel.length || imprimindo}
+                              title={marcasSel.length ? `Imprime o desenho carimbado e registra a GRD de ${marcasSel.length} marca(s)` : "Selecione as peças"}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-torg-orange text-white hover:opacity-90 disabled:opacity-40">
+                              {imprimindo ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />}
+                              Imprimir e liberar
+                            </button>
+                          </div>
                         </div>
 
                         {/* ⚠⚠ `table-fixed` COM LARGURA EM %, e não `overflow-x-auto`.
@@ -354,7 +486,10 @@ export default function ProducaoClient() {
                                 <th className="px-2 py-2 text-left font-bold w-[14%]">Programação</th>
                                 <th className="px-2 py-2 text-left font-bold w-[13%]">Onde está</th>
                                 <th className="px-2 py-2 text-left font-bold w-[11%]">Material</th>
-                                <th className="px-2 py-2 text-left font-bold w-[11%]">Liberado</th>
+                                <th className="px-2 py-2 text-left font-bold w-[11%]"
+                                  title="Data em que o desenho foi impresso pelo portal e a GRD registrada — é o que prova que a peça desceu para a fábrica.">
+                                  Liberado (GRD)
+                                </th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
@@ -387,6 +522,17 @@ export default function ProducaoClient() {
                                     <td className="px-2 py-1.5 text-torg-gray truncate"
                                       title={p.programacao?.setores?.length ? `Rota no Syneco: ${p.programacao.setores.join(" · ")}` : "Sem ordem no Syneco."}>
                                       {p.expedida ? <span className="text-emerald-700 font-semibold">expedida</span>
+                                        /* ⚠ MONTADO ganha do setor: a peça solta deixou de existir quando
+                                           entrou no conjunto, e dizer "Preparação" mandaria alguém
+                                           procurar na fábrica o que já virou outra coisa. */
+                                        : p.montadoEm ? (
+                                          <span className={p.montadoEm.montados >= p.montadoEm.total ? "text-indigo-700 font-semibold" : "text-indigo-600"}
+                                            title={`Entrou em ${p.montadoEm.montados} de ${p.montadoEm.total} conjunto(s) que usam esta peça: ${p.montadoEm.conjuntos.slice(0, 12).join(", ")}${p.montadoEm.conjuntos.length > 12 ? "…" : ""}`}>
+                                            {p.montadoEm.montados >= p.montadoEm.total
+                                              ? "montado"
+                                              : `montado ${p.montadoEm.montados}/${p.montadoEm.total}`}
+                                          </span>
+                                        )
                                         : p.setorReal ? SETOR_LABEL[p.setorReal] || p.setorReal
                                         : <span className="text-torg-gray-light" title="Nenhum apontamento no Syneco: ainda não passou por setor nenhum.">não começou</span>}
                                     </td>

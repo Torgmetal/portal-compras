@@ -294,6 +294,45 @@ export async function GET(req) {
     for (const x of ri) if (x.pecaConjunto?.marca) expedidaPorRomaneio.add(x.pecaConjunto.marca);
   } catch {}
 
+  // ── O CROQUI JÁ VIROU CONJUNTO? ────────────────────────────────────────────────────────────
+  // Vitor (24/08/2026): "as que já foram para a montagem e já foram apontadas em alguma peça
+  // consegue colocar como montado?".
+  //
+  // ⚠ A peça solta deixa de existir quando entra no conjunto. Enquanto a coluna só dizia o setor,
+  // um croqui já soldado dentro de um guarda-corpo aparecia como se ainda estivesse por aí — e o
+  // PCP ficava procurando na fábrica uma peça que virou outra coisa.
+  //
+  // ⚠ MONTADO É PROPRIEDADE DO CONJUNTO, LIDA DO LADO DO CROQUI. O mesmo critério que o Corte já
+  // usava para saber que um conjunto não trava mais: apontamento no Syneco em Montagem ou adiante,
+  // baixa de Montagem no portal, ou peça expedida.
+  let montadoPorCroqui = new Map();
+  try {
+    const links = await prisma.conjuntoCroqui.findMany({
+      where: { conjunto: { opId } },
+      select: { conjunto: { select: { marca: true, status: true, baixaSetores: true } }, croqui: { select: { marca: true } } },
+    });
+    const conjMontado = (c) => {
+      const real = realMapOp.get(c.marca);
+      if (real && (IDX_SETOR[real] ?? -1) >= IDX_SETOR.MONTAGEM) return true;
+      const bx = c.baixaSetores && typeof c.baixaSetores === "object" ? c.baixaSetores : {};
+      return !!bx.MONTAGEM || c.status === "EXPEDIDO";
+    };
+    // ⚠⚠ MONTADO EM PARTE NÃO É MONTADO. O mesmo croqui entra em vários conjuntos — na OP-067 o
+    // T67BT-P1 é usado em 30 e já foi para 22. Marcar só "montado" faria o PCP parar de cortar uma
+    // peça que os outros 8 conjuntos ainda esperam. Por isso conta os DOIS lados: quantos conjuntos
+    // usam o croqui e em quantos ele já entrou.
+    for (const lk of links) {
+      const g = montadoPorCroqui.get(lk.croqui.marca) || { conjuntos: [], total: new Set() };
+      g.total.add(lk.conjunto.marca);
+      if (conjMontado(lk.conjunto) && !g.conjuntos.includes(lk.conjunto.marca)) g.conjuntos.push(lk.conjunto.marca);
+      montadoPorCroqui.set(lk.croqui.marca, g);
+    }
+    for (const [k, g] of montadoPorCroqui) {
+      if (!g.conjuntos.length) { montadoPorCroqui.delete(k); continue; } // nenhum montado: nada a dizer
+      montadoPorCroqui.set(k, { conjuntos: g.conjuntos, montados: g.conjuntos.length, total: g.total.size });
+    }
+  } catch { /* sem estrutura de conjunto a peça segue avulsa — informação a menos, não erro */ }
+
   // ── JÁ FOI LIBERADO PARA A FÁBRICA? ────────────────────────────────────────────────────────
   // Vitor (24/08/2026): liberar É imprimir a GRD. Então "liberado" não é campo novo — é a GRD
   // daquela marca, que já guarda quem emitiu, quando e quantas impressões. Sem isto na listagem, o
@@ -352,6 +391,7 @@ export async function GET(req) {
       // calculado aqui para não deixar peça adiantada aparecer na fila de um setor atrás; só não
       // estava saindo na listagem.
       setorReal: realMapOp.get(p.marca) || null,
+      montadoEm: montadoPorCroqui.get(p.marca) || null,
       travaConjuntos: tr ? tr.conjuntos.length : 0, travaMarcas: tr ? tr.conjuntos.slice(0, 12) : null, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
   });
 
