@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { baixarDesenho, garantirDesenhos } from "@/lib/relatorio-dimensional";
 import { usaCotas } from "@/lib/qualidade-campo";
+import { gerarPDFdoRelatorio } from "@/lib/relatorio-render";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -16,8 +17,8 @@ export async function GET(req, { params }) {
   const rel = await prisma.relatorioInspecao.findUnique({ where: { id } });
   // ⚠ idem à tela de marcação: se o relatório nasceu sem desenho (criação instantânea), resolve e
   // grava aqui. Sem isto o PDF sairia com o campo do croqui em branco.
-  if (rel && usaCotas(rel.tipo)) rel.desenhos = await garantirDesenhos(rel);
   if (!rel) return NextResponse.json({ error: "Relatório não encontrado" }, { status: 404 });
+  if (usaCotas(rel.tipo)) rel.desenhos = await garantirDesenhos(rel);
 
   const fotos = await prisma.fotoInspecao.findMany({
     where: { relatorioId: id },
