@@ -313,12 +313,33 @@ export default function ProducaoClient() {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao emitir o lote");
-      await baixarZip(j, detalhe.opNumero).catch(() => {});
+
+      // ⚠⚠ ZERO EMITIDAS NÃO É SUCESSO — e a mensagem dizia que era.
+      // Estava `j.emitidas || marcasSel.length`: com emitidas = 0 (nenhuma marca tem desenho na
+      // pasta da OP), o zero é falsy e caía no fallback, então a tela anunciava "7 desenho(s)
+      // liberado(s)" tendo liberado nenhum. Vitor (24/08/2026): "estou tentando imprimir os
+      // projetos mas não está indo" — o portal tinha dito que foi.
+      const emitidas = Number(j.emitidas) || 0;
       const semDesenho = j.semDesenho?.length || 0;
+      const faltantes = semDesenho ? ` Sem desenho na pasta da OP: ${j.semDesenho.slice(0, 8).join(", ")}${semDesenho > 8 ? ` e mais ${semDesenho - 8}` : ""}.` : "";
+      if (!emitidas) {
+        setAviso({
+          ok: false,
+          texto: `Nenhum desenho foi encontrado para as ${marcasSel.length} marca(s) selecionada(s), então nada foi impresso nem liberado.${faltantes}`
+            + " Confira se os PDFs estão em 2. Engenharia › 2.5 Projetos › 2.5.2 Fabricação, com o nome começando pela marca.",
+        });
+        return;
+      }
+
+      // ⚠ o erro do ZIP não pode mais sumir: as GRDs JÁ foram gravadas, então dizer só "liberado"
+      // sem o arquivo na mão deixa a pessoa procurando um download que não aconteceu.
+      let erroZip = null;
+      try { await baixarZip(j, detalhe.opNumero); } catch (e) { erroZip = e?.message || "falhou"; }
       setAviso({
-        ok: true,
-        texto: `${j.emitidas || marcasSel.length} desenho(s) liberado(s) e baixado(s) em pastas por impressora.`
-          + (semDesenho ? ` ${semDesenho} marca(s) sem desenho na pasta da OP: ${j.semDesenho.slice(0, 8).join(", ")}.` : ""),
+        ok: !erroZip,
+        texto: `${emitidas} desenho(s) liberado(s)`
+          + (erroZip ? `, mas o download falhou (${erroZip}). A GRD está registrada; abra os arquivos pela pasta da OP no servidor.` : " e baixado(s) em pastas por impressora.")
+          + faltantes,
       });
       setSel(new Set());
       await carregarDetalhe(aberta, setorAba); // a GRD nova aparece na coluna
