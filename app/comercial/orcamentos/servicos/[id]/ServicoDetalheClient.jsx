@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, Wrench, Plus, Trash2, Layers, DollarSign, FolderUp, FileText, Send, CheckCircle2, ClipboardList, Paperclip, ShieldCheck, Copy } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { SERVICOS, SERVICO_LABEL, STATUS_SERVICO } from "@/lib/orcamento-servico";
-import { precoHoraDoServico } from "@/lib/custo-hora-calc";
+import { precoHoraDoServico, configCustoHoraCoerente } from "@/lib/custo-hora-calc";
 import { DEFAULT_INCLUSOS, DEFAULT_EXCLUSOS } from "@/lib/proposta-textos";
 
 const os = (n) => (n ? `OS-${String(n).padStart(3, "0")}` : "—");
@@ -544,7 +544,15 @@ export default function ServicoDetalheClient({ id }) {
                   {cfPrecoSugerido > 0 ? (
                     <p className="text-[11px] text-torg-gray mt-1">Custo-hora ({cfSetorPreco.nome}): <strong className="text-torg-dark tabular-nums">{fmtBRL(cfPrecoSugerido)}/h</strong>{num(cfValorHora) !== cfPrecoSugerido && (<button type="button" onClick={() => setCfValorHora(cfPrecoSugerido)} className="ml-1.5 text-torg-blue hover:underline font-medium">usar</button>)}</p>
                   ) : (
-                    <p className="text-[11px] text-amber-600 mt-1"><Link href="/comercial/orcamentos/custo-hora" className="hover:underline">Defina o custo-hora</Link> pra puxar automático.</p>
+                    <p className="text-[11px] text-amber-600 mt-1">
+                      {/* ⚠ dois motivos diferentes para não ter preço, e a diferença importa: sem
+                          configuração o orçamentista precisa pedir que criem uma; com configuração
+                          incoerente (absenteísmo acima de 40%, ver lib/custo-hora-calc.js) o número
+                          existe e está errado — mandar "definir" faria ele achar que já está feito. */}
+                      {configCH && !configCustoHoraCoerente(configCH)
+                        ? "O custo-hora está com um absenteísmo impossível e por isso não é puxado. Peça a revisão à Diretoria e lance o valor à mão por enquanto."
+                        : <><Link href="/comercial/orcamentos/custo-hora" className="hover:underline">Defina o custo-hora</Link> pra puxar automático.</>}
+                    </p>
                   )}
                 </div>
               ) : (
