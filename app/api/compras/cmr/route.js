@@ -32,7 +32,7 @@ export async function GET(req) {
 
   const [rows, total, anosRaw] = await Promise.all([
     prisma.documentoQualidade.findMany({
-      where, orderBy: { importRef: "desc" }, take: 500,
+      where, orderBy: { importRef: "desc" }, take: 6000,
       select: {
         id: true, importRef: true, nome: true, norma: true, opNumero: true, numeroCorrida: true,
         numeroDocumento: true, fornecedor: true, pedidoCompra: true, nfNumero: true, dataRecebimento: true,

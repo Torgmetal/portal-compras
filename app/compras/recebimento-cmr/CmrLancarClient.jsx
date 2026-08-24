@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useStore } from "@/lib/store";
-import { Loader2, Plus, ClipboardPaste, Save, Trash2, Search, Check, X, PackagePlus } from "lucide-react";
+import { Loader2, Plus, ClipboardPaste, Save, Trash2, Search, Check, X, PackagePlus, Filter, ChevronDown, ArrowUp, ArrowDown } from "lucide-react";
 
 const anoAtual = new Date().getFullYear();
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -20,6 +20,26 @@ const VAZIO = { rc: "R", descricao: "", especificacao: "", certificado: "", lote
 // Ordem das colunas ao COLAR do Excel (igual à planilha CMR; o índice R é automático).
 const COLS_MASSA = ["rc", "_indice", "descricao", "certificado", "loteCorrida", "especificacao", "pedidoCompra", "dataRecebimento", "nf", "fornecedor", "obra", "qtd", "pesoLitro", "observacao"];
 
+const VAZIA = "(vazias)";
+// Colunas da tabela (filtro/ordenação estilo Excel). `get` devolve o valor de exibição.
+const COLUNAS = [
+  { key: "rc", label: "R/RC", get: (l) => l.rc },
+  { key: "importRef", label: "Índice R", get: (l) => l.importRef, num: true },
+  { key: "nome", label: "Descrição do material", get: (l) => l.nome, w: 320 },
+  { key: "cert", label: "Nº certificado", get: (l) => (l.certOk ? l.numeroDocumento : "") },
+  { key: "corrida", label: "Lote / corrida", get: (l) => l.numeroCorrida || "" },
+  { key: "norma", label: "Especificação", get: (l) => l.norma || "" },
+  { key: "pedido", label: "Pedido compra", get: (l) => l.pedidoCompra || "" },
+  { key: "data", label: "Data receb.", get: (l) => l.dataFmt },
+  { key: "nf", label: "Nº NF", get: (l) => l.nfNumero || "" },
+  { key: "fornecedor", label: "Fornecedor", get: (l) => l.fornecedor || "" },
+  { key: "obra", label: "Obra", get: (l) => l.opNumero || "" },
+  { key: "qtd", label: "Qtd pçs", get: (l) => l.quantidade ?? "", num: true, align: "right" },
+  { key: "peso", label: "Peso/litro", get: (l) => l.pesoKg ?? "", num: true, align: "right" },
+  { key: "obs", label: "Observação", get: (l) => l.obs || "", w: 200 },
+];
+const valorCol = (col, l) => { const v = col.get(l); return v == null || v === "" ? VAZIA : String(v); };
+
 export default function CmrLancarClient() {
   const { showToast } = useStore();
   const [ano, setAno] = useState(anoAtual);
@@ -32,6 +52,46 @@ export default function CmrLancarClient() {
   const [salvando, setSalvando] = useState(false);
   const [pedido, setPedido] = useState(null); // itens puxados do pedido de compra
   const [buscandoPed, setBuscandoPed] = useState(false);
+  const [filtros, setFiltros] = useState({}); // { colKey: Set(valores) }
+  const [ordenar, setOrdenar] = useState(null); // { key, dir }
+  const [filtroAberto, setFiltroAberto] = useState(null); // { key, rect }
+
+  // Normaliza cada item p/ o filtro/ordenação (rc derivado, cert, data formatada).
+  const linhas = useMemo(() => (dados?.itens || []).map((it) => {
+    const { rc: rcSalvo, obs } = parseObs(it.observacao);
+    const rc = rcSalvo || (Number(it.pesoKg) > 0 ? "R" : Number(it.quantidade) > 0 ? "RC" : "R");
+    return { ...it, rc, obs, certOk: !!(it.numeroDocumento && String(it.numeroDocumento).trim()), dataFmt: fmtData(it.dataRecebimento) };
+  }), [dados]);
+
+  const passa = useCallback((l, exceto) => {
+    for (const col of COLUNAS) {
+      if (col.key === exceto) continue;
+      const sel = filtros[col.key];
+      if (sel && !sel.has(valorCol(col, l))) return false;
+    }
+    return true;
+  }, [filtros]);
+
+  const visiveis = useMemo(() => {
+    let arr = linhas.filter((l) => passa(l, null));
+    if (ordenar) {
+      const col = COLUNAS.find((c) => c.key === ordenar.key);
+      arr = [...arr].sort((a, b) => {
+        let x = col.get(a), y = col.get(b);
+        if (col.num) { x = Number(x) || 0; y = Number(y) || 0; return ordenar.dir === "asc" ? x - y : y - x; }
+        x = String(x || ""); y = String(y || "");
+        return ordenar.dir === "asc" ? x.localeCompare(y, "pt-BR") : y.localeCompare(x, "pt-BR");
+      });
+    }
+    return arr;
+  }, [linhas, passa, ordenar]);
+
+  const distintos = useCallback((colKey) => {
+    const col = COLUNAS.find((c) => c.key === colKey);
+    const set = new Set();
+    for (const l of linhas) if (passa(l, colKey)) set.add(valorCol(col, l));
+    return [...set].sort((a, b) => (col.num ? (Number(a) || 0) - (Number(b) || 0) : String(a).localeCompare(String(b), "pt-BR")));
+  }, [linhas, passa]);
 
   const carregar = useCallback(async () => {
     const p = new URLSearchParams({ ano: String(ano) });
@@ -232,61 +292,121 @@ export default function CmrLancarClient() {
             <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar descrição, fornecedor, OP, NF…" className="w-64 pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm" />
           </div>
         </div>
-        {/* Legenda das cores */}
-        <div className="px-4 py-1.5 flex items-center gap-4 text-[11px] text-torg-gray border-b border-gray-50">
+        {/* Legenda + filtros ativos */}
+        <div className="px-4 py-1.5 flex items-center gap-4 text-[11px] text-torg-gray border-b border-gray-50 flex-wrap">
           <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-yellow-200 border border-yellow-300" /> com certificado</span>
           <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-100 border border-red-300" /> falta certificado</span>
+          {(Object.keys(filtros).length > 0 || ordenar) && (
+            <button onClick={() => { setFiltros({}); setOrdenar(null); }} className="ml-auto text-torg-blue hover:underline inline-flex items-center gap-1"><X size={12} /> Limpar filtros ({visiveis.length} de {linhas.length})</button>
+          )}
         </div>
         <div className="overflow-x-auto">
           <table className="text-[12px] whitespace-nowrap" style={{ minWidth: 1500 }}>
             <thead className="bg-gray-100"><tr className="text-[10px] text-gray-600 uppercase">
-              <th className="px-2.5 py-2 text-left">R/RC</th>
-              <th className="px-2.5 py-2 text-left">Índice R</th>
-              <th className="px-2.5 py-2 text-left">Descrição do material</th>
-              <th className="px-2.5 py-2 text-left">Nº certificado</th>
-              <th className="px-2.5 py-2 text-left">Lote / corrida</th>
-              <th className="px-2.5 py-2 text-left">Especificação</th>
-              <th className="px-2.5 py-2 text-left">Pedido compra</th>
-              <th className="px-2.5 py-2 text-left">Data receb.</th>
-              <th className="px-2.5 py-2 text-left">Nº NF</th>
-              <th className="px-2.5 py-2 text-left">Fornecedor</th>
-              <th className="px-2.5 py-2 text-left">Obra</th>
-              <th className="px-2.5 py-2 text-right">Qtd pçs</th>
-              <th className="px-2.5 py-2 text-right">Peso/litro</th>
-              <th className="px-2.5 py-2 text-left">Observação</th>
+              {COLUNAS.map((col) => {
+                const ativo = !!filtros[col.key];
+                const ord = ordenar?.key === col.key ? ordenar.dir : null;
+                return (
+                  <th key={col.key} className={`px-2.5 py-2 ${col.align === "right" ? "text-right" : "text-left"}`}>
+                    <button onClick={(e) => setFiltroAberto({ key: col.key, rect: e.currentTarget.getBoundingClientRect() })}
+                      className={`inline-flex items-center gap-1 hover:text-torg-blue ${ativo || ord ? "text-torg-blue" : ""}`}>
+                      {col.label}
+                      {ord === "asc" ? <ArrowUp size={11} /> : ord === "desc" ? <ArrowDown size={11} /> : null}
+                      <Filter size={11} className={ativo ? "fill-torg-blue" : "opacity-40"} />
+                    </button>
+                  </th>
+                );
+              })}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {dados === null ? <tr><td colSpan={14} className="px-3 py-8 text-center text-torg-gray"><Loader2 size={16} className="animate-spin inline" /></td></tr>
-                : itens.length === 0 ? <tr><td colSpan={14} className="px-3 py-8 text-center text-torg-gray">Nenhum lançamento em {ano}.</td></tr>
-                : itens.map((it) => {
-                  const { rc: rcSalvo, obs } = parseObs(it.observacao);
-                  // R = material por peso (aço/arame); RC = consumível por peça/litro (tinta).
-                  const rc = rcSalvo || (Number(it.pesoKg) > 0 ? "R" : Number(it.quantidade) > 0 ? "RC" : "R");
-                  const temCert = !!(it.numeroDocumento && String(it.numeroDocumento).trim());
-                  return (
-                    <tr key={it.id} className={temCert ? "bg-yellow-50 hover:bg-yellow-100/70" : "bg-red-50 hover:bg-red-100/60"}>
-                      <td className="px-2.5 py-1.5 font-mono font-semibold">{rc}</td>
-                      <td className="px-2.5 py-1.5 font-mono text-torg-blue">{it.importRef}</td>
-                      <td className="px-2.5 py-1.5 max-w-[320px] truncate" title={it.nome}>{it.nome}</td>
-                      <td className="px-2.5 py-1.5">{temCert ? it.numeroDocumento : <span className="text-red-600 font-medium">falta</span>}</td>
-                      <td className="px-2.5 py-1.5 text-torg-gray">{it.numeroCorrida || "—"}</td>
-                      <td className="px-2.5 py-1.5">{it.norma || "—"}</td>
-                      <td className="px-2.5 py-1.5">{it.pedidoCompra || "—"}</td>
-                      <td className="px-2.5 py-1.5 text-torg-gray">{fmtData(it.dataRecebimento)}</td>
-                      <td className="px-2.5 py-1.5">{it.nfNumero || "—"}</td>
-                      <td className="px-2.5 py-1.5">{it.fornecedor || "—"}</td>
-                      <td className="px-2.5 py-1.5 font-mono">{it.opNumero || "—"}</td>
-                      <td className="px-2.5 py-1.5 text-right tabular-nums">{fmtNum(it.quantidade)}</td>
-                      <td className="px-2.5 py-1.5 text-right tabular-nums">{fmtNum(it.pesoKg)}</td>
-                      <td className="px-2.5 py-1.5 max-w-[200px] truncate text-torg-gray" title={obs}>{obs || "—"}</td>
-                    </tr>
-                  );
-                })}
+                : visiveis.length === 0 ? <tr><td colSpan={14} className="px-3 py-8 text-center text-torg-gray">{linhas.length === 0 ? `Nenhum lançamento em ${ano}.` : "Nenhuma linha com os filtros atuais."}</td></tr>
+                : visiveis.map((l) => (
+                  <tr key={l.id} className={l.certOk ? "bg-yellow-50 hover:bg-yellow-100/70" : "bg-red-50 hover:bg-red-100/60"}>
+                    <td className="px-2.5 py-1.5 font-mono font-semibold">{l.rc}</td>
+                    <td className="px-2.5 py-1.5 font-mono text-torg-blue">{l.importRef}</td>
+                    <td className="px-2.5 py-1.5 max-w-[320px] truncate" title={l.nome}>{l.nome}</td>
+                    <td className="px-2.5 py-1.5">{l.certOk ? l.numeroDocumento : <span className="text-red-600 font-medium">falta</span>}</td>
+                    <td className="px-2.5 py-1.5 text-torg-gray">{l.numeroCorrida || "—"}</td>
+                    <td className="px-2.5 py-1.5">{l.norma || "—"}</td>
+                    <td className="px-2.5 py-1.5">{l.pedidoCompra || "—"}</td>
+                    <td className="px-2.5 py-1.5 text-torg-gray">{l.dataFmt}</td>
+                    <td className="px-2.5 py-1.5">{l.nfNumero || "—"}</td>
+                    <td className="px-2.5 py-1.5">{l.fornecedor || "—"}</td>
+                    <td className="px-2.5 py-1.5 font-mono">{l.opNumero || "—"}</td>
+                    <td className="px-2.5 py-1.5 text-right tabular-nums">{fmtNum(l.quantidade)}</td>
+                    <td className="px-2.5 py-1.5 text-right tabular-nums">{fmtNum(l.pesoKg)}</td>
+                    <td className="px-2.5 py-1.5 max-w-[200px] truncate text-torg-gray" title={l.obs}>{l.obs || "—"}</td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {filtroAberto && (
+        <ColunaFiltro
+          col={COLUNAS.find((c) => c.key === filtroAberto.key)}
+          rect={filtroAberto.rect}
+          valores={distintos(filtroAberto.key)}
+          selecionados={filtros[filtroAberto.key]}
+          ordenar={ordenar?.key === filtroAberto.key ? ordenar.dir : null}
+          onOrdenar={(dir) => { setOrdenar(dir ? { key: filtroAberto.key, dir } : null); setFiltroAberto(null); }}
+          onAplicar={(sel) => { setFiltros((f) => { const n = { ...f }; if (sel) n[filtroAberto.key] = sel; else delete n[filtroAberto.key]; return n; }); setFiltroAberto(null); }}
+          onClose={() => setFiltroAberto(null)}
+        />
+      )}
     </div>
+  );
+}
+
+// Popup de filtro de coluna (estilo Excel): ordenar, pesquisar, marcar/desmarcar valores.
+function ColunaFiltro({ col, rect, valores, selecionados, ordenar, onOrdenar, onAplicar, onClose }) {
+  const [q, setQ] = useState("");
+  const [sel, setSel] = useState(() => new Set(selecionados || valores)); // undefined = todos
+  const filtrados = valores.filter((v) => v.toLowerCase().includes(q.toLowerCase()));
+  const todosMarcados = filtrados.every((v) => sel.has(v));
+  const toggle = (v) => setSel((s) => { const n = new Set(s); n.has(v) ? n.delete(v) : n.add(v); return n; });
+  const marcarTodos = () => setSel((s) => { const n = new Set(s); if (todosMarcados) filtrados.forEach((v) => n.delete(v)); else filtrados.forEach((v) => n.add(v)); return n; });
+  function aplicar() {
+    // se selecionou tudo → sem filtro (undefined); senão manda o set
+    onAplicar(sel.size === valores.length ? null : new Set(sel));
+  }
+  const left = Math.max(8, Math.min(rect.left, (typeof window !== "undefined" ? window.innerWidth : 1200) - 300));
+  const top = rect.bottom + 4;
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="fixed z-50 w-72 bg-white border border-gray-200 rounded-lg shadow-xl text-[12px]" style={{ left, top }}>
+        <div className="p-2 border-b border-gray-100">
+          <p className="text-[10px] font-semibold text-torg-gray uppercase px-1 pb-1">{col.label}</p>
+          <button onClick={() => onOrdenar(ordenar === "asc" ? null : "asc")} className={`w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 inline-flex items-center gap-2 ${ordenar === "asc" ? "text-torg-blue" : ""}`}><ArrowUp size={13} /> Ordenar A→Z (menor→maior)</button>
+          <button onClick={() => onOrdenar(ordenar === "desc" ? null : "desc")} className={`w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 inline-flex items-center gap-2 ${ordenar === "desc" ? "text-torg-blue" : ""}`}><ArrowDown size={13} /> Ordenar Z→A (maior→menor)</button>
+        </div>
+        <div className="p-2">
+          <div className="relative mb-2">
+            <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} autoFocus placeholder="Pesquisar…" className="w-full pl-7 pr-2 py-1.5 border border-gray-300 rounded-lg text-xs" />
+          </div>
+          <label className="flex items-center gap-2 px-1 py-1 font-medium cursor-pointer">
+            <input type="checkbox" checked={todosMarcados} onChange={marcarTodos} /> (Selecionar tudo)
+          </label>
+          <div className="max-h-56 overflow-y-auto border-t border-gray-100 mt-1 pt-1">
+            {filtrados.length === 0 ? <p className="px-1 py-2 text-torg-gray">Nada encontrado.</p>
+              : filtrados.map((v) => (
+                <label key={v} className="flex items-center gap-2 px-1 py-0.5 cursor-pointer hover:bg-gray-50 rounded">
+                  <input type="checkbox" checked={sel.has(v)} onChange={() => toggle(v)} />
+                  <span className="truncate" title={v}>{v}</span>
+                </label>
+              ))}
+          </div>
+        </div>
+        <div className="p-2 border-t border-gray-100 flex justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-1.5 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
+          <button onClick={aplicar} className="px-3 py-1.5 bg-torg-blue text-white rounded-lg hover:bg-torg-dark">OK</button>
+        </div>
+      </div>
+    </>
   );
 }
 
