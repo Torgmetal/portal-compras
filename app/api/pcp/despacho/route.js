@@ -356,13 +356,42 @@ export async function GET(req) {
     } catch { /* GRD é informação, não pode derrubar a listagem */ }
   }
 
+  // ── O PRODUZIDO DO SYNECO REPARTIDO ENTRE AS LINHAS DA MESMA MARCA ─────────────────────────
+  // ⚠⚠ MARCA NÃO É ÚNICA NA OP: sub-obras repetem a marca com perfil diferente, e o Syneco conta por
+  // MARCA. Dando o total a cada linha, a OP-089 tinha 132 peças dizendo "2/1", "3/1" — produzido
+  // maior que a quantidade —, e a soma da coluna contava a mesma produção duas e três vezes.
+  //
+  // ⚠ A repartição é por ORDEM DE CHEGADA, não proporcional: a fábrica produz peça inteira, não
+  // fração. Enche a primeira linha até a quantidade dela, depois a segunda, e o que sobrar fica na
+  // última — se o Syneco produziu MAIS que a soma das linhas (relançamento), a diferença aparece
+  // ali em vez de sumir.
+  const restoSyneco = new Map(synecoQtd);
+  const produzidoDaLinha = new Map(); // id da peça → quanto do Syneco cabe nela
+  if (setor) {
+    for (const p of escopo) {
+      const resta = restoSyneco.get(p.marca);
+      if (resta == null) continue;
+      const cabe = Math.min(resta, Number(p.qte) || 0);
+      produzidoDaLinha.set(p.id, cabe);
+      restoSyneco.set(p.marca, resta - cabe);
+    }
+    // sobra (Syneco acima da soma das linhas) vai para a ÚLTIMA linha daquela marca
+    const ultimaDaMarca = new Map();
+    for (const p of escopo) ultimaDaMarca.set(p.marca, p.id);
+    for (const [marca, sobra] of restoSyneco) {
+      if (sobra <= 0) continue;
+      const id = ultimaDaMarca.get(marca);
+      if (id) produzidoDaLinha.set(id, (produzidoDaLinha.get(id) || 0) + sobra);
+    }
+  }
+
   const pecas = escopo.map((p) => {
     const bx = p.baixaSetores && typeof p.baixaSetores === "object" ? p.baixaSetores : {};
     const reg = setor ? bx[setor] : null;
     // Compat: baixas antigas (sem qtd) contam como peça inteira.
     const baixadoQtd = reg ? (reg.qtd != null ? Number(reg.qtd) : p.qte) : 0;
     const baixadoPortal = baixadoQtd > 0;
-    const produzidoSyneco = setor ? (synecoQtd.get(p.marca) || 0) : null;
+    const produzidoSyneco = setor ? (produzidoDaLinha.get(p.id) || 0) : null;
     // Portal à frente do Syneco: ou porque teve baixa manual, ou porque o romaneio prova que a
     // peça já saiu (e o Syneco não registrou a produção daquele setor).
     const expedida = expedidaPorRomaneio.has(p.marca) || p.status === "EXPEDIDO";

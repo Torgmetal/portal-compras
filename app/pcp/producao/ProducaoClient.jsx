@@ -79,10 +79,18 @@ const FILTROS = [
 // ⚠ É DERIVADO, não é campo. Finalizado é o que a fábrica fechou (Syneco atingiu a quantidade) OU o
 // que alguém baixou no portal — as duas coisas querem dizer a mesma: aqui acabou. Guardar um campo
 // à parte criaria uma terceira verdade para brigar com essas duas.
+// ⚠ O QUE JÁ SAIU DA PEÇA NESTE SETOR: o maior entre o apontado no Syneco e a baixa do portal.
+// São dois registros da mesma coisa — a fábrica apontando e alguém dando baixa no que ela não
+// apontou —, então somar contaria duas vezes e ficar só com um deixaria peça pronta parecendo
+// pendente. Mesma regra da situação, para o número e a cor nunca contarem histórias diferentes.
+function feitoDaPeca(p) {
+  return Math.max(Number(p.produzidoSyneco) || 0, Number(p.baixadoQtd) || 0);
+}
+
 function situacaoDaPeca(p) {
   if (p.expedida) return "EXPEDIDA";
   const qtd = Number(p.qte) || 0;
-  const feito = Math.max(Number(p.produzidoSyneco) || 0, Number(p.baixadoQtd) || 0);
+  const feito = feitoDaPeca(p);
   if (p.baixadoPortal && (Number(p.baixadoQtd) || 0) >= qtd) return "FINALIZADO";
   if (qtd > 0 && feito >= qtd) return "FINALIZADO";
   if (feito > 0) return "PARCIAL";
@@ -423,7 +431,7 @@ export default function ProducaoClient() {
     const nomeSetor = SETOR_LABEL[setorAba] || setorAba || "Geral";
     const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } =
       await import("@/lib/excel-relatorio");
-    const headers = ["Marca", "Perfil", "Qtd", "Peso (kg)", "Programação", "Onde está", "Material (R)", "NF", "Corrida", "Liberado em", "Liberado por"];
+    const headers = ["Marca", "Perfil", "Feito", "Qtd", "Peso (kg)", "Programação", "Onde está", "Material (R)", "NF", "Corrida", "Liberado em", "Liberado por"];
     const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
       titulo: `Produção — ${fmtOP(detalhe.opNumero)} · ${nomeSetor}`,
       // ⚠ a planilha sai COM O FILTRO da tela, então ela precisa DIZER isso. Papel de 40 linhas que
@@ -439,12 +447,12 @@ export default function ProducaoClient() {
       ],
       totalColunas: headers.length, nomePlanilha: "Produção", codigoDoc: "REL-PCP-001",
     });
-    ws.columns = [{ width: 18 }, { width: 22 }, { width: 8 }, { width: 12 }, { width: 15 }, { width: 16 }, { width: 14 }, { width: 12 }, { width: 16 }, { width: 14 }, { width: 22 }];
+    ws.columns = [{ width: 18 }, { width: 22 }, { width: 8 }, { width: 8 }, { width: 12 }, { width: 15 }, { width: 16 }, { width: 14 }, { width: 12 }, { width: 16 }, { width: 14 }, { width: 22 }];
     let linha = linhaInicio;
     adicionarHeaderTabela(ws, linha, headers); linha++;
     for (const p of lista) {
       adicionarLinhaTabela(ws, linha, [
-        p.marca, p.descricao || "", Number(p.qte) || 0, Number(p.pesoTotalKg) || 0,
+        p.marca, p.descricao || "", feitoDaPeca(p), Number(p.qte) || 0, Number(p.pesoTotalKg) || 0,
         PROG[p.programacao?.situacao]?.txt || "—",
         p.expedida ? "expedida"
           : p.montadoEm ? (p.montadoEm.montados >= p.montadoEm.total ? "montado" : `montado ${p.montadoEm.montados}/${p.montadoEm.total}`)
@@ -455,7 +463,10 @@ export default function ProducaoClient() {
       ]);
       linha++;
     }
-    adicionarLinhaTotais(ws, linha, ["TOTAL", "", lista.reduce((a, p) => a + (Number(p.qte) || 0), 0), Math.round(lista.reduce((a, p) => a + (Number(p.pesoTotalKg) || 0), 0)), "", "", "", "", "", "", ""]);
+    adicionarLinhaTotais(ws, linha, ["TOTAL", "",
+      lista.reduce((a, p) => a + feitoDaPeca(p), 0),
+      lista.reduce((a, p) => a + (Number(p.qte) || 0), 0),
+      Math.round(lista.reduce((a, p) => a + (Number(p.pesoTotalKg) || 0), 0)), "", "", "", "", "", "", ""]);
       const hoje = new Date().toISOString().split("T")[0];
       await downloadWorkbook(workbook, `Producao ${fmtOP(detalhe.opNumero)} - ${nomeSetor} - ${hoje}.xlsx`);
       setAviso({ ok: true, texto: `Planilha de ${lista.length} peça(s) baixada.` });
@@ -682,8 +693,11 @@ export default function ProducaoClient() {
                                     onChange={() => marcarTodas(pecas)} className="accent-torg-orange" />
                                 </th>
                                 <Th col="marca" larg="w-[17%]" {...fp}>Marca</Th>
-                                <Th col="perfil" larg="w-[15%]" {...fp}>Perfil</Th>
-                                <th className="px-2 py-2 text-right font-bold w-[7%]">Qtd</th>
+                                <Th col="perfil" larg="w-[12%]" {...fp}>Perfil</Th>
+                                <th className="px-2 py-2 text-right font-bold w-[10%]"
+                                  title="Quantidade já feita neste setor sobre a quantidade da peça. O feito é o apontamento do Syneco ou a baixa do portal, o que for maior.">
+                                  Feito / Qtd
+                                </th>
                                 <th className="px-2 py-2 text-right font-bold w-[10%]">Peso</th>
                                 <Th col="programacao" larg="w-[14%]" {...fp}>Programação</Th>
                                 <Th col="situacao" larg="w-[15%]" dica="Não iniciado → em produção → finalizado. Finalizado é o que o Syneco fechou ou o que recebeu baixa no portal." {...fp}>Situação</Th>
@@ -725,7 +739,24 @@ export default function ProducaoClient() {
                                       )}
                                     </td>
                                     <td className="px-2 py-1.5 text-torg-gray truncate" title={p.descricao || ""}>{p.descricao || "—"}</td>
-                                    <td className="px-2 py-1.5 text-right tabular-nums">{fmtN(p.qte)}</td>
+                                    {/* ⚠ Vitor (24/08/2026): "aqui era bom colocar a quantidade total x
+                                        realizado". O total sozinho não dizia se a peça andou — e
+                                        peça de 6 unidades com 5 feitas é bem diferente de 6 paradas. */}
+                                    <td className="px-2 py-1.5 text-right tabular-nums"
+                                      title={feitoDaPeca(p) > (Number(p.qte) || 0)
+                                        ? `O Syneco aponta ${fmtN(feitoDaPeca(p))} e a lista tem ${fmtN(p.qte)}. Costuma ser peça relançada no Syneco ou quantidade errada na lista — vale conferir.`
+                                        : `${fmtN(feitoDaPeca(p))} de ${fmtN(p.qte)} feita(s) neste setor.`}>
+                                      {/* ⚠ feito ACIMA da quantidade não é "pronto", é divergência: sai em
+                                          âmbar para não passar por conclusão. */}
+                                      <span className={
+                                        feitoDaPeca(p) > (Number(p.qte) || 0) ? "font-bold text-amber-600"
+                                        : feitoDaPeca(p) >= (Number(p.qte) || 0) ? "font-bold text-emerald-700"
+                                        : feitoDaPeca(p) > 0 ? "font-bold text-sky-700"
+                                        : "text-torg-gray-light"}>
+                                        {fmtN(feitoDaPeca(p))}
+                                      </span>
+                                      <span className="text-torg-gray-light">/{fmtN(p.qte)}</span>
+                                    </td>
                                     <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtKg(p.pesoTotalKg)}</td>
                                     <td className="px-2 py-1.5 truncate">
                                       <span title={prog.dica} className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold whitespace-nowrap ${prog.cls}`}>{prog.txt}</span>
