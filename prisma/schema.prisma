@@ -4519,6 +4519,7 @@ model RomaneioTerceiro {
   remessaStatus     String    @default("PENDENTE") // PENDENTE | EMITIDA | CANCELADA | DISPENSADA
   remessaCfop       String? // 5901 (dentro do estado) / 6901 (fora) — remessa p/ industrialização
   remessaFrete      Json? // dados do frete p/ a NF: { tpFrete, nCodTransp, transpNome, placa, uf, qtdVol, especie, pesoLiq, pesoBruto, valorFrete, valorSeguro, valorOutras }
+  remessaErroEmissao String? // última mensagem de erro da emissão (SEFAZ) — some quando autoriza
   remessaNatureza   String? // natureza da operação (ex.: "Remessa para industrialização")
   remessaNfNumero   String?
   remessaNfSerie    String?

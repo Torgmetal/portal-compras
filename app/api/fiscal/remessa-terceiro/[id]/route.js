@@ -9,7 +9,7 @@ import { requireRole } from "@/lib/session";
 import { criarPedidoRemessa, conferirRemessaOmie, concluirRemessaOmie } from "@/lib/omie-remessa-industrializacao";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120; // emitir_omie espera a autorização do SEFAZ (poll)
 const ROLES = ["ADMIN", "FISCAL", "FINANCEIRO"];
 
 const materialResolvidoSchema = z.object({
@@ -122,12 +122,17 @@ export async function PATCH(req, { params }) {
     return NextResponse.json({ success: true, mensagem: r.mensagem });
   }
 
-  // ── Emitir a NF-e da remessa (ConcluirRemessa → SEFAZ) — IRREVERSÍVEL ──
+  // ── Emitir a NF-e da remessa (ConcluirRemessa → SEFAZ) — só marca EMITIDA se AUTORIZAR ──
   if (body.acao === "emitir_omie") {
     if (atual.remessaStatus === "EMITIDA") return NextResponse.json({ error: "Remessa já emitida." }, { status: 400 });
     if (!atual.remessaPedidoOmie) return NextResponse.json({ error: "Gere a remessa no Omie antes de emitir." }, { status: 400 });
     const r = await concluirRemessaOmie(atual.remessaPedidoOmie);
-    if (!r.ok) return NextResponse.json({ error: `Falha ao emitir a NF no Omie: ${r.erro}` }, { status: 502 });
+    if (!r.ok) {
+      // NÃO marca EMITIDA — guarda o erro (aparece no portal) e mantém PEDIDO_CRIADO p/ reenviar.
+      await prisma.romaneioTerceiro.update({ where: { id: atual.id }, data: { remessaErroEmissao: (r.erro || "Falha na emissão").substring(0, 900) } }).catch(() => {});
+      await prisma.auditLog.create({ data: { userId: user.id, action: "REMESSA_TERCEIRO_EMITIR_ERRO", entity: "RomaneioTerceiro", entityId: atual.id, diff: { numero: atual.numero, pedidoOmie: atual.remessaPedidoOmie, erro: r.erro } } }).catch(() => {});
+      return NextResponse.json({ error: r.erro, pendente: !!r.pendente }, { status: 502 });
+    }
     const upd = await prisma.romaneioTerceiro.update({
       where: { id: atual.id },
       data: {
@@ -136,6 +141,7 @@ export async function PATCH(req, { params }) {
         remessaNfSerie: r.nf?.serie || null,
         remessaNfChave: r.nf?.chave || null,
         remessaNfEmitidaEm: new Date(),
+        remessaErroEmissao: null,
         remessaPorNome: user.name || null,
       },
     });

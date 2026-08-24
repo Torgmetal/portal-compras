@@ -138,7 +138,8 @@ export default function RemessaTerceiroClient() {
                       <td className="px-3 py-2 text-center text-xs font-mono text-torg-gray">{r.cfop}</td>
                       <td className="px-3 py-2">
                         <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border whitespace-nowrap ${st.cls}`}>{st.label}</span>
-                        {r.remessaStatus === "PEDIDO_CRIADO" && r.pedidoNumero && <span className="block text-[10px] text-torg-gray mt-0.5">Remessa nº {r.pedidoNumero} — confira e fature no Omie</span>}
+                        {r.remessaStatus === "PEDIDO_CRIADO" && r.pedidoNumero && !r.erroEmissao && <span className="block text-[10px] text-torg-gray mt-0.5">Remessa nº {r.pedidoNumero} — confira e fature no Omie</span>}
+                        {r.remessaStatus === "PEDIDO_CRIADO" && r.erroEmissao && <span className="block text-[10px] text-red-600 mt-0.5 max-w-[240px]" title={r.erroEmissao}><AlertCircle size={10} className="inline mr-0.5" /> Erro na emissão — corrija no Omie e reenvie</span>}
                         {r.remessaStatus === "EMITIDA" && r.nfNumero && <span className="block text-[10px] text-torg-gray mt-0.5">NF {r.nfNumero}{r.nfSerie ? `/${r.nfSerie}` : ""} · {fmtD(r.nfEmitidaEm)}</span>}
                       </td>
                       <td className="px-3 py-2">
@@ -463,6 +464,11 @@ function ModalFaturar({ remessa, onClose, onEmitido }) {
             <p><strong className="text-torg-dark">{remessa.terceiro?.nome}</strong>{remessa.terceiro?.uf ? ` · ${remessa.terceiro.uf}` : ""}{remessa.opRefNumero ? ` · OP ${remessa.opRefNumero}` : ""}</p>
             <p className="mt-0.5">Remessa nº {remessa.pedidoNumero || "—"} no Omie · {fmtKg(remessa.pesoEnviadoKg)}</p>
           </div>
+          {remessa.erroEmissao && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded px-3 py-2 flex items-start gap-1.5">
+              <AlertCircle size={13} className="mt-0.5 shrink-0" /><span><strong>Erro na última emissão:</strong> {remessa.erroEmissao}<br />Corrija no Omie (aba Comunicação com a SEFAZ) e reenvie aqui.</span>
+            </div>
+          )}
 
           {/* Passo 1: conferência */}
           <div className="border border-gray-100 rounded-lg p-3">
@@ -482,7 +488,8 @@ function ModalFaturar({ remessa, onClose, onEmitido }) {
           {/* Passo 2: emissão */}
           <div className={`border rounded-lg p-3 ${conf.estado === "ok" ? "border-amber-200 bg-amber-50/40" : "border-gray-100 opacity-60"}`}>
             <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wider mb-1.5">2. Emitir NF-e</p>
-            <p className="text-xs text-torg-gray">Ao emitir, a NF-e é enviada ao <strong>SEFAZ</strong> e a nota é gerada de verdade. <strong className="text-amber-700">Essa ação não pode ser desfeita.</strong></p>
+            <p className="text-xs text-torg-gray">Ao emitir, a NF-e é enviada ao <strong>SEFAZ</strong> e a nota é gerada de verdade. <strong className="text-amber-700">Essa ação não pode ser desfeita.</strong> O portal <strong>espera a autorização real</strong> — só marca como emitida quando o SEFAZ autoriza (pode levar até ~1 min).</p>
+            {emitindo && <p className="mt-2 text-sm text-torg-blue inline-flex items-center gap-1.5"><Loader2 size={14} className="animate-spin" /> Enviando ao SEFAZ e aguardando a autorização…</p>}
             {erroEmit && <p className="mt-2 text-sm text-red-600 inline-flex items-start gap-1.5"><AlertCircle size={14} className="mt-0.5 shrink-0" /> {erroEmit}</p>}
           </div>
         </div>
