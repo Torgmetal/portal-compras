@@ -36,8 +36,13 @@ export async function GET(_req, { params }) {
 
   // ── cronograma: as frentes e o avanço ──
   if (tem("CRONOGRAMA")) {
+    // ⚠⚠ O CRONOGRAMA NUNCA APARECIA PARA O CLIENTE — descasamento de chave. `PortalCliente.opNumero`
+    // guarda "089"; TODOS os 31 `Cronograma` guardam "T089". A busca por `opNumero` casava ZERO, e o
+    // `if (cron)` logo abaixo pulava a seção em silêncio. Conferido no banco: os três portais casam
+    // 0 por `opNumero` e 1 por `opId` — e o da TMSA (OP-089) está PUBLICADO, com a seção CRONOGRAMA
+    // ligada e **25 acessos do cliente**. Ele abriu 25 vezes uma aba que nunca teve conteúdo.
     const cron = await prisma.cronograma.findFirst({
-      where: { opNumero: portal.opNumero, ativo: true },
+      where: { ativo: true, ...(op?.id ? { opId: op.id } : { opNumero: portal.opNumero }) },
       orderBy: { ultimoSync: "desc" },
       select: { id: true, titulo: true, dataInicio: true, dataFim: true, areas: true },
     });
