@@ -14,11 +14,11 @@
 // própria GRD emitida, que já grava quem imprimiu, quando e quantas vezes. Por isso o botão diz
 // "Imprimir e liberar" — o ato é um só, e chamar de duas coisas faria alguém procurar um segundo
 // botão que não existe.
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, Printer, Search,
-  Factory, Monitor, CalendarClock, Package, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet, Send, Flag,
+  Factory, Monitor, CalendarClock, Package, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet, Send, Flag, Filter, X,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import CompraChip from "@/components/CompraChip";
@@ -93,6 +93,25 @@ const SIT = {
   EXPEDIDA:     { txt: "expedida",     cls: "bg-emerald-100 text-emerald-800 border-emerald-300", barra: "border-l-emerald-600", dica: "Já saiu em romaneio — a Expedição assumiu." },
 };
 
+// ⚠⚠ FILTRO POR COLUNA, COMO NO EXCEL. Vitor (24/08/2026): "nessa parte você poderia criar um
+// filtro igual no excel para facilitar o que eu quero filtrar de fato".
+//
+// ⚠ Cada coluna vira TEXTO por uma função só — a mesma que a célula mostra. Se o filtro derivasse o
+// valor de um jeito e a célula de outro, a pessoa marcaria "programada" e veria linha escrito outra
+// coisa, e passaria a não confiar no filtro.
+//
+// ⚠ Peso e Qtd ficam de fora de propósito: são contínuos, e lista de caixinha com 300 números
+// distintos não filtra nada — para eles vale a busca por texto.
+const COLUNAS_FILTRO = [
+  { key: "marca", label: "Marca", valor: (p) => p.marca || "—" },
+  { key: "perfil", label: "Perfil", valor: (p) => p.descricao || "—" },
+  { key: "programacao", label: "Programação", valor: (p) => (PROG[p.programacao?.situacao] || PROG.NAO_LANCADA).txt },
+  { key: "situacao", label: "Situação", valor: (p) => SIT[situacaoDaPeca(p)].txt },
+  { key: "material", label: "Material", valor: (p) => (p.material?.recebido ? (p.material.rastreio ? `R ${p.material.rastreio}` : "recebido") : p.perfil ? "sem entrada" : "—") },
+  { key: "grd", label: "Liberado (GRD)", valor: (p) => (p.grd ? "liberado" : "não liberado") },
+];
+const COL = Object.fromEntries(COLUNAS_FILTRO.map((c) => [c.key, c]));
+
 const ALERTA = {
   SEM_LISTA: { txt: "sem lista", cls: "bg-red-50 text-red-700 border-red-200", dica: "Nenhuma peça importada (nem LPC nem LE) — não há o que programar." },
   PRODUZINDO_SEM_LISTA: { txt: "produzindo sem lista", cls: "bg-red-50 text-red-700 border-red-200", dica: "A fábrica já apontou produção e o portal não tem o detalhamento." },
@@ -126,6 +145,9 @@ export default function ProducaoClient() {
   const [baixando, setBaixando] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [mandando, setMandando] = useState(false);
+  // coluna → Set de valores permitidos. Coluna ausente = sem filtro (todos passam).
+  const [filtroCol, setFiltroCol] = useState({});
+  const [colAberta, setColAberta] = useState(null);
   // ⚠ a lista de separação é o papel do ALMOXARIFADO, não do PCP: sai por material, com barras,
   // peso e o R de cada um. Mesmo componente da TV — duas versões do mesmo papel divergiriam, e é
   // ele que garante que o material separado é o R certo.
@@ -160,12 +182,12 @@ export default function ProducaoClient() {
     // ⚠ abre no setor que o filtro já escolheu; sem filtro, no primeiro que tem fila — é onde a
     // obra está parada, e é a pergunta que o PCP faz ao clicar.
     const setor = setorFiltro || op.setores.find((s) => s.pendenteKg > 0)?.setor || op.setores[0]?.setor || "";
-    setAberta(op.opId); setSetorAba(setor); setDetalhe(null); setFiltroPecas(""); setFiltroProg("TODAS");
+    setAberta(op.opId); setSetorAba(setor); setDetalhe(null); setFiltroPecas(""); setFiltroProg("TODAS"); setFiltroCol({}); setColAberta(null);
     carregarDetalhe(op.opId, setor);
   }
 
   function trocarSetor(op, setor) {
-    setSetorAba(setor); setDetalhe(null); setFiltroPecas(""); setFiltroProg("TODAS");
+    setSetorAba(setor); setDetalhe(null); setFiltroPecas(""); setFiltroProg("TODAS"); setFiltroCol({}); setColAberta(null);
     carregarDetalhe(op.opId, setor);
   }
 
@@ -188,6 +210,17 @@ export default function ProducaoClient() {
   }, [dados]);
 
   // ── peças da OP aberta, já filtradas ──
+  // ⚠ EXCLUINDO A PRÓPRIA COLUNA — é o que o Excel faz e o que faz o filtro ser usável: a lista de
+  // opções de "Perfil" mostra os perfis que existem DEPOIS dos outros filtros, mas sem se auto-cortar
+  // (senão, ao escolher um perfil, os outros sumiriam da lista e não haveria como trocar).
+  const passaNasColunas = useCallback((p, exceto) => {
+    for (const [k, vals] of Object.entries(filtroCol)) {
+      if (k === exceto || !vals?.size) continue;
+      if (!vals.has(COL[k].valor(p))) return false;
+    }
+    return true;
+  }, [filtroCol]);
+
   const pecas = useMemo(() => {
     let base = detalhe?.pecas || [];
     if (filtroProg !== "TODAS") {
@@ -197,10 +230,30 @@ export default function ProducaoClient() {
         return sit === filtroProg;
       });
     }
+    base = base.filter((p) => passaNasColunas(p, null));
     const q = filtroPecas.trim().toLowerCase();
     if (!q) return base;
     return base.filter((p) => [p.marca, p.descricao, p.perfil].some((x) => String(x || "").toLowerCase().includes(q)));
-  }, [detalhe, filtroPecas, filtroProg]);
+  }, [detalhe, filtroPecas, filtroProg, passaNasColunas]);
+
+  // Opções de uma coluna: valores distintos + quantas linhas cada um, já respeitando os OUTROS filtros.
+  const opcoesDaColuna = useCallback((key) => {
+    const c = COL[key];
+    const conta = new Map();
+    for (const p of detalhe?.pecas || []) {
+      if (!passaNasColunas(p, key)) continue;
+      const v = c.valor(p);
+      conta.set(v, (conta.get(v) || 0) + 1);
+    }
+    return [...conta.entries()]
+      .map(([v, n]) => ({ v, n }))
+      .sort((a, b) => String(a.v).localeCompare(String(b.v), "pt-BR", { numeric: true }));
+  }, [detalhe, passaNasColunas]);
+
+  const filtrosAtivos = Object.entries(filtroCol).filter(([, v]) => v?.size).length;
+  const limparColunas = () => { setFiltroCol({}); setColAberta(null); };
+  // tudo que o cabeçalho precisa, num objeto só — evita repetir seis props em cada <Th>
+  const fp = { filtroCol, setFiltroCol, colAberta, setColAberta, opcoesDaColuna };
 
   // Contadores do filtro — o número ao lado do rótulo evita clicar para descobrir que está vazio.
   const contas = useMemo(() => {
@@ -367,7 +420,12 @@ export default function ProducaoClient() {
     const headers = ["Marca", "Perfil", "Qtd", "Peso (kg)", "Programação", "Onde está", "Material (R)", "NF", "Corrida", "Liberado em", "Liberado por"];
     const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
       titulo: `Produção — ${fmtOP(detalhe.opNumero)} · ${nomeSetor}`,
-      subtitulo: `${op?.cliente || ""}${op?.obra ? ` — ${op.obra}` : ""} · ${lista.length} peça(s)${filtroProg !== "TODAS" ? ` · filtro: ${FILTROS.find((f) => f.key === filtroProg)?.label || filtroProg}` : ""}`,
+      // ⚠ a planilha sai COM O FILTRO da tela, então ela precisa DIZER isso. Papel de 40 linhas que
+      // parece a lista inteira leva alguém a concluir que o resto não existe.
+      subtitulo: `${op?.cliente || ""}${op?.obra ? ` — ${op.obra}` : ""} · ${lista.length} peça(s)`
+        + (filtroProg !== "TODAS" ? ` · ${FILTROS.find((f) => f.key === filtroProg)?.label || filtroProg}` : "")
+        + (filtrosAtivos ? ` · filtrado por ${Object.entries(filtroCol).filter(([, v]) => v?.size).map(([k]) => COL[k].label.toLowerCase()).join(", ")}` : "")
+        + (filtroPecas.trim() ? ` · busca "${filtroPecas.trim()}"` : ""),
       kpis: [
         `${lista.filter((p) => p.programacao?.situacao === "NAO_LANCADA").length} não lançada(s)`,
         `${lista.filter((p) => p.programacao?.situacao === "PROGRAMADA").length} programada(s)`,
@@ -554,6 +612,12 @@ export default function ProducaoClient() {
                             {marcasSel.length > 0 && (
                               <span className="text-[11px] text-torg-blue font-semibold">· {marcasSel.length} selecionada(s)</span>
                             )}
+                            {filtrosAtivos > 0 && (
+                              <button onClick={limparColunas}
+                                className="text-[11px] text-torg-orange hover:underline inline-flex items-center gap-1 font-semibold">
+                                <X size={11} /> limpar {filtrosAtivos} filtro(s) de coluna
+                              </button>
+                            )}
                             <span className="flex-1" />
                             {/* ⚠ com peça marcada, a lista sai SÓ das marcadas; sem marcar, da OP
                                 inteira — igual ao painel da TV. É o que deixa separar por lote. */}
@@ -607,20 +671,14 @@ export default function ProducaoClient() {
                                   <input type="checkbox" checked={pecas.length > 0 && pecas.every((p) => sel.has(p.id))}
                                     onChange={() => marcarTodas(pecas)} className="accent-torg-orange" />
                                 </th>
-                                <th className="px-2 py-2 text-left font-bold w-[17%]">Marca</th>
-                                <th className="px-2 py-2 text-left font-bold w-[15%]">Perfil</th>
+                                <Th col="marca" larg="w-[17%]" {...fp}>Marca</Th>
+                                <Th col="perfil" larg="w-[15%]" {...fp}>Perfil</Th>
                                 <th className="px-2 py-2 text-right font-bold w-[7%]">Qtd</th>
                                 <th className="px-2 py-2 text-right font-bold w-[10%]">Peso</th>
-                                <th className="px-2 py-2 text-left font-bold w-[14%]">Programação</th>
-                                <th className="px-2 py-2 text-left font-bold w-[15%]"
-                                  title="Não iniciado → em produção → finalizado. Finalizado é o que o Syneco fechou ou o que recebeu baixa no portal.">
-                                  Situação
-                                </th>
-                                <th className="px-2 py-2 text-left font-bold w-[11%]">Material</th>
-                                <th className="px-2 py-2 text-left font-bold w-[11%]"
-                                  title="Data em que o desenho foi impresso pelo portal e a GRD registrada — é o que prova que a peça desceu para a fábrica.">
-                                  Liberado (GRD)
-                                </th>
+                                <Th col="programacao" larg="w-[14%]" {...fp}>Programação</Th>
+                                <Th col="situacao" larg="w-[15%]" dica="Não iniciado → em produção → finalizado. Finalizado é o que o Syneco fechou ou o que recebeu baixa no portal." {...fp}>Situação</Th>
+                                <Th col="material" larg="w-[11%]" {...fp}>Material</Th>
+                                <Th col="grd" larg="w-[11%]" dica="Data em que o desenho foi impresso pelo portal e a GRD registrada — é o que prova que a peça desceu para a fábrica." {...fp}>Liberado (GRD)</Th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
@@ -721,6 +779,85 @@ export default function ProducaoClient() {
           ids={separacao.ids} onClose={() => setSeparacao(null)} />
       )}
     </div>
+  );
+}
+
+// ⚠⚠ CABEÇALHO COM FUNIL — o filtro do Excel.
+// A lista de opções vem de `opcoesDaColuna`, que já respeita os OUTROS filtros e não se auto-corta:
+// escolher um perfil não pode fazer os outros perfis sumirem da lista, senão não há como trocar.
+//
+// ⚠ marcar NADA é o mesmo que marcar TUDO — o Set vazio é apagado do estado. Filtro com zero
+// selecionados escondendo a tabela inteira é a armadilha clássica: a pessoa acha que quebrou.
+function Th({ col, larg, dica, children, filtroCol, setFiltroCol, colAberta, setColAberta, opcoesDaColuna }) {
+  const [busca, setBusca] = useState("");
+  const ref = useRef(null);
+  const aberto = colAberta === col;
+  const sel = filtroCol[col] || null;
+  const ativo = !!sel?.size;
+
+  useEffect(() => {
+    if (!aberto) return;
+    const fora = (e) => { if (ref.current && !ref.current.contains(e.target)) setColAberta(null); };
+    const esc = (e) => { if (e.key === "Escape") setColAberta(null); };
+    document.addEventListener("mousedown", fora);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc); };
+  }, [aberto, setColAberta]);
+
+  const opcoes = aberto ? opcoesDaColuna(col) : [];
+  const q = busca.trim().toLowerCase();
+  const visiveis = q ? opcoes.filter((o) => String(o.v).toLowerCase().includes(q)) : opcoes;
+
+  const trocar = (v) => setFiltroCol((f) => {
+    const s = new Set(f[col] || []);
+    s.has(v) ? s.delete(v) : s.add(v);
+    const n = { ...f };
+    if (s.size) n[col] = s; else delete n[col];
+    return n;
+  });
+  const marcarVisiveis = (ligar) => setFiltroCol((f) => {
+    const s = new Set(f[col] || []);
+    for (const o of visiveis) ligar ? s.add(o.v) : s.delete(o.v);
+    const n = { ...f };
+    if (s.size) n[col] = s; else delete n[col];
+    return n;
+  });
+
+  return (
+    <th className={`px-2 py-2 text-left font-bold relative ${larg}`} title={dica}>
+      <button onClick={() => { setColAberta(aberto ? null : col); setBusca(""); }}
+        title={ativo ? `${sel.size} valor(es) escolhido(s) — clique para mudar` : "Filtrar esta coluna"}
+        className={`inline-flex items-center gap-1 max-w-full ${ativo ? "text-torg-orange" : "hover:text-torg-blue"}`}>
+        <span className="truncate">{children}</span>
+        <Filter size={10} className={`shrink-0 ${ativo ? "fill-current" : "opacity-40"}`} />
+        {ativo && <span className="text-[9px] font-bold shrink-0">{sel.size}</span>}
+      </button>
+
+      {aberto && (
+        <div ref={ref} className="absolute left-0 top-full mt-1 z-30 w-64 bg-white border border-gray-200 rounded-xl shadow-lg p-2 font-normal">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <input autoFocus value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="buscar…"
+              className="flex-1 text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue" />
+            <button onClick={() => setColAberta(null)} className="text-torg-gray hover:text-torg-dark"><X size={13} /></button>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] mb-1.5 px-0.5">
+            <button onClick={() => marcarVisiveis(true)} className="text-torg-blue hover:underline">marcar {q ? "os achados" : "todos"}</button>
+            <button onClick={() => marcarVisiveis(false)} className="text-torg-gray hover:underline">limpar</button>
+            <span className="ml-auto text-torg-gray-light">{visiveis.length}</span>
+          </div>
+          <div className="max-h-56 overflow-y-auto space-y-0.5">
+            {visiveis.map((o) => (
+              <label key={o.v} className="flex items-center gap-2 text-[12px] px-1 py-0.5 rounded hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" checked={!!sel?.has(o.v)} onChange={() => trocar(o.v)} className="accent-torg-orange shrink-0" />
+                <span className="truncate flex-1" title={o.v}>{o.v}</span>
+                <span className="text-[10px] text-torg-gray-light tabular-nums shrink-0">{o.n}</span>
+              </label>
+            ))}
+            {!visiveis.length && <p className="text-[11px] text-torg-gray px-1 py-2">nada aqui.</p>}
+          </div>
+        </div>
+      )}
+    </th>
   );
 }
 
