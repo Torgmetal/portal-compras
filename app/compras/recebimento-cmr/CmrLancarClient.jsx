@@ -353,7 +353,7 @@ export default function CmrLancarClient() {
                   <tr key={l.id} className={`align-top ${l.certOk ? "bg-yellow-50 hover:bg-yellow-100/70" : "bg-red-50 hover:bg-red-100/60"}`}>
                     <td className="px-2.5 py-1 font-mono font-semibold">{l.rc}</td>
                     <td className="px-2.5 py-1 font-mono text-torg-blue">{l.importRef}</td>
-                    <td className="px-2.5 py-1 min-w-[360px] max-w-[560px] whitespace-normal break-words leading-snug" title={l.nome}>{l.nome}</td>
+                    <td className="px-2.5 py-1 min-w-[360px] max-w-[560px] whitespace-normal break-words leading-snug" title={l.nome}><span className="line-clamp-2">{l.nome}</span></td>
                     <td className="px-2.5 py-1">{l.certOk ? l.numeroDocumento : <span className="text-red-600 font-medium">falta</span>}</td>
                     <td className="px-2.5 py-1 text-torg-gray">{l.numeroCorrida || "—"}</td>
                     <td className="px-2.5 py-1">{l.norma || "—"}</td>
@@ -364,7 +364,7 @@ export default function CmrLancarClient() {
                     <td className="px-2.5 py-1 font-mono">{l.opNumero || "—"}</td>
                     <td className="px-2.5 py-1 text-right tabular-nums">{fmtNum(l.quantidade)}</td>
                     <td className="px-2.5 py-1 text-right tabular-nums">{fmtNum(l.pesoKg)}</td>
-                    <td className="px-2.5 py-1 min-w-[220px] max-w-[340px] whitespace-normal break-words leading-snug text-torg-gray" title={l.obs}>{l.obs || "—"}</td>
+                    <td className="px-2.5 py-1 min-w-[220px] max-w-[340px] whitespace-normal break-words leading-snug text-torg-gray" title={l.obs}><span className="line-clamp-2">{l.obs || "—"}</span></td>
                   </tr>
                 ))}
             </tbody>
