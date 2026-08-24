@@ -88,6 +88,7 @@ export default function ProducaoClient() {
   // a outra se desce para a fábrica.
   const [filtroProg, setFiltroProg] = useState("TODAS");
   const [baixando, setBaixando] = useState(false);
+  const [exportando, setExportando] = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
@@ -251,10 +252,20 @@ export default function ProducaoClient() {
 
   // ⚠ Excel no PADRÃO DAS PLANILHAS (lib/excel-relatorio.js): cabeçalho ISO 9001 com logo. Import
   // dinâmico porque o exceljs é pesado e só quem clica precisa dele.
+  // ⚠⚠ `adicionarHeaderTabela` E `adicionarLinhaTabela` NÃO DEVOLVEM A PRÓXIMA LINHA.
+  // Escrevi `linha = adicionarLinhaTabela(...)` como se devolvessem; devolvem `undefined`, então a
+  // primeira peça já chamava `getCell(undefined, 1)` e estourava. Todo o resto do portal incrementa
+  // a linha à mão — é a convenção da lib, e é o que vale aqui também.
+  //
+  // ⚠ E sem `try/catch` o erro sumia: o clique não fazia nada e não dizia nada, e o Vitor teve de
+  // vir avisar que "não estou conseguindo baixar a planilha". Exportação que falha calada é pior
+  // que exportação que falha — quem clica fica achando que o navegador travou.
   async function exportar() {
     if (!detalhe) return;
     const lista = pecas;
     if (!lista.length) return setAviso({ ok: false, texto: "Nada para exportar com este filtro." });
+    setExportando(true); setAviso(null);
+    try {
     const op = ops.find((o) => o.opId === aberta);
     const nomeSetor = SETOR_LABEL[setorAba] || setorAba || "Geral";
     const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } =
@@ -271,9 +282,10 @@ export default function ProducaoClient() {
       totalColunas: headers.length, nomePlanilha: "Produção", codigoDoc: "REL-PCP-001",
     });
     ws.columns = [{ width: 18 }, { width: 22 }, { width: 8 }, { width: 12 }, { width: 15 }, { width: 16 }, { width: 14 }, { width: 12 }, { width: 16 }, { width: 14 }, { width: 22 }];
-    let linha = adicionarHeaderTabela(ws, linhaInicio, headers);
+    let linha = linhaInicio;
+    adicionarHeaderTabela(ws, linha, headers); linha++;
     for (const p of lista) {
-      linha = adicionarLinhaTabela(ws, linha, [
+      adicionarLinhaTabela(ws, linha, [
         p.marca, p.descricao || "", Number(p.qte) || 0, Number(p.pesoTotalKg) || 0,
         PROG[p.programacao?.situacao]?.txt || "—",
         p.expedida ? "expedida"
@@ -283,9 +295,15 @@ export default function ProducaoClient() {
         p.material?.nf || "", p.material?.corrida || "",
         p.grd ? fmtDH(p.grd.em) : "", p.grd?.por || "",
       ]);
+      linha++;
     }
-    adicionarLinhaTotais(ws, linha, ["TOTAL", "", lista.reduce((a, p) => a + (Number(p.qte) || 0), 0), lista.reduce((a, p) => a + (Number(p.pesoTotalKg) || 0), 0), "", "", "", "", "", "", ""]);
-    await downloadWorkbook(workbook, `Producao ${fmtOP(detalhe.opNumero)} - ${nomeSetor}.xlsx`);
+    adicionarLinhaTotais(ws, linha, ["TOTAL", "", lista.reduce((a, p) => a + (Number(p.qte) || 0), 0), Math.round(lista.reduce((a, p) => a + (Number(p.pesoTotalKg) || 0), 0)), "", "", "", "", "", "", ""]);
+      const hoje = new Date().toISOString().split("T")[0];
+      await downloadWorkbook(workbook, `Producao ${fmtOP(detalhe.opNumero)} - ${nomeSetor} - ${hoje}.xlsx`);
+      setAviso({ ok: true, texto: `Planilha de ${lista.length} peça(s) baixada.` });
+    } catch (e) {
+      setAviso({ ok: false, texto: `Não consegui gerar a planilha: ${e?.message || e}` });
+    } finally { setExportando(false); }
   }
 
   return (
@@ -443,10 +461,10 @@ export default function ProducaoClient() {
                               <span className="text-[11px] text-torg-blue font-semibold">· {marcasSel.length} selecionada(s)</span>
                             )}
                             <span className="flex-1" />
-                            <button onClick={exportar} disabled={!pecas.length}
+                            <button onClick={exportar} disabled={!pecas.length || exportando}
                               title="Baixa a lista filtrada em Excel, no padrão das planilhas da Torg"
                               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-torg-gray hover:bg-gray-50 disabled:opacity-40">
-                              <FileSpreadsheet size={13} /> Planilha
+                              {exportando ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />} Planilha
                             </button>
                             {/* ⚠ a baixa é do PORTAL, não do Syneco — o rótulo diz o setor para ninguém
                                 baixar na aba errada achando que baixou na fábrica inteira. */}
