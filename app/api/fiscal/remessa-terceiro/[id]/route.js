@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { criarPedidoRemessa } from "@/lib/omie-remessa-industrializacao";
+import { criarPedidoRemessa, conferirRemessaOmie, concluirRemessaOmie } from "@/lib/omie-remessa-industrializacao";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -21,7 +21,7 @@ const materialResolvidoSchema = z.object({
 });
 
 const schema = z.object({
-  acao: z.enum(["gerar_pedido_omie", "registrar", "dispensar", "reabrir"]),
+  acao: z.enum(["gerar_pedido_omie", "conferir_omie", "emitir_omie", "registrar", "dispensar", "reabrir"]),
   // gerar_pedido_omie: materiais já resolvidos na tela de preparação (código + valor)
   materiais: z.array(materialResolvidoSchema).optional(),
   cfop: z.string().max(10).nullable().optional(),
@@ -94,6 +94,35 @@ export async function PATCH(req, { params }) {
     });
     await prisma.auditLog.create({ data: { userId: user.id, action: "REMESSA_TERCEIRO_GERAR_PEDIDO", entity: "RomaneioTerceiro", entityId: upd.id, diff: { numero: upd.numero, pedidoOmie: upd.remessaPedidoOmie, numeroPedido: upd.remessaPedidoNumero } } }).catch(() => {});
     return NextResponse.json({ success: true, remessaStatus: upd.remessaStatus, pedidoOmie: upd.remessaPedidoOmie, numeroPedido: upd.remessaPedidoNumero });
+  }
+
+  // ── Conferir a remessa no Omie (valida antes de emitir; não emite NF) ──
+  if (body.acao === "conferir_omie") {
+    if (!atual.remessaPedidoOmie) return NextResponse.json({ error: "Gere a remessa no Omie antes de conferir." }, { status: 400 });
+    const r = await conferirRemessaOmie(atual.remessaPedidoOmie);
+    if (!r.ok) return NextResponse.json({ error: r.erro }, { status: 400 });
+    return NextResponse.json({ success: true, mensagem: r.mensagem });
+  }
+
+  // ── Emitir a NF-e da remessa (ConcluirRemessa → SEFAZ) — IRREVERSÍVEL ──
+  if (body.acao === "emitir_omie") {
+    if (atual.remessaStatus === "EMITIDA") return NextResponse.json({ error: "Remessa já emitida." }, { status: 400 });
+    if (!atual.remessaPedidoOmie) return NextResponse.json({ error: "Gere a remessa no Omie antes de emitir." }, { status: 400 });
+    const r = await concluirRemessaOmie(atual.remessaPedidoOmie);
+    if (!r.ok) return NextResponse.json({ error: `Falha ao emitir a NF no Omie: ${r.erro}` }, { status: 502 });
+    const upd = await prisma.romaneioTerceiro.update({
+      where: { id: atual.id },
+      data: {
+        remessaStatus: "EMITIDA",
+        remessaNfNumero: r.nf?.numero || null,
+        remessaNfSerie: r.nf?.serie || null,
+        remessaNfChave: r.nf?.chave || null,
+        remessaNfEmitidaEm: new Date(),
+        remessaPorNome: user.name || null,
+      },
+    });
+    await prisma.auditLog.create({ data: { userId: user.id, action: "REMESSA_TERCEIRO_EMITIR_NF", entity: "RomaneioTerceiro", entityId: upd.id, diff: { numero: upd.numero, pedidoOmie: atual.remessaPedidoOmie, nf: r.nf } } }).catch(() => {});
+    return NextResponse.json({ success: true, remessaStatus: "EMITIDA", nf: r.nf });
   }
 
   const data = {};

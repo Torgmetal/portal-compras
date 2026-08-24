@@ -25,9 +25,10 @@ export default function RemessaTerceiroClient() {
   const [erro, setErro] = useState("");
   const [filtro, setFiltro] = useState("pendente"); // pendente | emitida | todos
   const [busca, setBusca] = useState("");
-  const [emitir, setEmitir] = useState(null); // remessa em emissão
+  const [emitir, setEmitir] = useState(null); // remessa em registro manual de NF
   const [verItens, setVerItens] = useState(null); // remessa cujos itens estão sendo vistos
   const [preparar, setPreparar] = useState(null); // remessa em preparação (gerar pedido)
+  const [faturar, setFaturar] = useState(null); // remessa em faturamento/emissão de NF pelo portal
 
   const carregar = useCallback(() => {
     setErro("");
@@ -151,7 +152,8 @@ export default function RemessaTerceiroClient() {
                           )}
                           {r.remessaStatus === "PEDIDO_CRIADO" && (
                             <>
-                              <button onClick={() => setEmitir(r)} title="Registrar a NF depois de faturar no Omie" className="text-xs font-semibold text-white bg-torg-blue hover:bg-torg-dark px-2.5 py-1 rounded-lg inline-flex items-center gap-1"><ReceiptText size={12} /> Registrar NF</button>
+                              <button onClick={() => setFaturar(r)} title="Conferir e emitir a NF-e pelo portal (SEFAZ)" className="text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1 rounded-lg inline-flex items-center gap-1"><ReceiptText size={12} /> Emitir NF</button>
+                              <button onClick={() => setEmitir(r)} title="Registrar manualmente a NF (se faturou direto no Omie)" className="text-xs text-torg-blue hover:text-torg-dark border border-torg-blue-100 rounded-lg px-2 py-1 inline-flex items-center gap-1"><Pencil size={12} /> Registrar manual</button>
                               <button onClick={() => acao(r.id, { acao: "reabrir" }, "Remessa reaberta")} title="Reabrir (desvincula do fluxo — o rascunho no Omie precisa ser removido lá)" className="text-torg-gray hover:text-red-600 p-1"><Undo2 size={14} /></button>
                             </>
                           )}
@@ -172,6 +174,7 @@ export default function RemessaTerceiroClient() {
       {emitir && <ModalEmitir remessa={emitir} onClose={() => setEmitir(null)} onSalvo={() => { setEmitir(null); carregar(); showToast("NF de remessa registrada", "success"); }} />}
       {verItens && <ModalItens remessa={verItens} onClose={() => setVerItens(null)} />}
       {preparar && <ModalPrepararRemessa remessa={preparar} onClose={() => setPreparar(null)} onGerado={(msg) => { setPreparar(null); carregar(); showToast(msg || "Remessa criada no Omie (rascunho)", "success"); }} />}
+      {faturar && <ModalFaturar remessa={faturar} onClose={() => setFaturar(null)} onEmitido={(msg) => { setFaturar(null); carregar(); showToast(msg || "NF-e emitida", "success"); }} />}
     </div>
   );
 }
@@ -286,6 +289,82 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
               {gerando ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Gerar remessa no Omie
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Faturamento pelo portal: CONFERE a remessa no Omie (valida) e, ao confirmar, EMITE a
+// NF-e no SEFAZ (ConcluirRemessa) — ação irreversível. Ao emitir, o portal puxa nº/chave
+// da NF e marca EMITIDA.
+function ModalFaturar({ remessa, onClose, onEmitido }) {
+  const [conf, setConf] = useState({ estado: "conferindo" }); // conferindo | ok | erro
+  const [emitindo, setEmitindo] = useState(false);
+  const [erroEmit, setErroEmit] = useState("");
+
+  const conferir = useCallback(async () => {
+    setConf({ estado: "conferindo" });
+    try {
+      const res = await fetch(`/api/fiscal/remessa-terceiro/${remessa.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao: "conferir_omie" }) });
+      const j = await res.json();
+      if (j.success) setConf({ estado: "ok", mensagem: j.mensagem });
+      else setConf({ estado: "erro", mensagem: j.error || "Falha na conferência" });
+    } catch { setConf({ estado: "erro", mensagem: "Não foi possível conferir a remessa." }); }
+  }, [remessa.id]);
+  useEffect(() => { conferir(); }, [conferir]);
+
+  async function emitir() {
+    setErroEmit(""); setEmitindo(true);
+    try {
+      const res = await fetch(`/api/fiscal/remessa-terceiro/${remessa.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao: "emitir_omie" }) });
+      const j = await res.json();
+      if (!j.success) throw new Error(j.error || "Falha ao emitir");
+      onEmitido(j.nf?.numero ? `NF-e ${j.nf.numero} emitida com sucesso` : "NF-e emitida — confira o número no Omie");
+    } catch (e) { setErroEmit(e.message); setEmitindo(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg my-8">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><ReceiptText size={16} className="text-emerald-600" /> Emitir NF-e — RT-{String(remessa.numero).padStart(3, "0")}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          <div className="bg-gray-50 rounded-lg p-3 text-xs text-torg-gray">
+            <p><strong className="text-torg-dark">{remessa.terceiro?.nome}</strong>{remessa.terceiro?.uf ? ` · ${remessa.terceiro.uf}` : ""}{remessa.opRefNumero ? ` · OP ${remessa.opRefNumero}` : ""}</p>
+            <p className="mt-0.5">Remessa nº {remessa.pedidoNumero || "—"} no Omie · {fmtKg(remessa.pesoEnviadoKg)}</p>
+          </div>
+
+          {/* Passo 1: conferência */}
+          <div className="border border-gray-100 rounded-lg p-3">
+            <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wider mb-1.5">1. Conferência</p>
+            {conf.estado === "conferindo" ? (
+              <p className="text-sm text-torg-gray inline-flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> Conferindo a remessa no Omie…</p>
+            ) : conf.estado === "ok" ? (
+              <p className="text-sm text-emerald-700 inline-flex items-center gap-1.5"><Check size={15} /> {conf.mensagem || "Remessa validada."}</p>
+            ) : (
+              <div>
+                <p className="text-sm text-red-600 inline-flex items-start gap-1.5"><AlertCircle size={15} className="mt-0.5 shrink-0" /> {conf.mensagem}</p>
+                <button onClick={conferir} className="mt-2 text-xs text-torg-blue hover:underline">Conferir de novo</button>
+              </div>
+            )}
+          </div>
+
+          {/* Passo 2: emissão */}
+          <div className={`border rounded-lg p-3 ${conf.estado === "ok" ? "border-amber-200 bg-amber-50/40" : "border-gray-100 opacity-60"}`}>
+            <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wider mb-1.5">2. Emitir NF-e</p>
+            <p className="text-xs text-torg-gray">Ao emitir, a NF-e é enviada ao <strong>SEFAZ</strong> e a nota é gerada de verdade. <strong className="text-amber-700">Essa ação não pode ser desfeita.</strong></p>
+            {erroEmit && <p className="mt-2 text-sm text-red-600 inline-flex items-start gap-1.5"><AlertCircle size={14} className="mt-0.5 shrink-0" /> {erroEmit}</p>}
+          </div>
+        </div>
+        <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 rounded-b-xl">
+          <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">Cancelar</button>
+          <button onClick={emitir} disabled={conf.estado !== "ok" || emitindo}
+            className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50">
+            {emitindo ? <Loader2 size={14} className="animate-spin" /> : <ReceiptText size={14} />} Emitir NF-e agora
+          </button>
         </div>
       </div>
     </div>
