@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma, waitMesTables } from "@/lib/prisma";
-import { obraParaNumeroOP } from "@/lib/syneco-obra";
+import { mapaObraParaOP, opIdDaLinha } from "@/lib/syneco-obra";
 
 // Endpoint de recebimento de dados do MES SKA/Syneco.
 // Chamado pelo agente local (scripts/mes-sync-agent.js) via HTTPS a cada hora.
@@ -77,18 +77,10 @@ export async function POST(req) {
 
   // Pré-carrega mapa obra → opId
   // Obra no SKA usa prefixo T (T64, T70...) — portal usa número com zero (064, 070...)
+  // ⚠ o número da OP pode ter sufixo: "T36" → "036" tem de achar a OP "036-01". Ver lib/syneco-obra.js.
   const obrasUnicas = [...new Set(body.apontamentos.map((a) => a.obra).filter(Boolean))];
-  const numerosPortal = [...new Set(obrasUnicas.map(obraParaNumeroOP))];
-  const ops = await prisma.oP.findMany({
-    where: { numero: { in: numerosPortal } },
-    select: { id: true, numero: true },
-  });
-  // opMap: chave = numero do portal (064) → id
-  const opMapPorNumero = Object.fromEntries(ops.map((o) => [o.numero, o.id]));
+  const opPorObra = await mapaObraParaOP(prisma, obrasUnicas);
   // opMap: chave = obra SKA (T64) → id  (para lookup direto no loop)
-  const opMap = Object.fromEntries(
-    obrasUnicas.map((obra) => [obra, opMapPorNumero[obraParaNumeroOP(obra)] || null])
-  );
 
   const syncLog = await prisma.mesSyncLog.create({
     data: {
@@ -107,8 +99,8 @@ export async function POST(req) {
       const lote = body.apontamentos.slice(i, i + LOTE);
       await Promise.all(
         lote.map(async (ap) => {
-          const opId = opMap[ap.obra] || null;
           const dataInicioDate = parseData(ap.dataInicio);
+          const opId = opIdDaLinha(opPorObra, ap.obra, dataInicioDate);
           const dataFimDate    = ap.dataFim ? parseData(ap.dataFim) : null;
 
           if (!dataInicioDate) return; // ignora registros sem data

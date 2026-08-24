@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma, waitMesTables } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { obraParaNumeroOP } from "@/lib/syneco-obra";
+import { mapaObraParaOP } from "@/lib/syneco-obra";
 
 // GET /api/mes/apontamentos
 // Fonte: MesOrdem (dataset 150 — planejado vs produzido).
@@ -100,15 +100,8 @@ export async function GET(req) {
   }));
 
   const obrasUnicas = [...new Set(grupos.map(g => g.obra))];
-  const numerosPortal = [...new Set(obrasUnicas.map(obraParaNumeroOP))];
-  const ops = await prisma.oP.findMany({
-    where: { numero: { in: numerosPortal } },
-    select: { id: true, numero: true, cliente: true, obra: true },
-  });
-  const opMapPorNumero = Object.fromEntries(ops.map(o => [o.numero, o]));
-  const opMap = Object.fromEntries(
-    obrasUnicas.map(obra => [obra, opMapPorNumero[obraParaNumeroOP(obra)] || null])
-  );
+  // ⚠ resolve por PREFIXO: "T36" → "036" tem de achar a OP "036-01". Ver lib/syneco-obra.js.
+  const opMap = await mapaObraParaOP(prisma, obrasUnicas, { id: true, numero: true, cliente: true, obra: true }, de ? new Date(de) : null);
 
   const totais0 = await prisma.mesOrdem.groupBy({
     by: ["obra"],

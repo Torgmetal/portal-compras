@@ -1,7 +1,7 @@
 import { prisma, waitMesTables } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import MesClient from "./MesClient";
-import { obraParaNumeroOP } from "@/lib/syneco-obra";
+import { mapaObraParaOPDeLista } from "@/lib/syneco-obra";
 
 export const metadata = {
   title: "Workspace Torg — Rastreabilidade Syneco",
@@ -71,14 +71,11 @@ export default async function MesPage() {
     _max: { updatedAt: t._max.updatedAt },
   }));
 
-  // opMapPorNumero: "064" → { id, numero, cliente, obra }
-  const opMapPorNumero = Object.fromEntries(opsDb.map(o => [o.numero, o]));
   // obrasUnicas do período: ["T64", "T70", ...]
   const obrasUnicas = [...new Set(grupos.map(g => g.obra).filter(Boolean))];
   // opMap final com chave = obra SKA (T64) para o client usar direto
-  const opMap = Object.fromEntries(
-    obrasUnicas.map(obra => [obra, opMapPorNumero[obraParaNumeroOP(obra)] || null])
-  );
+  // ⚠ tolera sufixo ("036" acha "036-01") — a mesma regra do sync. Ver lib/syneco-obra.js.
+  const opMap = mapaObraParaOPDeLista(opsDb, obrasUnicas, de);
   const totaisMap = Object.fromEntries(totaisPorObra.map(t => [t.obra, t]));
 
   // Status dominante por obra: Produzindo > Finalizado Total > Finalizado Parcial > Finalizado

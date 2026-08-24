@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma, prismaDirect, waitMesTables } from "@/lib/prisma";
-import { obraParaNumeroOP } from "@/lib/syneco-obra";
+import { mapaObraParaOP, opIdDaLinha } from "@/lib/syneco-obra";
 
 // Recebe ordens planejadas do SKA dataset 150 (snapshot planejado vs produzido).
 // Upsert EM MASSA via INSERT ... ON CONFLICT (1 SQL por lote) — rápido.
@@ -78,10 +78,9 @@ export async function POST(req) {
   // (PgBouncer) estoura "out of memory" sob carga repetida.
   // Mapa obra → opId do portal
   const obrasUnicas = [...new Set(body.ordens.map(o => o.obra).filter(Boolean))];
-  const numerosPortal = [...new Set(obrasUnicas.map(obraParaNumeroOP))];
-  const ops = await prismaDirect.oP.findMany({ where: { numero: { in: numerosPortal } }, select: { id: true, numero: true } });
-  const opMapPorNumero = Object.fromEntries(ops.map(o => [o.numero, o.id]));
-  const opIdDaObra = (obra) => opMapPorNumero[obraParaNumeroOP(obra)] || null;
+  // ⚠ resolve por PREFIXO: "T36" → "036" tem de achar a OP "036-01". Ver lib/syneco-obra.js.
+  const opPorObra = await mapaObraParaOP(prismaDirect, obrasUnicas);
+  const opIdDaObra = (obra, data) => opIdDaLinha(opPorObra, obra, data);
 
   // Registro de auditoria do sync — NÃO-FATAL: se falhar, o sync dos dados
   // continua normalmente (o syncLog é só bookkeeping, não pode derrubar o upsert).
@@ -155,7 +154,7 @@ export async function POST(req) {
     pgArray(lote.map(o => (o.productionId == null || !Number.isFinite(o.productionId)) ? null : Math.trunc(o.productionId))),
     pgArray(lote.map(o => { const d = parseData(o.dataInicio); return d ? d.toISOString() : null; })),
     pgArray(lote.map(o => { const d = parseData(o.dataFim);    return d ? d.toISOString() : null; })),
-    pgArray(lote.map(o => opIdDaObra(o.obra))),
+    pgArray(lote.map(o => opIdDaObra(o.obra, parseData(o.dataInicio)))),
     pgArray(lote.map(() => syncLogId)),
   ];
 
