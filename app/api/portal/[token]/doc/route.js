@@ -46,6 +46,11 @@ export async function GET(req, { params }) {
       },
     });
   } catch (e) {
-    return new NextResponse(`Não consegui abrir este documento: ${e.message}`, { status: 502 });
+    // ⚠ `e.message` VAI PARA O NAVEGADOR DO CLIENTE. Já saiu daqui coisa como "Failed to parse PDF
+    // document (line:582 col:436): No PDF header found" e "Falha ao baixar item 012SCVJY…: HTTP
+    // 404" — id interno do SharePoint e stack de parser, em inglês, na tela de quem comprou a
+    // obra. O motivo continua existindo no log do servidor, que é onde ele serve.
+    console.error("[portal/doc] falha ao servir documento:", e);
+    return new NextResponse("Não foi possível abrir este documento agora. Fale com a Qualidade da Torg.", { status: 502 });
   }
 }

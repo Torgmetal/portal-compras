@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarTokenForte } from "@/lib/token";
 import { RT_NOME, fmtOPdb, baseUrlDe, enviarEmailEtapa } from "@/lib/databook-assinaturas";
+import { estaFechado } from "@/lib/databook-revisao";
 
 export const runtime = "nodejs";
 
@@ -50,6 +51,17 @@ export async function POST(req, { params }) {
   if (!book) return NextResponse.json({ success: false, error: "Data book não encontrado" }, { status: 404 });
   if (book.assinaturas.some((a) => a.status === "ASSINADO")) {
     return NextResponse.json({ success: false, error: "O fluxo de assinaturas já está em andamento (já há assinatura registrada). Não é possível reconfigurar." }, { status: 400 });
+  }
+
+  // ⚠⚠ NÃO SE COLHE ASSINATURA DE RASCUNHO. A 4ª etapa desta cadeia é o CLIENTE, e a rota não
+  // exigia emissão nenhuma: com um clique dava para iniciar, em qualquer data book EM MONTAGEM, um
+  // fluxo que termina no cliente assinando um livro com seções pendentes. Assinar é atestar o
+  // documento que está ali — se ele ainda pode mudar, a assinatura não vale nada.
+  if (!estaFechado(book)) {
+    return NextResponse.json(
+      { error: "Emita o data book antes de enviar para assinatura — não se colhe assinatura de documento que ainda pode mudar." },
+      { status: 400 },
+    );
   }
 
   const op = fmtOPdb(book.opNumero);
