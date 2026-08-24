@@ -588,8 +588,14 @@ export default function ProducaoClient() {
                   <div className="border-t border-gray-100">
                     {/* abas de setor da OP */}
                     <div className="flex items-center gap-1 px-3 pt-2.5 flex-wrap">
+                      {/* ⚠⚠ O kg DA ABA É O QUE FALTA PASSAR NAQUELE SETOR — e não se somam.
+                          Vitor (24/08/2026): "o que significam esses números". A mesma peça conta em
+                          TODOS os setores por onde ainda vai passar, então somar as abas dá muito
+                          mais que o peso da obra. Croqui só existe na Preparação; conjunto vai de
+                          Montagem a Expedição; avulsa é cortada e pula Montagem/Solda. */}
                       {o.setores.map((s) => (
                         <button key={s.setor} onClick={() => trocarSetor(o, s.setor)}
+                          title={`${s.label}: falta passar ${fmtKg(s.pendenteKg)} de ${fmtKg(s.totalKg)} (${s.pct}% pronto). A mesma peça conta em cada setor por onde ainda vai passar — não some as abas.`}
                           className={`text-[11px] px-2.5 py-1 rounded-lg border font-semibold ${setorAba === s.setor ? "bg-torg-blue text-white border-torg-blue" : "border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
                           {s.label} <span className="font-normal opacity-80">{fmtKg(s.pendenteKg)}</span>
                         </button>
