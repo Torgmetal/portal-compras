@@ -18,6 +18,7 @@ import {
   Loader2, AlertCircle, RefreshCw, EyeOff, Send, Factory, ArrowRight, CalendarClock,
   ChevronRight, ChevronDown, FileSpreadsheet, FolderOpen, Search,
 } from "lucide-react";
+import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import { fmtOP } from "@/lib/utils";
 
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
@@ -32,12 +33,15 @@ const VEREDITO = {
   SEM_CONJUNTO: { rot: "croqui sim, conjunto não", chip: "bg-amber-50 text-amber-700 border-amber-200" },
   SO_MAQUINA:   { rot: "só arquivo de máquina",    chip: "bg-red-100 text-red-800 border-red-200" },
   SEM_DESENHO:  { rot: "sem desenho nenhum",       chip: "bg-red-100 text-red-800 border-red-200" },
-  SO_CLIENTE:   { rot: "desenho só na pasta do cliente", chip: "bg-amber-50 text-amber-700 border-amber-200" },
+  // ⚠ 2.5.5 é a pasta que a Torg monta para ENVIAR ao cliente — o desenho existe, mas não onde a
+  // fabricação procura. Ação é mover, não desenhar; por isso estado próprio.
+  SO_ENVIO:     { rot: "só na pasta de envio",     chip: "bg-amber-50 text-amber-700 border-amber-200" },
   SEM_LISTA:    { rot: "desenho sem lista",        chip: "bg-sky-50 text-sky-700 border-sky-200" },
   // ⚠ obra sem lista E sem arquivo é obra que ainda não começou — cinza, não vermelho. Em vermelho,
   // seis obras futuras encheriam o painel de alarme falso e afogariam a OP-106.
   VAZIA:        { rot: "ainda não começou",        chip: "bg-gray-100 text-torg-gray border-gray-200" },
   ERRO:         { rot: "não consegui ler a pasta",  chip: "bg-gray-100 text-torg-gray border-gray-200" },
+  NAO_CONFERIDA:{ rot: "ainda não conferida",      chip: "bg-gray-100 text-torg-gray border-gray-200" },
 };
 
 // ⚠ o resumo da linha chega em DOIS formatos: o que o cron gravou (vem no payload do painel, já
@@ -53,6 +57,12 @@ const resumoPasta = (o, fresco) => {
   };
   return o.pasta || null;
 };
+
+// colunas com funil, como no Excel — Vitor pediu o mesmo padrão da lista do PCP
+const COLUNAS_PASTA = [
+  { key: "cliente",  label: "Cliente",  valor: (l) => l._cliente },
+  { key: "veredito", label: "Veredito", valor: (l) => l._veredito },
+];
 
 const desdeQuando = (iso) => {
   if (!iso) return "";
@@ -76,6 +86,11 @@ export default function FluxoProducao() {
   const [conferindo, setConferindo] = useState(null);
   const [varrendo, setVarrendo] = useState(null); // { feitas, total } enquanto confere todas
   const [pastaAberta, setPastaAberta] = useState(null);
+  const [selPasta, setSelPasta] = useState(() => new Set()); // OPs marcadas para a planilha
+  const [colPasta, setColPasta] = useState(null);            // qual filtro de coluna está aberto
+  const [baixando, setBaixando] = useState(false);
+  const [verBaixadas, setVerBaixadas] = useState(false);
+  const [baixaEmCurso, setBaixaEmCurso] = useState(null);
 
   const carregar = useCallback(async () => {
     setCarregando(true); setErro("");
@@ -146,6 +161,104 @@ export default function FluxoProducao() {
     } catch { /* o resumo da linha continua valendo */ }
   }, [pastaAberta]);
 
+  // ⚠ pede o motivo, mas não OBRIGA: baixa é decisão da Diretoria, e travar num campo obrigatório
+  // só faria escrever "antiga" trinta vezes. Reativar é um clique, sem pergunta.
+  async function darBaixa(o) {
+    const jaTem = !!o.pasta?.baixada;
+    let motivo = null;
+    if (!jaTem) {
+      motivo = window.prompt(`Dar baixa na ${fmtOP(o.numero)} — some da lista de conferência de desenhos.\n\nMotivo (opcional):`, "obra antiga");
+      if (motivo === null) return; // cancelou
+    }
+    setBaixaEmCurso(o.opId); setErro("");
+    try {
+      const r = await fetch("/api/diretoria/fluxo/pasta/baixa", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opId: o.opId, baixada: !jaTem, motivo }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao registrar a baixa");
+      setSelPasta((sel) => { const n = new Set(sel); n.delete(o.opId); return n; });
+      await carregar();
+    } catch (e) { setErro(`Não consegui registrar a baixa: ${e?.message || e}`); }
+    finally { setBaixaEmCurso(null); }
+  }
+
+  // ⚠ PLANILHA DOS DESENHOS. Sai do que o cron gravou — não varre o SharePoint de novo, senão uma
+  // exportação de 30 obras viraria minutos de espera pelo mesmo número que já está no banco.
+  //
+  // ⚠ try/catch com o erro NA TELA: já aconteceu de a planilha falhar em silêncio e o clique não
+  // fazer nada visível. Sem isso, "não estou conseguindo baixar" vira investigação do zero.
+  async function baixarPlanilhaPasta(ids) {
+    setBaixando(true); setErro("");
+    try {
+      const r = await fetch("/api/diretoria/fluxo/pasta/planilha", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opIds: ids || [] }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao montar a planilha");
+      if (!j.resumo?.length) throw new Error("Nenhuma obra para exportar.");
+
+      const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarRodapeISO, downloadWorkbook } =
+        await import("@/lib/excel-relatorio");
+
+      const semDesenho = j.resumo.filter((x) => ["SO_MAQUINA", "SEM_DESENHO", "SO_ENVIO", "VAZIA"].includes(x.veredito)).length;
+      const completas = j.resumo.filter((x) => x.veredito === "OK").length;
+      const cab = ["OP", "Cliente", "Obra", "Veredito", "Marcas na lista", "Conjuntos c/ desenho", "Croquis c/ desenho",
+        "Desenhos em 2.5.2", "PDF em 2.5.5 (envio)", "Só em 2.5.5", "Arq. de máquina", "Modelo 3D",
+        "Nome fora do padrão", "Conferido em", "Baixa"];
+
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: "Desenhos na pasta da Engenharia",
+        subtitulo: ids?.length ? `${ids.length} obra(s) selecionada(s)` : "Todas as obras em andamento",
+        kpis: [`${fmtN(j.resumo.length)} obra(s)`, `${fmtN(semDesenho)} sem desenho`, `${fmtN(completas)} completa(s)`],
+        totalColunas: cab.length, nomePlanilha: "Resumo", codigoDoc: "REL-DIR-002",
+      });
+      ws.columns = [{ width: 10 }, { width: 20 }, { width: 26 }, { width: 24 }, { width: 15 }, { width: 19 }, { width: 17 },
+        { width: 17 }, { width: 19 }, { width: 12 }, { width: 15 }, { width: 11 }, { width: 18 }, { width: 16 }, { width: 22 }];
+
+      // ⚠ os helpers NÃO devolvem a próxima linha — contar aqui. Já custou uma planilha que não baixava.
+      let l = linhaInicio;
+      adicionarHeaderTabela(ws, l, cab); l++;
+      for (const x of j.resumo) {
+        adicionarLinhaTabela(ws, l, [
+          fmtOP(x.numero), x.cliente, x.obra,
+          x.veredito ? (VEREDITO[x.veredito]?.rot || x.veredito) : "ainda não conferida",
+          x.marcas, `${x.conjuntosCom}/${x.conjuntosTotal}`, `${x.croquisCom}/${x.croquisTotal}`,
+          x.pdfs, x.pdfsEnvio, x.soEnvio, x.nc1, x.igs, x.foraPadrao,
+          x.checadoEm ? new Date(x.checadoEm).toLocaleString("pt-BR") : "—",
+          x.baixada ? `sim${x.baixaMotivo ? ` — ${x.baixaMotivo}` : ""}` : "",
+        ], { alinhamento: { 4: "right", 5: "right", 6: "right", 7: "right", 8: "right", 9: "right", 10: "right", 11: "right", 12: "right" } });
+        l++;
+      }
+      adicionarRodapeISO(ws, l + 1, cab.length);
+
+      // ── aba 2: a peça, não a obra ──
+      const cab2 = ["OP", "Cliente", "Marca", "Tipo", "Tem NC1", "Está em 2.5.5 (envio)", "Desenho achado com outro nome"];
+      const ws2 = workbook.addWorksheet("Sem desenho");
+      ws2.columns = [{ width: 10 }, { width: 20 }, { width: 22 }, { width: 12 }, { width: 10 }, { width: 19 }, { width: 44 }];
+      let l2 = 1;
+      adicionarHeaderTabela(ws2, l2, cab2); l2++;
+      for (const it of j.itens) {
+        adicionarLinhaTabela(ws2, l2, [
+          fmtOP(it.numero), it.cliente, it.marca, it.conjunto ? "Conjunto" : "Croqui",
+          it.nc1 ? "sim" : "não", it.soEnvio ? "sim" : "", it.foraPadrao || "",
+        ]);
+        l2++;
+      }
+      if (!j.itens.length) { adicionarLinhaTabela(ws2, l2, ["—", "", "Nenhuma marca sem desenho.", "", "", "", ""]); }
+      ws2.views = [{ state: "frozen", ySplit: 1 }];
+
+      const nome = ids?.length ? `Desenhos na pasta - ${ids.length} OPs.xlsx` : "Desenhos na pasta - todas as OPs.xlsx";
+      await downloadWorkbook(workbook, nome);
+      // ⚠ avisar o corte: 20.000 itens calados pareceriam a lista inteira.
+      if (j.truncado) setErro("A planilha saiu, mas a aba de peças foi cortada em 20.000 linhas. Exporte por seleção de OP para ver o resto.");
+      else if (j.naoConferidas) setErro(`Planilha gerada. ${j.naoConferidas} obra(s) ainda não foram conferidas e saíram sem números.`);
+    } catch (e) { setErro(`Não consegui gerar a planilha: ${e?.message || e}`); }
+    finally { setBaixando(false); }
+  }
+
   // ⚠ a planilha é o que sai daqui para a Engenharia — é a lista do que falta importar, com nome
   // e peso. Sem ela, "3.671 itens" continua sendo um número que ninguém consegue acionar.
   async function exportar(opId) {
@@ -189,6 +302,21 @@ export default function FluxoProducao() {
   const obrasPasta = useMemo(
     () => (d?.ops || []).filter((o) => o.entregues > 0).sort((a, b) => String(b.numero).localeCompare(String(a.numero), "pt-BR", { numeric: true })),
     [d]);
+  // ⚠ o rótulo do veredito entra como CAMPO: o filtro de coluna lista o que a pessoa lê na tela,
+  // não a constante interna. Ninguém procura por "SO_MAQUINA".
+  const linhasPasta = useMemo(() => obrasPasta.map((o) => ({
+    ...o,
+    _veredito: o.pasta ? (VEREDITO[o.pasta.veredito]?.rot || o.pasta.veredito) : "ainda não conferida",
+    _cliente: o.cliente || "—",
+  })), [obrasPasta]);
+  const fPasta = useFiltroColunas(linhasPasta, COLUNAS_PASTA);
+  // obra com baixa fica escondida por padrão, e o contador no topo do bloco permite trazê-la de volta
+  const listaVisivel = useMemo(
+    () => fPasta.filtradas.filter((o) => verBaixadas || !o.pasta?.baixada),
+    [fPasta.filtradas, verBaixadas]);
+  const fp = { filtros: fPasta.filtros, setFiltros: fPasta.setFiltros, opcoesDaColuna: fPasta.opcoesDaColuna, aberta: colPasta, setAberta: setColPasta };
+  const todasMarcadas = listaVisivel.length > 0 && listaVisivel.every((x) => selPasta.has(x.opId));
+  const algumasMarcadas = listaVisivel.some((x) => selPasta.has(x.opId));
   const picoDia = useMemo(() => Math.max(1, ...(d?.dias || []).map((x) => x.kg)), [d]);
 
   if (carregando) return <div className="flex items-center justify-center py-20 gap-3 text-torg-gray"><Loader2 size={22} className="animate-spin" /> Carregando…</div>;
@@ -278,7 +406,7 @@ export default function FluxoProducao() {
       <Bloco
         icone={FolderOpen}
         titulo="O desenho existe na pasta?"
-        sub={`${fmtN(t.obrasConferidas)} de ${fmtN(obrasPasta.length)} obra(s) conferida(s) · ${fmtN(t.obrasSemDesenho)} sem desenho nenhum · ${fmtN(t.obrasPastaOk)} completa(s).`}
+        sub={`${fmtN(t.obrasConferidas)} de ${fmtN(obrasPasta.length)} obra(s) conferida(s) · ${fmtN(t.obrasSemDesenho)} sem desenho na pasta de fabricação · ${fmtN(t.obrasPastaOk)} completa(s).`}
         cor="text-torg-blue"
       >
         {/* ⚠ o texto diz por que o bloco existe: até aqui o painel media LISTA e chamava de desenho. */}
@@ -286,47 +414,108 @@ export default function FluxoProducao() {
           Lista importada não é desenho emitido. Medido na <b>OP-106</b>: a LPC estava no portal, a pasta
           tinha 16 arquivos <code className="text-[11px]">.nc1</code> e 11 <code className="text-[11px]">.igs</code> — e
           nenhum desenho. O programador conseguiu lançar porque a máquina lê NC1; a bancada ficou sem papel,
-          e foi por isso que a impressão não saiu.
+          e foi por isso que a impressão não saiu. Conta só o que está em <b>2.5.2 Fabricação</b>.
         </p>
 
         <div className="flex items-center gap-3 flex-wrap mb-3">
           <button
-            onClick={() => conferirTodas(obrasPasta)}
-            disabled={!!varrendo || !!conferindo || !obrasPasta.length}
+            onClick={() => baixarPlanilhaPasta(selPasta.size ? [...selPasta] : listaVisivel.map((x) => x.opId))}
+            disabled={baixando || !listaVisivel.length}
+            title={selPasta.size ? `Exportar as ${selPasta.size} obra(s) marcadas` : "Exportar as obras visíveis na lista"}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-torg-gray hover:bg-gray-50 disabled:opacity-40"
+          >
+            {baixando ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />}
+            {selPasta.size ? `Planilha das ${selPasta.size} marcada(s)` : `Planilha das ${listaVisivel.length} obras`}
+          </button>
+          <button
+            onClick={() => conferirTodas(listaVisivel)}
+            disabled={!!varrendo || !!conferindo || !listaVisivel.length}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-torg-gray hover:bg-gray-50 disabled:opacity-40"
           >
             {varrendo ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
-            {varrendo ? `conferindo ${varrendo.feitas} de ${varrendo.total}…` : `Reconferir as ${obrasPasta.length} obras agora`}
+            {varrendo ? `conferindo ${varrendo.feitas} de ${varrendo.total}…` : "Reconferir agora"}
           </button>
-          {/* ⚠ dizer que o número JÁ é atual evita o clique desnecessário — a varredura é cara. */}
+          {selPasta.size > 0 && (
+            <button onClick={() => setSelPasta(new Set())} className="text-[11px] text-torg-gray hover:underline">limpar seleção</button>
+          )}
+          {fPasta.ativos > 0 && (
+            <button onClick={fPasta.limpar} className="text-[11px] text-torg-orange hover:underline">
+              limpar filtro ({fPasta.rotulosAtivos.join(", ")})
+            </button>
+          )}
+          {/* ⚠ a baixa fica visível como CONTADOR, não escondida: obra fora da conta tem de ser
+              possível de reencontrar, senão vira dado sumido. */}
+          {t.obrasBaixadas > 0 && (
+            <button onClick={() => setVerBaixadas((v) => !v)} className="text-[11px] text-torg-gray hover:underline">
+              {verBaixadas ? "ocultar" : "mostrar"} {fmtN(t.obrasBaixadas)} com baixa
+            </button>
+          )}
           <span className="text-[11px] text-torg-gray-light">
-            atualizado todo dia pelo sistema; reconferir varre o SharePoint de novo e leva alguns minutos
+            atualizado todo dia pelo sistema; reconferir varre o SharePoint de novo
           </span>
         </div>
 
-        {!obrasPasta.length ? <Vazio texto="Nenhuma obra com lista importada." /> : (
-          <Tabela cabecalho={["", "Obra", "Na lista", "Desenhos", "Conjuntos", "Croquis", "Veredito", ""]}>
-            {obrasPasta.map((o) => {
+        {!listaVisivel.length ? <Vazio texto="Nenhuma obra nesta lista." /> : (
+          <Tabela cabecalhoNode={
+            <tr>
+              <th className="px-3 py-2 w-8">
+                {/* ⚠ MARCAR TODAS = as VISÍVEIS, não a base inteira. Com filtro ligado, marcar o que
+                    está escondido é a forma clássica de exportar o que ninguém pediu. */}
+                <input type="checkbox" aria-label="Marcar todas as obras visíveis" className="accent-torg-orange"
+                  checked={todasMarcadas} ref={(el) => { if (el) el.indeterminate = algumasMarcadas && !todasMarcadas; }}
+                  onChange={() => setSelPasta(todasMarcadas ? new Set() : new Set(listaVisivel.map((x) => x.opId)))} />
+              </th>
+              <th className="px-3 py-2 font-semibold text-left">Obra</th>
+              <ThFiltro col="cliente" label="Cliente" className="px-3 py-2 font-semibold text-left" {...fp} />
+              <th className="px-3 py-2 font-semibold text-right">Na lista</th>
+              <th className="px-3 py-2 font-semibold text-right">Desenhos</th>
+              <th className="px-3 py-2 font-semibold text-right">Conjuntos</th>
+              <th className="px-3 py-2 font-semibold text-right">Croquis</th>
+              <ThFiltro col="veredito" label="Veredito" className="px-3 py-2 font-semibold text-left" {...fp} />
+              <th className="px-3 py-2 font-semibold text-right">Conferido</th>
+            </tr>
+          }>
+            {listaVisivel.map((o) => {
               const r = resumoPasta(o, pasta[o.opId]);
               const det = pasta[o.opId];
               const open = pastaAberta === o.opId;
               const v = r?.veredito ? VEREDITO[r.veredito] : null;
               const ocupado = !!conferindo || !!varrendo;
+              const temDet = !!det?.semDesenho;
               return (
                 <Fragment key={o.opId}>
-                  <tr className={`border-t border-gray-50 ${r && !r.erro ? "cursor-pointer" : ""} ${open ? "bg-sky-50/40" : "hover:bg-gray-50/60"}`}
-                    onClick={() => r && !r.erro && abrirPasta(o.opId, !!det?.semDesenho)}>
+                  <tr className={`border-t border-gray-50 ${r && !r.erro ? "cursor-pointer" : ""} ${open ? "bg-sky-50/40" : "hover:bg-gray-50/60"} ${o.pasta?.baixada ? "opacity-50" : ""}`}
+                    onClick={() => r && !r.erro && abrirPasta(o.opId, temDet)}>
                     <Td>
-                      {r && !r.erro && (
-                        <button onClick={(e) => { e.stopPropagation(); abrirPasta(o.opId, !!det?.semDesenho); }} aria-expanded={open}
-                          aria-label={`${open ? "Fechar" : "Ver"} a pasta da OP ${o.numero}`} className="text-torg-gray">
+                      <input type="checkbox" className="accent-torg-orange" checked={selPasta.has(o.opId)}
+                        aria-label={`Marcar a OP ${o.numero} para a planilha`}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => setSelPasta((sel) => {
+                          const n = new Set(sel);
+                          if (n.has(o.opId)) n.delete(o.opId); else n.add(o.opId);
+                          return n;
+                        })} />
+                    </Td>
+                    <Td>
+                      <div className="flex items-start gap-1.5">
+                        <button onClick={(e) => { e.stopPropagation(); abrirPasta(o.opId, temDet); }} aria-expanded={open}
+                          aria-label={`${open ? "Fechar" : "Ver"} a pasta da OP ${o.numero}`}
+                          className={`mt-0.5 text-torg-gray ${r && !r.erro ? "" : "invisible"}`}>
                           {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                         </button>
-                      )}
+                        <div>
+                          <Obra o={o} />
+                          {o.pasta?.baixada && (
+                            <p className="text-[10px] text-torg-gray-light mt-0.5">
+                              baixa {o.pasta.baixadaPorNome ? `por ${o.pasta.baixadaPorNome}` : ""}{o.pasta.baixaMotivo ? ` — ${o.pasta.baixaMotivo}` : ""}
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </Td>
-                    <Td><Obra o={o} /></Td>
+                    <Td><span className="text-[12px] text-torg-gray">{o._cliente}</span></Td>
                     <Td dir><span className="tabular-nums text-torg-gray">{fmtN(o.entregues)}</span></Td>
-                    {!r ? (
+                    {!r || r.veredito === "NAO_CONFERIDA" ? (
                       <td colSpan={4} className="px-3 py-2 text-[12px] text-torg-gray-light">ainda não conferida</td>
                     ) : r.erro ? (
                       <td colSpan={4} className="px-3 py-2 text-[12px] text-torg-gray">{r.erro}</td>
@@ -338,26 +527,33 @@ export default function FluxoProducao() {
                         <Td>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {v && <Chip cor={v.chip}>{v.rot}</Chip>}
-                            {/* ⚠ desenho existe com nome fora do padrão é outro problema: a emissão
-                                não o acha, e some da impressão como se não existisse. */}
+                            {/* ⚠ desenho com nome fora do padrão é outro problema: a emissão não o
+                                acha, e some da impressão como se não existisse. */}
                             {r.foraPadrao > 0 && <Chip cor="bg-amber-50 text-amber-700 border-amber-200">{fmtN(r.foraPadrao)} mal nomeado(s)</Chip>}
                           </div>
                         </Td>
                       </>
                     )}
                     <Td dir>
-                      <button onClick={(e) => { e.stopPropagation(); conferirPasta(o.opId); }} disabled={ocupado}
-                        title={r?.checadoEm ? `conferido ${desdeQuando(r.checadoEm)} — clique para reconferir agora` : "conferir a pasta agora"}
-                        className="inline-flex items-center gap-1 text-[11px] text-torg-blue hover:underline disabled:opacity-40 disabled:no-underline whitespace-nowrap">
-                        {conferindo === o.opId
-                          ? <><Loader2 size={11} className="animate-spin" /> conferindo…</>
-                          : <><RefreshCw size={11} /> {r ? desdeQuando(r.checadoEm) : "conferir"}</>}
-                      </button>
+                      <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                        <button onClick={(e) => { e.stopPropagation(); conferirPasta(o.opId); }} disabled={ocupado}
+                          title={r?.checadoEm ? `conferido ${desdeQuando(r.checadoEm)} — clique para reconferir agora` : "conferir a pasta agora"}
+                          className="inline-flex items-center gap-1 text-[11px] text-torg-blue hover:underline disabled:opacity-40 disabled:no-underline">
+                          {conferindo === o.opId
+                            ? <><Loader2 size={11} className="animate-spin" /> conferindo…</>
+                            : <><RefreshCw size={11} /> {r?.checadoEm ? desdeQuando(r.checadoEm) : "conferir"}</>}
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); darBaixa(o); }} disabled={baixaEmCurso === o.opId}
+                          title={o.pasta?.baixada ? "Devolver esta obra à lista" : "Tirar esta obra da lista — obra antiga que não se acompanha mais"}
+                          className="text-[11px] text-torg-gray hover:underline disabled:opacity-40">
+                          {baixaEmCurso === o.opId ? "…" : o.pasta?.baixada ? "reativar" : "dar baixa"}
+                        </button>
+                      </div>
                     </Td>
                   </tr>
-                  {open && det?.semDesenho && <tr className="bg-gray-50/50"><td colSpan={8} className="px-3 py-3"><PastaDetalhe d={det} /></td></tr>}
-                  {open && !det?.semDesenho && (
-                    <tr className="bg-gray-50/50"><td colSpan={8} className="px-3 py-3">
+                  {open && temDet && <tr className="bg-gray-50/50"><td colSpan={9} className="px-3 py-3"><PastaDetalhe d={det} /></td></tr>}
+                  {open && !temDet && (
+                    <tr className="bg-gray-50/50"><td colSpan={9} className="px-3 py-3">
                       <p className="text-sm text-torg-gray inline-flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> abrindo o detalhe…</p>
                     </td></tr>
                   )}
@@ -543,22 +739,21 @@ function PastaDetalhe({ d }) {
             servida, bancada não. Sozinho, "0 desenhos" pareceria pasta esquecida. */}
         <Mini n={fmtN(a.nc1)} l="NC1 (máquina)" cor="text-torg-gray" bg="bg-white border-gray-200" />
         <Mini n={fmtN(a.igs)} l="IGS (modelo 3D)" cor="text-torg-gray" bg="bg-white border-gray-200" />
-        <Mini n={fmtN(a.pdfsCliente || 0)} l="desenhos do cliente" sub={a.soCliente ? `${fmtN(a.soCliente)} marca(s) só aqui` : undefined}
-          cor={a.soCliente ? "text-amber-700" : "text-torg-gray"} bg={a.soCliente ? "bg-amber-50 border-amber-200" : "bg-white border-gray-200"} />
-        <Mini n={fmtN(a.cliente)} l="arquivos em 2.5.5" sub={a.cliente ? undefined : "pasta vazia"}
-          cor={a.cliente ? "text-torg-dark" : "text-amber-700"} bg={a.cliente ? "bg-white border-gray-200" : "bg-amber-50 border-amber-200"} />
+        {/* ⚠ 2.5.5 aparece como INFORMAÇÃO, nunca como cobertura: é a pasta de envio ao cliente. */}
+        <Mini n={fmtN(a.pdfsEnvio || 0)} l="PDF em 2.5.5 (envio)" sub={a.soEnvio ? `${fmtN(a.soEnvio)} marca(s) só aqui` : undefined}
+          cor={a.soEnvio ? "text-amber-700" : "text-torg-gray"} bg={a.soEnvio ? "bg-amber-50 border-amber-200" : "bg-white border-gray-200"} />
       </div>
 
-      {a.soCliente > 0 && (
-        /* ⚠ Vitor (25/08): "mesmo sendo projeto do cliente deveria ser colocado em pastas corretas".
-           A peça TEM desenho — está onde a fabricação não procura. */
+      {a.soEnvio > 0 && (
+        /* ⚠ Vitor (25/08): 2.5.5 "é uma pasta que criamos para enviar ao cliente, ou seja não será
+           necessário estar ali". O desenho existe e está fora do alcance da fabricação. */
         <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          <b>{fmtN(a.soCliente)} marca(s) só têm desenho na pasta do cliente</b> (2.5.5), e nada em
-          2.5.2 Fabricação. O desenho existe; está no lugar onde a produção não procura.
+          <b>{fmtN(a.soEnvio)} marca(s) só têm arquivo em 2.5.5</b>, a pasta de envio ao cliente — e nada
+          em 2.5.2 Fabricação. O desenho está feito; falta estar onde a produção o procura.
         </p>
       )}
 
-      {a.pdfs === 0 && a.pdfsCliente === 0 && (a.nc1 > 0 || a.igs > 0) && (
+      {a.pdfs === 0 && !a.pdfsEnvio && (a.nc1 > 0 || a.igs > 0) && (
         <p className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
           <b>Saiu arquivo de máquina e não saiu desenho.</b> O programador consegue lançar; o setor não tem
           o que abrir na bancada, e a emissão em lote não acha nada para imprimir.
@@ -641,12 +836,14 @@ function Bloco({ icone: Icone, titulo, sub, cor, children }) {
   );
 }
 
-function Tabela({ cabecalho, children }) {
+// `cabecalhoNode` para tabelas cujo <th> tem funil ou caixa de seleção; `cabecalho` (strings) segue
+// valendo para as simples. Chave pelo índice: há colunas de rótulo vazio, e "" repetido colide.
+function Tabela({ cabecalho, cabecalhoNode, children }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-gray-50 text-[11px] uppercase text-torg-gray">
-          <tr>{cabecalho.map((h, i) => <th key={h} className={`px-3 py-2 font-semibold ${i === 0 ? "text-left" : "text-left"}`}>{h}</th>)}</tr>
+          {cabecalhoNode || <tr>{cabecalho.map((h, i) => <th key={i} className="px-3 py-2 font-semibold text-left">{h}</th>)}</tr>}
         </thead>
         <tbody>{children}</tbody>
       </table>

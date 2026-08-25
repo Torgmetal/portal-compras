@@ -4848,7 +4848,17 @@ model PastaEngenharia {
   detalhe        Json?
   erro           String?
   checadoEm      DateTime @default(now())
+  // BAIXA — obra antiga que a Diretoria não quer mais acompanhar aqui. Vitor (25/08/2026): "dar
+  // baixa em algumas OPs que são antigas... registrar isso e tirar elas da seleção".
+  //
+  // ⚠ NÃO é encerrar a OP: a obra segue viva no resto do portal. É só sumir desta lista, com quem
+  // deu baixa e por quê — sem o registro, some do painel e ninguém sabe explicar por quê depois.
+  baixada        Boolean  @default(false)
+  baixadaEm      DateTime?
+  baixadaPorNome String?
+  baixaMotivo    String?
 
   @@index([veredito])
   @@index([checadoEm])
+  @@index([baixada])
 }

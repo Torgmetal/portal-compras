@@ -35,7 +35,8 @@ export async function GET() {
         select: {
           veredito: true, erro: true, checadoEm: true, pdfs: true, nc1: true, igs: true, cliente: true,
           marcas: true, conjuntosTotal: true, conjuntosCom: true, croquisTotal: true, croquisCom: true,
-          foraPadrao: true,
+          foraPadrao: true, detalhe: true,
+          baixada: true, baixadaEm: true, baixadaPorNome: true, baixaMotivo: true,
         },
       },
     },
@@ -106,6 +107,12 @@ export async function GET() {
         checadoEm: o.pastaEngenharia.checadoEm.toISOString(),
         pdfs: o.pastaEngenharia.pdfs, nc1: o.pastaEngenharia.nc1, igs: o.pastaEngenharia.igs,
         cliente: o.pastaEngenharia.cliente, foraPadrao: o.pastaEngenharia.foraPadrao,
+        soEnvio: o.pastaEngenharia.detalhe?.soEnvio || 0,
+        pdfsEnvio: o.pastaEngenharia.detalhe?.pdfsEnvio || 0,
+        baixada: o.pastaEngenharia.baixada,
+        baixadaEm: o.pastaEngenharia.baixadaEm ? o.pastaEngenharia.baixadaEm.toISOString() : null,
+        baixadaPorNome: o.pastaEngenharia.baixadaPorNome,
+        baixaMotivo: o.pastaEngenharia.baixaMotivo,
         conjuntos: { total: o.pastaEngenharia.conjuntosTotal, comDesenho: o.pastaEngenharia.conjuntosCom },
         croquis: { total: o.pastaEngenharia.croquisTotal, comDesenho: o.pastaEngenharia.croquisCom },
       } : null,
@@ -144,9 +151,12 @@ export async function GET() {
     obrasSemLista: linhas.filter((l) => l.semListaNenhuma).length,
     // ⚠ conta obras SEM DESENHO, não peças: uma obra sem desenho nenhum é um problema inteiro,
     // não 34 problemas. Somar marcas faria a OP-089 (35 croquis) parecer pior que a OP-106 (tudo).
-    obrasSemDesenho: linhas.filter((l) => ["SO_MAQUINA", "SEM_DESENHO", "VAZIA"].includes(l.pasta?.veredito)).length,
-    obrasPastaOk: linhas.filter((l) => l.pasta?.veredito === "OK").length,
-    obrasConferidas: linhas.filter((l) => l.pasta && !l.pasta.erro).length,
+    // ⚠ obra com baixa fica FORA de todo total: quem deu baixa disse que não quer mais contar com
+    // ela, e deixá-la no numerador faria o painel discordar da própria lista.
+    obrasSemDesenho: linhas.filter((l) => !l.pasta?.baixada && ["SO_MAQUINA", "SEM_DESENHO", "SO_ENVIO", "VAZIA"].includes(l.pasta?.veredito)).length,
+    obrasPastaOk: linhas.filter((l) => !l.pasta?.baixada && l.pasta?.veredito === "OK").length,
+    obrasConferidas: linhas.filter((l) => l.pasta && !l.pasta.erro && !l.pasta.baixada && l.pasta.veredito !== "NAO_CONFERIDA").length,
+    obrasBaixadas: linhas.filter((l) => l.pasta?.baixada).length,
   };
 
   return NextResponse.json({

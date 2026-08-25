@@ -30,10 +30,13 @@ export async function GET(req) {
 
     const ops = await prisma.oP.findMany({
       where: { status: { notIn: ["ENCERRADA", "CANCELADA"] } },
-      select: { id: true, numero: true, pastaEngenharia: { select: { checadoEm: true } } },
+      select: { id: true, numero: true, pastaEngenharia: { select: { checadoEm: true, baixada: true } } },
     });
     const limite = new Date(Date.now() - IDADE_H * 3600_000);
     const fila = ops
+      // ⚠ obra com baixa não é varrida: é exatamente o pedido — parar de gastar varredura com obra
+      // velha que ninguém acompanha mais.
+      .filter((o) => !o.pastaEngenharia?.baixada)
       .filter((o) => !o.pastaEngenharia || o.pastaEngenharia.checadoEm < limite)
       // sem conferência nunca vem primeiro; depois, a mais velha
       .sort((a, b) => {
