@@ -27,7 +27,18 @@ export async function GET() {
 
   const ops = await prisma.oP.findMany({
     where: { status: { notIn: ["ENCERRADA", "CANCELADA"] } },
-    select: { id: true, numero: true, cliente: true, obra: true, emProducao: true, dataFimPrevista: true },
+    // ⚠ a conferência da pasta vem JUNTO, do que o cron gravou — varrer o SharePoint aqui faria a
+    // tela abrir em minutos. O botão da linha reconfere uma obra na hora, quando alguém duvida.
+    select: {
+      id: true, numero: true, cliente: true, obra: true, emProducao: true, dataFimPrevista: true,
+      pastaEngenharia: {
+        select: {
+          veredito: true, erro: true, checadoEm: true, pdfs: true, nc1: true, igs: true, cliente: true,
+          marcas: true, conjuntosTotal: true, conjuntosCom: true, croquisTotal: true, croquisCom: true,
+          foraPadrao: true,
+        },
+      },
+    },
     orderBy: { numero: "asc" },
   });
   const ids = ops.map((o) => o.id);
@@ -88,6 +99,16 @@ export async function GET() {
       // ⚠ a obra que produz SEM lista nenhuma é o caso extremo do fora do mapa: nem dá para dizer
       // o que ela é. Merece nome próprio para não se perder no meio dos números grandes.
       semListaNenhuma: entregues === 0 && prog.marcas.size > 0,
+      // resumo da pasta (o detalhe pesado fica na rota própria, sob demanda)
+      pasta: o.pastaEngenharia ? {
+        veredito: o.pastaEngenharia.veredito,
+        erro: o.pastaEngenharia.erro,
+        checadoEm: o.pastaEngenharia.checadoEm.toISOString(),
+        pdfs: o.pastaEngenharia.pdfs, nc1: o.pastaEngenharia.nc1, igs: o.pastaEngenharia.igs,
+        cliente: o.pastaEngenharia.cliente, foraPadrao: o.pastaEngenharia.foraPadrao,
+        conjuntos: { total: o.pastaEngenharia.conjuntosTotal, comDesenho: o.pastaEngenharia.conjuntosCom },
+        croquis: { total: o.pastaEngenharia.croquisTotal, comDesenho: o.pastaEngenharia.croquisCom },
+      } : null,
     };
   }).filter((l) => l.entregues > 0 || l.foraDoMapa > 0);
 
@@ -121,6 +142,11 @@ export async function GET() {
     foraDoMapa: linhas.reduce((a, l) => a + l.foraDoMapa, 0),
     obrasForaDoMapa: linhas.filter((l) => l.foraDoMapa > 0).length,
     obrasSemLista: linhas.filter((l) => l.semListaNenhuma).length,
+    // ⚠ conta obras SEM DESENHO, não peças: uma obra sem desenho nenhum é um problema inteiro,
+    // não 34 problemas. Somar marcas faria a OP-089 (35 croquis) parecer pior que a OP-106 (tudo).
+    obrasSemDesenho: linhas.filter((l) => ["SO_MAQUINA", "SEM_DESENHO", "VAZIA"].includes(l.pasta?.veredito)).length,
+    obrasPastaOk: linhas.filter((l) => l.pasta?.veredito === "OK").length,
+    obrasConferidas: linhas.filter((l) => l.pasta && !l.pasta.erro).length,
   };
 
   return NextResponse.json({

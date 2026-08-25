@@ -190,6 +190,7 @@ model OP {
   desenhos             DesenhoOP[]
   pecasLote            PecaLote[]
   romaneiosPrevios     RomaneioPrevio[]
+  pastaEngenharia      PastaEngenharia?
 
   @@index([numero])
   @@index([status])
@@ -4817,4 +4818,37 @@ model ObraEmailSync {
   criadoEm     DateTime  @default(now())
 
   @@unique([caixa, pasta])
+}
+
+// A PASTA DA ENGENHARIA, CONFERIDA — resultado gravado da varredura do SharePoint.
+//
+// Vitor (25/08/2026): "faça rápido". A conferência sob demanda levava minutos por obra e ele teria
+// de clicar obra por obra; aqui o cron varre de madrugada e o painel abre com tudo pronto.
+//
+// ⚠ UMA LINHA POR OP (@unique): é uma foto do estado atual, não histórico. Guardar série temporal
+// disso multiplicaria a tabela por dia sem ninguém consultar o passado.
+model PastaEngenharia {
+  id             String   @id @default(cuid())
+  opId           String   @unique
+  op             OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
+  // OK | PARCIAL | SEM_CONJUNTO | SO_MAQUINA | SEM_DESENHO | SEM_LISTA | VAZIA
+  veredito       String
+  pdfs           Int      @default(0)
+  outrosPdfs     Int      @default(0)
+  nc1            Int      @default(0)
+  igs            Int      @default(0)
+  cliente        Int      @default(0)
+  marcas         Int      @default(0)
+  conjuntosTotal Int      @default(0)
+  conjuntosCom   Int      @default(0)
+  croquisTotal   Int      @default(0)
+  croquisCom     Int      @default(0)
+  foraPadrao     Int      @default(0)
+  // semDesenho[], porFormato[], clienteAmostra[] — o que a tabela do detalhe mostra
+  detalhe        Json?
+  erro           String?
+  checadoEm      DateTime @default(now())
+
+  @@index([veredito])
+  @@index([checadoEm])
 }
