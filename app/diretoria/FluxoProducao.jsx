@@ -324,9 +324,9 @@ function Detalhe({ d, onExportar, exportando }) {
           </tbody>
         </table>
       </div>
+      {/* ⚠ o corte NUNCA esconde urgente: a API ordena "a produzir" primeiro, então o que sobra de
+          fora é sempre a cauda do que já foi produzido. */}
       {d.truncado > 0 && (
-        {/* ⚠ o corte NUNCA esconde urgente: a API ordena "a produzir" primeiro, então o que sobra
-            de fora é sempre a cauda do que já foi produzido. */}
         <p className="text-[11px] text-amber-700">
           Mostrando as {fmtN(d.itens.length)} primeiras — mais {fmtN(d.truncado)} não couberam na tela.
           A ordem põe as <b>a produzir</b> na frente, então nenhuma pendente ficou de fora. A planilha sai completa.
