@@ -8,6 +8,7 @@ import {
   CalendarClock, Zap, Clock, Pencil, CheckCircle2, ExternalLink, ChevronDown, Download, Target,
 } from "lucide-react";
 import CustoHoraClient from "@/components/CustoHoraClient";
+import FluxoProducao from "./FluxoProducao";
 import ResumoMensalDiretoria from "@/components/ResumoMensalDiretoria";
 
 const fmtR$ = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
@@ -17,6 +18,9 @@ const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 
 const ABAS_BASE = [
   { id: "resumo", label: "Resumo" },
+  // ⚠ ao lado do Resumo e antes das financeiras: é a pergunta que o Vitor faz todo dia ("a
+  // produção está no ritmo?"), e a resposta dela muda o que ele cobra na semana.
+  { id: "fluxo", label: "Fluxo da Produção" },
   { id: "tarefas", label: "Tarefas" },
   { id: "dre", label: "DRE Alvo × Real" },
   { id: "resumo-mensal", label: "Resumo mensal" },
@@ -184,6 +188,8 @@ export default function DiretoriaClient({ isDono, userNome }) {
         {aba === "resumo" && fin && <Resumo fin={fin} />}
 
         {/* ════════ TAREFAS (acompanhamento / cobrança) ════════ */}
+        {aba === "fluxo" && <FluxoProducao />}
+
         {aba === "tarefas" && <TarefasDiretoria />}
 
         {/* ════════ A PAGAR / A RECEBER ════════ */}
