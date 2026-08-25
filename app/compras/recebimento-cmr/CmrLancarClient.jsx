@@ -126,7 +126,8 @@ export default function CmrLancarClient() {
       const r = await fetch("/api/compras/cmr", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ano, lancamentos: [form] }) });
       const j = await r.json();
       if (!j.success) throw new Error(j.error || "Erro");
-      showToast(`Lançado — índice R ${j.indices?.[0] || ""}`, "success");
+      const sp = j.planilha ? (j.planilha.ok ? " · planilha atualizada" : " · ⚠ planilha não atualizada") : "";
+      showToast(`Lançado — índice R ${j.indices?.[0] || ""}${sp}`, "success");
       setForm({ ...VAZIO, rc: form.rc, obra: form.obra, fornecedor: form.fornecedor, dataRecebimento: form.dataRecebimento, nf: form.nf }); // mantém campos repetitivos
       carregar();
     } catch (e) { showToast(e.message, "erro"); } finally { setSalvando(false); }
@@ -150,7 +151,8 @@ export default function CmrLancarClient() {
       const r = await fetch("/api/compras/cmr", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ano, lancamentos: validos }) });
       const j = await r.json();
       if (!j.success) throw new Error(j.error || "Erro");
-      showToast(`${j.criados} lançamento(s) gravados (${j.indices?.[0]}…${j.indices?.[j.indices.length - 1]})`, "success");
+      const sp = j.planilha ? (j.planilha.ok ? " · planilha atualizada" : " · ⚠ planilha não atualizada") : "";
+      showToast(`${j.criados} lançamento(s) gravados (${j.indices?.[0]}…${j.indices?.[j.indices.length - 1]})${sp}`, "success");
       setMassa([]); setModo(null); carregar();
     } catch (e) { showToast(e.message, "erro"); } finally { setSalvando(false); }
   }

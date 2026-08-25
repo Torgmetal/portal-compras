@@ -7,6 +7,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { CMR_CAT, prefixoAno, proximoIndiceR, mapearLancamento, aprenderReferencias } from "@/lib/cmr";
+import { appendLinhasCmr } from "@/lib/cmr-sharepoint";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,6 +80,7 @@ export async function POST(req) {
   let seq = Number(String(base).slice(2));
 
   const criados = [];
+  const linhasSP = []; // p/ espelhar na planilha do SharePoint (mesma ordem/índice R)
   for (const l of body.lancamentos) {
     const indiceR = `${pre}${String(seq).padStart(4, "0")}`;
     seq++;
@@ -86,9 +88,20 @@ export async function POST(req) {
     try {
       const doc = await prisma.documentoQualidade.create({ data, select: { id: true, importRef: true } });
       criados.push(doc);
+      linhasSP.push({
+        rc: l.rc, indiceR, descricao: l.descricao, certificado: l.certificado, loteCorrida: l.loteCorrida,
+        especificacao: l.especificacao, pedidoCompra: l.pedidoCompra, dataRecebimento: l.dataRecebimento,
+        nf: l.nf, fornecedor: l.fornecedor, obra: l.obra, qtd: l.qtd, pesoLitro: l.pesoLitro, observacao: l.observacao,
+      });
     } catch (e) { return NextResponse.json({ error: `Falha ao gravar (${indiceR}): ${e.message}`, criados: criados.length }, { status: 500 }); }
   }
   await aprenderReferencias(body.lancamentos).catch(() => {});
   await prisma.auditLog.create({ data: { userId: user.id, action: "CMR_LANCAR", entity: "DocumentoQualidade", entityId: String(criados.length), diff: { ano, qtd: criados.length, de: criados[0]?.importRef, ate: criados[criados.length - 1]?.importRef } } }).catch(() => {});
-  return NextResponse.json({ success: true, criados: criados.length, indices: criados.map((c) => c.importRef) });
+
+  // Espelha na planilha do SharePoint (best-effort — NUNCA trava o lançamento no portal).
+  let planilha = null;
+  try { planilha = await appendLinhasCmr(ano, linhasSP); }
+  catch (e) { planilha = { ok: false, erro: e.message }; }
+
+  return NextResponse.json({ success: true, criados: criados.length, indices: criados.map((c) => c.importRef), planilha });
 }
