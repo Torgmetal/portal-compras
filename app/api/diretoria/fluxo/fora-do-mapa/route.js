@@ -24,6 +24,24 @@ export const dynamic = "force-dynamic";
 
 const TETO = 3000; // acima disso a resposta fica grande demais para o navegador montar tabela
 
+// o que vem depois do setor onde a peça está
+function restantes(rota, feitos) {
+  const ord = ordenarSetores(rota);
+  const onde = setorMaisAvancado(feitos);
+  if (!onde) return ord;                       // não começou: falta a rota inteira
+  return ord.slice(ord.indexOf(onde) + 1);
+}
+
+// ⚠ etapa ANTES da posição atual e sem apontamento. Não é trabalho pendente — a peça já passou por
+// ali. É o apontamento que não foi feito, e vale mostrar separado: some do "quanto falta" e vira
+// medida da qualidade do registro.
+function buracos(rota, feitos) {
+  const ord = ordenarSetores(rota);
+  const onde = setorMaisAvancado(feitos);
+  if (!onde) return [];
+  return ord.slice(0, ord.indexOf(onde)).filter((s) => !feitos.includes(s));
+}
+
 export async function GET(req) {
   try { await requireDiretoria(); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
@@ -75,9 +93,15 @@ export async function GET(req) {
     ...g,
     // ordenado pelo fluxo: cru, o banco devolve "Acabamento, Jato, Corte"
     rota: ordenarSetores(g.rota),
-    feitos: ordenarSetores(g.feitos),
-    // até onde chegou de fato — o que a coluna mostra
+    // ⚠⚠ A PEÇA ESTÁ EM UM LUGAR SÓ, e é o mais adiantado. Vitor (25/08/2026): "se tem peça que está
+    // no setor da frente não poderia estar no setor anterior". Etapa anterior sem apontamento é
+    // falha de REGISTRO, não peça que pulou — fisicamente ela passou por lá. É o mesmo critério do
+    // Status da Obra e da Expedição Semanal (`mapaSetorReal`): vale o máximo, não a contagem.
     onde: setorMaisAvancado(g.feitos),
+    // o que ainda falta DEPOIS de onde ela está — é isso que responde "quanto falta"
+    restam: restantes(g.rota, g.feitos),
+    // etapas da rota sem apontamento ANTES de onde ela está: buraco de registro, não de produção
+    semRegistro: buracos(g.rota, g.feitos),
     kg: Math.round(g.kg * 10) / 10,
     primeiro: g.primeiro ? g.primeiro.toISOString() : null,
     ultimo: g.ultimo ? g.ultimo.toISOString() : null,
@@ -89,6 +113,21 @@ export async function GET(req) {
     // já saiu é história, e importar a lista só conserta o número.
     aProduzir: (g.produzido || 0) <= 0,
   })).sort((a, b) => (a.aProduzir === b.aProduzir ? b.kg - a.kg : a.aProduzir ? -1 : 1));
+
+  // ⚠ ONDE ESTÁ O LOTE, não só onde está cada peça. Vitor (25/08/2026): "não fica claro onde cada
+  // peça está". Ler 3.000 linhas para descobrir a distribuição é o mesmo que não ter a informação;
+  // esta contagem responde de relance, e cada peça entra em UM setor só — o dela.
+  const porSetorMap = new Map();
+  for (const it of itens) {
+    const k = it.onde || "não começou";
+    const g = porSetorMap.get(k) || { setor: k, pecas: 0, kg: 0 };
+    g.pecas++; g.kg += it.kg;
+    porSetorMap.set(k, g);
+  }
+  const porSetor = ordenarSetores([...porSetorMap.keys()].filter((k) => k !== "não começou"))
+    .map((k) => porSetorMap.get(k))
+    .concat(porSetorMap.has("não começou") ? [porSetorMap.get("não começou")] : [])
+    .map((g) => ({ ...g, kg: Math.round(g.kg) }));
 
   const aProduzir = itens.filter((x) => x.aProduzir);
   const jaProduzido = itens.filter((x) => !x.aProduzir);
@@ -106,7 +145,10 @@ export async function GET(req) {
       conjuntos: itens.filter((x) => !x.croqui).length,
       primeiroApontamento: datas[0] || null,
       ultimoApontamento: datas[datas.length - 1] || null,
+      // etapa que a peça já passou e ninguém apontou — mede o registro, não a produção
+      comBuracoDeRegistro: itens.filter((x) => (x.semRegistro || []).length > 0).length,
     },
+    porSetor,
     itens: itens.slice(0, TETO),
     truncado: Math.max(0, itens.length - TETO),
   });

@@ -268,20 +268,21 @@ export default function FluxoProducao() {
     try {
       const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, downloadWorkbook } =
         await import("@/lib/excel-relatorio");
-      const headers = ["Peça (Syneco)", "Tipo", "Situação", "Onde parou", "Etapas feitas", "Rota lançada", "Planejado", "Produzido", "Peso (kg)", "1º apontamento", "Último"];
+      const headers = ["Peça (Syneco)", "Tipo", "Situação", "Onde está", "Falta passar por", "Rota lançada", "Sem apontamento (já passou)", "Planejado", "Produzido", "Peso (kg)", "1º apontamento", "Último"];
       const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
         titulo: `Fora do mapa — ${fmtOP(d0.op.numero)}`,
         subtitulo: `${d0.op.cliente || ""}${d0.op.obra ? ` — ${d0.op.obra}` : ""} · peças com ordem no Syneco e sem lista no portal`,
         kpis: [`${fmtN(d0.resumo.aProduzir)} a produzir`, `${fmtN(d0.resumo.jaProduzido)} já produzidas`, `${fmtN(d0.resumo.total)} no total`],
         totalColunas: headers.length, nomePlanilha: "Fora do mapa", codigoDoc: "REL-DIR-001",
       });
-      ws.columns = [{ width: 20 }, { width: 12 }, { width: 14 }, { width: 15 }, { width: 30 }, { width: 34 }, { width: 11 }, { width: 11 }, { width: 12 }, { width: 15 }, { width: 15 }];
+      ws.columns = [{ width: 20 }, { width: 12 }, { width: 14 }, { width: 15 }, { width: 28 }, { width: 34 }, { width: 28 }, { width: 11 }, { width: 11 }, { width: 12 }, { width: 15 }, { width: 15 }];
       let linha = linhaInicio;
       adicionarHeaderTabela(ws, linha, headers); linha++;
       for (const it of d0.itens) {
         adicionarLinhaTabela(ws, linha, [
           it.item, it.croqui ? "Croqui" : "Conjunto", it.aProduzir ? "A PRODUZIR" : "já produzida",
-          it.onde || "não começou", (it.feitos || []).join(" · "), (it.rota || []).join(" · "),
+          it.onde || "não começou", (it.restam || []).join(" · "), (it.rota || []).join(" · "),
+          (it.semRegistro || []).join(" · "),
           it.planejado, it.produzido, it.kg, fmtD(it.primeiro), fmtD(it.ultimo),
         ]);
         linha++;
@@ -669,6 +670,31 @@ function Detalhe({ d, onExportar, exportando }) {
         </button>
       </div>
 
+      {/* ⚠ a distribuição vem ANTES da tabela: é a resposta de "onde está o lote". A tabela existe
+          para quem precisa da peça específica depois de já saber a foto geral. */}
+      {d.porSetor?.length > 0 && (
+        <div>
+          <p className="text-[11px] uppercase text-torg-gray-light mb-1.5">Onde estão as peças</p>
+          <div className="flex flex-wrap gap-1.5">
+            {d.porSetor.map((s) => (
+              <span key={s.setor}
+                className={`text-[11px] px-2 py-1 rounded-lg border tabular-nums ${s.setor === "não começou" ? "bg-red-50 border-red-200 text-red-700" : "bg-white border-gray-200 text-torg-dark"}`}>
+                <b>{s.setor}</b> · {fmtN(s.pecas)} peça(s) · {fmtKg(s.kg)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.comBuracoDeRegistro > 0 && (
+        /* ⚠ é medida do REGISTRO, não da produção — a peça passou, o apontamento é que não veio.
+           Fora do "quanto falta" de propósito: somado ali, viraria trabalho que não existe. */
+        <p className="text-[11px] text-torg-gray">
+          {fmtN(r.comBuracoDeRegistro)} peça(s) passaram por etapa sem apontamento — a peça avançou,
+          o registro é que ficou para trás. Não conta como trabalho pendente.
+        </p>
+      )}
+
       <p className="text-[12px] text-torg-gray">
         {r.aProduzir > 0
           ? <><b className="text-red-700">{fmtN(r.aProduzir)} peça(s) ainda não produzidas</b> — a fábrica vai fazer e o portal não sabe o que é. É o que precisa de lista com urgência.</>
@@ -683,7 +709,7 @@ function Detalhe({ d, onExportar, exportando }) {
               <th className="px-2 py-1.5 text-left font-semibold">Peça</th>
               <th className="px-2 py-1.5 text-left font-semibold">Tipo</th>
               <th className="px-2 py-1.5 text-left font-semibold">Situação</th>
-              <th className="px-2 py-1.5 text-left font-semibold" title="O setor mais adiantado em que a peça foi apontada, e quantas etapas da rota já passou">Onde parou</th>
+              <th className="px-2 py-1.5 text-left font-semibold" title="O setor em que a peça está — o mais adiantado com apontamento — e quantas etapas ainda faltam depois dele">Onde está</th>
               <th className="px-2 py-1.5 text-right font-semibold">Feito/Plan.</th>
               <th className="px-2 py-1.5 text-right font-semibold">Peso</th>
               <th className="px-2 py-1.5 text-left font-semibold">Último</th>
@@ -805,21 +831,32 @@ function PastaDetalhe({ d }) {
   );
 }
 
-// "onde parou" — o setor mais adiantado com apontamento, mais o avanço na rota
+// ONDE A PEÇA ESTÁ — um setor só, o mais adiantado, e o que falta depois dele.
+//
+// ⚠ NÃO conta quantos setores apontaram. Vitor (25/08/2026): "se tem peça que está no setor da
+// frente não poderia estar no setor anterior". Peça na pintura passou pela montagem, tenha ou não
+// apontamento lá — a fração "2/5" dizia o contrário e era a origem da confusão.
 function Rota({ it }) {
   const rota = it.rota || [];
-  const feitos = it.feitos || [];
   if (!rota.length) return <span className="text-torg-gray-light">—</span>;
-  const dica = rota.map((s) => `${feitos.includes(s) ? "✓" : "○"} ${s}`).join("\n");
-  if (!it.onde) {
-    // ⚠ tem ordem e nenhum apontamento: dizer "não começou" é mais honesto do que listar os
-    // setores da rota, que ainda não aconteceram.
-    return <span className="text-torg-gray-light" title={`Rota lançada:\n${dica}`}>não começou</span>;
-  }
+
+  const restam = it.restam || [];
+  const semReg = it.semRegistro || [];
+  const dica = [
+    `Rota: ${rota.join(" → ")}`,
+    it.onde ? `Está em: ${it.onde}` : "Sem apontamento nenhum",
+    restam.length ? `Falta: ${restam.join(" → ")}` : it.onde ? "Última etapa da rota" : "",
+    semReg.length ? `Sem apontamento (já passou): ${semReg.join(", ")}` : "",
+  ].filter(Boolean).join("\n");
+
+  if (!it.onde) return <span className="text-torg-gray-light" title={dica}>não começou</span>;
+
   return (
     <span className="whitespace-nowrap" title={dica}>
-      <span className="text-torg-dark">{it.onde}</span>
-      {rota.length > 1 && <span className="text-torg-gray-light tabular-nums ml-1">{feitos.length}/{rota.length}</span>}
+      <span className="text-torg-dark font-medium">{it.onde}</span>
+      <span className="text-torg-gray-light ml-1">
+        {restam.length ? `· faltam ${restam.length}` : "· última"}
+      </span>
     </span>
   );
 }
