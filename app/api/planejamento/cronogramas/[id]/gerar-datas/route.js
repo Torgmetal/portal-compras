@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 import { gerarDatasCronograma, rollupPercentualDepartamentos } from "@/lib/cronograma-recalcular";
+import { semearDatasSetor } from "@/lib/prioridades-setor";
 
 export const runtime = "nodejs";
 export const maxDuration = 20;
@@ -43,6 +44,8 @@ export async function POST(req, { params }) {
       // ⚠ `dataBase` decide se há baseline a proteger; as datas ATUAIS de cada tarefa são o que a
       // revisão precisa guardar para que dê para desfazer.
       id: true, dataInicio: true, tipoDias: true, dataBase: true,
+      // a OP é para semear as datas por setor ao final — sem ela não há a quem atribuí-las
+      opNumero: true, op: { select: { id: true, numero: true } },
       tarefas: {
         orderBy: { uidMpp: "asc" },
         select: {
@@ -151,5 +154,29 @@ export async function POST(req, { params }) {
   // Rollup dos resumos de departamento (mín. início / máx. fim / % médio)
   await rollupPercentualDepartamentos(id, null);
 
-  return NextResponse.json({ success: true, aplicadas: preview.length, semDuracao, preview });
+  // ⚠ AQUI é o "cronograma preenchido e definido" — Vitor (25/08/2026) pediu que as datas por setor
+  // nasçam deste momento, em vez de alguém ter de abrir a tela, escolher a OP e clicar em "usar
+  // sugestão". Só preenche setor vazio: data já informada manda na TV de Prioridades e regerar o
+  // cronograma não pode desfazer essa escolha.
+  //
+  // ⚠ `.catch` mudo NÃO: falhar em silêncio aqui daria "gerei as datas e o setor continua vazio",
+  // sem pista nenhuma. O Gerar Datas segue válido — a semeadura é um extra —, então o erro vai para
+  // o log e para a resposta, sem derrubar a operação principal.
+  let datasSetor = null;
+  try {
+    const frescas = await prisma.cronogramaTarefa.findMany({
+      where: { cronogramaId: id, isSummary: false },
+      select: { departamento: true, nome: true, dataFimPrevista: true },
+    });
+    datasSetor = await semearDatasSetor(prisma, {
+      opNumero: cronograma.op?.numero || cronograma.opNumero,
+      opId: cronograma.op?.id || null,
+      tarefas: frescas,
+    });
+  } catch (e) {
+    console.error("[gerar-datas] falhou ao semear datas por setor:", e);
+    datasSetor = { erro: e?.message || "falha ao semear as datas por setor" };
+  }
+
+  return NextResponse.json({ success: true, aplicadas: preview.length, semDuracao, preview, datasSetor });
 }
