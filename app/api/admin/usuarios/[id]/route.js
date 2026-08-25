@@ -4,9 +4,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { MODULOS_VALIDOS } from "@/lib/modulos";
 
 const TIPOS_VALIDOS   = ["ADMIN", "USUARIO"];
-const MODULOS_VALIDOS = ["COMERCIAL", "ENGENHARIA", "COMPRAS", "PRODUCAO", "ALMOXARIFADO", "FINANCEIRO", "EXPEDICAO", "RH", "PLANEJAMENTO", "PCP", "REQUISICOES", "QUALIDADE", "FISCAL"];
 
 const schemaPut = z.object({
   name:             z.string().min(2).max(100).optional(),
