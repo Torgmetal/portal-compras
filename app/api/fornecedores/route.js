@@ -32,7 +32,8 @@ const schema = z.object({
   razaoSocial: z.string().min(1),
   nomeFantasia: z.string().optional().nullable(),
   cnpj: z.string().optional().nullable(),
-  email: z.string().email(),
+  // E-mail opcional: fornecedor importado do Omie pode não ter. Se vier, valida formato.
+  email: z.union([z.string().email(), z.literal(""), z.null()]).optional(),
   emailsAdicionais: z.array(z.string().email()).default([]),
   telefone: z.string().optional().nullable(),
   contato: z.string().optional().nullable(),
@@ -128,7 +129,7 @@ export async function POST(req) {
       razaoSocial: razaoNormalizada,
       nomeFantasia: fantasiaNormalizada,
       cnpj: body.cnpj?.replace(/\D/g, "") || null,
-      email: body.email.trim().toLowerCase(),
+      email: body.email?.trim().toLowerCase() || null,
       emailsAdicionais: body.emailsAdicionais.map((e) => e.trim().toLowerCase()),
       telefone: body.telefone?.trim() || null,
       contato: body.contato ? titleCaseNome(body.contato) : null,

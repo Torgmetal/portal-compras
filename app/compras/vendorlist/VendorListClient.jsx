@@ -1,6 +1,6 @@
 "use client";
 import { useState, useMemo } from "react";
-import { Building2, Plus, Search, Edit2, Trash2, Mail, Phone, MapPin, AlertCircle, Loader2, X, Filter, Tag, Settings } from "lucide-react";
+import { Building2, Plus, Search, Edit2, Trash2, Mail, Phone, MapPin, AlertCircle, Loader2, X, Filter, Tag, Settings, RefreshCw } from "lucide-react";
 import {
   CATEGORIAS_FORNECEDOR_BUILTIN,
   CORES_DISPONIVEIS,
@@ -25,6 +25,22 @@ export default function VendorListClient({ fornecedoresIniciais, categoriasCusto
   const [verInativos, setVerInativos] = useState(false);
   const [modal, setModal] = useState(null); // null | "novo" | "categorias" | fornecedor
   const [erro, setErro] = useState("");
+  const [sincronizando, setSincronizando] = useState(false);
+  const [resSync, setResSync] = useState(null);
+  const [soSemEmail, setSoSemEmail] = useState(false);
+
+  const sincronizarOmie = async () => {
+    setErro(""); setResSync(null); setSincronizando(true);
+    try {
+      const res = await fetch("/api/fornecedores/sync-omie", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Falha na sincronização");
+      setResSync(data);
+      // Muitos registros novos foram criados — recarrega a lista completa (inclui inativos).
+      const r2 = await fetch("/api/fornecedores?ativos=0").then((x) => x.json()).catch(() => null);
+      if (r2?.fornecedores) setFornecedores(r2.fornecedores);
+    } catch (e) { setErro(e.message); } finally { setSincronizando(false); }
+  };
 
   // Lista combinada de categorias (built-in + custom do banco)
   const todasCategorias = useMemo(() => mergeCategorias(categoriasCustom), [categoriasCustom]);
@@ -32,6 +48,7 @@ export default function VendorListClient({ fornecedoresIniciais, categoriasCusto
   const filtrados = useMemo(() => {
     return fornecedores.filter((f) => {
       if (!verInativos && !f.ativo) return false;
+      if (soSemEmail && f.email) return false;
       if (filtroCat && !(f.categorias || []).includes(filtroCat)) return false;
       if (busca) {
         const b = busca.toLowerCase();
@@ -41,7 +58,9 @@ export default function VendorListClient({ fornecedoresIniciais, categoriasCusto
       }
       return true;
     });
-  }, [fornecedores, busca, filtroCat, verInativos]);
+  }, [fornecedores, busca, filtroCat, verInativos, soSemEmail]);
+
+  const semEmailTotal = useMemo(() => fornecedores.filter((f) => f.ativo && !f.email).length, [fornecedores]);
 
   // Contagem por categoria
   const contPorCat = useMemo(() => {
@@ -88,6 +107,15 @@ export default function VendorListClient({ fornecedoresIniciais, categoriasCusto
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
+            onClick={sincronizarOmie}
+            disabled={sincronizando}
+            className="px-4 py-2 border border-emerald-300 text-emerald-700 bg-white hover:bg-emerald-50 text-sm font-medium rounded-lg inline-flex items-center gap-2 disabled:opacity-50"
+            title="Puxar os fornecedores cadastrados no Omie (tag Fornecedor) e atualizar a Vendor List"
+          >
+            {sincronizando ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            {sincronizando ? "Sincronizando…" : "Sincronizar com Omie"}
+          </button>
+          <button
             onClick={() => setModal("categorias")}
             className="px-4 py-2 border border-gray-300 text-torg-gray bg-white hover:bg-gray-50 text-sm font-medium rounded-lg inline-flex items-center gap-2"
             title="Cadastrar/editar categorias customizadas"
@@ -106,6 +134,17 @@ export default function VendorListClient({ fornecedoresIniciais, categoriasCusto
       {erro && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
           <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+        </div>
+      )}
+
+      {resSync && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-lg px-3 py-2 flex items-start justify-between gap-2">
+          <span>
+            Sincronização concluída — <strong>{resSync.novos}</strong> novo(s), <strong>{resSync.vinculados}</strong> vinculado(s) ao cadastro existente,
+            de <strong>{resSync.total}</strong> fornecedores no Omie. <strong>{resSync.semEmail}</strong> sem e-mail (marcados para completar).
+            {resSync.erros?.length ? ` ⚠ ${resSync.erros.length} erro(s) — ver logs.` : ""}
+          </span>
+          <button onClick={() => setResSync(null)} className="text-emerald-700 hover:text-emerald-900 shrink-0"><X size={15} /></button>
         </div>
       )}
 
@@ -166,6 +205,15 @@ export default function VendorListClient({ fornecedoresIniciais, categoriasCusto
           />
           Mostrar inativos
         </label>
+        <label className="text-xs text-torg-gray inline-flex items-center gap-1.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={soSemEmail}
+            onChange={(e) => setSoSemEmail(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+          />
+          Só sem e-mail {semEmailTotal > 0 && <span className="text-amber-700 font-medium">({semEmailTotal})</span>}
+        </label>
       </div>
 
       {/* Tabela */}
@@ -225,12 +273,18 @@ export default function VendorListClient({ fornecedoresIniciais, categoriasCusto
                     </td>
                     <td className="px-4 py-3">
                       <div className="space-y-0.5">
-                        <a
-                          href={`mailto:${f.email}`}
-                          className="text-xs text-torg-blue hover:underline inline-flex items-center gap-1"
-                        >
-                          <Mail size={11} /> {f.email}
-                        </a>
+                        {f.email ? (
+                          <a
+                            href={`mailto:${f.email}`}
+                            className="text-xs text-torg-blue hover:underline inline-flex items-center gap-1"
+                          >
+                            <Mail size={11} /> {f.email}
+                          </a>
+                        ) : (
+                          <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 inline-flex items-center gap-1">
+                            <AlertCircle size={11} /> falta e-mail
+                          </span>
+                        )}
                         {f.telefone && (
                           <p className="text-xs text-torg-gray inline-flex items-center gap-1">
                             <Phone size={11} /> {f.telefone}
@@ -327,8 +381,8 @@ function ModalFornecedor({ fornecedor, onClose, onSaved, categoriasDisponiveis =
   const submit = async () => {
     setErro("");
     if (!form.razaoSocial.trim()) return setErro("Razão Social é obrigatória.");
-    if (!form.email.trim()) return setErro("Email é obrigatório.");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return setErro("Email inválido.");
+    // E-mail é opcional (fornecedores importados do Omie podem não ter). Se preenchido, valida o formato.
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return setErro("Email inválido.");
 
     const emailsAdicionais = form.emailsAdicionaisTexto
       .split(/[\n,;]+/)
@@ -344,7 +398,7 @@ function ModalFornecedor({ fornecedor, onClose, onSaved, categoriasDisponiveis =
       razaoSocial: form.razaoSocial,
       nomeFantasia: form.nomeFantasia || null,
       cnpj: form.cnpj || null,
-      email: form.email,
+      email: form.email.trim() || null,
       emailsAdicionais,
       telefone: form.telefone || null,
       contato: form.contato || null,
@@ -426,13 +480,14 @@ function ModalFornecedor({ fornecedor, onClose, onSaved, categoriasDisponiveis =
           {/* Contato */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-torg-dark mb-1">Email principal *</label>
+              <label className="block text-xs font-medium text-torg-dark mb-1">Email principal</label>
               <input
                 type="email" value={form.email}
                 onChange={(e) => set("email", e.target.value)}
                 placeholder="vendas@fornecedor.com.br"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
               />
+              <p className="text-[11px] text-torg-gray mt-1">Necessário para enviar cotação. Fornecedor importado do Omie pode vir sem e-mail.</p>
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Telefone</label>

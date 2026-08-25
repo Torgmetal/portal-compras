@@ -1006,7 +1006,9 @@ model Fornecedor {
   razaoSocial      String
   nomeFantasia     String?
   cnpj             String?
-  email            String
+  // Opcional: fornecedores importados do Omie geralmente não têm e-mail lá; ficam
+  // marcados "falta e-mail" e o time completa antes de cotar. Cadastro manual continua exigindo.
+  email            String?
   emailsAdicionais String[]
   telefone         String?
   contato          String?
@@ -1015,12 +1017,15 @@ model Fornecedor {
   categorias       String[]
   observacao       String?
   nCodOmie         String?
+  // Sincronização com o cadastro de fornecedores do Omie (geral/clientes, tag "Fornecedor").
+  omieSyncEm       DateTime?
   ativo            Boolean   @default(true)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   cotacoes         Cotacao[]
 
   @@index([ativo])
+  @@index([nCodOmie])
 }
 
 model EmailNotificacao {

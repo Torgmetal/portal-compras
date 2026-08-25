@@ -29,7 +29,8 @@ const patchSchema = z.object({
   razaoSocial: z.string().min(1).optional(),
   nomeFantasia: z.string().optional().nullable(),
   cnpj: z.string().optional().nullable(),
-  email: z.string().email().optional(),
+  // E-mail opcional (fornecedor importado do Omie pode não ter). Se vier preenchido, valida formato.
+  email: z.union([z.string().email(), z.literal(""), z.null()]).optional(),
   emailsAdicionais: z.array(z.string().email()).optional(),
   telefone: z.string().optional().nullable(),
   contato: z.string().optional().nullable(),
@@ -72,7 +73,7 @@ export async function PATCH(req, { params }) {
   if (body.razaoSocial !== undefined) dataUpdate.razaoSocial = body.razaoSocial.trim().toUpperCase();
   if (body.nomeFantasia !== undefined) dataUpdate.nomeFantasia = body.nomeFantasia ? body.nomeFantasia.trim().toUpperCase() : null;
   if (body.cnpj !== undefined) dataUpdate.cnpj = body.cnpj?.replace(/\D/g, "") || null;
-  if (body.email !== undefined) dataUpdate.email = body.email.trim().toLowerCase();
+  if (body.email !== undefined) dataUpdate.email = body.email?.trim().toLowerCase() || null;
   if (body.emailsAdicionais !== undefined) dataUpdate.emailsAdicionais = body.emailsAdicionais.map((e) => e.trim().toLowerCase());
   if (body.telefone !== undefined) dataUpdate.telefone = body.telefone?.trim() || null;
   if (body.contato !== undefined) dataUpdate.contato = body.contato ? titleCaseNome(body.contato) : null;
