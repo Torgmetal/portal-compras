@@ -166,6 +166,16 @@ export default function ProducaoClient() {
   const [separacao, setSeparacao] = useState(null);
   const [rastro, setRastro] = useState(null); // opNumero com a rastreabilidade aberta
 
+  // ⚠⚠ O HOOK VEM ANTES DE QUEM O USA — e não vinha.
+  // `pecas` chama `passaColuna` no corpo do `useMemo`, que roda DURANTE a renderização. Com a
+  // declaração depois, o `const` ainda estava na zona morta e a tela inteira caía com "Cannot access
+  // 'passaColuna' before initialization" — a página do PCP abria em branco com "Application error".
+  // ⚠ nem o `next build` nem o `no-undef` pegam isto: a variável existe, só ainda não foi criada
+  // quando alguém a chama. Ordem de declaração é regra, não estilo.
+  const { filtros: filtroCol, setFiltros: setFiltroCol, passa: passaColuna, opcoesDaColuna, ativos: filtrosAtivos, limpar: limparColunas, rotulosAtivos } =
+    useFiltroColunas(detalhe?.pecas || [], COLUNAS_FILTRO);
+  const fp = { filtros: filtroCol, setFiltros: setFiltroCol, opcoesDaColuna, aberta: colAberta, setAberta: setColAberta };
+
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
     try {
@@ -237,11 +247,6 @@ export default function ProducaoClient() {
     if (!q) return base;
     return base.filter((p) => [p.marca, p.descricao, p.perfil].some((x) => String(x || "").toLowerCase().includes(q)));
   }, [detalhe, filtroPecas, filtroProg, passaColuna]);
-
-  // ⚠ o hook mora em components/FiltroColuna.jsx — mesma mecânica da lista de expedição.
-  const { filtros: filtroCol, setFiltros: setFiltroCol, passa: passaColuna, opcoesDaColuna, ativos: filtrosAtivos, limpar: limparColunas, rotulosAtivos } =
-    useFiltroColunas(detalhe?.pecas || [], COLUNAS_FILTRO);
-  const fp = { filtros: filtroCol, setFiltros: setFiltroCol, opcoesDaColuna, aberta: colAberta, setAberta: setColAberta };
 
   // Contadores do filtro — o número ao lado do rótulo evita clicar para descobrir que está vazio.
   const contas = useMemo(() => {
