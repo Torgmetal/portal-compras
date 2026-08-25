@@ -142,7 +142,7 @@ export default function VendorListClient({ fornecedoresIniciais, categoriasCusto
           <span>
             Sincronização concluída — <strong>{resSync.novos}</strong> novo(s), <strong>{resSync.vinculados}</strong> vinculado(s) ao cadastro existente,
             de <strong>{resSync.total}</strong> fornecedores no Omie. <strong>{resSync.semEmail}</strong> sem e-mail (marcados para completar).
-            {resSync.removidos > 0 ? ` ${resSync.removidos} funcionário(s)-PJ removido(s).` : ""}
+            {resSync.removidos > 0 ? ` ${resSync.removidos} cadastro(s) CPF/funcionário removido(s).` : ""}
             {resSync.erros?.length ? ` ⚠ ${resSync.erros.length} erro(s) — ver logs.` : ""}
           </span>
           <button onClick={() => setResSync(null)} className="text-emerald-700 hover:text-emerald-900 shrink-0"><X size={15} /></button>

@@ -19,7 +19,7 @@ export async function GET(req) {
     await aquecerBanco(prisma);
     await aquecerBanco(prismaDirect).catch(() => {});
     const r = await sincronizarFornecedoresOmie({ dryRun: false });
-    await registrarExecucao("sync-fornecedores-omie", { ok: true, duracaoMs: Date.now() - t0, mensagem: `total ${r.total} · novos ${r.novos} · vinc ${r.vinculados} · semEmail ${r.semEmail} · funcRemov ${r.removidos}` });
+    await registrarExecucao("sync-fornecedores-omie", { ok: true, duracaoMs: Date.now() - t0, mensagem: `total ${r.total} · novos ${r.novos} · vinc ${r.vinculados} · semEmail ${r.semEmail} · remov ${r.removidos}` });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
     console.error("[cron sync-fornecedores-omie] erro:", e?.message);
