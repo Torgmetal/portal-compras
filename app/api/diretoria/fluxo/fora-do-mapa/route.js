@@ -1,0 +1,103 @@
+// GET /api/diretoria/fluxo/fora-do-mapa?opId=… — QUAIS peças a fábrica tem e o portal não conhece.
+//
+// Vitor (25/08/2026): "consegue trazer os detalhes dessas obras para eu ver de fato quais peças são
+// de cada obra".
+//
+// ⚠⚠ DOIS PROBLEMAS DIFERENTES MORAVAM NO MESMO NÚMERO — e a ação de cada um é oposta.
+// Medido ao montar isto:
+//   OP-064 → 3.671 itens, 3.082 JÁ PRODUZIDOS, último apontamento em nov/dez de 2025. É histórico:
+//            a obra rodou antes de a lista existir no portal. Importar agora não muda nada na
+//            bancada — conserta os NÚMEROS (kg pendente, avanço, indicador).
+//   OP-097 →   266 itens, ZERO produzidos, todos conjuntos, sem data nenhuma. É lista incompleta de
+//            obra ATUAL: a fábrica vai produzir e o portal não sabe o que é. Esse é urgente.
+// Somar os dois num total só faz o urgente sumir dentro do histórico — por isso a resposta separa.
+//
+// ⚠ SOB DEMANDA, não no payload do painel: a OP-064 sozinha tem 3.671 itens. O resumo tem de abrir
+// rápido; o detalhe vem quando alguém pergunta por aquela obra.
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { requireDiretoria } from "@/lib/diretoria";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const TETO = 3000; // acima disso a resposta fica grande demais para o navegador montar tabela
+
+export async function GET(req) {
+  try { await requireDiretoria(); }
+  catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  const opId = new URL(req.url).searchParams.get("opId");
+  if (!opId) return NextResponse.json({ error: "Informe a OP." }, { status: 400 });
+
+  const op = await prisma.oP.findUnique({ where: { id: opId }, select: { id: true, numero: true, cliente: true, obra: true } });
+  if (!op) return NextResponse.json({ error: "OP não encontrada." }, { status: 404 });
+
+  const marcas = new Set(
+    (await prisma.pecaConjunto.findMany({ where: { opId: op.id, fonte: "LPC_IMPORT" }, select: { marca: true } }))
+      .map((x) => String(x.marca || "").toUpperCase())
+  );
+
+  // ⚠ agrupa por ITEM e por SETOR: o mesmo item tem uma ordem por etapa da rota, e é a lista de
+  // setores que diz por onde ele passou — informação que o número sozinho não dá.
+  const linhas = await prisma.mesOrdem.groupBy({
+    by: ["item", "setor"],
+    where: { opId: op.id },
+    _sum: { planejadoUn: true, produzidoUn: true },
+    // ⚠ MAX, não SUM, no peso: cada ordem de setor repete o peso da peça. Somando, a OP-064 dava
+    // 3,4 MILHÕES de kg — cinco vezes a obra.
+    _max: { pesoPlanejado: true, dataInicio: true },
+    _min: { dataInicio: true },
+  });
+
+  const porItem = new Map();
+  for (const l of linhas) {
+    const k = String(l.item || "");
+    if (!k || marcas.has(k.toUpperCase())) continue;
+    const g = porItem.get(k) || { item: k, setores: [], planejado: 0, produzido: 0, kg: 0, primeiro: null, ultimo: null };
+    if (l.setor && !g.setores.includes(l.setor)) g.setores.push(l.setor);
+    // planejado: a rota repete a quantidade por setor — vale o maior, não a soma
+    g.planejado = Math.max(g.planejado, Number(l._sum.planejadoUn) || 0);
+    g.produzido = Math.max(g.produzido, Number(l._sum.produzidoUn) || 0);
+    g.kg = Math.max(g.kg, Number(l._max.pesoPlanejado) || 0);
+    const pri = l._min.dataInicio, ult = l._max.dataInicio;
+    if (pri && (!g.primeiro || pri < g.primeiro)) g.primeiro = pri;
+    if (ult && (!g.ultimo || ult > g.ultimo)) g.ultimo = ult;
+    porItem.set(k, g);
+  }
+
+  const itens = [...porItem.values()].map((g) => ({
+    ...g,
+    kg: Math.round(g.kg * 10) / 10,
+    primeiro: g.primeiro ? g.primeiro.toISOString() : null,
+    ultimo: g.ultimo ? g.ultimo.toISOString() : null,
+    // ⚠ heurística de NOME, e assumida como tal: "-P###" é como a Engenharia nomeia croqui. Serve
+    // para dizer QUAL import falhou (a de peças ou a de conjuntos) — na OP-097 os 266 eram TODOS
+    // conjunto, o que apontou direto para a aba que não entrou.
+    croqui: /-P\d+$/i.test(g.item),
+    // ⚠ o eixo que decide a ação: o que ainda não foi produzido é a fábrica andando às cegas; o que
+    // já saiu é história, e importar a lista só conserta o número.
+    aProduzir: (g.produzido || 0) <= 0,
+  })).sort((a, b) => (a.aProduzir === b.aProduzir ? b.kg - a.kg : a.aProduzir ? -1 : 1));
+
+  const aProduzir = itens.filter((x) => x.aProduzir);
+  const jaProduzido = itens.filter((x) => !x.aProduzir);
+  const datas = itens.map((x) => x.ultimo).filter(Boolean).sort();
+
+  return NextResponse.json({
+    op: { id: op.id, numero: op.numero, cliente: op.cliente, obra: op.obra },
+    resumo: {
+      total: itens.length,
+      aProduzir: aProduzir.length,
+      aProduzirKg: Math.round(aProduzir.reduce((a, x) => a + x.kg, 0)),
+      jaProduzido: jaProduzido.length,
+      jaProduzidoKg: Math.round(jaProduzido.reduce((a, x) => a + x.kg, 0)),
+      croquis: itens.filter((x) => x.croqui).length,
+      conjuntos: itens.filter((x) => !x.croqui).length,
+      primeiroApontamento: datas[0] || null,
+      ultimoApontamento: datas[datas.length - 1] || null,
+    },
+    itens: itens.slice(0, TETO),
+    truncado: Math.max(0, itens.length - TETO),
+  });
+}
