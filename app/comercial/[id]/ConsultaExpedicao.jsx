@@ -25,7 +25,11 @@ const STATUS = {
 
 // ⚠ `focoPendentes` abre já filtrado no que falta expedir — é como a aba do Planejamento usa a
 // tela: o resumo em cima responde "quanto saiu", e aqui embaixo fica "o que falta programar".
-export default function ConsultaExpedicao({ opId, readOnly = false, focoPendentes = false }) {
+// ⚠ `semCard` renderiza SEM o cartão e sem o título próprio: é assim que esta tela entra DENTRO da
+// Lista de Expedição, na aba Planejamento. Vitor (24/08/2026): "está deixando separado ainda, deixe
+// juntas" — dois cartões brancos empilhados, os dois escritos "Lista de Expedição", continuavam
+// lendo como duas listas mesmo estando na mesma aba.
+export default function ConsultaExpedicao({ opId, readOnly = false, focoPendentes = false, semCard = false }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [msg, setMsg] = useState("");
@@ -302,10 +306,13 @@ export default function ConsultaExpedicao({ opId, readOnly = false, focoPendente
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+      <div className={semCard ? "" : "bg-white rounded-xl border border-gray-100 shadow-sm p-4"}>
         <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
-          <h3 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5"><PackageSearch size={15} className="text-torg-blue" /> Lista de expedição <span className="text-torg-gray font-normal">· consulta por peça</span></h3>
-          <button onClick={exportar} disabled={exportando || !todas.length} className="text-xs text-torg-gray border border-gray-300 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-gray-50 disabled:opacity-40">{exportando ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />} Exportar</button>
+          <h3 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5">
+            <PackageSearch size={15} className="text-torg-blue" />
+            {semCard ? "Peças da lista" : <>Lista de expedição <span className="text-torg-gray font-normal">· consulta por peça</span></>}
+          </h3>
+          <button onClick={exportar} disabled={exportando || !todas.length} className="text-xs text-torg-gray border border-gray-300 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-gray-50 disabled:opacity-40">{exportando ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />} Exportar peças</button>
         </div>
         {readOnly
           ? <p className="text-[11px] text-torg-gray mb-3">Acompanhamento por peça — o que já foi <strong>expedido</strong>, o que <strong>falta</strong> e em qual <strong>romaneio</strong> saiu.</p>
@@ -319,11 +326,15 @@ export default function ConsultaExpedicao({ opId, readOnly = false, focoPendente
         ) : !todas.length ? (
           <p className="text-sm text-torg-gray py-8 text-center">Nenhuma lista de expedição importada para esta OP ainda — importe na aba <strong>Engenharia</strong>.</p>
         ) : (<>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-gray-100 border border-gray-100 rounded-lg overflow-hidden mb-3">
-            <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Marcas</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{todas.length}</p></div>
-            <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Expedidas</p><p className="text-lg font-extrabold text-emerald-700 tabular-nums">{nFull}</p><p className="text-[10px] text-torg-gray">{[nParcial ? `${nParcial} parcial(is)` : null, nBaixa ? `${nBaixa} baixa` : null].filter(Boolean).join(" · ") || " "}</p></div>
-            <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Pendentes</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{nPendente}</p></div>
-            <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Peso expedido</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{fmtKg(pesoExpedidoReal)}</p><p className="text-[10px] text-torg-gray">de {fmtKg(contratado)}</p></div>
+          {/* ⚠ EMBUTIDO, SÓ O QUE A TABELA DE CIMA NÃO DÁ. "Marcas" e "Peso expedido" repetiam
+              exatamente as colunas MARCAS / CONTRATADO / EXPEDIDO do resumo por frente — os mesmos
+              620 e os mesmos 87.639,84 kg, um palmo abaixo. O que só existe aqui é a CONTAGEM de
+              marcas expedidas e pendentes; é isso que fica. */}
+          <div className={`grid gap-px bg-gray-100 border border-gray-100 rounded-lg overflow-hidden mb-3 ${semCard ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4"}`}>
+            {!semCard && <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Marcas</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{todas.length}</p></div>}
+            <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Marcas expedidas</p><p className="text-lg font-extrabold text-emerald-700 tabular-nums">{nFull}<span className="text-sm font-bold text-torg-gray-light">/{todas.length}</span></p><p className="text-[10px] text-torg-gray">{[nParcial ? `${nParcial} parcial(is)` : null, nBaixa ? `${nBaixa} baixa` : null].filter(Boolean).join(" · ") || " "}</p></div>
+            <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Marcas pendentes</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{nPendente}</p></div>
+            {!semCard && <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Peso expedido</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{fmtKg(pesoExpedidoReal)}</p><p className="text-[10px] text-torg-gray">de {fmtKg(contratado)}</p></div>}
           </div>
 
           <div className="flex items-center gap-2 flex-wrap mb-2">

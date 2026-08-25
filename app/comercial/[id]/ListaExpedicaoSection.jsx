@@ -6,7 +6,9 @@ import { exportarListaExpedicao } from "@/lib/export-lista-expedicao";
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`;
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
 
-export default function ListaExpedicaoSection({ opId }) {
+// ⚠ `children` entra DENTRO do cartão, abaixo do resumo por frente — é como a tabela peça a peça
+// vira parte desta seção em vez de um segundo cartão com o mesmo nome.
+export default function ListaExpedicaoSection({ opId, children }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [atualizando, setAtualizando] = useState(false);
@@ -148,6 +150,8 @@ export default function ListaExpedicaoSection({ opId }) {
           </table>
         </div>
       )}
+
+      {children && <div className="mt-5 pt-5 border-t border-gray-100">{children}</div>}
     </div>
   );
 }

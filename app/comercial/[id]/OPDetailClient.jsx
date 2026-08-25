@@ -866,8 +866,9 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
           {/* ⚠ a ordem é a da pergunta: primeiro QUANTO já saiu (resumo por frente), depois O QUE
               falta programar (peças em aberto, selecionáveis). `focoPendentes` abre a tabela já
               filtrada no que falta — é o que o Planejamento vem fazer aqui. */}
-          <ListaExpedicaoSection opId={op.id} />
-          <ConsultaExpedicao opId={op.id} focoPendentes />
+          <ListaExpedicaoSection opId={op.id}>
+            <ConsultaExpedicao opId={op.id} focoPendentes semCard />
+          </ListaExpedicaoSection>
           <AbaPlanejamento opId={op.id} />
         </div>
       )}
