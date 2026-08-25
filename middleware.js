@@ -37,6 +37,9 @@ function moduloNegado(path, token) {
     return null; // lista de OPs e detalhe da OP
   }
   if (path.startsWith("/engenharia")) return nega("ENGENHARIA");
+  // Recebimento (CMR): quem LANÇA os recebimentos é o Almoxarifado. Ele acessa essa tela do
+  // Compras sem ter o módulo COMPRAS inteiro (a Sidebar de Compras filtra o resto pra ele).
+  if (path.startsWith("/compras/recebimento-cmr")) return nega("COMPRAS", "ALMOXARIFADO");
   if (path.startsWith("/compras")) return nega("COMPRAS");
   // Módulo Indicadores (visão gerencial consolidada) é só do ADMIN. Cada setor continua
   // vendo os SEUS indicadores pela aba "Indicadores" dentro do próprio módulo.

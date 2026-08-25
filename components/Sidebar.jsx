@@ -16,7 +16,7 @@ const menu = [
   // ⚠ ENTRA NO MENU JUNTO COM A TELA. A auditoria de 23/08 encontrou 11 páginas órfãs — tela sem
   // link é tela que ninguém usa, e a lista dos itens que não casaram com o CMR existia calculada
   // e jogada fora justamente por não ter para onde aparecer.
-  { href: "/compras/recebimento-cmr", label: "Recebimento (CMR)", icon: PackageCheck },
+  { href: "/compras/recebimento-cmr", label: "Recebimento (CMR)", icon: PackageCheck, modulos: ["COMPRAS", "ALMOXARIFADO"] },
   { href: "/compras", label: "RMs Materiais", icon: RailSymbol, exact: true, matchAlso: "/compras/rm/" },
   { href: "/compras/consumiveis", label: "RMs Consumíveis", icon: ShoppingCart },
   { href: "/compras/aluguel", label: "Aluguel de Equipamentos", icon: Forklift, matchPainel: "aluguel" },
@@ -39,9 +39,20 @@ function SidebarNav() {
   const ehDetalheRM = pathname.startsWith("/compras/rm/");
   const painel = searchParams.get("painel"); // contexto de origem do detalhe da RM
 
+  // Visibilidade por módulo: itens sem `modulos` são do Compras (default). ADMIN e quem tem o
+  // módulo COMPRAS vê tudo; quem só tem ALMOXARIFADO (lança CMR) vê apenas os itens liberados.
+  const isAdmin = session?.user?.tipo === "ADMIN";
+  const mods = session?.user?.modulos ?? [];
+  const podeVer = (m) => {
+    if (m.masterOnly && !isAdmin) return false;
+    if (isAdmin) return true;
+    const req = m.modulos || ["COMPRAS"];
+    return req.some((x) => mods.includes(x));
+  };
+
   return (
     <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-      {menu.filter((m) => !m.masterOnly || session?.user?.role === "ADMIN").map((m) => {
+      {menu.filter(podeVer).map((m) => {
         const Icon = m.icon;
         let active = m.exact
           ? pathname === m.href || (m.matchAlso && pathname.startsWith(m.matchAlso) && !painel)
