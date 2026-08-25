@@ -10,6 +10,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { casaMarca } from "@/lib/pasta-engenharia";
 import { requireRole } from "@/lib/session";
 import { getAccessToken, acharPastaOp, uploadFileToFolder } from "@/lib/sharepoint";
 import { rastreioDoConjunto } from "@/lib/rastreio-peca";
@@ -23,16 +24,6 @@ export const maxDuration = 60; // baixar A1 do SharePoint + carimbar + subir
 
 const ROLES = ["ADMIN", "PLANEJAMENTO", "PCP", "PRODUCAO", "COMERCIAL"];
 const GRAPH = "https://graph.microsoft.com/v1.0";
-
-// nome do arquivo casa a marca EXATA (evita T89A1 pegar T89A10): "T89A1.pdf", "T89A1 - CROQUI.pdf",
-// "T89A1_R01.pdf", "T89A1-R2.pdf" casam; "T89A10.pdf" não.
-function casaMarca(nome, marca) {
-  const up = String(nome).toUpperCase();
-  const m = String(marca).toUpperCase();
-  if (!up.startsWith(m)) return false;
-  const resto = up.slice(m.length);
-  return /^(\.PDF|[ ._\-])/.test(resto);
-}
 
 export async function GET(req) {
   try { await requireRole(ROLES); }

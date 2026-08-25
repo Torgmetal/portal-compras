@@ -16,13 +16,25 @@ import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import Link from "next/link";
 import {
   Loader2, AlertCircle, RefreshCw, EyeOff, Send, Factory, ArrowRight, CalendarClock,
-  ChevronRight, ChevronDown, FileSpreadsheet,
+  ChevronRight, ChevronDown, FileSpreadsheet, FolderOpen, Search,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit" }) : "—");
+
+// ⚠ o veredito da pasta em uma frase. Classes ESCRITAS por extenso — Tailwind não gera classe
+// montada em runtime, e o chip sairia sem cor nenhuma.
+const VEREDITO = {
+  OK:           { rot: "desenho completo",         chip: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  PARCIAL:      { rot: "falta desenho",            chip: "bg-amber-50 text-amber-700 border-amber-200" },
+  SEM_CONJUNTO: { rot: "croqui sim, conjunto não", chip: "bg-amber-50 text-amber-700 border-amber-200" },
+  SO_MAQUINA:   { rot: "só arquivo de máquina",    chip: "bg-red-100 text-red-800 border-red-200" },
+  SEM_DESENHO:  { rot: "sem desenho nenhum",       chip: "bg-red-100 text-red-800 border-red-200" },
+  SEM_LISTA:    { rot: "desenho sem lista",        chip: "bg-sky-50 text-sky-700 border-sky-200" },
+  VAZIA:        { rot: "pasta vazia",              chip: "bg-red-100 text-red-800 border-red-200" },
+};
 
 export default function FluxoProducao() {
   const [d, setD] = useState(null);
@@ -33,6 +45,11 @@ export default function FluxoProducao() {
   const [detalhe, setDetalhe] = useState({}); // opId → payload
   const [buscando, setBuscando] = useState(null);
   const [exportando, setExportando] = useState(false);
+  // conferência da pasta da Engenharia: opId → payload, e a varredura em andamento
+  const [pasta, setPasta] = useState({});
+  const [conferindo, setConferindo] = useState(null);
+  const [varrendo, setVarrendo] = useState(null); // { feitas, total } enquanto confere todas
+  const [pastaAberta, setPastaAberta] = useState(null);
 
   const carregar = useCallback(async () => {
     setCarregando(true); setErro("");
@@ -59,6 +76,32 @@ export default function FluxoProducao() {
       setDetalhe((d) => ({ ...d, [opId]: j }));
     } catch (e) { setErro(e.message); } finally { setBuscando(null); }
   }, [aberta, detalhe]);
+
+  // ⚠ UMA OBRA POR VEZ, A PEDIDO. A varredura é uma ida ao SharePoint por subpasta — a OP-089 tem
+  // 521 desenhos espalhados em A1..A4. Conferir tudo no carregamento faria a tela abrir em minutos.
+  const conferirPasta = useCallback(async (opId) => {
+    setConferindo(opId);
+    try {
+      const r = await fetch(`/api/diretoria/fluxo/pasta?opId=${opId}`, { cache: "no-store" });
+      const j = await r.json();
+      setPasta((p) => ({ ...p, [opId]: r.ok ? j : { erro: j.error || "Erro ao conferir" } }));
+      return r.ok ? j : null;
+    } catch (e) {
+      setPasta((p) => ({ ...p, [opId]: { erro: e.message } }));
+      return null;
+    } finally { setConferindo(null); }
+  }, []);
+
+  // ⚠ SEQUENCIAL, não em paralelo: são centenas de chamadas ao Graph por obra e o SharePoint
+  // devolve 429 quando se abre tudo de uma vez.
+  const conferirTodas = useCallback(async (lista) => {
+    setVarrendo({ feitas: 0, total: lista.length });
+    for (let i = 0; i < lista.length; i++) {
+      await conferirPasta(lista[i].opId);
+      setVarrendo({ feitas: i + 1, total: lista.length });
+    }
+    setVarrendo(null);
+  }, [conferirPasta]);
 
   // ⚠ a planilha é o que sai daqui para a Engenharia — é a lista do que falta importar, com nome
   // e peso. Sem ela, "3.671 itens" continua sendo um número que ninguém consegue acionar.
@@ -97,6 +140,11 @@ export default function FluxoProducao() {
     [d]);
   const filaProgramador = useMemo(
     () => (d?.ops || []).filter((o) => o.aLancar > 0).sort((a, b) => b.aLancar - a.aLancar),
+    [d]);
+  // obras que AFIRMAM entrega: têm lista no portal. São exatamente as que o painel dava por
+  // entregues sem nunca ter olhado a pasta.
+  const obrasPasta = useMemo(
+    () => (d?.ops || []).filter((o) => o.entregues > 0).sort((a, b) => String(b.numero).localeCompare(String(a.numero), "pt-BR", { numeric: true })),
     [d]);
   const picoDia = useMemo(() => Math.max(1, ...(d?.dias || []).map((x) => x.kg)), [d]);
 
@@ -180,7 +228,87 @@ export default function FluxoProducao() {
         )}
       </Bloco>
 
-      {/* ── 2. FILA DO PROGRAMADOR ── */}
+      {/* ── 2. A PASTA DA ENGENHARIA ── */}
+      <Bloco
+        icone={FolderOpen}
+        titulo="O desenho existe na pasta?"
+        sub="Confere a lista importada contra os arquivos de 2.5 Projetos, no SharePoint."
+        cor="text-torg-blue"
+      >
+        {/* ⚠ o texto diz por que o bloco existe: até aqui o painel media LISTA e chamava de desenho. */}
+        <p className="text-[12px] text-torg-gray mb-3">
+          Lista importada não é desenho emitido. Medido na <b>OP-106</b>: a LPC estava no portal, a pasta
+          tinha 16 arquivos <code className="text-[11px]">.nc1</code> e 11 <code className="text-[11px]">.igs</code> — e
+          nenhum desenho. O programador conseguiu lançar porque a máquina lê NC1; a bancada ficou sem papel,
+          e foi por isso que a impressão não saiu.
+        </p>
+
+        <div className="flex items-center gap-3 flex-wrap mb-3">
+          <button
+            onClick={() => conferirTodas(obrasPasta)}
+            disabled={!!varrendo || !!conferindo || !obrasPasta.length}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-torg-gray hover:bg-gray-50 disabled:opacity-40"
+          >
+            {varrendo ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
+            {varrendo ? `conferindo ${varrendo.feitas} de ${varrendo.total}…` : `Conferir as ${obrasPasta.length} obras`}
+          </button>
+          {/* ⚠ avisar o custo antes de clicar: são minutos, não segundos. */}
+          <span className="text-[11px] text-torg-gray-light">
+            varre o SharePoint obra por obra — leva alguns minutos
+          </span>
+        </div>
+
+        {!obrasPasta.length ? <Vazio texto="Nenhuma obra com lista importada." /> : (
+          <Tabela cabecalho={["", "Obra", "Na lista", "Desenhos", "Conjuntos", "Croquis", "Veredito"]}>
+            {obrasPasta.map((o) => {
+              const pa = pasta[o.opId];
+              const open = pastaAberta === o.opId;
+              const v = pa?.veredito ? VEREDITO[pa.veredito] : null;
+              return (
+                <Fragment key={o.opId}>
+                  <tr className={`border-t border-gray-50 ${pa && !pa.erro ? "cursor-pointer" : ""} ${open ? "bg-sky-50/40" : "hover:bg-gray-50/60"}`}
+                    onClick={() => pa && !pa.erro && setPastaAberta(open ? null : o.opId)}>
+                    <Td>
+                      {pa && !pa.erro && (
+                        <button onClick={(e) => { e.stopPropagation(); setPastaAberta(open ? null : o.opId); }} aria-expanded={open}
+                          aria-label={`${open ? "Fechar" : "Ver"} a pasta da OP ${o.numero}`} className="text-torg-gray">
+                          {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                        </button>
+                      )}
+                    </Td>
+                    <Td><Obra o={o} /></Td>
+                    <Td dir><span className="tabular-nums text-torg-gray">{fmtN(o.entregues)}</span></Td>
+                    {!pa ? (
+                      <td colSpan={4} className="px-3 py-2">
+                        <button onClick={(e) => { e.stopPropagation(); conferirPasta(o.opId); }} disabled={!!conferindo || !!varrendo}
+                          className="inline-flex items-center gap-1.5 text-[12px] text-torg-blue hover:underline disabled:opacity-40 disabled:no-underline">
+                          {conferindo === o.opId ? <><Loader2 size={12} className="animate-spin" /> conferindo…</> : "conferir a pasta"}
+                        </button>
+                      </td>
+                    ) : pa.erro ? (
+                      <td colSpan={4} className="px-3 py-2 text-[12px] text-red-600">{pa.erro}</td>
+                    ) : (
+                      <>
+                        <Td dir><span className="tabular-nums text-torg-gray">{fmtN(pa.arquivos.pdfs)}</span></Td>
+                        <Td dir><Fracao com={pa.lista.conjuntos.comDesenho} de={pa.lista.conjuntos.total} /></Td>
+                        <Td dir><Fracao com={pa.lista.croquis.comDesenho} de={pa.lista.croquis.total} /></Td>
+                        <Td>{v && <Chip cor={v.chip}>{v.rot}</Chip>}</Td>
+                      </>
+                    )}
+                  </tr>
+                  {open && pa && !pa.erro && (
+                    <tr className="bg-gray-50/50">
+                      <td colSpan={7} className="px-3 py-3"><PastaDetalhe d={pa} /></td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </Tabela>
+        )}
+      </Bloco>
+
+      {/* ── 3. FILA DO PROGRAMADOR ── */}
       <Bloco
         icone={Send}
         titulo="A Engenharia entregou e o programador ainda não pegou"
@@ -212,7 +340,7 @@ export default function FluxoProducao() {
         )}
       </Bloco>
 
-      {/* ── 3. RITMO POR SETOR ── */}
+      {/* ── 4. RITMO POR SETOR ── */}
       <Bloco
         icone={Factory}
         titulo={`O que cada setor fez nos últimos ${d.janelaDias} dias`}
@@ -331,6 +459,75 @@ function Detalhe({ d, onExportar, exportando }) {
           Mostrando as {fmtN(d.itens.length)} primeiras — mais {fmtN(d.truncado)} não couberam na tela.
           A ordem põe as <b>a produzir</b> na frente, então nenhuma pendente ficou de fora. A planilha sai completa.
         </p>
+      )}
+    </div>
+  );
+}
+
+// fração com desenho: verde só quando fecha. "16/25" em cinza faz o furo passar batido.
+const Fracao = ({ com, de }) => {
+  if (!de) return <span className="text-torg-gray-light">—</span>;
+  const ok = com >= de;
+  return <span className={`tabular-nums font-semibold ${ok ? "text-emerald-700" : "text-amber-700"}`}>{fmtN(com)}/{fmtN(de)}</span>;
+};
+
+function PastaDetalhe({ d }) {
+  const a = d.arquivos;
+  const semNada = d.semDesenho.filter((x) => !x.foraPadrao);
+  const malNomeado = d.semDesenho.filter((x) => x.foraPadrao);
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        <Mini n={fmtN(a.pdfs)} l="desenhos (PDF)" sub={a.porFormato.map(([f, n]) => `${f} ${n}`).join(" · ") || undefined} cor="text-torg-dark" bg="bg-white border-gray-200" />
+        {/* ⚠ NC1/IGS ao lado do desenho de propósito: é o contraste que explica a OP-106 — máquina
+            servida, bancada não. Sozinho, "0 desenhos" pareceria pasta esquecida. */}
+        <Mini n={fmtN(a.nc1)} l="NC1 (máquina)" cor="text-torg-gray" bg="bg-white border-gray-200" />
+        <Mini n={fmtN(a.igs)} l="IGS (modelo 3D)" cor="text-torg-gray" bg="bg-white border-gray-200" />
+        <Mini n={fmtN(a.cliente)} l="projeto do cliente" sub={a.cliente ? undefined : "pasta 2.5.5 vazia"}
+          cor={a.cliente ? "text-torg-dark" : "text-amber-700"} bg={a.cliente ? "bg-white border-gray-200" : "bg-amber-50 border-amber-200"} />
+      </div>
+
+      {a.pdfs === 0 && (a.nc1 > 0 || a.igs > 0) && (
+        <p className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <b>Saiu arquivo de máquina e não saiu desenho.</b> O programador consegue lançar; o setor não tem
+          o que abrir na bancada, e a emissão em lote não acha nada para imprimir.
+        </p>
+      )}
+
+      {malNomeado.length > 0 && (
+        /* ⚠ CASO DIFERENTE DE FALTAR: o desenho existe, com nome que a emissão não reconhece (ela
+           casa pelo COMEÇO do nome). Some da impressão em lote exatamente como se não existisse. */
+        <div className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <b>{fmtN(malNomeado.length)} desenho(s) existem com nome fora do padrão</b> — a emissão procura o
+          arquivo começando pela marca, então não os encontra. Renomear resolve:
+          <ul className="mt-1 space-y-0.5">
+            {malNomeado.slice(0, 4).map((x) => (
+              <li key={x.marca} className="font-mono text-[11px]">{x.marca} → {x.foraPadrao}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {!semNada.length ? (
+        <p className="text-[12px] text-emerald-700">Toda marca da lista tem desenho na pasta.</p>
+      ) : (
+        <>
+          <p className="text-[12px] text-torg-gray">
+            <b>{fmtN(semNada.length)}</b> marca(s) da lista sem desenho na pasta
+            {d.truncado > 0 && <> — mostrando as primeiras {fmtN(d.semDesenho.length)}</>}.
+          </p>
+          <div className="max-h-64 overflow-y-auto border border-gray-100 rounded-lg bg-white">
+            <Tabela cabecalho={["Marca", "Tipo", "NC1 gerado"]}>
+              {semNada.slice(0, 120).map((x) => (
+                <tr key={x.marca} className="border-t border-gray-50">
+                  <Td><span className="font-mono text-[12px]">{x.marca}</span></Td>
+                  <Td>{x.conjunto ? <Chip cor="bg-sky-50 text-sky-700 border-sky-200">conjunto</Chip> : <span className="text-[12px] text-torg-gray">croqui</span>}</Td>
+                  <Td>{x.nc1 ? <span className="text-[12px] text-torg-gray">sim</span> : <span className="text-[12px] text-torg-gray-light">não</span>}</Td>
+                </tr>
+              ))}
+            </Tabela>
+          </div>
+        </>
       )}
     </div>
   );
