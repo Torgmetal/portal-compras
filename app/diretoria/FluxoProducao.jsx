@@ -268,21 +268,21 @@ export default function FluxoProducao() {
     try {
       const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, downloadWorkbook } =
         await import("@/lib/excel-relatorio");
-      const headers = ["Peça (Syneco)", "Tipo", "Situação", "Setores", "Planejado", "Produzido", "Peso (kg)", "1º apontamento", "Último"];
+      const headers = ["Peça (Syneco)", "Tipo", "Situação", "Onde parou", "Etapas feitas", "Rota lançada", "Planejado", "Produzido", "Peso (kg)", "1º apontamento", "Último"];
       const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
         titulo: `Fora do mapa — ${fmtOP(d0.op.numero)}`,
         subtitulo: `${d0.op.cliente || ""}${d0.op.obra ? ` — ${d0.op.obra}` : ""} · peças com ordem no Syneco e sem lista no portal`,
         kpis: [`${fmtN(d0.resumo.aProduzir)} a produzir`, `${fmtN(d0.resumo.jaProduzido)} já produzidas`, `${fmtN(d0.resumo.total)} no total`],
         totalColunas: headers.length, nomePlanilha: "Fora do mapa", codigoDoc: "REL-DIR-001",
       });
-      ws.columns = [{ width: 20 }, { width: 12 }, { width: 14 }, { width: 30 }, { width: 11 }, { width: 11 }, { width: 12 }, { width: 15 }, { width: 15 }];
+      ws.columns = [{ width: 20 }, { width: 12 }, { width: 14 }, { width: 15 }, { width: 30 }, { width: 34 }, { width: 11 }, { width: 11 }, { width: 12 }, { width: 15 }, { width: 15 }];
       let linha = linhaInicio;
       adicionarHeaderTabela(ws, linha, headers); linha++;
       for (const it of d0.itens) {
         adicionarLinhaTabela(ws, linha, [
           it.item, it.croqui ? "Croqui" : "Conjunto", it.aProduzir ? "A PRODUZIR" : "já produzida",
-          (it.setores || []).join(", "), it.planejado, it.produzido, it.kg,
-          fmtD(it.primeiro), fmtD(it.ultimo),
+          it.onde || "não começou", (it.feitos || []).join(" · "), (it.rota || []).join(" · "),
+          it.planejado, it.produzido, it.kg, fmtD(it.primeiro), fmtD(it.ultimo),
         ]);
         linha++;
       }
@@ -683,7 +683,7 @@ function Detalhe({ d, onExportar, exportando }) {
               <th className="px-2 py-1.5 text-left font-semibold">Peça</th>
               <th className="px-2 py-1.5 text-left font-semibold">Tipo</th>
               <th className="px-2 py-1.5 text-left font-semibold">Situação</th>
-              <th className="px-2 py-1.5 text-left font-semibold">Por onde passou</th>
+              <th className="px-2 py-1.5 text-left font-semibold" title="O setor mais adiantado em que a peça foi apontada, e quantas etapas da rota já passou">Onde parou</th>
               <th className="px-2 py-1.5 text-right font-semibold">Feito/Plan.</th>
               <th className="px-2 py-1.5 text-right font-semibold">Peso</th>
               <th className="px-2 py-1.5 text-left font-semibold">Último</th>
@@ -699,7 +699,13 @@ function Detalhe({ d, onExportar, exportando }) {
                     ? <span className="text-[10px] font-bold text-red-700">a produzir</span>
                     : <span className="text-[10px] text-torg-gray">já produzida</span>}
                 </td>
-                <td className="px-2 py-1 text-torg-gray truncate max-w-[22ch]" title={(it.setores || []).join(" · ")}>{(it.setores || []).join(" · ") || "—"}</td>
+                {/* ⚠ UM setor, não a lista. A lista crua vinha fora de ordem ("Acabamento · Jato ·
+                    Corte") e incluía etapa que só tem ORDEM — a peça parecia ter passado por onde
+                    nunca esteve. Aqui: até onde chegou, e o quanto da rota isso é. A rota inteira,
+                    com o que já foi feito marcado, fica na dica do mouse. */}
+                <td className="px-2 py-1">
+                  <Rota it={it} />
+                </td>
                 <td className="px-2 py-1 text-right tabular-nums">{fmtN(it.produzido)}/{fmtN(it.planejado)}</td>
                 <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">{fmtKg(it.kg)}</td>
                 <td className="px-2 py-1 text-torg-gray tabular-nums whitespace-nowrap">{fmtD(it.ultimo)}</td>
@@ -796,6 +802,25 @@ function PastaDetalhe({ d }) {
         </>
       )}
     </div>
+  );
+}
+
+// "onde parou" — o setor mais adiantado com apontamento, mais o avanço na rota
+function Rota({ it }) {
+  const rota = it.rota || [];
+  const feitos = it.feitos || [];
+  if (!rota.length) return <span className="text-torg-gray-light">—</span>;
+  const dica = rota.map((s) => `${feitos.includes(s) ? "✓" : "○"} ${s}`).join("\n");
+  if (!it.onde) {
+    // ⚠ tem ordem e nenhum apontamento: dizer "não começou" é mais honesto do que listar os
+    // setores da rota, que ainda não aconteceram.
+    return <span className="text-torg-gray-light" title={`Rota lançada:\n${dica}`}>não começou</span>;
+  }
+  return (
+    <span className="whitespace-nowrap" title={dica}>
+      <span className="text-torg-dark">{it.onde}</span>
+      {rota.length > 1 && <span className="text-torg-gray-light tabular-nums ml-1">{feitos.length}/{rota.length}</span>}
+    </span>
   );
 }
 

@@ -17,6 +17,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireDiretoria } from "@/lib/diretoria";
+import { ordenarSetores, setorMaisAvancado } from "@/lib/setores";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,8 +39,9 @@ export async function GET(req) {
       .map((x) => String(x.marca || "").toUpperCase())
   );
 
-  // ⚠ agrupa por ITEM e por SETOR: o mesmo item tem uma ordem por etapa da rota, e é a lista de
-  // setores que diz por onde ele passou — informação que o número sozinho não dá.
+  // ⚠⚠ AGRUPA POR ITEM E POR SETOR, e o setor entra em DUAS listas. Ordem existe para a rota
+  // inteira desde o lançamento; produção só existe onde a peça passou de verdade. Misturar as duas
+  // mostrava etapa futura como se já tivesse acontecido.
   const linhas = await prisma.mesOrdem.groupBy({
     by: ["item", "setor"],
     where: { opId: op.id },
@@ -54,8 +56,11 @@ export async function GET(req) {
   for (const l of linhas) {
     const k = String(l.item || "");
     if (!k || marcas.has(k.toUpperCase())) continue;
-    const g = porItem.get(k) || { item: k, setores: [], planejado: 0, produzido: 0, kg: 0, primeiro: null, ultimo: null };
-    if (l.setor && !g.setores.includes(l.setor)) g.setores.push(l.setor);
+    const g = porItem.get(k) || { item: k, rota: [], feitos: [], planejado: 0, produzido: 0, kg: 0, primeiro: null, ultimo: null };
+    if (l.setor) {
+      if (!g.rota.includes(l.setor)) g.rota.push(l.setor);
+      if ((Number(l._sum.produzidoUn) || 0) > 0 && !g.feitos.includes(l.setor)) g.feitos.push(l.setor);
+    }
     // planejado: a rota repete a quantidade por setor — vale o maior, não a soma
     g.planejado = Math.max(g.planejado, Number(l._sum.planejadoUn) || 0);
     g.produzido = Math.max(g.produzido, Number(l._sum.produzidoUn) || 0);
@@ -68,6 +73,11 @@ export async function GET(req) {
 
   const itens = [...porItem.values()].map((g) => ({
     ...g,
+    // ordenado pelo fluxo: cru, o banco devolve "Acabamento, Jato, Corte"
+    rota: ordenarSetores(g.rota),
+    feitos: ordenarSetores(g.feitos),
+    // até onde chegou de fato — o que a coluna mostra
+    onde: setorMaisAvancado(g.feitos),
     kg: Math.round(g.kg * 10) / 10,
     primeiro: g.primeiro ? g.primeiro.toISOString() : null,
     ultimo: g.ultimo ? g.ultimo.toISOString() : null,
