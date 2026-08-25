@@ -79,26 +79,26 @@ export default function ProgramacaoCargasPlanejamentoClient() {
     try {
       const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarRodapeISO, downloadWorkbook } =
         await import("@/lib/excel-relatorio");
-      const cab = ["Data prevista", "OP", "Cliente", "Obra", "Ref. cliente", "Origem", "Descrição", "Situação",
-        "Dias em atraso", "Itens", "Peso (kg)", "Romaneio", "NF", "Remarcada de"];
+      const cab = ["Data prevista", "OP", "Cliente", "Obra", "Ref. cliente", "Origem", "Romaneio", "Local",
+        "Situação", "Dias em atraso", "Itens", "Peso (kg)", "Romaneio emitido", "NF", "Tipo NF", "Remarcada de"];
       const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
         titulo: "Cargas programadas — Planejamento",
         subtitulo: f.ativos ? `Filtro: ${f.rotulosAtivos.join(", ")}` : "Todas as cargas programadas",
         kpis: [`${fmtN(f.filtradas.length)} carga(s)`, `${fmtN(totais?.atrasadas || 0)} atrasada(s)`, `${fmtKg(totais?.pesoAberto)} em aberto`],
         totalColunas: cab.length, nomePlanilha: "Cargas", codigoDoc: "REL-PLN-002",
       });
-      ws.columns = [{ width: 14 }, { width: 10 }, { width: 20 }, { width: 26 }, { width: 16 }, { width: 13 }, { width: 32 },
-        { width: 13 }, { width: 14 }, { width: 8 }, { width: 13 }, { width: 12 }, { width: 12 }, { width: 14 }];
+      ws.columns = [{ width: 14 }, { width: 10 }, { width: 20 }, { width: 26 }, { width: 16 }, { width: 13 }, { width: 16 },
+        { width: 34 }, { width: 13 }, { width: 14 }, { width: 8 }, { width: 13 }, { width: 16 }, { width: 12 }, { width: 11 }, { width: 14 }];
       // ⚠ os helpers NÃO devolvem a próxima linha — contar aqui, senão a planilha sai vazia.
       let l = linhaInicio;
       adicionarHeaderTabela(ws, l, cab); l++;
       for (const c of f.filtradas) {
         adicionarLinhaTabela(ws, l, [
           c.dataPrevista ? fmtD(c.dataPrevista) : "sem data", fmtOP(c.opNumero), c.cliente, c.obra, c.refCliente,
-          ORIGEM[c.origem] || c.origem, c.descricao, SIT[c.situacao]?.rot || c.situacao,
-          c.diasAtraso || "", c.itens, c.pesoKg, c.romaneio || "", c.nf || "",
+          ORIGEM[c.origem] || c.origem, c.romaneioLabel, c.local, SIT[c.situacao]?.rot || c.situacao,
+          c.diasAtraso || "", c.itens, c.pesoKg, c.romaneioEmitido || "", c.nf?.numero || "", c.nf?.tipo || "",
           c.remarcadaDe ? fmtD(c.remarcadaDe) : "",
-        ], { alinhamento: { 8: "right", 9: "right", 10: "right" } });
+        ], { alinhamento: { 9: "right", 10: "right", 11: "right" } });
         l++;
       }
       adicionarRodapeISO(ws, l + 1, cab.length);
@@ -183,12 +183,12 @@ export default function ProgramacaoCargasPlanejamentoClient() {
                       <ThFiltro col="op" label="OP" className="px-3 py-2 font-semibold text-left" {...fp} />
                       <ThFiltro col="cliente" label="Cliente" className="px-3 py-2 font-semibold text-left" {...fp} />
                       <th className="px-3 py-2 font-semibold text-left">Obra</th>
-                      <th className="px-3 py-2 font-semibold text-left">Descrição</th>
+                      <th className="px-3 py-2 font-semibold text-left">Romaneio</th>
                       <ThFiltro col="origem" label="Origem" className="px-3 py-2 font-semibold text-left" {...fp} />
                       <th className="px-3 py-2 font-semibold text-right">Itens</th>
                       <th className="px-3 py-2 font-semibold text-right">Peso</th>
                       <ThFiltro col="situacao" label="Situação" className="px-3 py-2 font-semibold text-left" {...fp} />
-                      <th className="px-3 py-2 font-semibold text-left">Romaneio</th>
+                      <th className="px-3 py-2 font-semibold text-left">NF</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -218,7 +218,11 @@ export default function ProgramacaoCargasPlanejamentoClient() {
                           <td className="px-3 py-2 font-mono text-[12px] text-torg-blue whitespace-nowrap">{fmtOP(c.opNumero)}</td>
                           <td className="px-3 py-2 text-[12px] text-torg-dark truncate max-w-[18ch]" title={c.cliente}>{c.cliente || "—"}</td>
                           <td className="px-3 py-2 text-[12px] text-torg-gray truncate max-w-[24ch]" title={c.obra}>{c.obra || "—"}</td>
-                          <td className="px-3 py-2 text-[12px] text-torg-gray truncate max-w-[28ch]" title={c.descricao}>{c.descricao || "—"}</td>
+                          <td className="px-3 py-2">
+                            <span className="text-[12px] text-torg-dark whitespace-nowrap">{c.romaneioLabel || "—"}</span>
+                            {/* ⚠ endereço de obra vem com três linhas — resumido aqui, inteiro na dica. */}
+                            {c.local && <span className="block text-[10px] text-torg-gray-light truncate max-w-[26ch]" title={c.local}>{c.local}</span>}
+                          </td>
                           {/* ⚠ a origem fica visível porque as duas tabelas se comportam diferente:
                               a prévia vira romaneio e NF; a da programação vira romaneio da carga. */}
                           <td className="px-3 py-2 whitespace-nowrap">
@@ -237,8 +241,12 @@ export default function ProgramacaoCargasPlanejamentoClient() {
                             {c.diasAtraso > 0 && <span className="text-[10px] text-red-600 ml-1 tabular-nums">{c.diasAtraso}d</span>}
                           </td>
                           <td className="px-3 py-2 text-[12px] text-torg-gray whitespace-nowrap">
-                            {c.nf ? <span className="font-mono text-emerald-700">NF {c.nf}</span>
-                              : c.romaneio ? <span className="font-mono">{c.romaneio}</span>
+                            {/* ⚠ NF só existe depois que o Fiscal registra: traço é ausência de nota,
+                                não erro. A carga pode estar embarcada e ainda sem NF. */}
+                            {c.nf
+                              ? <span className="font-mono text-emerald-700" title={[c.nf.tipo, c.nf.emitidaEm ? `emitida em ${fmtD(c.nf.emitidaEm)}` : null].filter(Boolean).join(" · ")}>
+                                  {c.nf.numero}
+                                </span>
                               : <span className="text-torg-gray-light">—</span>}
                           </td>
                         </tr>

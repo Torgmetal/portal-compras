@@ -81,11 +81,16 @@ export async function GET() {
         id: `pc_${c.id}`, origem: "PROGRAMACAO", ...base(c.op, data, situacao),
         // ⚠ a data ORIGINAL só interessa quando mudou: separa "atrasou" de "foi empurrada".
         remarcadaDe: c.dataOriginal && +c.dataOriginal !== +c.dataPrevista ? c.dataOriginal.toISOString() : null,
-        descricao: c.descricao || "",
+        // a carga da programação não tem número próprio: o que identifica é a descrição que
+        // alguém digitou ("Romaneio 20"). Fica como está, sem inventar numeração.
+        romaneioLabel: c.descricao || "",
+        local: "",
         itens: itens.length,
         carregados: itens.filter((i) => i.status === "CARREGADO").length,
         pesoKg: Math.round(itens.reduce((s, i) => s + (Number(i.pesoEstimadoKg) || 0), 0)),
-        romaneio: c.romaneio?.numero || null,
+        romaneioEmitido: c.romaneio?.numero ? String(c.romaneio.numero) : null,
+        // ⚠ `PlanejamentoCarga` não guarda NF — quem registra nota é o Fiscal, sobre o romaneio
+        // prévio. Devolver null aqui é o fato, não uma lacuna a preencher com chute.
         nf: null,
         criadaEm: c.createdAt.toISOString(),
       };
@@ -107,12 +112,15 @@ export async function GET() {
         // duas guarda envio a terceiro (não há campo de fornecedor nelas). Conferido em 25/08/2026:
         // os 2 RT do banco são de MOISES DE ARAUJO, em tabela à parte; os 11 prévios têm todos
         // destino de obra do cliente (Tamanduateí, Paulínia, Franco da Rocha, Arujá…).
-        descricao: [`Romaneio ${String(r.numero).padStart(2, "0")}`, r.local, r.observacao].filter(Boolean).join(" · "),
+        romaneioLabel: `Romaneio ${String(r.numero).padStart(2, "0")}${r.revisao > 0 ? ` R${String(r.revisao).padStart(2, "0")}` : ""}`,
+        // ⚠ o local sai da mesma célula do número e vira linha própria: endereço de obra tem três
+        // linhas e empurrava o número para fora da vista.
+        local: [r.local, r.observacao].filter(Boolean).join(" · "),
         itens: Array.isArray(r.itens) ? r.itens.length : 0,
         carregados: 0,
         pesoKg: Math.round(Number(r.pesoKg) || 0),
-        romaneio: r.emitidoEm ? `R${String(r.revisao).padStart(2, "0")}` : null,
-        nf: r.nfNumero || null,
+        romaneioEmitido: r.emitidoEm ? `R${String(r.revisao).padStart(2, "0")}` : null,
+        nf: r.nfNumero ? { numero: r.nfNumero, tipo: r.nfTipo || null, emitidaEm: r.nfEmitidaEm ? r.nfEmitidaEm.toISOString() : null } : null,
         criadaEm: r.createdAt.toISOString(),
       };
     }),
