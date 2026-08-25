@@ -1,13 +1,20 @@
-// GET /api/planejamento/cargas — todas as cargas programadas, para a lista.
+// GET /api/planejamento/cargas — todas as cargas, das DUAS origens, numa lista só.
 //
-// Vitor (25/08/2026): "nessa página quero que mude a forma de visualizar... para podermos ver apenas
-// as que estão programadas, não ficando em botões por OP onde fica difícil de enxergar... pensei até
-// mesmo em formato de planilha, igual fizemos na planilha de rastreabilidade, com filtros".
+// Vitor (25/08/2026): "quero que mude a forma de visualizar... para podermos ver apenas as que estão
+// programadas, não ficando em botões por OP... pensei até mesmo em formato de planilha, igual
+// fizemos na planilha de rastreabilidade, com filtros".
 //
-// ⚠ ENXUTA DE PROPÓSITO. Já existe /api/expedicao/programacao-cargas, que devolve o mesmo e MAIS:
-// ela carrega `pecasConjunto` de TODAS as OPs ativas para calcular prontidão e peças esquecidas —
-// na OP-067 sozinha são 5.700 peças. Serve àquela tela; para abrir uma lista de cargas seria pagar
-// a conta inteira por três linhas de tabela.
+// ⚠⚠ SÃO DUAS TABELAS DE CARGA, E EU LIA SÓ UMA. Vitor (25/08): "havíamos criado algumas prévias,
+// por que não listou elas?". Ele está certo:
+//     PlanejamentoCarga →  3 registros, todos de junho, parados
+//     RomaneioPrevio    → 11 registros, 6 criados ontem — as cargas VIVAS
+// A lista mostrava exatamente as paradas e escondia as ativas. As duas são carga (OP, data, itens,
+// peso); o que muda é por onde nasceram, e é isso que a coluna "origem" diz — em vez de fingir que
+// são a mesma coisa ou de escolher uma e calar a outra.
+//
+// ⚠ ENXUTA DE PROPÓSITO. /api/expedicao/programacao-cargas devolve o mesmo e mais, mas carrega
+// `pecasConjunto` de TODAS as OPs ativas para calcular prontidão — só a OP-067 tem 5.700 peças.
+// Pagar essa conta para desenhar uma tabela é o que deixaria a lista lenta quando ela crescer.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -15,67 +22,111 @@ import { requireRole } from "@/lib/session";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// ⚠ ORDEM DE PRECEDÊNCIA, do fato mais forte para o mais fraco. NF emitida ganha de tudo: a carga
+// saiu e foi faturada, e nada depois disso a torna "atrasada". Cancelada vem antes de atrasada pelo
+// mesmo motivo — não se cobra o que foi cancelado. "Atrasada" é o que sobra.
+function situacaoDe({ cancelada, faturada, embarcada, confirmada, data, hoje }) {
+  if (cancelada) return "CANCELADA";
+  if (faturada) return "FATURADA";
+  if (embarcada) return "EMBARCADA";
+  if (confirmada && (!data || data >= hoje)) return "CONFIRMADA";
+  // ⚠ sem data não é atrasada: é carga que ninguém datou, e cobrar prazo de algo sem prazo é ruído.
+  if (data && data < hoje) return "ATRASADA";
+  return data ? "PROGRAMADA" : "SEM_DATA";
+}
+
 export async function GET() {
   try { await requireRole(["ADMIN", "PLANEJAMENTO", "EXPEDICAO", "PCP", "PRODUCAO", "COMERCIAL"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
-  const cargas = await prisma.planejamentoCarga.findMany({
-    orderBy: { dataPrevista: "asc" },
-    include: {
-      op: { select: { id: true, numero: true, cliente: true, obra: true, refCliente: true } },
-      romaneio: { select: { numero: true, data: true, pesoRealKg: true } },
-      itens: { select: { status: true, qtdPlanejada: true, qtdCarregada: true, pesoEstimadoKg: true } },
-    },
-  });
+  const selOp = { id: true, numero: true, cliente: true, obra: true, refCliente: true };
+  const [programadas, previas] = await Promise.all([
+    prisma.planejamentoCarga.findMany({
+      orderBy: { dataPrevista: "asc" },
+      include: {
+        op: { select: selOp },
+        romaneio: { select: { numero: true, data: true, pesoRealKg: true } },
+        itens: { select: { status: true, pesoEstimadoKg: true } },
+      },
+    }),
+    prisma.romaneioPrevio.findMany({
+      orderBy: [{ dataPrevista: "asc" }, { createdAt: "asc" }],
+      include: { op: { select: selOp } },
+    }),
+  ]);
 
-  // ⚠ o dia de HOJE em horário de Brasília, zerado: o servidor roda em UTC, e comparar com `new
-  // Date()` cru faria a carga de hoje virar "atrasada" durante as três primeiras horas do dia.
+  // ⚠ HOJE em horário de Brasília, zerado. O servidor roda em UTC: comparar com `new Date()` cru
+  // faria a carga do próprio dia aparecer como atrasada nas três primeiras horas da manhã.
   const hoje = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
   hoje.setHours(0, 0, 0, 0);
+  const dias = (d) => (d ? Math.floor((hoje - d) / 86400000) : 0);
 
-  const linhas = cargas.map((c) => {
-    const itens = c.itens || [];
-    const pesoPlan = itens.reduce((s, i) => s + (Number(i.pesoEstimadoKg) || 0), 0);
-    const carregados = itens.filter((i) => i.status === "CARREGADO").length;
-    const naoEnviados = itens.filter((i) => i.status === "NAO_ENVIADO").length;
-    const prevista = new Date(c.dataPrevista);
+  const base = (op, data, situacao) => ({
+    opId: op.id, opNumero: op.numero,
+    cliente: op.cliente || "", obra: op.obra || "", refCliente: op.refCliente || "",
+    dataPrevista: data ? data.toISOString() : null,
+    situacao,
+    diasAtraso: situacao === "ATRASADA" ? dias(data) : 0,
+  });
 
-    // ⚠ ORDEM IMPORTA. Romaneio emitido é o fato mais forte: a carga saiu, e nada depois disso a
-    // torna "atrasada". Cancelada vem antes de atrasada pelo mesmo motivo — não se cobra o que foi
-    // cancelado. "Atrasada" é o que sobra: passou da data e ninguém tratou.
-    const situacao =
-      c.situacao === "CANCELADA" ? "CANCELADA"
-      : c.romaneioId ? "EMBARCADA"
-      : c.situacao === "CONFIRMADA" ? "CONFIRMADA"
-      : prevista < hoje ? "ATRASADA"
-      : "PROGRAMADA";
-
-    return {
-      id: c.id, opId: c.op.id, opNumero: c.op.numero,
-      cliente: c.op.cliente || "", obra: c.op.obra || "", refCliente: c.op.refCliente || "",
-      dataPrevista: c.dataPrevista.toISOString(),
-      // ⚠ a data ORIGINAL só interessa quando mudou: é a prova de que a carga foi remarcada, e é
-      // isso que separa "atrasou" de "foi empurrada".
-      remarcadaDe: c.dataOriginal && +c.dataOriginal !== +c.dataPrevista ? c.dataOriginal.toISOString() : null,
-      diasAtraso: situacao === "ATRASADA" ? Math.floor((hoje - prevista) / 86400000) : 0,
-      descricao: c.descricao || "",
-      situacao,
-      itens: itens.length, carregados, naoEnviados,
-      pesoPlanejadoKg: Math.round(pesoPlan),
-      romaneio: c.romaneio ? { numero: c.romaneio.numero, data: c.romaneio.data, pesoRealKg: c.romaneio.pesoRealKg } : null,
-      criadaEm: c.createdAt.toISOString(),
-    };
+  const linhas = [
+    ...programadas.map((c) => {
+      const itens = c.itens || [];
+      const data = c.dataPrevista ? new Date(c.dataPrevista) : null;
+      const situacao = situacaoDe({
+        cancelada: c.situacao === "CANCELADA", faturada: false,
+        embarcada: !!c.romaneioId, confirmada: c.situacao === "CONFIRMADA", data, hoje,
+      });
+      return {
+        id: `pc_${c.id}`, origem: "PROGRAMACAO", ...base(c.op, data, situacao),
+        // ⚠ a data ORIGINAL só interessa quando mudou: separa "atrasou" de "foi empurrada".
+        remarcadaDe: c.dataOriginal && +c.dataOriginal !== +c.dataPrevista ? c.dataOriginal.toISOString() : null,
+        descricao: c.descricao || "",
+        itens: itens.length,
+        carregados: itens.filter((i) => i.status === "CARREGADO").length,
+        pesoKg: Math.round(itens.reduce((s, i) => s + (Number(i.pesoEstimadoKg) || 0), 0)),
+        romaneio: c.romaneio?.numero || null,
+        nf: null,
+        criadaEm: c.createdAt.toISOString(),
+      };
+    }),
+    ...previas.map((r) => {
+      const data = r.dataPrevista ? new Date(r.dataPrevista) : null;
+      const situacao = situacaoDe({
+        cancelada: r.status === "CANCELADO", faturada: !!r.nfEmitidaEm,
+        embarcada: !!r.emitidoEm, confirmada: r.status === "APROVADO", data, hoje,
+      });
+      return {
+        id: `rp_${r.id}`, origem: "PREVIA", ...base(r.op, data, situacao),
+        remarcadaDe: null,
+        // ⚠ o RT-## é como a Expedição chama a carga — sem ele a linha não casa com o papel.
+        descricao: [`RT-${String(r.numero).padStart(2, "0")}`, r.local, r.observacao].filter(Boolean).join(" · "),
+        itens: Array.isArray(r.itens) ? r.itens.length : 0,
+        carregados: 0,
+        pesoKg: Math.round(Number(r.pesoKg) || 0),
+        romaneio: r.emitidoEm ? `R${String(r.revisao).padStart(2, "0")}` : null,
+        nf: r.nfNumero || null,
+        criadaEm: r.createdAt.toISOString(),
+      };
+    }),
+  ].sort((a, b) => {
+    // sem data por último — não tem prazo para disputar posição na fila
+    if (!a.dataPrevista) return b.dataPrevista ? 1 : 0;
+    if (!b.dataPrevista) return -1;
+    return a.dataPrevista.localeCompare(b.dataPrevista);
   });
 
   const conta = (s) => linhas.filter((l) => l.situacao === s).length;
+  const emAberto = linhas.filter((l) => ["PROGRAMADA", "ATRASADA", "CONFIRMADA", "SEM_DATA"].includes(l.situacao));
   return NextResponse.json({
     cargas: linhas,
     totais: {
       total: linhas.length,
-      programadas: conta("PROGRAMADA"), atrasadas: conta("ATRASADA"),
-      confirmadas: conta("CONFIRMADA"), embarcadas: conta("EMBARCADA"), canceladas: conta("CANCELADA"),
-      pesoAberto: linhas.filter((l) => ["PROGRAMADA", "ATRASADA", "CONFIRMADA"].includes(l.situacao))
-        .reduce((s, l) => s + l.pesoPlanejadoKg, 0),
+      programadas: conta("PROGRAMADA"), atrasadas: conta("ATRASADA"), confirmadas: conta("CONFIRMADA"),
+      embarcadas: conta("EMBARCADA"), faturadas: conta("FATURADA"),
+      canceladas: conta("CANCELADA"), semData: conta("SEM_DATA"),
+      previas: linhas.filter((l) => l.origem === "PREVIA").length,
+      pesoAberto: emAberto.reduce((s, l) => s + l.pesoKg, 0),
     },
     geradoEm: new Date().toISOString(),
   });
