@@ -4060,6 +4060,15 @@ enum Modulo {
   PCP
   REQUISICOES
   QUALIDADE
+  // ⚠⚠ QUALIDADE_CAMPO É O ACESSO DO INSPETOR, e existia só no código.
+  // `lib/qualidade-campo.js` já dizia "os 5 inspetores (3 internos, 2 externos) têm SÓ este", mas o
+  // valor nunca entrou no enum — então era impossível criar o acesso, e a única saída era dar
+  // QUALIDADE inteiro, que abre TODAS as obras, relatórios, certificados e data books a quem só
+  // precisa tirar foto e medir peça na fábrica.
+  QUALIDADE_CAMPO
+  // ⚠ FISCAL também faltava, e a tela de admin já OFERECIA no seletor desde sempre: escolher
+  // "Fiscal" ao criar usuário estourava na gravação, porque o valor não existia no banco.
+  FISCAL
 }
 
 enum OPStatus {

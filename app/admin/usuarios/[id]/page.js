@@ -18,22 +18,9 @@ import {
 import { useStore } from "@/lib/store";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import SenhaGeradaModal from "@/components/admin/SenhaGeradaModal";
+import { MODULOS_OPCOES } from "@/lib/modulos";
 
-const MODULOS_OPCOES = [
-  { value: "COMERCIAL",    label: "Comercial" },
-  { value: "ENGENHARIA",   label: "Engenharia" },
-  { value: "COMPRAS",      label: "Compras" },
-  { value: "PRODUCAO",     label: "Produção" },
-  { value: "ALMOXARIFADO", label: "Almoxarifado" },
-  { value: "FINANCEIRO",   label: "Financeiro" },
-  { value: "EXPEDICAO",    label: "Expedição" },
-  { value: "RH",           label: "RH" },
-  { value: "PLANEJAMENTO", label: "Planejamento" },
-  { value: "PCP",          label: "PCP" },
-  { value: "REQUISICOES",  label: "Requisições" },
-  { value: "QUALIDADE",    label: "Qualidade" },
-  { value: "FISCAL",       label: "Fiscal" },
-];
+
 
 export default function PageEditarUsuario() {
   const router = useRouter();

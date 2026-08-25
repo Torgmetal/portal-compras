@@ -6,22 +6,9 @@ import Link from "next/link";
 import { ArrowLeft, UserPlus, Loader2, Shield } from "lucide-react";
 import { useStore } from "@/lib/store";
 import SenhaGeradaModal from "@/components/admin/SenhaGeradaModal";
+import { MODULOS_OPCOES } from "@/lib/modulos";
 
-const MODULOS_OPCOES = [
-  { value: "COMERCIAL",    label: "Comercial" },
-  { value: "ENGENHARIA",   label: "Engenharia" },
-  { value: "COMPRAS",      label: "Compras" },
-  { value: "PRODUCAO",     label: "Produção" },
-  { value: "ALMOXARIFADO", label: "Almoxarifado" },
-  { value: "FINANCEIRO",   label: "Financeiro" },
-  { value: "EXPEDICAO",    label: "Expedição" },
-  { value: "RH",           label: "RH" },
-  { value: "PLANEJAMENTO", label: "Planejamento" },
-  { value: "PCP",          label: "PCP" },
-  { value: "REQUISICOES",  label: "Requisições" },
-  { value: "QUALIDADE",    label: "Qualidade" },
-  { value: "FISCAL",       label: "Fiscal" },
-];
+
 
 const campoVazio = {
   name:             "",

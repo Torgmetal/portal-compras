@@ -62,6 +62,11 @@ function LoginForm() {
       try {
         const s = await fetch("/api/auth/session").then((r) => r.json());
         if (s?.user?.tipo === "FUNCIONARIO") destino = "/colaborador";
+        // ⚠⚠ INSPETOR DE CAMPO VAI PARA O PORTAL DELE, mesmo entrando por esta tela.
+        // Quem tem SÓ `QUALIDADE_CAMPO` não tem módulo interno nenhum: caía no destino padrão "/" e
+        // batia numa página sem permissão logo depois de acertar a senha. É o acesso do inspetor —
+        // inclusive o de fora —, e o lugar dele é /campo.
+        else if (s?.user?.tipo !== "ADMIN" && (s?.user?.modulos || []).length === 1 && (s.user.modulos[0]?.modulo ?? s.user.modulos[0]) === "QUALIDADE_CAMPO") destino = "/campo";
         else if (!destino) destino = homePorRole(s?.user?.role);
       } catch {
         if (!destino) destino = "/";
