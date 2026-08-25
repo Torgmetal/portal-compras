@@ -1028,6 +1028,17 @@ model Fornecedor {
   @@index([nCodOmie])
 }
 
+// Fornecedores do Omie que foram EXCLUÍDOS manualmente da Vendor List — o `nCodOmie`
+// fica bloqueado pra não voltar numa próxima sincronização com o Omie.
+model FornecedorOmieBloqueado {
+  id          String   @id @default(cuid())
+  nCodOmie    String   @unique
+  razaoSocial String?
+  motivo      String?
+  createdById String?
+  createdAt   DateTime @default(now())
+}
+
 model EmailNotificacao {
   id        String   @id @default(cuid())
   email     String

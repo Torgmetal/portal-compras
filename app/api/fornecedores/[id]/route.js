@@ -129,6 +129,16 @@ export async function DELETE(req, { params }) {
   const existe = await prisma.fornecedor.findUnique({ where: { id: params.id } });
   if (!existe) return NextResponse.json({ error: "Nao encontrado." }, { status: 404 });
 
+  // Se veio do Omie (tem nCodOmie), bloqueia o código pra NÃO voltar numa próxima
+  // sincronização. Exclusão manual = "eu não quero esse fornecedor".
+  if (existe.nCodOmie) {
+    await prisma.fornecedorOmieBloqueado.upsert({
+      where: { nCodOmie: existe.nCodOmie },
+      create: { nCodOmie: existe.nCodOmie, razaoSocial: existe.razaoSocial, motivo: "excluído manualmente", createdById: user.id },
+      update: { razaoSocial: existe.razaoSocial, createdById: user.id },
+    }).catch(() => {});
+  }
+
   await prisma.fornecedor.delete({ where: { id: params.id } });
   await prisma.auditLog.create({
     data: {
@@ -136,7 +146,7 @@ export async function DELETE(req, { params }) {
       action: "delete_fornecedor",
       entity: "Fornecedor",
       entityId: existe.id,
-      diff: { razaoSocial: existe.razaoSocial, email: existe.email },
+      diff: { razaoSocial: existe.razaoSocial, email: existe.email, nCodOmie: existe.nCodOmie, bloqueado: !!existe.nCodOmie },
     },
   });
   return NextResponse.json({ ok: true });

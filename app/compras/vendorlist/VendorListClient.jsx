@@ -143,6 +143,7 @@ export default function VendorListClient({ fornecedoresIniciais, categoriasCusto
             Sincronização concluída — <strong>{resSync.novos}</strong> novo(s), <strong>{resSync.vinculados}</strong> vinculado(s) ao cadastro existente,
             de <strong>{resSync.total}</strong> fornecedores no Omie. <strong>{resSync.semEmail}</strong> sem e-mail (marcados para completar).
             {resSync.removidos > 0 ? ` ${resSync.removidos} cadastro(s) CPF/funcionário removido(s).` : ""}
+            {resSync.bloqueados > 0 ? ` ${resSync.bloqueados} bloqueado(s) (excluídos manualmente).` : ""}
             {resSync.erros?.length ? ` ⚠ ${resSync.erros.length} erro(s) — ver logs.` : ""}
           </span>
           <button onClick={() => setResSync(null)} className="text-emerald-700 hover:text-emerald-900 shrink-0"><X size={15} /></button>
@@ -272,14 +273,15 @@ export default function VendorListClient({ fornecedoresIniciais, categoriasCusto
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 max-w-[220px]">
                       <div className="space-y-0.5">
                         {f.email ? (
                           <a
                             href={`mailto:${f.email}`}
-                            className="text-xs text-torg-blue hover:underline inline-flex items-center gap-1"
+                            title={f.email}
+                            className="text-xs text-torg-blue hover:underline flex items-center gap-1"
                           >
-                            <Mail size={11} /> {f.email}
+                            <Mail size={11} className="shrink-0" /> <span className="truncate">{f.email}</span>
                           </a>
                         ) : (
                           <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 inline-flex items-center gap-1">
@@ -287,12 +289,12 @@ export default function VendorListClient({ fornecedoresIniciais, categoriasCusto
                           </span>
                         )}
                         {f.telefone && (
-                          <p className="text-xs text-torg-gray inline-flex items-center gap-1">
-                            <Phone size={11} /> {f.telefone}
+                          <p className="text-[11px] text-torg-gray flex items-center gap-1">
+                            <Phone size={11} className="shrink-0" /> <span className="truncate">{f.telefone}</span>
                           </p>
                         )}
                         {f.contato && (
-                          <p className="text-[11px] text-torg-gray italic">{f.contato}</p>
+                          <p className="text-[11px] text-torg-gray italic truncate" title={f.contato}>{f.contato}</p>
                         )}
                       </div>
                     </td>
