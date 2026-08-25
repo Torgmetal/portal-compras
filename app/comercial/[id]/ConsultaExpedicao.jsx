@@ -179,8 +179,18 @@ export default function ConsultaExpedicao({ opId, readOnly = false, focoPendente
         + (j.duplicadasIgnoradas ? ` ${j.duplicadasIgnoradas} ignorada(s) por já estarem na LPC.` : "")
         // ⚠ marca da lista sem peça no portal é sinal de lista da Engenharia incompleta — dizer isso
         // é melhor que somar um sucesso que a fábrica nunca vai ver na fila.
-        + (semPeca ? ` ⚠ ${semPeca} marca(s) sem peça cadastrada na OP: ${j.marcasSemPeca.slice(0, 6).join(", ")}${semPeca > 6 ? "…" : ""}.` : ""));
-      setSel({});
+        + (semPeca ? ` ⚠ ${semPeca} marca(s) sem peça cadastrada na OP: ${j.marcasSemPeca.slice(0, 6).join(", ")}${semPeca > 6 ? "…" : ""}.` : "")
+        + " A seleção continua marcada — se estas peças já vão numa carga, gere o romaneio prévio agora.");
+      // ⚠⚠ A SELEÇÃO NÃO É LIMPA AQUI, de propósito.
+      // Prioridade e romaneio prévio são decisões diferentes sobre as MESMAS peças: uma diz à
+      // fábrica o que fazer primeiro, a outra diz o que vai junto no caminhão. Limpar obrigava a
+      // marcar tudo de novo para fazer as duas — Vitor (24/08/2026): "ou teremos que marcar
+      // novamente". Mantendo, os dois botões servem a uma seleção só.
+      //
+      // ⚠ e NÃO se cria romaneio prévio automático: ele consome um NÚMERO da série que continua a
+      // dos romaneios já emitidos, e nasceria sem data nem local. Carga é decisão de quando e como
+      // embarca; prioridade é ordem de fabricação. Amarrar as duas encheria a fila da Expedição de
+      // documento que ninguém pediu.
     } catch (e) { setErro(e.message); } finally { setPriorizando(false); }
   }
 
