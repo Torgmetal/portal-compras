@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo, useRef } from "react";
-import { PackageSearch, Search, Loader2, FileSpreadsheet, CheckCircle2, Clock, AlertCircle, X, Truck, Trash2, Copy, CalendarDays, MapPin, Upload, Plus, ThumbsUp, RotateCcw } from "lucide-react";
+import { PackageSearch, Search, Loader2, FileSpreadsheet, CheckCircle2, Clock, AlertCircle, X, Truck, Trash2, Copy, CalendarDays, MapPin, Upload, Plus, ThumbsUp, RotateCcw, Star } from "lucide-react";
 import { exportarListaExpedicao } from "@/lib/export-lista-expedicao";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 
@@ -23,12 +23,15 @@ const STATUS = {
   CANCELADO: { l: "cancelado", c: "bg-gray-200 text-torg-gray" },
 };
 
-export default function ConsultaExpedicao({ opId, readOnly = false }) {
+// ⚠ `focoPendentes` abre já filtrado no que falta expedir — é como a aba do Planejamento usa a
+// tela: o resumo em cima responde "quanto saiu", e aqui embaixo fica "o que falta programar".
+export default function ConsultaExpedicao({ opId, readOnly = false, focoPendentes = false }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [msg, setMsg] = useState("");
   const [busca, setBusca] = useState("");
-  const [situacao, setSituacao] = useState("todas");
+  const [situacao, setSituacao] = useState(focoPendentes ? "pendentes" : "todas");
+  const [priorizando, setPriorizando] = useState(false);
   const [frente, setFrente] = useState("");
   const [exportando, setExportando] = useState(false);
   const [importando, setImportando] = useState(false);
@@ -143,6 +146,39 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
   const pesoSel = marcadas.reduce((s, m) => s + pesoUsar(m), 0);
   const unSel = marcadas.reduce((s, m) => s + qteUsar(m), 0);
   const parciais = marcadas.filter((m) => baseQte(m) != null && qteUsar(m) < baseQte(m)).length;
+
+  // ── PRIORIDADE PARA O PCP ──────────────────────────────────────────────────────────────────
+  // Vitor (24/08/2026): "uma forma de marcarmos quais conjuntos da lista seriam prioridades, isso
+  // já vai indicando para o PCP onde atacar".
+  //
+  // ⚠⚠ É A MESMA FILA DE PRIORIDADE do "Mandar p/ produção" da tela do PCP — `destino: PRIORIDADE`
+  // no /api/pcp/despacho, que numera a peça na fila da OP e a põe no topo da aba do setor em
+  // /producao/prioridades. Um "prioritário da expedição" à parte criaria duas listas de prioridade
+  // para a mesma fábrica, e ela seguiria a errada.
+  //
+  // ⚠ vai pela MARCA porque a lista de expedição vem do arquivo da Engenharia e não carrega o id da
+  // peça; a rota resolve marca → peça dentro da OP.
+  async function priorizar() {
+    const alvo = marcadas;
+    if (!alvo.length) return;
+    if (!confirm(`Marcar ${alvo.length} conjunto(s) como PRIORIDADE para a produção?\n\nEles entram na fila da OP e sobem no topo do setor onde estiverem, no Painel de Produção.`)) return;
+    setPriorizando(true); setErro(""); setMsg("");
+    try {
+      const r = await fetch("/api/pcp/despacho", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opId, marcas: [...new Set(alvo.map((m) => m.marca))], destino: "PRIORIDADE" }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao marcar prioridade");
+      const semPeca = j.marcasSemPeca?.length || 0;
+      setMsg(`${j.atualizados ?? alvo.length} peça(s) na fila de prioridade da produção.`
+        + (j.duplicadasIgnoradas ? ` ${j.duplicadasIgnoradas} ignorada(s) por já estarem na LPC.` : "")
+        // ⚠ marca da lista sem peça no portal é sinal de lista da Engenharia incompleta — dizer isso
+        // é melhor que somar um sucesso que a fábrica nunca vai ver na fila.
+        + (semPeca ? ` ⚠ ${semPeca} marca(s) sem peça cadastrada na OP: ${j.marcasSemPeca.slice(0, 6).join(", ")}${semPeca > 6 ? "…" : ""}.` : ""));
+      setSel({});
+    } catch (e) { setErro(e.message); } finally { setPriorizando(false); }
+  }
 
   // Baixa MANUAL (sem romaneio) das marcas selecionadas, com motivo.
   async function darBaixa() {
@@ -328,6 +364,12 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
             <div className="flex items-center gap-2 flex-wrap mb-2 bg-torg-blue-50/60 border border-torg-blue-200 rounded-lg px-3 py-2 text-xs">
               <span className="font-semibold text-torg-dark">{marcadas.length} peça(s){unSel ? ` · ${unSel} un` : ""} · {fmtKg(pesoSel)}{parciais ? <span className="text-amber-600"> · {parciais} parcial(is)</span> : ""}</span>
               <button onClick={() => setModal(true)} className="bg-torg-blue text-white rounded-lg px-2.5 py-1 font-medium inline-flex items-center gap-1 hover:bg-torg-dark"><Truck size={12} /> Gerar romaneio prévio{proximo ? ` ${String(proximo).padStart(2, "0")}` : ""}</button>
+              {/* ⚠ mesma fila do "Mandar p/ produção" do PCP — não é prioridade "da expedição". */}
+              <button onClick={priorizar} disabled={priorizando}
+                title="Põe estes conjuntos na fila de prioridade da produção — sobem no topo do setor onde estiverem, no Painel de Produção"
+                className="bg-torg-orange text-white rounded-lg px-2.5 py-1 font-medium inline-flex items-center gap-1 hover:opacity-90 disabled:opacity-50">
+                {priorizando ? <Loader2 size={12} className="animate-spin" /> : <Star size={12} />} Prioridade p/ produção
+              </button>
               <button onClick={() => setModalBaixa(true)} className="bg-amber-500 text-white rounded-lg px-2.5 py-1 font-medium inline-flex items-center gap-1 hover:bg-amber-600" title="Marcar como expedida SEM romaneio, com um motivo"><CheckCircle2 size={12} /> Dar baixa (sem romaneio)</button>
               <button onClick={() => { setSel({}); setQtdImport({}); }} className="text-torg-gray hover:text-torg-dark ml-auto">limpar seleção</button>
             </div>

@@ -28,6 +28,13 @@ const SETORES_ENCAMINHAR = ["MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA"
 
 const schema = z.object({
   ids: z.array(z.string()).optional(),
+  // ⚠⚠ MARCAR PRIORIDADE PELA MARCA, não pelo id da peça.
+  // A lista de expedição vem do arquivo da Engenharia (`ListaExpedicao.marcasJson`), que não tem o
+  // id do `PecaConjunto` — ela só sabe o NOME da marca. Sem isto, marcar prioridade a partir dali
+  // exigiria uma segunda rota com regra própria de numeração da fila, e duas numerações da mesma
+  // fila é como se perde a ordem que a fábrica segue.
+  opId: z.string().optional(),   // obrigatório junto com `marcas`
+  marcas: z.array(z.string()).optional(),
   destino: z.enum(DESTINOS).optional(),
   destinoTerceirizado: z.enum(VOLTA_TERCEIRO).optional(),
   dataPrevRetorno: z.string().optional().nullable(), // volta prevista do terceiro (romaneio RT)
@@ -457,7 +464,34 @@ export async function POST(req) {
   try { body = schema.parse(await req.json()); }
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
-  const { ids, destino, destinoTerceirizado, dataPrevRetorno, encaminharSetor, comPrioridade, obs, reverter, tirarPrioridade, baixaSetor, baixas, reverterBaixa } = body;
+  const { destino, destinoTerceirizado, dataPrevRetorno, encaminharSetor, comPrioridade, obs, reverter, tirarPrioridade, baixaSetor, baixas, reverterBaixa } = body;
+  let { ids } = body;
+
+  // ⚠ resolve marca → peça DENTRO da OP. Marca não é única na OP (sub-obras repetem com perfil
+  // diferente), então uma marca pode virar várias peças — e é isso mesmo: a fila é de peça.
+  // ⚠ e só o que ainda não tem número: repriorizar o que já está na fila embaralharia a ordem que
+  // a fábrica está seguindo.
+  let marcasSemPeca = [];
+  if (!ids?.length && body.marcas?.length && body.opId) {
+    const pedidas = [...new Set(body.marcas.map((m) => String(m).trim()).filter(Boolean))];
+    const alvo = await prisma.pecaConjunto.findMany({
+      where: { opId: body.opId, marca: { in: pedidas } },
+      select: { id: true, marca: true },
+    });
+    ids = alvo.map((x) => x.id);
+    // ⚠ MARCA DA LISTA SEM PEÇA NO PORTAL NÃO PODE SUMIR CALADA. A lista de expedição vem do
+    // arquivo da Engenharia e pode ter marca que a LPC não trouxe — na OP-067 são 484 de 2.094.
+    // Marcar prioridade "com sucesso" nesses casos deixaria o Planejamento achando que apontou algo
+    // que a fábrica nunca vai ver na fila.
+    const achadas = new Set(alvo.map((x) => x.marca));
+    marcasSemPeca = pedidas.filter((m) => !achadas.has(m));
+    if (!ids.length) {
+      return NextResponse.json(
+        { error: `Nenhuma das ${pedidas.length} marca(s) escolhida(s) tem peça cadastrada nesta OP — a lista da Engenharia não foi importada para elas.` },
+        { status: 404 },
+      );
+    }
+  }
 
   // ── Baixa PORTAL ──────────────────────────────────────────────────────────
   // Grava/remove a QUANTIDADE baixada da peça NAQUELE setor (PecaConjunto.baixaSetores[setor] =
@@ -621,5 +655,5 @@ export async function POST(req) {
     },
   }).catch(() => {});
 
-  return NextResponse.json({ ok: true, atualizados, duplicadasIgnoradas });
+  return NextResponse.json({ ok: true, atualizados, duplicadasIgnoradas, marcasSemPeca });
 }

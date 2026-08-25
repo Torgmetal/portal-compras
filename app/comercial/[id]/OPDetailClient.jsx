@@ -843,9 +843,19 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
 
       {vista === "expedicao" && (
         <div className="space-y-6">
-          <ListaExpedicaoSection opId={op.id} />
+          {/* ⚠⚠ A LISTA DE EXPEDIÇÃO MORA NUM LUGAR SÓ: a aba Planejamento.
+              Vitor (24/08/2026): "temos duas listas de expedição aparecendo, e acho isso
+              desnecessário, além de poluir a tela fica confuso para onde olhar". Eram duas de fato —
+              o resumo por frente (ListaExpedicaoSection) e a tabela marca a marca
+              (ConsultaExpedicao) —, as duas com "Lista de Expedição" no título, uma embaixo da
+              outra. Aqui fica o que é da Expedição: lote e romaneio.
+              ⚠ o atalho abaixo existe para ninguém procurar a lista e concluir que ela sumiu. */}
           <AbaExpedicao opId={op.id} proposta={proposta} />
-          <ConsultaExpedicao opId={op.id} readOnly />
+          <p className="text-[12px] text-torg-gray bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+            A <strong>Lista de Expedição</strong> — resumo por frente e as peças marca a marca —
+            fica na aba <button onClick={() => setVista("planejamento")} className="text-torg-blue font-semibold hover:underline">Planejamento</button>,
+            onde as cargas são programadas.
+          </p>
         </div>
       )}
 
@@ -853,7 +863,11 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
 
       {vista === "planejamento" && (
         <div className="space-y-6">
+          {/* ⚠ a ordem é a da pergunta: primeiro QUANTO já saiu (resumo por frente), depois O QUE
+              falta programar (peças em aberto, selecionáveis). `focoPendentes` abre a tabela já
+              filtrada no que falta — é o que o Planejamento vem fazer aqui. */}
           <ListaExpedicaoSection opId={op.id} />
+          <ConsultaExpedicao opId={op.id} focoPendentes />
           <AbaPlanejamento opId={op.id} />
         </div>
       )}
@@ -931,8 +945,6 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
             })()}
           </div>
 
-          {/* Lista de Expedição — puxada da pasta do servidor, com diff por revisão */}
-          <ListaExpedicaoSection opId={op.id} />
         </div>
       )}
 
@@ -949,7 +961,6 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
 
       {vista === "producao" && (
         <div className="space-y-6">
-          <ListaExpedicaoSection opId={op.id} />
           <AbaProducao opId={op.id} opNumero={op.numero} obra={op.obra} cliente={op.cliente} refCliente={op.refCliente} />
         </div>
       )}
