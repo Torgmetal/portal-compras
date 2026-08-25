@@ -99,8 +99,15 @@ export async function GET() {
       return {
         id: `rp_${r.id}`, origem: "PREVIA", ...base(r.op, data, situacao),
         remarcadaDe: null,
-        // ⚠ o RT-## é como a Expedição chama a carga — sem ele a linha não casa com o papel.
-        descricao: [`RT-${String(r.numero).padStart(2, "0")}`, r.local, r.observacao].filter(Boolean).join(" · "),
+        // ⚠⚠ "Romaneio ##", NUNCA "RT-##". RT é a série do `RomaneioTerceiro` — envio a prestador
+        // (galvanização, usinagem), que NÃO é carga para o cliente. Eu tinha rotulado assim por
+        // engano e Vitor leu, com razão, como se romaneio de terceiro tivesse entrado na lista.
+        //
+        // ⚠ E não entra mesmo: esta rota lê `PlanejamentoCarga` e `RomaneioPrevio`, nenhuma das
+        // duas guarda envio a terceiro (não há campo de fornecedor nelas). Conferido em 25/08/2026:
+        // os 2 RT do banco são de MOISES DE ARAUJO, em tabela à parte; os 11 prévios têm todos
+        // destino de obra do cliente (Tamanduateí, Paulínia, Franco da Rocha, Arujá…).
+        descricao: [`Romaneio ${String(r.numero).padStart(2, "0")}`, r.local, r.observacao].filter(Boolean).join(" · "),
         itens: Array.isArray(r.itens) ? r.itens.length : 0,
         carregados: 0,
         pesoKg: Math.round(Number(r.pesoKg) || 0),
