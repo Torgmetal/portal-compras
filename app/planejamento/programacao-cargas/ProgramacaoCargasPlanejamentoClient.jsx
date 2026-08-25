@@ -249,12 +249,52 @@ export default function ProgramacaoCargasPlanejamentoClient() {
               </div>
             </div>
 
-            {/* ⚠ dito por extenso porque é uma ausência, e ausência não aparece em tabela nenhuma. */}
-            <p className="text-[11px] text-torg-gray-light mt-3 inline-flex items-center gap-1.5">
-              <CalendarClock size={12} /> Mostra as cargas das duas origens — os romaneios prévios e a
-              programação por OP. Datas de embarque que existem só no cronograma ainda não entram.
-            </p>
+            <Legenda />
       </div>
+    </div>
+  );
+}
+
+// ⚠ A LEGENDA DIZ DE ONDE VEM CADA SITUAÇÃO, não só o que ela significa. Vitor (25/08/2026):
+// "crie uma legenda pequena do que significa cada status, no caso de onde ver a informação". Status
+// derivado sem origem declarada é o tipo de número que ninguém consegue conferir nem contestar —
+// quem discorda da linha precisa saber em qual tela ir mudar.
+const LEGENDA = [
+  { k: "PROGRAMADA", o: "Romaneio prévio criado com data à frente, ainda não liberado." },
+  { k: "ATRASADA",   o: "A data prevista já passou e a carga não foi emitida nem cancelada." },
+  { k: "CONFIRMADA", o: "Aprovada em Romaneios prévios — liberada para a Expedição, ainda não saiu." },
+  { k: "EMBARCADA",  o: "Romaneio emitido pela Expedição. A carga saiu do pátio." },
+  { k: "FATURADA",   o: "NF registrada no módulo Fiscal sobre esse romaneio." },
+  { k: "CANCELADA",  o: "Cancelada em Romaneios prévios." },
+  { k: "SEM_DATA",   o: "Criada sem data prevista — falta datar em Romaneios prévios." },
+];
+
+function Legenda() {
+  return (
+    <div className="mt-4 bg-white border border-gray-100 rounded-xl px-4 py-3">
+      <p className="text-[11px] uppercase tracking-wide text-torg-gray-light mb-2">O que cada situação quer dizer</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
+        {LEGENDA.map(({ k, o }) => (
+          <div key={k} className="flex items-start gap-2">
+            <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold shrink-0 ${SIT[k].chip}`}>{SIT[k].rot}</span>
+            <span className="text-[11px] text-torg-gray leading-snug">{o}</span>
+          </div>
+        ))}
+      </div>
+      {/* ⚠ a regra de precedência é o que explica a linha que "deveria estar atrasada e não está" —
+          sem ela, a tabela parece errada justamente nos casos em que acerta. */}
+      <p className="text-[11px] text-torg-gray-light mt-2.5 pt-2.5 border-t border-gray-50">
+        Vale sempre o fato mais forte: faturada ganha de embarcada, que ganha de confirmada. Carga que
+        já saiu ou foi cancelada nunca aparece como atrasada.
+      </p>
+      <p className="text-[11px] text-torg-gray-light mt-1.5 flex items-start gap-1.5">
+        <CalendarClock size={12} className="mt-0.5 shrink-0" />
+        <span>
+          <b>Origem</b> diz de qual lista a carga veio: <b>Prévia</b> é o romaneio prévio do
+          Planejamento; <b>Programação</b> é a carga montada por OP no painel da Expedição.
+          Datas de embarque que existem só no cronograma ainda não entram.
+        </span>
+      </p>
     </div>
   );
 }
