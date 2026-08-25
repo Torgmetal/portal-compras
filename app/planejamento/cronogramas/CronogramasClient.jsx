@@ -1210,6 +1210,11 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
   const [gerarPreview, setGerarPreview] = useState(null);
   const [gerando, setGerando] = useState(false);
   const [encadearSetor, setEncadearSetor] = useState(true); // encadeia tarefas do mesmo setor em sequência
+  // ⚠⚠ LIGADO POR PADRÃO. Gerar datas recalcula TUDO a partir do início do projeto — na OP-094 isso
+  // preenchia as 6 tarefas de Fabricação e MUDAVA as 8 que já tinham data acordada (Recebimento dos
+  // arquivos ia de 22/06→03/07 para 22/06→22/06). O caso comum é completar o que falta, não
+  // refazer o cronograma; refazer é a exceção e agora exige desmarcar.
+  const [apenasSemData, setApenasSemData] = useState(true);
   // Copiar cronograma pra outra OP (mesma estrutura, progresso zerado)
   const [showCopiar, setShowCopiar] = useState(false);
   const [copiarOp, setCopiarOp] = useState("");
@@ -1304,7 +1309,7 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
   const gerarDatas = async (aplicar) => {
     setGerando(true);
     try {
-      const body = { aplicar, encadearSetor };
+      const body = { aplicar, encadearSetor, apenasSemData };
       if (gerarInicio) body.dataInicioProjeto = new Date(gerarInicio + "T12:00:00Z").toISOString();
       const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/gerar-datas`, {
         method: "POST",
@@ -1497,6 +1502,15 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
                   {gerando ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />} Calcular prévia
                 </button>
               </div>
+
+              {/* ⚠ a opção que protege o que já foi acordado — ver o comentário no estado. */}
+              <label className={`flex items-start gap-2 text-[11px] cursor-pointer select-none border rounded-lg px-2.5 py-1.5 ${apenasSemData ? "text-torg-dark bg-emerald-50/60 border-emerald-200" : "text-amber-900 bg-amber-50 border-amber-300"}`}>
+                <input type="checkbox" checked={apenasSemData} onChange={(e) => { setApenasSemData(e.target.checked); setGerarPreview(null); }} className="mt-0.5 rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
+                <span>
+                  Preencher <b>só as tarefas sem data</b>, usando as que já têm como âncora.
+                  {!apenasSemData && <b className="block mt-0.5">⚠ Desmarcado, o cálculo REFAZ o cronograma inteiro a partir da data de início — as datas já acordadas mudam.</b>}
+                </span>
+              </label>
 
               <label className="flex items-start gap-2 text-[11px] text-torg-dark cursor-pointer select-none bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg px-2.5 py-1.5">
                 <input type="checkbox" checked={encadearSetor} onChange={(e) => { setEncadearSetor(e.target.checked); setGerarPreview(null); }} className="mt-0.5 rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />

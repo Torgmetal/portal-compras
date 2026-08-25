@@ -17,6 +17,8 @@ const schema = z.object({
   // ⚠ segunda confirmação, só quando há baseline — ver o guard mais abaixo
   confirmarSobreBaseline: z.boolean().default(false),
   encadearSetor: z.boolean().default(false), // encadeia tarefas do mesmo setor em sequência (quando sem antecessora)
+  // ⚠ completa só as tarefas SEM data, usando as que já têm como âncora — ver lib/cronograma-recalcular.js
+  apenasSemData: z.boolean().default(false),
 });
 
 export async function POST(req, { params }) {
@@ -60,6 +62,7 @@ export async function POST(req, { params }) {
     : (cronograma.dataInicio ? new Date(cronograma.dataInicio) : new Date());
 
   const { preview, error } = gerarDatasCronograma(cronograma.tarefas, {
+    apenasSemData: parsed.data.apenasSemData,
     dataInicioProjeto: inicioProjeto,
     tipoDias: cronograma.tipoDias,
     encadearSetor: parsed.data.encadearSetor,
