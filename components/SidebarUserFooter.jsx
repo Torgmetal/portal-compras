@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
-import { LogOut, Settings } from "lucide-react";
+import { LogOut, Settings, KeyRound } from "lucide-react";
 
 export default function SidebarUserFooter() {
   const { data: session } = useSession();
@@ -31,6 +31,15 @@ export default function SidebarUserFooter() {
             <Settings size={14} />
           </Link>
         )}
+        {/* ⚠ trocar a senha estava só numa página solta, sem link de lugar nenhum — existia e
+            ninguém achava. Aqui, ao lado do Sair, é onde a pessoa procura a própria conta. */}
+        <Link
+          href="/trocar-senha"
+          title="Trocar minha senha"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-torg-gray hover:bg-gray-50 hover:text-torg-dark transition-colors"
+        >
+          <KeyRound size={14} />
+        </Link>
         <button
           onClick={() => signOut({ callbackUrl: "/entrar" })}
           className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-torg-gray hover:bg-gray-50 hover:text-torg-dark transition-colors"

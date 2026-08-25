@@ -4,10 +4,7 @@ import Medir from "./Medir";
 import RNCs from "./RNCs";
 import NovoRelatorio from "./NovoRelatorio";
 import { signOut } from "next-auth/react";
-import {
-  Loader2, QrCode, Search, X, Check, ChevronLeft, HardHat,
-  LogOut, AlertCircle, Tag, Ruler,
-} from "lucide-react";
+import { Loader2, QrCode, Search, X, Check, ChevronLeft, HardHat, LogOut, AlertCircle, Tag, Ruler, KeyRound } from "lucide-react";
 import { marcaDoQR, marcaCasaOP } from "@/lib/qualidade-campo";
 import { instrumentosDoTipo, FONTE_POR_TIPO } from "@/lib/instrumentos-por-relatorio";
 import LeitorQR from "./LeitorQR";
@@ -131,6 +128,9 @@ function Tela({ titulo, sub, voltar, children }) {
           <p className="font-semibold leading-tight truncate">{titulo}</p>
           {sub && <p className="text-[11px] text-white/70 leading-tight truncate">{sub}</p>}
         </div>
+        {/* ⚠ `voltar=/campo` porque a saída daqui NÃO é /entrar: o inspetor tem login próprio, e
+            devolvê-lo à tela do portal interno seria mandá-lo para uma porta que não é a dele. */}
+        <a href="/trocar-senha?voltar=/campo" title="Trocar minha senha" className="p-1 text-white/70"><KeyRound size={18} /></a>
         <button onClick={() => signOut({ callbackUrl: "/campo/entrar" })} className="p-1 text-white/70"><LogOut size={18} /></button>
       </header>
       <main className="flex-1 p-4">{children}</main>

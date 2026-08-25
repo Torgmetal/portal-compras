@@ -1,11 +1,35 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
 import { Loader2, AlertCircle, CheckCircle2, ArrowLeft, Eye, EyeOff, KeyRound } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
+// ⚠⚠ ESTA PÁGINA EXISTIA E NINGUÉM ACHAVA: não havia link para ela em lugar nenhum do portal.
+// Vitor (24/08/2026): "deixe a opção de alterar senha visível tanto no celular quanto no
+// computador". Agora entra no rodapé do menu (computador) e no cabeçalho do portal de campo
+// (celular) — e as duas passam `?voltar=`, porque a porta de saída de cada área é diferente:
+// mandar o inspetor de volta para `/entrar` seria mandá-lo para um login que não é o dele.
+// ⚠⚠ `useSearchParams()` EXIGE SUSPENSE, e o build NÃO diz isso na linha de "Compiled
+// successfully" — ele compila, e só depois estoura na pré-renderização com "should be wrapped in a
+// suspense boundary". Sem o embrulho, a página ia para produção quebrada.
 export default function TrocarSenhaPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-torg-blue-50/40" />}>
+      <Formulario />
+    </Suspense>
+  );
+}
+
+function Formulario() {
+  const params = useSearchParams();
+  const { data: sessao } = useSession();
+  // ⚠ só aceita caminho interno: `?voltar=` vem da URL, e sem esta trava viraria redirecionamento
+  // aberto — link de troca de senha apontando para fora é isca de phishing pronta.
+  const voltarBruto = params.get("voltar") || "";
+  const voltar = /^\/[a-zA-Z0-9/_-]*$/.test(voltarBruto) ? voltarBruto : "/entrar";
   const [email, setEmail] = useState("");
   const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
@@ -14,6 +38,9 @@ export default function TrocarSenhaPage() {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState(false);
+
+  // ⚠ quem já está logado não deve redigitar o próprio e-mail para trocar a senha.
+  useEffect(() => { if (sessao?.user?.email && !email) setEmail(sessao.user.email); }, [sessao, email]);
 
   const senhaForteOk = novaSenha.length >= 8;
   const baterConfirmacao = novaSenha === confirmar && confirmar.length > 0;
@@ -98,7 +125,7 @@ export default function TrocarSenhaPage() {
               <CheckCircle2 size={16} className="mt-0.5 flex-shrink-0 text-torg-blue" />
               <span>
                 Senha trocada com sucesso!{" "}
-                <Link href="/entrar" className="font-semibold text-torg-blue underline">
+                <Link href={voltar} className="font-semibold text-torg-blue underline">
                   Entrar agora
                 </Link>
               </span>
@@ -185,10 +212,10 @@ export default function TrocarSenhaPage() {
           </button>
 
           <Link
-            href="/entrar"
+            href={voltar}
             className="block text-center text-sm text-torg-gray hover:text-torg-dark pt-2 border-t border-gray-100 inline-flex items-center gap-1 justify-center w-full"
           >
-            <ArrowLeft size={14} /> Voltar pra tela de login
+            <ArrowLeft size={14} /> {voltar === "/entrar" ? "Voltar pra tela de login" : "Voltar"}
           </Link>
         </form>
       </div>
