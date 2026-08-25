@@ -301,6 +301,9 @@ function Legenda() {
           <b>Origem</b> diz de qual lista a carga veio: <b>Prévia</b> é o romaneio prévio do
           Planejamento; <b>Programação</b> é a carga montada por OP no painel da Expedição.
           Datas de embarque que existem só no cronograma ainda não entram.
+          {/* ⚠ dito por extenso: linha que some sem explicação vira "sumiu do sistema". */}
+          {" "}Carga faturada continua aqui enquanto a obra estiver aberta — sai quando o Comercial
+          encerra a OP.
         </span>
       </p>
     </div>

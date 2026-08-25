@@ -40,8 +40,18 @@ export async function GET() {
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const selOp = { id: true, numero: true, cliente: true, obra: true, refCliente: true };
+  // ⚠⚠ A OP ENCERRADA SAI DA LISTA, mesmo faturada. Vitor (25/08/2026): "as OPs que estiverem como
+  // faturada você deixa aparecendo até que a OP esteja aberta; quando o comercial der como
+  // finalizada, tirar ela do histórico da página de cargas".
+  //
+  // O corte é o status da OP, não a NF: carga faturada de obra ABERTA continua na tela — ainda há o
+  // que conferir nela. Quem encerra é o Comercial (/api/comercial/op/[id], grava ENCERRADA +
+  // dataFimReal), então esta lista acompanha a decisão dele em vez de ter regra própria de
+  // arquivamento — duas regras de "quando some" divergiriam na primeira exceção.
+  const opAberta = { op: { status: { notIn: ["ENCERRADA", "CANCELADA"] } } };
   const [programadas, previas] = await Promise.all([
     prisma.planejamentoCarga.findMany({
+      where: opAberta,
       orderBy: { dataPrevista: "asc" },
       include: {
         op: { select: selOp },
@@ -50,6 +60,7 @@ export async function GET() {
       },
     }),
     prisma.romaneioPrevio.findMany({
+      where: opAberta,
       orderBy: [{ dataPrevista: "asc" }, { createdAt: "asc" }],
       include: { op: { select: selOp } },
     }),
