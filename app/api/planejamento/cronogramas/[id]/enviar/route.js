@@ -10,7 +10,7 @@ import { escapeHtml, textoParaHtml } from "@/lib/html";
 import { gerarCronogramaPDF } from "@/lib/cronograma-pdf";
 import { aplicarAvancoSyneco } from "@/lib/cronograma-syneco";
 import { gerarCronogramaMSProjectXML } from "@/lib/cronograma-msproject-xml";
-import { CONTATOS_TAREFAS } from "@/lib/contatos-tarefas";
+import { getContatosTarefas } from "@/lib/contatos-tarefas";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -48,7 +48,7 @@ export async function GET(_req, { params }) {
 
   return NextResponse.json({
     cronograma: { id: c.id, titulo: c.titulo, opNumero: c.opNumero, cliente: c.op?.cliente || null, dataInicio: c.dataInicio, dataFim: c.dataFim, tarefas: c.tarefas.length },
-    setores: CONTATOS_TAREFAS,
+    setores: await getContatosTarefas(),
     clientes: [...registrados, ...doCadastro],
     temOp: !!c.op?.id,
     historico: c.envios.map((e) => ({

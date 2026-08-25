@@ -10,7 +10,7 @@ import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { gerarTokenForte } from "@/lib/token";
 import { escapeHtml, textoParaHtml } from "@/lib/html";
-import { CONTATOS_TAREFAS } from "@/lib/contatos-tarefas";
+import { getContatosTarefas } from "@/lib/contatos-tarefas";
 import { gerarAtaOPPDF } from "@/lib/ata-op-pdf";
 import { put } from "@vercel/blob";
 import { z } from "zod";
@@ -46,7 +46,7 @@ export async function GET(_req, { params }) {
     success: true,
     ata: { numero: ata.numero, opNumero: ata.opNumero, titulo: ata.titulo, obra: ata.op?.obra || null, cliente: ata.op?.cliente || null, refCliente: ata.op?.refCliente || null, status: ata.status, enviadoEm: ata.enviadoEm, aceiteEm: ata.aceiteEm, aceiteNome: ata.aceiteNome, temConteudo: !!(ata.conteudoJson || ata.pauta), anexos: Array.isArray(ata.anexos) ? ata.anexos.length : 0 },
     clientes: [...registrados, ...doCadastro],
-    setores: CONTATOS_TAREFAS,
+    setores: await getContatosTarefas(),
   });
 }
 

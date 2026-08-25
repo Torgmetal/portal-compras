@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, Target, Bot, Activity } from "lucide-react";
+import { Users, Target, Bot, Activity, Mail } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/admin/usuarios",  label: "Usuários",  icon: Users },
+  { href: "/admin/contatos",  label: "Contatos por setor", icon: Mail },
   { href: "/admin/metas",     label: "Metas",     icon: Target },
   { href: "/admin/torguinho", label: "Torguinho", icon: Bot },
   { href: "/admin/sincronizacoes", label: "Sincronizações", icon: Activity },

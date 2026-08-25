@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/html";
 import { criarCompromissosDaTarefa } from "@/lib/compromissos";
-import { CONTATOS_TAREFAS, SETOR_AREA_TAREFA } from "@/lib/contatos-tarefas";
+import { getContatosTarefas, SETOR_AREA_TAREFA } from "@/lib/contatos-tarefas";
 import { gerarTokenForte } from "@/lib/token";
 
 // Mapeamento setor da tarefa → modulo do sistema (para buscar usuarios)
@@ -65,7 +65,7 @@ export async function GET(req, { params }) {
   return NextResponse.json({
     setor: tarefa.setor,
     doCliente: tarefa.doCliente,
-    areas: CONTATOS_TAREFAS,
+    areas: await getContatosTarefas(),
     areaPreMarcada: SETOR_AREA_TAREFA[tarefa.setor] || null,
     cliente,
   });

@@ -6,16 +6,16 @@
 // liberar para expedição — é aqui que começamos a direcionar as peças que precisam ser enviadas,
 // daqui pode aparecer no portal da expedição essas informações".
 //
-// O caminho pro portal da Expedição já existia, só que começava em outra tela
-// (/planejamento/expedicao-semanal). São duas coisas que precisam existir juntas:
+// São duas coisas que precisam existir juntas:
 //   1. `ConjuntoEntrega` por peça — quanto vai pra qual destino (é o que a Expedição romaneia);
 //   2. `PedidoExpedicao` da obra — é o que faz a OP aparecer na fila da Expedição.
 // Uma sem a outra não mostra nada: pedido sem entrega é uma OP vazia na fila, entrega sem pedido
 // é peça direcionada que ninguém vê.
 //
-// ⚠ NÃO SOBRESCREVE divisão que já existe. Se a peça já foi repartida entre destinos (na Expedição
-// Semanal), ela é PULADA e volta na resposta — reescrever apagaria a divisão que alguém fez à mão,
-// e o erro só apareceria no romaneio errado, lá na frente.
+// ⚠ NÃO SOBRESCREVE divisão que já existe. Peça já repartida entre destinos é PULADA e volta na
+// resposta — reescrever apagaria a divisão, e o erro só apareceria no romaneio, lá na frente.
+// A tela que criava essas divisões (Expedição Semanal) saiu em 25/08/2026; a guarda fica, porque
+// os registros continuam no banco e sobrescrevê-los seria pior do que ignorá-los.
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -158,7 +158,6 @@ export async function POST(req) {
   });
 
   revalidatePath("/expedicao");
-  revalidatePath("/planejamento/expedicao-semanal");
 
   return NextResponse.json({
     ok: true,

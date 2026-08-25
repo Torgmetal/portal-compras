@@ -1,15 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ListTodo, GanttChart, Truck, ClipboardCheck, Mail, Tv, CalendarClock, PackageCheck, ClipboardList } from "lucide-react";
+import { ListTodo, GanttChart, ClipboardCheck, Tv, CalendarClock, PackageCheck, ClipboardList } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/planejamento/cronogramas", label: "Cronogramas", icon: GanttChart },
   { href: "/planejamento/datas-setor", label: "Datas por setor", icon: CalendarClock },
-  { href: "/planejamento/comunicacao", label: "Matriz de comunicação", icon: Mail },
-  { href: "/planejamento/expedicao-semanal", label: "Expedição Semanal", icon: Truck },
   { href: "/planejamento/programacao-cargas", label: "Programação de Cargas", icon: PackageCheck },
   // ⚠ vizinho da Programação de Cargas de propósito: são os dois passos da mesma conversa —
   // a carga é o que vai viajar, o romaneio prévio é a relação que a Expedição confere e emite.

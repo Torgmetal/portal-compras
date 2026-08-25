@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
-import { CC_DIRECAO } from "@/lib/contatos-tarefas";
+import { getCcDirecao } from "@/lib/contatos-tarefas";
 import { gerarTokenForte } from "@/lib/token";
 import { dataBR } from "@/lib/data-br";
 
@@ -72,7 +72,7 @@ export async function GET(req, { params }) {
       }));
 
     // CC padrão: a direção, marcada mas desmarcável (Vitor 19/08).
-    return NextResponse.json({ success: true, sugeridos, ccPadrao: CC_DIRECAO });
+    return NextResponse.json({ success: true, sugeridos, ccPadrao: await getCcDirecao() });
   } catch (e) {
     console.error("[notificar-atrasos GET] erro:", e?.message);
     return NextResponse.json(
@@ -172,7 +172,7 @@ export async function POST(req, { params }) {
   // Agora o padrão é a direção e o cliente manda o que ficou marcado. Array vazio = sem cópia:
   // por isso o teste é `Array.isArray`, não `?.length` — [] tem de significar "nenhum", e não
   // "usa o padrão".
-  const ccEmails = (ccEscolhido ?? CC_DIRECAO.map((c) => c.email))
+  const ccEmails = (ccEscolhido ?? (await getCcDirecao()).map((c) => c.email))
     .filter((e) => typeof e === "string" && e.includes("@"))
     // quem já está no "para" não precisa aparecer no CC também
     .filter((e) => !emailsManuais.includes(e));

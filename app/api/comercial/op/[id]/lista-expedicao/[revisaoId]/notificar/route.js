@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/html";
 import { cabecalhoEmail } from "@/lib/email-layout";
-import { CONTATOS_TAREFAS } from "@/lib/contatos-tarefas";
+import { getContatosTarefas } from "@/lib/contatos-tarefas";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -89,7 +89,7 @@ export async function POST(_req, { params }) {
     </div>
   </div>`;
 
-  const destinos = [...new Set(CONTATOS_TAREFAS.flatMap((g) => g.contatos.map((c) => c.email)).filter(Boolean))];
+  const destinos = [...new Set((await getContatosTarefas()).flatMap((g) => g.contatos.map((c) => c.email)).filter(Boolean))];
   let ok = 0;
   for (const to of destinos) {
     try {
