@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useStore } from "@/lib/store";
-import { Loader2, Plus, ClipboardPaste, Save, Trash2, Search, Check, X, PackagePlus, Filter, ChevronDown, ArrowUp, ArrowDown, FileDown } from "lucide-react";
+import { Loader2, Plus, ClipboardPaste, Save, Trash2, Search, Check, X, PackagePlus, Filter, ChevronDown, ArrowUp, ArrowDown, FileDown, RefreshCw } from "lucide-react";
 
 const anoAtual = new Date().getFullYear();
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -158,6 +158,24 @@ export default function CmrLancarClient() {
   }
 
   const itens = dados?.itens || [];
+
+  // Reconcilia com a planilha do SharePoint (puxa rastreio digitado direto no Excel e
+  // reenvia o que faltar lá). Chave = índice R.
+  const [reconciliando, setReconciliando] = useState(false);
+  async function reconciliarPlanilha() {
+    setReconciliando(true);
+    try {
+      const r = await fetch("/api/compras/cmr/reconciliar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ano }) });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error || "Falha na reconciliação");
+      const partes = [];
+      if (j.importados) partes.push(`${j.importados} vindo(s) do Excel`);
+      if (j.enviados) partes.push(`${j.enviados} enviado(s) ao Excel`);
+      if (j.ignoradasSemIndice) partes.push(`${j.ignoradasSemIndice} sem índice R (ignorada)`);
+      showToast(partes.length ? `Planilha sincronizada — ${partes.join(", ")}` : "Planilha já estava em dia", "success");
+      if (j.importados) carregar();
+    } catch (e) { showToast(e.message, "erro"); } finally { setReconciliando(false); }
+  }
 
   // Exporta pra .xlsx o que está VISÍVEL (respeita filtros/ordenação/busca) — todas as colunas da planilha.
   const [exportando, setExportando] = useState(false);
@@ -316,6 +334,10 @@ export default function CmrLancarClient() {
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar descrição, fornecedor, OP, NF…" className="w-64 pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm" />
             </div>
+            <button onClick={reconciliarPlanilha} disabled={reconciliando} title="Sincronizar com a planilha do servidor: puxa rastreios digitados direto no Excel e reenvia o que faltar lá"
+              className="text-sm font-medium rounded-lg px-3 py-2 inline-flex items-center gap-2 bg-white border border-torg-blue-200 text-torg-blue hover:bg-torg-blue-50 disabled:opacity-50">
+              {reconciliando ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />} <span className="hidden sm:inline">Sincronizar planilha</span>
+            </button>
             <button onClick={exportarExcel} disabled={exportando || !visiveis.length} title="Baixar a planilha em Excel (.xlsx) com o que está na tela"
               className="text-sm font-medium rounded-lg px-3 py-2 inline-flex items-center gap-2 bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
               {exportando ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />} <span className="hidden sm:inline">Exportar Excel</span>

@@ -87,6 +87,10 @@
     {
       "path": "/api/cron/sync-fornecedores-omie",
       "schedule": "20 5 * * *"
+    },
+    {
+      "path": "/api/cron/cmr-reconciliar",
+      "schedule": "40 5 * * *"
     }
   ]
 }
