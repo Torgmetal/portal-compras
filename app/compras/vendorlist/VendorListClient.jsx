@@ -142,6 +142,7 @@ export default function VendorListClient({ fornecedoresIniciais, categoriasCusto
           <span>
             Sincronização concluída — <strong>{resSync.novos}</strong> novo(s), <strong>{resSync.vinculados}</strong> vinculado(s) ao cadastro existente,
             de <strong>{resSync.total}</strong> fornecedores no Omie. <strong>{resSync.semEmail}</strong> sem e-mail (marcados para completar).
+            {resSync.removidos > 0 ? ` ${resSync.removidos} funcionário(s)-PJ removido(s).` : ""}
             {resSync.erros?.length ? ` ⚠ ${resSync.erros.length} erro(s) — ver logs.` : ""}
           </span>
           <button onClick={() => setResSync(null)} className="text-emerald-700 hover:text-emerald-900 shrink-0"><X size={15} /></button>
@@ -249,8 +250,8 @@ export default function VendorListClient({ fornecedoresIniciais, categoriasCusto
                 {filtrados.map((f) => (
                   <tr key={f.id} className={`hover:bg-gray-50 ${!f.ativo ? "opacity-50" : ""}`}>
                     <td className="px-4 py-3">
-                      <p className="text-torg-dark font-medium">{f.razaoSocial}</p>
-                      {f.nomeFantasia && <p className="text-xs text-torg-gray">{f.nomeFantasia}</p>}
+                      <p className="text-torg-dark font-medium">{f.nomeFantasia || f.razaoSocial}</p>
+                      {f.nomeFantasia && <p className="text-xs text-torg-gray">{f.razaoSocial}</p>}
                       {f.cnpj && <p className="text-[10px] text-torg-gray font-mono">{fmtCnpj(f.cnpj)}</p>}
                       {!f.ativo && (
                         <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded mt-1 inline-block">Inativo</span>
