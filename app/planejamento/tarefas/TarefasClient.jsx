@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { fmtOP } from "@/lib/utils";
+import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import {
   Loader2, AlertCircle, RefreshCw, Plus, X, Trash2, Filter,
   CheckCircle2, Clock, Circle, ListTodo, Bell, Send,
@@ -52,6 +53,17 @@ const COLUNAS_KANBAN = [
   { key: "CONCLUIDA", label: "Concluída", cor: "bg-emerald-50 text-emerald-700" },
 ];
 const fmtPrazoCurto = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit" }) : null);
+// ⚠ o valor do filtro é o RÓTULO que aparece na célula, não a constante do banco: ninguém procura
+// por "EM_ANDAMENTO" numa lista de opções.
+const COLUNAS_TAREFA = [
+  { key: "setor",       label: "Setor",       valor: (t) => SETOR_LABEL[t.setor] || t.setor || "—" },
+  { key: "op",          label: "OP",          valor: (t) => (t.opNumero ? fmtOP(t.opNumero) : "sem OP") },
+  { key: "cliente",     label: "Cliente",     valor: (t) => t.op?.cliente || "—" },
+  { key: "responsavel", label: "Responsável", valor: (t) => t.responsavel || "—" },
+  { key: "prioridade",  label: "Prior.",      valor: (t) => t.prioridade || "—" },
+  { key: "situacao",    label: "Situação",    valor: (t) => (t.status === "CONCLUIDA" ? "Concluída" : ehAtrasada(t) ? "Atrasada" : STATUS_LABEL[t.status] || t.status) },
+];
+
 function ehAtrasada(t) {
   if (!t.dataPrevista || t.status === "CONCLUIDA" || t.status === "CANCELADA") return false;
   const hoje = new Date(); hoje.setUTCHours(0, 0, 0, 0);
@@ -80,8 +92,13 @@ function getISOWeek() {
 }
 
 export default function TarefasClient() {
-  const [aba, setAba] = useState("semanais"); // "semanais" | "cronograma"
-  const [vista, setVista] = useState("kanban"); // "kanban" | "lista"
+  // ⚠ CRONOGRAMA PRIMEIRO. Vitor (25/08/2026): "a tela principal dessa parte deve ser as tarefas
+  // de cronograma". Abrir nas semanais punha 40 concluídas na frente de quem procura o que atrasou.
+  const [aba, setAba] = useState("cronograma");
+  // ⚠ e a vista das semanais abre em LISTA: o kanban empilha cartão alto e obriga a rolar três
+  // colunas para comparar prazos. A tabela ordena e filtra como planilha, que é como se lê.
+  const [vista, setVista] = useState("lista"); // "kanban" | "lista"
+  const [verConcluidas, setVerConcluidas] = useState(false);
   const { semana: semanaInit, ano: anoInit } = getISOWeek();
   const [tarefas, setTarefas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -124,6 +141,18 @@ export default function TarefasClient() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
+  // ⚠ o hook do filtro vem ANTES de qualquer uso de `filtradas` no render — declarado depois, a
+  // tela quebra em tempo de execução e nem o build nem o `checar` pegam.
+  const fTar = useFiltroColunas(tarefas, COLUNAS_TAREFA);
+  const [colTarefa, setColTarefa] = useState(null);
+  const fpT = { filtros: fTar.filtros, setFiltros: fTar.setFiltros, opcoesDaColuna: fTar.opcoesDaColuna, aberta: colTarefa, setAberta: setColTarefa };
+  // ⚠ concluída fica FORA por padrão: eram 40 de 53 linhas, e a lista abria mostrando sobretudo o
+  // que já acabou. O botão traz de volta quando alguém quiser conferir.
+  const linhasTarefa = ordenarPorPrazo(
+    fTar.filtradas.filter((t) => verConcluidas || t.status !== "CONCLUIDA")
+  );
+  const concluidasOcultas = fTar.filtradas.filter((t) => t.status === "CONCLUIDA").length;
+
   async function atualizarStatus(id, status) {
     try {
       const res = await fetch(`/api/planejamento/tarefas/${id}`, {
@@ -160,7 +189,7 @@ export default function TarefasClient() {
           <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight">Tarefas</h2>
           <p className="text-xs text-torg-gray mt-0.5">
             {aba === "semanais"
-              ? (filtroOp.trim() ? `Tarefas da OP-${filtroOp.trim().padStart(3, "0")} — todas as semanas` : todasSemanas ? "Acompanhamento por setor — todas as semanas" : `Acompanhamento por setor — Semana ${semana}/${ano}`)
+              ? (filtroOp.trim() ? `Tarefas da OP-${filtroOp.trim().padStart(3, "0")} — todas as semanas` : todasSemanas ? "Acompanhamento por setor — em aberto, todas as semanas" : `Acompanhamento por setor — Semana ${semana}/${ano}`)
               : aba === "cronograma" ? "Atividades dos cronogramas ativos"
               : aba === "cobranca" ? "Compras atrasadas e itens para cobrança dos setores"
               : "Respostas do cliente e dos setores às tarefas"}
@@ -179,20 +208,20 @@ export default function TarefasClient() {
       {/* Abas */}
       <div className="flex items-center gap-1 border-b border-gray-200">
         <button
-          onClick={() => setAba("semanais")}
-          className={`px-4 py-2 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
-            aba === "semanais" ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"
-          }`}
-        >
-          <ListTodo size={13} /> Semanais
-        </button>
-        <button
           onClick={() => setAba("cronograma")}
           className={`px-4 py-2 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
             aba === "cronograma" ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"
           }`}
         >
           <GanttChart size={13} /> Cronograma
+        </button>
+        <button
+          onClick={() => setAba("semanais")}
+          className={`px-4 py-2 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
+            aba === "semanais" ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"
+          }`}
+        >
+          <ListTodo size={13} /> Semanais
         </button>
         <button
           onClick={() => setAba("cobranca")}
@@ -233,14 +262,17 @@ export default function TarefasClient() {
           <input type="checkbox" checked={todasSemanas} onChange={(e) => setTodasSemanas(e.target.checked)} disabled={!!filtroOp.trim()} className="accent-torg-blue" />
           Todas as semanas
         </label>
-        <div className={`flex items-center gap-1 ${(filtroOp.trim() || todasSemanas) ? "opacity-40" : ""}`} title={filtroOp.trim() ? "Filtrando por OP — semana ignorada" : todasSemanas ? "Desmarque \"Todas as semanas\" para filtrar" : ""}>
-          <label className="text-[10px] text-torg-gray">Semana:</label>
-          <input type="number" value={semana} onChange={(e) => setSemana(+e.target.value)} min={1} max={53} disabled={!!filtroOp.trim() || todasSemanas}
-            className="w-14 px-2 py-1 border border-gray-300 rounded text-xs text-center disabled:bg-gray-50" />
-          <span className="text-torg-gray">/</span>
-          <input type="number" value={ano} onChange={(e) => setAno(+e.target.value)} min={2024} disabled={!!filtroOp.trim() || todasSemanas}
-            className="w-16 px-2 py-1 border border-gray-300 rounded text-xs text-center disabled:bg-gray-50" />
-        </div>
+        {/* ⚠ campo desabilitado a 40% de opacidade ocupa espaço e não faz nada — some quando não vale. */}
+        {!todasSemanas && !filtroOp.trim() && (
+          <div className="flex items-center gap-1">
+            <label className="text-[10px] text-torg-gray">Semana:</label>
+            <input type="number" value={semana} onChange={(e) => setSemana(+e.target.value)} min={1} max={53}
+              className="w-14 px-2 py-1 border border-gray-300 rounded text-xs text-center" />
+            <span className="text-torg-gray">/</span>
+            <input type="number" value={ano} onChange={(e) => setAno(+e.target.value)} min={2024}
+              className="w-16 px-2 py-1 border border-gray-300 rounded text-xs text-center" />
+          </div>
+        )}
         <select value={filtroSetor} onChange={(e) => setFiltroSetor(e.target.value)}
           className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white">
           <option value="">Todos setores</option>
@@ -248,9 +280,15 @@ export default function TarefasClient() {
         </select>
         <input value={filtroOp} onChange={(e) => setFiltroOp(e.target.value.replace(/[^\dA-Za-z]/g, ""))} placeholder="Filtrar por OP (ex: 84)"
           className="w-36 px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:border-torg-blue outline-none" />
-        <button onClick={() => { setSemana(semanaInit); setAno(anoInit); setFiltroSetor(""); setFiltroOp(""); }}
+        {concluidasOcultas > 0 && (
+          <button onClick={() => setVerConcluidas((v) => !v)}
+            className="text-[11px] text-torg-gray hover:text-torg-dark border border-gray-200 rounded-lg px-2 py-1">
+            {verConcluidas ? "ocultar" : "mostrar"} {concluidasOcultas} concluída{concluidasOcultas === 1 ? "" : "s"}
+          </button>
+        )}
+        <button onClick={() => { setSemana(semanaInit); setAno(anoInit); setFiltroSetor(""); setFiltroOp(""); fTar.limpar(); }}
           className="text-xs text-torg-gray hover:text-torg-dark ml-auto">
-          Limpar
+          Limpar{fTar.ativos > 0 ? ` (${fTar.rotulosAtivos.join(", ")})` : ""}
         </button>
         <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
           <button onClick={() => setVista("kanban")} title="Kanban"
@@ -286,23 +324,30 @@ export default function TarefasClient() {
         </div>
       ) : vista === "kanban" ? (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {COLUNAS_KANBAN.map((col) => {
-            const doStatus = ordenarPorPrazo(tarefas.filter((t) => t.status === col.key));
+          {COLUNAS_KANBAN.filter((col) => col.key !== "CONCLUIDA" || verConcluidas).map((col) => {
+            // ⚠ o kanban lê as MESMAS linhas filtradas da tabela — duas vistas discordando do
+            // filtro é a receita para alguém contar errado ao trocar de vista.
+            const doStatus = ordenarPorPrazo(fTar.filtradas.filter((t) => t.status === col.key));
             const atrasadasCol = doStatus.filter(ehAtrasada).length;
             return (
               <div key={col.key} className="bg-gray-50/60 rounded-xl border border-gray-100 p-2 min-h-[120px]">
                 <div className="flex items-center justify-between px-1 py-1.5">
                   <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${col.cor}`}>{col.label}</span>
-                  <span className="text-[11px] text-torg-gray">{doStatus.length}{col.key !== "CONCLUIDA" && atrasadasCol > 0 ? ` · ${atrasadasCol} atras.` : ""}</span>
+                  {/* ⚠ "9 · 6 atras." não se lê. Palavra inteira cabe e diz o que é. */}
+                  <span className="text-[11px] text-torg-gray">
+                    {doStatus.length}{col.key !== "CONCLUIDA" && atrasadasCol > 0 ? `, ${atrasadasCol} atrasada${atrasadasCol === 1 ? "" : "s"}` : ""}
+                  </span>
                 </div>
                 <div className="space-y-2 mt-1">
                   {doStatus.length === 0 && <p className="text-[11px] text-torg-gray/60 italic px-2 py-4 text-center">vazio</p>}
                   {doStatus.map((t) => {
                     const atras = ehAtrasada(t);
                     const prazo = fmtPrazoCurto(t.dataPrevista);
+                    // ⚠ faixa à esquerda em vez de borda vermelha inteira: com todo cartão
+                    // atrasado, o contorno vermelho vira ruído e nada se destaca.
                     return (
-                      <div key={t.id} className={`bg-white rounded-lg border p-2.5 shadow-sm ${atras ? "border-red-200" : "border-gray-100"}`}>
-                        <p className={`text-[13px] font-medium ${t.status === "CONCLUIDA" ? "line-through text-torg-gray" : "text-torg-dark"}`}>{t.titulo}</p>
+                      <div key={t.id} className={`bg-white rounded-lg border border-gray-100 border-l-[3px] p-2.5 shadow-sm ${atras ? "border-l-red-500" : t.status === "CONCLUIDA" ? "border-l-emerald-400" : "border-l-gray-200"}`}>
+                        <p className={`text-[13px] font-medium ${t.status === "CONCLUIDA" ? "text-torg-gray" : "text-torg-dark"}`}>{t.titulo}</p>
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           <span className="text-[9px] font-semibold text-torg-gray uppercase tracking-wide">{SETOR_LABEL[t.setor] || t.setor}</span>
                           {t.opNumero && <span className="text-[10px] text-torg-blue font-mono">{fmtOP(t.opNumero)}</span>}
@@ -344,69 +389,87 @@ export default function TarefasClient() {
           })}
         </div>
       ) : (
-        <div className="space-y-2">
-          {SETORES.map((setor) => {
-            const doSetor = tarefas.filter((t) => t.setor === setor);
-            if (doSetor.length === 0 && filtroSetor) return null;
-            if (doSetor.length === 0) return null;
-            return (
-              <div key={setor}>
-                <h4 className="text-xs font-semibold text-torg-dark uppercase tracking-wide mb-2 mt-3">{SETOR_LABEL[setor]}</h4>
-                <div className="space-y-1">
-                  {doSetor.map((t) => {
-                    const Icon = STATUS_ICON[t.status] || Circle;
-                    return (
-                      <div key={t.id} className={`bg-white rounded-lg border border-gray-100 px-4 py-3 flex items-center gap-3 ${
-                        t.status === "CONCLUIDA" ? "opacity-60" : ""
-                      }`}>
+        /* ⚠ TABELA, não cartão. Vitor (25/08/2026): "essa tela está horrível de entender". O que
+           estava difícil era comparar: cada tarefa era um cartão alto, agrupado por setor, sem
+           prazo visível na lista e sem como filtrar. Em tabela, prazo e responsável ficam na mesma
+           coluna para todos, e o funil de coluna é o mesmo do resto do portal. */
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-[11px] uppercase text-torg-gray">
+                <tr>
+                  <th className="px-3 py-2 w-8" />
+                  <th className="px-3 py-2 font-semibold text-left">Tarefa</th>
+                  <ThFiltro col="setor" label="Setor" className="px-3 py-2 font-semibold text-left" {...fpT} />
+                  <ThFiltro col="op" label="OP" className="px-3 py-2 font-semibold text-left" {...fpT} />
+                  <ThFiltro col="cliente" label="Cliente" className="px-3 py-2 font-semibold text-left" {...fpT} />
+                  <ThFiltro col="responsavel" label="Responsável" className="px-3 py-2 font-semibold text-left" {...fpT} />
+                  <th className="px-3 py-2 font-semibold text-left">Prazo</th>
+                  <ThFiltro col="prioridade" label="Prior." className="px-3 py-2 font-semibold text-left" {...fpT} />
+                  <ThFiltro col="situacao" label="Situação" className="px-3 py-2 font-semibold text-left" {...fpT} />
+                  <th className="px-3 py-2 w-24" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {!linhasTarefa.length && (
+                  <tr><td colSpan={10} className="px-3 py-8 text-center text-sm text-torg-gray">Nada com esse filtro.</td></tr>
+                )}
+                {linhasTarefa.map((t) => {
+                  const atras = ehAtrasada(t);
+                  const feita = t.status === "CONCLUIDA";
+                  const Icon = STATUS_ICON[t.status] || Circle;
+                  return (
+                    <tr key={t.id} className={`hover:bg-gray-50/60 ${feita ? "text-torg-gray" : ""}`}>
+                      <td className="px-3 py-2">
+                        {/* clique avança o status — era o único jeito rápido de fechar tarefa na lista antiga */}
                         <button
-                          onClick={() => atualizarStatus(t.id, t.status === "CONCLUIDA" ? "PENDENTE" : t.status === "PENDENTE" ? "EM_ANDAMENTO" : "CONCLUIDA")}
-                          className={`flex-shrink-0 ${
-                            t.status === "CONCLUIDA" ? "text-emerald-500" : t.status === "EM_ANDAMENTO" ? "text-amber-500" : "text-gray-300 hover:text-torg-blue"
-                          }`}
-                          title={`Status: ${STATUS_LABEL[t.status]}`}
-                        >
-                          <Icon size={18} />
+                          onClick={() => atualizarStatus(t.id, feita ? "PENDENTE" : t.status === "PENDENTE" ? "EM_ANDAMENTO" : "CONCLUIDA")}
+                          title={`${STATUS_LABEL[t.status]} — clique para avançar`}
+                          className={feita ? "text-emerald-500" : t.status === "EM_ANDAMENTO" ? "text-amber-500" : "text-gray-300 hover:text-torg-blue"}>
+                          <Icon size={17} />
                         </button>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium ${t.status === "CONCLUIDA" ? "line-through text-torg-gray" : "text-torg-dark"}`}>
-                            {t.titulo}
-                          </p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            {t.opNumero && <span className="text-[10px] text-torg-blue font-mono">{fmtOP(t.opNumero)}</span>}
-                            {t.responsavel && <span className="text-[10px] text-torg-gray">{t.responsavel}</span>}
-                            {t.observacao && <span className="text-[10px] text-torg-gray italic truncate max-w-[200px]">{t.observacao}</span>}
-                          </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        {/* ⚠ sem line-through: título riscado em 40 linhas é ilegível. Cinza basta. */}
+                        <p className={`text-[13px] ${feita ? "text-torg-gray" : "font-medium text-torg-dark"}`}>{t.titulo}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {t.doCliente && <span className="text-[10px] text-torg-orange inline-flex items-center gap-0.5"><Building2 size={9} /> cliente</span>}
+                          {t.respostaSolicitadaEm && !(t.respostaRecebidaEm && new Date(t.respostaRecebidaEm) >= new Date(t.respostaSolicitadaEm)) && (
+                            <span className="text-[10px] text-amber-600">aguardando resposta desde {new Date(t.respostaSolicitadaEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</span>
+                          )}
+                          {t.observacao && <span className="text-[10px] text-torg-gray italic truncate max-w-[240px]" title={t.observacao}>{t.observacao}</span>}
                         </div>
-                        <span className={`px-2 py-0.5 text-[10px] font-semibold rounded border ${PRIORIDADE_COR[t.prioridade]}`}>
-                          {t.prioridade}
-                        </span>
-                        {t.doCliente && <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded border bg-orange-50 text-torg-orange border-orange-200 inline-flex items-center gap-0.5" title={t.clienteRespostaEm ? t.clienteResposta : t.clienteAvisadoEm ? "aguardando resposta do cliente" : "tarefa do cliente"}><Building2 size={10} /> {t.clienteRespostaEm ? "respondeu" : "cliente"}</span>}
-                        {t.doCliente && <button onClick={() => setAvisarTarefa(t)} className="text-gray-300 hover:text-torg-orange p-1" title="Avisar/cobrar cliente por e-mail"><Building2 size={13} /></button>}
-                        <select
-                          value={t.status}
-                          onChange={(e) => atualizarStatus(t.id, e.target.value)}
-                          className="text-[11px] border border-gray-200 rounded px-1.5 py-1 bg-white"
-                        >
-                          {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                        </select>
-                        <button
-                          onClick={() => setLembreteTarefa(t)}
-                          className="text-gray-300 hover:text-torg-blue p-1"
-                          title="Enviar lembrete / escolher destinatários"
-                        >
-                          <Bell size={13} />
-                        </button>
-                        <button onClick={() => setConfirmDelete(t)} className="text-gray-300 hover:text-red-500 p-1">
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+                      </td>
+                      <td className="px-3 py-2 text-[11px] text-torg-gray whitespace-nowrap">{SETOR_LABEL[t.setor] || t.setor}</td>
+                      <td className="px-3 py-2 text-[11px] font-mono text-torg-blue whitespace-nowrap">{t.opNumero ? fmtOP(t.opNumero) : "—"}</td>
+                      <td className="px-3 py-2 text-[11px] text-torg-gray truncate max-w-[16ch]" title={t.op?.cliente || ""}>{t.op?.cliente || "—"}</td>
+                      <td className="px-3 py-2 text-[11px] text-torg-gray truncate max-w-[16ch]" title={t.responsavel || ""}>{t.responsavel || "—"}</td>
+                      <td className={`px-3 py-2 text-[11px] whitespace-nowrap tabular-nums ${atras && !feita ? "text-red-600 font-semibold" : "text-torg-gray"}`}>
+                        {fmtPrazoCurto(t.dataPrevista) || "—"}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded border ${PRIORIDADE_COR[t.prioridade]}`}>{t.prioridade}</span>
+                      </td>
+                      <td className="px-3 py-2">
+                        {feita
+                          ? <span className="text-[11px] text-emerald-700">Concluída</span>
+                          : atras
+                            ? <span className="text-[11px] font-semibold text-red-600">Atrasada</span>
+                            : <span className="text-[11px] text-torg-gray">{STATUS_LABEL[t.status]}</span>}
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center justify-end gap-0.5">
+                          {t.doCliente && <button onClick={() => setAvisarTarefa(t)} className="text-gray-300 hover:text-torg-orange p-1" title="Avisar/cobrar cliente por e-mail"><Building2 size={13} /></button>}
+                          <button onClick={() => setLembreteTarefa(t)} className="text-gray-300 hover:text-torg-blue p-1" title="Enviar lembrete"><Bell size={13} /></button>
+                          <button onClick={() => setConfirmDelete(t)} className="text-gray-300 hover:text-red-500 p-1" title="Excluir"><Trash2 size={13} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
