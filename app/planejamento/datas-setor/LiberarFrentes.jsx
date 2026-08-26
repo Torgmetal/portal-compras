@@ -14,7 +14,7 @@
 // custa prazo). O marco é congelado na liberação — recalcular o cronograma depois não pode apagar
 // um desvio já medido.
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, AlertCircle, Send, Check, X, Flag, CalendarClock, Wand2, Star, RefreshCw, Minus, FileWarning, Timer, FileDown, CalendarRange } from "lucide-react";
+import { Loader2, AlertCircle, Send, Check, X, Flag, CalendarClock, Wand2, Star, RefreshCw, Minus, FileWarning, Timer, FileDown, CalendarRange, FolderTree } from "lucide-react";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import { estimarPrazo, somarDiasUteis, proximoDiaUtil, classeDaPeca, kgPorMetro } from "@/lib/prazo-preparacao";
 
@@ -89,6 +89,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   const [programandoSemana, setProgramandoSemana] = useState(false);
   const [plano, setPlano] = useState(null);
   const [nDias, setNDias] = useState(5);
+  const [pastas, setPastas] = useState(null);
 
   const carregar = useCallback(async () => {
     if (!opId) { setD(null); setLib(null); return; }
@@ -300,8 +301,9 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
 
   async function gravarPlano() {
     if (!plano?.dias?.length || !setores.length) return;
-    setProgramandoSemana(true); setErro("");
+    setProgramandoSemana(true); setErro(""); setPastas(null);
     try {
+      const criadas = [];
       for (const dd of plano.dias) {
         const frentes = [...new Set(dd.pecas.map((p) => p.frente))];
         const r = await fetch("/api/planejamento/liberacao", {
@@ -316,11 +318,34 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         const j = await r.json();
         // ⚠ para no primeiro erro e diz em qual dia parou — seguir gravaria um calendário com buraco
         if (!r.ok) throw new Error(`${new Date(`${dd.data}T12:00:00Z`).toLocaleDateString("pt-BR")}: ${j.error || "erro ao programar"}`);
+        criadas.push(j.liberacao?.id);
       }
+      await montarPastas(criadas);
       setPlano(null); setMotivo("");
       await carregar(); onMudou?.();
     } catch (e) { setErro(e.message); await carregar(); }
     finally { setProgramandoSemana(false); }
+  }
+
+  // ⚠ A PASTA DO DIA NO SHAREPOINT. Vitor (26/08/2026): "crie dentro dessas pastas outras pastas
+  // com as datas que foram liberadas (…) e separe em outras pastas cada tipo de perfil".
+  //
+  // ⚠ DEPOIS DA GRAVAÇÃO E FORA DELA. A liberação é a verdade do portal e não depende de pasta
+  // nenhuma; se o SharePoint estiver fora do ar, o dia continua programado e isto se repete depois.
+  // Por isso o erro daqui é AVISO, não falha da liberação.
+  async function montarPastas(ids) {
+    const feitas = [];
+    for (const id of ids.filter(Boolean)) {
+      try {
+        const r = await fetch("/api/planejamento/liberacao/pastas", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ liberacaoId: id }),
+        });
+        const j = await r.json();
+        feitas.push(r.ok ? { ok: true, ...j } : { ok: false, erro: j.error || "falhou" });
+      } catch (e) { feitas.push({ ok: false, erro: e.message }); }
+    }
+    setPastas(feitas);
   }
 
   async function conferirPasta() {
@@ -341,7 +366,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
     // a frente da liberação: se a seleção é de uma frente só, usa ela; senão, marca como mista
     const frentes = [...new Set(selecionadas.map((p) => p.frente))];
     const frente = frentes.length === 1 ? frentes[0] : `${frentes.length} frentes`;
-    setSalvando(true); setErro("");
+    setSalvando(true); setErro(""); setPastas(null);
     let ok = false;
     try {
       const r = await fetch("/api/planejamento/liberacao", {
@@ -359,6 +384,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao liberar");
       ok = true;
+      if (dia && j.liberacao?.id) await montarPastas([j.liberacao.id]);
       setSel(new Set()); setSugestao(null); setMotivo("");
       // ⚠ o próximo dia já vem preenchido: quem programa a semana não deveria digitar data sete vezes
       if (dia) setDia(somarDiasUteis(new Date(`${dia}T12:00:00Z`), 1).toISOString().slice(0, 10));
@@ -772,6 +798,27 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
           </p>
         )}
       </div>
+
+      {pastas?.length > 0 && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5 text-[12px] text-emerald-900 space-y-1.5">
+          <div className="flex items-start gap-2">
+            <FolderTree size={15} className="mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <b>Pasta do dia montada em 2.5.2.4 (NC1 e IGS)</b> — NC1 das chapas e IGS dos perfis,
+              separados por tipo de perfil.
+            </div>
+            <button onClick={() => setPastas(null)} className="text-[11px] hover:underline">fechar</button>
+          </div>
+          {pastas.map((x, i) => (
+            <p key={i} className={x.ok ? "" : "text-red-700"}>
+              {x.ok
+                ? <>· <b>{fmtD(x.dia)}</b> — {fmtN(x.arquivos)} arquivo(s) em {fmtN(x.grupos.length)} pasta(s) de perfil
+                    {x.semArquivoTotal > 0 && <span className="text-amber-800"> · {fmtN(x.semArquivoTotal)} marca(s) sem arquivo de máquina: {x.semArquivo.slice(0, 6).map((m) => m.marca).join(", ")}{x.semArquivoTotal > 6 ? "…" : ""}</span>}</>
+                : <>· não consegui montar a pasta: {x.erro} — a liberação está gravada, dá para repetir depois.</>}
+            </p>
+          ))}
+        </div>
+      )}
 
       {/* ── a programação montada, antes de gravar ── */}
       {plano && (
