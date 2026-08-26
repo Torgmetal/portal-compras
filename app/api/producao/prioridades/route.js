@@ -8,7 +8,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { carregarPrioridadesPorObra } from "@/lib/prioridades-setor-data";
-import { setorRealIndex, FLUXO_SETORES, noTerceiroAgora, entregaDoSetor, croquiCortado } from "@/lib/prioridades-setor";
+import { setorRealIndex, FLUXO_SETORES, noTerceiroAgora, entregaDoSetor, croquiCortado,
+         ROTA_SOLO as ROTA_SOLO_LIB, ROTA_COMPOSTA as ROTA_COMPOSTA_LIB } from "@/lib/prioridades-setor";
 import { ehItemComprado } from "@/lib/item-comprado";
 import { ehLinhaLixo } from "@/lib/pecas-producao";
 import { dedupLpcLe, renumerarPrioridades } from "@/lib/pecas-producao";
@@ -35,10 +36,14 @@ const ABA_DO_SETOR = { CORTE: "preparacao", MONTAGEM: "montagem", SOLDA: "solda"
 const IDX = Object.fromEntries(FLUXO_SETORES.map((s, i) => [s.key, i]));
 const LABEL = Object.fromEntries(FLUXO_SETORES.map((s) => [s.key, s.label]));
 
-// ROTA da peça (por onde ela passa): conjunto COMPOSTO é montado (o corte é dos croquis dele);
-// peça SOLO/avulsa é cortada e PULA Montagem/Solda.
-const ROTA_COMPOSTA = ["MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA"];
-const ROTA_SOLO = ["CORTE", "ACABAMENTO", "JATO", "PINTURA"];
+// ROTA da peça: conjunto COMPOSTO é montado (o corte é dos croquis dele); peça SOLO/avulsa é
+// cortada e vai direto ao JATO.
+//
+// ⚠ VEM DE lib/prioridades-setor — esta regra já esteve copiada aqui, e quando ela mudou lá esta
+// tela ficou listando avulsa no Acabamento enquanto a TV dizia que não havia nenhuma.
+// A EXPEDIÇÃO fica de fora nas duas: esta rota é a do trabalho de fábrica, não do embarque.
+const ROTA_COMPOSTA = ROTA_COMPOSTA_LIB.filter((s) => s !== "EXPEDICAO");
+const ROTA_SOLO = ROTA_SOLO_LIB.filter((s) => s !== "EXPEDICAO");
 
 // Em qual setor a peça precisa ser TRABALHADA AGORA = o PRÓXIMO da rota dela depois do que já
 // foi feito. (Vitor 18/08: "as que já forem apontadas no Syneco você já manda para acabamento, as

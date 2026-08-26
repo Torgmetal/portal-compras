@@ -15,7 +15,7 @@ import { whereSetorSyneco, normalizeSetorSyneco } from "@/lib/syneco-dia";
 import { ehItemComprado } from "@/lib/item-comprado";
 import { dedupLpcLe, renumerarPrioridades, ehLinhaLixo } from "@/lib/pecas-producao";
 import { materialPorPerfil, statusCompraPorOp } from "@/lib/status-compra";
-import { croquiCortado, setorRealIndex, mapaSetorReal, FLUXO_SETORES } from "@/lib/prioridades-setor";
+import { croquiCortado, setorRealIndex, mapaSetorReal, FLUXO_SETORES, soloPassaNoSetor } from "@/lib/prioridades-setor";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -94,8 +94,10 @@ export async function GET(req) {
   //     hoje ainda SEM croqui na LPC e sem perfil de corte) → Montagem→Expedição. É MONTADA, não
   //     cortada. Resolve sozinho quando a LPC ganhar os croquis do GC (aí vira croqui/composta).
   //     (Vitor 17/08. Guarda por perfil: se a marca da LE tiver perfil, é avulsa de corte, fica no corte.)
-  //   • SOLO/AVULSA (perfil de aço da LPC, OU OP que só tem LE) → CORTE + Acabamento→Expedição
-  //     (pula Montagem/Solda).
+  //   • SOLO/AVULSA (perfil de aço da LPC, OU OP que só tem LE) → CORTE → JATO → Pintura →
+  //     Expedição. Pula Montagem, Solda E Acabamento — Vitor (25/08/2026): "no jato as peças
+  //     avulsas ficam disponíveis para jateamento assim que sai do corte". A rota vem de
+  //     lib/prioridades-setor (`soloPassaNoSetor`), que é a fonte única.
   const temLPC = todas.some((p) => p.fonte === "LPC_IMPORT");
   const temPerfil = (p) => !!(p.perfil && String(p.perfil).trim());
   const ehCroqui = (p) => p.tipoPeca === "CROQUI";
@@ -106,7 +108,7 @@ export async function GET(req) {
     if (!s) return true;
     if (ehCroqui(p)) return s === "CORTE";
     if (vaiPraMontagem(p)) return s !== "CORTE";               // Montagem→Expedição
-    return s === "CORTE" || !["MONTAGEM", "SOLDA"].includes(s); // solo/avulsa pula Mont./Solda
+    return soloPassaNoSetor(s); // solo/avulsa: CORTE → JATO → Pintura → Expedição
   };
   // FIM DE LINHA DO PCP: peça em romaneio (prévio ou emitido) já é da Expedição — sai da lista.
   // Vitor (19/08): "fez o romaneio prévio, ou emitiu o romaneio, sim essa peça deve sair do portal
