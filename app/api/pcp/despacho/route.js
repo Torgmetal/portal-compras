@@ -55,7 +55,8 @@ export async function GET(req) {
   try {
     await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]);
   } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
+    return NextResponse.json({
+    error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }
   const url = new URL(req.url);
   let opId = url.searchParams.get("opId");
@@ -122,7 +123,39 @@ export async function GET(req) {
   // ⚠ No romaneio mas SEM produção no portal: contradição, não entrega. Fica na lista e é contada
   // à parte — normalmente é lista faltando (a OP-071 está sem a LPC) ou apontamento que não chegou.
   const romaneioSemProducao = noRomaneioSemProducao(noSetor, marcasEntregues);
-  const escopo = entregues.length ? noSetor.filter((p) => !entregueAExpedicao(p, marcasEntregues)) : noSetor;
+  const semEntregues = entregues.length ? noSetor.filter((p) => !entregueAExpedicao(p, marcasEntregues)) : noSetor;
+
+  // ⚠⚠ SÓ O QUE O PLANEJAMENTO LIBEROU. Vitor (26/08/2026): "na pagina do pcp eu importei apenas as
+  // peças Z da OP 105 vc puxou 100% da OP 105".
+  //
+  // A liberação já guardava as peças escolhidas (`pecaIds`), mas o PCP abria a OP INTEIRA — o
+  // recorte que o Planejamento fez morria na passagem. É o oposto do que o Vitor desenhou em
+  // 25/08: "o planejamento cria a demanda para o pcp indicando as prioridades e fases das obras".
+  // Sem isto, escolher 19 peças e mandar 2.900 é a mesma bagunça de antes, só com um passo a mais.
+  //
+  // ⚠ LIBERAÇÃO DE FRENTE INTEIRA (pecaIds nulo) NÃO RESTRINGE NADA — é o caso "desce tudo".
+  // ⚠ E `?tudo=1` mostra a OP inteira, para quem precisa procurar uma peça que não foi liberada.
+  const tudo = url.searchParams.get("tudo") === "1";
+  let escopo = semEntregues, liberacaoInfo = null;
+  if (!tudo) {
+    const libs = await prisma.liberacaoProducao.findMany({
+      where: { opId, status: { in: ["LIBERADA", "EM_PRODUCAO"] } },
+      select: { id: true, frente: true, dataProgramada: true, pecaIds: true, prioridade: true },
+      orderBy: [{ dataProgramada: "asc" }, { liberadoEm: "asc" }],
+    }).catch(() => []);
+    if (libs.length) {
+      const frenteInteira = libs.some((l) => !Array.isArray(l.pecaIds) || !l.pecaIds.length);
+      const ids = new Set(libs.flatMap((l) => (Array.isArray(l.pecaIds) ? l.pecaIds : [])));
+      if (!frenteInteira && ids.size) escopo = semEntregues.filter((p) => ids.has(p.id));
+      liberacaoInfo = {
+        lotes: libs.length, frenteInteira,
+        pecasLiberadas: frenteInteira ? null : ids.size,
+        dias: [...new Set(libs.map((l) => (l.dataProgramada ? l.dataProgramada.toISOString().slice(0, 10) : null)).filter(Boolean))],
+        // ⚠ diz quanto ficou de fora: um recorte silencioso faz o PCP achar que a obra acabou
+        foraDoRecorte: frenteInteira ? 0 : semEntregues.length - escopo.length,
+      };
+    }
+  }
 
   // Reconciliação com o Syneco: quantidade PRODUZIDA no mesOrdem daquele setor, por marca
   // (extremo sincronismo portal×Syneco — o histórico e o export usam isto).
@@ -446,6 +479,9 @@ export async function GET(req) {
   return NextResponse.json({
     opId, opNumero: opInfo?.numero || null, emProducao: !!opInfo?.emProducao, setor: setor || null,
     total: pecas.length, placar, baixados, precisamSyneco, compra: compraOp,
+    // ⚠ o recorte do Planejamento vai declarado: lista cortada em silêncio faz o PCP achar que a
+    // obra acabou quando só o lote do dia acabou.
+    liberacao: liberacaoInfo, escopoTudo: tudo,
     ordensSincronizadasEm: ordensSincronizadasEm ? ordensSincronizadasEm.toISOString() : null,
     // quantas saíram da lista por já estarem em romaneio — o PCP se despediu delas
     entreguesAExpedicao: entregues.length,
