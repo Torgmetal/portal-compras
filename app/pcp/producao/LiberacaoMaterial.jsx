@@ -35,6 +35,7 @@ export default function LiberacaoMaterial({ liberacaoId, opNumero, onImprimir })
   const [editando, setEditando] = useState(null); // perfil onde se digita o R
   const [rDigitado, setRDigitado] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [aviso, setAviso] = useState(null); // R aceito, mas já usado por outra obra
 
   const carregar = useCallback(async () => {
     setCarregando(true); setErro("");
@@ -58,6 +59,9 @@ export default function LiberacaoMaterial({ liberacaoId, opNumero, onImprimir })
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao informar o R");
       setEditando(null); setRDigitado("");
+      // ⚠ o mesmo fardo pode atender duas obras — é aviso, não erro. Mas precisa ser DITO: sem
+      // isso, o consumo de um R por várias obras vira invenção na hora de fechar a conta.
+      setAviso(j.tambemUsadoPor?.length ? { r: j.rUsado, ops: j.tambemUsadoPor } : null);
       await carregar();
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
   }
@@ -71,6 +75,17 @@ export default function LiberacaoMaterial({ liberacaoId, opNumero, onImprimir })
   return (
     <div className="space-y-3">
       {erro && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-[12px] text-red-700">{erro}</div>}
+      {aviso && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-[12px] text-amber-800 flex items-start gap-2">
+          <AlertCircle size={14} className="mt-0.5 shrink-0" />
+          <span>
+            O R <b className="font-mono">{aviso.r}</b> também já foi informado por{" "}
+            {aviso.ops.map((o) => `OP-${o.op} (${o.perfil})`).join(", ")}. O mesmo fardo pode atender
+            mais de uma obra — só confira se sobra material para as duas.
+          </span>
+          <button onClick={() => setAviso(null)} className="ml-auto text-amber-700">✕</button>
+        </div>
+      )}
 
       {/* ── o veredito, em uma linha ── */}
       <div className="flex flex-wrap items-center gap-2">

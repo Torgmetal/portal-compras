@@ -13,6 +13,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { analisarMaterial, pecasLiberaveis } from "@/lib/material-liberacao";
+import { casarPerfilComOmie } from "@/lib/casar-omie";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -99,9 +100,32 @@ export async function POST(req) {
   // valida contra o CMR da OP, senão a resposta correta seria recusada.
   const existe = await prisma.documentoQualidade.findFirst({
     where: { categoria: "MATERIAL", importRef: d.rUsado.trim() },
-    select: { importRef: true, nome: true, opNumero: true },
+    select: { id: true, importRef: true, nome: true, opNumero: true, pesoKg: true, numeroCorrida: true },
   });
   if (!existe) return NextResponse.json({ error: `O R ${d.rUsado} não existe no CMR.` }, { status: 400 });
+
+  // ⚠⚠ O R TEM DE SER DO MESMO MATERIAL. Vitor (25/08/2026): "se deixarmos isso dessa maneira não
+  // vamos criar uma maneira de burlarmos e informar um material que não era destinado a essa obra".
+  // Sem esta checagem dava para digitar o R de uma chapa de 16 num perfil W410 — e o certificado
+  // que sai no Data Book apontaria para um aço que a peça não é. É o pior tipo de erro: silencioso
+  // e assinado.
+  const casa = casarPerfilComOmie(d.perfil, [{ codigo: null, descricao: existe.nome }]);
+  if (!casa) {
+    return NextResponse.json({
+      error: `O R ${existe.importRef} é "${existe.nome}" — não é o material do perfil ${d.perfil}. ` +
+             `Informe o R do material certo; se estiver certo e o portal não reconheceu, avise para ajustarmos o cadastro.`,
+      naoCasa: true, descricaoDoR: existe.nome,
+    }, { status: 400 });
+  }
+
+  // ⚠ MESMO R REIVINDICADO POR OUTRA OBRA. O saldo do CMR é recalculado por OP, então duas obras
+  // podem apontar para o mesmo fardo sem nenhuma delas ver a outra. Não bloqueia — material de
+  // estoque é dividido entre obras mesmo —, mas registra e devolve o aviso, para a conta de quem
+  // consumiu o quê não virar invenção depois.
+  const outras = await prisma.trocaRastreabilidade.findMany({
+    where: { rUsado: d.rUsado.trim(), opNumero: { not: op.numero } },
+    select: { opNumero: true, perfil: true, trocadoPorNome: true, createdAt: true },
+  });
 
   const reg = await prisma.trocaRastreabilidade.upsert({
     where: { opNumero_perfil: { opNumero: op.numero, perfil: d.perfil.trim() } },
@@ -115,8 +139,16 @@ export async function POST(req) {
 
   await prisma.auditLog.create({
     data: { userId: user.id, action: "INFORMAR_R_ESTOQUE", entity: "TrocaRastreabilidade", entityId: reg.id,
-      diff: { op: op.numero, perfil: d.perfil, rUsado: d.rUsado, materialDe: existe.opNumero, descricao: existe.nome } },
+      diff: { op: op.numero, perfil: d.perfil, rUsado: d.rUsado, materialDe: existe.opNumero,
+              descricao: existe.nome, corrida: existe.numeroCorrida, pesoDoR: existe.pesoKg,
+              tambemUsadoPor: outras.map((o) => `${o.opNumero}/${o.perfil}`) } },
   }).catch(() => {});
 
-  return NextResponse.json({ ok: true, perfil: reg.perfil, rUsado: reg.rUsado, materialDe: existe.opNumero });
+  return NextResponse.json({
+    ok: true, perfil: reg.perfil, rUsado: reg.rUsado,
+    materialDe: existe.opNumero, descricao: existe.nome, corrida: existe.numeroCorrida,
+    pesoDoR: existe.pesoKg,
+    // aviso, não erro: o mesmo fardo pode legitimamente atender duas obras
+    tambemUsadoPor: outras.map((o) => ({ op: o.opNumero, perfil: o.perfil, por: o.trocadoPorNome })),
+  });
 }
