@@ -2297,6 +2297,15 @@ model PortalCliente {
   fotos            Json?
   // quais seções aparecem; null = o padrão de lib/portal-cliente.js
   secoes           Json?
+  // ⚠⚠ OS DOCUMENTOS DA ENGENHARIA SÃO ESCOLHIDOS, NUNCA VARRIDOS. Vitor (26/08/2026): "na
+  // Engenharia preciso que vincule a pasta 2.5.5, lá vamos trazer vários documentos, porém eu
+  // preciso selecionar esses documentos — não sai puxando sozinho".
+  //
+  // A 2.5.5 é a pasta de ENVIO AO CLIENTE, então a fonte está certa; o que não pode é o portal
+  // publicar tudo que aparecer lá. A pasta tem revisão antiga, arquivo de trabalho e material que
+  // ainda não foi liberado — publicar sozinho é vazar por descuido, e no portal do cliente não tem
+  // volta. [{ id, nome, tamanho, em }]
+  docsEngenharia   Json?
   // ⚠ PESO É PREÇO. Vitor (22/08/2026): "a lista LPC e LE deixe a opção de divulgar com e
   // sem peso, isso é importante para nós". Estrutura metálica se cota por R$/kg — publicar
   // o peso item a item entrega a base de cálculo do nosso preço a quem vai negociar o

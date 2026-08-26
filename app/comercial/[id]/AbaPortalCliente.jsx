@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye, Upload, X, ImagePlus } from "lucide-react";
 import { upload } from "@vercel/blob/client";
 import { SECOES, CAPAS, AREAS, situacao } from "@/lib/portal-cliente";
+import SeletorDocsEngenharia from "./SeletorDocsEngenharia";
 
 // ─── CONFIGURAR O PORTAL DO CLIENTE ───────────────────────────────────────────
 // Vitor (22/08/2026): "tudo que for de interesse nosso em mostrar e que seja interesse
@@ -11,7 +12,7 @@ import { SECOES, CAPAS, AREAS, situacao } from "@/lib/portal-cliente";
 // As duas metades dessa frase viram esta tela: a mensagem (o que queremos dizer) e as
 // seções (o que ele vai ver). Nada além disso — os DADOS não se configuram aqui, porque
 // eles já vivem nos módulos e o portal os lê vivos.
-export default function AbaPortalCliente({ opId }) {
+export default function AbaPortalCliente({ opId, opNumero }) {
   const [d, setD] = useState(null);
   const [f, setF] = useState(null);
   const [erro, setErro] = useState("");
@@ -312,6 +313,10 @@ export default function AbaPortalCliente({ opId }) {
           })}
         </div>
       </div>
+
+      {/* ⚠ o seletor fica JUNTO das seções, não numa tela à parte: escolher documento é parte de
+          montar o portal, e separar faria alguém publicar sem nunca ter aberto a pasta. */}
+      {f.secoes.includes("DOCUMENTOS") && <SeletorDocsEngenharia opNumero={opNumero} />}
 
       {erro && <p className="text-[12px] text-red-600">{erro}</p>}
       {aviso && <p className="text-[12px] text-emerald-700">{aviso}</p>}

@@ -291,6 +291,22 @@ export async function GET(_req, { params }) {
   //
   // O campo `tipo` guarda a seção do data book a que o documento pertence ("Anexo — PIT/ITP",
   // "Anexo — EPS/WPS e RQPS/PQR"), então é por ele que se agrupa.
+  // ⚠ os documentos da ENGENHARIA escolhidos da 2.5.5 — vêm do que foi marcado, não de uma
+  // varredura. Ver /api/portal/engenharia-docs. (Vitor, 26/08/2026)
+  if (tem("DOCUMENTOS")) {
+    const eng = Array.isArray(portal.docsEngenharia) ? portal.docsEngenharia : [];
+    if (eng.length) {
+      const porPasta = new Map();
+      for (const d of eng) {
+        const k = d.pasta || "Documentos da Engenharia";
+        const g = porPasta.get(k) || { assunto: k, itens: [] };
+        g.itens.push({ id: d.id, nome: d.nome, eng: true });
+        porPasta.set(k, g);
+      }
+      dados.engenharia = [...porPasta.values()];
+    }
+  }
+
   if (tem("DOCUMENTOS")) {
     const docs = await prisma.documentoQualidade.findMany({
       where: {

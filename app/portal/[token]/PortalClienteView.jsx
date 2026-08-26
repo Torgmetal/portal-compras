@@ -83,7 +83,15 @@ export default function PortalClienteView({ token }) {
     DOCUMENTOS: tem("DOCUMENTOS") && dados.documentos?.length > 0,
     FOTOS: tem("FOTOS") && portal.fotos?.length > 0,
   };
-  const secoesDaArea = (a) => SECOES.filter((x) => x.area === a && conteudo[x.id]);
+  const secoesDaArea = (a) => {
+    const base = SECOES.filter((x) => x.area === a && conteudo[x.id]);
+    // ⚠ os documentos escolhidos da 2.5.5 não são uma "seção" configurável — são conteúdo da
+    // Engenharia. Sem contá-los, uma obra que só publicou desenhos não teria a aba.
+    if (a === "ENGENHARIA" && dados.engenharia?.length && tem("DOCUMENTOS")) {
+      return base.length ? base : [{ id: "ENG_DOCS", area: "ENGENHARIA" }];
+    }
+    return base;
+  };
   const areasComConteudo = AREAS.filter((a) => secoesDaArea(a.id).length > 0);
   const abaAtiva = areasComConteudo.some((a) => a.id === aba) ? aba : areasComConteudo[0]?.id || null;
   const mostrar = (id) => conteudo[id] && SECAO[id]?.area === abaAtiva;
@@ -336,6 +344,34 @@ export default function PortalClienteView({ token }) {
             </p>
           </Bloco>
         )}
+        {/* ⚠ ENGENHARIA — o que foi ESCOLHIDO da pasta 2.5.5 (envio ao cliente). Bloco próprio, e
+            não misturado com "Documentos da obra": um é desenho e lista de projeto, o outro é
+            documento formal (PIT, EPS, ARTs). Juntar faria o cliente caçar o desenho no meio de
+            certificado de soldador. */}
+        {abaAtiva === "ENGENHARIA" && dados.engenharia?.length > 0 && (
+          <Bloco icone={Layers} titulo="Documentos da Engenharia"
+            sub={`${dados.engenharia.reduce((n, g) => n + g.itens.length, 0)} arquivos`}>
+            <div className="space-y-4">
+              {dados.engenharia.map((g) => (
+                <div key={g.assunto}>
+                  <p className="text-[13px] font-semibold mb-1.5">
+                    {g.assunto} <span className="text-gray-400 font-normal">{g.itens.length}</span>
+                  </p>
+                  <div className="grid sm:grid-cols-2 gap-1.5">
+                    {g.itens.map((doc) => (
+                      <a key={doc.id} href={`/api/portal/${token}/eng?id=${encodeURIComponent(doc.id)}`} target="_blank" rel="noreferrer"
+                        className="flex items-center gap-2 border border-gray-100 rounded-lg px-3 py-1.5 hover:border-[#006EAB] hover:bg-[#006EAB]/5 transition-colors">
+                        <Download size={12} className="text-[#006EAB] shrink-0" />
+                        <span className="text-[12px] truncate" title={doc.nome}>{doc.nome}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Bloco>
+        )}
+
         {mostrar("DOCUMENTOS") && (
           <Bloco icone={FileText} titulo="Documentos da obra" recolhida
             sub={`${dados.documentos.length} assuntos`}>

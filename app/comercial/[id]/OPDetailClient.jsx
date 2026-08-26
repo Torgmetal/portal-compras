@@ -968,7 +968,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
 
       {vista === "qualidade" && <AbaQualidade opNumero={op.numero} />}
 
-      {vista === "portal" && <AbaPortalCliente opId={op.id} />}
+      {vista === "portal" && <AbaPortalCliente opId={op.id} opNumero={op.numero} />}
 
       {vista === "terceiros" && <AbaTerceiros opId={op.id} opNumero={op.numero} />}
 
