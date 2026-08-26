@@ -139,6 +139,10 @@ export async function GET(req) {
       id: l.id, frente: l.frente, setores: l.setores, prioridade: l.prioridade, status: l.status,
       liberadoEm: l.liberadoEm.toISOString(), liberadoPorNome: l.liberadoPorNome,
       dataMarco: l.dataMarco ? l.dataMarco.toISOString() : null,
+      // o DIA em que este lote deve ser cortado — é por ele que a fila se ordena
+      dataProgramada: l.dataProgramada ? l.dataProgramada.toISOString().slice(0, 10) : null,
+      pecas: Array.isArray(l.pecaIds) ? l.pecaIds.length : null,
+      totalKg: l.totalKg || null,
       desvioDias: l.desvioDias, desvioMotivo: l.desvioMotivo,
     });
     porOpLib.set(l.opId, g);
@@ -148,12 +152,29 @@ export async function GET(req) {
   const visiveis = todas ? ops : ops.filter((o) => o.liberacoes.length > 0);
 
   const PRIO = { ALTA: 0, MEDIA: 1, BAIXA: 2 };
+  // ⚠⚠ A FILA É A DATA. Vitor (26/08/2026): "na pagina do pcp precisamos que deixe a fila de acordo
+  // com a data que definimos".
+  //
+  // O Planejamento agora programa dia a dia; a ordem da fábrica tem de ser essa, não uma régua que
+  // o PCP recalcula por conta. Antes ordenava por prioridade → atraso → entrega — critérios que
+  // fazem sentido SEM programação, e que passam por cima dela quando ela existe.
+  //
+  // ⚠ Obra sem dia programado vai para o FIM, não para o começo: sem data ela não foi posta em
+  // nenhum dia, e furar a fila de quem tem dia marcado desfaz a programação.
+  const diaDaOp = (o) => {
+    const dias = (o.liberacoes || []).map((l) => l.dataProgramada).filter(Boolean).sort();
+    return dias[0] || null;
+  };
   // ⚠ com liberação, a PRIORIDADE do Planejamento manda — é a decisão dele, e o PCP não deve
   // reordenar por conta própria. Sem liberação (modo "todas"), vale a régua antiga da TV.
   const prioDaOp = (o) => Math.min(...(o.liberacoes.length ? o.liberacoes.map((l) => PRIO[l.prioridade] ?? 1) : [9]));
 
   // Atrasada primeiro, depois entrega mais próxima, depois mais kg parado. Mesma régua da TV.
   visiveis.sort((a, b) => {
+    // 1) o dia programado manda
+    const da = diaDaOp(a), db = diaDaOp(b);
+    if (da !== db) { if (!da) return 1; if (!db) return -1; return da < db ? -1 : 1; }
+    // 2) empatado no dia, a prioridade do Planejamento desempata
     const pa = prioDaOp(a), pb = prioDaOp(b);
     if (pa !== pb) return pa - pb;
     if ((b.atrasoDias > 0) !== (a.atrasoDias > 0)) return (b.atrasoDias > 0) - (a.atrasoDias > 0);
