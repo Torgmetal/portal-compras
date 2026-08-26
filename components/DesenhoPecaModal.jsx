@@ -48,6 +48,11 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, soImpri
         });
       }
       if (j.avisoCarimbo) setErro(j.avisoCarimbo);
+      // ⚠ o R do conjunto discordando do que já foi no papel do croqui é o defeito que o Vitor
+      // pediu para não deixar passar: no Data Book os dois convivem, e ninguém saberia qual vale.
+      if (j.divergenciaR?.length) {
+        setErro(`Atenção: ${j.divergenciaR.length} posição(ões) com R diferente do que já foi impresso no croqui — ${j.divergenciaR.slice(0, 3).map((d) => `${d.marca}: croqui R ${d.noCroqui}, conjunto R ${d.noConjunto}`).join(" · ")}${j.divergenciaR.length > 3 ? "…" : ""}. Reimprima o croqui para os dois baterem.`);
+      }
       // abre o CARIMBADO (o mesmo que foi pro Data Book); se o carimbo falhou, cai no original
       abrirItem(j.abrirItemId || a.itemId, j.abrirNome || a.nome);
     } catch (e) { setErro(e.message); } finally { setRegistrando(""); }

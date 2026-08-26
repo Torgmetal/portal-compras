@@ -16,6 +16,7 @@ import { getAccessToken, acharPastaOp, uploadFileToFolder } from "@/lib/sharepoi
 import { rastreioDoConjunto } from "@/lib/rastreio-peca";
 import { amarracoesDaOp, amarracaoDoPerfil } from "@/lib/r-amarrado";
 import { novaEntradaGrd } from "@/lib/grd-registro";
+import { conferirRComCroquis } from "@/lib/conferir-r";
 import { carimbarDesenho } from "@/lib/carimbo-desenho";
 import { dataHoraBR } from "@/lib/data-br";
 import { consumivelDoConjunto } from "@/lib/consumivel-solda";
@@ -233,6 +234,11 @@ export async function POST(req) {
         });
   }
 
+  // ⚠ CONJUNTO: o R de cada posição tem de bater com o que já foi para o papel do croqui.
+  // Vitor (26/08/2026): "no data book não podemos informar um R no croqui e outro no conjunto".
+  let divergenciaR = [];
+  if (itens.length > 1) divergenciaR = await conferirRComCroquis(opNumero, itens).catch(() => []);
+
   // 3) amarra no Data Book: o MESMO arquivo carimbado vira documento da §02 (Desenhos as-built).
   //    Um documento por marca+arquivo — reemitir atualiza o ponteiro pro PDF mais novo, em vez de
   //    encher a seção com uma cópia por impressão (o histórico completo fica na GRD).
@@ -304,6 +310,7 @@ export async function POST(req) {
     ok: true, avisoCarimbo, acao: body.acao,
     // ⚠ dizer que NÃO foi para o Data Book, e por quê — silêncio aqui viraria "sumiu"
     dataBook: ehCroqui ? { entrou: false, motivo: "croqui não entra no Data Book — a §02 leva conjunto e marca avulsa" } : { entrou: !!documentoId },
+    divergenciaR,
     liberacao: reg && { arquivo: reg.arquivo, formato: reg.formato, setor: reg.setor, liberadoPorNome: reg.liberadoPorNome, createdAt: reg.createdAt, impressoItemId: reg.impressoItemId, impressoes: reg.impressoes, ultimaImpressaoEm: reg.ultimaImpressaoEm },
     // é ESTE arquivo que a pessoa abre/imprime — o mesmo que foi pro Data Book
     abrirItemId: carimbado?.id || body.itemId || null,
