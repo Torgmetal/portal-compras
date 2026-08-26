@@ -14,9 +14,9 @@
 // custa prazo). O marco é congelado na liberação — recalcular o cronograma depois não pode apagar
 // um desvio já medido.
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, AlertCircle, Send, Check, X, Flag, CalendarClock, Wand2, Star, RefreshCw, Minus, FileWarning, Timer } from "lucide-react";
+import { Loader2, AlertCircle, Send, Check, X, Flag, CalendarClock, Wand2, Star, RefreshCw, Minus, FileWarning, Timer, FileDown } from "lucide-react";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
-import { estimarPrazo, somarDiasUteis, proximoDiaUtil } from "@/lib/prazo-preparacao";
+import { estimarPrazo, somarDiasUteis, proximoDiaUtil, classeDaPeca, kgPorMetro } from "@/lib/prazo-preparacao";
 
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -29,6 +29,13 @@ const PRIO = {
 };
 // ⚠ o nome que a fábrica usa. Vitor (26/08/2026): croqui é croqui, e a avulsa é uma MARCA — "Peça
 // P" e "Avulsa" eram rótulo de tela, não a palavra de quem trabalha com a peça na mão.
+const MAT = {
+  NA_OP:        { rot: "entregue",   dica: "material desta obra recebido no CMR",             cor: "text-emerald-600", Icone: "Check" },
+  ESTOQUE:      { rot: "de estoque", dica: "existe material igual, mas entrou por outra obra — o PCP informa o R usado", cor: "text-amber-700", Icone: "FileWarning" },
+  SEM_MATERIAL: { rot: "não chegou", dica: "sem entrada no CMR para este perfil",             cor: "text-red-500",     Icone: "X" },
+};
+const MAT_FALTA = { AGUARDANDO_ENTREGA: "aguardando entrega", SOLICITADO: "pedido não emitido", NAO_COMPRADO: "não comprado" };
+
 const NAT = { croqui: "Croqui", avulsa: "Marca", conjunto: "Conjunto" };
 
 const COLUNAS = [
@@ -37,6 +44,7 @@ const COLUNAS = [
   // ⚠ o FILTRO fica por extenso (ninguém procura por um ícone numa lista de opções); quem encurta
   // é a célula.
   { key: "nc1",      label: "NC1",      valor: (p) => (p.temMaquina == null ? "não medido" : p.temMaquina ? "tem NC1" : "sem NC1") },
+  { key: "material", label: "Material", valor: (p) => (p.material ? MAT[p.material]?.rot || p.material : "não medido") },
   { key: "desenho",  label: "Desenho",  valor: (p) => (p.temDesenho == null ? "não conferido" : p.temDesenho ? "tem desenho"
       : p.desenhoForaPadrao ? "outro nome" : "sem desenho") },
   { key: "natureza", label: "Tipo",     valor: (p) => NAT[p.natureza] || p.natureza },
@@ -73,6 +81,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   const [salvando, setSalvando] = useState(false);
   const [marcando, setMarcando] = useState(false);
   const [conferindo, setConferindo] = useState(false);
+  const [baixando, setBaixando] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!opId) { setD(null); setLib(null); return; }
@@ -171,6 +180,53 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
       if (!r.ok) throw new Error(j.error || "Erro ao marcar");
       await carregar();
     } catch (e) { setErro(e.message); } finally { setMarcando(false); }
+  }
+
+  // ⚠ EXPORTA O QUE ESTÁ NA TELA, não a lista bruta: sai com os filtros aplicados e na ordem que a
+  // pessoa deixou. Planilha que ignora o filtro obriga a filtrar tudo de novo no Excel.
+  // ⚠ E SAI INTEIRA — a tabela mostra no máximo 1.500 linhas, a planilha leva as {f.filtradas}.
+  async function exportar() {
+    if (!f.filtradas.length) return;
+    setBaixando(true); setErro("");
+    try {
+      const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarRodapeISO, downloadWorkbook } =
+        await import("@/lib/excel-relatorio");
+      const cab = ["Marca", "Frente", "Tipo", "Desenho", "NC1", "Material", "Perfil", "Aço", "Compr. (mm)",
+        "Qtd", "Peso (kg)", "Classe", "kg/m", "Máquina", "Situação", "Prioridade", "Selecionada"];
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: `Lista de preparação — OP-${opNumero}`,
+        subtitulo: [
+          selecionadas.length ? `${fmtN(somaSel.n)} peça(s) selecionada(s)` : "Lista completa",
+          f.ativos ? `Filtro: ${f.rotulosAtivos.join(", ")}` : soAFazer ? "Só as a fazer" : "Todas",
+          prazo.diasCheios ? `Previsão ${fmtN(prazo.diasCheios)} dia(s) na meta de ${fmtN(Number(metaKg) || 0)} kg/dia` : "",
+        ].filter(Boolean).join(" · "),
+        kpis: [`${fmtN(prazo.un)} peça(s)`, fmtKg(prazo.kg), `${fmtN(prazo.diasCheios)} dia(s)`],
+        totalColunas: cab.length, nomePlanilha: "Preparacao", codigoDoc: "REL-PLN-003",
+      });
+      ws.columns = [{ width: 16 }, { width: 10 }, { width: 10 }, { width: 12 }, { width: 10 }, { width: 20 },
+        { width: 22 }, { width: 14 }, { width: 12 }, { width: 7 }, { width: 11 }, { width: 14 },
+        { width: 8 }, { width: 10 }, { width: 11 }, { width: 11 }, { width: 12 }];
+      let l = linhaInicio;
+      adicionarHeaderTabela(ws, l, cab); l++;
+      for (const p of f.filtradas) {
+        const c = classeDaPeca(p);
+        adicionarLinhaTabela(ws, l, [
+          p.marca, p.frente, NAT[p.natureza] || p.natureza,
+          // ⚠ na planilha vai por extenso: ✓/✕ é atalho de tela, e ninguém filtra Excel por ícone.
+          p.temDesenho == null ? "não conferido" : p.temDesenho ? "tem" : p.desenhoForaPadrao ? `outro nome: ${p.desenhoForaPadrao}` : "não tem",
+          p.temMaquina == null ? "não medido" : p.temMaquina ? "tem" : "não tem",
+          !p.material ? "não medido" : p.material === "SEM_MATERIAL" ? (MAT_FALTA[p.materialFalta] || "não chegou") : MAT[p.material]?.rot || p.material,
+          p.perfil || "", p.aco || "", Math.round(p.comprimentoMm || 0), p.qte || 0,
+          Math.round(p.pesoTotalKg || 0), c?.nome || "", Number(kgPorMetro(p).toFixed(1)),
+          p.pool === "CHAPAS" ? "chapa" : "perfil", p.cortada ? "já cortada" : "a fazer",
+          p.prioridade != null ? "sim" : "", sel.has(p.id) ? "sim" : "",
+        ], { alinhamento: { 8: "right", 9: "right", 10: "right", 12: "right" } });
+        l++;
+      }
+      adicionarRodapeISO(ws, l + 1, cab.length);
+      await downloadWorkbook(workbook, `Lista de preparacao - OP-${opNumero}.xlsx`);
+    } catch (e) { setErro(`Não consegui gerar a planilha: ${e?.message || e}`); }
+    finally { setBaixando(false); }
   }
 
   async function conferirPasta() {
@@ -314,6 +370,23 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         </div>
       )}
 
+      {d?.material && d.material.semMaterial > 0 && (
+        <div className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2.5 text-[12px] text-sky-900 flex items-start gap-2">
+          <AlertCircle size={15} className="mt-0.5 shrink-0" />
+          <span>
+            <b>{fmtN(d.material.semMaterial)} peça(s) · {fmtKg(d.material.kgSemMaterial)} sem material entregue</b>
+            {(d.material.aguardandoEntrega > 0 || d.material.solicitado > 0 || d.material.naoComprado > 0) && <>
+              {" "}— {[
+                d.material.aguardandoEntrega > 0 ? `${fmtN(d.material.aguardandoEntrega)} a caminho` : null,
+                d.material.solicitado > 0 ? `${fmtN(d.material.solicitado)} sem pedido emitido` : null,
+                d.material.naoComprado > 0 ? `${fmtN(d.material.naoComprado)} sem RM` : null,
+              ].filter(Boolean).join(" · ")}
+            </>}.
+            {" "}Dá para liberar assim mesmo: quem separa o material e trava o que falta é o PCP.
+          </span>
+        </div>
+      )}
+
       {/* ── quanto tempo isto leva ── */}
       {prazo.un > 0 && (
         <div className="bg-white border border-torg-blue-100 rounded-xl p-3.5 space-y-3">
@@ -428,6 +501,11 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
 
         <div className="ml-auto flex items-center gap-2">
           {f.ativos > 0 && <button onClick={f.limpar} className="text-[11px] text-torg-orange hover:underline">limpar filtro</button>}
+          <button onClick={exportar} disabled={baixando || !f.filtradas.length}
+            title="Exporta as linhas filtradas, com classe, kg/m e o status de desenho e NC1"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-torg-blue-100 bg-white text-torg-dark hover:border-torg-blue disabled:opacity-40">
+            {baixando ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />} Planilha
+          </button>
           <span className="text-[12px] text-torg-gray">
             {fmtN(f.filtradas.length)} de {fmtN(base.length)} peça(s)
           </span>
@@ -464,6 +542,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                 <ThFiltro col="natureza" label="Tipo" className="px-3 py-2 font-semibold text-left" {...fp} />
                 <ThFiltro col="desenho" label="Desenho" className="px-3 py-2 font-semibold text-left" {...fp} />
                 <ThFiltro col="nc1" label="NC1" className="px-3 py-2 font-semibold text-left" {...fp} />
+                <ThFiltro col="material" label="Material" className="px-3 py-2 font-semibold text-left" {...fp} />
                 <ThFiltro col="perfil" label="Perfil" className="px-3 py-2 font-semibold text-left" {...fp} />
                 <th className="px-3 py-2 text-right font-semibold">Compr.</th>
                 <th className="px-3 py-2 text-right font-semibold">Qtd</th>
@@ -475,7 +554,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {!f.filtradas.length && (
-                <tr><td colSpan={13} className="px-3 py-8 text-center text-sm text-torg-gray">
+                <tr><td colSpan={14} className="px-3 py-8 text-center text-sm text-torg-gray">
                   {soAFazer ? "Nada a fazer com este filtro — tudo já foi cortado." : "Nada com este filtro."}
                 </td></tr>
               )}
@@ -514,6 +593,12 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                         ? <Check size={14} className="text-emerald-600" title="Arquivo de máquina (NC1/DXF) ou modelo 3D na pasta" />
                         : <X size={14} className="text-red-500" title="Sem arquivo de máquina — a máquina não tem o que ler" />}
                     </td>
+                    <td className="px-3 py-1.5 whitespace-nowrap">
+                      {!p.material ? <Minus size={13} className="text-torg-gray-light" title="Material não medido para esta peça" />
+                        : p.material === "NA_OP" ? <Check size={14} className="text-emerald-600" title={MAT.NA_OP.dica} />
+                        : p.material === "ESTOQUE" ? <span className="inline-flex items-center gap-1 text-[11px] text-amber-700" title={MAT.ESTOQUE.dica}><FileWarning size={13} className="shrink-0" /> estoque</span>
+                        : <span className="inline-flex items-center gap-1 text-[11px] text-red-600" title={MAT_FALTA[p.materialFalta] || MAT.SEM_MATERIAL.dica}><X size={13} className="shrink-0" /> {p.materialFalta === "AGUARDANDO_ENTREGA" ? "a caminho" : "não tem"}</span>}
+                    </td>
                     <td className="px-3 py-1.5 text-[12px] text-torg-gray truncate max-w-[18ch]" title={p.perfil}>{p.perfil || "—"}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-torg-gray">{p.comprimentoMm ? fmtN(p.comprimentoMm) : "—"}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums text-[12px]">{fmtN(p.qte)}</td>
@@ -537,6 +622,16 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
           <span className="uppercase text-torg-gray-light">Desenho / NC1</span>
           <span className="inline-flex items-center gap-1"><Check size={13} className="text-emerald-600" /> tem — pode ser liberada</span>
           <span className="text-torg-gray-light">Desenho = o que a bancada abre · NC1 = o que a máquina lê</span>
+        </div>
+        {/* ⚠ MATERIAL NÃO TRAVA AQUI. Vitor (25/08/2026) pôs essa etapa no PCP: "pcp recebe a
+            solicitação, manda separar o material (…) caso não tenha o material não libera aquele
+            projeto para preparar". Aqui é para o Planejamento saber com o que está contando. */}
+        <div className="px-3 pb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-torg-gray">
+          <span className="uppercase text-torg-gray-light">Material</span>
+          <span className="inline-flex items-center gap-1"><Check size={13} className="text-emerald-600" /> entregue nesta obra (CMR)</span>
+          <span className="inline-flex items-center gap-1 text-amber-700"><FileWarning size={13} /> estoque — existe, entrou por outra OP</span>
+          <span className="inline-flex items-center gap-1 text-red-600"><X size={13} /> a caminho / não tem</span>
+          <span className="text-torg-gray-light">não trava a liberação — quem separa material é o PCP</span>
           <span className="inline-flex items-center gap-1"><X size={13} className="text-red-500" /> não tem</span>
           <span className="inline-flex items-center gap-1 text-amber-700"><FileWarning size={13} /> nome — existe com outro nome, é renomear</span>
           <span className="inline-flex items-center gap-1"><Minus size={13} className="text-torg-gray-light" /> sem conferência que valha</span>

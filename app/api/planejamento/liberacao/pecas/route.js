@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { portaoDoDesenho, temDesenhoNaPasta, temMaquinaNaPasta } from "@/lib/pasta-engenharia";
+import { analisarMaterial } from "@/lib/material-liberacao";
 import { requireRole } from "@/lib/session";
 import { pecaCortada, poolDaPeca, POOLS } from "@/lib/liberacao-producao";
 
@@ -50,6 +51,19 @@ export async function GET(req) {
   // pedido ("vamos ignorar os projetos da pasta 2.5.5").
   const portao = await portaoDoDesenho(prisma, opId);
 
+  // ⚠ MATERIAL AQUI É INFORMAÇÃO, NÃO PORTÃO. Vitor (26/08/2026): "aqui no planejamento já seria
+  // importante o status do material tbm se foi entregue ou não" — ele pediu o STATUS.
+  //
+  // ⚠⚠ E QUEM TRAVA POR MATERIAL É O PCP, por decisão dele mesmo (25/08/2026): "o planejamento
+  // solta a lista, pcp recebe a solicitação, manda separar o material, analisa se está tudo em
+  // estoque (…) caso não tenha o material não libera aquele projeto para preparar". Barrar aqui
+  // tiraria do PCP a etapa que é dele — e material chega no meio da semana, então o Planejamento
+  // precisa poder programar o que ainda está a caminho.
+  //
+  // A conta é a MESMA do painel do PCP (lib/material-liberacao.js): duas leituras diferentes do
+  // mesmo aço fariam as duas telas discordarem sobre a mesma peça.
+  const material = await analisarMaterial(op.numero, brutas).catch(() => null);
+
   // ⚠ conjunto composto fica FORA da planilha de corte: ele não se corta, é montado a partir dos
   // croquis. Quem escolhe o dia da Preparação escolhe peça P e avulsa. (Vitor, 25/08/2026)
   const comCroqui = new Set(
@@ -62,9 +76,12 @@ export async function GET(req) {
       : p.tipoPeca === "CONJUNTO" && comCroqui.has(p.id) ? "conjunto"
       : "avulsa";
     const cortada = pecaCortada(p);
+    const mat = material?.porPeca?.get(p.id) || null;
     return {
       id: p.id, marca: p.marca, frente: p.opNumero, descricao: p.descricao || "",
-      natureza, perfil: p.perfil || "", material: p.material || "",
+      // ⚠ `aco` é o AÇO da peça (A36, ASTM…). Chamava-se `material` e o status do material o
+      // sobrescrevia calado — dois significados no mesmo nome.
+      natureza, perfil: p.perfil || "", aco: p.material || "",
       comprimentoMm: p.comprimentoMm || null, qte: p.qte, pesoUnitKg: p.pesoUnitKg,
       pesoTotalKg: Math.round((p.pesoTotalKg || 0) * 10) / 10,
       pool: poolDaPeca(p.perfil),
@@ -80,6 +97,10 @@ export async function GET(req) {
       desenhoSoEnvio: portao.soEnvio.has(String(p.marca || "").trim().toUpperCase()),
       // ⚠ NC1/DXF/IGS: o que a MÁQUINA lê. Ter desenho não é ter arquivo de máquina.
       temMaquina: temMaquinaNaPasta(portao, p.marca, false),
+      // material: NA_OP (chegou nesta obra) · ESTOQUE (existe, é de outra OP) · SEM_MATERIAL
+      material: mat ? mat.estado : null,
+      materialFalta: mat?.falta || null,
+      materialRs: mat?.rs?.length || 0,
     };
   });
 
@@ -95,6 +116,8 @@ export async function GET(req) {
       maquinaMedida: portao.maquinaMedida, semMaquina: pecas.filter((x) => x.temMaquina === false).length,
       soEnvio: pecas.filter((x) => x.desenhoSoEnvio).length,
     },
+    // ⚠ o resumo do material vem do MESMO cálculo do painel do PCP
+    material: material ? material.resumo : null,
   });
 }
 
