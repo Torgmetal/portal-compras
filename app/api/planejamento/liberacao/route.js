@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { frentesDaOp, desvioDoMarco, PRIORIDADES, SETORES_LIBERAVEIS } from "@/lib/liberacao-producao";
 import { FLUXO_SETORES } from "@/lib/prioridades-setor";
+import { portaoDoDesenho } from "@/lib/pasta-engenharia";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,6 +77,58 @@ export async function POST(req) {
   // seleção pode cruzar frentes — e aí o rótulo é "N frentes", que não existe na LPC de propósito.
   if (!d.pecaIds?.length && !frentes.some((f) => f.frente === d.frente)) {
     return NextResponse.json({ error: `A frente "${d.frente}" não existe na LPC desta obra.` }, { status: 400 });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // O PORTÃO DO DESENHO. Vitor (26/08/2026): "só pode ser liberado as marcas que possuem projetos
+  // nas pastas".
+  //
+  // ⚠ AQUI, E NÃO SÓ NA TELA. Filtro de tela é sugestão: basta um POST fora dela — ou a tela
+  // abrir com o retrato velho — para descer peça sem desenho. Vitor, sobre o portão do material:
+  // "não vamos criar uma maneira de burlarmos". Vale igual para o desenho.
+  //
+  // ⚠ 2.5.5 NÃO CONTA. A conferência só casa PDF de 2.5.2 Fabricação; a pasta de envio ao cliente
+  // entra apenas para explicar o motivo (marca desenhada e guardada no lugar errado).
+  const portao = await portaoDoDesenho(prisma, d.opId);
+  if (!portao.conferida) {
+    return NextResponse.json({
+      error: portao.erroPasta
+        ? `Não deu para ler a pasta da ${op.numero} na última conferência: ${portao.erroPasta}. Confira de novo antes de liberar.`
+        : `A pasta da ${op.numero} nunca foi conferida. Sem saber quais marcas têm desenho não dá para liberar — confira a pasta e tente de novo.`,
+      precisaConferir: true,
+    }, { status: 400 });
+  }
+  // ⚠ os dois jeitos de a lista de faltantes estar incompleta — e incompleta ela LIBERA, não barra
+  if (!portao.confiavel) {
+    return NextResponse.json({
+      error: portao.truncado > 0
+        ? `A conferência da ${op.numero} veio truncada (${portao.truncado} marca(s) fora da lista). Refaça a conferência da pasta antes de liberar.`
+        : `A conferência da ${op.numero} é de antes da lista atual: olhou ${portao.marcas} marca(s) e a LPC hoje tem ${portao.marcasHoje}. Reconfira a pasta antes de liberar.`,
+      precisaConferir: true,
+    }, { status: 400 });
+  }
+
+  // ⚠ as marcas vêm do BANCO, não do que o cliente mandou: o corpo do POST traz ids, e é o id que
+  // se resolve em marca aqui. Confiar numa marca enviada pela tela seria o mesmo furo de novo.
+  const alvo = d.pecaIds?.length
+    ? await prisma.pecaConjunto.findMany({ where: { id: { in: d.pecaIds }, opId: op.id }, select: { id: true, marca: true } })
+    : await prisma.pecaConjunto.findMany({ where: { opId: op.id, fonte: "LPC_IMPORT", opNumero: d.frente }, select: { id: true, marca: true } });
+
+  const barradas = new Map();
+  for (const p of alvo) {
+    const k = String(p.marca || "").trim().toUpperCase();
+    if (portao.semDesenho.has(k) && !barradas.has(k)) {
+      barradas.set(k, portao.foraPadrao.get(k) ? "arquivo com outro nome" : portao.soEnvio.has(k) ? "só em 2.5.5" : "sem desenho");
+    }
+  }
+  if (barradas.size) {
+    const amostra = [...barradas.entries()].slice(0, 8).map(([m, por]) => `${m} (${por})`);
+    return NextResponse.json({
+      error: `${barradas.size} marca(s) desta liberação não têm desenho em 2.5.2 Fabricação: ${amostra.join(", ")}${barradas.size > 8 ? "…" : ""}. Só desce para o PCP o que tem projeto na pasta.`,
+      semDesenho: barradas.size,
+      marcas: [...barradas.keys()],
+      checadoEm: portao.checadoEm,
+    }, { status: 400 });
   }
 
   const agora = new Date();

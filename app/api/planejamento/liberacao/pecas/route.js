@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { portaoDoDesenho, temDesenhoNaPasta } from "@/lib/pasta-engenharia";
 import { requireRole } from "@/lib/session";
 import { pecaCortada, poolDaPeca, POOLS } from "@/lib/liberacao-producao";
 
@@ -43,14 +44,11 @@ export async function GET(req) {
   // OP-064 tem 2.449 marcas e nenhuma casa com PDF. Liberar isso manda o PCP imprimir o que não
   // existe.
   //
-  // A conferência da pasta já roda (cron `pasta-engenharia`, tabela PastaEngenharia) e guarda a
-  // lista de marcas sem desenho. Aqui ela vira uma marca por peça — informativa, não bloqueante:
-  // o dado é de uma varredura periódica e pode estar velho, e travar a liberação por um retrato
-  // de ontem seria pior que avisar.
-  const pasta = await prisma.pastaEngenharia.findUnique({ where: { opId }, select: { veredito: true, checadoEm: true, detalhe: true } });
-  const semDesenho = new Set((pasta?.detalhe?.semDesenho || []).map((x) => String(x.marca || "").toUpperCase()));
-  const foraPadrao = new Map((pasta?.detalhe?.semDesenho || [])
-    .filter((x) => x.foraPadrao).map((x) => [String(x.marca || "").toUpperCase(), x.foraPadrao]));
+  // ⚠ AGORA BLOQUEIA. Vitor (26/08/2026): "só pode ser liberado as marcas que possuem projetos nas
+  // pastas". Era aviso; virou portão. O critério mora em `portaoDoDesenho` para a tela pintar
+  // exatamente o que o POST vai cobrar — e 2.5.5 continua não contando, que é a outra metade do
+  // pedido ("vamos ignorar os projetos da pasta 2.5.5").
+  const portao = await portaoDoDesenho(prisma, opId);
 
   // ⚠ conjunto composto fica FORA da planilha de corte: ele não se corta, é montado a partir dos
   // croquis. Quem escolhe o dia da Preparação escolhe peça P e avulsa. (Vitor, 25/08/2026)
@@ -76,19 +74,24 @@ export async function GET(req) {
       // ⚠ "a fazer" é o filtro que o Vitor pediu: o que ainda não passou pelo corte.
       aFazer: !cortada,
       // desenho na pasta 2.5.2 Fabricação — null = a obra nunca foi conferida
-      temDesenho: pasta ? !semDesenho.has(String(p.marca || "").toUpperCase()) : null,
-      desenhoForaPadrao: foraPadrao.get(String(p.marca || "").toUpperCase()) || null,
+      temDesenho: temDesenhoNaPasta(portao, p.marca),
+      desenhoForaPadrao: portao.foraPadrao.get(String(p.marca || "").trim().toUpperCase()) || null,
+      // desenhado, mas em 2.5.5 — some da fabricação: é mover arquivo, não desenhar
+      desenhoSoEnvio: portao.soEnvio.has(String(p.marca || "").trim().toUpperCase()),
     };
   });
 
   return NextResponse.json({
     op, temLpc: true, pecas, pools: POOLS,
     truncado: brutas.length > TETO ? brutas.length - TETO : 0,
-    pasta: pasta ? {
-      veredito: pasta.veredito,
-      checadoEm: pasta.checadoEm.toISOString(),
+    // ⚠ O PORTÃO VAI NA RESPOSTA para a tela desenhar exatamente o que o POST vai cobrar.
+    pasta: {
+      conferida: portao.conferida, confiavel: portao.confiavel, truncado: portao.truncado || 0,
+      marcasConferidas: portao.marcas || 0, marcasHoje: portao.marcasHoje || 0,
+      veredito: portao.veredito, checadoEm: portao.checadoEm, erro: portao.erroPasta || null,
       semDesenho: pecas.filter((x) => x.temDesenho === false).length,
-    } : null,
+      soEnvio: pecas.filter((x) => x.desenhoSoEnvio).length,
+    },
   });
 }
 

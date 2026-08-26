@@ -14,7 +14,7 @@
 // custa prazo). O marco é congelado na liberação — recalcular o cronograma depois não pode apagar
 // um desvio já medido.
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, AlertCircle, Send, Check, X, Flag, CalendarClock, Wand2, Star } from "lucide-react";
+import { Loader2, AlertCircle, Send, Check, X, Flag, CalendarClock, Wand2, Star, RefreshCw } from "lucide-react";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
@@ -31,12 +31,24 @@ const NAT = { croqui: "Peça P", avulsa: "Avulsa", conjunto: "Conjunto" };
 const COLUNAS = [
   { key: "frente",   label: "Frente",   valor: (p) => p.frente || "—" },
   // ⚠ estar na LPC não é ter desenho — e é por esta coluna que dá para separar os dois.
-  { key: "desenho",  label: "Desenho",  valor: (p) => (p.temDesenho == null ? "não conferido" : p.temDesenho ? "na pasta" : "sem desenho") },
+  { key: "desenho",  label: "Desenho",  valor: (p) => (p.temDesenho == null ? "não conferido" : p.temDesenho ? "na pasta"
+      : p.desenhoForaPadrao ? "outro nome" : p.desenhoSoEnvio ? "só em 2.5.5" : "sem desenho") },
   { key: "natureza", label: "Tipo",     valor: (p) => NAT[p.natureza] || p.natureza },
   { key: "perfil",   label: "Perfil",   valor: (p) => p.perfil || "—" },
   { key: "pool",     label: "Máquina",  valor: (p) => (p.pool === "CHAPAS" ? "Laser chapa" : "Laser perfil") },
   { key: "situacao", label: "Situação", valor: (p) => (p.cortada ? "Já cortada" : "A fazer") },
 ];
+
+function BotaoConferir({ onClick, conferindo }) {
+  return (
+    <button onClick={onClick} disabled={conferindo}
+      title="Lê a pasta 2.5 Projetos no SharePoint agora e refaz a conferência desta obra"
+      className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-current bg-white/70 hover:bg-white disabled:opacity-50">
+      {conferindo ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+      {conferindo ? "conferindo…" : "conferir a pasta agora"}
+    </button>
+  );
+}
 
 export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   const [d, setD] = useState(null);
@@ -54,6 +66,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   const [motivo, setMotivo] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [marcando, setMarcando] = useState(false);
+  const [conferindo, setConferindo] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!opId) { setD(null); setLib(null); return; }
@@ -83,6 +96,13 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   const f = useFiltroColunas(base, COLUNAS);
   const fp = { filtros: f.filtros, setFiltros: f.setFiltros, opcoesDaColuna: f.opcoesDaColuna, aberta: col, setAberta: setCol };
 
+  // ⚠ O PORTÃO, do lado da tela — o mesmo que o POST cobra. Vitor (26/08/2026): "só pode ser
+  // liberado as marcas que possuem projetos nas pastas". `temDesenho == null` = obra nunca
+  // conferida: também não libera, porque "não sei" não é "tem".
+  // ⚠ `confiavel` entra aqui porque o POST cobra ele: conferência truncada ou de antes da lista
+  // atual barra a OP INTEIRA. Sem isso a tela pintaria verde no que o servidor recusa.
+  const liberavel = (p) => !!d?.pasta?.confiavel && p.temDesenho === true;
+  const selecionaveis = useMemo(() => f.filtradas.filter(liberavel), [f.filtradas]);
   const selecionadas = useMemo(() => f.filtradas.filter((p) => sel.has(p.id)), [f.filtradas, sel]);
   const somaSel = useMemo(() => selecionadas.reduce((a, p) => ({
     kg: a.kg + (p.pesoTotalKg || 0), n: a.n + (p.qte || 1),
@@ -99,7 +119,9 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
 
   async function preencherDia() {
     const { sugerirDoDia } = await import("@/lib/liberacao-sugestao");
-    const s = sugerirDoDia(f.filtradas, { metaKg: Number(metaKg) || 12000, pools: d.pools });
+    // ⚠ a sugestão do dia respeita o portão: sugerir peça que o POST vai barrar é fazer a pessoa
+    // montar a carga do dia duas vezes.
+    const s = sugerirDoDia(selecionaveis, { metaKg: Number(metaKg) || 12000, pools: d.pools });
     setSel(new Set(s.ids)); setSugestao(s);
   }
 
@@ -117,6 +139,19 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
     } catch (e) { setErro(e.message); } finally { setMarcando(false); }
   }
 
+  async function conferirPasta() {
+    setConferindo(true); setErro("");
+    try {
+      const r = await fetch("/api/planejamento/liberacao/pasta", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opId }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao conferir a pasta");
+      await carregar();
+    } catch (e) { setErro(e.message); } finally { setConferindo(false); }
+  }
+
   async function liberar() {
     if (!selecionadas.length) return;
     // a frente da liberação: se a seleção é de uma frente só, usa ela; senão, marca como mista
@@ -128,7 +163,10 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           opId, frente, setores, prioridade, dataMarco: marco, desvioMotivo: motivo,
-          pecaIds: [...sel], metaKg: Number(metaKg) || null,
+          // ⚠ MANDA O QUE A TELA MOSTRA. `sel` guarda tudo que já foi marcado, inclusive o que
+          // saiu de vista quando o filtro mudou — e os totais ao lado do botão saem de
+          // `selecionadas`. Mandar `sel` liberava mais peças do que o número no botão dizia.
+          pecaIds: selecionadas.map((p) => p.id), metaKg: Number(metaKg) || null,
           totalKg: Math.round(somaSel.kg), totalPecas: somaSel.n,
         }),
       });
@@ -153,7 +191,9 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
     );
   }
 
-  const todasMarcadas = f.filtradas.length > 0 && f.filtradas.every((p) => sel.has(p.id));
+  // ⚠ "todas" = todas as que PODEM descer. Marcar as travadas encheria a seleção de peça que o
+  // POST vai barrar, e o erro só apareceria no fim.
+  const todasMarcadas = selecionaveis.length > 0 && selecionaveis.every((p) => sel.has(p.id));
 
   return (
     <div className="space-y-3">
@@ -163,17 +203,51 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         </div>
       )}
 
-      {/* ⚠ o retrato da pasta é de uma varredura periódica: dizer QUANDO foi evita que alguém trate
-          um dado de ontem como verdade de hoje. */}
-      {d?.pasta && d.pasta.semDesenho > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-[12px] text-amber-800 flex items-start gap-2">
-          <AlertCircle size={14} className="mt-0.5 shrink-0" />
-          <span>
-            <b>{fmtN(d.pasta.semDesenho)} marca(s) desta lista não têm desenho</b> em 2.5.2 Fabricação
-            (conferido em {new Date(d.pasta.checadoEm).toLocaleDateString("pt-BR")}). Estar na LPC não é
-            ter projeto — liberar essas manda o PCP imprimir o que não existe.
-            {d.pasta.veredito === "SO_ENVIO" && <> Nesta obra os desenhos estão na pasta <b>2.5.5</b>, de envio ao cliente.</>}
-          </span>
+      {/* ⚠⚠ O PORTÃO DO DESENHO. Vitor (26/08/2026): "vamos ignorar os projetos da pasta 2.5.5,
+          então precisamos disso na tela do planejamento, só pode ser liberado as marcas que
+          possuem projetos nas pastas".
+
+          ⚠ O retrato é de uma varredura periódica, então o bloqueio VEM COM SAÍDA: o botão
+          reconfere a obra na hora. Barrar por um dado de ontem sem oferecer como atualizar seria
+          uma parede, não um portão. */}
+      {d?.pasta && !d.pasta.conferida && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-[12px] text-red-700 flex items-start gap-2">
+          <AlertCircle size={15} className="mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <b>A pasta desta obra nunca foi conferida.</b> Sem saber quais marcas têm desenho em
+            2.5.2 Fabricação nada pode ser liberado — estar na LPC não é ter projeto.
+            {d.pasta.erro && <span className="block mt-0.5 text-red-600">Última tentativa: {d.pasta.erro}</span>}
+          </div>
+          <BotaoConferir onClick={conferirPasta} conferindo={conferindo} />
+        </div>
+      )}
+
+      {d?.pasta?.conferida && !d.pasta.confiavel && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-[12px] text-red-700 flex items-start gap-2">
+          <AlertCircle size={15} className="mt-0.5 shrink-0" />
+          <div className="flex-1">
+            {d.pasta.truncado > 0
+              ? <><b>A conferência desta obra veio cortada</b> — {fmtN(d.pasta.truncado)} marca(s) ficaram fora da lista de faltantes.</>
+              : <><b>A conferência é de antes da lista atual:</b> olhou {fmtN(d.pasta.marcasConferidas)} marca(s) e a LPC hoje tem {fmtN(d.pasta.marcasHoje)}.</>}
+            {" "}O que ficou de fora passaria por "tem desenho", então nada é liberado até reconferir.
+          </div>
+          <BotaoConferir onClick={conferirPasta} conferindo={conferindo} />
+        </div>
+      )}
+
+      {d?.pasta?.conferida && d.pasta.confiavel && d.pasta.semDesenho > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-[12px] text-amber-800 flex items-start gap-2">
+          <AlertCircle size={15} className="mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <b>{fmtN(d.pasta.semDesenho)} peça(s) desta lista estão travadas por falta de desenho</b> em
+            2.5.2 Fabricação — só desce para o PCP o que tem projeto na pasta.
+            {d.pasta.soEnvio > 0 && <> {fmtN(d.pasta.soEnvio)} delas estão em <b>2.5.5</b>, a pasta de envio ao cliente: é mover o arquivo, não desenhar.</>}
+            <span className="block mt-0.5 text-amber-700">
+              Conferido em {new Date(d.pasta.checadoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+              {" "}· se a Engenharia acabou de salvar, reconfira.
+            </span>
+          </div>
+          <BotaoConferir onClick={conferirPasta} conferindo={conferindo} />
         </div>
       )}
 
@@ -197,10 +271,23 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
           <input type="checkbox" checked={soAFazer} onChange={(e) => { setSoAFazer(e.target.checked); setSel(new Set()); setSugestao(null); }} className="accent-torg-blue" />
           só as a fazer
         </label>
-        {d?.pasta && (
-          <label className="text-[12px] text-torg-gray inline-flex items-center gap-1.5 cursor-pointer select-none" title="Esconde as marcas que a última conferência não achou desenho na pasta 2.5.2">
+        {d?.pasta?.conferida && !d.pasta.confiavel && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-[12px] text-red-700 flex items-start gap-2">
+          <AlertCircle size={15} className="mt-0.5 shrink-0" />
+          <div className="flex-1">
+            {d.pasta.truncado > 0
+              ? <><b>A conferência desta obra veio cortada</b> — {fmtN(d.pasta.truncado)} marca(s) ficaram fora da lista de faltantes.</>
+              : <><b>A conferência é de antes da lista atual:</b> olhou {fmtN(d.pasta.marcasConferidas)} marca(s) e a LPC hoje tem {fmtN(d.pasta.marcasHoje)}.</>}
+            {" "}O que ficou de fora passaria por "tem desenho", então nada é liberado até reconferir.
+          </div>
+          <BotaoConferir onClick={conferirPasta} conferindo={conferindo} />
+        </div>
+      )}
+
+      {d?.pasta?.conferida && d.pasta.confiavel && d.pasta.semDesenho > 0 && (
+          <label className="text-[12px] text-torg-gray inline-flex items-center gap-1.5 cursor-pointer select-none" title="Tira da frente as marcas travadas por falta de desenho (elas continuam existindo — só não aparecem)">
             <input type="checkbox" checked={soComDesenho} onChange={(e) => { setSoComDesenho(e.target.checked); setSel(new Set()); setSugestao(null); }} className="accent-torg-blue" />
-            só com desenho
+            esconder as travadas
           </label>
         )}
 
@@ -247,7 +334,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                 <th className="px-3 py-2 w-8">
                   <input type="checkbox" aria-label="Marcar todas as visíveis" className="accent-torg-orange"
                     checked={todasMarcadas}
-                    onChange={() => setSel(todasMarcadas ? new Set() : new Set(f.filtradas.map((p) => p.id)))} />
+                    onChange={() => setSel(todasMarcadas ? new Set() : new Set(selecionaveis.map((p) => p.id)))} />
                 </th>
                 <th className="px-3 py-2 text-left font-semibold">Marca</th>
                 <ThFiltro col="frente" label="Frente" className="px-3 py-2 font-semibold text-left" {...fp} />
@@ -270,11 +357,15 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
               )}
               {f.filtradas.slice(0, 1500).map((p) => {
                 const on = sel.has(p.id);
+                // ⚠ trava a linha, não some com ela: a marca sem desenho é justamente a que o
+                // Planejamento precisa enxergar para cobrar a Engenharia.
+                const trava = !liberavel(p);
                 return (
-                  <tr key={p.id} className={`${on ? "bg-torg-blue-50/50" : "hover:bg-gray-50/60"} ${p.cortada ? "opacity-60" : ""}`}>
+                  <tr key={p.id} className={`${on ? "bg-torg-blue-50/50" : trava ? "bg-red-50/40" : "hover:bg-gray-50/60"} ${p.cortada ? "opacity-60" : ""}`}>
                     <td className="px-3 py-1.5">
-                      <input type="checkbox" className="accent-torg-orange" checked={on}
-                        aria-label={`Selecionar ${p.marca}`}
+                      <input type="checkbox" className="accent-torg-orange disabled:cursor-not-allowed" checked={on} disabled={trava}
+                        aria-label={trava ? `${p.marca} sem desenho na pasta — não pode ser liberada` : `Selecionar ${p.marca}`}
+                        title={trava ? "Sem desenho em 2.5.2 Fabricação — não desce para o PCP" : ""}
                         onChange={() => setSel((s) => { const n = new Set(s); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n; })} />
                     </td>
                     <td className="px-3 py-1.5 font-mono text-[12px] font-semibold text-torg-dark whitespace-nowrap">
@@ -284,11 +375,12 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                     <td className="px-3 py-1.5 text-[12px] text-torg-gray">{p.frente}</td>
                     <td className="px-3 py-1.5 text-[12px] text-torg-gray">{NAT[p.natureza]}</td>
                     <td className="px-3 py-1.5 whitespace-nowrap">
-                      {p.temDesenho == null ? <span className="text-[11px] text-torg-gray-light">—</span>
+                      {!d?.pasta?.confiavel ? <span className="text-[11px] text-torg-gray-light" title="A conferência desta obra não vale — reconfira a pasta">não conferido</span>
+                        : p.temDesenho == null ? <span className="text-[11px] text-torg-gray-light" title="A pasta desta obra nunca foi conferida">não conferido</span>
                         : p.temDesenho ? <span className="text-[11px] text-emerald-700">na pasta</span>
-                        : <span className="text-[11px] text-red-600" title={p.desenhoForaPadrao ? `achado com outro nome: ${p.desenhoForaPadrao}` : ""}>
-                            sem desenho{p.desenhoForaPadrao ? " *" : ""}
-                          </span>}
+                        : p.desenhoForaPadrao ? <span className="text-[11px] text-amber-700" title={`o arquivo existe com outro nome: ${p.desenhoForaPadrao} — renomear resolve`}>outro nome *</span>
+                        : p.desenhoSoEnvio ? <span className="text-[11px] text-amber-700" title="o desenho está em 2.5.5, a pasta de envio ao cliente — mover para 2.5.2 resolve">só em 2.5.5</span>
+                        : <span className="text-[11px] text-red-600">sem desenho</span>}
                     </td>
                     <td className="px-3 py-1.5 text-[12px] text-torg-gray truncate max-w-[18ch]" title={p.perfil}>{p.perfil || "—"}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-torg-gray">{p.comprimentoMm ? fmtN(p.comprimentoMm) : "—"}</td>
