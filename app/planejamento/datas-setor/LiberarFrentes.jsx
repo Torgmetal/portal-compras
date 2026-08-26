@@ -673,6 +673,78 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         </div>
       )}
 
+      {/* ── o que fazer com a seleção ── */}
+      {/* ⚠⚠ ACIMA DA TABELA, E COMPACTO. Vitor (26/08/2026): "deixe essa parte mais compacta e deixa
+          ele para cima para ficar mais facil para apertar o botão". Ela ficava DEPOIS da planilha:
+          com 200 linhas, marcar uma peça no topo e ir apertar o botão era rolar a tela inteira.
+          Três linhas em vez de seis, e o botão a um palmo da seleção. */}
+      {sel.size > 0 && (
+        <div className="bg-white border-2 border-torg-blue rounded-xl px-3.5 py-3 space-y-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <p className="text-sm font-bold text-torg-dark">{fmtN(somaSel.n)} peça(s) · {fmtKg(somaSel.kg)}</p>
+            <span className="text-[11px] text-torg-gray">perfil {fmtN(somaSel.perfis)} · chapa {fmtN(somaSel.chapas)}</span>
+            <span className="text-torg-gray-light">·</span>
+            <button onClick={() => marcarPrioridade(1)} disabled={marcando}
+              title="Marca as peças escolhidas como prioridade"
+              className="text-[11px] px-2 py-0.5 rounded-lg border bg-torg-orange text-white border-torg-orange disabled:opacity-40 inline-flex items-center gap-1">
+              <Star size={11} /> prioridade
+            </button>
+            <button onClick={() => marcarPrioridade(null)} disabled={marcando}
+              className="text-[11px] px-2 py-0.5 rounded-lg border bg-white text-torg-gray border-gray-200 disabled:opacity-40">
+              tirar
+            </button>
+            {marcando && <Loader2 size={12} className="animate-spin text-torg-blue" />}
+            <button onClick={() => { setSel(new Set()); setSugestao(null); }} className="text-[11px] text-torg-gray hover:underline ml-auto">limpar seleção</button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-gray-100 pt-2">
+            <span className="text-[10px] uppercase text-torg-gray-light">Descem</span>
+            {(lib?.setores || []).map((sx) => {
+              const on = setores.includes(sx.key);
+              return (
+                <button key={sx.key} onClick={() => setSetores((v) => (on ? v.filter((k) => k !== sx.key) : [...v, sx.key]))}
+                  title={lib?.datasSetor?.[sx.key] || lib?.datasSetorCrono?.[sx.key] ? `marco ${fmtD(lib?.datasSetorCrono?.[sx.key] || lib?.datasSetor?.[sx.key])}` : "sem marco no cronograma"}
+                  className={`text-[11px] px-2 py-0.5 rounded-lg border ${on ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue"}`}>
+                  {sx.label}
+                </button>
+              );
+            })}
+            <span className="text-torg-gray-light">·</span>
+            <span className="text-[10px] uppercase text-torg-gray-light">Carga</span>
+            {["ALTA", "MEDIA", "BAIXA"].map((k) => (
+              <button key={k} onClick={() => setPrioridade(k)}
+                className={`text-[11px] px-2 py-0.5 rounded-lg border ${prioridade === k ? PRIO[k].chip + " font-semibold" : "bg-white text-torg-gray border-gray-200"}`}>
+                {PRIO[k].rot}
+              </button>
+            ))}
+            <span className="text-[11px] text-torg-gray inline-flex items-center gap-1 ml-auto">
+              <CalendarClock size={12} />
+              {marco
+                ? <>marco {fmtD(marco)}{desvio === 0 ? "" : desvio > 0 ? <span className="text-red-600"> · {desvio}d depois</span> : <span className="text-emerald-700"> · {-desvio}d antes</span>}</>
+                : <span className="text-torg-gray-light">sem marco — o desvio não será medido</span>}
+            </span>
+          </div>
+
+          {/* ⚠ o motivo do atraso continua obrigatório: é o que o Vitor pediu para medir. Só aparece
+              quando faz falta, em vez de ocupar linha em toda liberação. */}
+          {desvio > 0 && (
+            <input value={motivo} onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Por que não começou no marco? ex.: material não chegou, desenho em revisão"
+              className="w-full text-[12px] border border-gray-200 rounded-lg px-2.5 py-1.5 focus:border-torg-blue outline-none" />
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-2">
+            <button onClick={liberar} disabled={salvando || !setores.length || (desvio > 0 && !motivo.trim())}
+              className="px-3.5 py-1.5 bg-torg-blue text-white text-[13px] font-semibold rounded-lg disabled:opacity-40 inline-flex items-center gap-1.5">
+              {salvando ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              Liberar {fmtN(somaSel.n)} peça(s){dia ? ` para ${fmtD(dia)}` : ""}
+            </button>
+            {!setores.length && <span className="text-[11px] text-red-600">escolha ao menos um setor</span>}
+            <span className="text-[11px] text-torg-gray-light">o PCP gera a separação, imprime os projetos e libera para os setores</span>
+          </div>
+        </div>
+      )}
+
       {/* ── a planilha ── */}
       <div className="border border-gray-100 rounded-xl overflow-hidden">
         <div className="overflow-x-auto max-h-[28rem] overflow-y-auto">
@@ -865,84 +937,6 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         </div>
       )}
 
-      {/* ── o que fazer com a seleção ── */}
-      {sel.size > 0 && (
-        <div className="bg-white border border-torg-blue-100 rounded-xl p-4 space-y-3">
-          <div className="flex items-baseline gap-3 flex-wrap">
-            <p className="text-sm font-bold text-torg-dark">{fmtN(somaSel.n)} peça(s) · {fmtKg(somaSel.kg)}</p>
-            <span className="text-[12px] text-torg-gray">perfil {fmtN(somaSel.perfis)} · chapa {fmtN(somaSel.chapas)}</span>
-            <button onClick={() => { setSel(new Set()); setSugestao(null); }} className="text-[11px] text-torg-gray hover:underline ml-auto">limpar seleção</button>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] uppercase text-torg-gray-light">Prioridade da peça</span>
-            <button onClick={() => marcarPrioridade(1)} disabled={marcando}
-              className="text-[12px] px-2.5 py-1 rounded-lg border bg-torg-orange text-white border-torg-orange disabled:opacity-40 inline-flex items-center gap-1">
-              <Star size={12} /> marcar como prioridade
-            </button>
-            <button onClick={() => marcarPrioridade(null)} disabled={marcando}
-              className="text-[12px] px-2.5 py-1 rounded-lg border bg-white text-torg-gray border-gray-200 disabled:opacity-40">
-              tirar prioridade
-            </button>
-            {marcando && <Loader2 size={13} className="animate-spin text-torg-blue" />}
-          </div>
-
-          <div className="border-t border-gray-100 pt-3 space-y-3">
-            <p className="text-sm font-bold text-torg-dark inline-flex items-center gap-2"><Flag size={15} className="text-torg-blue" /> Liberar para o PCP</p>
-
-            <div>
-              <p className="text-[11px] uppercase text-torg-gray-light mb-1.5">Setores que descem agora</p>
-              <div className="flex flex-wrap gap-1.5">
-                {(lib?.setores || []).map((s) => {
-                  const on = setores.includes(s.key);
-                  return (
-                    <button key={s.key} onClick={() => setSetores((v) => (on ? v.filter((k) => k !== s.key) : [...v, s.key]))}
-                      className={`text-[12px] px-2.5 py-1 rounded-lg border ${on ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue"}`}>
-                      {s.label}
-                      {lib?.datasSetor?.[s.key] && <span className={`ml-1.5 text-[10px] ${on ? "text-white/70" : "text-torg-gray-light"}`}>{fmtD(lib.datasSetor[s.key])}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] uppercase text-torg-gray-light">Prioridade da carga</span>
-              {["ALTA", "MEDIA", "BAIXA"].map((k) => (
-                <button key={k} onClick={() => setPrioridade(k)}
-                  className={`text-[12px] px-2.5 py-1 rounded-lg border ${prioridade === k ? PRIO[k].chip + " font-semibold" : "bg-white text-torg-gray border-gray-200"}`}>
-                  {PRIO[k].rot}
-                </button>
-              ))}
-            </div>
-
-            <div className="text-[12px] text-torg-gray inline-flex items-center gap-2">
-              <CalendarClock size={14} />
-              {marco
-                ? <>Marco: <b className="text-torg-dark">{fmtD(marco)}</b>{desvio === 0 ? " — liberando no dia" : desvio > 0 ? <span className="text-red-600"> — {desvio} dia(s) depois</span> : <span className="text-emerald-700"> — {-desvio} dia(s) antes</span>}</>
-                : <span className="text-torg-gray-light">Sem data por setor informada — a liberação fica sem marco e sem desvio para medir.</span>}
-            </div>
-
-            {desvio > 0 && (
-              <div>
-                <label className="block text-[11px] uppercase text-torg-gray-light mb-1">Por que não começou no marco?</label>
-                <input value={motivo} onChange={(e) => setMotivo(e.target.value)}
-                  placeholder="ex.: material não chegou, desenho em revisão, fábrica na OP-083"
-                  className="w-full text-[13px] border border-gray-200 rounded-lg px-3 py-2 focus:border-torg-blue outline-none" />
-              </div>
-            )}
-
-            <div className="flex items-center gap-2">
-              <button onClick={liberar} disabled={salvando || !setores.length || (desvio > 0 && !motivo.trim())}
-                className="px-4 py-2 bg-torg-blue text-white text-sm font-semibold rounded-lg disabled:opacity-40 inline-flex items-center gap-2">
-                {salvando ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-                Liberar {fmtN(somaSel.n)} peça(s){dia ? ` para ${fmtD(dia)}` : ""}
-              </button>
-              <span className="text-[11px] text-torg-gray-light">o PCP gera a separação, imprime os projetos e libera para os setores</span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
