@@ -37,6 +37,21 @@ export async function GET(req) {
   });
   if (!brutas.length) return NextResponse.json({ op, temLpc: false, pecas: [], pools: POOLS });
 
+  // ⚠⚠ ESTAR NA LPC NÃO É TER DESENHO. Vitor (25/08/2026): "quando marcamos as marcas é porque já
+  // temos projeto na pasta, ou apenas por ter o projeto listado na lista LPC?". Era só a LPC — e a
+  // diferença é enorme: a OP-106 tem a lista importada e ZERO desenho em 2.5.2 Fabricação; a
+  // OP-064 tem 2.449 marcas e nenhuma casa com PDF. Liberar isso manda o PCP imprimir o que não
+  // existe.
+  //
+  // A conferência da pasta já roda (cron `pasta-engenharia`, tabela PastaEngenharia) e guarda a
+  // lista de marcas sem desenho. Aqui ela vira uma marca por peça — informativa, não bloqueante:
+  // o dado é de uma varredura periódica e pode estar velho, e travar a liberação por um retrato
+  // de ontem seria pior que avisar.
+  const pasta = await prisma.pastaEngenharia.findUnique({ where: { opId }, select: { veredito: true, checadoEm: true, detalhe: true } });
+  const semDesenho = new Set((pasta?.detalhe?.semDesenho || []).map((x) => String(x.marca || "").toUpperCase()));
+  const foraPadrao = new Map((pasta?.detalhe?.semDesenho || [])
+    .filter((x) => x.foraPadrao).map((x) => [String(x.marca || "").toUpperCase(), x.foraPadrao]));
+
   // ⚠ conjunto composto fica FORA da planilha de corte: ele não se corta, é montado a partir dos
   // croquis. Quem escolhe o dia da Preparação escolhe peça P e avulsa. (Vitor, 25/08/2026)
   const comCroqui = new Set(
@@ -60,12 +75,20 @@ export async function GET(req) {
       cortada, feito: p.qteProduzida || 0,
       // ⚠ "a fazer" é o filtro que o Vitor pediu: o que ainda não passou pelo corte.
       aFazer: !cortada,
+      // desenho na pasta 2.5.2 Fabricação — null = a obra nunca foi conferida
+      temDesenho: pasta ? !semDesenho.has(String(p.marca || "").toUpperCase()) : null,
+      desenhoForaPadrao: foraPadrao.get(String(p.marca || "").toUpperCase()) || null,
     };
   });
 
   return NextResponse.json({
     op, temLpc: true, pecas, pools: POOLS,
     truncado: brutas.length > TETO ? brutas.length - TETO : 0,
+    pasta: pasta ? {
+      veredito: pasta.veredito,
+      checadoEm: pasta.checadoEm.toISOString(),
+      semDesenho: pecas.filter((x) => x.temDesenho === false).length,
+    } : null,
   });
 }
 

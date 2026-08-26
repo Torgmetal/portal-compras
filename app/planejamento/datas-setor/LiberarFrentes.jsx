@@ -30,6 +30,8 @@ const NAT = { croqui: "Peça P", avulsa: "Avulsa", conjunto: "Conjunto" };
 
 const COLUNAS = [
   { key: "frente",   label: "Frente",   valor: (p) => p.frente || "—" },
+  // ⚠ estar na LPC não é ter desenho — e é por esta coluna que dá para separar os dois.
+  { key: "desenho",  label: "Desenho",  valor: (p) => (p.temDesenho == null ? "não conferido" : p.temDesenho ? "na pasta" : "sem desenho") },
   { key: "natureza", label: "Tipo",     valor: (p) => NAT[p.natureza] || p.natureza },
   { key: "perfil",   label: "Perfil",   valor: (p) => p.perfil || "—" },
   { key: "pool",     label: "Máquina",  valor: (p) => (p.pool === "CHAPAS" ? "Laser chapa" : "Laser perfil") },
@@ -43,6 +45,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   const [carregando, setCarregando] = useState(false);
   const [sel, setSel] = useState(() => new Set());
   const [soAFazer, setSoAFazer] = useState(true);
+  const [soComDesenho, setSoComDesenho] = useState(false);
   const [col, setCol] = useState(null);
   const [metaKg, setMetaKg] = useState(12000);
   const [sugestao, setSugestao] = useState(null);
@@ -71,8 +74,12 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
 
   // ⚠ conjunto fora da planilha: não se corta conjunto. Quem escolhe o dia escolhe peça P e avulsa.
   const base = useMemo(
-    () => (d?.pecas || []).filter((p) => p.natureza !== "conjunto" && (!soAFazer || p.aFazer)),
-    [d, soAFazer]);
+    () => (d?.pecas || []).filter((p) => p.natureza !== "conjunto"
+      && (!soAFazer || p.aFazer)
+      // ⚠ opcional de propósito: o retrato da pasta é de uma varredura periódica e pode estar
+      // velho. Esconder por padrão faria sumir peça que ganhou desenho depois da última conferência.
+      && (!soComDesenho || p.temDesenho !== false)),
+    [d, soAFazer, soComDesenho]);
   const f = useFiltroColunas(base, COLUNAS);
   const fp = { filtros: f.filtros, setFiltros: f.setFiltros, opcoesDaColuna: f.opcoesDaColuna, aberta: col, setAberta: setCol };
 
@@ -156,6 +163,20 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         </div>
       )}
 
+      {/* ⚠ o retrato da pasta é de uma varredura periódica: dizer QUANDO foi evita que alguém trate
+          um dado de ontem como verdade de hoje. */}
+      {d?.pasta && d.pasta.semDesenho > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-[12px] text-amber-800 flex items-start gap-2">
+          <AlertCircle size={14} className="mt-0.5 shrink-0" />
+          <span>
+            <b>{fmtN(d.pasta.semDesenho)} marca(s) desta lista não têm desenho</b> em 2.5.2 Fabricação
+            (conferido em {new Date(d.pasta.checadoEm).toLocaleDateString("pt-BR")}). Estar na LPC não é
+            ter projeto — liberar essas manda o PCP imprimir o que não existe.
+            {d.pasta.veredito === "SO_ENVIO" && <> Nesta obra os desenhos estão na pasta <b>2.5.5</b>, de envio ao cliente.</>}
+          </span>
+        </div>
+      )}
+
       {/* ── o que já está liberado ── */}
       {lib?.frentes?.some((x) => x.liberacao && x.liberacao.status !== "CANCELADA") && (
         <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -176,6 +197,12 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
           <input type="checkbox" checked={soAFazer} onChange={(e) => { setSoAFazer(e.target.checked); setSel(new Set()); setSugestao(null); }} className="accent-torg-blue" />
           só as a fazer
         </label>
+        {d?.pasta && (
+          <label className="text-[12px] text-torg-gray inline-flex items-center gap-1.5 cursor-pointer select-none" title="Esconde as marcas que a última conferência não achou desenho na pasta 2.5.2">
+            <input type="checkbox" checked={soComDesenho} onChange={(e) => { setSoComDesenho(e.target.checked); setSel(new Set()); setSugestao(null); }} className="accent-torg-blue" />
+            só com desenho
+          </label>
+        )}
 
         <span className="text-torg-gray-light">·</span>
         <span className="text-[12px] text-torg-gray">meta do dia</span>
@@ -225,6 +252,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                 <th className="px-3 py-2 text-left font-semibold">Marca</th>
                 <ThFiltro col="frente" label="Frente" className="px-3 py-2 font-semibold text-left" {...fp} />
                 <ThFiltro col="natureza" label="Tipo" className="px-3 py-2 font-semibold text-left" {...fp} />
+                <ThFiltro col="desenho" label="Desenho" className="px-3 py-2 font-semibold text-left" {...fp} />
                 <ThFiltro col="perfil" label="Perfil" className="px-3 py-2 font-semibold text-left" {...fp} />
                 <th className="px-3 py-2 text-right font-semibold">Compr.</th>
                 <th className="px-3 py-2 text-right font-semibold">Qtd</th>
@@ -236,7 +264,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {!f.filtradas.length && (
-                <tr><td colSpan={11} className="px-3 py-8 text-center text-sm text-torg-gray">
+                <tr><td colSpan={12} className="px-3 py-8 text-center text-sm text-torg-gray">
                   {soAFazer ? "Nada a fazer com este filtro — tudo já foi cortado." : "Nada com este filtro."}
                 </td></tr>
               )}
@@ -255,6 +283,13 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                     </td>
                     <td className="px-3 py-1.5 text-[12px] text-torg-gray">{p.frente}</td>
                     <td className="px-3 py-1.5 text-[12px] text-torg-gray">{NAT[p.natureza]}</td>
+                    <td className="px-3 py-1.5 whitespace-nowrap">
+                      {p.temDesenho == null ? <span className="text-[11px] text-torg-gray-light">—</span>
+                        : p.temDesenho ? <span className="text-[11px] text-emerald-700">na pasta</span>
+                        : <span className="text-[11px] text-red-600" title={p.desenhoForaPadrao ? `achado com outro nome: ${p.desenhoForaPadrao}` : ""}>
+                            sem desenho{p.desenhoForaPadrao ? " *" : ""}
+                          </span>}
+                    </td>
                     <td className="px-3 py-1.5 text-[12px] text-torg-gray truncate max-w-[18ch]" title={p.perfil}>{p.perfil || "—"}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-torg-gray">{p.comprimentoMm ? fmtN(p.comprimentoMm) : "—"}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums text-[12px]">{fmtN(p.qte)}</td>
