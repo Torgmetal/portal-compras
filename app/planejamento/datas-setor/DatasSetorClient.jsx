@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { CalendarClock, Loader2, AlertCircle, RefreshCw, Check, Wand2, Send } from "lucide-react";
+import { CalendarClock, Loader2, AlertCircle, RefreshCw, Send } from "lucide-react";
 import LiberarFrentes from "./LiberarFrentes";
 
 const fmtDia = (d) => (d ? new Date(d + "T12:00:00Z").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—");
@@ -10,9 +10,6 @@ export default function DatasSetorClient() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [opSel, setOpSel] = useState("");
-  const [form, setForm] = useState({});
-  const [salvando, setSalvando] = useState(false);
-  const [salvo, setSalvo] = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
@@ -29,25 +26,8 @@ export default function DatasSetorClient() {
   const ops = dados?.ops || [];
   const op = ops.find((o) => o.opNumero === opSel) || null;
 
-  // Ao trocar de OP (ou recarregar), preenche o form com as datas já informadas.
-  useEffect(() => { setForm(op ? { ...op.datasSetor } : {}); setSalvo(false); }, [opSel, dados]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const setData = (key, v) => { setForm((f) => ({ ...f, [key]: v })); setSalvo(false); };
-  const usarCronograma = () => { if (op) { setForm({ ...op.datasSetorCrono }); setSalvo(false); } };
-
-  const salvar = async () => {
-    if (!op) return;
-    setSalvando(true); setErro("");
-    try {
-      const res = await fetch("/api/planejamento/datas-setor", {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: op.opNumero, opId: op.opId, datasSetor: form }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error || "Erro ao salvar");
-      setSalvo(true);
-      await carregar();
-    } catch (e) { setErro(e.message); } finally { setSalvando(false); }
-  };
+  // ⚠ o dia de hoje em ISO, para dizer qual marco já venceu
+  const hojeISO = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="max-w-6xl">
@@ -56,7 +36,7 @@ export default function DatasSetorClient() {
           <div className="bg-torg-blue-50 p-2.5 rounded-xl"><CalendarClock size={24} className="text-torg-blue" /></div>
           <div>
             <h1 className="text-2xl font-bold text-torg-dark">Datas por setor</h1>
-            <p className="text-sm text-torg-gray">Informe quando cada setor precisa entregar em cada obra · essas datas mandam na TV de Prioridades (sobrepõem o cronograma)</p>
+            <p className="text-sm text-torg-gray">O marco de cada setor vem do cronograma da obra · escolha a OP para liberar o que desce para o PCP</p>
           </div>
         </div>
         <button onClick={carregar} className="p-2.5 rounded-xl bg-white border border-torg-blue-100 hover:border-torg-blue-300 text-torg-dark"><RefreshCw size={18} className={loading ? "animate-spin" : ""} /></button>
@@ -78,35 +58,42 @@ export default function DatasSetorClient() {
                   {ops.map((o) => <option key={o.opNumero} value={o.opNumero}>OP-{o.opNumero} — {o.obra}</option>)}
                 </select>
               </div>
-              {op && (
-                <button onClick={usarCronograma} className="px-3 py-2 rounded-lg bg-torg-blue-50 text-torg-blue text-sm font-medium inline-flex items-center gap-1.5 hover:bg-torg-blue-100" title="Preencher com as datas que o cronograma sugere">
-                  <Wand2 size={15} /> Usar sugestão do cronograma
-                </button>
-              )}
             </div>
 
             {!op ? (
-              <p className="text-sm text-torg-gray py-6 text-center">Escolha uma OP acima (ou clique numa linha da tabela) para informar as datas de cada setor.</p>
+              <p className="text-sm text-torg-gray py-6 text-center">Escolha uma OP acima (ou clique numa linha da tabela) para ver os marcos e liberar para o PCP.</p>
             ) : (
               <>
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                {/* ⚠⚠ NÃO SE DIGITA MAIS DATA AQUI. Vitor (26/08/2026): "quando seleciono a obra
+                    não quero que traga mais esse campo para preencher as datas daquela maneira, a
+                    partir da OP que eu selecionar vc já traz a data informada no cronograma".
+
+                    O cronograma já é a data acordada da obra; redigitá-la criava uma segunda
+                    verdade que envelhecia sozinha. Aqui ela é MARCO: serve para medir o desvio da
+                    liberação, não para ser preenchida.
+
+                    ⚠ A data digitada à mão continua existindo no banco e continua mandando na TV
+                    de Prioridades — por isso aparece quando difere. Escondê-la faria dela uma
+                    regra invisível. */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                   {setores.map((s) => {
-                    const sugestao = op.datasSetorCrono?.[s.key];
+                    const crono = op.datasSetorCrono?.[s.key] || null;
+                    const manual = op.datasSetor?.[s.key] || null;
+                    const venceu = crono && crono < hojeISO;
                     return (
-                      <div key={s.key}>
-                        <label className="block text-xs font-semibold text-torg-dark mb-1">{s.label}</label>
-                        <input type="date" value={form[s.key] || ""} onChange={(e) => setData(s.key, e.target.value)}
-                          className="w-full border border-torg-blue-100 rounded-lg px-2 py-1.5 text-sm tabular-nums focus:border-torg-blue outline-none" />
-                        <p className="text-[10px] text-torg-gray-light mt-1 h-3">{sugestao && sugestao !== form[s.key] ? `cronograma: ${fmtDia(sugestao)}` : ""}</p>
+                      <div key={s.key} className={`rounded-lg border px-2.5 py-2 ${venceu ? "border-red-200 bg-red-50" : crono ? "border-torg-blue-100 bg-white" : "border-gray-100 bg-gray-50"}`}>
+                        <p className="text-[11px] font-semibold text-torg-dark truncate">{s.label}</p>
+                        <p className={`text-sm font-bold tabular-nums ${venceu ? "text-red-600" : crono ? "text-torg-dark" : "text-torg-gray-light"}`}>
+                          {crono ? fmtDia(crono) : "—"}
+                        </p>
+                        <p className="text-[10px] mt-0.5 h-3 truncate">
+                          {venceu ? <span className="text-red-500">venceu</span>
+                            : manual && manual !== crono ? <span className="text-torg-gray-light" title="data informada à mão — é ela que manda na TV de Prioridades">TV: {fmtDia(manual)}</span>
+                            : <span className="text-torg-gray-light">{crono ? "cronograma" : "sem tarefa"}</span>}
+                        </p>
                       </div>
                     );
                   })}
-                </div>
-                <div className="flex items-center gap-3 mt-4">
-                  <button onClick={salvar} disabled={salvando} className="px-5 py-2 bg-torg-blue text-white text-sm font-semibold rounded-lg disabled:opacity-50 inline-flex items-center gap-2">
-                    {salvando ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Salvar datas
-                  </button>
-                  {salvo && <span className="text-sm text-emerald-600 inline-flex items-center gap-1"><Check size={15} /> salvo — já vale na TV</span>}
                 </div>
 
                 {/* ── liberar para o PCP, por frente ── */}

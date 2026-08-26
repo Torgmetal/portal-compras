@@ -14,8 +14,9 @@
 // custa prazo). O marco é congelado na liberação — recalcular o cronograma depois não pode apagar
 // um desvio já medido.
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, AlertCircle, Send, Check, X, Flag, CalendarClock, Wand2, Star, RefreshCw, Minus, FileWarning } from "lucide-react";
+import { Loader2, AlertCircle, Send, Check, X, Flag, CalendarClock, Wand2, Star, RefreshCw, Minus, FileWarning, Timer } from "lucide-react";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
+import { estimarPrazo, somarDiasUteis, proximoDiaUtil } from "@/lib/prazo-preparacao";
 
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -35,6 +36,7 @@ const COLUNAS = [
   // ⚠ estar na LPC não é ter desenho — e é por esta coluna que dá para separar os dois.
   // ⚠ o FILTRO fica por extenso (ninguém procura por um ícone numa lista de opções); quem encurta
   // é a célula.
+  { key: "nc1",      label: "NC1",      valor: (p) => (p.temMaquina == null ? "não medido" : p.temMaquina ? "tem NC1" : "sem NC1") },
   { key: "desenho",  label: "Desenho",  valor: (p) => (p.temDesenho == null ? "não conferido" : p.temDesenho ? "tem desenho"
       : p.desenhoForaPadrao ? "outro nome" : "sem desenho") },
   { key: "natureza", label: "Tipo",     valor: (p) => NAT[p.natureza] || p.natureza },
@@ -105,7 +107,9 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   // conferida: também não libera, porque "não sei" não é "tem".
   // ⚠ `confiavel` entra aqui porque o POST cobra ele: conferência truncada ou de antes da lista
   // atual barra a OP INTEIRA. Sem isso a tela pintaria verde no que o servidor recusa.
-  const liberavel = (p) => !!d?.pasta?.confiavel && p.temDesenho === true;
+  // ⚠ os DOIS arquivos: o desenho que a bancada abre e o NC1 que a máquina lê. `temMaquina == null`
+  // é conferência antiga que não mediu isso — aí não se cobra, senão travava tudo até o cron passar.
+  const liberavel = (p) => !!d?.pasta?.confiavel && p.temDesenho === true && p.temMaquina !== false;
   const selecionaveis = useMemo(() => f.filtradas.filter(liberavel), [f.filtradas]);
   const selecionadas = useMemo(() => f.filtradas.filter((p) => sel.has(p.id)), [f.filtradas, sel]);
   const somaSel = useMemo(() => selecionadas.reduce((a, p) => ({
@@ -114,12 +118,38 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
     chapas: a.chapas + (p.pool === "CHAPAS" ? p.qte || 1 : 0),
   }), { kg: 0, n: 0, perfis: 0, chapas: 0 }), [selecionadas]);
 
-  // o marco = a data do primeiro setor escolhido
+  // ⚠⚠ A PREVISÃO. Vitor (26/08/2026): "de acordo com o total da lista ou a seleção das peças vc já
+  // nos informa quanto tempo (…) para podermos definir o tempo que será necessário para o setor
+  // finalizar". Sem seleção ela fala da LISTA INTEIRA — é a pergunta "quanto tempo esta obra leva";
+  // com seleção, fala do pacote — "quanto tempo o que estou mandando hoje leva".
+  const escopo = selecionadas.length ? selecionadas : f.filtradas;
+  const travadasNoEscopo = useMemo(() => escopo.reduce((n, p) => n + (liberavel(p) ? 0 : (Number(p.qte) || 1)), 0), [escopo]); // eslint-disable-line react-hooks/exhaustive-deps
+  const prazo = useMemo(
+    () => estimarPrazo(escopo, { metaKg: Number(metaKg) || 12000, pools: d?.pools }),
+    [escopo, metaKg, d]);
+
+  // ⚠ O MARCO VEM DO CRONOGRAMA. Vitor (26/08/2026): "a partir da OP que eu selecionar vc já traz a
+  // data informada no cronograma". A data digitada à mão continua existindo (é ela que manda na TV
+  // de Prioridades) e entra só como reserva, quando o cronograma não tem a linha daquele setor.
   const marco = useMemo(() => {
-    const datas = setores.map((k) => lib?.datasSetor?.[k]).filter(Boolean).sort();
+    const datas = setores.map((k) => lib?.datasSetorCrono?.[k] || lib?.datasSetor?.[k]).filter(Boolean).sort();
     return datas[0] || null;
   }, [setores, lib]);
   const desvio = marco ? Math.round((new Date().setUTCHours(12, 0, 0, 0) - new Date(`${marco}T12:00:00Z`)) / 86400000) : null;
+
+  // ⚠ MARCO VENCIDO NÃO VIRA PROMESSA. Vitor (26/08/2026): "se a data já estiver como atrasa sem
+  // problema preencha com a data nova". Repetir uma data que já passou seria fingir que dá; o que
+  // vale é quando dá se começar agora.
+  const marcoPrazo = useMemo(() => {
+    if (!prazo.diasCheios) return null;
+    const atrasado = desvio != null && desvio > 0;
+    const partida = atrasado || !marco ? proximoDiaUtil() : new Date(`${marco}T12:00:00Z`);
+    return {
+      marco, atrasado,
+      inicio: partida.toISOString().slice(0, 10),
+      fim: somarDiasUteis(partida, prazo.diasCheios - 1).toISOString().slice(0, 10),
+    };
+  }, [marco, desvio, prazo.diasCheios]);
 
   async function preencherDia() {
     const { sugerirDoDia } = await import("@/lib/liberacao-sugestao");
@@ -258,6 +288,18 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         </div>
       )}
 
+      {d?.pasta?.conferida && d.pasta.confiavel && d.pasta.semMaquina > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-[12px] text-amber-800 flex items-start gap-2">
+          <AlertCircle size={15} className="mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <b>{fmtN(d.pasta.semMaquina)} peça(s) têm desenho mas não têm arquivo de máquina</b> (NC1, DXF
+            ou modelo 3D) na pasta da obra. O desenho a bancada abre; sem o NC1 a máquina não tem o
+            que ler, então também não desce.
+          </div>
+          <BotaoConferir onClick={conferirPasta} conferindo={conferindo} />
+        </div>
+      )}
+
       {/* ── o que já está liberado ── */}
       {lib?.frentes?.some((x) => x.liberacao && x.liberacao.status !== "CANCELADA") && (
         <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -269,6 +311,80 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
               {x.liberacao.desvioDias > 0 && <span className="ml-1 font-normal">{x.liberacao.desvioDias}d após o marco</span>}
             </span>
           ))}
+        </div>
+      )}
+
+      {/* ── quanto tempo isto leva ── */}
+      {prazo.un > 0 && (
+        <div className="bg-white border border-torg-blue-100 rounded-xl p-3.5 space-y-3">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <Timer size={15} className="text-torg-blue self-center" />
+            <p className="text-sm font-bold text-torg-dark">
+              {fmtN(prazo.diasCheios)} dia(s) de preparação
+            </p>
+            <span className="text-[12px] text-torg-gray">
+              {selecionadas.length ? "para a seleção" : "para a lista inteira"} · {fmtN(prazo.un)} peça(s) · {fmtKg(prazo.kg)} · meta {fmtN(Number(metaKg) || 0)} kg/dia
+            </span>
+            {marcoPrazo && (
+              <span className="text-[12px] text-torg-gray ml-auto">
+                {marcoPrazo.atrasado
+                  ? <>marco de {fmtD(marcoPrazo.marco)} já passou — começando hoje, termina <b className="text-torg-dark">{fmtD(marcoPrazo.fim)}</b></>
+                  : <>começando {fmtD(marcoPrazo.inicio)}, termina <b className="text-torg-dark">{fmtD(marcoPrazo.fim)}</b></>}
+              </span>
+            )}
+          </div>
+
+          {/* ⚠ o prazo da lista INTEIRA conta o que ainda não pode descer — é o tempo que o setor
+              precisa, não o que dá para mandar hoje. Dizer os dois evita ler "3 dias" numa lista
+              que está 90% travada. */}
+          {!selecionadas.length && travadasNoEscopo > 0 && (
+            <p className="text-[12px] text-amber-800">
+              {fmtN(travadasNoEscopo)} destas peças ainda não podem ser liberadas (falta desenho ou NC1) —
+              o prazo acima é o do setor, não o do que desce hoje.
+            </p>
+          )}
+
+          {/* ⚠ O QUE TRAVA O DIA, não só quantos dias. Peso e peças são tetos diferentes: 12 t de
+              extra leve são milhares de peças e 12 t de extra pesado são dezenas. Dizer só o número
+              de dias esconde o motivo — e o motivo é o que se ataca. */}
+          <div className="flex flex-wrap gap-1.5">
+            {prazo.porPool.map((g) => (
+              <span key={g.pool} className="text-[11px] px-2 py-1 rounded-lg border border-gray-200 bg-gray-50 text-torg-gray">
+                <b className="text-torg-dark">{g.label}</b> {fmtN(Math.ceil(g.dias))} d ·
+                {" "}{fmtKg(g.kg)} / {fmtN(g.un)} pç ·
+                {" "}<span className={g.limite === "pecas" ? "text-torg-orange font-semibold" : ""}>
+                  trava {g.limite === "pecas" ? "no nº de peças" : "no peso"}
+                </span>
+              </span>
+            ))}
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px]">
+              <thead className="text-torg-gray-light uppercase text-[10px]">
+                <tr className="text-left">
+                  <th className="py-1 pr-3 font-semibold">Classe</th>
+                  <th className="py-1 pr-3 font-semibold">Faixa</th>
+                  <th className="py-1 pr-3 font-semibold text-right">Peças</th>
+                  <th className="py-1 pr-3 font-semibold text-right">Peso</th>
+                  <th className="py-1 pr-3 font-semibold text-right">Peso/peça</th>
+                  <th className="py-1 font-semibold text-right">% do peso</th>
+                </tr>
+              </thead>
+              <tbody className="text-torg-gray">
+                {prazo.porClasse.map((c) => (
+                  <tr key={c.key} className="border-t border-gray-50">
+                    <td className="py-1 pr-3 font-semibold text-torg-dark whitespace-nowrap">{c.nome}</td>
+                    <td className="py-1 pr-3 text-torg-gray-light whitespace-nowrap">{c.faixa}</td>
+                    <td className="py-1 pr-3 text-right tabular-nums">{fmtN(c.un)}</td>
+                    <td className="py-1 pr-3 text-right tabular-nums">{fmtKg(c.kg)}</td>
+                    <td className="py-1 pr-3 text-right tabular-nums">{fmtKg(c.un ? c.kg / c.un : 0)}</td>
+                    <td className="py-1 text-right tabular-nums">{prazo.kg ? Math.round((c.kg / prazo.kg) * 100) : 0}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -347,6 +463,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                 <ThFiltro col="frente" label="Frente" className="px-3 py-2 font-semibold text-left" {...fp} />
                 <ThFiltro col="natureza" label="Tipo" className="px-3 py-2 font-semibold text-left" {...fp} />
                 <ThFiltro col="desenho" label="Desenho" className="px-3 py-2 font-semibold text-left" {...fp} />
+                <ThFiltro col="nc1" label="NC1" className="px-3 py-2 font-semibold text-left" {...fp} />
                 <ThFiltro col="perfil" label="Perfil" className="px-3 py-2 font-semibold text-left" {...fp} />
                 <th className="px-3 py-2 text-right font-semibold">Compr.</th>
                 <th className="px-3 py-2 text-right font-semibold">Qtd</th>
@@ -358,7 +475,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {!f.filtradas.length && (
-                <tr><td colSpan={12} className="px-3 py-8 text-center text-sm text-torg-gray">
+                <tr><td colSpan={13} className="px-3 py-8 text-center text-sm text-torg-gray">
                   {soAFazer ? "Nada a fazer com este filtro — tudo já foi cortado." : "Nada com este filtro."}
                 </td></tr>
               )}
@@ -390,6 +507,13 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                         ? <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 whitespace-nowrap" title={`o arquivo existe com outro nome: ${p.desenhoForaPadrao} — renomear resolve`}><FileWarning size={13} className="shrink-0" /> nome</span>
                         : <X size={14} className="text-red-500" title="Sem desenho em 2.5.2 Fabricação — não desce para o PCP" />}
                     </td>
+                    <td className="px-3 py-1.5">
+                      {p.temMaquina == null
+                        ? <Minus size={13} className="text-torg-gray-light" title="Esta conferência não mediu arquivo de máquina — reconfira" />
+                        : p.temMaquina
+                        ? <Check size={14} className="text-emerald-600" title="Arquivo de máquina (NC1/DXF) ou modelo 3D na pasta" />
+                        : <X size={14} className="text-red-500" title="Sem arquivo de máquina — a máquina não tem o que ler" />}
+                    </td>
                     <td className="px-3 py-1.5 text-[12px] text-torg-gray truncate max-w-[18ch]" title={p.perfil}>{p.perfil || "—"}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-torg-gray">{p.comprimentoMm ? fmtN(p.comprimentoMm) : "—"}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums text-[12px]">{fmtN(p.qte)}</td>
@@ -410,8 +534,9 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         {/* ⚠ coluna de ícone pede legenda: sem ela o ✓ e o ✕ viram adivinhação, e é justamente esta
             coluna que decide o que pode descer. */}
         <div className="px-3 py-2 border-t border-gray-100 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-torg-gray">
-          <span className="uppercase text-torg-gray-light">Desenho</span>
+          <span className="uppercase text-torg-gray-light">Desenho / NC1</span>
           <span className="inline-flex items-center gap-1"><Check size={13} className="text-emerald-600" /> tem — pode ser liberada</span>
+          <span className="text-torg-gray-light">Desenho = o que a bancada abre · NC1 = o que a máquina lê</span>
           <span className="inline-flex items-center gap-1"><X size={13} className="text-red-500" /> não tem</span>
           <span className="inline-flex items-center gap-1 text-amber-700"><FileWarning size={13} /> nome — existe com outro nome, é renomear</span>
           <span className="inline-flex items-center gap-1"><Minus size={13} className="text-torg-gray-light" /> sem conferência que valha</span>

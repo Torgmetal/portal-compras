@@ -6,7 +6,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { portaoDoDesenho, temDesenhoNaPasta } from "@/lib/pasta-engenharia";
+import { portaoDoDesenho, temDesenhoNaPasta, temMaquinaNaPasta } from "@/lib/pasta-engenharia";
 import { requireRole } from "@/lib/session";
 import { pecaCortada, poolDaPeca, POOLS } from "@/lib/liberacao-producao";
 
@@ -76,8 +76,10 @@ export async function GET(req) {
       // desenho na pasta 2.5.2 Fabricação — null = a obra nunca foi conferida
       temDesenho: temDesenhoNaPasta(portao, p.marca),
       desenhoForaPadrao: portao.foraPadrao.get(String(p.marca || "").trim().toUpperCase()) || null,
-      // desenhado, mas em 2.5.5 — some da fabricação: é mover arquivo, não desenhar
+      // desenhado, mas fora da fabricação — o dado fica, a tela não mostra
       desenhoSoEnvio: portao.soEnvio.has(String(p.marca || "").trim().toUpperCase()),
+      // ⚠ NC1/DXF/IGS: o que a MÁQUINA lê. Ter desenho não é ter arquivo de máquina.
+      temMaquina: temMaquinaNaPasta(portao, p.marca, false),
     };
   });
 
@@ -90,6 +92,7 @@ export async function GET(req) {
       marcasConferidas: portao.marcas || 0, marcasHoje: portao.marcasHoje || 0,
       veredito: portao.veredito, checadoEm: portao.checadoEm, erro: portao.erroPasta || null,
       semDesenho: pecas.filter((x) => x.temDesenho === false).length,
+      maquinaMedida: portao.maquinaMedida, semMaquina: pecas.filter((x) => x.temMaquina === false).length,
       soEnvio: pecas.filter((x) => x.desenhoSoEnvio).length,
     },
   });

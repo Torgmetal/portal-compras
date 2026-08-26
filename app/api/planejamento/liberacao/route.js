@@ -10,7 +10,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { frentesDaOp, desvioDoMarco, PRIORIDADES, SETORES_LIBERAVEIS } from "@/lib/liberacao-producao";
-import { FLUXO_SETORES } from "@/lib/prioridades-setor";
+import { FLUXO_SETORES, datasSetorDoCronograma } from "@/lib/prioridades-setor";
 import { portaoDoDesenho } from "@/lib/pasta-engenharia";
 
 export const runtime = "nodejs";
@@ -32,10 +32,17 @@ export async function GET(req) {
   const { temLpc, frentes } = await frentesDaOp(opId);
   // o marco vem das datas por setor da obra (semeadas do cronograma no "Gerar Datas")
   const sol = await prisma.solicitacaoProducao.findUnique({ where: { opNumero: op.numero }, select: { datasSetor: true } });
+  // ⚠ o marco sai do CRONOGRAMA (Vitor, 26/08/2026). A data digitada à mão vai junto porque é ela
+  // que manda na TV de Prioridades — some daqui e viraria regra invisível.
+  const crono = await prisma.cronograma.findFirst({
+    where: { opId, ativo: true },
+    select: { tarefas: { where: { isSummary: false }, select: { departamento: true, nome: true, dataFimPrevista: true } } },
+  }).catch(() => null);
 
   return NextResponse.json({
     op, temLpc, frentes,
     datasSetor: sol?.datasSetor || {},
+    datasSetorCrono: crono ? datasSetorDoCronograma(crono.tarefas) : {},
     setores: SETORES_LIBERAVEIS,
     prioridades: PRIORIDADES,
   });
@@ -114,9 +121,20 @@ export async function POST(req) {
     ? await prisma.pecaConjunto.findMany({ where: { id: { in: d.pecaIds }, opId: op.id }, select: { id: true, marca: true } })
     : await prisma.pecaConjunto.findMany({ where: { opId: op.id, fonte: "LPC_IMPORT", opNumero: d.frente }, select: { id: true, marca: true } });
 
+  // ⚠ DOIS ARQUIVOS, DOIS PORTÕES. Vitor (26/08/2026): "vamos colocar um status dos arquivos nc1
+  // ou igs (…) para poder garantir que todos os arquivos necessários estão prontos para liberar".
+  // O desenho é o que a bancada abre; o NC1 é o que a máquina lê. Medido: onde há desenho, o NC1
+  // acompanha (083 99%, 097 100%, 105 100%) — cobrar os dois não trava o que estava pronto.
+  //
+  // ⚠ SÓ COBRA NC1 DE CONFERÊNCIA QUE MEDIU ISSO. As varreduras anteriores a 26/08/2026 não
+  // guardavam arquivo de máquina; tratar "não medido" como "não tem" travaria a casa inteira até o
+  // cron passar.
   const barradas = new Map();
   for (const p of alvo) {
     const k = String(p.marca || "").trim().toUpperCase();
+    if (portao.maquinaMedida && portao.semMaquina.has(k) && !portao.semDesenho.has(k) && !barradas.has(k)) {
+      barradas.set(k, "sem NC1");
+    }
     if (portao.semDesenho.has(k) && !barradas.has(k)) {
       // ⚠ o motivo que aparece para quem lê é só o acionável. Vitor (26/08/2026): "o vinculo da
       // pasta 2.5.5 não precisa ser mencionado em nada só se eu pedir".
@@ -126,8 +144,8 @@ export async function POST(req) {
   if (barradas.size) {
     const amostra = [...barradas.entries()].slice(0, 8).map(([m, por]) => `${m} (${por})`);
     return NextResponse.json({
-      error: `${barradas.size} marca(s) desta liberação não têm desenho em 2.5.2 Fabricação: ${amostra.join(", ")}${barradas.size > 8 ? "…" : ""}. Só desce para o PCP o que tem projeto na pasta.`,
-      semDesenho: barradas.size,
+      error: `${barradas.size} marca(s) desta liberação não têm o arquivo pronto na pasta: ${amostra.join(", ")}${barradas.size > 8 ? "…" : ""}. Só desce para o PCP o que tem desenho e arquivo de máquina.`,
+      semArquivo: barradas.size,
       marcas: [...barradas.keys()],
       checadoEm: portao.checadoEm,
     }, { status: 400 });
