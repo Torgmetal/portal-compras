@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Package, ListOrdered, FileText, Truck, FolderKanban, Printer, Factory,
+  LayoutDashboard, Package, ListOrdered, FileText, Truck, FolderKanban, Printer, Factory, Gauge,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -23,6 +23,9 @@ const menu = [
   // Controle de liberação de desenhos: quem levou qual desenho, quando e com qual R carimbado.
   { href: "/pcp/grd",          label: "GRD",              icon: Printer },
   { href: "/pcp/fila-corte",   label: "Corte",            icon: ListOrdered },
+  // ⚠ o indicador ISO do setor mora no menu do setor, como nos outros — quem responde por ele é
+  // quem opera, não a Qualidade.
+  { href: "/pcp/indicadores",  label: "Indicadores",      icon: Gauge },
 ];
 
 // FORA DO MENU DO PCP (Vitor 26/08/2026) — as PÁGINAS continuam no ar, só saíram daqui:
