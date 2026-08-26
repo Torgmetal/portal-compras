@@ -16,9 +16,16 @@ const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 // classes por extenso: Tailwind não gera classe montada em runtime
 const EST = {
-  NA_OP:        { rot: "material da obra",  chip: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  NA_OP:        { rot: "material da obra",    chip: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   ESTOQUE:      { rot: "material de estoque", chip: "bg-amber-50 text-amber-700 border-amber-200" },
-  SEM_MATERIAL: { rot: "material não entrou", chip: "bg-red-100 text-red-800 border-red-200" },
+  SEM_MATERIAL: { rot: "sem material",        chip: "bg-red-100 text-red-800 border-red-200" },
+};
+// ⚠ FALTAR MATERIAL NÃO É UMA COISA SÓ — e a diferença é de quem é a bola. Vitor (25/08/2026):
+// "material aguardando entrega se já tiver pedido emitido, ou não comprado se não tiver nem RM".
+const FALTA = {
+  AGUARDANDO_ENTREGA: { rot: "aguardando entrega", chip: "bg-sky-50 text-sky-700 border-sky-200" },
+  SOLICITADO:         { rot: "solicitado, sem pedido", chip: "bg-amber-50 text-amber-700 border-amber-200" },
+  NAO_COMPRADO:       { rot: "não comprado", chip: "bg-red-100 text-red-800 border-red-200" },
 };
 
 export default function LiberacaoMaterial({ liberacaoId, opNumero, onImprimir }) {
@@ -70,7 +77,18 @@ export default function LiberacaoMaterial({ liberacaoId, opNumero, onImprimir })
         <span className="text-[11px] uppercase text-torg-gray-light">material</span>
         <span className="text-[12px] text-emerald-700"><b>{fmtN(r.naOp)}</b> da obra</span>
         {r.estoque > 0 && <span className="text-[12px] text-amber-700"><b>{fmtN(r.estoque)}</b> de estoque{r.estoqueSemR > 0 && <> · <b>{fmtN(r.estoqueSemR)}</b> esperando o R</>}</span>}
-        {r.semMaterial > 0 && <span className="text-[12px] text-red-700"><b>{fmtN(r.semMaterial)}</b> sem material ({fmtKg(r.kgSemMaterial)})</span>}
+        {r.semMaterial > 0 && (
+          <span className="text-[12px] text-red-700">
+            <b>{fmtN(r.semMaterial)}</b> sem material ({fmtKg(r.kgSemMaterial)})
+            {(r.aguardandoEntrega > 0 || r.solicitado > 0) && (
+              <span className="text-torg-gray font-normal">
+                {" — "}{[r.aguardandoEntrega && `${fmtN(r.aguardandoEntrega)} a caminho`,
+                         r.solicitado && `${fmtN(r.solicitado)} no Compras`,
+                         r.naoComprado && `${fmtN(r.naoComprado)} não comprado`].filter(Boolean).join(" · ")}
+              </span>
+            )}
+          </span>
+        )}
         <span className="ml-auto text-[12px] text-torg-dark"><b>{fmtN(r.liberaveis)}</b> de {fmtN(r.pecas)} liberáveis · {fmtKg(r.kgLiberavel)}</span>
       </div>
 
@@ -95,12 +113,27 @@ export default function LiberacaoMaterial({ liberacaoId, opNumero, onImprimir })
                   <td className="px-2.5 py-1.5 text-right tabular-nums text-torg-gray">{fmtN(pf.un)}</td>
                   <td className="px-2.5 py-1.5 text-right tabular-nums text-torg-gray">{fmtKg(pf.kg)}</td>
                   <td className="px-2.5 py-1.5">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${e.chip}`}>{e.rot}</span>
+                    {/* ⚠ no "sem material" o chip mostra o SUB-ESTADO: aguardando entrega é prazo do
+                        fornecedor, não comprado é o Compras. São donos diferentes. */}
+                    {pf.estado === "SEM_MATERIAL" && pf.falta ? (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${FALTA[pf.falta].chip}`}>{FALTA[pf.falta].rot}</span>
+                    ) : (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${e.chip}`}>{e.rot}</span>
+                    )}
                     {pf.descricaoCmr && <span className="block text-[10px] text-torg-gray-light truncate max-w-[30ch]" title={pf.descricaoCmr}>{pf.descricaoCmr}</span>}
+                    {pf.rm?.descricao && <span className="block text-[10px] text-torg-gray-light truncate max-w-[30ch]" title={pf.rm.descricao}>{pf.rm.descricao}</span>}
                   </td>
                   <td className="px-2.5 py-1.5">
                     {pf.estado === "SEM_MATERIAL" ? (
-                      <span className="text-[11px] text-red-700">não há entrada no CMR</span>
+                      pf.rm?.pedido ? (
+                        <span className="text-[11px] text-sky-700">
+                          pedido {pf.rm.pedido.numero || "—"}{pf.rm.pedido.fornecedor ? ` · ${String(pf.rm.pedido.fornecedor).slice(0, 22)}` : ""}
+                        </span>
+                      ) : pf.rm ? (
+                        <span className="text-[11px] text-amber-700">RM feita, pedido não emitido</span>
+                      ) : (
+                        <span className="text-[11px] text-red-700">sem RM e sem pedido</span>
+                      )
                     ) : pf.estado === "NA_OP" ? (
                       <span className="font-mono text-[11px] text-torg-gray">{(pf.rs || []).slice(0, 3).join(" ") || "—"}</span>
                     ) : pf.rInformado ? (
@@ -114,10 +147,18 @@ export default function LiberacaoMaterial({ liberacaoId, opNumero, onImprimir })
                         <button onClick={() => setEditando(null)} className="text-torg-gray text-[11px]">✕</button>
                       </span>
                     ) : (
+                      /* ⚠ "entrou na OP 079" não dizia nada. O que a pessoa precisa saber é: o aço
+                         EXISTE, a nota dele foi lançada em outra obra, e este é o R que sai da
+                         prateleira. Mostrar o R sugerido evita que ela vá procurar em outra tela. */
                       <button onClick={() => { setEditando(pf.perfil); setRDigitado((pf.rs || [])[0] || ""); }}
-                        className="text-[11px] text-torg-blue hover:underline">
+                        className="text-left text-[11px] text-torg-blue hover:underline">
                         informar o R usado
-                        {pf.opsDoMaterial?.length > 0 && <span className="text-torg-gray-light ml-1">(entrou na OP {pf.opsDoMaterial.slice(0, 2).join(", ")})</span>}
+                        {(pf.rs || [])[0] && (
+                          <span className="block text-[10px] text-torg-gray-light font-normal">
+                            sugerido: R <b className="font-mono">{pf.rs[0]}</b>
+                            {pf.opsDoMaterial?.length > 0 && <> — nota lançada na OP {pf.opsDoMaterial.slice(0, 2).join(", ")}</>}
+                          </span>
+                        )}
                       </button>
                     )}
                   </td>
@@ -134,10 +175,14 @@ export default function LiberacaoMaterial({ liberacaoId, opNumero, onImprimir })
            lançamento no CMR, e as duas coisas são de outra pessoa. */
         <p className="text-[12px] text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-start gap-2">
           <ShieldAlert size={15} className="mt-0.5 shrink-0" />
+          {/* ⚠ o bloqueio diz de QUEM é a bola: prazo de fornecedor, fila do Compras, ou ninguém
+              pediu. Sem isso o PCP vai cobrar quem não pode resolver. */}
           <span>
-            <b>{fmtN(r.semMaterial)} peça(s) não vão para a impressão</b> — o material delas não tem entrada
-            no CMR de obra nenhuma. Ou não foi comprado, ou chegou e não foi lançado. As outras{" "}
-            {fmtN(r.liberaveis)} seguem normalmente.
+            <b>{fmtN(r.semMaterial)} peça(s) não vão para a impressão.</b>{" "}
+            {r.aguardandoEntrega > 0 && <>{fmtN(r.aguardandoEntrega)} com <b>pedido emitido</b> — é prazo de entrega. </>}
+            {r.solicitado > 0 && <>{fmtN(r.solicitado)} com <b>RM feita e pedido não emitido</b> — está no Compras. </>}
+            {r.naoComprado > 0 && <>{fmtN(r.naoComprado)} <b>sem RM e sem pedido</b> — ninguém comprou ainda. </>}
+            As outras {fmtN(r.liberaveis)} seguem normalmente.
           </span>
         </p>
       )}
@@ -146,7 +191,8 @@ export default function LiberacaoMaterial({ liberacaoId, opNumero, onImprimir })
           <Boxes size={15} className="mt-0.5 shrink-0" />
           <span>
             <b>{fmtN(r.estoqueSemR)} peça(s) usam material de estoque</b> e ainda não têm o R informado.
-            O aço existe — entrou por outra obra. Informe qual R saiu da prateleira para elas irem junto.
+            O aço está no pátio — a nota dele foi lançada em outra obra, então o CMR desta não o
+            enxerga. Informe qual R saiu da prateleira: é o que amarra a peça ao certificado certo.
           </span>
         </p>
       )}
