@@ -906,8 +906,9 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
           <div className="flex items-start gap-2">
             <FolderTree size={15} className="mt-0.5 shrink-0" />
             <div className="flex-1">
-              <b>Pasta do dia montada em 2.5.2.4 (NC1 e IGS)</b> — NC1 das chapas e IGS dos perfis,
-              separados por tipo de perfil.
+              <b>Pasta do dia montada em 2.5.2.4</b> — o dia fica dentro da pasta do tipo:
+              <b> NC1/{"{dia}"}</b> para as chapas e <b>IGS/{"{dia}"}</b> para os perfis, separados por
+              tipo de perfil.
             </div>
             <button onClick={() => setPastas(null)} className="text-[11px] hover:underline">fechar</button>
           </div>
@@ -915,6 +916,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
             <p key={i} className={x.ok ? "" : "text-red-700"}>
               {x.ok
                 ? <>· <b>{fmtD(x.dia)}</b> — {fmtN(x.arquivos)} arquivo(s) em {fmtN(x.grupos.length)} pasta(s) de perfil
+                    {x.pastasDia?.length ? <span className="text-emerald-700"> ({x.pastasDia.join(" · ")})</span> : null}
                     {x.semArquivoTotal > 0 && <span className="text-amber-800"> · {fmtN(x.semArquivoTotal)} marca(s) sem arquivo de máquina: {x.semArquivo.slice(0, 6).map((m) => m.marca).join(", ")}{x.semArquivoTotal > 6 ? "…" : ""}</span>}</>
                 : <>· não consegui montar a pasta: {x.erro} — a liberação está gravada, dá para repetir depois.</>}
             </p>
