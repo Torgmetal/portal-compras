@@ -37,11 +37,16 @@ export async function GET(req) {
   if (!opNumero || !marca) return NextResponse.json({ error: "Informe opNumero e marca." }, { status: 400 });
 
   // Liberações GRD já registradas (independem do SharePoint responder).
-  const liberacoes = await prisma.grdLiberacao.findMany({
+  const liberacoes = (await prisma.grdLiberacao.findMany({
     where: { opNumero: String(opNumero).replace(/\D/g, "").padStart(3, "0"), marca },
     orderBy: { createdAt: "desc" },
-    select: { id: true, arquivo: true, formato: true, setor: true, liberadoPorNome: true, createdAt: true, impressoItemId: true, impressoes: true, ultimaImpressaoEm: true },
-  });
+    select: { id: true, arquivo: true, formato: true, setor: true, liberadoPorNome: true, createdAt: true, impressoItemId: true, impressoes: true, ultimaImpressaoEm: true, historico: true },
+  })).map((l) => ({
+    ...l,
+    // ⚠ do mais RECENTE para o mais antigo: quem abre quer ver a última cópia primeiro
+    copias: (Array.isArray(l.historico) ? l.historico : []).slice().reverse(),
+    historico: undefined,
+  }));
 
   let arquivos = [];
   let erroSp = null;
@@ -55,7 +60,14 @@ export async function GET(req) {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) throw new Error(`SharePoint HTTP ${res.status}`);
     const data = await res.json();
-    const pdfs = (data.value || []).filter((x) => x.file && /\.pdf$/i.test(x.name) && casaMarca(x.name, marca) && !/obsolet/i.test(x.name));
+    // ⚠⚠ O CARIMBADO NÃO É DESENHO PARA IMPRIMIR — é o RESULTADO de uma impressão. Vitor
+    // (26/08/2026) viu "105A-P34 - RASTREADO 26-08 17-38.pdf" listado com botão de imprimir do
+    // lado do croqui: imprimir aquilo criaria uma GRD de um arquivo que já É uma GRD, e a segunda
+    // via nasceria como liberação nova em vez de somar na existente. O emitido se abre pelo "ver
+    // emitido" da própria GRD, que é onde ele significa alguma coisa.
+    const ehCarimbado = (n) => /\bRASTREADO\b/i.test(n) || /^LOTE\s/i.test(n);
+    const pdfs = (data.value || []).filter((x) => x.file && /\.pdf$/i.test(x.name) && casaMarca(x.name, marca)
+      && !/obsolet/i.test(x.name) && !ehCarimbado(x.name));
 
     // formato = nome da pasta-mãe (A1..A4); croqui identifica pelo nome. Resolve o pai por id
     // (o search não devolve o path) e descarta o que estiver em OBSOLETOS.

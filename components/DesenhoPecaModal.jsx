@@ -118,16 +118,32 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, soImpri
           {liberacoes.length > 0 && (
             <div>
               <p className="text-[10px] uppercase font-semibold text-torg-gray tracking-wide mb-1">Impressões registradas (GRD)</p>
-              <div className="space-y-1">
+              {/* ⚠ CADA CÓPIA, UMA LINHA. Vitor (26/08/2026): "deixe a data, as horas e o usuarios
+                  que imprimiram". "2 impressões" não prova nada — quem tirou a 2ª via, quando e com
+                  qual R é o que a GRD existe para responder. Cópia sem histórico é impressão
+                  anterior a 26/08/2026, quando o registro por cópia passou a ser gravado. */}
+              <div className="space-y-2">
                 {liberacoes.map((l, i) => (
-                  <p key={i} className="text-[11px] text-torg-gray">
-                    <CheckCircle2 size={10} className="inline text-emerald-600 -mt-0.5" /> {l.arquivo}{l.formato ? ` · ${l.formato}` : ""}{l.setor ? ` · ${l.setor}` : ""} — {l.liberadoPorNome || "—"} em {fmtDataHora(l.createdAt)}
-                    {l.impressoes > 1 && <b className="text-torg-dark"> · {l.impressoes} impressões (última {fmtDataHora(l.ultimaImpressaoEm || l.createdAt)})</b>}
-                    {l.impressoItemId && (
-                      <button onClick={() => abrirItem(l.impressoItemId, `${marca} rastreado.pdf`)} title="Abrir o PDF carimbado que foi emitido (o mesmo do Data Book)"
-                        className="ml-1 text-torg-blue font-semibold hover:underline">ver emitido</button>
-                    )}
-                  </p>
+                  <div key={i} className="text-[11px] text-torg-gray">
+                    <p>
+                      <CheckCircle2 size={10} className="inline text-emerald-600 -mt-0.5" /> {l.arquivo}{l.formato ? ` · ${l.formato}` : ""}{l.setor ? ` · ${l.setor}` : ""}
+                      {" "}· <b className="text-torg-dark">{l.impressoes || 1} impressão(ões)</b>
+                      {l.impressoItemId && (
+                        <button onClick={() => abrirItem(l.impressoItemId, `${marca} rastreado.pdf`)} title="Abrir o PDF carimbado que foi emitido (o mesmo do Data Book)"
+                          className="ml-1 text-torg-blue font-semibold hover:underline">ver emitido</button>
+                      )}
+                    </p>
+                    <ul className="mt-0.5 ml-3 border-l border-gray-200 pl-2.5 space-y-0.5">
+                      {(l.copias?.length ? l.copias : [{ em: l.ultimaImpressaoEm || l.createdAt, por: l.liberadoPorNome, semRegistro: true }]).map((c, j) => (
+                        <li key={j} className="tabular-nums">
+                          <span className="font-semibold text-torg-dark">{(l.copias?.length ? l.copias.length - j : l.impressoes || 1)}ª</span>
+                          {" "}{fmtDataHora(c.em)} · {c.por || "—"}
+                          {c.rs?.length ? <span className="text-emerald-700 font-mono"> · R {c.rs.join(", ")}</span> : null}
+                          {c.semRegistro && l.impressoes > 1 && <span className="text-torg-gray-light"> · cópias anteriores a 26/08 não foram registradas uma a uma</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ))}
               </div>
             </div>
