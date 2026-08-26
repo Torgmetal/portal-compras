@@ -32,12 +32,21 @@ const PRIO = {
 // ⚠ SEM "ESTOQUE". Vitor (26/08/2026): "essa informação não mostrar mais, pois nesse caso não
 // sabemos quanto tem de estoque mesmo — sendo assim deixe apenas o filtro do aguardando entrega,
 // cotação ou não comprado". O que sobra é o estado da COMPRA, que é verificável.
+// ⚠⚠ OS NOMES ANTIGOS FICAM. A tela e a API sobem juntas, mas o navegador guarda o bundle: durante
+// a troca, uma página velha recebe valor novo (ou o contrário) e o código não reconhece nenhum dos
+// dois. Foi o que aconteceu em 26/08/2026 — o Z da OP-105 lia "✕ não tem" com o servidor mandando
+// ENTREGUE, porque a página em cache era de antes dos quatro estados.
 const MAT = {
   ENTREGUE:           { rot: "entregue",           dica: "recebido no CMR desta obra" },
+  NA_OP:              { rot: "entregue",           dica: "recebido no CMR desta obra" },
   AGUARDANDO_ENTREGA: { rot: "aguardando entrega", dica: "pedido emitido — o aço está a caminho" },
   SOLICITADO:         { rot: "cotação",            dica: "RM aberta, pedido ainda não emitido" },
   NAO_COMPRADO:       { rot: "não comprado",       dica: "sem RM para este perfil nesta obra" },
+  SEM_MATERIAL:       { rot: "não comprado",       dica: "sem entrada no CMR para este perfil" },
+  ESTOQUE:            { rot: "não comprado",       dica: "sem entrada no CMR desta obra" },
 };
+// ⚠ QUAL VALOR CONTA COMO ENTREGUE — inclui o nome antigo, pelo mesmo motivo acima.
+const MAT_OK = (v) => v === "ENTREGUE" || v === "NA_OP";
 
 const NAT = { croqui: "Croqui", avulsa: "Marca", conjunto: "Conjunto" };
 
@@ -48,7 +57,7 @@ const COLUNAS = [
   // é a célula.
   { key: "nc1",      label: "NC1",      valor: (p) => (p.temMaquina == null ? "não medido" : p.temMaquina ? "tem NC1" : "sem NC1") },
   { key: "material", label: "Material", valor: (p) => (!p.material ? "não medido"
-      : p.materialPorTroca ? "entregue (R amarrado)" : MAT[p.material]?.rot || p.material) },
+      : p.materialPorTroca ? "entregue (R amarrado)" : MAT[p.material]?.rot || "recarregue a página") },
   { key: "desenho",  label: "Desenho",  valor: (p) => (p.temDesenho == null ? "não conferido" : p.temDesenho ? "tem desenho"
       : p.desenhoForaPadrao ? "outro nome" : "sem desenho") },
   { key: "natureza", label: "Tipo",     valor: (p) => NAT[p.natureza] || p.natureza },
@@ -134,7 +143,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   // conta — "não sabemos quanto tem de estoque mesmo". Aguardando entrega, cotação e não comprado
   // não entram; o PCP segue podendo usar estoque e informar o R, que é a etapa dele.
   const liberavel = (p) => !!d?.pasta?.confiavel && p.temDesenho === true && p.temMaquina !== false
-    && p.material !== "AGUARDANDO_ENTREGA" && p.material !== "SOLICITADO" && p.material !== "NAO_COMPRADO"
+    && (!p.material || MAT_OK(p.material))
     && !p.programadaEm;
   const selecionaveis = useMemo(() => f.filtradas.filter(liberavel), [f.filtradas]);
   const selecionadas = useMemo(() => f.filtradas.filter((p) => sel.has(p.id)), [f.filtradas, sel]);
@@ -815,16 +824,21 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                         : <X size={14} className="text-red-500" title="Sem arquivo de máquina — a máquina não tem o que ler" />}
                     </td>
                     <td className="px-3 py-1.5 whitespace-nowrap">
+                      {/* ⚠ VALOR DESCONHECIDO NÃO VIRA ✕. Um ✕ vermelho é uma AFIRMAÇÃO: "não tem
+                          material". Quando a tela não reconhece o valor, ela não sabe — e dizer
+                          "não tem" por não saber foi exatamente o que fez o Z da OP-105 parecer sem
+                          aço. Agora aparece "?" pedindo recarga, que é o que o caso realmente é. */}
                       {!p.material ? <Minus size={13} className="text-torg-gray-light" title="Material não medido para esta peça" />
-                        : p.material === "ENTREGUE"
+                        : !MAT[p.material] ? <span className="text-[11px] text-torg-gray-light" title="Esta página está desatualizada em relação ao servidor — recarregue (Cmd+Shift+R)">?</span>
+                        : MAT_OK(p.material)
                         ? (p.materialPorTroca
                             ? <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 whitespace-nowrap"
                                 title={`Entrega amarrada à mão ao R ${p.materialPorTroca.r}${p.materialPorTroca.por ? ` por ${p.materialPorTroca.por}` : ""} — a descrição da compra não bate com a da LPC`}>
                                 <Check size={13} className="shrink-0" /> R {p.materialPorTroca.r}
                               </span>
                             : <Check size={14} className="text-emerald-600" title={MAT.ENTREGUE.dica} />)
-                        : <span className="inline-flex items-center gap-1 text-[11px] text-red-600 whitespace-nowrap" title={MAT[p.material]?.dica || ""}>
-                            <X size={13} className="shrink-0" /> {MAT[p.material]?.rot || "não tem"}
+                        : <span className="inline-flex items-center gap-1 text-[11px] text-red-600 whitespace-nowrap" title={MAT[p.material].dica}>
+                            <X size={13} className="shrink-0" /> {MAT[p.material].rot}
                           </span>}
                     </td>
                     <td className="px-3 py-1.5 text-[12px] text-torg-gray truncate max-w-[18ch]" title={p.perfil}>{p.perfil || "—"}</td>
