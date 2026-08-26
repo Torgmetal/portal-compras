@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, ShieldCheck, Clock, ExternalLink, FolderOpen, Paintbrush, FileSpreadsheet } from "lucide-react";
+import { Loader2, ShieldCheck, Clock, ExternalLink, FolderOpen, Paintbrush, FileSpreadsheet, ClipboardCheck, Check } from "lucide-react";
 import { TIPO_LABEL, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
 
 // ─── OS RELATÓRIOS DE INSPEÇÃO DESTA OBRA ─────────────────────────────────────
@@ -13,6 +13,24 @@ import { TIPO_LABEL, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
 // inspeção?". Quem abre a OP quer ver o que já foi aprovado e o que falta, sem
 // atravessar a fila de todas as obras.
 export default function AbaQualidade({ opNumero }) {
+  const [pit, setPit] = useState(null);
+  const [salvandoPit, setSalvandoPit] = useState(false);
+  useEffect(() => {
+    fetch(`/api/qualidade/pit/${encodeURIComponent(opNumero)}`, { cache: "no-store" })
+      .then((r) => r.json()).then((j) => { if (!j.error) setPit(j); }).catch(() => {});
+  }, [opNumero]);
+
+  async function salvarPadrao(padrao) {
+    setSalvandoPit(true);
+    try {
+      const r = await fetch(`/api/qualidade/pit/${encodeURIComponent(opNumero)}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ padrao, revisao: pit?.revisao || "0" }),
+      });
+      if (r.ok) setPit((p) => ({ ...p, padrao }));
+    } finally { setSalvandoPit(false); }
+  }
+
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
 
@@ -87,6 +105,50 @@ export default function AbaQualidade({ opNumero }) {
       {/* ⚠ O PLP MORA AQUI. Vitor (26/08/2026): "ele será gerado na aba da OP dentro da área da
           qualidade". É o lugar certo: o PLP é documento DA OBRA, não de um relatório de inspeção —
           ele existe antes da primeira inspeção e vale para todas elas. */}
+      {/* ⚠ O PIT NASCE COM A PROPOSTA, mas o padrão pode ser escolhido aqui — Vitor (26/08/2026):
+          "também pode ser selecionado na aba da qualidade, igual vamos fazer no PLP". */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <h4 className="text-sm font-semibold text-torg-dark flex items-center gap-2 mb-1">
+          <ClipboardCheck size={15} className="text-torg-blue" /> Plano de Inspeção e Testes (PIT)
+        </h4>
+        <p className="text-[12px] text-torg-gray mb-3">
+          Escolha o padrão da obra — ele define o que a Qualidade inspeciona, com que percentual e
+          contra qual norma. O documento sai no padrão Torg, com o campo de assinatura do
+          <b> inspetor do cliente</b>.
+        </p>
+        {!pit ? (
+          <p className="text-[12px] text-torg-gray inline-flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> carregando…</p>
+        ) : (
+          <>
+            <div className="grid sm:grid-cols-2 gap-2 mb-3">
+              {(pit.opcoes || []).map((o) => {
+                const on = pit.padrao === o.id;
+                return (
+                  <button key={o.id} onClick={() => salvarPadrao(o.id)} disabled={salvandoPit}
+                    className={`text-left border rounded-lg px-3 py-2 disabled:opacity-60 ${on ? "border-torg-blue bg-torg-blue/5" : "border-gray-200 hover:border-torg-blue-300"}`}>
+                    <span className="block text-[12px] font-semibold text-torg-dark">
+                      {on && <Check size={11} className="inline -mt-0.5 mr-1 text-torg-blue" />}{o.nome}
+                    </span>
+                    <span className="block text-[11px] text-torg-gray">{o.resumo}</span>
+                    <span className="block text-[10px] text-torg-gray-light mt-0.5">{o.itens} itens de inspeção</span>
+                  </button>
+                );
+              })}
+            </div>
+            {pit.padrao ? (
+              <a href={`/api/qualidade/pit/${encodeURIComponent(opNumero)}/excel`}
+                className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:opacity-90 inline-flex items-center gap-1.5">
+                <FileSpreadsheet size={13} /> Gerar PIT (Excel)
+              </a>
+            ) : (
+              // ⚠ sem padrão não se emite: um plano de inspeção que ninguém escolheu seria assinado
+              // pelo cliente como se fosse decisão nossa.
+              <p className="text-[12px] text-amber-700">Escolha um padrão acima para emitir o PIT.</p>
+            )}
+          </>
+        )}
+      </div>
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <h4 className="text-sm font-semibold text-torg-dark flex items-center gap-2 mb-1">
           <Paintbrush size={15} className="text-torg-blue" /> Plano de Pintura (PLP)

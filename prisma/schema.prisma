@@ -113,6 +113,13 @@ model OP {
   cliente              String
   obra                 String?
   refCliente           String?              // código/nº de referência da obra no cliente (aparece nos relatórios enviados)
+  // ⚠ O PADRÃO DE PIT DA OBRA. Vitor (26/08/2026): "o PIT é aquele documento que NASCE COM A
+  // PROPOSTA — vamos informar qual o padrão que vamos usar na criação da proposta e com isso você
+  // já vai puxar todas as informações"; e depois: "também pode ser selecionado na aba da qualidade,
+  // igual vamos fazer no PLP". Fica na OP porque é decisão DA OBRA, não de um documento: o PIT sai
+  // dele, e amanhã o Data Book e o escopo de inspeção também podem sair.
+  pitPadrao            String?              // PINTURA | GALVANIZACAO | GALV_PINTURA | SNQC | BASICO
+  pitRevisao           String?
   descricao            String?
   status               OPStatus             @default(ABERTA)
   createdById          String
