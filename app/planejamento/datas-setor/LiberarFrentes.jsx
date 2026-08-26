@@ -47,7 +47,8 @@ const COLUNAS = [
   // ⚠ o FILTRO fica por extenso (ninguém procura por um ícone numa lista de opções); quem encurta
   // é a célula.
   { key: "nc1",      label: "NC1",      valor: (p) => (p.temMaquina == null ? "não medido" : p.temMaquina ? "tem NC1" : "sem NC1") },
-  { key: "material", label: "Material", valor: (p) => (p.material ? MAT[p.material]?.rot || p.material : "não medido") },
+  { key: "material", label: "Material", valor: (p) => (!p.material ? "não medido"
+      : p.materialPorTroca ? "entregue (R amarrado)" : MAT[p.material]?.rot || p.material) },
   { key: "desenho",  label: "Desenho",  valor: (p) => (p.temDesenho == null ? "não conferido" : p.temDesenho ? "tem desenho"
       : p.desenhoForaPadrao ? "outro nome" : "sem desenho") },
   { key: "natureza", label: "Tipo",     valor: (p) => NAT[p.natureza] || p.natureza },
@@ -225,7 +226,8 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         { t: "Desenho", w: 22, v: (p) => (p.temDesenho == null ? "não conferido" : p.temDesenho ? "tem"
             : p.desenhoForaPadrao ? `outro nome: ${p.desenhoForaPadrao}` : "não tem") },
         { t: "NC1", w: 12, v: (p) => (p.temMaquina == null ? "não medido" : p.temMaquina ? "tem" : "não tem") },
-        { t: "Material", w: 20, v: (p) => (p.material ? MAT[p.material]?.rot || p.material : "não medido") },
+        { t: "Material", w: 22, v: (p) => (!p.material ? "não medido"
+            : p.materialPorTroca ? `entregue · R ${p.materialPorTroca.r} amarrado` : MAT[p.material]?.rot || p.material) },
         { t: "Perfil", w: 22, v: (p) => p.perfil || "" },
         { t: "Aço", w: 14, v: (p) => p.aco || "" },
         { t: "Compr. (mm)", w: 12, dir: "right", v: (p) => Math.round(p.comprimentoMm || 0) },
@@ -814,7 +816,13 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                     </td>
                     <td className="px-3 py-1.5 whitespace-nowrap">
                       {!p.material ? <Minus size={13} className="text-torg-gray-light" title="Material não medido para esta peça" />
-                        : p.material === "ENTREGUE" ? <Check size={14} className="text-emerald-600" title={MAT.ENTREGUE.dica} />
+                        : p.material === "ENTREGUE"
+                        ? (p.materialPorTroca
+                            ? <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 whitespace-nowrap"
+                                title={`Entrega amarrada à mão ao R ${p.materialPorTroca.r}${p.materialPorTroca.por ? ` por ${p.materialPorTroca.por}` : ""} — a descrição da compra não bate com a da LPC`}>
+                                <Check size={13} className="shrink-0" /> R {p.materialPorTroca.r}
+                              </span>
+                            : <Check size={14} className="text-emerald-600" title={MAT.ENTREGUE.dica} />)
                         : <span className="inline-flex items-center gap-1 text-[11px] text-red-600 whitespace-nowrap" title={MAT[p.material]?.dica || ""}>
                             <X size={13} className="shrink-0" /> {MAT[p.material]?.rot || "não tem"}
                           </span>}
@@ -854,6 +862,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         <div className="px-3 pb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-torg-gray">
           <span className="uppercase text-torg-gray-light">Material</span>
           <span className="inline-flex items-center gap-1"><Check size={13} className="text-emerald-600" /> entregue nesta obra (CMR)</span>
+          <span className="inline-flex items-center gap-1 text-emerald-700"><Check size={13} /> R nnn — entrega amarrada à mão a um R da obra</span>
           <span className="inline-flex items-center gap-1 text-red-600"><X size={13} /> aguardando entrega · cotação · não comprado</span>
           <span className="text-torg-gray-light">só programa o que já chegou</span>
           <span className="inline-flex items-center gap-1"><X size={13} className="text-red-500" /> não tem</span>
