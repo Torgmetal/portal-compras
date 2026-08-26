@@ -90,8 +90,17 @@ export async function GET(req) {
     : [];
   const info = new Map(ops.map((o) => [o.numero, o]));
   // Total de marcas da OP (denominador da cobertura de emissão: quantas já foram pro papel).
+  //
+  // ⚠⚠ MARCA É CONJUNTO + AVULSA, NÃO TUDO. Vitor (26/08/2026): "garanta que está importando as
+  // peças avulsa que vamos chamar de MARCA e os CONJUNTOS". O denominador contava a tabela inteira
+  // — croqui, item comprado e a linha da Lista de Expedição junto — e um denominador inflado faz a
+  // cobertura parecer pior do que é: a OP-105 mostrava 19 de 237 quando o universo real é bem menor.
   const totMarcas = nums.length
-    ? await prisma.pecaConjunto.groupBy({ by: ["opNumero"], where: { opNumero: { in: nums } }, _count: { _all: true } })
+    ? await prisma.pecaConjunto.groupBy({
+        by: ["opNumero"],
+        where: { opNumero: { in: nums }, tipoPeca: { not: "CROQUI" } },
+        _count: { _all: true },
+      })
     : [];
   const totPorOp = new Map(totMarcas.map((t) => [t.opNumero, t._count._all]));
 

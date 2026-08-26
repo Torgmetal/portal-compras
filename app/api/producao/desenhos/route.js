@@ -236,8 +236,27 @@ export async function POST(req) {
   // 3) amarra no Data Book: o MESMO arquivo carimbado vira documento da §02 (Desenhos as-built).
   //    Um documento por marca+arquivo — reemitir atualiza o ponteiro pro PDF mais novo, em vez de
   //    encher a seção com uma cópia por impressão (o histórico completo fica na GRD).
+  //
+  // ⚠⚠ CROQUI NÃO ENTRA NO DATA BOOK. Vitor (26/08/2026): "garanta que está importando as peças
+  // avulsa que vamos chamar de MARCA e os CONJUNTOS — sempre lembre-se disso".
+  //
+  // O Data Book é o documento do CLIENTE: ele registra o que foi entregue, e o que se entrega é o
+  // conjunto e a marca avulsa. O croqui é peça-componente — ele vira parte de um conjunto e não
+  // existe sozinho na obra. Amarrar croqui na §02 enchia a seção de desenho interno e afogava o
+  // que o cliente precisa achar (a OP-105 sozinha tem 103 croquis para 20 conjuntos).
+  //
+  // ⚠ A GRD CONTINUA REGISTRANDO O CROQUI. Imprimir croqui é liberação de fabricação e tem de ser
+  // controlado — o que muda é só o destino no Data Book. Controle interno e documento do cliente
+  // são coisas diferentes.
   let documentoId = null;
-  if (carimbado) {
+  let ehCroqui = false;
+  try {
+    if (opId) {
+      const pc = await prisma.pecaConjunto.findFirst({ where: { opId, marca }, select: { tipoPeca: true } });
+      ehCroqui = pc?.tipoPeca === "CROQUI";
+    }
+  } catch {}
+  if (carimbado && !ehCroqui) {
     try {
       const nomeDoc = `${marca} — ${body.arquivo.replace(/\.pdf$/i, "")} (rastreado)`;
       const existente = await prisma.documentoQualidade.findFirst({
@@ -283,6 +302,8 @@ export async function POST(req) {
 
   return NextResponse.json({
     ok: true, avisoCarimbo, acao: body.acao,
+    // ⚠ dizer que NÃO foi para o Data Book, e por quê — silêncio aqui viraria "sumiu"
+    dataBook: ehCroqui ? { entrou: false, motivo: "croqui não entra no Data Book — a §02 leva conjunto e marca avulsa" } : { entrou: !!documentoId },
     liberacao: reg && { arquivo: reg.arquivo, formato: reg.formato, setor: reg.setor, liberadoPorNome: reg.liberadoPorNome, createdAt: reg.createdAt, impressoItemId: reg.impressoItemId, impressoes: reg.impressoes, ultimaImpressaoEm: reg.ultimaImpressaoEm },
     // é ESTE arquivo que a pessoa abre/imprime — o mesmo que foi pro Data Book
     abrirItemId: carimbado?.id || body.itemId || null,
