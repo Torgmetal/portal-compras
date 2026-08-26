@@ -14,7 +14,7 @@
 // custa prazo). O marco é congelado na liberação — recalcular o cronograma depois não pode apagar
 // um desvio já medido.
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, AlertCircle, Send, Check, X, Flag, CalendarClock, Wand2, Star, RefreshCw } from "lucide-react";
+import { Loader2, AlertCircle, Send, Check, X, Flag, CalendarClock, Wand2, Star, RefreshCw, Minus, FileWarning } from "lucide-react";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
@@ -26,12 +26,16 @@ const PRIO = {
   MEDIA: { rot: "Média", chip: "bg-amber-50 text-amber-700 border-amber-200" },
   BAIXA: { rot: "Baixa", chip: "bg-gray-100 text-torg-gray border-gray-200" },
 };
-const NAT = { croqui: "Peça P", avulsa: "Avulsa", conjunto: "Conjunto" };
+// ⚠ o nome que a fábrica usa. Vitor (26/08/2026): croqui é croqui, e a avulsa é uma MARCA — "Peça
+// P" e "Avulsa" eram rótulo de tela, não a palavra de quem trabalha com a peça na mão.
+const NAT = { croqui: "Croqui", avulsa: "Marca", conjunto: "Conjunto" };
 
 const COLUNAS = [
   { key: "frente",   label: "Frente",   valor: (p) => p.frente || "—" },
   // ⚠ estar na LPC não é ter desenho — e é por esta coluna que dá para separar os dois.
-  { key: "desenho",  label: "Desenho",  valor: (p) => (p.temDesenho == null ? "não conferido" : p.temDesenho ? "na pasta"
+  // ⚠ o FILTRO fica por extenso (ninguém procura por um ícone numa lista de opções); quem encurta
+  // é a célula.
+  { key: "desenho",  label: "Desenho",  valor: (p) => (p.temDesenho == null ? "não conferido" : p.temDesenho ? "tem desenho"
       : p.desenhoForaPadrao ? "outro nome" : p.desenhoSoEnvio ? "só em 2.5.5" : "sem desenho") },
   { key: "natureza", label: "Tipo",     valor: (p) => NAT[p.natureza] || p.natureza },
   { key: "perfil",   label: "Perfil",   valor: (p) => p.perfil || "—" },
@@ -375,12 +379,15 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                     <td className="px-3 py-1.5 text-[12px] text-torg-gray">{p.frente}</td>
                     <td className="px-3 py-1.5 text-[12px] text-torg-gray">{NAT[p.natureza]}</td>
                     <td className="px-3 py-1.5 whitespace-nowrap">
-                      {!d?.pasta?.confiavel ? <span className="text-[11px] text-torg-gray-light" title="A conferência desta obra não vale — reconfira a pasta">não conferido</span>
-                        : p.temDesenho == null ? <span className="text-[11px] text-torg-gray-light" title="A pasta desta obra nunca foi conferida">não conferido</span>
-                        : p.temDesenho ? <span className="text-[11px] text-emerald-700">na pasta</span>
-                        : p.desenhoForaPadrao ? <span className="text-[11px] text-amber-700" title={`o arquivo existe com outro nome: ${p.desenhoForaPadrao} — renomear resolve`}>outro nome *</span>
-                        : p.desenhoSoEnvio ? <span className="text-[11px] text-amber-700" title="o desenho está em 2.5.5, a pasta de envio ao cliente — mover para 2.5.2 resolve">só em 2.5.5</span>
-                        : <span className="text-[11px] text-red-600">sem desenho</span>}
+                      {!d?.pasta?.confiavel || p.temDesenho == null
+                        ? <Minus size={13} className="text-torg-gray-light" title="A pasta desta obra não tem conferência que valha — reconfira" />
+                        : p.temDesenho
+                        ? <Check size={14} className="text-emerald-600" title="Desenho na pasta 2.5.2 Fabricação" />
+                        : p.desenhoForaPadrao
+                        ? <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 whitespace-nowrap" title={`o arquivo existe com outro nome: ${p.desenhoForaPadrao} — renomear resolve`}><FileWarning size={13} className="shrink-0" /> nome</span>
+                        : p.desenhoSoEnvio
+                        ? <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 whitespace-nowrap" title="o desenho está em 2.5.5, a pasta de envio ao cliente — mover para 2.5.2 resolve"><FileWarning size={13} className="shrink-0" /> 2.5.5</span>
+                        : <X size={14} className="text-red-500" title="Sem desenho em 2.5.2 Fabricação — não desce para o PCP" />}
                     </td>
                     <td className="px-3 py-1.5 text-[12px] text-torg-gray truncate max-w-[18ch]" title={p.perfil}>{p.perfil || "—"}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-torg-gray">{p.comprimentoMm ? fmtN(p.comprimentoMm) : "—"}</td>
@@ -399,11 +406,23 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
             </tbody>
           </table>
         </div>
+        {/* ⚠ coluna de ícone pede legenda: sem ela o ✓ e o ✕ viram adivinhação, e é justamente esta
+            coluna que decide o que pode descer. */}
+        <div className="px-3 py-2 border-t border-gray-100 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-torg-gray">
+          <span className="uppercase text-torg-gray-light">Desenho em 2.5.2</span>
+          <span className="inline-flex items-center gap-1"><Check size={13} className="text-emerald-600" /> tem — pode ser liberada</span>
+          <span className="inline-flex items-center gap-1"><X size={13} className="text-red-500" /> não tem</span>
+          <span className="inline-flex items-center gap-1 text-amber-700"><FileWarning size={13} /> nome — existe com outro nome, é renomear</span>
+          <span className="inline-flex items-center gap-1 text-amber-700"><FileWarning size={13} /> 2.5.5 — está na pasta de envio, é mover</span>
+          <span className="inline-flex items-center gap-1"><Minus size={13} className="text-torg-gray-light" /> sem conferência que valha</span>
+        </div>
+
         {f.filtradas.length > 1500 && (
           /* ⚠ corte declarado: lista silenciosamente truncada faria alguém liberar achando que viu tudo */
           <p className="px-3 py-2 text-[11px] text-amber-700 bg-amber-50 border-t border-amber-100">
             Mostrando 1.500 de {fmtN(f.filtradas.length)}. Use os filtros para chegar no que interessa — a
-            seleção e o "preencher o dia" consideram as {fmtN(f.filtradas.length)}.
+            seleção e o "preencher o dia" consideram as {fmtN(f.filtradas.length)} — sempre só as que
+            têm desenho.
           </p>
         )}
       </div>
