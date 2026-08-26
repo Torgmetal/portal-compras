@@ -191,6 +191,7 @@ model OP {
   pecasLote            PecaLote[]
   romaneiosPrevios     RomaneioPrevio[]
   pastaEngenharia      PastaEngenharia?
+  liberacoesProducao   LiberacaoProducao[]
 
   @@index([numero])
   @@index([status])
@@ -4861,4 +4862,47 @@ model PastaEngenharia {
   @@index([veredito])
   @@index([checadoEm])
   @@index([baixada])
+}
+
+// LIBERAÇÃO DE PRODUÇÃO — o Planejamento diz ao PCP o que desce, por FRENTE.
+//
+// Vitor (25/08/2026): "o planejamento cria a demanda para o pcp indicando as prioridades e fases
+// das obras... a data seria o marco para iniciar, mas podemos começar antes ou depois da data que
+// estava no cronograma e isso deve ser medido do porquê não foi iniciado naquela data".
+//
+// ⚠⚠ A DATA É MARCO, NÃO GATILHO. Se a data do cronograma liberasse sozinha, todo recálculo
+// jogaria obra na fábrica sem ninguém olhar — e ninguém saberia quem decidiu. Aqui alguém
+// confirma, e a diferença entre o marco e o dia em que confirmou fica gravada com o motivo. É o
+// desvio que vira medida; o botão sozinho não mede nada.
+//
+// ⚠ UMA LINHA POR FRENTE, não por OP. A frente é a fase (T83A, T83B…) e vive no `opNumero` da
+// peça. Liberar a obra inteira é o que faz o PCP abrir 1.330 itens e não saber por onde começar.
+model LiberacaoProducao {
+  id              String    @id @default(cuid())
+  opId            String
+  op              OP        @relation(fields: [opId], references: [id], onDelete: Cascade)
+  opNumero        String
+  frente          String // T83A, T67BT… ou o próprio número quando a LPC não separa
+  setores         Json      @default("[]") // ["CORTE","MONTAGEM"] — o que desce agora
+  prioridade      String    @default("MEDIA") // ALTA | MEDIA | BAIXA
+  // marco = a data por setor (semeada do cronograma). Guardada NO MOMENTO da liberação: se o
+  // cronograma for recalculado depois, o desvio medido não pode mudar retroativamente.
+  dataMarco       DateTime? @db.Date
+  desvioDias      Int? // liberadoEm − dataMarco, em dias corridos. Negativo = adiantou.
+  desvioMotivo    String?
+  liberadoEm      DateTime  @default(now())
+  liberadoPorId   String?
+  liberadoPorNome String?
+  observacao      String?
+  status          String    @default("LIBERADA") // LIBERADA | EM_PRODUCAO | CONCLUIDA | CANCELADA
+  concluidaEm     DateTime?
+  canceladaEm     DateTime?
+  canceladaMotivo String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([opId, frente])
+  @@index([status])
+  @@index([opNumero])
+  @@index([liberadoEm])
 }

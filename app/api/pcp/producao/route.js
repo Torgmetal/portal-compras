@@ -27,9 +27,17 @@ export const dynamic = "force-dynamic";
 
 const ROLES = ["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"];
 
-export async function GET() {
+export async function GET(req) {
   try { await requireRole(ROLES); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  // ⚠⚠ POR PADRÃO, SÓ O QUE O PLANEJAMENTO LIBEROU. Vitor (25/08/2026): "no painel do PCP o ideal
+  // seria não mostrar nenhuma obra por hora para não ficar confuso, e o planejamento cria a demanda
+  // para o pcp indicando as prioridades e fases das obras".
+  //
+  // Antes esta lista trazia TODA obra com cronograma ativo — 30 linhas, e escolher qual atacar
+  // virava conversa diária. `?todas=1` continua mostrando tudo, para quem precisa procurar.
+  const todas = new URL(req.url).searchParams.get("todas") === "1";
 
   const { porObra, now } = await carregarPrioridadesPorObra();
   if (!porObra.length) return NextResponse.json({ ops: [], geradoEm: new Date().toISOString() });
@@ -119,8 +127,35 @@ export async function GET() {
     };
   });
 
+  // ── a liberação do Planejamento ──────────────────────────────────────────────────────────
+  const libs = await prisma.liberacaoProducao.findMany({
+    where: { opId: { in: opIds }, status: { in: ["LIBERADA", "EM_PRODUCAO"] } },
+    orderBy: { liberadoEm: "asc" },
+  });
+  const porOpLib = new Map();
+  for (const l of libs) {
+    const g = porOpLib.get(l.opId) || [];
+    g.push({
+      id: l.id, frente: l.frente, setores: l.setores, prioridade: l.prioridade, status: l.status,
+      liberadoEm: l.liberadoEm.toISOString(), liberadoPorNome: l.liberadoPorNome,
+      dataMarco: l.dataMarco ? l.dataMarco.toISOString() : null,
+      desvioDias: l.desvioDias, desvioMotivo: l.desvioMotivo,
+    });
+    porOpLib.set(l.opId, g);
+  }
+  for (const o of ops) o.liberacoes = porOpLib.get(o.opId) || [];
+
+  const visiveis = todas ? ops : ops.filter((o) => o.liberacoes.length > 0);
+
+  const PRIO = { ALTA: 0, MEDIA: 1, BAIXA: 2 };
+  // ⚠ com liberação, a PRIORIDADE do Planejamento manda — é a decisão dele, e o PCP não deve
+  // reordenar por conta própria. Sem liberação (modo "todas"), vale a régua antiga da TV.
+  const prioDaOp = (o) => Math.min(...(o.liberacoes.length ? o.liberacoes.map((l) => PRIO[l.prioridade] ?? 1) : [9]));
+
   // Atrasada primeiro, depois entrega mais próxima, depois mais kg parado. Mesma régua da TV.
-  ops.sort((a, b) => {
+  visiveis.sort((a, b) => {
+    const pa = prioDaOp(a), pb = prioDaOp(b);
+    if (pa !== pb) return pa - pb;
     if ((b.atrasoDias > 0) !== (a.atrasoDias > 0)) return (b.atrasoDias > 0) - (a.atrasoDias > 0);
     if (a.atrasoDias !== b.atrasoDias) return b.atrasoDias - a.atrasoDias;
     if (a.entrega && b.entrega && a.entrega !== b.entrega) return new Date(a.entrega) - new Date(b.entrega);
@@ -128,5 +163,11 @@ export async function GET() {
     return b.kg.pendente - a.kg.pendente;
   });
 
-  return NextResponse.json({ ops, geradoEm: new Date().toISOString() });
+  return NextResponse.json({
+    ops: visiveis,
+    todas,
+    totalObras: ops.length,
+    liberadas: ops.filter((o) => o.liberacoes.length > 0).length,
+    geradoEm: new Date().toISOString(),
+  });
 }

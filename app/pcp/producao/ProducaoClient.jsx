@@ -137,6 +137,7 @@ const ALERTA = {
 export default function ProducaoClient() {
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [verTodas, setVerTodas] = useState(false);
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
   const [setorFiltro, setSetorFiltro] = useState("");
@@ -179,12 +180,15 @@ export default function ProducaoClient() {
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
     try {
-      const r = await fetch("/api/pcp/producao", { cache: "no-store" });
+      // ⚠ por padrão só o que o Planejamento LIBEROU. Vitor (25/08/2026): "no painel do PCP o ideal
+      // seria não mostrar nenhuma obra por hora para não ficar confuso". `todas` é a saída de
+      // emergência, não o normal.
+      const r = await fetch(`/api/pcp/producao${verTodas ? "?todas=1" : ""}`, { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao carregar");
       setDados(j);
     } catch (e) { setErro(e.message); } finally { setLoading(false); }
-  }, []);
+  }, [verTodas]);
   useEffect(() => { carregar(); }, [carregar]);
 
   const carregarDetalhe = useCallback(async (opId, setor) => {
@@ -536,8 +540,26 @@ export default function ProducaoClient() {
       ) : erro ? (
         <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center text-red-700 flex flex-col items-center gap-2"><AlertCircle size={26} /> {erro}</div>
       ) : !ops.length ? (
-        <div className="bg-white border border-gray-100 rounded-xl p-10 text-center text-torg-gray">
-          Nenhuma OP com fila{busca || setorFiltro ? " para este filtro" : ""}.
+        /* ⚠ VAZIO NÃO É ERRO — é o estado normal quando o Planejamento não liberou nada. O texto
+            precisa DIZER isso, senão a tela parece quebrada e alguém vai procurar a obra na mão. */
+        <div className="bg-white border border-gray-100 rounded-xl p-10 text-center">
+          {busca || setorFiltro ? (
+            <p className="text-torg-gray">Nenhuma OP com fila para este filtro.</p>
+          ) : verTodas ? (
+            <p className="text-torg-gray">Nenhuma OP com fila.</p>
+          ) : (
+            <>
+              <p className="text-torg-dark font-semibold mb-1">Nada liberado para produzir.</p>
+              <p className="text-[13px] text-torg-gray max-w-lg mx-auto">
+                A fila do PCP é montada pelo Planejamento, em <b>Datas por setor → Liberar para o PCP</b>,
+                por frente da obra e com prioridade.
+                {dados?.totalObras > 0 && <> Há {fmtN(dados.totalObras)} obra(s) com cronograma ativo esperando liberação.</>}
+              </p>
+              <button onClick={() => setVerTodas(true)} className="mt-3 text-[12px] text-torg-blue hover:underline">
+                ver todas as obras mesmo assim
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-2">
@@ -545,6 +567,19 @@ export default function ProducaoClient() {
             const open = aberta === o.opId;
             return (
               <div key={o.opId} className={`bg-white rounded-xl border shadow-[0_1px_3px_rgba(0,41,69,0.06)] overflow-hidden ${open ? "border-torg-blue-200" : "border-gray-100"}`}>
+                {/* ⚠ O QUE O PLANEJAMENTO LIBEROU, no topo do cartão. Sem isto o PCP vê a obra e não
+                    sabe QUAL frente foi mandada nem com que prioridade — que é a informação toda. */}
+                {o.liberacoes?.length > 0 && (
+                  <div className="px-4 pt-2.5 pb-1 flex flex-wrap items-center gap-1.5 border-b border-gray-50">
+                    {o.liberacoes.map((l) => (
+                      <span key={l.id} title={[`liberada por ${l.liberadoPorNome || "—"}`, l.desvioMotivo].filter(Boolean).join(" · ")}
+                        className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${l.prioridade === "ALTA" ? "bg-red-50 text-red-700 border-red-200" : l.prioridade === "BAIXA" ? "bg-gray-100 text-torg-gray border-gray-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+                        {l.frente} · {(l.setores || []).join(" ")}
+                        {l.desvioDias > 0 && <span className="ml-1 font-normal">{l.desvioDias}d após o marco</span>}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {/* ⚠ DIV, NÃO BUTTON. A linha carrega o CompraChip, que é um botão com modal
                     próprio — botão dentro de botão é HTML inválido e o React avisa em cada
                     render. O chevron é o botão de verdade (é por ele que o teclado abre a OP);

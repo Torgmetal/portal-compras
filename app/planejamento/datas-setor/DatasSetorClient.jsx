@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { CalendarClock, Loader2, AlertCircle, RefreshCw, Check, Wand2 } from "lucide-react";
+import { CalendarClock, Loader2, AlertCircle, RefreshCw, Check, Wand2, Send } from "lucide-react";
+import LiberarFrentes from "./LiberarFrentes";
 
 const fmtDia = (d) => (d ? new Date(d + "T12:00:00Z").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—");
 
@@ -106,6 +107,20 @@ export default function DatasSetorClient() {
                     {salvando ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Salvar datas
                   </button>
                   {salvo && <span className="text-sm text-emerald-600 inline-flex items-center gap-1"><Check size={15} /> salvo — já vale na TV</span>}
+                </div>
+
+                {/* ── liberar para o PCP, por frente ── */}
+                {/* ⚠ a data acima é MARCO, não gatilho: quem libera é alguém, aqui, e o desvio
+                    entre o marco e o dia da liberação fica gravado com o motivo. */}
+                <div className="mt-6 pt-5 border-t border-gray-100">
+                  <div className="flex items-baseline justify-between gap-3 mb-3 flex-wrap">
+                    <h3 className="font-bold text-torg-dark inline-flex items-center gap-2"><Send size={16} className="text-torg-blue" /> Liberar para o PCP</h3>
+                    <p className="text-[12px] text-torg-gray">
+                      As datas acima são o <b>marco</b> de início. Liberar é decisão — pode ser antes ou
+                      depois, e o desvio fica registrado.
+                    </p>
+                  </div>
+                  <LiberarFrentes opId={op.opId} opNumero={op.opNumero} onMudou={carregar} />
                 </div>
               </>
             )}
