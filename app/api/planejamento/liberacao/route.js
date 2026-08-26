@@ -48,6 +48,11 @@ const schemaPost = z.object({
   dataMarco: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   desvioMotivo: z.string().max(400).nullable().optional(),
   observacao: z.string().max(400).nullable().optional(),
+  // ⚠ as peças escolhidas. Vazio = a frente inteira (como era antes desta coluna existir).
+  pecaIds: z.array(z.string().min(1)).max(12000).optional(),
+  metaKg: z.number().nullable().optional(),
+  totalKg: z.number().nullable().optional(),
+  totalPecas: z.number().int().nullable().optional(),
 });
 
 export async function POST(req) {
@@ -67,7 +72,9 @@ export async function POST(req) {
   // imprimir nem o que baixar, e a "liberação" seria uma linha que não vira trabalho.
   const { temLpc, frentes } = await frentesDaOp(d.opId);
   if (!temLpc) return NextResponse.json({ error: `A ${op.numero} não tem LPC importada. Sem a lista não há o que liberar.` }, { status: 400 });
-  if (!frentes.some((f) => f.frente === d.frente)) {
+  // ⚠ a frente só é validada quando a liberação é da frente INTEIRA. Com peças escolhidas a mão, a
+  // seleção pode cruzar frentes — e aí o rótulo é "N frentes", que não existe na LPC de propósito.
+  if (!d.pecaIds?.length && !frentes.some((f) => f.frente === d.frente)) {
     return NextResponse.json({ error: `A frente "${d.frente}" não existe na LPC desta obra.` }, { status: 400 });
   }
 
@@ -88,6 +95,8 @@ export async function POST(req) {
     opNumero: op.numero, frente: d.frente, setores: d.setores, prioridade: d.prioridade,
     dataMarco: marco, desvioDias: desvio, desvioMotivo: (d.desvioMotivo || "").trim() || null,
     observacao: (d.observacao || "").trim() || null,
+    pecaIds: d.pecaIds?.length ? d.pecaIds : null,
+    metaKg: d.metaKg ?? null, totalKg: d.totalKg ?? null, totalPecas: d.totalPecas ?? null,
     liberadoEm: agora, liberadoPorId: user?.id || null, liberadoPorNome: user?.name || user?.email || null,
     status: "LIBERADA", canceladaEm: null, canceladaMotivo: null,
   };
@@ -99,7 +108,8 @@ export async function POST(req) {
 
   await prisma.auditLog.create({
     data: { userId: user?.id || null, action: "LIBERAR_PRODUCAO", entity: "LiberacaoProducao", entityId: lib.id,
-      diff: { op: op.numero, frente: d.frente, setores: d.setores, prioridade: d.prioridade, desvioDias: desvio, motivo: dados.desvioMotivo } },
+      diff: { op: op.numero, frente: d.frente, setores: d.setores, prioridade: d.prioridade,
+              desvioDias: desvio, motivo: dados.desvioMotivo, pecas: d.pecaIds?.length || null, totalKg: d.totalKg } },
   }).catch(() => {});
 
   return NextResponse.json({ ok: true, liberacao: lib });

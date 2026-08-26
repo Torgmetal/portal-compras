@@ -4894,6 +4894,14 @@ model LiberacaoProducao {
   liberadoPorId   String?
   liberadoPorNome String?
   observacao      String?
+  // ⚠ AS PEÇAS ESCOLHIDAS, não a frente inteira. Vitor (25/08/2026): "já deveria trazer uma pré
+  // seleção para cumprir a meta diária de acordo com a obra". Liberar a frente toda devolve o
+  // problema que a lista por OP tinha: o PCP recebe 6.653 peças e não sabe o que é do dia.
+  // Vazio = a frente inteira (compatível com as liberações feitas antes desta coluna existir).
+  pecaIds         Json?
+  metaKg          Float? // a meta do dia com que a seleção foi montada — para medir depois
+  totalKg         Float?
+  totalPecas      Int?
   status          String    @default("LIBERADA") // LIBERADA | EM_PRODUCAO | CONCLUIDA | CANCELADA
   concluidaEm     DateTime?
   canceladaEm     DateTime?
