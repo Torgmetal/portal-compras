@@ -22,7 +22,7 @@ export default function GrdClient() {
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
   const [aberta, setAberta] = useState(null); // opNumero expandida
-  const [detalhe, setDetalhe] = useState({}); // opNumero → { linhas, cobertura, op }
+  const [detalhe, setDetalhe] = useState({}); // opNumero → { linhas, op }
   const [carregando, setCarregando] = useState("");
   // Desenho aberto a partir da GRD: quando uma marca dá problema, é daqui que se abre pra ver
   // do que se trata (croqui ou conjunto). (Vitor 19/08.)
@@ -235,7 +235,6 @@ function Kpi({ rot, val }) {
 }
 
 function Detalhe({ det, abrirPdf, onVerDesenho }) {
-  const c = det.cobertura;
   const [q, setQ] = useState("");
   const linhas = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -244,22 +243,6 @@ function Detalhe({ det, abrirPdf, onVerDesenho }) {
   const verDesenho = (l) => onVerDesenho({ opNumero: det.op.numero, opId: det.op.id || null, marca: l.marca, setor: l.setor || null });
   return (
     <div className="space-y-3">
-      {/* Cobertura de rastreabilidade das PEÇAS da OP — o quadro geral, além do que já foi impresso */}
-      {c && (
-        <div className="flex items-center gap-2 flex-wrap text-[11px]">
-          <span className="text-torg-gray font-semibold uppercase tracking-wide text-[10px]">Rastreabilidade das peças da OP:</span>
-          <Pill cor="emerald" n={c.definido} txt="R definido" dica={`${c.porFifo} atribuídos por FIFO (entrega mais antiga disponível no corte)`} />
-          <Pill cor="slate" n={c.aguardandoCorte} txt="aguarda corte" dica="O R só é atribuído quando a peça é cortada." />
-          {c.estoque > 0 && <Pill cor="amber" n={c.estoque} txt="de estoque" dica="Cortada antes de qualquer entrega desta OP." />}
-          {c.semMaterial > 0 && <Pill cor="slate" n={c.semMaterial} txt="sem material no CMR" dica="Nenhuma entrada desse perfil no CMR desta OP." />}
-          {c.semCorridaNoCmr > 0 && (
-            <span className="text-amber-700 inline-flex items-center gap-1" title="O R existe, mas o CMR está sem a corrida — dá pra achar pelo R e completar no Almoxarifado.">
-              <AlertTriangle size={11} /> {fmtN(c.semCorridaNoCmr)} com o R sem corrida lançada
-            </span>
-          )}
-        </div>
-      )}
-
       {det.linhas.length > 8 && (
         <div className="relative max-w-sm">
           <Search size={13} className="absolute left-2.5 top-2 text-torg-gray" />
@@ -335,9 +318,4 @@ function Detalhe({ det, abrirPdf, onVerDesenho }) {
       )}
     </div>
   );
-}
-
-function Pill({ cor, n, txt, dica }) {
-  const cls = { emerald: "bg-emerald-50 text-emerald-700", amber: "bg-amber-50 text-amber-700", slate: "bg-slate-100 text-slate-600" }[cor] || "bg-slate-100 text-slate-600";
-  return <span className={`rounded px-1.5 py-0.5 font-semibold ${cls}`} title={dica}>{fmtN(n)} {txt}</span>;
 }

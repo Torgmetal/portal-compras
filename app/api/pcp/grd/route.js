@@ -1,6 +1,6 @@
 // GRD — Controle de liberação de desenhos (guia de remessa de documentos).
 // GET                → todas as OPs que já tiveram desenho emitido/impresso, com o resumo.
-// GET ?opNumero=097  → as liberações daquela OP + a cobertura de rastreabilidade das peças.
+// GET ?opNumero=097  → as liberações daquela OP (o que já foi impresso, com o R do papel).
 //
 // A GRD nasce quando o desenho é IMPRESSO (emitir/abrir não é liberação) e a reimpressão soma
 // no contador da mesma linha. Cada linha guarda o SNAPSHOT do R que estava carimbado no papel
@@ -8,7 +8,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { rastreioDaOp } from "@/lib/rastreio-peca";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,14 +49,15 @@ export async function GET(req) {
       },
     });
     // Cobertura de rastreabilidade das PEÇAS da OP (o quadro geral, além do que já foi impresso).
-    let cobertura = null;
-    try { if (op?.id) cobertura = (await rastreioDaOp(op.numero, op.id)).resumo; } catch {}
+    // ⚠ A COBERTURA SAIU DE VEZ, não só da tela. Vitor (26/08/2026): "não precisa dessa
+    // informação". Ela contava o estado de rastreio de TODAS as peças da OP — uma pergunta da
+    // Qualidade, não da GRD, que é sobre o que foi impresso. E era cara: `rastreioDaOp` varre a
+    // obra inteira a cada abertura. Deixar de mostrar e continuar calculando seria o pior dos dois.
 
     return NextResponse.json({
       // opId vai junto: a tela abre o modal de desenhos da marca direto daqui (Vitor 19/08 —
       // "preciso entender os que der problema e abrir ele para saber do que se trata").
       op: op ? { id: op.id, numero: op.numero, obra: op.obra, cliente: op.cliente } : { numero: num },
-      cobertura,
       // ⚠ o histórico vai do mais RECENTE para o mais antigo: quem abre a GRD quer a última cópia
       linhas: linhas.map((l) => ({
         ...l, resumoR: resumoRastreio(l.rastreio), rastreio: undefined,
