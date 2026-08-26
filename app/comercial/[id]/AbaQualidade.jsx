@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, ShieldCheck, Clock, ExternalLink, FolderOpen } from "lucide-react";
+import { Loader2, ShieldCheck, Clock, ExternalLink, FolderOpen, Paintbrush, FileSpreadsheet } from "lucide-react";
 import { TIPO_LABEL, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
 
 // ─── OS RELATÓRIOS DE INSPEÇÃO DESTA OBRA ─────────────────────────────────────
@@ -84,6 +84,31 @@ export default function AbaQualidade({ opNumero }) {
 
   return (
     <div className="space-y-4">
+      {/* ⚠ O PLP MORA AQUI. Vitor (26/08/2026): "ele será gerado na aba da OP dentro da área da
+          qualidade". É o lugar certo: o PLP é documento DA OBRA, não de um relatório de inspeção —
+          ele existe antes da primeira inspeção e vale para todas elas. */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <h4 className="text-sm font-semibold text-torg-dark flex items-center gap-2 mb-1">
+          <Paintbrush size={15} className="text-torg-blue" /> Plano de Pintura (PLP)
+        </h4>
+        <p className="text-[12px] text-torg-gray mb-3">
+          Sai no padrão Torg, em três folhas, com os campos de assinatura em branco para a aprovação
+          e a fiscalização do cliente assinarem no papel impresso. Obra, cliente, local, Nº PC/CT e
+          referência do cliente vêm do portal; o sistema de pintura e as cores por item vêm do PLP
+          cadastrado na Qualidade.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <a href={`/api/qualidade/plp/${encodeURIComponent(opNumero)}/excel`}
+            title="Gera o PLP desta obra no padrão Torg, em Excel"
+            className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:opacity-90 inline-flex items-center gap-1.5">
+            <FileSpreadsheet size={13} /> Gerar PLP (Excel)
+          </a>
+          <Link href="/qualidade/inspecoes" className="text-[11px] text-torg-blue hover:underline">
+            editar o plano de pintura da obra
+          </Link>
+        </div>
+      </div>
+
       <Bloco titulo="Relatórios aprovados" icone={ShieldCheck} cor="text-emerald-700" lista={aprovados}
         vazio="Nenhum relatório aprovado nesta obra ainda." />
       <Bloco titulo="Aguardando aprovação" icone={Clock} cor="text-torg-dark" lista={pendentes}
