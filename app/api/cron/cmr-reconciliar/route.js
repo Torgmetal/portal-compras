@@ -32,13 +32,49 @@ export async function GET(req) {
         select: { importRef: true, nome: true, norma: true, opNumero: true, numeroCorrida: true, numeroDocumento: true, fornecedor: true, pedidoCompra: true, nfNumero: true, dataRecebimento: true, pesoKg: true, quantidade: true, observacao: true },
       }),
     ]);
-    const dbSet = new Set(dbRows.map((r) => so(r.importRef)));
+    const porR = new Map(dbRows.map((r) => [so(r.importRef), r]));
     const sheetSet = new Set(sheet.map((r) => so(r.indiceR)).filter(Boolean));
-    const doExcel = sheet.filter((r) => r.indiceR && !dbSet.has(r.indiceR));
+    const doExcel = sheet.filter((r) => r.indiceR && !porR.has(so(r.indiceR)));
     const doPortal = dbRows.filter((r) => !sheetSet.has(so(r.importRef)));
+
+    // ⚠⚠ O R QUE JÁ EXISTIA NUNCA MAIS ERA LIDO — e era esse o furo. Vitor (26/08/2026): "alguns R
+    // da planilha ja foram preenchidos e não está puxando".
+    //
+    // O almoxarifado NUMERA O R ANTES DE RECEBER: a linha nasce na planilha só com o índice. O cron
+    // importava essa casca, e quando a linha era preenchida de verdade o R já constava no portal —
+    // `!dbSet.has(...)` deixava a linha de fora para sempre. Medido: 33 R preenchidos na planilha e
+    // vazios aqui, em 8 obras (083, 085, 094, 0102, 0105, 0112, 0113, 0115). Para o Planejamento
+    // isso lia como "material não comprado" no aço que estava no pátio com certificado.
+    //
+    // ⚠ SÓ PREENCHE O QUE ESTÁ VAZIO AQUI. A planilha não sobrescreve o que alguém digitou no
+    // portal: se o campo tem valor dos dois lados e diferem, quem manda é o portal (é a tela onde a
+    // pessoa vê o que está fazendo). O que a planilha faz é COMPLETAR a casca.
+    const VAZIO_NOME = (v) => !so(v) || so(v) === "(sem descrição)";
+    const CAMPOS = ["nome", "norma", "opNumero", "numeroCorrida", "numeroDocumento", "fornecedor",
+                    "pedidoCompra", "nfNumero", "dataRecebimento", "pesoKg", "quantidade"];
+    let completados = 0;
+    for (const r of sheet) {
+      const atual = porR.get(so(r.indiceR));
+      if (!atual || !so(r.descricao)) continue;
+      const d = mapearLancamento(r, r.indiceR, null);
+      const patch = {};
+      for (const c of CAMPOS) {
+        const novo = d[c];
+        const velho = atual[c];
+        const velhoVazio = c === "nome" ? VAZIO_NOME(velho) : velho == null || so(velho) === "";
+        if (velhoVazio && novo != null && so(novo) !== "") patch[c] = novo;
+      }
+      if (!Object.keys(patch).length) continue;
+      // ⚠ updateMany porque `importRef` NÃO é único no schema — só indexado. Um `update` por chave
+      // composta nem existe aqui, e a planilha pode ter o mesmo R em duas linhas.
+      try { const u = await prisma.documentoQualidade.updateMany({ where: { categoria: CMR_CAT, importRef: so(r.indiceR) }, data: patch }); completados += u.count ? 1 : 0; } catch {}
+    }
 
     let importados = 0;
     for (const r of doExcel) {
+      // ⚠ casca sem descrição não vira registro: é R reservado, ainda sem material. Criar aqui só
+      // recriaria o problema acima — e um R sem descrição não casa com perfil nenhum.
+      if (!so(r.descricao)) continue;
       try { const d = mapearLancamento(r, r.indiceR, null); d.origem = "planilha_sharepoint"; await prisma.documentoQualidade.create({ data: d }); importados++; } catch {}
     }
     await aprenderReferencias(doExcel).catch(() => {});
@@ -49,8 +85,8 @@ export async function GET(req) {
       try { const rr = await appendLinhasCmr(ano, linhas); enviados = rr.anexadas || 0; } catch {}
     }
 
-    await registrarExecucao("cmr-reconciliar", { ok: true, duracaoMs: Date.now() - t0, mensagem: `Excel→portal ${importados} · portal→Excel ${enviados}` });
-    return NextResponse.json({ ok: true, ano, importados, enviados });
+    await registrarExecucao("cmr-reconciliar", { ok: true, duracaoMs: Date.now() - t0, mensagem: `Excel→portal ${importados} novo(s) · ${completados} completado(s) · portal→Excel ${enviados}` });
+    return NextResponse.json({ ok: true, ano, importados, completados, enviados });
   } catch (e) {
     console.error("[cron cmr-reconciliar] erro:", e?.message);
     await registrarExecucao("cmr-reconciliar", { ok: false, mensagem: e?.message, duracaoMs: Date.now() - t0 });
