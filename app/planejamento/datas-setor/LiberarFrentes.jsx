@@ -195,47 +195,70 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   // ⚠ EXPORTA O QUE ESTÁ NA TELA, não a lista bruta: sai com os filtros aplicados e na ordem que a
   // pessoa deixou. Planilha que ignora o filtro obriga a filtrar tudo de novo no Excel.
   // ⚠ E SAI INTEIRA — a tabela mostra no máximo 1.500 linhas, a planilha leva as {f.filtradas}.
+  // ⚠ EXPORTA A SELEÇÃO; SEM SELEÇÃO, A LISTA. Vitor (26/08/2026): "no botão da planilha extrair
+  // apenas as peças selecionadas, no caso se não estiver nada selecionada ai sim extrair a lista
+  // toda". É o mesmo `escopo` da previsão de prazo — planilha e previsão têm que falar do mesmo
+  // conjunto, senão uma diz 3 dias e a outra lista peça que não estava na conta.
+  //
+  // ⚠ E SAI INTEIRA: a tabela mostra no máximo 1.500 linhas; a planilha leva o escopo todo.
   async function exportar() {
-    if (!f.filtradas.length) return;
+    if (!escopo.length) return;
+    const daSelecao = selecionadas.length > 0;
     setBaixando(true); setErro("");
     try {
       const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarRodapeISO, downloadWorkbook } =
         await import("@/lib/excel-relatorio");
-      const cab = ["Marca", "Frente", "Tipo", "Desenho", "NC1", "Material", "Perfil", "Aço", "Compr. (mm)",
-        "Qtd", "Peso (kg)", "Classe", "kg/m", "Máquina", "Situação", "Prioridade", "Selecionada"];
+
+      // ⚠ UMA LISTA SÓ define cabeçalho, largura e valor. Manter três arrays em paralelo é como o
+      // cabeçalho acaba uma coluna fora do dado — e numa planilha isso não aparece, só engana.
+      const COLS = [
+        { t: "Marca", w: 16, v: (p) => p.marca },
+        { t: "Frente", w: 10, v: (p) => p.frente },
+        { t: "Tipo", w: 10, v: (p) => NAT[p.natureza] || p.natureza },
+        // ⚠ na planilha vai por extenso: ✓/✕ é atalho de tela, e ninguém filtra Excel por ícone.
+        { t: "Desenho", w: 22, v: (p) => (p.temDesenho == null ? "não conferido" : p.temDesenho ? "tem"
+            : p.desenhoForaPadrao ? `outro nome: ${p.desenhoForaPadrao}` : "não tem") },
+        { t: "NC1", w: 12, v: (p) => (p.temMaquina == null ? "não medido" : p.temMaquina ? "tem" : "não tem") },
+        { t: "Material", w: 20, v: (p) => (!p.material ? "não medido"
+            : p.material === "SEM_MATERIAL" ? (MAT_FALTA[p.materialFalta] || "não chegou") : MAT[p.material]?.rot || p.material) },
+        { t: "Perfil", w: 22, v: (p) => p.perfil || "" },
+        { t: "Aço", w: 14, v: (p) => p.aco || "" },
+        { t: "Compr. (mm)", w: 12, dir: "right", v: (p) => Math.round(p.comprimentoMm || 0) },
+        { t: "Qtd", w: 7, dir: "right", v: (p) => p.qte || 0 },
+        { t: "Peso (kg)", w: 11, dir: "right", v: (p) => Math.round(p.pesoTotalKg || 0) },
+        { t: "Classe", w: 14, v: (p) => classeDaPeca(p)?.nome || "" },
+        { t: "kg/m", w: 8, dir: "right", v: (p) => Number(kgPorMetro(p).toFixed(1)) },
+        { t: "Máquina", w: 10, v: (p) => (p.pool === "CHAPAS" ? "chapa" : "perfil") },
+        { t: "Situação", w: 16, v: (p) => (p.cortada ? "já cortada"
+            : p.programadaEm ? (p.programadaEm === "sem data" ? "programada" : `programada ${fmtD(p.programadaEm)}`) : "a fazer") },
+        { t: "Prioridade", w: 11, v: (p) => (p.prioridade != null ? "sim" : "") },
+        // ⚠ a coluna "Selecionada" só faz sentido na lista inteira — na planilha da seleção ela
+        // seria uma coluna inteira de "sim".
+        ...(daSelecao ? [] : [{ t: "Selecionada", w: 12, v: (p) => (sel.has(p.id) ? "sim" : "") }]),
+      ];
+      const alinhamento = Object.fromEntries(COLS.map((c, i) => [i, c.dir]).filter(([, d]) => d));
+
       const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
         titulo: `Lista de preparação — OP-${opNumero}`,
         subtitulo: [
-          selecionadas.length ? `${fmtN(somaSel.n)} peça(s) selecionada(s)` : "Lista completa",
+          daSelecao ? `Seleção: ${fmtN(somaSel.n)} peça(s)` : "Lista completa",
           f.ativos ? `Filtro: ${f.rotulosAtivos.join(", ")}` : soAFazer ? "Só as a fazer" : "Todas",
+          dia ? `Dia ${fmtD(dia)}` : "",
           prazo.diasCheios ? `Previsão ${fmtN(prazo.diasCheios)} dia(s) na meta de ${fmtN(Number(metaKg) || 0)} kg/dia` : "",
         ].filter(Boolean).join(" · "),
         kpis: [`${fmtN(prazo.un)} peça(s)`, fmtKg(prazo.kg), `${fmtN(prazo.diasCheios)} dia(s)`],
-        totalColunas: cab.length, nomePlanilha: "Preparacao", codigoDoc: "REL-PLN-003",
+        totalColunas: COLS.length, nomePlanilha: daSelecao ? "Selecao" : "Preparacao", codigoDoc: "REL-PLN-003",
       });
-      ws.columns = [{ width: 16 }, { width: 10 }, { width: 10 }, { width: 12 }, { width: 10 }, { width: 20 },
-        { width: 22 }, { width: 14 }, { width: 12 }, { width: 7 }, { width: 11 }, { width: 14 },
-        { width: 8 }, { width: 10 }, { width: 11 }, { width: 11 }, { width: 12 }];
+      ws.columns = COLS.map((c) => ({ width: c.w }));
+
       let l = linhaInicio;
-      adicionarHeaderTabela(ws, l, cab); l++;
-      for (const p of f.filtradas) {
-        const c = classeDaPeca(p);
-        adicionarLinhaTabela(ws, l, [
-          p.marca, p.frente, NAT[p.natureza] || p.natureza,
-          // ⚠ na planilha vai por extenso: ✓/✕ é atalho de tela, e ninguém filtra Excel por ícone.
-          p.temDesenho == null ? "não conferido" : p.temDesenho ? "tem" : p.desenhoForaPadrao ? `outro nome: ${p.desenhoForaPadrao}` : "não tem",
-          p.temMaquina == null ? "não medido" : p.temMaquina ? "tem" : "não tem",
-          !p.material ? "não medido" : p.material === "SEM_MATERIAL" ? (MAT_FALTA[p.materialFalta] || "não chegou") : MAT[p.material]?.rot || p.material,
-          p.perfil || "", p.aco || "", Math.round(p.comprimentoMm || 0), p.qte || 0,
-          Math.round(p.pesoTotalKg || 0), c?.nome || "", Number(kgPorMetro(p).toFixed(1)),
-          p.pool === "CHAPAS" ? "chapa" : "perfil",
-          p.cortada ? "já cortada" : p.programadaEm ? (p.programadaEm === "sem data" ? "programada" : `programada ${fmtD(p.programadaEm)}`) : "a fazer",
-          p.prioridade != null ? "sim" : "", sel.has(p.id) ? "sim" : "",
-        ], { alinhamento: { 8: "right", 9: "right", 10: "right", 12: "right" } });
+      adicionarHeaderTabela(ws, l, COLS.map((c) => c.t)); l++;
+      for (const p of escopo) {
+        adicionarLinhaTabela(ws, l, COLS.map((c) => c.v(p)), { alinhamento });
         l++;
       }
-      adicionarRodapeISO(ws, l + 1, cab.length);
-      await downloadWorkbook(workbook, `Lista de preparacao - OP-${opNumero}.xlsx`);
+      adicionarRodapeISO(ws, l + 1, COLS.length);
+      await downloadWorkbook(workbook, `Lista de preparacao - OP-${opNumero}${daSelecao ? " - selecao" : ""}.xlsx`);
     } catch (e) { setErro(`Não consegui gerar a planilha: ${e?.message || e}`); }
     finally { setBaixando(false); }
   }
@@ -603,10 +626,11 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
 
         <div className="ml-auto flex items-center gap-2">
           {f.ativos > 0 && <button onClick={f.limpar} className="text-[11px] text-torg-orange hover:underline">limpar filtro</button>}
-          <button onClick={exportar} disabled={baixando || !f.filtradas.length}
-            title="Exporta as linhas filtradas, com classe, kg/m e o status de desenho e NC1"
+          <button onClick={exportar} disabled={baixando || !escopo.length}
+            title={selecionadas.length ? `Exporta as ${fmtN(somaSel.n)} peça(s) selecionadas` : "Exporta a lista filtrada — selecione peças para exportar só elas"}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-torg-blue-100 bg-white text-torg-dark hover:border-torg-blue disabled:opacity-40">
-            {baixando ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />} Planilha
+            {baixando ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+            Planilha{selecionadas.length ? " da seleção" : ""}
           </button>
           <span className="text-[12px] text-torg-gray">
             {fmtN(f.filtradas.length)} de {fmtN(base.length)} peça(s)
