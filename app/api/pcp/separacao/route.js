@@ -15,6 +15,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { rastreioDaOp } from "@/lib/rastreio-peca";
+import { amarracoesDaOp, amarracaoDoPerfil } from "@/lib/r-amarrado";
 import { casarPerfilComOmie } from "@/lib/casar-omie";
 import { ehItemComprado } from "@/lib/item-comprado";
 import { dedupLpcLe } from "@/lib/pecas-producao";
@@ -55,6 +56,15 @@ export async function GET(req) {
   // R indicado por peça (motor de rastreio: FIFO pela entrega mais antiga, só peça cortada)
   let porMarca = new Map();
   try { ({ porMarca } = await rastreioDaOp(op.numero, op.id)); } catch {}
+
+  // ⚠⚠ O R AMARRADO À MÃO. Vitor (26/08/2026): "na planilha de separação vc não esta puxando as
+  // informações do lote corrida e o R".
+  //
+  // Dois motivos para faltar, e os dois batem aqui: (1) `rastreioDaOp` só dá R a peça JÁ CORTADA —
+  // e a lista de separação é feita ANTES de cortar, então ela nunca teria R por esse caminho; (2) o
+  // casamento por descrição não acha o material quando a LPC e o CMR escrevem o mesmo aço diferente.
+  // A amarração resolve os dois: é uma decisão humana registrada, apontando o fardo.
+  const amarradas = await amarracoesDaOp(op.numero);
 
   // Entradas do CMR — as desta OP e as das outras (o fardo pode ser de qualquer lote em estoque)
   const cmr = await prisma.documentoQualidade.findMany({
@@ -135,9 +145,18 @@ export async function GET(req) {
     // segunda escolha, nunca a primeira).
     const hitOp = comoItensOp.length ? casarPerfilComOmie(g.perfil, comoItensOp) : null;
     const hit = hitOp || (comoItens.length ? casarPerfilComOmie(g.perfil, comoItens) : null);
-    const opcoes = hit ? cmr.filter((c) => c.nome === hit.descricao).map(opcaoR) : [];
+    let opcoes = hit ? cmr.filter((c) => c.nome === hit.descricao).map(opcaoR) : [];
+    // ⚠ e a linha do R amarrado entra nas opções mesmo sem casar por descrição — senão a tela
+    // indicaria um R que não está na lista, e trocar viraria impossível.
+    if (am) {
+      const linha = cmr.find((c) => String(c.importRef || "").trim() === am.r);
+      if (linha && !opcoes.some((o) => o.rastreio === am.r)) opcoes = [opcaoR(linha), ...opcoes];
+    }
     // R indicado = o mais apontado pelas peças do grupo; sem isso, a entrada mais antiga da OP
-    const maisApontado = [...g.rs.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+    // ⚠ a amarração GANHA do mais apontado e do casamento por texto: alguém disse qual é o fardo,
+    // com nome e motivo. Palpite não desempata decisão registrada.
+    const am = amarracaoDoPerfil(amarradas, g.perfil);
+    const maisApontado = am?.r || [...g.rs.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
     const daOpAntiga = [...opcoes].filter((o) => o.daOp).sort((a, b) => String(a.recebidoEm || "").localeCompare(String(b.recebidoEm || "")))[0];
     // ⚠⚠ PEÇA SEM R AINDA PRECISA DIZER QUAL VAI USAR.
     // Vitor (24/08/2026): "no caso das peças que estiverem sem o R deve ser informado qual será
