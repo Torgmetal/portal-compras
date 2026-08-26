@@ -58,6 +58,8 @@ const schemaPost = z.object({
   observacao: z.string().max(400).nullable().optional(),
   // ⚠ as peças escolhidas. Vazio = a frente inteira (como era antes desta coluna existir).
   pecaIds: z.array(z.string().min(1)).max(12000).optional(),
+  // o dia em que este lote deve ser cortado — é o que deixa programar a semana adiantada
+  dataProgramada: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   metaKg: z.number().nullable().optional(),
   totalKg: z.number().nullable().optional(),
   totalPecas: z.number().int().nullable().optional(),
@@ -151,6 +153,26 @@ export async function POST(req) {
     }, { status: 400 });
   }
 
+  // ⚠⚠ PEÇA JÁ PROGRAMADA NÃO ENTRA DE NOVO. Programar vários dias significa voltar a esta tela
+  // várias vezes; sem esta guarda, a mesma peça cairia no dia 1 e no dia 3 e o PCP cortaria duas.
+  if (d.pecaIds?.length) {
+    const abertas = await prisma.liberacaoProducao.findMany({
+      where: { opId: op.id, status: { in: ["LIBERADA", "EM_PRODUCAO"] } },
+      select: { id: true, frente: true, dataProgramada: true, pecaIds: true },
+    });
+    const jaEm = new Map();
+    for (const l of abertas) for (const id of (Array.isArray(l.pecaIds) ? l.pecaIds : [])) if (!jaEm.has(id)) jaEm.set(id, l);
+    const repetidas = d.pecaIds.filter((id) => jaEm.has(id));
+    if (repetidas.length) {
+      const l = jaEm.get(repetidas[0]);
+      const quando = l.dataProgramada ? new Date(l.dataProgramada).toLocaleDateString("pt-BR") : "sem data";
+      return NextResponse.json({
+        error: `${repetidas.length} peça(s) desta seleção já estão programadas (${l.frente}, ${quando}). Recarregue a lista — as programadas saem da seleção.`,
+        jaProgramadas: repetidas.length,
+      }, { status: 409 });
+    }
+  }
+
   const agora = new Date();
   const marco = d.dataMarco ? new Date(`${d.dataMarco}T12:00:00Z`) : null;
   const desvio = desvioDoMarco(marco, agora);
@@ -169,19 +191,19 @@ export async function POST(req) {
     dataMarco: marco, desvioDias: desvio, desvioMotivo: (d.desvioMotivo || "").trim() || null,
     observacao: (d.observacao || "").trim() || null,
     pecaIds: d.pecaIds?.length ? d.pecaIds : null,
+    dataProgramada: d.dataProgramada ? new Date(`${d.dataProgramada}T12:00:00Z`) : null,
     metaKg: d.metaKg ?? null, totalKg: d.totalKg ?? null, totalPecas: d.totalPecas ?? null,
     liberadoEm: agora, liberadoPorId: user?.id || null, liberadoPorNome: user?.name || user?.email || null,
     status: "LIBERADA", canceladaEm: null, canceladaMotivo: null,
   };
-  const lib = await prisma.liberacaoProducao.upsert({
-    where: { opId_frente: { opId: op.id, frente: d.frente } },
-    create: { opId: op.id, ...dados },
-    update: dados,
-  });
+  // ⚠ CREATE, NÃO UPSERT. O upsert por (opId, frente) sobrescrevia a liberação anterior da mesma
+  // frente — o dia 2 apagava o dia 1, e a programação da semana nunca existiria.
+  const lib = await prisma.liberacaoProducao.create({ data: { opId: op.id, ...dados } });
 
   await prisma.auditLog.create({
     data: { userId: user?.id || null, action: "LIBERAR_PRODUCAO", entity: "LiberacaoProducao", entityId: lib.id,
       diff: { op: op.numero, frente: d.frente, setores: d.setores, prioridade: d.prioridade,
+              dia: d.dataProgramada || null,
               desvioDias: desvio, motivo: dados.desvioMotivo, pecas: d.pecaIds?.length || null, totalKg: d.totalKg } },
   }).catch(() => {});
 

@@ -49,6 +49,20 @@ export async function GET(req) {
   // pastas". Era aviso; virou portão. O critério mora em `portaoDoDesenho` para a tela pintar
   // exatamente o que o POST vai cobrar — e 2.5.5 continua não contando, que é a outra metade do
   // pedido ("vamos ignorar os projetos da pasta 2.5.5").
+  // ⚠ o que JÁ FOI PROGRAMADO sai da escolha do próximo dia — senão "preencher o dia" devolveria
+  // sempre o mesmo lote e a semana nunca avançaria.
+  const abertas = await prisma.liberacaoProducao.findMany({
+    where: { opId, status: { in: ["LIBERADA", "EM_PRODUCAO"] } },
+    select: { id: true, frente: true, dataProgramada: true, pecaIds: true, liberadoEm: true },
+    orderBy: [{ dataProgramada: "asc" }, { liberadoEm: "asc" }],
+  });
+  const programada = new Map();
+  for (const l of abertas) {
+    for (const id of (Array.isArray(l.pecaIds) ? l.pecaIds : [])) {
+      if (!programada.has(id)) programada.set(id, l.dataProgramada ? l.dataProgramada.toISOString().slice(0, 10) : "sem data");
+    }
+  }
+
   const portao = await portaoDoDesenho(prisma, opId);
 
   // ⚠ MATERIAL AQUI É INFORMAÇÃO, NÃO PORTÃO. Vitor (26/08/2026): "aqui no planejamento já seria
@@ -98,6 +112,8 @@ export async function GET(req) {
       // ⚠ NC1/DXF/IGS: o que a MÁQUINA lê. Ter desenho não é ter arquivo de máquina.
       temMaquina: temMaquinaNaPasta(portao, p.marca, false),
       // material: NA_OP (chegou nesta obra) · ESTOQUE (existe, é de outra OP) · SEM_MATERIAL
+      // dia já programado para esta peça — "sem data" = liberada sem marcar o dia
+      programadaEm: programada.get(p.id) || null,
       material: mat ? mat.estado : null,
       materialFalta: mat?.falta || null,
       materialRs: mat?.rs?.length || 0,
@@ -118,6 +134,13 @@ export async function GET(req) {
     },
     // ⚠ o resumo do material vem do MESMO cálculo do painel do PCP
     material: material ? material.resumo : null,
+    // os dias já programados desta obra, para a tela mostrar a semana montada
+    dias: [...abertas.reduce((m, l) => {
+      const k = l.dataProgramada ? l.dataProgramada.toISOString().slice(0, 10) : "";
+      const g = m.get(k) || { dia: k || null, lotes: 0, pecas: 0 };
+      g.lotes++; g.pecas += (Array.isArray(l.pecaIds) ? l.pecaIds.length : 0);
+      return m.set(k, g);
+    }, new Map()).values()].sort((a, b) => String(a.dia).localeCompare(String(b.dia))),
   });
 }
 

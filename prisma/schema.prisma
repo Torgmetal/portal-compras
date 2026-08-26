@@ -4899,6 +4899,10 @@ model LiberacaoProducao {
   // problema que a lista por OP tinha: o PCP recebe 6.653 peças e não sabe o que é do dia.
   // Vazio = a frente inteira (compatível com as liberações feitas antes desta coluna existir).
   pecaIds         Json?
+  // ⚠ O DIA EM QUE ESTE LOTE DEVE SER CORTADO. Vitor (26/08/2026): "preciso de um botão para gerar
+  // a demanda e marcar a data, e já deixar permitido para eu fazer isso já vários dias para já
+  // deixar pronto essa programação". Sem ela, liberar era sempre "para agora".
+  dataProgramada  DateTime? @db.Date
   metaKg          Float? // a meta do dia com que a seleção foi montada — para medir depois
   totalKg         Float?
   totalPecas      Int?
@@ -4909,8 +4913,11 @@ model LiberacaoProducao {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  @@unique([opId, frente])
+  // ⚠⚠ NÃO É MAIS ÚNICO POR (opId, frente). Programar a semana é ter VÁRIAS liberações da mesma
+  // frente, uma por dia — com o unique, o dia 2 apagava o dia 1 no upsert.
+  @@index([opId, frente])
   @@index([status])
   @@index([opNumero])
   @@index([liberadoEm])
+  @@index([dataProgramada])
 }
