@@ -570,25 +570,16 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
       )}
 
       {/* ── barra de ação ── */}
-      <div className="bg-white border border-torg-blue-100 rounded-xl p-3 flex flex-wrap items-center gap-2">
+      {/* ⚠ CENTRALIZADA, E POR ISSO SEM `ml-auto`. Vitor (26/08/2026): "ajuste essa parte para
+          deixar centralizado". O grupo da direita era empurrado por `ml-auto`, que vence o
+          `justify-center` — na quebra de linha o resto nascia torto. Agora a barra é um bloco só,
+          centrado, e quebra simétrica. */}
+      <div className="bg-white border border-torg-blue-100 rounded-xl p-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-2.5">
         <label className="text-[12px] text-torg-gray inline-flex items-center gap-1.5 cursor-pointer select-none">
           <input type="checkbox" checked={soAFazer} onChange={(e) => { setSoAFazer(e.target.checked); setSel(new Set()); setSugestao(null); }} className="accent-torg-blue" />
           só as a fazer
         </label>
-        {d?.pasta?.conferida && !d.pasta.confiavel && (
-        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-[12px] text-red-700 flex items-start gap-2">
-          <AlertCircle size={15} className="mt-0.5 shrink-0" />
-          <div className="flex-1">
-            {d.pasta.truncado > 0
-              ? <><b>A conferência desta obra veio cortada</b> — {fmtN(d.pasta.truncado)} marca(s) ficaram fora da lista de faltantes.</>
-              : <><b>A conferência é de antes da lista atual:</b> olhou {fmtN(d.pasta.marcasConferidas)} marca(s) e a LPC hoje tem {fmtN(d.pasta.marcasHoje)}.</>}
-            {" "}O que ficou de fora passaria por "tem desenho", então nada é liberado até reconferir.
-          </div>
-          <BotaoConferir onClick={conferirPasta} conferindo={conferindo} />
-        </div>
-      )}
-
-      {d?.pasta?.conferida && d.pasta.confiavel && d.pasta.semDesenho > 0 && (
+        {d?.pasta?.conferida && d.pasta.confiavel && d.pasta.semDesenho > 0 && (
           <label className="text-[12px] text-torg-gray inline-flex items-center gap-1.5 cursor-pointer select-none" title="Tira da frente as marcas travadas por falta de desenho (elas continuam existindo — só não aparecem)">
             <input type="checkbox" checked={soComDesenho} onChange={(e) => { setSoComDesenho(e.target.checked); setSel(new Set()); setSugestao(null); }} className="accent-torg-blue" />
             esconder as travadas
@@ -624,7 +615,8 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
           <CalendarRange size={14} /> Montar {Math.max(1, Number(nDias) || 1)} dia(s)
         </button>
 
-        <div className="ml-auto flex items-center gap-2">
+        <span className="text-torg-gray-light">·</span>
+        <div className="flex items-center gap-2">
           {f.ativos > 0 && <button onClick={f.limpar} className="text-[11px] text-torg-orange hover:underline">limpar filtro</button>}
           <button onClick={exportar} disabled={baixando || !escopo.length}
             title={selecionadas.length ? `Exporta as ${fmtN(somaSel.n)} peça(s) selecionadas` : "Exporta a lista filtrada — selecione peças para exportar só elas"}
