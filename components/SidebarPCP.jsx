@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Package, Target, ListOrdered, Gauge, FileText, Truck, Tv, FolderKanban, Printer, Factory,
+  LayoutDashboard, Package, ListOrdered, FileText, Truck, FolderKanban, Printer, Factory,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -18,16 +18,22 @@ const menu = [
   // aqui: lista de OPs, peças, o que o programador lançou e o botão de imprimir/liberar em lote.
   { href: "/pcp/producao",     label: "Produção",         icon: Factory },
   { href: "/pcp/relatorio-corte", label: "Relatório de Produção", icon: FileText },
-  { href: "/pcp/pmp",          label: "PMP",              icon: Target },
-  { href: "/pcp/dashboard-prioridades", label: "Prioridades (TV)", icon: Tv },
   { href: "/pcp/pecas-corte",  label: "Programação",      icon: Package },
-  { href: "/pcp/terceirizados", label: "Terceirizados",   icon: Truck },
+  { href: "/pcp/terceirizados", label: "Terceiros",       icon: Truck },
   // Controle de liberação de desenhos: quem levou qual desenho, quando e com qual R carimbado.
   { href: "/pcp/grd",          label: "GRD",              icon: Printer },
-  { href: "/pcp/carga-corte",  label: "Carga do Corte",   icon: Gauge },
   { href: "/pcp/fila-corte",   label: "Corte",            icon: ListOrdered },
 ];
 
+// FORA DO MENU DO PCP (Vitor 26/08/2026) — as PÁGINAS continuam no ar, só saíram daqui:
+//   /pcp/pmp · /pcp/carga-corte
+//     "vamos remover o PMP da pagina do PCP" e "pode tirar o botão de carga de corte não faz
+//     sentido". A carga do corte media dias de fila pela meta de 6.000 kg/dia da preparação; agora
+//     quem diz o que desce e em que dia é a programação do Planejamento, lote a lote.
+//   /pcp/dashboard-prioridades
+//     "Prioridades TV não faz mais sentido" — mesma decisão que ele já tinha tomado no menu do
+//     Planejamento. Quem opera entra em Produção; a régua da fila agora é a data programada.
+//
 // FORA DO MENU DO PCP (Vitor 19/08/2026) — as PÁGINAS continuam no ar, só saíram daqui:
 //   /pcp/montagem · /pcp/solda · /pcp/acabamento · /pcp/jato · /pcp/pintura
 //     São invólucros das mesmas telas da Produção (importam os Clients de
