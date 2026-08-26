@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye, Upload, X, ImagePlus } from "lucide-react";
 import { upload } from "@vercel/blob/client";
-import { SECOES, CAPAS, situacao } from "@/lib/portal-cliente";
+import { SECOES, CAPAS, AREAS, situacao } from "@/lib/portal-cliente";
 
 // ─── CONFIGURAR O PORTAL DO CLIENTE ───────────────────────────────────────────
 // Vitor (22/08/2026): "tudo que for de interesse nosso em mostrar e que seja interesse
@@ -276,18 +276,38 @@ export default function AbaPortalCliente({ opId }) {
           </label>
         )}
 
-        <div className="grid sm:grid-cols-2 gap-2">
-          {SECOES.map((s) => {
-            const on = f.secoes.includes(s.id);
+        {/* ⚠ AGRUPADO PELA MESMA ÁREA QUE O CLIENTE VÊ. Quem configura precisa enxergar a página
+            que o cliente vai abrir — com as seções soltas numa grade, ninguém percebia que desligar
+            duas caixas fazia uma ABA INTEIRA sumir do portal. */}
+        <div className="space-y-3">
+          {AREAS.map((a) => {
+            const doGrupo = SECOES.filter((x) => x.area === a.id);
+            if (!doGrupo.length) return null;
+            const ligadas = doGrupo.filter((x) => f.secoes.includes(x.id)).length;
             return (
-              <label key={s.id} className={`flex items-start gap-2.5 border rounded-lg px-3 py-2.5 cursor-pointer ${on ? "border-torg-blue bg-torg-blue/5" : "border-gray-200"}`}>
-                <input type="checkbox" checked={on} className="mt-0.5 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
-                  onChange={() => set("secoes", on ? f.secoes.filter((x) => x !== s.id) : [...f.secoes, s.id])} />
-                <span className="min-w-0">
-                  <span className="block text-[13px] font-semibold text-torg-dark">{s.nome}</span>
-                  <span className="block text-[11px] text-torg-gray">{s.resumo}</span>
-                </span>
-              </label>
+              <div key={a.id}>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-torg-gray-light mb-1.5">
+                  {a.nome}
+                  <span className={`ml-2 font-normal ${ligadas ? "text-torg-gray" : "text-amber-700"}`}>
+                    {ligadas ? `${ligadas} de ${doGrupo.length}` : "aba não aparece no portal"}
+                  </span>
+                </p>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {doGrupo.map((s) => {
+                    const on = f.secoes.includes(s.id);
+                    return (
+                      <label key={s.id} className={`flex items-start gap-2.5 border rounded-lg px-3 py-2.5 cursor-pointer ${on ? "border-torg-blue bg-torg-blue/5" : "border-gray-200"}`}>
+                        <input type="checkbox" checked={on} className="mt-0.5 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
+                          onChange={() => set("secoes", on ? f.secoes.filter((x) => x !== s.id) : [...f.secoes, s.id])} />
+                        <span className="min-w-0">
+                          <span className="block text-[13px] font-semibold text-torg-dark">{s.nome}</span>
+                          <span className="block text-[11px] text-torg-gray">{s.resumo}</span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
         </div>

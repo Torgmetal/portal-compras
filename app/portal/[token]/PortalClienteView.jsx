@@ -5,6 +5,10 @@ import {
   BookCheck, Layers, Image as ImageIcon, ChevronRight, ChevronDown,
   Download, Package, ShoppingCart, Truck, Check, FileSpreadsheet, History,
 } from "lucide-react";
+import { AREAS, SECOES, SECAO } from "@/lib/portal-cliente";
+
+const AREA_NOME = Object.fromEntries(AREAS.map((a) => [a.id, a.nome]));
+const AREA_RESUMO = Object.fromEntries(AREAS.map((a) => [a.id, a.resumo]));
 
 // ─── O PORTAL DA OBRA, PELO LADO DO CLIENTE ───────────────────────────────────
 // Vitor (22/08/2026): "precisa ser um portal com a melhor arte que acharmos... uma
@@ -28,6 +32,7 @@ const fmtMB = (b) => (!b ? "—" : b < 1048576 ? `${Math.round(b / 1024)} KB` : 
 export default function PortalClienteView({ token }) {
   const [d, setD] = useState(null);
   const [erro, setErro] = useState("");
+  const [aba, setAba] = useState(null);
 
   useEffect(() => {
     fetch(`/api/portal/${token}`)
@@ -56,6 +61,32 @@ export default function PortalClienteView({ token }) {
 
   const { op, portal, dados } = d;
   const tem = (s) => portal.secoes.includes(s);
+
+  // ⚠⚠ ABAS POR ÁREA DA OBRA. Vitor (26/08/2026): "preciso que separe abas por áreas da obra:
+  // Engenharia, Compras, Planejamento, Qualidade e Expedição — em cada aba teremos documentos
+  // relacionados a isso".
+  //
+  // Antes era uma página só, com nove blocos empilhados na ordem do processo. Funcionava para quem
+  // lia de cima a baixo; não funciona para quem entra atrás de UMA coisa — e é assim que o cliente
+  // volta ao portal depois da primeira visita.
+  //
+  // ⚠ ABA SEM CONTEÚDO NÃO APARECE: "Compras (0)" faz o cliente clicar para não achar nada, e a
+  // primeira impressão é justamente o que ele quer proteger.
+  const conteudo = {
+    LPC: tem("LPC") && !!dados.lpc,
+    LE: tem("LE") && !!dados.le,
+    COMPRAS: tem("COMPRAS") && dados.compras?.itens?.length > 0,
+    CRONOGRAMA: tem("CRONOGRAMA") && !!dados.cronograma,
+    CERTIFICADOS: tem("CERTIFICADOS") && dados.certificados?.length > 0,
+    RELATORIOS: tem("RELATORIOS") && dados.relatorios?.length > 0,
+    DATABOOK: tem("DATABOOK") && dados.databook?.volumes?.length > 0,
+    DOCUMENTOS: tem("DOCUMENTOS") && dados.documentos?.length > 0,
+    FOTOS: tem("FOTOS") && portal.fotos?.length > 0,
+  };
+  const secoesDaArea = (a) => SECOES.filter((x) => x.area === a && conteudo[x.id]);
+  const areasComConteudo = AREAS.filter((a) => secoesDaArea(a.id).length > 0);
+  const abaAtiva = areasComConteudo.some((a) => a.id === aba) ? aba : areasComConteudo[0]?.id || null;
+  const mostrar = (id) => conteudo[id] && SECAO[id]?.area === abaAtiva;
 
   // os números que sustentam a mensagem — só entram os que existem de verdade
   const numeros = [
@@ -171,20 +202,48 @@ export default function PortalClienteView({ token }) {
         dados.le?.revisao && { fonte: "LE", titulo: "Lista de expedição (LE)", rev: dados.le.revisao },
       ].filter(Boolean)} />
 
+      {/* ── as áreas da obra ── */}
+      {areasComConteudo.length > 1 && (
+        <nav className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-gray-100">
+          <div className="max-w-5xl mx-auto px-6 sm:px-8 flex gap-1 overflow-x-auto">
+            {areasComConteudo.map((a) => {
+              const on = a.id === abaAtiva;
+              return (
+                <button key={a.id} onClick={() => setAba(a.id)} title={a.resumo}
+                  className={`whitespace-nowrap px-4 py-3.5 text-[13px] font-semibold border-b-[3px] transition-colors ${
+                    on ? "border-[#F4801F] text-[#0D1F3C]" : "border-transparent text-gray-500 hover:text-[#0D1F3C]"}`}>
+                  {a.nome}
+                  <span className="ml-1.5 text-[11px] font-normal text-gray-400">{secoesDaArea(a.id).length}</span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      )}
+
       <div className="max-w-5xl mx-auto px-6 sm:px-8 py-14 space-y-12">
+        {/* ⚠ o resumo da área abre a aba: o cliente que clicou em "Qualidade" tem de saber o que
+            esperar antes de rolar. */}
+        {abaAtiva && areasComConteudo.length > 1 && (
+          <div>
+            <h2 className="text-[22px] font-bold text-[#0D1F3C]">{AREA_NOME[abaAtiva]}</h2>
+            <div className="h-[3px] w-12 bg-[#F4801F] rounded-full my-2" />
+            <p className="text-[14px] text-gray-500">{AREA_RESUMO[abaAtiva]}</p>
+          </div>
+        )}
         {/* ⚠ A ORDEM É A DO PROCESSO. Vitor (22/08/2026): "sempre começar com os documentos da
             Engenharia LPC e LE, depois Tabela de compras". Faz sentido: a Engenharia define o que
             será fabricado, o Compras traz o material, a Qualidade prova que está conforme. O
             cliente lê a obra na ordem em que ela acontece. */}
-        {tem("LPC") && dados.lpc && (
+        {mostrar("LPC") && (
           <BlocoLista icone={Layers} titulo="Lista de produção (LPC)" fonte="LPC" d={dados.lpc} token={token} />
         )}
 
-        {tem("LE") && dados.le && (
+        {mostrar("LE") && (
           <BlocoLista icone={Truck} titulo="Lista de expedição (LE)" fonte="LE" d={dados.le} token={token} />
         )}
 
-        {tem("COMPRAS") && dados.compras?.itens?.length > 0 && (
+        {mostrar("COMPRAS") && (
           <Bloco icone={ShoppingCart} titulo="Materiais da obra" recolhida
             sub={`${dados.compras.recebidos} de ${dados.compras.total} recebidos`}>
             <Tabela
@@ -201,7 +260,7 @@ export default function PortalClienteView({ token }) {
           </Bloco>
         )}
 
-        {tem("CRONOGRAMA") && dados.cronograma && (
+        {mostrar("CRONOGRAMA") && (
           <Bloco icone={CalendarRange} titulo="Cronograma da obra"
             sub={`${fmtD(dados.cronograma.inicio)} a ${fmtD(dados.cronograma.fim)}`}>
             <div className="space-y-3">
@@ -222,11 +281,11 @@ export default function PortalClienteView({ token }) {
             </div>
           </Bloco>
         )}
-        {tem("CERTIFICADOS") && dados.certificados?.length > 0 && (
+        {mostrar("CERTIFICADOS") && (
           <Certificados token={token} lista={dados.certificados} />
         )}
 
-        {tem("RELATORIOS") && dados.relatorios?.length > 0 && (
+        {mostrar("RELATORIOS") && (
           <Bloco icone={FileText} titulo="Relatórios de inspeção" recolhida
             sub={`${dados.relatorios.length} aprovados`}>
             {/* ⚠ SÓ OS APROVADOS. Relatório em rascunho ou reprovado é trabalho em curso;
@@ -248,7 +307,7 @@ export default function PortalClienteView({ token }) {
             cliente esperar o e-mail do aceite. Vitor (24/08/2026) escolheu liberar aqui depois do
             aceite: a rota só serve com o livro `ACEITO`, então o que aparece nesta tela já passou
             pelas quatro assinaturas da cadeia — inclusive a dele. */}
-        {tem("DATABOOK") && dados.databook?.volumes?.length > 0 && (
+        {mostrar("DATABOOK") && (
           <Bloco icone={BookCheck} titulo="Data Book da obra"
             sub={`${dados.databook.volumes.length} volume(s) · R${String(dados.databook.revisao).padStart(2, "0")}`}>
             <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
@@ -277,7 +336,7 @@ export default function PortalClienteView({ token }) {
             </p>
           </Bloco>
         )}
-        {tem("DOCUMENTOS") && dados.documentos?.length > 0 && (
+        {mostrar("DOCUMENTOS") && (
           <Bloco icone={FileText} titulo="Documentos da obra" recolhida
             sub={`${dados.documentos.length} assuntos`}>
             {/* ⚠ agrupado por assunto, não uma lista chapada: a obra tem centenas de documentos e o
@@ -310,7 +369,7 @@ export default function PortalClienteView({ token }) {
             </div>
           </Bloco>
         )}
-        {tem("FOTOS") && portal.fotos?.length > 0 && (
+        {mostrar("FOTOS") && (
           <Bloco icone={ImageIcon} titulo="A obra em imagens" sub={`${portal.fotos.length} registros`}>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {portal.fotos.map((f, i) => (
