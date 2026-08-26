@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { baixarDocumento, resolverDriveServidor } from "@/lib/databook-arquivo";
 import { secoesDoPortal } from "@/lib/portal-cliente";
+import { registrarAcesso } from "@/lib/portal-acesso";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -38,6 +39,13 @@ export async function GET(req, { params }) {
     const drive = await resolverDriveServidor([doc]);
     const buf = await baixarDocumento(doc, drive);
     const nome = `${String(doc.nome).replace(/[\\/:*?"<>|]/g, "_").slice(0, 120)}.pdf`;
+    // ⚠ o nome do DOCUMENTO vai no registro, não só a contagem: "3 downloads" não responde se o
+    // cliente pegou o certificado que ele está cobrando por telefone.
+    await registrarAcesso(req, {
+      portal, codigo: new URL(req.url).searchParams.get("d"), evento: "DOWNLOAD",
+      documento: doc.nome, documentoId: doc.id,
+      secao: doc.categoria === "MATERIAL" ? "CERTIFICADOS" : "DOCUMENTOS",
+    });
     return new NextResponse(buf, {
       headers: {
         "Content-Type": "application/pdf",

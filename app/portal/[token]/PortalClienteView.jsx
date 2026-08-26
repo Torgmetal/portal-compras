@@ -33,9 +33,14 @@ export default function PortalClienteView({ token }) {
   const [d, setD] = useState(null);
   const [erro, setErro] = useState("");
   const [aba, setAba] = useState(null);
+  // ⚠ O CÓDIGO DA PESSOA VIAJA JUNTO. O `?d=` chega na URL do e-mail; se ele não for repassado nas
+  // chamadas seguintes, só a ABERTURA saberia quem é e todo download voltaria a ser anônimo — que
+  // é justamente a metade da pergunta do Vitor ("o que foi aberto e feito download").
+  const cod = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("d") : null;
+  const comCod = (u) => (cod ? `${u}${u.includes("?") ? "&" : "?"}d=${encodeURIComponent(cod)}` : u);
 
   useEffect(() => {
-    fetch(`/api/portal/${token}`)
+    fetch(comCod(`/api/portal/${token}`))
       .then((r) => r.json())
       .then((j) => (j.error ? setErro(j.error) : setD(j)))
       .catch(() => setErro("Não consegui carregar o portal."));
@@ -359,7 +364,7 @@ export default function PortalClienteView({ token }) {
                   </p>
                   <div className="grid sm:grid-cols-2 gap-1.5">
                     {g.itens.map((doc) => (
-                      <a key={doc.id} href={`/api/portal/${token}/eng?id=${encodeURIComponent(doc.id)}`} target="_blank" rel="noreferrer"
+                      <a key={doc.id} href={comCod(`/api/portal/${token}/eng?id=${encodeURIComponent(doc.id)}`)} target="_blank" rel="noreferrer"
                         className="flex items-center gap-2 border border-gray-100 rounded-lg px-3 py-1.5 hover:border-[#006EAB] hover:bg-[#006EAB]/5 transition-colors">
                         <Download size={12} className="text-[#006EAB] shrink-0" />
                         <span className="text-[12px] truncate" title={doc.nome}>{doc.nome}</span>
@@ -390,7 +395,7 @@ export default function PortalClienteView({ token }) {
                       // ser possíveis de baixar também, para que o cliente possa ver tudo que ele
                       // precisa". Lista que só mostra o nome prova que o documento existe e não
                       // deixa lê-lo — é pior que não listar.
-                      <a key={doc.id} href={`/api/portal/${token}/doc?id=${doc.id}`} target="_blank" rel="noreferrer"
+                      <a key={doc.id} href={comCod(`/api/portal/${token}/doc?id=${doc.id}`)} target="_blank" rel="noreferrer"
                         className="flex items-center gap-2 border border-gray-100 rounded-lg px-3 py-1.5 hover:border-[#006EAB] hover:bg-[#006EAB]/5 transition-colors">
                         <Download size={12} className="text-[#006EAB] shrink-0" />
                         <span className="text-[12px] truncate">{doc.nome}</span>

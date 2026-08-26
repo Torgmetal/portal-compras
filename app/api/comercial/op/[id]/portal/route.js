@@ -92,6 +92,27 @@ export async function POST(req, { params }) {
   if (b.enviar) {
     const para = txt(b.clienteEmail, 160) || portal.clienteEmail;
     if (!para) return NextResponse.json({ error: "Informe o e-mail do cliente para enviar." }, { status: 400 });
+
+    // ⚠⚠ UM CÓDIGO POR PESSOA. Vitor (26/08/2026): "preciso do histórico do acesso (…) para as
+    // pessoas que enviamos". Com um link só para a obra dá para dizer "abriram 7 vezes" e nunca
+    // "o Fulano abriu e baixou o certificado" — e é a segunda pergunta que ele faz.
+    //
+    // ⚠ O CÓDIGO NÃO É SENHA: quem repassar o link repassa a identidade junto. Serve para saber
+    // quem recebeu e o que aconteceu depois; quem controla o acesso continua sendo o token.
+    // ⚠ Reenviar para o MESMO e-mail reaproveita o código — senão o histórico de quem já abriu se
+    // partiria em duas pessoas a cada reenvio.
+    const jaTem = await prisma.portalDestinatario.findFirst({ where: { portalId: portal.id, email: para } });
+    const dest = jaTem
+      ? await prisma.portalDestinatario.update({ where: { id: jaTem.id }, data: { enviadoEm: new Date(), enviadoPorNome: user.name || user.email || null, nome: txt(b.contato, 120) || jaTem.nome } })
+      : await prisma.portalDestinatario.create({
+          data: {
+            portalId: portal.id, opNumero: portal.opNumero, email: para,
+            nome: txt(b.contato, 120) || portal.contato || null,
+            codigo: `${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}`,
+            enviadoEm: new Date(), enviadoPorNome: user.name || user.email || null,
+          },
+        });
+    const linkPessoal = `${link}?d=${dest.codigo}`;
     const obra = r.op.obra || `OP-${String(r.op.numero).padStart(3, "0")}`;
     const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#0D1F3C">
       ${cabecalhoEmail("Portal da Obra")}
@@ -103,17 +124,17 @@ export async function POST(req, { params }) {
           documentos da obra — atualizados conforme ela avança.
         </p>
         <p style="text-align:center;margin:24px 0">
-          <a href="${link}" style="background:#006EAB;color:#fff;text-decoration:none;padding:13px 30px;border-radius:8px;font-size:15px;font-weight:bold;display:inline-block">Abrir o portal da obra</a>
+          <a href="${linkPessoal}" style="background:#006EAB;color:#fff;text-decoration:none;padding:13px 30px;border-radius:8px;font-size:15px;font-weight:bold;display:inline-block">Abrir o portal da obra</a>
         </p>
         <p style="margin:0;color:#5b6b7a;font-size:12px">
           Se o botão não funcionar, copie e cole no navegador:<br>
-          <span style="color:#006EAB;word-break:break-all">${link}</span>
+          <span style="color:#006EAB;word-break:break-all">${linkPessoal}</span>
         </p>
       </div>
     </div>`;
     const res = await sendEmail({
       to: para, subject: `Portal da obra — ${obra} · Torg Metal`, html,
-      text: `Acompanhe a fabricação de ${obra}: ${link}`,
+      text: `Acompanhe a fabricação de ${obra}: ${linkPessoal}`,
       replyTo: user.email || undefined,
     }).catch(() => ({ ok: false }));
     enviado = !!res?.ok;

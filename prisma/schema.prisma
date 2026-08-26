@@ -2277,6 +2277,56 @@ model PortalListaRevisao {
   @@index([opNumero])
 }
 
+// ─── QUEM ABRIU O PORTAL, E O QUE BAIXOU ──────────────────────────────────────
+// Vitor (26/08/2026): "preciso do histórico do acesso, através do e-mail enviado, e o que foi
+// aberto e feito download, para as pessoas que enviamos".
+//
+// ⚠⚠ COM UM LINK SÓ PARA A OBRA ISSO É IMPOSSÍVEL. O portal tinha um token por OP e um contador de
+// acessos — dá para dizer "abriram 7 vezes", nunca "o Fulano abriu e baixou o certificado". Cada
+// destinatário passa a ter um CÓDIGO próprio no link; é ele que dá nome ao acesso.
+//
+// ⚠ O CÓDIGO NÃO É SENHA: quem repassar o link repassa a identidade junto. Serve para saber quem
+// recebeu e o que aconteceu depois — não para controlar acesso, que continua sendo o token do
+// portal.
+model PortalDestinatario {
+  id               String    @id @default(cuid())
+  portalId         String
+  opNumero         String
+  nome             String?
+  email            String
+  codigo           String    @unique // vai no link como ?d=
+  enviadoEm        DateTime?
+  enviadoPorNome   String?
+  aberturas        Int       @default(0)
+  downloads        Int       @default(0)
+  primeiroAcessoEm DateTime?
+  ultimoAcessoEm   DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([portalId])
+  @@index([opNumero])
+}
+
+// Uma linha por evento — abertura e download. ⚠ O CONTADOR NÃO BASTA: "3 downloads" não diz QUAL
+// documento, e é o documento que interessa quando o cliente pergunta se recebeu o certificado.
+model PortalAcesso {
+  id             String   @id @default(cuid())
+  portalId       String
+  opNumero       String
+  destinatarioId String?
+  email          String?
+  evento         String // ABERTURA | DOWNLOAD
+  documento      String?
+  documentoId    String?
+  secao          String?
+  ip             String?
+  userAgent      String?
+  em             DateTime @default(now())
+
+  @@index([portalId, em])
+  @@index([destinatarioId])
+}
+
 model PortalCliente {
   id               String    @id @default(cuid())
   opId             String?

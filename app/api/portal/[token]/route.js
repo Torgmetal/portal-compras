@@ -8,6 +8,7 @@
 // ⚠ E SÓ SAI O QUE A OBRA LIGOU. A consulta de cada seção só roda se ela estiver ativa: além de
 // não vazar o que o contrato não previu, evita pagar dez consultas para mostrar três blocos.
 import { NextResponse } from "next/server";
+import { registrarAcesso } from "@/lib/portal-acesso";
 import { prisma } from "@/lib/prisma";
 import { secoesDoPortal, mensagemPadrao, CAPA_PADRAO } from "@/lib/portal-cliente";
 import { pecasDaLista, sincronizarRevisao, revisaoParaOCliente } from "@/lib/portal-listas";
@@ -18,7 +19,7 @@ export const maxDuration = 60;
 
 const fmt = (d) => (d ? new Date(d).toISOString().slice(0, 10) : null);
 
-export async function GET(_req, { params }) {
+export async function GET(req, { params }) {
   const { token } = await params;
   const portal = await prisma.portalCliente.findUnique({ where: { token } });
   if (!portal || portal.status !== "PUBLICADO") {
@@ -338,6 +339,10 @@ export async function GET(_req, { params }) {
       ...(portal.primeiroAcessoEm ? {} : { primeiroAcessoEm: new Date() }),
     },
   }).catch(() => { /* contar acesso nunca pode derrubar a página do cliente */ });
+
+  // ⚠ e QUEM abriu, pelo código do link do e-mail. Sem `?d=`, o acesso fica anônimo — que também é
+  // informação: quer dizer que a pessoa entrou por um link repassado, não pelo e-mail que enviamos.
+  await registrarAcesso(req, { portal, codigo: new URL(req.url).searchParams.get("d"), evento: "ABERTURA" });
 
   return NextResponse.json({
     op: op ? { numero: op.numero, cliente: op.cliente, obra: op.obra, refCliente: op.refCliente } : { numero: portal.opNumero },

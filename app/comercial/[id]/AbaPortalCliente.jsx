@@ -4,6 +4,7 @@ import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye, Upload, X, 
 import { upload } from "@vercel/blob/client";
 import { SECOES, CAPAS, AREAS, situacao } from "@/lib/portal-cliente";
 import SeletorDocsEngenharia from "./SeletorDocsEngenharia";
+import HistoricoPortal from "./HistoricoPortal";
 
 // ─── CONFIGURAR O PORTAL DO CLIENTE ───────────────────────────────────────────
 // Vitor (22/08/2026): "tudo que for de interesse nosso em mostrar e que seja interesse
@@ -317,6 +318,8 @@ export default function AbaPortalCliente({ opId, opNumero }) {
       {/* ⚠ o seletor fica JUNTO das seções, não numa tela à parte: escolher documento é parte de
           montar o portal, e separar faria alguém publicar sem nunca ter aberto a pasta. */}
       {f.secoes.includes("DOCUMENTOS") && <SeletorDocsEngenharia opNumero={opNumero} />}
+
+      <HistoricoPortal opNumero={opNumero} />
 
       {erro && <p className="text-[12px] text-red-600">{erro}</p>}
       {aviso && <p className="text-[12px] text-emerald-700">{aviso}</p>}

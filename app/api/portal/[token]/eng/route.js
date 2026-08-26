@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAccessToken } from "@/lib/sharepoint";
 import { secoesDoPortal } from "@/lib/portal-cliente";
+import { registrarAcesso } from "@/lib/portal-acesso";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -37,6 +38,10 @@ export async function GET(req, { params }) {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const buf = Buffer.from(await r.arrayBuffer());
     await prisma.portalCliente.update({ where: { id: portal.id }, data: { ultimoAcessoEm: new Date() } }).catch(() => {});
+    await registrarAcesso(req, {
+      portal, codigo: new URL(req.url).searchParams.get("d"), evento: "DOWNLOAD",
+      documento: doc.nome, documentoId: String(id), secao: "ENGENHARIA",
+    });
     return new NextResponse(buf, {
       headers: {
         "Content-Type": r.headers.get("content-type") || "application/octet-stream",
