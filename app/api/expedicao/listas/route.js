@@ -173,11 +173,16 @@ export async function GET(req) {
       ps.kg += kg;
       if (setor && PRONTA.has(setor)) { g.prontasMarcas++; g.prontasKg += kg; }
 
-      if (g.itensFaltantes.length < 400) {
+      // ⚠ o teto era 400 por obra, do tempo em que a tela era cartão com tabela dentro. Agora a
+      // tela é planilha com export, e uma planilha truncada em silêncio é pior que não ter: são
+      // 1.890 faltantes em toda a casa, então 2.000 cobre tudo com folga.
+      if (g.itensFaltantes.length < 2000) {
         g.itensFaltantes.push({
           marca: m.marca, descricao: m.descricao || null,
           qtd: Number(m.qte ?? m.qtd ?? 1) || 0, pesoKg: kg,
-          grupo, frente: l.frente,
+          // ⚠ o RÓTULO vai junto: a planilha filtra pelo que a pessoa lê, e ninguém procura por
+          // "ESTR" numa lista de opções.
+          grupo, grupoLabel: GRUPO_LABEL[grupo] || grupo, frente: l.frente,
           setor, setorLabel: setor ? SETOR_LABEL[setor] || setor : null,
           pronta: !!setor && PRONTA.has(setor),
           statusPortal,
