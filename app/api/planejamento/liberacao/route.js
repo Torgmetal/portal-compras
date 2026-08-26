@@ -118,7 +118,9 @@ export async function POST(req) {
   for (const p of alvo) {
     const k = String(p.marca || "").trim().toUpperCase();
     if (portao.semDesenho.has(k) && !barradas.has(k)) {
-      barradas.set(k, portao.foraPadrao.get(k) ? "arquivo com outro nome" : portao.soEnvio.has(k) ? "só em 2.5.5" : "sem desenho");
+      // ⚠ o motivo que aparece para quem lê é só o acionável. Vitor (26/08/2026): "o vinculo da
+      // pasta 2.5.5 não precisa ser mencionado em nada só se eu pedir".
+      barradas.set(k, portao.foraPadrao.get(k) ? "arquivo com outro nome" : "sem desenho");
     }
   }
   if (barradas.size) {

@@ -33,9 +33,11 @@ const VEREDITO = {
   SEM_CONJUNTO: { rot: "croqui sim, conjunto não", chip: "bg-amber-50 text-amber-700 border-amber-200" },
   SO_MAQUINA:   { rot: "só arquivo de máquina",    chip: "bg-red-100 text-red-800 border-red-200" },
   SEM_DESENHO:  { rot: "sem desenho nenhum",       chip: "bg-red-100 text-red-800 border-red-200" },
-  // ⚠ 2.5.5 é a pasta que a Torg monta para ENVIAR ao cliente — o desenho existe, mas não onde a
-  // fabricação procura. Ação é mover, não desenhar; por isso estado próprio.
-  SO_ENVIO:     { rot: "só na pasta de envio",     chip: "bg-amber-50 text-amber-700 border-amber-200" },
+  // ⚠ ESTADO INTERNO, RÓTULO NEUTRO. Vitor (26/08/2026): "o vinculo da pasta 2.5.5 não precisa ser
+  // mencionado em nada só se eu pedir". O veredito continua separado no banco (o arquivo existe,
+  // fora do alcance da fabricação — é dado que ele pode pedir), mas na tela lê como o que é para
+  // quem precisa produzir: não tem desenho na fabricação.
+  SO_ENVIO:     { rot: "sem desenho na fabricação", chip: "bg-red-100 text-red-800 border-red-200" },
   SEM_LISTA:    { rot: "desenho sem lista",        chip: "bg-sky-50 text-sky-700 border-sky-200" },
   // ⚠ obra sem lista E sem arquivo é obra que ainda não começou — cinza, não vermelho. Em vermelho,
   // seis obras futuras encheriam o painel de alarme falso e afogariam a OP-106.
@@ -206,7 +208,7 @@ export default function FluxoProducao() {
       const semDesenho = j.resumo.filter((x) => ["SO_MAQUINA", "SEM_DESENHO", "SO_ENVIO", "VAZIA"].includes(x.veredito)).length;
       const completas = j.resumo.filter((x) => x.veredito === "OK").length;
       const cab = ["OP", "Cliente", "Obra", "Veredito", "Marcas na lista", "Conjuntos c/ desenho", "Croquis c/ desenho",
-        "Desenhos em 2.5.2", "PDF em 2.5.5 (envio)", "Só em 2.5.5", "Arq. de máquina", "Modelo 3D",
+        "Desenhos em 2.5.2", "Arq. de máquina", "Modelo 3D",
         "Nome fora do padrão", "Conferido em", "Baixa"];
 
       const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
@@ -226,7 +228,7 @@ export default function FluxoProducao() {
           fmtOP(x.numero), x.cliente, x.obra,
           x.veredito ? (VEREDITO[x.veredito]?.rot || x.veredito) : "ainda não conferida",
           x.marcas, `${x.conjuntosCom}/${x.conjuntosTotal}`, `${x.croquisCom}/${x.croquisTotal}`,
-          x.pdfs, x.pdfsEnvio, x.soEnvio, x.nc1, x.igs, x.foraPadrao,
+          x.pdfs, x.nc1, x.igs, x.foraPadrao,
           x.checadoEm ? new Date(x.checadoEm).toLocaleString("pt-BR") : "—",
           x.baixada ? `sim${x.baixaMotivo ? ` — ${x.baixaMotivo}` : ""}` : "",
         ], { alinhamento: { 4: "right", 5: "right", 6: "right", 7: "right", 8: "right", 9: "right", 10: "right", 11: "right", 12: "right" } });
@@ -235,7 +237,7 @@ export default function FluxoProducao() {
       adicionarRodapeISO(ws, l + 1, cab.length);
 
       // ── aba 2: a peça, não a obra ──
-      const cab2 = ["OP", "Cliente", "Marca", "Tipo", "Tem NC1", "Está em 2.5.5 (envio)", "Desenho achado com outro nome"];
+      const cab2 = ["OP", "Cliente", "Marca", "Tipo", "Tem NC1", "Desenho achado com outro nome"];
       const ws2 = workbook.addWorksheet("Sem desenho");
       ws2.columns = [{ width: 10 }, { width: 20 }, { width: 22 }, { width: 12 }, { width: 10 }, { width: 19 }, { width: 44 }];
       let l2 = 1;
@@ -243,7 +245,7 @@ export default function FluxoProducao() {
       for (const it of j.itens) {
         adicionarLinhaTabela(ws2, l2, [
           fmtOP(it.numero), it.cliente, it.marca, it.conjunto ? "Conjunto" : "Croqui",
-          it.nc1 ? "sim" : "não", it.soEnvio ? "sim" : "", it.foraPadrao || "",
+          it.nc1 ? "sim" : "não", it.foraPadrao || "",
         ]);
         l2++;
       }
@@ -771,21 +773,9 @@ function PastaDetalhe({ d }) {
             servida, bancada não. Sozinho, "0 desenhos" pareceria pasta esquecida. */}
         <Mini n={fmtN(a.nc1)} l="NC1 (máquina)" cor="text-torg-gray" bg="bg-white border-gray-200" />
         <Mini n={fmtN(a.igs)} l="IGS (modelo 3D)" cor="text-torg-gray" bg="bg-white border-gray-200" />
-        {/* ⚠ 2.5.5 aparece como INFORMAÇÃO, nunca como cobertura: é a pasta de envio ao cliente. */}
-        <Mini n={fmtN(a.pdfsEnvio || 0)} l="PDF em 2.5.5 (envio)" sub={a.soEnvio ? `${fmtN(a.soEnvio)} marca(s) só aqui` : undefined}
-          cor={a.soEnvio ? "text-amber-700" : "text-torg-gray"} bg={a.soEnvio ? "bg-amber-50 border-amber-200" : "bg-white border-gray-200"} />
       </div>
 
-      {a.soEnvio > 0 && (
-        /* ⚠ Vitor (25/08): 2.5.5 "é uma pasta que criamos para enviar ao cliente, ou seja não será
-           necessário estar ali". O desenho existe e está fora do alcance da fabricação. */
-        <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          <b>{fmtN(a.soEnvio)} marca(s) só têm arquivo em 2.5.5</b>, a pasta de envio ao cliente — e nada
-          em 2.5.2 Fabricação. O desenho está feito; falta estar onde a produção o procura.
-        </p>
-      )}
-
-      {a.pdfs === 0 && !a.pdfsEnvio && (a.nc1 > 0 || a.igs > 0) && (
+      {a.pdfs === 0 && (a.nc1 > 0 || a.igs > 0) && (
         <p className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
           <b>Saiu arquivo de máquina e não saiu desenho.</b> O programador consegue lançar; o setor não tem
           o que abrir na bancada, e a emissão em lote não acha nada para imprimir.
