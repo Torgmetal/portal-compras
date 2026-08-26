@@ -888,6 +888,15 @@ function LoteDesenhos({ lote, onClose }) {
                   <AlertTriangle size={13} className="inline -mt-0.5" /> <b>{lote.semDesenho.length} marca(s) sem desenho</b> na pasta da Engenharia: {lote.semDesenho.slice(0, 10).join(", ")}{lote.semDesenho.length > 10 ? "…" : ""}
                 </p>
               )}
+              {/* ⚠ material barrado é DIFERENTE de desenho faltando: um é a Engenharia, o outro é
+                  o Almoxarifado/Compras. Juntar os dois num aviso só faz a pessoa cobrar o setor
+                  errado. */}
+              {lote.semMaterial?.length > 0 && (
+                <p className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-2">
+                  <AlertTriangle size={13} className="inline -mt-0.5" /> <b>{lote.semMaterial.length} marca(s) não foram liberadas por material</b> — o desenho só sai com o material conferido e o R definido:
+                  {" "}{lote.semMaterial.slice(0, 8).map((m) => `${m.marca} (${m.motivo})`).join(" · ")}{lote.semMaterial.length > 8 ? "…" : ""}
+                </p>
+              )}
               {lote.erros?.length > 0 && (
                 <p className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-2">
                   {lote.erros.length} falharam: {lote.erros.slice(0, 6).map((e) => `${e.marca} (${e.erro})`).join(" · ")}

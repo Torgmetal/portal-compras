@@ -17,6 +17,7 @@ import { rastreioDoConjunto } from "@/lib/rastreio-peca";
 import { amarracoesDaOp, amarracaoDoPerfil } from "@/lib/r-amarrado";
 import { novaEntradaGrd } from "@/lib/grd-registro";
 import { conferirRComCroquis } from "@/lib/conferir-r";
+import { analisarMaterial } from "@/lib/material-liberacao";
 import { carimbarDesenho } from "@/lib/carimbo-desenho";
 import { dataHoraBR } from "@/lib/data-br";
 import { consumivelDoConjunto } from "@/lib/consumivel-solda";
@@ -132,6 +133,44 @@ export async function POST(req) {
 
   // 1) rastreabilidade da marca AGORA (croqui = a própria peça; conjunto = os croquis dele)
   let itens = [];
+  // ⚠⚠ SEM MATERIAL NÃO SE IMPRIME. Vitor (26/08/2026): "não será possível liberar desenhos se
+  // estoque e R definido, não foi isso?" — foi, e a regra estava só metade aplicada.
+  //
+  // A sequência que ele desenhou em 25/08: "o pcp recebe a solicitação, manda separar o material,
+  // analisa se está tudo em estoque, caso seja usado um material de estoque informa o R usado e
+  // caso não tenha o material NÃO LIBERA aquele projeto para preparar; avaliou isso IMPRIME os
+  // desenhos para o setor já marca o R". A impressão vem DEPOIS da conferência de material — e
+  // esta rota não tinha uma linha sobre material.
+  //
+  // ⚠ SÓ NO IMPRIMIR (GRD). "Emitir carimbado" é consulta e continua livre; o que se controla é a
+  // LIBERAÇÃO para o chão de fábrica.
+  // ⚠ SÓ PARA PEÇA COM PERFIL (croqui/avulsa). O conjunto não tem material próprio — ele é montado
+  // do que já foi cortado, e cobrar material dele travaria a Montagem por uma pergunta que não é
+  // dela.
+  if (body.acao === "IMPRIMIR" && opId) {
+    try {
+      const pc = await prisma.pecaConjunto.findFirst({ where: { opId, marca }, select: { id: true, perfil: true, tipoPeca: true } });
+      if (pc?.perfil && pc.tipoPeca !== "CONJUNTO") {
+        const { porPeca } = await analisarMaterial(opNumero, [pc]);
+        const v = porPeca.get(pc.id);
+        // ⚠ ESTOQUE PASSA COM O R INFORMADO — é a etapa do PCP, não uma exceção à regra.
+        const ok = v && (v.estado === "NA_OP" || (v.estado === "ESTOQUE" && v.rInformado));
+        if (!ok) {
+          const porque = !v ? "material não medido"
+            : v.estado === "ESTOQUE" ? `existe material igual em estoque (R ${(v.rs || []).slice(0, 3).join(", ") || "—"}), mas ninguém informou qual R foi usado`
+            : v.faltaRotulo || "sem entrada no CMR desta obra";
+          return NextResponse.json({
+            error: `${marca} não pode ser liberada: ${porque}. O desenho só é impresso depois de o material estar conferido e o R definido — informe o R no painel do PCP ou aguarde a entrega.`,
+            semMaterial: true, perfil: pc.perfil, estado: v?.estado || null,
+          }, { status: 409 });
+        }
+      }
+    } catch {
+      // ⚠ falha na ANÁLISE não vira bloqueio: travar a impressão por um erro de leitura pararia a
+      // fábrica por um problema que não é dela. (O `return` acima sai da função sem passar aqui.)
+    }
+  }
+
   try { if (opId) itens = await rastreioDoConjunto(opNumero, opId, marca); } catch {}
   // ⚠⚠ O R AMARRADO ENTRA NO CARIMBO. `rastreioDoConjunto` só dá R a peça JÁ CORTADA e o desenho é
   // impresso ANTES de cortar — o papel saía "sem R" exatamente quando ele é necessário. Vitor
