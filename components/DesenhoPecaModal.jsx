@@ -10,7 +10,11 @@ import { X, Loader2, FileText, Printer, ExternalLink, AlertCircle, CheckCircle2,
 
 const fmtDataHora = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + " " + new Date(d).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—");
 
-export default function DesenhoPecaModal({ opNumero, opId, marca, setor, onClose }) {
+// ⚠ `soImprimir` — Vitor (26/08/2026): "na parte de impressão deixar apenas o botão de imprimir GRD
+// na aba de GRD". Quem abre a peça PELA GRD já está no ato de liberar; "ver original" e "emitir
+// carimbado" ali são dois caminhos que NÃO registram liberação, ao lado do único que registra —
+// convite a clicar no errado e achar que liberou.
+export default function DesenhoPecaModal({ opNumero, opId, marca, setor, soImprimir = false, onClose }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [registrando, setRegistrando] = useState("");
@@ -92,12 +96,14 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, onClose
                     </div>
                     {/* Botões numa linha própria: com três ações eles espremiam o nome do arquivo. */}
                     <div className="flex items-center gap-2 flex-wrap justify-end mt-2 pt-2 border-t border-gray-50">
-                      <button onClick={() => abrir(a)} title="Abrir o PDF original da Engenharia, sem carimbo e sem registro"
-                        className="text-[11px] font-semibold text-torg-gray border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 inline-flex items-center gap-1"><ExternalLink size={12} /> Ver original</button>
-                      <button onClick={() => emitir(a, "EMITIR")} disabled={!!registrando} title="Carimba a rastreabilidade + quem emitiu com data/hora, arquiva na pasta da OP e amarra na Seção 02 do Data Book. NÃO registra GRD — é só consultar."
-                        className="text-[11px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 inline-flex items-center gap-1 disabled:opacity-50">
-                        {ocupado(a, "EMITIR") ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Emitir carimbado
-                      </button>
+                      {!soImprimir && <>
+                        <button onClick={() => abrir(a)} title="Abrir o PDF original da Engenharia, sem carimbo e sem registro"
+                          className="text-[11px] font-semibold text-torg-gray border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 inline-flex items-center gap-1"><ExternalLink size={12} /> Ver original</button>
+                        <button onClick={() => emitir(a, "EMITIR")} disabled={!!registrando} title="Carimba a rastreabilidade + quem emitiu com data/hora, arquiva na pasta da OP e amarra na Seção 02 do Data Book. NÃO registra GRD — é só consultar."
+                          className="text-[11px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 inline-flex items-center gap-1 disabled:opacity-50">
+                          {ocupado(a, "EMITIR") ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Emitir carimbado
+                        </button>
+                      </>}
                       <button onClick={() => emitir(a, "IMPRIMIR")} disabled={!!registrando} title="Emite o carimbado e REGISTRA A GRD (liberação pro setor). Reimprimir a mesma peça soma no contador, não cria outra GRD."
                         className="text-[11px] font-semibold text-white bg-torg-blue hover:bg-torg-blue/90 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1 disabled:opacity-50">
                         {ocupado(a, "IMPRIMIR") ? <Loader2 size={12} className="animate-spin" /> : <Printer size={12} />} Imprimir (GRD)
@@ -129,7 +135,9 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, onClose
         </div>
 
         <div className="px-5 py-3 border-t border-gray-100">
-          <p className="text-[11px] text-torg-gray">O formato (A1–A4) vem da pasta da Engenharia — imprima no papel indicado. <b>"Emitir carimbado"</b> carimba no PDF o <b>R</b> do material (com corrida, certificado e fornecedor) + quem emitiu com data/hora, arquiva na pasta da OP e amarra o <b>mesmo arquivo</b> na Seção 02 do Data Book — <b>sem</b> registrar GRD, porque abrir o desenho não é liberação. <b>"Imprimir (GRD)"</b> faz isso e registra a liberação; reimprimir a mesma peça <b>soma no contador</b> em vez de criar outra GRD. Peça ainda não cortada sai com "R a definir no corte" e o campo pra anotar. "Ver original" mostra o PDF da Engenharia, sem carimbo e sem registro.</p>
+          <p className="text-[11px] text-torg-gray">{soImprimir
+            ? <>Nesta aba só existe <b>"Imprimir (GRD)"</b>: ela é o registro da liberação. O PDF sai carimbado com o <b>R</b> do material (corrida, certificado e fornecedor) + quem imprimiu, com data e hora. Reimprimir a mesma peça <b>soma no contador e grava a cópia</b> em vez de criar outra GRD.</>
+            : <>O formato (A1–A4) vem da pasta da Engenharia — imprima no papel indicado. <b>"Emitir carimbado"</b> carimba no PDF o <b>R</b> do material (com corrida, certificado e fornecedor) + quem emitiu com data/hora, arquiva na pasta da OP e amarra o <b>mesmo arquivo</b> na Seção 02 do Data Book — <b>sem</b> registrar GRD, porque abrir o desenho não é liberação. <b>"Imprimir (GRD)"</b> faz isso e registra a liberação; reimprimir a mesma peça <b>soma no contador</b> em vez de criar outra GRD. Peça ainda não cortada sai com "R a definir no corte" e o campo pra anotar. "Ver original" mostra o PDF da Engenharia, sem carimbo e sem registro.</>}</p>
         </div>
       </div>
     </div>

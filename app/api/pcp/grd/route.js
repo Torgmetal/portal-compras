@@ -44,7 +44,7 @@ export async function GET(req) {
       where: { opNumero: num },
       orderBy: [{ ultimaImpressaoEm: "desc" }, { createdAt: "desc" }],
       select: {
-        id: true, marca: true, arquivo: true, formato: true, setor: true, rastreio: true,
+        id: true, marca: true, arquivo: true, formato: true, setor: true, rastreio: true, historico: true,
         impressoes: true, ultimaImpressaoEm: true, createdAt: true,
         liberadoPorNome: true, impressoItemId: true, impressoUrl: true, documentoId: true,
       },
@@ -58,7 +58,12 @@ export async function GET(req) {
       // "preciso entender os que der problema e abrir ele para saber do que se trata").
       op: op ? { id: op.id, numero: op.numero, obra: op.obra, cliente: op.cliente } : { numero: num },
       cobertura,
-      linhas: linhas.map((l) => ({ ...l, resumoR: resumoRastreio(l.rastreio), rastreio: undefined })),
+      // ⚠ o histórico vai do mais RECENTE para o mais antigo: quem abre a GRD quer a última cópia
+      linhas: linhas.map((l) => ({
+        ...l, resumoR: resumoRastreio(l.rastreio), rastreio: undefined,
+        copias: (Array.isArray(l.historico) ? l.historico : []).slice().reverse(),
+        historico: undefined,
+      })),
     });
   }
 

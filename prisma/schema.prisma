@@ -4213,6 +4213,11 @@ model GrdLiberacao {
   // marca/arquivo/setor NÃO cria outra GRD: soma aqui, com a data da última. (Vitor 19/08.)
   impressoes      Int      @default(1)
   ultimaImpressaoEm DateTime?
+  // ⚠ CADA CÓPIA, não só quantas. Vitor (26/08/2026): "garanta que está sendo registradas copias
+  // que foram impressas novamente não estou vendo esse registro dessas copias". O contador dizia o
+  // total e a data da última — quem imprimiu a 2ª via, quando e com qual R não ficava em lugar
+  // nenhum, e é exatamente isso que uma GRD existe para provar.
+  historico       Json? // [{ em, por, itemId, rs: [] }] — uma entrada por impressão
   liberadoPorId   String?
   liberadoPorNome String?
   createdAt       DateTime @default(now())

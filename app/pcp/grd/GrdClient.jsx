@@ -219,7 +219,7 @@ export default function GrdClient() {
       </p>
 
       {desenho && (
-        <DesenhoPecaModal opNumero={desenho.opNumero} opId={desenho.opId} marca={desenho.marca} setor={desenho.setor} onClose={() => setDesenho(null)} />
+        <DesenhoPecaModal opNumero={desenho.opNumero} opId={desenho.opId} marca={desenho.marca} setor={desenho.setor} soImprimir onClose={() => setDesenho(null)} />
       )}
     </div>
   );
@@ -305,7 +305,15 @@ function Detalhe({ det, abrirPdf, onVerDesenho }) {
                       ? <span className="text-emerald-800">{l.resumoR.texto}</span>
                       : <span className="text-amber-700 font-sans inline-flex items-center gap-1"><AlertTriangle size={10} /> sem R no papel</span>}
                   </td>
-                  <td className="px-2.5 py-1.5 text-right tabular-nums font-semibold">{fmtN(l.impressoes || 1)}</td>
+                  {/* ⚠ o contador vira a LISTA das cópias na dica: "3" não prova nada; "3 cópias,
+                      estas horas, por estas pessoas" é o que uma GRD tem de responder. */}
+                  <td className="px-2.5 py-1.5 text-right tabular-nums font-semibold"
+                      title={l.copias?.length
+                        ? l.copias.map((c, i) => `${l.copias.length - i}ª · ${fmtDH(c.em)} · ${c.por || "—"}${c.rs?.length ? " · R " + c.rs.join(", ") : ""}`).join("\n")
+                        : "sem histórico por cópia (impressão anterior a 26/08/2026)"}>
+                    {fmtN(l.impressoes || 1)}
+                    {l.copias?.length > 1 && <span className="ml-1 text-[9px] text-torg-blue align-super">•</span>}
+                  </td>
                   <td className="px-2.5 py-1.5 whitespace-nowrap tabular-nums text-torg-gray">{fmtDH(l.createdAt)}</td>
                   <td className="px-2.5 py-1.5 whitespace-nowrap tabular-nums">{fmtDH(l.ultimaImpressaoEm || l.createdAt)}</td>
                   <td className="px-2.5 py-1.5 whitespace-nowrap">{l.liberadoPorNome || "—"}</td>

@@ -14,6 +14,8 @@ import { casaMarca } from "@/lib/pasta-engenharia";
 import { requireRole } from "@/lib/session";
 import { getAccessToken, acharPastaOp, uploadFileToFolder } from "@/lib/sharepoint";
 import { rastreioDoConjunto } from "@/lib/rastreio-peca";
+import { amarracoesDaOp, amarracaoDoPerfil } from "@/lib/r-amarrado";
+import { novaEntradaGrd } from "@/lib/grd-registro";
 import { carimbarDesenho } from "@/lib/carimbo-desenho";
 import { dataHoraBR } from "@/lib/data-br";
 import { consumivelDoConjunto } from "@/lib/consumivel-solda";
@@ -118,6 +120,17 @@ export async function POST(req) {
   // 1) rastreabilidade da marca AGORA (croqui = a própria peça; conjunto = os croquis dele)
   let itens = [];
   try { if (opId) itens = await rastreioDoConjunto(opNumero, opId, marca); } catch {}
+  // ⚠⚠ O R AMARRADO ENTRA NO CARIMBO. `rastreioDoConjunto` só dá R a peça JÁ CORTADA e o desenho é
+  // impresso ANTES de cortar — o papel saía "sem R" exatamente quando ele é necessário. Vitor
+  // (25/08/2026): "imprime os desenhos para o setor já marca o R". Mesma regra do lote.
+  try {
+    const semR = !itens.some((i) => (i.usadas || []).some((u) => u.rastreio));
+    if (semR && opId) {
+      const pc = await prisma.pecaConjunto.findFirst({ where: { opId, marca }, select: { perfil: true } });
+      const am = pc?.perfil ? amarracaoDoPerfil(await amarracoesDaOp(opNumero), pc.perfil) : null;
+      if (am) itens = [...itens, { marca, perfil: pc.perfil, situacao: "R_INDICADO", usadas: [{ rastreio: am.r, indicado: true, por: am.por || null }] }];
+    }
+  } catch {}
 
   // 2) baixa o desenho original, carimba e arquiva. Se qualquer passo falhar, a liberação (GRD)
   //    ainda é registrada e a tela cai no PDF original — o controle não pode parar por causa do
@@ -176,7 +189,7 @@ export async function POST(req) {
     const jaTem = await prisma.grdLiberacao.findFirst({
       where: { opNumero, marca, arquivo: body.arquivo.trim(), setor: body.setor || null },
       orderBy: { createdAt: "desc" },
-      select: { id: true, impressoes: true },
+      select: { id: true, impressoes: true, historico: true },
     });
     reg = jaTem
       ? await prisma.grdLiberacao.update({
@@ -184,6 +197,7 @@ export async function POST(req) {
           data: {
             impressoes: { increment: 1 }, ultimaImpressaoEm: agora,
             rastreio: itens.length ? itens : undefined,
+            historico: novaEntradaGrd({ anterior: jaTem.historico, quando: agora, usuario: user.name || user.email || null, itemId: carimbado?.id || null, itens }),
             impressoItemId: carimbado?.id || undefined,
             impressoUrl: carimbado?.webUrl || undefined,
           },
@@ -200,6 +214,7 @@ export async function POST(req) {
             impressoItemId: carimbado?.id || null,
             impressoUrl: carimbado?.webUrl || null,
             impressoes: 1, ultimaImpressaoEm: agora,
+            historico: novaEntradaGrd({ anterior: [], quando: agora, usuario: user.name || user.email || null, itemId: carimbado?.id || null, itens }),
             liberadoPorId: user.id,
             liberadoPorNome: user.name || null,
           },
