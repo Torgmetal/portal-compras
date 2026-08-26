@@ -48,6 +48,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
     const datas = keys.map((k) => d?.datasSetor?.[k]).filter(Boolean).sort();
     return datas[0] || null;
   };
+  const frenteSel = sel ? d?.frentes?.find((f) => f.frente === sel) : null;
   const marco = sel ? marcoDe(setores) : null;
   const desvio = marco ? Math.round((new Date().setUTCHours(12,0,0,0) - new Date(`${marco}T12:00:00Z`)) / 86400000) : null;
 
@@ -114,9 +115,10 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
           <thead className="bg-gray-50 text-[11px] uppercase text-torg-gray">
             <tr>
               <th className="px-3 py-2 text-left font-semibold">Frente</th>
-              <th className="px-3 py-2 text-right font-semibold">Peso</th>
-              <th className="px-3 py-2 text-right font-semibold">Peças</th>
-              <th className="px-3 py-2 text-right font-semibold">Conjuntos</th>
+              <th className="px-3 py-2 text-right font-semibold" title="Croqui + avulsa — o que a Preparação corta">Peso p/ corte</th>
+              <th className="px-3 py-2 text-right font-semibold" title="Peças P (croqui) — só passam pela Preparação">Peças P</th>
+              <th className="px-3 py-2 text-right font-semibold" title="Avulsas — cortam e vão direto ao Jato">Avulsas</th>
+              <th className="px-3 py-2 text-right font-semibold" title="Conjuntos — Montagem em diante">Conjuntos</th>
               <th className="px-3 py-2 text-left font-semibold">Situação</th>
               <th className="px-3 py-2" />
             </tr>
@@ -129,7 +131,8 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                 <tr key={f.frente} className={l && l.status !== "CANCELADA" ? "bg-emerald-50/30" : ""}>
                   <td className="px-3 py-2 font-mono text-[12px] font-semibold text-torg-dark">{f.frente}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-[12px]">{fmtKg(f.kg)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-[12px] text-torg-gray">{fmtN(f.pecas)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-[12px] text-torg-gray">{fmtN(f.croqui?.n || 0)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-[12px] text-torg-gray">{fmtN(f.avulsa?.n || 0)}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-[12px] text-torg-gray">{fmtN(f.conjuntos)}</td>
                   <td className="px-3 py-2">
                     {!l || l.status === "CANCELADA" ? (
@@ -176,15 +179,33 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
             <div className="flex flex-wrap gap-1.5">
               {d.setores.map((s) => {
                 const on = setores.includes(s.key);
+                const e = frenteSel?.escopo?.[s.key];
                 return (
                   <button key={s.key} onClick={() => setSetores((v) => (on ? v.filter((k) => k !== s.key) : [...v, s.key]))}
-                    className={`text-[12px] px-2.5 py-1 rounded-lg border ${on ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue"}`}>
+                    title={e ? `${s.label}: ${e.o} — ${fmtN(e.n)} item(ns), ${fmtKg(e.kg)}` : s.label}
+                    className={`text-[12px] px-2.5 py-1 rounded-lg border ${on ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue"} ${e && !e.n ? "opacity-40" : ""}`}>
                     {s.label}
                     {d.datasSetor?.[s.key] && <span className={`ml-1.5 text-[10px] ${on ? "text-white/70" : "text-torg-gray-light"}`}>{fmtD(d.datasSetor[s.key])}</span>}
                   </button>
                 );
               })}
             </div>
+            {/* ⚠ DIZER O QUE CADA SETOR RECEBE. Croqui não se monta, conjunto não se corta — sem
+                isto, liberar "Montagem" numa frente só de peça P parece funcionar e não desce nada. */}
+            {frenteSel && setores.length > 0 && (
+              <div className="mt-2 space-y-0.5">
+                {setores.map((k) => {
+                  const e = frenteSel.escopo?.[k];
+                  const lbl = d.setores.find((s) => s.key === k)?.label || k;
+                  if (!e) return null;
+                  return (
+                    <p key={k} className={`text-[11px] ${e.n ? "text-torg-gray" : "text-amber-700"}`}>
+                      <b>{lbl}</b> recebe {e.o}: {e.n ? `${fmtN(e.n)} item(ns) · ${fmtKg(e.kg)}` : "nada nesta frente"}
+                    </p>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
