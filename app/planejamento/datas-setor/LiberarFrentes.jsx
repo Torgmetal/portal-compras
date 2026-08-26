@@ -124,7 +124,11 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   // é conferência antiga que não mediu isso — aí não se cobra, senão travava tudo até o cron passar.
   // ⚠ JÁ PROGRAMADA SAI DA ESCOLHA. Programar a semana é voltar aqui vários dias seguidos; se a
   // peça do dia 1 continuasse disponível, o "preencher o dia" devolveria o mesmo lote sempre.
-  const liberavel = (p) => !!d?.pasta?.confiavel && p.temDesenho === true && p.temMaquina !== false && !p.programadaEm;
+  // ⚠ SEM MATERIAL NÃO PROGRAMA. Vitor (26/08/2026): "vc não deve programar aquilo que não tem em
+  // estoque, marcar o que tem de outra obra até ok, mas o que não tem não pode". ESTOQUE passa — o
+  // aço existe, só entrou por outra obra, e o R quem informa é o PCP.
+  const liberavel = (p) => !!d?.pasta?.confiavel && p.temDesenho === true && p.temMaquina !== false
+    && p.material !== "SEM_MATERIAL" && !p.programadaEm;
   const selecionaveis = useMemo(() => f.filtradas.filter(liberavel), [f.filtradas]);
   const selecionadas = useMemo(() => f.filtradas.filter((p) => sel.has(p.id)), [f.filtradas, sel]);
   const somaSel = useMemo(() => selecionadas.reduce((a, p) => ({
@@ -462,7 +466,8 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                 d.material.naoComprado > 0 ? `${fmtN(d.material.naoComprado)} sem RM` : null,
               ].filter(Boolean).join(" · ")}
             </>}.
-            {" "}Dá para liberar assim mesmo: quem separa o material e trava o que falta é o PCP.
+            {" "}Essas não entram na programação enquanto o aço não chegar. As de <b>estoque</b> entram —
+            existe material igual, e o R quem informa é o PCP.
           </span>
         </div>
       )}
@@ -724,15 +729,16 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
           <span className="inline-flex items-center gap-1"><Check size={13} className="text-emerald-600" /> tem — pode ser liberada</span>
           <span className="text-torg-gray-light">Desenho = o que a bancada abre · NC1 = o que a máquina lê</span>
         </div>
-        {/* ⚠ MATERIAL NÃO TRAVA AQUI. Vitor (25/08/2026) pôs essa etapa no PCP: "pcp recebe a
-            solicitação, manda separar o material (…) caso não tenha o material não libera aquele
-            projeto para preparar". Aqui é para o Planejamento saber com o que está contando. */}
+        {/* ⚠ MATERIAL TRAVA — mas só o que NÃO EXISTE. Vitor (26/08/2026): "vc não deve programar
+            aquilo que não tem em estoque, marcar o que tem de outra obra até ok, mas o que não tem
+            não pode". O PCP continua com a etapa dele (separar e informar o R do estoque); o que
+            não pode é o dia nascer com peça sem aço. */}
         <div className="px-3 pb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-torg-gray">
           <span className="uppercase text-torg-gray-light">Material</span>
           <span className="inline-flex items-center gap-1"><Check size={13} className="text-emerald-600" /> entregue nesta obra (CMR)</span>
           <span className="inline-flex items-center gap-1 text-amber-700"><FileWarning size={13} /> estoque — existe, entrou por outra OP</span>
           <span className="inline-flex items-center gap-1 text-red-600"><X size={13} /> a caminho / não tem</span>
-          <span className="text-torg-gray-light">não trava a liberação — quem separa material é o PCP</span>
+          <span className="text-torg-gray-light">sem material não programa · estoque programa (o PCP informa o R)</span>
           <span className="inline-flex items-center gap-1"><X size={13} className="text-red-500" /> não tem</span>
           <span className="inline-flex items-center gap-1 text-amber-700"><FileWarning size={13} /> nome — existe com outro nome, é renomear</span>
           <span className="inline-flex items-center gap-1"><Minus size={13} className="text-torg-gray-light" /> sem conferência que valha</span>

@@ -12,6 +12,7 @@ import { requireRole } from "@/lib/session";
 import { frentesDaOp, desvioDoMarco, PRIORIDADES, SETORES_LIBERAVEIS } from "@/lib/liberacao-producao";
 import { FLUXO_SETORES, datasSetorDoCronograma } from "@/lib/prioridades-setor";
 import { portaoDoDesenho } from "@/lib/pasta-engenharia";
+import { analisarMaterial } from "@/lib/material-liberacao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,8 +121,20 @@ export async function POST(req) {
   // ⚠ as marcas vêm do BANCO, não do que o cliente mandou: o corpo do POST traz ids, e é o id que
   // se resolve em marca aqui. Confiar numa marca enviada pela tela seria o mesmo furo de novo.
   const alvo = d.pecaIds?.length
-    ? await prisma.pecaConjunto.findMany({ where: { id: { in: d.pecaIds }, opId: op.id }, select: { id: true, marca: true } })
-    : await prisma.pecaConjunto.findMany({ where: { opId: op.id, fonte: "LPC_IMPORT", opNumero: d.frente }, select: { id: true, marca: true } });
+    ? await prisma.pecaConjunto.findMany({ where: { id: { in: d.pecaIds }, opId: op.id }, select: { id: true, marca: true, perfil: true, pesoTotalKg: true } })
+    : await prisma.pecaConjunto.findMany({ where: { opId: op.id, fonte: "LPC_IMPORT", opNumero: d.frente }, select: { id: true, marca: true, perfil: true, pesoTotalKg: true } });
+
+  // ⚠⚠ SEM MATERIAL NÃO SE PROGRAMA. Vitor (26/08/2026): "vc não deve programar aquilo que não tem
+  // em estoque, marcar o que tem de outra obra até ok, mas o que não tem não pode".
+  //
+  // Eu tinha deixado isto só como aviso, argumentando que material chega no meio da semana e que
+  // travar aqui tiraria do PCP a etapa dele. Ele reafirmou — e a razão é melhor que a minha:
+  // programar um dia com peça sem aço é montar um calendário que a fábrica não cumpre, e o furo só
+  // aparece na manhã do corte.
+  //
+  // ⚠ ESTOQUE PASSA. Material igual que entrou por outra obra existe fisicamente; quem responde
+  // qual R foi usado é o PCP, na etapa dele. O que não passa é o que NÃO EXISTE.
+  const mat = await analisarMaterial(op.numero, alvo).catch(() => null);
 
   // ⚠ DOIS ARQUIVOS, DOIS PORTÕES. Vitor (26/08/2026): "vamos colocar um status dos arquivos nc1
   // ou igs (…) para poder garantir que todos os arquivos necessários estão prontos para liberar".
@@ -134,6 +147,9 @@ export async function POST(req) {
   const barradas = new Map();
   for (const p of alvo) {
     const k = String(p.marca || "").trim().toUpperCase();
+    // ⚠ análise falhou (null) não vira "não tem": travaria a casa por um erro de leitura
+    const estado = mat?.porPeca?.get(p.id)?.estado || null;
+    if (estado === "SEM_MATERIAL" && !barradas.has(k)) barradas.set(k, "sem material");
     if (portao.maquinaMedida && portao.semMaquina.has(k) && !portao.semDesenho.has(k) && !barradas.has(k)) {
       barradas.set(k, "sem NC1");
     }
@@ -146,7 +162,7 @@ export async function POST(req) {
   if (barradas.size) {
     const amostra = [...barradas.entries()].slice(0, 8).map(([m, por]) => `${m} (${por})`);
     return NextResponse.json({
-      error: `${barradas.size} marca(s) desta liberação não têm o arquivo pronto na pasta: ${amostra.join(", ")}${barradas.size > 8 ? "…" : ""}. Só desce para o PCP o que tem desenho e arquivo de máquina.`,
+      error: `${barradas.size} marca(s) desta liberação não estão prontas: ${amostra.join(", ")}${barradas.size > 8 ? "…" : ""}. Só desce para o PCP o que tem desenho, arquivo de máquina e material.`,
       semArquivo: barradas.size,
       marcas: [...barradas.keys()],
       checadoEm: portao.checadoEm,
