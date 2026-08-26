@@ -95,7 +95,10 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   const [marcando, setMarcando] = useState(false);
   const [conferindo, setConferindo] = useState(false);
   const [baixando, setBaixando] = useState(false);
-  const [dia, setDia] = useState("");
+  // ⚠⚠ O DIA NASCE PREENCHIDO. Vitor liberou 19 peças (8.422 kg) e a pasta não saiu: o campo estava
+  // vazio, e sem dia não há pasta para criar. O campo ser opcional fazia o caminho normal — marcar e
+  // apertar o botão — cair no caminho que NÃO monta a pasta, em silêncio.
+  const [dia, setDia] = useState(() => proximoDiaUtil().toISOString().slice(0, 10));
   const [programandoSemana, setProgramandoSemana] = useState(false);
   const [plano, setPlano] = useState(null);
   const [nDias, setNDias] = useState(5);
@@ -396,6 +399,9 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
       if (!r.ok) throw new Error(j.error || "Erro ao liberar");
       ok = true;
       if (dia && j.liberacao?.id) await montarPastas([j.liberacao.id]);
+      // ⚠ liberar sem dia é permitido (nem toda liberação é de um dia), mas não pode ser mudo: sem
+      // data não existe pasta em 2.5.2.4, e quem espera os NC1/IGS lá vai achar que falhou.
+      else if (!dia) setPastas([{ ok: false, erro: "liberação sem dia — a pasta com os arquivos de máquina não foi criada. Informe o dia e libere de novo, ou peça para eu montar a pasta desta liberação." }]);
       setSel(new Set()); setSugestao(null); setMotivo("");
       // ⚠ o próximo dia já vem preenchido: quem programa a semana não deveria digitar data sete vezes
       if (dia) setDia(somarDiasUteis(new Date(`${dia}T12:00:00Z`), 1).toISOString().slice(0, 10));
@@ -751,6 +757,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
               Liberar {fmtN(somaSel.n)} peça(s){dia ? ` para ${fmtD(dia)}` : ""}
             </button>
             {!setores.length && <span className="text-[11px] text-red-600">escolha ao menos um setor</span>}
+            {!dia && <span className="text-[11px] text-amber-700">sem dia informado — não vai gerar a pasta de NC1/IGS</span>}
             <span className="text-[11px] text-torg-gray-light">o PCP gera a separação, imprime os projetos e libera para os setores</span>
           </div>
         </div>
