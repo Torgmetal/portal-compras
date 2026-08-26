@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Loader2, Paintbrush, Pencil, Check, X, FolderSearch, Download } from "lucide-react";
+import { Loader2, Paintbrush, Pencil, Check, X, FolderSearch, Download, FileSpreadsheet } from "lucide-react";
 import { METODOS_PREPARO, PLP_PADRAO, resumoPlp, camposDoRelatorioPintura } from "@/lib/plp";
 import { GRAUS_LIMPEZA, METODOS_APLICACAO } from "@/lib/pintura-campos";
 
@@ -181,6 +181,15 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas, onPlp, res =
                 <Download size={11} /> Preencher
               </button>
             )}
+            {/* ⚠ o PLP no PADRÃO TORG, em Excel. Vitor (26/08/2026): "deixar ele no formato excel
+                para ficar mais sério, preservar os campos de assinatura" — a fiscalização do
+                cliente assina à caneta no papel impresso, então o arquivo tem de sair com o espaço,
+                não com uma assinatura embutida. */}
+            <a href={`/api/qualidade/plp/${encodeURIComponent(opNumero)}/excel`}
+              title="Gera o PLP da obra no padrão Torg (3 folhas, com os campos de assinatura) em Excel"
+              className="text-[11px] font-semibold text-torg-dark border border-torg-blue-300 rounded-lg px-2.5 py-1 hover:bg-white inline-flex items-center gap-1">
+              <FileSpreadsheet size={11} /> PLP Torg (Excel)
+            </a>
             <button onClick={abrir} className="text-[11px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-2.5 py-1 hover:bg-white inline-flex items-center gap-1">
               <Pencil size={11} /> {dados.plp ? "Editar" : "Definir"}
             </button>
