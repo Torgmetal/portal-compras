@@ -29,12 +29,15 @@ const PRIO = {
 };
 // ⚠ o nome que a fábrica usa. Vitor (26/08/2026): croqui é croqui, e a avulsa é uma MARCA — "Peça
 // P" e "Avulsa" eram rótulo de tela, não a palavra de quem trabalha com a peça na mão.
+// ⚠ SEM "ESTOQUE". Vitor (26/08/2026): "essa informação não mostrar mais, pois nesse caso não
+// sabemos quanto tem de estoque mesmo — sendo assim deixe apenas o filtro do aguardando entrega,
+// cotação ou não comprado". O que sobra é o estado da COMPRA, que é verificável.
 const MAT = {
-  NA_OP:        { rot: "entregue",   dica: "material desta obra recebido no CMR",             cor: "text-emerald-600", Icone: "Check" },
-  ESTOQUE:      { rot: "de estoque", dica: "existe material igual, mas entrou por outra obra — o PCP informa o R usado", cor: "text-amber-700", Icone: "FileWarning" },
-  SEM_MATERIAL: { rot: "não chegou", dica: "sem entrada no CMR para este perfil",             cor: "text-red-500",     Icone: "X" },
+  ENTREGUE:           { rot: "entregue",           dica: "recebido no CMR desta obra" },
+  AGUARDANDO_ENTREGA: { rot: "aguardando entrega", dica: "pedido emitido — o aço está a caminho" },
+  SOLICITADO:         { rot: "cotação",            dica: "RM aberta, pedido ainda não emitido" },
+  NAO_COMPRADO:       { rot: "não comprado",       dica: "sem RM para este perfil nesta obra" },
 };
-const MAT_FALTA = { AGUARDANDO_ENTREGA: "aguardando entrega", SOLICITADO: "pedido não emitido", NAO_COMPRADO: "não comprado" };
 
 const NAT = { croqui: "Croqui", avulsa: "Marca", conjunto: "Conjunto" };
 
@@ -124,11 +127,13 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   // é conferência antiga que não mediu isso — aí não se cobra, senão travava tudo até o cron passar.
   // ⚠ JÁ PROGRAMADA SAI DA ESCOLHA. Programar a semana é voltar aqui vários dias seguidos; se a
   // peça do dia 1 continuasse disponível, o "preencher o dia" devolveria o mesmo lote sempre.
-  // ⚠ SEM MATERIAL NÃO PROGRAMA. Vitor (26/08/2026): "vc não deve programar aquilo que não tem em
-  // estoque, marcar o que tem de outra obra até ok, mas o que não tem não pode". ESTOQUE passa — o
-  // aço existe, só entrou por outra obra, e o R quem informa é o PCP.
+  // ⚠ SÓ PROGRAMA O QUE CHEGOU NESTA OBRA. Vitor (26/08/2026), duas vezes no mesmo dia: primeiro
+  // "vc não deve programar aquilo que não tem em estoque", depois tirando o próprio estoque da
+  // conta — "não sabemos quanto tem de estoque mesmo". Aguardando entrega, cotação e não comprado
+  // não entram; o PCP segue podendo usar estoque e informar o R, que é a etapa dele.
   const liberavel = (p) => !!d?.pasta?.confiavel && p.temDesenho === true && p.temMaquina !== false
-    && p.material !== "SEM_MATERIAL" && !p.programadaEm;
+    && p.material !== "AGUARDANDO_ENTREGA" && p.material !== "SOLICITADO" && p.material !== "NAO_COMPRADO"
+    && !p.programadaEm;
   const selecionaveis = useMemo(() => f.filtradas.filter(liberavel), [f.filtradas]);
   const selecionadas = useMemo(() => f.filtradas.filter((p) => sel.has(p.id)), [f.filtradas, sel]);
   const somaSel = useMemo(() => selecionadas.reduce((a, p) => ({
@@ -219,8 +224,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         { t: "Desenho", w: 22, v: (p) => (p.temDesenho == null ? "não conferido" : p.temDesenho ? "tem"
             : p.desenhoForaPadrao ? `outro nome: ${p.desenhoForaPadrao}` : "não tem") },
         { t: "NC1", w: 12, v: (p) => (p.temMaquina == null ? "não medido" : p.temMaquina ? "tem" : "não tem") },
-        { t: "Material", w: 20, v: (p) => (!p.material ? "não medido"
-            : p.material === "SEM_MATERIAL" ? (MAT_FALTA[p.materialFalta] || "não chegou") : MAT[p.material]?.rot || p.material) },
+        { t: "Material", w: 20, v: (p) => (p.material ? MAT[p.material]?.rot || p.material : "não medido") },
         { t: "Perfil", w: 22, v: (p) => p.perfil || "" },
         { t: "Aço", w: 14, v: (p) => p.aco || "" },
         { t: "Compr. (mm)", w: 12, dir: "right", v: (p) => Math.round(p.comprimentoMm || 0) },
@@ -477,20 +481,19 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         </div>
       )}
 
-      {d?.material && d.material.semMaterial > 0 && (
+      {d?.material && d.material.naoEntregue > 0 && (
         <div className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2.5 text-[12px] text-sky-900 flex items-start gap-2">
           <AlertCircle size={15} className="mt-0.5 shrink-0" />
           <span>
-            <b>{fmtN(d.material.semMaterial)} peça(s) · {fmtKg(d.material.kgSemMaterial)} sem material entregue</b>
+            <b>{fmtN(d.material.naoEntregue)} peça(s) · {fmtKg(d.material.kgNaoEntregue)} sem material entregue</b>
             {(d.material.aguardandoEntrega > 0 || d.material.solicitado > 0 || d.material.naoComprado > 0) && <>
               {" "}— {[
                 d.material.aguardandoEntrega > 0 ? `${fmtN(d.material.aguardandoEntrega)} a caminho` : null,
-                d.material.solicitado > 0 ? `${fmtN(d.material.solicitado)} sem pedido emitido` : null,
-                d.material.naoComprado > 0 ? `${fmtN(d.material.naoComprado)} sem RM` : null,
+                d.material.solicitado > 0 ? `${fmtN(d.material.solicitado)} em cotação` : null,
+                d.material.naoComprado > 0 ? `${fmtN(d.material.naoComprado)} não comprado` : null,
               ].filter(Boolean).join(" · ")}
             </>}.
-            {" "}Essas não entram na programação enquanto o aço não chegar. As de <b>estoque</b> entram —
-            existe material igual, e o R quem informa é o PCP.
+            {" "}Essas não entram na programação enquanto o aço não chegar nesta obra.
           </span>
         </div>
       )}
@@ -713,9 +716,10 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                     </td>
                     <td className="px-3 py-1.5 whitespace-nowrap">
                       {!p.material ? <Minus size={13} className="text-torg-gray-light" title="Material não medido para esta peça" />
-                        : p.material === "NA_OP" ? <Check size={14} className="text-emerald-600" title={MAT.NA_OP.dica} />
-                        : p.material === "ESTOQUE" ? <span className="inline-flex items-center gap-1 text-[11px] text-amber-700" title={MAT.ESTOQUE.dica}><FileWarning size={13} className="shrink-0" /> estoque</span>
-                        : <span className="inline-flex items-center gap-1 text-[11px] text-red-600" title={MAT_FALTA[p.materialFalta] || MAT.SEM_MATERIAL.dica}><X size={13} className="shrink-0" /> {p.materialFalta === "AGUARDANDO_ENTREGA" ? "a caminho" : "não tem"}</span>}
+                        : p.material === "ENTREGUE" ? <Check size={14} className="text-emerald-600" title={MAT.ENTREGUE.dica} />
+                        : <span className="inline-flex items-center gap-1 text-[11px] text-red-600 whitespace-nowrap" title={MAT[p.material]?.dica || ""}>
+                            <X size={13} className="shrink-0" /> {MAT[p.material]?.rot || "não tem"}
+                          </span>}
                     </td>
                     <td className="px-3 py-1.5 text-[12px] text-torg-gray truncate max-w-[18ch]" title={p.perfil}>{p.perfil || "—"}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-torg-gray">{p.comprimentoMm ? fmtN(p.comprimentoMm) : "—"}</td>
@@ -752,9 +756,8 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         <div className="px-3 pb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-torg-gray">
           <span className="uppercase text-torg-gray-light">Material</span>
           <span className="inline-flex items-center gap-1"><Check size={13} className="text-emerald-600" /> entregue nesta obra (CMR)</span>
-          <span className="inline-flex items-center gap-1 text-amber-700"><FileWarning size={13} /> estoque — existe, entrou por outra OP</span>
-          <span className="inline-flex items-center gap-1 text-red-600"><X size={13} /> a caminho / não tem</span>
-          <span className="text-torg-gray-light">sem material não programa · estoque programa (o PCP informa o R)</span>
+          <span className="inline-flex items-center gap-1 text-red-600"><X size={13} /> aguardando entrega · cotação · não comprado</span>
+          <span className="text-torg-gray-light">só programa o que já chegou</span>
           <span className="inline-flex items-center gap-1"><X size={13} className="text-red-500" /> não tem</span>
           <span className="inline-flex items-center gap-1 text-amber-700"><FileWarning size={13} /> nome — existe com outro nome, é renomear</span>
           <span className="inline-flex items-center gap-1"><Minus size={13} className="text-torg-gray-light" /> sem conferência que valha</span>

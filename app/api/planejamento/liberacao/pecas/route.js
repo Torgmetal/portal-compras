@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { portaoDoDesenho, temDesenhoNaPasta, temMaquinaNaPasta } from "@/lib/pasta-engenharia";
-import { analisarMaterial } from "@/lib/material-liberacao";
+import { analisarMaterial, statusMaterialPlanejamento } from "@/lib/material-liberacao";
 import { requireRole } from "@/lib/session";
 import { pecaCortada, poolDaPeca, POOLS } from "@/lib/liberacao-producao";
 
@@ -133,7 +133,13 @@ export async function GET(req) {
       soEnvio: pecas.filter((x) => x.desenhoSoEnvio).length,
     },
     // ⚠ o resumo do material vem do MESMO cálculo do painel do PCP
-    material: material ? material.resumo : null,
+    material: material ? {
+      ...material.resumo,
+      // ⚠ o resumo do lib conta ESTOQUE à parte; aqui ele já entrou na fila de compra
+      naoEntregue: pecas.filter((x) => x.material && x.material !== "ENTREGUE").length,
+      kgNaoEntregue: Math.round(pecas.filter((x) => x.material && x.material !== "ENTREGUE")
+        .reduce((a, x) => a + (x.pesoTotalKg || 0), 0)),
+    } : null,
     // os dias já programados desta obra, para a tela mostrar a semana montada
     dias: [...abertas.reduce((m, l) => {
       const k = l.dataProgramada ? l.dataProgramada.toISOString().slice(0, 10) : "";

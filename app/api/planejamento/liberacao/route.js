@@ -12,7 +12,7 @@ import { requireRole } from "@/lib/session";
 import { frentesDaOp, desvioDoMarco, PRIORIDADES, SETORES_LIBERAVEIS } from "@/lib/liberacao-producao";
 import { FLUXO_SETORES, datasSetorDoCronograma } from "@/lib/prioridades-setor";
 import { portaoDoDesenho } from "@/lib/pasta-engenharia";
-import { analisarMaterial } from "@/lib/material-liberacao";
+import { analisarMaterial, statusMaterialPlanejamento } from "@/lib/material-liberacao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -132,8 +132,10 @@ export async function POST(req) {
   // programar um dia com peça sem aço é montar um calendário que a fábrica não cumpre, e o furo só
   // aparece na manhã do corte.
   //
-  // ⚠ ESTOQUE PASSA. Material igual que entrou por outra obra existe fisicamente; quem responde
-  // qual R foi usado é o PCP, na etapa dele. O que não passa é o que NÃO EXISTE.
+  // ⚠ E ESTOQUE DEIXOU DE PASSAR (26/08/2026, mesmo dia). Eu tinha liberado material de outra obra
+  // por existir fisicamente; Vitor tirou: "não sabemos quanto tem de estoque mesmo". Sem saber
+  // quanto tem, contar com ele é programar sobre um número que ninguém conferiu. Aqui só passa o
+  // que chegou NESTA obra — o PCP continua podendo usar estoque e informar o R, que é a etapa dele.
   const mat = await analisarMaterial(op.numero, alvo).catch(() => null);
 
   // ⚠ DOIS ARQUIVOS, DOIS PORTÕES. Vitor (26/08/2026): "vamos colocar um status dos arquivos nc1
@@ -148,8 +150,11 @@ export async function POST(req) {
   for (const p of alvo) {
     const k = String(p.marca || "").trim().toUpperCase();
     // ⚠ análise falhou (null) não vira "não tem": travaria a casa por um erro de leitura
-    const estado = mat?.porPeca?.get(p.id)?.estado || null;
-    if (estado === "SEM_MATERIAL" && !barradas.has(k)) barradas.set(k, "sem material");
+    const st = statusMaterialPlanejamento(mat?.porPeca?.get(p.id));
+    if (st && st !== "ENTREGUE" && !barradas.has(k)) {
+      barradas.set(k, st === "AGUARDANDO_ENTREGA" ? "material aguardando entrega"
+        : st === "SOLICITADO" ? "material em cotação" : "material não comprado");
+    }
     if (portao.maquinaMedida && portao.semMaquina.has(k) && !portao.semDesenho.has(k) && !barradas.has(k)) {
       barradas.set(k, "sem NC1");
     }
