@@ -104,9 +104,19 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, soImpri
                           {ocupado(a, "EMITIR") ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Emitir carimbado
                         </button>
                       </>}
-                      <button onClick={() => emitir(a, "IMPRIMIR")} disabled={!!registrando} title="Emite o carimbado e REGISTRA A GRD (liberação pro setor). Reimprimir a mesma peça soma no contador, não cria outra GRD."
+                      {/* ⚠ O NOME MUDA DEPOIS DA PRIMEIRA. Vitor (26/08/2026) perguntou se
+                          reimprimir gera "uma nova versão do projeto" — NÃO gera, e é justamente
+                          por isso que o botão precisa dizer outra coisa. O desenho da Engenharia
+                          não muda; sai um PDF carimbado novo, com a data/hora e o R do momento, e
+                          mais uma CÓPIA somada na mesma GRD. Chamar isso de "imprimir" outra vez
+                          deixava a dúvida de pé — e a dúvida certa aqui é entre cópia e revisão. */}
+                      <button onClick={() => emitir(a, "IMPRIMIR")} disabled={!!registrando}
+                        title={lib
+                          ? `Gera outro PDF carimbado (com o R e a hora de agora) e registra a ${(lib.impressoes || 1) + 1}ª cópia nesta mesma GRD. Não altera o desenho da Engenharia nem cria revisão.`
+                          : "Emite o carimbado e REGISTRA A GRD (liberação pro setor)."}
                         className="text-[11px] font-semibold text-white bg-torg-blue hover:bg-torg-blue/90 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1 disabled:opacity-50">
-                        {ocupado(a, "IMPRIMIR") ? <Loader2 size={12} className="animate-spin" /> : <Printer size={12} />} Imprimir (GRD)
+                        {ocupado(a, "IMPRIMIR") ? <Loader2 size={12} className="animate-spin" /> : <Printer size={12} />}
+                        {lib ? `Nova cópia (${(lib.impressoes || 1) + 1}ª)` : "Imprimir (GRD)"}
                       </button>
                     </div>
                   </div>
@@ -152,7 +162,7 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, soImpri
 
         <div className="px-5 py-3 border-t border-gray-100">
           <p className="text-[11px] text-torg-gray">{soImprimir
-            ? <>Nesta aba só existe <b>"Imprimir (GRD)"</b>: ela é o registro da liberação. O PDF sai carimbado com o <b>R</b> do material (corrida, certificado e fornecedor) + quem imprimiu, com data e hora. Reimprimir a mesma peça <b>soma no contador e grava a cópia</b> em vez de criar outra GRD.</>
+            ? <>Nesta aba só existe <b>"Imprimir (GRD)"</b>: ela é o registro da liberação. O PDF sai carimbado com o <b>R</b> do material (corrida, certificado e fornecedor) + quem imprimiu, com data e hora. Depois da primeira, o botão vira <b>"Nova cópia"</b>: sai outro PDF carimbado, com o R e a hora de agora, e a cópia é somada nesta mesma GRD — <b>não é revisão do projeto</b>, o desenho da Engenharia continua o mesmo.</>
             : <>O formato (A1–A4) vem da pasta da Engenharia — imprima no papel indicado. <b>"Emitir carimbado"</b> carimba no PDF o <b>R</b> do material (com corrida, certificado e fornecedor) + quem emitiu com data/hora, arquiva na pasta da OP e amarra o <b>mesmo arquivo</b> na Seção 02 do Data Book — <b>sem</b> registrar GRD, porque abrir o desenho não é liberação. <b>"Imprimir (GRD)"</b> faz isso e registra a liberação; reimprimir a mesma peça <b>soma no contador</b> em vez de criar outra GRD. Peça ainda não cortada sai com "R a definir no corte" e o campo pra anotar. "Ver original" mostra o PDF da Engenharia, sem carimbo e sem registro.</>}</p>
         </div>
       </div>
