@@ -797,7 +797,12 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
           {/* ⚠ o que SOBRA é a informação que decide se a semana fecha a obra ou não */}
           {plano.sobra > 0 && (
             <p className="text-[12px] text-amber-800">
-              Sobram {fmtN(plano.sobra)} linha(s) · {fmtKg(plano.sobraKg)} depois destes dias — não cabem na meta.
+              {plano.motivo === "dias"
+                ? <>Ficaram <b>{fmtN(plano.sobra)} linha(s) · {fmtKg(plano.sobraKg)}</b> fora: os {fmtN(plano.dias.length)} dia(s)
+                    pedidos não dão conta da lista. Peça mais dias para programar o resto.</>
+                : <>Ficaram <b>{fmtN(plano.sobra)} linha(s) · {fmtKg(plano.sobraKg)}</b> fora e <b>não entram em dia nenhum</b>:
+                    cada uma sozinha passa do teto de um dia ({fmtN(Number(metaKg) || 0)} kg, no laser dela). Aumente a
+                    meta do dia para elas caberem.</>}
             </p>
           )}
 
