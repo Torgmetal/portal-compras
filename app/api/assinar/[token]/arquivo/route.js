@@ -7,7 +7,7 @@
 // exatamente o que recebeu para aceitar.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { excelDoPlano } from "@/lib/planos-aceite";
+import { excelDoPlano, ehTipoDePlano, docDoTipo } from "@/lib/planos-aceite";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,9 +20,10 @@ export async function GET(_req, { params }) {
   });
   if (!a) return new NextResponse("Link inválido.", { status: 404 });
   const { tipo, opNumero, snapshot } = a.envio;
-  if (tipo !== "PLP" && tipo !== "PIT") return new NextResponse("Este documento não tem arquivo.", { status: 400 });
+  if (!ehTipoDePlano(tipo)) return new NextResponse("Este documento não tem arquivo.", { status: 400 });
+  const doc = docDoTipo(tipo);
 
-  const arq = await excelDoPlano(prisma, tipo, opNumero || snapshot?.opNumero, { snapshot }).catch(() => null);
+  const arq = await excelDoPlano(prisma, doc, opNumero || snapshot?.opNumero, { snapshot }).catch(() => null);
   if (!arq) return new NextResponse("Não consegui montar o arquivo deste documento.", { status: 502 });
 
   return new NextResponse(Buffer.from(arq.bytes), {

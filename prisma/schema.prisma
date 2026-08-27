@@ -4721,6 +4721,27 @@ model EnvioAssinatura {
   @@index([opNumero])
 }
 
+// Quem ELABORA e quem VERIFICA o PIT e o PLP da obra, antes de o documento ir ao cliente.
+//
+// Vitor (26/08/2026): "deixar o campo de elaborado e verificado para poder ser preenchido e enviar
+// para esses e-mails antes, para depois ir até o cliente".
+//
+// ⚠ FICA POR OBRA E POR DOCUMENTO, não no usuário logado. O Excel preenchia "ELABORADO POR" com
+// quem clicou em gerar — o que faz o mesmo plano sair com um nome diferente a cada emissão.
+model PlanoResponsavel {
+  id              String   @id @default(cuid())
+  opNumero        String
+  doc             String // PIT | PLP
+  elaboradoNome   String?
+  elaboradoEmail  String?
+  verificadoNome  String?
+  verificadoEmail String?
+  atualizadoEm    DateTime @updatedAt
+  atualizadoPorId String?
+
+  @@unique([opNumero, doc])
+}
+
 model AssinaturaDocumento {
   id         String          @id @default(cuid())
   envioId    String

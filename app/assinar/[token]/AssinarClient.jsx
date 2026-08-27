@@ -36,6 +36,9 @@ export default function AssinarClient({ token }) {
   // ⚠ PLP e PIT são ACEITE DO CLIENTE. Quem clica é o inspetor do cliente, não um responsável de
   // setor nosso — a frase que ele confirma tem de dizer o que ele está de fato aprovando.
   const aceite = !!info?.aceiteCliente;
+  // ⚠ a verificação interna é OUTRA afirmação: quem assina aqui é da casa, e está dizendo que
+  // elaborou ou verificou o documento — não que o aceita como cliente.
+  const interna = !!info?.verificacaoInterna;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -62,7 +65,7 @@ export default function AssinarClient({ token }) {
         ) : (
           <div className="space-y-4">
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-              <p className="text-sm text-torg-gray">Olá <strong className="text-torg-dark">{info.nome}</strong>{info.setor ? ` · ${info.setor}` : ""} — {aceite ? "este documento da sua obra está aguardando o seu aceite." : "você foi indicado para validar este documento."}</p>
+              <p className="text-sm text-torg-gray">Olá <strong className="text-torg-dark">{info.nome}</strong>{info.setor ? ` · ${info.setor}` : ""} — {aceite ? "este documento da sua obra está aguardando o seu aceite." : interna ? `você foi indicado para a ${String(info.setor || "verificação").toLowerCase()} deste documento.` : "você foi indicado para validar este documento."}</p>
               <p className="text-[12px] text-torg-gray mt-1">Revisão <strong className="text-torg-dark">R{String(info.revisao ?? 0).padStart(2, "0")}</strong> · enviado em {fmtDT(info.enviadoEm)}</p>
               <div className="mt-3 flex flex-wrap items-center gap-4">
                 <a href={`/api/assinar/${token}/pdf`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-torg-blue hover:text-torg-dark font-medium">
@@ -98,7 +101,9 @@ export default function AssinarClient({ token }) {
                   <input type="checkbox" checked={concordo} onChange={(e) => setConcordo(e.target.checked)} className="mt-0.5 accent-torg-blue" />
                   <span>{aceite
                     ? <>Confirmo que li o documento acima e <strong>aceito</strong> o plano apresentado para esta obra.</>
-                    : <>Confirmo que li o documento acima e <strong>valido</strong> as informações como responsável do meu setor.</>}</span>
+                    : interna
+                      ? <>Confirmo a <strong>{String(info.setor || "verificação").toLowerCase()}</strong> deste documento e que ele está pronto para seguir ao cliente.</>
+                      : <>Confirmo que li o documento acima e <strong>valido</strong> as informações como responsável do meu setor.</>}</span>
                 </label>
                 {erro && <p className="text-xs text-red-600 mb-2">{erro}</p>}
                 <button onClick={assinar} disabled={!concordo || assinando} className="px-5 py-2.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-semibold inline-flex items-center gap-2 disabled:opacity-50">

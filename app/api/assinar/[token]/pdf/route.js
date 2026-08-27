@@ -30,7 +30,7 @@ export async function GET(_req, { params }) {
     bytes = await gerarPlanoTreinamentoPDF({ ano: snap.ano, revisao: snap.revisao, treinamentos: snap.treinamentos || [], assinaturas });
   } else if (a.envio.tipo === "CRONOGRAMA_AUDITORIA") {
     bytes = await gerarCronogramaAuditoriaPDF({ ano: snap.ano, revisao: snap.revisao, auditorias: snap.auditorias || [], assinaturas });
-  } else if (a.envio.tipo === "PLP" || a.envio.tipo === "PIT") {
+  } else if (["PLP", "PIT", "PLP_INTERNO", "PIT_INTERNO"].includes(a.envio.tipo)) {
     // ⚠ O PLANO É LIDO NA TELA ANTES DO ACEITE. O entregável continua sendo o Excel (anexo do
     // e-mail e botão nesta mesma página); este PDF existe para o inspetor do cliente ver o que
     // está aceitando sem precisar baixar e abrir uma planilha.
