@@ -1867,6 +1867,17 @@ model ProdutoTinta {
   id               String    @id @default(cuid())
   fabricante       String
   produto          String
+  // ⚠⚠ TINTA, ENDURECEDOR E DILUENTE SÃO FICHAS DIFERENTES E TODAS ENTRAM. Vitor (27/08/2026):
+  // "precisa incluir tanto a ficha técnica do diluente e você descrever qual diluente vamos usar, e
+  // também trazer o componente A e B". Um esquema epóxi ou PU é um CONJUNTO: base (A) + endurecedor
+  // (B) + diluente, cada um com o seu boletim e a sua validade. O PLP que cita só a tinta manda
+  // aplicar metade do produto.
+  categoria        String    @default("TINTA") // TINTA | ENDURECEDOR | DILUENTE
+  componenteA      String? // a base, como o boletim nomeia
+  componenteB      String? // o endurecedor / catalisador
+  proporcaoMistura String? // "4:1 em volume"
+  potLife          String? // vida útil da mistura ("4 h a 25 °C")
+  diluenteId       String? // o diluente indicado, quando ele também está no catálogo
   tipo             String? // PRIMER | INTERMEDIARIA | ACABAMENTO | UNICA
   norma            String?
   diluente         String?

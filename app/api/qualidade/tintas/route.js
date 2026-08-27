@@ -57,36 +57,54 @@ export async function POST(req) {
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const body = await req.json().catch(() => ({}));
-  const arquivoNome = txt(body?.arquivoNome, 200) || "boletim.pdf";
-  const contentType = String(body?.contentType || "application/pdf").split(";")[0].trim();
-  const b64 = String(body?.arquivo || "").split(",").pop();
-  if (!b64) return NextResponse.json({ error: "Envie o arquivo do boletim técnico." }, { status: 400 });
 
-  // ⚠ o corpo da rota serverless trava por volta de 4,5 MB — boletim técnico não chega perto disso,
-  // mas dizer o limite é melhor que deixar a requisição morrer sem resposta.
-  const bytes = Buffer.from(b64, "base64");
-  if (bytes.length > 4 * 1024 * 1024) {
-    return NextResponse.json({ error: `O boletim tem ${(bytes.length / 1048576).toFixed(1)} MB e o limite é 4 MB. Envie só as páginas de dados técnicos.` }, { status: 413 });
-  }
+  // ⚠ VÁRIOS ARQUIVOS DE UMA VEZ. Vitor (27/08/2026): "nesse botão de importação vamos conseguir
+  // colocar mais do que 1?" — sim, e é o caso comum: a tinta, o endurecedor e o diluente são três
+  // boletins do mesmo esquema. Importar um por vez faria a pessoa repetir o caminho três vezes e
+  // perder o vínculo entre eles.
+  const entrada = Array.isArray(body?.arquivos) && body.arquivos.length
+    ? body.arquivos
+    : [{ arquivo: body?.arquivo, nome: body?.arquivoNome, contentType: body?.contentType }];
+  if (entrada.length > 8) return NextResponse.json({ error: "Envie até 8 boletins por vez." }, { status: 400 });
 
-  // planilha vira TEXTO (a API não lê xlsx) e pode trazer VÁRIOS produtos — é o caso da
-  // "Descrição de tintas para o PLP.xlsx" que a Qualidade já mantém à mão.
-  const ehPlanilha = /\.xlsx?$/i.test(arquivoNome) || /spreadsheet|excel/i.test(contentType);
-  let lista;
-  try {
-    if (ehPlanilha) {
-      const { planilhaParaTexto } = await import("@/lib/plp-servidor");
-      lista = await extrairBoletim({ texto: planilhaParaTexto(bytes), contentType: "text/plain", arquivo: arquivoNome });
-    } else {
-      lista = await extrairBoletim({ data: bytes, contentType, arquivo: arquivoNome });
+  const pedidos = [];
+  for (const a of entrada) {
+    const b64 = String(a?.arquivo || "").split(",").pop();
+    if (!b64) continue;
+    const bytes = Buffer.from(b64, "base64");
+    const nome = txt(a?.nome, 200) || "boletim.pdf";
+    // ⚠ o corpo da rota serverless trava por volta de 4,5 MB — somando os arquivos, o teto é o
+    // mesmo. Dizer o limite é melhor que deixar a requisição morrer sem resposta.
+    if (bytes.length > 4 * 1024 * 1024) {
+      return NextResponse.json({ error: `"${nome}" tem ${(bytes.length / 1048576).toFixed(1)} MB e o limite é 4 MB por arquivo. Envie só as páginas de dados técnicos.` }, { status: 413 });
     }
-  } catch (e) {
-    const { msg, status } = mensagemErroIA(e);
-    return NextResponse.json({ error: msg }, { status });
+    pedidos.push({ bytes, nome, contentType: String(a?.contentType || "application/pdf").split(";")[0].trim() });
   }
-  if (!lista?.length) {
+  if (!pedidos.length) return NextResponse.json({ error: "Envie o arquivo do boletim técnico." }, { status: 400 });
+
+  const lista = [];
+  const falhas = [];
+  for (const pd of pedidos) {
+    const ehPlanilha = /\.xlsx?$/i.test(pd.nome) || /spreadsheet|excel/i.test(pd.contentType);
+    try {
+      const achados = ehPlanilha
+        ? await (async () => {
+            const { planilhaParaTexto } = await import("@/lib/plp-servidor");
+            return extrairBoletim({ texto: planilhaParaTexto(pd.bytes), contentType: "text/plain", arquivo: pd.nome });
+          })()
+        : await extrairBoletim({ data: pd.bytes, contentType: pd.contentType, arquivo: pd.nome });
+      if (achados?.length) lista.push(...achados.map((x) => ({ ...x, boletimNome: pd.nome })));
+      else falhas.push(`${pd.nome} (nenhum produto reconhecido)`);
+    } catch (e) {
+      const { msg } = mensagemErroIA(e);
+      falhas.push(`${pd.nome} (${msg})`);
+    }
+  }
+  if (!lista.length) {
     return NextResponse.json({
-      error: "Li o arquivo e não reconheci nenhum produto com fabricante. Confira se é o boletim técnico da tinta ou uma tabela de tintas.",
+      error: falhas.length
+        ? `Não consegui aproveitar nenhum arquivo: ${falhas.slice(0, 3).join(" · ")}`
+        : "Li o arquivo e não reconheci nenhum produto com fabricante. Confira se é o boletim técnico da tinta.",
     }, { status: 422 });
   }
 
@@ -99,20 +117,42 @@ export async function POST(req) {
       where: { fabricante: { equals: dados.fabricante, mode: "insensitive" }, produto: { equals: dados.produto, mode: "insensitive" } },
       select: { id: true },
     });
-    const comum = { ...dados, boletimNome: arquivoNome, extraidoEm: new Date(), ativo: true };
+    const comum = { ...dados, extraidoEm: new Date(), ativo: true };
     salvos.push(jaTem
       ? await prisma.produtoTinta.update({ where: { id: jaTem.id }, data: comum })
       : await prisma.produtoTinta.create({ data: { ...comum, criadoPorId: user?.id || null, criadoPorNome: user?.name || user?.email || null } }));
     if (jaTem) atualizados++;
   }
-  const tinta = salvos[0];
+
+  // ⚠⚠ AMARRA A TINTA AO DILUENTE. Se o diluente veio na mesma leva (ou já estava no catálogo), o
+  // vínculo é feito aqui — é o que faz o PLP conseguir dizer QUAL diluente usar, com a ficha dele
+  // por trás, em vez de repetir um nome solto digitado na tinta.
+  const diluentes = await prisma.produtoTinta.findMany({ where: { categoria: "DILUENTE", ativo: true }, select: { id: true, produto: true } });
+  const soDigitos = (v) => String(v || "").replace(/\D/g, "");
+  for (const t of salvos.filter((x) => x.categoria === "TINTA" && x.diluente && !x.diluenteId)) {
+    const cod = soDigitos(t.diluente);
+    const achado = diluentes.find((d) => {
+      const dc = soDigitos(d.produto);
+      // casa pelo CÓDIGO quando há um ("Diluente 34.019" → 34019); senão pelo nome
+      if (cod && dc) return cod.includes(dc) || dc.includes(cod);
+      return String(t.diluente).toLowerCase().includes(String(d.produto).toLowerCase());
+    });
+    if (achado) {
+      await prisma.produtoTinta.update({ where: { id: t.id }, data: { diluenteId: achado.id } });
+      t.diluenteId = achado.id;
+    }
+  }
+  const tinta = salvos.find((x) => x.categoria === "TINTA") || salvos[0];
 
   await prisma.auditLog.create({
     data: { userId: user?.id || null, action: "TINTA_IMPORTADA", entity: "ProdutoTinta", entityId: tinta.id,
-      diff: { boletim: arquivoNome, produtos: salvos.map((x) => `${x.fabricante} · ${x.produto}`), atualizados } },
+      diff: { arquivos: pedidos.map((p2) => p2.nome), produtos: salvos.map((x) => `${x.categoria} · ${x.fabricante} · ${x.produto}`), atualizados, falhas } },
   }).catch(() => {});
 
-  return NextResponse.json({ ok: true, tinta, tintas: salvos, total: salvos.length, atualizados });
+  return NextResponse.json({
+    ok: true, tinta, tintas: salvos, total: salvos.length, atualizados,
+    falhas: falhas.length ? falhas : undefined,
+  });
 }
 
 export async function PUT(req) {
@@ -127,6 +167,10 @@ export async function PUT(req) {
   // ⚠ o que a leitura errou se corrige aqui: o boletim é a fonte, mas quem responde é a Qualidade.
   const dados = {
     fabricante: txt(b.fabricante, 80), produto: txt(b.produto, 160), especificacao: txt(b.especificacao, 300),
+    categoria: ["TINTA", "ENDURECEDOR", "DILUENTE"].includes(String(b.categoria || "").toUpperCase()) ? String(b.categoria).toUpperCase() : "TINTA",
+    componenteA: txt(b.componenteA, 160), componenteB: txt(b.componenteB, 160),
+    proporcaoMistura: txt(b.proporcaoMistura, 60), potLife: txt(b.potLife, 60),
+    diluenteId: txt(b.diluenteId, 40),
     tipo: ["PRIMER", "INTERMEDIARIA", "ACABAMENTO", "UNICA"].includes(String(b.tipo || "").toUpperCase()) ? String(b.tipo).toUpperCase() : null,
     norma: txt(b.norma, 80), diluente: txt(b.diluente, 120),
     diluicaoMin: num(b.diluicaoMin), diluicaoMax: num(b.diluicaoMax),

@@ -144,6 +144,20 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
     return linha?.umida ?? null;
   }
 
+  /**
+   * Como o diluente aparece no plano.
+   *
+   * ⚠ COM O NOME DA FICHA, não com o texto que veio dentro da tinta. Vitor (27/08/2026): "precisa
+   * incluir tanto a ficha técnica do diluente e você descrever qual diluente vamos usar". Quando o
+   * boletim do diluente também está no catálogo, é o nome DELE que vale — é o que se compra e o que
+   * o almoxarifado separa.
+   */
+  function nomeDoDiluente(t, pct) {
+    const doCatalogo = t?.diluenteId ? catalogo.find((x) => x.id === t.diluenteId) : null;
+    const nome = doCatalogo ? `${doCatalogo.produto}` : t?.diluente;
+    return [nome, pct === "" || pct == null ? null : `${pct}%`].filter(Boolean).join(" · ");
+  }
+
   /** As diluições que fazem sentido para este produto: a tabela do boletim, ou a faixa dele. */
   function diluicoesDe(t) {
     if (t?.camadas?.length) return t.camadas.map((c) => Number(c.diluicao));
@@ -176,8 +190,11 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           ...dm,
           produtoId: t.id, produto: t.produto, fabricante: t.fabricante || dm.fabricante,
           diluicaoPct: pct === "" ? "" : String(pct),
-          diluicao: [t.diluente, pct === "" ? null : `${pct}%`].filter(Boolean).join(" · ") || dm.diluicao,
+          diluicao: nomeDoDiluente(t, pct) || dm.diluicao,
           camadaUmida: umida != null ? String(umida) : dm.camadaUmida,
+          componentes: [t.componenteA && `A: ${t.componenteA}`, t.componenteB && `B: ${t.componenteB}`, t.proporcaoMistura]
+            .filter(Boolean).join(" · ") || dm.componentes || "",
+          potLife: t.potLife || dm.potLife || "",
           secagem: [t.secagemToque && `${t.secagemToque} ao toque`, t.secagemManuseio && `${t.secagemManuseio} ao manuseio`]
             .filter(Boolean).join(" · ") || dm.secagem,
           espessuraMin: dm.espessuraMin || (t.secaMin != null ? String(t.secaMin) : ""),
@@ -197,33 +214,43 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
         const umida = umidaDe(t, dm.espessuraMin, pct);
         return {
           ...dm, diluicaoPct: pct === "" ? "" : String(pct),
-          diluicao: [t?.diluente, pct === "" ? null : `${pct}%`].filter(Boolean).join(" · ") || dm.diluicao,
+          diluicao: nomeDoDiluente(t, pct) || dm.diluicao,
           camadaUmida: umida != null ? String(umida) : dm.camadaUmida,
         };
       }),
     }));
   }
 
-  /** Importa o boletim técnico do fabricante e já usa o produto nesta demão. */
-  async function importarBoletim(i, file) {
-    if (!file) return;
-    setImportando(i); setErro("");
+  /**
+   * Importa boletins técnicos e já usa a TINTA nesta demão.
+   *
+   * ⚠ ACEITA VÁRIOS DE UMA VEZ — tinta, endurecedor e diluente são três fichas do mesmo esquema, e
+   * o vínculo entre elas é feito no servidor. Um por vez faria a pessoa repetir o caminho três
+   * vezes e o diluente ficar solto.
+   */
+  async function importarBoletim(i, files) {
+    const lista = [...(files || [])];
+    if (!lista.length) return;
+    setImportando(i); setErro(""); setOk("");
     try {
-      const b64 = await new Promise((res, rej) => {
+      const arquivos = await Promise.all(lista.map((file) => new Promise((res, rej) => {
         const fr = new FileReader();
-        fr.onload = () => res(String(fr.result));
-        fr.onerror = () => rej(new Error("Não consegui ler o arquivo."));
+        fr.onload = () => res({ arquivo: String(fr.result), nome: file.name, contentType: file.type || "application/pdf" });
+        fr.onerror = () => rej(new Error(`Não consegui ler "${file.name}".`));
         fr.readAsDataURL(file);
-      });
+      })));
       const r = await fetch("/api/qualidade/tintas", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ arquivo: b64, arquivoNome: file.name, contentType: file.type || "application/pdf" }),
+        body: JSON.stringify({ arquivos }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Falha ao ler o boletim.");
-      setCatalogo((c) => [j.tinta, ...c.filter((x) => x.id !== j.tinta.id)]);
-      aplicarProduto(i, j.tinta);
-      setOk(`${j.tinta.produto} ${j.atualizado ? "atualizado" : "cadastrado"} a partir do boletim.`);
+      const novos = j.tintas || [];
+      setCatalogo((c) => [...novos, ...c.filter((x) => !novos.some((n) => n.id === x.id))]);
+      const aTinta = novos.find((x) => x.categoria === "TINTA");
+      if (aTinta) aplicarProduto(i, aTinta);
+      const resumo = novos.map((x) => `${x.produto}${x.categoria !== "TINTA" ? ` (${x.categoria.toLowerCase()})` : ""}`).join(", ");
+      setOk(`${novos.length} ficha(s) no catálogo: ${resumo}.${j.falhas ? ` Não aproveitei: ${j.falhas.join(" · ")}` : ""}`);
     } catch (e) { setErro(e.message); } finally { setImportando(null); }
   }
 
@@ -437,13 +464,14 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
                       else setDemao(i, "produtoId", "");
                     }} className={`${cls} text-torg-gray`}>
                     <option value="">produto do catálogo…</option>
-                    {catalogo.map((t) => <option key={t.id} value={t.id}>{t.fabricante} · {t.produto}</option>)}
+                    {catalogo.filter((t) => t.categoria !== "DILUENTE" && t.categoria !== "ENDURECEDOR")
+                      .map((t) => <option key={t.id} value={t.id}>{t.fabricante} · {t.produto}</option>)}
                   </select>
-                  <label title="Importar o boletim técnico do fabricante (PDF)"
+                  <label title="Importar boletins técnicos (tinta, endurecedor, diluente) — pode escolher vários"
                     className="shrink-0 text-[11px] text-torg-blue border border-torg-blue-300 rounded-lg px-2 py-1.5 hover:bg-torg-blue-50 cursor-pointer inline-flex items-center gap-1">
                     {importando === i ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
-                    <input type="file" accept="application/pdf,image/*" className="hidden"
-                      onChange={(e) => { importarBoletim(i, e.target.files?.[0]); e.target.value = ""; }} />
+                    <input type="file" multiple accept="application/pdf,image/*,.xlsx,.xls" className="hidden"
+                      onChange={(e) => { importarBoletim(i, e.target.files); e.target.value = ""; }} />
                   </label>
                 </div>
                 <Texto valor={dm.produto} onChange={(v) => { setDemao(i, "produto", v); setDemao(i, "produtoId", ""); }} ph="produto / norma" />
@@ -470,7 +498,7 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           ))}
         </div>
         {f.demaos.length < 6 && (
-          <button onClick={() => setF((x) => ({ ...x, demaos: [...x.demaos, { ordem: x.demaos.length + 1, nome: "", produto: "", fabricante: "", cor: "", espessuraMin: "", espessuraMax: "", lote: "", diluicao: "", camadaUmida: "", secagem: "", produtoId: "", diluicaoPct: "" }] }))}
+          <button onClick={() => setF((x) => ({ ...x, demaos: [...x.demaos, { ordem: x.demaos.length + 1, nome: "", produto: "", fabricante: "", cor: "", espessuraMin: "", espessuraMax: "", lote: "", diluicao: "", camadaUmida: "", secagem: "", produtoId: "", diluicaoPct: "", componentes: "", potLife: "" }] }))}
             className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={11} /> demão</button>
         )}
       </Secao>
@@ -502,6 +530,13 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
                 )}
                 <Texto valor={dm.camadaUmida} onChange={(v) => setDemao(i, "camadaUmida", v)} ph="úmida µm" />
                 <Texto valor={dm.secagem} onChange={(v) => setDemao(i, "secagem", v)} ph="tempo de secagem" />
+                {/* ⚠ componentes e pot life ocupam a linha inteira: é o que a fábrica lê para
+                    misturar, e cortar num campo de 6 rem não ajuda ninguém. */}
+                <div className="sm:col-span-5 grid sm:grid-cols-[9rem_1fr_10rem] gap-1.5 items-center">
+                  <span />
+                  <Texto valor={dm.componentes} onChange={(v) => setDemao(i, "componentes", v)} ph="componente A · componente B · proporção" />
+                  <Texto valor={dm.potLife} onChange={(v) => setDemao(i, "potLife", v)} ph="vida útil da mistura" />
+                </div>
               </div>
             );
           })}
