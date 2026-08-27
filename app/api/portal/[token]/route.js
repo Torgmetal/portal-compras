@@ -44,11 +44,13 @@ export async function GET(req, { params }) {
   const preview = new URL(req.url).searchParams.get("preview") === "1";
   const codigoDoLink = new URL(req.url).searchParams.get("d");
 
-  // Quando a lista saiu das nossas mãos para as dele. É o que dá sentido a "mudou desde então".
-  const primeiroEnvio = await prisma.portalDestinatario
-    .findFirst({ where: { portalId: portal.id, enviadoEm: { not: null } }, orderBy: { enviadoEm: "asc" }, select: { enviadoEm: true } })
+  // ⚠ QUANDO O CLIENTE ABRIU O PORTAL PELA PRIMEIRA VEZ — é o que dá sentido a "mudou desde então".
+  // Só conta destinatário que entrou pelo `?d=` do e-mail: o nosso "ver como o cliente vê" não
+  // grava `primeiroAcessoEm`, e o envio sozinho não prova que alguém leu a lista.
+  const primeiroAcesso = await prisma.portalDestinatario
+    .findFirst({ where: { portalId: portal.id, primeiroAcessoEm: { not: null } }, orderBy: { primeiroAcessoEm: "asc" }, select: { primeiroAcessoEm: true } })
     .catch(() => null);
-  const enviadoAoClienteEm = [portal.enviadoEm, primeiroEnvio?.enviadoEm].filter(Boolean).sort((a, b) => new Date(a) - new Date(b))[0] || null;
+  const clienteViuEm = primeiroAcesso?.primeiroAcessoEm || null;
 
   // ── cronograma: as frentes e o avanço ──
   if (tem("CRONOGRAMA")) {
@@ -212,7 +214,7 @@ export async function GET(req, { params }) {
         material: p.material || null, qtd: p.qte,
         ...(comPeso ? { pesoKg: Math.round(p.pesoTotalKg || 0) } : {}),
       })),
-      revisao: revisaoParaOCliente(rev, comPeso, { enviadoAoClienteEm }),
+      revisao: revisaoParaOCliente(rev, comPeso, { clienteViuEm }),
     };
   };
   if (tem("LPC") && op?.id) dados.lpc = await listaDe("LPC");
