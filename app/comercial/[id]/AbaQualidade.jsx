@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Loader2, ShieldCheck, Clock, ExternalLink, FolderOpen, Paintbrush, FileText, ClipboardCheck, Check, Sparkles, AlertCircle } from "lucide-react";
 import { TIPO_LABEL, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
 import AceitePlano from "./AceitePlano";
+import EditarPlp from "./EditarPlp";
 
 // ─── OS RELATÓRIOS DE INSPEÇÃO DESTA OBRA ─────────────────────────────────────
 // Vitor (22/08/2026): "relatórios aprovados deverão ser guardados na aba de qualidade
@@ -192,9 +193,9 @@ export default function AbaQualidade({ opNumero }) {
             className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-3 py-1.5 hover:bg-torg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">
             {lendo ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} Ler o PLP da pasta da obra
           </button>
-          <Link href="/qualidade/inspecoes" className="text-[11px] text-torg-blue hover:underline">
-            editar o plano de pintura da obra
-          </Link>
+          {/* ⚠ EDITA AQUI MESMO. Era um link para a fila de inspeções — quem clicava caía numa
+              lista de relatórios de todas as obras e voltava sem editar nada. (Vitor, 27/08/2026) */}
+          <EditarPlp opNumero={opNumero} aoSalvar={() => setLeitura(null)} />
         </div>
         {erroPlp && (
           <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mt-2 inline-flex items-start gap-1.5">
