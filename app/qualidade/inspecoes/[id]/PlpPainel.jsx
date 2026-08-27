@@ -18,6 +18,24 @@ import { GRAUS_LIMPEZA, METODOS_APLICACAO } from "@/lib/pintura-campos";
 
 const N = ["1ª", "2ª", "3ª"];
 
+/**
+ * Um campo do formulário do PLP.
+ *
+ * ⚠⚠ FICA FORA DO COMPONENTE DE PROPÓSITO. Declarado dentro de `PlpPainel`, vira um TIPO NOVO a
+ * cada render — o React desmonta e remonta o input a cada tecla e o cursor sai do campo depois de
+ * cada letra. É o defeito que Vitor relatou em 27/08/2026 no aceite dos planos ("estou com
+ * dificuldade para digitar nesses campos"), corrigido do mesmo jeito em AceitePlano.jsx.
+ * Componente de formulário nunca se declara dentro de outro componente.
+ *
+ * Este já lia tudo por props (`v` e `on`), então bastou subir: os usos não mudaram.
+ */
+function Inp({ v, on, ph = "", tipo = "text", w = "" }) {
+  return (
+    <input type={tipo} value={v ?? ""} placeholder={ph} onChange={(e) => on(e.target.value)}
+      className={`text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue ${w || "w-full"}`} />
+  );
+}
+
 export default function PlpPainel({ opNumero, podeEditar, onTintas, onPlp, res = {}, setResultado }) {
   const [dados, setDados] = useState(null);
   const [editando, setEditando] = useState(false);
@@ -147,10 +165,6 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas, onPlp, res =
 
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const setD = (i, k, v) => setF((p) => ({ ...p, demaos: p.demaos.map((d, j) => (j === i ? { ...d, [k]: v } : d)) }));
-  const Inp = ({ v, on, ph = "", tipo = "text", w = "" }) => (
-    <input type={tipo} value={v ?? ""} placeholder={ph} onChange={(e) => on(e.target.value)}
-      className={`text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue ${w || "w-full"}`} />
-  );
 
   if (!editando) {
     return (
