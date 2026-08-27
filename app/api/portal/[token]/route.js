@@ -308,6 +308,25 @@ export async function GET(req, { params }) {
     }
   }
 
+  // ⚠⚠ PLANO DE CONTROLE ≠ DOCUMENTO TÉCNICO. Vitor (26/08/2026) separou: PIT e PLP vão para a
+  // QUALIDADE (são plano de controle — o que se inspeciona e como se pinta); ART e memorial de
+  // cálculo ficam na ENGENHARIA (responsabilidade técnica de projeto). Antes tudo caía num bloco
+  // só chamado "Documentos", e o cliente procurava o plano de inspeção no meio das ARTs.
+  const RX_PLANO = /\b(PIT|PLP)\b|plano de (inspe|pintura)/i;
+
+  if (tem("PLANOS")) {
+    const planos = await prisma.documentoQualidade.findMany({
+      where: { opNumero: portal.opNumero, ativo: true, categoria: { in: ["ANEXO", "SISTEMA"] } },
+      select: { id: true, nome: true, tipo: true },
+      orderBy: [{ nome: "asc" }],
+      take: 100,
+    });
+    const doPlano = planos.filter((d) => RX_PLANO.test(`${d.tipo || ""} ${d.nome || ""}`));
+    if (doPlano.length) {
+      dados.planos = [{ assunto: "Planos de controle", total: doPlano.length, itens: doPlano.map((d) => ({ id: d.id, nome: d.nome })) }];
+    }
+  }
+
   if (tem("DOCUMENTOS")) {
     const docs = await prisma.documentoQualidade.findMany({
       where: {
@@ -321,6 +340,8 @@ export async function GET(req, { params }) {
     });
     const porAssunto = new Map();
     for (const doc of docs) {
+      // ⚠ o que é plano de controle sai daqui: ele tem bloco próprio, na Qualidade.
+      if (RX_PLANO.test(`${doc.tipo || ""} ${doc.nome || ""}`)) continue;
       const assunto = String(doc.tipo || "Documentos da obra").replace(/^Anexo\s*[—-]\s*/i, "").trim();
       const g = porAssunto.get(assunto) || { assunto, itens: [] };
       g.itens.push({ id: doc.id, nome: doc.nome });

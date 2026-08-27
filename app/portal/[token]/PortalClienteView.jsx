@@ -86,6 +86,7 @@ export default function PortalClienteView({ token }) {
     RELATORIOS: tem("RELATORIOS") && dados.relatorios?.length > 0,
     DATABOOK: tem("DATABOOK") && dados.databook?.volumes?.length > 0,
     DOCUMENTOS: tem("DOCUMENTOS") && dados.documentos?.length > 0,
+    PLANOS: tem("PLANOS") && dados.planos?.length > 0,
     FOTOS: tem("FOTOS") && portal.fotos?.length > 0,
   };
   const secoesDaArea = (a) => {
@@ -377,8 +378,25 @@ export default function PortalClienteView({ token }) {
           </Bloco>
         )}
 
+        {/* ⚠ na QUALIDADE, não na Engenharia: PIT e PLP são plano de CONTROLE — o que se inspeciona
+            e como se pinta. Quem responde por eles assina como Qualidade. (Vitor, 26/08/2026) */}
+        {mostrar("PLANOS") && (
+          <Bloco icone={ShieldCheck} titulo="Planos de controle (PIT e PLP)"
+            sub={`${dados.planos.reduce((n, g) => n + g.itens.length, 0)} documentos`}>
+            <div className="grid sm:grid-cols-2 gap-1.5">
+              {dados.planos.flatMap((g) => g.itens).map((doc) => (
+                <a key={doc.id} href={comCod(`/api/portal/${token}/doc?id=${doc.id}`)} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-2 border border-gray-100 rounded-lg px-3 py-1.5 hover:border-[#006EAB] hover:bg-[#006EAB]/5 transition-colors">
+                  <Download size={12} className="text-[#006EAB] shrink-0" />
+                  <span className="text-[12px] truncate" title={doc.nome}>{doc.nome}</span>
+                </a>
+              ))}
+            </div>
+          </Bloco>
+        )}
+
         {mostrar("DOCUMENTOS") && (
-          <Bloco icone={FileText} titulo="Documentos da obra" recolhida
+          <Bloco icone={FileText} titulo="Documentos da Engenharia" recolhida
             sub={`${dados.documentos.length} assuntos`}>
             {/* ⚠ agrupado por assunto, não uma lista chapada: a obra tem centenas de documentos e o
                 que o cliente quer saber é QUE TIPO de controle existe — PIT, EPS, qualificação de

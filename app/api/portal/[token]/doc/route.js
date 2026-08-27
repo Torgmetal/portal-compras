@@ -32,7 +32,13 @@ export async function GET(req, { params }) {
   // Desligar uma seção precisa desligar também o que se baixa por ela, senão o botão some da tela
   // mas o arquivo continua ao alcance de quem souber o endereço.
   const ativas = secoesDoPortal(portal);
-  const permitido = doc.categoria === "MATERIAL" ? ativas.includes("CERTIFICADOS") : ativas.includes("DOCUMENTOS");
+  // ⚠ PLANO DE CONTROLE TEM SEÇÃO PRÓPRIA (Qualidade). Sem tratá-lo aqui, o PIT/PLP aparecia na
+  // aba e o download batia na checagem de DOCUMENTOS — obra que publicou só os planos veria o
+  // botão e levaria 403.
+  const ehPlano = /\b(PIT|PLP)\b|plano de (inspe|pintura)/i.test(`${doc.tipo || ""} ${doc.nome || ""}`);
+  const permitido = doc.categoria === "MATERIAL"
+    ? ativas.includes("CERTIFICADOS")
+    : ehPlano ? (ativas.includes("PLANOS") || ativas.includes("DOCUMENTOS")) : ativas.includes("DOCUMENTOS");
   if (!permitido) return new NextResponse("Este documento não faz parte do portal desta obra.", { status: 403 });
 
   try {

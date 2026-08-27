@@ -74,6 +74,18 @@ export default function SeletorDocsEngenharia({ opNumero }) {
 
       {erro && <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 inline-flex items-start gap-1.5"><AlertCircle size={13} className="mt-0.5 shrink-0" /> {erro}</p>}
 
+      {/* ⚠ O CAMINHO DA PASTA, COPIÁVEL. Para PÔR arquivo novo é preciso ir ao SharePoint — a tela
+          só escolhe entre o que já está lá. Caçar a pasta a cada obra é o atrito que faz ninguém
+          publicar nada. */}
+      {dados?.caminho && (
+        <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5">
+          <FolderOpen size={13} className="text-torg-gray shrink-0" />
+          <code className="text-[11px] text-torg-dark truncate flex-1" title={dados.caminho}>{dados.caminho}</code>
+          <button onClick={() => { navigator.clipboard?.writeText(dados.caminho); setAviso("Caminho copiado — cole no Explorer ou no SharePoint."); }}
+            className="text-[11px] font-semibold text-torg-blue hover:underline shrink-0">copiar</button>
+        </div>
+      )}
+
       {carregando && !dados ? (
         <p className="text-[12px] text-torg-gray inline-flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> lendo a pasta no servidor…</p>
       ) : arquivos.length === 0 ? (

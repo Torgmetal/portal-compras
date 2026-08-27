@@ -47,7 +47,12 @@ export async function GET(req) {
 
   const proj = `${base}/2. Engenharia/2.5 Projetos`;
   const sub = (await listar(proj)).find((x) => x.folder && RX_CLIENTE.test(x.name));
-  if (!sub) return NextResponse.json({ error: "Esta obra não tem a pasta 2.5.5 (envio ao cliente).", arquivos: [] });
+  // ⚠ mesmo SEM a 2.5.5, devolve onde ela DEVERIA estar: "não existe" sem dizer onde criar é meio
+  // recado.
+  if (!sub) return NextResponse.json({
+    error: "Esta obra ainda não tem a pasta 2.5.5 (envio ao cliente).",
+    caminho: `${proj}/2.5.5 Cliente`, arquivos: [],
+  });
 
   // ⚠ desce um nível: a 2.5.5 costuma ter subpastas por assunto, e o documento que o cliente
   // recebe raramente está solto na raiz.
@@ -67,6 +72,11 @@ export async function GET(req) {
 
   return NextResponse.json({
     pasta: sub.name,
+    // ⚠ O CAMINHO COMPLETO VOLTA JUNTO. Vitor (26/08/2026): "preciso que me dê o caminho da pasta
+    // 2.5.5 do servidor para eu conseguir anexar os arquivos". A tela lista o que JÁ está lá; para
+    // pôr coisa nova é preciso ir ao SharePoint, e caçar a pasta a cada obra é o atrito que faz
+    // ninguém publicar nada.
+    caminho: raiz,
     arquivos: out.map((a) => ({ ...a, escolhido: escolhidos.has(a.id) })),
     total: out.length, escolhidos: escolhidos.size,
   });
