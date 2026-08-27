@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Check, X, Plus, Trash2, AlertCircle, Pencil } from "lucide-react";
+import { Loader2, Check, X, Plus, Trash2, AlertCircle, Pencil, Upload } from "lucide-react";
 import { METODOS_PREPARO, PLP_PADRAO } from "@/lib/plp";
 import { GRAUS_LIMPEZA, METODOS_APLICACAO } from "@/lib/pintura-campos";
 
@@ -19,8 +19,10 @@ import { GRAUS_LIMPEZA, METODOS_APLICACAO } from "@/lib/pintura-campos";
 const so = (v) => (v === null || v === undefined ? "" : String(v));
 
 // as três demãos do esquema mais comum — em branco, só para haver onde escrever
-const VAZIAS = [{ nome: "Fundo" }, { nome: "Intermediária" }, { nome: "Acabamento" }];
+const VAZIAS = [{ nome: "Primer" }, { nome: "Intermediária" }, { nome: "Acabamento" }];
 const REF_PADRAO = "PO-05 — Pintura · NBR 16775";
+// os papéis do esquema, na ordem em que se aplicam
+const NOMES_DEMAO = ["Primer", "Intermediária", "Acabamento", "Acabamento (Fábrica)", "Acabamento (Campo)", "Demão única"];
 const hojeBR = () => new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
 
 function Secao({ folha, titulo, children }) {
@@ -58,6 +60,8 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
   const [ok, setOk] = useState("");
   const [aceite, setAceite] = useState(null);
   const [obra, setObra] = useState(null);
+  const [catalogo, setCatalogo] = useState([]);   // ProdutoTinta — vem dos boletins técnicos
+  const [importando, setImportando] = useState(null); // índice da demão em importação
 
   const carregar = useCallback(async () => {
     setErro("");
@@ -70,6 +74,8 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
       setD(rp);
       setAceite(ra?.status?.PLP || null);
       setObra(ra?.dadosDaObra || null);
+      fetch("/api/qualidade/tintas", { cache: "no-store" })
+        .then((x) => x.json()).then((x) => setCatalogo(x.tintas || [])).catch(() => {});
       const p = rp.plp || {};
       setF({
         revisao: so(p.revisao),
@@ -121,6 +127,105 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
     const alvo = somaDemaos ? String(somaDemaos) : "";
     if (so(f.espessuraTotal) !== alvo) setF((x) => ({ ...x, espessuraTotal: alvo }));
   }, [f, somaDemaos]);
+
+  /**
+   * A camada ÚMIDA pela fórmula da própria planilha da Qualidade: EPU = EPS × (100 + %DIL) / SV.
+   *
+   * ⚠⚠ NÃO É DADO DE TABELA, É CONTA. Com o sólidos em volume, a úmida sai para QUALQUER espessura
+   * seca e QUALQUER diluição — a tabela do boletim só cobre as linhas que ele listou. Conferido no
+   * INDUSTHANE RHB DF: SV 55,2% dá 181 / 199 / 208 µm contra os 181 / 200 / 209 da planilha dele.
+   * Sem SV cadastrado, vale a linha da tabela; sem as duas, o campo fica livre.
+   */
+  function umidaDe(t, seca, pct) {
+    const eps = Number(seca);
+    const dil = Number(pct);
+    if (t?.solidosVol > 0 && eps > 0 && Number.isFinite(dil)) return Math.round((eps * (100 + dil)) / t.solidosVol);
+    const linha = (t?.camadas || []).find((c) => Number(c.diluicao) === dil);
+    return linha?.umida ?? null;
+  }
+
+  /** As diluições que fazem sentido para este produto: a tabela do boletim, ou a faixa dele. */
+  function diluicoesDe(t) {
+    if (t?.camadas?.length) return t.camadas.map((c) => Number(c.diluicao));
+    const max = Number(t?.diluicaoMax);
+    if (!Number.isFinite(max) || max <= 0) return [];
+    const passo = max <= 10 ? 5 : 5;
+    const out = [];
+    for (let v = Number(t?.diluicaoMin) || 0; v <= max + 0.001; v += passo) out.push(Math.round(v));
+    if (out[out.length - 1] !== max) out.push(max);
+    return [...new Set(out)];
+  }
+
+  /**
+   * Escolher o produto do catálogo preenche o que o BOLETIM já respondeu.
+   *
+   * ⚠ ESPESSURA SÓ ENTRA SE ESTIVER VAZIA. O boletim diz a faixa recomendada; a obra pode ter
+   * fechado outra com o cliente. Sobrescrever o que a pessoa digitou seria o portal decidindo
+   * contra o contrato.
+   */
+  function aplicarProduto(i, t) {
+    setF((x) => ({
+      ...x,
+      demaos: x.demaos.map((dm, j) => {
+        if (j !== i) return dm;
+        const opcoes = diluicoesDe(t);
+        const pct = dm.diluicaoPct !== "" && dm.diluicaoPct != null ? Number(dm.diluicaoPct) : (opcoes[0] ?? "");
+        const seca = dm.espessuraMin || (t.secaMin != null ? t.secaMin : "");
+        const umida = umidaDe(t, seca, pct);
+        return {
+          ...dm,
+          produtoId: t.id, produto: t.produto, fabricante: t.fabricante || dm.fabricante,
+          diluicaoPct: pct === "" ? "" : String(pct),
+          diluicao: [t.diluente, pct === "" ? null : `${pct}%`].filter(Boolean).join(" · ") || dm.diluicao,
+          camadaUmida: umida != null ? String(umida) : dm.camadaUmida,
+          secagem: [t.secagemToque && `${t.secagemToque} ao toque`, t.secagemManuseio && `${t.secagemManuseio} ao manuseio`]
+            .filter(Boolean).join(" · ") || dm.secagem,
+          espessuraMin: dm.espessuraMin || (t.secaMin != null ? String(t.secaMin) : ""),
+          espessuraMax: dm.espessuraMax || (t.secaMax != null ? String(t.secaMax) : ""),
+        };
+      }),
+    }));
+  }
+
+  /** Trocar a % de diluição troca a camada úmida — é a tabela do boletim respondendo. */
+  function aplicarDiluicao(i, pct) {
+    const t = catalogo.find((x) => x.id === f.demaos[i]?.produtoId);
+    setF((x) => ({
+      ...x,
+      demaos: x.demaos.map((dm, j) => {
+        if (j !== i) return dm;
+        const umida = umidaDe(t, dm.espessuraMin, pct);
+        return {
+          ...dm, diluicaoPct: pct === "" ? "" : String(pct),
+          diluicao: [t?.diluente, pct === "" ? null : `${pct}%`].filter(Boolean).join(" · ") || dm.diluicao,
+          camadaUmida: umida != null ? String(umida) : dm.camadaUmida,
+        };
+      }),
+    }));
+  }
+
+  /** Importa o boletim técnico do fabricante e já usa o produto nesta demão. */
+  async function importarBoletim(i, file) {
+    if (!file) return;
+    setImportando(i); setErro("");
+    try {
+      const b64 = await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = () => res(String(fr.result));
+        fr.onerror = () => rej(new Error("Não consegui ler o arquivo."));
+        fr.readAsDataURL(file);
+      });
+      const r = await fetch("/api/qualidade/tintas", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ arquivo: b64, arquivoNome: file.name, contentType: file.type || "application/pdf" }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Falha ao ler o boletim.");
+      setCatalogo((c) => [j.tinta, ...c.filter((x) => x.id !== j.tinta.id)]);
+      aplicarProduto(i, j.tinta);
+      setOk(`${j.tinta.produto} ${j.atualizado ? "atualizado" : "cadastrado"} a partir do boletim.`);
+    } catch (e) { setErro(e.message); } finally { setImportando(null); }
+  }
 
   // as cores e os sistemas já usados viram sugestão nos campos seguintes
   const cores = [...new Set([...(f?.demaos || []).map((x) => x.cor), ...(f?.itens || []).map((x) => x.cor)].filter(Boolean))];
@@ -311,29 +416,51 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
             // viravam duas caixinhas de 10 px onde não dava para ler o número.
             <div key={i} className="border border-gray-100 rounded-lg p-2 space-y-1.5 bg-gray-50/40">
               <div className="grid sm:grid-cols-[11rem_1fr_1fr_1.5rem] gap-1.5 items-center">
-                <input list="nomes-demao" value={so(dm.nome)} onChange={(e) => setDemao(i, "nome", e.target.value)}
-                  placeholder={`${i + 1}ª demão`} className={`${cls} font-semibold`} />
-                <Texto valor={dm.produto} onChange={(v) => setDemao(i, "produto", v)} ph="produto / norma" />
-                <Texto valor={dm.fabricante} onChange={(v) => setDemao(i, "fabricante", v)} ph="fabricante" />
+                {/* ⚠ PRIMER, INTERMEDIÁRIA E ACABAMENTO JÁ VÊM NA LISTA. Vitor (27/08/2026):
+                    "precisamos deixar alguns itens pré-selecionados: primer, intermediário e
+                    acabamento". Campo livre fazia a mesma demão virar "Fundo" numa obra e "Primer"
+                    noutra — e o esquema deixa de ser comparável entre obras. */}
+                <select value={NOMES_DEMAO.includes(dm.nome) ? dm.nome : (dm.nome ? "__outro" : "")}
+                  onChange={(e) => setDemao(i, "nome", e.target.value === "__outro" ? "" : e.target.value)}
+                  className={`${cls} font-semibold`}>
+                  <option value="">— demão —</option>
+                  {NOMES_DEMAO.map((n) => <option key={n} value={n}>{n}</option>)}
+                  <option value="__outro">outro…</option>
+                </select>
+                {/* o produto sai do CATÁLOGO (boletins técnicos importados); texto livre continua
+                    valendo para a tinta que ainda não tem boletim cadastrado */}
+                <div className="flex items-center gap-1">
+                  <select value={dm.produtoId || ""}
+                    onChange={(e) => {
+                      const t = catalogo.find((x) => x.id === e.target.value);
+                      if (t) aplicarProduto(i, t);
+                      else setDemao(i, "produtoId", "");
+                    }} className={`${cls} text-torg-gray`}>
+                    <option value="">produto do catálogo…</option>
+                    {catalogo.map((t) => <option key={t.id} value={t.id}>{t.fabricante} · {t.produto}</option>)}
+                  </select>
+                  <label title="Importar o boletim técnico do fabricante (PDF)"
+                    className="shrink-0 text-[11px] text-torg-blue border border-torg-blue-300 rounded-lg px-2 py-1.5 hover:bg-torg-blue-50 cursor-pointer inline-flex items-center gap-1">
+                    {importando === i ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
+                    <input type="file" accept="application/pdf,image/*" className="hidden"
+                      onChange={(e) => { importarBoletim(i, e.target.files?.[0]); e.target.value = ""; }} />
+                  </label>
+                </div>
+                <Texto valor={dm.produto} onChange={(v) => { setDemao(i, "produto", v); setDemao(i, "produtoId", ""); }} ph="produto / norma" />
                 <button onClick={() => setF((x) => ({ ...x, demaos: x.demaos.filter((_, j) => j !== i) }))}
                   title="Remover esta demão" className="text-torg-gray-light hover:text-red-600 justify-self-center"><Trash2 size={13} /></button>
               </div>
               <div className="grid sm:grid-cols-[11rem_1fr_1fr_1.5rem] gap-1.5 items-center">
-                <select value="" onChange={(e) => {
-                  const t = (d?.tintas || []).find((x) => x.id === e.target.value);
-                  if (t) {
-                    setDemao(i, "produto", t.produto);
-                    if (t.fabricante) setDemao(i, "fabricante", t.fabricante);
-                    if (t.lote || t.r) setDemao(i, "lote", [t.lote, t.r].filter(Boolean).join(" · "));
-                  }
-                }} className={`${cls} text-torg-gray`}>
-                  <option value="">puxar tinta do CMR…</option>
-                  {(d?.tintas || []).map((t) => <option key={t.id} value={t.id}>{t.produto}</option>)}
-                </select>
+                <Texto valor={dm.fabricante} onChange={(v) => setDemao(i, "fabricante", v)} ph="fabricante" />
                 <input list="cores-plp" value={so(dm.cor)} onChange={(e) => setDemao(i, "cor", e.target.value)}
                   placeholder="cor" className={cls} />
                 <div className="flex items-center gap-1">
-                  <Texto tipo="number" valor={dm.espessuraMin} onChange={(v) => setDemao(i, "espessuraMin", v)} ph="µm seca mín" />
+                  {/* ⚠ mexer na espessura seca refaz a úmida: as duas são a mesma conta. */}
+                  <Texto tipo="number" valor={dm.espessuraMin} onChange={(v) => {
+                    const t = catalogo.find((x) => x.id === dm.produtoId);
+                    const umida = umidaDe(t, v, dm.diluicaoPct);
+                    setF((x) => ({ ...x, demaos: x.demaos.map((d2, j) => (j === i ? { ...d2, espessuraMin: v, ...(umida != null ? { camadaUmida: String(umida) } : {}) } : d2)) }));
+                  }} ph="µm seca mín" />
                   <span className="text-[11px] text-torg-gray-light">a</span>
                   <Texto tipo="number" valor={dm.espessuraMax} onChange={(v) => setDemao(i, "espessuraMax", v)} ph="máx" />
                 </div>
@@ -343,7 +470,7 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           ))}
         </div>
         {f.demaos.length < 6 && (
-          <button onClick={() => setF((x) => ({ ...x, demaos: [...x.demaos, { ordem: x.demaos.length + 1, nome: "", produto: "", fabricante: "", cor: "", espessuraMin: "", espessuraMax: "", lote: "", diluicao: "", camadaUmida: "", secagem: "" }] }))}
+          <button onClick={() => setF((x) => ({ ...x, demaos: [...x.demaos, { ordem: x.demaos.length + 1, nome: "", produto: "", fabricante: "", cor: "", espessuraMin: "", espessuraMax: "", lote: "", diluicao: "", camadaUmida: "", secagem: "", produtoId: "", diluicaoPct: "" }] }))}
             className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={11} /> demão</button>
         )}
       </Secao>
@@ -353,18 +480,39 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           faria duas verdades para o mesmo dado; ele aparece só como referência da linha. */}
       <Secao folha="Folha 2 · 2" titulo="Especificações das tintas">
         <div className="space-y-1.5">
-          {f.demaos.map((dm, i) => (
-            <div key={i} className="grid sm:grid-cols-[9rem_1fr_1fr_6rem_1fr] gap-1.5 items-center">
-              <span className="text-[11px] text-torg-dark truncate" title={dm.produto || dm.nome}>
-                <b>{dm.nome || `${i + 1}ª demão`}</b>{dm.produto ? ` · ${dm.produto}` : ""}
-              </span>
-              <Texto valor={dm.lote} onChange={(v) => setDemao(i, "lote", v)} ph="lote / R" />
-              <Texto valor={dm.diluicao} onChange={(v) => setDemao(i, "diluicao", v)} ph="diluição" />
-              <Texto valor={dm.camadaUmida} onChange={(v) => setDemao(i, "camadaUmida", v)} ph="úmida µm" />
-              <Texto valor={dm.secagem} onChange={(v) => setDemao(i, "secagem", v)} ph="tempo de secagem" />
-            </div>
-          ))}
+          {f.demaos.map((dm, i) => {
+            const t = catalogo.find((x) => x.id === dm.produtoId) || null;
+            const faixas = diluicoesDe(t);
+            return (
+              <div key={i} className="grid sm:grid-cols-[9rem_1fr_7rem_6rem_1fr] gap-1.5 items-center">
+                <span className="text-[11px] text-torg-dark truncate" title={dm.produto || dm.nome}>
+                  <b>{dm.nome || `${i + 1}ª demão`}</b>{dm.produto ? ` · ${dm.produto}` : ""}
+                </span>
+                <Texto valor={dm.lote} onChange={(v) => setDemao(i, "lote", v)} ph="lote / R" />
+                {/* ⚠⚠ A CAMADA ÚMIDA VEM DA DILUIÇÃO. O boletim do INDUSTHANE dá 181 µm sem diluir,
+                    200 µm a 10% e 209 µm a 15% — escolher a % preenche a espessura úmida sozinha.
+                    Sem boletim cadastrado, os dois campos continuam livres para digitar. */}
+                {faixas.length ? (
+                  <select value={so(dm.diluicaoPct)} onChange={(e) => aplicarDiluicao(i, e.target.value)} className={cls}>
+                    <option value="">diluição…</option>
+                    {faixas.map((c) => <option key={c} value={c}>{c}%</option>)}
+                  </select>
+                ) : (
+                  <Texto valor={dm.diluicao} onChange={(v) => setDemao(i, "diluicao", v)} ph="diluição" />
+                )}
+                <Texto valor={dm.camadaUmida} onChange={(v) => setDemao(i, "camadaUmida", v)} ph="úmida µm" />
+                <Texto valor={dm.secagem} onChange={(v) => setDemao(i, "secagem", v)} ph="tempo de secagem" />
+              </div>
+            );
+          })}
           {!f.demaos.length && <p className="text-[11px] text-torg-gray">Cadastre as demãos acima.</p>}
+          {/* o que o boletim respondeu, para quem preenche saber de onde veio o número */}
+          {f.demaos.some((dm) => dm.produtoId) && (
+            <p className="text-[10px] text-torg-gray-light">
+              Diluente, camada úmida e secagem vêm do boletim técnico do fabricante — dá para
+              corrigir aqui se a obra usar outra condição.
+            </p>
+          )}
         </div>
       </Secao>
 
@@ -398,9 +546,6 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
       </Secao>
 
       {/* sugestões que se alimentam do que já foi preenchido — nada é imposto, tudo aceita texto livre */}
-      <datalist id="nomes-demao">
-        {["Fundo", "Intermediária", "Acabamento (Fábrica)", "Acabamento (Campo)", "Demão única"].map((n) => <option key={n} value={n} />)}
-      </datalist>
       <datalist id="cores-plp">{cores.map((c) => <option key={c} value={c} />)}</datalist>
       <datalist id="sistemas-plp">{sistemas.map((c) => <option key={c} value={c} />)}</datalist>
 

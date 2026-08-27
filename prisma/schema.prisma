@@ -1849,6 +1849,57 @@ model DataBookQualidade {
 // lote, validade, condições do dia) continua nascendo em branco. Vitor já barrou o
 // contrário uma vez: "esses números em vermelho não devem sair, o Inspetor é quem vai
 // preencher essa informação".
+// ─── CATÁLOGO DE TINTAS (do boletim técnico do fabricante) ────────────────────
+// Vitor (27/08/2026): "vou procurar cadastrar os produtos de vários fornecedores, e preciso criar
+// um banco de dados onde você vai consultar e me dá a diluição do produto, a espessura da camada
+// úmida (…) e ao invés de criarmos um banco de dados, na verdade eu importar um boletim técnico da
+// tinta — você já conseguiria todas essas informações?".
+//
+// ⚠⚠ A FONTE É O BOLETIM DO FABRICANTE, não a nossa digitação. Diluição, camada úmida e secagem
+// são dados de engenharia da tinta: quem responde por eles é quem fabrica. Copiados à mão de um PDF
+// para um cadastro, envelhecem na primeira revisão do boletim e ninguém percebe — e o PLP sai
+// mandando aplicar 200 µm úmidos de um produto que mudou de sólidos.
+//
+// ⚠ A CAMADA ÚMIDA DEPENDE DA DILUIÇÃO. O mesmo INDUSTHANE dá 181 µm sem diluição, 200 µm a 10% e
+// 209 µm a 15% — por isso `camadas` é uma TABELA [{ diluicao, umida, seca }], não um número. Guardar
+// um valor só obrigaria o PLP a mentir em duas das três situações.
+model ProdutoTinta {
+  id               String    @id @default(cuid())
+  fabricante       String
+  produto          String
+  tipo             String? // PRIMER | INTERMEDIARIA | ACABAMENTO | UNICA
+  norma            String?
+  diluente         String?
+  diluicaoMin      Float? // %
+  diluicaoMax      Float? // %
+  camadas          Json? // [{ diluicao, umida, seca }]
+  secaMin          Float? // µm
+  secaMax          Float? // µm
+  secagemToque     String?
+  secagemManuseio  String?
+  secagemRepintura String?
+  rendimento       String?
+  solidos          String? // como o boletim escreve ("72 ± 2% em volume")
+  // ⚠⚠ O NÚMERO DOS SÓLIDOS EM VOLUME É O QUE FAZ A CONTA. A camada ÚMIDA não é um dado de tabela:
+  // é EPU = EPS × (100 + %DIL) / SV — a fórmula que a própria planilha do Vitor usa. Com o SV, a
+  // úmida sai para QUALQUER espessura seca e QUALQUER diluição; sem ele, só para as três linhas que
+  // o boletim listou. Conferido no INDUSTHANE RHB DF: SV 55,2% dá 181 / 199 / 208 µm, contra os
+  // 181 / 200 / 209 da planilha dele.
+  solidosVol       Float? // % em volume, só o número
+  especificacao    String? // a descrição do tipo ("Tinta poliuretano dupla função…")
+  boletimUrl       String?
+  boletimNome      String?
+  extraidoEm       DateTime?
+  observacoes      String?
+  ativo            Boolean   @default(true)
+  criadoPorId      String?
+  criadoPorNome    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([tipo])
+}
+
 model PlanoPintura {
   id             String   @id @default(cuid())
   opId           String?
