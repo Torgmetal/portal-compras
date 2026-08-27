@@ -65,6 +65,10 @@ export default function AbaPortalCliente({ opId, opNumero }) {
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const st = situacao(d.portal);
   const link = d.portal.token ? `${typeof window !== "undefined" ? window.location.origin : ""}/portal/${d.portal.token}` : null;
+  // ⚠ O QUE NÓS ABRIMOS NÃO É ACESSO DO CLIENTE. `?preview=1` faz a rota do portal não contar
+  // acesso, não gravar "primeiro acesso" e não tirar foto de revisão — o histórico do portal é o
+  // que o CLIENTE fez. O link que se copia e se envia continua sendo `link`, sem o parâmetro.
+  const linkPreview = link ? `${link}?preview=1` : null;
 
   // ⚠ SOBE DIRETO PARA O BLOB, com token. Foto de obra sai do celular com 8 a 12 MB — o dobro do
   // teto em que a rota serverless trava, e ali o erro apareceria como "não anexa" sem dizer o
@@ -144,7 +148,8 @@ export default function AbaPortalCliente({ opId, opNumero }) {
           </div>
           {link && (
             <div className="flex items-center gap-2">
-              <a href={link} target="_blank" rel="noreferrer"
+              <a href={linkPreview} target="_blank" rel="noreferrer"
+                title="Abre o portal sem contar como acesso do cliente"
                 className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-2.5 py-1.5 hover:bg-torg-blue-50 inline-flex items-center gap-1.5">
                 <Eye size={13} /> Ver como o cliente
               </a>

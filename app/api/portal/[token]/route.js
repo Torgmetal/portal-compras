@@ -36,6 +36,18 @@ export async function GET(req, { params }) {
   const tem = (s) => ativas.includes(s);
   const dados = {};
 
+  // ⚠ PREVIEW NOSSO NÃO É ACESSO DO CLIENTE. O botão "ver como o cliente vê" abre esta mesma rota;
+  // sem marcar, ele contava acesso, gravava "primeiro acesso" e tirava foto de revisão em nome de
+  // um cliente que nunca entrou — foi assim que os quatro portais publicados ficaram com
+  // `primeiroAcessoEm` a segundos do `publicadoEm`.
+  const preview = new URL(req.url).searchParams.get("preview") === "1";
+
+  // Quando a lista saiu das nossas mãos para as dele. É o que dá sentido a "mudou desde então".
+  const primeiroEnvio = await prisma.portalDestinatario
+    .findFirst({ where: { portalId: portal.id, enviadoEm: { not: null } }, orderBy: { enviadoEm: "asc" }, select: { enviadoEm: true } })
+    .catch(() => null);
+  const enviadoAoClienteEm = [portal.enviadoEm, primeiroEnvio?.enviadoEm].filter(Boolean).sort((a, b) => new Date(a) - new Date(b))[0] || null;
+
   // ── cronograma: as frentes e o avanço ──
   if (tem("CRONOGRAMA")) {
     // ⚠⚠ O CRONOGRAMA NUNCA APARECIA PARA O CLIENTE — descasamento de chave. `PortalCliente.opNumero`
@@ -178,9 +190,11 @@ export async function GET(req, { params }) {
   const listaDe = async (chave) => {
     const pecas = await pecasDaLista(prisma, op.id, chave);
     // A foto da revisão é tirada aqui, na visita do cliente — ver lib/portal-listas.
-    const rev = await sincronizarRevisao(prisma, {
-      opId: op.id, opNumero: portal.opNumero, chave, pecas,
-    }).catch(() => null);
+    // ⚠ no preview interno NÃO se tira foto: revisão é o histórico do que o cliente viu, e nós
+    // abrimos esta página dezenas de vezes por dia enquanto montamos o portal.
+    const rev = preview
+      ? await prisma.portalListaRevisao.findFirst({ where: { opId: op.id, fonte: chave }, orderBy: { seq: "desc" } }).catch(() => null)
+      : await sincronizarRevisao(prisma, { opId: op.id, opNumero: portal.opNumero, chave, pecas }).catch(() => null);
     return {
       total: pecas.length,
       comPeso,
@@ -196,7 +210,7 @@ export async function GET(req, { params }) {
         material: p.material || null, qtd: p.qte,
         ...(comPeso ? { pesoKg: Math.round(p.pesoTotalKg || 0) } : {}),
       })),
-      revisao: revisaoParaOCliente(rev, comPeso),
+      revisao: revisaoParaOCliente(rev, comPeso, { enviadoAoClienteEm }),
     };
   };
   if (tem("LPC") && op?.id) dados.lpc = await listaDe("LPC");
@@ -393,18 +407,20 @@ export async function GET(req, { params }) {
       .sort((a2, b2) => a2.assunto.localeCompare(b2.assunto, "pt-BR"));
   }
 
-  await prisma.portalCliente.update({
-    where: { id: portal.id },
-    data: {
-      acessos: { increment: 1 },
-      ultimoAcessoEm: new Date(),
-      ...(portal.primeiroAcessoEm ? {} : { primeiroAcessoEm: new Date() }),
-    },
-  }).catch(() => { /* contar acesso nunca pode derrubar a página do cliente */ });
+  if (!preview) {
+    await prisma.portalCliente.update({
+      where: { id: portal.id },
+      data: {
+        acessos: { increment: 1 },
+        ultimoAcessoEm: new Date(),
+        ...(portal.primeiroAcessoEm ? {} : { primeiroAcessoEm: new Date() }),
+      },
+    }).catch(() => { /* contar acesso nunca pode derrubar a página do cliente */ });
 
-  // ⚠ e QUEM abriu, pelo código do link do e-mail. Sem `?d=`, o acesso fica anônimo — que também é
-  // informação: quer dizer que a pessoa entrou por um link repassado, não pelo e-mail que enviamos.
-  await registrarAcesso(req, { portal, codigo: new URL(req.url).searchParams.get("d"), evento: "ABERTURA" });
+    // ⚠ e QUEM abriu, pelo código do link do e-mail. Sem `?d=`, o acesso fica anônimo — que também é
+    // informação: quer dizer que a pessoa entrou por um link repassado, não pelo e-mail que enviamos.
+    await registrarAcesso(req, { portal, codigo: new URL(req.url).searchParams.get("d"), evento: "ABERTURA" });
+  }
 
   return NextResponse.json({
     op: op ? { numero: op.numero, cliente: op.cliente, obra: op.obra, refCliente: op.refCliente } : { numero: portal.opNumero },

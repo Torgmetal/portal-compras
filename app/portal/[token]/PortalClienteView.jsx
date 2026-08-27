@@ -38,9 +38,15 @@ export default function PortalClienteView({ token }) {
   // é justamente a metade da pergunta do Vitor ("o que foi aberto e feito download").
   const cod = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("d") : null;
   const comCod = (u) => (cod ? `${u}${u.includes("?") ? "&" : "?"}d=${encodeURIComponent(cod)}` : u);
+  // ⚠ o "ver como o cliente vê" abre esta mesma página com ?preview=1 — a rota então não conta
+  // acesso nem tira foto de revisão em nome de um cliente que não entrou.
+  const preview = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("preview") === "1";
 
   useEffect(() => {
-    fetch(comCod(`/api/portal/${token}`))
+    const url = new URL(`/api/portal/${token}`, window.location.origin);
+    if (cod) url.searchParams.set("d", cod);
+    if (preview) url.searchParams.set("preview", "1");
+    fetch(url.pathname + url.search)
       .then((r) => r.json())
       .then((j) => (j.error ? setErro(j.error) : setD(j)))
       .catch(() => setErro("Não consegui carregar o portal."));
