@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ArrowLeft, Loader2, Trash2, CheckCircle2, AlertCircle, ListChecks, FileDown, Plus, Upload, X, FileText, Sparkles } from "lucide-react";
 import { numRNC, TIPOS_RNC, ORIGEM_NC, DISPOSICAO_NC, NECESSITA_ACAO, STATUS_RNC, statusRncLabel } from "@/lib/nao-conformidade";
 import { SETORES_AUDITORIA } from "@/lib/auditoria-interna";
+import { SETORES_RETRABALHO } from "@/lib/retrabalho";
+import SeletorPecasLE from "./SeletorPecasLE";
 
 const dISO = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 
@@ -29,6 +31,7 @@ export default function RncDetalheClient({ id }) {
       setD({
         ...r, data: dISO(r.data), prazoResposta: dISO(r.prazoResposta), realizadoEm: dISO(r.realizadoEm),
         anexos: Array.isArray(r.anexos) ? r.anexos : [],
+        pecas: Array.isArray(r.pecas) ? r.pecas : [],
         cincoPorques: Array.from({ length: 5 }, (_, i) => ({ porque: `${i + 1}º porquê`, resposta: (Array.isArray(r.cincoPorques) ? r.cincoPorques[i]?.resposta : "") || "" })),
       });
       setPlano(j.plano || null);
@@ -47,7 +50,8 @@ export default function RncDetalheClient({ id }) {
         tipo: d.tipo,
         data: d.data || null, cliente: d.cliente, opNumero: d.opNumero, desenhoProjetoMarca: d.desenhoProjetoMarca,
         origem: d.origem, fornecedor: d.fornecedor, processoArea: d.processoArea, descricao: d.descricao,
-        disposicao: d.disposicao, pesoRetrabalhoKg: Number.isFinite(Number(d.pesoRetrabalhoKg)) && d.pesoRetrabalhoKg !== "" && d.pesoRetrabalhoKg != null ? Number(d.pesoRetrabalhoKg) : null,
+        disposicao: d.disposicao, pecas: Array.isArray(d.pecas) ? d.pecas : null, setorRetrabalho: d.setorRetrabalho || null,
+        pesoRetrabalhoKg: Number.isFinite(Number(d.pesoRetrabalhoKg)) && d.pesoRetrabalhoKg !== "" && d.pesoRetrabalhoKg != null ? Number(d.pesoRetrabalhoKg) : null,
         elaborador: d.elaborador, resultadoReinspecao: d.resultadoReinspecao, abrangencia: d.abrangencia,
         necessitaAcao: d.necessitaAcao, motivoNaoAcao: d.motivoNaoAcao, causas: d.causas,
         cincoPorques: d.cincoPorques.map((x, i) => ({ porque: `${i + 1}º porquê`, resposta: (x.resposta || "").trim() })),
@@ -198,12 +202,42 @@ export default function RncDetalheClient({ id }) {
           </Campo>
           <Campo label="Cliente"><input value={d.cliente || ""} onChange={(e) => set("cliente", e.target.value)} className="inp" /></Campo>
           <Campo label="OP / Obra"><input value={d.opNumero || ""} onChange={(e) => set("opNumero", e.target.value)} className="inp" /></Campo>
-          <Campo label="Desenho / Projeto / Marca"><input value={d.desenhoProjetoMarca || ""} onChange={(e) => set("desenhoProjetoMarca", e.target.value)} className="inp" /></Campo>
+          {/* ⚠⚠ AS PEÇAS SAEM DA LISTA DE EXPEDIÇÃO, com peso e quantidade. Vitor (27/08/2026):
+              "com base na lista LE trazer as marcas e deixar selecionar as peças e trazer as
+              informações dela e o peso, assim como deixar eu selecionar a quantidade". O peso
+              somado aqui é o que vira indicador de retrabalho do setor. */}
+          <div className="sm:col-span-2">
+            <Campo label="Desenho / Projeto / Marca">
+              <SeletorPecasLE
+                rncId={d.id}
+                pecas={d.pecas}
+                onChange={(pecas) => setD((x) => ({
+                  ...x, pecas,
+                  // o peso do retrabalho passa a ser a SOMA das peças — nada de digitar por fora
+                  pesoRetrabalhoKg: pecas.length
+                    ? Math.round(pecas.reduce((t, p2) => t + (Number(p2.pesoKg) || (Number(p2.qtd) || 0) * (Number(p2.pesoUnitKg) || 0)), 0) * 100) / 100
+                    : x.pesoRetrabalhoKg,
+                  desenhoProjetoMarca: pecas.length ? pecas.map((p2) => p2.marca).join(" / ") : x.desenhoProjetoMarca,
+                }))}
+                textoLivre={d.desenhoProjetoMarca}
+                onTextoLivre={(v) => set("desenhoProjetoMarca", v)}
+              />
+            </Campo>
+          </div>
           <Campo label="Processo / Área da ocorrência">
             <select value={d.processoArea || ""} onChange={(e) => set("processoArea", e.target.value)} className="inp">
               <option value="">— selecione o setor —</option>
               {SETORES_AUDITORIA.map((s) => <option key={s} value={s}>{s}</option>)}
               {d.processoArea && !SETORES_AUDITORIA.includes(d.processoArea) && <option value={d.processoArea}>{d.processoArea}</option>}
+            </select>
+          </Campo>
+          {/* ⚠ QUEM GEROU, não quem vai refazer: é por este campo que o peso entra no indicador de
+              cada setor. Sem ele, o portal deduz do "Processo / Área" — o que funciona para o
+              histórico, mas erra quando a área da ocorrência não é a que causou. */}
+          <Campo label="Setor que gerou o retrabalho">
+            <select value={d.setorRetrabalho || ""} onChange={(e) => set("setorRetrabalho", e.target.value)} className="inp">
+              <option value="">— deduzir do processo / área —</option>
+              {SETORES_RETRABALHO.map((st) => <option key={st.id} value={st.id}>{st.nome}</option>)}
             </select>
           </Campo>
           <Campo label="Origem da não conformidade">
