@@ -8,6 +8,7 @@
 // ⚠ E SÓ SAI O QUE A OBRA LIGOU. A consulta de cada seção só roda se ela estiver ativa: além de
 // não vazar o que o contrato não previu, evita pagar dez consultas para mostrar três blocos.
 import { NextResponse } from "next/server";
+import { ordenarCompras } from "@/lib/item-comprado";
 import { registrarAcesso } from "@/lib/portal-acesso";
 import { prisma } from "@/lib/prisma";
 import { secoesDoPortal, mensagemPadrao, CAPA_PADRAO } from "@/lib/portal-cliente";
@@ -227,13 +228,13 @@ export async function GET(req, { params }) {
     const normal = (t) => String(t || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
     const certsDaOP = await prisma.documentoQualidade.findMany({
       where: { opNumero: portal.opNumero, ativo: true, categoria: "MATERIAL", importRef: { not: null } },
-      select: { nome: true, importRef: true, numeroCorrida: true },
+      select: { nome: true, importRef: true, numeroCorrida: true, dataRecebimento: true },
       take: 800,
     });
     const rPorMaterial = new Map();
     for (const c of certsDaOP) {
       const k = normal(c.nome);
-      if (k && !rPorMaterial.has(k)) rPorMaterial.set(k, { r: c.importRef, corrida: c.numeroCorrida });
+      if (k && !rPorMaterial.has(k)) rPorMaterial.set(k, { r: c.importRef, corrida: c.numeroCorrida, em: c.dataRecebimento });
     }
     const acharR = (desc) => {
       const k = normal(desc);
@@ -270,7 +271,12 @@ export async function GET(req, { params }) {
           qtd: it.peso > 0 ? `${Math.round(it.peso)} kg` : `${it.qtd} ${it.unidade || ""}`.trim(),
           status: ROTULO[st] || st,
           pedido: ped?.numeroPedido || null,
-          chegouEm: fmt(receb?.dataRecebimento || ped?.dataEntregaReal),
+          // ⚠⚠ A DATA VEM DO CMR, do mesmo lugar que o R. Vitor (26/08/2026): "você traz o R mas
+          // não informa a data que chegou". Medido na OP-112: ZERO itens têm recebimento na RM ou
+          // `dataEntregaReal` no pedido — a coluna era "—" em toda linha. Mas o CMR, que já é
+          // consultado aqui para achar o R, guarda `dataRecebimento`: a data existia ao lado do
+          // número que já estava na tela, e só não estava sendo lida.
+          chegouEm: fmt(receb?.dataRecebimento || ped?.dataEntregaReal || acharR(it.descricao)?.em),
           nf: receb?.nfNumero || null,
           ...(() => { const m = acharR(it.descricao); return { rastreio: m?.r || null, corrida: m?.corrida || null }; })(),
         });
@@ -280,7 +286,11 @@ export async function GET(req, { params }) {
     dados.compras = {
       total: linhas.length,
       recebidos: conta("Recebido"),
-      itens: linhas.sort((a2, b2) => String(a2.material).localeCompare(String(b2.material), "pt-BR")).slice(0, 400),
+      // ⚠ A ORDEM É A DA OBRA, NÃO A ALFABÉTICA. Vitor (26/08/2026): "deixe os perfis nas
+      // primeiras linhas, depois os acessórios como telhas, calhas, rufos, depois o lanternim e por
+      // último os parafusos". Em ordem alfabética a lista abria com ARRUELA e AUTOBROCANTE — três
+      // telas de fixador antes do primeiro perfil, e a impressão é de uma obra feita de parafuso.
+      itens: linhas.sort((a2, b2) => ordenarCompras(a2.material, b2.material)).slice(0, 400),
     };
   }
 
