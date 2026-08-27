@@ -1871,6 +1871,14 @@ model PlanoPintura {
   // das peças. [{ item, sistema, cor, obs }], vindo da folha 3 do PLP.
   itens          Json?
   espessuraTotal Float? // µm, seca, do sistema todo
+  // FL 1 da capa: o que rege a pintura desta obra (procedimento e normas)
+  documentosReferencia String?
+  // ⚠ ÍNDICE DE REVISÕES — parte do documento, não histórico de sistema. Vitor (27/08/2026): "no
+  // caso de revisão precisamos ter esse registro". É a tabela da capa: o que mudou, quando, e quem
+  // elaborou, verificou e aprovou cada revisão. Sem ela, o cliente recebe uma R01 sem saber o que
+  // mudou da R00 — e é a primeira pergunta que a fiscalização faz.
+  // [{ revisao, data, descricao, elaborado, verificado, aprovado }]
+  revisoes       Json?
   // o PLP em si (PDF do cliente/projeto), quando houver
   arquivoUrl     String?
   arquivoNome    String?

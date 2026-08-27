@@ -20,6 +20,19 @@ const so = (v) => (v === null || v === undefined ? "" : String(v));
 
 // as três demãos do esquema mais comum — em branco, só para haver onde escrever
 const VAZIAS = [{ nome: "Fundo" }, { nome: "Intermediária" }, { nome: "Acabamento" }];
+const REF_PADRAO = "PO-05 — Pintura · NBR 16775";
+const hojeBR = () => new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+
+function Secao({ folha, titulo, children }) {
+  return (
+    <section className="space-y-1.5">
+      <p className="text-[11px] font-semibold text-torg-dark border-b border-gray-100 pb-1">
+        <span className="text-torg-gray-light font-normal">{folha} · </span>{titulo}
+      </p>
+      {children}
+    </section>
+  );
+}
 
 function Campo({ rotulo, children }) {
   return (
@@ -74,7 +87,16 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           ordem: x.ordem || i + 1, nome: so(x.nome) || `${i + 1}ª demão`, produto: so(x.produto),
           fabricante: so(x.fabricante), cor: so(x.cor), espessuraMin: so(x.espessuraMin), espessuraMax: so(x.espessuraMax),
         })),
-        itens: (p.itens || []).map((x) => ({ item: so(x.item), sistema: so(x.sistema), cor: so(x.cor), obs: so(x.obs) })),
+        itens: (p.itens || []).map((x) => ({
+          item: so(x.item), sistema: so(x.sistema), cor: so(x.cor), obs: so(x.obs),
+          interno: !!x.interno, externo: !!x.externo,
+        })),
+        documentosReferencia: so(p.documentosReferencia) || REF_PADRAO,
+        // ⚠ o índice de revisões nasce com a emissão inicial: documento controlado sem a linha da
+        // R00 não diz quando começou a valer.
+        revisoes: (p.revisoes || []).length
+          ? p.revisoes.map((r) => ({ revisao: so(r.revisao), data: so(r.data), descricao: so(r.descricao), elaborado: so(r.elaborado), verificado: so(r.verificado), aprovado: so(r.aprovado) }))
+          : [{ revisao: so(p.revisao) || "0", data: hojeBR(), descricao: "Emissão inicial", elaborado: "", verificado: "", aprovado: "" }],
         observacoes: so(p.observacoes),
       });
     } catch (e) { setErro(e.message); }
@@ -85,6 +107,7 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const setDemao = (i, k, v) => setF((x) => ({ ...x, demaos: x.demaos.map((d2, j) => (j === i ? { ...d2, [k]: v } : d2)) }));
   const setItem = (i, k, v) => setF((x) => ({ ...x, itens: x.itens.map((it, j) => (j === i ? { ...it, [k]: v } : it)) }));
+  const setRev = (i, k, v) => setF((x) => ({ ...x, revisoes: x.revisoes.map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
 
   async function salvar() {
     setSalvando(true); setErro(""); setOk("");
@@ -97,6 +120,7 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           // e a pessoa apaga o que está errado — apagar o texto tem de apagar a linha.
           demaos: f.demaos.filter((x) => x.produto || x.cor || x.espessuraMin),
           itens: f.itens.filter((x) => x.item),
+          revisoes: f.revisoes.filter((x) => x.revisao || x.descricao),
         }),
       });
       const j = await r.json();
@@ -173,43 +197,77 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
         </p>
       )}
 
-      <div className="grid sm:grid-cols-4 gap-2">
-        <Campo rotulo="Revisão do PLP"><Texto valor={f.revisao} onChange={(v) => set("revisao", v)} ph="0" /></Campo>
-        <Campo rotulo="Método de preparo">
-          <select value={f.preparoMetodo} onChange={(e) => set("preparoMetodo", e.target.value)} className={cls}>
-            <option value="">—</option>
-            {METODOS_PREPARO.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </Campo>
-        <Campo rotulo="Grau de limpeza">
-          <select value={f.grauLimpeza} onChange={(e) => set("grauLimpeza", e.target.value)} className={cls}>
-            <option value="">—</option>
-            {GRAUS_LIMPEZA.map((g) => <option key={g.id} value={g.id}>{g.nome}</option>)}
-          </select>
-        </Campo>
-        <Campo rotulo="Tipo de abrasivo"><Texto valor={f.abrasivo} onChange={(v) => set("abrasivo", v)} ph="granalha de aço" /></Campo>
-        <Campo rotulo="Rugosidade mín. (µm)"><Texto tipo="number" valor={f.rugosidadeMin} onChange={(v) => set("rugosidadeMin", v)} /></Campo>
-        <Campo rotulo="Rugosidade máx. (µm)"><Texto tipo="number" valor={f.rugosidadeMax} onChange={(v) => set("rugosidadeMax", v)} /></Campo>
-        <Campo rotulo="Método de aplicação">
-          <select value={f.metodoAplicacao} onChange={(e) => set("metodoAplicacao", e.target.value)} className={cls}>
-            <option value="">—</option>
-            {METODOS_APLICACAO.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </Campo>
-        <Campo rotulo="Espessura total (µm)"><Texto tipo="number" valor={f.espessuraTotal} onChange={(v) => set("espessuraTotal", v)} ph="soma das demãos" /></Campo>
-      </div>
+      {/* ── FOLHA 1 — capa ── */}
+      <Secao folha="Folha 1" titulo="Capa: referências e índice de revisões">
+        <div className="grid sm:grid-cols-2 gap-2">
+          <Campo rotulo="Revisão do PLP"><Texto valor={f.revisao} onChange={(v) => set("revisao", v)} ph="0" /></Campo>
+          <Campo rotulo="Documentos de referência">
+            <Texto valor={f.documentosReferencia} onChange={(v) => set("documentosReferencia", v)} ph={REF_PADRAO} />
+          </Campo>
+        </div>
 
-      {/* ── esquema de pintura ── */}
-      <div>
-        <p className="text-[11px] font-semibold text-torg-gray mb-1">Esquema de pintura</p>
+        {/* ⚠⚠ O ÍNDICE DE REVISÕES É DO DOCUMENTO. Vitor (27/08/2026): "no caso de revisão
+            precisamos ter esse registro". Sem ele o cliente recebe uma R01 sem saber o que mudou
+            da R00 — e é a primeira pergunta que a fiscalização faz. */}
+        <p className="text-[10px] uppercase tracking-wide text-torg-gray-light mt-1">Índice de revisões</p>
+        <div className="space-y-1.5">
+          {f.revisoes.map((r, i) => (
+            <div key={i} className="grid sm:grid-cols-[3.5rem_6rem_2fr_1fr_1fr_1fr_1.5rem] gap-1.5 items-center">
+              <Texto valor={r.revisao} onChange={(v) => setRev(i, "revisao", v)} ph="0" />
+              <Texto valor={r.data} onChange={(v) => setRev(i, "data", v)} ph="dd/mm/aaaa" />
+              <Texto valor={r.descricao} onChange={(v) => setRev(i, "descricao", v)} ph="o que mudou nesta revisão" />
+              <Texto valor={r.elaborado} onChange={(v) => setRev(i, "elaborado", v)} ph="elaborado" />
+              <Texto valor={r.verificado} onChange={(v) => setRev(i, "verificado", v)} ph="verificado" />
+              <Texto valor={r.aprovado} onChange={(v) => setRev(i, "aprovado", v)} ph="aprovado" />
+              <button onClick={() => setF((x) => ({ ...x, revisoes: x.revisoes.filter((_, j) => j !== i) }))}
+                title="Remover esta revisão" className="text-torg-gray-light hover:text-red-600"><Trash2 size={13} /></button>
+            </div>
+          ))}
+        </div>
+        <button onClick={() => setF((x) => ({ ...x, revisoes: [...x.revisoes, { revisao: "", data: hojeBR(), descricao: "", elaborado: "", verificado: "", aprovado: "" }] }))}
+          className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={11} /> revisão</button>
+      </Secao>
+
+      {/* ── FOLHA 2 · 1 — sistema de pintura ── */}
+      <Secao folha="Folha 2 · 1" titulo="Sistema de pintura da obra">
+        <div className="grid sm:grid-cols-4 gap-2">
+          <Campo rotulo="Método de preparo">
+            <select value={f.preparoMetodo} onChange={(e) => set("preparoMetodo", e.target.value)} className={cls}>
+              <option value="">—</option>
+              {METODOS_PREPARO.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </Campo>
+          <Campo rotulo="Grau de limpeza">
+            <select value={f.grauLimpeza} onChange={(e) => set("grauLimpeza", e.target.value)} className={cls}>
+              <option value="">—</option>
+              {GRAUS_LIMPEZA.map((g) => <option key={g.id} value={g.id}>{g.nome}</option>)}
+            </select>
+          </Campo>
+          <Campo rotulo="Tipo de abrasivo"><Texto valor={f.abrasivo} onChange={(v) => set("abrasivo", v)} ph="granalha de aço" /></Campo>
+          <Campo rotulo="Método de aplicação">
+            <select value={f.metodoAplicacao} onChange={(e) => set("metodoAplicacao", e.target.value)} className={cls}>
+              <option value="">—</option>
+              {METODOS_APLICACAO.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </Campo>
+          <Campo rotulo="Rugosidade mín. (µm)"><Texto tipo="number" valor={f.rugosidadeMin} onChange={(v) => set("rugosidadeMin", v)} /></Campo>
+          <Campo rotulo="Rugosidade máx. (µm)"><Texto tipo="number" valor={f.rugosidadeMax} onChange={(v) => set("rugosidadeMax", v)} /></Campo>
+          <Campo rotulo="Espessura total (µm)"><Texto tipo="number" valor={f.espessuraTotal} onChange={(v) => set("espessuraTotal", v)} ph="soma das demãos" /></Campo>
+        </div>
+
+        <p className="text-[10px] uppercase tracking-wide text-torg-gray-light mt-1">Demãos</p>
         <div className="space-y-1.5">
           {f.demaos.map((dm, i) => (
             <div key={i} className="grid sm:grid-cols-[7rem_1fr_1fr_1fr_5rem_5rem_1.5rem] gap-1.5 items-center">
               <Texto valor={dm.nome} onChange={(v) => setDemao(i, "nome", v)} ph={`${i + 1}ª demão`} />
-              {/* a tinta pode vir do CMR: escolher preenche produto e fabricante de uma vez */}
+              {/* a tinta pode vir do CMR: escolher preenche produto, fabricante e o lote/R de uma vez */}
               <select value="" onChange={(e) => {
                 const t = (d?.tintas || []).find((x) => x.id === e.target.value);
-                if (t) { setDemao(i, "produto", t.produto); if (t.fabricante) setDemao(i, "fabricante", t.fabricante); }
+                if (t) {
+                  setDemao(i, "produto", t.produto);
+                  if (t.fabricante) setDemao(i, "fabricante", t.fabricante);
+                  if (t.lote || t.r) setDemao(i, "lote", [t.lote, t.r].filter(Boolean).join(" · "));
+                }
               }} className={`${cls} text-torg-gray`}>
                 <option value="">tinta do CMR…</option>
                 {(d?.tintas || []).map((t) => <option key={t.id} value={t.id}>{t.produto}</option>)}
@@ -227,20 +285,45 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           ))}
         </div>
         {f.demaos.length < 6 && (
-          <button onClick={() => setF((x) => ({ ...x, demaos: [...x.demaos, { ordem: x.demaos.length + 1, nome: `${x.demaos.length + 1}ª demão`, produto: "", fabricante: "", cor: "", espessuraMin: "", espessuraMax: "" }] }))}
-            className="mt-1.5 text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={11} /> demão</button>
+          <button onClick={() => setF((x) => ({ ...x, demaos: [...x.demaos, { ordem: x.demaos.length + 1, nome: "", produto: "", fabricante: "", cor: "", espessuraMin: "", espessuraMax: "", lote: "", diluicao: "", camadaUmida: "", secagem: "" }] }))}
+            className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={11} /> demão</button>
         )}
-      </div>
+      </Secao>
 
-      {/* ── itens da estrutura e cores ── */}
-      <div>
-        <p className="text-[11px] font-semibold text-torg-gray mb-1">Itens da estrutura e cores</p>
+      {/* ── FOLHA 2 · 2 — especificações das tintas ── */}
+      {/* ⚠ AS MESMAS DEMÃOS, OUTRAS COLUNAS: é a §2 do documento. Repetir o produto aqui como campo
+          faria duas verdades para o mesmo dado; ele aparece só como referência da linha. */}
+      <Secao folha="Folha 2 · 2" titulo="Especificações das tintas">
+        <div className="space-y-1.5">
+          {f.demaos.map((dm, i) => (
+            <div key={i} className="grid sm:grid-cols-[9rem_1fr_1fr_6rem_1fr] gap-1.5 items-center">
+              <span className="text-[11px] text-torg-dark truncate" title={dm.produto || dm.nome}>
+                <b>{dm.nome || `${i + 1}ª demão`}</b>{dm.produto ? ` · ${dm.produto}` : ""}
+              </span>
+              <Texto valor={dm.lote} onChange={(v) => setDemao(i, "lote", v)} ph="lote / R" />
+              <Texto valor={dm.diluicao} onChange={(v) => setDemao(i, "diluicao", v)} ph="diluição" />
+              <Texto valor={dm.camadaUmida} onChange={(v) => setDemao(i, "camadaUmida", v)} ph="úmida µm" />
+              <Texto valor={dm.secagem} onChange={(v) => setDemao(i, "secagem", v)} ph="tempo de secagem" />
+            </div>
+          ))}
+          {!f.demaos.length && <p className="text-[11px] text-torg-gray">Cadastre as demãos acima.</p>}
+        </div>
+      </Secao>
+
+      {/* ── FOLHA 3 — itens da estrutura ── */}
+      <Secao folha="Folha 3" titulo="Sistema de pintura da estrutura metálica">
         <div className="space-y-1.5">
           {f.itens.map((it, i) => (
-            <div key={i} className="grid sm:grid-cols-[2fr_5rem_1fr_1.5fr_1.5rem] gap-1.5 items-center">
-              <Texto valor={it.item} onChange={(v) => setItem(i, "item", v)} ph="item da estrutura" />
+            <div key={i} className="grid sm:grid-cols-[2fr_4.5rem_4.5rem_5rem_1fr_1.5fr_1.5rem] gap-1.5 items-center">
+              <Texto valor={it.item} onChange={(v) => setItem(i, "item", v)} ph="equipamento / conjunto" />
+              <label className="text-[11px] text-torg-gray inline-flex items-center gap-1 justify-center">
+                <input type="checkbox" className="accent-torg-orange" checked={!!it.interno} onChange={(e) => setItem(i, "interno", e.target.checked)} /> interno
+              </label>
+              <label className="text-[11px] text-torg-gray inline-flex items-center gap-1 justify-center">
+                <input type="checkbox" className="accent-torg-orange" checked={!!it.externo} onChange={(e) => setItem(i, "externo", e.target.checked)} /> externo
+              </label>
               <Texto valor={it.sistema} onChange={(v) => setItem(i, "sistema", v)} ph="sistema" />
-              <Texto valor={it.cor} onChange={(v) => setItem(i, "cor", v)} ph="cor" />
+              <Texto valor={it.cor} onChange={(v) => setItem(i, "cor", v)} ph="cor de acabamento" />
               <Texto valor={it.obs} onChange={(v) => setItem(i, "obs", v)} ph="observação" />
               <button onClick={() => setF((x) => ({ ...x, itens: x.itens.filter((_, j) => j !== i) }))}
                 title="Remover este item" className="text-torg-gray-light hover:text-red-600"><Trash2 size={13} /></button>
@@ -248,9 +331,9 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           ))}
           {!f.itens.length && <p className="text-[11px] text-torg-gray">Nenhum item relacionado.</p>}
         </div>
-        <button onClick={() => setF((x) => ({ ...x, itens: [...x.itens, { item: "", sistema: "", cor: "", obs: "" }] }))}
-          className="mt-1.5 text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={11} /> item</button>
-      </div>
+        <button onClick={() => setF((x) => ({ ...x, itens: [...x.itens, { item: "", sistema: "", cor: "", obs: "", interno: false, externo: false }] }))}
+          className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={11} /> item</button>
+      </Secao>
 
       <Campo rotulo="Observações">
         <textarea value={f.observacoes} onChange={(e) => set("observacoes", e.target.value)} rows={3}
