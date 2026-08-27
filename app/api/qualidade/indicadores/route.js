@@ -78,10 +78,30 @@ export async function GET(req) {
   { const s = arr12();
     for (let m = 0; m <= mesFim; m++) { const ini = new Date(Date.UTC(ano, m, 1)), fim = new Date(Date.UTC(ano, m + 1, 1)); const adm = funcs.filter((f) => f.dataAdmissao >= ini && f.dataAdmissao < fim).length; const dem = funcs.filter((f) => f.dataDemissao && f.dataDemissao >= ini && f.dataDemissao < fim).length; const hc = headcount(m); s[m] = hc > 0 ? Math.round(((adm + dem) / 2 / hc) * 1000) / 10 : null; }
     series.turnover = s; }
-  { const af = await prisma.afastamento.findMany({ where: { dataInicio: { gte: yIni, lt: yFim } }, select: { dataInicio: true, diasAfastado: true } });
-    const s = arr12();
-    for (let m = 0; m <= mesFim; m++) { const ini = new Date(Date.UTC(ano, m, 1)), fim = new Date(Date.UTC(ano, m + 1, 1)); const dias = af.filter((x) => x.dataInicio >= ini && x.dataInicio < fim).reduce((a, x) => a + (x.diasAfastado || 0), 0); const hc = headcount(m); const prev = hc * uteisNoMes(ano, m); s[m] = prev > 0 ? Math.round((dias / prev) * 1000) / 10 : null; }
-    series.absenteismo = s; }
+  // ⚠⚠ ABSENTEÍSMO VEM DO CONTROLE DE PRESENÇA DO RH, não dos afastamentos formais. Vitor
+  // (27/08/2026): "nessa pasta temos uma informação para preencher o indicador de absenteísmo do
+  // RH" — é a `/Qualidade/Presença.xlsx`, o controle diário por setor. A nota do indicador já dizia
+  // que o certo era a falta do ponto; até aqui ele contava só `Afastamento`, que registra o
+  // afastamento longo e ignora a falta do dia a dia — o grosso do que o indicador mede.
+  //
+  // ⚠ OS DOIS TIPOS CONTAM (decisão do Vitor, 27/08): falta do dia e afastamento longo no mesmo
+  // índice. Sem a planilha (falha de rede, arquivo movido), cai no cálculo antigo em vez de deixar
+  // o indicador em branco.
+  { let serie = null;
+    try {
+      const { absenteismoDoAno, serieAbsenteismo } = await import("@/lib/absenteismo-planilha");
+      const d = await absenteismoDoAno(ano);
+      if (d.achou && d.meses.length) serie = serieAbsenteismo(d);
+    } catch (e) { console.error("[indicadores] absenteísmo pela planilha:", e?.message); }
+
+    if (!serie) {
+      const af = await prisma.afastamento.findMany({ where: { dataInicio: { gte: yIni, lt: yFim } }, select: { dataInicio: true, diasAfastado: true } });
+      const s2 = arr12();
+      for (let m = 0; m <= mesFim; m++) { const ini = new Date(Date.UTC(ano, m, 1)), fim = new Date(Date.UTC(ano, m + 1, 1)); const dias = af.filter((x) => x.dataInicio >= ini && x.dataInicio < fim).reduce((a, x) => a + (x.diasAfastado || 0), 0); const hc = headcount(m); const prev = hc * uteisNoMes(ano, m); s2[m] = prev > 0 ? Math.round((dias / prev) * 1000) / 10 : null; }
+      serie = s2;
+    }
+    series.absenteismo = serie; }
+
   { const ac = await prisma.acidenteTrabalho.findMany({ where: { data: { gte: yIni, lt: yFim }, tipo: "COM_AFASTAMENTO" }, select: { data: true } });
     const s = arr12(); for (let m = 0; m <= mesFim; m++) s[m] = 0; for (const a of ac) { const m = a.data.getUTCMonth(); if (m <= mesFim) s[m] += 1; }
     series.acidentes_afastamento = s; }

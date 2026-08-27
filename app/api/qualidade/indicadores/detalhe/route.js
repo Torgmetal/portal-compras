@@ -59,6 +59,52 @@ export async function GET(req) {
     });
   }
 
+  // ⚠ ABSENTEÍSMO — quem faltou, quanto e em que setor. O índice sozinho não se discute: 14,7% em
+  // agosto parece a fábrica inteira faltando, quando quatro pessoas em afastamento longo respondem
+  // por 76 dos 132,5 dias. A tabela mostra as duas coisas.
+  if (indicador === "absenteismo") {
+    const { absenteismoDoAno } = await import("@/lib/absenteismo-planilha");
+    const d = await absenteismoDoAno(ano);
+    if (!d.achou) return NextResponse.json({ error: d.erro || "Planilha de presença não encontrada." }, { status: 404 });
+
+    const meses = anoTodo ? d.meses : d.meses.filter((m) => m.mes === mes);
+    if (!meses.length) return NextResponse.json({ titulo: "Absenteísmo", colunas: ["Colaborador"], linhas: [], resumo: "Sem registro de presença neste período." });
+
+    const uteis = meses.reduce((s2, m) => s2 + m.diasUteis, 0);
+    const faltas = meses.reduce((s2, m) => s2 + m.faltas, 0);
+    const longos = meses.flatMap((m) => m.afastamentoLongo.pessoas.map((p) => p.nome));
+    const kgLongos = meses.reduce((s2, m) => s2 + m.afastamentoLongo.faltas, 0);
+
+    // uma linha por pessoa, somando os meses do período
+    const porPessoa = new Map();
+    for (const m of meses) {
+      for (const p of m.detalhe) {
+        const a = porPessoa.get(p.nome) || { nome: p.nome, funcao: p.funcao, setor: p.setor, dias: 0, uteis: 0 };
+        a.dias += p.dias; a.uteis += p.uteis;
+        porPessoa.set(p.nome, a);
+      }
+    }
+    const linhas = [...porPessoa.values()]
+      .sort((a, b) => b.dias - a.dias)
+      .map((p) => [
+        p.nome, p.setor || "—", p.funcao || "—",
+        `${p.dias.toLocaleString("pt-BR")} dia(s)`,
+        p.uteis ? `${(Math.round((p.dias / p.uteis) * 1000) / 10).toLocaleString("pt-BR")}%` : "—",
+        longos.includes(p.nome) ? "afastamento longo" : "",
+      ]);
+    const pct = uteis > 0 ? Math.round((faltas / uteis) * 1000) / 10 : null;
+    const pctSemLongo = uteis > 0 ? Math.round(((faltas - kgLongos) / uteis) * 1000) / 10 : null;
+    return NextResponse.json({
+      titulo: "Absenteísmo — controle de presença",
+      colunas: ["Colaborador", "Setor", "Função", "Faltas", "% do próprio período", ""],
+      linhas,
+      resumo: `${faltas.toLocaleString("pt-BR")} dias de ausência em ${uteis.toLocaleString("pt-BR")} dias úteis`
+        + `${pct == null ? "" : ` · ${pct.toLocaleString("pt-BR")}%`}`
+        + `${kgLongos > 0 ? ` · desses, ${kgLongos.toLocaleString("pt-BR")} dias são de afastamento longo (${[...new Set(longos)].length} pessoa(s)) — sem eles o índice seria ${pctSemLongo?.toLocaleString("pt-BR")}%` : ""}`
+        + ` · fonte: ${d.arquivo}`,
+    });
+  }
+
   if (indicador === "rnc_cliente") {
     const rncs = await prisma.naoConformidade.findMany({
       where: { data: { gte: pIni, lt: pFim }, pertinente: true, OR: [{ tipo: "CLIENTE" }, { origem: "CLIENTE" }] },
