@@ -13,8 +13,12 @@ export async function GET(req) {
 
   // fonte=rnc → só os planos vindos de RNC (origem "RNC-…"); fonte=auditoria → o resto.
   const fonte = new URL(req.url).searchParams.get("fonte");
-  const where = fonte === "rnc" ? { origem: { startsWith: "RNC-" } }
-    : fonte === "auditoria" ? { NOT: { origem: { startsWith: "RNC-" } } } : {};
+  // ⚠ PLANO DE INDICADOR NÃO APARECE AQUI. Vitor (27/08/2026): "não precisa salvar na aba de plano
+  // de ação da aba qualidade, pode ser apenas dentro do painel indicadores de cada setor". Eles
+  // moram no painel do setor, com outro rito: nascem de um mês fora da meta e se discutem lá.
+  const semIndicador = { indicador: null };
+  const where = fonte === "rnc" ? { ...semIndicador, origem: { startsWith: "RNC-" } }
+    : fonte === "auditoria" ? { ...semIndicador, NOT: { origem: { startsWith: "RNC-" } } } : semIndicador;
   const planos = await prisma.planoAcao.findMany({ where, orderBy: [{ numero: "desc" }], take: 300 });
   const lista = planos.map((p) => {
     const itens = Array.isArray(p.itens) ? p.itens : [];

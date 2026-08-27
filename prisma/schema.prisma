@@ -2162,6 +2162,22 @@ model PlanoAcao {
   numero      Int // PA-001
   titulo      String
   origem      String? // de onde veio (Auditoria RAI-001, NC, reclamação…)
+  // ⚠⚠ PLANO DE MÊS FORA DA META. Vitor (27/08/2026): "criar um botão para criar plano de ação para
+  // os meses que estão abaixo da meta (…) não precisa salvar na aba de plano de ação da aba
+  // qualidade, pode ser apenas dentro do painel indicadores de cada setor".
+  //
+  // Mesmo 5W2H da RNC e da auditoria — mudar de estrutura por causa da origem só criaria um segundo
+  // formulário para a mesma coisa. O que muda é o vínculo: indicador + mês, e o valor contra a meta
+  // no dia em que o plano nasceu, para daqui a seis meses ainda se saber POR QUE ele existe.
+  //
+  // ⚠ Estes NÃO entram na aba Planos de Ação da Qualidade (ela filtra `indicador: null`): lá ficam
+  // os planos de auditoria e de RNC, que têm outro rito de acompanhamento.
+  indicador   String? // id do indicador ISO (ex.: "retrabalho")
+  processo    String? // PRODUCAO | ENGENHARIA | …
+  ano         Int?
+  mes         Int? // 0-11; null = plano do acumulado do ano
+  valor       Float? // o valor apurado que disparou o plano
+  metaValor   Float? // a meta vigente naquele mês
   responsavel String? // dono do plano
   status      String   @default("EM_ANDAMENTO") // EM_ANDAMENTO | CONCLUIDO | CANCELADO
   itens       Json     @default("[]") // [{ oque, porque, onde, quem, quando, como, quanto, status, acompanhamento, concluidoEm }]

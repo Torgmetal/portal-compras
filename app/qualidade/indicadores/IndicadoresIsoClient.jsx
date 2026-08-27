@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { Gauge, Loader2, Lock, Info, TrendingUp, X, FileDown } from "lucide-react";
+import { Gauge, Loader2, Lock, Info, TrendingUp, X, FileDown, ClipboardList } from "lucide-react";
 import { farol, FAROL_COR, metaTexto } from "@/lib/indicadores-iso";
+import PlanoAcaoIndicador from "./PlanoAcaoIndicador";
 
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 const MES3 = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -36,6 +37,7 @@ export default function IndicadoresIsoClient({ processo = "QUALIDADE", endpoint 
   const [ano] = useState(hoje.getUTCFullYear());
   const [mes, setMes] = useState(null); // null = deixa a API escolher (mês atual)
   const [modo, setModo] = useState("mes"); // mes | acumulado (do ano)
+  const [plano, setPlano] = useState(null);
   const [detalhe, setDetalhe] = useState(null); // indicador aberto no modal de registros do mês
   const acum = modo === "acumulado";
 
@@ -100,11 +102,20 @@ export default function IndicadoresIsoClient({ processo = "QUALIDADE", endpoint 
         <div className="py-10 text-center text-red-600 text-sm">{erro}</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
-          {data.indicadores.filter((i) => i.processo === processo).map((ind) => <Card key={ind.id} ind={ind} mesFim={data.mesFim} acum={acum} onAbrir={detalheEndpoint && ind.fonte !== "pendente" ? () => setDetalhe(ind) : null} />)}
+          {data.indicadores.filter((i) => i.processo === processo).map((ind) => (
+            <Card key={ind.id} ind={ind} mesFim={data.mesFim} acum={acum}
+              onAbrir={detalheEndpoint && ind.fonte !== "pendente" ? () => setDetalhe(ind) : null}
+              onPlano={() => setPlano(ind)} />
+          ))}
         </div>
       )}
 
       {detalhe && <DetalheModal ind={detalhe} endpoint={detalheEndpoint} ano={ano} mes={acum ? -1 : mes} onClose={() => setDetalhe(null)} />}
+      {plano && (
+        <PlanoAcaoIndicador ind={plano} processo={processo} ano={ano}
+          mes={acum ? null : mes} valor={acum ? plano.acumulado : plano.atual}
+          onFechar={() => setPlano(null)} />
+      )}
     </div>
   );
 }
@@ -159,7 +170,7 @@ function Chip({ n, l, cor, bg }) {
   return <div className="rounded-xl px-4 py-2 flex items-center gap-2.5" style={{ background: bg }}><span className="text-2xl font-extrabold tabular-nums" style={{ color: cor }}>{n}</span><span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: cor }}>{l}</span></div>;
 }
 
-function Card({ ind, mesFim, onAbrir, acum }) {
+function Card({ ind, mesFim, onAbrir, acum, onPlano }) {
   const pendente = ind.fonte === "pendente";
   const valor = acum ? ind.acumulado : ind.atual;
   const f = pendente ? null : farol(valor, ind.meta);
@@ -191,7 +202,18 @@ function Card({ ind, mesFim, onAbrir, acum }) {
             <Spark serie={ind.serie} meta={ind.meta} mesFim={mesFim} />
           </div>
           {valor == null && <div className="text-[10.5px] text-torg-gray inline-flex items-center gap-1"><TrendingUp size={11} /> Sem dado {acum ? "no ano" : "no mês selecionado"}.</div>}
-          {clicavel && <div className="text-[10.5px] text-torg-blue font-medium">ver registros {acum ? "do ano" : "do mês"} →</div>}
+          <div className="flex items-center gap-3 flex-wrap">
+            {clicavel && <div className="text-[10.5px] text-torg-blue font-medium">ver registros {acum ? "do ano" : "do mês"} →</div>}
+            {/* ⚠⚠ O BOTÃO SÓ APARECE FORA DA META. Vitor (27/08/2026): "criar um botão para criar
+                plano de ação para os meses que estão abaixo da meta". Botão sempre visível vira
+                enfeite; aparecendo só no vermelho, ele é a própria leitura do indicador. */}
+            {f === "vermelho" && onPlano && (
+              <button onClick={(e) => { e.stopPropagation(); onPlano(); }}
+                className="text-[10.5px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-100 inline-flex items-center gap-1">
+                <ClipboardList size={11} /> plano de ação
+              </button>
+            )}
+          </div>
         </>
       )}
     </div>
