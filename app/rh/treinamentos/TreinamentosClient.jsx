@@ -240,6 +240,14 @@ export default function TreinamentosClient() {
           </button>
         </div>
       </div>
+      {/* ⚠⚠ O PLANO ASSINADO PRECISA APARECER NA PÁGINA. Vitor (26/08/2026) procurou o Plano Anual
+          de Treinamentos duas vezes e não achou — ele existia, estava completo e ASSINADO pelos
+          quatro desde 11/08. O registro das assinaturas morava DENTRO do modal "Enviar p/
+          assinatura": quem quer só CONSULTAR o que já foi assinado tinha de clicar num botão que
+          parece disparar um envio novo. Ninguém clica ali para consultar — e o documento existia
+          sem existir. */}
+      <PlanoAssinado />
+
       {assinaturaOpen && <AssinaturaModal onClose={() => setAssinaturaOpen(false)} />}
 
       {/* Erro global */}
@@ -694,6 +702,58 @@ export default function TreinamentosClient() {
   );
 }
 
+const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
+
+/** O estado do Plano Anual, na página: revisão, quem assinou e o PDF a um clique. */
+function PlanoAssinado() {
+  const [d, setD] = useState(null);
+  useEffect(() => {
+    fetch("/api/rh/treinamentos/assinatura").then((r) => r.json()).then(setD).catch(() => setD({ envios: [] }));
+  }, []);
+  const ultimo = d?.envios?.[0];
+  if (!d) return null;
+
+  if (!ultimo) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 text-[13px] text-torg-gray">
+        O Plano Anual de Treinamentos ainda não foi enviado para assinatura.
+      </div>
+    );
+  }
+  const ass = ultimo.assinaturas || [];
+  const assinados = ass.filter((a) => a.assinadoEm).length;
+  const completo = assinados === ass.length && ass.length > 0;
+  return (
+    <div className={`bg-white rounded-xl border shadow-sm px-4 py-3 ${completo ? "border-emerald-200" : "border-amber-200"}`}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[13px] font-bold text-torg-dark inline-flex items-center gap-1.5">
+          {completo ? <CheckCircle2 size={15} className="text-emerald-600" /> : <Clock size={15} className="text-amber-500" />}
+          Plano Anual de Treinamentos — R{String(ultimo.revisao).padStart(2, "0")}
+        </span>
+        <span className={`text-[11px] font-bold rounded px-1.5 py-0.5 ${completo ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200"}`}>
+          {assinados}/{ass.length} assinaram
+        </span>
+        <span className="text-[11px] text-torg-gray">enviado {fmtDT(ultimo.enviadoEm)}</span>
+        <a href="/api/rh/treinamentos/pdf" target="_blank" rel="noopener noreferrer"
+          className="ml-auto text-[12px] font-semibold text-torg-blue hover:text-torg-dark inline-flex items-center gap-1">
+          <FileDown size={13} /> abrir o PDF
+        </a>
+      </div>
+      {/* ⚠ os NOMES na página, não só o placar: "4/4" não responde "a Fabrine assinou?", que é a
+          pergunta que se faz de verdade. */}
+      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+        {ass.map((a) => (
+          <span key={a.id} className="text-[11px] inline-flex items-center gap-1">
+            {a.assinadoEm ? <CheckCircle2 size={11} className="text-emerald-600" /> : <Clock size={11} className="text-amber-500" />}
+            <span className="font-medium text-torg-dark">{a.nome}</span>
+            <span className="text-torg-gray">{a.assinadoEm ? fmtDT(a.assinadoEm) : "aguardando"}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AssinaturaModal({ onClose }) {
   const [dados, setDados] = useState(null); // { envios, revisaoAtual }
   const [rows, setRows] = useState([{ nome: "", email: "", setor: "" }]);
@@ -707,7 +767,6 @@ function AssinaturaModal({ onClose }) {
   const setRow = (i, k, v) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
   const addRow = () => setRows((rs) => [...rs, { nome: "", email: "", setor: "" }]);
   const rmRow = (i) => setRows((rs) => (rs.length > 1 ? rs.filter((_, j) => j !== i) : rs));
-  const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
   const rev = dados?.revisaoAtual ?? 0;
 
   async function enviar() {
