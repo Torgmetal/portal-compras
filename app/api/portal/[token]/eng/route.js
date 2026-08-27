@@ -1,4 +1,4 @@
-// GET — o cliente baixa UM documento de ENGENHARIA do portal (os escolhidos da pasta 2.5.5).
+// GET — o cliente baixa UM documento escolhido do servidor (qualquer área do portal).
 //
 // ⚠ O TOKEN É DO PORTAL e a checagem é TRIPLA: o portal tem de estar publicado, a seção
 // DOCUMENTOS tem de estar ligada, E o arquivo tem de estar na LISTA ESCOLHIDA daquela obra.
@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAccessToken } from "@/lib/sharepoint";
-import { secoesDoPortal } from "@/lib/portal-cliente";
+import { secoesDoPortal, tipoDoDocEng } from "@/lib/portal-cliente";
 import { registrarAcesso } from "@/lib/portal-acesso";
 
 export const runtime = "nodejs";
@@ -28,9 +28,32 @@ export async function GET(req, { params }) {
     return new NextResponse("Este documento não faz parte do portal desta obra.", { status: 403 });
   }
 
-  const escolhidos = Array.isArray(portal.docsEngenharia) ? portal.docsEngenharia : [];
-  const doc = escolhidos.find((d) => String(d.id) === String(id));
+  // ⚠ PROCURA EM TODAS AS ÁREAS. Antes lia só `docsEngenharia`, o campo antigo de quando o portal
+  // tinha uma lista só — e desde que a seleção passou a ser por área (`docsPorArea`), documento
+  // escolhido para Compras, Qualidade, Planejamento ou Expedição chegava ao cliente como link que
+  // devolve 404. A OP-112 é a única obra que ainda tem o campo antigo preenchido; ele continua
+  // valendo como origem, mas quem manda é o mapa por área.
+  const mapa = portal.docsPorArea || (portal.docsEngenharia ? { ENGENHARIA: portal.docsEngenharia } : {});
+  let doc = null;
+  let areaDoDoc = null;
+  for (const [ar, lista] of Object.entries(mapa || {})) {
+    const achado = (Array.isArray(lista) ? lista : []).find((d) => String(d.id) === String(id));
+    if (achado) { doc = achado; areaDoDoc = ar; break; }
+  }
+  if (!doc && Array.isArray(portal.docsEngenharia)) {
+    doc = portal.docsEngenharia.find((d) => String(d.id) === String(id)) || null;
+    if (doc) areaDoDoc = "ENGENHARIA";
+  }
   if (!doc) return new NextResponse("Documento não encontrado nesta obra.", { status: 404 });
+
+  // ⚠⚠ A TRAVA DOS QUATRO TIPOS VALE AQUI TAMBÉM. Vitor (26/08/2026) restringiu a Engenharia ao
+  // Modelo 3D, memorial de cálculo, ART e diagramas de montagem. Se a regra só existisse na
+  // listagem, o que ficou de fora — a LPC crua da OP-112, com o peso item a item — continuaria a um
+  // id de distância na barra de endereço, que é exatamente o furo que esta rota já fechava para a
+  // pasta inteira.
+  if (areaDoDoc === "ENGENHARIA" && !tipoDoDocEng(doc)) {
+    return new NextResponse("Este documento não faz parte do portal desta obra.", { status: 403 });
+  }
 
   try {
     const auth = { Authorization: `Bearer ${await getAccessToken()}` };
@@ -40,7 +63,7 @@ export async function GET(req, { params }) {
     await prisma.portalCliente.update({ where: { id: portal.id }, data: { ultimoAcessoEm: new Date() } }).catch(() => {});
     await registrarAcesso(req, {
       portal, codigo: new URL(req.url).searchParams.get("d"), evento: "DOWNLOAD",
-      documento: doc.nome, documentoId: String(id), secao: "ENGENHARIA",
+      documento: doc.nome, documentoId: String(id), secao: areaDoDoc || "ENGENHARIA",
     });
     return new NextResponse(buf, {
       headers: {

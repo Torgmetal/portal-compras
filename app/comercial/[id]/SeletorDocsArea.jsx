@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, FolderOpen, Folder, Check, AlertCircle, RefreshCw, ChevronRight, FileText, CornerLeftUp, Pencil, X } from "lucide-react";
+import { Loader2, FolderOpen, Folder, Check, AlertCircle, RefreshCw, ChevronRight, FileText, CornerLeftUp, Pencil, X, Lock, Trash2 } from "lucide-react";
 
 const kb = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round((n || 0) / 1024))} KB`);
 
@@ -15,13 +15,16 @@ const kb = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(
  * comprou a obra — publicar o nome do arquivo é publicar a nossa nomenclatura. O nome de exibição
  * é opcional; sem ele vale o original, que é melhor que um campo obrigatório preenchido às pressas.
  *
- * ⚠ NAVEGA UMA PASTA POR VEZ, começando na pasta natural da área. Não é trava: dá para subir até a
- * raiz da OP e ir a qualquer lugar — é só o ponto de partida.
+ * ⚠ COM `tipo`, A PASTA É TRAVA. Vitor (26/08/2026): "vamos restringir a permissão de importação de
+ * arquivos; na Engenharia apenas permitir o Modelo 3D, memorial de cálculo, ART e Diagramas de
+ * montagem". Nesse modo não existe "subir até a raiz da OP": o topo é o tipo, e o servidor recusa
+ * caminho de fora. Sem `tipo` (as outras áreas) segue navegando a OP inteira.
  */
-export default function SeletorDocsArea({ opNumero, area, nomeArea }) {
+export default function SeletorDocsArea({ opNumero, area, nomeArea, tipo, nomeTipo, ondeTipo, resumoTipo }) {
   const [d, setD] = useState(null);
-  const [caminho, setCaminho] = useState(null);   // null = deixa a API escolher a pasta da área
+  const [caminho, setCaminho] = useState(null);   // null = deixa a API escolher a pasta de partida
   const [sel, setSel] = useState(() => new Map()); // id → doc escolhido
+  const [fora, setFora] = useState([]);            // escolhidos que não são de nenhum dos 4 tipos
   const [editando, setEditando] = useState(null);  // id em renomeação
   const [rascunho, setRascunho] = useState("");
   const [carregando, setCarregando] = useState(false);
@@ -29,28 +32,32 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea }) {
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
 
+  const rotulo = nomeTipo || nomeArea;
+
   const carregar = useCallback(async (p) => {
     setCarregando(true); setErro("");
     try {
       const q = new URLSearchParams({ opNumero, area });
+      if (tipo) q.set("tipo", tipo);
       if (p !== null && p !== undefined) q.set("caminho", p);
       const r = await fetch(`/api/portal/engenharia-docs?${q}`, { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao ler a pasta");
       setD(j);
       setCaminho(j.caminho ?? "");
-      // ⚠ a seleção da ÁREA inteira, não só o que está nesta pasta: navegar não pode desmarcar o
+      // ⚠ a seleção do TIPO inteiro, não só o que está nesta pasta: navegar não pode desmarcar o
       // que foi escolhido noutra pasta.
       setSel(new Map((j.selecionados || []).map((x) => [String(x.id), x])));
+      setFora(j.foraDoPadrao || []);
       if (j.error) setErro(j.error);
-      if (j.aviso) setAviso(j.aviso);
+      setAviso(j.aviso || "");
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
-  }, [opNumero, area]);
+  }, [opNumero, area, tipo]);
   useEffect(() => { carregar(null); }, [carregar]);
 
   const marcar = (a, ligar) => setSel((m) => {
     const n = new Map(m);
-    if (ligar) n.set(String(a.id), { id: a.id, nome: a.nome, nomeExibicao: n.get(String(a.id))?.nomeExibicao || null, pasta: caminho || "", tamanho: a.tamanho, em: a.em });
+    if (ligar) n.set(String(a.id), { id: a.id, nome: a.nome, nomeExibicao: n.get(String(a.id))?.nomeExibicao || null, pasta: a.pasta ?? (caminho || ""), tamanho: a.tamanho, em: a.em });
     else n.delete(String(a.id));
     return n;
   });
@@ -62,27 +69,38 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea }) {
     return n;
   });
 
-  async function salvar() {
+  async function salvar(limparFora = false) {
     setSalvando(true); setErro(""); setAviso("");
     try {
       const r = await fetch("/api/portal/engenharia-docs", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero, area, docs: [...sel.values()] }),
+        body: JSON.stringify({ opNumero, area, tipo: tipo || undefined, docs: [...sel.values()], limparForaDoPadrao: limparFora }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao salvar");
-      setAviso(`${j.escolhidos} documento(s) publicados em ${nomeArea}.`);
+      if (limparFora) setFora([]);
+      setAviso(`${j.escolhidos} documento(s) publicados em ${rotulo}.`);
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
   }
 
-  const trilha = (caminho || "").split("/").filter(Boolean);
-  const subir = () => carregar(trilha.slice(0, -1).join("/"));
+  // ── a trilha ──
+  // com tipo: o topo é o TIPO, e só se mostra o que está abaixo da pasta dele.
+  // sem tipo: o topo é a OP, como sempre foi.
+  const raizAtual = tipo ? (d?.raizes || []).find((r) => caminho === r || (caminho || "").startsWith(`${r}/`)) : null;
+  const trilha = tipo
+    ? (raizAtual ? (caminho || "").slice(raizAtual.length).split("/").filter(Boolean) : [])
+    : (caminho || "").split("/").filter(Boolean);
+  const subirPara = () => {
+    if (!tipo) return trilha.slice(0, -1).join("/");
+    return trilha.length > 1 ? `${raizAtual}/${trilha.slice(0, -1).join("/")}` : "";
+  };
+  const irAte = (i) => (tipo ? `${raizAtual}/${trilha.slice(0, i + 1).join("/")}` : trilha.slice(0, i + 1).join("/"));
 
   return (
     <div className="border border-gray-200 rounded-xl p-3.5 space-y-2.5">
       <div className="flex items-center gap-2 flex-wrap">
         <p className="text-[13px] font-semibold text-torg-dark inline-flex items-center gap-1.5 flex-1">
-          <FolderOpen size={14} className="text-torg-blue" /> {nomeArea}
+          {tipo ? <Lock size={13} className="text-torg-gray-light" /> : <FolderOpen size={14} className="text-torg-blue" />} {rotulo}
           <span className="text-[11px] font-normal text-torg-gray">· {sel.size} documento(s) no portal</span>
         </p>
         <button onClick={() => carregar(caminho)} disabled={carregando}
@@ -90,6 +108,11 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea }) {
           {carregando ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
         </button>
       </div>
+      {tipo && (resumoTipo || ondeTipo) && (
+        <p className="text-[11px] text-torg-gray -mt-1">
+          {resumoTipo} {ondeTipo && <span className="text-torg-gray-light">· pasta {ondeTipo}</span>}
+        </p>
+      )}
 
       {erro && <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 inline-flex items-start gap-1.5"><AlertCircle size={13} className="mt-0.5 shrink-0" /> {erro}</p>}
 
@@ -103,11 +126,11 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea }) {
 
       {/* ── trilha ── */}
       <div className="flex items-center gap-1 text-[12px] flex-wrap">
-        <button onClick={() => carregar("")} className={`hover:underline ${trilha.length ? "text-torg-blue" : "font-semibold text-torg-dark"}`}>OP</button>
+        <button onClick={() => carregar("")} className={`hover:underline ${trilha.length ? "text-torg-blue" : "font-semibold text-torg-dark"}`}>{tipo ? rotulo : "OP"}</button>
         {trilha.map((n, i) => (
           <span key={i} className="inline-flex items-center gap-1">
             <ChevronRight size={11} className="text-torg-gray-light" />
-            <button onClick={() => carregar(trilha.slice(0, i + 1).join("/"))}
+            <button onClick={() => carregar(irAte(i))}
               className={i === trilha.length - 1 ? "font-semibold text-torg-dark" : "text-torg-blue hover:underline"}>{n}</button>
           </span>
         ))}
@@ -116,7 +139,7 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea }) {
       <div className="max-h-64 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-50">
         {carregando && <p className="px-3 py-3 text-[12px] text-torg-gray inline-flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> lendo…</p>}
         {!carregando && trilha.length > 0 && (
-          <button onClick={subir} className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-torg-gray hover:bg-gray-50">
+          <button onClick={() => carregar(subirPara())} className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-torg-gray hover:bg-gray-50">
             <CornerLeftUp size={13} /> voltar
           </button>
         )}
@@ -124,7 +147,7 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea }) {
           // ⚠ o aviso de OBSOLETO na pasta: é como a revisão antiga vaza para o cliente.
           const suspeita = /obsolet/i.test(f.nome);
           return (
-            <button key={f.nome} onClick={() => carregar(caminho ? `${caminho}/${f.nome}` : f.nome)}
+            <button key={f.caminho || f.nome} onClick={() => carregar(f.caminho ?? (caminho ? `${caminho}/${f.nome}` : f.nome))}
               className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50/60 text-left">
               <Folder size={14} className="text-torg-blue shrink-0" />
               <span className="text-[12px] font-semibold text-torg-dark truncate flex-1">{f.nome}</span>
@@ -148,6 +171,12 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea }) {
                 {/\.xls[xm]?$/i.test(a.nome) && /(^|[^A-Za-z])(LPC|LE)([^A-Za-z]|$)|lista de (pe[çc]a|produ|expedi)/i.test(a.nome) && (
                   <span className="text-[10px] text-red-700 bg-red-50 rounded px-1.5 py-0.5 shrink-0"
                     title="O portal já publica esta lista no template Torg e sem peso. O arquivo da pasta tem o peso item a item.">tem peso</span>
+                )}
+                {/* ⚠ .dwg é o nosso arquivo de trabalho: vai editável para o cliente. Para diagrama
+                    de montagem existe o PDF ao lado; no Modelo 3D o formato editável é o esperado. */}
+                {tipo !== "MODELO_3D" && /\.dwg$/i.test(a.nome) && (
+                  <span className="text-[10px] text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 shrink-0"
+                    title="Arquivo de CAD editável. Normalmente existe o PDF do mesmo desenho ao lado.">editável</span>
                 )}
                 <span className="text-[10px] text-torg-gray-light shrink-0">{kb(a.tamanho)}</span>
               </label>
@@ -180,8 +209,26 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea }) {
         )}
       </div>
 
+      {/* ⚠ O QUE FICOU FORA DOS QUATRO TIPOS. Escolhido antes desta regra existir — não sai sozinho
+          do cadastro, mas também não vai ao portal. Aparece uma vez, para ele decidir. */}
+      {tipo && fora.length > 0 && (
+        <div className="text-[11px] bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 space-y-1">
+          <p className="text-amber-800 inline-flex items-start gap-1.5">
+            <AlertCircle size={13} className="mt-0.5 shrink-0" />
+            {fora.length} documento(s) escolhidos antes desta regra não são nenhum dos quatro tipos — <b>não vão ao portal</b>.
+          </p>
+          <ul className="text-torg-gray pl-5 list-disc">
+            {fora.slice(0, 6).map((f) => <li key={f.id} className="truncate">{f.nomeExibicao || f.nome}</li>)}
+          </ul>
+          <button onClick={() => salvar(true)} disabled={salvando}
+            className="text-[11px] font-semibold text-amber-800 hover:underline inline-flex items-center gap-1">
+            <Trash2 size={11} /> tirar do cadastro
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={salvar} disabled={salvando}
+        <button onClick={() => salvar(false)} disabled={salvando}
           className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5">
           {salvando ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Publicar {sel.size}
         </button>

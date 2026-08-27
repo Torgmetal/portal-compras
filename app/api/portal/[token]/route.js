@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
 import { ordenarCompras } from "@/lib/item-comprado";
 import { registrarAcesso } from "@/lib/portal-acesso";
 import { prisma } from "@/lib/prisma";
-import { secoesDoPortal, mensagemPadrao, CAPA_PADRAO } from "@/lib/portal-cliente";
+import { secoesDoPortal, mensagemPadrao, CAPA_PADRAO, TIPOS_ENGENHARIA, agruparEngenharia } from "@/lib/portal-cliente";
 import { pecasDaLista, sincronizarRevisao, revisaoParaOCliente } from "@/lib/portal-listas";
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
 
@@ -318,11 +318,30 @@ export async function GET(req, { params }) {
     dados.docsPorArea = {};
     for (const [ar, lista] of Object.entries(mapa || {})) {
       if (!Array.isArray(lista) || !lista.length) continue;
+      const item = (d) => ({ id: d.id, nome: d.nomeExibicao || d.nome, arquivo: d.nome, eng: true });
+
+      // ⚠⚠ A ENGENHARIA SAI PELOS QUATRO TIPOS, não pela pasta de origem. Vitor (26/08/2026):
+      // "na Engenharia apenas permitir o Modelo 3D, memorial de cálculo, ART e Diagramas de
+      // montagem — criar uma forma de ficar separado". Agrupar pela pasta do servidor dava ao
+      // cliente títulos como "Montagem / Projetos de Montagem" e "Memorial de Cálculo e ART" —
+      // a nossa arrumação de arquivos, não o nome do documento que ele procura.
+      //
+      // ⚠ O QUE NÃO É UM DOS QUATRO NÃO VAI AO AR, mesmo escolhido antes desta regra: é o caso da
+      // `T112A-LPC_R00.xlsx` que estava publicada na OP-112 — a LPC crua, com o peso item a item.
+      if (ar === "ENGENHARIA") {
+        const { porTipo } = agruparEngenharia(lista);
+        dados.docsPorArea[ar] = TIPOS_ENGENHARIA
+          .filter((t) => (porTipo.get(t.id) || []).length)
+          .map((t) => ({ assunto: t.nome, itens: porTipo.get(t.id).map(item) }));
+        if (!dados.docsPorArea[ar].length) delete dados.docsPorArea[ar];
+        continue;
+      }
+
       const porPasta = new Map();
       for (const d of lista) {
         const k = d.pasta || "Documentos";
         const g = porPasta.get(k) || { assunto: k, itens: [] };
-        g.itens.push({ id: d.id, nome: d.nomeExibicao || d.nome, arquivo: d.nome, eng: true });
+        g.itens.push(item(d));
         porPasta.set(k, g);
       }
       dados.docsPorArea[ar] = [...porPasta.values()];

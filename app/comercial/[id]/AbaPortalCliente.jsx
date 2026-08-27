@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye, Upload, X, ImagePlus } from "lucide-react";
+import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye, Upload, X, ImagePlus, FolderOpen } from "lucide-react";
 import { upload } from "@vercel/blob/client";
-import { SECOES, CAPAS, AREAS, situacao } from "@/lib/portal-cliente";
+import { SECOES, CAPAS, AREAS, TIPOS_ENGENHARIA, situacao } from "@/lib/portal-cliente";
 import SeletorDocsArea from "./SeletorDocsArea";
 import HistoricoPortal from "./HistoricoPortal";
 
@@ -353,7 +353,27 @@ export default function AbaPortalCliente({ opId, opNumero }) {
           Navegue a pasta da obra e escolha o que o cliente vê em cada aba. Dá para dar um nome mais
           claro que o nome do arquivo. <b>Nada é publicado sozinho.</b>
         </p>
-        {AREAS.map((a) => <SeletorDocsArea key={a.id} opNumero={opNumero} area={a.id} nomeArea={a.nome} />)}
+        {AREAS.map((a) => (
+          // ⚠ A ENGENHARIA TEM QUATRO CAIXAS, NÃO UMA. Vitor (26/08/2026): "na Engenharia apenas
+          //   permitir o Modelo 3D, memorial de cálculo, ART e Diagramas de montagem — criar uma
+          //   forma de ficar separado e que eu consiga acessar as pastas respectivas". Cada caixa
+          //   abre já na pasta daquele documento e não sai dela; as outras áreas seguem navegando
+          //   a OP inteira.
+          a.id === "ENGENHARIA" ? (
+            <div key={a.id} className="border border-gray-200 rounded-xl p-3 space-y-2 bg-gray-50/40">
+              <p className="text-[13px] font-semibold text-torg-dark inline-flex items-center gap-1.5">
+                <FolderOpen size={14} className="text-torg-blue" /> {a.nome}
+                <span className="text-[11px] font-normal text-torg-gray">· quatro documentos, cada um na sua pasta</span>
+              </p>
+              {TIPOS_ENGENHARIA.map((t) => (
+                <SeletorDocsArea key={t.id} opNumero={opNumero} area={a.id} nomeArea={a.nome}
+                  tipo={t.id} nomeTipo={t.nome} ondeTipo={t.onde} resumoTipo={t.resumo} />
+              ))}
+            </div>
+          ) : (
+            <SeletorDocsArea key={a.id} opNumero={opNumero} area={a.id} nomeArea={a.nome} />
+          )
+        ))}
       </div>
 
       <HistoricoPortal opNumero={opNumero} />
