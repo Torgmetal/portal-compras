@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye, Upload, X, ImagePlus, FolderOpen } from "lucide-react";
 import { upload } from "@vercel/blob/client";
-import { SECOES, CAPAS, AREAS, TIPOS_ENGENHARIA, situacao } from "@/lib/portal-cliente";
+import { SECOES, CAPAS, AREAS, AREAS_COM_SELETOR, TIPOS_ENGENHARIA, situacao } from "@/lib/portal-cliente";
 import SeletorDocsArea from "./SeletorDocsArea";
 import HistoricoPortal from "./HistoricoPortal";
 
@@ -355,10 +355,12 @@ export default function AbaPortalCliente({ opId, opNumero }) {
       <div className="space-y-2">
         <p className="text-[13px] font-semibold text-torg-dark">Documentos do servidor, por área</p>
         <p className="text-[11px] text-torg-gray -mt-1">
-          Navegue a pasta da obra e escolha o que o cliente vê em cada aba. Dá para dar um nome mais
-          claro que o nome do arquivo. <b>Nada é publicado sozinho.</b>
+          Escolha o que o cliente vê na Engenharia e na Qualidade, com um nome mais claro que o do
+          arquivo. <b>Nada é publicado sozinho.</b> Compras, Planejamento e Expedição não têm
+          seleção: o portal já publica a lista de materiais, o cronograma e a Lista de Expedição
+          direto do que os módulos mantêm.
         </p>
-        {AREAS.map((a) => (
+        {AREAS.filter((a) => AREAS_COM_SELETOR.includes(a.id)).map((a) => (
           // ⚠ A ENGENHARIA TEM QUATRO CAIXAS, NÃO UMA. Vitor (26/08/2026): "na Engenharia apenas
           //   permitir o Modelo 3D, memorial de cálculo, ART e Diagramas de montagem — criar uma
           //   forma de ficar separado e que eu consiga acessar as pastas respectivas". Cada caixa

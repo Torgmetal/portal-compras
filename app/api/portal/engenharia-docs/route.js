@@ -17,7 +17,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { acharPastaOp, getAccessToken } from "@/lib/sharepoint";
-import { AREA, TIPO_ENG, TIPOS_ENGENHARIA, tipoDoDocEng } from "@/lib/portal-cliente";
+import { AREA, AREAS_COM_SELETOR, TIPO_ENG, TIPOS_ENGENHARIA, tipoDoDocEng } from "@/lib/portal-cliente";
 import { raizesDoTipo, conteudoDoTipo, caminhosDasRaizes } from "@/lib/portal-eng-pastas";
 
 export const runtime = "nodejs";
@@ -38,6 +38,14 @@ const RAIZ_DA_AREA = {
   EXPEDICAO: "4. Expedição",
 };
 
+// ⚠ O QUE VAI AO CLIENTE É O DOCUMENTO FECHADO. Vitor (27/08/2026): "na aba qualidade apenas deixar
+// para buscar os arquivos em pdf". A pasta da Qualidade tem modelo em .xls
+// (MODELO-RELATORIO-FOTOGRAFICO-OPXX_DATA.xls) e planilha de trabalho no meio dos relatórios — e
+// arquivo editável publicado é revisão que sai da nossa mão sem carimbo.
+const EXTENSOES_DA_AREA = {
+  QUALIDADE: ["pdf"],
+};
+
 export async function GET(req) {
   try { await requireRole(ROLES); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
@@ -48,6 +56,10 @@ export async function GET(req) {
   const tipo = so(u.searchParams.get("tipo")).toUpperCase();
   if (!opNumero) return NextResponse.json({ error: "Informe a OP." }, { status: 400 });
   if (!AREA[area]) return NextResponse.json({ error: "Área desconhecida." }, { status: 400 });
+  // ⚠ esconder o seletor na tela não impede uma chamada: a recusa é aqui.
+  if (!AREAS_COM_SELETOR.includes(area)) {
+    return NextResponse.json({ error: `${AREA[area].nome} não escolhe documento do servidor — o portal publica o conteúdo dessa aba sozinho.` }, { status: 400 });
+  }
   if (area === "ENGENHARIA" && !TIPO_ENG[tipo]) {
     return NextResponse.json({ error: "Escolha o tipo de documento da Engenharia.", tipos: TIPOS_ENGENHARIA.map((t) => t.id) }, { status: 400 });
   }
@@ -100,10 +112,13 @@ export async function GET(req) {
       pastas: naRaiz.filter((x) => x.folder).map((x) => ({ nome: x.name, caminho: x.name, itens: x.folder?.childCount ?? null })),
       arquivos: naRaiz.filter((x) => !x.folder).map((x) => ({ item: x, pasta: "" })) });
   }
+  const exts = EXTENSOES_DA_AREA[area] || null;
+  const daExtensao = (x) => !exts || exts.includes((String(x.name).split(".").pop() || "").toLowerCase());
   return devolver({
-    base, atual, opNumero, area, tipo: null, raizes: null, aviso: null,
+    base, atual, opNumero, area, tipo: null, raizes: null,
+    aviso: exts ? `Só arquivos ${exts.map((e) => e.toUpperCase()).join(" / ")} — é o que se publica ao cliente.` : null,
     pastas: itens.filter((x) => x.folder).map((x) => ({ nome: x.name, caminho: atual ? `${atual}/${x.name}` : x.name, itens: x.folder?.childCount ?? null })),
-    arquivos: itens.filter((x) => !x.folder).map((x) => ({ item: x, pasta: atual })),
+    arquivos: itens.filter((x) => !x.folder && daExtensao(x)).map((x) => ({ item: x, pasta: atual })),
   });
 }
 
@@ -145,6 +160,9 @@ export async function POST(req) {
   const tipo = so(rawTipo).toUpperCase();
   if (!opNumero) return NextResponse.json({ error: "Informe a OP." }, { status: 400 });
   if (!AREA[area]) return NextResponse.json({ error: "Área desconhecida." }, { status: 400 });
+  if (!AREAS_COM_SELETOR.includes(area)) {
+    return NextResponse.json({ error: `${AREA[area].nome} não escolhe documento do servidor.` }, { status: 400 });
+  }
   if (area === "ENGENHARIA" && !TIPO_ENG[tipo]) return NextResponse.json({ error: "Escolha o tipo de documento da Engenharia." }, { status: 400 });
   if (!Array.isArray(docs)) return NextResponse.json({ error: "Envie a lista de documentos." }, { status: 400 });
 
