@@ -334,7 +334,16 @@ export async function GET(req, { params }) {
     dados.docsPorArea = {};
     for (const [ar, lista] of Object.entries(mapa || {})) {
       if (!Array.isArray(lista) || !lista.length) continue;
-      const item = (d) => ({ id: d.id, nome: d.nomeExibicao || d.nome, arquivo: d.nome, eng: true });
+      const item = (d) => ({ id: d.id, nome: d.nomeExibicao || d.nome, arquivo: d.nome, tamanho: Number(d.tamanho) || 0, eng: true });
+
+      // ⚠ MESMO NOME = MESMO DOCUMENTO. O mesmo desenho escolhido de duas pastas tem dois ids e
+      // aparecia duas vezes na lista do cliente — que lê como se fossem revisões diferentes. A
+      // gravação já deduplica; aqui é a rede embaixo, para as obras que já estão publicadas.
+      const unicos = (lista) => {
+        const m = new Map();
+        for (const d of lista) m.set(String(d.nomeExibicao || d.nome).trim().toLowerCase(), d);
+        return [...m.values()];
+      };
 
       // ⚠⚠ A ENGENHARIA SAI PELOS QUATRO TIPOS, não pela pasta de origem. Vitor (26/08/2026):
       // "na Engenharia apenas permitir o Modelo 3D, memorial de cálculo, ART e Diagramas de
@@ -345,7 +354,7 @@ export async function GET(req, { params }) {
       // ⚠ O QUE NÃO É UM DOS QUATRO NÃO VAI AO AR, mesmo escolhido antes desta regra: é o caso da
       // `T112A-LPC_R00.xlsx` que estava publicada na OP-112 — a LPC crua, com o peso item a item.
       if (ar === "ENGENHARIA") {
-        const { porTipo } = agruparEngenharia(lista);
+        const { porTipo } = agruparEngenharia(unicos(lista));
         dados.docsPorArea[ar] = TIPOS_ENGENHARIA
           .filter((t) => (porTipo.get(t.id) || []).length)
           .map((t) => ({ assunto: t.nome, itens: porTipo.get(t.id).map(item) }));
@@ -354,7 +363,7 @@ export async function GET(req, { params }) {
       }
 
       const porPasta = new Map();
-      for (const d of lista) {
+      for (const d of unicos(lista)) {
         const k = d.pasta || "Documentos";
         const g = porPasta.get(k) || { assunto: k, itens: [] };
         g.itens.push(item(d));

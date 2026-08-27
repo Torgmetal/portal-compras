@@ -370,27 +370,7 @@ export default function PortalClienteView({ token }) {
         {/* ⚠ os documentos escolhidos do servidor, na ÁREA de cada um, com o nome que o cliente
             entende — não o nome do arquivo. (Vitor, 26/08/2026) */}
         {dados.docsPorArea?.[abaAtiva]?.length > 0 && (
-          <Bloco icone={Layers} titulo="Documentos"
-            sub={`${dados.docsPorArea[abaAtiva].reduce((n, g) => n + g.itens.length, 0)} arquivos`}>
-            <div className="space-y-4">
-              {dados.docsPorArea[abaAtiva].map((g) => (
-                <div key={g.assunto}>
-                  <p className="text-[13px] font-semibold mb-1.5">
-                    {g.assunto} <span className="text-gray-400 font-normal">{g.itens.length}</span>
-                  </p>
-                  <div className="grid sm:grid-cols-2 gap-1.5">
-                    {g.itens.map((doc) => (
-                      <a key={doc.id} href={comCod(`/api/portal/${token}/eng?id=${encodeURIComponent(doc.id)}`)} target="_blank" rel="noreferrer"
-                        className="flex items-center gap-2 border border-gray-100 rounded-lg px-3 py-1.5 hover:border-[#006EAB] hover:bg-[#006EAB]/5 transition-colors">
-                        <Download size={12} className="text-[#006EAB] shrink-0" />
-                        <span className="text-[12px] truncate" title={doc.nome}>{doc.nome}</span>
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Bloco>
+          <DocumentosDaArea key={abaAtiva} grupos={dados.docsPorArea[abaAtiva]} token={token} cod={cod} />
         )}
 
         {/* ⚠ na QUALIDADE, não na Engenharia: PIT e PLP são plano de CONTROLE — o que se inspeciona
@@ -654,6 +634,109 @@ function AvisoDeRevisao({ token, listas }) {
 }
 
 const plural = (n, um, muitos) => `${n} ${n === 1 ? um : muitos}`;
+
+/**
+ * Os documentos de uma área, com CAIXA DE SELEÇÃO para baixar vários de uma vez.
+ *
+ * Vitor (26/08/2026): "crie uma caixa de seleção para que o cliente possa baixar mais de um arquivo
+ * de uma vez".
+ *
+ * ⚠ CLICAR NO NOME CONTINUA BAIXANDO UM SÓ. Quem quer um arquivo não devia ter de marcar, rolar até
+ * o botão e esperar um ZIP — a seleção é atalho para quem quer muitos, não pedágio para quem quer
+ * um. Por isso a caixa fica à esquerda e o nome segue sendo link.
+ */
+function DocumentosDaArea({ grupos, token, cod }) {
+  const [sel, setSel] = useState(() => new Set());
+  const [baixando, setBaixando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const todos = grupos.flatMap((g) => g.itens);
+  const marcar = (id, on) => setSel((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n; });
+  const marcarGrupo = (g, on) => setSel((s) => {
+    const n = new Set(s);
+    for (const d of g.itens) { if (on) n.add(d.id); else n.delete(d.id); }
+    return n;
+  });
+  const pesoSel = todos.filter((d) => sel.has(d.id)).reduce((t, d) => t + (d.tamanho || 0), 0);
+
+  async function baixar() {
+    setBaixando(true); setErro("");
+    try {
+      const r = await fetch(`/api/portal/${token}/eng-zip${cod ? `?d=${encodeURIComponent(cod)}` : ""}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...sel] }),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error || "Não consegui montar o download.");
+      }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `documentos-${(r.headers.get("content-disposition") || "").match(/OP-\d+/)?.[0] || "obra"}.zip`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      setSel(new Set());
+    } catch (e) { setErro(e.message); } finally { setBaixando(false); }
+  }
+
+  return (
+    <Bloco icone={Layers} titulo="Documentos" sub={`${todos.length} arquivos`}>
+      <div className="space-y-4">
+        {grupos.map((g) => {
+          const marcadosNoGrupo = g.itens.filter((d) => sel.has(d.id)).length;
+          return (
+            <div key={g.assunto}>
+              <div className="flex items-center gap-2 mb-1.5">
+                <p className="text-[13px] font-semibold">
+                  {g.assunto} <span className="text-gray-400 font-normal">{g.itens.length}</span>
+                </p>
+                <button onClick={() => marcarGrupo(g, marcadosNoGrupo !== g.itens.length)}
+                  className="text-[11px] text-[#006EAB] hover:underline">
+                  {marcadosNoGrupo === g.itens.length ? "desmarcar" : "selecionar todos"}
+                </button>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-1.5">
+                {g.itens.map((doc) => {
+                  const on = sel.has(doc.id);
+                  return (
+                    <div key={doc.id}
+                      className={`flex items-center gap-2 border rounded-lg px-3 py-1.5 transition-colors ${on ? "border-[#006EAB] bg-[#006EAB]/5" : "border-gray-100 hover:border-[#006EAB]"}`}>
+                      <input type="checkbox" checked={on} onChange={(e) => marcar(doc.id, e.target.checked)}
+                        aria-label={`Selecionar ${doc.nome}`} className="accent-[#006EAB] shrink-0" />
+                      <a href={`/api/portal/${token}/eng?id=${encodeURIComponent(doc.id)}${cod ? `&d=${encodeURIComponent(cod)}` : ""}`}
+                        target="_blank" rel="noreferrer"
+                        className="flex items-center gap-2 min-w-0 flex-1 hover:text-[#006EAB]">
+                        <Download size={12} className="text-[#006EAB] shrink-0" />
+                        <span className="text-[12px] truncate" title={doc.nome}>{doc.nome}</span>
+                      </a>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ⚠ a barra só aparece com algo marcado: botão desabilitado permanente é ruído em página de
+          cliente, que não conhece a tela e não sabe o que precisa fazer para habilitar. */}
+      {sel.size > 0 && (
+        <div className="sticky bottom-3 mt-4 flex items-center gap-3 flex-wrap bg-white border border-[#006EAB]/30 rounded-xl px-4 py-2.5 shadow-sm">
+          <button onClick={baixar} disabled={baixando}
+            className="text-[13px] font-semibold text-white bg-[#006EAB] rounded-lg px-4 py-2 hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-2">
+            {baixando ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            Baixar {sel.size} arquivo{sel.size > 1 ? "s" : ""}
+          </button>
+          {pesoSel > 0 && <span className="text-[12px] text-gray-500">{fmtMB(pesoSel)} em um .zip</span>}
+          <button onClick={() => setSel(new Set())} className="text-[12px] text-gray-500 hover:text-[#0D1F3C]">limpar</button>
+          {erro && <span className="text-[12px] text-red-600">{erro}</span>}
+        </div>
+      )}
+    </Bloco>
+  );
+}
 
 const NOME_PLANO = { PIT: "Plano de Inspeção e Testes (PIT)", PLP: "Plano de Pintura (PLP)" };
 // ⚠ `fmtD` é para data pura ("AAAA-MM-DD"); o aceite é um instante, com hora e fuso.

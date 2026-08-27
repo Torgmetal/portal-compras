@@ -180,6 +180,20 @@ export async function POST(req) {
   }
   const mapa = { ...(atual?.docsPorArea || (atual?.docsEngenharia ? { ENGENHARIA: atual.docsEngenharia } : {})) };
 
+  // ⚠⚠ O MESMO ARQUIVO, DE DUAS PASTAS, É UM SÓ PARA O CLIENTE. A OP-112 tinha 29 documentos na
+  // Engenharia e 17 nomes: os 12 diagramas de montagem estavam duas vezes — uma da via do cliente,
+  // outra de 2.5.4 — porque a seleção guarda o que foi marcado noutra pasta (para navegar não
+  // desmarcar) e o mesmo desenho foi marcado nos dois lugares, com ids diferentes. No portal isso
+  // aparece como a lista repetida, e quem lê acha que são revisões diferentes.
+  //
+  // Vence o ÚLTIMO: a tela lista primeiro o que já estava escolhido e depois o que foi marcado
+  // agora, então o último é a escolha mais recente — a que a pessoa acabou de fazer.
+  const semRepetido = (lista) => {
+    const porNome = new Map();
+    for (const d of lista) porNome.set(String(d.nomeExibicao || d.nome).trim().toLowerCase(), d);
+    return [...porNome.values()];
+  };
+
   if (area === "ENGENHARIA") {
     // ⚠ SALVA SÓ O TIPO ABERTO. Trocar o array inteiro apagaria a ART ao salvar o Modelo 3D — e o
     // sumiço só apareceria no portal do cliente, dias depois.
@@ -190,9 +204,9 @@ export async function POST(req) {
       if (t === null) return !limparForaDoPadrao;         // fora dos quatro tipos: só sai se ele mandar
       return true;
     });
-    mapa.ENGENHARIA = [...outros, ...limpo];
+    mapa.ENGENHARIA = semRepetido([...outros, ...limpo]);
   } else {
-    mapa[area] = limpo;
+    mapa[area] = semRepetido(limpo);
   }
 
   await prisma.portalCliente.upsert({
