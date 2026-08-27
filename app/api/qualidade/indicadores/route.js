@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { INDICADORES_ISO } from "@/lib/indicadores-iso";
+import { retrabalhoDoAno, serieDoProcesso } from "@/lib/retrabalho";
 import { indicadoresQualidadeIso } from "@/lib/indicadores-qualidade-iso";
 import { indicadoresComercialIso } from "@/lib/indicadores-comercial-iso";
 import { indicadoresRhIso } from "@/lib/indicadores-rh-iso";
@@ -84,6 +85,11 @@ export async function GET(req) {
   { const ac = await prisma.acidenteTrabalho.findMany({ where: { data: { gte: yIni, lt: yFim }, tipo: "COM_AFASTAMENTO" }, select: { data: true } });
     const s = arr12(); for (let m = 0; m <= mesFim; m++) s[m] = 0; for (const a of ac) { const m = a.data.getUTCMonth(); if (m <= mesFim) s[m] += 1; }
     series.acidentes_afastamento = s; }
+
+  // ── Engenharia: retrabalho gerado por erro de projeto (peso ÷ produção do mês) ──
+  // Mesma base e mesma meta (≤2%) do retrabalho da Produção, para os dois serem comparáveis.
+  { const r = await retrabalhoDoAno(prisma, ano);
+    series.retrabalho_engenharia = serieDoProcesso(r, "ENGENHARIA").serie; }
 
   // ── Engenharia: erros de projeto (contagem de RNCs de engenharia/projeto) ──
   const rncs = await prisma.naoConformidade.findMany({ where: { data: { gte: yIni, lt: yFim } }, select: { data: true, processoArea: true } });

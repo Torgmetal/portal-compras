@@ -3,7 +3,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { whereSetorSyneco } from "@/lib/syneco-dia";
 import { historicoProducao } from "@/lib/indicadores-producao-iso";
 import { pesoRealPecas } from "@/lib/peso-op";
 
@@ -59,26 +58,44 @@ export async function GET(req) {
     });
   }
 
-  // Retrabalho — RNCs com disposição Retrabalhar (e peso) do período + base de produção (corte).
+  // Retrabalho — apontamentos (FORM 34) + RNCs sem apontamento, repartidos POR SETOR.
+  //
+  // ⚠⚠ A TABELA É POR SETOR, não uma lista de ocorrências. Vitor (27/08/2026): "nos indicadores
+  // desses setores colocar essa informação". Uma lista de 36 linhas de outubro não responde "qual
+  // setor gerou o retrabalho do mês" — a tabela por setor responde, e a lista fica no detalhe.
+  //
+  // ⚠ A COBERTURA VAI JUNTO. Sem peso não há percentual: em janeiro/2026 só 1 dos 8 apontamentos
+  // tinha peso, e um "0,4%" sem essa ressalva se lê como um mês excelente.
   if (indicador === "retrabalho") {
-    const rncs = await prisma.naoConformidade.findMany({
-      where: { disposicao: "RETRABALHAR", pesoRetrabalhoKg: { not: null }, data: { gte: pIni, lt: pFim } },
-      select: { numero: true, ano: true, data: true, desenhoProjetoMarca: true, opNumero: true, pesoRetrabalhoKg: true },
-      orderBy: { data: "asc" },
-    });
-    const corte = await prisma.mesApontamento.aggregate({
-      where: { dataInicio: { gte: pIni, lt: pFim }, ...whereSetorSyneco("CORTE") }, _sum: { produzidoKg: true },
-    });
-    const prod = corte._sum.produzidoKg || 0;
-    const totRt = rncs.reduce((s, r) => s + (r.pesoRetrabalhoKg || 0), 0);
-    const linhas = rncs.map((r) => [
-      `RNC-${String(r.numero).padStart(3, "0")}/${String(r.ano).slice(-2)}`,
-      fmtD(r.data), r.desenhoProjetoMarca || "—", r.opNumero || "—", kg(r.pesoRetrabalhoKg),
-    ]);
+    const { retrabalhoDoAno, SETORES_RETRABALHO } = await import("@/lib/retrabalho");
+    const dados = await retrabalhoDoAno(prisma, ano);
+    const meses = anoTodo ? [...Array(12).keys()] : [mes];
+    const somaMeses = (v) => meses.reduce((t, m) => t + (v[m] || 0), 0);
+
+    const prod = somaMeses(dados.producao);
+    const totRt = somaMeses(dados.totalKg);
+    const linhas = SETORES_RETRABALHO
+      .map((st) => ({ st, kgSetor: somaMeses(dados.porSetor[st.id]) }))
+      .filter((x) => x.kgSetor > 0)
+      .sort((a, b) => b.kgSetor - a.kgSetor)
+      .map(({ st, kgSetor }) => [
+        st.nome,
+        String(dados.registros.filter((r) => r.setor === st.id && meses.includes(r.mes)).length),
+        kg(kgSetor),
+        prod > 0 ? `${(Math.round((kgSetor / prod) * 1000) / 10).toLocaleString("pt-BR")}%` : "—",
+      ]);
+    const semSetor = somaMeses(dados.semSetor);
+    if (semSetor > 0) linhas.push(["Sem setor identificado", "—", kg(semSetor), prod > 0 ? `${(Math.round((semSetor / prod) * 1000) / 10).toLocaleString("pt-BR")}%` : "—"]);
+
+    const n = meses.reduce((t, m) => t + (dados.qtd[m] || 0), 0);
+    const nPeso = meses.reduce((t, m) => t + (dados.qtdComPeso[m] || 0), 0);
     const perc = prod > 0 ? Math.round((totRt / prod) * 1000) / 10 : null;
+    const cobertura = n > 0 && nPeso < n
+      ? ` · ⚠ ${nPeso} de ${n} apontamentos com peso — o percentual cobre só esses`
+      : "";
     return NextResponse.json({
-      titulo: "Retrabalho", colunas: ["RNC", "Data", "Marca", "OP", "Peso retrabalhado"], linhas,
-      resumo: `${notaManual}${kg(totRt)} retrabalhado de ${kg(prod)} produzidos (corte)${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}`,
+      titulo: "Retrabalho por setor", colunas: ["Setor", "Apontamentos", "Peso retrabalhado", "% da produção"], linhas,
+      resumo: `${notaManual}${kg(totRt)} retrabalhado de ${kg(prod)} produzidos (corte)${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}${cobertura}`,
     });
   }
 

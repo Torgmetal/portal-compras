@@ -2175,6 +2175,48 @@ model PlanoAcao {
 // Relatório de Não Conformidade (RNC / FORM 20). tipo INTERNA (Torg detecta) ou
 // CLIENTE (o cliente envia um RTNC que anexamos e a IA converte). Alimenta os
 // indicadores RNCs do Cliente, Erros de Projeto e Recorrência de NC.
+// ─── APONTAMENTO DE RETRABALHO ────────────────────────────────────────────────
+// O registro do dia a dia: peça, setor, quem apontou e o que aconteceu. Vem da planilha
+// "APONTAMENTO DE RETRABALHO" (FORM 34) que a Qualidade mantinha à mão e que o Vitor mandou
+// importar em 27/08/2026 — 227 apontamentos de 2025 e 2026.
+//
+// ⚠⚠ RETRABALHO NÃO É SÓ RNC. Dos 227, a maioria tem "Abrir RNC? Não" — são correções imediatas no
+// chão de fábrica. O indicador de retrabalho olhava SÓ para RNCs com disposição Retrabalhar, então
+// enxergava uma fração do que acontece. Esta tabela é a fonte; a RNC, quando existe, aponta para o
+// apontamento (`rncId`), e por isso o mesmo retrabalho nunca conta duas vezes.
+//
+// ⚠ O PESO É O QUE FALTA NO PASSADO. Em 2026 nenhum dos 95 apontamentos tem peso; em 2025, 92 de
+// 132 têm. Sem peso não há percentual — daí a escolha das PEÇAS pela Lista de Expedição na tela
+// nova: o peso passa a ser somado da lista, não digitado de memória.
+model ApontamentoRetrabalho {
+  id            String   @id @default(cuid())
+  data          DateTime
+  desenho       String? // a marca/desenho como foi apontada
+  opNumero      String?
+  categoria     String   @default("RETRABALHO") // RETRABALHO | SUCATA | NAO_CONFORME
+  qtd           Float?
+  pesoKg        Float?
+  pesoEstimado  Boolean  @default(false) // peso deduzido do cadastro (marca × quantidade), não medido
+  setor         String? // canônico — ver SETORES_RETRABALHO em lib/retrabalho
+  setorTexto    String? // o que estava escrito na origem ("Pintura / Jateamento", "Movimentação")
+  colaborador   String?
+  abriuRnc      Boolean  @default(false)
+  numeroRnc     String?
+  rncId         String? @unique
+  descricao     String?
+  acao          String?
+  pecas         Json? // quando escolhidas da LE: [{ marca, descricao, pesoUnitKg, qtd, pesoKg }]
+  origem        String   @default("PORTAL") // PORTAL | IMPORT
+  importRef     String? @unique // chave da linha na planilha de origem (dedupe do import)
+  criadoPorId   String?
+  criadoPorNome String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([data])
+  @@index([setor])
+}
+
 model NaoConformidade {
   id                  String    @id @default(cuid())
   numero              Int // sequencial por ano
@@ -2194,6 +2236,20 @@ model NaoConformidade {
   anexos              Json      @default("[]") // anexos p/ compor o relatório [{ url, nome, tipo }] (imagens/PDF/docs)
   disposicao          String? // APROVAR_CONCESSAO | RETRABALHAR | REFUGAR | DEVOLVER_FORNECEDOR
   pesoRetrabalhoKg    Float? // peso retrabalhado (kg) — base do indicador de Retrabalho da Produção
+  // ⚠⚠ AS PEÇAS DA RNC, ESCOLHIDAS DA LISTA DE EXPEDIÇÃO. Vitor (27/08/2026): "com base na lista LE
+  // trazer as marcas e deixar selecionar as peças e trazer as informações dela e o peso, assim como
+  // deixar eu selecionar a quantidade".
+  //
+  // O campo `desenhoProjetoMarca` é texto livre — "T36F186 / T36F199 / T36F236 / …" — e o peso saía
+  // de um palpite que casava marca por marca no cadastro, uma unidade cada. Duas peças iguais
+  // contavam uma; marca escrita diferente não casava; e ninguém tinha como conferir de onde veio o
+  // número que vira INDICADOR. Aqui cada peça é escolhida da LE da obra, com peso unitário e
+  // QUANTIDADE — o peso do retrabalho passa a ser uma soma auditável.
+  // [{ marca, descricao, perfil, material, pesoUnitKg, qtd, pesoKg }]
+  pecas               Json?
+  // O setor que GEROU o retrabalho (ver lib/retrabalho): Engenharia, Preparação, Montagem, Solda,
+  // Acabamento, Jato ou Pintura. É por ele que o peso entra no indicador de cada setor.
+  setorRetrabalho     String?
   elaborador          String?
   resultadoReinspecao String?
   abrangencia         String?
