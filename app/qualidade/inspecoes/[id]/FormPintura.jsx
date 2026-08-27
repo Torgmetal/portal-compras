@@ -10,6 +10,43 @@ import {
 } from "@/lib/pintura-campos";
 
 /**
+ * Um campo do relatório, com o que o PLP da obra diz embaixo.
+ *
+ * ⚠⚠ FICA FORA DO COMPONENTE DE PROPÓSITO. Declarado dentro de `FormPintura`, vira um TIPO NOVO a
+ * cada render — o React desmonta e remonta o input a cada tecla e o cursor sai do campo depois de
+ * cada letra. É o defeito que Vitor relatou em 27/08/2026 no aceite dos planos ("estou com
+ * dificuldade para digitar nesses campos"), corrigido do mesmo jeito em AceitePlano.jsx. E aqui
+ * pegava em dobro: `Campo` também ia de PROP para `CondicoesAmbientais`, então os cinco campos de
+ * lá remontavam junto. Componente de formulário nunca se declara dentro de outro componente — nem
+ * viaja por prop.
+ *
+ * O que ele lia do fecho (`res`, `travado`, `setResultado`, `doPlp`) agora chega por props —
+ * `doForm` junta os quatro para o espalhamento ficar num lugar só.
+ */
+function Campo({ rot, k, tipo = "text", opcoes = null, largura = "", res, travado, setResultado, doPlp }) {
+  return (
+    <label className={`block ${largura}`}>
+      <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">{rot}</span>
+      {opcoes ? (
+        <select value={res[k] || ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
+          className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue disabled:bg-gray-50">
+          <option value="">—</option>
+          {opcoes.map((o) => <option key={o.id || o} value={o.id || o}>{o.nome || o}</option>)}
+        </select>
+      ) : (
+        <input type={tipo} value={res[k] ?? ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
+          placeholder={doPlp[k] != null && typeof doPlp[k] !== "object" ? String(doPlp[k]) : ""}
+          className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
+      )}
+      {/* a dica só aparece enquanto o campo está vazio: depois de preenchido ela seria ruído */}
+      {doPlp[k] != null && typeof doPlp[k] !== "object" && (res[k] === undefined || res[k] === null || res[k] === "") && (
+        <span className="block text-[10px] text-torg-blue mt-0.5">PLP: {String(doPlp[k])}</span>
+      )}
+    </label>
+  );
+}
+
+/**
  * O PREENCHIMENTO DA INSPEÇÃO DE PINTURA.
  *
  * Baseado no PO-05 Rev.3 (09/02/2026) — "Preparação de Superfície e Pintura".
@@ -111,26 +148,8 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
   };
   const setRug = (i, v) => { const a = [...rug]; a[i] = v; setResultado("rugLeituras", a); };
 
-  const Campo = ({ rot, k, tipo = "text", opcoes = null, largura = "" }) => (
-    <label className={`block ${largura}`}>
-      <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">{rot}</span>
-      {opcoes ? (
-        <select value={res[k] || ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
-          className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue disabled:bg-gray-50">
-          <option value="">—</option>
-          {opcoes.map((o) => <option key={o.id || o} value={o.id || o}>{o.nome || o}</option>)}
-        </select>
-      ) : (
-        <input type={tipo} value={res[k] ?? ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
-          placeholder={doPlp[k] != null && typeof doPlp[k] !== "object" ? String(doPlp[k]) : ""}
-          className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
-      )}
-      {/* a dica só aparece enquanto o campo está vazio: depois de preenchido ela seria ruído */}
-      {doPlp[k] != null && typeof doPlp[k] !== "object" && (res[k] === undefined || res[k] === null || res[k] === "") && (
-        <span className="block text-[10px] text-torg-blue mt-0.5">PLP: {String(doPlp[k])}</span>
-      )}
-    </label>
-  );
+  // o que todo <Campo> lê — ver o comentário do componente, lá em cima
+  const doForm = { res, travado, setResultado, doPlp };
 
   const mediaRug = mediaRugosidade(rug);
   const rugFora = mediaRug != null && (mediaRug < RUGOSIDADE_MIN || mediaRug > RUGOSIDADE_MAX);
@@ -158,16 +177,16 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
       <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
         <p className="text-[12px] font-bold text-torg-dark mb-2">Preparação de superfície</p>
         <div className="grid sm:grid-cols-4 gap-2.5">
-          <Campo rot="Procedimento de preparo" k="prepProcedimento" />
-          <Campo rot="Data" k="prepData" tipo="date" />
-          <Campo rot="Horário inicial" k="prepIni" tipo="time" />
-          <Campo rot="Horário final" k="prepFim" tipo="time" />
-          <Campo rot="Grau de limpeza" k="limpeza" opcoes={GRAUS_LIMPEZA} />
-          {esc.intemperismo && <Campo rot="Grau de intemperismo" k="intemperismo" opcoes={GRAUS_INTEMPERISMO} />}
-          <Campo rot="Tipo de abrasivo" k="abrasivo" />
-          <Campo rot="Rugosidade especificada (PLP)" k="rugEspec" />
-          {esc.poeira && <Campo rot="Poeira (ISO 8502-3)" k="poeira" />}
-          {esc.salinidade && <Campo rot="Salinidade — Bresle (ISO 8502-6/9)" k="salinidade" />}
+          <Campo {...doForm} rot="Procedimento de preparo" k="prepProcedimento" />
+          <Campo {...doForm} rot="Data" k="prepData" tipo="date" />
+          <Campo {...doForm} rot="Horário inicial" k="prepIni" tipo="time" />
+          <Campo {...doForm} rot="Horário final" k="prepFim" tipo="time" />
+          <Campo {...doForm} rot="Grau de limpeza" k="limpeza" opcoes={GRAUS_LIMPEZA} />
+          {esc.intemperismo && <Campo {...doForm} rot="Grau de intemperismo" k="intemperismo" opcoes={GRAUS_INTEMPERISMO} />}
+          <Campo {...doForm} rot="Tipo de abrasivo" k="abrasivo" />
+          <Campo {...doForm} rot="Rugosidade especificada (PLP)" k="rugEspec" />
+          {esc.poeira && <Campo {...doForm} rot="Poeira (ISO 8502-3)" k="poeira" />}
+          {esc.salinidade && <Campo {...doForm} rot="Salinidade — Bresle (ISO 8502-6/9)" k="salinidade" />}
         </div>
 
         {/* ⚠ item 5.5.1.1: o perfil é a MÉDIA DE CINCO MEDIÇÕES, entre 50 e 90 µm ou conforme PLP */}
@@ -192,7 +211,7 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
       </div>
 
       {/* ── condições ambientais ──────────────────────────────────────────────────── */}
-      <CondicoesAmbientais res={res} travado={travado} setResultado={setResultado} Campo={Campo} />
+      <CondicoesAmbientais doForm={doForm} />
 
       {/* ── aplicação: 3 demãos em colunas ────────────────────────────────────────── */}
       <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm overflow-x-auto">
@@ -314,8 +333,8 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
           </tbody>
         </table>
         <div className="grid sm:grid-cols-2 gap-2.5 mt-3">
-          <Campo rot="Espessura mínima especificada (PLP)" k="espessuraMinima" />
-          <Campo rot="Laudo final" k="laudo" opcoes={["Aprovado", "Reprovado"]} />
+          <Campo {...doForm} rot="Espessura mínima especificada (PLP)" k="espessuraMinima" />
+          <Campo {...doForm} rot="Laudo final" k="laudo" opcoes={["Aprovado", "Reprovado"]} />
         </div>
       </div>
       )}
@@ -325,10 +344,10 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
         <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
           <p className="text-[12px] font-bold text-torg-dark mb-2">Aderência — pull-off</p>
           <div className="grid sm:grid-cols-4 gap-2.5">
-            <Campo rot="Equipamento" k="pullOffEquip" />
-            <Campo rot="Valor obtido (MPa)" k="pullOffValor" tipo="number" />
-            <Campo rot="Mínimo exigido (MPa)" k="pullOffMin" tipo="number" />
-            <Campo rot="Tipo de ruptura" k="pullOffRuptura" />
+            <Campo {...doForm} rot="Equipamento" k="pullOffEquip" />
+            <Campo {...doForm} rot="Valor obtido (MPa)" k="pullOffValor" tipo="number" />
+            <Campo {...doForm} rot="Mínimo exigido (MPa)" k="pullOffMin" tipo="number" />
+            <Campo {...doForm} rot="Tipo de ruptura" k="pullOffRuptura" />
           </div>
         </div>
       )}
@@ -341,8 +360,14 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
  *
  * ⚠ Separado em componente porque é o bloco que MUDA a decisão: o resto da tela registra, este
  * julga. Ele diz, com a regra na mão, se a aplicação era permitida — e nomeia o impedimento.
+ *
+ * O `Campo` vinha por PROP até 27/08/2026 — e como era declarado dentro de `FormPintura`, chegava
+ * aqui como um tipo novo a cada render e remontava estes cinco campos a cada tecla. Agora ele mora
+ * no escopo do módulo e só o `doForm` viaja.
  */
-function CondicoesAmbientais({ res, travado, setResultado, Campo }) {
+function CondicoesAmbientais({ doForm }) {
+  // `res` é o que este bloco JULGA; `doForm` é o que os campos leem — o mesmo objeto serve aos dois
+  const { res } = doForm;
   const r = condicoesPermitemPintar({
     tAmbiente: res.prepTAmb, tSuperficie: res.prepTSup,
     pontoOrvalho: res.prepOrvalho, umidade: res.prepUmidade, tempo: res.tempo,
@@ -351,11 +376,11 @@ function CondicoesAmbientais({ res, travado, setResultado, Campo }) {
     <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
       <p className="text-[12px] font-bold text-torg-dark mb-2">Condições ambientais · PO-05, item 5.4</p>
       <div className="grid sm:grid-cols-5 gap-2.5">
-        <Campo rot="Umidade relativa (%)" k="prepUmidade" tipo="number" />
-        <Campo rot="Temp. ambiente (°C)" k="prepTAmb" tipo="number" />
-        <Campo rot="Temp. superfície (°C)" k="prepTSup" tipo="number" />
-        <Campo rot="Ponto de orvalho (°C)" k="prepOrvalho" tipo="number" />
-        <Campo rot="Tempo" k="tempo" opcoes={TEMPO} />
+        <Campo {...doForm} rot="Umidade relativa (%)" k="prepUmidade" tipo="number" />
+        <Campo {...doForm} rot="Temp. ambiente (°C)" k="prepTAmb" tipo="number" />
+        <Campo {...doForm} rot="Temp. superfície (°C)" k="prepTSup" tipo="number" />
+        <Campo {...doForm} rot="Ponto de orvalho (°C)" k="prepOrvalho" tipo="number" />
+        <Campo {...doForm} rot="Tempo" k="tempo" opcoes={TEMPO} />
       </div>
 
       {!r.avaliado ? (
