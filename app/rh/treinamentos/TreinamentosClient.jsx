@@ -228,10 +228,6 @@ export default function TreinamentosClient() {
             className="px-3 py-2 text-torg-gray bg-white border border-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50 inline-flex items-center gap-1.5">
             <FileDown size={15} /> Exportar PDF
           </a>
-          <button onClick={() => setAssinaturaOpen(true)}
-            className="px-3 py-2 text-white bg-torg-dark text-sm font-medium rounded-lg hover:opacity-90 inline-flex items-center gap-1.5">
-            <PenLine size={15} /> Enviar p/ assinatura
-          </button>
           <button
             onClick={abrirNovo}
             className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2"
@@ -246,7 +242,7 @@ export default function TreinamentosClient() {
           assinatura": quem quer só CONSULTAR o que já foi assinado tinha de clicar num botão que
           parece disparar um envio novo. Ninguém clica ali para consultar — e o documento existia
           sem existir. */}
-      <PlanoAssinado />
+      <PlanoAssinado onEnviar={() => setAssinaturaOpen(true)} recarregar={assinaturaOpen} />
 
       {assinaturaOpen && <AssinaturaModal onClose={() => setAssinaturaOpen(false)} />}
 
@@ -705,18 +701,31 @@ export default function TreinamentosClient() {
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 
 /** O estado do Plano Anual, na página: revisão, quem assinou e o PDF a um clique. */
-function PlanoAssinado() {
+function PlanoAssinado({ onEnviar, recarregar }) {
   const [d, setD] = useState(null);
   useEffect(() => {
     fetch("/api/rh/treinamentos/assinatura").then((r) => r.json()).then(setD).catch(() => setD({ envios: [] }));
-  }, []);
+  }, [recarregar]);
   const ultimo = d?.envios?.[0];
   if (!d) return null;
 
+  // ⚠⚠ A REVISÃO SÓ VALE ASSINADA. Vitor (26/08/2026): "uma vez que essa ata for assinada não
+  // poderá ser assinada novamente (…) quando for colocado novo treinamento que seja obrigatório a
+  // assinatura da nova ata para validar a revisada com a inclusão de novos treinamentos".
+  //
+  // Incluir treinamento sobe a revisão sozinho (qualquer tipo). Então o plano passa a ter DUAS
+  // revisões relevantes: a que está valendo (última inteiramente assinada) e a atual, que só passa
+  // a valer quando todos assinarem. Mostrar as duas é o que impede alguém agir sobre um plano que
+  // ninguém aprovou ainda.
+  const precisaAssinar = d.revisaoAtual > (d.revisaoValida ?? -1);
+
   if (!ultimo) {
     return (
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 text-[13px] text-torg-gray">
-        O Plano Anual de Treinamentos ainda não foi enviado para assinatura.
+      <div className="bg-white rounded-xl border border-amber-200 shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
+        <span className="text-[13px] text-torg-dark">O Plano Anual de Treinamentos ainda não foi assinado.</span>
+        <button onClick={onEnviar} className="ml-auto px-3 py-1.5 text-white bg-torg-dark text-[12px] font-semibold rounded-lg hover:opacity-90 inline-flex items-center gap-1.5">
+          <PenLine size={13} /> Enviar p/ assinatura
+        </button>
       </div>
     );
   }
@@ -739,6 +748,23 @@ function PlanoAssinado() {
           <FileDown size={13} /> abrir o PDF
         </a>
       </div>
+
+      {/* ⚠ SÓ APARECE QUANDO HÁ O QUE ASSINAR. Assinado e sem treinamento novo, o botão SOME — era
+          o pedido do Vitor, e não é só estética: um botão de enviar ao lado de um documento
+          fechado é convite a criar uma segunda ata com o mesmo número. */}
+      {precisaAssinar && (
+        <div className="mt-2 pt-2 border-t border-gray-100 flex items-center gap-2 flex-wrap">
+          <span className="text-[12px] text-amber-800">
+            <b>R{String(d.revisaoAtual).padStart(2, "0")} ainda não foi assinada.</b>{" "}
+            {d.revisaoValida >= 0
+              ? <>Vale a R{String(d.revisaoValida).padStart(2, "0")} até que todos assinem a nova — treinamento incluído depois dela ainda não está aprovado.</>
+              : <>O plano só passa a valer quando todos assinarem.</>}
+          </span>
+          <button onClick={onEnviar} className="ml-auto px-3 py-1.5 text-white bg-torg-dark text-[12px] font-semibold rounded-lg hover:opacity-90 inline-flex items-center gap-1.5">
+            <PenLine size={13} /> {d.pendente ? "Reenviar p/ assinatura" : "Enviar R" + String(d.revisaoAtual).padStart(2, "0") + " p/ assinatura"}
+          </button>
+        </div>
+      )}
       {/* ⚠ os NOMES na página, não só o placar: "4/4" não responde "a Fabrine assinou?", que é a
           pergunta que se faz de verdade. */}
       <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">

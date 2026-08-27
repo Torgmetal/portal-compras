@@ -23,7 +23,24 @@ export async function GET() {
     select: { id: true, revisao: true, titulo: true, enviadoEm: true, assinaturas: { select: { id: true, nome: true, setor: true, email: true, assinadoEm: true, ip: true }, orderBy: { nome: "asc" } } },
     take: 30,
   });
-  return NextResponse.json({ envios, revisaoAtual: await getRevisao(TIPO) });
+  const revisaoAtual = await getRevisao(TIPO);
+  // ⚠⚠ ASSINADO NÃO SE ASSINA DE NOVO. Vitor (26/08/2026): "uma vez que essa ata for assinada não
+  // poderá ser assinada novamente (…) e quando for colocado novo treinamento que seja obrigatório a
+  // assinatura da nova ata para validar a revisada com a inclusão de novos treinamentos".
+  //
+  // A conta é uma só e vale para a tela e para o POST: existe assinatura pendente quando a REVISÃO
+  // ATUAL ainda não tem um envio com todas as assinaturas. Incluir treinamento sobe a revisão
+  // (bumpRevisao), então o plano volta a pedir assinatura sozinho — é isso que faz a revisão valer.
+  const doAtual = envios.filter((e) => e.revisao === revisaoAtual);
+  const assinado = doAtual.some((e) => e.assinaturas.length > 0 && e.assinaturas.every((a) => a.assinadoEm));
+  const pendente = doAtual.some((e) => e.assinaturas.some((a) => !a.assinadoEm));
+  return NextResponse.json({
+    envios, revisaoAtual, assinado, pendente,
+    // ⚠ a revisão que está VALENDO é a última INTEIRAMENTE assinada — não a última enviada. Uma
+    // revisão enviada e não assinada não valida nada, e é justamente o que ele quer cobrar.
+    revisaoValida: Math.max(-1, ...envios.filter((e) => e.assinaturas.length && e.assinaturas.every((a) => a.assinadoEm)).map((e) => e.revisao)),
+    podeEnviar: !assinado,
+  });
 }
 
 export async function POST(req) {
@@ -37,8 +54,23 @@ export async function POST(req) {
     : [];
   if (!dest.length) return NextResponse.json({ error: "Informe ao menos um destinatário (nome + e-mail válido)." }, { status: 400 });
 
-  const treinamentos = await prisma.treinamento.findMany({ orderBy: { dataInicio: "asc" }, select: { titulo: true, nrRelacionada: true, dataInicio: true, cargaHoraria: true, tipo: true } });
   const revisao = await getRevisao(TIPO);
+
+  // ⚠⚠ NO SERVIDOR, NÃO SÓ NA TELA. Esconder o botão não impede um POST — e reenviar uma revisão já
+  // assinada criaria uma SEGUNDA ata com o mesmo número, as duas válidas, cada uma com assinaturas
+  // diferentes. Num documento controlado isso é pior que não ter ata.
+  const jaAssinado = await prisma.envioAssinatura.findFirst({
+    where: { tipo: TIPO, revisao },
+    select: { id: true, titulo: true, assinaturas: { select: { assinadoEm: true } } },
+  });
+  if (jaAssinado && jaAssinado.assinaturas.length && jaAssinado.assinaturas.every((a) => a.assinadoEm)) {
+    return NextResponse.json({
+      error: `"${jaAssinado.titulo}" já está assinado por todos. Para uma nova assinatura, inclua o treinamento novo — a revisão sobe e o plano volta a pedir assinatura.`,
+      jaAssinado: true,
+    }, { status: 409 });
+  }
+
+  const treinamentos = await prisma.treinamento.findMany({ orderBy: { dataInicio: "asc" }, select: { titulo: true, nrRelacionada: true, dataInicio: true, cargaHoraria: true, tipo: true } });
   const ano = treinamentos[0]?.dataInicio ? new Date(treinamentos[0].dataInicio).getUTCFullYear() : new Date().getUTCFullYear();
   const titulo = `Plano Anual de Treinamentos ${ano} — ${fmtRev(revisao)}`;
 
