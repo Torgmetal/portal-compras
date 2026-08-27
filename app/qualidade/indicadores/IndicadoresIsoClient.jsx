@@ -218,14 +218,17 @@ function Card({ ind, mesFim, onAbrir, acum, onPlano }) {
           {valor == null && <div className="text-[10.5px] text-torg-gray inline-flex items-center gap-1"><TrendingUp size={11} /> Sem dado {acum ? "no ano" : "no mês selecionado"}.</div>}
           <div className="flex items-center gap-3 flex-wrap">
             {clicavel && <div className="text-[10.5px] text-torg-blue font-medium">ver registros {acum ? "do ano" : "do mês"} →</div>}
-            {/* ⚠ O BOTÃO APARECE FORA DA META (vermelho) E NA ATENÇÃO (amarelo). Vitor
-                (27/08/2026): "criar um botão para criar plano de ação para os meses que estão
-                abaixo da meta" — e, depois, "o plano de ação não foi criado nos portais nas abas de
-                indicadores": ele não achou porque, no mês que abriu, nada estava vermelho. Por isso
-                o amarelo entrou e há um acesso fixo no cabeçalho, que não depende do farol. */}
-            {(f === "vermelho" || f === "amarelo") && onPlano && (
+            {/* ⚠ SEMPRE VISÍVEL. Vitor (27/08/2026): "não quero que ele apareça apenas no
+                vermelho, quero poder abrir sempre que necessário". Começou aparecendo só fora da
+                meta — e ele não achou a funcionalidade num mês em que tudo estava verde. Plano de
+                ação não é só reação a desvio: serve para melhoria e para reabrir o que ficou
+                pendente. A COR ainda diz o estado do mês; o acesso não depende dela. */}
+            {onPlano && (
               <button onClick={(e) => { e.stopPropagation(); onPlano(); }}
-                className={`text-[10.5px] font-semibold rounded-lg px-2 py-1 inline-flex items-center gap-1 border ${f === "vermelho" ? "text-red-700 bg-red-50 border-red-200 hover:bg-red-100" : "text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100"}`}>
+                className={`text-[10.5px] font-semibold rounded-lg px-2 py-1 inline-flex items-center gap-1 border ${
+                  f === "vermelho" ? "text-red-700 bg-red-50 border-red-200 hover:bg-red-100"
+                    : f === "amarelo" ? "text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100"
+                      : "text-torg-gray border-gray-200 hover:bg-gray-50 hover:text-torg-blue"}`}>
                 <ClipboardList size={11} /> plano de ação
               </button>
             )}
