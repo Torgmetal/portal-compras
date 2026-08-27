@@ -67,9 +67,17 @@ export async function PUT(req, { params }) {
 
   const txt = (v, n = 120) => (v === null || v === undefined ? null : String(v).trim().slice(0, n) || null);
   const email = (v) => { const e = txt(v, 160); return e && /.+@.+\..+/.test(e) ? e : null; };
+  // ⚠ QUEM MAIS RECEBE, e se assina. Vitor (27/08/2026): "preciso ter permissão para colocar mais
+  // e-mails além do Elaborado, Verificado e cliente". Cópia recebe o documento e não trava o fluxo;
+  // quem assina entra na conta da verificação interna.
+  const outros = (Array.isArray(body?.outros) ? body.outros : [])
+    .map((o) => ({ nome: txt(o?.nome) || txt(o?.email), email: email(o?.email), assina: !!o?.assina }))
+    .filter((o) => o.email)
+    .slice(0, 10);
   const dados = {
     elaboradoNome: txt(body?.elaboradoNome), elaboradoEmail: email(body?.elaboradoEmail),
     verificadoNome: txt(body?.verificadoNome), verificadoEmail: email(body?.verificadoEmail),
+    outros,
     atualizadoPorId: user?.id || null,
   };
   if (body?.elaboradoEmail && !dados.elaboradoEmail) return NextResponse.json({ error: "E-mail de quem elabora está inválido." }, { status: 400 });
@@ -104,12 +112,19 @@ export async function POST(req, { params }) {
   // ⚠ NA ETAPA INTERNA OS DESTINATÁRIOS SÃO OS RESPONSÁVEIS CADASTRADOS, e o papel de cada um vai
   // gravado: é por ele que o documento sabe qual assinatura é a de quem ELABOROU e qual é a de quem
   // VERIFICOU. Deixar a tela escolher livremente aqui faria o campo do papel virar adivinhação.
+  // ⚠ CÓPIA NÃO ASSINA E NÃO TRAVA. Ela recebe o mesmo e-mail e o mesmo PDF, sem o botão de
+  // assinar e sem virar AssinaturaDocumento — senão a verificação interna, que só fecha com TODOS
+  // assinados, ficaria pendurada em quem foi posto ali só para ficar sabendo.
+  const extras = (plano.responsaveis?.outros || []).filter((o) => o?.email);
+  const copias = extras.filter((o) => !o.assina).map((o) => ({ nome: o.nome || o.email, email: o.email }));
+
   let dest;
   if (etapa === "INTERNA") {
     const r = plano.responsaveis || {};
     dest = [
       { ...r.elaborado, papel: "Elaboração" },
       { ...r.verificado, papel: "Verificação" },
+      ...extras.filter((o) => o.assina).map((o) => ({ ...o, papel: "Verificação adicional" })),
     ]
       .filter((x) => x?.nome && x?.email)
       .map((x) => ({ nome: x.nome, email: x.email, setor: x.papel }));
@@ -187,13 +202,32 @@ export async function POST(req, { params }) {
     if (r?.ok) enviados++; else falhas.push(d.email);
   }
 
+  // ── as cópias: mesmo documento, sem link de assinatura ──
+  let emCopia = 0;
+  for (const c of copias) {
+    const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#0D1F3C">
+      ${cabecalhoEmail(`${def.nome} — cópia`)}
+      <div style="border:1px solid #e7ecf2;border-top:none;border-radius:0 0 8px 8px;padding:20px 24px">
+        <p style="margin:0 0 10px">Olá, <strong>${c.nome}</strong>,</p>
+        <p style="margin:0 0 12px">Segue, <strong>para conhecimento</strong>, o <strong>${plano.numero}</strong> — ${def.nome.toLowerCase()} da obra <strong>${plano.snapshot.obra || plano.snapshot.cliente || `OP-${opNumero}`}</strong>, revisão <strong>${plano.snapshot.revisao}</strong>, ${etapa === "INTERNA" ? "enviado para verificação interna" : "enviado ao cliente para aceite"}.</p>
+        <p style="margin:0;font-size:12px;color:#5a6b78">O documento está em anexo, em PDF. Esta cópia não pede assinatura.</p>
+      </div>
+    </div>`;
+    const r2 = await sendEmail({
+      to: c.email, subject: `${plano.numero} — ${def.nome} (cópia)`, html,
+      attachments: anexoB64 ? [{ filename: arquivo.nome, content: anexoB64 }] : undefined,
+      replyTo: user.email || undefined,
+    }).catch(() => ({ ok: false }));
+    if (r2?.ok) emCopia++; else falhas.push(`${c.email} (cópia)`);
+  }
+
   await prisma.auditLog.create({
     data: { userId: user?.id || null, action: "PLANO_ACEITE_ENVIO", entity: "EnvioAssinatura", entityId: envio.id,
-      diff: { op: opNumero, doc, etapa, revisao: plano.revisao, destinatarios: dest.map((d) => d.email), enviados } },
+      diff: { op: opNumero, doc, etapa, revisao: plano.revisao, destinatarios: dest.map((d) => d.email), enviados, copias: copias.map((c) => c.email), emCopia } },
   }).catch(() => {});
 
   return NextResponse.json({
-    ok: true, envioId: envio.id, doc, etapa, numero: plano.numero, total: dest.length, enviados,
+    ok: true, envioId: envio.id, doc, etapa, numero: plano.numero, total: dest.length, enviados, emCopia,
     falhas: falhas.length ? falhas : undefined,
     semAnexo: !arquivo || undefined,
   });

@@ -43,6 +43,7 @@ function CampoResponsavel({ rot, chave, resp, setResp, assinadoEm }) {
 export default function AceitePlano({ opNumero, doc, nome }) {
   const [d, setD] = useState(null);
   const [resp, setResp] = useState({ elaboradoNome: "", elaboradoEmail: "", verificadoNome: "", verificadoEmail: "" });
+  const [outros, setOutros] = useState([]); // [{ nome, email, assina }]
   const [salvandoResp, setSalvandoResp] = useState(false);
   const [abrir, setAbrir] = useState(false);
   const [marcados, setMarcados] = useState(() => new Set());
@@ -64,6 +65,7 @@ export default function AceitePlano({ opNumero, doc, nome }) {
             elaboradoNome: r.elaborado?.nome || "", elaboradoEmail: r.elaborado?.email || "",
             verificadoNome: r.verificado?.nome || "", verificadoEmail: r.verificado?.email || "",
           });
+          setOutros((r.outros || []).map((o) => ({ nome: o.nome || "", email: o.email || "", assina: !!o.assina, assinadoEm: o.assinadoEm || null })));
         }
       })
       .catch(() => {});
@@ -81,7 +83,7 @@ export default function AceitePlano({ opNumero, doc, nome }) {
     try {
       const rq = await fetch(`/api/qualidade/planos/${encodeURIComponent(opNumero)}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ doc, ...resp }),
+        body: JSON.stringify({ doc, ...resp, outros: outros.filter((o) => o.email.trim()) }),
       });
       const j = await rq.json();
       if (!rq.ok) throw new Error(j.error || "Erro ao salvar");
@@ -105,7 +107,7 @@ export default function AceitePlano({ opNumero, doc, nome }) {
       });
       const j = await rq.json();
       if (!rq.ok) throw new Error(j.error || "Erro ao enviar");
-      setOk(`${j.numero} enviado para ${j.enviados} de ${j.total} destinatário(s).`);
+      setOk(`${j.numero} enviado para ${j.enviados} de ${j.total} destinatário(s)${j.emCopia ? ` · ${j.emCopia} em cópia` : ""}.`);
       setAbrir(false); setNovo({ nome: "", email: "" });
       carregar();
     } catch (e) { setErro(e.message); } finally { setEnviando(""); }
@@ -120,6 +122,30 @@ export default function AceitePlano({ opNumero, doc, nome }) {
         <p className="text-[12px] font-semibold text-torg-dark">Elaboração e verificação</p>
         <CampoResponsavel rot="Elaborado" chave="elaborado" resp={resp} setResp={setResp} assinadoEm={r?.elaborado?.assinadoEm} />
         <CampoResponsavel rot="Verificado" chave="verificado" resp={resp} setResp={setResp} assinadoEm={r?.verificado?.assinadoEm} />
+        {/* ⚠⚠ MAIS GENTE ALÉM DOS TRÊS. Vitor (27/08/2026): "preciso ter permissão para colocar mais
+            e-mails além do Elaborado, Verificado e cliente, tanto no PLP quanto para o PIT". Quem
+            entra como CÓPIA recebe o documento e não trava nada; marcando "assina", a pessoa entra
+            na verificação interna — que só fecha quando todos assinaram. */}
+        {outros.map((o, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <span className="text-[10px] uppercase tracking-wide text-torg-gray-light w-20 shrink-0">Também</span>
+            <input value={o.nome} onChange={(e) => setOutros((x) => x.map((y, j) => (j === i ? { ...y, nome: e.target.value } : y)))}
+              placeholder="Nome" className="text-[11px] border border-gray-200 rounded px-2 py-1 w-36 outline-none focus:border-torg-blue" />
+            <input value={o.email} onChange={(e) => setOutros((x) => x.map((y, j) => (j === i ? { ...y, email: e.target.value } : y)))}
+              placeholder="e-mail" type="email" className="text-[11px] border border-gray-200 rounded px-2 py-1 flex-1 outline-none focus:border-torg-blue" />
+            <label className="text-[11px] text-torg-gray inline-flex items-center gap-1 shrink-0" title="Além de receber, precisa assinar a verificação interna">
+              <input type="checkbox" className="accent-torg-orange" checked={o.assina}
+                onChange={(e) => setOutros((x) => x.map((y, j) => (j === i ? { ...y, assina: e.target.checked } : y)))} /> assina
+            </label>
+            {o.assinadoEm && <span className="text-[10px] text-emerald-700 shrink-0 inline-flex items-center gap-1"><CheckCircle2 size={11} /> {fmtDT(o.assinadoEm)}</span>}
+            <button onClick={() => setOutros((x) => x.filter((_, j) => j !== i))} className="text-torg-gray-light hover:text-red-600 shrink-0"><X size={12} /></button>
+          </div>
+        ))}
+        <button onClick={() => setOutros((x) => [...x, { nome: "", email: "", assina: false }])}
+          className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1">
+          <Plus size={11} /> outro destinatário
+        </button>
+
         <div className="flex items-center gap-3 flex-wrap">
           <button onClick={salvarResp} disabled={salvandoResp}
             className="text-[11px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-2.5 py-1 hover:bg-torg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">
