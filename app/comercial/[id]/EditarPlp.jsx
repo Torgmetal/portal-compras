@@ -205,8 +205,10 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           potLife: t.potLife || dm.potLife || "",
           secagem: [t.secagemToque && `${t.secagemToque} ao toque`, t.secagemManuseio && `${t.secagemManuseio} ao manuseio`]
             .filter(Boolean).join(" · ") || dm.secagem,
+          // ⚠ o boletim dá uma FAIXA recomendada; o plano especifica UM valor. Sugere a mínima —
+          // é a que o medidor tem de encontrar — e só quando o campo está vazio.
           espessuraMin: dm.espessuraMin || (t.secaMin != null ? String(t.secaMin) : ""),
-          espessuraMax: dm.espessuraMax || (t.secaMax != null ? String(t.secaMax) : ""),
+          espessuraMax: "",
         };
       }),
     }));
@@ -491,17 +493,15 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
                 <Texto valor={dm.fabricante} onChange={(v) => setDemao(i, "fabricante", v)} ph="fabricante" />
                 <input list="cores-plp" value={so(dm.cor)} onChange={(e) => setDemao(i, "cor", e.target.value)}
                   placeholder="cor" className={cls} />
-                <div className="flex items-center gap-1">
-                  {/* ⚠ mexer na espessura seca refaz a úmida: as duas são a mesma conta. */}
-                  <Texto tipo="number" valor={dm.espessuraMin} onChange={(v) => {
-                    const t = catalogo.find((x) => x.id === dm.produtoId);
-                    const umida = umidaDe(t, v, dm.diluicaoPct);
-                    const tabela = umidasDe(t, v);
-                    setF((x) => ({ ...x, demaos: x.demaos.map((d2, j) => (j === i ? { ...d2, espessuraMin: v, ...(umida != null ? { camadaUmida: String(umida) } : {}), ...(tabela.length ? { umidas: tabela } : {}) } : d2)) }));
-                  }} ph="µm seca mín" />
-                  <span className="text-[11px] text-torg-gray-light">a</span>
-                  <Texto tipo="number" valor={dm.espessuraMax} onChange={(v) => setDemao(i, "espessuraMax", v)} ph="máx" />
-                </div>
+                {/* ⚠ UM NÚMERO SÓ. Vitor (27/08/2026): "no caso da aplicação da tinta não precisa
+                    ter mínimo e máximo, apenas a espessura seca final". Mexer nela refaz a camada
+                    úmida — as duas são a mesma conta. */}
+                <Texto tipo="number" valor={dm.espessuraMin} onChange={(v) => {
+                  const t = catalogo.find((x) => x.id === dm.produtoId);
+                  const umida = umidaDe(t, v, dm.diluicaoPct);
+                  const tabela = umidasDe(t, v);
+                  setF((x) => ({ ...x, demaos: x.demaos.map((d2, j) => (j === i ? { ...d2, espessuraMin: v, espessuraMax: "", ...(umida != null ? { camadaUmida: String(umida) } : {}), ...(tabela.length ? { umidas: tabela } : {}) } : d2)) }));
+                }} ph="espessura seca (µm)" />
                 <span />
               </div>
             </div>
