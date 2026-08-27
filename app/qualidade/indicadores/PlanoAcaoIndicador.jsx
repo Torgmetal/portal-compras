@@ -29,12 +29,15 @@ export default function PlanoAcaoIndicador({ ind, processo, ano, mes, valor, onF
   const carregar = useCallback(async () => {
     setErro("");
     try {
-      const r = await fetch(`/api/indicadores/plano-acao?indicador=${encodeURIComponent(ind.id)}&ano=${ano}`, { cache: "no-store" });
+      // ⚠ sem indicador (aberto pelo cabeçalho) lista os planos do SETOR inteiro — é como se vê o
+      // que está em aberto sem depender de qual cartão está vermelho hoje.
+      const q = new URLSearchParams({ ano: String(ano), ...(ind.id ? { indicador: ind.id } : { processo }) });
+      const r = await fetch(`/api/indicadores/plano-acao?${q}`, { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Não consegui ler os planos.");
       setPlanos(j.planos || []);
     } catch (e) { setErro(e.message); setPlanos([]); }
-  }, [ind.id, ano]);
+  }, [ind.id, processo, ano]);
   useEffect(() => { carregar(); }, [carregar]);
 
   const abrir = (p) => {
@@ -81,10 +84,16 @@ export default function PlanoAcaoIndicador({ ind, processo, ano, mes, valor, onF
         <div className="flex items-start gap-3 px-5 py-4 border-b border-gray-100">
           <ClipboardList size={18} className="text-torg-blue mt-0.5 shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-[15px] font-bold text-torg-dark">Plano de ação · {ind.nome}</p>
+            <p className="text-[15px] font-bold text-torg-dark">
+              {ind.id ? `Plano de ação · ${ind.nome}` : `Planos de ação · ${ind.nome}`}
+            </p>
             <p className="text-[12px] text-torg-gray">
-              {mes == null ? `Acumulado ${ano}` : `${MESES[mes]}/${ano}`}
-              {valor != null && ` · ${valor.toLocaleString("pt-BR")}${ind.meta?.unidade || ""} contra a meta de ${ind.meta?.valor}${ind.meta?.unidade || ""}`}
+              {ind.id ? (
+                <>
+                  {mes == null ? `Acumulado ${ano}` : `${MESES[mes]}/${ano}`}
+                  {valor != null && ` · ${valor.toLocaleString("pt-BR")}${ind.meta?.unidade || ""} contra a meta de ${ind.meta?.valor}${ind.meta?.unidade || ""}`}
+                </>
+              ) : `Todos os planos deste setor em ${ano} — abra pelo cartão do indicador para criar um novo.`}
             </p>
           </div>
           <button onClick={onFechar} className="text-torg-gray hover:text-torg-dark"><X size={18} /></button>
@@ -100,7 +109,7 @@ export default function PlanoAcaoIndicador({ ind, processo, ano, mes, valor, onF
           ))}
           <div className="flex-1" />
           {/* ⚠ um plano por mês: se já existe, o botão leva a ele em vez de criar um segundo. */}
-          {aba === "ABERTOS" && (
+          {aba === "ABERTOS" && ind.id && (
             doMes
               ? <button onClick={() => abrir(doMes)} className="text-[12px] font-semibold text-torg-blue hover:underline">abrir o plano deste mês</button>
               : <button onClick={criar} disabled={salvando}

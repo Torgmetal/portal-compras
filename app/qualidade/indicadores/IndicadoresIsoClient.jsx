@@ -38,6 +38,7 @@ export default function IndicadoresIsoClient({ processo = "QUALIDADE", endpoint 
   const [mes, setMes] = useState(null); // null = deixa a API escolher (mês atual)
   const [modo, setModo] = useState("mes"); // mes | acumulado (do ano)
   const [plano, setPlano] = useState(null);
+  const [planosAbertos, setPlanosAbertos] = useState(null);
   const [detalhe, setDetalhe] = useState(null); // indicador aberto no modal de registros do mês
   const acum = modo === "acumulado";
 
@@ -45,6 +46,11 @@ export default function IndicadoresIsoClient({ processo = "QUALIDADE", endpoint 
     setLoading(true);
     const q = new URLSearchParams({ ano: String(ano) });
     if (mes != null) q.set("mes", String(mes));
+    // quantos planos de ação deste setor seguem em aberto — para o acesso do cabeçalho
+    fetch(`/api/indicadores/plano-acao?processo=${encodeURIComponent(processo)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setPlanosAbertos((j?.planos || []).filter((x) => x.status === "EM_ANDAMENTO").length))
+      .catch(() => {});
     fetch(`${endpoint}?${q}`).then((r) => (r.ok ? r.json() : null))
       .then((j) => { if (!j) return setErro("Erro ao carregar"); setData(j); if (mes == null) setMes(j.mes); })
       .catch(() => setErro("Erro ao carregar")).finally(() => setLoading(false));
@@ -93,6 +99,14 @@ export default function IndicadoresIsoClient({ processo = "QUALIDADE", endpoint 
           <Chip n={resumo.amarelo} l="Atenção" cor="#b45309" bg="#fff6e6" />
           <Chip n={resumo.vermelho} l="Fora da meta" cor="#b91c1c" bg="#fdeaea" />
           <Chip n={resumo.pendente} l="Aguardando registro" cor="#64748b" bg="#f1f5f9" />
+          <div className="flex-1" />
+          {/* ⚠ ACESSO FIXO AOS PLANOS DE AÇÃO. O botão do cartão depende do farol — num mês em que
+              tudo está verde, a funcionalidade some da tela e ninguém encontra os planos já
+              abertos. Aqui ele está sempre, com a contagem dos que seguem em aberto. */}
+          <button onClick={() => setPlano({ id: null, nome: titulo, meta: null })}
+            className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-2.5 py-1 hover:bg-torg-blue-50 inline-flex items-center gap-1.5">
+            <ClipboardList size={13} /> Planos de ação{planosAbertos != null ? ` (${planosAbertos})` : ""}
+          </button>
         </div>
       )}
 
@@ -204,12 +218,14 @@ function Card({ ind, mesFim, onAbrir, acum, onPlano }) {
           {valor == null && <div className="text-[10.5px] text-torg-gray inline-flex items-center gap-1"><TrendingUp size={11} /> Sem dado {acum ? "no ano" : "no mês selecionado"}.</div>}
           <div className="flex items-center gap-3 flex-wrap">
             {clicavel && <div className="text-[10.5px] text-torg-blue font-medium">ver registros {acum ? "do ano" : "do mês"} →</div>}
-            {/* ⚠⚠ O BOTÃO SÓ APARECE FORA DA META. Vitor (27/08/2026): "criar um botão para criar
-                plano de ação para os meses que estão abaixo da meta". Botão sempre visível vira
-                enfeite; aparecendo só no vermelho, ele é a própria leitura do indicador. */}
-            {f === "vermelho" && onPlano && (
+            {/* ⚠ O BOTÃO APARECE FORA DA META (vermelho) E NA ATENÇÃO (amarelo). Vitor
+                (27/08/2026): "criar um botão para criar plano de ação para os meses que estão
+                abaixo da meta" — e, depois, "o plano de ação não foi criado nos portais nas abas de
+                indicadores": ele não achou porque, no mês que abriu, nada estava vermelho. Por isso
+                o amarelo entrou e há um acesso fixo no cabeçalho, que não depende do farol. */}
+            {(f === "vermelho" || f === "amarelo") && onPlano && (
               <button onClick={(e) => { e.stopPropagation(); onPlano(); }}
-                className="text-[10.5px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-100 inline-flex items-center gap-1">
+                className={`text-[10.5px] font-semibold rounded-lg px-2 py-1 inline-flex items-center gap-1 border ${f === "vermelho" ? "text-red-700 bg-red-50 border-red-200 hover:bg-red-100" : "text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100"}`}>
                 <ClipboardList size={11} /> plano de ação
               </button>
             )}

@@ -40,12 +40,47 @@ export async function GET(req) {
     return NextResponse.json({ titulo: "Turnover (Taxa de Rotatividade)", colunas: ["Movimento", "Colaborador", "Data", "Detalhe"], linhas, resumo: `${adm.length} admissão(ões) + ${dem.length} desligamento(s) no período` });
   }
 
-  // Absenteísmo — afastamentos iniciados no período.
+  // Absenteísmo — do controle de presença do RH (/Qualidade/Presença.xlsx), pessoa a pessoa.
+  // ⚠ o detalhamento tem de sair da MESMA fonte do card: com o card lendo a planilha e a tabela
+  // lendo `Afastamento`, o número de cima nunca fecharia com a lista de baixo.
   if (indicador === "absenteismo") {
+    const { absenteismoDoAno } = await import("@/lib/absenteismo-planilha");
+    const d = await absenteismoDoAno(ano);
+    if (d.achou && d.meses.length) {
+      const meses = anoTodo ? d.meses : d.meses.filter((m) => m.mes === mes);
+      const uteis = meses.reduce((t, m) => t + m.diasUteis, 0);
+      const faltas = meses.reduce((t, m) => t + m.faltas, 0);
+      const longos = new Set(meses.flatMap((m) => m.afastamentoLongo.pessoas.map((p) => p.nome)));
+      const diasLongos = meses.reduce((t, m) => t + m.afastamentoLongo.faltas, 0);
+      const porPessoa = new Map();
+      for (const m of meses) for (const p of m.detalhe) {
+        const a = porPessoa.get(p.nome) || { ...p, dias: 0, uteis: 0 };
+        a.dias += p.dias; a.uteis += p.uteis;
+        porPessoa.set(p.nome, a);
+      }
+      const linhas = [...porPessoa.values()].sort((a, b) => b.dias - a.dias).map((p) => [
+        p.nome, p.setor || "—", p.funcao || "—",
+        `${p.dias.toLocaleString("pt-BR")} dia(s)`,
+        p.uteis ? `${(Math.round((p.dias / p.uteis) * 1000) / 10).toLocaleString("pt-BR")}%` : "—",
+        longos.has(p.nome) ? "afastamento longo" : "",
+      ]);
+      const pct = uteis > 0 ? Math.round((faltas / uteis) * 1000) / 10 : null;
+      const semLongo = uteis > 0 ? Math.round(((faltas - diasLongos) / uteis) * 1000) / 10 : null;
+      return NextResponse.json({
+        titulo: "Absenteísmo — controle de presença",
+        colunas: ["Colaborador", "Setor", "Função", "Faltas", "% do próprio período", ""],
+        linhas,
+        resumo: `${faltas.toLocaleString("pt-BR")} dias de ausência em ${uteis.toLocaleString("pt-BR")} dias úteis`
+          + `${pct == null ? "" : ` · ${pct.toLocaleString("pt-BR")}%`}`
+          + `${diasLongos > 0 ? ` · desses, ${diasLongos.toLocaleString("pt-BR")} dias são afastamento longo (${longos.size} pessoa(s)) — sem eles o índice seria ${semLongo?.toLocaleString("pt-BR")}%` : ""}`
+          + ` · fonte: ${d.arquivo}`,
+      });
+    }
+    // sem a planilha: cai nos afastamentos formais, como era antes
     const af = await prisma.afastamento.findMany({ where: { dataInicio: { gte: pIni, lt: pFim } }, select: { dataInicio: true, dataFim: true, diasAfastado: true, natureza: true, funcionario: { select: { nome: true } } }, orderBy: { dataInicio: "asc" } });
     const linhas = af.map((a) => [a.funcionario?.nome || "—", NAT[a.natureza] || a.natureza || "—", fmtD(a.dataInicio), String(a.diasAfastado ?? "—")]);
-    const totDias = af.reduce((s, a) => s + (a.diasAfastado || 0), 0);
-    return NextResponse.json({ titulo: "Absenteísmo", colunas: ["Colaborador", "Natureza", "Início", "Dias"], linhas, resumo: `${af.length} afastamento(s) · ${totDias} dia(s) de ausência no período` });
+    const totDias = af.reduce((s2, a) => s2 + (a.diasAfastado || 0), 0);
+    return NextResponse.json({ titulo: "Absenteísmo", colunas: ["Colaborador", "Natureza", "Início", "Dias"], linhas, resumo: `${d.erro || "Planilha de presença indisponível"} — mostrando os afastamentos formais: ${af.length} · ${totDias} dia(s)` });
   }
 
   // Acidentes com afastamento — acidentes COM_AFASTAMENTO do período.
