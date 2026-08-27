@@ -96,8 +96,15 @@ export async function POST(req) {
   // Upsert em lote: 1 findMany (marca -> id) em vez de um findUnique por peca —
   // corta metade dos round-trips ao Neon (era isso que estourava os 60s -> 504).
   // Depois do sobrescrever pra o mapa refletir o estado ja deletado.
+  //
+  // ⚠⚠ SÓ AS PEÇAS DA PRÓPRIA LE. A busca era por `opNumero` SEM a fonte — e a mesma marca existe
+  // nas duas listas de propósito: a LPC lista conjunto + croquis, a LE lista conjunto + acessórios.
+  // Onde as duas gravam o MESMO `opNumero` (hoje: 060, 089, 097, 103 e 104 — nas outras a LPC usa o
+  // código de frente, "T112A"), o import achava o conjunto da LPC pelo nome e fazia UPDATE nele:
+  // a linha da LE nunca nascia e os números da LPC eram sobrescritos pelos da LE. Nessas cinco OPs
+  // não há hoje UMA marca em comum entre as duas fontes — que é exatamente o rastro disso.
   const existentes = await prisma.pecaConjunto.findMany({
-    where: { opNumero },
+    where: { opNumero, fonte: "LE_IMPORT" },
     select: { id: true, marca: true },
   });
   const idPorMarca = new Map(existentes.map((e) => [e.marca, e.id]));
