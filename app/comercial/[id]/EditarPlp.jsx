@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Check, X, Plus, Trash2, AlertCircle, Pencil, Upload } from "lucide-react";
-import { METODOS_PREPARO, PLP_PADRAO } from "@/lib/plp";
-import { GRAUS_LIMPEZA, METODOS_APLICACAO } from "@/lib/pintura-campos";
+import { Loader2, Check, X, Plus, Trash2, AlertCircle, Pencil, Upload, Sparkles } from "lucide-react";
+import { METODOS_PREPARO, PLP_PADRAO, descreverSistema } from "@/lib/plp";
+import { GRAUS_LIMPEZA, METODOS_APLICACAO, grauNaNorma } from "@/lib/pintura-campos";
 
 // ─── CORRIGIR O PLANO DE PINTURA DA OBRA ──────────────────────────────────────
 // Vitor (27/08/2026): "na parte do plano de pintura preciso que no botão de editar você me permita
@@ -177,6 +177,13 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
    * fechado outra com o cliente. Sobrescrever o que a pessoa digitou seria o portal decidindo
    * contra o contrato.
    */
+  /** As espessuras úmidas de cada diluição possível — é o que sai impresso na folha 2·2. */
+  function umidasDe(t, seca) {
+    return diluicoesDe(t)
+      .map((dl) => ({ d: dl, u: umidaDe(t, seca, dl) }))
+      .filter((x) => x.u != null);
+  }
+
   function aplicarProduto(i, t) {
     setF((x) => ({
       ...x,
@@ -192,6 +199,7 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           diluicaoPct: pct === "" ? "" : String(pct),
           diluicao: nomeDoDiluente(t, pct) || dm.diluicao,
           camadaUmida: umida != null ? String(umida) : dm.camadaUmida,
+          umidas: umidasDe(t, seca),
           componentes: [t.componenteA && `A: ${t.componenteA}`, t.componenteB && `B: ${t.componenteB}`, t.proporcaoMistura]
             .filter(Boolean).join(" · ") || dm.componentes || "",
           potLife: t.potLife || dm.potLife || "",
@@ -216,6 +224,7 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           ...dm, diluicaoPct: pct === "" ? "" : String(pct),
           diluicao: nomeDoDiluente(t, pct) || dm.diluicao,
           camadaUmida: umida != null ? String(umida) : dm.camadaUmida,
+          umidas: umidasDe(t, dm.espessuraMin),
         };
       }),
     }));
@@ -487,7 +496,8 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
                   <Texto tipo="number" valor={dm.espessuraMin} onChange={(v) => {
                     const t = catalogo.find((x) => x.id === dm.produtoId);
                     const umida = umidaDe(t, v, dm.diluicaoPct);
-                    setF((x) => ({ ...x, demaos: x.demaos.map((d2, j) => (j === i ? { ...d2, espessuraMin: v, ...(umida != null ? { camadaUmida: String(umida) } : {}) } : d2)) }));
+                    const tabela = umidasDe(t, v);
+                    setF((x) => ({ ...x, demaos: x.demaos.map((d2, j) => (j === i ? { ...d2, espessuraMin: v, ...(umida != null ? { camadaUmida: String(umida) } : {}), ...(tabela.length ? { umidas: tabela } : {}) } : d2)) }));
                   }} ph="µm seca mín" />
                   <span className="text-[11px] text-torg-gray-light">a</span>
                   <Texto tipo="number" valor={dm.espessuraMax} onChange={(v) => setDemao(i, "espessuraMax", v)} ph="máx" />
@@ -498,7 +508,7 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           ))}
         </div>
         {f.demaos.length < 6 && (
-          <button onClick={() => setF((x) => ({ ...x, demaos: [...x.demaos, { ordem: x.demaos.length + 1, nome: "", produto: "", fabricante: "", cor: "", espessuraMin: "", espessuraMax: "", lote: "", diluicao: "", camadaUmida: "", secagem: "", produtoId: "", diluicaoPct: "", componentes: "", potLife: "" }] }))}
+          <button onClick={() => setF((x) => ({ ...x, demaos: [...x.demaos, { ordem: x.demaos.length + 1, nome: "", produto: "", fabricante: "", cor: "", espessuraMin: "", espessuraMax: "", lote: "", diluicao: "", camadaUmida: "", secagem: "", produtoId: "", diluicaoPct: "", componentes: "", potLife: "", umidas: [] }] }))}
             className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={11} /> demão</button>
         )}
       </Secao>
@@ -528,7 +538,18 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
                 ) : (
                   <Texto valor={dm.diluicao} onChange={(v) => setDemao(i, "diluicao", v)} ph="diluição" />
                 )}
-                <Texto valor={dm.camadaUmida} onChange={(v) => setDemao(i, "camadaUmida", v)} ph="úmida µm" />
+                {(dm.umidas || []).length ? (
+                  // ⚠ as três (ou N) condições, não só a escolhida: é o que o pintor lê no galpão.
+                  <span className="text-[11px] text-torg-dark leading-tight">
+                    {dm.umidas.map((x) => (
+                      <span key={x.d} className={`inline-block mr-2 ${String(x.d) === String(dm.diluicaoPct) ? "font-semibold" : "text-torg-gray"}`}>
+                        {x.d}%: {x.u} µm
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  <Texto valor={dm.camadaUmida} onChange={(v) => setDemao(i, "camadaUmida", v)} ph="úmida µm" />
+                )}
                 <Texto valor={dm.secagem} onChange={(v) => setDemao(i, "secagem", v)} ph="tempo de secagem" />
                 {/* ⚠ componentes e pot life ocupam a linha inteira: é o que a fábrica lê para
                     misturar, e cortar num campo de 6 rem não ajuda ninguém. */}
@@ -584,10 +605,22 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
       <datalist id="cores-plp">{cores.map((c) => <option key={c} value={c} />)}</datalist>
       <datalist id="sistemas-plp">{sistemas.map((c) => <option key={c} value={c} />)}</datalist>
 
-      <Campo rotulo="Observações">
-        <textarea value={f.observacoes} onChange={(e) => set("observacoes", e.target.value)} rows={3}
-          placeholder="Retoques, faixas, exigências do cliente…" className={cls} />
-      </Campo>
+      <div className="space-y-1">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-[10px] font-semibold text-torg-gray">OBSERVAÇÕES</span>
+          {/* ⚠ o texto sai DOS CAMPOS acima, não de uma leitura. Observação que repete campo
+              envelhece sozinha: muda a demão e ela continua dizendo a anterior. */}
+          <button onClick={() => set("observacoes", descreverSistema(f, { grauNaNorma }))}
+            className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1">
+            <Sparkles size={11} /> descrever o sistema
+          </button>
+          {f.observacoes && (
+            <button onClick={() => set("observacoes", "")} className="text-[11px] text-torg-gray hover:underline">limpar</button>
+          )}
+        </div>
+        <textarea value={f.observacoes} onChange={(e) => set("observacoes", e.target.value)} rows={4}
+          placeholder="Descreva o sistema, retoques, faixas, exigências do cliente…" className={cls} />
+      </div>
 
       {erro && <p className="text-[12px] text-red-600 inline-flex items-start gap-1.5"><AlertCircle size={13} className="mt-0.5 shrink-0" /> {erro}</p>}
 
