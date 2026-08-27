@@ -47,12 +47,17 @@ export async function GET(req, { params }) {
   const revisao = rev?.rotulo || (rev ? `Revisao ${rev.seq}` : "00");
 
   const headers = ["Marca", "Descricao", "Material", "Qtd.", ...(comPeso ? ["Peso (kg)"] : [])];
-  const totalKg = Math.round(pecas.reduce((s, p) => s + (p.pesoTotalKg || 0), 0));
+  // ⚠⚠ SÓ O NÍVEL 0 SOMA. Com as subpeças na lista, somar tudo conta o MESMO aço duas vezes — o
+  // peso do conjunto já é a soma dos croquis dele (regra da casa: "somar PecaConjunto cru dobra").
+  const totalKg = Math.round(pecas.filter((p) => !p.nivel).reduce((s, p) => s + (p.pesoTotalKg || 0), 0));
+  // ⚠ e o TOTAL de itens conta só os conjuntos: "197 itens" ao lado de um peso de 47 conjuntos
+  // faria os dois números parecerem errados. A planilha traz as 197 linhas do mesmo jeito.
+  const totalItens = pecas.filter((p) => !p.nivel).length || pecas.length;
   const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
     titulo: cfg.nome,
     subtitulo: `OP-${op.numero} — ${op.obra || ""}${op.refCliente ? ` (Ref. ${op.refCliente})` : ""}`,
     kpis: [
-      `Cliente: ${op.cliente || "—"}  |  ${pecas.length} itens${comPeso ? `  |  ${totalKg.toLocaleString("pt-BR")} kg` : ""}`,
+      `Cliente: ${op.cliente || "—"}  |  ${totalItens} conjunto(s), ${pecas.length} linha(s)${comPeso ? `  |  ${totalKg.toLocaleString("pt-BR")} kg` : ""}`,
     ],
     totalColunas: headers.length,
     nomePlanilha: chave === "LPC" ? "LPC" : "LE",
@@ -69,7 +74,10 @@ export async function GET(req, { params }) {
   adicionarHeaderTabela(ws, row, headers); row++;
   for (const p of pecas) {
     adicionarLinhaTabela(ws, row, [
-      p.marca,
+      // ⚠ o recuo vai para a PLANILHA também. Vitor (26/08/2026): "isso acontece no excel também".
+      // Sem ele o Excel repete o problema da tela: 197 linhas sem dizer quais são peças de qual
+      // conjunto.
+      p.nivel ? `    ${p.marca}` : p.marca,
       p.descricao || p.perfil || "—",
       p.material || "—",
       p.qte || 0,
@@ -78,7 +86,7 @@ export async function GET(req, { params }) {
     row++;
   }
   adicionarLinhaTotais(ws, row, [
-    "TOTAL", "", "", pecas.length, ...(comPeso ? [totalKg] : []),
+    "TOTAL", "", "", totalItens, ...(comPeso ? [totalKg] : []),
   ]);
 
   const buf = await workbook.xlsx.writeBuffer();

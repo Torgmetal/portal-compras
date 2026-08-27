@@ -651,7 +651,7 @@ function CartaoRevisao({ l, onEntendi }) {
         <History size={18} className="text-[#F4801F] shrink-0 mt-0.5" />
         <div className="min-w-0 flex-1">
           <p className="text-[14px] font-bold text-[#0D1F3C]">
-            {l.titulo} — {r.daEngenharia ? `revisão ${r.rotulo}` : r.rotulo}
+            {l.titulo}{r.rotulo ? ` — revisão ${r.rotulo}` : ""}
           </p>
           <p className="text-[13px] text-gray-600 mt-1">
             Atualizada em {new Date(r.publicadaEm).toLocaleDateString("pt-BR")}. {resumo}.
@@ -715,7 +715,7 @@ function BlocoLista({ icone, titulo, fonte, d, token }) {
   const sub = [
     plural(d.total, "item", "itens"),
     d.comPeso ? fmtKg(d.pesoKg) : null,
-    r ? (r.daEngenharia ? `rev. ${r.rotulo}` : r.rotulo) : null,
+    r?.rotulo ? `rev. ${r.rotulo}` : null,
   ].filter(Boolean).join(" · ");
   return (
     <Bloco icone={icone} titulo={titulo} recolhida sub={sub}
@@ -727,7 +727,7 @@ function BlocoLista({ icone, titulo, fonte, d, token }) {
       }>
       {r?.mudou && (
         <p className="text-[12px] text-gray-600 bg-[#FFF7ED] border border-[#F4801F]/30 rounded-lg px-3 py-2 mb-4">
-          Esta é a {r.daEngenharia ? `revisão ${r.rotulo}` : r.rotulo.toLowerCase()}, de{" "}
+          {r.rotulo ? <>Esta é a revisão {r.rotulo}, de{" "}</> : <>Lista atualizada em{" "}</>}
           {new Date(r.publicadaEm).toLocaleDateString("pt-BR")} — a planilha acima já sai atualizada.
         </p>
       )}
@@ -735,7 +735,11 @@ function BlocoLista({ icone, titulo, fonte, d, token }) {
         quebra={[1]} larguraMin={d.comPeso ? 620 : 520}
         cols={["Marca", "Descrição", "Material", "Qtd.", ...(d.comPeso ? ["Peso"] : [])]}
         linhas={d.itens.slice(0, 200).map((p) => [
-          <span key="m" className="font-mono">{p.marca}</span>, p.descricao, p.material || "—", p.qtd,
+          // ⚠ a peça do conjunto entra RECUADA e em cinza: a LPC é "lista de peças POR CONJUNTO", e
+          // é o recuo que mostra o que compõe o quê. Chapada, ela vira um índice de marcas.
+          <span key="m" className={p.nivel ? "font-mono text-gray-500 pl-4" : "font-mono font-semibold"}>{p.marca}</span>,
+          <span key="d" className={p.nivel ? "text-gray-500" : ""}>{p.descricao}</span>,
+          p.material || "—", p.qtd,
           ...(d.comPeso ? [fmtKg(p.pesoKg)] : []),
         ])}
         rodape={d.total > 200 ? `A tela mostra as primeiras 200 marcas — a planilha traz as ${d.total}.` : null}

@@ -184,9 +184,15 @@ export async function GET(req, { params }) {
     return {
       total: pecas.length,
       comPeso,
-      pesoKg: comPeso ? Math.round(pecas.reduce((sm, p) => sm + (p.pesoTotalKg || 0), 0)) : null,
+      // ⚠⚠ SÓ O NÍVEL 0 SOMA. Com as subpeças na lista, somar tudo conta o MESMO aço duas vezes —
+      // o peso do conjunto já é a soma dos croquis dele (regra da casa). O total dobraria no dia em
+      // que as subpeças entraram, e ninguém ligaria uma coisa à outra.
+      pesoKg: comPeso ? Math.round(pecas.filter((p) => !p.nivel).reduce((sm, p) => sm + (p.pesoTotalKg || 0), 0)) : null,
       itens: pecas.slice(0, 500).map((p) => ({
         marca: p.marca, descricao: p.descricao || p.perfil || "—",
+        // ⚠ o nível vai junto: sem ele a tela não sabe que a linha é peça DE um conjunto, e a LPC
+        // vira uma lista chapada onde ninguém enxerga o que compõe o quê.
+        nivel: p.nivel || 0, conjunto: p.conjunto || null,
         material: p.material || null, qtd: p.qte,
         ...(comPeso ? { pesoKg: Math.round(p.pesoTotalKg || 0) } : {}),
       })),
