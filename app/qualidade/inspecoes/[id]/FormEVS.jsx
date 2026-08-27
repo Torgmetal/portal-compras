@@ -5,6 +5,37 @@ import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOE
 import { criteriosDoDefeito, ONDE_VALE } from "@/lib/aws-d11";
 
 /**
+ * Um campo das condições do ensaio.
+ *
+ * ⚠⚠ FICA FORA DO COMPONENTE DE PROPÓSITO. Declarado dentro de `FormEVS`, vira um TIPO NOVO a cada
+ * render — o React desmonta e remonta o input a cada tecla e o cursor sai do campo depois de cada
+ * letra. É o defeito que Vitor relatou em 27/08/2026 no aceite dos planos ("estou com dificuldade
+ * para digitar nesses campos"), corrigido do mesmo jeito em AceitePlano.jsx. Componente de
+ * formulário nunca se declara dentro de outro componente.
+ *
+ * O que ele lia do fecho (`res`, `travado`, `setResultado`) agora chega por props — `doForm` no
+ * corpo de `FormEVS` junta os três para o espalhamento ficar num lugar só.
+ */
+function Campo({ rot, k, tipo = "text", opcoes = null, largura = "", res, travado, setResultado }) {
+  return (
+    <label className={`block ${largura}`}>
+      <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">{rot}</span>
+      {opcoes ? (
+        <select value={res[k] || ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
+          className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue disabled:bg-gray-50">
+          <option value="">—</option>
+          {opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+      ) : (
+        <input type={tipo} value={res[k] ?? ""} disabled={travado}
+          onChange={(e) => setResultado(k, e.target.value)}
+          className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
+      )}
+    </label>
+  );
+}
+
+/**
  * O PREENCHIMENTO DO ENSAIO VISUAL DE SOLDA.
  *
  * Vitor (21/08/2026): "construa o caminho para o inspetor de qualidade preencher as informações
@@ -55,22 +86,8 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
     } : l)));
   }
 
-  const Campo = ({ rot, k, tipo = "text", opcoes = null, largura = "" }) => (
-    <label className={`block ${largura}`}>
-      <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">{rot}</span>
-      {opcoes ? (
-        <select value={res[k] || ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
-          className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue disabled:bg-gray-50">
-          <option value="">—</option>
-          {opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-      ) : (
-        <input type={tipo} value={res[k] ?? ""} disabled={travado}
-          onChange={(e) => setResultado(k, e.target.value)}
-          className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
-      )}
-    </label>
-  );
+  // o que todo <Campo> lê do formulário — ver o comentário do componente, lá em cima
+  const doForm = { res, travado, setResultado };
 
   return (
     <div className="space-y-3">
@@ -78,9 +95,9 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
       <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
         <p className="text-[12px] font-bold text-torg-dark mb-2">Condições do ensaio</p>
         <div className="grid sm:grid-cols-3 gap-2.5">
-          <Campo rot="Tipo de estrutura" k="tipoPeca" opcoes={TIPOS_PECA} />
-          <Campo rot="Componente / parte" k="componente" />
-          <Campo rot="Metal base" k="metalBase" opcoes={METAIS_BASE} />
+          <Campo {...doForm} rot="Tipo de estrutura" k="tipoPeca" opcoes={TIPOS_PECA} />
+          <Campo {...doForm} rot="Componente / parte" k="componente" />
+          <Campo {...doForm} rot="Metal base" k="metalBase" opcoes={METAIS_BASE} />
           <label className="block">
             <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">
               Iluminação (lux) <span className="font-normal">· mínimo {LUX_MINIMO}</span>
@@ -95,8 +112,8 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
               </span>
             )}
           </label>
-          <Campo rot="Técnica de inspeção" k="tecnica" opcoes={TECNICAS} />
-          <Campo rot="Condições superficiais" k="condicoes" opcoes={CONDICOES} />
+          <Campo {...doForm} rot="Técnica de inspeção" k="tecnica" opcoes={TECNICAS} />
+          <Campo {...doForm} rot="Condições superficiais" k="condicoes" opcoes={CONDICOES} />
           {/* ⚠ o critério NÃO é texto livre à toa: vem do PO-06, item 9.4. Deixar em branco num
               documento que vai ao cliente é dizer que a peça foi julgada contra nada. */}
           <label className="block">
