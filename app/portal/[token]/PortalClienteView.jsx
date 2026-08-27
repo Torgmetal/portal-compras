@@ -220,6 +220,9 @@ export default function PortalClienteView({ token }) {
       {areasComConteudo.length > 1 && (
         <nav className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-gray-100">
           <div className="max-w-5xl mx-auto px-6 sm:px-8 flex gap-1 overflow-x-auto">
+            {/* ⚠ SEM CONTADOR. Ele contava SEÇÕES, não documentos — dava "1" em quase toda aba, o
+                que não informa nada e ainda sugere que a obra tem um documento só. Um número que
+                não ajuda a decidir onde clicar é ruído na primeira coisa que o cliente vê. */}
             {areasComConteudo.map((a) => {
               const on = a.id === abaAtiva;
               return (
@@ -227,7 +230,6 @@ export default function PortalClienteView({ token }) {
                   className={`whitespace-nowrap px-4 py-3.5 text-[13px] font-semibold border-b-[3px] transition-colors ${
                     on ? "border-[#F4801F] text-[#0D1F3C]" : "border-transparent text-gray-500 hover:text-[#0D1F3C]"}`}>
                   {a.nome}
-                  <span className="ml-1.5 text-[11px] font-normal text-gray-400">{secoesDaArea(a.id).length}</span>
                 </button>
               );
             })}
