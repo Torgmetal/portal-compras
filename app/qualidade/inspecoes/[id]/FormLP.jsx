@@ -9,6 +9,37 @@ import {
 import { LAUDOS } from "@/lib/evs-campos";
 
 /**
+ * Um campo do formulário: rótulo, campo e a dica do PO-15 embaixo.
+ *
+ * ⚠⚠ FICA FORA DO COMPONENTE DE PROPÓSITO. Declarada dentro de `FormLP`, ela vira um TIPO NOVO a
+ * cada render — o React desmonta e remonta o `input` a cada tecla, e o cursor sai do campo depois
+ * de cada letra. É o mesmo defeito que Vitor relatou em 27/08/2026 no aceite dos planos ("estou com
+ * dificuldade para digitar nesses campos"), e aqui doeria mais: quem preenche está no celular, no
+ * chão de fábrica. Componente de formulário nunca se declara dentro de outro componente.
+ *
+ * O que ela lia do fecho (`res`, `travado`, `setResultado`) agora chega por props — `doForm` no
+ * corpo de `FormLP` junta os três para o espalhamento ficar num lugar só.
+ */
+function Campo({ rot, k, tipo = "text", opcoes = null, dica = null, larg = "", res, travado, setResultado }) {
+  return (
+    <label className={`block ${larg}`}>
+      <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">{rot}</span>
+      {opcoes ? (
+        <select value={res[k] || ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
+          className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue disabled:bg-gray-50">
+          <option value="">—</option>
+          {opcoes.map((o) => <option key={o.id || o} value={o.id || o}>{o.nome || o}</option>)}
+        </select>
+      ) : (
+        <input type={tipo} value={res[k] ?? ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
+          className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
+      )}
+      {dica && <span className="block text-[10px] text-torg-gray mt-0.5">{dica}</span>}
+    </label>
+  );
+}
+
+/**
  * O PREENCHIMENTO DO ENSAIO POR LÍQUIDO PENETRANTE.
  *
  * Modelo: FORM. SGQ - 012 (aba do "Modelos de relatórios de qualidade torg"), conferido contra o
@@ -29,22 +60,8 @@ export default function FormLP({ rel, linhas, res, travado, setLinhas, setResult
 
   const set = (i, k, v) => setLinhas(linhas.map((l, j) => (j === i ? { ...l, [k]: v } : l)));
 
-  const Campo = ({ rot, k, tipo = "text", opcoes = null, dica = null, larg = "" }) => (
-    <label className={`block ${larg}`}>
-      <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">{rot}</span>
-      {opcoes ? (
-        <select value={res[k] || ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
-          className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue disabled:bg-gray-50">
-          <option value="">—</option>
-          {opcoes.map((o) => <option key={o.id || o} value={o.id || o}>{o.nome || o}</option>)}
-        </select>
-      ) : (
-        <input type={tipo} value={res[k] ?? ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
-          className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
-      )}
-      {dica && <span className="block text-[10px] text-torg-gray mt-0.5">{dica}</span>}
-    </label>
-  );
+  // o que todo <Campo> lê do formulário — ver o comentário do componente, lá em cima
+  const doForm = { res, travado, setResultado };
 
   return (
     <div className="space-y-3">
@@ -52,14 +69,14 @@ export default function FormLP({ rel, linhas, res, travado, setLinhas, setResult
       <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
         <p className="text-[12px] font-bold text-torg-dark mb-2">Identificação</p>
         <div className="grid sm:grid-cols-4 gap-2.5">
-          <Campo rot="Documento de inspeção" k="documentoInspecao" />
-          <Campo rot="Data de inspeção" k="dataInspecao" tipo="date" />
-          <Campo rot="Componente inspecionado" k="componente" />
-          <Campo rot="Revisão do desenho" k="revisaoDesenho" />
-          <Campo rot="Metal base / espessura" k="metalBase" />
-          <Campo rot="Metal de adição" k="metalAdicao" />
-          <Campo rot="Processo de soldagem" k="processoSolda" />
-          <Campo rot="Condições superficiais" k="condicoes" opcoes={CONDICOES_SUPERFICIE} />
+          <Campo {...doForm} rot="Documento de inspeção" k="documentoInspecao" />
+          <Campo {...doForm} rot="Data de inspeção" k="dataInspecao" tipo="date" />
+          <Campo {...doForm} rot="Componente inspecionado" k="componente" />
+          <Campo {...doForm} rot="Revisão do desenho" k="revisaoDesenho" />
+          <Campo {...doForm} rot="Metal base / espessura" k="metalBase" />
+          <Campo {...doForm} rot="Metal de adição" k="metalAdicao" />
+          <Campo {...doForm} rot="Processo de soldagem" k="processoSolda" />
+          <Campo {...doForm} rot="Condições superficiais" k="condicoes" opcoes={CONDICOES_SUPERFICIE} />
         </div>
       </div>
 
@@ -67,32 +84,32 @@ export default function FormLP({ rel, linhas, res, travado, setLinhas, setResult
       <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
         <p className="text-[12px] font-bold text-torg-dark mb-2">Parâmetros do ensaio</p>
         <div className="grid sm:grid-cols-4 gap-2.5">
-          <Campo rot="Tipo de penetrante" k="tipoPenetrante" opcoes={TIPOS_PENETRANTE} />
-          <Campo rot="Método (remoção)" k="metodo" opcoes={METODOS} />
-          <Campo rot="Penetrante — marca" k="penetranteMarca" opcoes={MARCAS} />
-          <Campo rot="Penetrante — lote" k="penetranteLote" />
+          <Campo {...doForm} rot="Tipo de penetrante" k="tipoPenetrante" opcoes={TIPOS_PENETRANTE} />
+          <Campo {...doForm} rot="Método (remoção)" k="metodo" opcoes={METODOS} />
+          <Campo {...doForm} rot="Penetrante — marca" k="penetranteMarca" opcoes={MARCAS} />
+          <Campo {...doForm} rot="Penetrante — lote" k="penetranteLote" />
 
-          <Campo rot="Tempo de penetração (min)" k="tempoPenetracao" tipo="number"
+          <Campo {...doForm} rot="Tempo de penetração (min)" k="tempoPenetracao" tipo="number"
             dica={`PO-15: ${PENETRACAO_MIN} a ${PENETRACAO_MAX} min`} />
-          <Campo rot="Removedor" k="removedor" opcoes={REMOVEDORES} />
-          <Campo rot="Removedor — lote" k="removedorLote" />
-          <Campo rot="Tempo de secagem (min)" k="tempoSecagem" tipo="number"
+          <Campo {...doForm} rot="Removedor" k="removedor" opcoes={REMOVEDORES} />
+          <Campo {...doForm} rot="Removedor — lote" k="removedorLote" />
+          <Campo {...doForm} rot="Tempo de secagem (min)" k="tempoSecagem" tipo="number"
             dica={`PO-15: mínimo ${SECAGEM_MIN} min`} />
 
-          <Campo rot="Revelador" k="revelador" opcoes={MARCAS} />
-          <Campo rot="Revelador — lote" k="reveladorLote" />
-          <Campo rot="Tempo de interpretação (min)" k="tempoRevelador" tipo="number"
+          <Campo {...doForm} rot="Revelador" k="revelador" opcoes={MARCAS} />
+          <Campo {...doForm} rot="Revelador — lote" k="reveladorLote" />
+          <Campo {...doForm} rot="Tempo de interpretação (min)" k="tempoRevelador" tipo="number"
             dica={`PO-15: revelador em até ${REVELADOR_MAX} min`} />
-          <Campo rot="Temperatura da superfície (°C)" k="temperatura" tipo="number"
+          <Campo {...doForm} rot="Temperatura da superfície (°C)" k="temperatura" tipo="number"
             dica={fluor ? "Tipo I: 10 a 38 °C" : "Tipo II: 10 a 52 °C"} />
 
           {/* ⚠ a exigência de luz MUDA com a técnica, e inverte: a colorida quer luz, a
               fluorescente quer escuro. Trocar as duas invalida o ensaio. */}
-          <Campo rot="Iluminação (lux)" k="iluminacao" tipo="number"
+          <Campo {...doForm} rot="Iluminação (lux)" k="iluminacao" tipo="number"
             dica={fluor ? `Fluorescente: no máximo ${LUX_MAXIMO_FLUORESCENTE} lux` : `Colorida: mínimo ${LUX_MINIMO_COLORIDA} lux`} />
-          {fluor && <Campo rot="Luz negra (µW/cm²)" k="uv" tipo="number" dica={`Mínimo ${UV_MINIMO}`} />}
-          <Campo rot="Procedimento / rev." k="procedimento" dica={PROCEDIMENTO_PADRAO} />
-          <Campo rot="Norma / critério de aceitação" k="criterio" opcoes={CRITERIOS} dica={CRITERIO_PADRAO} />
+          {fluor && <Campo {...doForm} rot="Luz negra (µW/cm²)" k="uv" tipo="number" dica={`Mínimo ${UV_MINIMO}`} />}
+          <Campo {...doForm} rot="Procedimento / rev." k="procedimento" dica={PROCEDIMENTO_PADRAO} />
+          <Campo {...doForm} rot="Norma / critério de aceitação" k="criterio" opcoes={CRITERIOS} dica={CRITERIO_PADRAO} />
         </div>
 
         {check.avaliado && (
