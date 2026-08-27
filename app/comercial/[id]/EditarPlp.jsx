@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Check, X, Plus, Trash2, AlertCircle, Pencil, Sparkles } from "lucide-react";
+import { Loader2, Check, X, Plus, Trash2, AlertCircle, Pencil } from "lucide-react";
 import { METODOS_PREPARO, PLP_PADRAO } from "@/lib/plp";
 import { GRAUS_LIMPEZA, METODOS_APLICACAO } from "@/lib/pintura-campos";
 
@@ -17,6 +17,9 @@ import { GRAUS_LIMPEZA, METODOS_APLICACAO } from "@/lib/pintura-campos";
 // sistemas). Um editor que não alcança o campo errado não corrige nada.
 
 const so = (v) => (v === null || v === undefined ? "" : String(v));
+
+// as três demãos do esquema mais comum — em branco, só para haver onde escrever
+const VAZIAS = [{ nome: "Fundo" }, { nome: "Intermediária" }, { nome: "Acabamento" }];
 
 function Campo({ rotulo, children }) {
   return (
@@ -41,6 +44,7 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
   const [erro, setErro] = useState("");
   const [ok, setOk] = useState("");
   const [aceite, setAceite] = useState(null);
+  const [obra, setObra] = useState(null);
 
   const carregar = useCallback(async () => {
     setErro("");
@@ -52,6 +56,7 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
       if (rp.error) throw new Error(rp.error);
       setD(rp);
       setAceite(ra?.status?.PLP || null);
+      setObra(ra?.dadosDaObra || null);
       const p = rp.plp || {};
       setF({
         revisao: so(p.revisao),
@@ -62,7 +67,10 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
         rugosidadeMax: so(p.rugosidadeMax ?? PLP_PADRAO.rugosidadeMax),
         metodoAplicacao: p.metodoAplicacao || "",
         espessuraTotal: so(p.espessuraTotal),
-        demaos: (p.demaos || []).map((x, i) => ({
+        // ⚠ COMEÇA PRONTO PARA DIGITAR. Vitor (27/08/2026): "por que ao invés de lermos um
+        // documento você não deixa para eu preencher as informações". Obra sem plano abria com
+        // zero linhas e obrigava a clicar em "+ demão" antes de escrever a primeira letra.
+        demaos: ((p.demaos || []).length ? p.demaos : VAZIAS).map((x, i) => ({
           ordem: x.ordem || i + 1, nome: so(x.nome) || `${i + 1}ª demão`, produto: so(x.produto),
           fabricante: so(x.fabricante), cor: so(x.cor), espessuraMin: so(x.espessuraMin), espessuraMax: so(x.espessuraMax),
         })),
@@ -126,11 +134,31 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
         <button onClick={() => { setAberto(false); setF(null); setOk(""); }} className="text-torg-gray"><X size={14} /></button>
       </div>
 
-      {/* ⚠ o que veio de leitura automática pode estar errado — é o motivo deste editor existir. */}
+      {/* ⚠⚠ O QUE VEM PRONTO É SÓ A OBRA. Vitor (27/08/2026): "trazer apenas as informações da Obra
+          por hora". Mostrar quais são evita a pergunta seguinte — onde digito o cliente, o local,
+          o Nº PC/CT? — e deixa claro que o resto é dele. */}
+      {obra && (
+        <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+          <p className="text-[10px] uppercase tracking-wide text-torg-gray-light mb-1">Do portal, direto para o documento</p>
+          <div className="grid sm:grid-cols-3 gap-x-4 gap-y-1 text-[11px]">
+            {[["Cliente", obra.cliente], ["Obra", obra.obra], ["Local", obra.local],
+              ["Nº PC/CT", obra.pedidoCliente], ["OP", `OP-${obra.numero}`], ["Ref. cliente", obra.refCliente]]
+              .map(([r, v]) => (
+                <span key={r} className="truncate"><span className="text-torg-gray-light">{r}: </span><b className="text-torg-dark">{v || "—"}</b></span>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* ⚠ o que sobrou de leitura automática pode estar errado — é o motivo deste editor existir. */}
       {d?.plp?.arquivoNome && (
-        <p className="text-[11px] text-torg-gray inline-flex items-start gap-1.5">
-          <Sparkles size={12} className="mt-0.5 shrink-0 text-torg-blue" />
-          Lido de <b className="text-torg-dark">{d.plp.arquivoNome}</b>. Confira campo a campo — o que estiver errado, corrija aqui.
+        <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5 flex-wrap">
+          <AlertCircle size={13} className="mt-0.5 shrink-0" />
+          <span className="flex-1">
+            O que está abaixo veio de <b>{d.plp.arquivoNome}</b>, lido automaticamente — pode estar errado.
+          </span>
+          <button onClick={() => setF((x) => ({ ...x, demaos: VAZIAS.map((v, i) => ({ ordem: i + 1, nome: v.nome, produto: "", fabricante: "", cor: "", espessuraMin: "", espessuraMax: "" })), itens: [], observacoes: "" }))}
+            className="font-semibold text-amber-900 hover:underline shrink-0">apagar e preencher do zero</button>
         </p>
       )}
 

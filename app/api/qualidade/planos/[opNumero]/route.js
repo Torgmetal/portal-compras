@@ -38,9 +38,16 @@ export async function GET(_req, { params }) {
   const contatos = Array.isArray(op?.clienteContatos)
     ? op.clienteContatos.filter((c) => c?.email).map((c) => ({ nome: c.nome || null, email: c.email }))
     : [];
+  // ⚠ os dados da OBRA vão junto. Vitor (27/08/2026): "trazer apenas as informações da Obra por
+  // hora" — é o que o portal preenche sozinho no documento, e a tela do plano mostra quais são para
+  // ninguém procurar onde digitar cliente, local ou Nº PC/CT.
   return NextResponse.json({
     status, contatos, cliente: op?.cliente || null, obra: op?.obra || null,
     responsaveis: { PIT: respPit, PLP: respPlp },
+    dadosDaObra: op ? {
+      numero: op.numero, cliente: op.cliente || null, obra: op.obra || null,
+      local: op.local || null, pedidoCliente: op.pedidoCliente || null, refCliente: op.refCliente || null,
+    } : null,
   });
 }
 

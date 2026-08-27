@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, ShieldCheck, Clock, ExternalLink, FolderOpen, Paintbrush, FileText, ClipboardCheck, Check, Sparkles, AlertCircle } from "lucide-react";
+import { Loader2, ShieldCheck, Clock, ExternalLink, FolderOpen, Paintbrush, FileText, ClipboardCheck, Check } from "lucide-react";
 import { TIPO_LABEL, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
 import AceitePlano from "./AceitePlano";
 import EditarPlp from "./EditarPlp";
@@ -31,22 +31,6 @@ export default function AbaQualidade({ opNumero }) {
       });
       if (r.ok) setPit((p) => ({ ...p, padrao }));
     } finally { setSalvandoPit(false); }
-  }
-
-  // ── ler o documento de PLP da pasta da obra ──
-  // Vitor (26/08/2026): "nessa parte do PLP preciso que você leia um documento e preencha com as
-  // informações os campos que precisam".
-  const [lendo, setLendo] = useState(false);
-  const [leitura, setLeitura] = useState(null);
-  const [erroPlp, setErroPlp] = useState("");
-  async function lerPlp() {
-    setLendo(true); setErroPlp(""); setLeitura(null);
-    try {
-      const r = await fetch(`/api/qualidade/plp/${encodeURIComponent(opNumero)}`, { method: "POST" });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Não consegui ler o PLP da pasta.");
-      setLeitura(j);
-    } catch (e) { setErroPlp(e.message); } finally { setLendo(false); }
   }
 
   const [dados, setDados] = useState(null);
@@ -176,8 +160,8 @@ export default function AbaQualidade({ opNumero }) {
         </h4>
         <p className="text-[12px] text-torg-gray mb-3">
           Sai no padrão Torg, com o quadro de aprovações (elaboração, verificação e o inspetor do
-          cliente). Obra, cliente, local, Nº PC/CT e referência do cliente vêm do portal; o sistema
-          de pintura e as cores por item vêm do PLP cadastrado na Qualidade.
+          cliente). Do portal vêm só os dados da obra — cliente, obra, local, Nº PC/CT, OP e
+          referência do cliente. O esquema de pintura e as cores por item são preenchidos aqui.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <a href={`/api/qualidade/planos/${encodeURIComponent(opNumero)}/pdf?doc=PLP`} target="_blank" rel="noreferrer"
@@ -185,38 +169,10 @@ export default function AbaQualidade({ opNumero }) {
             className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:opacity-90 inline-flex items-center gap-1.5">
             <FileText size={13} /> Gerar PLP (PDF)
           </a>
-          {/* ⚠ LÊ O DOCUMENTO DA PASTA E PREENCHE. A planilha da obra raramente está no modelo
-              Torg (as da OP-105 e OP-106 são do cliente, e as da OP-089 e OP-094 são PDF) — por
-              isso a leitura cai na IA quando o parser do modelo não reconhece nada. */}
-          <button onClick={lerPlp} disabled={lendo}
-            title="Lê o documento em 8. Qualidade / 2. PLP e preenche os campos do plano"
-            className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-3 py-1.5 hover:bg-torg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">
-            {lendo ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} Ler o PLP da pasta da obra
-          </button>
           {/* ⚠ EDITA AQUI MESMO. Era um link para a fila de inspeções — quem clicava caía numa
               lista de relatórios de todas as obras e voltava sem editar nada. (Vitor, 27/08/2026) */}
-          <EditarPlp opNumero={opNumero} aoSalvar={() => setLeitura(null)} />
+          <EditarPlp opNumero={opNumero} />
         </div>
-        {erroPlp && (
-          <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mt-2 inline-flex items-start gap-1.5">
-            <AlertCircle size={13} className="mt-0.5 shrink-0" /> {erroPlp}
-          </p>
-        )}
-        {leitura && (
-          <div className="text-[12px] bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2 mt-2">
-            <p className="text-emerald-800">
-              Li <b>{leitura.arquivo}</b>: {leitura.resumo?.demaos || 0} demão(ões){leitura.resumo?.itens ? `, ${leitura.resumo.itens} item(ns) da estrutura` : ""}
-              {leitura.resumo?.preparo ? ` · ${leitura.resumo.preparo}` : ""}{leitura.resumo?.grau ? ` ${leitura.resumo.grau}` : ""}.
-            </p>
-            {/* ⚠ leitura por IA se confere ANTES de virar plano da obra: o esquema vale para a
-                estrutura inteira, e um valor plausível e errado é aplicado em tudo. */}
-            {leitura.via === "IA" && (
-              <p className="text-[11px] text-emerald-700 mt-0.5">
-                Leitura automática do documento (o arquivo não está no modelo Torg) — <b>confira os campos</b> antes de emitir.
-              </p>
-            )}
-          </div>
-        )}
         <AceitePlano opNumero={opNumero} doc="PLP" nome="o PLP" />
       </div>
 
