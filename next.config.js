@@ -32,10 +32,16 @@ const SECURITY_HEADERS = [
   { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'" },
 ];
 
-// Exceção só para assets que PRECISAM ser exibidos em <iframe> dentro do próprio portal
-// (mesma origem) — hoje a planta 3D dos galpões em /estrutura-3d. Mantém toda a postura de
-// segurança; só troca o anti-framing de 'none'/DENY para permitir a MESMA origem
+// Exceção só para o que PRECISA ser exibido em <iframe> dentro do próprio portal (mesma origem):
+// a planta 3D dos galpões em /estrutura-3d e o PDF do documento na página de assinatura. Mantém
+// toda a postura de segurança; só troca o anti-framing de 'none'/DENY para permitir a MESMA origem
 // (cross-origin continua bloqueado, então clickjacking segue barrado).
+//
+// ⚠⚠ ERA POR ISSO QUE A PRÉ-VISUALIZAÇÃO APARECIA QUEBRADA. Vitor (27/08/2026): "na tela das pessoas
+// que estão recebendo o documento para assinar a imagem da pré-visualização está quebrada". O PDF
+// era gerado certo — o navegador é que recusava o iframe por causa do `frame-ancestors 'none'`
+// desta lista. Vale para TODA página de assinatura: o Plano de Treinamentos e o Cronograma de
+// Auditoria também mostravam o painel vazio, e ninguém tinha reclamado.
 const FRAMEABLE_HEADERS = SECURITY_HEADERS.map((h) =>
   h.key === "X-Frame-Options" ? { key: h.key, value: "SAMEORIGIN" }
     : h.key === "Content-Security-Policy" ? { key: h.key, value: "frame-ancestors 'self'; base-uri 'self'; object-src 'none'" }
@@ -54,7 +60,9 @@ const nextConfig = {
     return [
       // A planta 3D é servida em /estrutura-3d e precisa poder ser embutida no portal.
       { source: "/estrutura-3d/:path*", headers: FRAMEABLE_HEADERS },
-      { source: "/((?!estrutura-3d/).*)", headers: SECURITY_HEADERS },
+      // O documento a assinar é mostrado em <iframe> na própria página de assinatura.
+      { source: "/api/assinar/:path*", headers: FRAMEABLE_HEADERS },
+      { source: "/((?!estrutura-3d/|api/assinar/).*)", headers: SECURITY_HEADERS },
     ];
   },
 };

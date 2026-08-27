@@ -24,7 +24,7 @@ export async function GET(_req, { params }) {
   return NextResponse.json({
     nome: a.nome, setor: a.setor, assinadoEm: a.assinadoEm, ip: a.ip,
     titulo: a.envio.titulo, revisao: a.envio.revisao, tipo: a.envio.tipo, enviadoEm: a.envio.enviadoEm,
-    aceiteCliente: doObra, temArquivo: doObra || interno, verificacaoInterna: interno,
+    aceiteCliente: doObra, verificacaoInterna: interno,
   });
 }
 

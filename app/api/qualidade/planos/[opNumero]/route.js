@@ -12,7 +12,7 @@ import { gerarTokenForte } from "@/lib/token";
 import { sendEmail } from "@/lib/email";
 import { cabecalhoEmail } from "@/lib/email-layout";
 import { baseUrlDe } from "@/lib/databook-assinaturas";
-import { DOCS, ETAPAS, tipoDoEnvio, montarPlano, statusDosPlanos, excelDoPlano, dadosDaObra, responsaveisDoPlano } from "@/lib/planos-aceite";
+import { DOCS, ETAPAS, tipoDoEnvio, montarPlano, statusDosPlanos, pdfDoPlano, dadosDaObra, responsaveisDoPlano } from "@/lib/planos-aceite";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -144,8 +144,9 @@ export async function POST(req, { params }) {
     },
   });
 
-  // o anexo é o Excel — o entregável que ele pediu ("no formato excel para ficar mais sério")
-  const arquivo = await excelDoPlano(prisma, doc, opNumero, { snapshot: plano.snapshot, usuario: user?.name || user?.email || null }).catch(() => null);
+  // ⚠ o anexo é o PDF. Vitor (27/08/2026): "não será necessário o excel nem no PIT nem no PLP, pois
+  // o PDF que criou ficou muito mais bonito".
+  const arquivo = await pdfDoPlano(prisma, doc, opNumero, { snapshot: plano.snapshot }).catch(() => null);
   const anexoB64 = arquivo ? Buffer.from(arquivo.bytes).toString("base64") : null;
   const base = baseUrlDe(req);
   const def = DOCS[doc];
@@ -168,7 +169,7 @@ export async function POST(req, { params }) {
         <p style="text-align:center;margin:22px 0">
           <a href="${link}" style="background:#006EAB;color:#fff;text-decoration:none;padding:12px 26px;border-radius:8px;font-weight:bold;display:inline-block">${botao}</a>
         </p>
-        <p style="margin:0;font-size:12px;color:#5a6b78">O documento está também em anexo, em Excel, com os campos de assinatura. Ao assinar, ficam gravados a sua confirmação, a <strong>data/hora</strong> e o <strong>IP</strong> do acesso.</p>
+        <p style="margin:0;font-size:12px;color:#5a6b78">O documento está também em anexo, em PDF. Ao assinar, ficam gravados a sua confirmação, a <strong>data/hora</strong> e o <strong>IP</strong> do acesso.</p>
       </div>
     </div>`;
     const r = await sendEmail({

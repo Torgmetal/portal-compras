@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { FileText, CheckCircle2, Loader2, Lock, PenLine, ShieldCheck, Download, FileSpreadsheet } from "lucide-react";
+import { FileText, CheckCircle2, Loader2, Lock, PenLine, ShieldCheck, Download } from "lucide-react";
 
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 
@@ -67,18 +67,10 @@ export default function AssinarClient({ token }) {
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
               <p className="text-sm text-torg-gray">Olá <strong className="text-torg-dark">{info.nome}</strong>{info.setor ? ` · ${info.setor}` : ""} — {aceite ? "este documento da sua obra está aguardando o seu aceite." : interna ? `você foi indicado para a ${String(info.setor || "verificação").toLowerCase()} deste documento.` : "você foi indicado para validar este documento."}</p>
               <p className="text-[12px] text-torg-gray mt-1">Revisão <strong className="text-torg-dark">R{String(info.revisao ?? 0).padStart(2, "0")}</strong> · enviado em {fmtDT(info.enviadoEm)}</p>
-              <div className="mt-3 flex flex-wrap items-center gap-4">
-                <a href={`/api/assinar/${token}/pdf`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-torg-blue hover:text-torg-dark font-medium">
-                  <Download size={15} /> Abrir / baixar o documento (PDF)
-                </a>
-                {/* ⚠ o Excel é o documento controlado, com os campos de assinatura — o PDF acima é
-                    a leitura. Quem arquiva o plano da obra arquiva a planilha. */}
-                {info.temArquivo && (
-                  <a href={`/api/assinar/${token}/arquivo`} className="inline-flex items-center gap-1.5 text-sm text-torg-blue hover:text-torg-dark font-medium">
-                    <FileSpreadsheet size={15} /> Baixar em Excel
-                  </a>
-                )}
-              </div>
+              {/* ⚠ o PDF é o documento — não há mais versão em planilha. (Vitor, 27/08/2026) */}
+              <a href={`/api/assinar/${token}/pdf`} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-sm text-torg-blue hover:text-torg-dark font-medium">
+                <Download size={15} /> Abrir / baixar o documento (PDF)
+              </a>
             </div>
 
             {/* preview do PDF */}

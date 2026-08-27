@@ -15,6 +15,31 @@ const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { timeZone: "Ameri
  * assinada NA MESMA REVISÃO — e o servidor recusa igual, porque esconder o botão não impede um
  * POST. Documento que chega ao cliente sem passar por quem elabora e verifica não tem volta.
  */
+/**
+ * Uma linha de responsável (rótulo + nome + e-mail).
+ *
+ * ⚠⚠ FICA FORA DO COMPONENTE DE PROPÓSITO. Definida dentro, ela vira um TIPO NOVO a cada render —
+ * o React desmonta e remonta os `input` a cada tecla, e o cursor sai do campo depois de cada letra.
+ * Foi exatamente o que aconteceu: "estou com dificuldade para digitar nesses campos" (Vitor,
+ * 27/08/2026). Componente de formulário nunca se declara dentro de outro componente.
+ */
+function CampoResponsavel({ rot, chave, resp, setResp, assinadoEm }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[10px] uppercase tracking-wide text-torg-gray-light w-20 shrink-0">{rot}</span>
+      <input value={resp[`${chave}Nome`]} onChange={(e) => setResp((v) => ({ ...v, [`${chave}Nome`]: e.target.value }))} placeholder="Nome"
+        className="text-[11px] border border-gray-200 rounded px-2 py-1 w-36 outline-none focus:border-torg-blue" />
+      <input value={resp[`${chave}Email`]} onChange={(e) => setResp((v) => ({ ...v, [`${chave}Email`]: e.target.value }))} placeholder="e-mail" type="email"
+        className="text-[11px] border border-gray-200 rounded px-2 py-1 flex-1 outline-none focus:border-torg-blue" />
+      {assinadoEm && (
+        <span className="text-[10px] text-emerald-700 shrink-0 inline-flex items-center gap-1">
+          <CheckCircle2 size={11} /> {fmtDT(assinadoEm)}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function AceitePlano({ opNumero, doc, nome }) {
   const [d, setD] = useState(null);
   const [resp, setResp] = useState({ elaboradoNome: "", elaboradoEmail: "", verificadoNome: "", verificadoEmail: "" });
@@ -88,34 +113,20 @@ export default function AceitePlano({ opNumero, doc, nome }) {
 
   if (!d) return <p className="text-[11px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={11} className="animate-spin" /> lendo o aceite…</p>;
 
-  const Campo = ({ rot, k }) => (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[10px] uppercase tracking-wide text-torg-gray-light w-20 shrink-0">{rot}</span>
-      <input value={resp[`${k}Nome`]} onChange={(e) => setResp((v) => ({ ...v, [`${k}Nome`]: e.target.value }))} placeholder="Nome"
-        className="text-[11px] border border-gray-200 rounded px-2 py-1 w-36 outline-none focus:border-torg-blue" />
-      <input value={resp[`${k}Email`]} onChange={(e) => setResp((v) => ({ ...v, [`${k}Email`]: e.target.value }))} placeholder="e-mail" type="email"
-        className="text-[11px] border border-gray-200 rounded px-2 py-1 flex-1 outline-none focus:border-torg-blue" />
-      {r?.[k === "elaborado" ? "elaborado" : "verificado"]?.assinadoEm && (
-        <span className="text-[10px] text-emerald-700 shrink-0 inline-flex items-center gap-1">
-          <CheckCircle2 size={11} /> {fmtDT(r[k === "elaborado" ? "elaborado" : "verificado"].assinadoEm)}
-        </span>
-      )}
-    </div>
-  );
-
   return (
     <div className="mt-3 pt-3 border-t border-gray-100 space-y-2.5">
       {/* ── quem elabora e quem verifica ── */}
       <div className="space-y-1.5">
         <p className="text-[12px] font-semibold text-torg-dark">Elaboração e verificação</p>
-        <Campo rot="Elaborado" k="elaborado" />
-        <Campo rot="Verificado" k="verificado" />
+        <CampoResponsavel rot="Elaborado" chave="elaborado" resp={resp} setResp={setResp} assinadoEm={r?.elaborado?.assinadoEm} />
+        <CampoResponsavel rot="Verificado" chave="verificado" resp={resp} setResp={setResp} assinadoEm={r?.verificado?.assinadoEm} />
         <div className="flex items-center gap-3 flex-wrap">
           <button onClick={salvarResp} disabled={salvandoResp}
             className="text-[11px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-2.5 py-1 hover:bg-torg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">
             {salvandoResp ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />} Salvar
           </button>
-          {/* ⚠ conferir a formatação ANTES de enviar — sai marcado como MINUTA enquanto não foi. */}
+          {/* ⚠ conferir a formatação ANTES de enviar — sai marcado como MINUTA enquanto não foi.
+              É o mesmo PDF do botão "Gerar" do cartão; aqui ele fica à mão de quem preenche. */}
           <a href={`/api/qualidade/planos/${encodeURIComponent(opNumero)}/pdf?doc=${doc}`} target="_blank" rel="noreferrer"
             className="text-[11px] font-semibold text-torg-blue hover:underline inline-flex items-center gap-1">
             <FileText size={11} /> Ver o PDF

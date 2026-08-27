@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, ShieldCheck, Clock, ExternalLink, FolderOpen, Paintbrush, FileSpreadsheet, ClipboardCheck, Check, Sparkles, AlertCircle } from "lucide-react";
+import { Loader2, ShieldCheck, Clock, ExternalLink, FolderOpen, Paintbrush, FileText, ClipboardCheck, Check, Sparkles, AlertCircle } from "lucide-react";
 import { TIPO_LABEL, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
 import AceitePlano from "./AceitePlano";
 
@@ -153,9 +153,9 @@ export default function AbaQualidade({ opNumero }) {
               })}
             </div>
             {pit.padrao ? (
-              <a href={`/api/qualidade/pit/${encodeURIComponent(opNumero)}/excel`}
+              <a href={`/api/qualidade/planos/${encodeURIComponent(opNumero)}/pdf?doc=PIT`} target="_blank" rel="noreferrer"
                 className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:opacity-90 inline-flex items-center gap-1.5">
-                <FileSpreadsheet size={13} /> Gerar PIT (Excel)
+                <FileText size={13} /> Gerar PIT (PDF)
               </a>
             ) : (
               // ⚠ sem padrão não se emite: um plano de inspeção que ninguém escolheu seria assinado
@@ -174,16 +174,15 @@ export default function AbaQualidade({ opNumero }) {
           <Paintbrush size={15} className="text-torg-blue" /> Plano de Pintura (PLP)
         </h4>
         <p className="text-[12px] text-torg-gray mb-3">
-          Sai no padrão Torg, em três folhas, com os campos de assinatura em branco para a aprovação
-          e a fiscalização do cliente assinarem no papel impresso. Obra, cliente, local, Nº PC/CT e
-          referência do cliente vêm do portal; o sistema de pintura e as cores por item vêm do PLP
-          cadastrado na Qualidade.
+          Sai no padrão Torg, com o quadro de aprovações (elaboração, verificação e o inspetor do
+          cliente). Obra, cliente, local, Nº PC/CT e referência do cliente vêm do portal; o sistema
+          de pintura e as cores por item vêm do PLP cadastrado na Qualidade.
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          <a href={`/api/qualidade/plp/${encodeURIComponent(opNumero)}/excel`}
-            title="Gera o PLP desta obra no padrão Torg, em Excel"
+          <a href={`/api/qualidade/planos/${encodeURIComponent(opNumero)}/pdf?doc=PLP`} target="_blank" rel="noreferrer"
+            title="Gera o PLP desta obra no padrão Torg, em PDF"
             className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:opacity-90 inline-flex items-center gap-1.5">
-            <FileSpreadsheet size={13} /> Gerar PLP (Excel)
+            <FileText size={13} /> Gerar PLP (PDF)
           </a>
           {/* ⚠ LÊ O DOCUMENTO DA PASTA E PREENCHE. A planilha da obra raramente está no modelo
               Torg (as da OP-105 e OP-106 são do cliente, e as da OP-089 e OP-094 são PDF) — por
