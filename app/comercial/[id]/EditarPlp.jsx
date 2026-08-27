@@ -91,6 +91,9 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           item: so(x.item), sistema: so(x.sistema), cor: so(x.cor), obs: so(x.obs),
           interno: !!x.interno, externo: !!x.externo,
         })),
+        // ⚠ só é "manual" quando o total gravado NÃO é a soma das demãos: aí alguém o definiu de
+        // propósito e o portal não pode sobrescrever.
+        totalManual: !!p.espessuraTotal && Number(p.espessuraTotal) !== (p.demaos || []).reduce((t, x) => t + (Number(x.espessuraMin) || 0), 0),
         documentosReferencia: so(p.documentosReferencia) || REF_PADRAO,
         // ⚠ o índice de revisões nasce com a emissão inicial: documento controlado sem a linha da
         // R00 não diz quando começou a valer.
@@ -108,6 +111,20 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
   const setDemao = (i, k, v) => setF((x) => ({ ...x, demaos: x.demaos.map((d2, j) => (j === i ? { ...d2, [k]: v } : d2)) }));
   const setItem = (i, k, v) => setF((x) => ({ ...x, itens: x.itens.map((it, j) => (j === i ? { ...it, [k]: v } : it)) }));
   const setRev = (i, k, v) => setF((x) => ({ ...x, revisoes: x.revisoes.map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
+
+  // ⚠ A ESPESSURA TOTAL É A SOMA DAS CAMADAS SECAS e segue as demãos enquanto ninguém a escrever à
+  // mão. Vitor (27/08/2026): "não está dinâmico o preenchimento desse PLP". Dois campos que deviam
+  // bater e são digitados em separado divergem — e é o total que o inspetor confere no medidor.
+  const somaDemaos = (f?.demaos || []).reduce((t, x) => t + (Number(x.espessuraMin) || 0), 0);
+  useEffect(() => {
+    if (!f || f.totalManual) return;
+    const alvo = somaDemaos ? String(somaDemaos) : "";
+    if (so(f.espessuraTotal) !== alvo) setF((x) => ({ ...x, espessuraTotal: alvo }));
+  }, [f, somaDemaos]);
+
+  // as cores e os sistemas já usados viram sugestão nos campos seguintes
+  const cores = [...new Set([...(f?.demaos || []).map((x) => x.cor), ...(f?.itens || []).map((x) => x.cor)].filter(Boolean))];
+  const sistemas = [...new Set((f?.itens || []).map((x) => x.sistema).filter(Boolean))];
 
   async function salvar() {
     setSalvando(true); setErro(""); setOk("");
@@ -228,8 +245,14 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={11} /> revisão</button>
       </Secao>
 
-      {/* ── FOLHA 2 · 1 — sistema de pintura ── */}
-      <Secao folha="Folha 2 · 1" titulo="Sistema de pintura da obra">
+      {/* ── FOLHA 2 · 1a — PREPARAÇÃO (jateamento) ── */}
+      {/* ⚠⚠ JATEAMENTO E PINTURA SÃO DUAS COISAS. Vitor (27/08/2026): "está confuso na edição,
+          muita informação que é de jateamento está em pintura e vice-versa". Estavam na mesma
+          grade de oito campos: grau de limpeza e rugosidade (que se medem ANTES de pintar, com
+          pente e rugosímetro) ao lado de método de aplicação e espessura seca (que se medem
+          DEPOIS, com o medidor de camada). Quem preenche faz as duas coisas em momentos
+          diferentes, com instrumentos diferentes — e a folha tem de seguir isso. */}
+      <Secao folha="Folha 2 · 1" titulo="Preparação de superfície (jateamento)">
         <div className="grid sm:grid-cols-4 gap-2">
           <Campo rotulo="Método de preparo">
             <select value={f.preparoMetodo} onChange={(e) => set("preparoMetodo", e.target.value)} className={cls}>
@@ -244,43 +267,78 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
             </select>
           </Campo>
           <Campo rotulo="Tipo de abrasivo"><Texto valor={f.abrasivo} onChange={(v) => set("abrasivo", v)} ph="granalha de aço" /></Campo>
+          <Campo rotulo="Rugosidade (µm)">
+            <div className="flex items-center gap-1">
+              <Texto tipo="number" valor={f.rugosidadeMin} onChange={(v) => set("rugosidadeMin", v)} ph="mín" />
+              <span className="text-[11px] text-torg-gray-light">a</span>
+              <Texto tipo="number" valor={f.rugosidadeMax} onChange={(v) => set("rugosidadeMax", v)} ph="máx" />
+            </div>
+          </Campo>
+        </div>
+      </Secao>
+
+      {/* ── FOLHA 2 · 1b — PINTURA ── */}
+      <Secao folha="Folha 2 · 1" titulo="Esquema de pintura">
+        <div className="grid sm:grid-cols-4 gap-2">
           <Campo rotulo="Método de aplicação">
             <select value={f.metodoAplicacao} onChange={(e) => set("metodoAplicacao", e.target.value)} className={cls}>
               <option value="">—</option>
               {METODOS_APLICACAO.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </Campo>
-          <Campo rotulo="Rugosidade mín. (µm)"><Texto tipo="number" valor={f.rugosidadeMin} onChange={(v) => set("rugosidadeMin", v)} /></Campo>
-          <Campo rotulo="Rugosidade máx. (µm)"><Texto tipo="number" valor={f.rugosidadeMax} onChange={(v) => set("rugosidadeMax", v)} /></Campo>
-          <Campo rotulo="Espessura total (µm)"><Texto tipo="number" valor={f.espessuraTotal} onChange={(v) => set("espessuraTotal", v)} ph="soma das demãos" /></Campo>
+          {/* ⚠ A ESPESSURA TOTAL SEGUE AS DEMÃOS. Vitor: "não está dinâmico o preenchimento desse
+              PLP". É a soma das camadas secas — digitar de novo é convite a divergir do esquema
+              logo acima. Segue sozinha até alguém escrever outro valor; aí para de seguir. */}
+          <Campo rotulo="Espessura total (µm)">
+            <div className="flex items-center gap-1.5">
+              <input type="number" value={so(f.espessuraTotal)}
+                onChange={(e) => { set("espessuraTotal", e.target.value); set("totalManual", true); }}
+                placeholder={String(somaDemaos || "")} className={cls} />
+              {f.totalManual && somaDemaos > 0 && Number(f.espessuraTotal) !== somaDemaos && (
+                <button onClick={() => setF((x) => ({ ...x, espessuraTotal: String(somaDemaos), totalManual: false }))}
+                  title={`Soma das demãos: ${somaDemaos} µm`}
+                  className="text-[10px] text-torg-blue hover:underline shrink-0 whitespace-nowrap">= {somaDemaos}</button>
+              )}
+            </div>
+          </Campo>
         </div>
 
         <p className="text-[10px] uppercase tracking-wide text-torg-gray-light mt-1">Demãos</p>
         <div className="space-y-1.5">
           {f.demaos.map((dm, i) => (
-            <div key={i} className="grid sm:grid-cols-[7rem_1fr_1fr_1fr_5rem_5rem_1.5rem] gap-1.5 items-center">
-              <Texto valor={dm.nome} onChange={(v) => setDemao(i, "nome", v)} ph={`${i + 1}ª demão`} />
-              {/* a tinta pode vir do CMR: escolher preenche produto, fabricante e o lote/R de uma vez */}
-              <select value="" onChange={(e) => {
-                const t = (d?.tintas || []).find((x) => x.id === e.target.value);
-                if (t) {
-                  setDemao(i, "produto", t.produto);
-                  if (t.fabricante) setDemao(i, "fabricante", t.fabricante);
-                  if (t.lote || t.r) setDemao(i, "lote", [t.lote, t.r].filter(Boolean).join(" · "));
-                }
-              }} className={`${cls} text-torg-gray`}>
-                <option value="">tinta do CMR…</option>
-                {(d?.tintas || []).map((t) => <option key={t.id} value={t.id}>{t.produto}</option>)}
-              </select>
-              <Texto valor={dm.produto} onChange={(v) => setDemao(i, "produto", v)} ph="produto" />
-              <Texto valor={dm.fabricante} onChange={(v) => setDemao(i, "fabricante", v)} ph="fabricante" />
-              <Texto valor={dm.cor} onChange={(v) => setDemao(i, "cor", v)} ph="cor" />
-              <div className="flex gap-1">
-                <Texto tipo="number" valor={dm.espessuraMin} onChange={(v) => setDemao(i, "espessuraMin", v)} ph="µm mín" />
-                <Texto tipo="number" valor={dm.espessuraMax} onChange={(v) => setDemao(i, "espessuraMax", v)} ph="máx" />
+            // ⚠ CADA DEMÃO É UM CARTÃO DE DUAS LINHAS, não sete colunas espremidas: com tudo numa
+            // linha só, "Acabamento (Fábrica)" aparecia como "Acabamento (Fá" e as espessuras
+            // viravam duas caixinhas de 10 px onde não dava para ler o número.
+            <div key={i} className="border border-gray-100 rounded-lg p-2 space-y-1.5 bg-gray-50/40">
+              <div className="grid sm:grid-cols-[11rem_1fr_1fr_1.5rem] gap-1.5 items-center">
+                <input list="nomes-demao" value={so(dm.nome)} onChange={(e) => setDemao(i, "nome", e.target.value)}
+                  placeholder={`${i + 1}ª demão`} className={`${cls} font-semibold`} />
+                <Texto valor={dm.produto} onChange={(v) => setDemao(i, "produto", v)} ph="produto / norma" />
+                <Texto valor={dm.fabricante} onChange={(v) => setDemao(i, "fabricante", v)} ph="fabricante" />
+                <button onClick={() => setF((x) => ({ ...x, demaos: x.demaos.filter((_, j) => j !== i) }))}
+                  title="Remover esta demão" className="text-torg-gray-light hover:text-red-600 justify-self-center"><Trash2 size={13} /></button>
               </div>
-              <button onClick={() => setF((x) => ({ ...x, demaos: x.demaos.filter((_, j) => j !== i) }))}
-                title="Remover esta demão" className="text-torg-gray-light hover:text-red-600"><Trash2 size={13} /></button>
+              <div className="grid sm:grid-cols-[11rem_1fr_1fr_1.5rem] gap-1.5 items-center">
+                <select value="" onChange={(e) => {
+                  const t = (d?.tintas || []).find((x) => x.id === e.target.value);
+                  if (t) {
+                    setDemao(i, "produto", t.produto);
+                    if (t.fabricante) setDemao(i, "fabricante", t.fabricante);
+                    if (t.lote || t.r) setDemao(i, "lote", [t.lote, t.r].filter(Boolean).join(" · "));
+                  }
+                }} className={`${cls} text-torg-gray`}>
+                  <option value="">puxar tinta do CMR…</option>
+                  {(d?.tintas || []).map((t) => <option key={t.id} value={t.id}>{t.produto}</option>)}
+                </select>
+                <input list="cores-plp" value={so(dm.cor)} onChange={(e) => setDemao(i, "cor", e.target.value)}
+                  placeholder="cor" className={cls} />
+                <div className="flex items-center gap-1">
+                  <Texto tipo="number" valor={dm.espessuraMin} onChange={(v) => setDemao(i, "espessuraMin", v)} ph="µm seca mín" />
+                  <span className="text-[11px] text-torg-gray-light">a</span>
+                  <Texto tipo="number" valor={dm.espessuraMax} onChange={(v) => setDemao(i, "espessuraMax", v)} ph="máx" />
+                </div>
+                <span />
+              </div>
             </div>
           ))}
         </div>
@@ -322,8 +380,10 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
               <label className="text-[11px] text-torg-gray inline-flex items-center gap-1 justify-center">
                 <input type="checkbox" className="accent-torg-orange" checked={!!it.externo} onChange={(e) => setItem(i, "externo", e.target.checked)} /> externo
               </label>
-              <Texto valor={it.sistema} onChange={(v) => setItem(i, "sistema", v)} ph="sistema" />
-              <Texto valor={it.cor} onChange={(v) => setItem(i, "cor", v)} ph="cor de acabamento" />
+              <input list="sistemas-plp" value={so(it.sistema)} onChange={(e) => setItem(i, "sistema", e.target.value)}
+                placeholder="sistema" className={cls} />
+              <input list="cores-plp" value={so(it.cor)} onChange={(e) => setItem(i, "cor", e.target.value)}
+                placeholder="cor de acabamento" className={cls} />
               <Texto valor={it.obs} onChange={(v) => setItem(i, "obs", v)} ph="observação" />
               <button onClick={() => setF((x) => ({ ...x, itens: x.itens.filter((_, j) => j !== i) }))}
                 title="Remover este item" className="text-torg-gray-light hover:text-red-600"><Trash2 size={13} /></button>
@@ -331,9 +391,18 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           ))}
           {!f.itens.length && <p className="text-[11px] text-torg-gray">Nenhum item relacionado.</p>}
         </div>
-        <button onClick={() => setF((x) => ({ ...x, itens: [...x.itens, { item: "", sistema: "", cor: "", obs: "", interno: false, externo: false }] }))}
+        {/* ⚠ item novo já vem com o sistema em uso: as obras da Torg têm um sistema só, e digitar
+            "1" em cada linha é trabalho que o portal pode poupar. */}
+        <button onClick={() => setF((x) => ({ ...x, itens: [...x.itens, { item: "", sistema: sistemas[0] || "1", cor: "", obs: "", interno: false, externo: true }] }))}
           className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={11} /> item</button>
       </Secao>
+
+      {/* sugestões que se alimentam do que já foi preenchido — nada é imposto, tudo aceita texto livre */}
+      <datalist id="nomes-demao">
+        {["Fundo", "Intermediária", "Acabamento (Fábrica)", "Acabamento (Campo)", "Demão única"].map((n) => <option key={n} value={n} />)}
+      </datalist>
+      <datalist id="cores-plp">{cores.map((c) => <option key={c} value={c} />)}</datalist>
+      <datalist id="sistemas-plp">{sistemas.map((c) => <option key={c} value={c} />)}</datalist>
 
       <Campo rotulo="Observações">
         <textarea value={f.observacoes} onChange={(e) => set("observacoes", e.target.value)} rows={3}
