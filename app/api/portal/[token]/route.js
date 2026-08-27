@@ -305,17 +305,23 @@ export async function GET(req, { params }) {
   // ⚠ os documentos da ENGENHARIA escolhidos da 2.5.5 — vêm do que foi marcado, não de uma
   // varredura. Ver /api/portal/engenharia-docs. (Vitor, 26/08/2026)
   if (tem("DOCUMENTOS")) {
-    const eng = Array.isArray(portal.docsEngenharia) ? portal.docsEngenharia : [];
-    if (eng.length) {
+    // ⚠ POR ÁREA e com o NOME DE EXIBIÇÃO. Vitor (26/08/2026): "me dê a opção de renomear os
+    // arquivos para que o cliente veja um nome mais adequado do que o nome original". O nome do
+    // arquivo é interno — "T112-PM-01_R00.pdf" é a nossa nomenclatura, não a linguagem do cliente.
+    const mapa = portal.docsPorArea || (portal.docsEngenharia ? { ENGENHARIA: portal.docsEngenharia } : {});
+    dados.docsPorArea = {};
+    for (const [ar, lista] of Object.entries(mapa || {})) {
+      if (!Array.isArray(lista) || !lista.length) continue;
       const porPasta = new Map();
-      for (const d of eng) {
-        const k = d.pasta || "Documentos da Engenharia";
+      for (const d of lista) {
+        const k = d.pasta || "Documentos";
         const g = porPasta.get(k) || { assunto: k, itens: [] };
-        g.itens.push({ id: d.id, nome: d.nome, eng: true });
+        g.itens.push({ id: d.id, nome: d.nomeExibicao || d.nome, arquivo: d.nome, eng: true });
         porPasta.set(k, g);
       }
-      dados.engenharia = [...porPasta.values()];
+      dados.docsPorArea[ar] = [...porPasta.values()];
     }
+    dados.engenharia = dados.docsPorArea.ENGENHARIA || null;
   }
 
   // ⚠⚠ PLANO DE CONTROLE ≠ DOCUMENTO TÉCNICO. Vitor (26/08/2026) separou: PIT e PLP vão para a

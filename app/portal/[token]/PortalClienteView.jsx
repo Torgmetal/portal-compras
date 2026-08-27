@@ -78,8 +78,13 @@ export default function PortalClienteView({ token }) {
   // ⚠ ABA SEM CONTEÚDO NÃO APARECE: "Compras (0)" faz o cliente clicar para não achar nada, e a
   // primeira impressão é justamente o que ele quer proteger.
   const conteudo = {
-    LPC: tem("LPC") && !!dados.lpc,
-    LE: tem("LE") && !!dados.le,
+    // ⚠⚠ LISTA VAZIA NÃO É LISTA. A OP-112 mostrava "Lista de produção (LPC) · 0 itens" com o
+    // botão "Baixar planilha" ao lado — o cliente clicava e recebia uma planilha em branco, o que é
+    // pior que não ter a seção. A causa era simples e ficou invisível: a Engenharia não tinha
+    // importado a LPC daquela obra (Vitor descobriu em 26/08/2026). Sem itens, a seção não aparece;
+    // quem publica vê o aviso na configuração do portal.
+    LPC: tem("LPC") && dados.lpc?.itens?.length > 0,
+    LE: tem("LE") && dados.le?.itens?.length > 0,
     COMPRAS: tem("COMPRAS") && dados.compras?.itens?.length > 0,
     CRONOGRAMA: tem("CRONOGRAMA") && !!dados.cronograma,
     CERTIFICADOS: tem("CERTIFICADOS") && dados.certificados?.length > 0,
@@ -93,8 +98,8 @@ export default function PortalClienteView({ token }) {
     const base = SECOES.filter((x) => x.area === a && conteudo[x.id]);
     // ⚠ os documentos escolhidos da 2.5.5 não são uma "seção" configurável — são conteúdo da
     // Engenharia. Sem contá-los, uma obra que só publicou desenhos não teria a aba.
-    if (a === "ENGENHARIA" && dados.engenharia?.length && tem("DOCUMENTOS")) {
-      return base.length ? base : [{ id: "ENG_DOCS", area: "ENGENHARIA" }];
+    if (dados.docsPorArea?.[a]?.length && tem("DOCUMENTOS")) {
+      return base.length ? base : [{ id: "DOCS_AREA", area: a }];
     }
     return base;
   };
@@ -356,11 +361,13 @@ export default function PortalClienteView({ token }) {
             não misturado com "Documentos da obra": um é desenho e lista de projeto, o outro é
             documento formal (PIT, EPS, ARTs). Juntar faria o cliente caçar o desenho no meio de
             certificado de soldador. */}
-        {abaAtiva === "ENGENHARIA" && dados.engenharia?.length > 0 && (
-          <Bloco icone={Layers} titulo="Documentos da Engenharia"
-            sub={`${dados.engenharia.reduce((n, g) => n + g.itens.length, 0)} arquivos`}>
+        {/* ⚠ os documentos escolhidos do servidor, na ÁREA de cada um, com o nome que o cliente
+            entende — não o nome do arquivo. (Vitor, 26/08/2026) */}
+        {dados.docsPorArea?.[abaAtiva]?.length > 0 && (
+          <Bloco icone={Layers} titulo="Documentos"
+            sub={`${dados.docsPorArea[abaAtiva].reduce((n, g) => n + g.itens.length, 0)} arquivos`}>
             <div className="space-y-4">
-              {dados.engenharia.map((g) => (
+              {dados.docsPorArea[abaAtiva].map((g) => (
                 <div key={g.assunto}>
                   <p className="text-[13px] font-semibold mb-1.5">
                     {g.assunto} <span className="text-gray-400 font-normal">{g.itens.length}</span>

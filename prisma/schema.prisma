@@ -2362,7 +2362,15 @@ model PortalCliente {
   // publicar tudo que aparecer lá. A pasta tem revisão antiga, arquivo de trabalho e material que
   // ainda não foi liberado — publicar sozinho é vazar por descuido, e no portal do cliente não tem
   // volta. [{ id, nome, tamanho, em }]
-  docsEngenharia   Json?
+  docsEngenharia   Json? // legado: virou a chave ENGENHARIA de `docsPorArea`
+  // ⚠⚠ AGORA POR ÁREA, E COM NOME DE EXIBIÇÃO. Vitor (26/08/2026): "para cada parte aqui me
+  // permita acessar o servidor e selecionar o que eu quero colocar, e me dê a opção de podermos
+  // renomear os arquivos para que o cliente veja um nome mais adequado do que o nome original".
+  //
+  // O nome do arquivo no servidor é interno: "T112-PM-01_R00.pdf" diz tudo para quem fabrica e nada
+  // para quem comprou a obra. Publicar o nome do arquivo é publicar a nossa nomenclatura.
+  // { ENGENHARIA: [{ id, nome, nomeExibicao, pasta, tamanho, em }], QUALIDADE: [...], … }
+  docsPorArea      Json?
   // ⚠ PESO É PREÇO. Vitor (22/08/2026): "a lista LPC e LE deixe a opção de divulgar com e
   // sem peso, isso é importante para nós". Estrutura metálica se cota por R$/kg — publicar
   // o peso item a item entrega a base de cálculo do nosso preço a quem vai negociar o

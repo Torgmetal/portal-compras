@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye, Upload, X, ImagePlus } from "lucide-react";
 import { upload } from "@vercel/blob/client";
 import { SECOES, CAPAS, AREAS, situacao } from "@/lib/portal-cliente";
-import SeletorDocsEngenharia from "./SeletorDocsEngenharia";
+import SeletorDocsArea from "./SeletorDocsArea";
 import HistoricoPortal from "./HistoricoPortal";
 
 // ─── CONFIGURAR O PORTAL DO CLIENTE ───────────────────────────────────────────
@@ -13,6 +13,27 @@ import HistoricoPortal from "./HistoricoPortal";
 // As duas metades dessa frase viram esta tela: a mensagem (o que queremos dizer) e as
 // seções (o que ele vai ver). Nada além disso — os DADOS não se configuram aqui, porque
 // eles já vivem nos módulos e o portal os lê vivos.
+function AvisoListas({ opNumero, secoes }) {
+  const [d, setD] = useState(null);
+  useEffect(() => {
+    fetch(`/api/comercial/op/${encodeURIComponent(opNumero)}/listas-status`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null)).then(setD).catch(() => {});
+  }, [opNumero]);
+  if (!d) return null;
+  const faltando = [
+    secoes.includes("LPC") && !d.lpc && "LPC",
+    secoes.includes("LE") && !d.le && "Lista de Expedição",
+  ].filter(Boolean);
+  if (!faltando.length) return null;
+  return (
+    <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
+      <b>{faltando.join(" e ")} sem itens importados nesta obra.</b> A seção não vai aparecer no
+      portal — o cliente receberia uma planilha em branco. Peça à Engenharia para importar a lista;
+      publicar o arquivo da pasta no lugar entrega o peso item a item.
+    </p>
+  );
+}
+
 export default function AbaPortalCliente({ opId, opNumero }) {
   const [d, setD] = useState(null);
   const [f, setF] = useState(null);
@@ -317,7 +338,23 @@ export default function AbaPortalCliente({ opId, opNumero }) {
 
       {/* ⚠ o seletor fica JUNTO das seções, não numa tela à parte: escolher documento é parte de
           montar o portal, e separar faria alguém publicar sem nunca ter aberto a pasta. */}
-      {f.secoes.includes("DOCUMENTOS") && <SeletorDocsEngenharia opNumero={opNumero} />}
+      {/* ⚠ QUEM PUBLICA PRECISA SABER QUE A LISTA NÃO ENTROU. Sem este aviso, a seção some do
+          portal em silêncio e a pessoa recorre a publicar o xlsx cru da pasta — que é como o peso
+          vaza. O aviso aponta a causa (a Engenharia não importou a LPC/LE desta obra), que é onde
+          se resolve de verdade. */}
+      <AvisoListas opNumero={opNumero} secoes={f.secoes} />
+
+      {/* ⚠ UM SELETOR POR ÁREA. Vitor (26/08/2026): "para cada parte aqui me permita acessar o
+          servidor e selecionar o que eu quero colocar". Cada aba do portal do cliente tem a sua
+          pasta natural no servidor, e a decisão de o que publicar é de quem responde por ela. */}
+      <div className="space-y-2">
+        <p className="text-[13px] font-semibold text-torg-dark">Documentos do servidor, por área</p>
+        <p className="text-[11px] text-torg-gray -mt-1">
+          Navegue a pasta da obra e escolha o que o cliente vê em cada aba. Dá para dar um nome mais
+          claro que o nome do arquivo. <b>Nada é publicado sozinho.</b>
+        </p>
+        {AREAS.map((a) => <SeletorDocsArea key={a.id} opNumero={opNumero} area={a.id} nomeArea={a.nome} />)}
+      </div>
 
       <HistoricoPortal opNumero={opNumero} />
 
