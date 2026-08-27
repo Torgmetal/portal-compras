@@ -8,6 +8,53 @@ import {
 import { LAUDOS } from "@/lib/evs-campos";
 
 /**
+ * Um campo das condições do ensaio.
+ *
+ * ⚠⚠ FICA FORA DO COMPONENTE DE PROPÓSITO. Declarado dentro de `FormUS`, vira um TIPO NOVO a cada
+ * render — o React desmonta e remonta o input a cada tecla e o cursor sai do campo depois de cada
+ * letra. É o defeito que Vitor relatou em 27/08/2026 no aceite dos planos ("estou com dificuldade
+ * para digitar nesses campos"), corrigido do mesmo jeito em AceitePlano.jsx. Componente de
+ * formulário nunca se declara dentro de outro componente.
+ *
+ * `destaque` pinta de âmbar o campo obrigatório do item 18.1 enquanto ele estiver vazio.
+ */
+function Campo({ rot, k, opcoes = null, tipo = "text", destaque = false, res, travado, setResultado }) {
+  return (
+    <label className="block">
+      <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">{rot}</span>
+      {opcoes ? (
+        <select value={res[k] || ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
+          className={`w-full text-[12px] border rounded-lg px-2 py-1.5 disabled:bg-gray-50 ${
+            destaque && !res[k] ? "border-amber-400 bg-amber-50" : "border-gray-200 focus:border-torg-blue"}`}>
+          <option value="">—</option>
+          {opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+      ) : (
+        <input type={tipo} value={res[k] ?? ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
+          className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
+      )}
+    </label>
+  );
+}
+
+/**
+ * Um número de uma indicação (dB, percurso, distância…).
+ *
+ * ⚠⚠ FICA FORA PELO MESMO MOTIVO DO `Campo` acima — e aqui o estrago era maior: são dez destes por
+ * indicação, todos numéricos, todos digitados em sequência. Chamava-se `N`; no escopo do módulo o
+ * nome precisa dizer o que é.
+ */
+function CampoNum({ l, i, k, rot, travado, set }) {
+  return (
+    <label className="block">
+      <span className="block text-[10px] text-torg-gray mb-0.5">{rot}</span>
+      <input type="number" value={l[k] ?? ""} disabled={travado} onChange={(e) => set(i, k, e.target.value)}
+        className="w-full text-[12px] border border-gray-200 rounded px-1.5 py-1 disabled:bg-gray-50" />
+    </label>
+  );
+}
+
+/**
  * O PREENCHIMENTO DO ENSAIO POR ULTRASSOM, no computador.
  *
  * Vitor (21/08/2026): "quando eu clico em um relatório já criado, tanto no PC quanto no celular, não
@@ -32,30 +79,9 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
   const set = (i, campo, v) => setLinhas(linhas.map((l, k) => (k === i ? { ...l, [campo]: v } : l)));
   const addLinha = () => setLinhas([...linhas, { marca: marcas[0] || "", indicacao: String(linhas.length + 1), laudo: "R" }]);
 
-  const Campo = ({ rot, k, opcoes = null, tipo = "text", destaque = false }) => (
-    <label className="block">
-      <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">{rot}</span>
-      {opcoes ? (
-        <select value={res[k] || ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
-          className={`w-full text-[12px] border rounded-lg px-2 py-1.5 disabled:bg-gray-50 ${
-            destaque && !res[k] ? "border-amber-400 bg-amber-50" : "border-gray-200 focus:border-torg-blue"}`}>
-          <option value="">—</option>
-          {opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-      ) : (
-        <input type={tipo} value={res[k] ?? ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
-          className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
-      )}
-    </label>
-  );
-
-  const N = ({ l, i, k, rot }) => (
-    <label className="block">
-      <span className="block text-[10px] text-torg-gray mb-0.5">{rot}</span>
-      <input type="number" value={l[k] ?? ""} disabled={travado} onChange={(e) => set(i, k, e.target.value)}
-        className="w-full text-[12px] border border-gray-200 rounded px-1.5 py-1 disabled:bg-gray-50" />
-    </label>
-  );
+  // o que os campos leem do formulário e da linha — ver o comentário dos componentes, lá em cima
+  const doForm = { res, travado, setResultado };
+  const daLinha = { travado, set };
 
   return (
     <div className="space-y-3">
@@ -64,18 +90,18 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
         <p className="text-[12px] font-bold text-torg-dark mb-2">Condições do ensaio</p>
         <div className="grid sm:grid-cols-4 gap-2.5">
           {/* ⚠ obrigatório pelo item 18.1 do PI-QUA-003, e o critério muda com ele (15.6 × 15.7) */}
-          <Campo rot="Tipo de estrutura" k="carregamento" opcoes={TIPOS_CARREGAMENTO.map((t) => t.nome)} destaque />
-          <Campo rot="Local de ensaio" k="local" />
-          <Campo rot="Acoplante" k="acoplante" opcoes={ACOPLANTES} />
-          <Campo rot="Bloco padrão" k="blocoPadrao" opcoes={BLOCOS_PADRAO} />
-          <Campo rot="Aparelho" k="apModelo" opcoes={APARELHOS} />
-          <Campo rot="Nº de série do aparelho" k="apSerie" />
-          <Campo rot="Cabeçote" k="cbModelo" opcoes={CABECOTES.map((c) => `${c.modelo}${c.angulo ? ` · ${c.angulo}°` : ""} · ${c.mhz} MHz`)} />
-          <Campo rot="Nº de série do cabeçote" k="cbSerie" />
-          <Campo rot="Ângulo real (graus)" k="cbAngulo" tipo="number" />
-          <Campo rot="Ganho de varredura (dB)" k="ganhoVarredura" tipo="number" />
-          <Campo rot="Material" k="material" />
-          <Campo rot="Espessura" k="espessura" />
+          <Campo {...doForm} rot="Tipo de estrutura" k="carregamento" opcoes={TIPOS_CARREGAMENTO.map((t) => t.nome)} destaque />
+          <Campo {...doForm} rot="Local de ensaio" k="local" />
+          <Campo {...doForm} rot="Acoplante" k="acoplante" opcoes={ACOPLANTES} />
+          <Campo {...doForm} rot="Bloco padrão" k="blocoPadrao" opcoes={BLOCOS_PADRAO} />
+          <Campo {...doForm} rot="Aparelho" k="apModelo" opcoes={APARELHOS} />
+          <Campo {...doForm} rot="Nº de série do aparelho" k="apSerie" />
+          <Campo {...doForm} rot="Cabeçote" k="cbModelo" opcoes={CABECOTES.map((c) => `${c.modelo}${c.angulo ? ` · ${c.angulo}°` : ""} · ${c.mhz} MHz`)} />
+          <Campo {...doForm} rot="Nº de série do cabeçote" k="cbSerie" />
+          <Campo {...doForm} rot="Ângulo real (graus)" k="cbAngulo" tipo="number" />
+          <Campo {...doForm} rot="Ganho de varredura (dB)" k="ganhoVarredura" tipo="number" />
+          <Campo {...doForm} rot="Material" k="material" />
+          <Campo {...doForm} rot="Espessura" k="espessura" />
         </div>
         <p className="text-[10px] text-torg-gray mt-2">
           Procedimento: <strong className="text-torg-dark">{res.procedimento || "—"}</strong>
@@ -118,7 +144,7 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
                       {marcas.map((m) => <option key={m} value={m}>{m}</option>)}
                     </select>
                   </label>
-                  <N l={l} i={i} k="indicacao" rot="Nº indicação" />
+                  <CampoNum {...daLinha} l={l} i={i} k="indicacao" rot="Nº indicação" />
                   <label className="block">
                     <span className="block text-[10px] text-torg-gray mb-0.5">Ângulo</span>
                     <select value={l.angulo || ""} disabled={travado} onChange={(e) => set(i, "angulo", e.target.value)}
@@ -152,17 +178,17 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
                 </div>
 
                 <div className="grid sm:grid-cols-6 gap-2 mt-2">
-                  <N l={l} i={i} k="db_indicacao" rot="a — indicação (dB)" />
-                  <N l={l} i={i} k="db_referencia" rot="b — referência (dB)" />
-                  <N l={l} i={i} k="percurso" rot="Percurso sônico (mm)" />
-                  <N l={l} i={i} k="comprimento" rot="Compr. reprovado (mm)" />
-                  <N l={l} i={i} k="profundidade" rot="Profund. face A (mm)" />
-                  <N l={l} i={i} k="nivel" rot="Nível de defeito" />
+                  <CampoNum {...daLinha} l={l} i={i} k="db_indicacao" rot="a — indicação (dB)" />
+                  <CampoNum {...daLinha} l={l} i={i} k="db_referencia" rot="b — referência (dB)" />
+                  <CampoNum {...daLinha} l={l} i={i} k="percurso" rot="Percurso sônico (mm)" />
+                  <CampoNum {...daLinha} l={l} i={i} k="comprimento" rot="Compr. reprovado (mm)" />
+                  <CampoNum {...daLinha} l={l} i={i} k="profundidade" rot="Profund. face A (mm)" />
+                  <CampoNum {...daLinha} l={l} i={i} k="nivel" rot="Nível de defeito" />
                 </div>
 
                 <div className="grid sm:grid-cols-6 gap-2 mt-2 items-end">
-                  <N l={l} i={i} k="dist_x" rot="Distância X (mm)" />
-                  <N l={l} i={i} k="dist_y" rot="Distância Y (mm)" />
+                  <CampoNum {...daLinha} l={l} i={i} k="dist_x" rot="Distância X (mm)" />
+                  <CampoNum {...daLinha} l={l} i={i} k="dist_y" rot="Distância Y (mm)" />
                   {/* ⚠ c e d calculados — itens 15.3 e 15.4; número que decide não se digita */}
                   <div className="sm:col-span-2 rounded bg-torg-blue/5 border border-torg-blue-200 px-2 py-1.5">
                     <p className="text-[11px] text-torg-dark">
