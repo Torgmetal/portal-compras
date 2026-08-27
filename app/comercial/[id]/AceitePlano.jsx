@@ -135,26 +135,31 @@ export default function AceitePlano({ opNumero, doc, nome }) {
       </div>
 
       {/* ── etapa 1: verificação interna ── */}
-      <div className="space-y-1.5">
-        {interna?.aceito ? (
-          <p className="text-[12px] text-emerald-700 inline-flex items-start gap-1.5">
-            <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
-            <span><b>Verificado internamente</b> — {interna.assinantes.filter((a) => a.assinadoEm).map((a) => `${a.nome} (${a.papel})`).join(" · ")}</span>
-          </p>
-        ) : interna?.enviado ? (
-          <p className="text-[12px] text-amber-700 inline-flex items-start gap-1.5">
-            <Clock size={14} className="mt-0.5 shrink-0" />
-            <span><b>Em verificação interna</b> — falta {interna.pendentes.join(" e ")}</span>
-          </p>
-        ) : (
-          <p className="text-[12px] text-torg-gray inline-flex items-start gap-1.5">
-            <Mail size={14} className="mt-0.5 shrink-0" />
-            <span>Passo 1: enviar para quem elabora e quem verifica assinarem.</span>
-          </p>
-        )}
+      {/* ⚠ o botão vai para o FIM DA LINHA. Vitor (27/08/2026): "ajuste esses botões, coloca no
+          final da linha". Colado no texto, ele parecia parte da frase — e o olho não achava a ação
+          numa tela que tem duas etapas com dois botões parecidos. */}
+      <div className="flex items-start gap-3 flex-wrap">
+        <div className="flex-1 min-w-[16rem]">
+          {interna?.aceito ? (
+            <p className="text-[12px] text-emerald-700 inline-flex items-start gap-1.5">
+              <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
+              <span><b>Verificado internamente</b> — {interna.assinantes.filter((a) => a.assinadoEm).map((a) => `${a.nome} (${a.papel})`).join(" · ")}</span>
+            </p>
+          ) : interna?.enviado ? (
+            <p className="text-[12px] text-amber-700 inline-flex items-start gap-1.5">
+              <Clock size={14} className="mt-0.5 shrink-0" />
+              <span><b>Em verificação interna</b> — falta {interna.pendentes.join(" e ")}</span>
+            </p>
+          ) : (
+            <p className="text-[12px] text-torg-gray inline-flex items-start gap-1.5">
+              <Mail size={14} className="mt-0.5 shrink-0" />
+              <span>Passo 1: enviar para quem elabora e quem verifica assinarem.</span>
+            </p>
+          )}
+        </div>
         <button onClick={() => enviar("INTERNA")} disabled={!!enviando || !temResponsaveis}
           title={temResponsaveis ? "" : "Preencha nome e e-mail de quem elabora e de quem verifica"}
-          className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-3 py-1.5 hover:bg-torg-blue-50 disabled:opacity-40 inline-flex items-center gap-1.5">
+          className="shrink-0 text-[12px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-3 py-1.5 hover:bg-torg-blue-50 disabled:opacity-40 inline-flex items-center gap-1.5">
           {enviando === "INTERNA" ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
           {interna?.enviado ? "Enviar de novo para verificação" : "Enviar para verificação interna"}
         </button>
@@ -162,30 +167,35 @@ export default function AceitePlano({ opNumero, doc, nome }) {
 
       {/* ── etapa 2: aceite do cliente ── */}
       <div className="space-y-1.5">
-        {cliente?.aceito ? (
-          <p className="text-[12px] text-emerald-700 inline-flex items-start gap-1.5">
-            <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
-            <span><b>Aceito pelo cliente</b> — {cliente.aceitoPor} em {fmtDT(cliente.aceitoEm)} · revisão R{String(cliente.revisao ?? 0).padStart(2, "0")}</span>
-          </p>
-        ) : cliente?.enviado ? (
-          <p className="text-[12px] text-amber-700 inline-flex items-start gap-1.5">
-            <Clock size={14} className="mt-0.5 shrink-0" />
-            <span><b>Aguardando aceite</b> — enviado em {fmtDT(cliente.enviadoEm)} para {cliente.pendentes.join(", ")}</span>
-          </p>
-        ) : (
-          <p className="text-[12px] text-torg-gray inline-flex items-start gap-1.5">
-            {interna?.aceito ? <Mail size={14} className="mt-0.5 shrink-0" /> : <Lock size={14} className="mt-0.5 shrink-0 text-torg-gray-light" />}
-            <span>Passo 2: {interna?.aceito ? `enviar ${nome} ao cliente para aceite.` : "libera quando a verificação interna estiver assinada."}</span>
-          </p>
-        )}
+        <div className="flex items-start gap-3 flex-wrap">
+          <div className="flex-1 min-w-[16rem]">
+            {cliente?.aceito ? (
+              <p className="text-[12px] text-emerald-700 inline-flex items-start gap-1.5">
+                <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
+                <span><b>Aceito pelo cliente</b> — {cliente.aceitoPor} em {fmtDT(cliente.aceitoEm)} · revisão R{String(cliente.revisao ?? 0).padStart(2, "0")}</span>
+              </p>
+            ) : cliente?.enviado ? (
+              <p className="text-[12px] text-amber-700 inline-flex items-start gap-1.5">
+                <Clock size={14} className="mt-0.5 shrink-0" />
+                <span><b>Aguardando aceite</b> — enviado em {fmtDT(cliente.enviadoEm)} para {cliente.pendentes.join(", ")}</span>
+              </p>
+            ) : (
+              <p className="text-[12px] text-torg-gray inline-flex items-start gap-1.5">
+                {interna?.aceito ? <Mail size={14} className="mt-0.5 shrink-0" /> : <Lock size={14} className="mt-0.5 shrink-0 text-torg-gray-light" />}
+                <span>Passo 2: {interna?.aceito ? `enviar ${nome} ao cliente para aceite.` : "libera quando a verificação interna estiver assinada."}</span>
+              </p>
+            )}
+          </div>
+          {!abrir && (
+            <button onClick={() => setAbrir(true)} disabled={!interna?.aceito}
+              title={interna?.aceito ? "" : "A verificação interna precisa estar assinada"}
+              className="shrink-0 text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:opacity-90 disabled:opacity-40 inline-flex items-center gap-1.5">
+              <Send size={12} /> {cliente?.enviado ? "Enviar de novo ao cliente" : "Enviar ao cliente para aceite"}
+            </button>
+          )}
+        </div>
 
-        {!abrir ? (
-          <button onClick={() => setAbrir(true)} disabled={!interna?.aceito}
-            title={interna?.aceito ? "" : "A verificação interna precisa estar assinada"}
-            className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:opacity-90 disabled:opacity-40 inline-flex items-center gap-1.5">
-            <Send size={12} /> {cliente?.enviado ? "Enviar de novo ao cliente" : "Enviar ao cliente para aceite"}
-          </button>
-        ) : (
+        {abrir && (
           <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50/50">
             <div className="flex items-center justify-between">
               <p className="text-[12px] font-semibold text-torg-dark">Quem assina pelo cliente</p>

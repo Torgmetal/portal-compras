@@ -7,6 +7,7 @@ import { gerarCronogramaAuditoriaPDF } from "@/lib/cronograma-auditoria-pdf";
 import { baixarDesenho } from "@/lib/relatorio-dimensional";
 import { gerarPDFdoRelatorio } from "@/lib/relatorio-render";
 import { gerarPlanoClientePDF } from "@/lib/plano-cliente-pdf";
+import { comResponsaveis, docDoTipo } from "@/lib/planos-aceite";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -34,7 +35,10 @@ export async function GET(_req, { params }) {
     // ⚠ O PLANO É LIDO NA TELA ANTES DO ACEITE. O entregável continua sendo o Excel (anexo do
     // e-mail e botão nesta mesma página); este PDF existe para o inspetor do cliente ver o que
     // está aceitando sem precisar baixar e abrir uma planilha.
-    bytes = await gerarPlanoClientePDF({ snapshot: snap, assinaturas });
+    bytes = await gerarPlanoClientePDF({
+      snapshot: await comResponsaveis(prisma, docDoTipo(a.envio.tipo), a.envio.opNumero, snap),
+      assinaturas,
+    });
   } else if (a.envio.tipo === "RELATORIO_INSPECAO") {
     // ⚠ aqui o snapshot guarda só o ID: o corpo do relatório são FOTOS, e copiar dezenas de URLs
     // pro snapshot só criaria uma segunda cópia pra desencontrar. O documento é relido do banco.

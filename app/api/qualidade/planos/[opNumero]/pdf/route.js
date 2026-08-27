@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { DOCS, montarPlano, tipoDoEnvio } from "@/lib/planos-aceite";
+import { DOCS, montarPlano, tipoDoEnvio, comResponsaveis } from "@/lib/planos-aceite";
 import { gerarPlanoClientePDF } from "@/lib/plano-cliente-pdf";
 
 export const runtime = "nodejs";
@@ -42,7 +42,7 @@ export async function GET(req, { params }) {
     : [];
 
   const bytes = await gerarPlanoClientePDF({
-    snapshot: doCliente?.snapshot || plano.snapshot,
+    snapshot: await comResponsaveis(prisma, doc, opNumero, doCliente?.snapshot || plano.snapshot),
     assinaturas,
     minuta: !envios.length,
   });

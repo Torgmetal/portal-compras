@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { secoesDoPortal } from "@/lib/portal-cliente";
 import { gerarPlanoClientePDF } from "@/lib/plano-cliente-pdf";
+import { comResponsaveis } from "@/lib/planos-aceite";
 import { registrarAcesso } from "@/lib/portal-acesso";
 
 export const runtime = "nodejs";
@@ -36,7 +37,7 @@ export async function GET(req, { params }) {
     orderBy: { nome: "asc" },
   });
 
-  const bytes = await gerarPlanoClientePDF({ snapshot: envio.snapshot || {}, assinaturas });
+  const bytes = await gerarPlanoClientePDF({ snapshot: await comResponsaveis(prisma, doc, portal.opNumero, envio.snapshot), assinaturas });
   await registrarAcesso(req, {
     portal, codigo: new URL(req.url).searchParams.get("d"), evento: "DOWNLOAD",
     documento: envio.titulo, secao: "QUALIDADE",
