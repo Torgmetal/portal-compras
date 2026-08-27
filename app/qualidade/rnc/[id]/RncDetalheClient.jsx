@@ -237,13 +237,23 @@ export default function RncDetalheClient({ id }) {
           <Campo label="Setor que gerou o retrabalho">
             <select value={d.setorRetrabalho || ""} onChange={(e) => set("setorRetrabalho", e.target.value)} className="inp">
               <option value="">— deduzir do processo / área —</option>
-              {SETORES_RETRABALHO.map((st) => <option key={st.id} value={st.id}>{st.nome}</option>)}
+              <optgroup label="Setores da Torg">
+                {SETORES_RETRABALHO.filter((st) => !st.externo).map((st) => <option key={st.id} value={st.id}>{st.nome}</option>)}
+              </optgroup>
+              {/* ⚠ material fora de especificação ou serviço de terceiro refeito: as horas são
+                  nossas, a causa não. Sem esta opção, quem preenche escolhe o setor que REFEZ e o
+                  índice dele sobe por culpa alheia. */}
+              <optgroup label="Externo">
+                {SETORES_RETRABALHO.filter((st) => st.externo).map((st) => <option key={st.id} value={st.id}>{st.nome}</option>)}
+              </optgroup>
             </select>
           </Campo>
           <Campo label="Origem da não conformidade">
             <select value={d.origem || ""} onChange={(e) => set("origem", e.target.value)} className="inp"><option value="">—</option>{Object.entries(ORIGEM_NC).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
           </Campo>
-          {d.origem === "FORNECEDOR" && <Campo label="Fornecedor"><input value={d.fornecedor || ""} onChange={(e) => set("fornecedor", e.target.value)} className="inp" /></Campo>}
+          {(d.origem === "FORNECEDOR" || d.setorRetrabalho === "FORNECEDOR") && (
+            <Campo label="Fornecedor"><input value={d.fornecedor || ""} onChange={(e) => set("fornecedor", e.target.value)} className="inp" /></Campo>
+          )}
           <Campo label="Data"><input type="date" value={d.data || ""} onChange={(e) => set("data", e.target.value)} className="inp" /></Campo>
           <Campo label="Prazo para resposta"><input type="date" value={d.prazoResposta || ""} onChange={(e) => set("prazoResposta", e.target.value)} className="inp" /></Campo>
           {cliente && <>
