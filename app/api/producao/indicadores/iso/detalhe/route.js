@@ -74,28 +74,54 @@ export async function GET(req) {
 
     const prod = somaMeses(dados.producao);
     const totRt = somaMeses(dados.totalKg);
+
+    // ⚠⚠ OS NÚMEROS DAS RNCs DE CADA LINHA. Vitor (27/08/2026): "para os apontamentos desse mês
+    // trazer os números das RNCs que fazem parte de cada marcação, e os que foram puxados como
+    // apontamento lista como apontamento no lugar da RNC, apenas para ficar o registro". Sem isso,
+    // a linha do setor é um número que ninguém consegue abrir — e indicador que não se abre não se
+    // discute na reunião.
+    const registrosDe = (filtro) => {
+      const regs = dados.registros.filter((r) => meses.includes(r.mes) && filtro(r));
+      const rncs = [...new Set(regs.map((r) => r.numeroRnc).filter(Boolean))]
+        .map((x) => `RNC ${String(x).replace(/[_-]/g, "/")}`);
+      const semRnc = regs.filter((r) => !r.numeroRnc).length;
+      // apontamento sem RNC entra como "apontamento" — é o registro, mesmo sem número
+      const partes = [...rncs, ...(semRnc ? [semRnc === 1 ? "1 apontamento" : `${semRnc} apontamentos`] : [])];
+      return partes.join(" · ") || "—";
+    };
+
     const linhas = SETORES_RETRABALHO
       .map((st) => ({ st, kgSetor: somaMeses(dados.porSetor[st.id]) }))
       .filter((x) => x.kgSetor > 0)
       .sort((a, b) => b.kgSetor - a.kgSetor)
       .map(({ st, kgSetor }) => [
-        st.nome,
+        // ⚠ diz de quem é o índice: o card da Produção conta só os setores dela.
+        st.processo === "PRODUCAO" ? st.nome : `${st.nome} (fora do índice da Produção)`,
         String(dados.registros.filter((r) => r.setor === st.id && meses.includes(r.mes)).length),
         kg(kgSetor),
         prod > 0 ? `${(Math.round((kgSetor / prod) * 1000) / 10).toLocaleString("pt-BR")}%` : "—",
+        registrosDe((r) => r.setor === st.id),
       ]);
     const semSetor = somaMeses(dados.semSetor);
-    if (semSetor > 0) linhas.push(["Sem setor identificado", "—", kg(semSetor), prod > 0 ? `${(Math.round((semSetor / prod) * 1000) / 10).toLocaleString("pt-BR")}%` : "—"]);
+    if (semSetor > 0) {
+      linhas.push(["Sem setor identificado", "—", kg(semSetor), prod > 0 ? `${(Math.round((semSetor / prod) * 1000) / 10).toLocaleString("pt-BR")}%` : "—", registrosDe((r) => !r.setor)]);
+    }
 
     const n = meses.reduce((t, m) => t + (dados.qtd[m] || 0), 0);
     const nPeso = meses.reduce((t, m) => t + (dados.qtdComPeso[m] || 0), 0);
-    const perc = prod > 0 ? Math.round((totRt / prod) * 1000) / 10 : null;
+    // o índice do CARD é só da Produção; o total da fábrica vai junto, para o número fechar
+    const kgProducao = SETORES_RETRABALHO.filter((st) => st.processo === "PRODUCAO")
+      .reduce((t, st) => t + somaMeses(dados.porSetor[st.id]), 0);
+    const percProd = prod > 0 ? Math.round((kgProducao / prod) * 1000) / 10 : null;
+    const percTot = prod > 0 ? Math.round((totRt / prod) * 1000) / 10 : null;
     const cobertura = n > 0 && nPeso < n
       ? ` · ⚠ ${nPeso} de ${n} apontamentos com peso — o percentual cobre só esses`
       : "";
     return NextResponse.json({
-      titulo: "Retrabalho por setor", colunas: ["Setor", "Apontamentos", "Peso retrabalhado", "% da produção"], linhas,
-      resumo: `${notaManual}${kg(totRt)} retrabalhado de ${kg(prod)} produzidos (corte)${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}${cobertura}`,
+      titulo: "Retrabalho por setor",
+      colunas: ["Setor", "Apontamentos", "Peso retrabalhado", "% da produção", "Registros"],
+      linhas,
+      resumo: `${notaManual}Produção: ${kg(kgProducao)}${percProd == null ? "" : ` · ${percProd.toLocaleString("pt-BR")}%`} de ${kg(prod)} produzidos (corte). Fábrica toda (com Engenharia, terceiro e demais): ${kg(totRt)}${percTot == null ? "" : ` · ${percTot.toLocaleString("pt-BR")}%`}${cobertura}`,
     });
   }
 

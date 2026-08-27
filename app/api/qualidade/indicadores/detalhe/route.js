@@ -28,6 +28,37 @@ export async function GET(req) {
   const pFim = anoTodo ? yFim : new Date(Date.UTC(ano, mes + 1, 1));
 
   // RNCs recebidas do cliente (pertinentes) no período.
+  // ⚠ RETRABALHO DA ENGENHARIA — o que o erro de projeto custou em peso. Vitor (27/08/2026):
+  // "apenas se for apontado que o erro foi da engenharia, aí sim você lista no indicador da
+  // engenharia". Cada linha traz o registro (RNC ou apontamento) para o número poder ser aberto.
+  if (indicador === "retrabalho_engenharia") {
+    const { retrabalhoDoAno } = await import("@/lib/retrabalho");
+    const dados = await retrabalhoDoAno(prisma, ano);
+    const meses = anoTodo ? [...Array(12).keys()] : [mes];
+    const regs = dados.registros.filter((r) => r.setor === "ENGENHARIA" && meses.includes(r.mes));
+    const prod = meses.reduce((t, m) => t + (dados.producao[m] || 0), 0);
+    const kgEng = meses.reduce((t, m) => t + (dados.porSetor.ENGENHARIA[m] || 0), 0);
+    const kgFmt = (v) => `${Math.round(Number(v) || 0).toLocaleString("pt-BR")} kg`;
+    const linhas = regs
+      .sort((a, b) => new Date(a.data) - new Date(b.data))
+      .map((r) => [
+        r.numeroRnc ? `RNC ${String(r.numeroRnc).replace(/[_-]/g, "/")}` : "Apontamento",
+        fmtD(r.data), r.marca || "—", r.opNumero || "—",
+        r.kg ? `${kgFmt(r.kg)}${r.estimado ? " *" : ""}` : "sem peso",
+        r.descricao || "—",
+      ]);
+    const semPeso = regs.filter((r) => !r.kg).length;
+    const perc = prod > 0 ? Math.round((kgEng / prod) * 1000) / 10 : null;
+    return NextResponse.json({
+      titulo: "Retrabalho gerado pela Engenharia",
+      colunas: ["Registro", "Data", "Marca", "OP", "Peso", "O que houve"],
+      linhas,
+      resumo: `${kgFmt(kgEng)} de ${kgFmt(prod)} produzidos (corte)${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}`
+        + `${semPeso ? ` · ⚠ ${semPeso} de ${regs.length} sem peso — o percentual cobre só os demais` : ""}`
+        + `${regs.some((r) => r.estimado) ? " · * peso deduzido do cadastro pela marca" : ""}`,
+    });
+  }
+
   if (indicador === "rnc_cliente") {
     const rncs = await prisma.naoConformidade.findMany({
       where: { data: { gte: pIni, lt: pFim }, pertinente: true, OR: [{ tipo: "CLIENTE" }, { origem: "CLIENTE" }] },
