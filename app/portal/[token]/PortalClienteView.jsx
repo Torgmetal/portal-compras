@@ -97,7 +97,7 @@ export default function PortalClienteView({ token }) {
     RELATORIOS: tem("RELATORIOS") && dados.relatorios?.length > 0,
     DATABOOK: tem("DATABOOK") && dados.databook?.volumes?.length > 0,
     DOCUMENTOS: tem("DOCUMENTOS") && dados.documentos?.length > 0,
-    PLANOS: tem("PLANOS") && dados.planos?.length > 0,
+    PLANOS: tem("PLANOS") && (dados.planos?.length > 0 || !!dados.planosAceite),
     FOTOS: tem("FOTOS") && portal.fotos?.length > 0,
   };
   const secoesDaArea = (a) => {
@@ -397,16 +397,28 @@ export default function PortalClienteView({ token }) {
             e como se pinta. Quem responde por eles assina como Qualidade. (Vitor, 26/08/2026) */}
         {mostrar("PLANOS") && (
           <Bloco icone={ShieldCheck} titulo="Planos de controle (PIT e PLP)"
-            sub={`${dados.planos.reduce((n, g) => n + g.itens.length, 0)} documentos`}>
-            <div className="grid sm:grid-cols-2 gap-1.5">
-              {dados.planos.flatMap((g) => g.itens).map((doc) => (
-                <a key={doc.id} href={comCod(`/api/portal/${token}/doc?id=${doc.id}`)} target="_blank" rel="noreferrer"
-                  className="flex items-center gap-2 border border-gray-100 rounded-lg px-3 py-1.5 hover:border-[#006EAB] hover:bg-[#006EAB]/5 transition-colors">
-                  <Download size={12} className="text-[#006EAB] shrink-0" />
-                  <span className="text-[12px] truncate" title={doc.nome}>{doc.nome}</span>
-                </a>
-              ))}
-            </div>
+            sub={dados.planos?.length ? `${dados.planos.reduce((n, g) => n + g.itens.length, 0)} documentos` : "PIT e PLP da obra"}>
+            {/* ⚠⚠ O ACEITE É O ASSUNTO DESTE BLOCO. Vitor (26/08/2026): "o PIT também deve conter o
+                aceite por parte do cliente, não pode deixar de ter esse aceite" — e o cliente tem
+                de ver, na página dele, se já aceitou e o que está pendente. */}
+            {dados.planosAceite && (
+              <div className="space-y-2 mb-3">
+                {["PIT", "PLP"].filter((k) => dados.planosAceite[k]).map((k) => (
+                  <PlanoAceite key={k} doc={k} p={dados.planosAceite[k]} token={token} comCod={comCod} />
+                ))}
+              </div>
+            )}
+            {dados.planos?.length > 0 && (
+              <div className="grid sm:grid-cols-2 gap-1.5">
+                {dados.planos.flatMap((g) => g.itens).map((doc) => (
+                  <a key={doc.id} href={comCod(`/api/portal/${token}/doc?id=${doc.id}`)} target="_blank" rel="noreferrer"
+                    className="flex items-center gap-2 border border-gray-100 rounded-lg px-3 py-1.5 hover:border-[#006EAB] hover:bg-[#006EAB]/5 transition-colors">
+                    <Download size={12} className="text-[#006EAB] shrink-0" />
+                    <span className="text-[12px] truncate" title={doc.nome}>{doc.nome}</span>
+                  </a>
+                ))}
+              </div>
+            )}
           </Bloco>
         )}
 
@@ -642,6 +654,47 @@ function AvisoDeRevisao({ token, listas }) {
 }
 
 const plural = (n, um, muitos) => `${n} ${n === 1 ? um : muitos}`;
+
+const NOME_PLANO = { PIT: "Plano de Inspeção e Testes (PIT)", PLP: "Plano de Pintura (PLP)" };
+// ⚠ `fmtD` é para data pura ("AAAA-MM-DD"); o aceite é um instante, com hora e fuso.
+const fmtInstante = (d) => (d ? new Date(d).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
+
+/**
+ * O estado do aceite de um plano, na página do cliente.
+ *
+ * ⚠ O BOTÃO DE ACEITAR SÓ APARECE PARA QUEM FOI CONVIDADO A ACEITAR — o servidor só devolve
+ * `tokenDoAceite` quando quem abriu é, pelo `?d=` do e-mail, um destinatário daquele envio. O link
+ * do portal costuma ser repassado dentro da obra; aceite de plano de inspeção é de quem responde.
+ */
+function PlanoAceite({ doc, p, token, comCod }) {
+  const aceito = !!p.aceito;
+  return (
+    <div className={`rounded-xl border px-4 py-3 ${aceito ? "border-emerald-200 bg-emerald-50/60" : "border-[#F4801F]/40 bg-[#F4801F]/5"}`}>
+      <div className="flex items-start gap-2 flex-wrap">
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-semibold text-[#0D1F3C]">{NOME_PLANO[doc] || doc}</p>
+          <p className={`text-[12px] mt-0.5 ${aceito ? "text-emerald-700" : "text-[#9a5410]"}`}>
+            {aceito
+              ? `Aceito em ${fmtInstante(p.aceitoEm)}${p.aceitoPor ? ` por ${p.aceitoPor}` : ""}.`
+              : "Aguardando o aceite do cliente."}
+          </p>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <a href={comCod(`/api/portal/${token}/plano?doc=${doc}`)} target="_blank" rel="noreferrer"
+            className="text-[12px] font-semibold text-[#006EAB] hover:underline inline-flex items-center gap-1">
+            <Download size={12} /> ver o documento
+          </a>
+          {!aceito && p.tokenDoAceite && (
+            <a href={`/assinar/${p.tokenDoAceite}`}
+              className="text-[12px] font-semibold text-white bg-[#006EAB] rounded-lg px-3 py-1.5 hover:opacity-90">
+              Registrar o aceite
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function CartaoRevisao({ l, onEntendi }) {
   const [aberto, setAberto] = useState(false);

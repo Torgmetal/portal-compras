@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { FileText, CheckCircle2, Loader2, Lock, PenLine, ShieldCheck, Download } from "lucide-react";
+import { FileText, CheckCircle2, Loader2, Lock, PenLine, ShieldCheck, Download, FileSpreadsheet } from "lucide-react";
 
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 
@@ -33,6 +33,9 @@ export default function AssinarClient({ token }) {
 
   const invalido = erro && !info;
   const assinado = info?.assinadoEm;
+  // ⚠ PLP e PIT são ACEITE DO CLIENTE. Quem clica é o inspetor do cliente, não um responsável de
+  // setor nosso — a frase que ele confirma tem de dizer o que ele está de fato aprovando.
+  const aceite = !!info?.aceiteCliente;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -59,11 +62,20 @@ export default function AssinarClient({ token }) {
         ) : (
           <div className="space-y-4">
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-              <p className="text-sm text-torg-gray">Olá <strong className="text-torg-dark">{info.nome}</strong>{info.setor ? ` · ${info.setor}` : ""} — você foi indicado para validar este documento.</p>
+              <p className="text-sm text-torg-gray">Olá <strong className="text-torg-dark">{info.nome}</strong>{info.setor ? ` · ${info.setor}` : ""} — {aceite ? "este documento da sua obra está aguardando o seu aceite." : "você foi indicado para validar este documento."}</p>
               <p className="text-[12px] text-torg-gray mt-1">Revisão <strong className="text-torg-dark">R{String(info.revisao ?? 0).padStart(2, "0")}</strong> · enviado em {fmtDT(info.enviadoEm)}</p>
-              <a href={`/api/assinar/${token}/pdf`} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-sm text-torg-blue hover:text-torg-dark font-medium">
-                <Download size={15} /> Abrir / baixar o documento (PDF)
-              </a>
+              <div className="mt-3 flex flex-wrap items-center gap-4">
+                <a href={`/api/assinar/${token}/pdf`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-torg-blue hover:text-torg-dark font-medium">
+                  <Download size={15} /> Abrir / baixar o documento (PDF)
+                </a>
+                {/* ⚠ o Excel é o documento controlado, com os campos de assinatura — o PDF acima é
+                    a leitura. Quem arquiva o plano da obra arquiva a planilha. */}
+                {info.temArquivo && (
+                  <a href={`/api/assinar/${token}/arquivo`} className="inline-flex items-center gap-1.5 text-sm text-torg-blue hover:text-torg-dark font-medium">
+                    <FileSpreadsheet size={15} /> Baixar em Excel
+                  </a>
+                )}
+              </div>
             </div>
 
             {/* preview do PDF */}
@@ -75,20 +87,22 @@ export default function AssinarClient({ token }) {
               <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex items-start gap-3">
                 <CheckCircle2 size={22} className="text-emerald-600 shrink-0" />
                 <div>
-                  <p className="font-semibold text-emerald-800">Documento assinado</p>
-                  <p className="text-sm text-emerald-700 mt-0.5">Assinatura registrada em <strong>{fmtDT(info.assinadoEm)}</strong>{info.ip ? ` · IP ${info.ip}` : ""}. Obrigado!</p>
+                  <p className="font-semibold text-emerald-800">{aceite ? "Documento aceito" : "Documento assinado"}</p>
+                  <p className="text-sm text-emerald-700 mt-0.5">{aceite ? "Aceite registrado" : "Assinatura registrada"} em <strong>{fmtDT(info.assinadoEm)}</strong>{info.ip ? ` · IP ${info.ip}` : ""}. Obrigado!</p>
                 </div>
               </div>
             ) : (
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                <p className="text-[12px] text-torg-gray mb-3 inline-flex items-center gap-1.5"><ShieldCheck size={14} className="text-emerald-600" /> Ao assinar, ficam registrados a sua confirmação, a data/hora e o IP deste acesso.</p>
+                <p className="text-[12px] text-torg-gray mb-3 inline-flex items-center gap-1.5"><ShieldCheck size={14} className="text-emerald-600" /> Ao {aceite ? "aceitar" : "assinar"}, ficam registrados a sua confirmação, a data/hora e o IP deste acesso.</p>
                 <label className="flex items-start gap-2 text-sm text-torg-dark mb-3 cursor-pointer">
                   <input type="checkbox" checked={concordo} onChange={(e) => setConcordo(e.target.checked)} className="mt-0.5 accent-torg-blue" />
-                  <span>Confirmo que li o documento acima e <strong>valido</strong> as informações como responsável do meu setor.</span>
+                  <span>{aceite
+                    ? <>Confirmo que li o documento acima e <strong>aceito</strong> o plano apresentado para esta obra.</>
+                    : <>Confirmo que li o documento acima e <strong>valido</strong> as informações como responsável do meu setor.</>}</span>
                 </label>
                 {erro && <p className="text-xs text-red-600 mb-2">{erro}</p>}
                 <button onClick={assinar} disabled={!concordo || assinando} className="px-5 py-2.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-semibold inline-flex items-center gap-2 disabled:opacity-50">
-                  {assinando ? <Loader2 size={16} className="animate-spin" /> : <PenLine size={16} />} Assinar documento
+                  {assinando ? <Loader2 size={16} className="animate-spin" /> : <PenLine size={16} />} {aceite ? "Registrar aceite" : "Assinar documento"}
                 </button>
               </div>
             )}

@@ -16,7 +16,9 @@ import { classificarMaterial } from "@/lib/databook-secoes";
 import { fichasPorR, comFicha } from "@/lib/databook-ficha-r";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+// ⚠ 120s: a leitura do documento passa por IA quando a planilha não é o modelo Torg — e é o caso
+// das obras de hoje. Com os 30s de antes, a rota morria antes da resposta e a tela dizia "erro".
+export const maxDuration = 120;
 
 /**
  * As tintas DESTA obra, do CMR.
@@ -94,7 +96,10 @@ export async function GET(_req, { params }) {
   return NextResponse.json({ plp, tintas, temPlp: !!plp });
 }
 
-// POST — importa o PLP da pasta da obra (<OP>/8. Qualidade/PLP).
+// POST — LÊ o documento de PLP da pasta da obra (<OP>/8. Qualidade/2. PLP) e preenche os campos.
+//
+// Vitor (26/08/2026): "nessa parte do PLP preciso que você leia um documento e preencha com as
+// informações os campos que precisam".
 //
 // Vitor (22/08/2026): "esse será sempre o caminho... e também pode ser criado no
 // relatório como você deixou". Então esta é a via principal e o formulário é o reparo:
@@ -118,7 +123,20 @@ export async function POST(_req, { params }) {
     create: { ...dados, opNumero, opId: op?.id || null, arquivoNome: r.arquivo, arquivoUrl: r.url || null, criadoPorId: user.id, criadoPorNome: user.name || user.email || null },
     update: { ...dados, arquivoNome: r.arquivo, arquivoUrl: r.url || null },
   });
-  return NextResponse.json({ ok: true, plp, arquivo: r.arquivo, caminho: r.caminho });
+  // ⚠ QUEM LEU IMPORTA. "MODELO_TORG" é o parser determinístico; "IA" é leitura de documento em
+  // layout livre (planilha do cliente, PDF) e PODE ERRAR — a tela avisa e pede conferência. Ler em
+  // silêncio e deixar a Qualidade achar que o dado foi conferido é o pior dos dois mundos.
+  const resumo = {
+    demaos: (dados.demaos || []).length,
+    itens: (dados.itens || []).length,
+    preparo: dados.preparoMetodo || null,
+    grau: dados.grauLimpeza || null,
+  };
+  await prisma.auditLog.create({
+    data: { userId: user?.id || null, action: "PLP_IMPORT", entity: "PlanoPintura", entityId: plp.id,
+      diff: { op: opNumero, arquivo: r.arquivo, via: r.via || null, ...resumo } },
+  }).catch(() => {});
+  return NextResponse.json({ ok: true, plp, arquivo: r.arquivo, caminho: r.caminho, via: r.via || null, resumo });
 }
 
 export async function PUT(req, { params }) {

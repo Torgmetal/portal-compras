@@ -9,7 +9,8 @@
 // não vazar o que o contrato não previu, evita pagar dez consultas para mostrar três blocos.
 import { NextResponse } from "next/server";
 import { ordenarCompras } from "@/lib/item-comprado";
-import { registrarAcesso } from "@/lib/portal-acesso";
+import { registrarAcesso, destinatarioDoCodigo } from "@/lib/portal-acesso";
+import { statusDosPlanos } from "@/lib/planos-aceite";
 import { prisma } from "@/lib/prisma";
 import { secoesDoPortal, mensagemPadrao, CAPA_PADRAO, TIPOS_ENGENHARIA, agruparEngenharia } from "@/lib/portal-cliente";
 import { pecasDaLista, sincronizarRevisao, revisaoParaOCliente } from "@/lib/portal-listas";
@@ -41,6 +42,7 @@ export async function GET(req, { params }) {
   // um cliente que nunca entrou — foi assim que os quatro portais publicados ficaram com
   // `primeiroAcessoEm` a segundos do `publicadoEm`.
   const preview = new URL(req.url).searchParams.get("preview") === "1";
+  const codigoDoLink = new URL(req.url).searchParams.get("d");
 
   // Quando a lista saiu das nossas mãos para as dele. É o que dá sentido a "mudou desde então".
   const primeiroEnvio = await prisma.portalDestinatario
@@ -380,6 +382,36 @@ export async function GET(req, { params }) {
     if (doPlano.length) {
       dados.planos = [{ assunto: "Planos de controle", total: doPlano.length, itens: doPlano.map((d) => ({ id: d.id, nome: d.nome })) }];
     }
+
+    // ⚠⚠ O ACEITE DO CLIENTE APARECE AQUI. Vitor (26/08/2026): "e já fique mostrando o status no
+    // portal do cliente; o PIT também deve conter o aceite por parte do cliente, não pode deixar de
+    // ter esse aceite".
+    //
+    // ⚠ O LINK DE ACEITE É DA PESSOA, não do portal: sai só para quem tem `?d=` e é destinatário
+    // daquele envio. Um botão de aceitar aberto no portal deixaria qualquer um com o link
+    // aprovando o plano de inspeção da obra em nome do cliente.
+    const st = await statusDosPlanos(prisma, portal.opNumero).catch(() => null);
+    if (st && (st.PIT.enviado || st.PLP.enviado)) {
+      const eu = codigoDoLink ? await destinatarioDoCodigo(codigoDoLink, portal.id).catch(() => null) : null;
+      const meuToken = async (envioId) => {
+        if (!eu?.email || !envioId) return null;
+        const a = await prisma.assinaturaDocumento.findFirst({
+          where: { envioId, email: { equals: eu.email, mode: "insensitive" }, assinadoEm: null },
+          select: { token: true },
+        }).catch(() => null);
+        return a?.token || null;
+      };
+      dados.planosAceite = {};
+      for (const doc of ["PIT", "PLP"]) {
+        const d = st[doc];
+        if (!d.enviado) continue;
+        dados.planosAceite[doc] = {
+          titulo: d.titulo, revisao: d.revisao, enviadoEm: d.enviadoEm,
+          aceito: d.aceito, aceitoEm: d.aceitoEm, aceitoPor: d.aceitoPor,
+          tokenDoAceite: d.aceito ? null : await meuToken(d.envioId),
+        };
+      }
+    }
   }
 
   if (tem("DOCUMENTOS")) {
@@ -419,7 +451,7 @@ export async function GET(req, { params }) {
 
     // ⚠ e QUEM abriu, pelo código do link do e-mail. Sem `?d=`, o acesso fica anônimo — que também é
     // informação: quer dizer que a pessoa entrou por um link repassado, não pelo e-mail que enviamos.
-    await registrarAcesso(req, { portal, codigo: new URL(req.url).searchParams.get("d"), evento: "ABERTURA" });
+    await registrarAcesso(req, { portal, codigo: codigoDoLink, evento: "ABERTURA" });
   }
 
   return NextResponse.json({

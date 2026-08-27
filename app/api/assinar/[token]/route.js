@@ -8,16 +8,21 @@ export const runtime = "nodejs";
 async function carregar(token) {
   return prisma.assinaturaDocumento.findUnique({
     where: { token },
-    include: { envio: { select: { tipo: true, revisao: true, titulo: true, enviadoEm: true } } },
+    include: { envio: { select: { tipo: true, revisao: true, titulo: true, enviadoEm: true, opNumero: true } } },
   });
 }
 
 export async function GET(_req, { params }) {
   const a = await carregar(params.token);
   if (!a) return NextResponse.json({ error: "Link inválido ou expirado." }, { status: 404 });
+  // ⚠ PLP e PIT são ACEITE DO CLIENTE, não validação de setor: a página muda a redação e oferece o
+  // Excel. Chamar de "assinatura do meu setor" na tela do inspetor do cliente é errado no que a
+  // pessoa está afirmando ao clicar.
+  const doObra = a.envio.tipo === "PLP" || a.envio.tipo === "PIT";
   return NextResponse.json({
     nome: a.nome, setor: a.setor, assinadoEm: a.assinadoEm, ip: a.ip,
     titulo: a.envio.titulo, revisao: a.envio.revisao, tipo: a.envio.tipo, enviadoEm: a.envio.enviadoEm,
+    aceiteCliente: doObra, temArquivo: doObra,
   });
 }
 
