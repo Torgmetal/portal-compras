@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X,
   FileText, CheckCircle2, Lock, BookCheck, FileDown, Upload, Send, Copy, Users,
-  FolderOpen, RotateCcw, History, Download, Eye,
+  FolderOpen, RotateCcw, History, Download, Eye, ListChecks,
 } from "lucide-react";
 import NavegadorServidor from "./NavegadorServidor";
 import Volumes from "./Volumes";
@@ -147,6 +147,23 @@ export default function DataBookDetalheClient({ id, userId }) {
     } finally {
       setAcao(null);
     }
+  }
+
+  // ⚠⚠ ESCOLHER À MÃO — o caminho das obras ANTIGAS. Vitor (28/08/2026): "para as obras antigas
+  // que estão antes do portal, você deixa a permissão para podermos selecionar os instrumentos".
+  // A regra automática (só o que os relatórios registraram) devolve vazio para a obra cujos
+  // relatórios foram feitos no papel; sem esta porta, essas obras não fecham o dossiê.
+  async function escolherEmpresa(secao, documentoIds) {
+    setAcao(secao.id);
+    try {
+      const res = await fetch(`/api/qualidade/data-books/secao/${secao.id}/popular-empresa`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentoIds }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Erro");
+      await carregar();
+    } catch (e) { alert(e.message); } finally { setAcao(null); }
   }
 
   async function popularProcedimentos(secao) {
@@ -451,7 +468,7 @@ export default function DataBookDetalheClient({ id, userId }) {
         {data.secoes.map((s) => (
           <SecaoCard key={s.id} secao={s} acaoLoading={acao === s.id}
             onEstado={(e) => setEstado(s, e)} onDesvincular={(docId) => desvincular(s, docId)}
-            onPopularMaterial={() => popularMaterial(s)} onPopularEmpresa={() => popularEmpresa(s)} onPopularProcedimentos={() => popularProcedimentos(s)}
+            onPopularMaterial={() => popularMaterial(s)} onPopularEmpresa={() => popularEmpresa(s)} onEscolherEmpresa={(ids) => escolherEmpresa(s, ids)} onPopularProcedimentos={() => popularProcedimentos(s)}
             onPuxarRelatorios={() => puxarRelatorios(s)} onSavePit={(itens) => savePit(s, itens)} onGerarLpc={() => gerarLpc(s)} onPuxarProjetos={() => puxarProjetos(s)} onReload={carregar} fechado={fechado} />
         ))}
       </div>
@@ -568,8 +585,9 @@ function Campo({ label, v, onChange, type = "text" }) {
   );
 }
 
-function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit, onGerarLpc, onPuxarProjetos, onReload, fechado }) {
+function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMaterial, onPopularEmpresa, onEscolherEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit, onGerarLpc, onPuxarProjetos, onReload, fechado }) {
   const [navegador, setNavegador] = useState(false);
+  const [escolher, setEscolher] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [progresso, setProgresso] = useState(""); // "2/5" durante o upload em lote
   // ⚠ A seção 02 de uma obra grande tem MILHARES de desenhos. Jogar tudo no DOM trava a
@@ -778,6 +796,14 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
                   <FileText size={12} /> Trazer documentos da empresa
                 </button>
               )}
+              {/* ⚠ a escolha à mão é o caminho da OBRA ANTIGA, cujos relatórios foram em papel e
+                  por isso não registram instrumento nenhum no portal. */}
+              {secaoUsaEmpresa(secao.numero) && (
+                <button onClick={() => setEscolher(true)} disabled={acaoLoading}
+                  className="text-[11px] text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
+                  <ListChecks size={12} /> {secao.numero === "19" ? "Escolher instrumentos" : "Escolher documentos"}
+                </button>
+              )}
               {secaoUsaProcedimentos(secao.numero) && (
                 <button onClick={onPopularProcedimentos} disabled={acaoLoading}
                   className="text-[11px] text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
@@ -792,6 +818,10 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
               )}
               </>}
             </div>
+          {escolher && (
+            <EscolherDocsEmpresa secao={secao} onClose={() => setEscolher(false)}
+              onConfirmar={(ids) => { setEscolher(false); onEscolherEmpresa?.(ids); }} />
+          )}
           {navegador && (
             <NavegadorServidor
               secaoId={secao.id}
@@ -933,6 +963,85 @@ function PitEditor({ secao, acaoLoading, onSave }) {
           {acaoLoading ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Salvar PIT
         </button>
         {dirty && <span className="text-[10px] text-amber-600">alterações não salvas</span>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * ESCOLHER À MÃO os documentos da empresa de uma seção — na §19, os instrumentos.
+ *
+ * ⚠ Vem com os USADOS já marcados quando a obra tem relatório emitido: o caminho normal continua
+ * sendo o automático, e a escolha existe para a obra antiga (relatório em papel) e para o
+ * instrumento que o relatório não registrou. Quem escolheu fica no AuditLog.
+ */
+function EscolherDocsEmpresa({ secao, onClose, onConfirmar }) {
+  const [docs, setDocs] = useState(null);
+  const [sel, setSel] = useState(() => new Set());
+  const [erro, setErro] = useState("");
+  const [temUso, setTemUso] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/qualidade/data-books/secao/${secao.id}/popular-empresa`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!j.success) throw new Error(j.error || "Erro ao carregar");
+        setDocs(j.docs || []);
+        setTemUso(!!j.temUso);
+        setSel(new Set((j.docs || []).filter((d) => d.vinculado || d.usado).map((d) => d.id)));
+      })
+      .catch((e) => setErro(e.message));
+  }, [secao.id]);
+
+  const alternar = (id) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-xl my-8">
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-torg-dark">
+              {secao.numero === "19" ? "Escolher instrumentos" : "Escolher documentos"} · §{secao.numero}
+            </p>
+            <p className="text-[11px] text-torg-gray mt-0.5">
+              {secao.numero === "19"
+                ? (temUso
+                    ? "Os marcados são os que os relatórios desta obra registraram. Ajuste se precisar."
+                    : "Esta obra não tem relatório no portal que registre instrumento — marque os que foram usados.")
+                : "Marque os documentos que entram nesta seção."}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        <div className="px-4 py-3 max-h-[55vh] overflow-y-auto">
+          {erro && <p className="text-[12px] text-red-600">{erro}</p>}
+          {!docs && !erro && <p className="text-[12px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> carregando…</p>}
+          {docs?.length === 0 && <p className="text-[12px] text-torg-gray">Nenhum documento em PDF nesta categoria do Controle de Documentos.</p>}
+          <div className="space-y-1">
+            {(docs || []).map((d) => (
+              <label key={d.id} className="flex items-start gap-2 text-[12.5px] px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" className="mt-0.5 accent-torg-blue" checked={sel.has(d.id)} onChange={() => alternar(d.id)} />
+                <span className="min-w-0 flex-1">
+                  <span className="text-torg-dark">{d.nome}</span>
+                  {d.usado && <span className="ml-2 text-[10px] font-semibold text-emerald-700 bg-emerald-50 rounded-full px-1.5 py-0.5">usado nos relatórios</span>}
+                  {d.vinculado && !d.usado && <span className="ml-2 text-[10px] text-torg-gray">já vinculado</span>}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between gap-2">
+          <span className="text-[11px] text-torg-gray">{sel.size} selecionado(s)</span>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="px-3 py-1.5 text-[12px] text-torg-gray hover:text-torg-dark rounded-lg hover:bg-gray-100">Cancelar</button>
+            <button onClick={() => onConfirmar([...sel])} disabled={!sel.size}
+              className="px-3 py-1.5 text-[12px] font-semibold text-white bg-torg-blue rounded-lg hover:bg-torg-dark disabled:opacity-50">
+              Vincular
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

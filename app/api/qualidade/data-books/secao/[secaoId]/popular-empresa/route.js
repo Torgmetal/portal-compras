@@ -11,6 +11,68 @@ import { whereDocsEmpresa, secaoUsaEmpresa, ehPdf } from "@/lib/databook-secoes"
 
 export const runtime = "nodejs";
 
+// ⚠⚠ OBRA ANTIGA NÃO TEM RELATÓRIO NO PORTAL. Vitor (28/08/2026): "para as obras antigas que estão
+// antes do portal, você deixa a permissão para podermos selecionar os instrumentos". A regra
+// automática (só o que os relatórios registraram) é a certa daqui pra frente, mas ela devolve VAZIO
+// para a obra cujos relatórios foram feitos no papel — e essas obras também precisam do dossiê.
+//
+// Então a §19 tem os dois caminhos: o automático, que ninguém precisa conferir, e a ESCOLHA à mão,
+// que fica registrada no AuditLog com o nome de quem escolheu. O que não existe é o meio-termo de
+// puxar os 54 sem ninguém assumir.
+async function instrumentosUsados(prisma, opNumero) {
+  const rels = await prisma.relatorioInspecao.findMany({
+    where: { opNumero, status: "EMITIDO" },
+    select: { equipamentos: true },
+  }).catch(() => []);
+  const usados = new Set();
+  for (const r of rels) {
+    for (const e of Array.isArray(r.equipamentos) ? r.equipamentos : []) {
+      for (const v of [e?.codigo, e?.nome, e?.tag, typeof e === "string" ? e : null]) {
+        if (v) usados.add(String(v).trim().toUpperCase());
+      }
+    }
+  }
+  return usados;
+}
+
+const norm = (v) => String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const casaInstrumento = (d, usados) =>
+  [d.nome, d.arquivoNome].some((v) => {
+    const t = norm(v);
+    return t && [...usados].some((u) => { const n = norm(u); return n && (t.includes(n) || n.includes(t)); });
+  });
+
+// GET — o que esta seção PODE puxar, para a tela deixar escolher à mão.
+export async function GET(_req, { params }) {
+  try { await requireRole(["ADMIN", "QUALIDADE"]); }
+  catch (e) { return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  const secao = await prisma.dataBookSecao.findUnique({
+    where: { id: params.secaoId },
+    select: { numero: true, dataBook: { select: { opNumero: true } }, documentos: { select: { documentoId: true } } },
+  });
+  if (!secao || !secaoUsaEmpresa(secao.numero)) {
+    return NextResponse.json({ success: false, error: "Seção não usa documentos da empresa." }, { status: 400 });
+  }
+  const docs = (await prisma.documentoQualidade.findMany({
+    where: whereDocsEmpresa(secao.numero),
+    select: { id: true, nome: true, arquivoNome: true, arquivoTipo: true, dataValidade: true },
+    orderBy: { nome: "asc" },
+  })).filter(ehPdf);
+
+  const usados = secao.numero === "19" ? await instrumentosUsados(prisma, secao.dataBook?.opNumero) : new Set();
+  const jaVinculados = new Set(secao.documentos.map((d) => d.documentoId));
+  return NextResponse.json({
+    success: true,
+    docs: docs.map((d) => ({
+      id: d.id, nome: d.nome, arquivo: d.arquivoNome, validade: d.dataValidade,
+      usado: usados.size ? casaInstrumento(d, usados) : false,
+      vinculado: jaVinculados.has(d.id),
+    })),
+    temUso: usados.size > 0,
+  });
+}
+
 export async function POST(req, { params }) {
   // 🚫 DATA BOOK FECHADO NÃO SE MEXE — a trava vale em TODA rota que altera seção, não só numa.
   // Vitor (19/08/2026): "os data books emitidos não mexa em nada, é um documento". Uma rota
@@ -49,6 +111,15 @@ export async function POST(req, { params }) {
   });
   let docs = brutos.filter(ehPdf); // só PDF entra no dossiê
 
+  // escolha à mão (obra antiga, ou instrumento que o relatório não registrou)
+  const escolha = await req.json().then((b) => (Array.isArray(b?.documentoIds) ? b.documentoIds : null)).catch(() => null);
+  let semUso = false;
+
+  if (escolha?.length) {
+    const ids = new Set(escolha);
+    docs = docs.filter((d) => ids.has(d.id));
+  } else {
+
   // ── §19: SÓ O INSTRUMENTO QUE MEDIU ESTA OBRA ───────────────────────────────────────────────
   //
   // Vitor (28/08/2026): "nos instrumentos calibrados trazer apenas os que foram marcados como
@@ -58,32 +129,15 @@ export async function POST(req, { params }) {
   // auditoria pega: ela pergunta qual relatório usou o instrumento, e não há resposta.
   //
   // A fonte é o próprio relatório: `equipamentos` guarda o que o inspetor marcou.
-  let semUso = false;
   if (secao.numero === "19") {
-    const rels = await prisma.relatorioInspecao.findMany({
-      // ⚠ só o relatório EMITIDO conta: rascunho é trabalho em curso, e instrumento de rascunho
-      // não pode entrar num dossiê que vai ao cliente.
-      where: { opNumero, status: "EMITIDO" },
-      select: { equipamentos: true },
-    }).catch(() => []);
-    const usados = new Set();
-    for (const r of rels) {
-      for (const e of Array.isArray(r.equipamentos) ? r.equipamentos : []) {
-        for (const v of [e?.codigo, e?.nome, e?.tag, typeof e === "string" ? e : null]) {
-          if (v) usados.add(String(v).trim().toUpperCase());
-        }
-      }
-    }
+    // ⚠ só o relatório EMITIDO conta: rascunho é trabalho em curso, e instrumento de rascunho não
+    // pode entrar num dossiê que vai ao cliente.
+    // ⚠ o certificado se chama "LX-LUXIMETRO", "MPS-MEDIDOR DE ESPESSURA": o CÓDIGO do instrumento
+    // é o prefixo do nome. Casa dos dois lados, porque o inspetor marca "LX 01" e o documento diz
+    // "LX-LUXIMETRO".
+    const usados = await instrumentosUsados(prisma, opNumero);
     if (usados.size) {
-      // ⚠ o certificado se chama "LX-LUXIMETRO", "MPS-MEDIDOR DE ESPESSURA": o CÓDIGO do
-      // instrumento é o prefixo do nome. Casa pelo que o relatório registrou (código ou nome),
-      // dos dois lados, porque o inspetor marca "LX 01" e o documento diz "LX-LUXIMETRO".
-      const norm = (v) => String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-      const bate = (d) => [d.nome, d.arquivoNome].some((v) => {
-        const t = norm(v);
-        return t && [...usados].some((u) => { const n = norm(u); return n && (t.includes(n) || n.includes(t)); });
-      });
-      docs = docs.filter(bate);
+      docs = docs.filter((d) => casaInstrumento(d, usados));
     } else {
       // ⚠ nenhum relatório aponta instrumento: não é para puxar todos. Melhor a seção vazia e a
       // explicação do que 54 certificados que ninguém consegue justificar.
@@ -91,12 +145,13 @@ export async function POST(req, { params }) {
       semUso = true;
     }
   }
+  }
 
   if (!docs.length) {
     return NextResponse.json({
       success: true, vinculados: 0, total: 0, semDocs: true,
       motivo: semUso
-        ? "Nenhum relatório de inspeção desta obra registrou instrumento utilizado. A seção traz só os instrumentos marcados nos relatórios — emita os relatórios e volte aqui."
+        ? "Nenhum relatório de inspeção desta obra registrou instrumento utilizado. A seção traz só os instrumentos marcados nos relatórios — em obra antiga, use \"Escolher instrumentos\" e selecione à mão."
         : undefined,
     });
   }
