@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { estaFechado, erroPrecisaRevisao } from "@/lib/databook-revisao";
-import { secaoUsaProcedimentos, procedimentoCasaSecao, whereProcedimentos } from "@/lib/databook-secoes";
+import { secaoUsaProcedimentos, procedimentoCasaSecao, whereProcedimentos, ehPdf } from "@/lib/databook-secoes";
 
 export const runtime = "nodejs";
 
@@ -43,9 +43,11 @@ export async function POST(req, { params }) {
 
   const procs = await prisma.documentoQualidade.findMany({
     where: whereProcedimentos(),
-    select: { id: true, nome: true },
+    select: { id: true, nome: true, arquivoNome: true, arquivoTipo: true },
   });
-  const aplicaveis = procs.filter((p) => procedimentoCasaSecao(p.nome, secao.numero));
+  // ⚠ só PDF entra no dossiê (ver ehPdf em lib/databook-secoes): o .docx do procedimento é o
+  // original editável, e ele nem sequer sairia no PDF final — o gerador só mescla PDF.
+  const aplicaveis = procs.filter((p) => procedimentoCasaSecao(p.nome, secao.numero)).filter(ehPdf);
   if (!aplicaveis.length) {
     // ⚠ DIZER POR QUE não veio nada. Vitor (19/08): "esses botões estão totalmente fora de
     // funcionamento, não trazem nada de informação". O botão não estava quebrado — a ORIGEM está
