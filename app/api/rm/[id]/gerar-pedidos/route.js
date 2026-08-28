@@ -288,7 +288,11 @@ export async function POST(req, { params }) {
             total,
             itens: linhas.length,
             erro: erroPedido,
-            cNumPedido,
+            // ⚠ era `cNumPedido` solto: a variável não existe aqui (o nome só aparece como CHAVE do
+            // payload lá em cima). Como isto monta o objeto ANTES da promise, o ReferenceError
+            // estourava a rota inteira — e justamente no caminho de ERRO, onde a pessoa já está
+            // tentando entender por que o pedido não foi. `npm run checar` (28/08/2026).
+            cNumPedido: cotacao.numeroProposta || "",
           },
         },
       }).catch(() => {});
