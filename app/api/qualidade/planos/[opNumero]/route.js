@@ -127,7 +127,10 @@ export async function POST(req, { params }) {
       ...extras.filter((o) => o.assina).map((o) => ({ ...o, papel: "Verificação adicional" })),
     ]
       .filter((x) => x?.nome && x?.email)
-      .map((x) => ({ nome: x.nome, email: x.email, setor: x.papel }));
+      // ⚠⚠ A ORDEM É O FLUXO. Vitor (27/08/2026): "o ideal seria o elaborador assinar primeiro, o
+      // verificador assina e o cliente assina por último". Quem verifica não pode validar um
+      // documento que quem elaborou ainda não assumiu.
+      .map((x, i) => ({ nome: x.nome, email: x.email, setor: x.papel, ordem: i + 1 }));
     if (!dest.length) {
       return NextResponse.json({ error: "Preencha quem elabora e quem verifica (nome e e-mail) antes de enviar para verificação." }, { status: 400 });
     }
@@ -138,7 +141,9 @@ export async function POST(req, { params }) {
         email: String(d?.email || "").trim(),
         setor: String(d?.setor || "").trim() || null,
       }))
-      .filter((d) => d.nome && /.+@.+\..+/.test(d.email));
+      .filter((d) => d.nome && /.+@.+\..+/.test(d.email))
+      // o cliente é o último da fila: a etapa dele só existe depois da interna fechada
+      .map((d, i) => ({ ...d, ordem: i + 1 }));
     if (!dest.length) return NextResponse.json({ error: "Informe ao menos um destinatário do cliente (nome + e-mail válido)." }, { status: 400 });
 
     // ⚠⚠ O CLIENTE SÓ RECEBE DEPOIS DA VERIFICAÇÃO INTERNA. Vitor (26/08/2026): "enviar para esses
@@ -175,9 +180,16 @@ export async function POST(req, { params }) {
   let enviados = 0;
   const falhas = [];
 
+  // ⚠⚠ SÓ O PRIMEIRO DA FILA RECEBE AGORA. Os demais são criados com o token pronto e sem convite:
+  // o e-mail de cada um sai quando chega a vez dele (ver /api/assinar/[token], ao registrar a
+  // assinatura). Mandar os três juntos é o que permitia o verificador assinar antes do elaborador.
   for (const d of dest) {
     const token = gerarTokenForte(24);
-    await prisma.assinaturaDocumento.create({ data: { envioId: envio.id, nome: d.nome, email: d.email, setor: d.setor, token } });
+    const primeiro = d.ordem === 1;
+    await prisma.assinaturaDocumento.create({
+      data: { envioId: envio.id, nome: d.nome, email: d.email, setor: d.setor, token, ordem: d.ordem, convidadoEm: primeiro ? new Date() : null },
+    });
+    if (!primeiro) continue;
     const link = `${base}/assinar/${token}`;
     const interno = etapa === "INTERNA";
     const acao = interno ? "a sua verificação" : "o seu aceite";
@@ -201,6 +213,7 @@ export async function POST(req, { params }) {
     }).catch((e) => ({ ok: false, erro: e?.message }));
     if (r?.ok) enviados++; else falhas.push(d.email);
   }
+  const naFila = dest.length - 1;
 
   // ── as cópias: mesmo documento, sem link de assinatura ──
   let emCopia = 0;
@@ -227,7 +240,7 @@ export async function POST(req, { params }) {
   }).catch(() => {});
 
   return NextResponse.json({
-    ok: true, envioId: envio.id, doc, etapa, numero: plano.numero, total: dest.length, enviados, emCopia,
+    ok: true, envioId: envio.id, doc, etapa, numero: plano.numero, total: dest.length, enviados, emCopia, naFila,
     falhas: falhas.length ? falhas : undefined,
     semAnexo: !arquivo || undefined,
   });

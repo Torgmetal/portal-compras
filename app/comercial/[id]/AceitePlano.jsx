@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Send, CheckCircle2, Clock, Mail, Plus, X, AlertCircle, FileText, Save, Lock, FolderCheck } from "lucide-react";
+import { Loader2, Send, CheckCircle2, Clock, Mail, Plus, X, AlertCircle, FileText, Save, Lock, FolderCheck, RotateCcw } from "lucide-react";
 
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 
@@ -107,7 +107,7 @@ export default function AceitePlano({ opNumero, doc, nome }) {
       });
       const j = await rq.json();
       if (!rq.ok) throw new Error(j.error || "Erro ao enviar");
-      setOk(`${j.numero} enviado para ${j.enviados} de ${j.total} destinatário(s)${j.emCopia ? ` · ${j.emCopia} em cópia` : ""}.`);
+      setOk(`${j.numero} enviado para ${j.enviados} destinatário(s)${j.naFila ? ` · ${j.naFila} na fila, recebe quando chegar a vez` : ""}${j.emCopia ? ` · ${j.emCopia} em cópia` : ""}.`);
       setAbrir(false); setNovo({ nome: "", email: "" });
       carregar();
     } catch (e) { setErro(e.message); } finally { setEnviando(""); }
@@ -161,11 +161,31 @@ export default function AceitePlano({ opNumero, doc, nome }) {
       </div>
 
       {/* ── etapa 1: verificação interna ── */}
+      {/* ⚠⚠ DEVOLVIDO PARA REVISÃO. Vitor (27/08/2026): "pode ter a opção de pedir revisão para
+          voltar o processo e subir revisão dos dois documentos". Quando alguém devolve, o
+          documento sobe de revisão e o ciclo recomeça — e quem monta o plano precisa ver o motivo
+          antes de reenviar, senão manda de novo a mesma coisa. */}
+      {(interna?.revisaoPedida || cliente?.revisaoPedida) && (
+        <div className="text-[12px] text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 space-y-1">
+          {[interna?.revisaoPedida, cliente?.revisaoPedida].filter(Boolean).map((r, i) => (
+            <p key={i} className="flex items-start gap-1.5">
+              <RotateCcw size={13} className="mt-0.5 shrink-0" />
+              <span>
+                <b>Revisão pedida por {r.por}</b>{r.papel ? ` (${String(r.papel).toLowerCase()})` : ""} em {fmtDT(r.em)} · era a R{String(r.revisao ?? 0).padStart(2, "0")}
+                {r.motivo ? <span className="block mt-0.5 pl-2 border-l-2 border-amber-300">{r.motivo}</span> : null}
+              </span>
+            </p>
+          ))}
+        </div>
+      )}
+
       {/* ⚠ o botão vai para o FIM DA LINHA. Vitor (27/08/2026): "ajuste esses botões, coloca no
           final da linha". Colado no texto, ele parecia parte da frase — e o olho não achava a ação
           numa tela que tem duas etapas com dois botões parecidos. */}
       <div className="flex items-start gap-3 flex-wrap">
         <div className="flex-1 min-w-[16rem]">
+          {/* ⚠ A FILA, e não uma lista de pendentes. O documento assina em ordem — elabora,
+              verifica, cliente — e o que importa na tela é de QUEM se espera agora. */}
           {interna?.aceito ? (
             <p className="text-[12px] text-emerald-700 inline-flex items-start gap-1.5">
               <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
@@ -174,7 +194,15 @@ export default function AceitePlano({ opNumero, doc, nome }) {
           ) : interna?.enviado ? (
             <p className="text-[12px] text-amber-700 inline-flex items-start gap-1.5">
               <Clock size={14} className="mt-0.5 shrink-0" />
-              <span><b>Em verificação interna</b> — falta {interna.pendentes.join(" e ")}</span>
+              <span>
+                <b>Em verificação interna</b>
+                {interna.vez ? <> — a vez é de <b>{interna.vez.nome}</b>{interna.vez.papel ? ` (${String(interna.vez.papel).toLowerCase()})` : ""}{interna.vez.convidado ? "" : ", ainda sem convite enviado"}</> : null}
+                {interna.assinantes?.length ? (
+                  <span className="block text-torg-gray mt-0.5">
+                    {interna.assinantes.map((a) => `${a.assinadoEm ? "✓" : "·"} ${a.nome}`).join("  →  ")}
+                  </span>
+                ) : null}
+              </span>
             </p>
           ) : (
             <p className="text-[12px] text-torg-gray inline-flex items-start gap-1.5">

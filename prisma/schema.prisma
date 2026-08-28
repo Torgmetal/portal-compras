@@ -4857,6 +4857,9 @@ model EnvioAssinatura {
   enviadoEm    DateTime              @default(now())
   enviadoPorId String?
   opNumero     String? // documento DE UMA OBRA (PLP, PIT): o mesmo tipo convive em várias OPs
+  // EM_ANDAMENTO | CONCLUIDO | REVISAO_PEDIDA — um envio com revisão pedida sai do caminho: o
+  // documento sobe de revisão e o ciclo recomeça do elaborador.
+  status       String   @default("EM_ANDAMENTO")
   assinaturas  AssinaturaDocumento[]
 
   @@index([tipo])
@@ -4899,6 +4902,16 @@ model AssinaturaDocumento {
   token      String          @unique
   assinadoEm DateTime?
   ip         String?
+  // ⚠⚠ A FILA DE ASSINATURA. Vitor (27/08/2026): "o ideal seria o elaborador assinar primeiro, o
+  // verificador assina e o cliente assina por último". Antes os dois recebiam juntos e qualquer um
+  // podia assinar primeiro — o verificador podia validar um documento que o elaborador ainda não
+  // tinha assumido. `ordem` põe cada um na vez, e `convidadoEm` marca quando o e-mail DELE saiu:
+  // quem ainda não foi convidado não recebeu nada e não tem o que assinar.
+  ordem      Int? // 1 = elabora · 2 = verifica · 3 = cliente
+  convidadoEm DateTime?
+  // Pedido de revisão: quem assina pode devolver o documento em vez de assinar.
+  revisaoPedidaEm DateTime?
+  motivo     String?
   envio      EnvioAssinatura @relation(fields: [envioId], references: [id], onDelete: Cascade)
 
   @@index([envioId])
