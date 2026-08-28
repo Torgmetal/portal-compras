@@ -4291,6 +4291,12 @@ enum TipoUsuario {
   ADMIN
   USUARIO
   FUNCIONARIO // acesso de autoatendimento (portal /meu-rh); não passa em módulos internos
+  // ⚠ ACESSO DO CLIENTE. Vitor (28/08/2026): "criar um acesso para um cliente (…) para o portal não
+  // há necessidade de login, mas para uma possível assinatura precisa ser feito o login (…) caso o
+  // cliente já tenha cadastro ele puxa o carimbo". O portal da obra continua aberto por token; o
+  // login existe para ASSINAR: é ele que prova que quem assinou foi a pessoa, e não quem recebeu o
+  // link encaminhado. Sem módulos — não entra em nada do ERP.
+  CLIENTE
 }
 
 enum Modulo {

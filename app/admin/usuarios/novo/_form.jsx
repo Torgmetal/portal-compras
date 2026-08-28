@@ -89,7 +89,7 @@ export default function FormNovoUsuario() {
           name:             form.name.trim(),
           email:            form.email.trim(),
           tipo:             form.tipo,
-          modulos:          form.tipo === "ADMIN" ? [] : form.modulos,
+          modulos:          form.tipo === "USUARIO" ? form.modulos : [],
           setor:            form.setor.trim() || null,
           podeAlterarVerba: form.podeAlterarVerba,
         }),
@@ -210,6 +210,9 @@ export default function FormNovoUsuario() {
                 {[
                   { value: "USUARIO", label: "Usuário", desc: "Acesso restrito aos módulos selecionados" },
                   { value: "ADMIN",   label: "Admin",   desc: "Acesso total ao sistema" },
+                  // ⚠ acesso de FORA: não entra em nada do portal. Serve para o cliente ASSINAR
+                  // documento logado — o portal da obra dele continua abrindo por link, sem login.
+                  { value: "CLIENTE", label: "Cliente", desc: "Só para assinar documentos (sem acesso ao portal)" },
                 ].map(({ value, label, desc }) => (
                   <button
                     key={value}

@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/session";
 import { PAPEL_LABEL, fmtOPdb, baseUrlDe, enviarEmailEtapa, enviarEmailDownloadCliente } from "@/lib/databook-assinaturas";
 
 export const runtime = "nodejs";
@@ -54,6 +55,21 @@ export async function POST(req, { params }) {
   const anterioresOk = etapas.filter((e) => e.ordem < etapa.ordem).every((e) => e.status === "ASSINADO");
   if (!anterioresOk) {
     return NextResponse.json({ success: false, error: "A etapa anterior do fluxo ainda não foi assinada." }, { status: 400 });
+  }
+
+  // ⚠⚠ CLIENTE COM CADASTRO ASSINA LOGADO (Vitor, 28/08/2026). O link prova que a pessoa recebeu o
+  // e-mail; a sessão prova que é ela. Só vale para conta de CLIENTE: o elaborador, o inspetor e o
+  // RT seguem assinando pelo link, como sempre.
+  const conta = etapa.email
+    ? await prisma.user.findFirst({ where: { email: etapa.email, ativo: true, tipo: "CLIENTE" }, select: { id: true } }).catch(() => null)
+    : null;
+  if (conta) {
+    const sessao = await getSession().catch(() => null);
+    const eu = sessao?.user?.email?.toLowerCase();
+    if (!eu) return NextResponse.json({ success: false, error: "Entre com o seu acesso para assinar este documento.", exigeLogin: true }, { status: 401 });
+    if (eu !== String(etapa.email).toLowerCase()) {
+      return NextResponse.json({ success: false, error: `Este documento está endereçado a ${etapa.email}. Entre com esse acesso para assinar.`, exigeLogin: true }, { status: 403 });
+    }
   }
 
   const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || null;

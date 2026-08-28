@@ -127,7 +127,7 @@ export default function PageEditarUsuario() {
       // ⚠ conta do portal do funcionário também não: ela não tem tipo nem módulo do portal.
       if (!proprio && !ehFuncionario) {
         body.tipo = form.tipo;
-        body.modulos = form.tipo === "ADMIN" ? [] : form.modulos;
+        body.modulos = form.tipo === "USUARIO" ? form.modulos : [];
         body.podeAlterarVerba = form.podeAlterarVerba;
       }
 
@@ -344,6 +344,7 @@ export default function PageEditarUsuario() {
                   {[
                     { value: "USUARIO", label: "Usuário", desc: "Acesso restrito aos módulos" },
                     { value: "ADMIN",   label: "Admin",   desc: "Acesso total ao sistema" },
+                    { value: "CLIENTE", label: "Cliente", desc: "Só assina documentos" },
                   ].map(({ value, label, desc }) => (
                     <button
                       key={value}

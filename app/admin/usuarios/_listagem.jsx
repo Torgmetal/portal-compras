@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import {
   Users,
+  Building2,
   UserPlus,
   RefreshCw,
   ChevronDown,
@@ -147,15 +148,16 @@ export default function ListagemUsuarios() {
 
   /* ── Filtragem client-side ─────────────────────────────────────── */
 
-  const ehFuncionario = (u) => u.tipo === "FUNCIONARIO";
-  const daAba = usuarios.filter((u) => (aba === "FUNCIONARIO" ? ehFuncionario(u) : !ehFuncionario(u)));
-  const contar = (fn) => usuarios.filter((u) => fn(u) && (mostrarInativos || u.ativo)).length;
-  const nPortal = contar((u) => !ehFuncionario(u));
-  const nFuncionarios = contar(ehFuncionario);
+  const grupo = (u) => (u.tipo === "FUNCIONARIO" ? "FUNCIONARIO" : u.tipo === "CLIENTE" ? "CLIENTE" : "PORTAL");
+  const daAba = usuarios.filter((u) => grupo(u) === aba);
+  const contar = (g) => usuarios.filter((u) => grupo(u) === g && (mostrarInativos || u.ativo)).length;
+  const nPortal = contar("PORTAL");
+  const nFuncionarios = contar("FUNCIONARIO");
+  const nClientes = contar("CLIENTE");
 
   const usuariosFiltrados = daAba.filter((u) => {
     if (!mostrarInativos && !u.ativo) return false;
-    if (aba === "FUNCIONARIO") return true; // conta de funcionário não tem módulo p/ filtrar
+    if (aba !== "PORTAL") return true; // conta de funcionário/cliente não tem módulo p/ filtrar
     if (filtroModulo) {
       if (filtroModulo === "ADMIN") return u.tipo === "ADMIN";
       const mods = (u.modulos ?? []).map((m) => m.modulo ?? m);
@@ -264,6 +266,7 @@ export default function ListagemUsuarios() {
         {[
           { k: "PORTAL", l: "Acesso ao portal", n: nPortal, icon: Shield },
           { k: "FUNCIONARIO", l: "Portal do funcionário", n: nFuncionarios, icon: Users },
+          { k: "CLIENTE", l: "Clientes", n: nClientes, icon: Building2 },
         ].map((t) => {
           const Icon = t.icon;
           return (
@@ -275,6 +278,14 @@ export default function ListagemUsuarios() {
           );
         })}
       </div>
+
+      {aba === "CLIENTE" && (
+        <p className="text-xs text-torg-gray bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 mb-4">
+          Acessos de <b>cliente</b> — servem para <b>assinar documentos logado</b> (é o login que prova quem assinou, em vez de
+          quem recebeu o link encaminhado). O portal da obra continua abrindo por link, sem login. Cadastre a assinatura para
+          o carimbo dele sair no documento.
+        </p>
+      )}
 
       {aba === "FUNCIONARIO" && (
         <p className="text-xs text-torg-gray bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 mb-4">

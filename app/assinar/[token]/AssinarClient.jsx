@@ -130,9 +130,30 @@ export default function AssinarClient({ token }) {
                   </p>
                 </div>
               </div>
+            ) : info.exigeLogin && !info.logado ? (
+              /* ⚠⚠ QUEM TEM CADASTRO ASSINA LOGADO. Vitor (28/08/2026): "para o portal não há
+                 necessidade de login, mas para uma possível assinatura precisa ser feito o login".
+                 O link prova que a pessoa RECEBEU o e-mail; não prova que é ela quem está clicando —
+                 e link se encaminha. O documento fica visível (ela pode ler e baixar); o que exige a
+                 sessão é o ato de assinar. */
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex items-start gap-3">
+                <Lock size={20} className="text-torg-blue shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-semibold text-torg-dark">Entre com o seu acesso para assinar</p>
+                  <p className="text-sm text-torg-gray mt-0.5 mb-3">
+                    Este documento está endereçado a <strong>{info.email}</strong>. O login é o que registra que quem assinou foi você
+                    {info.temCarimbo ? " — e é ele que traz a sua assinatura para o documento" : ""}.
+                  </p>
+                  <a href={`/entrar?callbackUrl=${encodeURIComponent(`/assinar/${token}`)}`}
+                    className="px-5 py-2.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-semibold inline-flex items-center gap-2">
+                    <Lock size={15} /> Entrar e assinar
+                  </a>
+                  <p className="text-[11px] text-torg-gray mt-2">Não lembra a senha? Use “Esqueci minha senha” na tela de entrada.</p>
+                </div>
+              </div>
             ) : (
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                <p className="text-[12px] text-torg-gray mb-3 inline-flex items-center gap-1.5"><ShieldCheck size={14} className="text-emerald-600" /> Ao {aceite ? "aceitar" : "assinar"}, ficam registrados a sua confirmação, a data/hora e o IP deste acesso.</p>
+                <p className="text-[12px] text-torg-gray mb-3 inline-flex items-center gap-1.5"><ShieldCheck size={14} className="text-emerald-600" /> Ao {aceite ? "aceitar" : "assinar"}, ficam registrados a sua confirmação, a data/hora e o IP deste acesso.{info.logado ? " Você está identificado pelo seu login." : ""}{info.logado && info.temCarimbo ? " A sua assinatura cadastrada sai no documento." : ""}</p>
                 <label className="flex items-start gap-2 text-sm text-torg-dark mb-3 cursor-pointer">
                   <input type="checkbox" checked={concordo} onChange={(e) => setConcordo(e.target.checked)} className="mt-0.5 accent-torg-blue" />
                   <span>{aceite

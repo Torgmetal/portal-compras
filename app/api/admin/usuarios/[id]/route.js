@@ -6,7 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { MODULOS_VALIDOS } from "@/lib/modulos";
 
-const TIPOS_VALIDOS   = ["ADMIN", "USUARIO"];
+// ⚠ CLIENTE é acesso de fora: sem módulo nenhum, serve para ASSINAR documento logado (o portal da
+// obra segue aberto por token). Ver TipoUsuario no schema.
+const TIPOS_VALIDOS   = ["ADMIN", "USUARIO", "CLIENTE"];
 
 const schemaPut = z.object({
   name:             z.string().min(2).max(100).optional(),

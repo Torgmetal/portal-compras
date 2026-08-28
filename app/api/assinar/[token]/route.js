@@ -8,6 +8,7 @@
 // elabora ainda não assumiu — e quem recebe fora da vez não tem o que assinar.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { cabecalhoEmail } from "@/lib/email-layout";
 import { baseUrlDe } from "@/lib/databook-assinaturas";
@@ -21,6 +22,25 @@ async function carregar(token) {
     where: { token },
     include: { envio: { select: { id: true, tipo: true, revisao: true, titulo: true, enviadoEm: true, opNumero: true, snapshot: true, status: true } } },
   });
+}
+
+/**
+ * A conta do portal que responde por este e-mail (se existir).
+ *
+ * ⚠⚠ QUEM TEM CADASTRO ASSINA LOGADO. Vitor (28/08/2026): "para o portal não há necessidade de
+ * login, mas para uma possível assinatura precisa ser feito o login". O link por token prova que a
+ * pessoa RECEBEU o e-mail; não prova que é ela quem está clicando — e link se encaminha. Onde há
+ * cadastro, a sessão prova a identidade, e é só aí que o carimbo dela pode sair no documento.
+ *
+ * ⚠ Sem cadastro nada muda: assina pelo link, com nome, data e IP. É o caso da maioria dos
+ * inspetores de cliente, e travar isso seria travar a assinatura.
+ */
+async function contaDe(email) {
+  if (!email) return null;
+  return prisma.user.findFirst({
+    where: { email, ativo: true, tipo: "CLIENTE" },
+    select: { id: true, name: true, email: true, assinaturaUrl: true },
+  }).catch(() => null);
 }
 
 /** Quem vem antes na fila e ainda não assinou — é quem segura a vez. */
@@ -40,9 +60,15 @@ export async function GET(_req, { params }) {
   const doObra = a.envio.tipo === "PLP" || a.envio.tipo === "PIT";
   const interno = a.envio.tipo === "PLP_INTERNO" || a.envio.tipo === "PIT_INTERNO";
   const anterior = await faltaAntes(a);
+  const conta = await contaDe(a.email);
+  const sessao = conta ? await getSession().catch(() => null) : null;
+  const logadoComoDono = !!sessao?.user?.email && sessao.user.email.toLowerCase() === String(a.email).toLowerCase();
 
   return NextResponse.json({
     nome: a.nome, setor: a.setor, assinadoEm: a.assinadoEm, ip: a.ip,
+    // login exigido só para quem TEM cadastro; o resto assina pelo link, como sempre
+    exigeLogin: !!conta, logado: logadoComoDono, email: conta ? a.email : null,
+    temCarimbo: !!conta?.assinaturaUrl,
     titulo: a.envio.titulo, revisao: a.envio.revisao, tipo: a.envio.tipo, enviadoEm: a.envio.enviadoEm,
     aceiteCliente: doObra, temArquivo: false, verificacaoInterna: interno,
     // ⚠ o documento pode ter sido devolvido por outra pessoa depois que este link saiu
@@ -58,6 +84,17 @@ export async function GET(_req, { params }) {
 export async function POST(req, { params }) {
   const a = await carregar(params.token);
   if (!a) return NextResponse.json({ error: "Link inválido ou expirado." }, { status: 404 });
+
+  // ⚠ a trava vale para ASSINAR e para PEDIR REVISÃO: os dois são atos do signatário.
+  const conta = await contaDe(a.email);
+  if (conta) {
+    const sessao = await getSession().catch(() => null);
+    const eu = sessao?.user?.email?.toLowerCase();
+    if (!eu) return NextResponse.json({ error: "Entre com o seu acesso para assinar este documento.", exigeLogin: true }, { status: 401 });
+    if (eu !== String(a.email).toLowerCase()) {
+      return NextResponse.json({ error: `Este documento está endereçado a ${a.email}. Entre com esse acesso para assinar.`, exigeLogin: true }, { status: 403 });
+    }
+  }
 
   const body = await req.json().catch(() => ({}));
   const pedirRevisao = body?.acao === "REVISAO";
@@ -151,8 +188,11 @@ export async function POST(req, { params }) {
   //
   // ⚠ Copiada, não referenciada: o documento guarda a imagem que foi usada. Trocar a assinatura no
   // cadastro depois não reescreve relatório já assinado.
-  let imagemUrl = null;
-  if (a.envio.tipo === "RELATORIO_INSPECAO" && a.email) {
+  // ⚠ o carimbo do CLIENTE sai em qualquer documento que ele assine logado (Vitor, 28/08/2026:
+  // "caso o cliente já tenha cadastro ele puxa o carimbo"); para os demais segue valendo o
+  // relatório de inspeção, que foi onde a regra nasceu.
+  let imagemUrl = conta?.assinaturaUrl || null;
+  if (!imagemUrl && a.envio.tipo === "RELATORIO_INSPECAO" && a.email) {
     const u = await prisma.user.findFirst({ where: { email: a.email }, select: { assinaturaUrl: true } }).catch(() => null);
     imagemUrl = u?.assinaturaUrl || null;
   }

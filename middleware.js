@@ -92,6 +92,21 @@ export default withAuth(
       return NextResponse.redirect(new URL("/meu-rh", req.url));
     }
 
+    // ⚠⚠ CLIENTE NÃO ENTRA NO PORTAL. Vitor (28/08/2026): o acesso do cliente existe para ASSINAR
+    // documento logado — o portal da obra dele segue aberto por token, sem login. Uma conta de fora
+    // com sessão ativa não pode passear pelo ERP: aqui ela só circula nas páginas de token
+    // (assinatura, portal da obra, data book) e nas de senha.
+    if (token?.tipo === "CLIENTE") {
+      const liberado = ["/assinar", "/api/assinar", "/portal", "/api/portal", "/data-book", "/api/qualidade/data-books/assinar", "/api/qualidade/data-books/aceite", "/trocar-senha", "/api/trocar-senha", "/esqueci-senha", "/api/esqueci-senha", "/entrar", "/sem-acesso"]
+        .some((r) => path === r || path.startsWith(`${r}/`));
+      if (!liberado) {
+        if (path.startsWith("/api/")) return NextResponse.json({ error: "Sem acesso" }, { status: 403 });
+        const url = new URL("/sem-acesso", req.url);
+        url.searchParams.set("de", path);
+        return NextResponse.redirect(url);
+      }
+    }
+
     // Falta de módulo: 403 na API, página explicativa no navegador. NUNCA o login.
     const falta = token ? moduloNegado(path, token) : null;
     if (falta) {

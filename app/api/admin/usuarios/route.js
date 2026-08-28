@@ -8,7 +8,9 @@ import { requireRole } from "@/lib/session";
 import { gerarSenhaTemporaria } from "@/lib/gerar-senha";
 import { MODULOS_VALIDOS } from "@/lib/modulos";
 
-const TIPOS_VALIDOS   = ["ADMIN", "USUARIO"];
+// ⚠ CLIENTE é acesso de fora: sem módulo nenhum, serve para ASSINAR documento logado (o portal da
+// obra segue aberto por token). Ver TipoUsuario no schema.
+const TIPOS_VALIDOS   = ["ADMIN", "USUARIO", "CLIENTE"];
 
 const schemaPost = z.object({
   name:             z.string().min(2, "Nome deve ter pelo menos 2 caracteres").max(100),
