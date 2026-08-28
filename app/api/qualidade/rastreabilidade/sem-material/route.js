@@ -18,7 +18,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { rastreioDaOp } from "@/lib/rastreio-peca";
+import { rastreioDaOp, ehMateriaPrimaDePeca } from "@/lib/rastreio-peca";
 import { casarPerfilComOmie } from "@/lib/casar-omie";
 
 export const runtime = "nodejs";
@@ -36,20 +36,39 @@ export async function GET(req) {
 
   const { porMarca } = await rastreioDaOp(op.numero, op.id);
 
-  // perfil → quantas marcas ficaram sem material
+  // ⚠⚠ DUAS FALTAS DIFERENTES, MESMO REMÉDIO. Vitor (28/08/2026), montando o data book da OP-106:
+  // "temos certificados dos materiais, porém alguns não estão saindo na LPC".
+  //
+  //   SEM_MATERIAL → não há entrada nenhuma desse perfil no CMR da OP.
+  //   ESTOQUE      → HÁ entrada, mas a peça foi CORTADA ANTES de ela chegar. Foi o caso da 106: o
+  //                  aço entrou em 11 e 13/08 e as peças foram cortadas em 3 e 4/08 — o motor se
+  //                  recusa a dizer que a peça saiu de aço que ainda não tinha chegado, e com razão.
+  //
+  // Nos dois casos a peça fica sem certificado no data book, e nos dois quem sabe a resposta é quem
+  // separou o material. Por isso o ESTOQUE entra aqui também: era a única falta sem lugar para ser
+  // resolvida, e a pessoa que monta o data book descobria o problema sem ter onde arrumá-lo.
   const perfis = new Map();
   for (const [marca, v] of porMarca) {
-    if (v.situacao !== "SEM_MATERIAL") continue;
+    if (v.situacao !== "SEM_MATERIAL" && v.situacao !== "ESTOQUE") continue;
     const k = v.perfil || "(sem perfil)";
-    const g = perfis.get(k) || { perfil: k, marcas: 0, exemplos: [] };
+    const g = perfis.get(k) || { perfil: k, marcas: 0, exemplos: [], motivo: v.situacao, cortadoEm: null, materiais: new Set() };
     g.marcas++;
+    // ⚠⚠ O MATERIAL QUE O MOTOR JÁ RECONHECEU vale mais que o palpite do casador. No ESTOQUE a OP
+    // TEM entrada do perfil (ela só chegou tarde), e é a descrição DELA que diz qual aço é este —
+    // procurar no CMR pela descrição que o casador escolhe sozinho trazia outra chapa e, com ela,
+    // certificados de 2025 no lugar do fardo de julho que estava na prateleira.
+    for (const c of v.candidatas || []) if (c.material) g.materiais.add(c.material);
+    // o corte mais antigo do perfil é o que limita quais entradas podem ter sido a origem
+    if (v.cortadoEm && (!g.cortadoEm || v.cortadoEm < g.cortadoEm)) g.cortadoEm = v.cortadoEm;
+    if (g.motivo !== v.situacao) g.motivo = "MISTO";
     if (g.exemplos.length < 6) g.exemplos.push(marca);
     perfis.set(k, g);
   }
   if (!perfis.size) return NextResponse.json({ op, perfis: [] });
 
   // o CMR INTEIRO: é fora da OP que o material de estoque está
-  const cmr = await prisma.documentoQualidade.findMany({
+  // ⚠ menos tinta e consumível de solda — não são origem de peça nenhuma (ver rastreio-peca)
+  const cmrTodo = await prisma.documentoQualidade.findMany({
     where: { categoria: "MATERIAL", ativo: true, importRef: { not: null } },
     select: {
       importRef: true, nome: true, opNumero: true, numeroCorrida: true, numeroDocumento: true,
@@ -57,6 +76,7 @@ export async function GET(req) {
     },
     orderBy: { dataRecebimento: "asc" },
   });
+  const cmr = cmrTodo.filter((c) => ehMateriaPrimaDePeca(c.nome));
   const itens = cmr.map((c) => ({ codigo: null, descricao: c.nome }));
 
   const trocas = new Map(
@@ -67,15 +87,26 @@ export async function GET(req) {
   const out = [];
   for (const g of perfis.values()) {
     const hit = g.perfil === "(sem perfil)" ? null : casarPerfilComOmie(g.perfil, itens);
-    const candidatos = hit
-      ? cmr.filter((c) => c.nome === hit.descricao).slice(0, 40).map((c) => ({
+    // descrições aceitas: as que o motor já usou nesta OP + a que o casador achou
+    const nomes = new Set(g.materiais);
+    if (hit?.descricao) nomes.add(hit.descricao);
+    const candidatos = nomes.size
+      ? cmr.filter((c) => nomes.has(c.nome)).slice(0, 40).map((c) => ({
           r: c.importRef, material: c.nome, op: c.opNumero || null,
           corrida: c.numeroCorrida || null, certificado: c.numeroDocumento || null,
           fornecedor: c.fornecedor || null, recebidoEm: c.dataRecebimento || null,
           pesoKg: Math.round(c.pesoKg || 0), temArquivo: !!c.sharepointItemId,
+          // ⚠ a entrada que chegou DEPOIS do corte não pode ser a origem — fica visível, mas
+          // marcada: é o que separa o candidato plausível do impossível.
+          antesDoCorte: !g.cortadoEm || !c.dataRecebimento
+            ? null
+            : c.dataRecebimento.toISOString().slice(0, 10) <= String(g.cortadoEm).slice(0, 10),
         }))
       : [];
-    out.push({ ...g, candidatos, jaApontado: trocas.get(String(g.perfil).trim().toUpperCase()) || null });
+    // primeiro os que já estavam na casa quando a peça foi cortada, do mais recente para o mais antigo
+    candidatos.sort((a, b) => (b.antesDoCorte === true) - (a.antesDoCorte === true) || new Date(b.recebidoEm || 0) - new Date(a.recebidoEm || 0));
+    const { materiais, ...semSet } = g;
+    out.push({ ...semSet, materiais: [...materiais], candidatos, jaApontado: trocas.get(String(g.perfil).trim().toUpperCase()) || null });
   }
   // mais marcas primeiro: é onde um registro só resolve mais peça
   out.sort((a, b) => b.marcas - a.marcas);
@@ -88,6 +119,7 @@ export async function GET(req) {
       marcas: out.reduce((s, g) => s + g.marcas, 0),
       comCandidato: out.filter((g) => g.candidatos.length).length,
       semCandidato: out.filter((g) => !g.candidatos.length).length,
+      cortadaAntes: out.filter((g) => g.motivo === "ESTOQUE" || g.motivo === "MISTO").length,
     },
   });
 }

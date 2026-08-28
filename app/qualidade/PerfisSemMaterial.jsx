@@ -69,11 +69,12 @@ export default function PerfisSemMaterial() {
       <div className="px-5 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5">
-            <PackageSearch size={15} className="text-torg-blue" /> Perfil sem material no CMR da OP
+            <PackageSearch size={15} className="text-torg-blue" /> Peça sem certificado — de onde veio o aço
           </p>
           <p className="text-[11px] text-torg-gray mt-0.5">
-            Peça que ficou sem R porque não há entrada daquele perfil nesta OP — normalmente material
-            de estoque, comprado sob outra. Aponte de onde veio e o certificado passa a valer.
+            As duas faltas que deixam a peça sem R no data book: <b>sem material</b> (não há entrada
+            desse perfil na OP) e <b>cortada antes da entrega</b> (o aço da OP chegou depois do corte —
+            saiu do estoque). Aponte de onde veio e o certificado passa a valer.
           </p>
         </div>
         <form onSubmit={buscar} className="flex items-center gap-2">
@@ -106,6 +107,13 @@ export default function PerfisSemMaterial() {
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-2">
                     <span className="text-[13px] font-bold text-torg-dark font-mono">{g.perfil}</span>
                     <span className="text-[11px] text-torg-orange-700 font-semibold">{fmtN(g.marcas)} {g.marcas === 1 ? "marca" : "marcas"}</span>
+                    {/* ⚠ dizer QUAL é a falta: "sem material" e "cortada antes" pedem decisões
+                        diferentes — a primeira é material de outra OP, a segunda é sobra de estoque. */}
+                    {g.motivo !== "SEM_MATERIAL" && (
+                      <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 whitespace-nowrap">
+                        cortada antes da entrega{g.cortadoEm ? ` · corte ${fmtD(g.cortadoEm)}` : ""}
+                      </span>
+                    )}
                     <span className="text-[11px] text-torg-gray truncate">{g.exemplos.join(", ")}{g.marcas > g.exemplos.length ? "…" : ""}</span>
                     {g.jaApontado && (
                       <span className="text-[11px] font-semibold text-green-700 inline-flex items-center gap-1">
@@ -127,7 +135,10 @@ export default function PerfisSemMaterial() {
                           <span className="text-torg-gray shrink-0">{c.op ? `OP-${c.op}` : "sem OP"}</span>
                           <span className="text-torg-dark shrink-0">{c.corrida ? `corrida ${c.corrida}` : "sem corrida"}</span>
                           <span className="text-torg-gray truncate max-w-[190px]">{c.certificado || "—"}</span>
-                          <span className="text-torg-gray shrink-0">{fmtD(c.recebidoEm)}</span>
+                          <span className={`shrink-0 ${c.antesDoCorte === false ? "text-amber-700 font-semibold" : "text-torg-gray"}`}
+                            title={c.antesDoCorte === false ? "Chegou DEPOIS do corte — não pode ser a origem desta peça" : undefined}>
+                            {fmtD(c.recebidoEm)}{c.antesDoCorte === false ? " ⚠" : ""}
+                          </span>
                           <span className="text-torg-gray shrink-0">{fmtN(c.pesoKg)} kg</span>
                           {!c.temArquivo && <span className="text-torg-orange-700 shrink-0">sem PDF</span>}
                           <button onClick={() => apontar(g.perfil, c.r)} disabled={!!salvando}
