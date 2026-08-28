@@ -6,10 +6,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { INDICADORES_ISO } from "@/lib/indicadores-iso";
-import { retrabalhoDoAno, serieDoProcesso } from "@/lib/retrabalho";
 import { indicadoresQualidadeIso } from "@/lib/indicadores-qualidade-iso";
 import { indicadoresComercialIso } from "@/lib/indicadores-comercial-iso";
 import { indicadoresRhIso } from "@/lib/indicadores-rh-iso";
+import { indicadoresEngenhariaIso } from "@/lib/indicadores-engenharia-iso";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -50,11 +50,10 @@ export async function GET(req) {
     for (const ci of cInds) { series[ci.id] = ci.serie; acumulados[ci.id] = ci.acumulado; }
   } catch (e) { console.error("[qualidade] comercial:", e?.message); }
 
-  // ── Engenharia: aderência do prazo do projeto (cronograma) ──
-  { const tar = await prisma.cronogramaTarefa.findMany({ where: { departamento: "ENGENHARIA", dataFimReal: { gte: yIni, lt: yFim }, dataFimPrevista: { not: null } }, select: { dataFimReal: true, dataFimPrevista: true } });
-    const ok = arr12(), t = arr12();
-    for (const x of tar) { const m = x.dataFimReal.getUTCMonth(); t[m] = (t[m] || 0) + 1; if (x.dataFimReal <= x.dataFimPrevista) ok[m] = (ok[m] || 0) + 1; }
-    series.aderencia_prazo_projeto = ok.map((v, m) => pct(v || 0, t[m] || 0)); }
+  // ── Engenharia: prazo do projeto, retrabalho e erros de projeto — via lib, a MESMA do painel
+  // /engenharia/indicadores. Duas contas do mesmo indicador divergem na primeira mudança de regra.
+  { const { indicadores: eInds } = await indicadoresEngenhariaIso(prisma, ano);
+    for (const ei of eInds) { series[ei.id] = ei.serie; acumulados[ei.id] = ei.acumulado; } }
 
   // ── Compras: retorno de orçamento (média de dias úteis) ──
   { const cot = await prisma.cotacao.findMany({ where: { recebidaEm: { gte: yIni, lt: yFim } }, select: { createdAt: true, recebidaEm: true } });
@@ -106,16 +105,6 @@ export async function GET(req) {
     const s = arr12(); for (let m = 0; m <= mesFim; m++) s[m] = 0; for (const a of ac) { const m = a.data.getUTCMonth(); if (m <= mesFim) s[m] += 1; }
     series.acidentes_afastamento = s; }
 
-  // ── Engenharia: retrabalho gerado por erro de projeto (peso ÷ produção do mês) ──
-  // Mesma base e mesma meta (≤2%) do retrabalho da Produção, para os dois serem comparáveis.
-  { const r = await retrabalhoDoAno(prisma, ano);
-    series.retrabalho_engenharia = serieDoProcesso(r, "ENGENHARIA").serie; }
-
-  // ── Engenharia: erros de projeto (contagem de RNCs de engenharia/projeto) ──
-  const rncs = await prisma.naoConformidade.findMany({ where: { data: { gte: yIni, lt: yFim } }, select: { data: true, processoArea: true } });
-  { const s = arr12(); for (let m = 0; m <= mesFim; m++) s[m] = 0; const engRe = /ENGENH|PROJET/i;
-    for (const r of rncs) { if (engRe.test(r.processoArea || "")) { const m = r.data.getUTCMonth(); if (m <= mesFim) s[m] += 1; } }
-    series.erros_projeto = s; }
 
   // ── RH: atendimento das competências — DOCUMENTOS reais + dispensas, via lib de RH (mesma
   // fonte do painel /rh/indicadores). Antes usava a matriz de competências e divergia. ──

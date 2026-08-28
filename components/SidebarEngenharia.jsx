@@ -13,12 +13,13 @@ const ITENS = [
   { href: "/engenharia/listas", label: "Listas (LE / LPC)", icon: ListChecks },
   // Tarefas dos cronogramas em ordem de prazo — só as que o Planejamento enviou. (Vitor 19/08.)
   { href: "/engenharia/sequencia", label: "Sequência", icon: ListOrdered },
+  // Indicadores ISO do setor — mesmo painel dos demais (Vitor, 28/08/2026).
+  { href: "/engenharia/indicadores", label: "Indicadores", icon: Gauge },
 ];
 const EM_BREVE = [
   { label: "Detalhamento por OP", icon: FileText, hint: "abre clicando numa OP da carteira" },
   { label: "Reconciliação de Peso", icon: GitCompareArrows },
   { label: "Revisões & Retrabalho", icon: RotateCcw },
-  { label: "Indicadores", icon: Gauge },
 ];
 
 export default function SidebarEngenharia() {
