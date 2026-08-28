@@ -119,7 +119,9 @@ export async function GET(req) {
       linhas.push([f.nome, f.cargo?.nome || "—", falta === 0 ? "Atende (todos em dia)" : `Faltam ${falta} de ${exigidas.length}`]);
     }
     const perc = comRegras > 0 ? Math.round((atende / comRegras) * 1000) / 10 : null;
-    return NextResponse.json({ titulo: "Atendimento das Competências", colunas: ["Colaborador", "Cargo", "Documentos"], linhas, resumo: `${atende} de ${comRegras} colaborador(es) no Prontuário Eletrônico com todos os documentos em dia${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}` });
+    // ⚠ a apuração do indicador é SEMESTRAL; este detalhamento é sempre a foto de HOJE (é o que
+    // dá para conferir nome a nome). Dizer isso evita a leitura de que o número do semestre está errado.
+    return NextResponse.json({ titulo: "Atendimento das Competências", colunas: ["Colaborador", "Cargo", "Documentos"], linhas, resumo: `${atende} de ${comRegras} colaborador(es) no Prontuário Eletrônico com todos os documentos em dia${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`} — foto de hoje; o indicador é apurado no fechamento de cada semestre` });
   }
 
   return NextResponse.json({ error: "Este indicador ainda não tem detalhamento." }, { status: 404 });
