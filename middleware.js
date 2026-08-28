@@ -239,6 +239,9 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|obras|torg-logo.*|estrutura-3d).*)",
+    // ⚠ `equipe` entra aqui pelo mesmo motivo de `obras` e `estrutura-3d`: são ARQUIVOS de /public.
+    // Sem a exceção, o middleware manda a foto para o /entrar (307) e o portal do cliente — que é
+    // público — mostra as iniciais no lugar do rosto, sem erro nenhum na tela.
+    "/((?!_next/static|_next/image|favicon.ico|obras|torg-logo.*|estrutura-3d|equipe).*)",
   ],
 };
