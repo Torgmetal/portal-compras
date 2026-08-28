@@ -12,8 +12,11 @@ const menu = [
   { href: "/qualidade/rastreabilidade", label: "Rastreabilidade", icon: ScrollText },
   { href: "/qualidade/inspecoes", label: "Inspeções", icon: Camera },
   { href: "/qualidade/data-books", label: "Data Books", icon: BookCheck },
-  { href: "/qualidade/auditorias-internas", label: "Auditorias Internas", icon: ClipboardList },
-  { href: "/qualidade/auditorias", label: "Auditorias Externas", icon: ClipboardCheck },
+  // ⚠ Vitor (27/08/2026): "na auditoria internas deixar como Auditorias, e a auditoria externa
+  // deixar como Homologações". Só o RÓTULO muda — a rota segue a mesma, senão link salvo, PDF e
+  // tudo que aponta para cá quebra junto.
+  { href: "/qualidade/auditorias-internas", label: "Auditorias", icon: ClipboardList },
+  { href: "/qualidade/auditorias", label: "Homologações", icon: ClipboardCheck },
   { href: "/qualidade/rnc", label: "RNC", icon: AlertOctagon },
   { href: "/qualidade/indicadores", label: "Indicadores", icon: Gauge },
 ];

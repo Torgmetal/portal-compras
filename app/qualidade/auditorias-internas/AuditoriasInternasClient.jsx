@@ -36,7 +36,7 @@ export default function AuditoriasInternasClient() {
     <div className="space-y-5 max-w-6xl">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2"><ClipboardList className="text-torg-blue" /> Auditorias Internas</h1>
+          <h1 className="text-2xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2"><ClipboardList className="text-torg-blue" /> Auditorias</h1>
           <p className="text-xs text-torg-gray mt-0.5">Programe as auditorias dos setores, emita o relatório e acompanhe os planos de ação.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

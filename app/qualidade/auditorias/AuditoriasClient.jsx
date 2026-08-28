@@ -28,7 +28,7 @@ export default function AuditoriasClient() {
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-lg font-bold text-torg-dark inline-flex items-center gap-2"><ClipboardCheck size={20} className="text-torg-blue" /> Auditorias Externas</h1>
+          <h1 className="text-lg font-bold text-torg-dark inline-flex items-center gap-2"><ClipboardCheck size={20} className="text-torg-blue" /> Homologações</h1>
           <p className="text-xs text-torg-gray mt-0.5">Atenda às solicitações do cliente e publique os documentos num portal exclusivo.</p>
         </div>
         <button onClick={() => setModal(true)} className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-2 hover:bg-torg-dark inline-flex items-center gap-1.5"><Plus size={14} /> Nova auditoria</button>
@@ -86,7 +86,7 @@ function NovaAuditoriaModal({ onClose, onCriada }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
-          <h3 className="font-bold text-torg-dark">Nova auditoria externa</h3>
+          <h3 className="font-bold text-torg-dark">Nova homologação</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
