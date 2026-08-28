@@ -43,10 +43,11 @@ export default function DataBooksClient() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  // ⚠ EM ABERTO EM ORDEM NUMÉRICA (pedido do Vitor): a fila da Qualidade é a das OPs, e procurar a
-  // 083 numa lista por data de criação é procurar no lugar errado. O registro dos concluídos vai na
-  // ordem da emissão — é um livro de registro, e livro de registro é cronológico.
-  const abertos = books.filter((b) => !CONCLUIDO.has(b.status)).sort((a, b) => numOP(a.opNumero) - numOP(b.opNumero));
+  // ⚠ EM ABERTO EM ORDEM NUMÉRICA, DA MAIOR PARA A MENOR (Vitor, 28/08/2026): a OP mais nova é a
+  // que está em montagem agora; as antigas que ainda não fecharam ficam no fim, onde se procura por
+  // elas. O registro dos concluídos vai na ordem da emissão — é um livro de registro, e livro de
+  // registro é cronológico.
+  const abertos = books.filter((b) => !CONCLUIDO.has(b.status)).sort((a, b) => numOP(b.opNumero) - numOP(a.opNumero));
   const concluidos = books.filter((b) => CONCLUIDO.has(b.status))
     .sort((a, b) => new Date(b.emitidoEm || b.createdAt) - new Date(a.emitidoEm || a.createdAt));
   const lista = aba === "CONCLUIDOS" ? concluidos : abertos;
