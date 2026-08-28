@@ -4,7 +4,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { criarPedidoOmie, anexarAoPedidoOmie } from "@/lib/omie-pedido-compra";
-import { resolverCodProjetoPorOp } from "@/lib/omie-pedidos-abertos";
+import { resolverCodProjetoPorOp, resolverCodProjetoPorNome } from "@/lib/omie-pedidos-abertos";
+
+// RMs Consumíveis (INTERNA) não têm obra própria → vinculam ao projeto geral.
+const PROJETO_CONSUMIVEL = "OP 000 - GERAL TORG";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -45,6 +48,11 @@ export async function POST(req, { params }) {
   if (rm.op?.numero) {
     try { nCodProjOP = await resolverCodProjetoPorOp(rm.op.numero); }
     catch (e) { console.error("[rm gerar-pedidos] falha ao resolver projeto:", e?.message); }
+  }
+  // RM Consumível (INTERNA) sem projeto de OP → vincula ao "OP 000 - GERAL TORG".
+  if (!nCodProjOP && rm.tipoRM === "INTERNA") {
+    try { nCodProjOP = await resolverCodProjetoPorNome(PROJETO_CONSUMIVEL); }
+    catch (e) { console.error("[rm gerar-pedidos] falha ao resolver projeto GERAL TORG:", e?.message); }
   }
 
   const itemPorId = new Map();
