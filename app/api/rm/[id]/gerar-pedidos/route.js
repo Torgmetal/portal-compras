@@ -6,7 +6,7 @@ import { requireRole } from "@/lib/session";
 import { criarPedidoOmie, anexarAoPedidoOmie } from "@/lib/omie-pedido-compra";
 import { resolverCodProjetoPorOp, resolverCodProjetoPorNome } from "@/lib/omie-pedidos-abertos";
 import { previsaoEntregaDDMMYYYY } from "@/lib/prazo-entrega";
-import { comCertificadoQualidade } from "@/lib/certificado-qualidade";
+import { TEXTO_CERTIFICADO_QUALIDADE } from "@/lib/certificado-qualidade";
 
 // RMs Consumíveis (INTERNA) não têm obra própria → vinculam ao projeto geral.
 const PROJETO_CONSUMIVEL = "OP 000 - GERAL TORG";
@@ -180,7 +180,6 @@ export async function POST(req, { params }) {
 
     const total = itensPayload.reduce((s, it) => s + it.qtd * it.precoUnit, 0);
     const temIPI = linhas.some((l) => Number(l.cotItem.ipiPct) > 0);
-    const cNumPedido = rm.numero;
     const observacaoBase = [
       `Pedido via Workspace Torg — RM ${rm.numero} (${rm.descricao || "Interna"})`,
       temIPI ? "Preço unitário inclui IPI" : null,
@@ -189,8 +188,9 @@ export async function POST(req, { params }) {
       cotacao.numeroProposta ? `Proposta forn.: ${cotacao.numeroProposta}` : null,
       cotacao.observacao || null,
     ].filter(Boolean).join(" | ");
-    // RM de matéria-prima (ENGENHARIA): anexa os requisitos de certificado de qualidade.
-    const observacaoPedido = comCertificadoQualidade(observacaoBase, rm.tipoRM);
+    // RM de matéria-prima (ENGENHARIA): requisitos de certificado vão na observação EXTERNA
+    // (cObs, impressa pro fornecedor). A observação interna (cObsInt) fica só com o resto.
+    const cObsExterna = rm.tipoRM === "ENGENHARIA" ? TEXTO_CERTIFICADO_QUALIDADE : "";
 
     const cnpjFinal = cnpjsPorCotacao[cotacao.id] || cotacao.cnpj || null;
 
@@ -210,10 +210,13 @@ export async function POST(req, { params }) {
       const dDtPrevisao = previsaoEntregaDDMMYYYY(cotacao.observacao) || undefined;
       const data = await criarPedidoOmie({
         itens: itensPayload,
-        observacao: observacaoPedido,
+        observacao: observacaoBase,
         nCodFor: Number(cotacao.nCodOmie) || 0,
         cnpjFornecedor: cnpjFinal,
-        cNumPedido,
+        // Nº do Pedido do Fornecedor = código da proposta do fornecedor; Nº do Contrato = nº da RM.
+        cNumPedido: cotacao.numeroProposta || "",
+        cContrato: rm.numero,
+        cObs: cObsExterna,
         nQtdeParc: 1,
         cCodCateg: categoriaSelecionada,
         cCodLocalEstoque: localSelecionado,
@@ -259,7 +262,7 @@ export async function POST(req, { params }) {
             total,
             faturamentoDireto: false,
             status: "CRIADO",
-            observacao: observacaoPedido,
+            observacao: observacaoBase,
             categoriaCompra: categoriaSelecionada,
             localEstoque: localSelecionado,
             payload: itensPayload,

@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/session";
 import { criarPedidoOmie, anexarAoPedidoOmie } from "@/lib/omie-pedido-compra";
 import { resolverCodProjetoPorOp } from "@/lib/omie-pedidos-abertos";
 import { previsaoEntregaDDMMYYYY } from "@/lib/prazo-entrega";
-import { comCertificadoQualidade } from "@/lib/certificado-qualidade";
+import { TEXTO_CERTIFICADO_QUALIDADE } from "@/lib/certificado-qualidade";
 import { fdPorCategoriaDaOP, rmEhFD, itemEhFD } from "@/lib/faturamento-direto";
 
 export const runtime = "nodejs";
@@ -252,9 +252,9 @@ export async function POST(req, { params }) {
     ]
       .filter(Boolean)
       .join(" | ");
-    // Requisitos de certificado de qualidade só quando o pedido cobre matéria-prima (RM ENGENHARIA).
+    // Requisitos de certificado de qualidade (matéria-prima) vão na observação EXTERNA (cObs).
     const ehMateriaPrima = [...rmIdsEnvolvidas].some((id) => tipoRMPorId.get(id) === "ENGENHARIA");
-    const observacaoPedido = comCertificadoQualidade(observacaoBase, ehMateriaPrima ? "ENGENHARIA" : null);
+    const cObsExterna = ehMateriaPrima ? TEXTO_CERTIFICADO_QUALIDADE : "";
 
     // Categoria e local de estoque vem do modal de geracao (uma vez pra todos)
     const cCodCateg = categoriaSelecionada;
@@ -283,10 +283,13 @@ export async function POST(req, { params }) {
     try {
       const data = await criarPedidoOmie({
         itens: itensPayload,
-        observacao: observacaoPedido,
+        observacao: observacaoBase,
         nCodFor: Number(cotacao.nCodOmie) || 0,
         cnpjFornecedor: cnpjFinal,
-        cNumPedido,
+        // Nº do Pedido do Fornecedor = código da proposta; Nº do Contrato = referência da(s) RM(s).
+        cNumPedido: cotacao.numeroProposta || "",
+        cContrato: cNumPedido,
+        cObs: cObsExterna,
         nQtdeParc: isFD ? 0 : 1,
         cCodCateg,
         cCodLocalEstoque,
@@ -334,7 +337,7 @@ export async function POST(req, { params }) {
             total,
             faturamentoDireto: isFD,
             status: "CRIADO",
-            observacao: observacaoPedido,
+            observacao: observacaoBase,
             categoriaCompra: cCodCateg,
             localEstoque: cCodLocalEstoque,
             payload: itensPayload,
