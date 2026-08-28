@@ -54,7 +54,21 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({ success: true, data });
+  // ⚠ AS OPs VÃO JUNTO, para a criação ser uma ESCOLHA e não uma digitação. Vitor (28/08/2026):
+  // "na criação do data book preciso que deixe a listagem de OPs". Digitar "083" à mão é como se
+  // cria data book na obra errada — e o dossiê nasce com cliente e peso de outra.
+  const jaTem = new Set(books.map((b) => b.opNumero));
+  const ops = await prisma.oP.findMany({
+    where: { status: { not: "CANCELADA" } },
+    select: { numero: true, cliente: true, obra: true, status: true, tipoDataBook: true },
+    orderBy: { numero: "desc" },
+    take: 400,
+  });
+  return NextResponse.json({
+    success: true,
+    data,
+    ops: ops.map((o) => ({ ...o, temDataBook: jaTem.has(o.numero) })),
+  });
 }
 
 export async function POST(req) {
