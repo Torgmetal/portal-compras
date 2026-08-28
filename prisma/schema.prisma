@@ -808,6 +808,10 @@ model PedidoOmie {
   criadoManualmente    Boolean          @default(false)
   opId                 String?
   categoriaItem        String?
+  // Categoria de compra + local de estoque escolhidos ao gerar o pedido no Omie —
+  // guardados pra pré-preencher o próximo pedido do mesmo fornecedor (histórico).
+  categoriaCompra      String?
+  localEstoque         String?
   itensDetalhes        Json?
   rmAtendidaId         String?
   dataEntregaReal      DateTime?

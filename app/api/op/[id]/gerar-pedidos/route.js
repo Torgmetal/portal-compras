@@ -325,6 +325,8 @@ export async function POST(req, { params }) {
             faturamentoDireto: isFD,
             status: "CRIADO",
             observacao: observacaoBase,
+            categoriaCompra: cCodCateg,
+            localEstoque: cCodLocalEstoque,
             payload: itensPayload,
             resposta: pedidoCriado || null,
             createdById: user.id,

@@ -894,6 +894,7 @@ function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalG
   const [carregandoOpcoes, setCarregandoOpcoes] = useState(true);
   const [erroOpcoes, setErroOpcoes] = useState("");
   const [erroGeral, setErroGeral] = useState("");
+  const [prefInfo, setPrefInfo] = useState(null); // histórico de categoria/local do fornecedor
 
   useEffect(() => {
     setCarregandoOpcoes(true);
@@ -909,6 +910,21 @@ function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalG
       })
       .finally(() => setCarregandoOpcoes(false));
   }, []);
+
+  // Histórico: se já houve pedido desses fornecedores, pré-preenche categoria + local.
+  useEffect(() => {
+    const cnpjs = [...new Set(fornecedoresVencedores.map((f) => (f.cnpj || "").replace(/\D/g, "")).filter((c) => c.length >= 11))];
+    if (!cnpjs.length) return;
+    fetch(`/api/compras/pedido-pref?cnpjs=${cnpjs.join(",")}`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!j?.sugestao) return;
+        setCategoria((prev) => prev || j.sugestao.categoria || "");
+        setLocalEstoque((prev) => prev || String(j.sugestao.localEstoque || ""));
+        setPrefInfo(j.sugestao);
+      })
+      .catch(() => {});
+  }, [fornecedoresVencedores]);
 
   const setCnpj = (cotId, val) => setCnpjPorCotacao((p) => ({ ...p, [cotId]: val }));
 
@@ -1099,6 +1115,13 @@ function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalG
               />
             )}
           </div>
+
+          {prefInfo && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-xs text-emerald-800 flex items-start gap-2">
+              <Award size={14} className="mt-0.5 shrink-0" />
+              <span>Pré-preenchido pelo <strong>último pedido</strong> de {prefInfo.fornecedorNome}{prefInfo.quando ? ` (${new Date(prefInfo.quando).toLocaleDateString("pt-BR")})` : ""}. Confira e ajuste se precisar.</span>
+            </div>
+          )}
 
           <div className="bg-torg-blue-50 border border-torg-blue-100 rounded-lg p-3 text-xs text-torg-dark">
             <p>

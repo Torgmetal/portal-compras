@@ -245,6 +245,8 @@ export async function POST(req, { params }) {
             faturamentoDireto: false,
             status: "CRIADO",
             observacao: observacaoBase,
+            categoriaCompra: categoriaSelecionada,
+            localEstoque: localSelecionado,
             payload: itensPayload,
             resposta: pedidoCriado || null,
             createdById: user.id,
