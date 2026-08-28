@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/session";
 import { baixarDesenho, garantirDesenhos } from "@/lib/relatorio-dimensional";
 import { usaCotas } from "@/lib/qualidade-campo";
 import { gerarPDFdoRelatorio } from "@/lib/relatorio-render";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -75,7 +76,7 @@ export async function GET(req, { params }) {
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${rel.codigo}.pdf"`,
+      "Content-Disposition": dispArquivo(`${rel.codigo}.pdf`, "inline"),
     },
   });
 }

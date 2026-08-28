@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { numRAC } from "@/lib/calibracao";
 import { gerarAvaliacaoCalibracaoPDF } from "@/lib/avaliacao-calibracao-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -24,7 +25,7 @@ export async function GET(_req, { params }) {
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="Avaliacao Calibracao ${numRAC(av.numero)}.pdf"`,
+      "Content-Disposition": dispArquivo(`Avaliacao Calibracao ${numRAC(av.numero)}.pdf`, "inline"),
       "Cache-Control": "no-store",
     },
   });

@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarComprovantePontoPDF } from "@/lib/ponto-comprovante-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -30,5 +31,5 @@ export async function GET(req) {
 
   await prisma.auditLog.create({ data: { userId: user.id, action: "COMPROVANTE_PONTO", entity: "PontoCompetencia", entityId: competencia, diff: { competencia, total: itens.length } } }).catch(() => {});
 
-  return new Response(Buffer.from(out.bytes), { status: 200, headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${out.filename}"` } });
+  return new Response(Buffer.from(out.bytes), { status: 200, headers: { "Content-Type": "application/pdf", "Content-Disposition": dispArquivo(out.filename, "attachment") } });
 }

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { MODS_RELATORIOS } from "@/lib/relatorios";
 import { gerarRelatorioStatusPDF } from "@/lib/relatorio-status-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 120; // embutir várias fotos pode levar tempo
@@ -30,7 +31,7 @@ export async function GET(_req, { params }) {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${nome}"`,
+      "Content-Disposition": dispArquivo(nome, "inline"),
       "Cache-Control": "private, no-store",
     },
   });

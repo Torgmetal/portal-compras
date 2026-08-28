@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { getRevisao, fmtRev } from "@/lib/assinatura-doc";
 import { gerarCronogramaAuditoriaPDF } from "@/lib/cronograma-auditoria-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -24,7 +25,7 @@ export async function GET() {
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="Cronograma de Auditoria Interna ${ano} ${fmtRev(revisao)}.pdf"`,
+      "Content-Disposition": dispArquivo(`Cronograma de Auditoria Interna ${ano} ${fmtRev(revisao)}.pdf`, "inline"),
       "Cache-Control": "no-store",
     },
   });

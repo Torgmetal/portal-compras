@@ -2,6 +2,7 @@
 import { prisma } from "@/lib/prisma";
 import { gerarDataBookPDF } from "@/lib/databook-pdf";
 import { responderVolume } from "@/lib/databook-download";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -28,7 +29,7 @@ export async function GET(req, { params }) {
   return new Response(bytes, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${filename}"`,
+      "Content-Disposition": dispArquivo(filename, inline ? "inline" : "attachment"),
     },
   });
 }

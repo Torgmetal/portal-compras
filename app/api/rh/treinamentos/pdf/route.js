@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { getRevisao, fmtRev } from "@/lib/assinatura-doc";
 import { gerarPlanoTreinamentoPDF } from "@/lib/plano-treinamento-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -52,7 +53,7 @@ export async function GET(req) {
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="Plano de Treinamentos ${ano} ${fmtRev(revisao)}${minuta ? " (MINUTA)" : ""}.pdf"`,
+      "Content-Disposition": dispArquivo(`Plano de Treinamentos ${ano} ${fmtRev(revisao)}${minuta ? " (MINUTA)" : ""}.pdf`, "inline"),
       "Cache-Control": "no-store",
     },
   });

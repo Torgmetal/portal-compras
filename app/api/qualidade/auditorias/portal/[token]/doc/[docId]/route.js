@@ -2,6 +2,7 @@
 // compartilhado na auditoria (resolve a fonte: Blob ou SharePoint). Sem login.
 import { prisma } from "@/lib/prisma";
 import { downloadFileById } from "@/lib/sharepoint";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -33,7 +34,7 @@ export async function GET(req, { params }) {
     return new Response(buffer, {
       headers: {
         "Content-Type": contentType,
-        "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${filename}"`,
+        "Content-Disposition": dispArquivo(filename, inline ? "inline" : "attachment"),
       },
     });
   } catch {

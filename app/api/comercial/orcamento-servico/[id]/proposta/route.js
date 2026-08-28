@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/session";
 import { gerarPropostaDocx } from "@/lib/proposta-servico-docx";
 import { gerarPropostaPDF } from "@/lib/proposta-servico-pdf";
 import { converterDocxParaPdf, cloudConvertConfigurado } from "@/lib/cloudconvert";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -48,5 +49,5 @@ export async function GET(req, { params }) {
     data: { userId: user.id, action: "GERAR_PROPOSTA_SERVICO", entity: "OrcamentoServico", entityId: o.id, diff: { formato: pdf ? "pdf" : "docx" } },
   }).catch(() => {});
 
-  return new Response(buffer, { status: 200, headers: { "Content-Type": contentType, "Content-Disposition": `attachment; filename="${filename}"` } });
+  return new Response(buffer, { status: 200, headers: { "Content-Type": contentType, "Content-Disposition": dispArquivo(filename, "attachment") } });
 }

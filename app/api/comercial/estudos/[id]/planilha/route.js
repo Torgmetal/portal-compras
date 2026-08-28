@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarPlanilhaLqc } from "@/lib/lqc-planilha";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -16,11 +17,10 @@ export async function GET(req, { params }) {
 
   try {
     const { buffer, nome, avisos, modelo } = await gerarPlanilhaLqc(estudo);
-    const ascii = nome.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\x20-\x7E]/g, "-");
     return new NextResponse(buffer, {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(nome)}`,
+        "Content-Disposition": dispArquivo(nome, "attachment"),
         // ⚠ o que não coube viaja no cabeçalho: a tela avisa em vez de o arquivo sair mudo.
         ...(avisos.length ? { "X-Avisos": encodeURIComponent(avisos.join(" | ")) } : {}),
         // qual modelo virou este arquivo — rastreável sem precisar abrir o servidor

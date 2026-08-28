@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { secoesDoPortal } from "@/lib/portal-cliente";
 import { LISTAS, pecasDaLista, sincronizarRevisao } from "@/lib/portal-listas";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais } from "@/lib/excel-relatorio";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -95,12 +96,10 @@ export async function GET(req, { params }) {
   // ⚠ `filename=` só aceita ASCII com segurança, e o rótulo de revisão de obra com mais de uma
   // frente vem com "·" e acentos. Sem o par ASCII + filename*, parte dos navegadores salva o
   // arquivo com o nome truncado ou trocado — e o cliente fica com "download.xlsx" na pasta.
-  const ascii = bonito.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x20-\x7E]/g, "-");
   return new NextResponse(buf, {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition":
-        `attachment; filename="${ascii}.xlsx"; filename*=UTF-8''${encodeURIComponent(`${bonito}.xlsx`)}`,
+      "Content-Disposition": dispArquivo(`${bonito}.xlsx`, "attachment"),
       "Cache-Control": "no-store",
     },
   });

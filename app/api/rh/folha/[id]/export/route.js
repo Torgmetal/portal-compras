@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { calcDerivados, resumo } from "@/lib/folha-calc";
 import * as XLSX from "xlsx";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -55,7 +56,7 @@ export async function GET(_req, { params }) {
   return new NextResponse(buf, {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="folha-${folha.competencia}.xlsx"`,
+      "Content-Disposition": dispArquivo(`folha-${folha.competencia}.xlsx`, "attachment"),
     },
   });
 }

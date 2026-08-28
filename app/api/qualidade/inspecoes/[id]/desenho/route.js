@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { baixarDesenho } from "@/lib/relatorio-dimensional";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -37,7 +38,7 @@ export async function GET(req, { params }) {
   return new NextResponse(bytes, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${alvo.nome || "desenho"}.pdf"`,
+      "Content-Disposition": dispArquivo(`${alvo.nome || "desenho"}.pdf`, "inline"),
       // o desenho muda pouco, mas revisão nova tem de aparecer — cache curto, do navegador só
       "Cache-Control": "private, max-age=300",
     },

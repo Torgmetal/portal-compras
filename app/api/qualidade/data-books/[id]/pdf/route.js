@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { gerarDataBookPDF } from "@/lib/databook-pdf";
 import { montarRoteiro } from "@/lib/databook-volumes";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 // Acima disto o arquivo único deixa de ser entregável: não fecha dentro da função e
 // o leitor de PDF do cliente engasga. O caminho passa a ser gerar em volumes.
@@ -46,7 +47,7 @@ export async function GET(req, { params }) {
   const nome = out.filename.replace(/["\r\n]/g, "");
   const headers = new Headers();
   headers.set("Content-Type", "application/pdf");
-  headers.set("Content-Disposition", `${inline ? "inline" : "attachment"}; filename="${nome}"`);
+  headers.set("Content-Disposition", dispArquivo(nome, inline ? "inline" : "attachment"));
   headers.set("Cache-Control", "private, no-store");
   return new Response(Buffer.from(out.bytes), { status: 200, headers });
 }

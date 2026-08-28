@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 // Exporta o Fluxo de Caixa em Excel por período + filtros (banco, categoria,
 // fornecedor, tipo, situação). Consulta o banco direto — qualquer período.
@@ -94,7 +95,7 @@ export async function GET(req) {
     status: 200,
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="${nome}"`,
+      "Content-Disposition": dispArquivo(nome, "attachment"),
     },
   });
 }

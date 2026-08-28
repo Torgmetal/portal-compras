@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { indicadoresRhIso } from "@/lib/indicadores-rh-iso";
 import { gerarIndicadoresIsoPDF } from "@/lib/indicadores-iso-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -19,6 +20,6 @@ export async function GET(req) {
   const { indicadores } = await indicadoresRhIso(prisma, ano);
   const bytes = await gerarIndicadoresIsoPDF({ titulo: "Indicadores de RH e Segurança do Trabalho (ISO)", ano, indicadores, mesFim });
   return new NextResponse(Buffer.from(bytes), {
-    headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="indicadores-rh-${ano}.pdf"` },
+    headers: { "Content-Type": "application/pdf", "Content-Disposition": dispArquivo(`indicadores-rh-${ano}.pdf`, "inline") },
   });
 }

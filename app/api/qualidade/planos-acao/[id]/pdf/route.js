@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarPlanoAcaoPDF } from "@/lib/plano-acao-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,5 +21,5 @@ export async function GET(_req, { params }) {
   catch (e) { return NextResponse.json({ success: false, error: "Falha ao gerar o PDF: " + (e?.message || "erro") }, { status: 500 }); }
 
   await prisma.auditLog.create({ data: { userId: user.id, action: "EXPORTAR_PLANO_ACAO_PDF", entity: "PlanoAcao", entityId: p.id, diff: {} } }).catch(() => {});
-  return new Response(Buffer.from(out.bytes), { status: 200, headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${out.filename}"` } });
+  return new Response(Buffer.from(out.bytes), { status: 200, headers: { "Content-Type": "application/pdf", "Content-Disposition": dispArquivo(out.filename, "inline") } });
 }

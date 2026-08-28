@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { secoesDoPortal } from "@/lib/portal-cliente";
 import { isBlobUrlSegura } from "@/lib/blob-url";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -72,7 +73,7 @@ export async function GET(req, { params }) {
     "Content-Type": "application/pdf",
     // ⚠ volume passa de 90 MB; `inline` faria o navegador tentar renderizar tudo antes de mostrar
     // qualquer coisa. Anexo baixa e abre no leitor do cliente, que é onde ele vai ler mesmo.
-    "Content-Disposition": `attachment; filename="${nome.replace(/["\r\n]/g, "")}"`,
+    "Content-Disposition": dispArquivo(nome, "attachment"),
     "Cache-Control": "private, no-store",
   });
   const len = res.headers.get("content-length");

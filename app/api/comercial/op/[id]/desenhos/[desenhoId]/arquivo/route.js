@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { downloadFileById } from "@/lib/sharepoint";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -33,7 +34,7 @@ export async function GET(_req, { params }) {
     status: 200,
     headers: {
       "Content-Type": isPdf ? "application/pdf" : (file.contentType || "application/octet-stream"),
-      "Content-Disposition": `${isPdf ? "inline" : "attachment"}; filename="${nomeSeguro}"`,
+      "Content-Disposition": dispArquivo(nomeSeguro, isPdf ? "inline" : "attachment"),
       "Cache-Control": "private, no-store",
     },
   });

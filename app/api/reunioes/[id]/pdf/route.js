@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarAtaPDF } from "@/lib/ata-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -27,6 +28,6 @@ export async function GET(_req, { params }) {
 
   return new Response(Buffer.from(out.bytes), {
     status: 200,
-    headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${out.filename}"` },
+    headers: { "Content-Type": "application/pdf", "Content-Disposition": dispArquivo(out.filename, "inline") },
   });
 }

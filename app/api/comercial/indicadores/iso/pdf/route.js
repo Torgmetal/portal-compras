@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { indicadoresComercialIso } from "@/lib/indicadores-comercial-iso";
 import { gerarIndicadoresIsoPDF } from "@/lib/indicadores-iso-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,6 @@ export async function GET(req) {
   const { indicadores } = await indicadoresComercialIso(ano);
   const bytes = await gerarIndicadoresIsoPDF({ titulo: "Indicadores do Comercial (ISO)", ano, indicadores, mesFim });
   return new NextResponse(Buffer.from(bytes), {
-    headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="indicadores-comercial-${ano}.pdf"` },
+    headers: { "Content-Type": "application/pdf", "Content-Disposition": dispArquivo(`indicadores-comercial-${ano}.pdf`, "inline") },
   });
 }

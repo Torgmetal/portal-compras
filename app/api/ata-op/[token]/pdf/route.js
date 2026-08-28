@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { gerarAtaOPPDF } from "@/lib/ata-op-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -21,7 +22,7 @@ export async function GET(_req, { params }) {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${out.filename.replace(/["\r\n]/g, "")}"`,
+      "Content-Disposition": dispArquivo(out.filename, "inline"),
       "Cache-Control": "private, no-store",
     },
   });

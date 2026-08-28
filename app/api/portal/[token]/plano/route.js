@@ -9,6 +9,7 @@ import { secoesDoPortal } from "@/lib/portal-cliente";
 import { gerarPlanoClientePDF } from "@/lib/plano-cliente-pdf";
 import { comResponsaveis } from "@/lib/planos-aceite";
 import { registrarAcesso } from "@/lib/portal-acesso";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -45,7 +46,7 @@ export async function GET(req, { params }) {
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${doc}-T${portal.opNumero}.pdf"`,
+      "Content-Disposition": dispArquivo(`${doc}-T${portal.opNumero}.pdf`, "inline"),
       "Cache-Control": "no-store",
     },
   });

@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { gerarPropostaPDF } from "@/lib/proposta-servico-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,6 +18,6 @@ export async function GET(_req, { params }) {
 
   return new Response(Buffer.from(out.bytes), {
     status: 200,
-    headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${out.numeroPtc}.pdf"` },
+    headers: { "Content-Type": "application/pdf", "Content-Disposition": dispArquivo(`${out.numeroPtc}.pdf`, "inline") },
   });
 }

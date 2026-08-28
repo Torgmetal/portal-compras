@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { DOCS, montarPlano, tipoDoEnvio, comResponsaveis } from "@/lib/planos-aceite";
 import { gerarPlanoClientePDF } from "@/lib/plano-cliente-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ export async function GET(req, { params }) {
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${doc}-T${opNumero}${envios.length ? "" : "-MINUTA"}.pdf"`,
+      "Content-Disposition": dispArquivo(`${doc}-T${opNumero}${envios.length ? "" : "-MINUTA"}.pdf`, "inline"),
       "Cache-Control": "no-store",
     },
   });

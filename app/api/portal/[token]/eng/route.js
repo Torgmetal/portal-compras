@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { getAccessToken } from "@/lib/sharepoint";
 import { secoesDoPortal, tipoDoDocEng } from "@/lib/portal-cliente";
 import { registrarAcesso } from "@/lib/portal-acesso";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -68,7 +69,7 @@ export async function GET(req, { params }) {
     return new NextResponse(buf, {
       headers: {
         "Content-Type": r.headers.get("content-type") || "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${encodeURIComponent(doc.nome)}"`,
+        "Content-Disposition": dispArquivo(doc.nome, "attachment"),
       },
     });
   } catch (e) {

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarOrganogramaPDF } from "@/lib/organograma-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -33,7 +34,7 @@ export async function GET() {
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="Organograma - Torg Metal.pdf"`,
+      "Content-Disposition": dispArquivo(`Organograma - Torg Metal.pdf`, "inline"),
       "Cache-Control": "no-store",
     },
   });

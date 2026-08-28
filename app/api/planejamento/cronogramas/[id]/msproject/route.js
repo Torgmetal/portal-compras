@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarCronogramaMSProjectXML } from "@/lib/cronograma-msproject-xml";
 import { aplicarAvancoSyneco } from "@/lib/cronograma-syneco";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -33,6 +34,6 @@ export async function GET(_req, { params }) {
     status: 200,
     // no-store: sem isso o navegador pode reaproveitar um download antigo da MESMA URL
     // (heurística de cache) e o arquivo sai sem as linhas novas do cronograma.
-    headers: { "Content-Type": "application/xml; charset=utf-8", "Content-Disposition": `attachment; filename="${out.filename}"`, "Cache-Control": "no-store" },
+    headers: { "Content-Type": "application/xml; charset=utf-8", "Content-Disposition": dispArquivo(out.filename, "attachment"), "Cache-Control": "no-store" },
   });
 }

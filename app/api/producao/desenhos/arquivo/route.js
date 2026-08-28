@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { getAccessToken } from "@/lib/sharepoint";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ export async function GET(req) {
   return new NextResponse(res.body, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${nome}"`,
+      "Content-Disposition": dispArquivo(nome, "inline"),
       "Cache-Control": "private, max-age=300",
     },
   });

@@ -14,6 +14,7 @@ import PizZip from "pizzip";
 import { requireRole } from "@/lib/session";
 import { getAccessToken } from "@/lib/sharepoint";
 import { dataHoraBR } from "@/lib/data-br";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,7 +77,7 @@ export async function POST(req) {
   return new NextResponse(buf, {
     headers: {
       "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="${nome}"`,
+      "Content-Disposition": dispArquivo(nome, "attachment"),
       "Content-Length": String(buf.length),
     },
   });

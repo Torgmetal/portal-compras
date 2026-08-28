@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { baseUrlDe } from "@/lib/databook-assinaturas";
 import { gerarAuditoriaPortalPDF } from "@/lib/auditoria-portal-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -28,7 +29,7 @@ export async function GET(req, { params }) {
   return new NextResponse(Buffer.from(out.bytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${out.filename}"`,
+      "Content-Disposition": dispArquivo(out.filename, "inline"),
       "Cache-Control": "no-store",
     },
   });

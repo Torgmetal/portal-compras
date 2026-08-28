@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { indicadoresPcpIso } from "@/lib/indicadores-pcp-iso";
 import { gerarIndicadoresIsoPDF } from "@/lib/indicadores-iso-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,6 @@ export async function GET(req) {
   const { indicadores } = await indicadoresPcpIso(prisma, ano);
   const bytes = await gerarIndicadoresIsoPDF({ titulo: "Indicadores do PCP (ISO)", ano, indicadores, mesFim });
   return new NextResponse(Buffer.from(bytes), {
-    headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="indicadores-pcp-${ano}.pdf"` },
+    headers: { "Content-Type": "application/pdf", "Content-Disposition": dispArquivo(`indicadores-pcp-${ano}.pdf`, "inline") },
   });
 }

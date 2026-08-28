@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { downloadFileByPath } from "@/lib/sharepoint";
 import { validarShare, arquivoPermitido, registrarAcesso, SGQ_BASE } from "@/lib/sgq-share";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -25,7 +26,7 @@ export async function GET(req, { params }) {
     return new NextResponse(buf, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${encodeURIComponent(nome)}"`,
+        "Content-Disposition": dispArquivo(nome, "inline"),
         "Cache-Control": "private, max-age=60",
       },
     });

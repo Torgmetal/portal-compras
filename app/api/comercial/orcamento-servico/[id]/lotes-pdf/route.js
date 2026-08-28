@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarLotesPDF } from "@/lib/lotes-entrega-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -22,5 +23,5 @@ export async function GET(_req, { params }) {
 
   await prisma.auditLog.create({ data: { userId: user.id, action: "GERAR_PLANO_ENTREGAS", entity: "OrcamentoServico", entityId: o.id, diff: {} } }).catch(() => {});
 
-  return new Response(Buffer.from(out.bytes), { status: 200, headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${out.filename}"` } });
+  return new Response(Buffer.from(out.bytes), { status: 200, headers: { "Content-Type": "application/pdf", "Content-Disposition": dispArquivo(out.filename, "attachment") } });
 }

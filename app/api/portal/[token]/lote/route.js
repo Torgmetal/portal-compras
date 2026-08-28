@@ -11,6 +11,7 @@ import PizZip from "pizzip";
 import { prisma } from "@/lib/prisma";
 import { baixarDocumento, resolverDriveServidor } from "@/lib/databook-arquivo";
 import { secoesDoPortal } from "@/lib/portal-cliente";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -67,7 +68,7 @@ export async function POST(req, { params }) {
   return new NextResponse(bytes, {
     headers: {
       "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="${nomeZip}"`,
+      "Content-Disposition": dispArquivo(nomeZip, "attachment"),
       // ⚠ o que NÃO entrou vai num cabeçalho, para a tela poder avisar: zip com menos arquivos do
       // que o pedido, em silêncio, é o cliente achando que tem tudo.
       "X-Falhas": String(falhas.length),

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarRncPDF } from "@/lib/rnc-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -21,6 +22,6 @@ export async function GET(_req, { params }) {
   catch (e) { return NextResponse.json({ error: "Falha ao gerar o PDF: " + (e?.message || "erro") }, { status: 500 }); }
 
   return new NextResponse(Buffer.from(pdf.bytes), {
-    headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${pdf.filename}"` },
+    headers: { "Content-Type": "application/pdf", "Content-Disposition": dispArquivo(pdf.filename, "inline") },
   });
 }

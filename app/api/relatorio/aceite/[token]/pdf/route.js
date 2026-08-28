@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { gerarRelatorioStatusPDF } from "@/lib/relatorio-status-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -19,6 +20,6 @@ export async function GET(_req, { params }) {
   const nome = out.filename.replace(/["\r\n]/g, "");
   return new Response(out.bytes, {
     status: 200,
-    headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${nome}"`, "Cache-Control": "private, no-store" },
+    headers: { "Content-Type": "application/pdf", "Content-Disposition": dispArquivo(nome, "inline"), "Cache-Control": "private, no-store" },
   });
 }

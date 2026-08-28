@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarRomaneioTerceiroForm22 } from "@/lib/romaneio-terceiro-form22";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 const ROLES = ["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "ALMOXARIFADO", "PCP", "PLANEJAMENTO"];
@@ -18,7 +19,7 @@ export async function GET(_req, { params }) {
   return new NextResponse(buf, {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="${nome}"`,
+      "Content-Disposition": dispArquivo(nome, "attachment"),
       "Cache-Control": "no-store",
     },
   });

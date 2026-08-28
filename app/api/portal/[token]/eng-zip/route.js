@@ -14,6 +14,7 @@ import PizZip from "pizzip";
 import { getAccessToken } from "@/lib/sharepoint";
 import { secoesDoPortal, tipoDoDocEng } from "@/lib/portal-cliente";
 import { registrarAcesso } from "@/lib/portal-acesso";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -109,7 +110,7 @@ export async function POST(req, { params }) {
   return new NextResponse(bytes, {
     headers: {
       "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="${encodeURIComponent(nomeZip)}"`,
+      "Content-Disposition": dispArquivo(nomeZip, "attachment"),
       "Cache-Control": "no-store",
       "Content-Length": String(bytes.length),
       ...(falhas.length ? { "X-Falhas": String(falhas.length) } : {}),

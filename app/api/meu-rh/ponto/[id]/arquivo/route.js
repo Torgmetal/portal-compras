@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireFuncionario } from "@/lib/session";
 import { assertBlobUrlSegura } from "@/lib/blob-url";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -60,7 +61,7 @@ export async function GET(req, { params }) {
   const nome = `cartao-ponto-${item.ponto?.competencia || "mes"}.pdf`;
   const headers = new Headers();
   headers.set("Content-Type", "application/pdf");
-  headers.set("Content-Disposition", `${baixar ? "attachment" : "inline"}; filename="${nome}"`);
+  headers.set("Content-Disposition", dispArquivo(nome, baixar ? "attachment" : "inline"));
   headers.set("Cache-Control", "private, no-store");
   return new Response(bytes, { status: 200, headers });
 }

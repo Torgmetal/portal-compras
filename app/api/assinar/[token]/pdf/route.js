@@ -8,6 +8,7 @@ import { baixarDesenho } from "@/lib/relatorio-dimensional";
 import { gerarPDFdoRelatorio } from "@/lib/relatorio-render";
 import { gerarPlanoClientePDF } from "@/lib/plano-cliente-pdf";
 import { comResponsaveis, docDoTipo } from "@/lib/planos-aceite";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -67,6 +68,6 @@ export async function GET(_req, { params }) {
   }
 
   return new NextResponse(Buffer.from(bytes), {
-    headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${a.envio.titulo}.pdf"`, "Cache-Control": "no-store" },
+    headers: { "Content-Type": "application/pdf", "Content-Disposition": dispArquivo(`${a.envio.titulo}.pdf`, "inline"), "Cache-Control": "no-store" },
   });
 }

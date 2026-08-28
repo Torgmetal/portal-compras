@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { indicadoresComprasIso } from "@/lib/indicadores-compras-iso";
 import { gerarIndicadoresIsoPDF } from "@/lib/indicadores-iso-pdf";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,6 @@ export async function GET(req) {
   const { indicadores } = await indicadoresComprasIso(prisma, ano);
   const bytes = await gerarIndicadoresIsoPDF({ titulo: "Indicadores de Compras (ISO)", ano, indicadores, mesFim });
   return new NextResponse(Buffer.from(bytes), {
-    headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="indicadores-compras-${ano}.pdf"` },
+    headers: { "Content-Type": "application/pdf", "Content-Disposition": dispArquivo(`indicadores-compras-${ano}.pdf`, "inline") },
   });
 }

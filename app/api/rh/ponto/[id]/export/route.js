@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import * as XLSX from "xlsx";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -39,7 +40,7 @@ export async function GET(_req, { params }) {
   return new NextResponse(buf, {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="ponto-${ponto.competencia}.xlsx"`,
+      "Content-Disposition": dispArquivo(`ponto-${ponto.competencia}.xlsx`, "attachment"),
     },
   });
 }

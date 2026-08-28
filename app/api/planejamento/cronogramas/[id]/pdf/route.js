@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarCronogramaPDF } from "@/lib/cronograma-pdf";
 import { aplicarAvancoSyneco } from "@/lib/cronograma-syneco";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -33,6 +34,6 @@ export async function GET(_req, { params }) {
     status: 200,
     // no-store: sem isso o navegador pode reaproveitar o PDF antigo da MESMA URL
     // (heurística de cache) e a prévia abre sem as linhas novas do cronograma.
-    headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${out.filename}"`, "Cache-Control": "no-store" },
+    headers: { "Content-Type": "application/pdf", "Content-Disposition": dispArquivo(out.filename, "inline"), "Cache-Control": "no-store" },
   });
 }

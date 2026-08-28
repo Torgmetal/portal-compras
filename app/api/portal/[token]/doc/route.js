@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { baixarDocumento, resolverDriveServidor } from "@/lib/databook-arquivo";
 import { secoesDoPortal } from "@/lib/portal-cliente";
 import { registrarAcesso } from "@/lib/portal-acesso";
+import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -55,7 +56,7 @@ export async function GET(req, { params }) {
     return new NextResponse(buf, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${nome}"`,
+        "Content-Disposition": dispArquivo(nome, "inline"),
         "Cache-Control": "private, max-age=3600",
       },
     });
