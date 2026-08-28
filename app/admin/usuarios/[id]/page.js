@@ -31,8 +31,14 @@ export default function PageEditarUsuario() {
 
   const proprio = session?.user?.id === id;
 
+
   // Dados originais do usuário (referência para diff)
   const [original, setOriginal] = useState(null);
+  // ⚠⚠ CONTA DO PORTAL DO FUNCIONÁRIO. Ela nasce do cadastro do RH e não tem tipo nem módulo do
+  // portal: o seletor de tipo aparecia em branco e salvar devolvia "dados inválidos" (FUNCIONARIO
+  // não existe no formulário) — ou pior, um clique em "Usuário" convertia o acesso do funcionário
+  // num acesso ao ERP. Aqui ela é só leitura no que é do portal. (Vitor, 28/08/2026)
+  const ehFuncionario = original?.tipo === "FUNCIONARIO";
 
   // Estado do formulário
   const [form, setForm] = useState({
@@ -97,10 +103,12 @@ export default function PageEditarUsuario() {
       e.email = "E-mail é obrigatório.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       e.email = "E-mail inválido.";
-    if (!form.tipo)
-      e.tipo = "Selecione o tipo de usuário.";
-    if (form.tipo === "USUARIO" && form.modulos.length === 0)
-      e.modulos = "Selecione pelo menos um módulo.";
+    if (!ehFuncionario) {
+      if (!form.tipo)
+        e.tipo = "Selecione o tipo de usuário.";
+      if (form.tipo === "USUARIO" && form.modulos.length === 0)
+        e.modulos = "Selecione pelo menos um módulo.";
+    }
     return e;
   }
 
@@ -115,8 +123,9 @@ export default function PageEditarUsuario() {
     setErros({});
     try {
       const body = { name: form.name.trim(), email: form.email.trim(), setor: form.setor.trim() || null };
-      // Anti-suicídio: não enviar tipo/modulos/podeAlterarVerba se for o próprio admin
-      if (!proprio) {
+      // Anti-suicídio: não enviar tipo/modulos/podeAlterarVerba se for o próprio admin.
+      // ⚠ conta do portal do funcionário também não: ela não tem tipo nem módulo do portal.
+      if (!proprio && !ehFuncionario) {
         body.tipo = form.tipo;
         body.modulos = form.tipo === "ADMIN" ? [] : form.modulos;
         body.podeAlterarVerba = form.podeAlterarVerba;
@@ -313,7 +322,12 @@ export default function PageEditarUsuario() {
               <label className="block text-sm font-medium text-torg-dark mb-1.5">
                 Tipo <span className="text-red-500">*</span>
               </label>
-              {proprio ? (
+              {ehFuncionario ? (
+                <div className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-torg-gray">
+                  Acesso ao <b className="text-torg-dark">portal do funcionário</b> (Meu RH) — vinculado ao cadastro do RH.
+                  Não tem módulos do portal; para dar acesso ao ERP, crie um usuário próprio.
+                </div>
+              ) : proprio ? (
                 <div className="flex items-center gap-2">
                   <input
                     type="text"

@@ -104,6 +104,12 @@ export default function ListagemUsuarios() {
   const [loadingPagina, setLoadingPagina] = useState(true);
   const [erroCarregar, setErroCarregar] = useState(null);
 
+  // ⚠⚠ DOIS PÚBLICOS NA MESMA TABELA. Vitor (28/08/2026): "consegue separar os que são apenas para
+  // acesso ao portal de funcionários para que não fique tudo bagunçado como está lá". São contas de
+  // natureza diferente: quem trabalha NO portal (módulos, verba, admin) e quem só entra no Meu RH
+  // para ver holerite e ponto — essa conta nasce do cadastro do RH e não tem módulo nenhum. Juntas,
+  // a lista de acessos do ERP fica escondida no meio de uma lista de funcionários.
+  const [aba, setAba] = useState("PORTAL"); // PORTAL | FUNCIONARIO
   // Filtros (client-side)
   const [filtroModulo, setFiltroModulo] = useState("");
   const [mostrarInativos, setMostrarInativos] = useState(false);
@@ -141,8 +147,15 @@ export default function ListagemUsuarios() {
 
   /* ── Filtragem client-side ─────────────────────────────────────── */
 
-  const usuariosFiltrados = usuarios.filter((u) => {
+  const ehFuncionario = (u) => u.tipo === "FUNCIONARIO";
+  const daAba = usuarios.filter((u) => (aba === "FUNCIONARIO" ? ehFuncionario(u) : !ehFuncionario(u)));
+  const contar = (fn) => usuarios.filter((u) => fn(u) && (mostrarInativos || u.ativo)).length;
+  const nPortal = contar((u) => !ehFuncionario(u));
+  const nFuncionarios = contar(ehFuncionario);
+
+  const usuariosFiltrados = daAba.filter((u) => {
     if (!mostrarInativos && !u.ativo) return false;
+    if (aba === "FUNCIONARIO") return true; // conta de funcionário não tem módulo p/ filtrar
     if (filtroModulo) {
       if (filtroModulo === "ADMIN") return u.tipo === "ADMIN";
       const mods = (u.modulos ?? []).map((m) => m.modulo ?? m);
@@ -246,20 +259,46 @@ export default function ListagemUsuarios() {
         </Link>
       </div>
 
+      {/* Abas: acesso ao portal × acesso do funcionário */}
+      <div className="flex items-center gap-1 border-b border-gray-200 mb-4">
+        {[
+          { k: "PORTAL", l: "Acesso ao portal", n: nPortal, icon: Shield },
+          { k: "FUNCIONARIO", l: "Portal do funcionário", n: nFuncionarios, icon: Users },
+        ].map((t) => {
+          const Icon = t.icon;
+          return (
+            <button key={t.k} onClick={() => setAba(t.k)}
+              className={`px-4 py-2.5 text-sm font-medium inline-flex items-center gap-1.5 border-b-2 -mb-px transition-colors ${aba === t.k ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
+              <Icon size={15} /> {t.l}
+              <span className={`ml-1 text-[11px] px-1.5 py-0.5 rounded-full ${aba === t.k ? "bg-torg-blue/10 text-torg-blue" : "bg-gray-100 text-torg-gray"}`}>{t.n}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {aba === "FUNCIONARIO" && (
+        <p className="text-xs text-torg-gray bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 mb-4">
+          Contas de <b>acesso ao Meu RH</b> — holerite, ponto e documentos do próprio funcionário. Nascem do cadastro do RH e
+          não têm módulos do portal.
+        </p>
+      )}
+
       {/* Filtros */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 mb-4 flex flex-wrap items-center gap-3">
-        <div className="relative">
-          <select
-            value={filtroModulo}
-            onChange={(e) => setFiltroModulo(e.target.value)}
-            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-lg text-torg-dark focus:outline-none focus:ring-2 focus:ring-torg-blue/30 bg-white"
-          >
-            {FILTRO_OPCOES.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-torg-gray pointer-events-none" />
-        </div>
+        {aba === "PORTAL" && (
+          <div className="relative">
+            <select
+              value={filtroModulo}
+              onChange={(e) => setFiltroModulo(e.target.value)}
+              className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-lg text-torg-dark focus:outline-none focus:ring-2 focus:ring-torg-blue/30 bg-white"
+            >
+              {FILTRO_OPCOES.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-torg-gray pointer-events-none" />
+          </div>
+        )}
 
         <label className="flex items-center gap-2 text-sm text-torg-dark select-none cursor-pointer">
           <input
@@ -316,9 +355,9 @@ export default function ListagemUsuarios() {
                 <tr className="border-b border-gray-100 bg-gray-50/60">
                   <th className="text-left px-4 py-3 text-xs font-semibold text-torg-gray uppercase tracking-wide">Nome</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-torg-gray uppercase tracking-wide">E-mail</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-torg-gray uppercase tracking-wide">Módulos</th>
+                  {aba === "PORTAL" && <th className="text-left px-4 py-3 text-xs font-semibold text-torg-gray uppercase tracking-wide">Módulos</th>}
                   <th className="text-left px-4 py-3 text-xs font-semibold text-torg-gray uppercase tracking-wide">Setor</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-torg-gray uppercase tracking-wide">Verba</th>
+                  {aba === "PORTAL" && <th className="text-center px-4 py-3 text-xs font-semibold text-torg-gray uppercase tracking-wide">Verba</th>}
                   <th className="text-center px-4 py-3 text-xs font-semibold text-torg-gray uppercase tracking-wide">Status</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-torg-gray uppercase tracking-wide">Ações</th>
                 </tr>
@@ -350,6 +389,7 @@ export default function ListagemUsuarios() {
                       <td className="px-4 py-3 text-torg-gray">{u.email}</td>
 
                       {/* Módulos */}
+                      {aba === "PORTAL" && (
                       <td className="px-4 py-3">
                         {u.tipo === "ADMIN" ? (
                           <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
@@ -371,6 +411,7 @@ export default function ListagemUsuarios() {
                           </div>
                         )}
                       </td>
+                      )}
 
                       {/* Setor */}
                       <td className="px-4 py-3 text-torg-gray text-xs">
@@ -378,6 +419,7 @@ export default function ListagemUsuarios() {
                       </td>
 
                       {/* Verba */}
+                      {aba === "PORTAL" && (
                       <td className="px-4 py-3 text-center">
                         {u.podeAlterarVerba ? (
                           <CheckCircle2 size={15} className="inline text-green-500" title="Pode alterar verba" />
@@ -385,6 +427,7 @@ export default function ListagemUsuarios() {
                           <XCircle size={15} className="inline text-gray-300" title="Não pode alterar verba" />
                         )}
                       </td>
+                      )}
 
                       {/* Status */}
                       <td className="px-4 py-3 text-center">
