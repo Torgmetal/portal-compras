@@ -963,6 +963,17 @@ function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalG
   };
 
   const algumOk = Object.values(statusPorCotacao).some((s) => s === "ok");
+  const pendentes = fornecedoresVencedores.filter((f) => statusPorCotacao[f.cotacaoId] !== "ok");
+  const todosOk = fornecedoresVencedores.length > 0 && pendentes.length === 0;
+  const gerandoAlgum = Object.values(statusPorCotacao).some((s) => s === "loading");
+
+  // Gera todos os pedidos pendentes em sequência (1 por vez — evita rate-limit do Omie).
+  const gerarTodos = async () => {
+    if (!validarConfig()) return;
+    for (const f of pendentes) {
+      await gerarUm(f.cotacaoId, f.fornecedorNome);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
@@ -1142,16 +1153,27 @@ function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalG
         </div>
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3">
           <p className="text-xs text-torg-gray">
-            {algumOk
-              ? "Pedidos criados aparecem no Omie. Pode fechar a qualquer momento."
-              : "Configure categoria e local antes de gerar o primeiro pedido."}
+            {todosOk
+              ? "Pedidos criados no Omie. Pode fechar (X no topo)."
+              : "Confira categoria + local e gere o(s) pedido(s)."}
           </p>
-          <button
-            onClick={onClose}
-            className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium"
-          >
-            Fechar
-          </button>
+          {todosOk ? (
+            <button
+              onClick={onClose}
+              className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium"
+            >
+              Fechar
+            </button>
+          ) : (
+            <button
+              onClick={gerarTodos}
+              disabled={loading || gerandoAlgum}
+              className="px-5 py-2 bg-torg-orange text-white rounded-lg hover:bg-torg-orange-600 text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50"
+            >
+              {gerandoAlgum ? <Loader2 size={16} className="animate-spin" /> : <Truck size={16} />}
+              {gerandoAlgum ? "Gerando..." : `Gerar ${pendentes.length > 1 ? `${pendentes.length} pedidos` : "pedido"} no Omie`}
+            </button>
+          )}
         </div>
       </div>
     </div>
