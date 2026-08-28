@@ -19,7 +19,7 @@ function Spark({ serie, meta, mesFim }) {
   const Y = (v) => H - pad - ((v - min) / (max - min)) * (H - 2 * pad);
   const d = pts.map((p, k) => `${k ? "L" : "M"}${X(p.i).toFixed(1)},${Y(p.v).toFixed(1)}`).join(" ");
   const last = pts[pts.length - 1];
-  const cor = FAROL_COR[farol(last.v, meta)]?.dot || "#94a3b8";
+  const cor = FAROL_COR[farol(last.v, meta, "MES")]?.dot || "#94a3b8";
   return (
     <svg width={W} height={H} className="overflow-visible">
       <line x1={pad} x2={W - pad} y1={Y(meta.valor)} y2={Y(meta.valor)} stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3 3" />
@@ -62,7 +62,7 @@ export default function IndicadoresIsoClient({ processo = "QUALIDADE", endpoint 
     for (const ind of data.indicadores) {
       if (ind.processo !== processo) continue; // só os indicadores do processo desta tela
       if (ind.fonte === "pendente") { r.pendente++; continue; }
-      const f = farol(acum ? ind.acumulado : ind.atual, ind.meta);
+      const f = farol(acum ? ind.acumulado : ind.atual, ind.meta, acum ? "ANO" : "MES");
       if (f) r[f]++;
     }
     return r;
@@ -187,7 +187,7 @@ function Chip({ n, l, cor, bg }) {
 function Card({ ind, mesFim, onAbrir, acum, onPlano }) {
   const pendente = ind.fonte === "pendente";
   const valor = acum ? ind.acumulado : ind.atual;
-  const f = pendente ? null : farol(valor, ind.meta);
+  const f = pendente ? null : farol(valor, ind.meta, acum ? "ANO" : "MES");
   const cor = f ? FAROL_COR[f] : null;
   const clicavel = !!onAbrir;
   return (
