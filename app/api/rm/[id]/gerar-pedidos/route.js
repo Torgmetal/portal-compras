@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/session";
 import { criarPedidoOmie, anexarAoPedidoOmie } from "@/lib/omie-pedido-compra";
 import { resolverCodProjetoPorOp, resolverCodProjetoPorNome } from "@/lib/omie-pedidos-abertos";
 import { previsaoEntregaDDMMYYYY } from "@/lib/prazo-entrega";
+import { comCertificadoQualidade } from "@/lib/certificado-qualidade";
 
 // RMs Consumíveis (INTERNA) não têm obra própria → vinculam ao projeto geral.
 const PROJETO_CONSUMIVEL = "OP 000 - GERAL TORG";
@@ -188,6 +189,8 @@ export async function POST(req, { params }) {
       cotacao.numeroProposta ? `Proposta forn.: ${cotacao.numeroProposta}` : null,
       cotacao.observacao || null,
     ].filter(Boolean).join(" | ");
+    // RM de matéria-prima (ENGENHARIA): anexa os requisitos de certificado de qualidade.
+    const observacaoPedido = comCertificadoQualidade(observacaoBase, rm.tipoRM);
 
     const cnpjFinal = cnpjsPorCotacao[cotacao.id] || cotacao.cnpj || null;
 
@@ -207,7 +210,7 @@ export async function POST(req, { params }) {
       const dDtPrevisao = previsaoEntregaDDMMYYYY(cotacao.observacao) || undefined;
       const data = await criarPedidoOmie({
         itens: itensPayload,
-        observacao: observacaoBase,
+        observacao: observacaoPedido,
         nCodFor: Number(cotacao.nCodOmie) || 0,
         cnpjFornecedor: cnpjFinal,
         cNumPedido,
@@ -256,7 +259,7 @@ export async function POST(req, { params }) {
             total,
             faturamentoDireto: false,
             status: "CRIADO",
-            observacao: observacaoBase,
+            observacao: observacaoPedido,
             categoriaCompra: categoriaSelecionada,
             localEstoque: localSelecionado,
             payload: itensPayload,
