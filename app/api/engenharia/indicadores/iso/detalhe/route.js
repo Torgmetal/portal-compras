@@ -89,29 +89,42 @@ export async function GET(req) {
 
   // ── ADERÊNCIA AO PRAZO — tarefas de Engenharia concluídas no período.
   if (indicador === "aderencia_prazo_projeto") {
+    // ⚠ a OP não está na tarefa: vem do cronograma dono dela.
     const tar = await prisma.cronogramaTarefa.findMany({
       where: { departamento: "ENGENHARIA", dataFimReal: { gte: pIni, lt: pFim }, dataFimPrevista: { not: null } },
-      select: { nome: true, opNumero: true, dataFimPrevista: true, dataFimReal: true },
+      select: { nome: true, dataFimPrevista: true, dataFimBase: true, dataFimReal: true, cronograma: { select: { opNumero: true } } },
       orderBy: { dataFimReal: "asc" },
     });
     const dias = (a, b) => Math.round((new Date(a) - new Date(b)) / 86400000);
     const linhas = tar.map((t) => {
       const atraso = dias(t.dataFimReal, t.dataFimPrevista);
       return [
-        t.opNumero ? `OP-${t.opNumero}` : "—", t.nome || "—",
-        fmtD(t.dataFimPrevista), fmtD(t.dataFimReal),
+        t.cronograma?.opNumero ? `OP-${t.cronograma.opNumero}` : "—", t.nome || "—",
+        fmtD(t.dataFimPrevista),
+        // ⚠ a data BASE (o combinado original) vai ao lado: o previsto se move quando o cronograma é
+        // replanejado, e sem ver as duas não dá para saber se a tarefa cumpriu o prazo ou se o prazo
+        // é que andou até ela.
+        t.dataFimBase ? fmtD(t.dataFimBase) : "—",
+        fmtD(t.dataFimReal),
         atraso <= 0 ? "No prazo" : `${atraso} dia(s) de atraso`,
       ];
     });
     const noPrazo = tar.filter((t) => new Date(t.dataFimReal) <= new Date(t.dataFimPrevista)).length;
     const perc = tar.length ? Math.round((noPrazo / tar.length) * 1000) / 10 : null;
+    // as que ficaram para trás e nem foram baixadas — não entram na conta, mas precisam ser ditas
+    const abertasVencidas = await prisma.cronogramaTarefa.count({
+      where: { departamento: "ENGENHARIA", dataFimReal: null, dataFimPrevista: { lt: new Date(), not: null } },
+    });
+    const aviso = abertasVencidas
+      ? ` · ⚠ ${abertasVencidas} tarefa(s) de Engenharia venceram e seguem SEM data de conclusão no cronograma: não entram neste índice`
+      : "";
     return NextResponse.json({
       titulo: "Aderência ao Prazo de Entrega do Projeto",
-      colunas: ["OP", "Tarefa", "Previsto", "Concluído", "Situação"],
+      colunas: ["OP", "Tarefa", "Previsto", "Base", "Concluído", "Situação"],
       linhas,
       resumo: tar.length
-        ? `${noPrazo} de ${tar.length} tarefa(s) no prazo${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}`
-        : "Nenhuma tarefa de Engenharia com data real de conclusão no período — o indicador só enxerga tarefa baixada no cronograma.",
+        ? `${noPrazo} de ${tar.length} tarefa(s) concluídas no prazo${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}${aviso}`
+        : `Nenhuma tarefa de Engenharia com data real de conclusão no período — o indicador só enxerga tarefa baixada no cronograma.${aviso}`,
     });
   }
 
