@@ -97,13 +97,13 @@ export default withAuth(
     // com sessão ativa não pode passear pelo ERP: aqui ela só circula nas páginas de token
     // (assinatura, portal da obra, data book) e nas de senha.
     if (token?.tipo === "CLIENTE") {
-      const liberado = ["/assinar", "/api/assinar", "/portal", "/api/portal", "/data-book", "/api/qualidade/data-books/assinar", "/api/qualidade/data-books/aceite", "/trocar-senha", "/api/trocar-senha", "/esqueci-senha", "/api/esqueci-senha", "/entrar", "/sem-acesso"]
+      const liberado = ["/cliente", "/api/cliente", "/assinar", "/api/assinar", "/portal", "/api/portal", "/data-book", "/api/qualidade/data-books/assinar", "/api/qualidade/data-books/aceite", "/trocar-senha", "/api/trocar-senha", "/esqueci-senha", "/api/esqueci-senha", "/entrar", "/sem-acesso"]
         .some((r) => path === r || path.startsWith(`${r}/`));
       if (!liberado) {
         if (path.startsWith("/api/")) return NextResponse.json({ error: "Sem acesso" }, { status: 403 });
-        const url = new URL("/sem-acesso", req.url);
-        url.searchParams.set("de", path);
-        return NextResponse.redirect(url);
+        // ⚠ vai para a ÁREA DELE, não para "sem acesso": ele acabou de entrar porque o portal pediu.
+        // Mandar quem logou para uma tela de negativa é o mesmo engano do /entrar com sessão viva.
+        return NextResponse.redirect(new URL("/cliente", req.url));
       }
     }
 
