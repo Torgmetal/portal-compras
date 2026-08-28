@@ -23,6 +23,31 @@ import {
 
 const DEMAOS = ["1", "2", "3"];
 
+/**
+ * Um seletor de lote de tinta: escolhe entre os lotes daquele componente recebidos na OP e, quando
+ * a OP não tem nenhum registrado no CMR, cai num campo de texto para digitar o lote na mão.
+ *
+ * ⚠⚠ FICA FORA DO COMPONENTE DE PROPÓSITO. Declarado dentro de `Pintura`, vira um TIPO NOVO a cada
+ * render — o React desmonta e remonta a subárvore a cada tecla e o cursor sai do campo depois de
+ * cada letra. Mesmo defeito corrigido nos cinco formulários do desktop (b56b0572..1c7d7754) e no
+ * aceite dos planos (9dc54a3). Aqui pega justamente na obra sem lote no CMR, a única que chega no
+ * `Txt` — e no celular, com o inspetor na frente da peça, recuperar o cursor a cada letra é o dobro
+ * do trabalho. Componente de formulário nunca se declara dentro de outro componente.
+ *
+ * O que ele lia do fecho (`porComp`, `dem`, `aba`, `setDem`, `escolherLote`) agora chega por
+ * props — `daDemao` junta os cinco para o espalhamento ficar num lugar só.
+ */
+function SelLote({ rot, campo, campoVal, comp, porComp, dem, aba, setDem, escolherLote }) {
+  const lista = porComp(comp);
+  if (!lista.length) return <Txt rot={rot} v={dem[aba]?.[campo]} onMudar={(v) => setDem(aba, campo, v)} />;
+  // o valor guardado é o LOTE; o seletor casa por ele para reabrir marcado
+  const atual = lista.find((t) => t.lote === dem[aba]?.[campo])?.id || "";
+  return (
+    <Sel rot={rot} v={atual} onMudar={(v) => escolherLote(campo, campoVal, comp, v)}
+      opcoes={lista.map((t) => ({ v: t.id, t: `${t.lote ? `${t.lote} · ` : ""}${t.produto}` }))} />
+  );
+}
+
 export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
   const [aba, setAba] = useState("1");
   const set = (k, v) => setCond((c) => ({ ...c, [k]: v }));
@@ -63,16 +88,8 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
     set("demaos", { ...dem, [aba]: bloco });
   }
 
-  const SelLote = ({ rot, campo, campoVal, comp }) => {
-    const lista = porComp(comp);
-    if (!lista.length) return <Txt rot={rot} v={dem[aba]?.[campo]} onMudar={(v) => setDem(aba, campo, v)} />;
-    // o valor guardado é o LOTE; o seletor casa por ele para reabrir marcado
-    const atual = lista.find((t) => t.lote === dem[aba]?.[campo])?.id || "";
-    return (
-      <Sel rot={rot} v={atual} onMudar={(v) => escolherLote(campo, campoVal, comp, v)}
-        opcoes={lista.map((t) => ({ v: t.id, t: `${t.lote ? `${t.lote} · ` : ""}${t.produto}` }))} />
-    );
-  };
+  // o que todo <SelLote> lê da demão aberta — ver o comentário do componente, lá em cima
+  const daDemao = { porComp, dem, aba, setDem, escolherLote };
 
   const mRug = mediaRugosidade(rug);
   const rugFora = mRug != null && (mRug < RUGOSIDADE_MIN || mRug > RUGOSIDADE_MAX);
@@ -181,9 +198,9 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
         </div>
 
         <div className="space-y-2.5">
-          <SelLote rot="Tinta (base) — lote" campo="loteA" campoVal="valA" comp="A" />
-          <SelLote rot="Endurecedor — lote" campo="loteB" campoVal="valB" comp="B" />
-          <SelLote rot="Diluente — lote" campo="loteD" campoVal="valD" comp="D" />
+          <SelLote {...daDemao} rot="Tinta (base) — lote" campo="loteA" campoVal="valA" comp="A" />
+          <SelLote {...daDemao} rot="Endurecedor — lote" campo="loteB" campoVal="valB" comp="B" />
+          <SelLote {...daDemao} rot="Diluente — lote" campo="loteD" campoVal="valD" comp="D" />
 
           {dem[aba]?.produto && (
             <p className="text-[12px] text-torg-gray -mt-1">
