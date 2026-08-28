@@ -38,7 +38,8 @@ export async function POST(req, { params }) {
   });
   await prisma.user.update({ where: { id: alvo.id }, data: { assinaturaUrl: blob.url } });
   await prisma.auditLog.create({ data: { userId: admin.id, action: "ASSINATURA_USUARIO", entity: "User", entityId: alvo.id, diff: { nome: alvo.name } } }).catch(() => {});
-  return NextResponse.json({ success: true, url: blob.url });
+  // ⚠ devolve só a confirmação: a tela busca a imagem pela rota que confere quem está pedindo.
+  return NextResponse.json({ success: true });
 }
 
 export async function DELETE(_req, { params }) {

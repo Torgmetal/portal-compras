@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, UserPlus, Loader2, Shield } from "lucide-react";
 import { useStore } from "@/lib/store";
 import SenhaGeradaModal from "@/components/admin/SenhaGeradaModal";
+import AssinaturaUsuario from "../[id]/AssinaturaUsuario";
 import { MODULOS_OPCOES } from "@/lib/modulos";
 
 
@@ -20,6 +21,10 @@ const campoVazio = {
 };
 
 export default function FormNovoUsuario() {
+  // ⚠ a assinatura é preparada aqui e SOBE DEPOIS: só existe para onde subir quando o usuário já
+  // foi criado e tem id. Vitor (28/08/2026) pediu a opção já na criação — quem cadastra a pessoa é
+  // quem sabe se ela vai assinar documento.
+  const [assinatura, setAssinatura] = useState(null); // Blob tratado, ou null
   const router = useRouter();
   const { showToast } = useStore();
 
@@ -101,6 +106,19 @@ export default function FormNovoUsuario() {
       }
 
       const { usuario, senhaTemporaria } = json.data;
+
+      if (assinatura && usuario?.id) {
+        try {
+          const fd = new FormData();
+          fd.append("file", new File([assinatura], "assinatura.png", { type: "image/png" }));
+          const rA = await fetch(`/api/admin/usuarios/${usuario.id}/assinatura`, { method: "POST", body: fd });
+          if (!rA.ok) throw new Error();
+        } catch {
+          // ⚠ o usuário JÁ FOI CRIADO: falhar a assinatura não pode desfazer nem esconder isso.
+          showToast("Usuário criado, mas a assinatura não subiu. Envie de novo pela tela do usuário.", "error");
+        }
+      }
+
       setModal({
         senha:        senhaTemporaria,
         nomeUsuario:  usuario.name,
@@ -269,6 +287,9 @@ export default function FormNovoUsuario() {
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-torg-blue/30 disabled:bg-gray-50 disabled:text-gray-400"
               />
             </div>
+
+            {/* Assinatura (opcional) */}
+            <AssinaturaUsuario novo aoPreparar={setAssinatura} />
 
             {/* podeAlterarVerba */}
             <div className="flex items-start gap-3 py-1">

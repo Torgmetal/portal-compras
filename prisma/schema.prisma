@@ -2050,6 +2050,8 @@ model DataBookAssinatura {
   assinadoEm   DateTime?
   assinadoNome String?
   ip           String?
+  // ⚠ imagem da assinatura de quem assinou esta etapa, copiada do cadastro no ato (ver User.assinaturaUrl)
+  imagemUrl    String?
   criadoEm     DateTime          @default(now())
   dataBook     DataBookQualidade @relation(fields: [dataBookId], references: [id], onDelete: Cascade)
 

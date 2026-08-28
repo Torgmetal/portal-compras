@@ -58,7 +58,16 @@ export async function POST(req, { params }) {
 
   const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || null;
   const nome = body.nome.trim();
-  await prisma.dataBookAssinatura.update({ where: { id: etapa.id }, data: { status: "ASSINADO", assinadoNome: nome, assinadoEm: new Date(), ip } });
+  // ⚠ mesma regra do relatório de inspeção: se quem assina tem assinatura cadastrada no portal, ela
+  // é COPIADA para esta etapa e sai desenhada no Data Book. Copiada, não referenciada — trocar a
+  // assinatura no cadastro depois não reescreve dossiê já assinado. Quem não tem (o cliente, quase
+  // sempre) continua com nome, data e IP.
+  let imagemUrl = null;
+  if (etapa.email) {
+    const u = await prisma.user.findFirst({ where: { email: etapa.email }, select: { assinaturaUrl: true } }).catch(() => null);
+    imagemUrl = u?.assinaturaUrl || null;
+  }
+  await prisma.dataBookAssinatura.update({ where: { id: etapa.id }, data: { status: "ASSINADO", assinadoNome: nome, assinadoEm: new Date(), ip, ...(imagemUrl ? { imagemUrl } : {}) } });
 
   const op = fmtOPdb(book?.opNumero);
   const base = baseUrlDe(req);

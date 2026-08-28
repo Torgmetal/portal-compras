@@ -36,7 +36,7 @@ export default function PageEditarUsuario() {
 
   // Estado do formulário
   const [form, setForm] = useState({
-    name: "", email: "", tipo: "", modulos: [], setor: "", podeAlterarVerba: false, assinaturaUrl: null,
+    name: "", email: "", tipo: "", modulos: [], setor: "", podeAlterarVerba: false, temAssinatura: false,
   });
   const [ativo, setAtivo] = useState(true);
 
@@ -69,7 +69,7 @@ export default function PageEditarUsuario() {
         tipo:             u.tipo,
         modulos:          (u.modulos ?? []).map((m) => m.modulo ?? m),
         setor:            u.setor ?? "",
-        assinaturaUrl:    u.assinaturaUrl ?? null,
+        temAssinatura:    !!u.temAssinatura,
         podeAlterarVerba: u.podeAlterarVerba,
       });
       setAtivo(u.ativo);
@@ -420,7 +420,7 @@ export default function PageEditarUsuario() {
                 relatórios de qualidade (…) quando o usuário assinar ela sair no campo de assinatura
                 dela". Cadastrada uma vez aqui, vale para todo relatório de inspeção que a pessoa
                 assinar. PIT/PLP ficam de fora de propósito. */}
-            <AssinaturaUsuario id={id} url={form.assinaturaUrl} onMudar={(u) => setcampo("assinaturaUrl", u)} />
+            <AssinaturaUsuario id={id} tem={form.temAssinatura} onMudar={(v) => setcampo("temAssinatura", v)} />
 
             {/* podeAlterarVerba */}
             <div className={`flex items-start gap-3 py-1 ${proprio ? "opacity-50" : ""}`}>

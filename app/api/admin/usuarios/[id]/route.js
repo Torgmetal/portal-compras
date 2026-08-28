@@ -25,11 +25,24 @@ const selectUsuario = {
   tipo:             true,
   modulos:          { select: { modulo: true } },
   setor:            true,
-  assinaturaUrl:    true,
+  assinaturaUrl:    true, // ⚠ NÃO vai para o cliente — vira `temAssinatura` na resposta
   ativo:            true,
   podeAlterarVerba: true,
   createdAt:        true,
   updatedAt:        true,
+};
+
+/**
+ * ⚠⚠ A URL DA ASSINATURA NÃO SAI DAQUI. Vitor (28/08/2026): "essa assinatura tem que ficar restrita
+ * a esse usuário, não sendo possível ser usada por mais ninguém". O endereço do Blob é público para
+ * quem o tem; devolvê-lo na resposta seria entregar a assinatura da pessoa a qualquer um que abrisse
+ * o painel. A tela recebe só `temAssinatura` e busca a imagem por /api/usuarios/assinatura/[id],
+ * que confere quem está pedindo.
+ */
+const semUrlDaAssinatura = (u) => {
+  if (!u) return u;
+  const { assinaturaUrl, ...resto } = u;
+  return { ...resto, temAssinatura: !!assinaturaUrl };
 };
 
 // ─── GET ─────────────────────────────────────────────────────────────────────
@@ -51,7 +64,7 @@ export async function GET(_req, { params }) {
     return NextResponse.json({ success: false, error: "Usuário não encontrado." }, { status: 404 });
   }
 
-  return NextResponse.json({ success: true, data: usuario });
+  return NextResponse.json({ success: true, data: semUrlDaAssinatura(usuario) });
 }
 
 // ─── PUT ─────────────────────────────────────────────────────────────────────
@@ -161,5 +174,5 @@ export async function PUT(req, { params }) {
     },
   });
 
-  return NextResponse.json({ success: true, data: atualizado });
+  return NextResponse.json({ success: true, data: semUrlDaAssinatura(atualizado) });
 }
