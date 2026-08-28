@@ -114,6 +114,22 @@ export default function AceitePlano({ opNumero, doc, nome }) {
     } catch (e) { setErro(e.message); } finally { setEnviando(""); }
   }
 
+  // ⚠ ARQUIVAR À MÃO. O gatilho automático é uma assinatura: o plano que ficou verificado e parado
+  // esperando um cliente que não responde nunca mais dispara sozinho. É também a saída quando o
+  // arquivamento automático falha calado (SharePoint fora do ar não pode derrubar a assinatura).
+  async function arquivar() {
+    setEnviando("ARQUIVO"); setErro(""); setOk("");
+    try {
+      const rq = await fetch(`/api/qualidade/planos/${encodeURIComponent(opNumero)}/arquivar`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ doc }),
+      });
+      const j = await rq.json();
+      if (!rq.ok) throw new Error(j.error || "Erro ao arquivar");
+      setOk(`Guardado em ${j.pasta?.split("/").slice(-2).join("/") || "8. Qualidade"} e anexado ao Data Book.`);
+      carregar();
+    } catch (e) { setErro(e.message); } finally { setEnviando(""); }
+  }
+
   if (!d) return <p className="text-[11px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={11} className="animate-spin" /> lendo o aceite…</p>;
 
   return (
@@ -243,7 +259,12 @@ export default function AceitePlano({ opNumero, doc, nome }) {
             ) : (
               <p className="text-[12px] text-torg-gray inline-flex items-start gap-1.5">
                 {interna?.aceito ? <Mail size={14} className="mt-0.5 shrink-0" /> : <Lock size={14} className="mt-0.5 shrink-0 text-torg-gray-light" />}
-                <span>Passo 2: {interna?.aceito ? `enviar ${nome} ao cliente para aceite.` : "libera quando a verificação interna estiver assinada."}</span>
+                {/* ⚠⚠ PASSO OPCIONAL. Vitor (28/08/2026): "para o PLP e PIT tire a opção de ter que
+                    a assinatura do cliente obrigatoriamente". O documento já vale (e já foi
+                    arquivado) com a verificação interna; o aceite do cliente é confirmação, não
+                    condição. A tela precisa dizer isso, senão a Qualidade fica esperando um
+                    e-mail que muita obra nunca devolve. */}
+                <span>Passo 2 <i>(opcional)</i>: {interna?.aceito ? `enviar ${nome} ao cliente para aceite.` : "libera quando a verificação interna estiver assinada."}</span>
               </p>
             )}
           </div>
@@ -291,11 +312,19 @@ export default function AceitePlano({ opNumero, doc, nome }) {
         )}
       </div>
 
-      {/* ⚠ arquivado sozinho quando todos aprovam — ver arquivarPlano em lib/planos-aceite. */}
-      {interna?.aceito && cliente?.aceito && (
+      {/* ⚠ arquivado sozinho quando a verificação interna fecha — ver arquivarPlano em
+          lib/planos-aceite. O aceite do cliente, quando vem, arquiva de novo por cima, com a
+          assinatura dele no quadro de aprovações. */}
+      {interna?.aceito && (
         <p className="text-[11px] text-emerald-700 inline-flex items-start gap-1.5">
           <FolderCheck size={12} className="mt-0.5 shrink-0" />
-          Aprovado por todos: o documento foi guardado em <span className="font-mono">8. Qualidade</span> e anexado ao Data Book.
+          <span>
+            {cliente?.aceito ? "Aprovado por todos" : "Verificado internamente"}: o documento foi guardado em <span className="font-mono">8. Qualidade</span> e anexado ao Data Book
+            {cliente?.aceito ? "" : ". O aceite do cliente, se vier, entra no mesmo arquivo"}.
+            <button onClick={arquivar} disabled={!!enviando} className="ml-1.5 text-torg-blue hover:underline disabled:opacity-50">
+              {enviando === "ARQUIVO" ? "arquivando…" : "arquivar de novo"}
+            </button>
+          </span>
         </p>
       )}
 
