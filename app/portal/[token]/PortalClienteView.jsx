@@ -6,6 +6,7 @@ import {
   Download, Package, ShoppingCart, Truck, Check, FileSpreadsheet, History,
 } from "lucide-react";
 import { AREAS, SECOES, SECAO } from "@/lib/portal-cliente";
+import MatrizComunicacao from "./MatrizComunicacao";
 
 const AREA_NOME = Object.fromEntries(AREAS.map((a) => [a.id, a.nome]));
 const AREA_RESUMO = Object.fromEntries(AREAS.map((a) => [a.id, a.resumo]));
@@ -110,7 +111,12 @@ export default function PortalClienteView({ token }) {
     return base;
   };
   const areasComConteudo = AREAS.filter((a) => secoesDaArea(a.id).length > 0);
-  const abaAtiva = areasComConteudo.some((a) => a.id === aba) ? aba : areasComConteudo[0]?.id || null;
+  // ⚠⚠ A PRIMEIRA ABA É "FALE COM A TORG" (Vitor, 28/08/2026). Ela não depende de conteúdo
+  // publicado: existe em toda obra, inclusive na que acabou de abrir o portal — e é o que o cliente
+  // procura primeiro quando algo trava. As outras abas continuam aparecendo só quando têm o que
+  // mostrar. Ver lib/matriz-comunicacao.js.
+  const abas = [{ id: "CONTATO", nome: "Fale com a Torg", resumo: "Quem atende o seu projeto em cada assunto." }, ...areasComConteudo];
+  const abaAtiva = abas.some((a) => a.id === aba) ? aba : abas[0].id;
   const mostrar = (id) => conteudo[id] && SECAO[id]?.area === abaAtiva;
 
   // os números que sustentam a mensagem — só entram os que existem de verdade
@@ -228,13 +234,13 @@ export default function PortalClienteView({ token }) {
       ].filter(Boolean)} />
 
       {/* ── as áreas da obra ── */}
-      {areasComConteudo.length > 1 && (
+      {abas.length > 1 && (
         <nav className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-gray-100">
           <div className="max-w-5xl mx-auto px-6 sm:px-8 flex gap-1 overflow-x-auto">
             {/* ⚠ SEM CONTADOR. Ele contava SEÇÕES, não documentos — dava "1" em quase toda aba, o
                 que não informa nada e ainda sugere que a obra tem um documento só. Um número que
                 não ajuda a decidir onde clicar é ruído na primeira coisa que o cliente vê. */}
-            {areasComConteudo.map((a) => {
+            {abas.map((a) => {
               const on = a.id === abaAtiva;
               return (
                 <button key={a.id} onClick={() => setAba(a.id)} title={a.resumo}
@@ -251,7 +257,8 @@ export default function PortalClienteView({ token }) {
       <div className="max-w-5xl mx-auto px-6 sm:px-8 py-14 space-y-12">
         {/* ⚠ o resumo da área abre a aba: o cliente que clicou em "Qualidade" tem de saber o que
             esperar antes de rolar. */}
-        {abaAtiva && areasComConteudo.length > 1 && (
+        {abaAtiva === "CONTATO" && <MatrizComunicacao />}
+        {abaAtiva !== "CONTATO" && abaAtiva && abas.length > 1 && (
           <div>
             <h2 className="text-[22px] font-bold text-[#0D1F3C]">{AREA_NOME[abaAtiva]}</h2>
             <div className="h-[3px] w-12 bg-[#F4801F] rounded-full my-2" />
