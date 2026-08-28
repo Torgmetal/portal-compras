@@ -77,11 +77,15 @@ export async function PUT(req, { params }) {
   const dados = {
     elaboradoNome: txt(body?.elaboradoNome), elaboradoEmail: email(body?.elaboradoEmail),
     verificadoNome: txt(body?.verificadoNome), verificadoEmail: email(body?.verificadoEmail),
+    // ⚠ o contato do cliente é cadastrado AQUI, junto dos outros dois (Vitor, 28/08/2026): o nome
+    // sai impresso no quadro de aprovações e o e-mail é para onde o aceite vai quando a etapa abrir.
+    clienteNome: txt(body?.clienteNome), clienteEmail: email(body?.clienteEmail),
     outros,
     atualizadoPorId: user?.id || null,
   };
   if (body?.elaboradoEmail && !dados.elaboradoEmail) return NextResponse.json({ error: "E-mail de quem elabora está inválido." }, { status: 400 });
   if (body?.verificadoEmail && !dados.verificadoEmail) return NextResponse.json({ error: "E-mail de quem verifica está inválido." }, { status: 400 });
+  if (body?.clienteEmail && !dados.clienteEmail) return NextResponse.json({ error: "E-mail do cliente está inválido." }, { status: 400 });
 
   await prisma.planoResponsavel.upsert({
     where: { opNumero_doc: { opNumero, doc } },
@@ -144,6 +148,12 @@ export async function POST(req, { params }) {
       .filter((d) => d.nome && /.+@.+\..+/.test(d.email))
       // o cliente é o último da fila: a etapa dele só existe depois da interna fechada
       .map((d, i) => ({ ...d, ordem: i + 1 }));
+    // ⚠ sem ninguém escolhido na tela, vale o contato do cliente cadastrado no documento — é o
+    // mesmo nome que já está impresso no quadro de aprovações.
+    if (!dest.length) {
+      const c = plano.responsaveis?.cliente;
+      if (c?.email) dest = [{ nome: c.nome || c.email, email: c.email, setor: plano.snapshot?.cliente || null, ordem: 1 }];
+    }
     if (!dest.length) return NextResponse.json({ error: "Informe ao menos um destinatário do cliente (nome + e-mail válido)." }, { status: 400 });
 
     // ⚠⚠ O CLIENTE SÓ RECEBE DEPOIS DA VERIFICAÇÃO INTERNA. Vitor (26/08/2026): "enviar para esses

@@ -42,7 +42,7 @@ function CampoResponsavel({ rot, chave, resp, setResp, assinadoEm }) {
 
 export default function AceitePlano({ opNumero, doc, nome }) {
   const [d, setD] = useState(null);
-  const [resp, setResp] = useState({ elaboradoNome: "", elaboradoEmail: "", verificadoNome: "", verificadoEmail: "" });
+  const [resp, setResp] = useState({ elaboradoNome: "", elaboradoEmail: "", verificadoNome: "", verificadoEmail: "", clienteNome: "", clienteEmail: "" });
   const [outros, setOutros] = useState([]); // [{ nome, email, assina }]
   const [salvandoResp, setSalvandoResp] = useState(false);
   const [abrir, setAbrir] = useState(false);
@@ -64,6 +64,7 @@ export default function AceitePlano({ opNumero, doc, nome }) {
           setResp({
             elaboradoNome: r.elaborado?.nome || "", elaboradoEmail: r.elaborado?.email || "",
             verificadoNome: r.verificado?.nome || "", verificadoEmail: r.verificado?.email || "",
+            clienteNome: r.cliente?.nome || "", clienteEmail: r.cliente?.email || "",
           });
           setOutros((r.outros || []).map((o) => ({ nome: o.nome || "", email: o.email || "", assina: !!o.assina, assinadoEm: o.assinadoEm || null })));
         }
@@ -119,9 +120,15 @@ export default function AceitePlano({ opNumero, doc, nome }) {
     <div className="mt-3 pt-3 border-t border-gray-100 space-y-2.5">
       {/* ── quem elabora e quem verifica ── */}
       <div className="space-y-1.5">
-        <p className="text-[12px] font-semibold text-torg-dark">Elaboração e verificação</p>
+        <p className="text-[12px] font-semibold text-torg-dark">Elaboração, verificação e aceite</p>
         <CampoResponsavel rot="Elaborado" chave="elaborado" resp={resp} setResp={setResp} assinadoEm={r?.elaborado?.assinadoEm} />
         <CampoResponsavel rot="Verificado" chave="verificado" resp={resp} setResp={setResp} assinadoEm={r?.verificado?.assinadoEm} />
+        {/* ⚠⚠ O CLIENTE SE CADASTRA AQUI, não só na hora de enviar. Vitor (28/08/2026): "tanto no
+            PLP quanto no PIT não está dando a opção de informar o nome e e-mail do cliente". Os
+            campos existiam apenas dentro do painel do passo 2, que fica TRANCADO até a verificação
+            interna fechar — quem monta o documento não tinha onde escrever. E o nome sai impresso
+            no quadro de aprovações: sem ele, a folha ia para verificação com o campo em branco. */}
+        <CampoResponsavel rot="Cliente" chave="cliente" resp={resp} setResp={setResp} assinadoEm={r?.cliente?.assinadoEm} />
         {/* ⚠⚠ MAIS GENTE ALÉM DOS TRÊS. Vitor (27/08/2026): "preciso ter permissão para colocar mais
             e-mails além do Elaborado, Verificado e cliente, tanto no PLP quanto para o PIT". Quem
             entra como CÓPIA recebe o documento e não trava nada; marcando "assina", a pessoa entra
@@ -241,7 +248,7 @@ export default function AceitePlano({ opNumero, doc, nome }) {
             )}
           </div>
           {!abrir && (
-            <button onClick={() => setAbrir(true)} disabled={!interna?.aceito}
+            <button onClick={() => { setNovo((v) => (v.email.trim() || marcados.size ? v : { nome: resp.clienteNome, email: resp.clienteEmail })); setAbrir(true); }} disabled={!interna?.aceito}
               title={interna?.aceito ? "" : "A verificação interna precisa estar assinada"}
               className="shrink-0 text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:opacity-90 disabled:opacity-40 inline-flex items-center gap-1.5">
               <Send size={12} /> {cliente?.enviado ? "Enviar de novo ao cliente" : "Enviar ao cliente para aceite"}

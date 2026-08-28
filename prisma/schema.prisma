@@ -4886,6 +4886,13 @@ model PlanoResponsavel {
   elaboradoEmail  String?
   verificadoNome  String?
   verificadoEmail String?
+  // ⚠⚠ QUEM ACEITA PELO CLIENTE, cadastrado JUNTO com os outros dois. Vitor (28/08/2026): "tanto no
+  // PLP quanto no PIT não está dando a opção de informar o nome e e-mail do cliente". Só havia onde
+  // digitar dentro do painel de envio, que fica TRANCADO até a verificação interna fechar — ou seja,
+  // não dava para preencher quando se monta o documento. E o nome do cliente sai impresso no quadro
+  // de aprovações: sem ele gravado, a folha ia para verificação com o terceiro campo vazio.
+  clienteNome     String?
+  clienteEmail    String?
   // ⚠ QUEM MAIS RECEBE. Vitor (27/08/2026): "preciso ter permissão para colocar mais e-mails além do
   // Elaborado, Verificado e cliente, tanto no PLP quanto para o PIT". Cada um escolhe se apenas
   // RECEBE (cópia, sem link de assinatura) ou se TAMBÉM ASSINA — e quem assina entra na conta da
