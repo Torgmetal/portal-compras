@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import NavegadorServidor from "./NavegadorServidor";
 import Volumes from "./Volumes";
-import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, GRUPO_POR_SECAO, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO } from "@/lib/databook-secoes";
+import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, gruposDaSecao, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO } from "@/lib/databook-secoes";
 import { secaoNavega } from "@/lib/databook-pastas-web";
 import { STATUS_COR } from "@/lib/qualidade-status";
 import { TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
@@ -588,7 +588,7 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
   // O "deixar apenas dois botões" era sobre as seções que ele listou PRA NAVEGAR (seção 02, seção 03, seção 07…),
   // onde o conteúdo é uma pasta. Nestas quatro o conteúdo vem do CMR e a pasta é só onde mora o
   // PDF — então trazer e navegar convivem, que é o que ele pediu desde o começo.
-  const secaoDeCertificado = !!GRUPO_POR_SECAO[secao.numero];
+  const secaoDeCertificado = gruposDaSecao(secao.numero).length > 0;
   // Documentos que a API apontou como sendo de OUTRA seção (ex.: tinta na seção 04 de matéria-prima).
   const foraDoGrupo = secao.documentos.filter((d) => d.secaoCerta);
   // Move os certificados que estão na seção errada pra seção certa deste mesmo data book.

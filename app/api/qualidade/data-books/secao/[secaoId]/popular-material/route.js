@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { estaFechado, erroPrecisaRevisao } from "@/lib/databook-revisao";
-import { classificarMaterial, GRUPO_POR_SECAO } from "@/lib/databook-secoes";
+import { classificarMaterial, gruposDaSecao } from "@/lib/databook-secoes";
 import { enriquecerComFicha } from "@/lib/databook-ficha-r";
 import { consumiveisDaOP, abrasivosDaOP } from "@/lib/consumivel-solda";
 
@@ -46,7 +46,7 @@ export async function POST(req, { params }) {
 
   // Certificados de material da OP (rastreabilidade importada do CMR), filtrados pelo
   // grupo da seção: seção 04 aço estrutural, seção 05 fixadores, seção 15 tintas. Outras seções: todos.
-  const grupo = GRUPO_POR_SECAO[secao.numero] || null;
+  const grupos = gruposDaSecao(secao.numero);
   const todos = await prisma.documentoQualidade.findMany({
     where: { ativo: true, categoria: "MATERIAL", opNumero },
     select: { id: true, nome: true },
@@ -62,17 +62,7 @@ export async function POST(req, { params }) {
   // MESMO cálculo do carimbo do desenho aponta: para cada conjunto, o arame vigente na data em que
   // ele foi soldado.
   let docs;
-  // ⚠ §14 (preparação de superfície) segue a MESMA regra da §06: a granalha entra no CMR sem OP, e
-  // o que vale para esta obra é o lote vigente nos dias em que ela foi jateada.
-  if (secao.numero === "14") {
-    const opId = secao.dataBook?.opId || (await prisma.oP.findFirst({ where: { numero: opNumero }, select: { id: true } }))?.id;
-    const usados = await abrasivosDaOP(opId);
-    if (!usados.length) return NextResponse.json({ success: true, vinculados: 0, total: 0, semDocs: true });
-    docs = await prisma.documentoQualidade.findMany({
-      where: { ativo: true, categoria: "MATERIAL", importRef: { in: usados.map((u) => u.rastreio) } },
-      select: { id: true, nome: true },
-    });
-  } else if (secao.numero === "06") {
+  if (secao.numero === "06") {
     const opId = secao.dataBook?.opId || (await prisma.oP.findFirst({ where: { numero: opNumero }, select: { id: true } }))?.id;
     const usados = await consumiveisDaOP(opId);
     if (!usados.length) {
@@ -88,7 +78,23 @@ export async function POST(req, { params }) {
     // "R 260527" — sem o material, `classificarMaterial` cai no padrão ESTRUTURAL e a tinta vai
     // parar na seção 04. Ver lib/databook-ficha-r.js.
     const enriquecidos = await enriquecerComFicha(todos, opNumero);
-    docs = grupo ? enriquecidos.filter((d) => classificarMaterial(d.nome) === grupo) : enriquecidos;
+    docs = grupos.length ? enriquecidos.filter((d) => grupos.includes(classificarMaterial(d.nome))) : enriquecidos;
+
+    // ⚠⚠ A GRANALHA ENTRA NA §15 JUNTO DAS TINTAS (Vitor, 28/08/2026), e ela NÃO se resolve por OP:
+    // como o arame, é comprada para estoque e entra no CMR sem obra. O que vale aqui é o lote
+    // vigente nos dias em que ESTA obra foi jateada — mesma regra da §06.
+    if (grupos.includes("ABRASIVO")) {
+      const opId = secao.dataBook?.opId || (await prisma.oP.findFirst({ where: { numero: opNumero }, select: { id: true } }))?.id;
+      const usados = await abrasivosDaOP(opId);
+      if (usados.length) {
+        const abrasivos = await prisma.documentoQualidade.findMany({
+          where: { ativo: true, categoria: "MATERIAL", importRef: { in: usados.map((u) => u.rastreio) } },
+          select: { id: true, nome: true },
+        });
+        const jaTem = new Set(docs.map((d) => d.id));
+        docs = [...docs, ...abrasivos.filter((a) => !jaTem.has(a.id))];
+      }
+    }
   }
   if (!docs.length) {
     return NextResponse.json({ success: true, vinculados: 0, total: 0, semDocs: true });
