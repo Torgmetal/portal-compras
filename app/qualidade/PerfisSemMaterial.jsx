@@ -45,14 +45,24 @@ export default function PerfisSemMaterial() {
     } catch (e2) { setErro(e2.message); } finally { setLoading(false); }
   };
 
-  const apontar = async (perfil, r) => {
+  // ⚠⚠ ATÉ ONDE A DECLARAÇÃO VALE. Perfil que não tem material nenhum na OP: vale para TODAS as
+  // peças dele (foi assim que isso nasceu, em 22/08). Perfil que TEM material e só perdeu algumas
+  // peças — a cortada antes da entrega — recebe SEM_R: preenche o que ficou sem R e não encosta no
+  // que o CMR da própria OP já respondeu. Na OP-106 é a diferença entre resolver 1 peça e apagar o
+  // rastreio bom das outras 3 do mesmo perfil. (Vitor, 28/08/2026: "sem você quebrar outras coisas".)
+  const apontar = async (perfil, r, escopo) => {
     setSalvando(`${perfil}|${r}`);
     try {
       const res = await fetch("/api/pcp/separacao", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           opId: data.op.id,
-          trocas: [{ perfil, rUsado: r, motivo: "material de estoque — origem apontada na conferência de rastreabilidade" }],
+          trocas: [{
+            perfil, rUsado: r, escopo,
+            motivo: escopo === "SEM_R"
+              ? "peça cortada antes da entrega — origem do estoque apontada na conferência de rastreabilidade"
+              : "material de estoque — origem apontada na conferência de rastreabilidade",
+          }],
         }),
       });
       const j = await res.json();
@@ -109,6 +119,12 @@ export default function PerfisSemMaterial() {
                     <span className="text-[11px] text-torg-orange-700 font-semibold">{fmtN(g.marcas)} {g.marcas === 1 ? "marca" : "marcas"}</span>
                     {/* ⚠ dizer QUAL é a falta: "sem material" e "cortada antes" pedem decisões
                         diferentes — a primeira é material de outra OP, a segunda é sobra de estoque. */}
+                    {g.motivo === "MISTO" && (
+                      <span className="text-[10px] font-semibold text-torg-blue bg-torg-blue-50 border border-torg-blue-300 rounded-full px-2 py-0.5 whitespace-nowrap"
+                        title="As demais peças deste perfil já têm R do CMR desta OP e não serão alteradas">
+                        só as peças sem R
+                      </span>
+                    )}
                     {g.motivo !== "SEM_MATERIAL" && (
                       <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 whitespace-nowrap">
                         cortada antes da entrega{g.cortadoEm ? ` · corte ${fmtD(g.cortadoEm)}` : ""}
@@ -141,7 +157,7 @@ export default function PerfisSemMaterial() {
                           </span>
                           <span className="text-torg-gray shrink-0">{fmtN(c.pesoKg)} kg</span>
                           {!c.temArquivo && <span className="text-torg-orange-700 shrink-0">sem PDF</span>}
-                          <button onClick={() => apontar(g.perfil, c.r)} disabled={!!salvando}
+                          <button onClick={() => apontar(g.perfil, c.r, g.motivo === "SEM_MATERIAL" ? "TODAS" : "SEM_R")} disabled={!!salvando}
                             className="ml-auto shrink-0 text-[10px] font-semibold text-torg-blue hover:underline disabled:opacity-50">
                             {salvando === `${g.perfil}|${c.r}` ? "gravando…" : g.jaApontado === c.r ? "apontado" : "veio deste"}
                           </button>

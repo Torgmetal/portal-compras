@@ -244,6 +244,9 @@ const schemaPost = z.object({
     perfil: z.string().min(1),
     rIndicado: z.string().nullable().optional(),
     rUsado: z.string().min(1),
+    // ⚠ até onde a declaração vale: TODAS (o fardo trocado na separação, padrão) ou SEM_R (só as
+    // peças que ficaram sem R — não mexe no que o CMR da OP já respondeu). Ver o schema.
+    escopo: z.enum(["TODAS", "SEM_R"]).optional(),
     motivo: z.string().max(300).nullable().optional(),
   })).min(1),
 });
@@ -267,15 +270,15 @@ export async function POST(req) {
       where: { opNumero_perfil: { opNumero: op.numero, perfil } },
       create: {
         opId: op.id, opNumero: op.numero, perfil,
-        rIndicado: t.rIndicado || null, rUsado: t.rUsado.trim(), motivo: t.motivo || null,
+        rIndicado: t.rIndicado || null, rUsado: t.rUsado.trim(), escopo: t.escopo || "TODAS", motivo: t.motivo || null,
         trocadoPorId: user.id, trocadoPorNome: user.name || null,
       },
       update: {
-        rIndicado: t.rIndicado || null, rUsado: t.rUsado.trim(), motivo: t.motivo || null,
+        rIndicado: t.rIndicado || null, rUsado: t.rUsado.trim(), escopo: t.escopo || "TODAS", motivo: t.motivo || null,
         trocadoPorId: user.id, trocadoPorNome: user.name || null,
       },
     });
-    salvas.push({ perfil: reg.perfil, rUsado: reg.rUsado, rIndicado: reg.rIndicado });
+    salvas.push({ perfil: reg.perfil, rUsado: reg.rUsado, rIndicado: reg.rIndicado, escopo: reg.escopo });
   }
   await prisma.auditLog.create({
     data: { userId: user.id, action: "TROCAR_RASTREABILIDADE", entity: "TrocaRastreabilidade", entityId: op.numero, diff: { op: op.numero, trocas: salvas } },

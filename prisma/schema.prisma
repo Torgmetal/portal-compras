@@ -4423,6 +4423,15 @@ model TrocaRastreabilidade {
   perfil     String
   rIndicado  String? // o que o FIFO tinha apontado (fica pra auditoria)
   rUsado     String // o R do fardo efetivamente separado
+  // ⚠⚠ ATÉ ONDE A DECLARAÇÃO VALE. Vitor (28/08/2026), sobre a OP-106: "precisamos ver como vamos
+  // resolver sem você quebrar outras coisas". São dois fatos diferentes registrados no mesmo lugar:
+  //   TODAS  → "todo este perfil, nesta OP, veio deste lote" (o fardo trocado na separação; era o
+  //            único caso quando isso nasceu, em 22/08, e segue sendo o padrão).
+  //   SEM_R  → "as peças deste perfil que ficaram SEM R vieram deste lote" — o resto continua com o
+  //            R que o CMR da própria OP já respondeu. É o caso da peça cortada antes da entrega:
+  //            na OP-106, o perfil CH12.50X100 tem 1 peça de estoque e 3 corretamente rastreadas,
+  //            e aplicar a declaração nas 4 apagaria rastreio bom.
+  escopo     String   @default("TODAS") // TODAS | SEM_R
   motivo     String?
   trocadoPorId   String?
   trocadoPorNome String?
