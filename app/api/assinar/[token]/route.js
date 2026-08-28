@@ -144,7 +144,19 @@ export async function POST(req, { params }) {
     }, { status: 409 });
   }
 
-  const upd = await prisma.assinaturaDocumento.update({ where: { id: a.id }, data: { assinadoEm: new Date(), ip } });
+  // ⚠⚠ A IMAGEM DA ASSINATURA ENTRA AQUI, no ato. Vitor (28/08/2026): "para as assinaturas dos
+  // relatórios de qualidade (…) quando o usuário assinar ela sair no campo de assinatura dela — mas
+  // isso seria apenas nos relatórios de inspeção; para o PIT e PLP por hora não precisa, pois nem
+  // sempre teremos como pegar a assinatura do cliente dessa maneira".
+  //
+  // ⚠ Copiada, não referenciada: o documento guarda a imagem que foi usada. Trocar a assinatura no
+  // cadastro depois não reescreve relatório já assinado.
+  let imagemUrl = null;
+  if (a.envio.tipo === "RELATORIO_INSPECAO" && a.email) {
+    const u = await prisma.user.findFirst({ where: { email: a.email }, select: { assinaturaUrl: true } }).catch(() => null);
+    imagemUrl = u?.assinaturaUrl || null;
+  }
+  const upd = await prisma.assinaturaDocumento.update({ where: { id: a.id }, data: { assinadoEm: new Date(), ip, ...(imagemUrl ? { imagemUrl } : {}) } });
 
   // ── passa a vez: convida o próximo da fila ──
   try {

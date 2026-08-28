@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import ConfirmModal from "@/components/admin/ConfirmModal";
+import AssinaturaUsuario from "./AssinaturaUsuario";
 import SenhaGeradaModal from "@/components/admin/SenhaGeradaModal";
 import { MODULOS_OPCOES } from "@/lib/modulos";
 
@@ -35,7 +36,7 @@ export default function PageEditarUsuario() {
 
   // Estado do formulário
   const [form, setForm] = useState({
-    name: "", email: "", tipo: "", modulos: [], setor: "", podeAlterarVerba: false,
+    name: "", email: "", tipo: "", modulos: [], setor: "", podeAlterarVerba: false, assinaturaUrl: null,
   });
   const [ativo, setAtivo] = useState(true);
 
@@ -68,6 +69,7 @@ export default function PageEditarUsuario() {
         tipo:             u.tipo,
         modulos:          (u.modulos ?? []).map((m) => m.modulo ?? m),
         setor:            u.setor ?? "",
+        assinaturaUrl:    u.assinaturaUrl ?? null,
         podeAlterarVerba: u.podeAlterarVerba,
       });
       setAtivo(u.ativo);
@@ -413,6 +415,12 @@ export default function PageEditarUsuario() {
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-torg-blue/30 disabled:bg-gray-50 disabled:text-gray-400"
               />
             </div>
+
+            {/* ⚠⚠ A ASSINATURA QUE SAI NO RELATÓRIO. Vitor (28/08/2026): "para as assinaturas dos
+                relatórios de qualidade (…) quando o usuário assinar ela sair no campo de assinatura
+                dela". Cadastrada uma vez aqui, vale para todo relatório de inspeção que a pessoa
+                assinar. PIT/PLP ficam de fora de propósito. */}
+            <AssinaturaUsuario id={id} url={form.assinaturaUrl} onMudar={(u) => setcampo("assinaturaUrl", u)} />
 
             {/* podeAlterarVerba */}
             <div className={`flex items-start gap-3 py-1 ${proprio ? "opacity-50" : ""}`}>

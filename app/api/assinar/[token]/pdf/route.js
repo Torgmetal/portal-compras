@@ -23,7 +23,7 @@ export async function GET(_req, { params }) {
   const snap = a.envio.snapshot || {};
   const assinaturas = await prisma.assinaturaDocumento.findMany({
     where: { envioId: a.envioId },
-    select: { nome: true, setor: true, assinadoEm: true, ip: true },
+    select: { nome: true, setor: true, assinadoEm: true, ip: true, imagemUrl: true },
     orderBy: { nome: "asc" },
   });
 

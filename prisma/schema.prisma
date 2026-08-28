@@ -13,6 +13,12 @@ model User {
   email                    String                @unique
   name                     String
   password                 String
+  // ⚠ A ASSINATURA DA PESSOA, em imagem. Vitor (28/08/2026): "para as assinaturas dos relatórios de
+  // qualidade, você consegue colocar uma imagem (…) para quando o usuário assinar ela sair no campo
+  // de assinatura dela? mas isso seria apenas nos relatórios de inspeção". Sobe uma vez aqui e vale
+  // para todo relatório que a pessoa assinar. PIT/PLP ficam de fora de propósito: a assinatura do
+  // cliente nem sempre dá para capturar assim.
+  assinaturaUrl String?
   setor                    String?
   ativo                    Boolean               @default(true)
   createdAt                DateTime              @default(now())
@@ -4914,6 +4920,11 @@ model AssinaturaDocumento {
   token      String          @unique
   assinadoEm DateTime?
   ip         String?
+  // ⚠ A IMAGEM DA ASSINATURA usada NESTE documento — copiada do cadastro da pessoa no momento em
+  // que ela assina. Fica congelada: trocar a assinatura no cadastro depois não reescreve o que já
+  // foi assinado. Vazia quando quem assina não tem imagem cadastrada (o caso do inspetor do
+  // cliente) — aí o campo sai com a linha para assinar à mão, como sempre foi.
+  imagemUrl  String?
   // ⚠⚠ A FILA DE ASSINATURA. Vitor (27/08/2026): "o ideal seria o elaborador assinar primeiro, o
   // verificador assina e o cliente assina por último". Antes os dois recebiam juntos e qualquer um
   // podia assinar primeiro — o verificador podia validar um documento que o elaborador ainda não

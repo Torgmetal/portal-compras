@@ -25,6 +25,7 @@ const selectUsuario = {
   tipo:             true,
   modulos:          { select: { modulo: true } },
   setor:            true,
+  assinaturaUrl:    true,
   ativo:            true,
   podeAlterarVerba: true,
   createdAt:        true,
