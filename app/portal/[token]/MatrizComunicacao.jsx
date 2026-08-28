@@ -17,6 +17,23 @@ import { MATRIZ_COMUNICACAO, FOCAIS, iniciais, zap } from "@/lib/matriz-comunica
 
 const CHIP = "whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors";
 
+/** Avatar: a foto quando existe, as iniciais quando não — e as iniciais também se a foto falhar. */
+function Avatar({ pessoa }) {
+  const [erro, setErro] = useState(false);
+  if (pessoa.foto && !erro) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={pessoa.foto} alt={pessoa.nome} onError={() => setErro(true)}
+        className="shrink-0 w-11 h-11 rounded-full object-cover bg-gray-100" />
+    );
+  }
+  return (
+    <span className="shrink-0 w-11 h-11 rounded-full bg-[#0D1F3C] text-white grid place-items-center text-[13px] font-bold">
+      {iniciais(pessoa.nome)}
+    </span>
+  );
+}
+
 export default function MatrizComunicacao() {
   const [filtro, setFiltro] = useState("TODOS");
   const [aberto, setAberto] = useState(null);
@@ -55,9 +72,7 @@ export default function MatrizComunicacao() {
             <div key={p.email + p.nome} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
               <button onClick={() => setAberto(on ? null : p.email)} className="w-full text-left p-4 hover:bg-gray-50/70">
                 <div className="flex items-start gap-3">
-                  <span className="shrink-0 w-11 h-11 rounded-full bg-[#0D1F3C] text-white grid place-items-center text-[13px] font-bold">
-                    {iniciais(p.nome)}
-                  </span>
+                  <Avatar pessoa={p} />
                   <div className="min-w-0 flex-1">
                     <p className="text-[15px] font-bold text-[#0D1F3C] leading-tight">{p.nome}</p>
                     <p className="text-[12.5px] text-gray-500 mt-0.5">

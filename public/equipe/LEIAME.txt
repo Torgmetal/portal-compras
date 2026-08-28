@@ -1,0 +1,8 @@
+Fotos dos focais de atendimento (aba "Fale com a Torg" do portal do cliente).
+
+Como adicionar:
+  1. Salve a foto aqui como <primeiro-nome>.jpg — quadrada, rosto centralizado, 400x400 basta.
+  2. Em lib/matriz-comunicacao.js, na pessoa, acrescente:  foto: "/equipe/diego.jpg"
+
+Sem foto, o avatar mostra as iniciais. Se o arquivo sumir, ele volta para as iniciais
+sozinho — o portal nunca mostra imagem quebrada.
