@@ -1140,7 +1140,7 @@ function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalG
               <span className="mx-2">·</span>
               <strong>Parcelas:</strong> 1 parcela
               <span className="mx-2">·</span>
-              <strong>Previsão de entrega:</strong> hoje
+              <strong>Previsão de entrega:</strong> pelo prazo do fornecedor
             </p>
           </div>
 

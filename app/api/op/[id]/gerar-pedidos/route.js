@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { criarPedidoOmie, anexarAoPedidoOmie } from "@/lib/omie-pedido-compra";
 import { resolverCodProjetoPorOp } from "@/lib/omie-pedidos-abertos";
+import { previsaoEntregaDDMMYYYY } from "@/lib/prazo-entrega";
 import { fdPorCategoriaDaOP, rmEhFD, itemEhFD } from "@/lib/faturamento-direto";
 
 export const runtime = "nodejs";
@@ -269,6 +270,9 @@ export async function POST(req, { params }) {
 
     // Chama a lib server-side direto (sem fetch interno — evita problema
     // de auth do middleware bloquear chamada interna).
+    // Previsão de entrega = dia da geração (RM ganha) + prazo do fornecedor (dias úteis/corridos).
+    const dDtPrevisao = previsaoEntregaDDMMYYYY(cotacao.observacao) || undefined;
+
     let pedidoCriado = null;
     let erroPedido = null;
     try {
@@ -284,6 +288,7 @@ export async function POST(req, { params }) {
         cInfAdic: `OP ${op.numero}`,
         nCodProj: nCodProjOP,
         prazoPagamento: cotacao.prazoPagamento,
+        dDtPrevisao,
       });
       if (data.error) {
         erroPedido = data.error;

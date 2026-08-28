@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { criarPedidoOmie, anexarAoPedidoOmie } from "@/lib/omie-pedido-compra";
 import { resolverCodProjetoPorOp, resolverCodProjetoPorNome } from "@/lib/omie-pedidos-abertos";
+import { previsaoEntregaDDMMYYYY } from "@/lib/prazo-entrega";
 
 // RMs Consumíveis (INTERNA) não têm obra própria → vinculam ao projeto geral.
 const PROJETO_CONSUMIVEL = "OP 000 - GERAL TORG";
@@ -202,6 +203,8 @@ export async function POST(req, { params }) {
     let pedidoCriado = null;
     let erroPedido = null;
     try {
+      // Previsão de entrega = dia da geração (RM ganha) + prazo do fornecedor (dias úteis/corridos).
+      const dDtPrevisao = previsaoEntregaDDMMYYYY(cotacao.observacao) || undefined;
       const data = await criarPedidoOmie({
         itens: itensPayload,
         observacao: observacaoBase,
@@ -214,6 +217,7 @@ export async function POST(req, { params }) {
         cInfAdic: `RM Interna ${rm.numero}`,
         nCodProj: nCodProjOP,
         prazoPagamento: cotacao.prazoPagamento,
+        dDtPrevisao,
       });
       if (data.error) {
         erroPedido = data.error;
