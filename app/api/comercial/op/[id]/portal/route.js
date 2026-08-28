@@ -56,6 +56,10 @@ export async function PUT(req, { params }) {
     where: { id: r.portal.id },
     data: {
       contato: txt(b.contato, 120), empresa: txt(b.empresa, 160), clienteEmail: txt(b.clienteEmail, 160),
+      destinatarios: Array.isArray(b.destinatarios)
+        ? b.destinatarios.slice(0, 20).map((x) => ({ nome: txt(x?.nome, 120), email: txt(x?.email, 160) }))
+            .filter((x) => x.email && /.+@.+\..+/.test(x.email))
+        : undefined,
       mensagem: txt(b.mensagem, 4000), capaUrl: txt(b.capaUrl, 600), logoClienteUrl: txt(b.logoClienteUrl, 600),
       secoes: normalizarSecoes(b.secoes),
       ...(b.mostrarPeso === undefined ? {} : { mostrarPeso: b.mostrarPeso === true }),
@@ -88,10 +92,25 @@ export async function POST(req, { params }) {
   const base = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace.torg.com.br";
   const link = `${base}/portal/${token}`;
   let enviado = null;
+  let totalEnvio = 0;
+  let okEnvio = 0;
 
   if (b.enviar) {
-    const para = txt(b.clienteEmail, 160) || portal.clienteEmail;
-    if (!para) return NextResponse.json({ error: "Informe o e-mail do cliente para enviar." }, { status: 400 });
+    // ⚠ A OBRA TEM MAIS DE UM INTERLOCUTOR. Vitor (27/08/2026): "preciso de campos para colocar mais
+    // e-mails para enviar o acesso ao portal da obra". O contato principal continua sendo o primeiro
+    // da fila; os demais vêm da lista gravada no portal. Cada um recebe o SEU código (?d=) — é o que
+    // permite dizer depois quem abriu, em vez de um "acesso sem identificação" quando o link é
+    // repassado. Endereço repetido entra uma vez só.
+    const principal = txt(b.clienteEmail, 160) || portal.clienteEmail;
+    const extras = Array.isArray(b.destinatarios) ? b.destinatarios : (Array.isArray(portal.destinatarios) ? portal.destinatarios : []);
+    const lista = [];
+    for (const x of [{ nome: txt(b.contato, 120) || portal.contato, email: principal }, ...extras]) {
+      const email = txt(x?.email, 160);
+      if (!email || !/.+@.+\..+/.test(email)) continue;
+      if (lista.some((y) => y.email.toLowerCase() === email.toLowerCase())) continue;
+      lista.push({ nome: txt(x?.nome, 120), email });
+    }
+    if (!lista.length) return NextResponse.json({ error: "Informe o e-mail do cliente para enviar." }, { status: 400 });
 
     // ⚠⚠ UM CÓDIGO POR PESSOA. Vitor (26/08/2026): "preciso do histórico do acesso (…) para as
     // pessoas que enviamos". Com um link só para a obra dá para dizer "abriram 7 vezes" e nunca
@@ -101,51 +120,56 @@ export async function POST(req, { params }) {
     // quem recebeu e o que aconteceu depois; quem controla o acesso continua sendo o token.
     // ⚠ Reenviar para o MESMO e-mail reaproveita o código — senão o histórico de quem já abriu se
     // partiria em duas pessoas a cada reenvio.
-    const jaTem = await prisma.portalDestinatario.findFirst({ where: { portalId: portal.id, email: para } });
-    const dest = jaTem
-      ? await prisma.portalDestinatario.update({ where: { id: jaTem.id }, data: { enviadoEm: new Date(), enviadoPorNome: user.name || user.email || null, nome: txt(b.contato, 120) || jaTem.nome } })
-      : await prisma.portalDestinatario.create({
-          data: {
-            portalId: portal.id, opNumero: portal.opNumero, email: para,
-            nome: txt(b.contato, 120) || portal.contato || null,
-            codigo: `${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}`,
-            enviadoEm: new Date(), enviadoPorNome: user.name || user.email || null,
-          },
-        });
-    const linkPessoal = `${link}?d=${dest.codigo}`;
     const obra = r.op.obra || `OP-${String(r.op.numero).padStart(3, "0")}`;
-    const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#0D1F3C">
-      ${cabecalhoEmail("Portal da Obra")}
-      <div style="border:1px solid #e7ecf2;border-top:none;border-radius:0 0 8px 8px;padding:22px 26px">
-        <p style="margin:0 0 12px">Olá${portal.contato ? `, <strong>${portal.contato}</strong>` : ""},</p>
-        <p style="margin:0 0 14px">
-          Preparamos um portal para você acompanhar a fabricação de <strong>${obra}</strong>: cronograma,
-          relatórios de inspeção aprovados, certificados de matéria-prima com rastreabilidade e os
-          documentos da obra — atualizados conforme ela avança.
-        </p>
-        <p style="text-align:center;margin:24px 0">
-          <a href="${linkPessoal}" style="background:#006EAB;color:#fff;text-decoration:none;padding:13px 30px;border-radius:8px;font-size:15px;font-weight:bold;display:inline-block">Abrir o portal da obra</a>
-        </p>
-        <p style="margin:0;color:#5b6b7a;font-size:12px">
-          Se o botão não funcionar, copie e cole no navegador:<br>
-          <span style="color:#006EAB;word-break:break-all">${linkPessoal}</span>
-        </p>
-      </div>
-    </div>`;
-    const res = await sendEmail({
-      to: para, subject: `Portal da obra — ${obra} · Torg Metal`, html,
-      text: `Acompanhe a fabricação de ${obra}: ${linkPessoal}`,
-      replyTo: user.email || undefined,
-    }).catch(() => ({ ok: false }));
-    enviado = !!res?.ok;
-    if (enviado) {
-      await prisma.portalCliente.update({ where: { id: portal.id }, data: { enviadoEm: new Date(), clienteEmail: para } });
+    let enviados = 0;
+    for (const pessoa of lista) {
+      const jaTem = await prisma.portalDestinatario.findFirst({ where: { portalId: portal.id, email: pessoa.email } });
+      const dest = jaTem
+        ? await prisma.portalDestinatario.update({ where: { id: jaTem.id }, data: { enviadoEm: new Date(), enviadoPorNome: user.name || user.email || null, nome: pessoa.nome || jaTem.nome } })
+        : await prisma.portalDestinatario.create({
+            data: {
+              portalId: portal.id, opNumero: portal.opNumero, email: pessoa.email,
+              nome: pessoa.nome || null,
+              codigo: `${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}`,
+              enviadoEm: new Date(), enviadoPorNome: user.name || user.email || null,
+            },
+          });
+      const linkPessoal = `${link}?d=${dest.codigo}`;
+      const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#0D1F3C">
+        ${cabecalhoEmail("Portal da Obra")}
+        <div style="border:1px solid #e7ecf2;border-top:none;border-radius:0 0 8px 8px;padding:22px 26px">
+          <p style="margin:0 0 12px">Olá${pessoa.nome ? `, <strong>${pessoa.nome}</strong>` : ""},</p>
+          <p style="margin:0 0 14px">
+            Preparamos um portal para você acompanhar a fabricação de <strong>${obra}</strong>: cronograma,
+            relatórios de inspeção aprovados, certificados de matéria-prima com rastreabilidade e os
+            documentos da obra — atualizados conforme ela avança.
+          </p>
+          <p style="text-align:center;margin:24px 0">
+            <a href="${linkPessoal}" style="background:#006EAB;color:#fff;text-decoration:none;padding:13px 30px;border-radius:8px;font-size:15px;font-weight:bold;display:inline-block">Abrir o portal da obra</a>
+          </p>
+          <p style="margin:0;color:#5b6b7a;font-size:12px">
+            Se o botão não funcionar, copie e cole no navegador:<br>
+            <span style="color:#006EAB;word-break:break-all">${linkPessoal}</span>
+          </p>
+        </div>
+      </div>`;
+      const res = await sendEmail({
+        to: pessoa.email, subject: `Portal da obra — ${obra} · Torg Metal`, html,
+        text: `Acompanhe a fabricação de ${obra}: ${linkPessoal}`,
+        replyTo: user.email || undefined,
+      }).catch(() => ({ ok: false }));
+      if (res?.ok) enviados++;
     }
+    enviado = enviados > 0;
+    if (enviado) {
+      await prisma.portalCliente.update({ where: { id: portal.id }, data: { enviadoEm: new Date(), clienteEmail: lista[0].email } });
+    }
+    totalEnvio = lista.length; okEnvio = enviados;
   }
 
   await prisma.auditLog.create({
-    data: { userId: user.id, action: "PUBLICAR_PORTAL_CLIENTE", entity: "PortalCliente", entityId: portal.id, diff: { opNumero: portal.opNumero, enviado } },
+    data: { userId: user.id, action: "PUBLICAR_PORTAL_CLIENTE", entity: "PortalCliente", entityId: portal.id, diff: { opNumero: portal.opNumero, enviado, destinatarios: totalEnvio } },
   }).catch(() => {});
 
-  return NextResponse.json({ ok: true, link, enviado });
+  return NextResponse.json({ ok: true, link, enviado, total: totalEnvio, enviados: okEnvio });
 }

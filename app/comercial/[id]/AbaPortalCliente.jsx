@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye, Upload, X, ImagePlus, FolderOpen } from "lucide-react";
+import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye, Upload, X, ImagePlus, FolderOpen, Plus, Trash2 } from "lucide-react";
 import { upload } from "@vercel/blob/client";
 import { SECOES, CAPAS, AREAS, AREAS_COM_SELETOR, TIPOS_ENGENHARIA, situacao } from "@/lib/portal-cliente";
 import SeletorDocsArea from "./SeletorDocsArea";
@@ -51,6 +51,7 @@ export default function AbaPortalCliente({ opId, opNumero }) {
         setF({
           contato: j.portal.contato || "", empresa: j.portal.empresa || j.op.cliente || "",
           clienteEmail: j.portal.clienteEmail || "", mensagem: j.portal.mensagem || "",
+          destinatarios: Array.isArray(j.portal.destinatarios) ? j.portal.destinatarios : [],
           capaUrl: j.portal.capaUrl || "", logoClienteUrl: j.portal.logoClienteUrl || "",
           fotos: Array.isArray(j.portal.fotos) ? j.portal.fotos : [],
           secoes: j.portal.secoesAtivas || [], mostrarPeso: j.portal.mostrarPeso === true,
@@ -63,6 +64,13 @@ export default function AbaPortalCliente({ opId, opNumero }) {
   if (!d || !f) return <p className="text-sm text-torg-gray inline-flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> carregando…</p>;
 
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+  const setDest = (i, k, v) => setF((p) => ({ ...p, destinatarios: p.destinatarios.map((d, j) => (j === i ? { ...d, [k]: v } : d)) }));
+  const addDest = () => setF((p) => ({ ...p, destinatarios: [...(p.destinatarios || []), { nome: "", email: "" }] }));
+  const rmDest = (i) => setF((p) => ({ ...p, destinatarios: p.destinatarios.filter((_, j) => j !== i) }));
+  // quem realmente vai receber: o contato principal + os extras com e-mail válido, sem repetir
+  const nDest = new Set([f.clienteEmail, ...(f.destinatarios || []).map((x) => x?.email)]
+    .map((e) => (e || "").trim().toLowerCase()).filter((e) => /.+@.+\..+/.test(e))).size;
+  const temEmail = nDest > 0;
   const st = situacao(d.portal);
   const link = d.portal.token ? `${typeof window !== "undefined" ? window.location.origin : ""}/portal/${d.portal.token}` : null;
   // ⚠ O QUE NÓS ABRIMOS NÃO É ACESSO DO CLIENTE. `?preview=1` faz a rota do portal não contar
@@ -127,12 +135,14 @@ export default function AbaPortalCliente({ opId, opNumero }) {
       });
       const r = await fetch(`/api/comercial/op/${opId}/portal`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enviar, clienteEmail: f.clienteEmail }),
+        body: JSON.stringify({ enviar, clienteEmail: f.clienteEmail, contato: f.contato, destinatarios: f.destinatarios }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao publicar");
       setD((p) => ({ ...p, portal: { ...p.portal, token: j.link.split("/").pop(), status: "PUBLICADO" } }));
-      setAviso(enviar ? (j.enviado ? "Publicado e enviado ao cliente." : "Publicado — mas o e-mail falhou; o link já vale.") : "Publicado.");
+      setAviso(enviar
+        ? (j.enviado ? `Publicado e enviado para ${j.enviados} de ${j.total} destinatário(s).` : "Publicado — mas o e-mail falhou; o link já vale.")
+        : "Publicado.");
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
   }
 
@@ -165,7 +175,25 @@ export default function AbaPortalCliente({ opId, opNumero }) {
           <Campo rot="Contato no cliente" v={f.contato} on={(v) => set("contato", v)} ph="nome de quem recebe" />
           <Campo rot="Empresa" v={f.empresa} on={(v) => set("empresa", v)} />
           <Campo rot="E-mail" v={f.clienteEmail} on={(v) => set("clienteEmail", v)} tipo="email" />
+        </div>
 
+        {/* ⚠ QUEM MAIS RECEBE. Obra tem engenharia, compras e fiscalização do lado do cliente:
+            mandar para um só obriga o repasse, e o link repassado chega sem código — o acesso
+            volta para nós como "sem identificação". Cada pessoa daqui recebe o seu. */}
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <p className="text-[10px] font-semibold text-torg-gray mb-1.5">Outros destinatários — cada um recebe o próprio link, e o acesso aparece com o nome dele no histórico</p>
+          {(f.destinatarios || []).map((dst, i) => (
+            <div key={i} className="grid grid-cols-12 gap-2 items-center mb-2">
+              <input value={dst.nome || ""} placeholder="nome" onChange={(e) => setDest(i, "nome", e.target.value)}
+                className="col-span-5 text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
+              <input value={dst.email || ""} placeholder="e-mail" type="email" onChange={(e) => setDest(i, "email", e.target.value)}
+                className="col-span-6 text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
+              <button onClick={() => rmDest(i)} title="Remover" className="col-span-1 text-gray-400 hover:text-red-500 flex justify-center"><Trash2 size={14} /></button>
+            </div>
+          ))}
+          <button onClick={addDest} className="text-[11px] font-semibold text-torg-blue hover:text-torg-dark inline-flex items-center gap-1">
+            <Plus size={12} /> adicionar e-mail
+          </button>
         </div>
       </div>
 
@@ -397,8 +425,8 @@ export default function AbaPortalCliente({ opId, opNumero }) {
           className="text-[12px] font-semibold text-torg-dark border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50 inline-flex items-center gap-1.5">
           <ExternalLink size={13} /> {d.portal.status === "PUBLICADO" ? "Republicar" : "Publicar"}
         </button>
-        <button onClick={() => publicar(true)} disabled={salvando || !f.clienteEmail}
-          title={!f.clienteEmail ? "Informe o e-mail do cliente" : "Publica e envia o link"}
+        <button onClick={() => publicar(true)} disabled={salvando || !temEmail}
+          title={!temEmail ? "Informe ao menos um e-mail" : `Publica e envia o link para ${nDest} destinatário(s)`}
           className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5">
           <Send size={13} /> Publicar e enviar
         </button>

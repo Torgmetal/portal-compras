@@ -2485,6 +2485,11 @@ model PortalCliente {
   contato          String?
   empresa          String?
   clienteEmail     String?
+  // ⚠ QUEM MAIS RECEBE O LINK. Vitor (27/08/2026): "preciso de campos para colocar mais e-mails
+  // para enviar o acesso ao portal da obra". Obra tem mais de um interlocutor (engenharia, compras,
+  // fiscalização) e mandar para um só obriga o cliente a repassar o link — o repasse chega sem
+  // código e o acesso volta para nós como anônimo. [{ nome, email }]
+  destinatarios    Json?
   capaUrl          String?
   // ⚠ O LOGO DO CLIENTE AO LADO DO NOSSO. Vitor (22/08/2026): "quero que tenha o logo da
   // torg e logo do cliente". Não é enfeite: o portal é o documento de uma PARCERIA, e uma
