@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { acoesValidas, acoesPendentes } from "@/lib/auditoria-interna";
-import { bumpRevisao } from "@/lib/assinatura-doc";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -67,7 +66,5 @@ export async function POST(req) {
   });
 
   await prisma.auditLog.create({ data: { userId: user.id, action: "CRIAR_AUDITORIA_INTERNA", entity: "AuditoriaInterna", entityId: a.id, diff: { numero, setor: body.setor } } }).catch(() => {});
-  // Nova auditoria no cronograma → sobe a revisão do documento (como no Plano de Treinamentos).
-  await bumpRevisao("CRONOGRAMA_AUDITORIA").catch(() => {});
   return NextResponse.json({ success: true, id: a.id, numero: a.numero });
 }

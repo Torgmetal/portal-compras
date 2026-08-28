@@ -4,7 +4,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarTokenForte } from "@/lib/token";
-import { getRevisao, fmtRev } from "@/lib/assinatura-doc";
+import { getRevisao, bumpRevisao, fmtRev } from "@/lib/assinatura-doc";
+import { diffCronograma, auditoriasDoSnapshot } from "@/lib/cronograma-auditoria-revisoes";
 import { gerarCronogramaAuditoriaPDF } from "@/lib/cronograma-auditoria-pdf";
 import { sendEmail } from "@/lib/email";
 import { cabecalhoEmail } from "@/lib/email-layout";
@@ -42,7 +43,15 @@ export async function POST(req) {
     select: { numero: true, setor: true, dataAuditoria: true, responsavelAcompanhamento: true, status: true, escopo: true },
     take: 500,
   });
-  const revisao = await getRevisao(TIPO);
+  // ⚠⚠ A REVISÃO SOBE AQUI E SÓ AQUI. Mexer no cronograma não é revisão — é rascunho (Vitor,
+  // 27/08/2026: "somente subir revisão no caso de enviar para assinatura"). E reenviar o MESMO
+  // cronograma (para incluir um destinatário, por exemplo) também não é revisão nova: só sobe
+  // quando o conteúdo mudou em relação ao último envio.
+  const ultimo = await prisma.envioAssinatura.findFirst({
+    where: { tipo: TIPO }, orderBy: { enviadoEm: "desc" }, select: { revisao: true, snapshot: true },
+  });
+  const mudou = ultimo ? diffCronograma(auditoriasDoSnapshot(ultimo), auditorias).total > 0 : false;
+  const revisao = mudou ? await bumpRevisao(TIPO) : await getRevisao(TIPO);
   const ano = auditorias[0]?.dataAuditoria ? new Date(auditorias[0].dataAuditoria).getUTCFullYear() : new Date().getUTCFullYear();
   const titulo = `Cronograma de Auditoria Interna ${ano} — ${fmtRev(revisao)}`;
 

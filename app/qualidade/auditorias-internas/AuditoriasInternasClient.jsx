@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ClipboardList, Plus, Loader2, X, AlertCircle, CheckCircle2, CalendarDays, FileText, ListChecks, Archive, FileDown, Send, PenLine, Clock, Trash2 } from "lucide-react";
+import { ClipboardList, Plus, Loader2, X, AlertCircle, CheckCircle2, CalendarDays, FileText, ListChecks, Archive, FileDown, Send, PenLine, Clock, Trash2, History } from "lucide-react";
+import Link from "next/link";
 import { numRAI, SETORES_AUDITORIA, STATUS_AI, statusAiLabel } from "@/lib/auditoria-interna";
 import PlanosAcaoLista from "./PlanosAcaoLista";
 
@@ -43,6 +44,7 @@ export default function AuditoriasInternasClient() {
           {aba === "cronograma" && (
             <>
               <a href="/api/qualidade/auditorias-internas/pdf" target="_blank" rel="noopener noreferrer" className="px-3.5 py-2.5 bg-white text-torg-dark border border-gray-300 rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2 text-sm"><FileDown size={16} /> Exportar PDF</a>
+              <Link href="/qualidade/auditorias-internas/revisoes" className="px-3.5 py-2.5 bg-white text-torg-dark border border-gray-300 rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2 text-sm"><History size={16} /> Revisões</Link>
               <button onClick={() => setAssinaturaOpen(true)} className="px-3.5 py-2.5 bg-white text-torg-blue border border-torg-blue/40 rounded-lg hover:bg-torg-blue-50/50 font-medium flex items-center gap-2 text-sm"><Send size={16} /> Enviar p/ assinatura</button>
             </>
           )}
@@ -211,7 +213,7 @@ function AssinaturaModal({ onClose }) {
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><PenLine size={16} className="text-torg-blue" /> Enviar cronograma p/ assinatura</h3>
-            <p className="text-[11px] text-torg-gray mt-0.5">Revisão atual <strong className="text-torg-dark">{fmtRev(revisao)}</strong> · o PDF vai anexado e o setor assina eletronicamente (confirmação + data + IP).</p>
+            <p className="text-[11px] text-torg-gray mt-0.5">Revisão atual <strong className="text-torg-dark">{fmtRev(revisao)}</strong> · o PDF vai anexado e o setor assina eletronicamente (confirmação + data + IP). A revisão só sobe aqui, se o cronograma tiver mudado desde o último envio.</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
