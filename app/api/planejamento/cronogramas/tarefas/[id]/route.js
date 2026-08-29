@@ -140,6 +140,17 @@ export async function PATCH(req, { params }) {
     // Mantém dataRealizacao em sincronia (consumida pelo recálculo de
     // antecessoras e pela exportação) quando o término real é informado.
     if (parsed.data.dataRealizacao === undefined) data.dataRealizacao = data.dataFimReal;
+
+    // ⚠⚠ CONCLUIR = 100%. Vitor (29/08/2026): "sempre que for dado como concluído uma tarefa
+    // precisa ser atualizado o % do cronograma". Informar o TÉRMINO REAL é dar a tarefa por
+    // concluída; sem isto ela ficava com data de fim e progresso parado (às vezes em 0), e o
+    // cronograma mostrava a obra mais atrasada do que está. Quem manda um percentual explícito
+    // continua mandando — este preenchimento só cobre quem não mandou.
+    if (data.dataFimReal && parsed.data.percentualRealizado === undefined && tarefa.percentualRealizado !== 100) {
+      diffAntes.percentualRealizado = tarefa.percentualRealizado;
+      diffDepois.percentualRealizado = 100;
+      data.percentualRealizado = 100;
+    }
   }
   if (parsed.data.dataInicioPrevista !== undefined) {
     const novo = parsed.data.dataInicioPrevista ? new Date(parsed.data.dataInicioPrevista) : null;
@@ -275,7 +286,9 @@ export async function PATCH(req, { params }) {
   // tarefas de Fabricação/Expedição, então rola TODOS os setores — não só o da tarefa
   // editada. Antes só o do editado era rolado e os resumos a jusante ficavam com as
   // datas velhas (o cabeçalho do setor lê summary.dataInicio/FimPrevista).
-  const datasMudaram = diffDepois.dataInicioPrevista !== undefined || diffDepois.dataFimPrevista !== undefined || diffDepois.dataLiberacao !== undefined || diffDepois.motivoBloqueio !== undefined;
+  // ⚠ o TÉRMINO REAL entra aqui: é ele que conclui a tarefa, e sem ele na lista o resumo do setor
+  // (e o % do cronograma) ficava com o número velho até alguém mexer em outra coisa.
+  const datasMudaram = diffDepois.dataInicioPrevista !== undefined || diffDepois.dataFimPrevista !== undefined || diffDepois.dataLiberacao !== undefined || diffDepois.motivoBloqueio !== undefined || data.dataFimReal !== undefined;
   if (progressoMudou || antecessorasChanged || datasMudaram) {
     try {
       await rollupPercentualDepartamentos(tarefa.cronograma.id, null);

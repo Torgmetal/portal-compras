@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FileText, GitCompareArrows, RotateCcw, Gauge, FolderKanban, ListChecks, ListOrdered } from "lucide-react";
+import { LayoutDashboard, FileText, GitCompareArrows, RotateCcw, Gauge, FolderKanban, ListChecks, ListOrdered, GanttChart } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -13,6 +13,12 @@ const ITENS = [
   { href: "/engenharia/listas", label: "Listas (LE / LPC)", icon: ListChecks },
   // Tarefas dos cronogramas em ordem de prazo — só as que o Planejamento enviou. (Vitor 19/08.)
   { href: "/engenharia/sequencia", label: "Sequência", icon: ListOrdered },
+  // ⚠⚠ CRONOGRAMA ≠ SEQUÊNCIA. A Sequência só mostra cronograma cujas tarefas o Planejamento
+  // ENVIOU (`tarefasEnviadasEm`); o Cronograma mostra TODAS as tarefas de Engenharia, que é o
+  // conjunto pelo qual o indicador de aderência cobra o setor. Vitor (29/08/2026): "preciso criar
+  // uma forma com que a engenharia enxergue as tarefas do cronograma, igual temos na aba do
+  // planejamento (...) apenas para as tarefas da engenharia".
+  { href: "/engenharia/cronograma", label: "Cronograma", icon: GanttChart },
   // Indicadores ISO do setor — mesmo painel dos demais (Vitor, 28/08/2026).
   { href: "/engenharia/indicadores", label: "Indicadores", icon: Gauge },
 ];
