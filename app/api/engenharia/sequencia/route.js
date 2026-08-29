@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { etapaDaTarefa, PROXIMA_ETAPA, emEspera } from "@/lib/etapa-projeto";
+import { evidenciasDasTarefas } from "@/lib/etapa-evidencia";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -119,6 +120,15 @@ export async function GET(req) {
       esperando: pendentes,
     };
   });
+
+  // ⚠⚠ A EVIDÊNCIA DO PORTAL. Vitor (29/08/2026): "mas LE e LPC não são enviadas por e-mail" — a
+  // etapa de listas se comprova AQUI DENTRO, na importação, não na caixa de entrada. A tarefa "LE e
+  // LPC" da OP-115 estava em 0% com as duas listas importadas desde 25/08.
+  const evid = await evidenciasDasTarefas(lista);
+  for (const t of lista) {
+    const e = evid.get(t.id);
+    if (e) t.evidencia = { ...e, etapa: "LISTAS" };
+  }
 
   // atrasada → a fazer → aguardando outro setor → em espera do cliente → concluída;
   // dentro de cada grupo, o que vence antes

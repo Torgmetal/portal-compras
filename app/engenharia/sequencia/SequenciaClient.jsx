@@ -25,6 +25,7 @@ export default function SequenciaClient() {
   const [erro, setErro] = useState("");
   const [impacto, setImpacto] = useState([]);
   const [abertoImp, setAbertoImp] = useState(null);
+  const [baixando, setBaixando] = useState(null);
   const [busca, setBusca] = useState("");
   const [concluidas, setConcluidas] = useState(false);
 
@@ -39,6 +40,21 @@ export default function SequenciaClient() {
       .then((r) => r.json()).then((j) => setImpacto(j.impacto || [])).catch(() => setImpacto([]));
   };
   useEffect(carregar, [concluidas]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ⚠ grava a data da EVIDÊNCIA (quando a lista entrou), não a de hoje — é o que faz o indicador de
+  // aderência medir a entrega em vez do dia em que alguém lembrou de clicar.
+  async function darBaixa(t, quando) {
+    setBaixando(t.id);
+    try {
+      const r = await fetch(`/api/planejamento/cronogramas/tarefas/${t.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataFimReal: new Date(quando).toISOString(), percentualRealizado: 100 }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao dar baixa");
+      carregar();
+    } catch (e) { alert(e.message); } finally { setBaixando(null); }
+  }
 
   const tarefas = useMemo(() => {
     const t = busca.trim().toLowerCase();
@@ -210,6 +226,24 @@ export default function SequenciaClient() {
                     </td>
                     <td className="px-3 py-2 font-medium text-torg-dark">
                       {t.nome}
+                      {/* ⚠ O PORTAL JÁ SABE. A etapa de listas se comprova na importação — e a
+                          baixa usa a DATA DA EVIDÊNCIA, não a de hoje: as listas da 115 entraram
+                          em 25/08 com prazo 21/08, e dar baixa hoje registraria 8 dias de atraso
+                          onde houve 4. */}
+                      {t.evidencia && (
+                        <span className={`block text-[11px] font-normal mt-0.5 ${t.evidencia.completa ? "text-green-700" : "text-amber-700"}`}>
+                          {t.evidencia.completa ? "✓" : "⚠"} {t.evidencia.resumo}
+                          {t.evidencia.completa && (
+                            <>
+                              {" "}em {fmtData(t.evidencia.atendidaEm)}
+                              <button onClick={() => darBaixa(t, t.evidencia.atendidaEm)} disabled={baixando === t.id}
+                                className="ml-1.5 text-torg-blue hover:underline font-medium disabled:opacity-50">
+                                {baixando === t.id ? "dando baixa…" : "dar baixa nesta data"}
+                              </button>
+                            </>
+                          )}
+                        </span>
+                      )}
                       {t.proximaEtapa && (
                         <span className="block text-[11px] text-torg-gray-light font-normal">
                           próxima: {ETAPA_LABEL[t.proximaEtapa]}
