@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { OP_VIVA } from "@/lib/op-viva";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { SO_FABRICACAO } from "@/lib/lista-pecas";
 import { requireRole } from "@/lib/session";
 
 export const maxDuration = 30;
@@ -47,7 +48,7 @@ export async function GET() {
         prisma.pecaConjunto.groupBy({
           by: ["statusEstoque"],
           // ⚠ obra encerrada fora do painel — ver lib/op-viva.js
-          where: { status: "PENDENTE", ...OP_VIVA },
+          where: { status: "PENDENTE", ...SO_FABRICACAO, ...OP_VIVA },
           _count: { id: true },
           _sum: { pesoTotalKg: true },
         }),
@@ -98,7 +99,7 @@ export async function GET() {
         // Pendentes (aguardando liberação) por obra — a parte da fila entra em JS
         prisma.pecaConjunto.groupBy({
           by: ["opNumero"],
-          where: { status: "PENDENTE", ...OP_VIVA },
+          where: { status: "PENDENTE", ...SO_FABRICACAO, ...OP_VIVA },
           _count: { id: true },
           _sum: { pesoTotalKg: true },
         }),
@@ -106,6 +107,9 @@ export async function GET() {
         // Peso total por obra (todas as peças) — pra % já cortado/avançado
         prisma.pecaConjunto.groupBy({
           by: ["opNumero"],
+          // ⚠ o denominador do "% já cortado" é o peso a FABRICAR. Somando a lista de expedição
+          // junto, a obra parecia ter o dobro de aço e a produção, metade do avanço.
+          where: { ...SO_FABRICACAO },
           _sum: { pesoTotalKg: true },
         }),
       ]);

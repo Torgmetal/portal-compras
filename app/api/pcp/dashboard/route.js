@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { SO_FABRICACAO } from "@/lib/lista-pecas";
 import { requireRole } from "@/lib/session";
 
 export const maxDuration = 30;
@@ -114,6 +115,8 @@ export async function GET(req) {
     // Pipeline de peças — quantas em cada status
     prisma.pecaConjunto.groupBy({
       by: ["status"],
+      // ⚠ só a LPC: a LE é a mesma estrutura vista pela expedição e dobrava o pipeline.
+      where: { ...SO_FABRICACAO },
       _count: true,
       _sum: { pesoTotalKg: true },
     }),
@@ -145,7 +148,7 @@ export async function GET(req) {
 
     // Total de peças ativas (PENDENTE a PINTURA, excl. EXPEDIDO)
     prisma.pecaConjunto.count({
-      where: { status: { not: "EXPEDIDO" } },
+      where: { status: { not: "EXPEDIDO" }, ...SO_FABRICACAO },
     }),
 
     // Metas do período (ProducaoDiaria)
@@ -168,7 +171,7 @@ export async function GET(req) {
     const opIds = opsAtivas.map((o) => o.id);
     const progressoRaw = await prisma.pecaConjunto.groupBy({
       by: ["opId", "status"],
-      where: { opId: { in: opIds } },
+      where: { opId: { in: opIds }, ...SO_FABRICACAO },
       _count: true,
       _sum: { pesoTotalKg: true },
     });

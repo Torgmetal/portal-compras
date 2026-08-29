@@ -4,6 +4,7 @@
 // onde há espaço para encaixar uma obra.
 import { NextResponse } from "next/server";
 import { OP_VIVA } from "@/lib/op-viva";
+import { SO_FABRICACAO } from "@/lib/lista-pecas";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { MAQUINAS, MAQUINA_LABEL } from "@/lib/maquina-corte";
@@ -62,7 +63,12 @@ export async function GET() {
         select: { maquina: true, produzidoUn: true, pesoProduzido: true },
       }),
       // Aguardando liberação (sem máquina ainda)
-      prisma.pecaConjunto.aggregate({ where: { status: "PENDENTE" }, _count: { id: true }, _sum: { pesoTotalKg: true } }),
+      //
+      // ⚠⚠ SÓ A LPC, E SÓ OBRA VIVA. Este número vira "dias de carga" na tela do PCP, e ele estava
+      // somando a LISTA DE EXPEDIÇÃO junto: 2.378 peças / 570 t = 95 dias, quando a fila real de
+      // fabricação é 197 peças / 26 t = 4,4 dias. Noventa dias de carga que não existem, e o PCP
+      // planeja o corte por eles. A LE não se corta — ver lib/lista-pecas.
+      prisma.pecaConjunto.aggregate({ where: { status: "PENDENTE", ...SO_FABRICACAO, ...OP_VIVA }, _count: { id: true }, _sum: { pesoTotalKg: true } }),
     ]);
 
     // Capacidade por nome Syneco (uppercase, sem _)
