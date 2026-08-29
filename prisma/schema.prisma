@@ -30,6 +30,10 @@ model User {
   // (sem expiração periódica). senhaAlteradaEm fica como registro da última troca.
   deveTrocarSenha          Boolean               @default(false)
   senhaAlteradaEm          DateTime?
+  // ⚠ Trava de força bruta POR CONTA (não por IP): a fábrica inteira sai pelo mesmo IP público, e
+  // um limitador por IP derrubaria o escritório junto com o atacante. Ver lib/login-tentativas.js.
+  tentativasFalhas         Int                   @default(0)
+  bloqueadoAte             DateTime?
   // Self-service: quando tipo=FUNCIONARIO, vincula 1:1 ao registro de RH
   funcionarioId            String?               @unique
   funcionario              Funcionario?          @relation("UsuarioFuncionario", fields: [funcionarioId], references: [id])

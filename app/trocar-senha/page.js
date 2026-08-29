@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
 import { Loader2, AlertCircle, CheckCircle2, ArrowLeft, Eye, EyeOff, KeyRound } from "lucide-react";
@@ -38,6 +38,10 @@ function Formulario() {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState(false);
+  // ⚠ `?inicial=1` é o middleware dizendo que esta conta entrou com a senha de cadastro e não
+  // segue sem trocar. Sem o aviso, a pessoa cai numa tela de senha sem entender por quê.
+  const inicial = params.get("inicial") === "1";
+  const logado = !!sessao?.user?.email;
 
   // ⚠ quem já está logado não deve redigitar o próprio e-mail para trocar a senha.
   useEffect(() => { if (sessao?.user?.email && !email) setEmail(sessao.user.email); }, [sessao, email]);
@@ -113,6 +117,13 @@ function Formulario() {
             Digite seu email e a senha atual pra definir uma nova.
           </p>
 
+          {inicial && !sucesso && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
+              <KeyRound size={16} className="mt-0.5 flex-shrink-0" />
+              <span>Esta conta ainda usa a senha de cadastro. Defina uma senha sua para continuar.</span>
+            </div>
+          )}
+
           {erro && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
               <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
@@ -123,12 +134,25 @@ function Formulario() {
           {sucesso && (
             <div className="bg-torg-blue-50 border border-torg-blue-200 text-torg-dark text-sm rounded-lg px-3 py-2 flex items-start gap-2">
               <CheckCircle2 size={16} className="mt-0.5 flex-shrink-0 text-torg-blue" />
-              <span>
-                Senha trocada com sucesso!{" "}
-                <Link href={voltar} className="font-semibold text-torg-blue underline">
-                  Entrar agora
-                </Link>
-              </span>
+              {/* ⚠⚠ QUEM ESTÁ LOGADO TEM DE SAIR E VOLTAR. A exigência de troca viaja no token da
+                  sessão, que só é reescrito no login: seguir navegando com o token antigo faria o
+                  middleware mandar a pessoa de volta para esta tela, em círculo. */}
+              {logado ? (
+                <span>
+                  Senha trocada com sucesso! Entre de novo com a senha nova.{" "}
+                  <button type="button" onClick={() => signOut({ callbackUrl: "/entrar" })}
+                    className="font-semibold text-torg-blue underline">
+                    Entrar agora
+                  </button>
+                </span>
+              ) : (
+                <span>
+                  Senha trocada com sucesso!{" "}
+                  <Link href={voltar} className="font-semibold text-torg-blue underline">
+                    Entrar agora
+                  </Link>
+                </span>
+              )}
             </div>
           )}
 

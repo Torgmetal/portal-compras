@@ -287,7 +287,9 @@ async function resetarSenha(req) {
   await prisma.$transaction([
     prisma.user.update({
       where: { id: user.id },
-      data: { password: hash },
+      // ⚠ limpa a exigência de troca e destrava a conta: quem redefiniu a senha pelo código do
+      // e-mail já provou quem é, e sair daqui ainda bloqueado seria um beco sem saída.
+      data: { password: hash, deveTrocarSenha: false, senhaAlteradaEm: new Date(), tentativasFalhas: 0, bloqueadoAte: null },
     }),
     prisma.passwordResetToken.update({
       where: { id: token.id },

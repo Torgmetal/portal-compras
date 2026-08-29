@@ -107,6 +107,24 @@ export default withAuth(
       }
     }
 
+    // ⚠⚠ SENHA DE CADASTRO NÃO ENTRA NO PORTAL. Vitor (29/08/2026): "as contas que estiverem com
+    // as senhas iniciais vamos alterar". A flag `deveTrocarSenha` já existia, mas SÓ o portal do
+    // colaborador a respeitava — no portal interno ela não fazia nada, e a conta com a senha de
+    // cadastro ("Primeiro@2026!") seguia trabalhando normalmente. O login liga a flag quando a
+    // senha digitada é a de cadastro (lib/login-tentativas.js); aqui é onde ela vira porta fechada.
+    //
+    // ⚠ O colaborador tem a página dele e já é tratado acima — este desvio é para os internos.
+    if (token?.deveTrocarSenha && token.tipo !== "FUNCIONARIO") {
+      const liberado = ["/trocar-senha", "/api/trocar-senha", "/esqueci-senha", "/api/esqueci-senha", "/api/auth", "/sem-acesso"]
+        .some((r) => path === r || path.startsWith(`${r}/`));
+      if (!liberado) {
+        if (path.startsWith("/api/")) return NextResponse.json({ error: "Troque a senha inicial para continuar." }, { status: 403 });
+        const url = new URL("/trocar-senha", req.url);
+        url.searchParams.set("inicial", "1");
+        return NextResponse.redirect(url);
+      }
+    }
+
     // Falta de módulo: 403 na API, página explicativa no navegador. NUNCA o login.
     const falta = token ? moduloNegado(path, token) : null;
     if (falta) {
