@@ -6,8 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Mail, Loader2, AlertCircle, ChevronDown, ChevronRight, FileBox, Paperclip,
   ArrowDownLeft, ArrowUpRight, Clock, CheckCircle2, PlayCircle, Send, ExternalLink, Circle,
-  XCircle, PencilRuler, HelpCircle, AlertTriangle, X,
-} from "lucide-react";
+  XCircle, PencilRuler, HelpCircle, AlertTriangle, X, FileText } from "lucide-react";
 
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
 const fmtDur = (h) => {
@@ -73,7 +72,19 @@ export default function EmailsObraCard({ opId }) {
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-5">
       <div className="flex items-center justify-between gap-2 mb-1">
         <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2"><Mail size={18} className="text-indigo-600" /> E-mails do Projeto</h3>
-        <span className="text-[10px] font-semibold text-torg-gray border border-gray-200 rounded px-1.5 py-0.5">diretoria</span>
+        <div className="flex items-center gap-2">
+          {/* ⚠⚠ O DOSSIÊ DA OBRA. Vitor (29/08/2026), sobre a TMSA: "temos que mostrar um histórico
+              para ele do problema que a engenharia deles causou (...) e tenho que buscar informação
+              com uma equipe que não marca nada". O portal marca — envio do cronograma com data,
+              hora e nomes, tarefa com data real, bloqueio com motivo, correspondência arquivada.
+              Este botão junta tudo num documento só, sem ninguém digitar nada. */}
+          <a href={`/api/comercial/op/${opId}/posicao-cronograma`} target="_blank" rel="noopener noreferrer"
+            className="text-[11.5px] font-semibold text-white bg-torg-blue rounded-lg px-2.5 py-1.5 hover:bg-torg-dark inline-flex items-center gap-1.5"
+            title="PDF com os envios do cronograma ao cliente, o que a Torg entregou, o que está parado esperando ele, o efeito na entrega e a correspondência item a item">
+            <FileText size={13} /> Posição do cronograma
+          </a>
+          <span className="text-[10px] font-semibold text-torg-gray border border-gray-200 rounded px-1.5 py-0.5">diretoria</span>
+        </div>
       </div>
       <p className="text-sm text-torg-gray mb-4">Marcos e tags detectados nos e-mails da Engenharia — IFC, liberação, envio/aprovação, revisões e pendências do cliente. Clique num e-mail para ler aqui dentro.</p>
 
