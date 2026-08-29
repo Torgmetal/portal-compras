@@ -159,6 +159,20 @@ export async function POST(req) {
   const aggLE = await prisma.pecaConjunto.aggregate({ where: { opNumero, fonte: "LE_IMPORT" }, _sum: { pesoTotalKg: true } });
   const pesoRealLE = Math.round((aggLE._sum.pesoTotalKg || 0) * 100) / 100;
 
+  // ⚠⚠ SEM REGISTRO NÃO HÁ COMO RESPONDER "EU IMPORTEI". A importação da LPC sempre gravou no
+  // AuditLog; a da LE, não — e em 29/08/2026 a Engenharia disse que tinha importado várias listas
+  // que continuavam pendentes, e não houve como saber se o import chegou a rodar. Agora deixa
+  // rastro igual ao da LPC, inclusive quando a OP não foi encontrada (peça órfã).
+  await prisma.auditLog.create({
+    data: {
+      userId: user.id, action: "IMPORTAR_LE", entity: "PecaConjunto", entityId: op?.id || null,
+      diff: {
+        opNumero: parsed.opNumero, obra: parsed.obra || null, opEncontrada: !!op,
+        totalNoArquivo: parsed.pecas.length, criados, atualizados, ignorados, pesoTotal: pesoRealLE,
+      },
+    },
+  }).catch(() => {});
+
   return NextResponse.json({
     ok: true,
     opNumero: parsed.opNumero,

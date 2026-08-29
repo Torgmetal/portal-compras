@@ -183,5 +183,18 @@ export async function POST(req) {
     }
   } catch {}
 
-  return NextResponse.json({ ok: true, arquivo: item.nome, ...resultado });
+  // ⚠⚠ ZERO EM TUDO NÃO É FALHA — É "JÁ ESTAVA CARREGADA". O merge só escreve o que MUDOU: uma
+  // revisão idêntica à que já está no portal devolve 0 adicionadas, 0 mantidas, 0 removidas, e a
+  // tela mostrava isso como um sucesso mudo. A Engenharia leu como "importei e não importou"
+  // (29/08/2026) — dois casos reais: T89A R02, com 505 linhas, e T84C R00. Agora a resposta diz.
+  const nAdd = Array.isArray(resultado.adicionadas) ? resultado.adicionadas.length : (resultado.adicionadas || 0);
+  const nRem = Array.isArray(resultado.removidas) ? resultado.removidas.length : (resultado.removidas || 0);
+  const nCon = Array.isArray(resultado.conflitos) ? resultado.conflitos.length : (resultado.conflitos || 0);
+  const semMudanca = !nAdd && !nRem && !nCon && !(resultado.mantidas || 0);
+  return NextResponse.json({
+    ok: true, arquivo: item.nome, ...resultado, semMudanca,
+    mensagem: semMudanca
+      ? `${item.nome} já estava carregada no portal, sem nenhuma diferença — nada a importar.`
+      : `${item.nome}: ${nAdd} nova(s), ${resultado.mantidas || 0} atualizada(s), ${nRem} removida(s)${nCon ? `, ${nCon} em conflito` : ""}.`,
+  });
 }
