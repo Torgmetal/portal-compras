@@ -17,8 +17,7 @@ import {
   Eye,
   EyeOff,
   Copy,
-  Check,
-} from "lucide-react";
+  Check, Mail } from "lucide-react";
 import { useStore } from "@/lib/store";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 
@@ -104,6 +103,10 @@ export default function ListagemUsuarios() {
   const [usuarios, setUsuarios] = useState([]);
   const [loadingPagina, setLoadingPagina] = useState(true);
   const [erroCarregar, setErroCarregar] = useState(null);
+  // comunicado do reforço de acesso — confere a lista ANTES de disparar
+  const [aviso, setAviso] = useState(null); // { pessoas, total, jaHoje } | "carregando"
+  const [enviandoAviso, setEnviandoAviso] = useState(false);
+  const [resultadoAviso, setResultadoAviso] = useState(null);
 
   // ⚠⚠ DOIS PÚBLICOS NA MESMA TABELA. Vitor (28/08/2026): "consegue separar os que são apenas para
   // acesso ao portal de funcionários para que não fique tudo bagunçado como está lá". São contas de
@@ -239,6 +242,28 @@ export default function ListagemUsuarios() {
 
   /* ── Render ────────────────────────────────────────────────────── */
 
+  // ⚠⚠ NUNCA DISPARAR DIRETO DO BOTÃO. É e-mail para o time inteiro: primeiro mostra QUEM recebe
+  // (e se já saiu hoje), e só depois de confirmar é que envia.
+  async function abrirAviso() {
+    setAviso("carregando"); setResultadoAviso(null);
+    try {
+      const r = await fetch("/api/admin/aviso-seguranca", { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao carregar");
+      setAviso(j);
+    } catch (e) { setAviso(null); alert(e.message); }
+  }
+
+  async function dispararAviso(forcar) {
+    setEnviandoAviso(true);
+    try {
+      const r = await fetch(`/api/admin/aviso-seguranca${forcar ? "?forcar=1" : ""}`, { method: "POST" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao enviar");
+      setResultadoAviso(j);
+    } catch (e) { alert(e.message); } finally { setEnviandoAviso(false); }
+  }
+
   return (
     <div className="max-w-6xl mx-auto">
       {/* Cabeçalho */}
@@ -252,14 +277,88 @@ export default function ListagemUsuarios() {
             <p className="text-xs text-torg-gray mt-0.5">Gestão de acessos ao portal</p>
           </div>
         </div>
-        <Link
-          href="/admin/usuarios/novo"
-          className="flex items-center gap-2 px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue-700 transition-colors shadow-sm"
-        >
-          <UserPlus size={16} />
-          Novo usuário
-        </Link>
+        <div className="flex items-center gap-2">
+          {/* ⚠ o envio SAI DO SERVIDOR, não de script local: a RESEND_API_KEY só existe no ambiente
+              da Vercel. Ver app/api/admin/aviso-seguranca. */}
+          <button
+            onClick={abrirAviso}
+            className="flex items-center gap-2 px-3 py-2 border border-gray-200 text-torg-dark text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+            title="Comunicado sobre o reforço de acesso — vai só para os usuários internos"
+          >
+            <Mail size={16} className="text-torg-gray" />
+            Avisar o time
+          </button>
+          <Link
+            href="/admin/usuarios/novo"
+            className="flex items-center gap-2 px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue-700 transition-colors shadow-sm"
+          >
+            <UserPlus size={16} />
+            Novo usuário
+          </Link>
+        </div>
       </div>
+
+      {aviso && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto"
+          onClick={(e) => e.target === e.currentTarget && setAviso(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg my-8">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-torg-dark">Avisar o time sobre o acesso</p>
+                <p className="text-[11px] text-torg-gray mt-0.5">
+                  Comunicado do reforço de login. Vai só para os usuários internos — cliente e portal do funcionário ficam de fora.
+                </p>
+              </div>
+              <button onClick={() => setAviso(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+
+            <div className="px-4 py-3 max-h-[50vh] overflow-y-auto">
+              {aviso === "carregando" ? (
+                <p className="text-[12px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> lendo a lista…</p>
+              ) : resultadoAviso ? (
+                <div className="text-[13px] text-torg-dark space-y-1.5">
+                  <p className="font-semibold text-emerald-700">Enviado para {resultadoAviso.enviados} pessoa(s).</p>
+                  {!!resultadoAviso.falhas?.length && (
+                    <div className="text-[12px] text-red-700">
+                      <p className="font-semibold">Falharam:</p>
+                      {resultadoAviso.falhas.map((f) => <p key={f.email}>{f.email} — {f.erro}</p>)}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {aviso.jaHoje && (
+                    <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mb-2">
+                      Este aviso já saiu hoje ({new Date(aviso.jaHoje.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}) para {aviso.jaHoje.diff?.enviados ?? "?"} pessoa(s). Enviar de novo manda um segundo e-mail para todo mundo.
+                    </p>
+                  )}
+                  <p className="text-[12px] text-torg-gray mb-1.5">{aviso.total} destinatário(s):</p>
+                  <div className="space-y-0.5">
+                    {aviso.pessoas.map((p) => (
+                      <p key={p.id} className="text-[12.5px] text-torg-dark">
+                        <span className="text-torg-gray-light">{p.setor || "—"}</span> · {p.name}{" "}
+                        <span className="text-torg-gray">{p.email}</span>
+                      </p>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
+              <button onClick={() => setAviso(null)} className="px-3 py-1.5 text-[12px] text-torg-gray hover:text-torg-dark rounded-lg hover:bg-gray-100">
+                {resultadoAviso ? "Fechar" : "Cancelar"}
+              </button>
+              {!resultadoAviso && aviso !== "carregando" && (
+                <button onClick={() => dispararAviso(!!aviso.jaHoje)} disabled={enviandoAviso}
+                  className="px-3 py-1.5 text-[12px] font-semibold text-white bg-torg-blue rounded-lg hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">
+                  {enviandoAviso ? <><Loader2 size={12} className="animate-spin" /> enviando…</> : <><Mail size={12} /> Enviar para {aviso.total}</>}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Abas: acesso ao portal × acesso do funcionário */}
       <div className="flex items-center gap-1 border-b border-gray-200 mb-4">
