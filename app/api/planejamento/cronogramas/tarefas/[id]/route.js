@@ -22,6 +22,8 @@ const patchSchema = z.object({
   qtdePlanejada: z.number().min(0).optional(),
   qtdeRealizada: z.number().min(0).optional(),
   antecessoraIds: z.array(z.string()).optional(),
+  // ⚠ null limpa o dono (a pessoa saiu do setor, a tarefa volta para a fila sem dono)
+  responsavelId: z.string().nullable().optional(),
   duracaoDias: z.number().int().min(0).max(9999).optional(),
 });
 
@@ -112,6 +114,14 @@ export async function PATCH(req, { params }) {
     antecessorasChanged = true; // trigger recalculo
   }
   if (parsed.data.observacao !== undefined) data.observacao = parsed.data.observacao;
+  if (parsed.data.responsavelId !== undefined) {
+    if ((parsed.data.responsavelId || null) !== (tarefa.responsavelId || null)) {
+      diffAntes.responsavelId = tarefa.responsavelId || null;
+      diffDepois.responsavelId = parsed.data.responsavelId || null;
+    }
+    data.responsavelId = parsed.data.responsavelId || null;
+  }
+
   if (parsed.data.motivoBloqueio !== undefined) {
     if ((parsed.data.motivoBloqueio || null) !== (tarefa.motivoBloqueio || null)) {
       diffAntes.motivoBloqueio = tarefa.motivoBloqueio || null;

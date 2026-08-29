@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Loader2, AlertCircle, ListOrdered, RefreshCw, Search, Lock, CheckCircle2, ExternalLink, PauseCircle } from "lucide-react";
+import { Loader2, AlertCircle, ListOrdered, RefreshCw, Search, Lock, CheckCircle2, ExternalLink, PauseCircle, Users } from "lucide-react";
 import { ETAPA_LABEL } from "@/lib/etapa-projeto";
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
@@ -26,6 +26,9 @@ export default function SequenciaClient() {
   const [impacto, setImpacto] = useState([]);
   const [abertoImp, setAbertoImp] = useState(null);
   const [baixando, setBaixando] = useState(null);
+  const [pessoas, setPessoas] = useState([]);
+  const [filtroPessoa, setFiltroPessoa] = useState("");
+  const [salvandoDono, setSalvandoDono] = useState(null);
   const [busca, setBusca] = useState("");
   const [concluidas, setConcluidas] = useState(false);
 
@@ -36,6 +39,8 @@ export default function SequenciaClient() {
       .then(setData).catch((e) => setErro(e.message)).finally(() => setLoading(false));
     // ⚠ o impacto vem em separado: é conta pesada (percorre o grafo de antecessoras de todos os
     // cronogramas afetados) e não pode segurar a lista, que é o que a pessoa veio ver.
+    fetch("/api/engenharia/sequencia/pessoas?modulo=ENGENHARIA")
+      .then((r) => r.json()).then((j) => setPessoas(j.pessoas || [])).catch(() => setPessoas([]));
     fetch("/api/engenharia/sequencia/impacto?setor=ENGENHARIA")
       .then((r) => r.json()).then((j) => setImpacto(j.impacto || [])).catch(() => setImpacto([]));
   };
@@ -56,13 +61,51 @@ export default function SequenciaClient() {
     } catch (e) { alert(e.message); } finally { setBaixando(null); }
   }
 
+  // ⚠ o dono grava direto — sem modal e sem botão de salvar. Atribuir 52 tarefas com dois cliques
+  // cada ninguém faz; com um select que salva sozinho, faz.
+  async function definirDono(t, responsavelId) {
+    setSalvandoDono(t.id);
+    try {
+      const r = await fetch(`/api/planejamento/cronogramas/tarefas/${t.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ responsavelId: responsavelId || null }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao definir o responsável");
+      carregar();
+    } catch (e) { alert(e.message); } finally { setSalvandoDono(null); }
+  }
+
   const tarefas = useMemo(() => {
+    let lista = data?.tarefas || [];
+    // "sem dono" é um filtro de verdade: é a fila que precisa ser distribuída
+    if (filtroPessoa === "__SEM__") lista = lista.filter((x) => !x.responsavelId);
+    else if (filtroPessoa) lista = lista.filter((x) => x.responsavelId === filtroPessoa);
     const t = busca.trim().toLowerCase();
-    if (!t) return data?.tarefas || [];
-    return (data?.tarefas || []).filter((x) =>
-      [x.nome, x.opNumero, x.cliente, x.obra, x.area].some((v) => String(v || "").toLowerCase().includes(t))
+    if (!t) return lista;
+    return lista.filter((x) =>
+      [x.nome, x.opNumero, x.cliente, x.obra, x.area, x.responsavel].some((v) => String(v || "").toLowerCase().includes(t))
     );
-  }, [data, busca]);
+  }, [data, busca, filtroPessoa]);
+
+  // ⚠⚠ O BACKLOG POR PESSOA. Vitor (29/08/2026): "para podermos ajustar as datas disponíveis para
+  // novas coisas e ir vendo o backlog da engenharia". Duas perguntas por pessoa: quanto ela tem em
+  // aberto, e ATÉ QUANDO já está comprometida — é a segunda que diz quando cabe coisa nova.
+  const carga = useMemo(() => {
+    const todas = data?.tarefas || [];
+    const linhas = pessoas.map((p) => {
+      const minhas = todas.filter((t) => t.responsavelId === p.id && !t.concluida);
+      const prazos = minhas.map((t) => t.fim).filter(Boolean).sort();
+      return {
+        id: p.id, nome: p.name, n: minhas.length,
+        atrasadas: minhas.filter((t) => t.atrasada).length,
+        espera: minhas.filter((t) => t.emEspera).length,
+        ate: prazos.length ? prazos[prazos.length - 1] : null,
+      };
+    });
+    const semDono = todas.filter((t) => !t.responsavelId && !t.concluida).length;
+    return { linhas: linhas.filter((l) => l.n > 0 || filtroPessoa === l.id), semDono };
+  }, [data, pessoas, filtroPessoa]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-4">
@@ -155,6 +198,42 @@ export default function SequenciaClient() {
         </div>
       )}
 
+      {/* ⚠ O BACKLOG: quanto cada um tem e até quando está comprometido. A coluna "até" é a que
+          responde "quando cabe coisa nova" — que foi o pedido. */}
+      {(carga.linhas.length > 0 || carga.semDono > 0) && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-2">
+            <Users size={14} className="text-torg-gray" />
+            <p className="text-[12.5px] font-semibold text-torg-dark">Carga da equipe</p>
+            <p className="text-[11px] text-torg-gray">clique para ver só as tarefas da pessoa</p>
+          </div>
+          <div className="flex flex-wrap divide-x divide-gray-100">
+            {carga.linhas.map((l) => (
+              <button key={l.id} onClick={() => setFiltroPessoa(filtroPessoa === l.id ? "" : l.id)}
+                className={`px-4 py-2.5 text-left flex-1 min-w-[10rem] hover:bg-torg-blue-50/50 ${filtroPessoa === l.id ? "bg-torg-blue-50" : ""}`}>
+                <p className="text-[12.5px] font-semibold text-torg-dark">{l.nome}</p>
+                <p className="text-[11.5px] text-torg-gray tabular-nums">
+                  <b className="text-torg-dark">{l.n}</b> em aberto
+                  {l.atrasadas ? <span className="text-red-600"> · {l.atrasadas} atrasada(s)</span> : null}
+                  {l.espera ? <span className="text-amber-700"> · {l.espera} em espera</span> : null}
+                </p>
+                <p className="text-[11px] text-torg-gray-light">
+                  {l.ate ? `comprometido até ${fmtData(l.ate)}` : "sem prazo em aberto"}
+                </p>
+              </button>
+            ))}
+            {carga.semDono > 0 && (
+              <button onClick={() => setFiltroPessoa(filtroPessoa === "__SEM__" ? "" : "__SEM__")}
+                className={`px-4 py-2.5 text-left flex-1 min-w-[10rem] hover:bg-amber-50 ${filtroPessoa === "__SEM__" ? "bg-amber-50" : ""}`}>
+                <p className="text-[12.5px] font-semibold text-amber-800">Sem dono</p>
+                <p className="text-[11.5px] text-torg-gray tabular-nums"><b className="text-amber-800">{carga.semDono}</b> em aberto</p>
+                <p className="text-[11px] text-torg-gray-light">a distribuir</p>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[220px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-torg-gray" />
@@ -205,6 +284,7 @@ export default function SequenciaClient() {
                   <th className="px-3 py-2 text-left font-medium">Tarefa</th>
                   <th className="px-3 py-2 text-left font-medium">OP / obra</th>
                   <th className="px-3 py-2 text-left font-medium">Área</th>
+                  <th className="px-3 py-2 text-left font-medium w-36">Responsável</th>
                   <th className="px-3 py-2 text-left font-medium">Início</th>
                   <th className="px-3 py-2 text-left font-medium">Prazo</th>
                   <th className="px-3 py-2 text-right font-medium">%</th>
@@ -260,6 +340,15 @@ export default function SequenciaClient() {
                       <span className="block text-[11px] text-torg-gray">{t.cliente || ""}{t.obra ? ` · ${t.obra}` : ""}</span>
                     </td>
                     <td className="px-3 py-2 text-torg-gray">{t.area || "—"}</td>
+                    <td className="px-3 py-2">
+                      {/* salva no onChange — ver definirDono */}
+                      <select value={t.responsavelId || ""} disabled={salvandoDono === t.id}
+                        onChange={(e) => definirDono(t, e.target.value)}
+                        className={`w-full text-[11.5px] border rounded px-1.5 py-1 outline-none focus:border-torg-blue disabled:opacity-50 ${t.responsavelId ? "border-gray-200 text-torg-dark" : "border-amber-200 bg-amber-50/60 text-amber-800"}`}>
+                        <option value="">sem dono</option>
+                        {pessoas.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    </td>
                     <td className="px-3 py-2 text-torg-gray tabular-nums whitespace-nowrap">{fmtData(t.inicio)}</td>
                     <td className={`px-3 py-2 tabular-nums whitespace-nowrap ${t.atrasada ? "text-red-600 font-semibold" : "text-torg-dark"}`}>
                       {fmtData(t.fim)}

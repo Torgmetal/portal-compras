@@ -45,6 +45,7 @@ model User {
   auditLogs                AuditLog[]
   consultasEstoqueCriadas  ConsultaEstoque[]     @relation("ConsultaEstoqueCreatedBy")
   consultaItensRespondidos ConsultaEstoqueItem[] @relation("ConsultaItemRespondidoPor")
+  tarefasCronograma        CronogramaTarefa[]    @relation("TarefaResponsavel")
   cronogramaRegistros      CronogramaRegistro[]  @relation("CronogramaRegistroCreatedBy")
   cronogramaRevisoes       CronogramaRevisao[]   @relation("CronogramaRevisaoCreatedBy")
   cronogramaCobrancas      CronogramaCobranca[]  @relation("CobrancaCreatedBy")
@@ -3895,6 +3896,13 @@ model CronogramaTarefa {
   antecessoraIds      String[]                @default([]) // IDs de tarefas predecessoras (finish-to-start)
   defasagemDias       Int                     @default(0) // Lead/lag vs o fim das antecessoras (DU ou DC). NEGATIVO = antecipação: começa antes da anterior terminar (na prática a gente adianta atividade). Preservado nos recálculos.
   duracaoDias         Int                     @default(0) // Duracao em dias (DU ou DC conforme cronograma)
+  // ⚠⚠ QUEM FAZ. Vitor (29/08/2026): "pode deixar uma forma de colocarmos a pessoa que deve fazer
+  // cada tarefa, para podermos ajustar as datas disponíveis para novas coisas e ir vendo o backlog
+  // da engenharia". Sem dono, a tela responde "o setor deve 52 coisas" — que é o número que faz a
+  // equipe parar de olhar. Com dono, responde "o Diego entrega isto hoje".
+  responsavelId       String?
+  responsavel         User?     @relation("TarefaResponsavel", fields: [responsavelId], references: [id])
+
   // ⚠ QUANDO A ESPERA COMEÇOU. Sem isto o hold registra o motivo mas não a duração, e "quantos dias
   // o cliente segurou o projeto" vira estimativa. Gravado quando o motivo de bloqueio é preenchido.
   esperaInicio        DateTime?
@@ -3912,6 +3920,7 @@ model CronogramaTarefa {
 
   @@index([cronogramaId])
   @@index([departamento])
+  @@index([responsavelId])
 }
 
 model CronogramaRegistro {

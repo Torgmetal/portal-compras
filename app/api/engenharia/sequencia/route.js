@@ -51,6 +51,8 @@ export async function GET(req) {
       dataInicioReal: true, dataFimReal: true,
       percentualRealizado: true, duracaoDias: true,
       antecessoraIds: true, motivoBloqueio: true, observacao: true,
+      dataLiberacao: true, esperaInicio: true, responsavelId: true,
+      responsavel: { select: { id: true, name: true } },
       cronograma: {
         select: {
           id: true, titulo: true, opNumero: true, tarefasEnviadasEm: true, ativo: true,
@@ -99,6 +101,8 @@ export async function GET(req) {
       duracaoDias: t.duracaoDias,
       observacao: t.observacao || null,
       motivoBloqueio: t.motivoBloqueio || null,
+      responsavelId: t.responsavelId || null,
+      responsavel: t.responsavel?.name || null,
       concluida,
       // ⚠⚠ ESPERA NÃO É ATRASO. Vitor (29/08/2026): "as tarefas em hold não podemos deixar como
       // atrasadas, pois isso é indefinição do projeto". A tarefa com motivo de bloqueio e sem
