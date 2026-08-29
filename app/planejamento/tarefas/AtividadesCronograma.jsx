@@ -10,12 +10,13 @@
 //
 // Duas cópias divergiriam na primeira correção feita só de um lado — e a Engenharia é justamente
 // quem precisa ver o mesmo número que o Planejamento cobra dela.
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { fmtOP } from "@/lib/utils";
+import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import { DEPTOS, DEPT_LABEL, DEPT_COR } from "@/lib/cronograma-departamentos";
 import {
   AlertCircle, AlertTriangle, Building2, CheckCircle2, ChevronDown, ChevronRight, Clock,
-  Download, Filter, GanttChart, Loader2, Lock, Mail, Pencil, Plus, RefreshCw, Send, User, X,
+  Download, Filter, GanttChart, Loader2, Lock, Mail, Pencil, Plus, RefreshCw, Send, User, X, ListFilter,
 } from "lucide-react";
 
 // ─── Aba Cronograma ──────────────────────────────────────
@@ -34,6 +35,13 @@ export default function AtividadesCronograma({ showToast, deptoFixo = "" }) {
   const [expandidasCumpridas, setExpandidasCumpridas] = useState(() => new Set()); // setores com as "cumpridas" abertas
   const [exportando, setExportando] = useState(false);
   const [preencherAtiv, setPreencherAtiv] = useState(null); // atividade sendo preenchida (grava no cronograma)
+  // ⚠⚠ MODO PLANILHA. Vitor (29/08/2026): "essa tela de cronograma do portal da engenharia, criar
+  // como se fosse planilha igual fizemos nas outras, pode criar o filtro na OP, Data e onde aparece
+  // hold". Com o setor travado o agrupamento por setor perde a razão de existir — sobra UMA lista,
+  // e a pergunta do setor vira "filtra a OP, ordena pela data, mostra o que está em hold".
+  // No Planejamento (sem `deptoFixo`) o agrupamento por setor continua sendo o certo.
+  const [tabela, setTabela] = useState(!!deptoFixo);
+  const [colAberta, setColAberta] = useState(null);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -60,6 +68,27 @@ export default function AtividadesCronograma({ showToast, deptoFixo = "" }) {
     if (!d) return "—";
     return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
   };
+  // dd/mm/aaaa para o filtro e para a planilha: "12 ago" não ordena nem agrupa por mês
+  const dataBR = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+  // ⚠ a situação é UMA coluna, não três colunas de sim/não: é assim que dá para filtrar "só o que
+  // está em hold" com um clique, que foi o pedido.
+  const situacao = (a) => (a.concluida ? "Concluída" : a.bloqueada ? "Em hold" : a.atrasada ? "Atrasada" : "Em andamento");
+
+  const COLUNAS_FILTRO = useMemo(() => [
+    { key: "op", label: "OP", valor: (a) => fmtOP(a.opNumero) || "—" },
+    { key: "cliente", label: "Cliente", valor: (a) => a.opCliente || "—" },
+    { key: "area", label: "Área", valor: (a) => a.area || "—" },
+    { key: "prazo", label: "Prazo", valor: (a) => dataBR(a.dataFimPrevista) },
+    { key: "situacao", label: "Situação", valor: situacao },
+  ], []);
+  const { filtros: filtroCol, setFiltros: setFiltroCol, filtradas, opcoesDaColuna, ativos: filtrosAtivos, limpar: limparColunas } =
+    useFiltroColunas(atividades, COLUNAS_FILTRO);
+  const fp = { filtros: filtroCol, setFiltros: setFiltroCol, opcoesDaColuna, aberta: colAberta, setAberta: setColAberta };
+  // ordenada por prazo: a pergunta do setor é "o que vence primeiro"
+  const linhasTabela = useMemo(
+    () => [...filtradas].sort((a, b) => (a.dataFimPrevista || "9999").localeCompare(b.dataFimPrevista || "9999")),
+    [filtradas],
+  );
 
   const atrasadas = atividades.filter((a) => a.atrasada).length;
   const concluidas = atividades.filter((a) => a.concluida).length;
@@ -155,9 +184,16 @@ export default function AtividadesCronograma({ showToast, deptoFixo = "" }) {
           placeholder="Filtrar por OP..."
           className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white w-32"
         />
-        <button onClick={() => { setFiltroDepto(""); setFiltroStatus(""); setFiltroOp(""); }}
+        <button onClick={() => { setFiltroDepto(deptoFixo); setFiltroStatus(""); setFiltroOp(""); limparColunas(); }}
           className="text-xs text-torg-gray hover:text-torg-dark ml-auto">
-          Limpar
+          Limpar{filtrosAtivos ? ` (${filtrosAtivos})` : ""}
+        </button>
+        {/* ⚠ o modo planilha é o padrão quando o setor está travado, mas dá para voltar aos
+            cartões: em obra com muitas áreas o agrupamento ainda ajuda a ler. */}
+        <button onClick={() => setTabela((v) => !v)}
+          className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs bg-white hover:bg-gray-50 inline-flex items-center gap-1.5"
+          title={tabela ? "Ver agrupado por setor" : "Ver como planilha, com filtro por coluna"}>
+          <ListFilter size={13} className="text-torg-gray" /> {tabela ? "Cartões" : "Planilha"}
         </button>
         <button onClick={carregar} className="p-1.5 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100">
           <RefreshCw size={14} />
@@ -216,6 +252,67 @@ export default function AtividadesCronograma({ showToast, deptoFixo = "" }) {
           <p className="text-xs text-torg-gray mt-1">Ajuste os filtros ou crie tarefas nos cronogramas.</p>
         </div>
       ) : (
+        tabela ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
+            <table className="w-full text-[12.5px]">
+              <thead className="bg-gray-50 sticky top-0 z-10">
+                <tr className="border-b border-gray-200 text-torg-dark">
+                  <ThFiltro col="op" label="OP" larg="w-[8%]" className="px-2 py-2 text-left font-bold" {...fp} />
+                  <ThFiltro col="cliente" label="Cliente" larg="w-[13%]" className="px-2 py-2 text-left font-bold" {...fp} />
+                  <th className="px-2 py-2 text-left font-bold w-[30%]">Atividade</th>
+                  <ThFiltro col="area" label="Área" larg="w-[10%]" className="px-2 py-2 text-left font-bold" {...fp} />
+                  <ThFiltro col="prazo" label="Prazo" larg="w-[10%]" className="px-2 py-2 text-left font-bold" {...fp} />
+                  <th className="px-2 py-2 text-center font-bold w-[7%]">%</th>
+                  <ThFiltro col="situacao" label="Situação" larg="w-[12%]"
+                    dica="Em hold = tem motivo de bloqueio e ainda não foi liberada; enquanto está em hold não conta como atrasada."
+                    className="px-2 py-2 text-left font-bold" {...fp} />
+                  <th className="px-2 py-2 text-right font-bold w-[10%]">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {linhasTabela.map((a, i) => (
+                  <tr key={a.id} className={`border-b border-gray-50 ${i % 2 ? "bg-gray-50/40" : ""} hover:bg-torg-blue-50/40`}>
+                    <td className="px-2 py-1.5 font-mono text-[11.5px] text-torg-dark">{fmtOP(a.opNumero) || "—"}</td>
+                    <td className="px-2 py-1.5 text-torg-gray truncate" title={a.opCliente || ""}>{a.opCliente || "—"}</td>
+                    <td className="px-2 py-1.5 text-torg-dark">{a.nome}</td>
+                    <td className="px-2 py-1.5 text-torg-gray">{a.area || "—"}</td>
+                    <td className={`px-2 py-1.5 tabular-nums ${a.atrasada ? "text-red-700 font-semibold" : "text-torg-dark"}`}>
+                      {dataBR(a.dataFimPrevista)}
+                      {a.diasAtraso > 0 ? <span className="text-[10.5px] text-red-600"> · {a.diasAtraso}d</span> : null}
+                    </td>
+                    <td className="px-2 py-1.5 text-center tabular-nums text-torg-dark">{Math.round(a.percentualRealizado || 0)}%</td>
+                    <td className="px-2 py-1.5">
+                      <span className={`px-1.5 py-0.5 rounded text-[10.5px] font-semibold border ${
+                        a.concluida ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : a.bloqueada ? "bg-amber-50 text-amber-800 border-amber-200"
+                        : a.atrasada ? "bg-red-50 text-red-700 border-red-200"
+                        : "bg-blue-50 text-blue-700 border-blue-200"}`}>
+                        {situacao(a)}
+                      </span>
+                      {a.bloqueada && a.motivoBloqueio
+                        ? <span className="block text-[10.5px] text-torg-gray mt-0.5 truncate" title={a.motivoBloqueio}>{a.motivoBloqueio}</span>
+                        : null}
+                    </td>
+                    <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                      <button onClick={() => setPreencherAtiv(a)} title="Preencher / concluir (grava no cronograma)"
+                        className="p-1 text-torg-gray hover:text-torg-blue rounded hover:bg-gray-100"><Pencil size={13} /></button>
+                      <button onClick={() => setNotificarAtiv(a)} title="Notificar"
+                        className="p-1 text-torg-gray hover:text-torg-blue rounded hover:bg-gray-100"><Mail size={13} /></button>
+                    </td>
+                  </tr>
+                ))}
+                {!linhasTabela.length && (
+                  <tr><td colSpan={8} className="px-3 py-8 text-center text-torg-gray text-[12px]">Nenhuma atividade com esses filtros.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-3 py-2 border-t border-gray-100 text-[11px] text-torg-gray">
+            {linhasTabela.length} de {atividades.length} atividade(s)
+          </div>
+        </div>
+        ) : (
         <div className="space-y-3">
           {gruposSetor.map(({ dept, ativas, cumpridas }) => {
             const atrasadasDept = ativas.filter((a) => a.atrasada).length;
@@ -300,6 +397,7 @@ export default function AtividadesCronograma({ showToast, deptoFixo = "" }) {
             );
           })}
         </div>
+        )
       )}
 
       {notificarAtiv && (
