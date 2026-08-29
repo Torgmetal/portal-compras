@@ -64,8 +64,16 @@ export async function PATCH(req) {
   const { pecaId, marcar } = await req.json().catch(() => ({}));
   if (!pecaId) return NextResponse.json({ error: "pecaId obrigatório" }, { status: 400 });
 
-  const peca = await prisma.pecaConjunto.findUnique({ where: { id: pecaId }, select: { id: true, opId: true, marca: true, prioridade: true } });
+  const peca = await prisma.pecaConjunto.findUnique({ where: { id: pecaId }, select: { id: true, opId: true, marca: true, prioridade: true, fonte: true } });
   if (!peca) return NextResponse.json({ error: "Peça não encontrada" }, { status: 404 });
+  // ⚠⚠ PRIORIDADE É DE PRODUÇÃO, E PRODUÇÃO É LPC. Vitor (29/08/2026): "nunca programar nada que
+  // for por parte da LE, produção é regra sempre LPC". Cinco marcas de expedição já tinham entrado
+  // na fila de prioridade por aqui.
+  if (peca.fonte === "LE_IMPORT") {
+    return NextResponse.json({
+      error: `A marca ${peca.marca} é da lista de EXPEDIÇÃO (LE). Prioridade de produção se marca na LPC.`,
+    }, { status: 409 });
+  }
 
   if (marcar) {
     // Sempre checa se já não estava marcada antes de marcar de novo.

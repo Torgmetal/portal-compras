@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { SO_FABRICACAO } from "@/lib/lista-pecas";
 import { requireRole } from "@/lib/session";
 import { recalcularPmpCorte } from "@/lib/pmp-corte";
 import { buscarFilaCorte } from "@/lib/fila-corte";
@@ -69,8 +70,10 @@ export async function POST(req) {
     if (fim < inicio) {
       return NextResponse.json({ error: "A data meta de fim não pode ser antes do início." }, { status: 400 });
     }
+    // ⚠ ...SO_FABRICACAO é redundante hoje (a LE nunca chega a "CORTE"), mas a regra não pode
+    // depender disso: "nunca programar nada que for por parte da LE" (Vitor, 29/08/2026).
     const r = await prisma.pecaConjunto.updateMany({
-      where: { id: { in: body.ids }, status: "CORTE", corteConcluidoEm: null },
+      where: { id: { in: body.ids }, status: "CORTE", corteConcluidoEm: null, ...SO_FABRICACAO },
       data: { corteDataMetaInicio: inicio, corteDataMetaFim: fim },
     });
     atualizados = r.count;

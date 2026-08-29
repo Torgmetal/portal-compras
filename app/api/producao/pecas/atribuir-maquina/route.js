@@ -3,6 +3,7 @@
 // Body: { ids: string[], maquina: "LASER_CHAPA"|... |null }
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { SO_FABRICACAO } from "@/lib/lista-pecas";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 
@@ -25,20 +26,34 @@ export async function POST(req) {
   try { body = schema.parse(await req.json()); }
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
+  // ⚠⚠ A LE NÃO SE PROGRAMA. Vitor (29/08/2026): "nunca programar nada que for por parte da LE,
+  // produção é regra sempre LPC". A lista de expedição descreve o que EMBARCA (inclui acessório
+  // comprado); a de fabricação é a LPC. Sem esta trava, 223 marcas de expedição já tinham recebido
+  // máquina de corte e prioridade — LASER_CANTONEIRA em marca que ninguém vai cortar.
+  //
+  // ⚠ O filtro fica no WHERE, não numa validação antes: assim vale para a seleção mista (parte LPC,
+  // parte LE) — a LPC é programada, a LE é recusada, e a resposta diz quantas ficaram de fora.
   const r = await prisma.pecaConjunto.updateMany({
-    where: { id: { in: body.ids } },
+    where: { id: { in: body.ids }, ...SO_FABRICACAO },
     data: { maquina: body.maquina },
   });
+  const recusadas = body.ids.length - r.count;
 
   try {
     await prisma.auditLog.create({
       data: {
         userId: user.id, action: "ATRIBUIR_MAQUINA_LOTE", entity: "PecaConjunto",
         entityId: body.ids.length === 1 ? body.ids[0] : `${body.ids.length} peças`,
-        diff: { maquina: body.maquina, total: body.ids.length, atualizados: r.count },
+        diff: { maquina: body.maquina, total: body.ids.length, atualizados: r.count, recusadasNaoLpc: recusadas },
       },
     });
   } catch {}
 
-  return NextResponse.json({ ok: true, atualizados: r.count, maquina: body.maquina });
+  return NextResponse.json({
+    ok: true, atualizados: r.count, maquina: body.maquina,
+    ...(recusadas > 0 ? {
+      recusadas,
+      aviso: `${recusadas} peça(s) não são da LPC e não entram em programação de produção — a lista de expedição (LE) não se corta.`,
+    } : {}),
+  });
 }
