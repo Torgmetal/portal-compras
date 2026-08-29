@@ -24,6 +24,8 @@ const patchSchema = z.object({
   antecessoraIds: z.array(z.string()).optional(),
   // ⚠ null limpa o dono (a pessoa saiu do setor, a tarefa volta para a fila sem dono)
   responsavelId: z.string().nullable().optional(),
+  // estimativa de dias ÚTEIS que ainda faltam, dada por quem executa
+  diasParaConcluir: z.number().int().min(0).max(999).nullable().optional(),
   duracaoDias: z.number().int().min(0).max(9999).optional(),
 });
 
@@ -120,6 +122,18 @@ export async function PATCH(req, { params }) {
       diffDepois.responsavelId = parsed.data.responsavelId || null;
     }
     data.responsavelId = parsed.data.responsavelId || null;
+  }
+
+  if (parsed.data.diasParaConcluir !== undefined) {
+    const novo = parsed.data.diasParaConcluir;
+    if (novo !== tarefa.diasParaConcluir) {
+      diffAntes.diasParaConcluir = tarefa.diasParaConcluir ?? null;
+      diffDepois.diasParaConcluir = novo ?? null;
+    }
+    data.diasParaConcluir = novo ?? null;
+    // ⚠ a data da estimativa anda junto: "faltam 5 dias" dito há três semanas não é previsão, é
+    // história. É esse carimbo que deixa a tela avisar quando a estimativa envelheceu.
+    data.estimativaEm = novo == null ? null : new Date();
   }
 
   if (parsed.data.motivoBloqueio !== undefined) {

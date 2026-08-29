@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { etapaDaTarefa, PROXIMA_ETAPA, emEspera } from "@/lib/etapa-projeto";
 import { evidenciasDasTarefas } from "@/lib/etapa-evidencia";
+import { addWorkdays } from "@/lib/cronograma-recalcular";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -52,6 +53,7 @@ export async function GET(req) {
       percentualRealizado: true, duracaoDias: true,
       antecessoraIds: true, motivoBloqueio: true, observacao: true,
       dataLiberacao: true, esperaInicio: true, responsavelId: true,
+      diasParaConcluir: true, estimativaEm: true,
       responsavel: { select: { id: true, name: true } },
       cronograma: {
         select: {
@@ -103,6 +105,25 @@ export async function GET(req) {
       motivoBloqueio: t.motivoBloqueio || null,
       responsavelId: t.responsavelId || null,
       responsavel: t.responsavel?.name || null,
+      // ⚠⚠ A PREVISÃO SAI DE HOJE, NÃO DO PRAZO. Vitor (29/08/2026): "nas tarefas que estiverem em
+      // dia vai calcular e já vai revelar se vai ter atraso ou não; para as que estão atrasadas vai
+      // mostrar a data real que de fato será finalizado". Contar a partir do prazo esconderia o
+      // atraso que já existe: tarefa vencida há 15 dias com 5 dias de trabalho pela frente termina
+      // daqui a 5 dias, não 5 dias depois do prazo que já passou.
+      diasParaConcluir: t.diasParaConcluir ?? null,
+      estimativaEm: t.estimativaEm || null,
+      ...(() => {
+        if (t.diasParaConcluir == null || concluida) return { previsaoFim: null, atrasoPrevisto: 0, estimativaVelha: false };
+        const previsao = addWorkdays(hoje, t.diasParaConcluir);
+        const prev = t.dataFimPrevista ? new Date(t.dataFimPrevista) : null;
+        return {
+          previsaoFim: previsao,
+          // dias CORRIDOS de estouro sobre o prazo — é assim que o cliente conta
+          atrasoPrevisto: prev && previsao > prev ? Math.round((previsao - prev) / 86400000) : 0,
+          // ⚠ estimativa com mais de 7 dias já não descreve o hoje; a tela pede para refazer
+          estimativaVelha: !!(t.estimativaEm && (hoje - new Date(t.estimativaEm)) / 86400000 > 7),
+        };
+      })(),
       concluida,
       // ⚠⚠ ESPERA NÃO É ATRASO. Vitor (29/08/2026): "as tarefas em hold não podemos deixar como
       // atrasadas, pois isso é indefinição do projeto". A tarefa com motivo de bloqueio e sem

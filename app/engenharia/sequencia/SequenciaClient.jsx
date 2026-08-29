@@ -29,6 +29,7 @@ export default function SequenciaClient() {
   const [pessoas, setPessoas] = useState([]);
   const [filtroPessoa, setFiltroPessoa] = useState("");
   const [salvandoDono, setSalvandoDono] = useState(null);
+  const [salvandoDias, setSalvandoDias] = useState(null);
   const [busca, setBusca] = useState("");
   const [concluidas, setConcluidas] = useState(false);
 
@@ -74,6 +75,23 @@ export default function SequenciaClient() {
       if (!r.ok) throw new Error(j.error || "Erro ao definir o responsável");
       carregar();
     } catch (e) { alert(e.message); } finally { setSalvandoDono(null); }
+  }
+
+  // ⚠ grava ao SAIR do campo (onBlur), não a cada tecla: digitar "12" dispararia duas gravações,
+  // e a primeira ("1") ficaria registrada como estimativa por um instante.
+  async function definirDias(t, valor) {
+    const n = valor === "" ? null : Math.max(0, Math.min(999, parseInt(valor, 10) || 0));
+    if (n === (t.diasParaConcluir ?? null)) return;
+    setSalvandoDias(t.id);
+    try {
+      const r = await fetch(`/api/planejamento/cronogramas/tarefas/${t.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ diasParaConcluir: n }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao salvar a estimativa");
+      carregar();
+    } catch (e) { alert(e.message); } finally { setSalvandoDias(null); }
   }
 
   const tarefas = useMemo(() => {
@@ -287,6 +305,8 @@ export default function SequenciaClient() {
                   <th className="px-3 py-2 text-left font-medium w-36">Responsável</th>
                   <th className="px-3 py-2 text-left font-medium">Início</th>
                   <th className="px-3 py-2 text-left font-medium">Prazo</th>
+                  <th className="px-3 py-2 text-center font-medium w-16" title="Dias úteis que ainda faltam, na conta de quem faz">Faltam</th>
+                  <th className="px-3 py-2 text-left font-medium w-32">Previsão</th>
                   <th className="px-3 py-2 text-right font-medium">%</th>
                   <th className="px-3 py-2 text-left font-medium">Situação</th>
                 </tr>
@@ -352,6 +372,31 @@ export default function SequenciaClient() {
                     <td className="px-3 py-2 text-torg-gray tabular-nums whitespace-nowrap">{fmtData(t.inicio)}</td>
                     <td className={`px-3 py-2 tabular-nums whitespace-nowrap ${t.atrasada ? "text-red-600 font-semibold" : "text-torg-dark"}`}>
                       {fmtData(t.fim)}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      {t.concluida ? <span className="text-torg-gray-light">—</span> : (
+                        <input type="number" min="0" max="999" defaultValue={t.diasParaConcluir ?? ""}
+                          onBlur={(e) => definirDias(t, e.target.value)} disabled={salvandoDias === t.id}
+                          placeholder="—" title="Dias úteis que ainda faltam"
+                          className="w-12 text-[12px] text-center border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-torg-blue disabled:opacity-50" />
+                      )}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {/* ⚠ o que a estimativa REVELA: em dia vira "vai atrasar N dias"; atrasada
+                          vira a data em que de fato termina. */}
+                      {t.previsaoFim ? (
+                        <>
+                          <span className={t.atrasoPrevisto > 0 ? "text-red-600 font-semibold" : "text-green-700 font-medium"}>
+                            {fmtData(t.previsaoFim)}
+                          </span>
+                          <span className="block text-[11px]">
+                            {t.atrasoPrevisto > 0
+                              ? <span className="text-red-600">{t.atrasada ? "termina" : "vai atrasar"} {t.atrasoPrevisto}d {t.atrasada ? "depois do prazo" : "além do prazo"}</span>
+                              : <span className="text-green-700">dentro do prazo</span>}
+                          </span>
+                          {t.estimativaVelha && <span className="block text-[10.5px] text-amber-700">estimativa de mais de 7 dias — revisar</span>}
+                        </>
+                      ) : <span className="text-torg-gray-light text-[11px]">informe os dias</span>}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">{t.percentual}%</td>
                     <td className="px-3 py-2 whitespace-nowrap">

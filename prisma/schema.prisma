@@ -3900,6 +3900,14 @@ model CronogramaTarefa {
   // cada tarefa, para podermos ajustar as datas disponíveis para novas coisas e ir vendo o backlog
   // da engenharia". Sem dono, a tela responde "o setor deve 52 coisas" — que é o número que faz a
   // equipe parar de olhar. Com dono, responde "o Diego entrega isto hoje".
+  // ⚠⚠ QUANTOS DIAS AINDA FALTAM, na conta de quem faz. Vitor (29/08/2026): "seria importante ter
+  // um campo para colocar quantidade de dias; nas tarefas que estiverem em dia vai calcular e já
+  // vai revelar se vai ter atraso ou não; para as que estão atrasadas vai mostrar a data real que
+  // de fato será finalizado". É estimativa de ESFORÇO RESTANTE a partir de hoje — não é a duração
+  // planejada (`duracaoDias`), que é o que o cronograma previu lá atrás e não muda com a realidade.
+  diasParaConcluir    Int?
+  // quando a estimativa foi dada — uma de 15 dias atrás não vale como previsão de hoje
+  estimativaEm        DateTime?
   responsavelId       String?
   responsavel         User?     @relation("TarefaResponsavel", fields: [responsavelId], references: [id])
 
