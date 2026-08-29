@@ -36,17 +36,18 @@ export async function GET(req) {
     const dados = await retrabalhoDoAno(prisma, ano);
     const meses = anoTodo ? [...Array(12).keys()] : [mes];
     const somaMeses = (v) => meses.reduce((t, m) => t + (v[m] || 0), 0);
-    const todosEng = dados.registros.filter((r) => meses.includes(r.mes) && SETOR_RETRABALHO[r.setor]?.processo === "ENGENHARIA");
-    // ⚠ só o que tem RNC entra no índice (regra do Vitor, 28/08/2026); o resto vira ressalva.
-    const daEng = todosEng.filter(ehDeRnc);
-    const foraSemRnc = todosEng.filter((r) => !ehDeRnc(r));
-    const kgForaSemRnc = foraSemRnc.reduce((t, r) => t + (r.kg || 0), 0);
+    // ⚠⚠ TODO APONTAMENTO ENTRA. Vitor (29/08/2026): "para esses casos marcar como apontamento e
+    // deixar descrito no indicador". A coluna diz de onde veio cada linha — RNC formalizada ou
+    // apontamento do FORM 34 —, que é o "deixar descrito": o número passa a mostrar o retrabalho
+    // inteiro e continua dando para ver o que já virou não conformidade e o que ainda não virou.
+    const daEng = dados.registros.filter((r) => meses.includes(r.mes) && SETOR_RETRABALHO[r.setor]?.processo === "ENGENHARIA");
+    const semRnc = daEng.filter((r) => !ehDeRnc(r));
 
     const linhas = daEng
       .sort((a, b) => new Date(a.data) - new Date(b.data))
       .map((r) => [
         fmtD(r.data),
-        `RNC ${String(r.numeroRnc || "").replace(/[_-]/g, "/") || "—"}`,
+        ehDeRnc(r) ? `RNC ${String(r.numeroRnc || "").replace(/[_-]/g, "/") || "—"}` : "Apontamento (FORM 34)",
         r.opNumero ? `OP-${String(r.opNumero).replace(/^0+/, "").padStart(3, "0")}` : "—",
         r.marca || "—",
         r.qtdPecas ? num(r.qtdPecas) : "—",
@@ -60,17 +61,17 @@ export async function GET(req) {
     const semPeso = daEng.filter((r) => !(r.kg > 0)).length;
     // ⚠ a cobertura vai junto: sem peso não há percentual, e um índice baixo por falta de dado se
     // lê como um mês excelente.
-    const aviso = semPeso ? ` · ⚠ ${semPeso} RNC(s) sem peça escolhida da Lista de Expedição — sem peça não há peso` : "";
-    // ⚠ o que ficou FORA precisa aparecer: um índice em 0% por falta de RNC se lê como "não houve
-    // retrabalho", e nesses meses houve — só não foi formalizado.
-    const avisoFora = kgForaSemRnc > 0
-      ? ` · ⚠ fora do índice: ${kg(kgForaSemRnc)} em ${foraSemRnc.length} apontamento(s) do FORM 34 com origem Engenharia mas SEM RNC aberta`
+    const aviso = semPeso ? ` · ⚠ ${semPeso} registro(s) sem peça escolhida da Lista de Expedição — sem peça não há peso` : "";
+    // ⚠ nada mais fica de fora do índice; o que a ressalva diz agora é quanto ainda não foi
+    // FORMALIZADO em RNC — é uma pendência da Qualidade, não um buraco no número.
+    const avisoFora = semRnc.length
+      ? ` · ${semRnc.length} apontamento(s) ainda sem RNC aberta (contam no índice)`
       : "";
     return NextResponse.json({
       titulo: "Retrabalho gerado pela Engenharia",
-      colunas: ["Data", "RNC", "OP", "Marca / desenho", "Peças", "Peso", "Descrição"],
+      colunas: ["Data", "Origem", "OP", "Marca / desenho", "Peças", "Peso", "Descrição"],
       linhas,
-      resumo: `${kg(pesoEng)} retrabalhados por erro de projeto${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`} de ${kg(producao)} produzidos (corte) · ${daEng.length} RNC(s)${aviso}${avisoFora}`,
+      resumo: `${kg(pesoEng)} retrabalhados por erro de projeto${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`} de ${kg(producao)} produzidos (corte) · ${daEng.length} registro(s)${aviso}${avisoFora}`,
     });
   }
 
