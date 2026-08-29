@@ -3895,6 +3895,9 @@ model CronogramaTarefa {
   antecessoraIds      String[]                @default([]) // IDs de tarefas predecessoras (finish-to-start)
   defasagemDias       Int                     @default(0) // Lead/lag vs o fim das antecessoras (DU ou DC). NEGATIVO = antecipação: começa antes da anterior terminar (na prática a gente adianta atividade). Preservado nos recálculos.
   duracaoDias         Int                     @default(0) // Duracao em dias (DU ou DC conforme cronograma)
+  // ⚠ QUANDO A ESPERA COMEÇOU. Sem isto o hold registra o motivo mas não a duração, e "quantos dias
+  // o cliente segurou o projeto" vira estimativa. Gravado quando o motivo de bloqueio é preenchido.
+  esperaInicio        DateTime?
   dataLiberacao       DateTime? // Data em que a tarefa foi liberada (desbloqueio externo)
   motivoBloqueio      String? // Ex: "Aguardando assinatura do aditivo"
   observacao          String?

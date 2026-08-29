@@ -23,6 +23,8 @@ export default function SequenciaClient() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
+  const [impacto, setImpacto] = useState([]);
+  const [abertoImp, setAbertoImp] = useState(null);
   const [busca, setBusca] = useState("");
   const [concluidas, setConcluidas] = useState(false);
 
@@ -31,6 +33,10 @@ export default function SequenciaClient() {
     fetch(`/api/engenharia/sequencia?setor=ENGENHARIA${concluidas ? "&concluidas=1" : ""}`)
       .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "Erro"); return j; })
       .then(setData).catch((e) => setErro(e.message)).finally(() => setLoading(false));
+    // ⚠ o impacto vem em separado: é conta pesada (percorre o grafo de antecessoras de todos os
+    // cronogramas afetados) e não pode segurar a lista, que é o que a pessoa veio ver.
+    fetch("/api/engenharia/sequencia/impacto?setor=ENGENHARIA")
+      .then((r) => r.json()).then((j) => setImpacto(j.impacto || [])).catch(() => setImpacto([]));
   };
   useEffect(carregar, [concluidas]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -68,6 +74,68 @@ export default function SequenciaClient() {
           <Kpi rotulo="Em espera do cliente" valor={fmtN(data.resumo.emEspera)} cor="text-amber-700" />
           <Kpi rotulo="Esperando outro setor" valor={fmtN(data.resumo.bloqueadas)} cor="text-torg-gray" />
           <Kpi rotulo="No total" valor={fmtN(data.resumo.total)} cor="text-torg-dark" />
+        </div>
+      )}
+
+      {/* ⚠⚠ MOSTRA, NÃO APLICA. Vitor (29/08/2026): "vamos no ponto 2; se caso avaliarmos ser
+          necessário passarmos para o cronograma, aí atualizamos depois". Empurrar as datas
+          atravessa três setores — na TMSA uma revisão parada aqui move Preparação, Montagem,
+          Solda, Pintura e Expedição —, e essa decisão é do Planejamento. */}
+      {impacto.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-amber-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-amber-100 bg-amber-50/60">
+            <p className="text-[13px] font-semibold text-torg-dark">O que estas esperas empurrariam</p>
+            <p className="text-[11.5px] text-torg-gray mt-0.5">
+              Cálculo do atraso que a espera do cliente causaria nas tarefas seguintes. <b>Nenhuma data foi alterada</b> — é só a conta.
+            </p>
+          </div>
+          {impacto.map((imp) => (
+            <div key={imp.cronogramaId} className="px-4 py-3 border-b border-gray-100 last:border-0">
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-[13px] font-semibold text-torg-dark">OP-{imp.opNumero}</span>
+                <span className="text-[12px] text-torg-gray">{imp.cliente || ""}{imp.obra ? ` · ${imp.obra}` : ""}</span>
+                <span className="ml-auto text-[12px]">
+                  {imp.diasNaEntrega > 0 ? (
+                    <>entrega <span className="text-torg-gray">{fmtData(imp.fimAtual)}</span> → <b className="text-amber-700">{fmtData(imp.fimNovo)}</b>{" "}
+                      <span className="text-amber-700 font-semibold">(+{imp.diasNaEntrega} dias)</span></>
+                  ) : (
+                    // ⚠ sem mudança na entrega não é "sem impacto": as tarefas se mexem por dentro,
+                    // a obra é que tem folga para absorver. Dizer "0 dias" sem explicar confunde.
+                    <span className="text-green-700">a entrega não muda — há folga no cronograma</span>
+                  )}
+                </span>
+              </div>
+              <p className="text-[11.5px] text-torg-gray mt-1">
+                {imp.tarefasMovidas} tarefa(s) se moveriam · {imp.porSetor.map((p) => `${p.setor.toLowerCase()} +${p.dias}d`).join(" · ")}
+                {imp.estimado && <span className="text-amber-700"> · duração estimada pelo prazo vencido (a espera não tinha data de início)</span>}
+              </p>
+              <button onClick={() => setAbertoImp(abertoImp === imp.cronogramaId ? null : imp.cronogramaId)}
+                className="text-[11.5px] text-torg-blue hover:underline mt-1">
+                {abertoImp === imp.cronogramaId ? "esconder o detalhe" : "ver tarefa a tarefa"}
+              </button>
+              {abertoImp === imp.cronogramaId && (
+                <div className="mt-2 space-y-1">
+                  {imp.esperas.map((e, i) => (
+                    <p key={i} className="text-[11.5px] text-amber-800">
+                      ⏸ <b>{e.nome}</b> — {e.motivo} · parada há {e.dias} dia(s)
+                    </p>
+                  ))}
+                  <table className="w-full text-[11.5px] mt-1">
+                    <tbody>
+                      {imp.detalhe.map((d, i) => (
+                        <tr key={i} className="border-t border-gray-50">
+                          <td className="py-1 pr-2 text-torg-gray-light uppercase text-[10px]">{d.setor}</td>
+                          <td className="py-1 pr-2 text-torg-dark">{d.nome}</td>
+                          <td className="py-1 pr-2 text-torg-gray tabular-nums whitespace-nowrap">{fmtData(d.de)} → {fmtData(d.para)}</td>
+                          <td className="py-1 text-amber-700 tabular-nums whitespace-nowrap">+{d.dias}d</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 

@@ -117,9 +117,17 @@ export async function PATCH(req, { params }) {
       diffAntes.motivoBloqueio = tarefa.motivoBloqueio || null;
       diffDepois.motivoBloqueio = parsed.data.motivoBloqueio || null;
       antecessorasChanged = true; // trigger recalculo — bloqueio afeta successoras
+      // ⚠⚠ A ESPERA COMEÇA AGORA. Vitor (29/08/2026): "alguns eventos são de responsabilidade do
+      // cliente e não medimos isso, e vários atrasos podem ser causados por isso". Sem a data de
+      // início, o hold guarda o motivo mas não a duração — e "quantos dias o cliente segurou o
+      // projeto" fica sendo memória de reunião. Só marca quando a espera NASCE; ao sair do
+      // bloqueio, zera, para a próxima espera não herdar o relógio da anterior.
+      if (parsed.data.motivoBloqueio) { if (!tarefa.esperaInicio) data.esperaInicio = new Date(); }
+      else data.esperaInicio = null;
     }
     data.motivoBloqueio = parsed.data.motivoBloqueio;
   }
+  // ⚠ liberar encerra a espera: o `dataLiberacao` é o fim do período que `esperaInicio` abriu.
   if (parsed.data.dataLiberacao !== undefined) {
     const novaLib = parsed.data.dataLiberacao ? new Date(parsed.data.dataLiberacao) : null;
     if (tarefa.dataLiberacao?.toISOString() !== novaLib?.toISOString()) {
