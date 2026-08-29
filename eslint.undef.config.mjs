@@ -40,10 +40,40 @@ const node = ["process", "Buffer", "module", "require", "__dirname", "__filename
 // resolvam; nenhuma regra é de fato aplicada.
 const stub = { rules: { "no-img-element": { create: () => ({}) }, "exhaustive-deps": { create: () => ({}) } } };
 
+// ⚠⚠ O `no-undef` NÃO ENXERGA COMPONENTE EM JSX. Sem o plugin do react, `<Loader2 />` com o import
+// faltando passa batido pelo checar E pelo build — o ReferenceError só aparece quando alguém abre a
+// tela. Foi assim que o modal "Avisar o time" derrubou /admin/usuarios em 29/08/2026, e é a mesma
+// classe de erro que este arquivo existe para pegar.
+//
+// ⚠ Regra escrita aqui em vez de instalar eslint-plugin-react: o checar roda por `npx --yes
+// eslint@9`, sem dependência no projeto, e assim continua rodando em qualquer máquina.
+const jsx = {
+  rules: {
+    "componente-sem-import": {
+      create(context) {
+        return {
+          JSXOpeningElement(node) {
+            let nome = node.name;
+            // <Foo.Bar /> — quem precisa existir é `Foo`
+            while (nome.type === "JSXMemberExpression") nome = nome.object;
+            if (nome.type !== "JSXIdentifier") return;
+            // minúscula é tag do HTML (<div>), não identificador do módulo
+            if (!/^[A-Z]/.test(nome.name)) return;
+            for (let escopo = context.sourceCode.getScope(node); escopo; escopo = escopo.upper) {
+              if (escopo.variables.some((v) => v.name === nome.name)) return;
+            }
+            context.report({ node: nome, message: `'${nome.name}' e usado em JSX mas nao foi importado nem declarado.` });
+          },
+        };
+      },
+    },
+  },
+};
+
 export default [
   {
     files: ["**/*.js", "**/*.jsx", "**/*.mjs"],
-    plugins: { "@next/next": stub, "react-hooks": stub },
+    plugins: { "@next/next": stub, "react-hooks": stub, jsx },
     linterOptions: { reportUnusedDisableDirectives: "off" },
     ignores: ["node_modules/**", ".next/**", "public/**", "lib/_*_*.mjs"],
     languageOptions: {
@@ -52,6 +82,6 @@ export default [
       parserOptions: { ecmaFeatures: { jsx: true } },
       globals: Object.fromEntries([...navegador, ...node].map((g) => [g, "readonly"])),
     },
-    rules: { "no-undef": "error" },
+    rules: { "no-undef": "error", "jsx/componente-sem-import": "error" },
   },
 ];
