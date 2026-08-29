@@ -9,7 +9,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
-import { htmlAvisoSeguranca, ASSUNTO_AVISO } from "@/lib/aviso-seguranca-email";
+import { htmlAvisoSeguranca, ASSUNTO_AVISO, AVISO_PADRAO } from "@/lib/aviso-seguranca-email";
+import { z } from "zod";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,13 +38,40 @@ export async function GET() {
     where: { action: "AVISO_SEGURANCA_EMAIL", createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } },
     orderBy: { createdAt: "desc" }, select: { createdAt: true, diff: true },
   });
-  return NextResponse.json({ total: pessoas.length, pessoas, jaHoje: jaHoje || null });
+  return NextResponse.json({ total: pessoas.length, pessoas, jaHoje: jaHoje || null, padrao: AVISO_PADRAO });
 }
+
+// ⚠ O QUE O ADMIN PODE ESCREVER. Só texto: a moldura (faixa navy, filete laranja, os blocos) é
+// código, e o conteúdo é escapado antes de virar HTML — ver lib/aviso-seguranca-email.
+const schemaConteudo = z.object({
+  assunto:    z.string().min(4).max(180),
+  titulo:     z.string().min(2).max(120),
+  abertura:   z.string().max(2000),
+  chamada:    z.string().max(200).optional().default(""),
+  blocos:     z.array(z.object({ titulo: z.string().max(160), texto: z.string().max(2000) })).max(6).optional().default([]),
+  botao:      z.string().max(60).optional().default(""),
+  fechamento: z.string().max(2000).optional().default(""),
+  rodape:     z.string().max(300).optional().default(""),
+}).partial({ abertura: true });
 
 export async function POST(req) {
   let admin;
   try { admin = await requireRole(["ADMIN"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  const corpo = await req.json().catch(() => ({}));
+  let conteudo = AVISO_PADRAO;
+  if (corpo && Object.keys(corpo).length && corpo.conteudo) {
+    const r = schemaConteudo.safeParse(corpo.conteudo);
+    if (!r.success) return NextResponse.json({ error: r.error.issues?.[0]?.message || "Texto inválido." }, { status: 400 });
+    conteudo = { ...AVISO_PADRAO, ...r.data };
+  }
+
+  // ⚠⚠ A PRÉVIA USA O MESMO CAMINHO DO ENVIO. Montar o HTML de novo no navegador só para mostrar
+  // criaria duas versões do mesmo e-mail, e a que o time recebe seria a que ninguém revisou.
+  if (corpo?.previa) {
+    return NextResponse.json({ ok: true, previa: true, html: htmlAvisoSeguranca(admin.name || "Vitor", conteudo), assunto: conteudo.assunto });
+  }
 
   const forcar = new URL(req.url).searchParams.get("forcar") === "1";
   // ⚠ TRAVA DE DUPLO CLIQUE. Comunicado ao time inteiro não pode sair duas vezes porque a tela
@@ -63,7 +91,7 @@ export async function POST(req) {
   const falhas = [];
   for (const p of pessoas) {
     const r = await sendEmail({
-      to: p.email, subject: ASSUNTO_AVISO, html: htmlAvisoSeguranca(p.name),
+      to: p.email, subject: conteudo.assunto || ASSUNTO_AVISO, html: htmlAvisoSeguranca(p.name, conteudo),
       replyTo: admin.email || undefined,
     }).catch((e) => ({ ok: false, error: String(e?.message || e) }));
     if (r?.ok) enviados.push(p.email);
@@ -72,7 +100,9 @@ export async function POST(req) {
 
   await prisma.auditLog.create({
     data: { userId: admin.id || null, action: "AVISO_SEGURANCA_EMAIL", entity: "User", entityId: null,
-      diff: { assunto: ASSUNTO_AVISO, enviados: enviados.length, falhas } },
+      // ⚠ o texto vai gravado: daqui a um mês, "o que exatamente foi dito ao time?" só tem
+      // resposta se a mensagem estiver no registro, não só a contagem.
+      diff: { assunto: conteudo.assunto, conteudo, enviados: enviados.length, falhas } },
   }).catch(() => {});
 
   return NextResponse.json({ ok: true, enviados: enviados.length, falhas });

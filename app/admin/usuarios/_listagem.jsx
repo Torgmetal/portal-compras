@@ -107,6 +107,9 @@ export default function ListagemUsuarios() {
   const [aviso, setAviso] = useState(null); // { pessoas, total, jaHoje } | "carregando"
   const [enviandoAviso, setEnviandoAviso] = useState(false);
   const [resultadoAviso, setResultadoAviso] = useState(null);
+  const [texto, setTexto] = useState(null);       // o comunicado, editável
+  const [previa, setPrevia] = useState("");       // HTML devolvido pelo servidor
+  const [abaAviso, setAbaAviso] = useState("TEXTO");
 
   // ⚠⚠ DOIS PÚBLICOS NA MESMA TABELA. Vitor (28/08/2026): "consegue separar os que são apenas para
   // acesso ao portal de funcionários para que não fique tudo bagunçado como está lá". São contas de
@@ -251,16 +254,65 @@ export default function ListagemUsuarios() {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao carregar");
       setAviso(j);
+      // ⚠ rascunho guardado no navegador: escrever o comunicado e perder tudo ao fechar a janela
+      // sem querer é o tipo de coisa que faz ninguém escrever direito da segunda vez.
+      let salvo = null;
+      try { salvo = JSON.parse(localStorage.getItem("torg:aviso-seguranca") || "null"); } catch { /* sem rascunho */ }
+      setTexto(salvo || j.padrao);
+      setAbaAviso("TEXTO");
     } catch (e) { setAviso(null); alert(e.message); }
+  }
+
+  function mudarTexto(campo, valor) {
+    setTexto((t) => {
+      const novo = { ...t, [campo]: valor };
+      try { localStorage.setItem("torg:aviso-seguranca", JSON.stringify(novo)); } catch { /* sem espaço */ }
+      return novo;
+    });
+    setPrevia("");
+  }
+
+  function mudarBloco(i, campo, valor) {
+    setTexto((t) => {
+      const blocos = t.blocos.map((b, k) => (k === i ? { ...b, [campo]: valor } : b));
+      const novo = { ...t, blocos };
+      try { localStorage.setItem("torg:aviso-seguranca", JSON.stringify(novo)); } catch { /* sem espaço */ }
+      return novo;
+    });
+    setPrevia("");
+  }
+
+  // ⚠ a prévia vem do SERVIDOR, do mesmo código que monta o e-mail enviado. Remontar o HTML aqui
+  // criaria duas versões da mensagem, e a que o time recebe seria a que ninguém revisou.
+  async function verPrevia() {
+    setAbaAviso("PREVIA");
+    if (previa) return;
+    const r = await fetch("/api/admin/aviso-seguranca", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ previa: true, conteudo: texto }),
+    });
+    const j = await r.json();
+    if (!r.ok) { alert(j.error || "Erro na prévia"); setAbaAviso("TEXTO"); return; }
+    setPrevia(j.html);
+  }
+
+  function restaurarPadrao() {
+    setTexto(aviso?.padrao || null);
+    setPrevia("");
+    try { localStorage.removeItem("torg:aviso-seguranca"); } catch { /* nada a limpar */ }
   }
 
   async function dispararAviso(forcar) {
     setEnviandoAviso(true);
     try {
-      const r = await fetch(`/api/admin/aviso-seguranca${forcar ? "?forcar=1" : ""}`, { method: "POST" });
+      const r = await fetch(`/api/admin/aviso-seguranca${forcar ? "?forcar=1" : ""}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conteudo: texto }),
+      });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao enviar");
       setResultadoAviso(j);
+      try { localStorage.removeItem("torg:aviso-seguranca"); } catch { /* nada a limpar */ }
     } catch (e) { alert(e.message); } finally { setEnviandoAviso(false); }
   }
 
@@ -312,6 +364,20 @@ export default function ListagemUsuarios() {
               <button onClick={() => setAviso(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
 
+            {aviso !== "carregando" && !resultadoAviso && (
+              <div className="flex items-center gap-1 border-b border-gray-100 px-4">
+                {[["TEXTO", "Texto"], ["PREVIA", "Prévia"], ["QUEM", `Quem recebe (${aviso.total})`]].map(([k, l]) => (
+                  <button key={k} onClick={() => (k === "PREVIA" ? verPrevia() : setAbaAviso(k))}
+                    className={`px-3 py-2 text-[12px] font-medium border-b-2 -mb-px ${abaAviso === k ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
+                    {l}
+                  </button>
+                ))}
+                <button onClick={restaurarPadrao} className="ml-auto text-[11px] text-torg-gray hover:text-torg-dark underline">
+                  restaurar o texto sugerido
+                </button>
+              </div>
+            )}
+
             <div className="px-4 py-3 max-h-[50vh] overflow-y-auto">
               {aviso === "carregando" ? (
                 <p className="text-[12px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> lendo a lista…</p>
@@ -325,6 +391,30 @@ export default function ListagemUsuarios() {
                     </div>
                   )}
                 </div>
+              ) : abaAviso === "TEXTO" && texto ? (
+                <div className="space-y-2.5">
+                  <p className="text-[11px] text-torg-gray">
+                    Escreva à vontade. Para <strong>negrito</strong>, use <code className="bg-gray-100 px-1 rounded">**assim**</code>. O cabeçalho navy, o filete laranja e o botão são o padrão da casa e não mudam.
+                  </p>
+                  <Campo rotulo="Assunto do e-mail" valor={texto.assunto} onChange={(v) => mudarTexto("assunto", v)} />
+                  <Campo rotulo="Título (faixa azul do topo)" valor={texto.titulo} onChange={(v) => mudarTexto("titulo", v)} />
+                  <Campo rotulo="Abertura" valor={texto.abertura} onChange={(v) => mudarTexto("abertura", v)} linhas={3} />
+                  <Campo rotulo="Chamada dos blocos" valor={texto.chamada} onChange={(v) => mudarTexto("chamada", v)} />
+                  {texto.blocos?.map((b, i) => (
+                    <div key={i} className="border border-gray-200 rounded-lg p-2.5 space-y-2 bg-gray-50/60">
+                      <Campo rotulo={`Bloco ${i + 1} · título`} valor={b.titulo} onChange={(v) => mudarBloco(i, "titulo", v)} />
+                      <Campo rotulo={`Bloco ${i + 1} · texto`} valor={b.texto} onChange={(v) => mudarBloco(i, "texto", v)} linhas={3} />
+                    </div>
+                  ))}
+                  <Campo rotulo="Texto do botão" valor={texto.botao} onChange={(v) => mudarTexto("botao", v)} />
+                  <Campo rotulo="Fechamento" valor={texto.fechamento} onChange={(v) => mudarTexto("fechamento", v)} linhas={3} />
+                  <Campo rotulo="Rodapé" valor={texto.rodape} onChange={(v) => mudarTexto("rodape", v)} />
+                </div>
+              ) : abaAviso === "PREVIA" ? (
+                previa
+                  ? <iframe title="Prévia do comunicado" srcDoc={previa} sandbox=""
+                      className="w-full h-[46vh] border border-gray-200 rounded-lg bg-white" />
+                  : <p className="text-[12px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> montando…</p>
               ) : (
                 <>
                   {aviso.jaHoje && (
@@ -619,5 +709,18 @@ export default function ListagemUsuarios() {
         />
       )}
     </div>
+  );
+}
+
+/** Campo de texto do comunicado — uma linha ou várias, conforme o conteúdo. */
+function Campo({ rotulo, valor, onChange, linhas = 1 }) {
+  const cls = "w-full text-[12.5px] border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-torg-blue text-torg-dark";
+  return (
+    <label className="block">
+      <span className="block text-[10px] font-semibold text-torg-gray uppercase tracking-wide mb-0.5">{rotulo}</span>
+      {linhas > 1
+        ? <textarea rows={linhas} value={valor || ""} onChange={(e) => onChange(e.target.value)} className={`${cls} resize-y`} />
+        : <input value={valor || ""} onChange={(e) => onChange(e.target.value)} className={cls} />}
+    </label>
   );
 }
