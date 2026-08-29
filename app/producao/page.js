@@ -34,7 +34,15 @@ export default async function PainelProducao() {
 
   const [pipeRaw, metas, synHojeRaw, synMesRaw, synSemanaRaw, furos, paradas, corteAtivo] = await Promise.all([
     // Pipeline das peças (conjuntos + avulsas; croqui só conta no corte)
-    prisma.pecaConjunto.groupBy({ by: ["status", "tipoPeca"], _count: true, _sum: { pesoTotalKg: true } }),
+    //
+    // ⚠⚠ SÓ A LPC. Vitor (29/08/2026): "a LPC e a LE são a mesma lista praticamente, a única
+    // diferença é que a LE mostra todos os itens que precisamos enviar, até acessórios; já a LPC é
+    // para a produção". Somando as duas, a mesma estrutura entrava duas vezes: 788 t dos 2.433 t
+    // que este painel mostrava — 32% — eram repetição, e o PENDENTE era 95% LE.
+    //
+    // ⚠ É a mesma regra que o Mapa da Produção já aplica ("só obras cuja LPC foi importada").
+    // O peso de expedição continua saindo da LE, pelo `pesoRealPecas` (lib/peso-op.js).
+    prisma.pecaConjunto.groupBy({ by: ["status", "tipoPeca"], where: { fonte: "LPC_IMPORT" }, _count: true, _sum: { pesoTotalKg: true } }),
 
     // Meta mensal por setor (modelo Meta — mesmas usadas no Mapa). Sem filtrar
     // por setor no SQL: o setor é gravado com casing inconsistente ("CORTE" vs

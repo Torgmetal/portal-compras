@@ -110,6 +110,7 @@ export async function POST(req) {
   const idPorMarca = new Map(existentes.map((e) => [e.marca, e.id]));
 
   let criados = 0, atualizados = 0, ignorados = 0;
+  const jaNaOutraLista = []; // marcas que a LPC já tem nesta OP (mesma peça, outra lista)
   for (const p of parsed.pecas) {
     try {
       const existId = idPorMarca.get(p.marca);
@@ -123,6 +124,11 @@ export async function POST(req) {
             qte: p.qte,
             pesoUnitKg: p.pesoUnitKg,
             pesoTotalKg: p.pesoTotalKg,
+            // ⚠ AMARRA A ÓRFÃ. Peça importada quando a OP ainda não existia (ou não casou) ficou com
+            // `opId` nulo, e tudo que junta por opId — cobertura, peso da OP, carteira — não a
+            // enxerga. O import da LPC já faz esse backfill; o da LE não fazia, e sobrou uma peça
+            // órfã na OP-111. Só preenche quando está vazio: nunca reescreve um vínculo existente.
+            ...(op?.id ? { opId: op.id } : {}),
             ...(p.observacao ? { observacao: p.observacao } : {}), // só sobrescreve se a lista trouxer
           },
         });
@@ -148,6 +154,13 @@ export async function POST(req) {
         criados++;
       }
     } catch (e) {
+      // ⚠⚠ MARCA QUE JÁ EXISTE PELA LPC NÃO É ERRO — É A MESMA PEÇA. A chave do banco é
+      // `@@unique([opNumero, marca])`, sem a fonte: quando as duas listas usam o mesmo número de OP
+      // (o caso da OP-106, cujas 7 marcas da LE já estavam gravadas como LPC), a linha da LE não
+      // nasce. Vitor (29/08/2026): "a LPC e a LE são a mesma lista praticamente". O que não pode é
+      // isso passar calado — antes contava como "ignorada" sem dizer por quê, e a tela mostrava um
+      // import bem-sucedido que não importou nada.
+      if (String(e?.code) === "P2002") jaNaOutraLista.push(p.marca);
       ignorados++;
     }
   }
@@ -169,6 +182,7 @@ export async function POST(req) {
       diff: {
         opNumero: parsed.opNumero, obra: parsed.obra || null, opEncontrada: !!op,
         totalNoArquivo: parsed.pecas.length, criados, atualizados, ignorados, pesoTotal: pesoRealLE,
+        jaNaOutraLista,
       },
     },
   }).catch(() => {});
@@ -182,6 +196,10 @@ export async function POST(req) {
     criados,
     atualizados,
     ignorados,
+    jaNaOutraLista,
+    avisoListaUnica: jaNaOutraLista.length
+      ? `${jaNaOutraLista.length} marca(s) desta LE já existem nesta OP pela LPC — é a mesma peça, não foram duplicadas.`
+      : undefined,
     pesoTotal: pesoRealLE, // peso real da LE (deduplicado), não a soma bruta do arquivo
     qteTotal: parsed.qteTotal,
     diff,
