@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Loader2, AlertCircle, ListOrdered, RefreshCw, Search, Lock, CheckCircle2, ExternalLink } from "lucide-react";
+import { Loader2, AlertCircle, ListOrdered, RefreshCw, Search, Lock, CheckCircle2, ExternalLink, PauseCircle } from "lucide-react";
+import { ETAPA_LABEL } from "@/lib/etapa-projeto";
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const fmtN = (v) => Number(v || 0).toLocaleString("pt-BR");
@@ -61,8 +62,10 @@ export default function SequenciaClient() {
 
       {data?.resumo && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+          {/* ⚠ "Em espera" ganhou card próprio: é um terço da lista, e enquanto vivia dentro de
+              "Atrasadas" o setor aparecia devendo o que depende de decisão do cliente. */}
           <Kpi rotulo="Atrasadas" valor={fmtN(data.resumo.atrasadas)} cor="text-red-600" />
-          <Kpi rotulo="Liberadas" valor={fmtN(data.resumo.liberadas)} cor="text-green-700" />
+          <Kpi rotulo="Em espera do cliente" valor={fmtN(data.resumo.emEspera)} cor="text-amber-700" />
           <Kpi rotulo="Esperando outro setor" valor={fmtN(data.resumo.bloqueadas)} cor="text-torg-gray" />
           <Kpi rotulo="No total" valor={fmtN(data.resumo.total)} cor="text-torg-dark" />
         </div>
@@ -114,6 +117,7 @@ export default function SequenciaClient() {
               <thead className="bg-gray-50 text-torg-gray">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium w-10">#</th>
+                  <th className="px-3 py-2 text-left font-medium w-24">Etapa</th>
                   <th className="px-3 py-2 text-left font-medium">Tarefa</th>
                   <th className="px-3 py-2 text-left font-medium">OP / obra</th>
                   <th className="px-3 py-2 text-left font-medium">Área</th>
@@ -125,10 +129,24 @@ export default function SequenciaClient() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {tarefas.map((t, i) => (
-                  <tr key={t.id} className={`hover:bg-gray-50 ${t.atrasada ? "bg-red-50/40" : t.bloqueada ? "bg-gray-50/60" : ""}`}>
+                  <tr key={t.id} className={`hover:bg-gray-50 ${t.emEspera ? "bg-amber-50/40" : t.atrasada ? "bg-red-50/40" : t.bloqueada ? "bg-gray-50/60" : ""}`}>
                     <td className="px-3 py-2 text-torg-gray tabular-nums">{i + 1}</td>
+                    {/* a etapa da esteira: Modelo → Aprovação → Detalhamento → Diagrama → Listas →
+                        Liberação. Deduzida do nome enquanto não existe o campo (ver lib/etapa-projeto). */}
+                    <td className="px-3 py-2">
+                      {t.etapa ? (
+                        <span className="text-[10px] font-semibold uppercase tracking-wide bg-torg-blue-50 text-torg-blue rounded px-1.5 py-0.5">
+                          {ETAPA_LABEL[t.etapa]}
+                        </span>
+                      ) : <span className="text-torg-gray-light text-[11px]">—</span>}
+                    </td>
                     <td className="px-3 py-2 font-medium text-torg-dark">
                       {t.nome}
+                      {t.proximaEtapa && (
+                        <span className="block text-[11px] text-torg-gray-light font-normal">
+                          próxima: {ETAPA_LABEL[t.proximaEtapa]}
+                        </span>
+                      )}
                       {t.observacao && <span className="block text-[11px] text-torg-gray font-normal">{t.observacao}</span>}
                     </td>
                     <td className="px-3 py-2">
@@ -148,6 +166,12 @@ export default function SequenciaClient() {
                     <td className="px-3 py-2 whitespace-nowrap">
                       {t.concluida ? (
                         <span className="text-green-700 inline-flex items-center gap-1"><CheckCircle2 size={12} /> concluída</span>
+                      ) : t.emEspera ? (
+                        // ⚠ ESPERA NÃO É ATRASO (Vitor, 29/08/2026): indefinição do projeto não é
+                        // dívida da Engenharia. Os dias contam para quem deve a resposta.
+                        <span className="text-amber-700 font-medium inline-flex items-center gap-1" title={t.motivoBloqueio || ""}>
+                          <PauseCircle size={12} /> em espera{t.diasEmEspera ? ` · ${t.diasEmEspera}d` : ""}
+                        </span>
                       ) : t.atrasada ? (
                         <span className="text-red-600 font-semibold">atrasada {Math.abs(t.diasParaPrazo)}d</span>
                       ) : t.bloqueada ? (

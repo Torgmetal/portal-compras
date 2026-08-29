@@ -15,6 +15,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { etapaDaTarefa, PROXIMA_ETAPA, emEspera } from "@/lib/etapa-projeto";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -36,7 +37,12 @@ export async function GET(req) {
       departamento: setor,
       dataFimPrevista: { not: null },
       ...(incluirConcluidas ? {} : { percentualRealizado: { lt: 100 } }),
-      cronograma: { ativo: true, tarefasEnviadasEm: { not: null } },
+      // ⚠⚠ O PORTÃO SAIU. Exigir `tarefasEnviadasEm` (o clique do Planejamento em "Enviar tarefas")
+      // deixava a tela VAZIA: nenhum cronograma tem esse clique, e as 52 tarefas de Engenharia em
+      // aberto — 50 delas vencidas — não apareciam para quem tinha de executá-las. A intenção era
+      // não publicar rascunho; o efeito foi não publicar nada. Cronograma ATIVO já é o filtro certo,
+      // e a tela marca o que ainda não foi formalmente liberado.
+      cronograma: { ativo: true },
     },
     select: {
       id: true, nome: true, area: true, departamento: true,
@@ -46,7 +52,7 @@ export async function GET(req) {
       antecessoraIds: true, motivoBloqueio: true, observacao: true,
       cronograma: {
         select: {
-          id: true, titulo: true, opNumero: true, tarefasEnviadasEm: true,
+          id: true, titulo: true, opNumero: true, tarefasEnviadasEm: true, ativo: true,
           op: { select: { id: true, numero: true, cliente: true, obra: true } },
         },
       },
@@ -93,16 +99,30 @@ export async function GET(req) {
       observacao: t.observacao || null,
       motivoBloqueio: t.motivoBloqueio || null,
       concluida,
-      atrasada: !concluida && diasParaPrazo != null && diasParaPrazo < 0,
+      // ⚠⚠ ESPERA NÃO É ATRASO. Vitor (29/08/2026): "as tarefas em hold não podemos deixar como
+      // atrasadas, pois isso é indefinição do projeto". A tarefa com motivo de bloqueio e sem
+      // liberação sai do vermelho e vai para um grupo próprio — são 17 das 52, um terço do que a
+      // Engenharia aparecia devendo. Os dias continuam contando, mas como espera de quem deve a
+      // resposta, não como atraso do setor.
+      emEspera: !concluida && emEspera(t),
+      atrasada: !concluida && !emEspera(t) && diasParaPrazo != null && diasParaPrazo < 0,
       diasParaPrazo,
+      diasEmEspera: emEspera(t) && diasParaPrazo != null && diasParaPrazo < 0 ? -diasParaPrazo : 0,
+      // a etapa da esteira do projeto (Modelo → Aprovação → Detalhamento → Diagrama → Listas →
+      // Liberação) e o que vem depois. Deduzida do nome enquanto não existe o campo.
+      etapa: etapaDaTarefa(t.nome),
+      proximaEtapa: PROXIMA_ETAPA[etapaDaTarefa(t.nome)] || null,
+      // ainda não formalmente liberada pelo Planejamento (o antigo portão, agora só um aviso)
+      naoLiberada: !t.cronograma?.tarefasEnviadasEm,
       // esperando outro setor terminar
       bloqueada: !concluida && pendentes.length > 0,
       esperando: pendentes,
     };
   });
 
-  // atrasada → liberada → bloqueada; dentro de cada grupo, o que vence antes
-  const peso = (t) => (t.concluida ? 3 : t.atrasada ? 0 : t.bloqueada ? 2 : 1);
+  // atrasada → a fazer → aguardando outro setor → em espera do cliente → concluída;
+  // dentro de cada grupo, o que vence antes
+  const peso = (t) => (t.concluida ? 4 : t.emEspera ? 3 : t.atrasada ? 0 : t.bloqueada ? 2 : 1);
   lista.sort((a, b) => peso(a) - peso(b) || new Date(a.fim || 0) - new Date(b.fim || 0));
 
   return NextResponse.json({
@@ -113,6 +133,7 @@ export async function GET(req) {
       atrasadas: lista.filter((t) => t.atrasada).length,
       liberadas: lista.filter((t) => !t.concluida && !t.atrasada && !t.bloqueada).length,
       bloqueadas: lista.filter((t) => t.bloqueada).length,
+      emEspera: lista.filter((t) => t.emEspera).length,
       concluidas: lista.filter((t) => t.concluida).length,
     },
     geradoEm: new Date().toISOString(),
