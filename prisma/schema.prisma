@@ -1626,7 +1626,11 @@ model EstudoFabricacao {
   revisao       Int      @default(0)
   cliente       String
   obra          String?
-  orcamentoId   String? // liga ao Orcamento do pipeline comercial
+  // ⚠ É ESTE O VÍNCULO QUE FALTAVA. Vitor (29/08/2026): "a estrutura LQC na verdade é o que gera a
+  // proposta, ou seja precisa vincular ela ao criador de proposta estruturas". O campo já existia e
+  // estava nulo nos 4 estudos; agora tem FK de verdade (ON DELETE SET NULL — apagar o orçamento
+  // não pode levar junto o estudo de custo, que é trabalho de horas).
+  orcamentoId   String?
   metodo        String   @default("ESTIMATIVA") // ESTIMATIVA | PESO DE PROJETO
   demaos        String? // 01 DEMAO | 02 DEMAOS | 03 DEMAOS | N/A
   preMontagem   String?
@@ -1639,6 +1643,7 @@ model EstudoFabricacao {
   criadoPorNome String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  orcamento     Orcamento? @relation("OrcamentoEstudoLqc", fields: [orcamentoId], references: [id], onDelete: SetNull)
 
   @@index([ano])
   @@index([orcamentoId])
@@ -3090,6 +3095,7 @@ model Orcamento {
   op             OP?                @relation("OrcamentoOP", fields: [opId], references: [id])
   revisoes       OrcamentoRevisao[]
   estudos        PropostaEstudo[]
+  estudosLqc     EstudoFabricacao[] @relation("OrcamentoEstudoLqc")
 
   @@index([status])
   @@index([vendedor])
@@ -4586,6 +4592,7 @@ enum TipoVenda {
   PINTURA
   MAO_DE_OBRA
   REVENDA
+  LAUDO
 }
 
 enum PorteOrcamento {
