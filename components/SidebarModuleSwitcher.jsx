@@ -25,6 +25,7 @@ import {
   ReceiptText,
 } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
+import { emSetembroAmarelo, usarPrevia, LACO } from "@/lib/campanha";
 
 /* ─── Módulos do portal ─────────────────────────────────────────── */
 
@@ -218,6 +219,7 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
   });
 
   // Só mostra o switcher se tem mais de 1 módulo acessível
+  const mostrarLaco = emSetembroAmarelo() || usarPrevia();
   const temMultiplos = modulosVisiveis.length > 1;
 
   return (
@@ -230,6 +232,16 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
         title={temMultiplos ? "Trocar de módulo" : undefined}
       >
         <TorgLogo size="sm" />
+        {/* ⚠ O LAÇO AO LADO DA MARCA, o mês inteiro. Vitor pediu no login e a recomendação foi
+            estender aqui: este cabeçalho é compartilhado por 17 sidebars, então é o mesmo canto
+            superior de TODA tela do portal — o login a pessoa vê uma vez por dia, este ela vê o
+            dia inteiro. Fica DEPOIS do logo e antes da seta, para não separar a marca do controle
+            de troca de módulo. */}
+        {mostrarLaco ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={LACO} alt="Setembro Amarelo" title="Setembro Amarelo — a Torg Metal apoia a valorização da vida"
+            className="h-7 w-7 shrink-0" />
+        ) : null}
         {temMultiplos && (
           <ChevronDown
             size={14}
