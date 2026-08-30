@@ -2,10 +2,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { getRevisao } from "@/lib/assinatura-doc";
+import { getRevisao, fmtRev } from "@/lib/assinatura-doc";
 import { gerarCronogramaAuditoriaPDF } from "@/lib/cronograma-auditoria-pdf";
 import { dispArquivo } from "@/lib/arquivo-http";
-import { nomeFORM } from "@/lib/sgq-forms";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -26,8 +25,7 @@ export async function GET() {
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       "Content-Type": "application/pdf",
-      // ⚠ a revisão do NOME é a do documento (o cronograma já tem revisão própria), não a do modelo.
-      "Content-Disposition": dispArquivo(nomeFORM(29, `Auditorias Internas ${ano}`, { revisao }), "inline"),
+      "Content-Disposition": dispArquivo(`Cronograma de Auditoria Interna ${ano} ${fmtRev(revisao)}.pdf`, "inline"),
       "Cache-Control": "no-store",
     },
   });
