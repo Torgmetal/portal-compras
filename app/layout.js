@@ -3,6 +3,8 @@ import { StoreProvider } from "@/lib/store";
 import Toast from "@/components/Toast";
 import NextAuthProvider from "@/components/SessionProvider";
 import TorguinhoChat from "@/components/TorguinhoChat";
+import AvisoVideoModal from "@/components/AvisoVideoModal";
+import FaixaSetembroAmarelo from "@/components/FaixaSetembroAmarelo";
 
 export const metadata = {
   title: "Workspace Torg",
@@ -15,9 +17,11 @@ export default function RootLayout({ children }) {
       <body className="bg-torg-blue-50/30">
         <NextAuthProvider>
           <StoreProvider>
+            <FaixaSetembroAmarelo />
             {children}
             <Toast />
             <TorguinhoChat />
+            <AvisoVideoModal />
           </StoreProvider>
         </NextAuthProvider>
       </body>

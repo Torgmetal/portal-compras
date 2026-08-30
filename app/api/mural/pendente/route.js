@@ -1,0 +1,75 @@
+// GET  /api/mural/pendente — o comunicado em vídeo que ESTE usuário ainda não viu (ou null).
+// POST /api/mural/pendente — registra a ciência.
+//
+// Vitor (30/08/2026): "quando as pessoas fossem fazer o login no dia 01/09 aparecesse um vídeo (…)
+// não poderia dar para adiar, e registrar seria maravilhoso pois isso conta muito".
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/session";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/**
+ * ⚠ SAI DO AR SOZINHO. `exibirLoginAte` é o que encerra a campanha — ninguém precisa lembrar de
+ * desligar no dia 02, e um aviso obrigatório esquecido no ar seria um estorvo diário para 30
+ * pessoas. Se a data passou, nem consulta a ciência.
+ */
+export async function GET() {
+  const session = await getSession();
+  const userId = session?.user?.id;
+  // Sem sessão não é erro: o layout raiz também envolve a tela de login. Só não há nada a mostrar.
+  if (!userId) return NextResponse.json({ aviso: null });
+
+  const agora = new Date();
+  const aviso = await prisma.muralAviso.findFirst({
+    // ⚠ JANELA COM COMEÇO E FIM. Só `exibirLoginAte` faria o aviso aparecer no instante em que a
+    // linha fosse criada — e ele é para o dia 01, não para o dia em que o RH cadastrou.
+    where: {
+      ativo: true, videoUrl: { not: null },
+      exibirLoginAte: { gte: agora },
+      OR: [{ exibirLoginDe: null }, { exibirLoginDe: { lte: agora } }],
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, titulo: true, corpo: true, videoUrl: true },
+  });
+  if (!aviso) return NextResponse.json({ aviso: null });
+
+  const visto = await prisma.muralCiencia.findUnique({
+    where: { avisoId_userId: { avisoId: aviso.id, userId } },
+    select: { id: true },
+  });
+  if (visto) return NextResponse.json({ aviso: null });
+
+  return NextResponse.json({ aviso });
+}
+
+const schema = z.object({
+  avisoId: z.string().min(1),
+  assistiu: z.boolean().optional(),
+  motivo: z.string().max(300).optional(),
+});
+
+export async function POST(req) {
+  const session = await getSession();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  let body;
+  try { body = schema.parse(await req.json()); }
+  catch { return NextResponse.json({ error: "Dados inválidos" }, { status: 400 }); }
+
+  // ⚠ upsert e não create: dois cliques, duas abas ou um retry de rede não podem virar erro na cara
+  // de quem acabou de assistir. A unique (avisoId,userId) garante uma linha por pessoa.
+  await prisma.muralCiencia.upsert({
+    where: { avisoId_userId: { avisoId: body.avisoId, userId } },
+    create: {
+      avisoId: body.avisoId, userId,
+      assistiu: body.assistiu !== false,
+      motivo: body.motivo?.trim() || null,
+    },
+    update: {},
+  });
+  return NextResponse.json({ success: true });
+}

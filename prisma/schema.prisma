@@ -1558,6 +1558,12 @@ model MuralAviso {
   ativo              Boolean   @default(true)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+  // ⚠ Comunicado em VÍDEO com ciência obrigatória no login (Setembro Amarelo, 01/09/2026).
+  // `exibirLoginAte` faz o aviso sair do ar sozinho — ninguém precisa lembrar de desligar.
+  videoUrl           String?
+  exibirLoginDe      DateTime?
+  exibirLoginAte     DateTime?
+  ciencias           MuralCiencia[]
 
   @@index([ativo, createdAt])
 }
@@ -5325,4 +5331,23 @@ model LiberacaoProducao {
   @@index([opNumero])
   @@index([liberadoEm])
   @@index([dataProgramada])
+}
+
+// Quem tomou ciência de um comunicado. Vitor (30/08/2026): "registrar seria maravilhoso, pois isso
+// conta muito" — a CIPA precisa de evidência de que a ação de conscientização aconteceu.
+//
+// ⚠ `assistiu` existe porque o modal é OBRIGATÓRIO: se o vídeo não carregar (wifi da fábrica), a
+// pessoa não pode ficar trancada fora do portal. Nesse caso a ciência é gravada com assistiu=false
+// e o motivo — que é honesto, e deixa a lista separar quem viu de quem não conseguiu ver.
+model MuralCiencia {
+  id       String     @id @default(cuid())
+  avisoId  String
+  userId   String
+  vistoEm  DateTime   @default(now())
+  assistiu Boolean    @default(true)
+  motivo   String?
+  aviso    MuralAviso @relation(fields: [avisoId], references: [id], onDelete: Cascade)
+
+  @@unique([avisoId, userId])
+  @@index([avisoId])
 }

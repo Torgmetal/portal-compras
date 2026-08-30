@@ -5,6 +5,11 @@ import { X, Send, Loader2, MessageCircle, ChevronDown, Paperclip, Download, File
 import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { fraseDoDia } from "@/lib/torguinho-frases";
+import { emSetembroAmarelo, TORGUINHO_LACO } from "@/lib/campanha";
+
+// ⚠ Em setembro ele veste o laço — presença da campanha o mês inteiro, sem pesar em nada.
+// Volta ao normal sozinho em outubro (a conta é em horário de Brasília, ver lib/campanha).
+const AVATAR = emSetembroAmarelo() ? TORGUINHO_LACO : "/torguinho.png";
 
 // ─── Renderiza markdown simples (negrito, listas, emojis) ─────────────────────
 function MensagemTexto({ texto }) {
@@ -55,7 +60,7 @@ function Bolha({ msg }) {
       {/* Avatar */}
       {!isUser && (
         <div className="shrink-0 w-7 h-7 rounded-full overflow-hidden mt-0.5 border-2 border-white shadow">
-          <img src="/torguinho.png" alt="Torguinho" className="w-full h-full object-cover"
+          <img src={AVATAR} alt="Torguinho" className="w-full h-full object-cover"
             onError={(e) => { e.target.style.display = "none"; e.target.parentElement.innerHTML = "🤖"; }}
           />
         </div>
@@ -262,7 +267,7 @@ export default function TorguinhoChat() {
           {/* Header */}
           <div className="flex items-center gap-3 px-4 py-3 bg-torg-dark text-white shrink-0">
             <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-white/30 shrink-0">
-              <img src="/torguinho.png" alt="Torguinho" className="w-full h-full object-cover"
+              <img src={AVATAR} alt="Torguinho" className="w-full h-full object-cover"
                 onError={(e) => { e.target.style.display = "none"; e.target.parentElement.textContent = "🤖"; }}
               />
             </div>
@@ -297,7 +302,7 @@ export default function TorguinhoChat() {
             {carregando && (
               <div className="flex gap-2">
                 <div className="w-7 h-7 rounded-full overflow-hidden border-2 border-white shadow shrink-0">
-                  <img src="/torguinho.png" alt="" className="w-full h-full object-cover"
+                  <img src={AVATAR} alt="" className="w-full h-full object-cover"
                     onError={(e) => { e.target.style.display = "none"; e.target.parentElement.textContent = "🤖"; }}
                   />
                 </div>
@@ -393,7 +398,7 @@ export default function TorguinhoChat() {
           <X size={22} className="text-white" />
         ) : (
           <div className="w-10 h-10 rounded-full overflow-hidden">
-            <img src="/torguinho.png" alt="Torguinho" className="w-full h-full object-cover"
+            <img src={AVATAR} alt="Torguinho" className="w-full h-full object-cover"
               onError={(e) => { e.target.style.display = "none"; e.target.parentElement.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>'; }}
             />
           </div>

@@ -257,9 +257,12 @@ export default withAuth(
 
 export const config = {
   matcher: [
+    // ⚠ `laco-setembro` entra pelo mesmo motivo: o laço aparece na TELA DE LOGIN e nas telas do
+    // cliente, onde não há sessão — sem a exceção o middleware manda o PNG para o /entrar (307) e
+    // a campanha fica com um ícone de imagem quebrada.
     // ⚠ `equipe` entra aqui pelo mesmo motivo de `obras` e `estrutura-3d`: são ARQUIVOS de /public.
     // Sem a exceção, o middleware manda a foto para o /entrar (307) e o portal do cliente — que é
     // público — mostra as iniciais no lugar do rosto, sem erro nenhum na tela.
-    "/((?!_next/static|_next/image|favicon.ico|obras|torg-logo.*|estrutura-3d|equipe).*)",
+    "/((?!_next/static|_next/image|favicon.ico|obras|torg-logo.*|estrutura-3d|equipe|laco-setembro).*)",
   ],
 };
