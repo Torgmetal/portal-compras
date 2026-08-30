@@ -42,6 +42,7 @@ export default function AtividadesCronograma({ showToast, deptoFixo = "" }) {
   // No Planejamento (sem `deptoFixo`) o agrupamento por setor continua sendo o certo.
   const [tabela, setTabela] = useState(!!deptoFixo);
   const [colAberta, setColAberta] = useState(null);
+  const [baixando, setBaixando] = useState(null);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -63,6 +64,23 @@ export default function AtividadesCronograma({ showToast, deptoFixo = "" }) {
   }, [filtroDepto, filtroStatus, filtroOp]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  // ⚠⚠ A DATA DA BAIXA É A DA EVIDÊNCIA, NÃO A DE HOJE. O material da OP-103 chegou em 28/08 com
+  // prazo 03/08: dar baixa hoje registraria um atraso diferente do que houve, e o indicador passaria
+  // a medir o dia em que alguém lembrou de clicar.
+  async function baixarPelaEvidencia(a) {
+    setBaixando(a.id);
+    try {
+      const r = await fetch(`/api/planejamento/cronogramas/tarefas/${a.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataFimReal: new Date(a.evidencia.atendidaEm).toISOString(), percentualRealizado: 100 }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao dar baixa");
+      avisar("Baixa registrada na data da evidência.", "sucesso");
+      carregar();
+    } catch (e) { avisar(e.message, "erro"); } finally { setBaixando(null); }
+  }
 
   const fmtData = (d) => {
     if (!d) return "—";
@@ -293,6 +311,20 @@ export default function AtividadesCronograma({ showToast, deptoFixo = "" }) {
                       {a.bloqueada && a.motivoBloqueio
                         ? <span className="block text-[10.5px] text-torg-gray mt-0.5 truncate" title={a.motivoBloqueio}>{a.motivoBloqueio}</span>
                         : null}
+                      {/* ⚠ o que o portal já sabe: recebimento lançado (Suprimentos) ou lista
+                          importada (Engenharia). Propõe a baixa, não a faz sozinho. */}
+                      {a.evidencia && !a.concluida && (
+                        <span className="block text-[10.5px] text-green-700 mt-0.5">
+                          ✓ {a.evidencia.resumo}
+                          {a.evidencia.generica && <span className="text-torg-gray"> · confira se é o material desta tarefa</span>}
+                          {a.evidencia.atendidaEm && (
+                            <button onClick={() => baixarPelaEvidencia(a)} disabled={baixando === a.id}
+                              className="ml-1 text-torg-blue hover:underline font-semibold disabled:opacity-50">
+                              {baixando === a.id ? "baixando…" : "dar baixa nesta data"}
+                            </button>
+                          )}
+                        </span>
+                      )}
                     </td>
                     <td className="px-2 py-1.5 text-right whitespace-nowrap">
                       <button onClick={() => setPreencherAtiv(a)} title="Preencher / concluir (grava no cronograma)"

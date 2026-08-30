@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { evidenciasDasTarefas } from "@/lib/etapa-evidencia";
+import { etapaDaTarefa } from "@/lib/etapa-projeto";
 
 // GET /api/planejamento/cronogramas/atividades
 // Lista todas as tarefas de cronogramas ativos (não-summary, outlineLevel > 1)
@@ -52,6 +54,7 @@ export async function GET(req) {
         select: {
           id: true,
           opNumero: true,
+          opId: true,
           titulo: true,
           op: {
             select: {
@@ -88,6 +91,7 @@ export async function GET(req) {
       percentualRealizado: t.percentualRealizado,
       observacao: t.observacao,
       opNumero: t.cronograma.opNumero,
+      opId: t.cronograma.op?.id || t.cronograma.opId || null,
       opCliente: t.cronograma.op?.cliente || null,
       opClienteEmail: t.cronograma.op?.clienteEmail || null,
       opClienteContato: t.cronograma.op?.clienteContato || null,
@@ -100,6 +104,21 @@ export async function GET(req) {
       diasAtraso: venceu && !bloqueada ? Math.ceil((now - new Date(t.dataFimPrevista)) / 86400000) : 0,
     };
   });
+
+  // ⚠⚠ O QUE O PORTAL JÁ SABE. Vitor (29/08/2026): "com base nos recebimentos do CMR você não
+  // consegue já dar baixa e avançar o cronograma?". A tarefa "Recebimento de tinta" se comprova no
+  // recebimento que o Almoxarifado lançou; a "LE e LPC", na importação. Nenhuma das duas chega por
+  // e-mail nem depende de alguém lembrar de marcar.
+  //
+  // ⚠ E a evidência é PROPOSTA, não baixa automática: o portal sabe que chegou tinta, não sabe se
+  // chegou TODA a tinta. Fechar sozinho com material faltando é pior que a tarefa aberta.
+  const evid = await evidenciasDasTarefas(
+    result.map((t) => ({ id: t.id, nome: t.nome, opId: t.opId, fimReal: null, etapa: etapaDaTarefa(t.nome) })),
+  ).catch(() => new Map());
+  for (const t of result) {
+    const e = evid.get(t.id);
+    if (e) t.evidencia = e;
+  }
 
   return NextResponse.json({ success: true, atividades: result });
 }
