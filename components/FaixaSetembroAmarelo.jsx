@@ -1,7 +1,8 @@
 "use client";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { emSetembroAmarelo, rotaDeCliente, usarPrevia, LACO, SLOGAN } from "@/lib/campanha";
+import { emSetembroAmarelo, rotaDeCliente, LACO, SLOGAN } from "@/lib/campanha";
+import { usarPrevia } from "@/lib/campanha-previa";
 
 // ─── A FAIXA NAS TELAS DO CLIENTE ─────────────────────────────────────────────
 // Vitor (30/08/2026): "precisa que na página do cliente tbm traga alguma propaganda mostrando o

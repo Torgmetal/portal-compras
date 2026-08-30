@@ -6,7 +6,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { Loader2, AlertCircle } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
-import { emSetembroAmarelo, usarPrevia, LACO } from "@/lib/campanha";
+import { emSetembroAmarelo, LACO } from "@/lib/campanha";
+import { usarPrevia } from "@/lib/campanha-previa";
 
 function homePorRole(role) {
   switch (role) {

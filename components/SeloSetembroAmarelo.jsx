@@ -1,5 +1,6 @@
 "use client";
-import { emSetembroAmarelo, usarPrevia, LACO, SLOGAN } from "@/lib/campanha";
+import { emSetembroAmarelo, LACO, SLOGAN } from "@/lib/campanha";
+import { usarPrevia } from "@/lib/campanha-previa";
 
 // ─── O SELO, PARA FUNDO ESCURO ────────────────────────────────────────────────
 // Vitor (30/08/2026), apontando o canto superior direito do portal da obra: "aqui no portal do

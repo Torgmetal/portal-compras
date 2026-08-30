@@ -25,7 +25,8 @@ import {
   ReceiptText,
 } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
-import { emSetembroAmarelo, usarPrevia, LACO } from "@/lib/campanha";
+import { emSetembroAmarelo, LACO } from "@/lib/campanha";
+import { usarPrevia } from "@/lib/campanha-previa";
 
 /* ─── Módulos do portal ─────────────────────────────────────────── */
 
