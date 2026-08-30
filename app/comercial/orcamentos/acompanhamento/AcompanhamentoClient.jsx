@@ -52,11 +52,22 @@ export default function AcompanhamentoClient() {
   const [busca, setBusca] = useState("");
   const [buscaDebounced, setBuscaDebounced] = useState("");
   const [mostrarFinalizados, setMostrarFinalizados] = useState(false);
+  // solicitações que chegaram e ainda não viraram orçamento no portal
+  const [solicitacoes, setSolicitacoes] = useState(null);
 
   useEffect(() => {
     const t = setTimeout(() => setBuscaDebounced(busca), 300);
     return () => clearTimeout(t);
   }, [busca]);
+
+  // ⚠ carrega à parte e NUNCA derruba a tela: lê o SharePoint, que é mais lento e pode falhar. O
+  // acompanhamento de prazo tem que abrir mesmo se a pasta estiver fora do ar.
+  useEffect(() => {
+    fetch("/api/comercial/orcamento/solicitacoes")
+      .then((r) => r.json())
+      .then((j) => setSolicitacoes(j.pendentes || []))
+      .catch(() => setSolicitacoes([]));
+  }, []);
 
   const fetchOrcamentos = useCallback(async () => {
     setLoading(true);
@@ -168,6 +179,52 @@ export default function AcompanhamentoClient() {
           Controle de prazos de entrega das propostas comerciais.
         </p>
       </div>
+
+      {/* ─── SOLICITAÇÕES AINDA SEM ORÇAMENTO ABERTO ───────────────────────────────────
+          Vitor (30/08/2026): "preencher na aba de Acompanhamento as solicitações novas que
+          chegarem desses e-mails". Elas vêm da pasta `1. Solicitados` do SharePoint, criada pelo
+          Comercial quando o pedido chega — antes de o orçamento ganhar número.
+
+          ⚠ Ficam ACIMA da lista de prazos de propósito: é trabalho já pedido pelo cliente que o
+          portal não estava contando em lugar nenhum. E o prazo vem do nome da pasta ("04_09"), que
+          é a data em que a proposta tem que sair. */}
+      {solicitacoes?.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-amber-200 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border-b border-amber-200">
+            <AlertTriangle size={15} className="text-amber-600 shrink-0" />
+            <p className="text-[13px] text-torg-dark">
+              <strong>{solicitacoes.length}</strong> solicitação(ões) recebida(s) sem orçamento aberto no portal
+            </p>
+            <span className="ml-auto text-[11px] text-torg-gray">pasta “1. Solicitados” do SharePoint</span>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {solicitacoes.map((s) => {
+              const dias = diasRestantes(s.prazo);
+              const u = urgenciaPrazo(dias);
+              return (
+                <div key={s.pasta} className="px-4 py-2.5 flex items-center gap-3 flex-wrap">
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg shrink-0 ${u.bg} ${u.cor}`}>{u.label}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] text-torg-dark truncate">
+                      {/* cliente não reconhecido aparece como o texto da pasta, sem inventar nome */}
+                      <strong>{s.cliente || s.clienteTexto || s.pasta}</strong>
+                      {s.obra ? <span className="text-torg-gray"> · {s.obra}</span> : null}
+                    </p>
+                    <p className="text-[11px] text-torg-gray truncate">
+                      {s.solicitante ? `${s.solicitante} · ` : ""}
+                      {s.pedidoEm ? `pedido em ${fmtData(s.pedidoEm)}` : `pasta de ${fmtData(s.criadaEm)}`}
+                      {s.assunto ? ` — ${s.assunto}` : ""}
+                    </p>
+                  </div>
+                  <span className="text-[11px] text-torg-gray whitespace-nowrap shrink-0">
+                    prazo {s.prazo ? fmtData(s.prazo) : "—"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards */}
       {!loading && pendentes.length > 0 && (

@@ -3096,6 +3096,7 @@ model Orcamento {
   revisoes       OrcamentoRevisao[]
   estudos        PropostaEstudo[]
   estudosLqc     EstudoFabricacao[] @relation("OrcamentoEstudoLqc")
+  emails         ObraEmailEvento[]  @relation("OrcamentoEmails")
 
   @@index([status])
   @@index([vendedor])
@@ -5114,6 +5115,11 @@ model RelatorioInspecao {
 model ObraEmailEvento {
   id                String    @id @default(cuid())
   opId              String? // vínculo com a OP (null enquanto não casou) — Fase 2
+  // ⚠ o mesmo evento pode pertencer a um ORÇAMENTO (fase comercial, antes da OP existir) ou a uma
+  // OP (fase de execução). São dois momentos da mesma obra, não dois modelos.
+  orcamentoId       String?
+  fonte             String? // GRAPH (caixa lida pelo agente) | SHAREPOINT (.eml arquivado na pasta)
+  arquivo           String? // nome do .eml, quando veio arquivado da pasta do orçamento
   caixa             String // mailbox de origem (qual das 6 caixas da engenharia)
   pasta             String // inbox | sentItems
   conversationId    String? // thread do Graph (amarra 1º e-mail ↔ resposta)
@@ -5141,8 +5147,10 @@ model ObraEmailEvento {
   respondidoEm      DateTime? // 1ª resposta da eng na thread (SLA — Fase 2)
   respondidoPor     String?
   criadoEm          DateTime  @default(now())
+  orcamento         Orcamento? @relation("OrcamentoEmails", fields: [orcamentoId], references: [id], onDelete: SetNull)
 
   @@index([opId])
+  @@index([orcamentoId])
   @@index([conversationId])
   @@index([caixa])
   @@index([direcao])
