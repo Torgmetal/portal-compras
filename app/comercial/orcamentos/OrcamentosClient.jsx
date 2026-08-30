@@ -308,47 +308,46 @@ export default function OrcamentosClient() {
     <div className="space-y-6 max-w-7xl">
       <OrcamentosTabs />
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">
-            Propostas
-          </h2>
-          <p className="text-sm text-torg-gray mt-1">
-            Todas as propostas comerciais — do orçamento ao fechamento.
-          </p>
-        </div>
-        {/* ⚠ OS DOIS CAMINHOS DE CRIAR, LADO A LADO. Vitor (29/08/2026): "nos botões de proposta
-            colocar o criar proposta estrutura e criar proposta serviço". Eram duas abas escondidas
-            no submenu; quem chegava aqui para fazer uma proposta não achava por onde começar. */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={atualizarDoSharePoint}
-            disabled={importando}
-            title="Relê a RELATÓRIO_PROPOSTAS do SharePoint e atualiza a central"
-            className="px-3 py-2.5 text-torg-gray hover:text-torg-blue hover:bg-torg-blue-50 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
-          >
-            <RefreshCw size={16} className={importando ? "animate-spin" : ""} />
-            {importando ? "Atualizando…" : "Atualizar do SharePoint"}
-          </button>
-          <button
-            onClick={handleNovo}
-            className="px-4 py-2.5 border border-torg-blue-100 text-torg-blue rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
-          >
-            <PlusCircle size={18} /> Novo Orçamento
-          </button>
-          <Link
-            href="/comercial/orcamentos/propostas"
-            className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
-          >
-            <Building2 size={18} /> Criar Proposta Estrutura
-          </Link>
-          <Link
-            href="/comercial/orcamentos/servicos"
-            className="px-4 py-2.5 bg-torg-dark text-white rounded-lg hover:bg-torg-blue font-medium flex items-center gap-2"
-          >
-            <Wrench size={18} /> Criar Proposta Serviço
-          </Link>
-        </div>
+      {/* ⚠ OS BOTÕES FICAM EM LINHA PRÓPRIA, ABAIXO DO CABEÇALHO. Vitor (30/08/2026): "esses
+          botões devem estar abaixo do Central de Orçamentos, não dentro". Espremidos à direita do
+          título eles disputavam a linha com as abas e apareciam cortados nas telas mais estreitas —
+          e são a ação principal da tela, não um detalhe do canto. */}
+      <div>
+        <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Propostas</h2>
+        <p className="text-sm text-torg-gray mt-1">
+          Todas as propostas comerciais — do orçamento ao fechamento.
+        </p>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <Link
+          href="/comercial/orcamentos/propostas"
+          className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
+        >
+          <Building2 size={18} /> Criar Proposta Estrutura
+        </Link>
+        <Link
+          href="/comercial/orcamentos/servicos"
+          className="px-4 py-2.5 bg-torg-dark text-white rounded-lg hover:bg-torg-blue font-medium flex items-center gap-2"
+        >
+          <Wrench size={18} /> Criar Proposta Serviço
+        </Link>
+        <button
+          onClick={handleNovo}
+          className="px-4 py-2.5 border border-torg-blue-100 text-torg-blue rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
+        >
+          <PlusCircle size={18} /> Novo Orçamento
+        </button>
+        {/* ⚠ à direita e discreto: sincronizar não é o que se faz aqui todo dia, criar proposta é. */}
+        <button
+          onClick={atualizarDoSharePoint}
+          disabled={importando}
+          title="Relê a RELATÓRIO_PROPOSTAS do SharePoint e atualiza a central"
+          className="ml-auto px-3 py-2.5 text-torg-gray hover:text-torg-blue hover:bg-torg-blue-50 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+        >
+          <RefreshCw size={16} className={importando ? "animate-spin" : ""} />
+          {importando ? "Atualizando…" : "Atualizar do SharePoint"}
+        </button>
       </div>
 
       {/* Filtro de Período */}
