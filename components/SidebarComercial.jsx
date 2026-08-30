@@ -2,27 +2,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { FolderKanban, Inbox, FileSpreadsheet, GitBranchPlus, ChevronDown, BarChart3, FilePlus2, CalendarClock, Presentation, Wrench, Building2, Gauge, Rocket } from "lucide-react";
+import { FolderKanban, Inbox, FileSpreadsheet, ChevronDown, Presentation, Gauge, Rocket } from "lucide-react";
 import { useState } from "react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/comercial", label: "OPs", icon: FolderKanban, exact: true },
-  {
-    href: "/comercial/orcamentos",
-    label: "Central de Orçamentos",
-    icon: FileSpreadsheet,
-    sub: [
-      { href: "/comercial/orcamentos", label: "Propostas", icon: FileSpreadsheet },
-      { href: "/comercial/orcamentos/propostas", label: "Propostas Estruturas", icon: Building2 },
-      { href: "/comercial/orcamentos/servicos", label: "Propostas Serviço", icon: Wrench },
-      { href: "/comercial/orcamentos/estudos", label: "Estudos (LQC)", icon: FileSpreadsheet },
-      { href: "/comercial/orcamentos/acompanhamento", label: "Acompanhamento", icon: CalendarClock },
-      { href: "/comercial/orcamentos/pipeline", label: "Pipeline", icon: GitBranchPlus },
-      { href: "/comercial/orcamentos/kpis", label: "KPIs de Vendas", icon: BarChart3 },
-    ],
-  },
+  // ⚠ SEM SUBMENU. Vitor (29/08/2026): "vamos tirar essas subpastas, pois está bem ruim para
+  // visualizar dessa maneira". Eram sete itens empilhados dentro da barra — e a navegação já
+  // existe, em abas, no topo das próprias telas (`OrcamentosTabs`). Duas navegações para o mesmo
+  // lugar é o que deixava a barra pesada.
+  { href: "/comercial/orcamentos", label: "Central de Orçamentos", icon: FileSpreadsheet },
   { href: "/comercial/kickoffs", label: "Kick Offs — Aceites", icon: Rocket },
   { href: "/comercial/apresentacoes", label: "Apresentação ao Cliente", icon: Presentation },
   { href: "/comercial/aprovacoes", label: "Aprovações", icon: Inbox, masterOnly: true },

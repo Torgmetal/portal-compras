@@ -5,8 +5,9 @@ import {
   FileSpreadsheet, PlusCircle, Search, X, ChevronDown,
   Pencil, Trash2, Eye, Loader2, AlertCircle, Filter,
   TrendingUp, Clock, XCircle, FileCheck2, DollarSign,
-  Calendar, BarChart3,
+  Calendar, BarChart3, Building2, Wrench, RefreshCw,
 } from "lucide-react";
+import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { fmtOP } from "@/lib/utils";
 import OrcamentosTabs from "@/components/OrcamentosTabs";
@@ -120,6 +121,7 @@ export default function OrcamentosClient() {
   const [anoSel, setAnoSel] = useState(now.getFullYear());
 
   // Modal
+  const [importando, setImportando] = useState(false);
   const [modal, setModal] = useState(null); // "novo" | "editar" | "ver" | "excluir"
   const [orcSelecionado, setOrcSelecionado] = useState(null);
 
@@ -252,6 +254,32 @@ export default function OrcamentosClient() {
     setOrcSelecionado(null);
   };
 
+  // ─── ATUALIZAR DO SHAREPOINT ─────────────────────────────────
+  // A `RELATÓRIO_PROPOSTAS_<ano>.xlsx` é a planilha que o Comercial mantém, e é dela que a central
+  // se abastece. O botão fica aqui porque quem percebe que falta proposta é quem está olhando a
+  // lista — não adianta a sincronia existir só no cron ou num script meu.
+  const atualizarDoSharePoint = async () => {
+    setImportando(true);
+    try {
+      const res = await fetch("/api/comercial/orcamento/importar-sharepoint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ano: new Date().getFullYear() }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Falha ao importar");
+      showToast(
+        `${j.criados} nova(s) · ${j.atualizados} atualizada(s) · ${j.iguais} sem mudança`,
+        j.erros?.length ? "erro" : "sucesso"
+      );
+      fetchOrcamentos();
+    } catch (e) {
+      showToast(e.message, "erro");
+    } finally {
+      setImportando(false);
+    }
+  };
+
   // ─── LABEL DO PERÍODO ATIVO ──────────────────────────────────
 
   const labelPeriodo = periodo === "semana"
@@ -290,12 +318,38 @@ export default function OrcamentosClient() {
             Todas as propostas comerciais — do orçamento ao fechamento.
           </p>
         </div>
-        <button
-          onClick={handleNovo}
-          className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
-        >
-          <PlusCircle size={18} /> Novo Orçamento
-        </button>
+        {/* ⚠ OS DOIS CAMINHOS DE CRIAR, LADO A LADO. Vitor (29/08/2026): "nos botões de proposta
+            colocar o criar proposta estrutura e criar proposta serviço". Eram duas abas escondidas
+            no submenu; quem chegava aqui para fazer uma proposta não achava por onde começar. */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={atualizarDoSharePoint}
+            disabled={importando}
+            title="Relê a RELATÓRIO_PROPOSTAS do SharePoint e atualiza a central"
+            className="px-3 py-2.5 text-torg-gray hover:text-torg-blue hover:bg-torg-blue-50 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={importando ? "animate-spin" : ""} />
+            {importando ? "Atualizando…" : "Atualizar do SharePoint"}
+          </button>
+          <button
+            onClick={handleNovo}
+            className="px-4 py-2.5 border border-torg-blue-100 text-torg-blue rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
+          >
+            <PlusCircle size={18} /> Novo Orçamento
+          </button>
+          <Link
+            href="/comercial/orcamentos/propostas"
+            className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
+          >
+            <Building2 size={18} /> Criar Proposta Estrutura
+          </Link>
+          <Link
+            href="/comercial/orcamentos/servicos"
+            className="px-4 py-2.5 bg-torg-dark text-white rounded-lg hover:bg-torg-blue font-medium flex items-center gap-2"
+          >
+            <Wrench size={18} /> Criar Proposta Serviço
+          </Link>
+        </div>
       </div>
 
       {/* Filtro de Período */}

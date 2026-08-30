@@ -1,15 +1,20 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileSpreadsheet, Building2, Wrench } from "lucide-react";
+import { FileSpreadsheet, CalendarClock, GitBranchPlus, BarChart3 } from "lucide-react";
 
-// Índice da Central de Orçamentos: 3 tipos de proposta. Renderizado no topo das
-// três telas; navega entre elas destacando a ativa pela URL.
+// Navegação da Central de Orçamentos — agora a ÚNICA, depois que o submenu da barra lateral saiu
+// (Vitor 29/08/2026). Renderizada no topo de todas as telas do módulo.
+//
+// ⚠⚠ AQUI SÓ ENTRA VISÃO, NUNCA CRIADOR. "Propostas Estruturas" e "Propostas Serviço" saíram
+// daqui e viraram BOTÃO na tela de Propostas — Vitor: "nos botões de proposta colocar o criar
+// proposta estrutura e criar proposta serviço". Aba é para onde se OLHA; botão é o que se FAZ, e
+// misturar os dois foi o que encheu a navegação de itens que ninguém sabia distinguir.
 const TABS = [
   { href: "/comercial/orcamentos", label: "Propostas", icon: FileSpreadsheet, exact: true },
-  { href: "/comercial/orcamentos/propostas", label: "Propostas Estruturas", icon: Building2 },
-  { href: "/comercial/orcamentos/servicos", label: "Propostas Serviço", icon: Wrench },
-  { href: "/comercial/orcamentos/estudos", label: "Estudos (LQC)", icon: FileSpreadsheet },
+  { href: "/comercial/orcamentos/acompanhamento", label: "Acompanhamento", icon: CalendarClock },
+  { href: "/comercial/orcamentos/pipeline", label: "Pipeline", icon: GitBranchPlus },
+  { href: "/comercial/orcamentos/kpis", label: "KPIs de Vendas", icon: BarChart3 },
 ];
 
 export default function OrcamentosTabs() {
