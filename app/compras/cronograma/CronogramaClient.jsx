@@ -447,7 +447,6 @@ export default function CronogramaClient() {
           listas={{ fornecedores, ops }}
           ordem={ordem}
           setOrdem={setOrdem}
-          ehConsumivel={abaEntregas === "INTERNA"}
         />
       )}
 
@@ -485,7 +484,7 @@ export default function CronogramaClient() {
 
 /* ─── Kanban View ────────────────────────────────────────────────── */
 
-function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir, onAjustarOmie, ajustandoOmie, filtros, setFiltros, listas, ordem, setOrdem, ehConsumivel }) {
+function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir, onAjustarOmie, ajustandoOmie, filtros, setFiltros, listas, ordem, setOrdem }) {
   // ⚠ o cabeçalho com os filtros fica MESMO quando o resultado é vazio: se ele sumisse junto, quem
   // filtrou demais ficaria sem como desfazer e teria que recarregar a página.
   const Th = ({ campo, children, className = "" }) => (
@@ -583,7 +582,6 @@ function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, regist
                   onExcluir={onExcluir}
                   onAjustarOmie={onAjustarOmie}
                   ajustandoOmie={ajustandoOmie === p.id}
-                  ehConsumivel={ehConsumivel}
                 />
               );
             })}
@@ -594,7 +592,7 @@ function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, regist
   );
 }
 
-function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir, onAjustarOmie, ajustandoOmie, ehConsumivel }) {
+function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir, onAjustarOmie, ajustandoOmie }) {
   const diasColor = p.statusEntrega === "ATRASADO" ? "text-red-600 font-semibold"
     : p.statusEntrega === "PROXIMO" ? "text-amber-600 font-medium"
     : "text-torg-gray";
