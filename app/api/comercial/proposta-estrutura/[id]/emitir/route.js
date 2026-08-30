@@ -53,6 +53,8 @@ export async function POST(req, { params }) {
     // item que hoje sai fixo no modelo
     escopoItens: p.escopo || [],
     modalidade: p.modalidade || null,
+    // o cálculo do estudo, que vira a tabela de preço e as frases de faturamento
+    resultado: p.estudo?.resultado || null,
     // a capa: o modelo tem os marcadores na ordem em que aparecem no parágrafo
     marcadores: {
       __CAPA__: [d.empresa, d.endereco, d.bairroCidade, d.contato, d.email, d.fone,
