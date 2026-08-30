@@ -6,6 +6,8 @@ import {
   FileCheck2, XCircle, FileSpreadsheet, ChevronDown, Calendar,
   ArrowRight, Users, BarChart3, Target,
 } from "lucide-react";
+import { fmtMoedaCompacta, fmtMoedaInteira } from "@/lib/utils";
+import OrcamentosTabs from "@/components/OrcamentosTabs";
 
 // ─── CONSTANTES ─────────────────────────────────────────────────
 
@@ -23,12 +25,9 @@ const MESES = [
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "R$ 0";
-const fmtMoedaCurto = (v) => {
-  if (v == null || v === 0) return "R$ 0";
-  if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1).replace(".", ",")}M`;
-  if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(0)}k`;
-  return `R$ ${v.toFixed(0)}`;
-};
+// ⚠ o compacto vem da lib. A cópia local aqui escrevia "R$ 1333,5M" — "M" inglês numa vírgula
+// decimal brasileira, e sem virar bilhão. Mesmo defeito que o Vitor apontou no card da Central;
+// estava em dois arquivos porque cada tela tinha o seu.
 
 // ─── COMPONENTE PRINCIPAL ───────────────────────────────────────
 
@@ -67,10 +66,29 @@ export default function PipelineClient() {
 
   // ─── FILTRO POR PERÍODO ─────────────────────────────────────
 
+  // ⚠⚠ O PIPELINE ESCONDIA METADE DA CARTEIRA. Vitor (30/08/2026): "vamos atualizar o pipeline
+  // também, tem muita informação errada e isso é muito importante para nós". O filtro de período
+  // usava `dataSolicitada` e descartava quem não tivesse — mas a planilha do Comercial registra
+  // "Data envio", não "Data solicitada": **141 dos 284 orçamentos não têm dataSolicitada**. No ano
+  // corrente a tela mostrava 143 de 284, R$ 916 milhões de R$ 1,33 bilhão.
+  //
+  // A data do funil é a do ENVIO — é quando a proposta vira oportunidade de verdade, e é a que o
+  // Comercial preenche (271 dos 284). `dataSolicitada` entra como reserva.
+  //
+  // ⚠ `createdAt` NÃO entra nessa cadeia, e é uma armadilha: para as 129 propostas que vieram da
+  // planilha ele é 29/08/2026, o dia em que eu importei. Usá-lo como data de negócio jogaria
+  // todas elas dentro de agosto no filtro por mês — um pico de carteira que nunca existiu.
+  const dataDoFunil = (o) => o.dataEnvio || o.dataSolicitada || null;
+
+  // ⚠ e quem NÃO tem data nenhuma não some: são 13 propostas ainda não enviadas, todas em
+  // "Orçamento" — sumir com elas é justamente perder o topo do funil.
+  const semData = orcamentos.filter((o) => !dataDoFunil(o));
+
   const filtrados = orcamentos.filter((o) => {
     if (periodo === "tudo") return true;
-    if (!o.dataSolicitada) return false;
-    const d = new Date(o.dataSolicitada);
+    const ref = dataDoFunil(o);
+    if (!ref) return true;
+    const d = new Date(ref);
     if (periodo === "mes") return d.getMonth() === mesSel && d.getFullYear() === anoSel;
     if (periodo === "ano") return d.getFullYear() === anoSel;
     // semana
@@ -95,9 +113,15 @@ export default function PipelineClient() {
   const totalAberto = porEtapa
     .filter((e) => e.key === "ORCAMENTO" || e.key === "EM_NEGOCIACAO")
     .reduce((s, e) => s + e.valor, 0);
-  const taxaConversao = filtrados.length > 0
-    ? ((porEtapa.find((e) => e.key === "FECHADA")?.count || 0) / filtrados.length * 100).toFixed(1)
-    : "0.0";
+  // ⚠⚠ CONVERSÃO SÓ ENTRE AS DECIDIDAS. Dividir fechadas pelo TOTAL conta como fracasso toda
+  // proposta que ainda está de pé: em 2026 são 140 em orçamento e 42 em negociação — 182 de 283
+  // que simplesmente não foram respondidas ainda. Isso dava 14,5% onde a taxa entre as decididas
+  // é 40,6%, e a diferença não é detalhe: é a diferença entre "vendemos mal" e "está em aberto".
+  const nFechadas = porEtapa.find((e) => e.key === "FECHADA")?.count || 0;
+  const nPerdidas = porEtapa.find((e) => e.key === "PERDIDA")?.count || 0;
+  const nDecididas = nFechadas + nPerdidas;
+  const nAbertas = filtrados.length - nDecididas;
+  const taxaConversao = nDecididas > 0 ? ((nFechadas / nDecididas) * 100).toFixed(1) : "—";
 
   // ─── POR VENDEDOR ───────────────────────────────────────────
 
@@ -120,6 +144,7 @@ export default function PipelineClient() {
   if (loading) {
     return (
       <div className="max-w-7xl space-y-6">
+        <OrcamentosTabs />
         <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Pipeline</h2>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <Loader2 size={32} className="mx-auto text-torg-blue animate-spin mb-3" />
@@ -132,6 +157,7 @@ export default function PipelineClient() {
   if (erro) {
     return (
       <div className="max-w-7xl space-y-6">
+        <OrcamentosTabs />
         <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Pipeline</h2>
         <div className="bg-white rounded-xl shadow-sm border border-red-100 p-12 text-center">
           <AlertCircle size={40} className="mx-auto text-red-400 mb-3" />
@@ -146,6 +172,7 @@ export default function PipelineClient() {
 
   return (
     <div className="max-w-7xl space-y-6">
+      <OrcamentosTabs />
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -154,9 +181,19 @@ export default function PipelineClient() {
             Visão do funil de vendas — do orçamento ao fechamento.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-torg-gray">
-          <GitBranchPlus size={16} />
-          <span>{filtrados.length} oportunidades no período</span>
+        <div className="text-right">
+          <div className="flex items-center gap-2 text-xs text-torg-gray justify-end">
+            <GitBranchPlus size={16} />
+            <span>{filtrados.length} de {orcamentos.length} oportunidades</span>
+          </div>
+          {/* ⚠ proposta sem data entra em TODO período, e isso precisa estar dito: são as que
+              ainda não foram enviadas — o topo do funil. Escondê-las seria pior; deixá-las
+              aparecer sem avisar faria a soma do mês não bater com a do ano. */}
+          {periodo !== "tudo" && semData.length > 0 && (
+            <p className="text-[11px] text-amber-600 mt-0.5">
+              inclui {semData.length} ainda sem data de envio
+            </p>
+          )}
         </div>
       </div>
 
@@ -217,11 +254,13 @@ export default function PipelineClient() {
       {/* KPIs Resumo */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         {[
-          { label: "Total orçado",      value: fmtMoedaCurto(totalGeral),  sub: `${filtrados.length} propostas`, color: "bg-torg-blue",  Icon: DollarSign },
-          { label: "Em aberto",         value: fmtMoedaCurto(totalAberto), sub: `${porEtapa[0].count + porEtapa[1].count} ativas`,  color: "bg-amber-500", Icon: Target },
-          { label: "Fechado",           value: fmtMoedaCurto(totalFechado), sub: `${porEtapa[2].count} obras`,  color: "bg-green-600", Icon: FileCheck2 },
-          { label: "Perdido",           value: fmtMoedaCurto(totalPerdido), sub: `${porEtapa[3].count} propostas`, color: "bg-red-500", Icon: XCircle },
-          { label: "Conversão",         value: `${taxaConversao}%`,         sub: "taxa de fechamento", color: "bg-torg-dark", Icon: BarChart3 },
+          { label: "Total orçado", value: fmtMoedaCompacta(totalGeral),  sub: `${fmtMoedaInteira(totalGeral)} · ${filtrados.length} propostas`, color: "bg-torg-blue",  Icon: DollarSign },
+          { label: "Em aberto",    value: fmtMoedaCompacta(totalAberto), sub: `${fmtMoedaInteira(totalAberto)} · ${porEtapa[0].count + porEtapa[1].count} ativas`, color: "bg-amber-500", Icon: Target },
+          { label: "Fechado",      value: fmtMoedaCompacta(totalFechado), sub: `${fmtMoedaInteira(totalFechado)} · ${porEtapa[2].count} obras`, color: "bg-green-600", Icon: FileCheck2 },
+          { label: "Perdido",      value: fmtMoedaCompacta(totalPerdido), sub: `${fmtMoedaInteira(totalPerdido)} · ${porEtapa[3].count} propostas`, color: "bg-red-500", Icon: XCircle },
+          // ⚠ o rodapé diz SOBRE O QUE a taxa é calculada; "taxa de fechamento" sozinho deixava
+          // qualquer um supor que o denominador era a carteira inteira.
+          { label: "Conversão",    value: taxaConversao === "—" ? "—" : `${taxaConversao}%`, sub: `${nFechadas} de ${nDecididas} decididas · ${nAbertas} em aberto`, color: "bg-torg-dark", Icon: BarChart3 },
         ].map((c) => (
           <div key={c.label} className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
             <div className={`${c.color} p-2 rounded-lg`}>
