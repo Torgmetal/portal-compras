@@ -7,6 +7,7 @@ import { criarPedidoOmie, anexarAoPedidoOmie } from "@/lib/omie-pedido-compra";
 import { resolverCodProjetoPorOp, resolverCodProjetoPorNome } from "@/lib/omie-pedidos-abertos";
 import { previsaoEntregaDDMMYYYY } from "@/lib/prazo-entrega";
 import { TEXTO_CERTIFICADO_QUALIDADE } from "@/lib/certificado-qualidade";
+import { reavaliarStatusRM } from "@/lib/rm-status";
 
 // RMs Consumíveis (INTERNA) não têm obra própria → vinculam ao projeto geral.
 const PROJETO_CONSUMIVEL = "OP 000 - GERAL TORG";
@@ -351,17 +352,8 @@ export async function POST(req, { params }) {
     await new Promise((r) => setTimeout(r, 1500));
   }
 
-  // Atualiza status da RM
-  const rmItens = await prisma.rMItem.findMany({
-    where: { rmId: rm.id },
-    select: { status: true },
-  });
-  const todosFinalizados = rmItens.every(
-    (i) => ["PEDIDO_GERADO", "CANCELADO", "ATENDIDO_ESTOQUE"].includes(i.status)
-  );
-  if (todosFinalizados && rmItens.length > 0) {
-    await prisma.rM.update({ where: { id: rm.id }, data: { status: "PEDIDO_GERADO" } });
-  }
+  // Atualiza status da RM — ver lib/rm-status: sobrando item, ela VOLTA para ABERTA
+  await reavaliarStatusRM(rm.id);
 
   await prisma.auditLog.create({
     data: {

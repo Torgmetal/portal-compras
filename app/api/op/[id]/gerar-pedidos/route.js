@@ -9,6 +9,7 @@ import { resolverCodProjetoPorOp } from "@/lib/omie-pedidos-abertos";
 import { previsaoEntregaDDMMYYYY } from "@/lib/prazo-entrega";
 import { TEXTO_CERTIFICADO_QUALIDADE } from "@/lib/certificado-qualidade";
 import { fdPorCategoriaDaOP, rmEhFD, itemEhFD } from "@/lib/faturamento-direto";
+import { reavaliarStatusRM } from "@/lib/rm-status";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -431,20 +432,9 @@ export async function POST(req, { params }) {
     await new Promise((r) => setTimeout(r, 1500));
   }
 
-  // Atualiza status das RMs envolvidas — se todos itens viraram pedido ou foram cancelados, RM = PEDIDO_GERADO
+  // Atualiza status das RMs envolvidas — ver lib/rm-status: sobrando item, a RM VOLTA para ABERTA
   const rmIdsAfetadas = [...new Set(op.rms.map((r) => r.id))];
-  for (const rmId of rmIdsAfetadas) {
-    const rmItens = await prisma.rMItem.findMany({
-      where: { rmId },
-      select: { status: true },
-    });
-    const todosFinalizados = rmItens.every(
-      (i) => ["PEDIDO_GERADO", "CANCELADO", "ATENDIDO_ESTOQUE"].includes(i.status)
-    );
-    if (todosFinalizados && rmItens.length > 0) {
-      await prisma.rM.update({ where: { id: rmId }, data: { status: "PEDIDO_GERADO" } });
-    }
-  }
+  for (const rmId of rmIdsAfetadas) await reavaliarStatusRM(rmId);
 
   await prisma.auditLog.create({
     data: {

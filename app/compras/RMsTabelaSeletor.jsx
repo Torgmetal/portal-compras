@@ -27,18 +27,20 @@ const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 // As categorias sao:
 //   - ABERTA          → ainda nao enviou cotacao pra fornecedor
 //   - EM_COTACAO      → enviou mas nenhuma proposta recebida ainda
-//   - PARCIAL         → recebeu algumas propostas, outras ainda pendentes
 //   - PRONTA          → todas propostas recebidas / status COTADA (pronta pra pedido)
 function categoriaRM(rm) {
   if (rm.status === "ABERTA") return "ABERTA";
   if (rm.status === "COTADA") return "PRONTA";
   if (rm.status === "EM_COTACAO") {
-    return (rm.recebidas || 0) > 0 ? "PARCIAL" : "EM_COTACAO";
+    // ⚠ "Recebida parcial" saiu (Vitor, 30/08/2026: "esse botão nunca vi ter nada nele, também acho
+    // que não há necessidade"). Na prática a RM vira COTADA assim que a primeira proposta fecha o
+    // quadro, então o estado intermediário nunca aparecia — o cartão marcava zero desde sempre.
+    return "EM_COTACAO";
   }
   return rm.status;
 }
 
-const PRIORIDADE_CAT = { PRONTA: 1, PARCIAL: 2, EM_COTACAO: 3, ABERTA: 4 };
+const PRIORIDADE_CAT = { PRONTA: 1, EM_COTACAO: 2, ABERTA: 3 };
 
 export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }) {
   // Lista mesclada (built-in + custom do banco) — passada por toda a arvore
@@ -78,7 +80,7 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
 
   // KPIs agregados por categoria de ação
   const stats = useMemo(() => {
-    const acc = { ABERTA: 0, EM_COTACAO: 0, PARCIAL: 0, PRONTA: 0 };
+    const acc = { ABERTA: 0, EM_COTACAO: 0, PRONTA: 0 };
     let atrasadas = 0;
     for (const r of rmsBase) {
       const cat = categoriaRM(r);
@@ -137,15 +139,6 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
           icon={Clock}
           active={filtroCat === "EM_COTACAO"}
           onClick={() => setFiltroCat(filtroCat === "EM_COTACAO" ? null : "EM_COTACAO")}
-        />
-        <KpiCard
-          label="Recebida parcial"
-          subtitle="Algumas propostas vieram"
-          value={stats.PARCIAL}
-          color="emerald"
-          icon={Mail}
-          active={filtroCat === "PARCIAL"}
-          onClick={() => setFiltroCat(filtroCat === "PARCIAL" ? null : "PARCIAL")}
         />
         <KpiCard
           label="Pronta pra pedido"
@@ -272,10 +265,9 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
                 const pendentes = (rm.itens || []).filter((i) => i.status === "PENDENTE").length;
                 const podeSelecionar = ["ABERTA", "EM_COTACAO", "COTADA"].includes(rm.status);
                 const checked = selecionadas.has(rm.id);
-                // Fundo sutil por categoria — destaca PRONTA (azul) e PARCIAL (verde)
+                // Fundo sutil por categoria — destaca PRONTA (azul)
                 const bgRow =
                   cat === "PRONTA" ? "bg-torg-blue-50/40 hover:bg-torg-blue-50/60" :
-                  cat === "PARCIAL" ? "bg-emerald-50/40 hover:bg-emerald-50/60" :
                   cat === "EM_COTACAO" ? "bg-amber-50/20 hover:bg-amber-50/40" :
                   "hover:bg-gray-50";
                 return (
@@ -934,7 +926,6 @@ function KanbanView({ rms, isAdmin }) {
   const colunas = [
     { cat: "ABERTA",     titulo: "Abertas",            subtitle: "Aguardando envio",       color: "blue" },
     { cat: "EM_COTACAO", titulo: "Em cotação",         subtitle: "Aguardando proposta",    color: "orange" },
-    { cat: "PARCIAL",    titulo: "Recebida parcial",   subtitle: "Algumas propostas",      color: "emerald" },
     { cat: "PRONTA",     titulo: "Pronta pra pedido",  subtitle: "Fechar no Omie",         color: "torg-blue" },
   ];
   const headerColor = {
