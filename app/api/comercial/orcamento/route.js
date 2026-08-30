@@ -44,6 +44,15 @@ export async function GET(req) {
       revisoes: { orderBy: { numero: "asc" } },
       op: { select: { id: true, numero: true } },
       criadoPor: { select: { id: true, name: true } },
+      // ⚠ o ESTUDO vem junto. Vitor (30/08/2026): "quero clicar para abrir os dados que foram
+      // preenchidos para eu ver os cenários (...) hoje você só me traz o resumo e não consigo ver
+      // as coisas de fato". A tela mostrava os 15 campos do cadastro e parava ali — o peso, o
+      // custo, o esquema de pintura e os três cenários estavam do outro lado de um link que não
+      // existia. `resultado` traz o cálculo já congelado, então o resumo sai sem recalcular nada.
+      estudosLqc: {
+        select: { id: true, numero: true, ano: true, revisao: true, status: true, resultado: true },
+        orderBy: { revisao: "desc" },
+      },
     },
     orderBy: { createdAt: "desc" },
   });

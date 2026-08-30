@@ -5,7 +5,7 @@ import {
   FileSpreadsheet, PlusCircle, Search, X, ChevronDown,
   Pencil, Trash2, Eye, Loader2, AlertCircle, Filter,
   TrendingUp, Clock, XCircle, FileCheck2, DollarSign,
-  Calendar, BarChart3, RefreshCw,
+  Calendar, BarChart3, RefreshCw, ArrowRight, FileSpreadsheet as IconLqc,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { fmtOP, fmtMoedaCompacta, fmtMoedaInteira } from "@/lib/utils";
@@ -667,10 +667,22 @@ function TabelaOrcamentos({ orcamentos, onVer, onEditar, onExcluir }) {
                   <td className="px-4 py-3 whitespace-nowrap">
                     <button
                       onClick={() => onVer(orc)}
-                      className="font-mono font-semibold text-torg-blue hover:underline"
+                      className="font-mono font-semibold text-torg-blue hover:underline block"
                     >
                       {orc.numero}
                     </button>
+                    {/* ⚠ atalho direto para o estudo, sem passar pelo modal: quem está varrendo a
+                        lista atrás de um número quer chegar no cenário, não numa ficha. */}
+                    {orc.estudosLqc?.[0] && (
+                      <a
+                        href={`/comercial/orcamentos/estudos/${orc.estudosLqc[0].id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        title="Abrir o estudo LQC e os cenários financeiros"
+                        className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-torg-gray hover:text-torg-blue"
+                      >
+                        <IconLqc size={10} /> LQC
+                      </a>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-torg-dark max-w-[200px] truncate" title={orc.cliente}>{orc.cliente}</td>
                   <td className="px-4 py-3 text-torg-gray max-w-[180px] truncate" title={orc.obra || ""}>{orc.obra || "—"}</td>
@@ -1038,6 +1050,9 @@ function FormOrcamentoModal({ orcamento, onSalvar, onClose }) {
 
 function VerOrcamentoModal({ orcamento, onClose, onEditar }) {
   const s = STATUS_LABELS[orcamento.status] || STATUS_LABELS.ORCAMENTO;
+  // a revisão mais nova é a que vale (a API já ordena por revisão desc)
+  const estudo = orcamento.estudosLqc?.[0] || null;
+  const res = estudo?.resultado || {};
 
   const campos = [
     { label: "Nº Orçamento", value: orcamento.numero },
@@ -1082,6 +1097,38 @@ function VerOrcamentoModal({ orcamento, onClose, onEditar }) {
         </div>
 
         <div className="p-6 space-y-3">
+          {/* ⚠⚠ O ESTUDO PRIMEIRO, E COM NÚMERO. Vitor (30/08/2026): "quero clicar para abrir os
+              dados que foram preenchidos para eu ver os cenários (...) hoje você só me traz o
+              resumo e não consigo ver as coisas de fato". Estava certo: o modal listava os 15
+              campos do cadastro e acabava — peso, custo, esquema de pintura e os três cenários
+              ficavam do outro lado de um caminho que não existia na tela. */}
+          {estudo && (
+            <a href={`/comercial/orcamentos/estudos/${estudo.id}`}
+              className="block -mt-1 mb-4 rounded-xl border border-torg-blue-100 bg-torg-blue-50/50 p-4 hover:border-torg-blue hover:bg-torg-blue-50 transition-colors group">
+              <div className="flex items-center justify-between gap-3 mb-2.5">
+                <span className="font-mono text-[13px] font-bold text-torg-blue">
+                  LQC-{String(estudo.numero || 0).padStart(3, "0")}-{String(estudo.ano).slice(-2)}
+                  {estudo.revisao ? ` R${estudo.revisao}` : ""}
+                </span>
+                <span className="text-[11px] font-semibold text-torg-blue group-hover:underline inline-flex items-center gap-1">
+                  abrir estudo e cenários <ArrowRight size={12} />
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                {[
+                  { r: "Peso", v: res.pesoTotal ? `${Math.round(res.pesoTotal).toLocaleString("pt-BR")} kg` : "—" },
+                  { r: "Preço", v: res.preco ? fmtMoedaCompacta(res.preco) : "—" },
+                  { r: "R$/kg", v: res.precoPorKg ? `R$ ${Number(res.precoPorKg).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—" },
+                ].map((x) => (
+                  <div key={x.r}>
+                    <p className="text-[10px] uppercase tracking-wide text-torg-gray">{x.r}</p>
+                    <p className="text-[13px] font-bold text-torg-dark tabular-nums">{x.v}</p>
+                  </div>
+                ))}
+              </div>
+            </a>
+          )}
+
           {campos.map((c, i) => (
             <div key={i} className="flex justify-between items-start gap-4">
               <span className="text-xs text-gray-500 font-medium min-w-[120px]">{c.label}</span>
