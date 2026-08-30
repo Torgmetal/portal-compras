@@ -5,9 +5,8 @@ import {
   FileSpreadsheet, PlusCircle, Search, X, ChevronDown,
   Pencil, Trash2, Eye, Loader2, AlertCircle, Filter,
   TrendingUp, Clock, XCircle, FileCheck2, DollarSign,
-  Calendar, BarChart3, Building2, Wrench, RefreshCw,
+  Calendar, BarChart3, RefreshCw,
 } from "lucide-react";
-import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { fmtOP, fmtMoedaCompacta, fmtMoedaInteira } from "@/lib/utils";
 import OrcamentosTabs from "@/components/OrcamentosTabs";
@@ -308,10 +307,6 @@ export default function OrcamentosClient() {
     <div className="space-y-6 max-w-7xl">
       <OrcamentosTabs />
       {/* Header */}
-      {/* ⚠ OS BOTÕES FICAM EM LINHA PRÓPRIA, ABAIXO DO CABEÇALHO. Vitor (30/08/2026): "esses
-          botões devem estar abaixo do Central de Orçamentos, não dentro". Espremidos à direita do
-          título eles disputavam a linha com as abas e apareciam cortados nas telas mais estreitas —
-          e são a ação principal da tela, não um detalhe do canto. */}
       <div>
         <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Propostas</h2>
         <p className="text-sm text-torg-gray mt-1">
@@ -319,26 +314,17 @@ export default function OrcamentosClient() {
         </p>
       </div>
 
+      {/* ⚠ AQUI SÓ FICA O QUE CUIDA DA PRÓPRIA LISTA. Criar proposta saiu para a barra lateral
+          (Vitor, 30/08/2026): "a Central de Orçamentos seria apenas para trazer todas as propostas
+          que foram criadas, pipeline, KPIs e o acompanhamento". Cadastrar um orçamento avulso e
+          resincronizar com a planilha são manutenção DESTA lista, não começo de proposta nova. */}
       <div className="flex items-center gap-2 flex-wrap">
-        <Link
-          href="/comercial/orcamentos/propostas"
-          className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
-        >
-          <Building2 size={18} /> Criar Proposta Estrutura
-        </Link>
-        <Link
-          href="/comercial/orcamentos/servicos"
-          className="px-4 py-2.5 bg-torg-dark text-white rounded-lg hover:bg-torg-blue font-medium flex items-center gap-2"
-        >
-          <Wrench size={18} /> Criar Proposta Serviço
-        </Link>
         <button
           onClick={handleNovo}
           className="px-4 py-2.5 border border-torg-blue-100 text-torg-blue rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
         >
           <PlusCircle size={18} /> Novo Orçamento
         </button>
-        {/* ⚠ à direita e discreto: sincronizar não é o que se faz aqui todo dia, criar proposta é. */}
         <button
           onClick={atualizarDoSharePoint}
           disabled={importando}

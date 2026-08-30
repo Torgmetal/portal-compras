@@ -2,18 +2,31 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { FolderKanban, Inbox, FileSpreadsheet, ChevronDown, Presentation, Gauge, Rocket } from "lucide-react";
+import { FolderKanban, Inbox, FileSpreadsheet, ChevronDown, Presentation, Gauge, Rocket, Building2, Wrench } from "lucide-react";
 import { useState } from "react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/comercial", label: "OPs", icon: FolderKanban, exact: true },
-  // ⚠ SEM SUBMENU. Vitor (29/08/2026): "vamos tirar essas subpastas, pois está bem ruim para
-  // visualizar dessa maneira". Eram sete itens empilhados dentro da barra — e a navegação já
-  // existe, em abas, no topo das próprias telas (`OrcamentosTabs`). Duas navegações para o mesmo
-  // lugar é o que deixava a barra pesada.
-  { href: "/comercial/orcamentos", label: "Central de Orçamentos", icon: FileSpreadsheet },
+  // ⚠⚠ NA BARRA SÓ O QUE SE CRIA; NA TELA, O QUE SE CONSULTA. Vitor (30/08/2026): "os botões de
+  // criar proposta devem ficar na lateral abaixo da Central de Orçamentos; a Central de Orçamentos
+  // seria apenas para trazer todas as propostas que foram criadas, pipeline, KPIs e o
+  // acompanhamento".
+  //
+  // É a divisão que faltava, e explica por que o menu antigo confundia: ele misturava sete itens
+  // sem dizer quais eram VISÕES da mesma lista (Propostas, Pipeline, KPIs, Acompanhamento — que
+  // agora são abas no topo da tela) e quais eram CAMINHOS PARA COMEÇAR algo novo. Sobram dois aqui,
+  // e os dois abrem uma proposta.
+  {
+    href: "/comercial/orcamentos",
+    label: "Central de Orçamentos",
+    icon: FileSpreadsheet,
+    sub: [
+      { href: "/comercial/orcamentos/propostas", label: "Criar Proposta Estrutura", icon: Building2 },
+      { href: "/comercial/orcamentos/servicos", label: "Criar Proposta Serviço", icon: Wrench },
+    ],
+  },
   { href: "/comercial/kickoffs", label: "Kick Offs — Aceites", icon: Rocket },
   { href: "/comercial/apresentacoes", label: "Apresentação ao Cliente", icon: Presentation },
   { href: "/comercial/aprovacoes", label: "Aprovações", icon: Inbox, masterOnly: true },
