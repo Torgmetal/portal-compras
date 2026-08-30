@@ -55,10 +55,12 @@ async function processar(ano, aplicar, userId) {
   });
   const porNumero = new Map(existentes.map((o) => [o.numero, o]));
 
-  const resumo = { ano, linhas: doSharePoint.length, criados: 0, atualizados: 0, iguais: 0, revisoes: 0, erros: [] };
+  const resumo = { ano, linhas: doSharePoint.length, criados: 0, atualizados: 0, iguais: 0, revisoes: 0, correcoes: [], erros: [] };
   const detalhe = [];
 
   for (const novo of doSharePoint) {
+    // ano digitado errado na planilha, corrigido e RELATADO — nunca em silêncio
+    for (const c of novo.correcoes || []) resumo.correcoes.push(`${novo.numero} ${c}`);
     const atual = porNumero.get(novo.numero);
     const { acao, dados, mudancas } = compararOrcamento(novo, atual);
     // revisões que ainda não estão no portal (por número da revisão)
