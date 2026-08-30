@@ -1,15 +1,18 @@
 // GET /api/engenharia/sequencia/pessoas — quem pode ser dono de uma tarefa do setor.
 //
-// ⚠⚠ TRÊS CAMINHOS PARA ENTRAR NA LISTA, e nenhum deles sozinho basta:
-//   · tem o MÓDULO do setor (o caso normal — Diego, John, Gabriel);
-//   · é ADMIN (enxerga tudo por definição e não carrega módulo nenhum — era por isso que o
-//     Guilherme não aparecia: Vitor pediu em 29/08/2026 para incluí-lo);
-//   · tem o SETOR no cadastro, mesmo sem o módulo (quem trabalha ali mas usa o portal por outra
-//     porta).
+// ⚠⚠ QUEM TEM O MÓDULO DO SETOR — e só. Vitor (29/08/2026): "na distribuição das tarefas da
+// engenharia deixar apenas o Mike, John, Diego, Guilherme; quando for cadastrado novo usuário da
+// engenharia o mesmo deve aparecer".
 //
-// ⚠ Ser DONO de uma tarefa não dá acesso a nada: é só um nome no cronograma. Por isso a lista pode
-// ser mais larga que a de quem entra no módulo — o contrário (dar o módulo para alguém virar dono)
-// mudaria a permissão da pessoa, que é efeito colateral que ninguém pediu.
+// A regra do módulo atende as duas metades do pedido: enxuga a lista (a versão anterior trazia
+// TODOS os ADMINs — Caio, Fabrine, Matheus e o próprio Vitor apareciam sem trabalhar no setor) e
+// mantém a lista viva sozinha, porque usuário novo da Engenharia nasce com o módulo.
+//
+// ⚠ Para incluir alguém, dá-se o MÓDULO — não se abre exceção no código. Foi o que se fez com o
+// Guilherme (ADMIN, que não carregava módulo nenhum): para quem é ADMIN o módulo não muda acesso
+// algum, já que o middleware libera tudo antes de olhar módulo. Lista com nome escrito na mão
+// desatualiza no dia seguinte e ninguém lembra de onde mexer.
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -22,21 +25,11 @@ export async function GET(req) {
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const modulo = new URL(req.url).searchParams.get("modulo") || "ENGENHARIA";
-  const rotulo = { ENGENHARIA: "Engenharia", PLANEJAMENTO: "Planejamento", PCP: "PCP", PRODUCAO: "Produção" }[modulo] || modulo;
   const pessoas = await prisma.user.findMany({
-    where: {
-      ativo: true, tipo: { in: ["ADMIN", "USUARIO"] },
-      OR: [
-        { modulos: { some: { modulo } } },
-        { tipo: "ADMIN" },
-        { setor: { equals: rotulo, mode: "insensitive" } },
-      ],
-    },
-    select: { id: true, name: true, setor: true, tipo: true, modulos: { select: { modulo: true } } },
+    where: { ativo: true, tipo: { in: ["ADMIN", "USUARIO"] }, modulos: { some: { modulo } } },
+    select: { id: true, name: true, setor: true },
     orderBy: { name: "asc" },
   });
-  // do setor primeiro — é quem a Engenharia escolhe no dia a dia; o resto fica no fim da lista
-  const doSetor = (p) => p.modulos.some((m) => m.modulo === modulo) || String(p.setor || "").toLowerCase() === rotulo.toLowerCase();
-  pessoas.sort((a, b) => (doSetor(b) ? 1 : 0) - (doSetor(a) ? 1 : 0) || a.name.localeCompare(b.name));
-  return NextResponse.json({ success: true, pessoas: pessoas.map(({ id, name, setor }) => ({ id, name, setor })) });
+
+  return NextResponse.json({ success: true, pessoas });
 }
