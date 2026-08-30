@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ClipboardList, Check, X, Loader2, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { ClipboardList, Check, X, Loader2, RefreshCw, ChevronDown, ChevronUp, DownloadCloud } from "lucide-react";
 
 const STATUS_LABEL = {
   ABERTA: "Aberta", EM_EXECUCAO: "Em execução", ATRASADA: "Atrasada",
@@ -21,6 +22,49 @@ function Marca({ tem, n }) {
 }
 
 export default function CoberturaListas() {
+  const { data: sessao } = useSession();
+  // ⚠ SÓ ADMIN vê o botão (Vitor, 29/08/2026). O gate de verdade está na rota — esconder o botão é
+  // conveniência, não segurança: quem descobrir a URL bate no requireRole igual.
+  const ehAdmin = sessao?.user?.tipo === "ADMIN";
+  const [puxando, setPuxando] = useState(null);   // OP em andamento
+  const [escolher, setEscolher] = useState(null); // { numero, arquivos }
+
+  // Carrega a LE que JA ESTA no servidor. Sem isto, obra com o arquivo salvo na pasta continuava
+  // "sem LE" no portal ate alguem reenviar o mesmo arquivo pela tela — aconteceu 6 vezes.
+  async function verNoServidor(numero) {
+    setPuxando(numero);
+    try {
+      const r = await fetch(`/api/engenharia/listas/le-servidor?op=${encodeURIComponent(numero)}`);
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro");
+      if (!j.arquivos?.length) { alert(j.erro || `Nenhuma LE (.xls/.xlsx) na pasta desta OP no servidor.`); return; }
+      setEscolher({ numero, arquivos: j.arquivos });
+    } catch (e) { alert(e.message); } finally { setPuxando(null); }
+  }
+
+  async function importarDoServidor(numero, arq) {
+    setPuxando(numero); setEscolher(null);
+    try {
+      // 1) o servidor le o arquivo e devolve as linhas
+      const r1 = await fetch("/api/engenharia/listas/le-servidor", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ op: numero, itemId: arq.id }),
+      });
+      const j1 = await r1.json();
+      if (!r1.ok) throw new Error(j1.error || "Falha ao ler o arquivo");
+      // 2) e o import de SEMPRE grava — mesma rota do upload, mesmo upsert, mesmo AuditLog
+      const r2 = await fetch("/api/producao/pecas/importar-le", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: j1.rows, opNumero: numero }),
+      });
+      const j2 = await r2.json();
+      if (!r2.ok) throw new Error(j2.error || "Falha ao importar");
+      alert(`${arq.nome}: ${j2.criados} nova(s), ${j2.atualizados} atualizada(s)${j2.ignorados ? `, ${j2.ignorados} ignorada(s)` : ""}.`
+        + (j2.avisoListaUnica ? `\n\n${j2.avisoListaUnica}` : ""));
+      carregar();
+    } catch (e) { alert(e.message); } finally { setPuxando(null); }
+  }
+
   const [dados, setDados] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
@@ -113,13 +157,49 @@ export default function CoberturaListas() {
                       </td>
                       <td className="py-2 pr-3 text-torg-gray whitespace-nowrap">{STATUS_LABEL[l.status] || l.status}</td>
                       <td className="py-2 pr-3 text-center"><Marca tem={l.temLPC} n={l.nLPC} /></td>
-                      <td className="py-2 text-center"><Marca tem={l.temLE} n={l.nLE} /></td>
+                      <td className="py-2 text-center">
+                        <Marca tem={l.temLE} n={l.nLE} />
+                        {/* o arquivo costuma JA ESTAR no servidor — o que falta e carregar */}
+                        {ehAdmin && !l.temLE && (
+                          <button onClick={() => verNoServidor(l.numero)} disabled={puxando === l.numero}
+                            className="block mx-auto mt-1 text-[11px] text-torg-blue hover:underline disabled:opacity-50 inline-flex items-center gap-1">
+                            {puxando === l.numero ? <Loader2 size={11} className="animate-spin" /> : <DownloadCloud size={11} />}
+                            buscar no servidor
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {escolher && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto"
+          onClick={(e) => e.target === e.currentTarget && setEscolher(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg my-10">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <p className="text-sm font-bold text-torg-dark">LE da OP-{escolher.numero} no servidor</p>
+              <p className="text-[11px] text-torg-gray mt-0.5">O mais recente primeiro. Carregar usa o mesmo import do upload.</p>
+            </div>
+            <div className="px-4 py-3 space-y-1 max-h-[50vh] overflow-y-auto">
+              {escolher.arquivos.map((a) => (
+                <button key={a.id} onClick={() => importarDoServidor(escolher.numero, a)}
+                  className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-torg-blue-50 border border-gray-100">
+                  <p className="text-[12.5px] font-medium text-torg-dark">{a.nome}</p>
+                  <p className="text-[11px] text-torg-gray">
+                    {new Date(a.modificadoEm).toLocaleDateString("pt-BR")} · {Math.round(a.tamanho / 1024)} kB
+                  </p>
+                </button>
+              ))}
+            </div>
+            <div className="px-4 py-3 border-t border-gray-100 text-right">
+              <button onClick={() => setEscolher(null)} className="text-[12px] text-torg-gray hover:text-torg-dark">Cancelar</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
