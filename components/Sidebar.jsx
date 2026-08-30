@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Gauge, PlusCircle, FolderKanban, Bell, Building2, Boxes, Layers, Truck, ClipboardList, RailSymbol, ShoppingCart, Forklift, Hammer, Star, PackageCheck
+import { Gauge, PlusCircle, FolderKanban, Building2, Boxes, Layers, Truck, RailSymbol, ShoppingCart, Forklift, Hammer, Star, PackageCheck
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -23,12 +23,10 @@ const menu = [
   { href: "/compras/montagem", label: "Medição de Montagem", icon: Hammer, matchPainel: "montagem" },
   { href: "/compras/nova-rm", label: "Nova RM", icon: PlusCircle },
   { href: "/compras/cronograma", label: "Entregas", icon: Truck },
-  { href: "/compras/saldo-materiais", label: "Saldo Materiais", icon: ClipboardList },
   { href: "/compras/estoque", label: "Estoque", icon: Boxes },
   { href: "/compras/materiais", label: "Materiais por OP", icon: Layers },
   { href: "/compras/vendorlist", label: "Vendor List", icon: Building2 },
   { href: "/compras/indicadores/fornecedores", label: "Avaliação Fornecedores (IQF)", icon: Star },
-  { href: "/compras/notificacoes", label: "Notificações", icon: Bell, masterOnly: true },
   { href: "/compras/indicadores", label: "Indicadores", icon: Gauge, exact: true },
 ];
 
