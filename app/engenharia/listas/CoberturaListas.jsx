@@ -61,7 +61,7 @@ export default function CoberturaListas() {
       if (!r2.ok) throw new Error(j2.error || "Falha ao importar");
       alert(`${arq.nome}: ${j2.criados} nova(s), ${j2.atualizados} atualizada(s)${j2.ignorados ? `, ${j2.ignorados} ignorada(s)` : ""}.`
         + (j2.avisoListaUnica ? `\n\n${j2.avisoListaUnica}` : ""));
-      carregar();
+      carregar(todas);
     } catch (e) { alert(e.message); } finally { setPuxando(null); }
   }
 
