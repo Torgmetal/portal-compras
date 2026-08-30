@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   FileSpreadsheet, PlusCircle, Search, X, ChevronDown,
   Pencil, Trash2, Eye, Loader2, AlertCircle, Filter,
@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { fmtOP, fmtMoedaCompacta, fmtMoedaInteira } from "@/lib/utils";
 import OrcamentosTabs from "@/components/OrcamentosTabs";
+import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 
 // ─── CONSTANTES ─────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ const TIPO_VENDA_LABELS = {
   PINTURA:                "Pintura",
   MAO_DE_OBRA:            "Mão de Obra",
   REVENDA:                "Revenda",
+  LAUDO:                  "Laudo",
 };
 
 const PORTE_LABELS = {
@@ -592,27 +594,66 @@ export default function OrcamentosClient() {
 
 // ─── TABELA ─────────────────────────────────────────────────────
 
+// ⚠ FILTRO POR COLUNA, IGUAL AO EXCEL. Vitor (30/08/2026): "mesmo caso aqui, transforme em filtro
+// de planilha". Mesmo componente das listas do PCP, da Expedição e das atividades do cronograma —
+// `components/FiltroColuna` — e não mais um filtro inventado só para esta tela.
+//
+// ⚠ Nº e Valor ficam SEM funil de propósito: um é único por linha e o outro é contínuo. Lista de
+// 283 números para marcar com checkbox não filtra nada, só empurra as colunas úteis para o lado.
+// O mês de envio, sim, é filtro ("ago/2026") — é como o Comercial fecha o período.
+const MES_CURTO = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+const mesAno = (d) => (d ? `${MES_CURTO[new Date(d).getUTCMonth()]}/${new Date(d).getUTCFullYear()}` : "—");
+
 function TabelaOrcamentos({ orcamentos, onVer, onEditar, onExcluir }) {
+  const [colAberta, setColAberta] = useState(null);
+  const COLUNAS = useMemo(() => [
+    { key: "cliente",  label: "Cliente",    valor: (o) => o.cliente || "—" },
+    { key: "obra",     label: "Obra",       valor: (o) => o.obra || "—" },
+    { key: "venda",    label: "Tipo Venda", valor: (o) => (o.tipoVenda ? TIPO_VENDA_LABELS[o.tipoVenda] || o.tipoVenda : "—") },
+    { key: "vendedor", label: "Vendedor",   valor: (o) => o.vendedor || "—" },
+    { key: "envio",    label: "Envio",      valor: (o) => mesAno(o.dataEnvio) },
+    { key: "status",   label: "Status",     valor: (o) => (STATUS_LABELS[o.status] || STATUS_LABELS.ORCAMENTO).label },
+  ], []);
+  const { filtros, setFiltros, filtradas, opcoesDaColuna, ativos, limpar, rotulosAtivos } =
+    useFiltroColunas(orcamentos, COLUNAS);
+  const fp = { filtros, setFiltros, opcoesDaColuna, aberta: colAberta, setAberta: setColAberta };
+  const th = "px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase";
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* ⚠ o que está filtrado fica ESCRITO. Filtro de coluna é fácil de esquecer ligado, e uma
+          tabela com 12 de 283 linhas parecendo a lista inteira é como se tira conclusão errada. */}
+      {ativos > 0 && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-torg-orange/5 border-b border-torg-orange/20 text-[12px]">
+          <span className="text-torg-dark">
+            <strong className="tabular-nums">{filtradas.length}</strong> de {orcamentos.length} · filtrando por {rotulosAtivos.join(", ")}
+          </span>
+          <button onClick={limpar} className="ml-auto text-torg-blue hover:underline font-medium">limpar filtros</button>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50/60">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nº</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Obra</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo Venda</th>
+              <th className={th}>Nº</th>
+              <ThFiltro col="cliente" label="Cliente" larg="w-[16%]" className={th} {...fp} />
+              <ThFiltro col="obra" label="Obra" larg="w-[16%]" className={th} {...fp} />
+              <ThFiltro col="venda" label="Tipo Venda" larg="w-[11%]" className={th} {...fp} />
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendedor</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Solicitação</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Envio</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              <ThFiltro col="vendedor" label="Vendedor" larg="w-[9%]" className={th} {...fp} />
+              <th className={th}>Solicitação</th>
+              <ThFiltro col="envio" label="Envio" larg="w-[8%]" className={th} {...fp} />
+              <ThFiltro col="status" label="Status" larg="w-[9%]" className={th} {...fp} />
               <th className="px-3 py-3 w-24"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {orcamentos.map((orc) => {
+            {filtradas.length === 0 && (
+              <tr><td colSpan={10} className="px-4 py-10 text-center text-torg-gray text-[13px]">
+                Nenhum orçamento com esses filtros. <button onClick={limpar} className="text-torg-blue hover:underline">limpar</button>
+              </td></tr>
+            )}
+            {filtradas.map((orc) => {
               const s = STATUS_LABELS[orc.status] || STATUS_LABELS.ORCAMENTO;
               return (
                 <tr key={orc.id} className="hover:bg-gray-50/50">
@@ -624,10 +665,12 @@ function TabelaOrcamentos({ orcamentos, onVer, onEditar, onExcluir }) {
                       {orc.numero}
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-torg-dark max-w-[200px] truncate">{orc.cliente}</td>
-                  <td className="px-4 py-3 text-torg-gray max-w-[180px] truncate">{orc.obra || "—"}</td>
-                  <td className="px-4 py-3 text-torg-gray text-xs">
-                    {orc.tipoVenda ? TIPO_VENDA_LABELS[orc.tipoVenda] : "—"}
+                  <td className="px-4 py-3 text-torg-dark max-w-[200px] truncate" title={orc.cliente}>{orc.cliente}</td>
+                  <td className="px-4 py-3 text-torg-gray max-w-[180px] truncate" title={orc.obra || ""}>{orc.obra || "—"}</td>
+                  {/* ⚠ nowrap: "Fabricação e Montagem" quebrava em TRÊS linhas e esticava a linha
+                      inteira da tabela — o print que o Vitor mandou é isso. */}
+                  <td className="px-4 py-3 text-torg-gray text-xs whitespace-nowrap">
+                    {orc.tipoVenda ? TIPO_VENDA_LABELS[orc.tipoVenda] || orc.tipoVenda : "—"}
                   </td>
                   <td className="px-4 py-3 text-right text-torg-dark font-medium tabular-nums whitespace-nowrap">
                     {fmtMoeda(orc.valor)}
