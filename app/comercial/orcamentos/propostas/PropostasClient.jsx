@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Search, AlertCircle, Loader2, Plus, FolderOpen, X, Building2,
-  FileSpreadsheet, Link2, ChevronRight,
+  FileSpreadsheet, Link2, ChevronRight, FileText,
 } from "lucide-react";
 import OrcamentosTabs from "@/components/OrcamentosTabs";
 
@@ -157,6 +157,19 @@ export default function PropostasClient() {
   const [busca, setBusca] = useState("");
   const [showModal, setShowModal] = useState(false);
 
+  // abre (ou cria) a proposta do orçamento e leva para a elaboração
+  async function abrirProposta(orcamentoId) {
+    try {
+      const r = await fetch("/api/comercial/proposta-estrutura", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orcamentoId, tipo: "PTC" }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao abrir a proposta");
+      router.push(`/comercial/orcamentos/propostas/${j.proposta.id}`);
+    } catch (e) { alert(e.message); }
+  }
+
   const carregar = useCallback(async () => {
     try {
       const res = await fetch("/api/comercial/estudos");
@@ -274,6 +287,16 @@ export default function PropostasClient() {
                             className="text-[11px] font-semibold text-torg-blue hover:underline inline-flex items-center gap-1">
                             <FileSpreadsheet size={12} /> planilha
                           </Link>
+                          {/* ⚠ o caminho do estudo para a PROPOSTA. Sem este atalho o portal
+                              calcula o preço e para ali — e o documento continua sendo escrito no
+                              Word, que é o trabalho que a tela existe para tirar. */}
+                          {e.orcamentoId && (
+                            <button onClick={(ev) => { ev.stopPropagation(); abrirProposta(e.orcamentoId); }}
+                              title="Elaborar a proposta a partir deste estudo"
+                              className="text-[11px] font-semibold text-torg-orange hover:underline inline-flex items-center gap-1">
+                              <FileText size={12} /> proposta
+                            </button>
+                          )}
                           <ChevronRight size={16} className="text-gray-300" />
                         </div>
                       </td>

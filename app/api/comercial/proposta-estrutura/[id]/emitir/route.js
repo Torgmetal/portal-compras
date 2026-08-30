@@ -49,6 +49,10 @@ export async function POST(req, { params }) {
     documentos: p.documentos || [],
     projetos: p.projetos || [],
     areas: p.areas || [],
+    // o escopo reescreve o item 1.1 e derruba a menção a cálculo no 1.4; a modalidade preenche o
+    // item que hoje sai fixo no modelo
+    escopoItens: p.escopo || [],
+    modalidade: p.modalidade || null,
     // a capa: o modelo tem os marcadores na ordem em que aparecem no parágrafo
     marcadores: {
       __CAPA__: [d.empresa, d.endereco, d.bairroCidade, d.contato, d.email, d.fone,

@@ -12,7 +12,7 @@ const ROLES = ["ADMIN", "COMERCIAL"];
 // ⚠ lista fechada: PATCH que aceita qualquer chave deixa a tela gravar `revisao` ou `emissoes`
 // sem passar pela emissão — e aí o histórico do documento deixa de valer como histórico.
 const CAMPOS = ["destinatario", "referencia", "escopo", "documentos", "projetos", "areas",
-                "selecao", "textos", "comMontagem", "estudoId", "status"];
+                "selecao", "textos", "comMontagem", "modalidade", "estudoId", "status", "tipo"];
 
 export async function GET(_req, { params }) {
   try { await requireRole(ROLES); }
@@ -47,6 +47,20 @@ export async function PATCH(req, { params }) {
     const antes = atual.selecao || {};
     const nova = selecaoPadrao({ tipo: atual.tipo, comMontagem: !!data.comMontagem });
     // preserva a escolha de quem já mexeu, nos blocos que continuam existindo
+    for (const k of Object.keys(nova)) if (antes[k]) nova[k] = antes[k];
+    data.selecao = nova;
+  }
+
+  // ⚠ trocar o TIPO troca quais blocos existem no documento — e o (orçamento, tipo) é único, então
+  // pode colidir com uma proposta que já exista. Mensagem clara em vez do erro cru do banco.
+  if (data.tipo && data.tipo !== atual.tipo) {
+    if (!["PT", "PC", "PTC"].includes(data.tipo)) return NextResponse.json({ error: "Tipo inválido." }, { status: 400 });
+    const colide = await prisma.propostaEstrutura.findUnique({
+      where: { orcamentoId_tipo: { orcamentoId: atual.orcamentoId, tipo: data.tipo } },
+    });
+    if (colide) return NextResponse.json({ error: `Já existe uma ${data.tipo} para este orçamento.` }, { status: 409 });
+    const nova = selecaoPadrao({ tipo: data.tipo, comMontagem: "comMontagem" in data ? !!data.comMontagem : atual.comMontagem });
+    const antes = data.selecao || atual.selecao || {};
     for (const k of Object.keys(nova)) if (antes[k]) nova[k] = antes[k];
     data.selecao = nova;
   }

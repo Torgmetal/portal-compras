@@ -3121,6 +3121,9 @@ model PropostaEstrutura {
   revisao     Int     @default(0)
   // escolhe qual dos dois modelos do SharePoint é usado — e 21 parágrafos mudam com isso
   comMontagem Boolean @default(false)
+  // Vitor (30/08/2026): "modalidade da proposta deve ser informada na elaboração para que preencha
+  // conforme selecionado" — hoje sai fixo "preço variável conforme peso" mesmo em preço global.
+  modalidade  String  @default("PESO_UNITARIO")
   status      String  @default("RASCUNHO")
 
   destinatario Json   @default("{}") // empresa, endereço, A/C, e-mail, fone
