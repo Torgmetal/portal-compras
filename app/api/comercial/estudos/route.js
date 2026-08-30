@@ -13,7 +13,10 @@ export async function GET(req) {
   const estudos = await prisma.estudoFabricacao.findMany({
     where: ano ? { ano } : undefined,
     orderBy: [{ ano: "desc" }, { numero: "desc" }],
-    select: { id: true, numero: true, ano: true, revisao: true, cliente: true, obra: true, status: true, resultado: true, criadoPorNome: true, updatedAt: true },
+    select: { id: true, numero: true, ano: true, revisao: true, cliente: true, obra: true, status: true,
+              resultado: true, criadoPorNome: true, updatedAt: true, orcamentoId: true,
+              // o orçamento vem junto: é ele que dá o número da proposta e o valor que foi ao cliente
+              orcamento: { select: { numero: true, cliente: true, obra: true, valor: true, status: true } } },
     take: 300,
   });
   return NextResponse.json({ estudos });
