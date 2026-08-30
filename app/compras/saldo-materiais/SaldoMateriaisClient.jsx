@@ -6,6 +6,7 @@ import {
   AlertTriangle, ChevronDown, ChevronRight, Filter,
   RefreshCw, Layers, Truck, ShoppingCart, ClipboardCheck, X,
 } from "lucide-react";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -534,7 +535,9 @@ function ModalRecebimento({ item, onClose, onSuccess }) {
     e.preventDefault();
     setErro("");
 
-    const qtdNum = Number(qtd.replace(",", "."));
+    // ⚠ a validação `qtdNum > falta * 1.1` logo abaixo NÃO pegava o erro, porque o valor mal
+    // lido fica MENOR — "1.234" virava 1,234 e passava como recebimento parcial.
+    const qtdNum = numeroBR(qtd, NaN);
     if (!qtdNum || qtdNum <= 0) {
       setErro("Informe uma quantidade valida");
       return;
