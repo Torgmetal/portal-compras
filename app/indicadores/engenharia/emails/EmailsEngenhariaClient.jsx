@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useStore } from "@/lib/store";
-import { Mail, Loader2, AlertCircle, RefreshCw, Search, Paperclip, FileBox, Inbox, Send, ArrowDownLeft, ArrowUpRight, Sparkles } from "lucide-react";
+import { Mail, Loader2, AlertCircle, RefreshCw, Search, Paperclip, FileBox, Inbox, Send, ArrowDownLeft, ArrowUpRight, Sparkles, MailQuestion } from "lucide-react";
 
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
 const caixaCurta = (c) => String(c || "").split("@")[0];
@@ -16,6 +16,9 @@ export default function EmailsEngenhariaClient() {
   const [direcao, setDirecao] = useState("");
   const [soIfc, setSoIfc] = useState(false);
   const [busca, setBusca] = useState("");
+  const [fila, setFila] = useState(null);      // { pendentes, ops }
+  const [vinculando, setVinculando] = useState(null);
+  const [verFila, setVerFila] = useState(true);
 
   const carregar = useCallback(() => {
     setErro("");
@@ -62,6 +65,30 @@ export default function EmailsEngenhariaClient() {
     finally { setReprocessando(false); }
   }
 
+  // ⚠ a fila é o que só uma pessoa resolve: e-mail de FORA que nenhuma regra casou. Interno e
+  // ruído ficam fora — jogar tudo aqui faria a lista morrer de tamanho.
+  const carregarFila = useCallback(() => {
+    fetch("/api/engenharia/emails/pendentes")
+      .then((r) => r.json()).then((j) => setFila(j.success ? j : null)).catch(() => setFila(null));
+  }, []);
+  useEffect(() => { carregarFila(); }, [carregarFila]);
+
+  async function vincular(email, opId) {
+    setVinculando(email.id);
+    try {
+      const r = await fetch(`/api/engenharia/emails/${email.id}/vincular`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opId: opId || null }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao vincular");
+      showToast(opId
+        ? `Vinculado${j.naThread ? ` — e mais ${j.naThread} da mesma conversa` : ""}.`
+        : "Marcado como fora de obra.", "success");
+      carregarFila(); carregar();
+    } catch (e) { showToast(e.message, "erro"); } finally { setVinculando(null); }
+  }
+
   const eventos = dados?.eventos || [];
   const syncs = dados?.syncs || [];
   const caixas = dados?.caixas || [];
@@ -77,8 +104,59 @@ export default function EmailsEngenhariaClient() {
     return porCaixa;
   }, [syncs]);
 
+  const filaUI = fila?.pendentes?.length ? (
+    <div className="bg-white rounded-xl shadow-sm border border-amber-200 overflow-hidden mb-4">
+      <button onClick={() => setVerFila((v) => !v)} className="w-full px-4 py-3 flex items-center gap-2 text-left hover:bg-amber-50/40">
+        <MailQuestion size={16} className="text-amber-700" />
+        <span className="text-[13px] font-semibold text-torg-dark">
+          {fila.pendentes.length} e-mail(s) de fora sem obra definida
+        </span>
+        <span className="text-[11.5px] text-torg-gray">— aponte a obra e a conversa inteira vai junto</span>
+        <span className="ml-auto text-[11.5px] text-torg-blue">{verFila ? "esconder" : "ver"}</span>
+      </button>
+      {verFila && (
+        <div className="divide-y divide-gray-50 max-h-[60vh] overflow-y-auto">
+          {fila.pendentes.map((e) => (
+            <div key={e.id} className="px-4 py-2.5">
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-[11.5px] text-torg-gray tabular-nums">{new Date(e.recebidoEm).toLocaleDateString("pt-BR")}</span>
+                <span className="text-[12px] font-semibold text-torg-dark">{e.deNome || e.de}</span>
+                <span className="text-[11px] text-torg-gray">{e.de}</span>
+                {e.naThread > 0 && (
+                  <span className="text-[10.5px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                    +{e.naThread} na conversa
+                  </span>
+                )}
+              </div>
+              <p className="text-[12.5px] text-torg-dark mt-0.5">{e.assunto || <span className="italic text-gray-400">(sem assunto)</span>}</p>
+              {e.snippet && <p className="text-[11px] text-torg-gray truncate">{e.snippet}</p>}
+              <div className="flex items-center gap-2 mt-1.5">
+                <select defaultValue="" disabled={vinculando === e.id}
+                  onChange={(ev) => ev.target.value && vincular(e, ev.target.value)}
+                  className="text-[11.5px] border border-gray-200 rounded px-2 py-1 outline-none focus:border-torg-blue disabled:opacity-50 max-w-[22rem]">
+                  <option value="">escolher a obra…</option>
+                  {fila.ops.map((o) => (
+                    <option key={o.id} value={o.id}>OP-{o.numero} · {o.cliente || "—"}{o.obra ? ` · ${o.obra}` : ""}</option>
+                  ))}
+                </select>
+                {/* ⚠ "não é de obra" também é resposta: sem esta saída o e-mail volta amanhã */}
+                <button onClick={() => vincular(e, null)} disabled={vinculando === e.id}
+                  className="text-[11.5px] text-torg-gray hover:text-torg-dark underline disabled:opacity-50">
+                  não é de obra
+                </button>
+                {vinculando === e.id && <Loader2 size={13} className="animate-spin text-torg-blue" />}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  ) : null;
+
   return (
     <div className="space-y-6 max-w-7xl">
+      {/* a fila primeiro: é o que tem alguém esperando decisão, e o resto da tela é consulta */}
+      {filaUI}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <span className="flex items-center justify-center w-11 h-11 rounded-xl bg-blue-50 text-blue-700"><Mail size={22} /></span>
