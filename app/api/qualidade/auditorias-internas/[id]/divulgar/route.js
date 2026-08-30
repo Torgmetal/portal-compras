@@ -9,6 +9,7 @@ import { cabecalhoEmail } from "@/lib/email-layout";
 import { gerarAuditoriaInternaPDF } from "@/lib/auditoria-interna-pdf";
 import { numRAI } from "@/lib/auditoria-interna";
 import { z } from "zod";
+import { arquivarERegistrar, pastaDe } from "@/lib/arquivar-form";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -73,7 +74,15 @@ export async function POST(req, { params }) {
       divulgadoPara: [...historico, ...emails.map((email) => ({ email, em: agora.toISOString() }))],
     },
   });
-  await prisma.auditLog.create({ data: { userId: user.id, action: "DIVULGAR_AUDITORIA_INTERNA", entity: "AuditoriaInterna", entityId: a.id, diff: { enviados: ok, total: emails.length } } }).catch(() => {});
+  // ⚠ ARQUIVA O MESMO PDF QUE FOI ANEXADO NO E-MAIL — não um regerado depois. É esse o documento
+  // que o setor recebeu, e é ele que tem de estar na pasta quando alguém for conferir.
+  const arq = await arquivarERegistrar(
+    { pasta: pastaDe("AUDITORIA_INTERNA", { ano: new Date(a.dataAuditoria || agora).getUTCFullYear() }), nomeArquivo: pdf.filename, bytes: pdf.bytes },
+    (dados) => prisma.auditoriaInterna.update({ where: { id: a.id }, data: dados }),
+  );
+  if (!arq.ok) console.error("[auditoria-interna] arquivamento:", arq.erro);
+
+  await prisma.auditLog.create({ data: { userId: user.id, action: "DIVULGAR_AUDITORIA_INTERNA", entity: "AuditoriaInterna", entityId: a.id, diff: { enviados: ok, total: emails.length, arquivado: arq.ok } } }).catch(() => {});
 
   return NextResponse.json({ success: true, enviados: ok, total: emails.length });
 }

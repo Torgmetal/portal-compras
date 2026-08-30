@@ -70,7 +70,22 @@ export async function PATCH(req, { params }) {
       });
   }
 
-  await prisma.planoAcao.update({ where: { id: atual.id }, data });
+  const plano = await prisma.planoAcao.update({ where: { id: atual.id }, data });
+
+  // ⚠ ARQUIVA AO CONCLUIR — o plano em andamento ainda muda de ação em ação.
+  if (body.status === "CONCLUIDO") {
+    try {
+      const { gerarPlanoAcaoPDF } = await import("@/lib/plano-acao-pdf");
+      const { arquivarERegistrar, pastaDe } = await import("@/lib/arquivar-form");
+      const doc = await gerarPlanoAcaoPDF(plano);
+      const r = await arquivarERegistrar(
+        { pasta: pastaDe("PLANO_ACAO", { ano: plano.ano }), nomeArquivo: doc.filename, bytes: doc.bytes },
+        (dados) => prisma.planoAcao.update({ where: { id: plano.id }, data: dados }),
+      );
+      if (!r.ok) console.error("[plano-acao] arquivamento:", r.erro);
+    } catch (e) { console.error("[plano-acao] arquivamento:", e?.message); }
+  }
+
   return NextResponse.json({ success: true });
 }
 

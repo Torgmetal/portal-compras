@@ -2172,6 +2172,8 @@ model AuditoriaInterna {
   createdById               String?
   createdAt                 DateTime  @default(now())
   updatedAt                 DateTime  @updatedAt
+  arquivadoEm         DateTime? // quando o PDF foi arquivado no SharePoint
+  arquivadoPath       String?   // caminho do arquivo lá — é o que torna o arquivamento verificável
 
   @@index([status])
   @@index([dataAuditoria])
@@ -2207,6 +2209,8 @@ model PlanoAcao {
   createdById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  arquivadoEm         DateTime? // quando o PDF foi arquivado no SharePoint
+  arquivadoPath       String?   // caminho do arquivo lá — é o que torna o arquivamento verificável
 
   @@index([status])
 }
@@ -2326,6 +2330,8 @@ model NaoConformidade {
   createdById         String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+  arquivadoEm         DateTime? // quando o PDF foi arquivado no SharePoint
+  arquivadoPath       String?   // caminho do arquivo lá — é o que torna o arquivamento verificável
 
   @@index([tipo])
   @@index([status])

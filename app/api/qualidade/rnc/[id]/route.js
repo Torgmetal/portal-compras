@@ -97,6 +97,22 @@ export async function PATCH(req, { params }) {
     }
   } catch (e) { console.error("[rnc] apontamento de retrabalho:", e?.message); }
 
+  // ⚠ ARQUIVA AO ENCERRAR. O que se guarda é o documento fechado — a RNC muda enquanto está aberta
+  // (disposição, 5 porquês, plano), e arquivar a cada salvamento encheria a pasta de rascunho. Se o
+  // SharePoint estiver fora, o encerramento NÃO falha: fica sem `arquivadoEm` e aparece na varredura.
+  if (body.status === "ENCERRADA") {
+    try {
+      const { gerarRncPDF } = await import("@/lib/rnc-pdf");
+      const { arquivarERegistrar, pastaDe } = await import("@/lib/arquivar-form");
+      const doc = await gerarRncPDF(rnc);
+      const r = await arquivarERegistrar(
+        { pasta: pastaDe("RNC", { opNumero: rnc.opNumero, ano: rnc.ano }), nomeArquivo: doc.filename, bytes: doc.bytes },
+        (dados) => prisma.naoConformidade.update({ where: { id: rnc.id }, data: dados }),
+      );
+      if (!r.ok) console.error("[rnc] arquivamento:", r.erro);
+    } catch (e) { console.error("[rnc] arquivamento:", e?.message); }
+  }
+
   return NextResponse.json({ success: true });
 }
 
