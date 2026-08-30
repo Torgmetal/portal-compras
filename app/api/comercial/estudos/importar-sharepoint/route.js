@@ -90,8 +90,24 @@ async function processar(ano, aplicar, user) {
       if (!lido) { resumo.erros.push({ numero, arquivo: escolhida.nome, erro: ultimoErro || "não deu para ler" }); continue; }
       if (usada.id !== escolhida.id) resumo.erros.push({ numero, arquivo: escolhida.nome, aviso: `ilegível — usei ${usada.nome}` });
 
-      const resumos = lido.resumos.map((r) => ({ ...r, precoKg: lido.precosPorArea?.[r.area] ?? null }));
-      const composicao = { resumos, tintas: lido.tintas || [], origemSharePoint: usada.nome };
+      // ⚠⚠ O PREÇO DO AÇO PRECISA CHEGAR AQUI, SENÃO O ESTUDO NASCE SEM A MAIOR PARCELA DO CUSTO.
+      // Vitor (30/08/2026): "os custos das obras estão errados; no caso da Orca o preço sugerido
+      // está em 3,68 o kg". A matéria-prima vinha zerada em 56 dos 57 estudos.
+      //
+      // Preferência: preço POR ÁREA (quando a INDUSTRIALIZAÇÃO é organizada assim) e, na falta
+      // dele, o R$/kg blendado da linha "MATÉRIA PRIMA" — que é o mesmo com que a planilha fecha
+      // o próprio subtotal, não um número inventado aqui.
+      const precoAco = (area) => lido.precosPorArea?.[area] ?? lido.precoMateriaPrima ?? null;
+      const resumos = lido.resumos.map((r) => ({ ...r, precoKg: precoAco(r.area) }));
+      const composicao = {
+        resumos, tintas: lido.tintas || [], origemSharePoint: usada.nome,
+        ...(lido.fixadoresRsKg ? { fixadoresRsKg: lido.fixadoresRsKg } : {}),
+        // sem o BDI o cálculo fecha com preço = custo, e a tela mostra CUSTO chamando de preço
+        ...(lido.bdi && Object.keys(lido.bdi).length ? { bdi: lido.bdi } : {}),
+        // ⚠ NÃO entra na conta — entra como CONFERÊNCIA. É o valor que foi ao cliente; tê-lo ao
+        // lado do que o portal calcula é o que denuncia na hora um custo que saiu errado.
+        ...(lido.precoPlanilha ? { precoPlanilha: lido.precoPlanilha } : {}),
+      };
       const resultado = calcularLqc(composicao);
       const dados = {
         ano, numero, revisao: usada.revisao || 0,
