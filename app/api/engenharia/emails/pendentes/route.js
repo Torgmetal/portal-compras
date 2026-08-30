@@ -7,6 +7,11 @@
 //
 // ⚠ E-mail interno fica de fora de propósito: conversa entre engenheiros não é correspondência de
 // projeto, e forçar alguém a apontar obra para cada uma seria inventar trabalho.
+//
+// ⚠⚠ QUEM CONSOME É O CARD DA OP. Vitor (29/08/2026): "o ideal é na aba de resumo da OP; não pode
+// ter essa informação na engenharia". Faz sentido além da organização: quem está na OP-072 sabe
+// reconhecer o e-mail dela, e quem olha uma lista solta de 22 assuntos não sabe. O contexto da
+// obra faz o trabalho que o seletor tentava fazer.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";

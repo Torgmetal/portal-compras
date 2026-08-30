@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Mail, Loader2, AlertCircle, ChevronDown, ChevronRight, FileBox, Paperclip,
   ArrowDownLeft, ArrowUpRight, Clock, CheckCircle2, PlayCircle, Send, ExternalLink, Circle,
-  XCircle, PencilRuler, HelpCircle, AlertTriangle, X, FileText } from "lucide-react";
+  XCircle, PencilRuler, HelpCircle, AlertTriangle, X, FileText, MailQuestion } from "lucide-react";
 
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
 const fmtDur = (h) => {
@@ -45,14 +45,43 @@ export default function EmailsObraCard({ opId }) {
   const [aberto, setAberto] = useState(false);
   const [ver, setVer] = useState(null); // e-mail aberto no leitor { id }
   const [corpo, setCorpo] = useState(null); // { carregando, erro, ...corpo }
+  // ⚠⚠ A FILA MORA AQUI, NÃO NA ENGENHARIA. Vitor (29/08/2026): "o ideal é na aba de resumo da OP;
+  // não pode ter essa informação na engenharia". E funciona melhor: quem está na OP-072 reconhece
+  // o e-mail dela de bate-pronto; quem olha uma lista solta de 22 assuntos, não. O contexto da
+  // obra faz o trabalho que o seletor tentava fazer.
+  const [pendentes, setPendentes] = useState([]);
+  const [verPendentes, setVerPendentes] = useState(false);
+  const [vinculando, setVinculando] = useState(null);
 
-  useEffect(() => {
-    setDados(null); setErro("");
+  const carregarPendentes = () =>
+    fetch("/api/engenharia/emails/pendentes")
+      .then((r) => r.json()).then((j) => setPendentes(j.pendentes || [])).catch(() => setPendentes([]));
+  useEffect(() => { carregarPendentes(); }, []);
+
+  // ⚠ vincular daqui é sempre "é DESTA obra": o opId vem do card, não de um seletor que a pessoa
+  // pode errar. E a thread inteira acompanha.
+  async function vincularAqui(email, ehDaObra) {
+    setVinculando(email.id);
+    try {
+      const r = await fetch(`/api/engenharia/emails/${email.id}/vincular`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opId: ehDaObra ? opId : null }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao vincular");
+      carregarPendentes();
+      if (ehDaObra) carregar();
+    } catch (e) { alert(e.message); } finally { setVinculando(null); }
+  }
+
+  const carregar = useCallback(() => {
+    setErro("");
     fetch(`/api/comercial/op/${opId}/emails`)
       .then((r) => r.json())
       .then((j) => { if (j.success) setDados(j); else setErro(j.error || "Erro"); })
       .catch(() => setErro("Não foi possível carregar."));
   }, [opId]);
+  useEffect(() => { setDados(null); carregar(); }, [opId, carregar]);
 
   const abrirEmail = useCallback((e) => {
     setVer(e); setCorpo({ carregando: true });
@@ -86,6 +115,52 @@ export default function EmailsObraCard({ opId }) {
           <span className="text-[10px] font-semibold text-torg-gray border border-gray-200 rounded px-1.5 py-0.5">diretoria</span>
         </div>
       </div>
+      {/* ⚠ e-mails de fora que nenhuma regra casou: quem está NESTA obra reconhece o que é dela */}
+      {pendentes.length > 0 && (
+        <div className="border border-amber-200 bg-amber-50/40 rounded-lg mb-3">
+          <button onClick={() => setVerPendentes((v) => !v)} className="w-full px-3 py-2 flex items-center gap-2 text-left">
+            <MailQuestion size={14} className="text-amber-700" />
+            <span className="text-[12.5px] font-semibold text-torg-dark">
+              {pendentes.length} e-mail(s) de fora ainda sem obra
+            </span>
+            <span className="text-[11.5px] text-torg-gray">— algum é desta?</span>
+            <span className="ml-auto text-[11.5px] text-torg-blue">{verPendentes ? "esconder" : "ver"}</span>
+          </button>
+          {verPendentes && (
+            <div className="divide-y divide-amber-100 max-h-[45vh] overflow-y-auto border-t border-amber-100">
+              {pendentes.map((e) => (
+                <div key={e.id} className="px-3 py-2">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="text-[11px] text-torg-gray tabular-nums">{fmtDT(e.recebidoEm)}</span>
+                    <span className="text-[12px] font-semibold text-torg-dark">{e.deNome || e.de}</span>
+                    <span className="text-[11px] text-torg-gray">{e.de}</span>
+                    {e.naThread > 0 && (
+                      <span className="text-[10.5px] text-amber-800 border border-amber-200 rounded px-1.5 py-0.5">
+                        +{e.naThread} na conversa
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[12.5px] text-torg-dark">{e.assunto || <span className="italic text-gray-400">(sem assunto)</span>}</p>
+                  {e.snippet && <p className="text-[11px] text-torg-gray truncate">{e.snippet}</p>}
+                  <div className="flex items-center gap-2 mt-1">
+                    <button onClick={() => vincularAqui(e, true)} disabled={vinculando === e.id}
+                      className="text-[11.5px] font-semibold text-white bg-torg-blue rounded px-2 py-0.5 hover:bg-torg-dark disabled:opacity-50">
+                      é desta obra
+                    </button>
+                    {/* ⚠ "não é de obra" também é resposta — sem ela o e-mail volta amanhã */}
+                    <button onClick={() => vincularAqui(e, false)} disabled={vinculando === e.id}
+                      className="text-[11.5px] text-torg-gray hover:text-torg-dark underline disabled:opacity-50">
+                      não é de obra nenhuma
+                    </button>
+                    {vinculando === e.id && <Loader2 size={12} className="animate-spin text-torg-blue" />}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <p className="text-sm text-torg-gray mb-4">Marcos e tags detectados nos e-mails da Engenharia — IFC, liberação, envio/aprovação, revisões e pendências do cliente. Clique num e-mail para ler aqui dentro.</p>
 
       {dados === null && !erro ? (
