@@ -22,7 +22,11 @@ export async function PATCH(req, { params }) {
   const diretor = user.tipo === "ADMIN" || (await temAcessoDiretoria(user.email).catch(() => false));
   if (!diretor) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { opId, propagarThread = true } = await req.json().catch(() => ({}));
+  // ⚠⚠ E O DESFAZER. Vitor marcou um e-mail como OP-089 em 29/08 e não era — era do Projeto VALE
+  // TR-36 (TPR00751) — e não havia como reverter pela tela. Vínculo errado num registro que serve
+  // de PROVA é pior que e-mail sem obra: ele entra no dossiê da obra errada e ninguém revisa.
+  // `desvincular: true` devolve à fila (opId e método nulos), para as regras reavaliarem do zero.
+  const { opId, propagarThread = true, desvincular = false } = await req.json().catch(() => ({}));
   const email = await prisma.obraEmailEvento.findUnique({
     where: { id: params.emailId },
     select: { id: true, conversationId: true, assunto: true },
@@ -31,10 +35,23 @@ export async function PATCH(req, { params }) {
 
   // opId null = "não é de obra nenhuma" (marketing, spam, conversa interna) — também é resposta,
   // e precisa ficar registrada para o e-mail sair da fila em vez de voltar amanhã.
-  const dados = opId
-    ? { opId, matchMetodo: "MANUAL", matchConfianca: 1 }
-    : { opId: null, matchMetodo: "IGNORADO", matchConfianca: null };
+  // três respostas possíveis, e as três precisam existir:
+  //   obra escolhida → MANUAL   · "não é de obra" → IGNORADO   · "errei" → volta para a fila
+  const dados = desvincular
+    ? { opId: null, matchMetodo: null, matchConfianca: null }
+    : opId
+      ? { opId, matchMetodo: "MANUAL", matchConfianca: 1 }
+      : { opId: null, matchMetodo: "IGNORADO", matchConfianca: null };
   await prisma.obraEmailEvento.update({ where: { id: email.id }, data: dados });
+
+  // ⚠ desfazer leva junto o que a thread arrastou: vincular propaga, então desvincular sem propagar
+  // deixaria as outras mensagens da conversa na obra errada — o erro pela metade é o pior estado.
+  if (desvincular && email.conversationId) {
+    await prisma.obraEmailEvento.updateMany({
+      where: { conversationId: email.conversationId, id: { not: email.id }, matchMetodo: "THREAD" },
+      data: { opId: null, matchMetodo: null, matchConfianca: null },
+    });
+  }
 
   // ⚠ a thread inteira acompanha: quem aponta a obra de uma mensagem está apontando a da conversa.
   // Só toca em quem ainda não tem vínculo — nunca sobrescreve match forte nem outra decisão manual.

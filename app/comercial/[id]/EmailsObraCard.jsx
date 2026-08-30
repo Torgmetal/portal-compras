@@ -60,6 +60,21 @@ export default function EmailsObraCard({ opId }) {
 
   // ⚠ vincular daqui é sempre "é DESTA obra": o opId vem do card, não de um seletor que a pessoa
   // pode errar. E a thread inteira acompanha.
+  // ⚠ desfazer é tão necessário quanto vincular: sem ele o e-mail errado fica no dossiê da obra
+  // errada, e o dossiê é o que vai para o cliente.
+  async function desvincular(email) {
+    setVinculando(email.id);
+    try {
+      const r = await fetch(`/api/engenharia/emails/${email.id}/vincular`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ desvincular: true }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao desvincular");
+      carregarPendentes(); carregar();
+    } catch (e) { alert(e.message); } finally { setVinculando(null); }
+  }
+
   async function vincularAqui(email, ehDaObra) {
     setVinculando(email.id);
     try {
@@ -243,7 +258,9 @@ export default function EmailsObraCard({ opId }) {
               const contraparte = entrada ? e.de : (Array.isArray(e.para) ? e.para[0] : null);
               const meta = e.tipoGatilho && e.tipoGatilho !== "OUTRO" ? TAG_META[e.tipoGatilho] : null;
               return (
-                <button key={e.id} onClick={() => abrirEmail(e)} className="w-full text-left px-3 py-2 flex items-start gap-2.5 hover:bg-gray-50/60">
+                // ⚠ vira <div>: o desfazer é um botão DENTRO da linha, e botão dentro de botão não
+                // é HTML válido — o clique interno vazaria para o de fora e abriria o e-mail.
+                <div key={e.id} className="w-full text-left px-3 py-2 flex items-start gap-2.5 hover:bg-gray-50/60 cursor-pointer" onClick={() => abrirEmail(e)}>
                   {entrada ? <ArrowDownLeft size={14} className="text-emerald-600 mt-0.5 shrink-0" /> : <ArrowUpRight size={14} className="text-torg-blue mt-0.5 shrink-0" />}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
@@ -256,8 +273,16 @@ export default function EmailsObraCard({ opId }) {
                     <p className="text-[11px] text-torg-gray whitespace-nowrap">{fmtDT(e.recebidoEm || e.enviadoEm)}</p>
                     {e.temAnexoIfc ? <span className="text-[10px] font-semibold text-torg-orange inline-flex items-center gap-0.5"><FileBox size={11} /> IFC</span>
                       : e.temAnexo ? <Paperclip size={11} className="inline text-torg-gray" /> : null}
+                    {/* ⚠ e-mail na obra errada entra no dossiê que vai para o cliente — o desfazer
+                        precisa estar à mão, não numa tela de administração. */}
+                    <button onClick={(ev) => { ev.stopPropagation(); if (confirm("Tirar este e-mail desta obra? Ele volta para a fila.")) desvincular(e); }}
+                      disabled={vinculando === e.id}
+                      className="text-[10px] text-torg-gray-light hover:text-red-600 underline disabled:opacity-50"
+                      title="Não é desta obra — devolver para a fila">
+                      não é desta obra
+                    </button>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
