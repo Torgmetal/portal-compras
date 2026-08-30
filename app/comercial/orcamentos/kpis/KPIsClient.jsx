@@ -9,6 +9,7 @@ import {
   ArrowUpRight, ArrowDownRight, Timer, Zap, ExternalLink,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
+import OrcamentosTabs from "@/components/OrcamentosTabs";
 
 const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -62,6 +63,7 @@ export default function KPIsClient() {
   if (loading) {
     return (
       <div className="max-w-7xl space-y-6">
+        <OrcamentosTabs />
         <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Indicadores Comercial</h2>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <Loader2 size={32} className="mx-auto text-torg-blue animate-spin mb-3" />
@@ -74,6 +76,7 @@ export default function KPIsClient() {
   if (erro) {
     return (
       <div className="max-w-7xl space-y-6">
+        <OrcamentosTabs />
         <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Indicadores Comercial</h2>
         <div className="bg-white rounded-xl shadow-sm border border-red-100 p-12 text-center">
           <AlertCircle size={40} className="mx-auto text-red-400 mb-3" />
@@ -88,6 +91,7 @@ export default function KPIsClient() {
 
   return (
     <div className="max-w-7xl space-y-8">
+      <OrcamentosTabs />
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>

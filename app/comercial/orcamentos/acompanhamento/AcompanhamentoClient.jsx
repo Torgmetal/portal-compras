@@ -7,6 +7,7 @@ import {
   Eye, Pencil, TrendingUp, XCircle, FileCheck2, Timer,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import OrcamentosTabs from "@/components/OrcamentosTabs";
 
 const STATUS_LABELS = {
   ORCAMENTO:     { label: "Orcamento",     cor: "bg-blue-50 text-blue-700",   icon: FileSpreadsheet },
@@ -157,6 +158,7 @@ export default function AcompanhamentoClient() {
 
   return (
     <div className="space-y-6 max-w-7xl">
+      <OrcamentosTabs />
       {/* Header */}
       <div>
         <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">
