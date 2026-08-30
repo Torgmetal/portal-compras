@@ -2,13 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { fmtOP } from "@/lib/utils";
 import Link from "next/link";
-import {
-  Loader2, AlertCircle, Package, Clock, AlertTriangle,
-  CheckCircle2, CalendarDays, Truck, Filter, RefreshCw,
-  ChevronDown, ChevronRight, ExternalLink, List, LayoutGrid,
-  FileText, MapPin, Wrench, Mail, Send, X,
-  CalendarClock, History, Trash2,
-} from "lucide-react";
+import { Loader2, AlertCircle, Package, Clock, AlertTriangle, CheckCircle2, CalendarDays, Truck, Filter, RefreshCw, ChevronDown, ChevronRight, ExternalLink, FileText, MapPin, Wrench, Mail, Send, X, CalendarClock, History, Trash2 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 
 const fmtMoeda = (v) =>
@@ -49,7 +43,6 @@ export default function CronogramaClient() {
   const [registrando, setRegistrando] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
-  const [visao, setVisao] = useState("kanban"); // "kanban" | "tabela"
   const [modalCobrar, setModalCobrar] = useState(null); // pedido obj ou null
   const [modalPrazo, setModalPrazo] = useState(null); // pedido obj ou null
   const [ajustandoOmie, setAjustandoOmie] = useState(null); // pedidoId durante ajuste
@@ -116,20 +109,6 @@ export default function CronogramaClient() {
     return lista;
   }, [pedidos, filtroFornecedor, filtroOP, filtroStatus]);
 
-  // Agrupados por status (pra kanban — ignora filtroStatus)
-  const gruposKanban = useMemo(() => {
-    let base = pedidos;
-    if (filtroFornecedor) base = base.filter((p) => p.fornecedor === filtroFornecedor);
-    if (filtroOP) base = base.filter((p) => p.opId === filtroOP);
-    const map = {};
-    for (const key of KANBAN_ORDER) map[key] = [];
-    for (const p of base) {
-      const key = p.statusEntrega || "SEM_PRAZO";
-      if (map[key]) map[key].push(p);
-      else map.SEM_PRAZO.push(p);
-    }
-    return map;
-  }, [pedidos, filtroFornecedor, filtroOP]);
 
   // Listas únicas pra filtros
   const fornecedores = useMemo(() => {
@@ -403,31 +382,6 @@ export default function CronogramaClient() {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {/* Toggle Kanban / Tabela */}
-          <div className="flex border border-gray-300 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setVisao("kanban")}
-              className={`px-3 py-1.5 text-sm flex items-center gap-1.5 ${
-                visao === "kanban"
-                  ? "bg-torg-blue text-white font-medium"
-                  : "bg-white text-torg-gray hover:bg-gray-50"
-              }`}
-              title="Visão Kanban"
-            >
-              <LayoutGrid size={14} /> Kanban
-            </button>
-            <button
-              onClick={() => setVisao("tabela")}
-              className={`px-3 py-1.5 text-sm flex items-center gap-1.5 ${
-                visao === "tabela"
-                  ? "bg-torg-blue text-white font-medium"
-                  : "bg-white text-torg-gray hover:bg-gray-50"
-              }`}
-              title="Visão Lista"
-            >
-              <List size={14} /> Lista
-            </button>
-          </div>
           <button
             onClick={syncOmie}
             disabled={syncing}
@@ -477,20 +431,6 @@ export default function CronogramaClient() {
             Gere pedidos a partir do Mapa de Cotação pra acompanhar as entregas aqui.
           </p>
         </div>
-      ) : visao === "kanban" ? (
-        <KanbanView
-          grupos={gruposKanban}
-          filtroStatus={filtroStatus}
-          expandido={expandido}
-          setExpandido={setExpandido}
-          registrarEntrega={registrarEntrega}
-          registrando={registrando}
-          onCobrar={setModalCobrar}
-          onAtualizarPrazo={setModalPrazo}
-          onAjustarOmie={ajustarOmie}
-          ajustandoOmie={ajustandoOmie}
-          onExcluir={setModalExcluir}
-        />
       ) : (
         <TabelaView
           pedidos={pedidosFiltrados}
@@ -501,6 +441,8 @@ export default function CronogramaClient() {
           onCobrar={setModalCobrar}
           onAtualizarPrazo={setModalPrazo}
           onExcluir={setModalExcluir}
+          onAjustarOmie={ajustarOmie}
+          ajustandoOmie={ajustandoOmie}
         />
       )}
 
@@ -538,285 +480,7 @@ export default function CronogramaClient() {
 
 /* ─── Kanban View ────────────────────────────────────────────────── */
 
-function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo, onAjustarOmie, ajustandoOmie, onExcluir }) {
-  const colunas = filtroStatus
-    ? KANBAN_ORDER.filter((k) => k === filtroStatus)
-    : KANBAN_ORDER;
-
-  return (
-    <div className={`grid gap-4 ${
-      colunas.length === 1
-        ? "grid-cols-1 max-w-2xl"
-        : colunas.length <= 3
-        ? `grid-cols-1 md:grid-cols-${colunas.length}`
-        : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
-    }`}>
-      {colunas.map((key) => {
-        const cfg = STATUS_CFG[key];
-        const lista = grupos[key] || [];
-        return (
-          <div key={key} className={`rounded-xl border ${cfg.border} bg-white flex flex-col min-h-[200px]`}>
-            {/* Cabeçalho da coluna */}
-            <div className={`px-3 py-2.5 ${cfg.headerBg} rounded-t-xl border-b ${cfg.border} flex items-center justify-between`}>
-              <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
-                <span className="text-sm font-semibold text-torg-dark">{cfg.label}</span>
-              </div>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cfg.badge}`}>
-                {lista.length}
-              </span>
-            </div>
-
-            {/* Cards */}
-            <div className="p-2 space-y-2 flex-1 overflow-y-auto max-h-[600px]">
-              {lista.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-6">Nenhum pedido</p>
-              ) : (
-                lista.map((p) => (
-                  <PedidoCard
-                    key={p.id}
-                    pedido={p}
-                    cfg={cfg}
-                    isExpanded={expandido === p.id}
-                    onToggle={() => setExpandido(expandido === p.id ? null : p.id)}
-                    onRegistrarEntrega={() => registrarEntrega(p.id)}
-                    registrando={registrando === p.id}
-                    onCobrar={onCobrar}
-                    onAtualizarPrazo={onAtualizarPrazo}
-                    onAjustarOmie={onAjustarOmie}
-                    ajustandoOmie={ajustandoOmie === p.id}
-                    onExcluir={onExcluir}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ─── Pedido Card (Kanban) ───────────────────────────────────────── */
-
-function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo, onAjustarOmie, ajustandoOmie, onExcluir }) {
-  const p = pedido;
-  const dias = diasAte(p.prazoEntregaPrevisto);
-  const diasLabel = dias !== null
-    ? dias < 0 ? `${Math.abs(dias)}d atraso` : dias === 0 ? "Hoje" : `em ${dias}d`
-    : null;
-
-  return (
-    <div
-      className={`border rounded-lg p-3 cursor-pointer transition-all hover:shadow-sm overflow-hidden ${
-        isExpanded ? "ring-1 ring-torg-blue/30 border-torg-blue-200 bg-sky-50/30" : "border-gray-200 bg-white"
-      }`}
-      onClick={onToggle}
-    >
-      {/* Header: número + valor */}
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-mono font-bold text-torg-blue">
-          #{p.numero}
-        </span>
-        <span className="text-xs font-semibold text-torg-dark tabular-nums">
-          {fmtMoeda(p.total)}
-        </span>
-      </div>
-
-      {/* Fornecedor */}
-      <p className="text-sm font-medium text-torg-dark leading-snug truncate" title={p.fornecedor}>
-        {p.fornecedor}
-      </p>
-
-      {/* OP + prazo */}
-      <div className="flex items-center justify-between mt-2 text-[11px] text-torg-gray">
-        <span className="truncate">
-          {p.opNumero ? fmtOP(p.opNumero) : "Sem OP"}
-          {p.opCliente ? ` · ${p.opCliente}` : ""}
-        </span>
-        {p.qtdItens > 0 && (
-          <span className="text-gray-400 shrink-0 ml-2">{p.qtdItens} ite{p.qtdItens !== 1 ? "ns" : "m"}</span>
-        )}
-      </div>
-
-      {/* Prazo */}
-      {p.prazoEntregaPrevisto && (
-        <div className="flex items-center gap-1.5 mt-2 text-[11px]">
-          <CalendarDays size={11} className="text-torg-gray" />
-          <span className="text-torg-gray">{fmtDataCurta(p.prazoEntregaPrevisto)}</span>
-          {diasLabel && (
-            <span className={`font-medium ${
-              p.statusEntrega === "ATRASADO" ? "text-red-600" :
-              p.statusEntrega === "PROXIMO" ? "text-amber-600" :
-              "text-torg-gray"
-            }`}>
-              ({diasLabel})
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* NF de entrada — aparece direto no card quando tem recebimento */}
-      {p.temRecebimento && (() => {
-        const nfs = [...new Set(p.recebimentos.filter(r => r.nfNumero).map(r => r.nfNumero))];
-        return nfs.length > 0 ? (
-          <div className="flex items-center gap-1.5 mt-2 text-[11px]">
-            <FileText size={11} className="text-emerald-600" />
-            <span className="text-emerald-700 font-medium">
-              NF {nfs.join(", ")}
-            </span>
-          </div>
-        ) : null;
-      })()}
-
-      {/* Data de entrega — quando já entregue */}
-      {p.dataEntregaReal && (
-        <div className="flex items-center gap-1.5 mt-1 text-[11px]">
-          <CheckCircle2 size={11} className="text-emerald-500" />
-          <span className="text-emerald-700 font-medium">Entregue {fmtDataCurta(p.dataEntregaReal)}</span>
-        </div>
-      )}
-
-      {/* Badges */}
-      <div className="flex gap-1 mt-1.5 flex-wrap">
-        {p.faturamentoDireto && (
-          <span className="inline-block text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded font-medium">
-            FD
-          </span>
-        )}
-        {p.foiPostergado && (
-          <span className="inline-block text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded font-medium">
-            Postergado
-          </span>
-        )}
-      </div>
-
-      {/* Expandido: detalhes */}
-      {isExpanded && (
-        <div className="mt-3 pt-3 border-t border-gray-100 space-y-3" onClick={(e) => e.stopPropagation()}>
-          {/* Itens do pedido */}
-          {p.itens.length > 0 && (
-            <div className="bg-gray-50 rounded-md px-2.5 py-2">
-              <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-1.5 font-semibold">Itens</p>
-              <div className="space-y-0.5">
-                {p.itens.slice(0, 5).map((it, i) => (
-                  <div key={i} className="flex items-baseline gap-1 text-xs min-w-0">
-                    <span className="truncate text-torg-dark flex-1 min-w-0" title={it.descricao}>{it.descricao}</span>
-                    <span className="text-torg-gray tabular-nums whitespace-nowrap shrink-0">
-                      {it.qtd != null ? `${Number(it.qtd).toFixed(it.unidade === "KG" ? 1 : 0)} ${it.unidade || ""}` : ""}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              {p.itens.length > 5 && (
-                <p className="text-[10px] text-gray-400 mt-1">+ {p.itens.length - 5} itens</p>
-              )}
-            </div>
-          )}
-
-          {/* Recebimentos */}
-          {p.temRecebimento && (
-            <div className="bg-emerald-50 rounded-md px-2.5 py-2">
-              <p className="text-[10px] text-emerald-700 uppercase tracking-wide mb-1.5 font-semibold">Recebimentos</p>
-              <div className="space-y-0.5">
-                {p.recebimentos.slice(0, 5).map((r) => (
-                  <div key={r.id} className="flex items-center gap-2 text-xs min-w-0">
-                    <span className="text-torg-dark whitespace-nowrap">{fmtDataCurta(r.dataRecebimento)}</span>
-                    <span className="text-torg-gray tabular-nums whitespace-nowrap">{r.qtdRecebida}</span>
-                    {r.nfNumero && (
-                      <span className="text-emerald-700 font-mono text-[10px] font-medium whitespace-nowrap">NF {r.nfNumero}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Timeline de prazos */}
-          {p.prazoHistorico?.length > 0 && (
-            <TimelinePrazos historico={p.prazoHistorico} prazoOriginal={p.prazoOriginal} />
-          )}
-
-          {/* Datas */}
-          <div className="flex gap-4 text-[11px]">
-            <div>
-              <span className="text-torg-gray">Criado </span>
-              <span className="text-torg-dark font-medium">{fmtDataCurta(p.createdAt)}</span>
-            </div>
-            {p.dataEntregaReal && (
-              <div>
-                <span className="text-torg-gray">Entregue </span>
-                <span className="text-emerald-700 font-medium">{fmtDataCurta(p.dataEntregaReal)}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Ações */}
-          <div className="flex gap-2 pt-1 flex-wrap">
-            {p.opId && (
-              <Link
-                href={`/compras/painel-ops/${p.opId}`}
-                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 bg-sky-100 text-torg-blue rounded-lg hover:bg-sky-200 font-medium"
-              >
-                <ExternalLink size={10} /> Ver OP
-              </Link>
-            )}
-            {p.statusEntrega !== "ENTREGUE" && (
-              <button
-                onClick={() => onAtualizarPrazo(p)}
-                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 font-medium"
-              >
-                <CalendarClock size={10} /> Prazo
-              </button>
-            )}
-            {p.statusEntrega !== "ENTREGUE" && (
-              <button
-                onClick={onRegistrarEntrega}
-                disabled={registrando}
-                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 font-medium disabled:opacity-50"
-              >
-                {registrando ? <Loader2 size={10} className="animate-spin" /> : <CheckCircle2 size={10} />}
-                Entregue
-              </button>
-            )}
-            {p.statusEntrega === "ATRASADO" && p.fornecedorEmail && (
-              <button
-                onClick={() => onCobrar(p)}
-                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium"
-              >
-                <Mail size={10} /> Cobrar
-              </button>
-            )}
-            {p.temRecebimento && p.codigoPedido && (
-              <button
-                onClick={() => onAjustarOmie(p)}
-                disabled={ajustandoOmie}
-                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 font-medium disabled:opacity-50"
-                title="Ajustar quantidades do pedido no Omie para igualar ao recebimento real (NF)"
-              >
-                {ajustandoOmie ? <Loader2 size={10} className="animate-spin" /> : <Wrench size={10} />}
-                Ajustar Omie
-              </button>
-            )}
-            {!p.temRecebimento && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onExcluir(p); }}
-                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 bg-gray-100 text-torg-gray rounded-lg hover:bg-red-100 hover:text-red-700 font-medium"
-                title="Excluir este pedido do portal (ex.: registro de teste)"
-              >
-                <Trash2 size={10} /> Excluir
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── Tabela View ────────────────────────────────────────────────── */
-
-function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir }) {
+function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir, onAjustarOmie, ajustandoOmie }) {
   if (pedidos.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
@@ -870,6 +534,8 @@ function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, regist
                   onCobrar={onCobrar}
                   onAtualizarPrazo={onAtualizarPrazo}
                   onExcluir={onExcluir}
+                  onAjustarOmie={onAjustarOmie}
+                  ajustandoOmie={ajustandoOmie === p.id}
                 />
               );
             })}
@@ -880,7 +546,7 @@ function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, regist
   );
 }
 
-function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir }) {
+function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir, onAjustarOmie, ajustandoOmie }) {
   const diasColor = p.statusEntrega === "ATRASADO" ? "text-red-600 font-semibold"
     : p.statusEntrega === "PROXIMO" ? "text-amber-600 font-medium"
     : "text-torg-gray";
@@ -1046,6 +712,19 @@ function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRe
                   className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium"
                 >
                   <Mail size={12} /> Cobrar fornecedor
+                </button>
+              )}
+              {/* ⚠ "Ajustar Omie" só existia no cartão do kanban. Ao tirar o kanban a ação se perderia
+                  em silêncio — e é ela que fecha pedido cuja NF veio com peso diferente do pedido. */}
+              {p.temRecebimento && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onAjustarOmie(p); }}
+                  disabled={ajustandoOmie}
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 font-medium disabled:opacity-50"
+                  title="Iguala a quantidade do pedido no Omie ao peso realmente recebido na NF"
+                >
+                  {ajustandoOmie ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                  Ajustar Omie
                 </button>
               )}
               {!p.temRecebimento && (
