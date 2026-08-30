@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { fmtOP } from "@/lib/utils";
-import { FolderKanban, FileText, Mail, Truck, ChevronRight } from "lucide-react";
+import { FolderKanban, ChevronRight } from "lucide-react";
 
 
 const STATUS_OP = {
@@ -80,19 +80,10 @@ export default async function PainelOPs({ searchParams }) {
     };
   });
 
-  // KPIs sempre consideram so OPs ativas (independente do filtro de aba)
+  // ⚠ o filtro fica: `totalAtivas` (o contador da aba) ainda depende dele. O que saiu foi só o
+  // `reduce` que somava RMs, cotações e itens para os cartões que o Vitor pediu para tirar.
   const opsAtivasParaKpis = opsComStats.filter(
     (op) => op.statusCalc !== "ENCERRADA" && op.statusCalc !== "CANCELADA"
-  );
-  const totaisGerais = opsAtivasParaKpis.reduce(
-    (acc, op) => {
-      acc.ops += 1;
-      acc.rms += op.stats.rms;
-      acc.cotacoesRecebidas += op.stats.cotacoesRecebidas;
-      acc.itensPedido += op.stats.itensPedido;
-      return acc;
-    },
-    { ops: 0, rms: 0, cotacoesRecebidas: 0, itensPedido: 0 }
   );
 
   // Filtro por aba
@@ -134,27 +125,6 @@ export default async function PainelOPs({ searchParams }) {
           </Link>
         </div>
       </div>
-
-      {!verFinalizadas && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { label: "OPs ativas",          value: totaisGerais.ops,                color: "bg-torg-blue",     Icon: FolderKanban },
-            { label: "RMs vinculadas",      value: totaisGerais.rms,                color: "bg-torg-blue-700", Icon: FileText },
-            { label: "Cotações recebidas",  value: totaisGerais.cotacoesRecebidas,  color: "bg-torg-orange",   Icon: Mail },
-            { label: "Itens em pedido",     value: totaisGerais.itensPedido,        color: "bg-torg-dark",     Icon: Truck },
-          ].map((c) => (
-            <div key={c.label} className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
-              <div className={`${c.color} p-2.5 rounded-lg`}>
-                <c.Icon size={20} className="text-white" />
-              </div>
-              <div>
-                <p className="text-xs text-torg-gray">{c.label}</p>
-                <p className="text-xl font-extrabold text-torg-dark tabular-nums">{c.value}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
 
       {opsFiltradas.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
