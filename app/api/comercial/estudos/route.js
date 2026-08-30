@@ -31,11 +31,29 @@ export async function POST(req) {
   if (!cliente) return NextResponse.json({ error: "Informe o cliente." }, { status: 400 });
 
   const ano = Number(b.ano) || new Date().getFullYear();
-  // ⚠ o número segue a LQC do Comercial (LQC-nnn-aa): sequencial POR ANO, não global.
-  const ultimo = await prisma.estudoFabricacao.findFirst({ where: { ano }, orderBy: { numero: "desc" }, select: { numero: true } });
+
+  // ⚠⚠ O NÚMERO DA LQC É O NÚMERO DO ORÇAMENTO. Descoberto ao ler as 93 LQCs do SharePoint
+  // (29/08/2026): elas se chamam `LQC-283-26-BERMER-AENA-TORG-R00` — 283-26 é o orçamento. O
+  // portal vinha gerando uma sequência própria (LQC-001, 002, 003, 004) que não correspondia a
+  // orçamento nenhum, então a mesma proposta tinha dois números diferentes: um no Excel do
+  // Comercial e outro aqui. Amarrado ao orçamento, o número passa a ser o mesmo dos dois lados.
+  //
+  // ⚠ Sem orçamento vinculado ainda existe sequencial — proposta pode nascer antes do cadastro —
+  // mas ele começa DEPOIS do maior número do ano, para não colidir com um orçamento futuro.
+  let numero = null;
+  if (b.orcamentoId) {
+    const orc = await prisma.orcamento.findUnique({ where: { id: b.orcamentoId }, select: { numero: true } });
+    const n = Number(String(orc?.numero || "").split("-")[0]);
+    if (Number.isFinite(n) && n > 0) numero = n;
+  }
+  if (!numero) {
+    const ultimo = await prisma.estudoFabricacao.findFirst({ where: { ano }, orderBy: { numero: "desc" }, select: { numero: true } });
+    numero = (ultimo?.numero || 0) + 1;
+  }
+
   const estudo = await prisma.estudoFabricacao.create({
     data: {
-      ano, numero: (ultimo?.numero || 0) + 1, cliente,
+      ano, numero, cliente,
       obra: String(b.obra || "").trim() || null,
       orcamentoId: b.orcamentoId || null,
       metodo: b.metodo || "ESTIMATIVA",
