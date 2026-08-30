@@ -1,8 +1,6 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { fmtOP } from "@/lib/utils";
-import { FolderKanban, ChevronRight } from "lucide-react";
+import ListaOPsClient from "./ListaOPsClient";
 
 
 const STATUS_OP = {
@@ -21,13 +19,9 @@ function calcStatus(op) {
   return "ABERTA";
 }
 
-const fmtMoeda = (v) =>
-  v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
-const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
-export default async function PainelOPs({ searchParams }) {
+export default async function PainelOPs() {
   await requireRole(["ADMIN", "COMPRAS"]);
-  const verFinalizadas = searchParams?.finalizadas === "1";
 
   const opsRaw = await prisma.oP.findMany({
     include: {
@@ -86,118 +80,31 @@ export default async function PainelOPs({ searchParams }) {
     (op) => op.statusCalc !== "ENCERRADA" && op.statusCalc !== "CANCELADA"
   );
 
-  // Filtro por aba
-  const opsFiltradas = opsComStats.filter((op) =>
-    verFinalizadas
-      ? op.statusCalc === "ENCERRADA" || op.statusCalc === "CANCELADA"
-      : op.statusCalc !== "ENCERRADA" && op.statusCalc !== "CANCELADA"
-  );
+  // ⚠ SÓ OBRA EM ANDAMENTO. Vitor (30/08/2026): "OPs finalizadas pode tirar dessa lista, aqui só
+  // fica obras em andamento". A aba de finalizadas saiu junto — histórico de obra encerrada não é
+  // trabalho de Compras, e ela só empurrava para baixo o que precisa de atenção.
+  const opsFiltradas = opsAtivasParaKpis;
+
   const totalAtivas = opsAtivasParaKpis.length;
   const totalFinalizadas = opsComStats.length - totalAtivas;
 
   return (
-    <div className="space-y-6 max-w-7xl">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Painel de OPs</h2>
-          <p className="text-sm text-torg-gray mt-1">
-            {verFinalizadas
-              ? "OPs encerradas e canceladas — histórico de obras concluídas."
-              : "Visão por contrato — cada OP traz suas RMs, cotações e pedidos. Clique pra abrir o mapa de cotação."}
-          </p>
-        </div>
-        <div className="flex gap-1 flex-wrap">
-          <Link
-            href="/compras/painel-ops"
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
-              !verFinalizadas ? "bg-torg-blue text-white" : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
-            }`}
-          >
-            Ativas ({totalAtivas})
-          </Link>
-          <Link
-            href="/compras/painel-ops?finalizadas=1"
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
-              verFinalizadas ? "bg-torg-blue text-white" : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
-            }`}
-          >
-            Finalizadas ({totalFinalizadas})
-          </Link>
-        </div>
+    <div className="space-y-5 max-w-7xl">
+      <div>
+        <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Painel de OPs</h2>
+        <p className="text-sm text-torg-gray mt-1">
+          Obras em andamento — cada OP traz suas RMs, cotações e pedidos. Clique pra abrir o mapa de cotação.
+        </p>
       </div>
 
-      {opsFiltradas.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-          <FolderKanban size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-torg-gray text-lg">
-            {verFinalizadas ? "Nenhuma OP finalizada ainda" : "Nenhuma OP ativa"}
-          </p>
-          <p className="text-sm text-torg-gray mt-1">
-            {verFinalizadas
-              ? "Quando uma OP for encerrada, ela aparece aqui."
-              : "Quando o Comercial cadastrar OPs, elas vão aparecer aqui agrupadas com suas RMs e cotações."}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {opsFiltradas.map((op) => {
-            const s = STATUS_OP[op.statusCalc] || STATUS_OP.ABERTA;
-            return (
-              <Link
-                key={op.id}
-                href={`/compras/painel-ops/${op.id}`}
-                className="block bg-white rounded-xl shadow-sm border border-gray-100 hover:border-torg-blue-200 hover:shadow-md transition-all p-5"
-              >
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className="w-12 h-12 rounded-lg bg-torg-blue-50 flex items-center justify-center flex-shrink-0">
-                      <FolderKanban size={22} className="text-torg-blue" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-mono font-semibold text-torg-blue text-lg">{fmtOP(op.numero)}</h3>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${s.className}`}>
-                          {s.label}
-                        </span>
-                      </div>
-                      <p className="text-sm text-torg-dark font-medium truncate">{op.cliente}</p>
-                      {op.obra && <p className="text-xs text-torg-gray truncate">{op.obra}</p>}
-                    </div>
-                  </div>
-                  <ChevronRight size={20} className="text-torg-gray flex-shrink-0 self-center" />
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4 pt-4 border-t border-gray-100 text-sm">
-                  <div>
-                    <p className="text-xs text-torg-gray">Início</p>
-                    <p className="text-torg-dark font-medium">{fmtData(op.dataInicio)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-torg-gray">Fim previsto</p>
-                    <p className="text-torg-dark font-medium">{fmtData(op.dataFimPrevista)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-torg-gray">RMs</p>
-                    <p className="text-torg-dark font-medium">{op.stats.rms}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-torg-gray">Cotações</p>
-                    <p className="text-torg-dark font-medium">
-                      {op.stats.cotacoesRecebidas}/{op.stats.cotacoesEnviadas}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-torg-gray">Itens em pedido</p>
-                    <p className="text-torg-dark font-medium">
-                      {op.stats.itensPedido}/{op.stats.itensTotais}
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      )}
+      <ListaOPsClient
+        ops={opsFiltradas.map((op) => ({
+          id: op.id, numero: op.numero, cliente: op.cliente, obra: op.obra,
+          dataFimPrevista: op.dataFimPrevista ? op.dataFimPrevista.toISOString() : null,
+          statusCalc: op.statusCalc, stats: op.stats,
+        }))}
+        statusCfg={STATUS_OP}
+      />
     </div>
   );
 }
