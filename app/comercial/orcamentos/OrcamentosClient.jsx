@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
-import { fmtOP } from "@/lib/utils";
+import { fmtOP, fmtMoedaCompacta, fmtMoedaInteira } from "@/lib/utils";
 import OrcamentosTabs from "@/components/OrcamentosTabs";
 
 // ─── CONSTANTES ─────────────────────────────────────────────────
@@ -41,12 +41,7 @@ const VENDEDORES = ["Vitor", "Patrícia", "Matheus", "André Metzker", "Jorge"];
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
-const fmtMoedaCurto = (v) => {
-  if (v == null || v === 0) return "R$ 0";
-  if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1).replace(".", ",")}M`;
-  if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(0)}k`;
-  return `R$ ${v.toFixed(0)}`;
-};
+
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
 // ─── HELPERS DE PERÍODO ─────────────────────────────────────────
@@ -297,10 +292,12 @@ export default function OrcamentosClient() {
   // ─── CARDS KPI ──────────────────────────────────────────────
 
   const cards = [
-    { label: "Total orçado",     value: fmtMoedaCurto(kpis.valorTotal),  sub: `${kpis.total} propostas`,   color: "bg-torg-blue",   Icon: DollarSign },
-    { label: "Obras fechadas",   value: fmtMoedaCurto(kpis.valorFechado), sub: `${kpis.fechados} fechadas`, color: "bg-green-600",   Icon: FileCheck2 },
-    { label: "Obras perdidas",   value: fmtMoedaCurto(kpis.valorPerdido), sub: `${kpis.perdidos} perdidas`, color: "bg-red-500",     Icon: XCircle },
-    { label: "Conversão",        value: `${taxaConversao}%`,              sub: `${kpis.negociando} em negociação`, color: "bg-torg-dark", Icon: BarChart3 },
+    // ⚠ `exato` fica embaixo do resumo: o resumo é para comparar de relance, o total exato é o
+    // que se leva para uma reunião. Antes só existia o resumo, e mal formatado.
+    { label: "Total orçado",   value: fmtMoedaCompacta(kpis.valorTotal),   exato: fmtMoedaInteira(kpis.valorTotal),   sub: `${kpis.total} propostas`,          color: "bg-torg-blue", Icon: DollarSign },
+    { label: "Obras fechadas", value: fmtMoedaCompacta(kpis.valorFechado), exato: fmtMoedaInteira(kpis.valorFechado), sub: `${kpis.fechados} fechadas`,        color: "bg-green-600", Icon: FileCheck2 },
+    { label: "Obras perdidas", value: fmtMoedaCompacta(kpis.valorPerdido), exato: fmtMoedaInteira(kpis.valorPerdido), sub: `${kpis.perdidos} perdidas`,        color: "bg-red-500",   Icon: XCircle },
+    { label: "Conversão",      value: `${taxaConversao}%`,                 exato: null,                               sub: `${kpis.negociando} em negociação`, color: "bg-torg-dark", Icon: BarChart3 },
   ];
 
   // ─── RENDER ─────────────────────────────────────────────────
@@ -448,10 +445,13 @@ export default function OrcamentosClient() {
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-torg-gray truncate">{c.label}</p>
-                <p className="text-xl font-extrabold text-torg-dark tabular-nums truncate">
+                <p className="text-xl font-extrabold text-torg-dark tabular-nums truncate" title={c.exato || undefined}>
                   {c.value}
                 </p>
-                <p className="text-[10px] text-torg-gray/70 truncate">{c.sub}</p>
+                {/* o total exato, embaixo do resumo — é o número que vai para a reunião */}
+                <p className="text-[10px] text-torg-gray/70 tabular-nums truncate">
+                  {c.exato ? `${c.exato} · ${c.sub}` : c.sub}
+                </p>
               </div>
             </div>
           ))}
