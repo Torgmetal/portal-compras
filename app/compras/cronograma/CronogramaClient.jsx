@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { fmtOP } from "@/lib/utils";
 import Link from "next/link";
-import { Loader2, AlertCircle, Package, Clock, AlertTriangle, CheckCircle2, CalendarDays, Truck, Filter, RefreshCw, ChevronDown, ChevronRight, ExternalLink, FileText, MapPin, Wrench, Mail, Send, X, CalendarClock, History, Trash2 } from "lucide-react";
+import { Loader2, AlertCircle, Package, Clock, AlertTriangle, CheckCircle2, CalendarDays, Truck, RefreshCw, ChevronDown, ChevronRight, ExternalLink, FileText, MapPin, Wrench, Mail, Send, X, CalendarClock, History, Trash2, ArrowUpDown } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 
 const fmtMoeda = (v) =>
@@ -37,6 +37,11 @@ export default function CronogramaClient() {
   const [erro, setErro] = useState("");
   const [abaEntregas, setAbaEntregas] = useState("ENGENHARIA"); // "ENGENHARIA" | "INTERNA"
   const [filtroFornecedor, setFiltroFornecedor] = useState("");
+  // ⚠ FILTRO TIPO PLANILHA (Vitor, 30/08/2026): a tela existe para o Compras cobrar prazo e conferir
+  // o que chegou. Com 206 pedidos, os dois seletores do topo não davam conta — o que resolve é
+  // filtrar na própria coluna e poder ordenar por ela, como se faz numa planilha.
+  const [filtroNumero, setFiltroNumero] = useState("");
+  const [ordem, setOrdem] = useState({ campo: "prazo", dir: "asc" });
   const [filtroOP, setFiltroOP] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
   const [expandido, setExpandido] = useState(null);
@@ -106,8 +111,28 @@ export default function CronogramaClient() {
     if (filtroFornecedor) lista = lista.filter((p) => p.fornecedor === filtroFornecedor);
     if (filtroOP) lista = lista.filter((p) => p.opId === filtroOP);
     if (filtroStatus) lista = lista.filter((p) => p.statusEntrega === filtroStatus);
-    return lista;
-  }, [pedidos, filtroFornecedor, filtroOP, filtroStatus]);
+    if (filtroNumero) lista = lista.filter((p) => String(p.numero || "").includes(filtroNumero.trim()));
+
+    // ⚠ cópia antes de ordenar: `sort` altera o array no lugar, e `lista` pode ainda ser o próprio
+    // `pedidos` quando nenhum filtro está ativo — ordenar ali reordenaria o estado por baixo.
+    const val = (p) => {
+      switch (ordem.campo) {
+        case "numero": return Number(p.numero) || 0;
+        case "fornecedor": return String(p.fornecedor || "").toLowerCase();
+        case "op": return String(p.opNumero || "").toLowerCase();
+        case "itens": return Number(p.qtdItens) || 0;
+        case "valor": return Number(p.total) || 0;
+        // ⚠ pedido SEM prazo vai para o fim, não para o começo: uma data nula viraria 0 e a lista
+        // abriria com o que ninguém consegue cobrar, escondendo o que está atrasado.
+        default: return p.prazoEntregaPrevisto ? new Date(p.prazoEntregaPrevisto).getTime() : Infinity;
+      }
+    };
+    return [...lista].sort((a, b) => {
+      const va = val(a), vb = val(b);
+      const c = typeof va === "string" ? va.localeCompare(vb) : (va === vb ? 0 : va < vb ? -1 : 1);
+      return ordem.dir === "asc" ? c : -c;
+    });
+  }, [pedidos, filtroFornecedor, filtroOP, filtroStatus, filtroNumero, ordem]);
 
 
   // Listas únicas pra filtros
@@ -346,35 +371,9 @@ export default function CronogramaClient() {
       {/* Filtros + toggle visao */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2 text-sm text-torg-gray">
-            <Filter size={16} />
-            <span className="font-medium">Filtros:</span>
-          </div>
-          {abaEntregas === "ENGENHARIA" && (
-            <select
-              value={filtroOP}
-              onChange={(e) => setFiltroOP(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-1 focus:ring-torg-blue"
-            >
-              <option value="">Todas as OPs</option>
-              {ops.map(([id, label]) => (
-                <option key={id} value={id}>{label}</option>
-              ))}
-            </select>
-          )}
-          <select
-            value={filtroFornecedor}
-            onChange={(e) => setFiltroFornecedor(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-1 focus:ring-torg-blue"
-          >
-            <option value="">Todos os fornecedores</option>
-            {fornecedores.map((f) => (
-              <option key={f} value={f}>{f}</option>
-            ))}
-          </select>
-          {(filtroOP || filtroFornecedor || filtroStatus) && (
+          {(filtroOP || filtroFornecedor || filtroStatus || filtroNumero) && (
             <button
-              onClick={() => { setFiltroOP(""); setFiltroFornecedor(""); setFiltroStatus(""); }}
+              onClick={() => { setFiltroOP(""); setFiltroFornecedor(""); setFiltroStatus(""); setFiltroNumero(""); }}
               className="text-xs text-torg-gray hover:text-red-600 underline"
             >
               Limpar filtros
@@ -443,6 +442,11 @@ export default function CronogramaClient() {
           onExcluir={setModalExcluir}
           onAjustarOmie={ajustarOmie}
           ajustandoOmie={ajustandoOmie}
+          filtros={{ status: filtroStatus, numero: filtroNumero, fornecedor: filtroFornecedor, op: filtroOP }}
+          setFiltros={{ status: setFiltroStatus, numero: setFiltroNumero, fornecedor: setFiltroFornecedor, op: setFiltroOP }}
+          listas={{ fornecedores, ops }}
+          ordem={ordem}
+          setOrdem={setOrdem}
         />
       )}
 
@@ -480,15 +484,22 @@ export default function CronogramaClient() {
 
 /* ─── Kanban View ────────────────────────────────────────────────── */
 
-function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir, onAjustarOmie, ajustandoOmie }) {
-  if (pedidos.length === 0) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-        <Package size={36} className="mx-auto text-gray-300 mb-3" />
-        <p className="text-torg-gray">Nenhum pedido encontrado com esses filtros</p>
-      </div>
-    );
-  }
+function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir, onAjustarOmie, ajustandoOmie, filtros, setFiltros, listas, ordem, setOrdem }) {
+  // ⚠ o cabeçalho com os filtros fica MESMO quando o resultado é vazio: se ele sumisse junto, quem
+  // filtrou demais ficaria sem como desfazer e teria que recarregar a página.
+  const Th = ({ campo, children, className = "" }) => (
+    <th className={`px-3 py-2.5 text-left text-[11px] font-semibold text-torg-gray uppercase tracking-wider whitespace-nowrap ${className}`}>
+      <button
+        onClick={() => setOrdem((o) => ({ campo, dir: o.campo === campo && o.dir === "asc" ? "desc" : "asc" }))}
+        className="inline-flex items-center gap-1 hover:text-torg-blue"
+        title="Ordenar por esta coluna"
+      >
+        {children}
+        <ArrowUpDown size={11} className={ordem.campo === campo ? "text-torg-blue" : "text-gray-300"} />
+      </button>
+    </th>
+  );
+  const inputCls = "w-full border border-gray-200 rounded px-2 py-1 text-xs bg-white focus:ring-1 focus:ring-torg-blue focus:border-torg-blue";
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -501,17 +512,52 @@ function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, regist
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50/60 border-b border-gray-100">
-              <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-torg-gray uppercase tracking-wider w-[110px]">Status</th>
-              <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-torg-gray uppercase tracking-wider w-[90px]">Nº Pedido</th>
-              <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-torg-gray uppercase tracking-wider">Fornecedor</th>
-              <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-torg-gray uppercase tracking-wider w-[120px]">OP</th>
-              <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-torg-gray uppercase tracking-wider w-[100px]">Prazo</th>
-              <th className="px-4 py-2.5 text-center text-[11px] font-semibold text-torg-gray uppercase tracking-wider w-[60px]">Itens</th>
-              <th className="px-4 py-2.5 text-right text-[11px] font-semibold text-torg-gray uppercase tracking-wider w-[110px]">Valor</th>
+              <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-torg-gray uppercase tracking-wider w-[120px]">Status</th>
+              <Th campo="numero" className="w-[100px] whitespace-nowrap">Pedido</Th>
+              <Th campo="fornecedor">Fornecedor</Th>
+              <Th campo="op" className="w-[130px]">OP</Th>
+              <Th campo="prazo" className="w-[110px]">Prazo</Th>
+              <Th campo="itens" className="w-[70px]">Itens</Th>
+              <Th campo="valor" className="w-[120px]">Valor</Th>
               <th className="px-2 py-2.5 w-[30px]" />
+            </tr>
+            {/* ⚠ linha de filtros por coluna — o "tipo planilha" que o Vitor pediu. Fornecedor e OP
+                são seleção (a lista é fechada e digitar o nome inteiro seria pior); número é texto
+                porque ninguém lembra o pedido exato, procura pelo "19..". */}
+            <tr className="bg-white border-b border-gray-100">
+              <td className="px-3 py-2">
+                <select value={filtros.status} onChange={(e) => setFiltros.status(e.target.value)} className={inputCls}>
+                  <option value="">Todos</option>
+                  {Object.entries(STATUS_CFG).map(([k, c]) => <option key={k} value={k}>{c.label}</option>)}
+                </select>
+              </td>
+              <td className="px-3 py-2">
+                <input value={filtros.numero} onChange={(e) => setFiltros.numero(e.target.value)} placeholder="nº" className={inputCls} />
+              </td>
+              <td className="px-3 py-2">
+                <select value={filtros.fornecedor} onChange={(e) => setFiltros.fornecedor(e.target.value)} className={inputCls}>
+                  <option value="">Todos</option>
+                  {(listas?.fornecedores || []).map((f) => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </td>
+              <td className="px-3 py-2">
+                <select value={filtros.op} onChange={(e) => setFiltros.op(e.target.value)} className={inputCls}>
+                  <option value="">Todas</option>
+                  {(listas?.ops || []).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                </select>
+              </td>
+              <td colSpan={4} />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
+            {pedidos.length === 0 && (
+              <tr>
+                <td colSpan={8} className="px-4 py-10 text-center text-sm text-torg-gray">
+                  <Package size={28} className="mx-auto text-gray-300 mb-2" />
+                  Nenhum pedido com esses filtros.
+                </td>
+              </tr>
+            )}
             {pedidos.map((p) => {
               const cfg = STATUS_CFG[p.statusEntrega || "SEM_PRAZO"];
               const dias = diasAte(p.prazoEntregaPrevisto);
