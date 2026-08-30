@@ -10,6 +10,7 @@ import { gerarCronogramaAuditoriaPDF } from "@/lib/cronograma-auditoria-pdf";
 import { sendEmail } from "@/lib/email";
 import { cabecalhoEmail } from "@/lib/email-layout";
 import { baseUrlDe } from "@/lib/databook-assinaturas";
+import { arquivarForm, pastaDe } from "@/lib/arquivar-form";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -59,7 +60,18 @@ export async function POST(req) {
     data: { tipo: TIPO, revisao, titulo, snapshot: { ano, revisao, auditorias }, enviadoPorId: user.id || null },
   });
 
-  const pdfB64 = Buffer.from(await gerarCronogramaAuditoriaPDF({ ano, revisao, auditorias })).toString("base64");
+  const pdfBytes = await gerarCronogramaAuditoriaPDF({ ano, revisao, auditorias });
+  const pdfB64 = Buffer.from(pdfBytes).toString("base64");
+
+  // ⚠ ARQUIVA A REVISÃO QUE FOI ENVIADA PARA ASSINATURA — é este o documento que os setores
+  // validaram. O nome carrega a revisão para que R00 e R01 convivam na pasta: aqui a versão
+  // anterior NÃO deve ser substituída, porque cada uma tem assinaturas próprias.
+  const arq = await arquivarForm({
+    pasta: pastaDe("AUDITORIA_INTERNA", { ano }),
+    nomeArquivo: `Cronograma de Auditoria Interna ${ano} ${fmtRev(revisao)}.pdf`,
+    bytes: pdfBytes,
+  });
+  if (!arq.ok) console.error("[cronograma-auditoria] arquivamento:", arq.erro);
   const base = baseUrlDe(req);
   let enviados = 0;
 
