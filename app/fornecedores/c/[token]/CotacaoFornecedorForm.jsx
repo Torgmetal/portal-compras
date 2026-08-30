@@ -221,8 +221,9 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     return res.json(); // { id, url, nomeArquivo, tamanho, tipo }
   }
 
-  // Faz parse via IA (ou fallback regex) de um PDF. Retorna { itens, fornecedor, prazoPagamento, usouIA }.
+  // Faz parse via IA (ou fallback regex) de um PDF. Retorna { itens, fornecedor, prazoPagamento, usouIA, motivoIA }.
   async function parsePDF(file) {
+    let motivoIA = null; // por que a leitura por IA não valeu — hoje isso sumia sem rastro
     const base64 = await new Promise((resolve, reject) => {
       const r = new FileReader();
       r.onload = () => resolve(r.result);
@@ -250,7 +251,18 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
         const data = await resIA.json();
         return { ...data, usouIA: true };
       }
-    } catch (_) { /* cai no fallback */ }
+      // ⚠ O ERRO DA IA ERA DESCARTADO SEM SER LIDO. A rota devolve mensagens boas (limite de
+      // requisições, PDF sem texto, arquivo grande demais) que nunca chegavam à tela: o fluxo caía
+      // no regex em silêncio e, quando ele também não casava, ninguém sabia por quê.
+      const detalhe = await resIA.json().catch(() => ({}));
+      motivoIA = detalhe?.error
+        ? `${detalhe.error}`
+        : resIA.status === 429 ? "Muitas leituras seguidas — aguarde um minuto e tente de novo."
+        : resIA.status === 413 ? "PDF grande demais para a leitura automática."
+        : `Leitura automática indisponível (${resIA.status}).`;
+    } catch (e) {
+      motivoIA = "Não consegui falar com a leitura automática — tentando o modo simples.";
+    }
 
     // 2. Fallback regex
     const resFb = await fetch("/api/parse-pdf-cotacao", {
@@ -263,7 +275,10 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
       throw new Error(e.error || "Falha ao ler PDF");
     }
     const data = await resFb.json();
-    return { ...data, usouIA: false };
+    // ⚠ os `avisos` que a rota já devolve ("PDF sem texto extraível", ou seja, escaneado) eram
+    // jogados fora. Vão junto: sem eles o fornecedor vê "não conseguimos casar os itens" e não tem
+    // como saber que o problema é o PDF dele ser imagem.
+    return { ...data, usouIA: false, motivoIA, avisos: data.avisos || [] };
   }
 
   // Aceita 1 ou mais PDFs. Sobe todos pro blob, mas o parse via IA roda
@@ -326,6 +341,11 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
             usouIA: data.usouIA,
             nomeArquivo: lista[0].name,
             multiPdf: lista.length > 1,
+            // ⚠ o porquê da falha vai para a tela. Antes, "não conseguimos casar os itens" era tudo
+            // o que o fornecedor via — sem saber se o PDF dele é escaneado, se o limite de leituras
+            // estourou ou se o arquivo é grande demais.
+            motivoIA: data.motivoIA || null,
+            avisos: data.avisos || [],
           });
           if (data.fornecedor && !razaoSocial) setRazaoSocial(data.fornecedor);
           if (data.prazoPagamento && !condicaoPagamento) setCondicaoPagamento(data.prazoPagamento);
@@ -714,8 +734,13 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
           </div>
         )}
 
+        {/* ⚠⚠ A CAIXA DE ERRO FICA NO TOPO E O BOTÃO "ENVIAR" NO RODAPÉ. Sem o scroll, o fornecedor
+            clica em enviar, uma das quatro validações barra, e NADA muda no campo de visão dele —
+            ele conclui que enviou e vai embora. É a explicação mais provável das 23 cotações da
+            Gerdau com anexo salvo e nenhum valor. */}
         {erro && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
+          <div ref={(el) => el?.scrollIntoView({ behavior: "smooth", block: "center" })}
+            className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
             <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
             <span>{erro}</span>
           </div>
@@ -814,7 +839,12 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                   </div>
                 ) : (
                   <p className="text-torg-orange-700">
-                    ⚠ O PDF foi lido mas não conseguimos casar os itens automaticamente. Pode preencher os preços abaixo manualmente.
+                    ⚠ O PDF foi lido mas não conseguimos casar os itens automaticamente. Preencha os preços abaixo à mão — <strong>e não esqueça de clicar em “Enviar proposta” no final da página</strong>, senão a cotação não chega até nós.
+                    {(parseInfo.motivoIA || parseInfo.avisos?.length > 0) && (
+                      <span className="block mt-1 text-[11px] text-torg-gray">
+                        {[parseInfo.motivoIA, ...(parseInfo.avisos || [])].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
                   </p>
                 )}
                 {parseInfo.match > 0 && autoFilled.size > 0 && (
@@ -826,7 +856,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
             )}
 
             <p className="text-[11px] text-torg-gray mt-3">
-              Aceita PDF de até 10MB. Por enquanto o arquivo não é armazenado — apenas usado pra ler os valores. Se preferir, preencha direto na tabela abaixo.
+              Aceita PDF de até 10MB. O arquivo fica anexado à cotação e os valores são lidos dele. ⚠ Anexar não envia a proposta — confira a tabela abaixo e clique em <strong>Enviar proposta</strong> no final da página.
             </p>
           </div>
 
