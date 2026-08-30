@@ -83,12 +83,15 @@ export async function GET(req) {
           take: 20,
         },
         // Recebimentos parciais
+        // ⚠ `origem` vem junto para a tela separar o que entrou pelo CMR do que foi marcado na mão
+        // ou veio do Omie — são pesos diferentes: o CMR é o registro do Almoxarifado.
         recebimentos: {
           select: {
             id: true,
             qtdRecebida: true,
             dataRecebimento: true,
             nfNumero: true,
+            origem: true,
           },
           orderBy: { dataRecebimento: "desc" },
         },
@@ -217,6 +220,7 @@ export async function GET(req) {
         itens,
         recebimentos: p.recebimentos,
         temRecebimento: p.recebimentos.length > 0,
+        recebimentosCmr: p.recebimentos.filter((r) => r.origem === "CMR").length,
         prazoOriginal: p.prazoOriginal || null,
         prazoHistorico: p.prazoHistorico || [],
         foiPostergado: (p.prazoHistorico?.length || 0) > 0,

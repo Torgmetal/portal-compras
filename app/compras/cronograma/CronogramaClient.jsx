@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { fmtOP } from "@/lib/utils";
 import Link from "next/link";
-import { Loader2, AlertCircle, Package, Clock, AlertTriangle, CheckCircle2, CalendarDays, Truck, RefreshCw, ChevronDown, ChevronRight, ExternalLink, FileText, MapPin, Wrench, Mail, Send, X, CalendarClock, History, Trash2, ArrowUpDown } from "lucide-react";
+import { Loader2, AlertCircle, Package, Clock, AlertTriangle, CheckCircle2, CalendarDays, Truck, RefreshCw, ChevronDown, ChevronRight, ExternalLink, FileText, MapPin, Wrench, Mail, Send, X, CalendarClock, History, Trash2, ArrowUpDown, PackageCheck } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 
 const fmtMoeda = (v) =>
@@ -447,6 +447,7 @@ export default function CronogramaClient() {
           listas={{ fornecedores, ops }}
           ordem={ordem}
           setOrdem={setOrdem}
+          ehConsumivel={abaEntregas === "INTERNA"}
         />
       )}
 
@@ -484,7 +485,7 @@ export default function CronogramaClient() {
 
 /* ─── Kanban View ────────────────────────────────────────────────── */
 
-function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir, onAjustarOmie, ajustandoOmie, filtros, setFiltros, listas, ordem, setOrdem }) {
+function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir, onAjustarOmie, ajustandoOmie, filtros, setFiltros, listas, ordem, setOrdem, ehConsumivel }) {
   // ⚠ o cabeçalho com os filtros fica MESMO quando o resultado é vazio: se ele sumisse junto, quem
   // filtrou demais ficaria sem como desfazer e teria que recarregar a página.
   const Th = ({ campo, children, className = "" }) => (
@@ -582,6 +583,7 @@ function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, regist
                   onExcluir={onExcluir}
                   onAjustarOmie={onAjustarOmie}
                   ajustandoOmie={ajustandoOmie === p.id}
+                  ehConsumivel={ehConsumivel}
                 />
               );
             })}
@@ -592,7 +594,7 @@ function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, regist
   );
 }
 
-function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir, onAjustarOmie, ajustandoOmie }) {
+function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir, onAjustarOmie, ajustandoOmie, ehConsumivel }) {
   const diasColor = p.statusEntrega === "ATRASADO" ? "text-red-600 font-semibold"
     : p.statusEntrega === "PROXIMO" ? "text-amber-600 font-medium"
     : "text-torg-gray";
@@ -742,7 +744,12 @@ function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRe
                   <CalendarClock size={12} /> Atualizar prazo
                 </button>
               )}
-              {p.statusEntrega !== "ENTREGUE" && (
+              {/* ⚠⚠ MARCAR NA MÃO SÓ NOS CONSUMÍVEIS. Vitor (30/08/2026): "só deixa vinculado ao
+                  recebimento do CMR; o botão pode deixar, mas só será usado para itens como
+                  consumíveis que não passam por lá". Material de OP entra pelo Almoxarifado, no CMR
+                  — deixar o botão ali criaria um segundo caminho para o mesmo fato e o portal
+                  passaria a divergir do que o Almoxarifado recebeu. */}
+              {p.statusEntrega !== "ENTREGUE" && ehConsumivel && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onRegistrarEntrega(); }}
                   disabled={registrando}
@@ -751,6 +758,14 @@ function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRe
                   {registrando ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
                   Marcar entregue
                 </button>
+              )}
+              {p.statusEntrega !== "ENTREGUE" && !ehConsumivel && (
+                <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 bg-torg-blue-50 text-torg-blue rounded-lg">
+                  <PackageCheck size={12} />
+                  {p.recebimentosCmr > 0
+                    ? `${p.recebimentosCmr} recebimento(s) no CMR`
+                    : "A entrada é dada no Recebimento (CMR)"}
+                </span>
               )}
               {p.statusEntrega === "ATRASADO" && p.fornecedorEmail && (
                 <button
