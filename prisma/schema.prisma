@@ -1561,6 +1561,9 @@ model MuralAviso {
   // ⚠ Comunicado em VÍDEO com ciência obrigatória no login (Setembro Amarelo, 01/09/2026).
   // `exibirLoginAte` faz o aviso sair do ar sozinho — ninguém precisa lembrar de desligar.
   videoUrl           String?
+  // ⚠ quem NÃO deve receber o comunicado: e-mails de gente de fora com conta no portal
+  // (inspetor terceirizado, cliente). Campanha interna não é assunto deles.
+  dispensados        Json      @default("[]")
   exibirLoginDe      DateTime?
   exibirLoginAte     DateTime?
   ciencias           MuralCiencia[]

@@ -22,6 +22,11 @@ export async function GET() {
   // Sem sessão não é erro: o layout raiz também envolve a tela de login. Só não há nada a mostrar.
   if (!userId) return NextResponse.json({ aviso: null });
 
+  // ⚠⚠ CLIENTE NUNCA RECEBE COMUNICADO INTERNO. Hoje o middleware já barra o tipo CLIENTE nesta
+  // rota, mas essa proteção é indireta: basta alguém acrescentar "/api/mural" à lista de rotas
+  // liberadas do cliente e uma campanha interna apareceria na cara dele. A regra fica aqui também.
+  if (session?.user?.tipo === "CLIENTE") return NextResponse.json({ aviso: null });
+
   const agora = new Date();
   const aviso = await prisma.muralAviso.findFirst({
     // ⚠ JANELA COM COMEÇO E FIM. Só `exibirLoginAte` faria o aviso aparecer no instante em que a
@@ -32,9 +37,17 @@ export async function GET() {
       OR: [{ exibirLoginDe: null }, { exibirLoginDe: { lte: agora } }],
     },
     orderBy: { createdAt: "desc" },
-    select: { id: true, titulo: true, corpo: true, videoUrl: true },
+    select: { id: true, titulo: true, corpo: true, videoUrl: true, dispensados: true },
   });
   if (!aviso) return NextResponse.json({ aviso: null });
+
+  // ⚠ DISPENSADOS: gente de fora com conta no portal. Vitor (30/08/2026): "para os clientes e o
+  // inspetor Lais Stival não precisam assistir ao vídeo". Por e-mail e não por id, para o RH
+  // conseguir ler e manter a lista sem consultar o banco.
+  const email = String(session?.user?.email || "").toLowerCase().trim();
+  const fora = (Array.isArray(aviso.dispensados) ? aviso.dispensados : [])
+    .map((e) => String(e).toLowerCase().trim());
+  if (email && fora.includes(email)) return NextResponse.json({ aviso: null });
 
   // ⚠⚠ SÓ QUEM ASSISTIU DE FATO SAI DA LISTA. Vitor (30/08/2026): "quem abrir uma única vez já tira
   // o vídeo para ele; agora quem não abrir, deixar lá para mostrar até o dia que o camarada for
@@ -47,7 +60,8 @@ export async function GET() {
   });
   if (visto?.assistiu) return NextResponse.json({ aviso: null });
 
-  return NextResponse.json({ aviso });
+  const { dispensados: _d, ...paraTela } = aviso;
+  return NextResponse.json({ aviso: paraTela });
 }
 
 const schema = z.object({
