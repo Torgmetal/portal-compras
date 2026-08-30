@@ -1,9 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import {
-  Loader2, Package, AlertCircle, CheckCircle2, Truck, Clock,
-  Archive, XCircle, ShoppingCart, Filter, ChevronDown, ChevronUp, Download,
-} from "lucide-react";
+import { Loader2, Package, AlertCircle, CheckCircle2, Truck, Clock, Archive, XCircle, ShoppingCart, Filter, ChevronDown, ChevronUp, Download, ArrowUpDown } from "lucide-react";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -85,6 +82,14 @@ export default function MateriaisOPSection({ opId }) {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [filtro, setFiltro] = useState("TODOS");
+  // ⚠ FILTRO POR COLUNA (Vitor, 30/08/2026: "deixar as informações como se fosse planilha e com
+  // filtro em cada coluna"). Os cartões de cima continuam sendo o filtro por STATUS — eles são
+  // úteis e já funcionam; aqui entram as colunas que eles não cobrem.
+  const [fRM, setFRM] = useState("");
+  const [fMat, setFMat] = useState("");
+  const [fPed, setFPed] = useState("");
+  const [fForn, setFForn] = useState("");
+  const [ordem, setOrdem] = useState({ campo: null, dir: "asc" });
   const [expandido, setExpandido] = useState(true);
   const [exportando, setExportando] = useState(false);
   const [exportErro, setExportErro] = useState("");
@@ -208,9 +213,42 @@ export default function MateriaisOPSection({ opId }) {
   const { itens, resumo } = data;
 
   // Aplica filtro
-  const itensFiltrados = filtro === "TODOS"
-    ? itens
-    : itens.filter((it) => derivarStatus(it) === filtro);
+  const contem = (v, q) => !q || String(v ?? "").toLowerCase().includes(q.toLowerCase().trim());
+  const inpCls = "w-full border border-gray-200 rounded px-2 py-1 text-[11px] bg-white focus:ring-1 focus:ring-torg-blue focus:border-torg-blue";
+  const Th = ({ campo, children, align = "text-left", titulo }) => (
+    <th className={`px-3 py-2 ${align} text-xs font-medium text-gray-500 uppercase`} title={titulo}>
+      <button
+        onClick={() => setOrdem((o) => ({ campo, dir: o.campo === campo && o.dir === "asc" ? "desc" : "asc" }))}
+        className="inline-flex items-center gap-1 hover:text-torg-blue uppercase"
+      >
+        {children}
+        <ArrowUpDown size={10} className={ordem.campo === campo ? "text-torg-blue" : "text-gray-300"} />
+      </button>
+    </th>
+  );
+  const itensFiltrados = (() => {
+    let l = filtro === "TODOS" ? itens : itens.filter((it) => derivarStatus(it) === filtro);
+    if (fRM)   l = l.filter((it) => contem(it.rmNumero, fRM));
+    if (fMat)  l = l.filter((it) => contem(it.descricao, fMat) || contem(it.material, fMat));
+    if (fPed)  l = l.filter((it) => contem(it.pedidoNumero, fPed) || contem(it.nfNumero, fPed));
+    if (fForn) l = l.filter((it) => contem(it.fornecedor, fForn));
+    if (!ordem.campo) return l;
+    // ⚠ cópia antes de ordenar: `l` pode ser o próprio `itens` quando nada está filtrado.
+    const val = (it) => {
+      switch (ordem.campo) {
+        case "rm": return String(it.rmNumero || "").toLowerCase();
+        case "material": return String(it.descricao || "").toLowerCase();
+        case "solicitado": return Number(it.peso) > 0 ? Number(it.peso) : Number(it.qtdSolicitada) || 0;
+        case "fornecedor": return String(it.fornecedor || "").toLowerCase();
+        default: return String(derivarStatus(it));
+      }
+    };
+    return [...l].sort((a, b) => {
+      const va = val(a), vb = val(b);
+      const c = typeof va === "string" ? va.localeCompare(vb) : (va === vb ? 0 : va < vb ? -1 : 1);
+      return ordem.dir === "asc" ? c : -c;
+    });
+  })();
 
   const totalItens = itens.length;
 
@@ -308,14 +346,27 @@ export default function MateriaisOPSection({ opId }) {
             <table className="w-full text-sm">
               <thead className="bg-gray-50/60">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">RM</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" title="Peso e nº de barras solicitados">Solicitado</th>
+                  <Th campo="rm">RM</Th>
+                  <Th campo="material">Material</Th>
+                  <Th campo="solicitado" align="text-right" titulo="Peso e nº de barras solicitados">Solicitado</Th>
                   <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Pedido</th>
                   <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">NF</th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" title="Quantidade real recebida">Recebido</th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fornecedor</th>
+                  <Th campo="fornecedor">Fornecedor</Th>
+                </tr>
+                {/* ⚠ linha de filtros por coluna — o "como se fosse planilha" que o Vitor pediu.
+                    Os cartões de cima continuam filtrando por STATUS; aqui entram as colunas que
+                    eles não cobrem. Pedido e NF dividem uma caixa só: quem procura "#1863" ou uma
+                    NF está atrás do mesmo pedido. */}
+                <tr className="bg-white">
+                  <td className="px-2 py-1.5"><input value={fRM} onChange={(e) => setFRM(e.target.value)} placeholder="RM" className={inpCls} /></td>
+                  <td className="px-2 py-1.5"><input value={fMat} onChange={(e) => setFMat(e.target.value)} placeholder="material ou bitola" className={inpCls} /></td>
+                  <td className="px-2 py-1.5" />
+                  <td className="px-2 py-1.5" colSpan={2}><input value={fPed} onChange={(e) => setFPed(e.target.value)} placeholder="pedido / NF" className={inpCls} /></td>
+                  <td className="px-2 py-1.5" />
+                  <td className="px-2 py-1.5" />
+                  <td className="px-2 py-1.5"><input value={fForn} onChange={(e) => setFForn(e.target.value)} placeholder="fornecedor" className={inpCls} /></td>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -329,9 +380,28 @@ export default function MateriaisOPSection({ opId }) {
                       <td className="px-3 py-2 font-mono text-xs text-torg-blue whitespace-nowrap align-top">
                         {item.rmNumero}
                       </td>
-                      <td className="px-3 py-2 align-top min-w-[240px] max-w-[420px]">
-                        <div className="text-torg-dark text-xs font-medium break-words whitespace-normal" title={item.descricao}>{item.descricao}</div>
-                        {item.material && <div className="text-[11px] text-torg-gray break-words whitespace-normal">{item.material}</div>}
+                      <td className="px-3 py-2 align-top w-[300px] max-w-[300px]">
+                        {(() => {
+                          const d = String(item.descricao || "");
+                          // ⚠ A BITOLA VEM NA FRENTE. "PERFIL H ACO CARBONO LAMINADO A 572 GR.50 DN.
+                          // W150 X 37,1KG/M" ocupava três linhas e o que o comprador procura — o
+                          // W150 x 37,1 — ficava no fim, justamente onde o corte esconderia. Aqui a
+                          // parte distintiva sobe para a primeira linha e o resto vira legenda.
+                          const m = d.match(/\bDN\.?\s*(.+)$/i);
+                          const destaque = m ? m[1].trim() : d;
+                          const resto = m ? d.slice(0, m.index).trim() : "";
+                          return (
+                            <div title={d}>
+                              <div className="text-torg-dark text-xs font-semibold truncate">{destaque}</div>
+                              {resto && <div className="text-[11px] text-torg-gray truncate">{resto}</div>}
+                              {item.material && (
+                                <span className="mt-0.5 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-torg-gray">
+                                  {item.material}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap align-top text-torg-dark text-xs">
                         {solicitadoTxt(item)}
