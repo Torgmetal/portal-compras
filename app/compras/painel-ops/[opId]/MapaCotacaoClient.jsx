@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { BarChart3, CheckCircle2, AlertCircle, Loader2, Truck, Award, Wand2, X, XCircle, Mail, Send } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtMoeda = (v) =>
   v != null && v > 0 ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -226,7 +227,7 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
       : "Digite o valor total da proposta do fornecedor (do PDF):\n\nEx: 110837.39\n\nO sistema vai ajustar os preços proporcionalmente pra bater com esse total no Omie.";
     const input = window.prompt(promptMsg, atual ? String(atual) : "");
     if (input === null) return;
-    const valor = input.trim() === "" ? null : parseFloat(input.replace(",", "."));
+    const valor = input.trim() === "" ? null : numeroBR(input);
     if (valor !== null && (isNaN(valor) || valor < 0)) {
       setErro("Valor inválido");
       return;

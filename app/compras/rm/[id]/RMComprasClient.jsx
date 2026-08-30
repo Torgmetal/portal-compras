@@ -21,6 +21,7 @@ import {
 } from "@/lib/fornecedor-categorias";
 import MapaCotacaoClient from "@/app/compras/painel-ops/[opId]/MapaCotacaoClient";
 import BotaoResumoFD from "@/app/compras/painel-ops/[opId]/BotaoResumoFD";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -915,14 +916,9 @@ function ModalEditarPedido({ pedido, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState("");
 
-  const parseTotal = (v) => {
-    // Aceita "39.804,33" (BR) ou "39804.33" (EN)
-    const limpo = String(v).replace(/\s/g, "");
-    if (/^\d{1,3}(\.\d{3})*(,\d+)?$/.test(limpo)) {
-      return Number(limpo.replace(/\./g, "").replace(",", "."));
-    }
-    return Number(limpo.replace(",", "."));
-  };
+  // ⚠ era um parser BR local, correto mas paralelo. Duas implementações da mesma conversão é
+  // exatamente como o erro dos 1000× se espalhou — uma fonte só (lib/numero-br).
+  const parseTotal = (v) => numeroBR(v);
 
   const handleSalvar = async () => {
     const totalNum = parseTotal(total);
@@ -1916,15 +1912,15 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
   // Total da nota: bruto × qtd × (1 + IPI%). Bate com "Valor total" do PDF.
   // ICMS nao entra (credito Torg, nao soma na NF).
   const total = linhas.reduce((s, l) => {
-    const p = parseFloat(String(l.precoUnit).replace(",", ".")) || 0;
-    const q = parseFloat(String(l.qtdCotada).replace(",", ".")) || 0;
-    const ipi = parseFloat(String(l.ipiPct).replace(",", ".")) || 0;
+    const p = numeroBR(l.precoUnit);
+    const q = numeroBR(l.qtdCotada);
+    const ipi = numeroBR(l.ipiPct);
     return s + p * q * (1 + ipi / 100);
   }, 0);
   // Subtotais pra mostrar separados embaixo
   const totalBrutoSemIPI = linhas.reduce((s, l) => {
-    const p = parseFloat(String(l.precoUnit).replace(",", ".")) || 0;
-    const q = parseFloat(String(l.qtdCotada).replace(",", ".")) || 0;
+    const p = numeroBR(l.precoUnit);
+    const q = numeroBR(l.qtdCotada);
     return s + p * q;
   }, 0);
   const totalIPI = total - totalBrutoSemIPI;
@@ -1939,17 +1935,17 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
     const itens = linhas
       .map((l) => ({
         rmItemId: l.rmItemId,
-        precoUnit: parseFloat(String(l.precoUnit).replace(",", ".")) || 0,
-        qtdCotada: parseFloat(String(l.qtdCotada).replace(",", ".")) || 0,
-        icmsPct: parseFloat(String(l.icmsPct).replace(",", ".")) || 0,
-        ipiPct: parseFloat(String(l.ipiPct).replace(",", ".")) || 0,
+        precoUnit: numeroBR(l.precoUnit),
+        qtdCotada: numeroBR(l.qtdCotada),
+        icmsPct: numeroBR(l.icmsPct),
+        ipiPct: numeroBR(l.ipiPct),
       }))
       .filter((l) => l.precoUnit > 0);
     if (itens.length === 0) return setErro("Preencha ao menos um preço unitário.");
 
     setSalvando(true);
     try {
-      const totalPropostaNum = parseFloat(String(totalPropostaInput).replace(",", "."));
+      const totalPropostaNum = numeroBR(totalPropostaInput);
       const res = await fetch(`/api/cotacao/${cotacao.id}/lancar-manual`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2107,7 +2103,7 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {linhas.map((l) => {
-                    const t = (parseFloat(String(l.precoUnit).replace(",", ".")) || 0) * (parseFloat(String(l.qtdCotada).replace(",", ".")) || 0);
+                    const t = (numeroBR(l.precoUnit)) * (numeroBR(l.qtdCotada));
                     const isAuto = autoFilled.has(l.rmItemId);
                     const isRevisado = revisado.has(l.rmItemId);
                     const inputCls = isAuto
@@ -2210,9 +2206,9 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
                       className="w-32 px-2 py-1.5 text-right text-sm font-bold text-amber-700 tabular-nums focus:outline-none"
                     />
                   </div>
-                  {totalPropostaInput && parseFloat(String(totalPropostaInput).replace(",", ".")) > 0 && (
+                  {totalPropostaInput && numeroBR(totalPropostaInput) > 0 && (
                     <p className="text-[10px] text-torg-gray mt-1 tabular-nums">
-                      Diff calc: {fmtMoeda(parseFloat(String(totalPropostaInput).replace(",", ".")) - total)}
+                      Diff calc: {fmtMoeda(numeroBR(totalPropostaInput) - total)}
                     </p>
                   )}
                 </div>
@@ -3428,7 +3424,7 @@ function ModalAdicionarItem({ rmId, onClose, onSaved }) {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const parseNum = (s) => { const n = parseFloat(String(s).replace(",", ".")); return isNaN(n) ? null : n; };
+  const parseNum = (s) => { const n = numeroBR(s); return isNaN(n) ? null : n; };
 
   const submit = async () => {
     setErro("");
@@ -3548,7 +3544,7 @@ function ModalEditarRMItem({ item, rmId, onClose, onSaved }) {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const parseNum = (s) => {
-    const n = parseFloat(String(s).replace(",", "."));
+    const n = numeroBR(s);
     return isNaN(n) ? null : n;
   };
 

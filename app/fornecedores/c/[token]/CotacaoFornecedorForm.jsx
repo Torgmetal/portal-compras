@@ -6,6 +6,7 @@ import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
 import { Loader2, AlertCircle, Send, AlertTriangle, Truck, RotateCcw, CheckCircle2, Upload, FileText, X, Sparkles, CalendarDays, PackageX } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -343,8 +344,8 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     () =>
       linhas.reduce((s, l) => {
         if (l.semEstoque) return s;
-        const p = parseFloat(String(l.precoUnit).replace(",", ".")) || 0;
-        const q = parseFloat(String(l.qtdCotada).replace(",", ".")) || 0;
+        const p = numeroBR(l.precoUnit);
+        const q = numeroBR(l.qtdCotada);
         return s + p * q;
       }, 0),
     [linhas]
@@ -355,9 +356,9 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     () =>
       linhas.reduce((s, l) => {
         if (l.semEstoque) return s;
-        const p = parseFloat(String(l.precoUnit).replace(",", ".")) || 0;
-        const q = parseFloat(String(l.qtdCotada).replace(",", ".")) || 0;
-        const ipi = parseFloat(String(l.ipiPct).replace(",", ".")) || 0;
+        const p = numeroBR(l.precoUnit);
+        const q = numeroBR(l.qtdCotada);
+        const ipi = numeroBR(l.ipiPct);
         const bruto = p * q;
         return s + bruto * (1 + ipi / 100);
       }, 0),
@@ -370,10 +371,10 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     const itens = linhas
       .map((l) => ({
         cotacaoItemId: l.id,
-        precoUnit: l.semEstoque ? 0 : (parseFloat(String(l.precoUnit).replace(",", ".")) || 0),
-        qtdCotada: l.semEstoque ? 0 : (parseFloat(String(l.qtdCotada).replace(",", ".")) || 0),
-        icmsPct: l.semEstoque ? 0 : (parseFloat(String(l.icmsPct).replace(",", ".")) || 0),
-        ipiPct: l.semEstoque ? 0 : (parseFloat(String(l.ipiPct).replace(",", ".")) || 0),
+        precoUnit: l.semEstoque ? 0 : (numeroBR(l.precoUnit)),
+        qtdCotada: l.semEstoque ? 0 : (numeroBR(l.qtdCotada)),
+        icmsPct: l.semEstoque ? 0 : (numeroBR(l.icmsPct)),
+        ipiPct: l.semEstoque ? 0 : (numeroBR(l.ipiPct)),
         observacao: l.observacao || null,
         semEstoque: l.semEstoque || false,
         prazoEntrega: l.semEstoque ? null : (l.prazoEntrega || null),
@@ -399,7 +400,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     setEnviando(true);
     setEnviadoAgora(false);
     try {
-      const totalPropostaNum = parseFloat(String(valorTotalProposta).replace(",", ".")) || null;
+      const totalPropostaNum = numeroBR(valorTotalProposta) || null;
       const res = await fetch(`/api/cotacao/submeter/${cotacao.token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -485,7 +486,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
   // Substitui o formulário inteiro: o fornecedor não fica em dúvida se enviou.
   if (enviadoAgora) {
     const totalEnviado =
-      (valorTotalProposta && (parseFloat(String(valorTotalProposta).replace(",", ".")) || 0)) ||
+      (valorTotalProposta && (numeroBR(valorTotalProposta))) ||
       totalComIPI || total;
     return (
       <div className="min-h-screen bg-torg-blue-50/30">
@@ -855,7 +856,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {linhas.map((l, i) => {
-                    const totalBruto = (parseFloat(String(l.precoUnit).replace(",", ".")) || 0) * (parseFloat(String(l.qtdCotada).replace(",", ".")) || 0);
+                    const totalBruto = (numeroBR(l.precoUnit)) * (numeroBR(l.qtdCotada));
                     const isAuto = autoFilled.has(l.id);
                     const isRevisado = revisado.has(l.id);
                     // Total que a IA leu no PDF p/ esta linha (referência de conferência)
