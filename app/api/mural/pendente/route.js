@@ -36,11 +36,16 @@ export async function GET() {
   });
   if (!aviso) return NextResponse.json({ aviso: null });
 
+  // ⚠⚠ SÓ QUEM ASSISTIU DE FATO SAI DA LISTA. Vitor (30/08/2026): "quem abrir uma única vez já tira
+  // o vídeo para ele; agora quem não abrir, deixar lá para mostrar até o dia que o camarada for
+  // abrir". Quem caiu no caminho de falha (vídeo não carregou, wifi da fábrica) tem `assistiu:false`
+  // — esse volta a ver no próximo login, que é o certo: ele não viu a campanha, só foi liberado
+  // para trabalhar. Antes, uma falha de conexão apagava o comunicado para sempre.
   const visto = await prisma.muralCiencia.findUnique({
     where: { avisoId_userId: { avisoId: aviso.id, userId } },
-    select: { id: true },
+    select: { assistiu: true },
   });
-  if (visto) return NextResponse.json({ aviso: null });
+  if (visto?.assistiu) return NextResponse.json({ aviso: null });
 
   return NextResponse.json({ aviso });
 }
@@ -62,14 +67,16 @@ export async function POST(req) {
 
   // ⚠ upsert e não create: dois cliques, duas abas ou um retry de rede não podem virar erro na cara
   // de quem acabou de assistir. A unique (avisoId,userId) garante uma linha por pessoa.
+  // ⚠ o `update` agora escreve: quem falhou na primeira vez e assistiu na segunda precisa passar de
+  // assistiu=false para true. Com `update: {}` a segunda tentativa era ignorada em silêncio e a
+  // pessoa ficaria vendo o comunicado até o fim da campanha, mesmo tendo assistido.
+  const assistiu = body.assistiu !== false;
   await prisma.muralCiencia.upsert({
     where: { avisoId_userId: { avisoId: body.avisoId, userId } },
-    create: {
-      avisoId: body.avisoId, userId,
-      assistiu: body.assistiu !== false,
-      motivo: body.motivo?.trim() || null,
-    },
-    update: {},
+    create: { avisoId: body.avisoId, userId, assistiu, motivo: body.motivo?.trim() || null },
+    update: assistiu
+      ? { assistiu: true, motivo: null, vistoEm: new Date() }
+      : {}, // uma falha não sobrescreve um "assistiu" anterior
   });
   return NextResponse.json({ success: true });
 }
