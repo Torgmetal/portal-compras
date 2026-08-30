@@ -1644,6 +1644,7 @@ model EstudoFabricacao {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   orcamento     Orcamento? @relation("OrcamentoEstudoLqc", fields: [orcamentoId], references: [id], onDelete: SetNull)
+  propostas     PropostaEstrutura[]
 
   @@index([ano])
   @@index([orcamentoId])
@@ -3097,10 +3098,53 @@ model Orcamento {
   estudos        PropostaEstudo[]
   estudosLqc     EstudoFabricacao[] @relation("OrcamentoEstudoLqc")
   emails         ObraEmailEvento[]  @relation("OrcamentoEmails")
+  propostas      PropostaEstrutura[]
 
   @@index([status])
   @@index([vendedor])
   @@index([createdAt])
+}
+
+// ─── A PROPOSTA DE ESTRUTURA ──────────────────────────────────────────────────
+// Vitor (30/08/2026): "precisamos de uma PT e PC para ficar completo, e em alguns casos será
+// necessário a PTC".
+//
+// ⚠⚠ UMA LINHA POR TIPO DE DOCUMENTO, e a revisão vive nela. Na VALE a PT parou no R04 enquanto a
+// PC seguiu até o R06 ("ajuste comercial após reunião") — amarrar as duas a uma revisão só
+// obrigaria a reemitir a técnica a cada rodada de preço, e reemitir técnica reabre discussão de
+// escopo. O @@unique é (orçamento, tipo), não (orçamento).
+model PropostaEstrutura {
+  id          String  @id @default(cuid())
+  orcamentoId String
+  estudoId    String? // a LQC que dá o preço
+  tipo        String  @default("PTC") // PT | PC | PTC
+  revisao     Int     @default(0)
+  // escolhe qual dos dois modelos do SharePoint é usado — e 21 parágrafos mudam com isso
+  comMontagem Boolean @default(false)
+  status      String  @default("RASCUNHO")
+
+  destinatario Json   @default("{}") // empresa, endereço, A/C, e-mail, fone
+  referencia   String? // a obra e a cidade, como aparecem na capa
+
+  escopo     Json @default("[]") // os elementos listados no escopo
+  documentos Json @default("[]") // documentos do cliente (ET, PIT, check list) com revisão
+  projetos   Json @default("[]") // desenhos que serviram de base
+  // o levantamento: [{ nome, elementos: [{ tipo, ...campos }] }] — mesmas áreas do RESUMOS_EM
+  areas      Json @default("[]")
+  selecao    Json @default("{}") // { BLOCO_ID: { incluso, variante } }
+  textos     Json @default("{}") // sobrescrita de texto por bloco, só nesta proposta
+  emissoes   Json @default("[]") // log: [{ em, revisao, tipo, arquivo, porNome }]
+
+  emitidoEm   DateTime?
+  criadoPorId String?
+  criadoEm    DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orcamento Orcamento         @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  estudo    EstudoFabricacao? @relation(fields: [estudoId], references: [id], onDelete: SetNull)
+
+  @@unique([orcamentoId, tipo])
+  @@index([estudoId])
 }
 
 model OrcamentoRevisao {
