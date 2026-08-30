@@ -283,7 +283,7 @@ export async function POST(req, { params }) {
             </p>
             <p style="color: #a0aec0; font-size: 12px; margin-top: 24px;">
               Você está inscrito nas notificações de cotações respondidas.
-              Pra parar, peça pra um admin remover seu email em /admin/notificacoes.
+              Pra parar de receber, fale com o administrador do portal.
             </p>
           </div>
         `,
