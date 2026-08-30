@@ -87,7 +87,13 @@ export default withAuth(
     }
     // Funcionário (autoatendimento) não acessa o portal interno — vai pro portal dele, não pro
     // login (ele ESTÁ logado; mandar pro /entrar é o mesmo engano de sempre).
-    if (token?.tipo === "FUNCIONARIO" && !path.startsWith("/meu-rh") && !path.startsWith("/api/meu-rh")) {
+    // ⚠ O COMUNICADO EM VÍDEO VALE PARA ELE TAMBÉM. Vitor (30/08/2026): "os demais da produção será
+    // disponibilizado no portal para eles assistirem". O modal vive no layout raiz, que envolve o
+    // /meu-rh — mas a chamada dele batia neste portão e voltava 403, então o vídeo simplesmente não
+    // aparecia para quem mais precisa dele. Liberada só esta rota, que é de leitura do próprio
+    // comunicado e registro da própria ciência; o resto de /api/rh continua fechado.
+    const COMUNICADO = "/api/mural/pendente";
+    if (token?.tipo === "FUNCIONARIO" && !path.startsWith("/meu-rh") && !path.startsWith("/api/meu-rh") && path !== COMUNICADO) {
       if (path.startsWith("/api/")) return NextResponse.json({ error: "Sem acesso" }, { status: 403 });
       return NextResponse.redirect(new URL("/meu-rh", req.url));
     }
