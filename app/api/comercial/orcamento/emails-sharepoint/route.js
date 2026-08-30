@@ -31,12 +31,12 @@ async function processar(ano, aplicar) {
   const numeros = [...pastas.keys()];
   const orcamentos = await prisma.orcamento.findMany({
     where: { numero: { in: numeros } },
-    select: { id: true, numero: true, cliente: true, contato: true, dataSolicitada: true },
+    select: { id: true, numero: true, cliente: true, contato: true, dataSolicitada: true, dataEnvio: true },
   });
   const porNumero = new Map(orcamentos.map((o) => [o.numero, o]));
 
   const resumo = { ano, pastas: pastas.size, comEmail: 0, eventos: 0, novos: 0,
-                   solicitacoesDatadas: 0, semOrcamento: [], erros: [] };
+                   solicitacoesDatadas: 0, solicitacaoPosteriorAoEnvio: 0, semOrcamento: [], erros: [] };
   const detalhe = [];
 
   for (const [numero, { caminho, fase }] of pastas) {
@@ -89,7 +89,15 @@ async function processar(ano, aplicar) {
     //
     // ⚠ NÃO SOBRESCREVE o que já está preenchido: alguém pode ter corrigido à mão, e a data do
     // e-mail arquivado é indício forte, não decisão final.
-    if (maisAntigoDoCliente && !orc.dataSolicitada) {
+    // ⚠⚠ SOLICITAÇÃO NÃO PODE SER DEPOIS DO ENVIO. Nem todo e-mail de entrada arquivado é o pedido
+    // original: na ORCA (186-26) o único inbound na pasta é um "Revisão Proposta Orçamentária" de
+    // 18/08, dois meses DEPOIS de a proposta ter saído em 23/06. Sem esta trava o portal gravava
+    // "solicitado em 18/08 · enviado em 23/06" — e a aba de Acompanhamento contaria prazo negativo.
+    // Aconteceu em 8 orçamentos. Quando o inbound mais antigo é posterior ao envio, o pedido
+    // original simplesmente não está arquivado: melhor sem data do que com data impossível.
+    const posterior = orc.dataEnvio && maisAntigoDoCliente && maisAntigoDoCliente > orc.dataEnvio;
+    if (posterior) resumo.solicitacaoPosteriorAoEnvio = (resumo.solicitacaoPosteriorAoEnvio || 0) + 1;
+    if (maisAntigoDoCliente && !posterior && !orc.dataSolicitada) {
       resumo.solicitacoesDatadas++;
       if (aplicar) {
         await prisma.orcamento.update({ where: { id: orc.id }, data: { dataSolicitada: maisAntigoDoCliente } })
