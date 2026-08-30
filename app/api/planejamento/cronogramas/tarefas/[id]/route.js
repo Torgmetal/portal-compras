@@ -26,6 +26,8 @@ const patchSchema = z.object({
   responsavelId: z.string().nullable().optional(),
   // estimativa de dias ÚTEIS que ainda faltam, dada por quem executa
   diasParaConcluir: z.number().int().min(0).max(999).nullable().optional(),
+  // de quem se espera enquanto a tarefa está em hold
+  esperaDe: z.enum(["CLIENTE", "FORNECEDOR", "SETOR_INTERNO"]).nullable().optional(),
   duracaoDias: z.number().int().min(0).max(9999).optional(),
 });
 
@@ -136,6 +138,14 @@ export async function PATCH(req, { params }) {
     data.estimativaEm = novo == null ? null : new Date();
   }
 
+  if (parsed.data.esperaDe !== undefined) {
+    if ((parsed.data.esperaDe || null) !== (tarefa.esperaDe || null)) {
+      diffAntes.esperaDe = tarefa.esperaDe || null;
+      diffDepois.esperaDe = parsed.data.esperaDe || null;
+    }
+    data.esperaDe = parsed.data.esperaDe || null;
+  }
+
   if (parsed.data.motivoBloqueio !== undefined) {
     if ((parsed.data.motivoBloqueio || null) !== (tarefa.motivoBloqueio || null)) {
       diffAntes.motivoBloqueio = tarefa.motivoBloqueio || null;
@@ -147,7 +157,7 @@ export async function PATCH(req, { params }) {
       // projeto" fica sendo memória de reunião. Só marca quando a espera NASCE; ao sair do
       // bloqueio, zera, para a próxima espera não herdar o relógio da anterior.
       if (parsed.data.motivoBloqueio) { if (!tarefa.esperaInicio) data.esperaInicio = new Date(); }
-      else data.esperaInicio = null;
+      else { data.esperaInicio = null; data.esperaDe = null; }
     }
     data.motivoBloqueio = parsed.data.motivoBloqueio;
   }

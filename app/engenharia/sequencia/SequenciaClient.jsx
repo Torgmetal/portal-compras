@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { Loader2, AlertCircle, ListOrdered, RefreshCw, Search, Lock, CheckCircle2, ExternalLink, PauseCircle, Users } from "lucide-react";
-import { ETAPA_LABEL } from "@/lib/etapa-projeto";
+import { ETAPA_LABEL, ESPERA_DE } from "@/lib/etapa-projeto";
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const fmtN = (v) => Number(v || 0).toLocaleString("pt-BR");
@@ -30,6 +30,7 @@ export default function SequenciaClient() {
   const [filtroPessoa, setFiltroPessoa] = useState("");
   const [salvandoDono, setSalvandoDono] = useState(null);
   const [salvandoDias, setSalvandoDias] = useState(null);
+  const [salvandoEspera, setSalvandoEspera] = useState(null);
   const [busca, setBusca] = useState("");
   const [concluidas, setConcluidas] = useState(false);
 
@@ -92,6 +93,19 @@ export default function SequenciaClient() {
       if (!r.ok) throw new Error(j.error || "Erro ao salvar a estimativa");
       carregar();
     } catch (e) { alert(e.message); } finally { setSalvandoDias(null); }
+  }
+
+  async function definirEsperaDe(t, valor) {
+    setSalvandoEspera(t.id);
+    try {
+      const r = await fetch(`/api/planejamento/cronogramas/tarefas/${t.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ esperaDe: valor || null }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao salvar");
+      carregar();
+    } catch (e) { alert(e.message); } finally { setSalvandoEspera(null); }
   }
 
   const tarefas = useMemo(() => {
@@ -405,8 +419,22 @@ export default function SequenciaClient() {
                       ) : t.emEspera ? (
                         // ⚠ ESPERA NÃO É ATRASO (Vitor, 29/08/2026): indefinição do projeto não é
                         // dívida da Engenharia. Os dias contam para quem deve a resposta.
-                        <span className="text-amber-700 font-medium inline-flex items-center gap-1" title={t.motivoBloqueio || ""}>
-                          <PauseCircle size={12} /> em espera{t.diasEmEspera ? ` · ${t.diasEmEspera}d` : ""}
+                        <span className="inline-flex flex-col gap-0.5">
+                          <span className="text-amber-700 font-medium inline-flex items-center gap-1" title={t.motivoBloqueio || ""}>
+                            <PauseCircle size={12} /> em espera{t.diasEmEspera ? ` · ${t.diasEmEspera}d` : ""}
+                          </span>
+                          {/* ⚠ DE QUEM se espera decide se a tarefa sai da aderência: espera de fora
+                              não é dívida do setor; esperar outro setor da Torg é. */}
+                          <select value={t.esperaDe || ""} disabled={salvandoEspera === t.id}
+                            onChange={(e) => definirEsperaDe(t, e.target.value)}
+                            title="De quem se espera"
+                            className={`text-[10.5px] border rounded px-1 py-0.5 outline-none focus:border-torg-blue disabled:opacity-50 ${t.esperaDe ? "border-amber-200 bg-amber-50 text-amber-800" : "border-red-200 bg-red-50 text-red-700"}`}>
+                            <option value="">quem? →</option>
+                            {ESPERA_DE.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                          </select>
+                          {t.esperaDe && !t.esperaDeFora && (
+                            <span className="text-[10px] text-red-700">conta na aderência (é da casa)</span>
+                          )}
                         </span>
                       ) : t.atrasada ? (
                         <span className="text-red-600 font-semibold">atrasada {Math.abs(t.diasParaPrazo)}d</span>

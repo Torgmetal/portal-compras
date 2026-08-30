@@ -3913,6 +3913,12 @@ model CronogramaTarefa {
 
   // ⚠ QUANDO A ESPERA COMEÇOU. Sem isto o hold registra o motivo mas não a duração, e "quantos dias
   // o cliente segurou o projeto" vira estimativa. Gravado quando o motivo de bloqueio é preenchido.
+  // ⚠⚠ DE QUEM SE ESPERA. Vitor (29/08/2026), escolhendo o desenho mínimo: um campo só, em vez de
+  // tipo + responsável. CLIENTE | FORNECEDOR | SETOR_INTERNO. É ele que permite somar ("a TMSA nos
+  // custou 60 dias"), cobrar o lado certo, e — o que mais importa — decidir se a espera SAI da
+  // aderência: espera de fora não é dívida do setor; espera de outro setor da Torg é.
+  // O `motivoBloqueio` continua em texto livre, como observação.
+  esperaDe            String?
   esperaInicio        DateTime?
   dataLiberacao       DateTime? // Data em que a tarefa foi liberada (desbloqueio externo)
   motivoBloqueio      String? // Ex: "Aguardando assinatura do aditivo"

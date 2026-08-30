@@ -15,7 +15,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { etapaDaTarefa, PROXIMA_ETAPA, emEspera } from "@/lib/etapa-projeto";
+import { etapaDaTarefa, PROXIMA_ETAPA, emEspera, esperaDeFora, ESPERA_LABEL } from "@/lib/etapa-projeto";
 import { evidenciasDasTarefas } from "@/lib/etapa-evidencia";
 import { addWorkdays } from "@/lib/cronograma-recalcular";
 
@@ -52,7 +52,7 @@ export async function GET(req) {
       dataInicioReal: true, dataFimReal: true,
       percentualRealizado: true, duracaoDias: true,
       antecessoraIds: true, motivoBloqueio: true, observacao: true,
-      dataLiberacao: true, esperaInicio: true, responsavelId: true,
+      dataLiberacao: true, esperaInicio: true, esperaDe: true, responsavelId: true,
       diasParaConcluir: true, estimativaEm: true,
       responsavel: { select: { id: true, name: true } },
       cronograma: {
@@ -131,6 +131,10 @@ export async function GET(req) {
       // Engenharia aparecia devendo. Os dias continuam contando, mas como espera de quem deve a
       // resposta, não como atraso do setor.
       emEspera: !concluida && emEspera(t),
+      esperaDe: t.esperaDe || null,
+      esperaDeLabel: t.esperaDe ? ESPERA_LABEL[t.esperaDe] : null,
+      // ⚠ só a espera de FORA sai da conta do setor: esperar outro setor da Torg é problema de casa
+      esperaDeFora: emEspera(t) ? esperaDeFora(t) : false,
       atrasada: !concluida && !emEspera(t) && diasParaPrazo != null && diasParaPrazo < 0,
       diasParaPrazo,
       diasEmEspera: emEspera(t) && diasParaPrazo != null && diasParaPrazo < 0 ? -diasParaPrazo : 0,
