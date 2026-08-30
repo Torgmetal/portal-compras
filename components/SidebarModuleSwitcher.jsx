@@ -240,7 +240,9 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
         {mostrarLaco ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={LACO} alt="Setembro Amarelo" title="Setembro Amarelo — a Torg Metal apoia a valorização da vida"
-            className="h-7 w-7 shrink-0" />
+            // ⚠ `-ml-4`: o SVG do logo tem folga interna à direita, e com o gap normal o laço
+            // ficava solto, parecendo outro elemento em vez de par da marca.
+            className="-ml-4 h-7 w-7 shrink-0" />
         ) : null}
         {temMultiplos && (
           <ChevronDown
