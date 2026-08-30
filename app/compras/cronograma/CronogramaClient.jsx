@@ -744,12 +744,12 @@ function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRe
                   <CalendarClock size={12} /> Atualizar prazo
                 </button>
               )}
-              {/* ⚠⚠ MARCAR NA MÃO SÓ NOS CONSUMÍVEIS. Vitor (30/08/2026): "só deixa vinculado ao
-                  recebimento do CMR; o botão pode deixar, mas só será usado para itens como
-                  consumíveis que não passam por lá". Material de OP entra pelo Almoxarifado, no CMR
-                  — deixar o botão ali criaria um segundo caminho para o mesmo fato e o portal
-                  passaria a divergir do que o Almoxarifado recebeu. */}
-              {p.statusEntrega !== "ENTREGUE" && ehConsumivel && (
+              {/* ⚠ O BOTÃO VALE NAS DUAS ABAS. Cheguei a escondê-lo em Materiais (OP), achando que
+                  tudo ali passava pelo CMR — errado: Vitor (30/08/2026) lembrou que "grade de piso,
+                  telhas, calhas e rufos" são material de OP e NÃO passam pelo Almoxarifado. Sem o
+                  botão, esses ficariam sem como fechar. O que o CMR cobre é marcado sozinho; o
+                  resto é na mão. */}
+              {p.statusEntrega !== "ENTREGUE" && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onRegistrarEntrega(); }}
                   disabled={registrando}
@@ -759,12 +759,16 @@ function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRe
                   Marcar entregue
                 </button>
               )}
-              {p.statusEntrega !== "ENTREGUE" && !ehConsumivel && (
-                <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 bg-torg-blue-50 text-torg-blue rounded-lg">
+              {p.cmr?.lancamentos > 0 && (
+                <span
+                  className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg ${
+                    p.cmr.coberto ? "bg-emerald-50 text-emerald-700" : "bg-torg-blue-50 text-torg-blue"
+                  }`}
+                  title={`Entradas do Almoxarifado no CMR — ${p.cmr.kgRecebido.toLocaleString("pt-BR")} kg de ${p.cmr.kgPedido.toLocaleString("pt-BR")} kg pedidos`}
+                >
                   <PackageCheck size={12} />
-                  {p.recebimentosCmr > 0
-                    ? `${p.recebimentosCmr} recebimento(s) no CMR`
-                    : "A entrada é dada no Recebimento (CMR)"}
+                  CMR: {p.cmr.kgRecebido.toLocaleString("pt-BR")} kg
+                  {p.cmr.kgPedido > 0 ? ` de ${p.cmr.kgPedido.toLocaleString("pt-BR")}` : ""}
                 </span>
               )}
               {p.statusEntrega === "ATRASADO" && p.fornecedorEmail && (

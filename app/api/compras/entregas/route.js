@@ -60,6 +60,11 @@ export async function GET(req) {
                     qtd: true,
                     unidade: true,
                     peso: true,
+                    // ⚠⚠ O CMR SÓ SE ALCANÇA POR AQUI. Medido em 30/08/2026: dos 52 recebimentos de
+                    // origem CMR, ZERO têm `pedidoOmieId` — só `rmItemId`. Os do Omie têm os dois.
+                    // Quem lê `pedido.recebimentos` (que é por pedidoOmieId) enxerga o Omie e não
+                    // enxerga o Almoxarifado, que é justamente a fonte que vale.
+                    recebimentos: { select: { qtdRecebida: true, origem: true, dataRecebimento: true } },
                   },
                 },
               },
@@ -160,11 +165,36 @@ export async function GET(req) {
         }
       }
 
+      // ─── O QUE O ALMOXARIFADO JÁ RECEBEU, PELO CMR ───────────────────────────────────────
+      // Vitor (30/08/2026): "no CMR informamos quanto estamos recebendo, vc iria dar baixa conforme
+      // essa informação (…) quero que veja tudo que já recebemos de material e dê baixa".
+      //
+      // ⚠ EM KG, dos dois lados. O CMR lança `qtdRecebida` em quilos (lib/recebimento-cmr grava
+      // `lancarKg`) e o item da RM guarda `peso` em quilos. Comparar com `qtd` (que é em BARRAS)
+      // daria um número sem sentido — 10 barras nunca vão "cobrir" 480 kg.
+      const itensVenc = p.cotacao?.itens || [];
+      let kgPedido = 0, kgCmr = 0, nCmr = 0, ultimaCmr = null;
+      for (const it of itensVenc) {
+        kgPedido += Number(it.rmItem?.peso) || 0;
+        for (const r of it.rmItem?.recebimentos || []) {
+          if (r.origem !== "CMR") continue;
+          kgCmr += Number(r.qtdRecebida) || 0;
+          nCmr++;
+          if (!ultimaCmr || r.dataRecebimento > ultimaCmr) ultimaCmr = r.dataRecebimento;
+        }
+      }
+      // ⚠⚠ SÓ FECHA SOZINHO O QUE TEM PESO. Telha, calha, rufo e grade de piso são material de OP e
+      // NÃO passam pelo Almoxarifado — Vitor lembrou disso. Eles vêm sem `peso`, então `kgPedido`
+      // fica 0 e a regra automática simplesmente não se aplica: continuam fechando pelo botão. É a
+      // mesma guarda que evita dividir por zero e declarar "entregue" um pedido que ninguém recebeu.
+      // A tolerância de 95% é a mesma do CMR (a nota raramente bate no quilo com o pedido).
+      const cobertoPeloCmr = kgPedido > 0 && kgCmr >= kgPedido * 0.95;
+
       // Calcular status de entrega baseado no prazo
       const prazo = prazoFinal ? new Date(prazoFinal) : null;
       let statusCalc = "SEM_PRAZO";
 
-      if (p.dataEntregaReal) {
+      if (p.dataEntregaReal || cobertoPeloCmr) {
         statusCalc = "ENTREGUE";
       } else if (prazo) {
         if (prazo < agora) {
@@ -206,7 +236,7 @@ export async function GET(req) {
         criadoManualmente: p.criadoManualmente,
         tipoRM,
         prazoEntregaPrevisto: prazoFinal || p.prazoEntregaPrevisto,
-        dataEntregaReal: p.dataEntregaReal,
+        dataEntregaReal: p.dataEntregaReal || (cobertoPeloCmr ? ultimaCmr : null),
         createdAt: p.createdAt,
         observacao: p.observacao,
         opId: op?.id || null,
@@ -219,8 +249,10 @@ export async function GET(req) {
         qtdItens: itens.length,
         itens,
         recebimentos: p.recebimentos,
-        temRecebimento: p.recebimentos.length > 0,
-        recebimentosCmr: p.recebimentos.filter((r) => r.origem === "CMR").length,
+        temRecebimento: p.recebimentos.length > 0 || nCmr > 0,
+        // o que veio do Almoxarifado, para a tela mostrar sem precisar abrir o pedido
+        cmr: { lancamentos: nCmr, kgRecebido: Math.round(kgCmr), kgPedido: Math.round(kgPedido),
+               coberto: cobertoPeloCmr, ultima: ultimaCmr },
         prazoOriginal: p.prazoOriginal || null,
         prazoHistorico: p.prazoHistorico || [],
         foiPostergado: (p.prazoHistorico?.length || 0) > 0,
