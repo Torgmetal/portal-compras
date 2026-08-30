@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { fmtOP, fmtMoedaCompacta, fmtMoedaInteira } from "@/lib/utils";
+import { conversaoComercial, META_CONVERSAO } from "@/lib/conversao-comercial";
 import OrcamentosTabs from "@/components/OrcamentosTabs";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 
@@ -74,24 +75,39 @@ const MESES = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
-/** Filtra orçamentos pelo período, usando dataSolicitada como referência */
+/**
+ * O recorte do período — uma função só, usada pela lista E pela conversão.
+ *
+ * ⚠⚠ MESMO DEFEITO QUE O PIPELINE TINHA. Isto aqui usava `dataSolicitada` e DESCARTAVA quem não
+ * tivesse: 141 dos 284 orçamentos não têm esse campo, porque a planilha do Comercial registra
+ * "Data envio", não "Data solicitada". Não aparecia porque o período abre em "Tudo" — bastava
+ * escolher "Ano" para a lista cair de 284 para 143 sem explicação.
+ *
+ * A referência é a data de ENVIO, com `dataSolicitada` de reserva. `createdAt` fica de fora: nas
+ * 129 vindas da planilha ele é o dia da importação, e empilharia todas em agosto.
+ */
+export function dataDeReferencia(o) {
+  return o?.dataEnvio || o?.dataSolicitada || null;
+}
+
+function limitesDoPeriodo(periodo, mesSel, anoSel) {
+  if (periodo === "semana") return getISOWeekBounds(new Date());
+  if (periodo === "mes") return getMonthBounds(anoSel, mesSel);
+  if (periodo === "ano") return getYearBounds(anoSel);
+  return null;
+}
+
 function filtrarPorPeriodo(orcamentos, periodo, mesSel, anoSel) {
   if (periodo === "tudo") return orcamentos;
-
-  let start, end;
-  const now = new Date();
-
-  if (periodo === "semana") {
-    [start, end] = getISOWeekBounds(now);
-  } else if (periodo === "mes") {
-    [start, end] = getMonthBounds(anoSel, mesSel);
-  } else if (periodo === "ano") {
-    [start, end] = getYearBounds(anoSel);
-  }
-
+  const limites = limitesDoPeriodo(periodo, mesSel, anoSel);
+  if (!limites) return orcamentos;
+  const [start, end] = limites;
   return orcamentos.filter((o) => {
-    if (!o.dataSolicitada) return false;
-    const d = new Date(o.dataSolicitada);
+    const ref = dataDeReferencia(o);
+    // ⚠ sem data nenhuma a proposta continua na lista: são as 13 ainda não enviadas, e sumir com
+    // elas esconde justamente o que está por sair.
+    if (!ref) return true;
+    const d = new Date(ref);
     return d >= start && d <= end;
   });
 }
@@ -180,9 +196,13 @@ export default function OrcamentosClient() {
     { total: 0, abertos: 0, negociando: 0, fechados: 0, perdidos: 0, valorTotal: 0, valorFechado: 0, valorPerdido: 0, valorNegociando: 0 }
   );
 
-  const taxaConversao = kpis.total > 0
-    ? ((kpis.fechados / kpis.total) * 100).toFixed(1)
-    : "0.0";
+  // ⚠ MESMA CONTA DO PIPELINE E DA PLANILHA. Aqui era `fechados ÷ total da lista`, que por acaso
+  // chegava perto do número certo (14,8% × 15,2%) por outro caminho — mas mudava conforme o filtro
+  // de status: filtrando por "Fechada" a taxa virava 100%. Duas telas com duas contas é como a
+  // mesma pergunta ganha duas respostas na mesma reunião.
+  const limitesPeriodo = limitesDoPeriodo(periodo, mesSel, anoSel);
+  const conv = conversaoComercial(orcamentos, (d) =>
+    !limitesPeriodo || (d >= limitesPeriodo[0] && d <= limitesPeriodo[1]));
 
   // ─── HANDLERS ───────────────────────────────────────────────
 
@@ -298,7 +318,9 @@ export default function OrcamentosClient() {
     { label: "Total orçado",   value: fmtMoedaCompacta(kpis.valorTotal),   exato: fmtMoedaInteira(kpis.valorTotal),   sub: `${kpis.total} propostas`,          color: "bg-torg-blue", Icon: DollarSign },
     { label: "Obras fechadas", value: fmtMoedaCompacta(kpis.valorFechado), exato: fmtMoedaInteira(kpis.valorFechado), sub: `${kpis.fechados} fechadas`,        color: "bg-green-600", Icon: FileCheck2 },
     { label: "Obras perdidas", value: fmtMoedaCompacta(kpis.valorPerdido), exato: fmtMoedaInteira(kpis.valorPerdido), sub: `${kpis.perdidos} perdidas`,        color: "bg-red-500",   Icon: XCircle },
-    { label: "Conversão",      value: `${taxaConversao}%`,                 exato: null,                               sub: `${kpis.negociando} em negociação`, color: "bg-torg-dark", Icon: BarChart3 },
+    { label: "Conversão", value: conv.pct == null ? "—" : `${conv.pct}%`, exato: null,
+      sub: `${conv.fechados} fechados ÷ ${conv.enviados} enviados · meta ${META_CONVERSAO}%`,
+      color: conv.pct != null && conv.pct < META_CONVERSAO ? "bg-red-500" : "bg-torg-dark", Icon: BarChart3 },
   ];
 
   // ─── RENDER ─────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import {
   ArrowRight, Users, BarChart3, Target,
 } from "lucide-react";
 import { fmtMoedaCompacta, fmtMoedaInteira } from "@/lib/utils";
+import { conversaoComercial, META_CONVERSAO } from "@/lib/conversao-comercial";
 import OrcamentosTabs from "@/components/OrcamentosTabs";
 
 // ─── CONSTANTES ─────────────────────────────────────────────────
@@ -84,19 +85,24 @@ export default function PipelineClient() {
   // "Orçamento" — sumir com elas é justamente perder o topo do funil.
   const semData = orcamentos.filter((o) => !dataDoFunil(o));
 
+  // o recorte do período, num lugar só — a lista e a conversão precisam do MESMO corte
+  const noPeriodo = (d) => {
+    if (periodo === "tudo") return true;
+    if (!d) return false;
+    if (periodo === "mes") return d.getMonth() === mesSel && d.getFullYear() === anoSel;
+    if (periodo === "ano") return d.getFullYear() === anoSel;
+    const hoje = new Date();
+    const day = hoje.getDay() || 7;
+    const seg = new Date(hoje); seg.setDate(hoje.getDate() - day + 1); seg.setHours(0, 0, 0, 0);
+    const dom = new Date(seg); dom.setDate(seg.getDate() + 6); dom.setHours(23, 59, 59, 999);
+    return d >= seg && d <= dom;
+  };
+
   const filtrados = orcamentos.filter((o) => {
     if (periodo === "tudo") return true;
     const ref = dataDoFunil(o);
     if (!ref) return true;
-    const d = new Date(ref);
-    if (periodo === "mes") return d.getMonth() === mesSel && d.getFullYear() === anoSel;
-    if (periodo === "ano") return d.getFullYear() === anoSel;
-    // semana
-    const hoje = new Date();
-    const day = hoje.getDay() || 7;
-    const seg = new Date(hoje); seg.setDate(hoje.getDate() - day + 1); seg.setHours(0,0,0,0);
-    const dom = new Date(seg); dom.setDate(seg.getDate() + 6); dom.setHours(23,59,59,999);
-    return d >= seg && d <= dom;
+    return noPeriodo(new Date(ref));
   });
 
   // ─── DADOS POR ETAPA ────────────────────────────────────────
@@ -113,15 +119,12 @@ export default function PipelineClient() {
   const totalAberto = porEtapa
     .filter((e) => e.key === "ORCAMENTO" || e.key === "EM_NEGOCIACAO")
     .reduce((s, e) => s + e.valor, 0);
-  // ⚠⚠ CONVERSÃO SÓ ENTRE AS DECIDIDAS. Dividir fechadas pelo TOTAL conta como fracasso toda
-  // proposta que ainda está de pé: em 2026 são 140 em orçamento e 42 em negociação — 182 de 283
-  // que simplesmente não foram respondidas ainda. Isso dava 14,5% onde a taxa entre as decididas
-  // é 40,6%, e a diferença não é detalhe: é a diferença entre "vendemos mal" e "está em aberto".
-  const nFechadas = porEtapa.find((e) => e.key === "FECHADA")?.count || 0;
-  const nPerdidas = porEtapa.find((e) => e.key === "PERDIDA")?.count || 0;
-  const nDecididas = nFechadas + nPerdidas;
-  const nAbertas = filtrados.length - nDecididas;
-  const taxaConversao = nDecididas > 0 ? ((nFechadas / nDecididas) * 100).toFixed(1) : "—";
+  // ⚠⚠ A CONVERSÃO É A DA TORG: fechados ÷ ENVIADOS no período (lib/conversao-comercial).
+  // Eu tinha trocado por "fechadas ÷ decididas" achando que era mais justo — proposta em aberto
+  // não é derrota. O raciocínio é defensável e a definição é errada: o padrão está na
+  // RELATÓRIO_PROPOSTAS, aba Indicadores, linha GERAL, e a meta ISO de 15% é sobre ELE. A minha
+  // versão dava 41,2% onde o número da casa é 15,2% — quase o triplo, numa tela de diretoria.
+  const conv = conversaoComercial(orcamentos, (d) => noPeriodo(d));
 
   // ─── POR VENDEDOR ───────────────────────────────────────────
 
@@ -258,9 +261,11 @@ export default function PipelineClient() {
           { label: "Em aberto",    value: fmtMoedaCompacta(totalAberto), sub: `${fmtMoedaInteira(totalAberto)} · ${porEtapa[0].count + porEtapa[1].count} ativas`, color: "bg-amber-500", Icon: Target },
           { label: "Fechado",      value: fmtMoedaCompacta(totalFechado), sub: `${fmtMoedaInteira(totalFechado)} · ${porEtapa[2].count} obras`, color: "bg-green-600", Icon: FileCheck2 },
           { label: "Perdido",      value: fmtMoedaCompacta(totalPerdido), sub: `${fmtMoedaInteira(totalPerdido)} · ${porEtapa[3].count} propostas`, color: "bg-red-500", Icon: XCircle },
-          // ⚠ o rodapé diz SOBRE O QUE a taxa é calculada; "taxa de fechamento" sozinho deixava
-          // qualquer um supor que o denominador era a carteira inteira.
-          { label: "Conversão",    value: taxaConversao === "—" ? "—" : `${taxaConversao}%`, sub: `${nFechadas} de ${nDecididas} decididas · ${nAbertas} em aberto`, color: "bg-torg-dark", Icon: BarChart3 },
+          // ⚠ o rodapé escreve a CONTA. Uma taxa sem denominador à vista é onde cada um supõe uma
+          // definição diferente — foi o que me fez trocar a fórmula sem perceber que trocava.
+          { label: "Conversão", value: conv.pct == null ? "—" : `${conv.pct}%`,
+            sub: `${conv.fechados} fechados ÷ ${conv.enviados} enviados · meta ${META_CONVERSAO}%`,
+            color: conv.pct != null && conv.pct < META_CONVERSAO ? "bg-red-500" : "bg-torg-dark", Icon: BarChart3 },
         ].map((c) => (
           <div key={c.label} className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
             <div className={`${c.color} p-2 rounded-lg`}>
