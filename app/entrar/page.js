@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Loader2, AlertCircle } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
-import { emSetembroAmarelo, LACO } from "@/lib/campanha";
+import { emSetembroAmarelo, usarPrevia, LACO } from "@/lib/campanha";
 
 function homePorRole(role) {
   switch (role) {
@@ -31,6 +31,7 @@ function homePorRole(role) {
 }
 
 function LoginForm() {
+  const mostrarLaco = emSetembroAmarelo() || usarPrevia();
   const router = useRouter();
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl");
@@ -105,7 +106,7 @@ function LoginForm() {
             <h1 className="text-3xl xl:text-4xl font-extrabold tracking-tight leading-tight flex items-center gap-3">
               Workspace Torg
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {emSetembroAmarelo() ? <img src={LACO} alt="Setembro Amarelo" title="Setembro Amarelo — a Torg Metal apoia a valorização da vida" className="h-9 w-9 shrink-0" /> : null}
+              {mostrarLaco ? <img src={LACO} alt="Setembro Amarelo" title="Setembro Amarelo — a Torg Metal apoia a valorização da vida" className="h-9 w-9 shrink-0" /> : null}
             </h1>
             <p className="text-white/80 text-sm mt-3">
               Portais de Comercial, Compras e Requisições integrados.

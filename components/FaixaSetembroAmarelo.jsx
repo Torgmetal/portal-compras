@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { emSetembroAmarelo, rotaDeCliente, LACO, SLOGAN } from "@/lib/campanha";
+import { emSetembroAmarelo, rotaDeCliente, usarPrevia, LACO, SLOGAN } from "@/lib/campanha";
 
 // ─── A FAIXA NAS TELAS DO CLIENTE ─────────────────────────────────────────────
 // Vitor (30/08/2026): "precisa que na página do cliente tbm traga alguma propaganda mostrando o
@@ -19,7 +19,8 @@ import { emSetembroAmarelo, rotaDeCliente, LACO, SLOGAN } from "@/lib/campanha";
 // ⚠ SAI SOZINHA em 01/10 (horário de Brasília) — ninguém precisa lembrar de desligar.
 export default function FaixaSetembroAmarelo() {
   const path = usePathname();
-  if (!rotaDeCliente(path) || !emSetembroAmarelo()) return null;
+  const previa = usarPrevia();
+  if (!rotaDeCliente(path) || !(emSetembroAmarelo() || previa)) return null;
 
   return (
     <div className="border-t-[3px] border-[#F4C000] bg-[#FFF8E1]">
