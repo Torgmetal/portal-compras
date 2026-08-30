@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarRomaneioTerceiroForm22 } from "@/lib/romaneio-terceiro-form22";
 import { dispArquivo } from "@/lib/arquivo-http";
+import { nomeFORM } from "@/lib/sgq-forms";
 
 export const runtime = "nodejs";
 const ROLES = ["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "ALMOXARIFADO", "PCP", "PLANEJAMENTO"];
@@ -14,7 +15,7 @@ export async function GET(_req, { params }) {
   if (!rom) return NextResponse.json({ error: "Romaneio não encontrado" }, { status: 404 });
 
   const buf = await gerarRomaneioTerceiroForm22(rom);
-  const nome = `Romaneio-Terceiro-RT-${String(rom.numero).padStart(3, "0")}.xlsx`;
+  const nome = nomeFORM(26, `RT-${String(rom.numero).padStart(3, "0")}`, { ext: "xlsx" });
   return new NextResponse(buf, {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
