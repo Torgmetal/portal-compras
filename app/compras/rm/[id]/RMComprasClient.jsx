@@ -918,11 +918,11 @@ function ModalEditarPedido({ pedido, onClose, onSaved }) {
 
   // ⚠ era um parser BR local, correto mas paralelo. Duas implementações da mesma conversão é
   // exatamente como o erro dos 1000× se espalhou — uma fonte só (lib/numero-br).
-  const parseTotal = (v) => numeroBR(v);
+  const parseTotal = (v) => numeroBR(v, NaN); // NaN para o guard de "Valor invalido" continuar valendo
 
   const handleSalvar = async () => {
     const totalNum = parseTotal(total);
-    if (isNaN(totalNum) || totalNum < 0) {
+    if (!Number.isFinite(totalNum) || totalNum < 0) {
       setErro("Valor invalido");
       return;
     }
@@ -3424,7 +3424,11 @@ function ModalAdicionarItem({ rmId, onClose, onSaved }) {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const parseNum = (s) => { const n = numeroBR(s); return isNaN(n) ? null : n; };
+  // ⚠⚠ `numeroBR(s, NaN)` e não `numeroBR(s)`. O padrão da função é 0, e com ele o `isNaN` abaixo
+  // vira código morto: campo em branco ou ilegível passaria como ZERO em vez de null, e peso não
+  // informado seria gravado como 0 kg — indistinguível de peso realmente zero. Regressão que a
+  // troca do parseFloat introduziu; o parâmetro `padrao` existe exatamente para isto.
+  const parseNum = (s) => { const n = numeroBR(s, NaN); return Number.isFinite(n) ? n : null; };
 
   const submit = async () => {
     setErro("");

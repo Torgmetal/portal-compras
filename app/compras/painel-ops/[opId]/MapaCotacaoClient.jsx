@@ -227,8 +227,9 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
       : "Digite o valor total da proposta do fornecedor (do PDF):\n\nEx: 110837.39\n\nO sistema vai ajustar os preços proporcionalmente pra bater com esse total no Omie.";
     const input = window.prompt(promptMsg, atual ? String(atual) : "");
     if (input === null) return;
-    const valor = input.trim() === "" ? null : numeroBR(input);
-    if (valor !== null && (isNaN(valor) || valor < 0)) {
+    // ⚠ NaN como padrão: com 0, texto ilegível apagaria em silêncio o total já conferido no PDF.
+    const valor = input.trim() === "" ? null : numeroBR(input, NaN);
+    if (valor !== null && (!Number.isFinite(valor) || valor < 0)) {
       setErro("Valor inválido");
       return;
     }
