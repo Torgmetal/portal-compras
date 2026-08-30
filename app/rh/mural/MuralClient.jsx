@@ -1,9 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import {
-  Megaphone, Loader2, AlertCircle, RefreshCw, Inbox, Send, Trash2, Pin,
-  Mail, MessageSquare, CheckCircle2, ImagePlus, X,
-} from "lucide-react";
+import { Megaphone, Loader2, AlertCircle, RefreshCw, Inbox, Send, Trash2, Pin, Mail, MessageSquare, CheckCircle2, ImagePlus, X, ClipboardSignature } from "lucide-react";
 import { upload } from "@vercel/blob/client";
 import { useStore } from "@/lib/store";
 
@@ -227,7 +224,17 @@ export default function MuralClient() {
                       <p className="text-sm text-torg-dark/80 mt-1.5 whitespace-pre-wrap">{a.corpo}</p>
                       <p className="text-[11px] text-torg-gray mt-2">{a.criadoPorNome ? `${a.criadoPorNome} · ` : ""}{fmt(a.createdAt)}</p>
                     </div>
-                    <button onClick={() => excluir(a.id)} className="text-red-400 hover:text-red-600 shrink-0" title="Excluir"><Trash2 size={16} /></button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* ⚠ A LISTA É PARA QUEM NÃO TEM LOGIN. São 70 funcionários ativos e 30 usuários
+                          do portal: sem o papel, a evidência da campanha cobriria menos da metade da
+                          empresa. Sai já arquivada em /RH/Workspace/Campanhas/<data> - <campanha>. */}
+                      <a href={`/api/rh/mural/${a.id}/lista-assinatura`} target="_blank" rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-torg-blue-200 px-2.5 py-1.5 text-[11px] font-medium text-torg-blue transition hover:bg-torg-blue-50"
+                        title="Lista de presença para a fábrica assinar (quem não tem acesso ao portal)">
+                        <ClipboardSignature size={13} /> Lista de presença
+                      </a>
+                      <button onClick={() => excluir(a.id)} className="text-red-400 hover:text-red-600" title="Excluir"><Trash2 size={16} /></button>
+                    </div>
                   </div>
                 </div>
               ))}
