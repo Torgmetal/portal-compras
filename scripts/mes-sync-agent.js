@@ -108,7 +108,24 @@ function fmtData(d) {
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
 }
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
-const num = (v) => parseFloat(String(v ?? "0").replace(",", ".")) || 0;
+// ⚠ MESMA REGRA DO lib/numero-br.js DO PORTAL, copiada aqui de proposito: este agente roda
+// sozinho em C:\MesSync na fabrica, em CommonJS, sem acesso ao repo. Se mudar la, mude aqui.
+// O `replace(",", ".")` sozinho troca so a PRIMEIRA virgula: "1.234,56" virava 1,234.
+const num = (v) => {
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  const s = String(v ?? "").trim().replace(/[^\d.,-]/g, "");
+  if (!s || !/\d/.test(s)) return 0;
+  const iv = s.lastIndexOf(","), ip = s.lastIndexOf(".");
+  let n;
+  if (iv >= 0 && ip >= 0) n = iv > ip ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
+  else if (iv >= 0) n = s.split(",").length > 2 ? s.replace(/,/g, "") : s.replace(",", ".");
+  else if (ip >= 0) {
+    const partes = s.split("."), ult = partes[partes.length - 1];
+    n = ult.length === 3 && partes.length >= 2 ? s.replace(/\./g, "") : s;
+  } else n = s;
+  const x = parseFloat(n);
+  return Number.isFinite(x) ? x : 0;
+};
 // "28/05/2026 00:00:00" → Date (datas do Syneco vêm em BRT). Retorna null se vazio.
 function parseDataBR(s) {
   if (!s || s === "---") return null;
