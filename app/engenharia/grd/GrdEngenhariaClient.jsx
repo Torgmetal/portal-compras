@@ -151,6 +151,15 @@ export default function GrdEngenhariaClient() {
                                 </span>
                               )}
                               {!g.vigente && <span className="ml-1 text-[10px] text-torg-gray">superada</span>}
+                              {/* ⚠ o número impresso no documento não bate com o do arquivo — quem
+                                  emitiu copiou uma GRD anterior e não trocou o campo. Numa auditoria
+                                  é o documento que o auditor lê, então isso precisa ficar visível. */}
+                              {g.numeroCabecalho && (
+                                <span className="ml-1 text-[10px] font-semibold rounded px-1 py-0.5 bg-[#FFF7ED] text-torg-orange-700 border border-[#F4801F]/40"
+                                  title={`O documento traz "Nº ${g.numeroCabecalho}" impresso — corrigir na pasta`}>
+                                  doc. diz {g.numeroCabecalho}
+                                </span>
+                              )}
                             </td>
                             <td className="py-1.5 whitespace-nowrap">{fmtData(g.data)}</td>
                             <td className="py-1.5">{g.para || "—"}</td>

@@ -16,7 +16,7 @@ export async function GET() {
   const grds = await prisma.grdEngenharia.findMany({
     orderBy: [{ data: "desc" }, { numero: "desc" }],
     select: {
-      id: true, numero: true, revisao: true, arquivo: true, data: true, para: true,
+      id: true, numero: true, numeroCabecalho: true, revisao: true, arquivo: true, data: true, para: true,
       referencia: true, opCodigo: true, opNumero: true, pesoKg: true, area: true,
       emitidoPor: true, qtdDocs: true, itens: true,
     },

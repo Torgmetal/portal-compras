@@ -5391,7 +5391,13 @@ model MuralCiencia {
 // justamente o histórico de revisão que o procedimento pede.
 model GrdEngenharia {
   id           String    @id @default(cuid())
-  numero       String
+  // ⚠⚠ O NÚMERO VEM DO NOME DO ARQUIVO, não do cabeçalho — e a diferença apareceu nos dados.
+  // Sete GRDs da pasta (24, 26, 27, 28, 29, 30, 31) trazem "Nº: 23" impresso: alguém copiou o
+  // arquivo da 23 e não trocou o campo. O nome do arquivo é a série real da pasta e é único; o
+  // cabeçalho é o que está impresso no documento, e quando os dois divergem isso é informação para
+  // a Engenharia corrigir, não motivo para o portal recusar o registro.
+  numero          String
+  numeroCabecalho String? // o Nº impresso no documento, quando difere do nome do arquivo
   revisao      Int       @default(0)
   arquivo      String
   itemId       String    @unique // id do arquivo no SharePoint
@@ -5413,7 +5419,10 @@ model GrdEngenharia {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  @@unique([numero, revisao])
+  // ⚠ SEM UNIQUE em (numero, revisao): ela recusava documento que existe de verdade — os sete
+  // arquivos com o mesmo Nº no cabeçalho ficavam de fora da importação sem ninguém saber por quê.
+  // A chave é o `itemId`: um arquivo, um registro.
+  @@index([numero, revisao])
   @@index([opNumero])
   @@index([data])
 }
