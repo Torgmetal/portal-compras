@@ -1155,8 +1155,9 @@ function Pintura({ c, res, setComp }) {
       produto: cm.produto || t[i]?.produto || "",
       peliculaSeca: cm.peliculaSeca ?? t[i]?.peliculaSeca ?? null,
       solidos: cm.solidos ?? t[i]?.solidos ?? null,
-      // ⚠ a cor do ACABAMENTO vem da §2 da planilha; primer e intermediária não têm cor de projeto
-      cor: cm.camada === "ACABAMENTO" ? (cm.cor || corAcab) : (cm.cor || t[i]?.cor || ""),
+      // ⚠ CINZA EMBAIXO, COR DO CLIENTE EM CIMA. Vitor (31/08/2026): "primer e intermediário é
+      // melhor considerar sempre cinza". Só o acabamento puxa a cor da §2 da planilha.
+      cor: cm.camada === "ACABAMENTO" ? (cm.cor || corAcab) : (cm.cor || "Cinza"),
       perda: t[i]?.perda ?? 45,
       nome: (t[i]?.perda ?? 45) === 85 ? "ESTRUTURA — FATOR DE PERDA: 85%" : "ESTRUTURA — FATOR DE PERDA: 45%",
     }));
@@ -1313,7 +1314,10 @@ function Pintura({ c, res, setComp }) {
                     <td className="py-1 text-torg-dark">{cm.produto || "—"}</td>
                     <td className="py-1 text-right tabular-nums">{cm.peliculaSeca ?? "—"} µm</td>
                     <td className="py-1 text-right tabular-nums">{cm.solidos ?? "—"}%</td>
-                    <td className="py-1 pl-3 text-torg-dark">{cm.cor || (cm.camada === "ACABAMENTO" ? (leitura.cores?.[0]?.cor || "—") : "—")}</td>
+                    <td className="py-1 pl-3 text-torg-dark">
+                      {cm.camada === "ACABAMENTO" ? (cm.cor || leitura.cores?.[0]?.cor || "—") : (cm.cor || "Cinza")}
+                      {cm.camada !== "ACABAMENTO" && <span className="text-torg-gray"> (padrão)</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
