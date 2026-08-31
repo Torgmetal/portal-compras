@@ -14,7 +14,7 @@ import { lerLinhasCmr, appendLinhasCmr } from "@/lib/cmr-sharepoint";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-const ROLES = ["ADMIN", "ALMOXARIFADO", "COMPRAS", "PCP", "PLANEJAMENTO"];
+const ROLES = ["ADMIN", "ALMOXARIFADO", "COMPRAS", "PCP", "PLANEJAMENTO", "QUALIDADE"];
 const so = (v) => (v == null ? "" : String(v).trim());
 
 // DB guarda o R/RC no início da observação como "Tipo: R | resto".

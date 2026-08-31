@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileCheck2, BookCheck, ScrollText, ClipboardCheck, ClipboardList, Gauge, AlertOctagon, FolderTree, Ruler , Camera } from "lucide-react";
+import { FileCheck2, BookCheck, PackageCheck, ClipboardCheck, ClipboardList, Gauge, AlertOctagon, FolderTree, Ruler, Camera } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -9,7 +9,10 @@ const menu = [
   { href: "/qualidade", label: "Controle de Documentos", icon: FileCheck2, exact: true },
   { href: "/qualidade/calibracao", label: "Calibração", icon: Ruler },
   { href: "/qualidade/sgq", label: "Documentos do SGQ", icon: FolderTree },
-  { href: "/qualidade/rastreabilidade", label: "Rastreabilidade", icon: ScrollText },
+  // ⚠ Vitor (30/08/2026): "precisamos tirar a Rastreabilidade do portal da Qualidade (…) o ideal
+  // seria trazer um espelho dessa Recebimentos CMR, pois essa nova ficou muito boa". A conferência
+  // de certificados não sumiu — virou a segunda aba dessa tela.
+  { href: "/qualidade/recebimento-cmr", label: "Recebimento CMR", icon: PackageCheck },
   { href: "/qualidade/inspecoes", label: "Inspeções", icon: Camera },
   { href: "/qualidade/data-books", label: "Data Books", icon: BookCheck },
   // ⚠ Vitor (27/08/2026): "na auditoria internas deixar como Auditorias, e a auditoria externa
