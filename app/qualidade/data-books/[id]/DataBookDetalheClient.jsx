@@ -13,9 +13,9 @@ import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, s
 import { secaoNavega } from "@/lib/databook-pastas-web";
 import { STATUS_COR } from "@/lib/qualidade-status";
 import { TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
+import { fmtOP } from "@/lib/utils";
 
 const fmtKg = (v) => (!v ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`);
-const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 const ESTADOS = ["PENDENTE", "ANEXADO", "NA"];
 // quantos documentos a seção mostra antes de pedir "ver todos"
 const LIMITE_LISTA = 40;

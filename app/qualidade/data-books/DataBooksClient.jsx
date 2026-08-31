@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, Plus, BookCheck, ChevronRight, X, Check, Weight, Search, Archive, FolderOpen, CheckCircle2,
 } from "lucide-react";
@@ -15,7 +16,6 @@ const numOP = (n) => parseInt(String(n ?? "").replace(/\D/g, ""), 10) || 0;
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—");
 
 const fmtKg = (v) => (!v ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`);
-const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 
 export default function DataBooksClient() {
   const router = useRouter();

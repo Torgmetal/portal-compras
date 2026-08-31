@@ -14,12 +14,12 @@ import { getContatosTarefas } from "@/lib/contatos-tarefas";
 import { gerarAtaOPPDF } from "@/lib/ata-op-pdf";
 import { put } from "@vercel/blob";
 import { z } from "zod";
+import { fmtOP } from "@/lib/utils";
 
 export const runtime = "nodejs";
 const ROLES = ["ADMIN", "COMERCIAL", "PLANEJAMENTO", "PCP"];
 const BASE = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || "https://workspace.torg.com.br";
 const normEmail = (e) => String(e || "").trim().toLowerCase();
-const fmtOP = (n) => `OP-${String(n).padStart(3, "0")}`;
 const nn = (n) => String(n).padStart(2, "0");
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "");
 

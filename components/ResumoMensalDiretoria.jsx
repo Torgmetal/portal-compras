@@ -1,11 +1,11 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, AlertCircle, TrendingUp, Package, ChevronDown, ChevronRight, Calendar } from "lucide-react";
+import { fmtOP } from "@/lib/utils";
 
 const fmtR$ = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 const fmtPct = (v) => `${(Number(v || 0) * 100).toFixed(0)}%`;
-const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 
 /**
  * Resumo mensal da Diretoria: por mês, o expedido de cada OP (peso da lista),

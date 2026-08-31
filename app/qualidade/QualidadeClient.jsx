@@ -10,10 +10,10 @@ import {
 } from "lucide-react";
 import { CATEGORIAS_QUALIDADE, CATEGORIA_LABEL, STATUS_COR } from "@/lib/qualidade-status";
 import BotaoSincronizarCmr from "@/components/BotaoSincronizarCmr";
+import { fmtOP } from "@/lib/utils";
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const fmtTam = (b) => (!b ? "" : b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1048576).toFixed(1)} MB`);
-const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 
 const STATUS_FILTROS = [
   { key: "", label: "Todos" },

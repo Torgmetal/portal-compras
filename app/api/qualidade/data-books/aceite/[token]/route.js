@@ -5,10 +5,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { montarTermoAceite } from "@/lib/databook-secoes";
+import { fmtOP } from "@/lib/utils";
 
 export const runtime = "nodejs";
 
-const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 
 function publico(book, volumes = []) {
   return {

@@ -7,10 +7,10 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarTokenForte } from "@/lib/token";
 import { sendEmail } from "@/lib/email";
+import { fmtOP } from "@/lib/utils";
 
 export const runtime = "nodejs";
 
-const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 
 export async function POST(req, { params }) {
   let user;

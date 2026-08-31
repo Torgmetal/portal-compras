@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { signOut } from "next-auth/react";
+import { fmtOP } from "@/lib/utils";
 import {
   FileText, Loader2, CheckCircle2, Clock, ExternalLink, Globe, LogOut, PenLine,
   AlertCircle, RotateCcw, Download, ChevronDown, ChevronRight, Building2,
@@ -8,7 +9,6 @@ import {
 
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : null);
-const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 const PADRAO_PIT = { PINTURA: "Pintura", GALVANIZACAO: "Galvanização", GALV_PINTURA: "Galvanização + pintura", SNQC: "SNQC", BASICO: "Básico" };
 const TIPO_DB = { PADRAO_TORG: "Padrão Torg", SNQC: "SNQC", RELATORIO_ACOMPANHAMENTO: "Relatório de acompanhamento" };
 

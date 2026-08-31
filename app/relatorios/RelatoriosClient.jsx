@@ -6,9 +6,9 @@ import {
   FileBarChart2, Plus, Loader2, AlertCircle, RefreshCw, Inbox, FileDown, Trash2, X, Camera, CheckCircle2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { fmtOP } from "@/lib/utils";
 
 const fmt = (d) => new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-const fmtOP = (n) => { if (!n) return null; const s = String(n).trim(); return /^\d+$/.test(s) ? `OP-${s.padStart(3, "0")}` : `OP ${s}`; };
 const ST = { RASCUNHO: "bg-amber-100 text-amber-700", EMITIDO: "bg-green-100 text-green-700" };
 
 export default function RelatoriosClient() {
@@ -150,7 +150,7 @@ export default function RelatoriosClient() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-torg-dark">{r.cliente || "—"}</div>
-                        <div className="text-[11px] text-torg-gray">{[fmtOP(r.opNumero), r.obra].filter(Boolean).join(" · ") || "—"}</div>
+                        <div className="text-[11px] text-torg-gray">{[r.opNumero ? fmtOP(r.opNumero) : null, r.obra].filter(Boolean).join(" · ") || "—"}</div>
                       </td>
                       <td className="px-4 py-3 text-center text-torg-gray whitespace-nowrap"><span className="inline-flex items-center gap-1"><Camera size={12} /> {r.nFotos}</span></td>
                       <td className="px-4 py-3 text-center"><span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${ST[r.status] || "bg-gray-100 text-gray-600"}`}>{r.status}</span></td>

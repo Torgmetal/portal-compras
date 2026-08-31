@@ -4,15 +4,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { fmtOP } from "@/lib/utils";
 
 export const runtime = "nodejs";
 
-const fmtOP = (n) => { if (!n) return null; const s = String(n).trim(); return /^\d+$/.test(s) ? `OP-${s.padStart(3, "0")}` : `OP ${s}`; };
 
 function publico(rel) {
   const blocos = Array.isArray(rel.blocos) ? rel.blocos : [];
   return {
-    titulo: rel.titulo, cliente: rel.cliente, obra: rel.obra, op: fmtOP(rel.opNumero),
+    titulo: rel.titulo, cliente: rel.cliente, obra: rel.obra, op: rel.opNumero ? fmtOP(rel.opNumero) : null,
     resumo: rel.resumo,
     nBlocos: blocos.length,
     nFotos: blocos.reduce((a, b) => a + (Array.isArray(b?.fotos) ? b.fotos.length : 0), 0),

@@ -11,11 +11,11 @@ import CustoHoraClient from "@/components/CustoHoraClient";
 import FluxoProducao from "./FluxoProducao";
 import ResumoMensalDiretoria from "@/components/ResumoMensalDiretoria";
 import { numeroBR } from "@/lib/numero-br";
+import { fmtOP } from "@/lib/utils";
 
 const fmtR$ = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
 const fmtDataHora = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
 const fmtDia = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "UTC" }) : "—");
-const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 
 const ABAS_BASE = [
   { id: "resumo", label: "Resumo" },

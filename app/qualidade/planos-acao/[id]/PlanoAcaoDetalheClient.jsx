@@ -53,7 +53,10 @@ export default function PlanoAcaoDetalheClient({ id }) {
     try {
       const r = await fetch(`/api/qualidade/planos-acao/${id}`, { method: "DELETE" });
       if (!r.ok) throw new Error("Erro ao excluir");
-      router.push("/qualidade/planos-acao");
+      // ⚠ NÃO EXISTE /qualidade/planos-acao: a lista é uma ABA, em Auditorias Internas ou na RNC,
+      // conforme a origem do plano. Mandar para a rota "raiz" dava 404 logo depois de excluir —
+      // o usuário via um erro no lugar da confirmação. Mesma regra do link "voltar" do cabeçalho.
+      router.push(p?.origem?.startsWith("RNC-") ? "/qualidade/rnc?aba=PLANOS" : "/qualidade/auditorias-internas?aba=planos");
     } catch (e) { alert(e.message); setSalvando(false); }
   }
 
