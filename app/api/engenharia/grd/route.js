@@ -30,9 +30,14 @@ export async function GET() {
     if (!atual || g.revisao > atual.revisao) porNumero.set(g.numero, g);
   }
 
+  // ⚠ SEM OP NÃO ENTRA NA LISTA. Vitor (31/08/2026): "as que estão sem OP nem precisa listar".
+  // São 27 GRDs de cabeçalho fora do padrão — sem obra, elas não respondem à pergunta que esta tela
+  // existe para responder ("o que foi liberado para esta obra") e só empurrariam as demais para
+  // baixo. Continuam gravadas: se um dia o cabeçalho for corrigido, a próxima leitura as encaixa.
   const ops = new Map();
   for (const g of grds) {
-    const k = g.opNumero || "SEM_OP";
+    if (!g.opNumero) continue;
+    const k = g.opNumero;
     if (!ops.has(k)) ops.set(k, { opNumero: g.opNumero, opCodigo: g.opCodigo, referencia: g.referencia, grds: [], docs: 0, pesoKg: 0, ultima: null });
     const o = ops.get(k);
     o.grds.push({ ...g, vigente: porNumero.get(g.numero)?.id === g.id });
@@ -41,15 +46,13 @@ export async function GET() {
     if (!o.referencia && g.referencia) o.referencia = g.referencia;
   }
 
-  const lista = [...ops.values()].sort((a, b) => {
-    if (a.opNumero === null) return 1;
-    if (b.opNumero === null) return -1;
-    return Number(b.opNumero) - Number(a.opNumero);
-  });
+  const lista = [...ops.values()].sort((a, b) => Number(b.opNumero) - Number(a.opNumero));
+  const semOp = grds.filter((g) => !g.opNumero).length;
 
   return NextResponse.json({
     ops: lista,
-    total: grds.length,
-    comRevisao: [...porNumero.values()].filter((g) => g.revisao > 0).length,
+    total: grds.length - semOp,
+    semOp, // fora da lista, mas contado: é o que diz que há cabeçalho a corrigir na pasta
+    comRevisao: [...porNumero.values()].filter((g) => g.opNumero && g.revisao > 0).length,
   });
 }

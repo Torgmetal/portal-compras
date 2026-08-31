@@ -71,6 +71,9 @@ export default function GrdEngenhariaClient() {
           <p className="text-[13px] text-torg-gray mt-0.5">
             O que a Engenharia liberou, por obra — {d.total} GRD(s), {d.comRevisao} com revisão.
             Vem da pasta <span className="font-mono text-[12px]">13. GRD</span> do SharePoint.
+            {d.semOp > 0 && (
+              <span className="text-torg-orange-700"> · {d.semOp} sem OP no cabeçalho, fora da lista.</span>
+            )}
           </p>
         </div>
         <button onClick={sincronizar} disabled={sincronizando}
@@ -95,16 +98,14 @@ export default function GrdEngenhariaClient() {
         </div>
         <div className="divide-y divide-gray-50">
           {ops.map((o) => {
-            const k = o.opNumero || "SEM_OP";
+            const k = o.opNumero;
             const ab = aberta === k;
             return (
               <div key={k}>
                 <button onClick={() => setAberta(ab ? null : k)}
                   className="w-full flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-left hover:bg-torg-blue-50/40">
                   {ab ? <ChevronDown size={15} className="text-torg-blue shrink-0" /> : <ChevronRight size={15} className="text-gray-300 shrink-0" />}
-                  <span className="font-mono text-sm font-semibold text-torg-blue">
-                    {o.opNumero ? fmtOP(o.opNumero) : "sem OP"}
-                  </span>
+                  <span className="font-mono text-sm font-semibold text-torg-blue">{fmtOP(o.opNumero)}</span>
                   {o.opCodigo && <span className="text-[11px] text-torg-gray font-mono">{o.opCodigo}</span>}
                   <span className="text-sm text-torg-dark truncate max-w-[280px]">{o.referencia || "—"}</span>
                   <span className="ml-auto text-[12px] text-torg-gray tabular-nums whitespace-nowrap">
