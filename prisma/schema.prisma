@@ -5485,3 +5485,51 @@ model GrdRemessaPcp {
   @@unique([numero, ano])
   @@index([opNumero])
 }
+
+// ─── COTAÇÃO A PARTIR DO ESTUDO (fase de ORÇAMENTO) ───────────────────────────────────────────
+// Vitor (31/08/2026): "precisamos que tenha o botão para enviar para cotação (…) mando a
+// especificação da pintura, mais a área a ser pintada e o coeficiente de perda para o fabricante da
+// tinta e, com base nisso, ele informa quantos galões, quantos diluentes e componentes B vai
+// precisar vender para atender a demanda".
+//
+// ⚠⚠ NÃO É A COTAÇÃO DO COMPRAS. Aquela nasce de uma RM, com item cadastrado e OP aberta — aqui a
+// obra ainda não foi vendida. Misturar as duas encheria a fila do comprador de cotação de orçamento
+// que talvez nunca vire pedido, e o fornecedor receberia o mesmo e-mail em dois contextos
+// diferentes. Vitor: "precisa ser um portal totalmente separado do de compras".
+//
+// ⚠ O SNAPSHOT CONGELA O QUE FOI PERGUNTADO. Área, perda e camadas mudam enquanto o orçamento é
+// negociado; a proposta do fornecedor tem de continuar respondendo à pergunta que ele recebeu.
+model CotacaoEstudo {
+  id             String   @id @default(cuid())
+  estudoId       String
+  tipo           String // TINTA | (outros insumos depois)
+  snapshot       Json     @default("{}")
+  enviadoEm      DateTime @default(now())
+  enviadoPorId   String?
+  enviadoPorNome String?
+  createdAt      DateTime @default(now())
+
+  fornecedores CotacaoEstudoFornecedor[]
+
+  @@index([estudoId])
+}
+
+model CotacaoEstudoFornecedor {
+  id           String    @id @default(cuid())
+  cotacaoId    String
+  fornecedorId String?
+  nome         String
+  email        String
+  token        String    @unique
+  enviadoEm    DateTime?
+  erroEnvio    String?
+  respondidoEm DateTime?
+  resposta     Json? // { galoes, diluentes, componenteB, prazo, observacao, itens[] }
+  valorTotal   Float?
+  vencedor     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+
+  cotacao CotacaoEstudo @relation(fields: [cotacaoId], references: [id], onDelete: Cascade)
+
+  @@index([cotacaoId])
+}

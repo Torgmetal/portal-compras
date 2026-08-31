@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
-import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload } from "lucide-react";
+import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload, Send } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAPACIDADE_CARGA, EVENTOS_PAGAMENTO, PAGAMENTO_PADRAO, PRAZOS_PAGAMENTO, conferirPagamento, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa, resultadoDoCenario, sensibilidade, ALAVANCAS_SENSIVEIS, equilibrioConvergido, impostosDoCenario } from "@/lib/lqc";
 import { capacidadePorHora } from "@/lib/fabrica-horas";
@@ -168,7 +168,7 @@ export default function EstudoClient({ id }) {
 
       {aba === "RESUMOS" && <Resumos e={e} c={c} setComp={setComp} mexer={mexer} res={res} />}
       {aba === "MATERIAL" && <Material c={c} res={res} setComp={setComp} />}
-      {aba === "PINTURA" && <Pintura c={c} res={res} setComp={setComp} />}
+      {aba === "PINTURA" && <Pintura c={c} res={res} setComp={setComp} estudoId={e.id} />}
       {aba === "FABRICACAO" && <Fabricacao c={c} res={res} setComp={setComp} custoFabrica={d.custoFabrica} />}
       {aba === "TERCEIROS" && <Terceiros c={c} res={res} setComp={setComp} />}
       {aba === "FRETE" && <Frete c={c} res={res} setComp={setComp} />}
@@ -823,6 +823,137 @@ function EspecificacaoComercial({ item, cfg, setIt }) {
   );
 }
 
+// ─── COTAÇÃO DE TINTA COM OS FABRICANTES ──────────────────────────────────────────────────────
+// Vitor (31/08/2026): "precisamos que tenha o botão para enviar para cotação (…) mando a
+// especificação da pintura, mais a área a ser pintada e o coeficiente de perda para o fabricante e
+// com base nisso ele informa quantos galões, quantos diluentes e componentes B vai precisar vender"
+// e "traga os cadastrados no vendor list, página de compras, lista de fornecedores de tintas".
+//
+// ⚠⚠ NADA SAI PARA QUEM NÃO FOI MARCADO. Vitor: "precisa ser selecionado quais fornecedores vamos
+// enviar, não deve mandar nada para ninguém que não esteja selecionado". Por isso não existe
+// "enviar para todos" nem pré-seleção: a caixa começa vazia e o botão só liga com alguém marcado.
+//
+// ⚠ ESTA NÃO É A COTAÇÃO DO COMPRAS. Lá nasce de uma RM, com OP aberta; aqui a obra ainda não foi
+// vendida. O e-mail diz isso com todas as letras ("ainda não é um pedido de compra") — se o
+// fornecedor confundir os dois, ele reserva estoque para uma obra que talvez não exista.
+function CotacaoTinta({ estudoId, c, res }) {
+  const [dados, setDados] = useState(null);
+  const [marcados, setMarcados] = useState(() => new Set());
+  const [enviando, setEnviando] = useState(false);
+  const [aviso, setAviso] = useState("");
+
+  const carregar = useCallback(() => {
+    if (!estudoId) return;
+    fetch(`/api/comercial/estudos/cotacao?tipo=TINTA&estudoId=${estudoId}`)
+      .then((r) => r.json()).then((j) => !j.error && setDados(j)).catch(() => {});
+  }, [estudoId]);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const camadas = (Array.isArray(c.tintas) ? c.tintas : [])
+    .filter((t) => t.produto || t.solidos || t.peliculaSeca)
+    .map((t) => ({ camada: t.camada, produto: t.produto, peliculaSeca: t.peliculaSeca, solidos: t.solidos, cor: t.cor }));
+  // ⚠ a perda que vai na consulta é a que PREDOMINA no levantamento: mandar 45% quando metade da
+  // obra é guarda-corpo faria o fabricante dimensionar tinta a menos.
+  const perdas = (Array.isArray(c.resumos) ? c.resumos : []).filter((l) => l.ativo !== false)
+    .map((l) => perdaDaEstrutura(l.estrutura));
+  const perda = perdas.length ? Math.max(...perdas) : 45;
+  const areaM2 = Math.round(num(res?.areaM2) || 0);
+  const pronto = areaM2 > 0 && camadas.length > 0;
+
+  const alterna = (id) => setMarcados((s2) => { const n = new Set(s2); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  async function enviar() {
+    if (!marcados.size) return;
+    if (!confirm(
+      `Enviar a consulta de tintas para ${marcados.size} fabricante(s)?\n\n` +
+      `Vai a área (${areaM2.toLocaleString("pt-BR")} m²), o coeficiente de perda (${perda}%) e o esquema de ` +
+      `${camadas.length} demão(ões). Não vai preço nosso nem nome de concorrente.`
+    )) return;
+    setEnviando(true); setAviso("");
+    try {
+      const r = await fetch("/api/comercial/estudos/cotacao", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          estudoId, tipo: "TINTA", fornecedorIds: [...marcados],
+          snapshot: { areaM2, perda, perdaNota: perda === 85 ? "guarda-corpo / escada marinheiro" : null,
+                      camadas, fabricante: c.pinturaFabricante || null },
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro");
+      setAviso(`Consulta enviada a ${j.enviados} de ${j.convidados} fabricante(s).`);
+      setMarcados(new Set());
+      carregar();
+    } catch (e) { setAviso("Falha: " + e.message); } finally { setEnviando(false); }
+  }
+
+  if (!dados) return null;
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-xl p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[12px] font-bold text-torg-dark">Cotação com os fabricantes de tinta</p>
+          <p className="text-[11px] text-torg-gray mt-0.5">
+            Manda área, coeficiente de perda e o esquema de pintura — o fabricante devolve galões,
+            diluente e componente B. Fase de orçamento: não é pedido de compra.
+          </p>
+        </div>
+        <button onClick={enviar} disabled={!marcados.size || enviando || !pronto}
+          title={!pronto ? "Lance a área e o esquema de pintura antes de consultar" : marcados.size ? "" : "Marque quem deve receber"}
+          className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-2 hover:bg-torg-dark disabled:opacity-40 inline-flex items-center gap-1.5">
+          {enviando ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+          Enviar para cotação{marcados.size ? ` (${marcados.size})` : ""}
+        </button>
+      </div>
+
+      {!pronto && (
+        <p className="mt-2 text-[11px] text-torg-orange-700">
+          Falta {areaM2 > 0 ? "o esquema de pintura (camadas)" : "a área a pintar"} — sem isso o fabricante não tem como dimensionar.
+        </p>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {dados.fornecedores.map((f) => (
+          <label key={f.id}
+            className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[12px] cursor-pointer ${
+              marcados.has(f.id) ? "border-torg-blue bg-torg-blue-50 text-torg-dark" : "border-gray-200 text-torg-gray hover:border-torg-blue/40"}`}>
+            <input type="checkbox" checked={marcados.has(f.id)} onChange={() => alterna(f.id)}
+              className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
+            <span className="font-medium text-torg-dark">{f.nome}</span>
+            {f.praca && <span className="text-[10px] text-torg-gray">{f.praca}</span>}
+          </label>
+        ))}
+        {!dados.fornecedores.length && (
+          <p className="text-[11px] text-torg-orange-700">
+            Nenhum fornecedor com família “Tinta” e e-mail no vendor list.
+          </p>
+        )}
+      </div>
+
+      {aviso && <p className="mt-2 text-[11px] text-torg-dark">{aviso}</p>}
+
+      {/* ⚠ O MAPA COMEÇA AQUI: por enquanto mostra quem foi consultado e quando. A resposta ainda
+          chega por e-mail; o lançamento do preço e a marcação do vencedor entram na próxima. */}
+      {dados.cotacoes.length > 0 && (
+        <div className="mt-3 border-t border-gray-100 pt-3">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-torg-gray mb-1">Consultas enviadas</p>
+          {dados.cotacoes.map((ct) => (
+            <div key={ct.id} className="text-[11px] text-torg-dark mb-1">
+              <span className="text-torg-gray">{new Date(ct.enviadoEm).toLocaleString("pt-BR")} · {ct.enviadoPorNome || "—"} · </span>
+              {ct.fornecedores.map((f) => (
+                <span key={f.id} className={`inline-block mr-2 ${f.erroEnvio ? "text-red-600" : f.respondidoEm ? "text-emerald-700" : ""}`}>
+                  {f.nome}{f.erroEnvio ? " (falhou)" : f.respondidoEm ? " ✓" : ""}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** FABRICAÇÃO — o que a fábrica faz. Sempre Torg, então não há o que escolher. */
 function Fabricacao({ c, res, setComp, custoFabrica }) {
   // ⚠ só as áreas no escopo: pré-montar o que não se vende não existe
@@ -1072,7 +1203,7 @@ function Quadro({ titulo, grupo, vazio, precoEditavel }) {
  * quantitativo, a tinta na MC_TINTAS e o preço da mão de obra na industrialização. A planilha
  * organiza assim porque as fórmulas dela precisam; quem monta o custo, não.
  */
-function Pintura({ c, res, setComp }) {
+function Pintura({ c, res, setComp, estudoId }) {
   const t = Array.isArray(c.tintas) ? c.tintas : [];
   // ─── LEVANTAMENTO DE PINTURA ANEXADO ────────────────────────────────────────────────────────
   // Vitor (31/08/2026): "na parte da pintura nessa página preciso da opção para que seja possível
@@ -1182,6 +1313,7 @@ function Pintura({ c, res, setComp }) {
 
   return (
     <div className="space-y-4">
+      <CotacaoTinta estudoId={estudoId} c={c} res={res} />
       <div className="bg-white border border-gray-100 rounded-xl p-4">
         {/* ─── O QUE VAI SER PINTADO ──────────────────────────────────────────────────────────
             Vitor (31/08/2026): "na aba pintura precisa vir o resumo da aba quantitativo e deixar
