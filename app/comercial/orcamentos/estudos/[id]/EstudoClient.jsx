@@ -262,10 +262,62 @@ function Resumos({ e, c, setComp, mexer, res }) {
   const add = () => setComp({ resumos: [...linhas, { item: `1.${linhas.length + 1}`, metodo: e.metodo || "ESTIMATIVA", un: "unid", quantidade: 1, unidades: 1 }] });
   const del = (i) => setComp({ resumos: linhas.filter((_, j) => j !== i) });
   const dup = (i) => setComp({ resumos: [...linhas.slice(0, i + 1), { ...linhas[i], item: `1.${linhas.length + 1}` }, ...linhas.slice(i + 1)] });
-  const pesoDe = (l) => num(l.quantidade) * num(l.unidades || 1) * num(l.pesoUnit);
+  // ⚠ MESMA REGRA DO MOTOR (lib/lqc.js): o peso lançado manda, a fórmula é o plano B. Sem isto a
+  // linha "N áreas · X kg" desta aba podia divergir do KPI do topo, que já usava a regra certa.
+  const pesoDe = (l) => (num(l.pesoTotal) > 0 ? num(l.pesoTotal) : num(l.quantidade) * num(l.unidades || 1) * num(l.pesoUnit));
   const total = linhas.filter((l) => l.ativo !== false).reduce((a, l) => a + pesoDe(l), 0);
   const fora = linhas.filter((l) => l.ativo === false).reduce((a, l) => a + pesoDe(l), 0);
   const ativas = linhas.filter((l) => l.ativo !== false).length;
+  // ─── IMPORTAR O PESO DA ÁREA DE UMA PLANILHA ────────────────────────────────────────────────
+  // Vitor (31/08/2026): "ao lado [do Método] ter um botão para ser possível importarmos uma
+  // planilha onde terá o peso da área".
+  //
+  // ⚠ A REGRA É EXPLÍCITA E SIMPLES, de propósito: procura a coluna cujo cabeçalho fale de PESO
+  // (ou kg) e SOMA a coluna inteira. Não tento adivinhar layout — a tela diz o que somou e de qual
+  // coluna, e quem lançou confere. Uma heurística esperta que erra em silêncio seria pior que
+  // digitar o número à mão.
+  const [importando, setImportando] = useState(null);   // índice da linha
+  const arquivoRef = useRef(null);
+  const alvoRef = useRef(null);
+
+  const pedirPlanilha = (i) => { alvoRef.current = i; arquivoRef.current?.click(); };
+
+  async function lerPlanilhaPeso(ev) {
+    const file = ev.target.files?.[0];
+    ev.target.value = "";
+    const i = alvoRef.current;
+    if (!file || i == null) return;
+    setImportando(i);
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const grade = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false });
+      // acha a linha de cabeçalho e a coluna de peso
+      let col = -1, cab = -1, nomeCol = "";
+      for (let r = 0; r < Math.min(grade.length, 25) && col < 0; r++) {
+        for (let cIdx = 0; cIdx < (grade[r] || []).length; cIdx++) {
+          const t = String(grade[r][cIdx] || "").trim();
+          if (/^(peso|peso\s*(total|liquido|líquido|kg)?|kg|kgs)\b/i.test(t) || /peso.*\(kg\)/i.test(t)) {
+            col = cIdx; cab = r; nomeCol = t; break;
+          }
+        }
+      }
+      if (col < 0) throw new Error("Não achei uma coluna de peso nesta planilha. O cabeçalho precisa ter “Peso” ou “kg”.");
+      let soma = 0, lidas = 0;
+      for (let r = cab + 1; r < grade.length; r++) {
+        const v = num(grade[r]?.[col]);
+        if (v > 0) { soma += v; lidas++; }
+      }
+      if (!(soma > 0)) throw new Error(`A coluna “${nomeCol}” não tem nenhum número maior que zero.`);
+      if (!confirm(
+        `Somei ${lidas} linha(s) da coluna “${nomeCol}”: ${fmtKg(soma)}.\n\n` +
+        "Usar como peso desta área?"
+      )) return;
+      setComp({ resumos: linhas.map((l, j) => (j === i ? { ...l, pesoTotal: soma, metodo: "PESO DE PROJETO" } : l)) });
+    } catch (e) { alert(e.message); } finally { setImportando(null); }
+  }
+
   const porArea = res?.porArea || [];
   // ⚠ A COR É CHAVE, NÃO ENFEITE. Vitor (23/08/2026): "o ideal seria já mencionar a cor de cada
   // tipo de estrutura". É ela que decide qual demão de acabamento cai naquele trecho — digitada
@@ -311,7 +363,12 @@ function Resumos({ e, c, setComp, mexer, res }) {
       </div>
 
       <div className="space-y-3">
-        {linhas.map((l, i) => <CartaoLinha key={i} l={l} i={i} set={set} del={del} dup={dup} porArea={porArea} cores={coresConhecidas} doEsquema={coresDoEsquema} />)}
+        <input ref={arquivoRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={lerPlanilhaPeso} />
+        {linhas.map((l, i) => (
+          <CartaoLinha key={i} l={l} i={i} set={set} del={del} dup={dup} porArea={porArea}
+            cores={coresConhecidas} doEsquema={coresDoEsquema}
+            onImportarPeso={pedirPlanilha} importando={importando === i} />
+        ))}
       </div>
 
       <button onClick={add}
@@ -323,7 +380,7 @@ function Resumos({ e, c, setComp, mexer, res }) {
 }
 
 /** Um elemento do quantitativo, com a consequência de cada escolha à vista. */
-function CartaoLinha({ l, i, set, del, dup, porArea, cores, doEsquema }) {
+function CartaoLinha({ l, i, set, del, dup, porArea, cores, doEsquema, onImportarPeso, importando }) {
   const dentro = l.ativo !== false;
   const custo = (porArea || []).find((x) => x.area === (l.area || l.item));
   // null = ainda não há esquema de acabamento para comparar
@@ -331,7 +388,14 @@ function CartaoLinha({ l, i, set, del, dup, porArea, cores, doEsquema }) {
   const corCasa = !doEsquema?.length ? null : !l.cor ? null : doEsquema.some((x) => norma(x) === norma(l.cor));
   const classe = CLASSES.find((x) => x.nome.toUpperCase() === String(l.classificacao || "").toUpperCase());
   const perfil = PERFIS.find((p) => p.nome === l.perfil);
-  const peso = num(l.quantidade) * num(l.unidades || 1) * num(l.pesoUnit);
+  // ⚠⚠ MESMA REGRA DO MOTOR, E ANTES NÃO ERA. `lib/lqc.js` calcula
+  // `pesoTotal ?? quantidade × unidades × pesoUnit` — o peso lançado manda, a fórmula é o plano B.
+  // A tela usava SÓ a fórmula, então card e cabeçalho podiam brigar: na LQC-290-26 a primeira área
+  // tem pesoTotal 90.216 kg e quantidade 1000 × unidades 18 gravadas do import, o que dava
+  // 1.623.888.000 kg no card contra 541.298 kg no topo. Três mil vezes de diferença na mesma tela.
+  const pesoFormula = num(l.quantidade) * num(l.unidades || 1) * num(l.pesoUnit);
+  const peso = num(l.pesoTotal) > 0 ? num(l.pesoTotal) : pesoFormula;
+  const porProjeto = String(l.metodo || "").toUpperCase() === "PESO DE PROJETO";
   const custoMat = perfil ? peso * perfil.preco : 0;
   const custoFab = classe ? peso * classe.fabricacao : 0;
   // a unidade do peso unitário SEGUE a unidade de medida — é o que evita lançar kg/m num item "unid"
@@ -370,24 +434,106 @@ function CartaoLinha({ l, i, set, del, dup, porArea, cores, doEsquema }) {
             <Inp value={l.elemento || ""} onChange={(ev) => set(i, "elemento", ev.target.value)} className="w-full" /></Campo>
         </Bloco>
 
-        <Bloco titulo="Como se mede" nota="Quantidade × Unidades × Peso unitário = peso do elemento">
+        {/* ⚠ O MÉTODO MANDA NO QUE APARECE. Vitor (31/08/2026): "Método manter como está com as
+            duas categorias, e ao lado ter um botão para importarmos uma planilha onde terá o peso
+            da área; quando for estimativa, manter os campos que já temos para preencher o peso".
+            Mostrar os cinco campos sempre era o que mais confundia: em PESO DE PROJETO o peso vem
+            pronto da lista, e Quantidade/Unidades/Peso unitário são ruído — pior, ficam gravados e
+            brigam com o peso lançado. */}
+        {/* ─── MODULAÇÃO ────────────────────────────────────────────────────────────────────────
+            Vitor (31/08/2026): "criar campos para preenchermos as modulações que pede na nossa
+            proposta — comprimento, altura, largura, descrição do que seria a estrutura — e deixar a
+            opção para assinalar se queremos ou não que apareça na proposta".
+
+            ⚠ NÃO ENTRA NO CÁLCULO. Modulação é descrição do que está sendo vendido, não medida de
+            peso: quem dá o peso é o bloco abaixo. Se entrasse na conta, um galpão descrito como
+            30 × 12 × 8 viraria volume e brigaria com o levantamento.
+
+            ⚠⚠ O CHECKBOX É POR ÁREA, e não uma chave geral. Numa proposta com galpão e mezanino, o
+            cliente quer ver a modulação do galpão e não a do corrimão — decidir isso uma vez para a
+            proposta inteira obrigaria a apagar o que não deve sair. */}
+        <Bloco titulo="Modulação" nota="vai para a descrição da proposta — não entra no cálculo de peso">
+          <Campo r="Comprimento (m)">
+            <Inp value={l.modComprimento ?? ""} onChange={(ev) => set(i, "modComprimento", ev.target.value)} className="w-full text-right" /></Campo>
+          <Campo r="Largura (m)">
+            <Inp value={l.modLargura ?? ""} onChange={(ev) => set(i, "modLargura", ev.target.value)} className="w-full text-right" /></Campo>
+          <Campo r="Altura (m)">
+            <Inp value={l.modAltura ?? ""} onChange={(ev) => set(i, "modAltura", ev.target.value)} className="w-full text-right" /></Campo>
+          <Campo r="Descrição da estrutura" ajuda="como o cliente lê na proposta">
+            <Inp value={l.modDescricao ?? ""} onChange={(ev) => set(i, "modDescricao", ev.target.value)}
+              placeholder="ex.: galpão em pórticos treliçados" className="w-full" /></Campo>
+          <Campo r="Na proposta">
+            <label className="flex items-center gap-2 text-[12px] text-torg-dark border border-gray-200 rounded px-2 py-1 bg-white">
+              <input type="checkbox" checked={l.modNaProposta === true}
+                onChange={(ev) => set(i, "modNaProposta", ev.target.checked)}
+                className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
+              mostrar
+            </label>
+          </Campo>
+          {l.modNaProposta && (
+            <div className="col-span-2 sm:col-span-3 lg:col-span-5">
+              <p className="text-[11px] text-torg-gray">
+                Sai na proposta como:{" "}
+                <strong className="text-torg-dark">
+                  {[l.modDescricao, [l.modComprimento, l.modLargura, l.modAltura].filter(Boolean).join(" × ") &&
+                    `${[l.modComprimento, l.modLargura, l.modAltura].filter(Boolean).join(" × ")} m`]
+                    .filter(Boolean).join(" — ") || "preencha a descrição e as medidas"}
+                </strong>
+              </p>
+            </div>
+          )}
+        </Bloco>
+
+        <Bloco titulo="Como se mede"
+          nota={porProjeto ? "o peso vem da lista de projeto" : "Quantidade × Unidades × Peso unitário = peso do elemento"}>
           <Campo r="Método">
             <Sel value={l.metodo || ""} onChange={(ev) => set(i, "metodo", ev.target.value)} opcoes={METODOS} rotulos={METODO_ROTULO} className="w-full" /></Campo>
-          <Campo r="Unidade de medida" ajuda="define o peso unitário abaixo">
-            <Sel value={l.un || ""} onChange={(ev) => set(i, "un", ev.target.value)} opcoes={["m", "m²", "unid"]} className="w-full" /></Campo>
-          <Campo r="Quantidade" ajuda={l.un === "unid" ? "quantas peças" : `quantos ${l.un || "m"}`}>
-            <Inp value={l.quantidade ?? ""} onChange={(ev) => set(i, "quantidade", ev.target.value)} className="w-full text-right" /></Campo>
-          <Campo r="Unidades" ajuda="repetições iguais (ex.: 12 pórticos)">
-            <Inp value={l.unidades ?? ""} onChange={(ev) => set(i, "unidades", ev.target.value)} className="w-full text-right" /></Campo>
-          <Campo r={`Peso unitário (${unPeso})`} ajuda="peso de cada unidade de medida">
-            <Inp value={l.pesoUnit ?? ""} onChange={(ev) => set(i, "pesoUnit", ev.target.value)} className="w-full text-right" /></Campo>
+
+          {porProjeto ? (
+            <>
+              <Campo r="Peso da área (kg)" ajuda="o peso levantado no projeto">
+                <Inp value={l.pesoTotal ?? ""} onChange={(ev) => set(i, "pesoTotal", ev.target.value)} className="w-full text-right" /></Campo>
+              <Campo r="Importar" ajuda="planilha com o peso desta área">
+                <button type="button" onClick={() => onImportarPeso?.(i)} disabled={importando}
+                  className="w-full border border-torg-blue-200 text-torg-blue rounded px-2 py-1 text-[12px] font-medium hover:bg-torg-blue-50 disabled:opacity-50 inline-flex items-center justify-center gap-1.5">
+                  {importando ? <Loader2 size={12} className="animate-spin" /> : <FileSpreadsheet size={12} />} Importar planilha
+                </button>
+              </Campo>
+            </>
+          ) : (
+            <>
+              <Campo r="Unidade de medida" ajuda="define o peso unitário abaixo">
+                <Sel value={l.un || ""} onChange={(ev) => set(i, "un", ev.target.value)} opcoes={["m", "m²", "unid"]} className="w-full" /></Campo>
+              <Campo r="Quantidade" ajuda={l.un === "unid" ? "quantas peças" : `quantos ${l.un || "m"}`}>
+                <Inp value={l.quantidade ?? ""} onChange={(ev) => set(i, "quantidade", ev.target.value)} className="w-full text-right" /></Campo>
+              <Campo r="Unidades" ajuda="repetições iguais (ex.: 12 pórticos)">
+                <Inp value={l.unidades ?? ""} onChange={(ev) => set(i, "unidades", ev.target.value)} className="w-full text-right" /></Campo>
+              <Campo r={`Peso unitário (${unPeso})`} ajuda="peso de cada unidade de medida">
+                <Inp value={l.pesoUnit ?? ""} onChange={(ev) => set(i, "pesoUnit", ev.target.value)} className="w-full text-right" /></Campo>
+            </>
+          )}
+
+          {/* ⚠ QUANDO OS DOIS PESOS DIVERGEM, A TELA DIZ. É o que faltava para o número do card
+              casar com o do cabeçalho sem ninguém precisar desconfiar. */}
+          {!porProjeto && num(l.pesoTotal) > 0 && Math.abs(num(l.pesoTotal) - pesoFormula) > 1 && (
+            <div className="col-span-2 sm:col-span-3 lg:col-span-5">
+              <p className="text-[11px] text-torg-orange-700">
+                Vale o peso lançado: <strong>{fmtKg(num(l.pesoTotal))}</strong>. A conta dos campos
+                acima daria {fmtKg(pesoFormula)} — confira qual está certo.
+              </p>
+            </div>
+          )}
         </Bloco>
 
         {/* ⚠ ÁREA INFORMADA MANDA. Vitor (23/08/2026): "deixar o campo para preencher caso
             tenhamos essa informação da área de pintura, ou veja se conseguimos fazer uma
             estimativa de área de acordo com o peso". As duas coisas, nesta ordem: quando existe
             medição, ela vence; o coeficiente é o plano B, e a tela diz qual dos dois está valendo. */}
-        <Bloco titulo="Área de pintura" nota="é ela que precifica tinta e ensaio por m²">
+        {/* ⚠ SEM PREÇO AQUI. Vitor (31/08/2026): "no campo de área de pintura tirar a formação do
+            preço, vamos formar preço na aba de pintura". O que fica é a MEDIDA — quantos m² esta
+            área tem — porque é dela que a aba de Pintura parte. Misturar medida e preço na mesma
+            caixa era metade da confusão desta tela. */}
+        <Bloco titulo="Área de pintura" nota="quantos m² esta área tem — o preço se forma na aba Pintura">
           <Campo r="Área informada (m²)" ajuda="tem o levantamento? preencha e o resto é ignorado">
             <Inp value={l.areaM2 ?? ""} onChange={(ev) => set(i, "areaM2", ev.target.value)} className="w-full text-right" /></Campo>
           <Campo r="Coeficiente (m²/kg)" ajuda={`vazio usa ${coefSugerido(l.perfil).toFixed(4)} — média das nossas obras neste perfil`}>
@@ -404,13 +550,12 @@ function CartaoLinha({ l, i, set, del, dup, porArea, cores, doEsquema }) {
           </div>
         </Bloco>
 
-        {/* ⚠ O AÇO É COTADO POR ÁREA. Descoberto na LQC-081-26-TMSA-VALE: num estudo de verdade a
-            coluna "Perfil predominante" fica vazia e cada trecho tem seu R$/kg — apoios 7,62,
-            treliça 6,50, galeria 7,55. O comprador cota o pacote do trecho, não "quantos quilos de
-            chapa lisa tem na obra". O perfil vira plano B, para quem orçar do outro jeito. */}
-        <Bloco titulo="Preço e acabamento desta área" nota="o R$/kg do aço deste trecho e a cor que ele recebe">
-          <Campo r="Aço (R$/kg)" ajuda="preço cotado para esta área">
-            <Inp value={l.precoKg ?? ""} onChange={(ev) => set(i, "precoKg", ev.target.value)} className="w-full text-right" /></Campo>
+        {/* ⚠ O R$/kg DO AÇO SAIU DAQUI (31/08/2026). Vitor: "Preço e acabamento dessa área, tirar o
+            preço". Esta aba passa a responder só QUANTO e ONDE; o preço do aço se forma na aba
+            Material, junto do resto do que se compra.
+            ⚠⚠ O VALOR NÃO FOI APAGADO. `precoKg` continua gravado e o motor continua lendo — estudo
+            antigo não perde o preço por área que alguém cotou. O que sai é o campo desta tela. */}
+        <Bloco titulo="Acabamento desta área" nota="a cor que este trecho recebe">
           <Campo r="Cor da estrutura"
             ajuda={corCasa === false ? "⚠ não há acabamento nesta cor — esta área fica sem a demão final"
               : corCasa === true ? "recebe o acabamento desta cor" : "define qual acabamento vai nesta área"}>
@@ -422,13 +567,13 @@ function CartaoLinha({ l, i, set, del, dup, porArea, cores, doEsquema }) {
               </datalist>
             </>
           </Campo>
-          <div className="col-span-2 sm:col-span-1 lg:col-span-3 flex items-end">
-            <p className="text-[11px] text-torg-gray">
-              {num(l.precoKg) > 0 && peso > 0
-                ? <>Aço desta área: <strong className="text-torg-dark">{fmtR$(num(l.precoKg) * peso)}</strong></>
-                : "Sem o R$/kg, o aço desta área não entra no custo."}
-            </p>
-          </div>
+          {num(l.precoKg) > 0 && (
+            <div className="col-span-2 sm:col-span-2 lg:col-span-4 flex items-end">
+              <p className="text-[11px] text-torg-gray">
+                Esta área tem R$/kg cotado ({fmtR$(num(l.precoKg))}/kg) vindo de antes — segue valendo no cálculo.
+              </p>
+            </div>
+          )}
         </Bloco>
 
         <Bloco titulo="De que é feito" nota={`opcional — só para quem orça por categoria de perfil · perda de tinta ${perdaDaEstrutura(l.estrutura)}%`}>
@@ -834,6 +979,44 @@ function Quadro({ titulo, grupo, vazio }) {
  */
 function Pintura({ c, res, setComp }) {
   const t = Array.isArray(c.tintas) ? c.tintas : [];
+  // ─── LEVANTAMENTO DE PINTURA ANEXADO ────────────────────────────────────────────────────────
+  // Vitor (31/08/2026): "na parte da pintura nessa página preciso da opção para que seja possível
+  // subir um PDF ou planilha com as informações de pintura".
+  //
+  // ⚠ ANEXO É PROVA, NÃO CÁLCULO. O que o cliente manda (esquema do fabricante da tinta, memorial
+  // de pintura, planilha de áreas) fica guardado ao lado das camadas para consulta e para a
+  // proposta — quem calcula continuam sendo os campos abaixo. Ler o PDF e mexer no preço sozinho
+  // seria adivinhar em cima do que o cliente escreveu.
+  //
+  // ⚠⚠ SOBE DIRETO PARA O BLOB (client token). Memorial de pintura passa fácil de 4,5 MB, que é o
+  // teto do corpo de uma função serverless — pelo caminho normal ele falharia sem dizer por quê.
+  const anexos = Array.isArray(c.pinturaAnexos) ? c.pinturaAnexos : [];
+  const [subindo, setSubindo] = useState(false);
+  const refArquivo = useRef(null);
+
+  async function anexar(ev) {
+    const files = Array.from(ev.target.files || []);
+    ev.target.value = "";
+    if (!files.length) return;
+    setSubindo(true);
+    const novos = [];
+    try {
+      const { upload } = await import("@vercel/blob/client");
+      for (const file of files) {
+        const seguro = file.name.replace(/[^\w.\- ]+/g, "_");
+        const blob = await upload(`estudos-pintura/${Date.now()}-${seguro}`, file, {
+          access: "public", handleUploadUrl: "/api/comercial/estudos/upload-token",
+        });
+        novos.push({ nome: file.name, url: blob.url, tamanho: file.size, em: new Date().toISOString() });
+      }
+      setComp({ pinturaAnexos: [...anexos, ...novos] });
+    } catch (e) { alert("Falha ao anexar: " + e.message); } finally { setSubindo(false); }
+  }
+
+  const remover = (i) => {
+    if (!confirm("Remover este anexo do estudo?")) return;
+    setComp({ pinturaAnexos: anexos.filter((_, j) => j !== i) });
+  };
   const linha = (i) => t[i] || {};
   const set = (i, campo, v) => {
     const novo = [...t];
@@ -847,6 +1030,39 @@ function Pintura({ c, res, setComp }) {
   return (
     <div className="space-y-4">
       <div className="bg-white border border-gray-100 rounded-xl p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div>
+            <p className="text-[12px] font-semibold text-torg-dark">Levantamento de pintura</p>
+            <p className="text-[11px] text-torg-gray">
+              Esquema do fabricante, memorial ou planilha de áreas — fica guardado aqui para consulta.
+              Não altera o cálculo abaixo.
+            </p>
+          </div>
+          <input ref={refArquivo} type="file" multiple accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg"
+            className="hidden" onChange={anexar} />
+          <button type="button" onClick={() => refArquivo.current?.click()} disabled={subindo}
+            className="text-[12px] font-semibold text-torg-blue border border-torg-blue-200 rounded-lg px-3 py-1.5 hover:bg-torg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">
+            {subindo ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+            {subindo ? "Enviando…" : "Anexar PDF ou planilha"}
+          </button>
+        </div>
+        {anexos.length > 0 && (
+          <div className="mb-3 divide-y divide-gray-50 border border-gray-100 rounded-lg">
+            {anexos.map((a, i) => (
+              <div key={i} className="flex items-center gap-2 px-3 py-2">
+                <FileSpreadsheet size={13} className="text-torg-gray shrink-0" />
+                <a href={a.url} target="_blank" rel="noopener noreferrer"
+                  className="min-w-0 flex-1 truncate text-[12px] text-torg-blue hover:underline">{a.nome}</a>
+                <span className="text-[11px] text-torg-gray whitespace-nowrap">
+                  {(Number(a.tamanho || 0) / 1048576).toFixed(1)} MB
+                </span>
+                <button onClick={() => remover(i)} title="remover" className="text-gray-300 hover:text-red-600">
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
           <p className="text-[12px] text-torg-dark">
             Área a pintar: <strong className="tabular-nums whitespace-nowrap">{Number(res.areaM2 || 0).toLocaleString("pt-BR")} m²</strong>
