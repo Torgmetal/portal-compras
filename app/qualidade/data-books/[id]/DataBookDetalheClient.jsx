@@ -784,6 +784,31 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
                   <FolderOpen size={12} /> Buscar no servidor
                 </button>
               )}
+              {/* ── PROCEDIMENTO NÃO MORA NA PASTA DA SEÇÃO ────────────────────────────────
+                  Vitor (31/08/2026): "preciso ajustar sobre a importação dos Procedimentos para as
+                  áreas de ensaios e relatórios, você consegue trazer isso pra o data book".
+
+                  ⚠ ESTE BOTÃO ESTAVA DENTRO DO BLOCO `!navegavel`, e por isso não aparecia em 9 das
+                  11 seções que TÊM procedimento mapeado — entre elas a 11 (dimensional), a 12 (END)
+                  e a 14 (pintura), que são exatamente as de ensaios e relatórios. Só sobravam a 16 e
+                  a 20, as duas sem pasta no servidor. Quem montava o livro não tinha como trazer o
+                  PO, e o dossiê ia sem o procedimento que rege o ensaio.
+
+                  ⚠⚠ ELE NÃO É UM "TRAZER X" DE VARREDURA CEGA — que é o que o navegar substituiu, e
+                  com razão. O procedimento vem do Controle de Documentos do SGQ, casado por código
+                  (PO-04 na 11, PO-06 e PO-15 na 12, PO-05 na 14): são dois ou três PDFs escolhidos
+                  por regra, não o lote inteiro de uma pasta. Por isso convive com o navegar em vez
+                  de ser substituído por ele.
+
+                  O "Trazer relatórios da OP (servidor)" continua só onde não há navegação, de
+                  propósito: aquele SIM varre a pasta inteira. */}
+              {secaoUsaProcedimentos(secao.numero) && (
+                <button onClick={onPopularProcedimentos} disabled={acaoLoading}
+                  title="Traz do SGQ os procedimentos que regem esta seção (PDF apenas)"
+                  className="text-[11px] text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
+                  <FileText size={12} /> Trazer procedimentos aplicáveis
+                </button>
+              )}
               {!navegavel && <>
               <input ref={fileRef} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" className="hidden" onChange={anexarArquivos} />
               <button onClick={() => fileRef.current?.click()} disabled={enviando || acaoLoading}
@@ -802,12 +827,6 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
                 <button onClick={() => setEscolher(true)} disabled={acaoLoading}
                   className="text-[11px] text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
                   <ListChecks size={12} /> {secao.numero === "19" ? "Escolher instrumentos" : "Escolher documentos"}
-                </button>
-              )}
-              {secaoUsaProcedimentos(secao.numero) && (
-                <button onClick={onPopularProcedimentos} disabled={acaoLoading}
-                  className="text-[11px] text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
-                  <FileText size={12} /> Trazer procedimentos aplicáveis
                 </button>
               )}
               {secaoUsaRelatoriosServidor(secao.numero) && (
