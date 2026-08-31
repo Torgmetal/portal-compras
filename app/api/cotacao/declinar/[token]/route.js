@@ -6,7 +6,6 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { notificarEvento } from "@/lib/email";
-import { criarNotificacao } from "@/lib/notificacoes";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 import { escapeHtml, limparTextoCurto } from "@/lib/html";
 
@@ -77,19 +76,10 @@ export async function POST(req, { params }) {
       }
       const rmsNumeros = Array.from(rmsMap.values()).sort();
       const rotuloRMs = rmsNumeros.length === 1 ? `RM ${rmsNumeros[0]}` : `RMs ${rmsNumeros.join(", ")}`;
-      const linkInterno = rmsMap.size === 1 ? `/compras/rm/${[...rmsMap.keys()][0]}` : "/compras";
 
       for (const rmId of rmsMap.keys()) revalidatePath(`/compras/rm/${rmId}`);
       for (const opId of opIds) revalidatePath(`/compras/painel-ops/${opId}`);
       revalidatePath("/compras");
-
-      await criarNotificacao({
-        tipo: "COTACAO_RESPONDIDA",
-        titulo: `Cotação declinada — ${cotacao.fornecedorNome}`,
-        mensagem: `${cotacao.fornecedorNome} declinou a cotação da ${rotuloRMs}${motivo ? ` — "${motivo}"` : ""}. Considere outro fornecedor.`,
-        link: linkInterno,
-        dados: { cotacaoId: cotacao.id, fornecedor: cotacao.fornecedorNome, rmsNumeros, motivo, declinada: true },
-      });
 
       await notificarEvento({
         evento: "COTACAO_RESPONDIDA",

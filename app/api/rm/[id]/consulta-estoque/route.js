@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { criarNotificacao } from "@/lib/notificacoes";
 import { sendEmail } from "@/lib/email";
 
 const postSchema = z.object({
@@ -114,13 +113,6 @@ export async function POST(req, { params }) {
 
     // Notificação in-app
     const opLabel = rm.op ? `OP ${rm.op.numero}` : "Sem OP";
-    await criarNotificacao({
-      tipo: "CONSULTA_ESTOQUE",
-      titulo: `Consulta de estoque — RM ${rm.numero}`,
-      mensagem: `${user.name} solicitou verificação de estoque para RM ${rm.numero} (${opLabel}). ${rm.itens.length} iten${rm.itens.length === 1 ? "" : "s"} para avaliar.`,
-      link: `/producao/consulta-estoque/${consulta.id}`,
-      origemUserId: user.id,
-    });
 
     // Email: usa o email informado manualmente, ou busca usuários de Produção
     let emails = [];

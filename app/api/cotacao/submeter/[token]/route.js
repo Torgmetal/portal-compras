@@ -4,7 +4,6 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { resolverFornecedorPorCnpj } from "@/lib/omie-pedido-compra";
 import { notificarEvento } from "@/lib/email";
-import { criarNotificacao } from "@/lib/notificacoes";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 import { escapeHtml, limparTextoCurto } from "@/lib/html";
 
@@ -238,23 +237,6 @@ export async function POST(req, { params }) {
         : "/compras";
       const linkRM = `${baseUrl}${linkInterno}`;
       const totalFmt = total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
-      // Notificacao IN-APP — sempre registrada
-      await criarNotificacao({
-        tipo: "COTACAO_RESPONDIDA",
-        titulo: `${eRevisao ? "Revisão de" : "Nova"} proposta — ${cotacao.fornecedorNome}`,
-        mensagem: `${cotacao.fornecedorNome} ${eRevisao ? "atualizou" : "enviou"} a proposta da ${rotuloRMs}. Total ${totalFmt}, ${itensValidos.length} item(s).`,
-        link: linkInterno,
-        dados: {
-          cotacaoId: cotacao.id,
-          fornecedor: cotacao.fornecedorNome,
-          rmsNumeros,
-          total,
-          itens: itensValidos.length,
-          revisao: eRevisao,
-          numeroRevisao: eRevisao ? cotacao.numeroRevisao + 1 : 0,
-        },
-      });
 
       const nomeFornEsc = escapeHtml(cotacao.fornecedorNome);
       const rotuloRMsEsc = escapeHtml(rotuloRMs);

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { criarNotificacao } from "@/lib/notificacoes";
 import { sendEmail } from "@/lib/email";
 
 const respostaItemSchema = z.object({
@@ -113,14 +112,6 @@ export async function POST(req, { params }) {
     resumo.PARCIAL && `${resumo.PARCIAL} parcial`,
     resumo.INDISPONIVEL && `${resumo.INDISPONIVEL} indisponível`,
   ].filter(Boolean).join(", ");
-
-  await criarNotificacao({
-    tipo: "CONSULTA_ESTOQUE",
-    titulo: `Estoque respondido — RM ${consulta.rm.numero}`,
-    mensagem: `${user.name} respondeu à consulta de estoque da RM ${consulta.rm.numero}: ${resumoText}.`,
-    link: `/compras/rm/${consulta.rm.id}`,
-    origemUserId: user.id,
-  });
 
   // Email para quem criou — busca itens com rmItem para montar tabela
   if (consulta.createdBy.email) {
