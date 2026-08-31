@@ -35,15 +35,21 @@ export async function GET(req, { params }) {
     return new NextResponse("O Data Book não faz parte do portal desta obra.", { status: 403 });
   }
 
-  // ⚠ `EM_AVALIACAO` TAMBÉM BAIXA — é o ponto da etapa. Vitor (31/08/2026) quer o cliente lendo o
-  // PDF antes de a cadeia começar; listar sem entregar seria pedir que ele avalie o que não pode
-  // abrir. O que muda é o rótulo na tela, não o acesso: lá o portal diz que o livro está em
-  // conferência e ainda não foi assinado.
-  const book = await prisma.dataBookQualidade.findFirst({
-    where: { opNumero: portal.opNumero, status: { in: ["ACEITO", "EM_AVALIACAO"] } },
-    orderBy: { revisao: "desc" },
+  // ⚠ O RASCUNHO EM CONFERÊNCIA TAMBÉM BAIXA — é o ponto da etapa. Vitor (31/08/2026) quer o
+  // cliente lendo o PDF antes de emitirmos; listar sem entregar seria pedir que ele confira o que
+  // não pode abrir. O próprio arquivo se identifica: capa com STATUS: RASCUNHO e nome
+  // "(rascunho)". O aceito tem precedência — livro que já acabou é o que vale.
+  let book = await prisma.dataBookQualidade.findFirst({
+    where: { opNumero: portal.opNumero, status: "ACEITO" },
     select: { id: true, revisao: true, opNumero: true },
   });
+  if (!book) {
+    book = await prisma.dataBookQualidade.findFirst({
+      where: { opNumero: portal.opNumero, avaliacaoEnviadaEm: { not: null }, status: { not: "ACEITO" } },
+      orderBy: { revisao: "desc" },
+      select: { id: true, revisao: true, opNumero: true },
+    });
+  }
   if (!book) return new NextResponse("O Data Book desta obra ainda não foi liberado.", { status: 404 });
 
   const arq = await prisma.dataBookArquivo.findFirst({

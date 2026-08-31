@@ -360,12 +360,12 @@ export default function PortalClienteView({ token }) {
             {dados.databook.emAvaliacao && (
               <div className="mb-4 rounded-xl border-2 border-[#F4801F]/40 bg-[#FFF8F0] px-4 py-3">
                 <p className="text-[13px] font-semibold text-[#0D1F3C]">
-                  Para sua conferência — ainda não assinado
+                  Rascunho para sua conferência
                 </p>
                 <p className="mt-1 text-[12px] leading-relaxed text-gray-600">
-                  Estes volumes são a versão final montada pela Qualidade da Torg. Confira as
-                  informações e nos dê o seu retorno: só depois do seu aceite o dossiê segue para as
-                  assinaturas.
+                  Este ainda não é o dossiê definitivo — é o rascunho, para você conferir as
+                  informações antes de fecharmos. Depois do seu retorno emitimos o documento, ele
+                  passa pelas assinaturas e a versão final volta para cá.
                 </p>
               </div>
             )}
@@ -1037,16 +1037,17 @@ function AvaliacaoDataBook({ token, dados }) {
     return (
       <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[12px] text-emerald-900">
         Conferência registrada{dados.avaliacaoOkNome ? ` por ${dados.avaliacaoOkNome}` : ""}
-        {dados.avaliacaoOkEm ? ` em ${dados.avaliacaoOkEm}` : ""}. O dossiê segue para as assinaturas —
-        você receberá o link para assinar como última etapa.
+        {dados.avaliacaoOkEm ? ` em ${dados.avaliacaoOkEm}` : ""}. Vamos emitir o dossiê e colher as
+        assinaturas — você receberá o link para assinar como última etapa, e a versão final fica
+        disponível aqui.
       </p>
     );
   }
   if (pronto === "ajuste") {
     return (
       <p className="mt-3 rounded-xl border border-[#F4801F]/40 bg-[#FFF8F0] px-4 py-3 text-[12px] text-[#0D1F3C]">
-        Recebemos seu apontamento. A Qualidade da Torg vai avaliar e devolver o dossiê corrigido
-        antes de seguir para as assinaturas.
+        Recebemos seu apontamento. A Qualidade da Torg vai corrigir o rascunho e devolvê-lo para
+        sua conferência antes de emitir o dossiê.
       </p>
     );
   }
@@ -1071,7 +1072,7 @@ function AvaliacaoDataBook({ token, dados }) {
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" disabled={enviando} onClick={() => enviar(true)}
           className="rounded-lg bg-[#006EAB] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#0D1F3C] disabled:opacity-50">
-          {enviando ? "Registrando…" : "Está tudo certo — pode seguir para assinatura"}
+          {enviando ? "Registrando…" : "Está tudo certo — podem emitir"}
         </button>
         {modo === "ajuste" ? (
           <button type="button" disabled={enviando} onClick={() => enviar(false)}

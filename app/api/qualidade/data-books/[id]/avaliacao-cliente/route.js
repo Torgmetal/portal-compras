@@ -6,14 +6,21 @@
 // cliente o PDF para ele avaliar as informações? (…) depois do ok dele aí sim subimos para
 // assinatura".
 //
-// ⚠ POR QUE ANTES E NÃO DEPOIS. O cliente já é a 4ª etapa da cadeia. O problema é a ordem: hoje o
-// Elaborador, o Inspetor e o Responsável Técnico assinam primeiro, e só então o cliente vê o
-// livro. Se ele achar um erro nessa hora, corrigir exige revisão — e revisão zera as três
-// assinaturas. Ler antes custa um clique; ler depois custa três assinaturas e um R a mais.
+// ⚠⚠ É O RASCUNHO QUE VAI, NÃO O EMITIDO. Vitor (31/08/2026): "o que deve aparecer para o cliente
+// é exatamente o rascunho; o emitido vai somente depois para ele, quando terminar todas as
+// assinaturas".
+//
+// A ordem importa e eu tinha invertido. Emitir é o ato que FECHA o documento: carimba R00, trava
+// as seções e só se desfaz por revisão. Emitir antes de o cliente ler significa que qualquer
+// apontamento dele custa um R a mais em um livro que ainda nem começou a circular. O rascunho já
+// se identifica sozinho — a capa traz STATUS: RASCUNHO e o arquivo baixa como "(rascunho)".
+//
+// Por isso esta rota NÃO exige emissão e NÃO mexe no `status`: ela só marca que o rascunho foi
+// posto para conferência. O livro segue editável, que é o ponto — a conferência existe para gerar
+// correção.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { estaFechado } from "@/lib/databook-revisao";
 import { secoesDoPortal } from "@/lib/portal-cliente";
 
 export const runtime = "nodejs";
@@ -32,22 +39,22 @@ export async function POST(_req, { params }) {
   });
   if (!book) return NextResponse.json({ success: false, error: "Data book não encontrado" }, { status: 404 });
 
-  // ⚠ NÃO SE MANDA RASCUNHO PARA O CLIENTE CONFERIR. Mesma régua da cadeia de assinaturas: se o
-  // livro ainda pode mudar, o "ok" dele não vale para nada — ele aprovou outro documento.
-  if (!estaFechado(book)) {
+  // ⚠ SÓ NÃO SE MANDA O QUE JÁ ACABOU. Depois do aceite o portal mostra o livro EMITIDO e assinado;
+  // reabrir uma conferência ali confundiria o cliente sobre qual documento vale.
+  if (book.status === "ACEITO") {
     return NextResponse.json(
-      { success: false, error: "Emita o data book antes de mandar para o cliente avaliar — o que ele aprova precisa ser o documento final." },
-      { status: 400 },
+      { success: false, error: "Este data book já foi aceito pelo cliente — não há o que conferir." },
+      { status: 409 },
     );
   }
 
-  // ⚠⚠ SEM VOLUME GERADO NÃO HÁ O QUE AVALIAR. O portal lista os arquivos da revisão corrente; se
-  // a geração não rodou depois da emissão, o cliente abriria a seção e não veria PDF nenhum — e
-  // ficaria esperando por um aviso que já foi dado.
+  // ⚠⚠ SEM VOLUME GERADO NÃO HÁ O QUE CONFERIR. O portal lista os arquivos da revisão corrente; se
+  // a geração não rodou, o cliente abriria a seção e não veria PDF nenhum — e ficaria esperando
+  // por um aviso que já foi dado.
   const volumes = await prisma.dataBookArquivo.count({ where: { dataBookId: book.id, revisao: book.revisao } });
   if (!volumes) {
     return NextResponse.json(
-      { success: false, error: `Nenhum volume gerado na revisão R${String(book.revisao).padStart(2, "0")}. Gere o PDF antes de mandar para avaliação.` },
+      { success: false, error: `Nenhum volume gerado na revisão R${String(book.revisao).padStart(2, "0")}. Gere o PDF do rascunho antes de mandar para conferência.` },
       { status: 409 },
     );
   }
@@ -75,7 +82,8 @@ export async function POST(_req, { params }) {
   const atualizado = await prisma.dataBookQualidade.update({
     where: { id: book.id },
     data: {
-      status: "EM_AVALIACAO",
+      // ⚠ o `status` NÃO muda: o livro continua o rascunho que é, e continua editável. Quem diz
+      // que há conferência em aberto é o `avaliacaoEnviadaEm` — e é ele que o portal consulta.
       avaliacaoEnviadaEm: new Date(),
       // reenviar limpa o parecer anterior: o que vale é a leitura desta rodada
       avaliacaoOkEm: null, avaliacaoOkNome: null, avaliacaoOkIp: null, avaliacaoObs: null,

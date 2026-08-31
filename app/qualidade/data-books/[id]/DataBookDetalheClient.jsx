@@ -92,9 +92,9 @@ export default function DataBookDetalheClient({ id, userId }) {
   // assinatura".
   async function enviarParaAvaliacao() {
     if (!confirm(
-      "Publicar este data book no portal do cliente para conferência?\n\n" +
-      "Ele passa a ver e baixar os volumes, marcados como “ainda não assinado”, e responde no " +
-      "próprio portal. As assinaturas só podem começar depois do ok dele."
+      "Publicar o RASCUNHO deste data book no portal do cliente para conferência?\n\n" +
+      "Ele passa a ver e baixar os volumes — a capa já diz STATUS: RASCUNHO e o arquivo baixa como " +
+      "“(rascunho)” — e responde no próprio portal. As assinaturas só podem começar depois do ok."
     )) return;
     setEnviandoAval(true);
     try {
@@ -275,6 +275,17 @@ export default function DataBookDetalheClient({ id, userId }) {
   useEffect(() => { carregarRevisoes(); }, [carregarRevisoes]);
 
   async function emitir() {
+    // ⚠ EMITIR É O ATO QUE FECHA O LIVRO: carimba a revisão e trava as seções. Se o cliente foi
+    // chamado a conferir o rascunho e ainda não respondeu, emitir agora significa que qualquer
+    // apontamento dele passa a custar uma revisão. Aviso, não bloqueio — a decisão continua sendo
+    // de quem monta, que às vezes precisa emitir com o cliente em silêncio.
+    if (data?.avaliacaoEnviadaEm && !data?.avaliacaoOkEm) {
+      if (!confirm(
+        "O cliente está com o rascunho para conferir e ainda não respondeu.\n\n" +
+        "Emitir agora fecha o documento: se ele apontar algo depois, a correção vai exigir uma " +
+        "revisão (R01) e as assinaturas serão colhidas de novo.\n\nEmitir mesmo assim?"
+      )) return;
+    }
     if (!confirm("Emitir o data book? (a geração do PDF entra na próxima fase)")) return;
     setEmitindo(true);
     try {
@@ -444,23 +455,24 @@ export default function DataBookDetalheClient({ id, userId }) {
           Fica ACIMA do fluxo de assinaturas porque é o que vem antes dele: o cliente lê, aprova, e
           só então as quatro assinaturas começam. Ler antes custa um clique; ler depois custa três
           assinaturas e uma revisão. */}
-      {fechado && (
+      {data.status !== "ACEITO" && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h2 className="text-sm font-bold text-torg-dark">
-                Conferência do cliente <span className="font-normal text-torg-gray">· antes das assinaturas</span>
+                Conferência do cliente <span className="font-normal text-torg-gray">· com o rascunho, antes de emitir</span>
               </h2>
               <p className="text-[12px] text-torg-gray mt-0.5">
-                Publica os volumes no portal do cliente, marcados como ainda não assinados, para ele
-                conferir as informações e responder.
+                Publica o <strong>rascunho</strong> no portal do cliente para ele conferir as
+                informações. Depois do ok, emitimos e o livro segue para as assinaturas — a versão
+                emitida só volta para ele no fim, assinada.
               </p>
             </div>
             {!data.avaliacaoOkEm && (
               <button onClick={enviarParaAvaliacao} disabled={enviandoAval}
                 className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5 shrink-0">
                 {enviandoAval ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                {data.avaliacaoEnviadaEm ? "Mandar conferir de novo" : "Mandar o cliente conferir"}
+                {data.avaliacaoEnviadaEm ? "Mandar conferir de novo" : "Mandar o rascunho para o cliente"}
               </button>
             )}
           </div>
@@ -469,25 +481,25 @@ export default function DataBookDetalheClient({ id, userId }) {
             <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900">
               <strong>Aprovado pelo cliente</strong>
               {data.avaliacaoOkNome ? ` — ${data.avaliacaoOkNome}` : ""}
-              {` em ${new Date(data.avaliacaoOkEm).toLocaleString("pt-BR")}`}. Liberado para assinatura.
+              {` em ${new Date(data.avaliacaoOkEm).toLocaleString("pt-BR")}`}. Pode emitir e seguir para as assinaturas.
               {data.avaliacaoObs ? <span className="block mt-1 text-emerald-800">Observação: “{data.avaliacaoObs}”</span> : null}
             </p>
           ) : data.avaliacaoObs ? (
             <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
               <strong>O cliente pediu ajuste:</strong> “{data.avaliacaoObs}”
               <span className="block mt-1">
-                Corrija por revisão e mande conferir de novo — as assinaturas continuam travadas até o ok.
+                Corrija o rascunho e mande conferir de novo — as assinaturas continuam travadas até o ok.
               </span>
             </p>
           ) : data.avaliacaoEnviadaEm ? (
             <p className="mt-3 rounded-lg border border-torg-blue-100 bg-torg-blue-50/40 px-3 py-2 text-[12px] text-torg-dark">
-              No portal do cliente desde {new Date(data.avaliacaoEnviadaEm).toLocaleString("pt-BR")} —
+              Rascunho no portal do cliente desde {new Date(data.avaliacaoEnviadaEm).toLocaleString("pt-BR")} —
               aguardando o retorno dele. As assinaturas só liberam depois do ok.
             </p>
           ) : (
             <p className="mt-3 text-[12px] text-torg-gray">
-              Ainda não foi enviado para conferência. Esta etapa é opcional — sem ela, as assinaturas
-              seguem como sempre.
+              Ainda não foi enviado para conferência. Esta etapa é opcional — sem ela, o fluxo segue
+              como sempre: emitir e colher as assinaturas.
             </p>
           )}
         </div>

@@ -1827,17 +1827,21 @@ model DataBookQualidade {
   pecas            Int?
   tipo             String? // herda de OP.tipoDataBook: PADRAO_TORG | SNQC | RELATORIO_ACOMPANHAMENTO
   observacao       String?
-  status           String               @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO | EM_AVALIACAO | EM_ASSINATURA | ENVIADO_CLIENTE | ACEITO
+  status           String               @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO | EM_ASSINATURA | ENVIADO_CLIENTE | ACEITO
 
   // ── AVALIAÇÃO DO CLIENTE, ANTES DA ASSINATURA ───────────────────────────────────────────────
   // Vitor (31/08/2026): "antes de enviar para assinatura, teria como disponibilizar no portal do
   // cliente o PDF para ele avaliar as informações? (…) depois do ok dele aí sim subimos para
   // assinatura".
   //
-  // ⚠ É UMA ETAPA A MAIS, NÃO A ASSINATURA DO CLIENTE. Ele já é a 4ª etapa da cadeia
-  // (Elaborador → Inspetor → Resp. Técnico → Cliente). O que faltava era ele LER antes: sem isso,
-  // três pessoas assinam um livro que o cliente ainda pode recusar, e recusar depois de assinado
-  // custa uma revisão que zera as três assinaturas.
+  // ⚠ O QUE VAI AO CLIENTE AQUI É O RASCUNHO. Vitor (31/08/2026): "o que deve aparecer para o
+  // cliente é exatamente o rascunho; o emitido vai somente depois para ele, quando terminar todas
+  // as assinaturas". Emitir é o ato que FECHA o livro — fazer isso antes de ele ler significa que
+  // qualquer apontamento passa a custar uma revisão.
+  //
+  // ⚠⚠ NÃO HÁ STATUS NOVO, de propósito. O livro continua EM_MONTAGEM e editável enquanto o
+  // cliente confere — é o ponto da etapa. Quem diz que há conferência em aberto é o
+  // `avaliacaoEnviadaEm`, e é ele que o portal consulta.
   avaliacaoEnviadaEm DateTime?
   avaliacaoOkEm      DateTime?
   avaliacaoOkNome    String?

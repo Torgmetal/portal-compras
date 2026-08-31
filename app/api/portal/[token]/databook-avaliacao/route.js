@@ -48,15 +48,16 @@ export async function POST(req, { params }) {
     return NextResponse.json({ success: false, error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 });
   }
 
-  // ⚠ SÓ RESPONDE QUEM ESTÁ SENDO PERGUNTADO. Fora de `EM_AVALIACAO` não há pergunta em aberto —
-  // e aceitar o parecer num livro já assinado sobrescreveria o registro da rodada que valeu.
+  // ⚠ SÓ RESPONDE QUEM ESTÁ SENDO PERGUNTADO. Sem `avaliacaoEnviadaEm` não há pergunta em aberto —
+  // e aceitar o parecer num livro já aceito sobrescreveria o registro da rodada que valeu.
   const book = await prisma.dataBookQualidade.findFirst({
-    where: { opNumero: portal.opNumero, status: "EM_AVALIACAO" },
+    where: { opNumero: portal.opNumero, avaliacaoEnviadaEm: { not: null }, status: { not: "ACEITO" } },
+    orderBy: { revisao: "desc" },
     select: { id: true, revisao: true, opNumero: true },
   });
   if (!book) {
     return NextResponse.json(
-      { success: false, error: "Não há data book aguardando sua avaliação nesta obra." },
+      { success: false, error: "Não há data book aguardando sua conferência nesta obra." },
       { status: 409 },
     );
   }

@@ -156,19 +156,26 @@ export async function GET(req, { params }) {
   // Vitor (24/08/2026) escolheu liberar no portal DEPOIS do aceite, com download. `ACEITO` é
   // gravado pela última assinatura da cadeia (Elaborador → Inspetor → Resp. Técnico → Cliente),
   // então checar o status aqui é checar as quatro de uma vez.
-  // ⚠ DUAS PORTAS, NÃO UMA. Vitor (31/08/2026): "antes de enviar para assinatura, teria como
-  // disponibilizar no portal do cliente o PDF para ele avaliar as informações (…) depois do ok dele
-  // aí sim subimos para assinatura". `EM_AVALIACAO` é o livro emitido posto para o cliente
-  // CONFERIR; `ACEITO` é o livro assinado por todos. O portal mostra os dois, com rótulos
-  // diferentes — confundir os dois entregaria como definitivo um documento que ainda vai ser
-  // assinado.
   if (tem("DATABOOK")) {
-    const book = await prisma.dataBookQualidade.findFirst({
-      where: { opNumero: portal.opNumero, status: { in: ["ACEITO", "EM_AVALIACAO"] } },
-      orderBy: { revisao: "desc" },
-      select: { id: true, revisao: true, status: true, emitidoEm: true, aceiteEm: true,
-                avaliacaoEnviadaEm: true, avaliacaoOkEm: true, avaliacaoOkNome: true, avaliacaoObs: true },
+    // ⚠⚠ DOIS DOCUMENTOS DIFERENTES, NUNCA AO MESMO TEMPO. Vitor (31/08/2026): "o que deve
+    // aparecer para o cliente é exatamente o rascunho; o emitido vai somente depois para ele,
+    // quando terminar todas as assinaturas".
+    //   ACEITO             → o livro final, assinado pelos quatro. É o que fica.
+    //   em conferência     → o RASCUNHO, para ele apontar erro antes de emitirmos. A capa dele já
+    //                        diz STATUS: RASCUNHO e o arquivo baixa como "(rascunho)".
+    // O aceito tem precedência: se o livro já acabou, é ele que o cliente vê — mostrar um rascunho
+    // ao lado de um documento assinado só criaria dúvida sobre qual vale.
+    const CAMPOS = { id: true, revisao: true, status: true, emitidoEm: true, aceiteEm: true,
+                     avaliacaoEnviadaEm: true, avaliacaoOkEm: true, avaliacaoOkNome: true, avaliacaoObs: true };
+    let book = await prisma.dataBookQualidade.findFirst({
+      where: { opNumero: portal.opNumero, status: "ACEITO" }, select: CAMPOS,
     });
+    if (!book) {
+      book = await prisma.dataBookQualidade.findFirst({
+        where: { opNumero: portal.opNumero, avaliacaoEnviadaEm: { not: null }, status: { not: "ACEITO" } },
+        orderBy: { revisao: "desc" }, select: CAMPOS,
+      });
+    }
     if (book) {
       const vols = await prisma.dataBookArquivo.findMany({
         where: { dataBookId: book.id, revisao: book.revisao },
@@ -178,7 +185,7 @@ export async function GET(req, { params }) {
       dados.databook = {
         revisao: book.revisao, status: book.status, emitidoEm: fmt(book.emitidoEm),
         aceiteEm: fmt(book.aceiteEm),
-        emAvaliacao: book.status === "EM_AVALIACAO",
+        emAvaliacao: book.status !== "ACEITO",   // é o rascunho posto para conferência
         avaliacaoEnviadaEm: fmt(book.avaliacaoEnviadaEm),
         avaliacaoOkEm: fmt(book.avaliacaoOkEm),
         avaliacaoOkNome: book.avaliacaoOkNome || null,
