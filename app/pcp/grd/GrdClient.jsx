@@ -290,8 +290,60 @@ function Detalhe({ det, abrirPdf, onVerDesenho }) {
     return t ? det.linhas.filter((l) => `${l.marca} ${l.arquivo} ${l.setor || ""} ${l.resumoR?.texto || ""}`.toLowerCase().includes(t)) : det.linhas;
   }, [det.linhas, q]);
   const verDesenho = (l) => onVerDesenho({ opNumero: det.op.numero, opId: det.op.id || null, marca: l.marca, setor: l.setor || null });
+  const guias = det.guias || [];
+  const fmtG = (g) => `GRD-PCP-${String(g.numero).padStart(3, "0")}/${g.ano}`;
   return (
     <div className="space-y-3">
+      {/* ─── GUIAS JÁ EMITIDAS ────────────────────────────────────────────────────────────────
+          Vitor (31/08/2026): "a GRD do PCP só aparece se eu reimprimir ela; preciso que traga o
+          form para poder mostrar ao auditor".
+
+          ⚠⚠ ERA PONTA SOLTA MINHA: a guia era gravada e nunca devolvida à tela, então a única forma
+          de "ver" era reemitir — o que cria uma SEGUNDA guia da mesma entrega. Duas guias dizendo a
+          mesma coisa é o oposto do que um controle de documentos precisa.
+
+          ⚠ O FORM ABRE INLINE, no navegador: numa auditoria o documento é mostrado na hora, e
+          obrigar a baixar para depois abrir é atrito no pior momento. */}
+      {guias.length > 0 && (
+        <div className="rounded-lg border border-torg-blue-100 bg-torg-blue-50/30 overflow-hidden">
+          <p className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-torg-blue">
+            Guias emitidas desta OP
+          </p>
+          <table className="w-full text-[12px]">
+            <thead className="text-[10px] uppercase text-torg-gray">
+              <tr>
+                <th className="text-left px-3 py-1">Guia</th><th className="text-left px-2 py-1">Setor</th>
+                <th className="text-right px-2 py-1">Docs</th><th className="text-left px-2 py-1">Emitida</th>
+                <th className="text-left px-3 py-1">Recebimento</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/70">
+              {guias.map((g) => (
+                <tr key={g.id}>
+                  <td className="px-3 py-1.5">
+                    <a href={`/api/pcp/grd/remessa/${g.id}/pdf`} target="_blank" rel="noopener noreferrer"
+                      title="Abrir o FORM 09 desta remessa"
+                      className="font-semibold text-torg-blue hover:underline inline-flex items-center gap-1">
+                      {fmtG(g)} <FileDown size={11} className="text-torg-blue/60" />
+                    </a>
+                  </td>
+                  <td className="px-2 py-1.5">{g.setor || "—"}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{g.qtdDocs}</td>
+                  <td className="px-2 py-1.5 whitespace-nowrap">
+                    {fmtDH(g.emitidoEm)}
+                    {g.emitidoPorNome && <span className="text-torg-gray"> · {g.emitidoPorNome}</span>}
+                  </td>
+                  <td className="px-3 py-1.5">
+                    {g.recebidoPorNome
+                      ? <span className="text-emerald-700">{g.recebidoPorNome} · {fmtDH(g.enviadoEm)}</span>
+                      : <span className="text-torg-orange-700">assinar no papel</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {det.linhas.length > 8 && (
         <div className="relative max-w-sm">
           <Search size={13} className="absolute left-2.5 top-2 text-torg-gray" />

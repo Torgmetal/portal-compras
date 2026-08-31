@@ -54,7 +54,22 @@ export async function GET(req) {
     // Qualidade, não da GRD, que é sobre o que foi impresso. E era cara: `rastreioDaOp` varre a
     // obra inteira a cada abertura. Deixar de mostrar e continuar calculando seria o pior dos dois.
 
+    // ⚠ AS GUIAS JÁ EMITIDAS VÊM JUNTO. Vitor (31/08/2026): "a GRD do PCP só aparece se eu
+    // reimprimir ela". Eu gravava a guia e não devolvia em lugar nenhum — o documento existia e a
+    // tela não sabia. Sem isto, "ver a guia" só acontecia reemitindo, o que cria uma segunda guia
+    // da mesma entrega.
+    const guias = await prisma.grdRemessaPcp.findMany({
+      where: { opNumero: num },
+      orderBy: { emitidoEm: "desc" },
+      select: {
+        id: true, numero: true, ano: true, setor: true, qtdDocs: true,
+        emitidoEm: true, emitidoPorNome: true,
+        recebidoPorNome: true, recebidoPorEmail: true, enviadoEm: true,
+      },
+    });
+
     return NextResponse.json({
+      guias,
       // opId vai junto: a tela abre o modal de desenhos da marca direto daqui (Vitor 19/08 —
       // "preciso entender os que der problema e abrir ele para saber do que se trata").
       op: op ? { id: op.id, numero: op.numero, obra: op.obra, cliente: op.cliente } : { numero: num },
