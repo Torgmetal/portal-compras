@@ -123,6 +123,7 @@ export default function GrdEngenhariaClient() {
                           <th className="text-left py-1.5">Para</th><th className="text-left py-1.5">Área</th>
                           <th className="text-right py-1.5">Peso</th><th className="text-right py-1.5">Docs</th>
                           <th className="text-left py-1.5 pl-3">Emitido</th>
+                          <th className="text-left py-1.5 pl-3">Remessa</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -167,6 +168,15 @@ export default function GrdEngenhariaClient() {
                             <td className="py-1.5 text-right tabular-nums whitespace-nowrap">{fmtKg(g.pesoKg)}</td>
                             <td className="py-1.5 text-right tabular-nums">{g.qtdDocs}</td>
                             <td className="py-1.5 pl-3">{g.emitidoPor || "—"}</td>
+                            {/* ⚠ REGISTRO DA REMESSA, não confirmação de leitura. O campo "Recebido"
+                                do FORM 09 nunca é preenchido na planilha, então esta é a única prova
+                                de destinação que existe — e ela vale só das GRDs novas para frente:
+                                as antigas foram entregues antes de haver registro. */}
+                            <td className="py-1.5 pl-3 whitespace-nowrap">
+                              {g.remetidoEm
+                                ? <span className="text-emerald-700">{g.remetidoParaNome} · {fmtData(g.remetidoEm)}</span>
+                                : <span className="text-torg-gray">—</span>}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

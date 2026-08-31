@@ -19,6 +19,7 @@ export async function GET() {
       id: true, numero: true, numeroCabecalho: true, revisao: true, arquivo: true, data: true, para: true,
       referencia: true, opCodigo: true, opNumero: true, pesoKg: true, area: true,
       emitidoPor: true, qtdDocs: true, itens: true,
+      remetidoParaNome: true, remetidoEm: true,
     },
   });
 

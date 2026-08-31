@@ -5416,6 +5416,21 @@ model GrdEngenharia {
   modificadoEm DateTime? // lastModifiedDateTime do arquivo, para detectar alteração
   importadoEm  DateTime  @default(now())
   avisadoEm    DateTime? // quando a Engenharia foi avisada desta GRD
+
+  // ─── REMESSA REGISTRADA ─────────────────────────────────────────────────────────────────────
+  // Vitor (31/08/2026): "vamos fazer as próximas assinadas; as antigas já foram, agora vamos fazer
+  // isso nas novas".
+  //
+  // O campo "Recebido:" do FORM 09 está EM BRANCO nas 12 GRDs mais recentes que abri — a Engenharia
+  // nunca preenche. Ou seja, hoje não existe prova de recebimento nenhuma para mostrar a um
+  // auditor. A partir daqui o portal registra a remessa conforme o roteiro (Engenharia → Gabriel),
+  // com a data.
+  //
+  // ⚠ SÓ DAQUI PARA FRENTE. As 480 já importadas ficam sem: elas foram entregues antes de existir
+  // registro, e preencher retroativamente inventaria uma remessa que o portal não presenciou.
+  remetidoParaNome  String?
+  remetidoParaEmail String?
+  remetidoEm        DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
