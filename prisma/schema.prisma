@@ -933,6 +933,7 @@ model Cotacao {
   numeroRevisao          Int           @default(0)
   totalProposta          Float?
   solicitadaRevisaoFinal DateTime?
+  solicitadoDesconto     DateTime?
   fornecedorId           String?
   numeroProposta         String?
   anexos                 Anexo[]

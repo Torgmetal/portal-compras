@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
-import { Loader2, AlertCircle, Send, AlertTriangle, Truck, RotateCcw, CheckCircle2, Upload, FileText, X, Sparkles, CalendarDays, PackageX } from "lucide-react";
+import { Loader2, AlertCircle, Send, AlertTriangle, Truck, RotateCcw, CheckCircle2, Upload, FileText, X, Sparkles, CalendarDays, PackageX, TrendingDown } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 import { numeroBR } from "@/lib/numero-br";
 
@@ -29,7 +29,7 @@ function parseObservacao(obs) {
   return { prazoEntrega, condicaoPagamento, observacao: restos.join(" | ") };
 }
 
-export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCotacao: anexosCotacaoInicial = [], vencida, faturamento = null, emRevisaoFinal = false }) {
+export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCotacao: anexosCotacaoInicial = [], vencida, faturamento = null, emRevisaoFinal = false, pedidoDesconto = false }) {
   const router = useRouter();
   const jaEnviou = cotacao.status === "RECEBIDA";
   const obsParsed = parseObservacao(cotacao.observacao);
@@ -704,6 +704,25 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
               <p className="font-semibold text-base">📋 Revisão final dos itens vencedores</p>
               <p className="text-xs mt-1 leading-relaxed">
                 A Torg analisou sua proposta e a partir das melhores condições, <strong>essa é a lista de itens em que você foi escolhido como fornecedor</strong>. Confira os valores abaixo e <strong>confirme</strong> (ou ajuste se necessário) antes de enviar — essa será a proposta final usada na geração do pedido de compra.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ⚠ TEXTO NEUTRO DE PROPÓSITO. Nada aqui pode sugerir que ele venceu: sem "escolhido",
+            sem "vencedor", sem contagem de itens vencedores. O que ele lê é um pedido de melhor
+            condição sobre a MESMA lista que cotou — o que é verdade, e é tudo que ele precisa
+            saber para responder. */}
+        {pedidoDesconto && (
+          <div className="bg-torg-orange-50 border-2 border-torg-orange-300 rounded-lg p-4 text-sm text-torg-dark flex items-start gap-3">
+            <TrendingDown size={22} className="mt-0.5 flex-shrink-0 text-torg-orange-700" />
+            <div>
+              <p className="font-semibold text-base">Pedido de melhor condição comercial</p>
+              <p className="text-xs mt-1 leading-relaxed">
+                Sua proposta está em análise junto com as demais. Antes de fecharmos, pedimos a
+                gentileza de <strong>revisar os valores abaixo e enviar sua melhor condição</strong> —
+                preço, prazo de entrega ou forma de pagamento. Ajuste o que puder melhorar e clique
+                em <strong>Atualizar proposta</strong>.
               </p>
             </div>
           </div>

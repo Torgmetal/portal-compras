@@ -119,6 +119,14 @@ export default async function CotacaoPorToken({ params }) {
     cotacao.itens = (cotacao.itens || []).filter((it) => it.vencedor === true);
   }
 
+  // Modo "Pedido de desconto" — Compras quer uma condição melhor SEM contar quem venceu.
+  // ⚠ NÃO FILTRA ITEM NENHUM, de propósito: o fornecedor revê exatamente a lista que cotou, com os
+  // preços que ele mesmo mandou. Se filtrássemos pelos vencedores (como a revisão final faz), abrir
+  // o link entregaria o resultado da concorrência — que é justamente o que não pode vazar.
+  // ⚠ A revisão final tem precedência: se ela já foi pedida, o fornecedor já sabe que venceu, e a
+  // tela dele continua sendo a de confirmação final.
+  const pedidoDesconto = !emRevisaoFinal && !!cotacao.solicitadoDesconto;
+
   // Carrega anexos de todas as RMs envolvidas (primaria + qualquer outra
   // que tenha rmItem referenciado nos CotacaoItens — caso consolidada).
   const rmIdsEnvolvidos = new Set([cotacao.rmId]);
@@ -197,6 +205,7 @@ export default async function CotacaoPorToken({ params }) {
       vencida={vencida}
       faturamento={faturamento}
       emRevisaoFinal={emRevisaoFinal}
+      pedidoDesconto={pedidoDesconto}
     />
   );
 }

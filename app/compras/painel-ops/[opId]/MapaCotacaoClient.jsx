@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart3, CheckCircle2, AlertCircle, Loader2, Truck, Award, Wand2, X, XCircle, Mail, Send } from "lucide-react";
+import { BarChart3, CheckCircle2, AlertCircle, Loader2, Truck, Award, Wand2, X, XCircle, Mail, Send, TrendingDown } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 import { numeroBR } from "@/lib/numero-br";
 
@@ -80,6 +80,8 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
   const [mostrarPedidos, setMostrarPedidos] = useState(false);
   const [revisaoToast, setRevisaoToast] = useState(null); // { cotacaoId, ok, msg }
   const [emailRevisaoCache, setEmailRevisaoCache] = useState({}); // cotacaoId -> emailData
+  const [descontoToast, setDescontoToast] = useState(null); // { ok, msg }
+  const [descontoPedido, setDescontoPedido] = useState({}); // cotacaoId -> true
 
   // Solicita revisao final ao fornecedor + copia email + abre Outlook
   const solicitarRevisaoFinal = async (cotacaoId, fornecedorNome) => {
@@ -119,6 +121,51 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
       router.refresh();
     } catch (e) {
       setRevisaoToast({ cotacaoId, ok: false, msg: e.message });
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  // ─── PEDIR MELHOR CONDIÇÃO (SEM REVELAR QUEM VENCEU) ────────────────────────────────────────
+  // Vitor: "precisa ter [um botão] para pedir um desconto, sem que ele saiba que ele venceu
+  // aqueles itens".
+  //
+  // Mesmo caminho da revisão final (marca a cotação → monta o e-mail → copia → abre o Outlook), mas
+  // o portal do fornecedor NÃO filtra os vencedores e o texto não cita resultado nenhum: ele revê a
+  // mesma lista que cotou.
+  //
+  // ⚠ O SIGILO DEPENDE DE QUEM RECEBE. Se só os vencedores forem chamados para "melhorar", o
+  // fornecedor deduz o que o texto não diz. É por isso que este botão fica na régua de TODOS os que
+  // responderam, e não no bloco dos vencedores — e o aviso ao lado diz isso em voz alta.
+  const solicitarDesconto = async (cotacaoId, fornecedorNome) => {
+    setLoading(`desc-${cotacaoId}`);
+    setDescontoToast(null);
+    try {
+      const res1 = await fetch(`/api/cotacao/${cotacaoId}/solicitar-desconto`, { method: "POST" });
+      const data1 = await res1.json();
+      if (!res1.ok) throw new Error(extractError(data1.error) || "Falha ao pedir desconto");
+
+      const res2 = await fetch(`/api/cotacao/${cotacaoId}/preview-email?format=json`);
+      if (!res2.ok) {
+        const d = await res2.json().catch(() => ({}));
+        throw new Error(extractError(d.error) || "Falha ao montar email");
+      }
+      const emailData = await res2.json();
+      setEmailRevisaoCache((prev) => ({ ...prev, [cotacaoId]: emailData }));
+
+      const copiouHtml = copyHtmlSync(emailData.html, emailData.text);
+      setTimeout(() => abrirOutlookMailto(emailData.to, emailData.subject), 300);
+
+      setDescontoPedido((prev) => ({ ...prev, [cotacaoId]: true }));
+      setDescontoToast({
+        ok: true,
+        msg: copiouHtml
+          ? `Desconto pedido a ${fornecedorNome}. Outlook abrindo + e-mail copiado — cole no corpo (Ctrl+V) e envie.`
+          : `Desconto pedido a ${fornecedorNome}. Outlook aberto; cole o conteúdo manualmente.`,
+      });
+      router.refresh();
+    } catch (e) {
+      setDescontoToast({ ok: false, msg: `${fornecedorNome}: ${e.message}` });
     } finally {
       setLoading(null);
     }
@@ -644,6 +691,63 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
           )}
         </table>
       </div>
+
+      {/* ─── PEDIR MELHOR CONDIÇÃO ─────────────────────────────────────────────────────────────
+          Régua de TODOS os fornecedores que responderam — não só os vencedores, de propósito. */}
+      {fornecedores.length > 0 && (
+        <div className="border-t border-gray-100 px-6 py-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h4 className="inline-flex items-center gap-2 text-sm font-semibold text-torg-dark">
+                <TrendingDown size={15} className="text-torg-orange-700" />
+                Pedir melhor condição
+              </h4>
+              <p className="mt-1 max-w-2xl text-xs text-torg-gray">
+                Abre um e-mail pedindo preço, prazo ou pagamento melhores. O fornecedor revê a mesma
+                lista que cotou — <strong>nada indica que ele venceu</strong>.{" "}
+                <span className="text-torg-orange-700">
+                  Chamar só os vencedores entrega o resultado mesmo sem dizer: peça a todos.
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {fornecedores.map((f) => {
+              const jaPediu = descontoPedido[f.cotacaoId];
+              const carregando = loading === `desc-${f.cotacaoId}`;
+              return (
+                <button
+                  key={f.cotacaoId}
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); solicitarDesconto(f.cotacaoId, f.fornecedorNome); }}
+                  disabled={!!loading}
+                  title={`Pedir melhor condição a ${f.fornecedorNome} sem revelar o resultado da concorrência`}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${
+                    jaPediu
+                      ? "border-torg-orange-300 bg-torg-orange-50 text-torg-orange-700"
+                      : "border-gray-200 text-torg-dark hover:border-torg-orange-300 hover:bg-torg-orange-50"
+                  }`}
+                >
+                  {carregando ? <Loader2 size={12} className="animate-spin" /> : <TrendingDown size={12} />}
+                  {f.fornecedorNome}
+                  {jaPediu && <span className="text-[10px] uppercase tracking-wide">· pedido</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          {descontoToast && (
+            <div className={`mt-3 rounded px-3 py-2 text-xs ${
+              descontoToast.ok
+                ? "border border-torg-orange-200 bg-torg-orange-50 text-torg-dark"
+                : "border border-red-200 bg-red-50 text-red-700"
+            }`}>
+              {descontoToast.ok ? "✓ " : "✗ "}{descontoToast.msg}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Resumo dos vencedores */}
       {fornecedoresVencedores.length > 0 && (
