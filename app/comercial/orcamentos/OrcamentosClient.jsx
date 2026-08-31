@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   FileSpreadsheet, PlusCircle, Search, X, ChevronDown,
-  Pencil, Trash2, Eye, Loader2, AlertCircle, Filter,
+  Pencil, Trash2, Eye, Loader2, AlertCircle, Filter, FileDown, FileText,
   TrendingUp, Clock, XCircle, FileCheck2, DollarSign,
   Calendar, BarChart3, RefreshCw, ArrowRight, FileSpreadsheet as IconLqc,
 } from "lucide-react";
@@ -1048,6 +1048,79 @@ function FormOrcamentoModal({ orcamento, onSalvar, onClose }) {
 
 // ─── MODAL: VER DETALHE ─────────────────────────────────────────
 
+// ─── EMITIR A PROPOSTA DIRETO DO ORÇAMENTO ────────────────────────────────────────────────────
+// Vitor (31/08/2026): "estou na proposta 290-26 e não estou encontrando o botão para extrair a
+// proposta (…) pode colocar emitir Word e emitir PDF".
+//
+// ⚠ FALTAVA O CAMINHO DE IDA. O documento nasce no assistente, sobre uma `PropostaEstrutura` — e
+// não havia como criar uma A PARTIR do orçamento. Quem abria a 290-26 procurava um botão que não
+// tinha de onde sair. Aqui o clique faz a ponte: cria a proposta ligada ao orçamento e ao estudo
+// LQC dele, e emite.
+//
+// ⚠⚠ EMITIR SOBE A REVISÃO — é um ato, não uma prévia. Por isso o aviso e a confirmação: a PT da
+// VALE chegou ao R04 assim, uma emissão de cada vez.
+function BotoesEmitirProposta({ orcamento }) {
+  const [emitindo, setEmitindo] = useState(null); // "docx" | "pdf"
+  const [erro, setErro] = useState("");
+  const [tipo, setTipo] = useState("PTC");
+
+  async function emitir(formato) {
+    if (!confirm(
+      `Emitir a proposta ${tipo} do orçamento ${orcamento.numero} em ${formato === "pdf" ? "PDF" : "Word"}?\n\n` +
+      "Cada emissão SOBE A REVISÃO e entra no histórico da proposta."
+    )) return;
+    setEmitindo(formato); setErro("");
+    try {
+      // 1. garante a proposta deste orçamento (não sobrescreve o que já foi montado)
+      const r1 = await fetch(`/api/comercial/orcamentos/${orcamento.id}/proposta`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo }),
+      });
+      const j1 = await r1.json();
+      if (!r1.ok) throw new Error(j1.error || "Não foi possível preparar a proposta.");
+      // ⚠ sem estudo LQC a tabela de preço sai vazia — melhor avisar antes de gerar do que entregar
+      // ao cliente uma proposta sem preço.
+      if (j1.semEstudo && !confirm(
+        "Este orçamento não tem estudo LQC vinculado — a proposta sai sem a tabela de preço.\n\nEmitir assim mesmo?"
+      )) { setEmitindo(null); return; }
+
+      // 2. emite
+      const r2 = await fetch(`/api/comercial/proposta-estrutura/${j1.id}/emitir`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ formato, revisar: true }),
+      });
+      if (!r2.ok) throw new Error((await r2.json().catch(() => ({}))).error || "Falha ao emitir");
+      const blob = await r2.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = r2.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/)?.[1] || `proposta.${formato}`;
+      a.click(); URL.revokeObjectURL(url);
+    } catch (e) { setErro(e.message); } finally { setEmitindo(null); }
+  }
+
+  return (
+    <div className="flex items-center gap-2 mr-auto">
+      <select value={tipo} onChange={(e) => setTipo(e.target.value)} disabled={!!emitindo}
+        title="PTC: técnica e comercial · PT: só técnica · PC: só comercial"
+        className="text-[13px] border border-gray-200 rounded-lg px-2 py-2 bg-white text-torg-dark">
+        <option value="PTC">PTC</option>
+        <option value="PT">PT</option>
+        <option value="PC">PC</option>
+      </select>
+      <button onClick={() => emitir("docx")} disabled={!!emitindo}
+        className="px-3 py-2 border border-torg-blue-100 text-torg-blue text-sm font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-1.5 disabled:opacity-50">
+        {emitindo === "docx" ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />} Emitir Word
+      </button>
+      <button onClick={() => emitir("pdf")} disabled={!!emitindo}
+        className="px-3 py-2 border border-torg-blue-100 text-torg-blue text-sm font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-1.5 disabled:opacity-50">
+        {emitindo === "pdf" ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} Emitir PDF
+      </button>
+      {erro && <span className="text-[12px] text-red-600 max-w-[220px]">{erro}</span>}
+    </div>
+  );
+}
+
 function VerOrcamentoModal({ orcamento, onClose, onEditar }) {
   const s = STATUS_LABELS[orcamento.status] || STATUS_LABELS.ORCAMENTO;
   // a revisão mais nova é a que vale (a API já ordena por revisão desc)
@@ -1152,7 +1225,8 @@ function VerOrcamentoModal({ orcamento, onClose, onEditar }) {
           )}
         </div>
 
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
+        <div className="flex flex-wrap items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
+          <BotoesEmitirProposta orcamento={orcamento} />
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-torg-gray hover:bg-gray-100 rounded-lg"
