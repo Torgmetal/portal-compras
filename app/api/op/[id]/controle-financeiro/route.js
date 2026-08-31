@@ -43,6 +43,10 @@ export async function GET(req, { params }) {
             },
           },
         },
+        // ⚠ a VERBA por categoria: é o que o Compras pode gastar em cada família (ver a regra de
+        // receita × verba). Sem ela, a tela mostra o realizado sem nada para comparar.
+        itens: { select: { categoria: true, valorVerba: true } },
+        aditivos: { select: { itens: { select: { categoria: true, valorVerba: true } } } },
       },
     });
 
@@ -72,6 +76,9 @@ export async function GET(req, { params }) {
         nfNumero: true,
         createdAt: true,
         faturamentoDireto: true,
+        // por onde o pedido acha a categoria da verba que consumiu ↓
+        categoriaItem: true,
+        cotacao: { select: { rm: { select: { categoriasOP: true } } } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -115,10 +122,71 @@ export async function GET(req, { params }) {
           total: totalEstoque,
         },
         custoTotal: totalPedidos + totalEstoque,
+        verba: montarVerba(op, allPedidos, totalPedidos),
       },
     });
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ error: e.message }, { status });
   }
+}
+
+// ─── VERBA PREVISTA × REALIZADA ───────────────────────────────────────────────
+// Vitor (30/08/2026): "aqui era bom ser mais detalhado e mostrar as verbas previstas × as
+// realizadas".
+//
+// PREVISTO = `OPItem.valorVerba` (contrato + aditivos). É o que o Compras pode gastar em cada
+// família — não é receita; a receita está na aba do contrato.
+// REALIZADO = pedidos emitidos.
+//
+// ⚠ O ESTOQUE FICA DE FORA DO REALIZADO. O cabeçalho da tela já diz que o custo de estoque é
+// ESTIMADO (CMC do Omie) e não sai do contrato; somá-lo faria a comparação com a verba mentir
+// para mais. Ele continua aparecendo no custo total, que é outra pergunta.
+//
+// ⚠⚠ DE ONDE SAI A CATEGORIA DE UM PEDIDO. `PedidoOmie.categoriaItem` está preenchido em 14 de
+// 228 pedidos (6%) — não dá para usar sozinho. O caminho que existe de verdade é
+// pedido → cotação → RM → `categoriasOP`. Medido em 30/08/2026 sobre os 228 pedidos vivos:
+//   · 187 com exatamente 1 categoria  R$ 4.939.165,08  → entram na família certa
+//   ·   1 com 2+ categorias           R$     5.341,18  → não dá para ratear, vai para "Vários"
+//   ·  25 sem categoria na RM         R$    29.158,43  → "Sem categoria"
+//   ·  15 sem RM (FD avulso)          R$ 1.228.879,26  → usa `categoriaItem`, senão "Sem categoria"
+// Os três últimos grupos aparecem NOMEADOS na tela em vez de sumirem: quem lê precisa saber que
+// aquele dinheiro saiu, mesmo sem família definida. A soma das linhas fecha com o realizado.
+const SEM_CATEGORIA = "Sem categoria";
+const VARIAS = "Várias categorias";
+
+function categoriaDoPedido(pedido) {
+  const cats = pedido.cotacao?.rm?.categoriasOP;
+  if (cats?.length === 1) return cats[0];
+  if (cats?.length > 1) return VARIAS;
+  return pedido.categoriaItem || SEM_CATEGORIA;
+}
+
+function montarVerba(op, pedidos, totalPedidos) {
+  const linhas = new Map();
+  const linha = (cat) => {
+    if (!linhas.has(cat)) linhas.set(cat, { categoria: cat, previsto: 0, realizado: 0, pedidos: 0 });
+    return linhas.get(cat);
+  };
+
+  for (const i of op.itens || []) linha(i.categoria || SEM_CATEGORIA).previsto += i.valorVerba || 0;
+  for (const a of op.aditivos || [])
+    for (const i of a.itens || []) linha(i.categoria || SEM_CATEGORIA).previsto += i.valorVerba || 0;
+
+  for (const pe of pedidos) {
+    const l = linha(categoriaDoPedido(pe));
+    l.realizado += pe.total || 0;
+    l.pedidos += 1;
+  }
+
+  const prevista = [...linhas.values()].reduce((s, l) => s + l.previsto, 0);
+  return {
+    prevista,
+    realizado: totalPedidos,
+    saldo: prevista - totalPedidos,
+    pct: prevista > 0 ? (totalPedidos / prevista) * 100 : 0,
+    // ordem: quem tem mais verba primeiro; as linhas sem previsto (gasto fora do orçado) no fim,
+    // que é justamente onde elas incomodam e precisam ser vistas
+    linhas: [...linhas.values()].sort((a, b) => b.previsto - a.previsto || b.realizado - a.realizado),
+  };
 }

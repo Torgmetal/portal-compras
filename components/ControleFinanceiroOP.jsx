@@ -1,10 +1,14 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Loader2, DollarSign, Package, Truck, FileText, AlertCircle, TrendingUp } from "lucide-react";
+import { Loader2, DollarSign, Package, Truck, FileText, AlertCircle, TrendingUp, Wallet } from "lucide-react";
+import { getCategoria } from "@/lib/op-categorias";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+const fmtPct = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
+// as duas linhas-coringa vêm do servidor com o nome já pronto; o resto é código de categoria
+const rotulo = (c) => getCategoria(c)?.label || c;
 
 /**
  * Painel de controle financeiro da OP.
@@ -58,7 +62,8 @@ export default function ControleFinanceiroOP({ opId }) {
 
   if (!data) return null;
 
-  const { pedidos, estoque, custoTotal } = data;
+  const { pedidos, estoque, custoTotal, verba } = data;
+  const estourou = verba && verba.saldo < -0.005;
   const temEstoque = estoque.itens.length > 0;
   const temPedidos = pedidos.torg.lista.length > 0 || pedidos.fd.lista.length > 0;
 
@@ -106,6 +111,89 @@ export default function ControleFinanceiroOP({ opId }) {
           destaque
         />
       </div>
+
+
+      {/* ─── VERBA PREVISTA × REALIZADA ────────────────────────────────────────────────────────
+          Vitor (30/08/2026): "aqui era bom ser mais detalhado e mostrar as verbas previstas × as
+          realizadas".
+
+          ⚠ REALIZADO = PEDIDOS, sem o estoque. O estoque é custo estimado (CMC do Omie) e não sai
+          da verba; misturá-lo aqui faria a obra parecer mais gasta do que está. Ele continua nos
+          KPIs acima, que respondem "quanto custou", não "quanto sobrou para comprar".
+
+          ⚠ ESTOURO SE MOSTRA, não se arredonda: a linha que passou da verba vem em vermelho, e o
+          saldo negativo aparece com sinal. É o número que o comprador precisa ver ANTES de emitir
+          o próximo pedido. */}
+      {verba && (verba.prevista > 0 || verba.realizado > 0) && (
+        <div className="border-t border-gray-100 px-6 py-5">
+          <h4 className="inline-flex items-center gap-2 text-sm font-semibold text-torg-dark">
+            <Wallet size={15} className="text-torg-blue" />
+            Verba prevista × realizada
+          </h4>
+          <p className="mt-1 text-xs text-torg-gray">
+            Previsto = verba dos itens do contrato e dos aditivos. Realizado = pedidos emitidos —
+            o custo de estoque não entra aqui.
+          </p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-gray-100 bg-gray-50/60 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-torg-gray">Verba prevista</p>
+              <p className="mt-0.5 text-lg font-semibold tabular-nums text-torg-dark">{fmtMoeda(verba.prevista)}</p>
+            </div>
+            <div className="rounded-lg border border-gray-100 bg-gray-50/60 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-torg-gray">Realizado em pedidos</p>
+              <p className="mt-0.5 text-lg font-semibold tabular-nums text-torg-dark">{fmtMoeda(verba.realizado)}</p>
+              <p className="text-xs text-torg-gray">{fmtPct(verba.pct)} da verba</p>
+            </div>
+            <div className={`rounded-lg border px-4 py-3 ${estourou ? "border-red-200 bg-red-50" : "border-emerald-100 bg-emerald-50/60"}`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-torg-gray">
+                {estourou ? "Estourou a verba em" : "Saldo a comprar"}
+              </p>
+              <p className={`mt-0.5 text-lg font-semibold tabular-nums ${estourou ? "text-red-700" : "text-emerald-700"}`}>
+                {fmtMoeda(Math.abs(verba.saldo))}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-100">
+            <div
+              className={`h-full rounded-full ${estourou ? "bg-red-500" : verba.pct >= 90 ? "bg-torg-orange" : "bg-torg-blue"}`}
+              style={{ width: `${Math.min(100, Math.max(0, verba.pct))}%` }}
+            />
+          </div>
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-[11px] uppercase tracking-wider text-torg-gray">
+                  <th className="py-2 pr-3 text-left font-semibold">Categoria</th>
+                  <th className="px-3 py-2 text-right font-semibold">Previsto</th>
+                  <th className="px-3 py-2 text-right font-semibold">Realizado</th>
+                  <th className="px-3 py-2 text-right font-semibold">Saldo</th>
+                  <th className="py-2 pl-3 text-right font-semibold">Pedidos</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {verba.linhas.map((l) => {
+                  const saldo = l.previsto - l.realizado;
+                  const passou = saldo < -0.005;
+                  return (
+                    <tr key={l.categoria} className={passou ? "bg-red-50/50" : undefined}>
+                      <td className="py-2 pr-3 text-torg-dark">{rotulo(l.categoria)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-torg-dark">{fmtMoeda(l.previsto)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-torg-dark">{fmtMoeda(l.realizado)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums font-medium ${passou ? "text-red-700" : "text-torg-dark"}`}>
+                        {passou ? `- ${fmtMoeda(Math.abs(saldo))}` : fmtMoeda(saldo)}
+                      </td>
+                      <td className="py-2 pl-3 text-right tabular-nums text-torg-gray">{l.pedidos || "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Itens de estoque */}
       {temEstoque && (
