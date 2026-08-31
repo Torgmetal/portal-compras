@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, RefreshCw, FileSpreadsheet, ChevronRight, ChevronDown, Search, AlertTriangle } from "lucide-react";
+import { Loader2, RefreshCw, FileSpreadsheet, ChevronRight, ChevronDown, Search, AlertTriangle, Download, ListChecks } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 
 // ─── GRD DA ENGENHARIA, POR OP ────────────────────────────────────────────────────────────────
@@ -129,8 +129,21 @@ export default function GrdEngenhariaClient() {
                         {o.grds.map((g) => (
                           <tr key={g.id} className={g.vigente ? "" : "opacity-55"}>
                             <td className="py-1.5">
-                              <button onClick={() => setDetalhe(g)} className="font-semibold text-torg-blue hover:underline">
+                              {/* ⚠ O NÚMERO ABRE O DOCUMENTO. Vitor (31/08/2026): "quando clico no
+                                  número da GRD preciso que traga o formulário da GRD preenchido,
+                                  para podermos comprovar no caso de uma auditoria da ISO". O que
+                                  baixa é o FORM 09 ORIGINAL da pasta — não uma reconstrução minha:
+                                  numa auditoria, o que vale é o documento que a Engenharia emitiu.
+                                  A lista de documentos continua a um clique, no ícone ao lado. */}
+                              <a href={`/api/engenharia/grd/${g.id}/arquivo`}
+                                title="Abrir o FORM 09 preenchido (documento original da pasta)"
+                                className="font-semibold text-torg-blue hover:underline inline-flex items-center gap-1">
                                 GRD-{g.numero}
+                                <Download size={11} className="text-torg-blue/60" />
+                              </a>
+                              <button onClick={() => setDetalhe(g)} title="Ver os documentos desta GRD"
+                                className="ml-1 text-torg-gray hover:text-torg-blue align-middle">
+                                <ListChecks size={12} />
                               </button>
                               {g.revisao > 0 && (
                                 <span className="ml-1 text-[10px] font-bold rounded px-1 py-0.5 bg-amber-100 text-amber-700">
@@ -210,7 +223,13 @@ function ModalGrd({ g, onClose }) {
         </div>
         <div className="px-5 py-3 border-t border-gray-100 flex justify-between items-center">
           <span className="text-[12px] text-torg-gray">{itens.length} documento(s) · {fmtKg(g.pesoKg)}</span>
-          <button onClick={onClose} className="text-sm font-medium text-torg-gray hover:text-torg-dark px-3 py-1.5">Fechar</button>
+          <span className="flex items-center gap-2">
+            <a href={`/api/engenharia/grd/${g.id}/arquivo`}
+              className="text-sm font-semibold text-torg-blue border border-torg-blue-200 rounded-lg px-3 py-1.5 hover:bg-torg-blue-50 inline-flex items-center gap-1.5">
+              <Download size={14} /> FORM 09 preenchido
+            </a>
+            <button onClick={onClose} className="text-sm font-medium text-torg-gray hover:text-torg-dark px-3 py-1.5">Fechar</button>
+          </span>
         </div>
       </div>
     </div>
