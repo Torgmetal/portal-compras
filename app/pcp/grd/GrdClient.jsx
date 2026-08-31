@@ -60,6 +60,39 @@ export default function GrdClient() {
 
   const abrirPdf = (itemId, nome) => window.open(`/api/producao/desenhos/arquivo?itemId=${encodeURIComponent(itemId)}&nome=${encodeURIComponent(nome)}`, "_blank");
 
+  // ─── EMITIR A GUIA (FORM 09) ────────────────────────────────────────────────────────────────
+  // Vitor (31/08/2026): "precisamos que gere essa mesma estrutura para o PCP, onde criamos a aba de
+  // GRD" e "preciso de uma forma de registrar a assinatura de quem deve receber".
+  //
+  // ⚠ O EXCEL AO LADO É OUTRA COISA. Ele é o CONTROLE — relatório gerencial de tudo que já foi
+  // liberado. A guia é o documento de UMA remessa, numerado, que o setor assina ao receber. Um não
+  // substitui o outro: numa auditoria, o controle mostra o histórico e a guia prova a entrega.
+  const [emitindo, setEmitindo] = useState(false);
+
+  async function emitirGuia(opNumero) {
+    const nome = prompt("Quem recebe esta remessa? (nome)");
+    if (!nome) return;
+    const email = prompt("E-mail de quem recebe — deixe em branco para assinar no papel:");
+    if (!confirm(
+      `Emitir a guia de remessa da OP-${opNumero}?\n\n` +
+      "Entram os desenhos liberados que ainda não saíram em guia." +
+      (email ? "\n\nEle recebe por e-mail o link para confirmar o recebimento." : "\n\nSem e-mail, a guia sai com a linha para assinar à mão.")
+    )) return;
+    setEmitindo(true);
+    try {
+      const r = await fetch("/api/pcp/grd/remessa", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opNumero, para: email ? { nome, email } : null }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro");
+      alert(
+        `${j.codigo} emitida com ${j.docs} documento(s).` +
+        (j.assinaturaLink ? `\n\nO link de confirmação foi enviado para ${email}.` : "\n\nImprima a guia e colha a assinatura no papel.")
+      );
+    } catch (e) { alert(e.message); } finally { setEmitindo(false); }
+  }
+
   // Excel do controle: a OP aberta (se houver) ou o resumo de todas.
   async function exportar() {
     const hoje = new Date().toISOString().split("T")[0];
@@ -125,6 +158,13 @@ export default function GrdClient() {
         <div className="flex items-center gap-2">
           <button onClick={carregar} className="text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 inline-flex items-center gap-1"><RefreshCw size={13} /> Atualizar</button>
           <button onClick={exportar} disabled={!data} className="text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 disabled:opacity-40 inline-flex items-center gap-1"><FileDown size={13} /> Exportar</button>
+          {aberta && (
+            <button onClick={() => emitirGuia(aberta)} disabled={emitindo}
+              title="Emite a guia de remessa (FORM 09) desta OP e manda para quem recebe confirmar"
+              className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-2.5 py-1.5 hover:bg-torg-dark disabled:opacity-40 inline-flex items-center gap-1">
+              {emitindo ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />} Emitir guia
+            </button>
+          )}
         </div>
       </div>
 

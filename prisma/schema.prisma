@@ -5417,3 +5417,33 @@ model GrdEngenharia {
   @@index([opNumero])
   @@index([data])
 }
+
+// ─── REMESSA DE DESENHOS DO PCP (FORM 09) ─────────────────────────────────────────────────────
+// Vitor (31/08/2026): "precisamos que gere essa mesma estrutura para o PCP, onde criamos a aba de
+// GRD".
+//
+// A aba do PCP já tinha o CONTROLE das liberações (`GrdLiberacao`, uma linha por marca impressa);
+// o que faltava era a GUIA — o documento numerado que prova, numa auditoria, o que o PCP entregou a
+// qual setor e quando. É o mesmo papel que o FORM 09 da Engenharia cumpre na liberação de projeto.
+//
+// ⚠⚠ SÉRIE PRÓPRIA, SEPARADA DA ENGENHARIA. A Engenharia numera as dela de 1 a 481 na pasta e
+// mantém isso à mão na Matriz GRD. Se o PCP emitisse na mesma sequência, dois setores estariam
+// disputando o mesmo número sem se falar — e num controle de documentos isso é exatamente o que não
+// pode acontecer. Aqui a série é do PCP e reinicia por ano.
+model GrdRemessaPcp {
+  id             String   @id @default(cuid())
+  numero         Int
+  ano            Int
+  opNumero       String
+  opId           String?
+  setor          String?
+  itens          Json     @default("[]") // congelado na emissão: [{marca, arquivo, formato, r, impressoes}]
+  qtdDocs        Int      @default(0)
+  emitidoPorId   String?
+  emitidoPorNome String?
+  emitidoEm      DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  @@unique([numero, ano])
+  @@index([opNumero])
+}
