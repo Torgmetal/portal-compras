@@ -1087,8 +1087,19 @@ function Pintura({ c, res, setComp }) {
   // teto do corpo de uma função serverless — pelo caminho normal ele falharia sem dizer por quê.
   const anexos = Array.isArray(c.pinturaAnexos) ? c.pinturaAnexos : [];
   const [subindo, setSubindo] = useState(false);
+  const [leitura, setLeitura] = useState(null);   // o que foi lido da planilha, à espera do OK
   const refArquivo = useRef(null);
 
+  // ⚠⚠ ANEXAR E LER SÃO A MESMA AÇÃO. Vitor (31/08/2026): "tentei importar um plano de pintura na
+  // proposta 290 e não reconheceu". Ele estava certo: eu tinha entregado só o anexo, guardando o
+  // arquivo sem abrir, quando o pedido era "importar o sistema de pintura para que seja avaliado
+  // qual o tipo de tinta e qual a quantidade". Agora a planilha é lida na hora.
+  //
+  // ⚠ O ARQUIVO CONTINUA GUARDADO mesmo quando a leitura falha — é o documento do cliente, e vale
+  // como prova do que foi especificado, independentemente de eu conseguir interpretá-lo.
+  //
+  // ⚠ E NÃO SOBRESCREVE SEM PERGUNTAR: as camadas já preenchidas são trabalho de alguém. A tela
+  // mostra o que leu e só aplica com confirmação.
   async function anexar(ev) {
     const files = Array.from(ev.target.files || []);
     ev.target.value = "";
@@ -1105,7 +1116,53 @@ function Pintura({ c, res, setComp }) {
         novos.push({ nome: file.name, url: blob.url, tamanho: file.size, em: new Date().toISOString() });
       }
       setComp({ pinturaAnexos: [...anexos, ...novos] });
+
+      // tenta LER a especificação da primeira planilha do lote
+      const planilha = files.find((f) => /\.(xlsx|xls|csv)$/i.test(f.name));
+      if (planilha) await lerEspec(planilha);
     } catch (e) { alert("Falha ao anexar: " + e.message); } finally { setSubindo(false); }
+  }
+
+  async function lerEspec(file) {
+    try {
+      const [XLSX, { lerEspecificacaoPintura }] = await Promise.all([
+        import("xlsx"), import("@/lib/pintura-especificacao"),
+      ]);
+      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const grade = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", blankrows: false });
+      const lido = lerEspecificacaoPintura(grade);
+      if (!lido.camadas.length) {
+        alert(
+          "Anexei o arquivo, mas não reconheci o sistema de pintura nele.\n\n" +
+          lido.avisos.join("\n") +
+          "\n\nEle continua guardado — preencha as camadas à mão, ou me mande o formato para eu ensinar a ler."
+        );
+        return;
+      }
+      setLeitura(lido);
+    } catch (e) {
+      alert("Anexei o arquivo, mas não consegui abrir a planilha: " + e.message);
+    }
+  }
+
+  function aplicarLeitura() {
+    const lido = leitura;
+    if (!lido) return;
+    const corAcab = lido.cores?.[0]?.cor || "";
+    const novas = lido.camadas.map((cm, i) => ({
+      ...(t[i] || {}),
+      camada: cm.camada,
+      produto: cm.produto || t[i]?.produto || "",
+      peliculaSeca: cm.peliculaSeca ?? t[i]?.peliculaSeca ?? null,
+      solidos: cm.solidos ?? t[i]?.solidos ?? null,
+      // ⚠ a cor do ACABAMENTO vem da §2 da planilha; primer e intermediária não têm cor de projeto
+      cor: cm.camada === "ACABAMENTO" ? (cm.cor || corAcab) : (cm.cor || t[i]?.cor || ""),
+      perda: t[i]?.perda ?? 45,
+      nome: (t[i]?.perda ?? 45) === 85 ? "ESTRUTURA — FATOR DE PERDA: 85%" : "ESTRUTURA — FATOR DE PERDA: 45%",
+    }));
+    // camadas que já existiam além das lidas continuam onde estão
+    setComp({ tintas: [...novas, ...t.slice(novas.length)], pinturaFabricante: lido.fabricante || null });
+    setLeitura(null);
   }
 
   const remover = (i) => {
@@ -1235,6 +1292,54 @@ function Pintura({ c, res, setComp }) {
             {subindo ? "Enviando…" : "Anexar PDF ou planilha"}
           </button>
         </div>
+        {/* ⚠ O QUE FOI LIDO APARECE ANTES DE VALER. Aplicar direto sobrescreveria camadas que
+            alguém preencheu à mão — e numa planilha do cliente, um campo mal lido vira preço
+            errado sem ninguém ver. Aqui ele confere as três demãos e decide. */}
+        {leitura && (
+          <div className="mb-3 rounded-lg border-2 border-torg-blue-200 bg-torg-blue-50/40 px-3 py-2.5">
+            <p className="text-[12px] font-semibold text-torg-dark">
+              Li o sistema de pintura{leitura.fabricante ? ` — fabricante ${leitura.fabricante}` : ""}
+            </p>
+            <table className="mt-2 w-full text-[11px]">
+              <thead className="text-[10px] uppercase text-torg-gray">
+                <tr><th className="text-left py-1">Demão</th><th className="text-left py-1">Produto</th>
+                  <th className="text-right py-1">Película</th><th className="text-right py-1">Sólidos</th>
+                  <th className="text-left py-1 pl-3">Cor</th></tr>
+              </thead>
+              <tbody>
+                {leitura.camadas.map((cm, i) => (
+                  <tr key={i} className="border-t border-torg-blue-100/60">
+                    <td className="py-1 font-semibold text-torg-dark">{cm.demao} · {cm.camada}</td>
+                    <td className="py-1 text-torg-dark">{cm.produto || "—"}</td>
+                    <td className="py-1 text-right tabular-nums">{cm.peliculaSeca ?? "—"} µm</td>
+                    <td className="py-1 text-right tabular-nums">{cm.solidos ?? "—"}%</td>
+                    <td className="py-1 pl-3 text-torg-dark">{cm.cor || (cm.camada === "ACABAMENTO" ? (leitura.cores?.[0]?.cor || "—") : "—")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {leitura.cores?.length > 0 && (
+              <p className="mt-2 text-[11px] text-torg-dark">
+                Cores de acabamento:{" "}
+                {leitura.cores.map((c) => `${c.cor}${c.notacao ? ` (${c.notacao})` : ""}`).join(" · ")}
+              </p>
+            )}
+            {leitura.avisos?.map((a2, i) => (
+              <p key={i} className="mt-1 text-[11px] text-torg-orange-700">⚠ {a2}</p>
+            ))}
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button onClick={aplicarLeitura}
+                className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:bg-torg-dark">
+                Preencher as camadas com isto
+              </button>
+              <button onClick={() => setLeitura(null)}
+                className="text-[12px] font-medium text-torg-gray hover:text-torg-dark px-3 py-1.5">
+                Descartar — o arquivo continua anexado
+              </button>
+            </div>
+          </div>
+        )}
+
         {anexos.length > 0 && (
           <div className="mb-3 divide-y divide-gray-50 border border-gray-100 rounded-lg">
             {anexos.map((a, i) => (
