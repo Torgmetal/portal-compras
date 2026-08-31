@@ -17,6 +17,7 @@ import { cabecalhoEmail } from "@/lib/email-layout";
 import { numGrdPcp } from "@/lib/grd-pcp-pdf";
 import { fmtOP } from "@/lib/utils";
 import { escapeHtml } from "@/lib/html";
+import { DESTINO_PCP } from "@/lib/grd-roteiro";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -62,6 +63,12 @@ export async function POST(req) {
     );
   }
 
+  // ⚠ O ROTEIRO É O PADRÃO, não uma obrigação. Vitor (31/08/2026): "Engenharia manda para o
+  // Gabriel e o Gabriel manda para a Larissa, pode deixar esse roteiro definido". Quem emite pode
+  // mandar para outra pessoa quando for o caso; o que muda é que o certo já vem preenchido, e um
+  // documento que a ISO lê não depende de alguém digitar o endereço sem errar.
+  const para = b.para?.email ? b.para : DESTINO_PCP;
+
   const op = await prisma.oP.findFirst({ where: { numero: b.opNumero }, select: { id: true, obra: true, cliente: true } });
   const ano = new Date().getFullYear();
   const ultimo = await prisma.grdRemessaPcp.findFirst({ where: { ano }, orderBy: { numero: "desc" }, select: { numero: true } });
@@ -98,14 +105,14 @@ export async function POST(req) {
   // preenche o campo e é o que uma guia de remessa precisa provar. Quem de fato leu, o portal já
   // sabe pelo acesso.
   let enviado = false;
-  if (b.para?.email) {
+  if (para?.email) {
     const res = await sendEmail({
-      to: b.para.email,
+      to: para.email,
       subject: `${numGrdPcp(numero, ano)} — desenhos da ${fmtOP(b.opNumero)} para o ${remessa.setor || "seu setor"}`,
       html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#0D1F3C">
         ${cabecalhoEmail("Guia de Remessa de Documentos")}
         <div style="border:1px solid #e7ecf2;border-top:none;border-radius:0 0 8px 8px;padding:22px 26px">
-          <p style="margin:0 0 12px">Olá <strong>${escapeHtml(b.para.nome)}</strong>,</p>
+          <p style="margin:0 0 12px">Olá <strong>${escapeHtml(para.nome)}</strong>,</p>
           <p style="margin:0 0 14px">
             O PCP está remetendo <strong>${itens.length} desenho(s)</strong> da
             <strong>${escapeHtml(fmtOP(b.opNumero))}</strong>${remessa.setor ? ` para o setor <strong>${escapeHtml(remessa.setor)}</strong>` : ""}.
@@ -125,20 +132,21 @@ export async function POST(req) {
   if (enviado) {
     await prisma.grdRemessaPcp.update({
       where: { id: remessa.id },
-      data: { recebidoPorNome: b.para.nome, recebidoPorEmail: b.para.email, enviadoEm: new Date() },
+      data: { recebidoPorNome: para.nome, recebidoPorEmail: para.email, enviadoEm: new Date() },
     });
   }
 
   await prisma.auditLog.create({
     data: {
       userId: user.id, action: "EMITIR_GRD_PCP", entity: "GrdRemessaPcp", entityId: remessa.id,
-      diff: { numero, ano, opNumero: b.opNumero, setor: remessa.setor, docs: itens.length, para: b.para?.email || null, enviado },
+      diff: { numero, ano, opNumero: b.opNumero, setor: remessa.setor, docs: itens.length, para: para?.email || null, enviado },
     },
   }).catch(() => {});
 
   return NextResponse.json({
     ok: true, id: remessa.id, numero, ano, codigo: numGrdPcp(numero, ano),
     docs: itens.length, enviado,
-    recebidoPor: enviado ? b.para.nome : null,
+    recebidoPor: enviado ? para.nome : null,
+    destino: para?.email || null,
   });
 }

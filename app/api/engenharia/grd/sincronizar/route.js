@@ -11,14 +11,14 @@ import { sendEmail } from "@/lib/email";
 import { cabecalhoEmail } from "@/lib/email-layout";
 import { fmtOP } from "@/lib/utils";
 import { escapeHtml } from "@/lib/html";
+import { DESTINO_ENGENHARIA } from "@/lib/grd-roteiro";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-// ⚠ QUEM RECEBE O AVISO. Vitor nomeou o Gabriel; o endereço vem do cadastro dele no portal, e não
-// escrito aqui — se ele mudar de e-mail, o aviso acompanha. Se a conta sumir, o cron não quebra:
-// a importação continua e o resultado diz que ninguém foi avisado.
-const AVISAR = ["engenharia3@torg.com.br"];
+// ⚠ QUEM RECEBE O AVISO vem do roteiro (lib/grd-roteiro.js): Engenharia → Gabriel. Deixar o
+// endereço escrito aqui espalharia a mesma decisão por dois arquivos.
+const AVISAR = [DESTINO_ENGENHARIA.email];
 
 export async function POST(req) {
   const auth = req.headers.get("authorization");

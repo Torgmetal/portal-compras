@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } from "@/lib/excel-relatorio";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
+import { DESTINO_PCP } from "@/lib/grd-roteiro";
 
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
 const fmtDH = (d) => (d ? `${new Date(d).toLocaleDateString("pt-BR")} ${new Date(d).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : "—");
@@ -70,9 +71,13 @@ export default function GrdClient() {
   const [emitindo, setEmitindo] = useState(false);
 
   async function emitirGuia(opNumero) {
-    const nome = prompt("Quem recebe esta remessa? (nome)");
+    // ⚠ O ROTEIRO JÁ VEM PREENCHIDO. Vitor (31/08/2026): "Engenharia manda para o Gabriel e o
+    // Gabriel manda para a Larissa, pode deixar esse roteiro definido". Perguntar do zero toda vez
+    // é onde entra o erro de digitação num documento que a ISO lê — e onde alguém manda para a
+    // pessoa errada num dia corrido. Continua editável: o padrão é sugestão, não trava.
+    const nome = prompt("Quem recebe esta remessa?", DESTINO_PCP.nome);
     if (!nome) return;
-    const email = prompt("E-mail de quem recebe — deixe em branco para assinar no papel:");
+    const email = prompt("E-mail de quem recebe — deixe em branco para assinar no papel:", DESTINO_PCP.email);
     if (!confirm(
       `Emitir a guia de remessa da OP-${opNumero}?\n\n` +
       "Entram os desenhos liberados que ainda não saíram em guia." +
