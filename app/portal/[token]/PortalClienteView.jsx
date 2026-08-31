@@ -349,6 +349,26 @@ export default function PortalClienteView({ token }) {
         {mostrar("DATABOOK") && (
           <Bloco icone={BookCheck} titulo="Data Book da obra"
             sub={`${dados.databook.volumes.length} volume(s) · R${String(dados.databook.revisao).padStart(2, "0")}`}>
+            {/* ─── EM CONFERÊNCIA, ANTES DA ASSINATURA ────────────────────────────────────────
+                Vitor (31/08/2026): "antes de enviar para assinatura, teria como disponibilizar no
+                portal do cliente o PDF para ele avaliar as informações (…) depois do ok dele aí sim
+                subimos para assinatura".
+
+                ⚠ O AVISO VEM ANTES DOS ARQUIVOS, de propósito. Se ele viesse depois, o cliente
+                baixaria o volume achando que é o dossiê final — e a leitura muda tudo: um é
+                documento fechado, o outro é rascunho que ele ainda pode recusar. */}
+            {dados.databook.emAvaliacao && (
+              <div className="mb-4 rounded-xl border-2 border-[#F4801F]/40 bg-[#FFF8F0] px-4 py-3">
+                <p className="text-[13px] font-semibold text-[#0D1F3C]">
+                  Para sua conferência — ainda não assinado
+                </p>
+                <p className="mt-1 text-[12px] leading-relaxed text-gray-600">
+                  Estes volumes são a versão final montada pela Qualidade da Torg. Confira as
+                  informações e nos dê o seu retorno: só depois do seu aceite o dossiê segue para as
+                  assinaturas.
+                </p>
+              </div>
+            )}
             <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
               {dados.databook.volumes.map((v) => (
                 <a key={v.volume} href={`/api/portal/${token}/databook?volume=${v.volume}`}
@@ -369,10 +389,17 @@ export default function PortalClienteView({ token }) {
             {/* ⚠ a data do aceite é o que dá autoridade ao arquivo: diz que este é o dossiê que a
                 obra fechou, não uma cópia de trabalho. Sem ela, um PDF baixado de um portal é só
                 mais um PDF. */}
-            <p className="text-[12px] text-gray-500 mt-3">
-              Dossiê aceito{dados.databook.aceiteEm ? ` em ${dados.databook.aceiteEm}` : ""} · revisão R{String(dados.databook.revisao).padStart(2, "0")}.
-              Cada volume abre em PDF.
-            </p>
+            {dados.databook.emAvaliacao ? (
+              <AvaliacaoDataBook token={token} dados={dados.databook} />
+            ) : (
+              /* ⚠ a data do aceite é o que dá autoridade ao arquivo: diz que este é o dossiê que a
+                 obra fechou, não uma cópia de trabalho. Sem ela, um PDF baixado de um portal é só
+                 mais um PDF. */
+              <p className="text-[12px] text-gray-500 mt-3">
+                Dossiê aceito{dados.databook.aceiteEm ? ` em ${dados.databook.aceiteEm}` : ""} · revisão R{String(dados.databook.revisao).padStart(2, "0")}.
+                Cada volume abre em PDF.
+              </p>
+            )}
           </Bloco>
         )}
         {/* ⚠ ENGENHARIA — o que foi ESCOLHIDO da pasta 2.5.5 (envio ao cliente). Bloco próprio, e
@@ -967,5 +994,97 @@ function Tabela({ cols, linhas, rodape, quebra = null, larguraMin = 420 }) {
       </div>
       {rodape && <p className="text-[12px] text-gray-500 mt-3">{rodape}</p>}
     </>
+  );
+}
+
+// ─── O PARECER DO CLIENTE SOBRE O DATA BOOK ───────────────────────────────────────────────────
+// Vitor (31/08/2026): "no caso da OP-106 quero que apareça para o Davi avaliar antes de mandar
+// para assinatura. Depois do ok dele aí sim subimos para assinatura".
+//
+// ⚠ O NOME É OBRIGATÓRIO E O "PEDIR AJUSTE" EXIGE MOTIVO. O portal é aberto por link, sem login —
+// sem o nome, o registro diria apenas que "alguém do cliente aprovou", que não serve como aceite.
+// E um "não" sem motivo devolve o livro à Qualidade sem dizer o que corrigir: vira uma ida e volta
+// a mais, justamente o que esta etapa existe para evitar.
+//
+// ⚠⚠ APROVAR NÃO É ASSINAR. Aqui ele diz "as informações estão certas, podem seguir"; a assinatura
+// dele continua sendo a 4ª etapa da cadeia, depois. O texto do botão precisa deixar isso claro —
+// se ele achar que já assinou, não assina depois.
+function AvaliacaoDataBook({ token, dados }) {
+  const [nome, setNome] = useState("");
+  const [obs, setObs] = useState("");
+  const [modo, setModo] = useState(null); // "ok" | "ajuste"
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [pronto, setPronto] = useState(dados.avaliacaoOkEm ? "ok" : null);
+
+  async function enviar(aprovado) {
+    if (nome.trim().length < 2) return setErro("Informe seu nome para registrarmos quem conferiu.");
+    if (!aprovado && obs.trim().length < 3) return setErro("Escreva o que precisa ser ajustado.");
+    setEnviando(true); setErro("");
+    try {
+      const q = typeof window !== "undefined" ? window.location.search : "";
+      const r = await fetch(`/api/portal/${token}/databook-avaliacao${q}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aprovado, nome, obs: obs || null }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Não foi possível registrar.");
+      setPronto(aprovado ? "ok" : "ajuste");
+    } catch (e) { setErro(e.message); } finally { setEnviando(false); }
+  }
+
+  if (pronto === "ok") {
+    return (
+      <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[12px] text-emerald-900">
+        Conferência registrada{dados.avaliacaoOkNome ? ` por ${dados.avaliacaoOkNome}` : ""}
+        {dados.avaliacaoOkEm ? ` em ${dados.avaliacaoOkEm}` : ""}. O dossiê segue para as assinaturas —
+        você receberá o link para assinar como última etapa.
+      </p>
+    );
+  }
+  if (pronto === "ajuste") {
+    return (
+      <p className="mt-3 rounded-xl border border-[#F4801F]/40 bg-[#FFF8F0] px-4 py-3 text-[12px] text-[#0D1F3C]">
+        Recebemos seu apontamento. A Qualidade da Torg vai avaliar e devolver o dossiê corrigido
+        antes de seguir para as assinaturas.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-gray-200 p-4">
+      <p className="text-[13px] font-semibold text-[#0D1F3C]">Seu retorno</p>
+      <label className="mt-2 block text-[12px] text-gray-600">
+        Nome de quem conferiu
+        <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome"
+          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-[13px] focus:border-[#006EAB] focus:outline-none focus:ring-1 focus:ring-[#006EAB]" />
+      </label>
+      {modo === "ajuste" && (
+        <label className="mt-3 block text-[12px] text-gray-600">
+          O que precisa ser ajustado
+          <textarea value={obs} onChange={(e) => setObs(e.target.value)} rows={3}
+            placeholder="Descreva o ponto — seção, documento ou informação"
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-[13px] focus:border-[#006EAB] focus:outline-none focus:ring-1 focus:ring-[#006EAB]" />
+        </label>
+      )}
+      {erro && <p className="mt-2 text-[12px] text-red-600">{erro}</p>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" disabled={enviando} onClick={() => enviar(true)}
+          className="rounded-lg bg-[#006EAB] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#0D1F3C] disabled:opacity-50">
+          {enviando ? "Registrando…" : "Está tudo certo — pode seguir para assinatura"}
+        </button>
+        {modo === "ajuste" ? (
+          <button type="button" disabled={enviando} onClick={() => enviar(false)}
+            className="rounded-lg border border-[#F4801F] px-4 py-2 text-[13px] font-semibold text-[#F4801F] hover:bg-[#FFF8F0] disabled:opacity-50">
+            Enviar apontamento
+          </button>
+        ) : (
+          <button type="button" onClick={() => { setModo("ajuste"); setErro(""); }}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-[13px] font-medium text-gray-700 hover:bg-gray-50">
+            Preciso de um ajuste
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

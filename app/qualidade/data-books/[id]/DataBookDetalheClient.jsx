@@ -27,6 +27,7 @@ export default function DataBookDetalheClient({ id, userId }) {
   const [acao, setAcao] = useState(null); // secaoId em ação
   const [emitindo, setEmitindo] = useState(false);
   const [revisando, setRevisando] = useState(false);
+  const [enviandoAval, setEnviandoAval] = useState(false);
   const [revisoes, setRevisoes] = useState(null);
   const [verHistorico, setVerHistorico] = useState(false);
   const [rastr, setRastr] = useState(null);
@@ -83,6 +84,25 @@ export default function DataBookDetalheClient({ id, userId }) {
     } finally {
       setAcao(null);
     }
+  }
+
+  // ─── MANDAR O CLIENTE CONFERIR ANTES DA ASSINATURA ──────────────────────────────────────────
+  // Vitor (31/08/2026): "antes de enviar para assinatura, teria como disponibilizar no portal do
+  // cliente o PDF para ele avaliar as informações? (…) depois do ok dele aí sim subimos para
+  // assinatura".
+  async function enviarParaAvaliacao() {
+    if (!confirm(
+      "Publicar este data book no portal do cliente para conferência?\n\n" +
+      "Ele passa a ver e baixar os volumes, marcados como “ainda não assinado”, e responde no " +
+      "próprio portal. As assinaturas só podem começar depois do ok dele."
+    )) return;
+    setEnviandoAval(true);
+    try {
+      const res = await fetch(`/api/qualidade/data-books/${id}/avaliacao-cliente`, { method: "POST" });
+      const j = await res.json();
+      if (!res.ok || !j.success) throw new Error(j.error || "Erro");
+      await carregar();
+    } catch (e) { alert(e.message); } finally { setEnviandoAval(false); }
   }
 
   async function popularMaterial(secao) {
@@ -419,6 +439,59 @@ export default function DataBookDetalheClient({ id, userId }) {
 
       {/* Volumes — a entrega de verdade quando o data book é grande */}
       <Volumes id={id} />
+
+      {/* ─── CONFERÊNCIA DO CLIENTE ────────────────────────────────────────────────────────────
+          Fica ACIMA do fluxo de assinaturas porque é o que vem antes dele: o cliente lê, aprova, e
+          só então as quatro assinaturas começam. Ler antes custa um clique; ler depois custa três
+          assinaturas e uma revisão. */}
+      {fechado && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-sm font-bold text-torg-dark">
+                Conferência do cliente <span className="font-normal text-torg-gray">· antes das assinaturas</span>
+              </h2>
+              <p className="text-[12px] text-torg-gray mt-0.5">
+                Publica os volumes no portal do cliente, marcados como ainda não assinados, para ele
+                conferir as informações e responder.
+              </p>
+            </div>
+            {!data.avaliacaoOkEm && (
+              <button onClick={enviarParaAvaliacao} disabled={enviandoAval}
+                className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5 shrink-0">
+                {enviandoAval ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                {data.avaliacaoEnviadaEm ? "Mandar conferir de novo" : "Mandar o cliente conferir"}
+              </button>
+            )}
+          </div>
+
+          {data.avaliacaoOkEm ? (
+            <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900">
+              <strong>Aprovado pelo cliente</strong>
+              {data.avaliacaoOkNome ? ` — ${data.avaliacaoOkNome}` : ""}
+              {` em ${new Date(data.avaliacaoOkEm).toLocaleString("pt-BR")}`}. Liberado para assinatura.
+              {data.avaliacaoObs ? <span className="block mt-1 text-emerald-800">Observação: “{data.avaliacaoObs}”</span> : null}
+            </p>
+          ) : data.avaliacaoObs ? (
+            <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+              <strong>O cliente pediu ajuste:</strong> “{data.avaliacaoObs}”
+              <span className="block mt-1">
+                Corrija por revisão e mande conferir de novo — as assinaturas continuam travadas até o ok.
+              </span>
+            </p>
+          ) : data.avaliacaoEnviadaEm ? (
+            <p className="mt-3 rounded-lg border border-torg-blue-100 bg-torg-blue-50/40 px-3 py-2 text-[12px] text-torg-dark">
+              No portal do cliente desde {new Date(data.avaliacaoEnviadaEm).toLocaleString("pt-BR")} —
+              aguardando o retorno dele. As assinaturas só liberam depois do ok.
+            </p>
+          ) : (
+            <p className="mt-3 text-[12px] text-torg-gray">
+              Ainda não foi enviado para conferência. Esta etapa é opcional — sem ela, as assinaturas
+              seguem como sempre.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Fluxo de assinaturas — Elaborador → Inspetor → Resp. Técnico → Cliente (por e-mail/link) */}
       <FluxoAssinaturas id={id} cliente={data.cliente} clienteEmail={data.clienteEmail} onChange={carregar} />

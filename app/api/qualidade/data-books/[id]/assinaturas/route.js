@@ -64,6 +64,22 @@ export async function POST(req, { params }) {
     );
   }
 
+  // ⚠ SE O CLIENTE FOI CHAMADO A CONFERIR, ESPERA-SE A RESPOSTA DELE. Vitor (31/08/2026): "depois
+  // do ok dele aí sim subimos para assinatura". A trava vale só quando a avaliação FOI PEDIDA —
+  // data book que nunca passou por essa etapa segue como antes, senão os livros em andamento
+  // travariam no meio do caminho por uma regra que não existia quando começaram.
+  if (book.avaliacaoEnviadaEm && !book.avaliacaoOkEm) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: book.avaliacaoObs
+          ? `O cliente pediu ajuste na conferência: "${book.avaliacaoObs}". Resolva e mande para avaliação de novo antes de subir para assinatura.`
+          : "Este data book está com o cliente para conferência e ainda não teve o ok dele. Aguarde o retorno antes de iniciar as assinaturas.",
+      },
+      { status: 409 },
+    );
+  }
+
   const op = fmtOPdb(book.opNumero);
   const etapas = [
     { ordem: 1, papel: "ELABORADOR", nome: body.elaboradorNome?.trim() || null, email: body.elaboradorEmail },

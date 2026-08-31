@@ -1827,7 +1827,22 @@ model DataBookQualidade {
   pecas            Int?
   tipo             String? // herda de OP.tipoDataBook: PADRAO_TORG | SNQC | RELATORIO_ACOMPANHAMENTO
   observacao       String?
-  status           String               @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO | ENVIADO_CLIENTE | ACEITO
+  status           String               @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO | EM_AVALIACAO | EM_ASSINATURA | ENVIADO_CLIENTE | ACEITO
+
+  // ── AVALIAÇÃO DO CLIENTE, ANTES DA ASSINATURA ───────────────────────────────────────────────
+  // Vitor (31/08/2026): "antes de enviar para assinatura, teria como disponibilizar no portal do
+  // cliente o PDF para ele avaliar as informações? (…) depois do ok dele aí sim subimos para
+  // assinatura".
+  //
+  // ⚠ É UMA ETAPA A MAIS, NÃO A ASSINATURA DO CLIENTE. Ele já é a 4ª etapa da cadeia
+  // (Elaborador → Inspetor → Resp. Técnico → Cliente). O que faltava era ele LER antes: sem isso,
+  // três pessoas assinam um livro que o cliente ainda pode recusar, e recusar depois de assinado
+  // custa uma revisão que zera as três assinaturas.
+  avaliacaoEnviadaEm DateTime?
+  avaliacaoOkEm      DateTime?
+  avaliacaoOkNome    String?
+  avaliacaoOkIp      String?
+  avaliacaoObs       String?   // o que o cliente escreveu ao pedir ajuste
   emitidoEm        DateTime?
   // REVISÃO. Vitor (19/08/2026): "sempre depois de emitido você não deve permitir salvar sem gerar
   // uma revisão; e se for revisão, fazer o histórico da revisão e enviar para assinatura de todos
