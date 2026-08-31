@@ -232,7 +232,14 @@ export default withAuth(
           path.startsWith("/api/sgq-publico/") ||
           // Assinatura eletronica de documento (Treinamentos / Auditoria) — publico via token
           path.startsWith("/assinar/") ||
-          path.startsWith("/api/assinar/")
+          path.startsWith("/api/assinar/") ||
+          // ⚠ Consulta de tintas na fase de ORÇAMENTO — portal proprio do fabricante, separado do
+          // /fornecedores (que responde RM do Compras). Vitor (31/08/2026): "precisa ser um portal
+          // totalmente separado do de compras". Publico via token unico por fabricante: cada um ve
+          // e responde so a sua linha, que e o que permite existir mapa de cotacoes sem a
+          // concorrencia ficar publica.
+          path.startsWith("/consulta-tinta/") ||
+          path.startsWith("/api/consulta-tinta/")
         ) {
           return true;
         }

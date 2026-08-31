@@ -51,7 +51,7 @@ export async function GET(req) {
         orderBy: { enviadoEm: "desc" },
         select: {
           id: true, enviadoEm: true, enviadoPorNome: true, snapshot: true,
-          fornecedores: { select: { id: true, nome: true, email: true, enviadoEm: true, erroEnvio: true, respondidoEm: true, valorTotal: true, vencedor: true } },
+          fornecedores: { select: { id: true, nome: true, email: true, enviadoEm: true, erroEnvio: true, respondidoEm: true, valorTotal: true, vencedor: true, resposta: true }, orderBy: { valorTotal: "asc" } },
         },
       })
     : [];
@@ -109,7 +109,7 @@ export async function POST(req) {
     // concorrente, sem OP: é orçamento, não pedido.
     // ⚠ o corpo vem de lib/cotacao-tinta-email.js — a prévia que o Vitor revisa usa a MESMA
     // função, então o que ele aprova é literalmente o que sai.
-    const msg = emailCotacaoTinta(f, s, { obra, numero: est?.numero, ano: est?.ano });
+    const msg = emailCotacaoTinta(f, s, { obra, numero: est?.numero, ano: est?.ano, token: f.token });
     const r = await sendEmail({
       to: f.email, subject: msg.subject, html: msg.html, text: msg.text,
       replyTo: user.email || undefined,
