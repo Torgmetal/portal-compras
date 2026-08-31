@@ -1050,6 +1050,90 @@ function Pintura({ c, res, setComp }) {
   return (
     <div className="space-y-4">
       <div className="bg-white border border-gray-100 rounded-xl p-4">
+        {/* ─── O QUE VAI SER PINTADO ──────────────────────────────────────────────────────────
+            Vitor (31/08/2026): "na aba pintura precisa vir o resumo da aba quantitativo e deixar
+            separado o total de cada área e a soma de todas; as cores de cada área também é
+            importante".
+
+            ⚠ A COR É O QUE DECIDE A DEMÃO DE ACABAMENTO, e ela era escolhida numa aba e usada em
+            outra sem nunca aparecer junto do cálculo. Quem monta a pintura precisa ver, na mesma
+            tela, que a passarela é RAL 7035 e o guarda-corpo é amarelo — senão precifica uma cor
+            só e a obra recebe duas.
+
+            ⚠⚠ AS MESMAS REGRAS DO MOTOR, e não uma segunda conta: peso é `pesoTotal ?? fórmula`,
+            área é `areaM2 informada ?? coeficiente × peso`, perda é a da estrutura (85% em guarda-
+            corpo e escada marinheiro, 45% no resto). Uma tabela-resumo que calcula por conta
+            própria vira a terceira versão da verdade. */}
+        {(() => {
+          const linhas = (Array.isArray(c.resumos) ? c.resumos : []).filter((l) => l.ativo !== false);
+          if (!linhas.length) return null;
+          const daLinha = (l) => {
+            const kg = num(l.pesoTotal) > 0 ? num(l.pesoTotal) : num(l.quantidade) * num(l.unidades || 1) * num(l.pesoUnit);
+            const m2 = num(l.areaM2) > 0 ? num(l.areaM2) : (num(l.coef) > 0 ? num(l.coef) : coefSugerido(l.perfil)) * kg;
+            return { kg, m2, informada: num(l.areaM2) > 0, perda: perdaDaEstrutura(l.estrutura) };
+          };
+          const tot = linhas.reduce((a2, l) => { const d = daLinha(l); return { kg: a2.kg + d.kg, m2: a2.m2 + d.m2 }; }, { kg: 0, m2: 0 });
+          return (
+            <div className="mb-3 border border-gray-100 rounded-lg overflow-hidden">
+              <p className="text-[12px] font-bold text-torg-dark px-3 py-2 bg-gray-50">
+                O que vai ser pintado <span className="font-normal text-torg-gray">· vem do Quantitativo</span>
+              </p>
+              <table className="w-full text-[12px]">
+                <thead className="text-[10px] uppercase text-torg-gray">
+                  <tr>
+                    <th className="text-left px-3 py-1.5">Área</th>
+                    <th className="text-left px-2 py-1.5">Cor</th>
+                    <th className="text-right px-2 py-1.5">Peso</th>
+                    <th className="text-right px-2 py-1.5">Área (m²)</th>
+                    <th className="text-right px-3 py-1.5">Perda</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {linhas.map((l, i) => {
+                    const d = daLinha(l);
+                    return (
+                      <tr key={i}>
+                        <td className="px-3 py-1">
+                          <span className="font-mono text-[11px] text-torg-blue mr-1">{l.item || `1.${i + 1}`}</span>
+                          {l.area || "—"}
+                          {l.estrutura && <span className="text-torg-gray"> · {ESTRUTURA_ROTULO[l.estrutura] || l.estrutura}</span>}
+                        </td>
+                        <td className="px-2 py-1">
+                          {l.cor
+                            ? <span className="text-[11px] rounded px-1.5 py-0.5 bg-white border border-gray-200 text-torg-dark">{l.cor}</span>
+                            : <span className="text-[11px] text-torg-orange-700">sem cor definida</span>}
+                        </td>
+                        <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">{fmtKg(d.kg)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">
+                          {Math.round(d.m2).toLocaleString("pt-BR")}
+                          {!d.informada && <span className="text-[10px] text-torg-gray"> est.</span>}
+                        </td>
+                        <td className="px-3 py-1 text-right tabular-nums whitespace-nowrap">
+                          <span className={d.perda === 85 ? "text-torg-orange-700 font-semibold" : "text-torg-gray"}>{d.perda}%</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="bg-gray-50 font-bold">
+                    <td className="px-3 py-1.5">Total · {linhas.length} {linhas.length === 1 ? "área" : "áreas"}</td>
+                    <td className="px-2 py-1.5 font-normal text-[11px] text-torg-gray">
+                      {[...new Set(linhas.map((l) => l.cor).filter(Boolean))].join(" · ") || "—"}
+                    </td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtKg(tot.kg)}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{Math.round(tot.m2).toLocaleString("pt-BR")}</td>
+                    <td className="px-3 py-1.5" />
+                  </tr>
+                </tbody>
+              </table>
+              {linhas.some((l) => !l.cor) && (
+                <p className="px-3 py-1.5 text-[11px] text-torg-orange-700 bg-[#FFF8F0]">
+                  Área sem cor não recebe demão de acabamento no cálculo — defina a cor no Quantitativo.
+                </p>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ⚠ VEIO DA ABA MATERIAL (31/08/2026). Vitor: "tire essa opção da tinta [do Material], pois
             vamos tratar disso em outra aba". Quem fatura a tinta é decisão de pintura — aqui ela
             fica ao lado das camadas que definem quanto de tinta a obra leva. É o MESMO campo
