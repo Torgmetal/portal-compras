@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import * as XLSX from "xlsx";
+import { numeroBR } from "@/lib/numero-br";
 
 export const maxDuration = 30;
 
@@ -86,7 +87,7 @@ export async function POST(req) {
 
       const nivel = NIVEL_MAP[norm(raw.nivel)] || null;
       const categoria = String(raw.categoria).trim() || null;
-      const salarioBase = parseFloat(String(raw.salarioBase).replace(/[^\d.,]/g, "").replace(",", ".")) || null;
+      const salarioBase = numeroBR(String(raw.salarioBase).replace(/[^\d.,]/g, ""), NaN) || null;
       const cbo = String(raw.cbo).trim() || null;
 
       try {

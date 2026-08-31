@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { fmtOP } from "@/lib/utils";
+import { numeroBR } from "@/lib/numero-br";
 import {
   ReceiptText, FileSpreadsheet, Loader2, CheckCircle2, Clock, Truck, Weight,
   X, Pencil, ExternalLink, AlertTriangle, Search, FilePlus2, RefreshCw, Check,
@@ -255,7 +256,7 @@ function NFRemessaOmieModal({ romaneio, onClose, onFim, onAtualizar }) {
   const [erro, setErro] = useState("");
   const [conf, setConf] = useState(gerado ? { estado: "conferindo" } : null);
   const setF = (k, v) => setFrete((s) => ({ ...s, [k]: v }));
-  const num = (v) => (v === "" || v == null ? null : parseFloat(String(v).replace(",", ".")));
+  const num = (v) => (v === "" || v == null ? null : numeroBR(v, NaN));
 
   useEffect(() => {
     fetch(`/api/fiscal/romaneios/${romaneio.id}`).then((r) => r.json()).then((j) => { if (j.success) setDet(j.romaneio); }).catch(() => {});

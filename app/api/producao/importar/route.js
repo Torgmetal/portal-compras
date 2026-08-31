@@ -4,6 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { requireRole } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { isoWeekString, semanaInicio, semanaFim, parseSemana } from "@/lib/semana";
+import { numeroBR } from "@/lib/numero-br";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -105,7 +106,7 @@ function parseRows(rows) {
   };
 
   const peso = (v) => {
-    const n = parseFloat(String(v || "0").replace(",", "."));
+    const n = numeroBR(v || "0", NaN);
     return isNaN(n) ? 0 : n;
   };
 

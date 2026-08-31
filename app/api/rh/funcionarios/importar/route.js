@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { syncContratacaoLote } from "@/lib/sharepoint-rh";
 import * as XLSX from "xlsx";
+import { numeroBR } from "@/lib/numero-br";
 
 export const maxDuration = 60;
 
@@ -209,7 +210,7 @@ export async function POST(req) {
       // Montar dados
       const tipoContrato = CONTRATO_MAP[norm(raw.tipoContrato)] || "CLT";
       const turno = TURNO_MAP[norm(raw.turno)] || (String(raw.turno).trim() ? String(raw.turno).trim() : null);
-      const salario = parseFloat(String(raw.salario).replace(/[^\d.,]/g, "").replace(",", ".")) || null;
+      const salario = numeroBR(String(raw.salario).replace(/[^\d.,]/g, ""), NaN) || null;
       const jornadaHoras = parseInt(raw.jornadaHoras) || 44;
 
       try {

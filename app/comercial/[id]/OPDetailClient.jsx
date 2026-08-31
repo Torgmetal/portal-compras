@@ -29,6 +29,7 @@ import { resumoEscopo } from "@/lib/qualidade-escopo";
 import { fmtOP } from "@/lib/utils";
 import OrcamentoComercial from "@/components/OrcamentoComercial";
 import { itensDaPlanilhaComercial } from "@/lib/op-categorias";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -1377,7 +1378,7 @@ function ValorMedicaoEditavel({ medicao, onSync }) {
   const valorAtual = Number(medicao.valorBruto) || 0;
 
   const salvar = async () => {
-    const v = parseFloat(String(valor).replace(",", "."));
+    const v = numeroBR(valor, NaN);
     if (isNaN(v) || v < 0) {
       alert("Valor inválido");
       return;
@@ -1479,7 +1480,7 @@ function ModalMedicao({ opId, onClose, onSaved }) {
 
     let valorBrutoNum = null;
     if (manual) {
-      valorBrutoNum = parseFloat(String(valorManual).replace(",", "."));
+      valorBrutoNum = numeroBR(valorManual, NaN);
       if (!valorBrutoNum || valorBrutoNum <= 0) {
         return setErro("No modo manual é obrigatório informar o valor (maior que 0).");
       }
@@ -1704,8 +1705,8 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
     }
     setSalvando(true);
     try {
-      const valorTotalNum = parseFloat(String(form.valorTotalContrato).replace(",", "."));
-      const valorKgNum = parseFloat(String(form.valorFaturarPorKg).replace(",", "."));
+      const valorTotalNum = numeroBR(form.valorTotalContrato, NaN);
+      const valorKgNum = numeroBR(form.valorFaturarPorKg, NaN);
       const res = await fetch(`/api/comercial/op/${opId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, Fragment } from "react";
 import * as XLSX from "xlsx";
 import { Truck, Plus, Pencil, Trash2, ChevronUp, ChevronDown, ChevronRight, Loader2, X, Upload, Download, AlertCircle, CheckCircle2, FileSpreadsheet } from "lucide-react";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtKg = (n) => (n == null ? null : `${Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`);
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -348,7 +349,7 @@ function LoteModal({ opId, lote, onClose, onSaved }) {
   async function salvar() {
     if (!f.nome.trim()) return setErro("Informe o nome/identificação do lote.");
     setErro(""); setSalvando(true);
-    const pesoNum = f.pesoKg.trim() === "" ? null : parseFloat(String(f.pesoKg).replace(",", "."));
+    const pesoNum = f.pesoKg.trim() === "" ? null : numeroBR(f.pesoKg, NaN);
     const payload = {
       nome: f.nome.trim(), local: f.local.trim() || null,
       dataPrevista: f.dataPrevista || null,

@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { numeroBR } from "@/lib/numero-br";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -37,15 +38,15 @@ export async function POST(req) {
     const opNumero = String(row.op || "").trim() || "SEM-OP";
     const qte = parseInt(row.qte) || 1;
 
-    const puRaw = parseFloat(String(row.pesoUnit || "").replace(",", "."));
-    const ptRaw = parseFloat(String(row.pesoTotal || "").replace(",", "."));
+    const puRaw = numeroBR(row.pesoUnit || "", NaN);
+    const ptRaw = numeroBR(row.pesoTotal || "", NaN);
     let pesoUnitKg = isNaN(puRaw) ? 0 : puRaw;
     let pesoTotalKg = isNaN(ptRaw) ? 0 : ptRaw;
     if (pesoTotalKg > 0 && pesoUnitKg === 0 && qte > 0) pesoUnitKg = pesoTotalKg / qte;
     if (pesoUnitKg > 0 && pesoTotalKg === 0) pesoTotalKg = pesoUnitKg * qte;
 
-    const prURaw = parseFloat(String(row.precoUnit || "").replace(",", "."));
-    const prTRaw = parseFloat(String(row.precoTotal || "").replace(",", "."));
+    const prURaw = numeroBR(row.precoUnit || "", NaN);
+    const prTRaw = numeroBR(row.precoTotal || "", NaN);
     let precoUnitario = isNaN(prURaw) ? 0 : prURaw;
     let precoTotal = isNaN(prTRaw) ? 0 : prTRaw;
     if (precoTotal > 0 && precoUnitario === 0 && qte > 0) precoUnitario = precoTotal / qte;

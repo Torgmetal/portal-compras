@@ -9,6 +9,7 @@ import {
 import { fmtOP, fmtKg } from "@/lib/utils";
 import { MAQUINA_LABEL } from "@/lib/maquina-corte";
 import BotaoSincronizarCmr from "@/components/BotaoSincronizarCmr";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtHora = (d) => (d ? new Date(d).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—");
 
@@ -50,7 +51,7 @@ export default function PCPDashboardClient({ isAdmin = false }) {
   useEffect(() => { carregar(); }, [carregar]);
 
   const salvarMeta = async () => {
-    const kg = Number(String(metaKgInput).replace(/\./g, "").replace(",", "."));
+    const kg = numeroBR(metaKgInput, NaN);
     if (!(kg > 0)) return;
     setSalvandoMeta(true);
     try {

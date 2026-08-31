@@ -2,6 +2,7 @@
 import { useState, useMemo, useEffect, useCallback, Fragment } from "react";
 import { useStore } from "@/lib/store";
 import { fmtOP } from "@/lib/utils";
+import { numeroBR } from "@/lib/numero-br";
 import {
   Factory, Plus, Search, Loader2, AlertCircle, X, Pencil, Trash2,
   Truck, PackageCheck, PackageOpen, Clock, ChevronDown, ChevronRight,
@@ -361,7 +362,7 @@ function ModalRomaneio({ ops, rom, onClose, onSalvo }) {
   const setItem = (i, k, v) => setItens((arr) => arr.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
   const addItem = () => setItens((arr) => [...arr, { marca: "", descricao: "", qte: "", pesoTotal: "" }]);
   const delItem = (i) => setItens((arr) => (arr.length === 1 ? arr : arr.filter((_, j) => j !== i)));
-  const num = (v) => (v === "" || v == null ? null : parseFloat(String(v).replace(",", ".")));
+  const num = (v) => (v === "" || v == null ? null : numeroBR(v, NaN));
   const pesoTotalCarga = itens.reduce((s, it) => s + (num(it.pesoTotal) || 0), 0);
 
   function escolherForn(fr) {
@@ -530,7 +531,7 @@ function ModalRetorno({ rom, onClose, onSalvo }) {
   const [obs, setObs] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
-  const num = (v) => (v === "" || v == null ? null : parseFloat(String(v).replace(",", ".")));
+  const num = (v) => (v === "" || v == null ? null : numeroBR(v, NaN));
   const set = (i, k, v) => setSel((arr) => arr.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
 
   const escolhidos = sel.filter((s) => s.on);

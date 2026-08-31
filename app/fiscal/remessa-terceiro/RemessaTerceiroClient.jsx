@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useStore } from "@/lib/store";
 import { fmtOP } from "@/lib/utils";
+import { numeroBR } from "@/lib/numero-br";
 import {
   Factory, Loader2, AlertCircle, X, FileText, Search,
   PackageOpen, ReceiptText, MinusCircle, Undo2, Truck, FilePlus2, Eye, Boxes, Package, Check, Pencil, RefreshCw,
@@ -231,7 +232,7 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
   const temMateriais = dados?.temMateriais;
   const itensOk = temMateriais ? (itens.length > 0 && pendentes.length === 0) : (dados?.marcasCount > 0);
   const podeGerar = itensOk && freteVisto; // só libera depois de conferir a aba Frete
-  const num = (v) => (v === "" || v == null ? null : parseFloat(String(v).replace(",", ".")));
+  const num = (v) => (v === "" || v == null ? null : numeroBR(v, NaN));
 
   async function gerar() {
     setErro(""); setGerando(true);
@@ -358,7 +359,7 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
                             {it.fonte && it.codigoOmie && <span className="block text-[10px] text-torg-gray mt-0.5">{it.fonte === "compra" ? "preço de compra" : it.fonte === "estoque" ? "custo do estoque" : "manual"}</span>}
                           </td>
                           <td className="px-2.5 py-1.5 text-right">
-                            <input value={it.valorUnit ?? ""} onChange={(e) => setItem(it.idx, { valorUnit: e.target.value === "" ? null : parseFloat(String(e.target.value).replace(",", ".")), fonte: "manual" })}
+                            <input value={it.valorUnit ?? ""} onChange={(e) => setItem(it.idx, { valorUnit: e.target.value === "" ? null : numeroBR(e.target.value, NaN), fonte: "manual" })}
                               inputMode="decimal" placeholder="0,00" className="w-24 text-right text-sm border border-gray-200 rounded px-2 py-1 tabular-nums" />
                           </td>
                           <td className="px-2.5 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-dark font-medium">{total > 0 ? fmtR$(total) : "—"}</td>

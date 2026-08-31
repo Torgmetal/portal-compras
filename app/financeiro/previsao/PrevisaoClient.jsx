@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { TrendingUp, Loader2, AlertCircle, RefreshCw, Check } from "lucide-react";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtR$ = (n, dec = 0) => (n == null ? "—" : `R$ ${Number(n).toLocaleString("pt-BR", { minimumFractionDigits: dec, maximumFractionDigits: dec })}`);
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR")} kg`;
@@ -42,7 +43,7 @@ export default function PrevisaoClient() {
   const salvarRsKg = async (op) => {
     const raw = edits[op.id];
     if (raw === undefined) return;
-    const val = raw === "" ? null : Number(String(raw).replace(",", "."));
+    const val = raw === "" ? null : numeroBR(raw, NaN);
     if (val != null && (Number.isNaN(val) || val < 0)) return;
     if ((op.valorFaturarPorKg ?? null) === (val ?? null)) return;
     setSalvando(op.id);

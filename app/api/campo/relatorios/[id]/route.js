@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { PERFIS_CAMPO, TIPO_LABEL } from "@/lib/qualidade-campo";
 import { RESULTADOS, proximaRevisao, linhasReprovadas, rotuloRevisao } from "@/lib/revisao-inspecao";
+import { numeroBR } from "@/lib/numero-br";
 
 export const runtime = "nodejs";
 
@@ -199,7 +200,7 @@ export async function PATCH(req, { params }) {
     // salvaria vazio pelo celular. Mesma armadilha que o formulário do computador já tinha.
     const numOuNulo = (v) => {
       if (v === "" || v === null || v === undefined) return null;
-      const n = Number(String(v).replace(",", "."));
+      const n = numeroBR(v, NaN);
       return Number.isFinite(n) ? n : null;
     };
     if (Array.isArray(c.rugLeituras)) dados.resultados.rugLeituras = c.rugLeituras.slice(0, 5).map(numOuNulo);

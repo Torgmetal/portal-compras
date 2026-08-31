@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { extrairBoletim } from "@/lib/extrair-boletim";
+import { numeroBR } from "@/lib/numero-br";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ const ESCREVER = ["ADMIN", "QUALIDADE"];
 
 const num = (v) => {
   if (v === null || v === undefined || v === "") return null;
-  const n = Number(String(v).replace(",", "."));
+  const n = numeroBR(v, NaN);
   return Number.isFinite(n) ? n : null;
 };
 const txt = (v, max = 160) => (v === null || v === undefined ? null : String(v).trim().slice(0, max) || null);

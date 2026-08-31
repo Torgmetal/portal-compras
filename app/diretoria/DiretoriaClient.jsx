@@ -10,6 +10,7 @@ import {
 import CustoHoraClient from "@/components/CustoHoraClient";
 import FluxoProducao from "./FluxoProducao";
 import ResumoMensalDiretoria from "@/components/ResumoMensalDiretoria";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtR$ = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
 const fmtDataHora = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
@@ -1177,7 +1178,7 @@ function FluxoDiario({ fluxo, fluxoNaturezas, fluxoVencido, saldoInicial, saldoA
   const [incluirInv, setIncluirInv] = useState(true);
 
   async function salvarSaldo() {
-    const v = Number(String(saldoInput).replace(/\./g, "").replace(",", "."));
+    const v = numeroBR(saldoInput, NaN);
     if (!Number.isFinite(v)) { alert("Valor inválido"); return; }
     setSalvandoSaldo(true);
     try {

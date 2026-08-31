@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
+import { numeroBR } from "@/lib/numero-br";
 import {
   Plus, Trash2, Loader2, X, Sparkles, Upload, Edit3, Check, Info,
   Percent, Scale, DollarSign,
@@ -212,16 +213,16 @@ export default function AbaParafusos({ estudo, estudoId, onEstudoUpdate }) {
   const custoTimer = useRef(null);
 
   const pesoTotal = (estudo.itensPerso || []).reduce((s, i) => s + (i.pesoTotal || 0), 0);
-  const percNum = parseFloat(String(percPeso).replace(",", ".")) || 0;
+  const percNum = numeroBR(percPeso, 0);
   const pesoParafusosEstimado = pesoTotal > 0 && percNum > 0 ? (pesoTotal * percNum) / 100 : 0;
-  const custoKgNum = parseFloat(String(custoKg).replace(",", ".")) || 0;
+  const custoKgNum = numeroBR(custoKg, 0);
   const custoParafusosTotal = custoKgNum * pesoTotal;
 
   // Debounce save do percentual
   const salvarPercentual = useCallback(async (valor) => {
     setSalvandoPerc(true);
     try {
-      const numVal = parseFloat(String(valor).replace(",", "."));
+      const numVal = numeroBR(valor, NaN);
       const body = { percPesoParafusos: isNaN(numVal) || numVal <= 0 ? null : numVal };
       await fetch(`/api/comercial/estudo/${estudoId}`, {
         method: "PATCH",
@@ -237,7 +238,7 @@ export default function AbaParafusos({ estudo, estudoId, onEstudoUpdate }) {
   const salvarCustoKg = useCallback(async (valor) => {
     setSalvandoCusto(true);
     try {
-      const numVal = parseFloat(String(valor).replace(",", ".")) || 0;
+      const numVal = numeroBR(valor, 0);
       const body = { percParafusos: numVal };
       const res = await fetch(`/api/comercial/estudo/${estudoId}`, {
         method: "PATCH",

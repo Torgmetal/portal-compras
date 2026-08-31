@@ -5,6 +5,7 @@ import {
   FileText, Plus, Upload, Loader2, AlertCircle, Trash2, ExternalLink, Send, CheckCircle2, Search, Link2,
 } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -270,9 +271,9 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], rmsAtivas = [], onClose, o
 
   // Total calculado dos itens (se houver)
   const totalItens = itens.reduce((s, it) => {
-    const qtd = parseFloat(String(it.qtd).replace(",", ".")) || 0;
-    const valorUnit = parseFloat(String(it.valorUnit).replace(",", ".")) || 0;
-    const ipi = parseFloat(String(it.ipiPct).replace(",", ".")) || 0;
+    const qtd = numeroBR(it.qtd, 0);
+    const valorUnit = numeroBR(it.valorUnit, 0);
+    const ipi = numeroBR(it.ipiPct, 0);
     return s + qtd * valorUnit * (1 + ipi / 100);
   }, 0);
   const temItens = itens.length > 0 && itens.some((it) => it.descricao && it.qtd && it.valorUnit);
@@ -286,11 +287,11 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], rmsAtivas = [], onClose, o
       .map((it) => ({
         codigo: it.codigo ? String(it.codigo).trim() : null,
         descricao: it.descricao.trim(),
-        qtd: parseFloat(String(it.qtd).replace(",", ".")) || 0,
+        qtd: numeroBR(it.qtd, 0),
         unidade: it.unidade || "UN",
-        valorUnit: parseFloat(String(it.valorUnit).replace(",", ".")) || 0,
-        ipiPct: parseFloat(String(it.ipiPct).replace(",", ".")) || 0,
-        icmsPct: parseFloat(String(it.icmsPct).replace(",", ".")) || 0,
+        valorUnit: numeroBR(it.valorUnit, 0),
+        ipiPct: numeroBR(it.ipiPct, 0),
+        icmsPct: numeroBR(it.icmsPct, 0),
       }))
       .filter((it) => it.descricao && it.qtd > 0 && it.valorUnit > 0);
 
@@ -301,7 +302,7 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], rmsAtivas = [], onClose, o
         0
       );
     } else {
-      total = parseFloat(String(form.total).replace(",", "."));
+      total = numeroBR(form.total, NaN);
       if (!total || total <= 0) return setErro("Informe o valor total (maior que 0) ou pelo menos 1 item detalhado.");
     }
 
@@ -450,9 +451,9 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], rmsAtivas = [], onClose, o
             {itens.length > 0 && (
               <div className="space-y-2 mb-2">
                 {itens.map((it, idx) => {
-                  const subtotal = (parseFloat(String(it.qtd).replace(",", ".")) || 0)
-                    * (parseFloat(String(it.valorUnit).replace(",", ".")) || 0)
-                    * (1 + (parseFloat(String(it.ipiPct).replace(",", ".")) || 0) / 100);
+                  const subtotal = (numeroBR(it.qtd, 0))
+                    * (numeroBR(it.valorUnit, 0))
+                    * (1 + (numeroBR(it.ipiPct, 0)) / 100);
                   return (
                     <div key={idx} className="bg-white border border-gray-200 rounded p-2 space-y-1">
                       <div className="flex items-center gap-2">

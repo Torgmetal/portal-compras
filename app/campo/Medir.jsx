@@ -8,6 +8,7 @@ import { ParametrosLP, IndicacaoLP } from "./Lp";
 import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA } from "@/lib/evs-campos";
 import { criteriosDoDefeito, ONDE_VALE } from "@/lib/aws-d11";
 import { RESULTADO_LABEL } from "@/lib/revisao-inspecao";
+import { numeroBR } from "@/lib/numero-br";
 import {
   APARELHOS, CABECOTES, ANGULOS, ACOPLANTES, BLOCOS_PADRAO, FACES,
   TIPOS_CARREGAMENTO, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL,
@@ -529,7 +530,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           if (!l.letra && !l.marca) return null;
           const marcados = String(l.descontinuidade || "").split(/[\s,;]+/).filter(Boolean);
           const dif = ehDim && l.encontradoMm != null && l.projetoMm != null ? Number(l.encontradoMm) - Number(l.projetoMm) : null;
-          const tol = parseFloat(String(l.tolerancia || "").replace(/[^\d.,]/g, "").replace(",", "."));
+          const tol = numeroBR(String(l.tolerancia || "").replace(/[^\d.,]/g, ""), NaN);
           const fora = dif != null && Number.isFinite(tol) && Math.abs(dif) > tol;
           return (
             <div key={i} className={`bg-white rounded-xl p-3 border ${l.reprovouAntes ? "border-2 border-amber-400" : "border-gray-200"}`}>

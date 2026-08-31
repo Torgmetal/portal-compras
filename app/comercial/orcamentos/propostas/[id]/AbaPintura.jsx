@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { calcularAreasTodosItens, TIPO_MATERIAL_LABEL } from "@/lib/perfil-perimetro";
 import { calcularQuantidadeTinta, RESINAS, METODOS_APLICACAO, ETAPAS, VOLUME_GALAO } from "@/lib/tinta-catalogo";
+import { numeroBR } from "@/lib/numero-br";
 
 // ── Esquemas predefinidos (templates) ──
 const ESQUEMAS = [
@@ -501,23 +502,23 @@ export default function AbaPintura({ estudo, estudoId, onEstudoUpdate }) {
       if (campos.pinturaPercPerda !== undefined) body.pinturaPercPerda = parseFloat(campos.pinturaPercPerda) || 0;
       if (campos.pinturaMetodo !== undefined) body.pinturaMetodo = campos.pinturaMetodo;
       if (campos.pinturaCustoM2 !== undefined) {
-        const v = parseFloat(String(campos.pinturaCustoM2).replace(",", "."));
+        const v = numeroBR(campos.pinturaCustoM2, NaN);
         body.pinturaCustoM2 = isNaN(v) ? null : v;
       }
       if (campos.pinturaRendimento !== undefined) {
-        const v = parseFloat(String(campos.pinturaRendimento).replace(",", "."));
+        const v = numeroBR(campos.pinturaRendimento, NaN);
         body.pinturaRendimento = isNaN(v) ? null : v;
       }
       if (campos.pinturaCustoLitro !== undefined) {
-        const v = parseFloat(String(campos.pinturaCustoLitro).replace(",", "."));
+        const v = numeroBR(campos.pinturaCustoLitro, NaN);
         body.pinturaCustoLitro = isNaN(v) ? null : v;
       }
       const perda = campos.pinturaPercPerda !== undefined ? parseFloat(campos.pinturaPercPerda) || 0 : pinturaPerda;
       const metodo = campos.pinturaMetodo || pinturaMetodo;
-      const cm2 = campos.pinturaCustoM2 !== undefined ? parseFloat(String(campos.pinturaCustoM2).replace(",", ".")) || 0 : parseFloat(custoM2) || 0;
-      const rend = campos.pinturaRendimento !== undefined ? parseFloat(String(campos.pinturaRendimento).replace(",", ".")) || 0 : parseFloat(rendimento) || 0;
-      const cl = campos.pinturaCustoLitro !== undefined ? parseFloat(String(campos.pinturaCustoLitro).replace(",", ".")) || 0 : parseFloat(custoLitro) || 0;
-      const ck = campos.custoPinturaKg !== undefined ? parseFloat(String(campos.custoPinturaKg).replace(",", ".")) || 0 : parseFloat(custoKg) || 0;
+      const cm2 = campos.pinturaCustoM2 !== undefined ? numeroBR(campos.pinturaCustoM2, 0) : parseFloat(custoM2) || 0;
+      const rend = campos.pinturaRendimento !== undefined ? numeroBR(campos.pinturaRendimento, 0) : parseFloat(rendimento) || 0;
+      const cl = campos.pinturaCustoLitro !== undefined ? numeroBR(campos.pinturaCustoLitro, 0) : parseFloat(custoLitro) || 0;
+      const ck = campos.custoPinturaKg !== undefined ? numeroBR(campos.custoPinturaKg, 0) : parseFloat(custoKg) || 0;
       const perdaDec = perda / 100;
       let custoBaseCalc;
       if (metodo === "KG") custoBaseCalc = ck * pesoTotalKg;
@@ -541,7 +542,7 @@ export default function AbaPintura({ estudo, estudoId, onEstudoUpdate }) {
   const salvarEsquema = useCallback(async (esq, desc, esp) => {
     setSalvandoEsq(true);
     try {
-      const espNum = parseFloat(String(esp).replace(",", "."));
+      const espNum = numeroBR(esp, NaN);
       await fetch(`/api/comercial/estudo/${estudoId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ esquemaPintura: esq || null, esquemaPinturaDesc: desc || null, esquemaPinturaEspessura: isNaN(espNum) ? null : espNum }) });
     } catch { /* silencioso */ } finally { setSalvandoEsq(false); }
   }, [estudoId]);
