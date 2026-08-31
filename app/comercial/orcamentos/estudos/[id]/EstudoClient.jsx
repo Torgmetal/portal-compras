@@ -656,17 +656,27 @@ function Material({ c, res, setComp }) {
 
       <div className="bg-white border border-gray-100 rounded-xl p-4">
         <div className="flex flex-wrap items-end gap-4">
-          {[["materiaPrima", "Aço (matéria-prima)"], ["fixadores", "Fixadores"], ["tintas", "Tintas"], ["itensComerciais", "Itens comerciais"]].map(([k, r]) => (
+          {/* ⚠ TINTA SAIU DAQUI (31/08/2026). Vitor: "tire essa opção da tinta, pois vamos tratar
+              disso em outra aba". Quem fatura a tinta é decisão de pintura, e ela agora mora junto
+              das camadas — na aba Pintura. O valor continua o mesmo campo (`faturamento.tintas`),
+              só mudou de tela: nada foi perdido nem recalculado. */}
+          {[["materiaPrima", "Aço (matéria-prima)"], ["fixadores", "Fixadores"], ["itensComerciais", "Itens comerciais"]].map(([k, r]) => (
             <label key={k} className="text-[11px] font-semibold text-torg-dark">{r}
               <Sel value={fat[k] || ""} onChange={(ev) => setFat(k, ev.target.value)} opcoes={FATURAMENTO} rotulos={FATURAMENTO_ROTULO} className="block mt-1 w-44" /></label>
           ))}
-          <label className="text-[11px] font-semibold text-torg-dark">Fixadores (R$/kg da obra)
-            <Inp value={c.fixadoresRsKg ?? ""} onChange={(ev) => setComp({ fixadoresRsKg: ev.target.value })} className="block mt-1 w-32 text-right" /></label>
+
         </div>
       </div>
 
       <Quadro titulo="Aço por categoria de perfil" grupo={g.materiaPrima} vazio="Lance o perfil predominante nas linhas do quantitativo." />
-      <Quadro titulo="Fixadores" grupo={g.fixadores} vazio="Informe o R$/kg dos fixadores acima." />
+      {/* ⚠ O PREÇO DO PARAFUSO ESTAVA LONGE DA LINHA DELE. Vitor (31/08/2026): "o preço do parafuso
+          deve ser preenchido no campo do preço unitário onde ele está descrito, deixar um detalhe
+          amarelo claro para chamar a atenção". Era um campo solto na régua de cima enquanto a linha
+          "Parafusos A325 e A307" mostrava R$ 0,00 e mandava "informe acima" — quem lia a tabela via
+          zero e não sabia onde mexer. Agora o campo É a célula de R$/kg, destacada em amarelo. */}
+      <Quadro titulo="Fixadores" grupo={g.fixadores}
+        vazio="Informe o R$/kg dos fixadores na linha abaixo."
+        precoEditavel={{ valor: c.fixadoresRsKg, onChange: (v) => setComp({ fixadoresRsKg: v }) }} />
 
       {/* ⚠ QUANTIDADE POR ÁREA, senão não acompanha o escopo. Vitor (23/08/2026): "a soma sai como
           se fosse para a obra toda ainda". Telha e calha eram número absoluto e continuavam
@@ -927,9 +937,11 @@ function Terceiros({ c, res, setComp }) {
   );
 }
 
-function Quadro({ titulo, grupo, vazio }) {
+function Quadro({ titulo, grupo, vazio, precoEditavel }) {
+  // ⚠ COM CAMPO EDITÁVEL, A TABELA NÃO PODE SUMIR. Sem preço lançado, `temLinha` era falso e o
+  // quadro virava uma frase — justamente escondendo o campo onde o preço deveria ser digitado.
   const temLinha = grupo?.linhas?.some((l) => l.pesoKg > 0 || l.subtotal > 0);
-  if (!temLinha) {
+  if (!temLinha && !(precoEditavel && grupo?.linhas?.length)) {
     return (
       <div className="bg-white border border-gray-100 rounded-xl px-4 py-3">
         <p className="text-[12px] font-bold text-torg-dark">{titulo}</p>
@@ -947,11 +959,19 @@ function Quadro({ titulo, grupo, vazio }) {
             <th className="text-right px-2 py-1.5">Subtotal</th><th className="text-right px-2 py-1.5">ICMS</th><th className="text-right px-4 py-1.5">PIS/COFINS</th></tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
-          {grupo.linhas.filter((l) => l.pesoKg > 0 || l.subtotal > 0).map((l, i) => (
+          {grupo.linhas.filter((l) => l.pesoKg > 0 || l.subtotal > 0 || precoEditavel).map((l, i) => (
             <tr key={i}>
               <td className="px-4 py-1">{l.nome}</td><td className="px-2 py-1 text-torg-gray">{l.espec || "—"}</td>
               <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">{fmtKg(l.pesoKg)}</td>
-              <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">{fmtR$(l.precoKg)}</td>
+              {precoEditavel && i === 0 ? (
+                <td className="px-2 py-1 bg-[#FEF9C3]">
+                  <input value={precoEditavel.valor ?? ""} onChange={(ev) => precoEditavel.onChange(ev.target.value)}
+                    placeholder="0,00" title="R$/kg dos fixadores desta obra"
+                    className="w-24 border border-[#EAB308] bg-white rounded px-2 py-0.5 text-[12px] text-right tabular-nums focus:border-torg-blue focus:ring-1 focus:ring-torg-blue" />
+                </td>
+              ) : (
+                <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">{fmtR$(l.precoKg)}</td>
+              )}
               <td className="px-2 py-1 text-right tabular-nums font-semibold whitespace-nowrap">{fmtR$(l.subtotal)}</td>
               <td className="px-2 py-1 text-right tabular-nums text-torg-gray whitespace-nowrap">{fmtR$(l.icms)}</td>
               <td className="px-4 py-1 text-right tabular-nums text-torg-gray whitespace-nowrap">{fmtR$(l.pisCofins)}</td>
@@ -1030,6 +1050,16 @@ function Pintura({ c, res, setComp }) {
   return (
     <div className="space-y-4">
       <div className="bg-white border border-gray-100 rounded-xl p-4">
+        {/* ⚠ VEIO DA ABA MATERIAL (31/08/2026). Vitor: "tire essa opção da tinta [do Material], pois
+            vamos tratar disso em outra aba". Quem fatura a tinta é decisão de pintura — aqui ela
+            fica ao lado das camadas que definem quanto de tinta a obra leva. É o MESMO campo
+            (`faturamento.tintas`): mudou de tela, não de valor. */}
+        <label className="block text-[11px] font-semibold text-torg-dark mb-3">Quem fatura a tinta
+          <Sel value={c.faturamento?.tintas || ""}
+            onChange={(ev) => setComp({ faturamento: { ...(c.faturamento || {}), tintas: ev.target.value } })}
+            opcoes={FATURAMENTO} rotulos={FATURAMENTO_ROTULO} className="block mt-1 w-52" />
+        </label>
+
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
           <div>
             <p className="text-[12px] font-semibold text-torg-dark">Levantamento de pintura</p>
