@@ -39,6 +39,13 @@ export default async function PainelOPDetalhe({ params }) {
             include: {
               opItem: { select: { categoria: true, faturamentoDireto: true } },
               aditivoItem: { select: { categoria: true, faturamentoDireto: true } },
+              // ⚠ preciso do vencedor para saber o que já tem preço decidido mas ainda não virou
+              // pedido — é o "comprometido em cotação" que o saldo passou a descontar.
+              cotacaoItens: {
+                where: { vencedor: true },
+                select: { precoUnit: true, qtdCotada: true, ipiPct: true, vencedor: true,
+                          cotacao: { select: { status: true } } },
+              },
             },
             orderBy: { ordem: "asc" },
           },
@@ -204,8 +211,36 @@ export default async function PainelOPDetalhe({ params }) {
     });
   }
   pedidosFlat.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  const saldo = verbaTotal - totalEmPedidos;
-  const consumoPct = verbaTotal > 0 ? (totalEmPedidos / verbaTotal) * 100 : 0;
+  // ─── O QUE AINDA VAI CONSUMIR A VERBA ─────────────────────────────────────────────────────
+  // Vitor (30/08/2026): "aqui era bom ser mais detalhado".
+  //
+  // ⚠⚠ O SALDO ESTAVA OTIMISTA. Ele descontava só o pedido EMITIDO. Item com vencedor escolhido e
+  // pedido ainda não gerado é dinheiro decidido, e aparecia como disponível — o comprador olhava um
+  // saldo que já tinha dono. Agora entra como "comprometido em cotação", separado do que já virou
+  // pedido, e o saldo livre é o que sobra dos dois.
+  //
+  // ⚠ E o que ainda NEM foi cotado entra como contagem, não como valor: sem cotação não existe preço,
+  // e inventar uma estimativa aqui seria colocar um número onde não há informação.
+  const FINAL_ITEM = ["PEDIDO_GERADO", "CANCELADO", "ATENDIDO_ESTOQUE"];
+  let comprometidoCotacao = 0, itensSemCotacao = 0, rmsComPendencia = new Set();
+  for (const rm of op.rms || []) {
+    for (const it of rm.itens || []) {
+      if (FINAL_ITEM.includes(it.status)) continue;
+      const vencedores = (it.cotacaoItens || []).filter(
+        (ci) => ci.vencedor && ci.cotacao?.status === "RECEBIDA"
+      );
+      if (vencedores.length) {
+        for (const ci of vencedores) {
+          comprometidoCotacao += (ci.precoUnit || 0) * (ci.qtdCotada || 0) * (1 + (Number(ci.ipiPct) || 0) / 100);
+        }
+      } else {
+        itensSemCotacao++;
+      }
+      rmsComPendencia.add(rm.numero);
+    }
+  }
+  const saldo = verbaTotal - totalEmPedidos - comprometidoCotacao;
+  const consumoPct = verbaTotal > 0 ? ((totalEmPedidos + comprometidoCotacao) / verbaTotal) * 100 : 0;
 
   // Deduz "Faturamento Direto" por CATEGORIA da OP — usado como fallback
   // quando RMItem.opItemId e null (RM nao vinculada diretamente ao OPItem).
@@ -272,34 +307,52 @@ export default async function PainelOPDetalhe({ params }) {
           {data.descricao && <p className="text-sm text-torg-gray mt-2">{data.descricao}</p>}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5 pt-5 border-t border-gray-100">
-          <div>
-            <p className="text-xs text-torg-gray">Verba estimada</p>
-            <p className="text-2xl font-extrabold text-torg-dark tabular-nums">{fmtMoeda(verbaTotal)}</p>
+        <div className="mt-5 pt-5 border-t border-gray-100">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <p className="text-xs text-torg-gray">Verba estimada</p>
+              <p className="text-2xl font-extrabold text-torg-dark tabular-nums">{fmtMoeda(verbaTotal)}</p>
+              {/* ⚠ base e aditivos separados: somados, ninguém via o que foi acrescido depois */}
+              {verbaAditivos > 0 && (
+                <p className="text-[10px] text-torg-gray mt-0.5">
+                  {fmtMoeda(verbaBase)} + {fmtMoeda(verbaAditivos)} em aditivos
+                </p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs text-torg-gray">Já em pedidos</p>
+              <p className="text-2xl font-extrabold text-torg-blue tabular-nums">{fmtMoeda(totalEmPedidos)}</p>
+              <p className="text-[10px] text-torg-gray mt-0.5">{pedidosFlat.length} pedido(s)</p>
+            </div>
+            <div>
+              <p className="text-xs text-torg-gray">Comprometido em cotação</p>
+              <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(comprometidoCotacao)}</p>
+              <p className="text-[10px] text-torg-gray mt-0.5">
+                {comprometidoCotacao > 0 ? "vencedor escolhido, pedido não emitido" : "nada decidido sem pedido"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-torg-gray">Saldo livre</p>
+              <p className={`text-2xl font-extrabold tabular-nums ${
+                saldo < 0 ? "text-red-600" : consumoPct >= 70 ? "text-torg-orange-700" : "text-torg-dark"
+              }`}>
+                {fmtMoeda(saldo)}
+              </p>
+              <p className="text-[10px] text-torg-gray mt-0.5">{consumoPct.toFixed(1)}% da verba comprometida</p>
+              {saldo < 0 && <p className="text-[10px] text-red-600 mt-0.5 font-medium">⚠ verba estourada</p>}
+              {saldo >= 0 && consumoPct >= 70 && <p className="text-[10px] text-torg-orange-700 mt-0.5 font-medium">⚠ acima de 70%</p>}
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-torg-gray">Já em pedidos</p>
-            <p className="text-2xl font-extrabold text-torg-blue tabular-nums">{fmtMoeda(totalEmPedidos)}</p>
-            <p className="text-[10px] text-torg-gray mt-0.5">{consumoPct.toFixed(1)}% da verba</p>
-          </div>
-          <div>
-            <p className="text-xs text-torg-gray">Saldo restante</p>
-            <p className={`text-2xl font-extrabold tabular-nums ${
-              saldo < 0
-                ? "text-red-600"
-                : consumoPct >= 70
-                ? "text-torg-orange-700"
-                : "text-torg-dark"
-            }`}>
-              {fmtMoeda(saldo)}
-            </p>
-            {saldo < 0 && (
-              <p className="text-[10px] text-red-600 mt-0.5 font-medium">⚠ verba estourada</p>
-            )}
-            {saldo >= 0 && consumoPct >= 70 && (
-              <p className="text-[10px] text-torg-orange-700 mt-0.5 font-medium">⚠ acima de 70%</p>
-            )}
-          </div>
+
+          {/* ⚠ O QUE FALTA COMPRAR ENTRA COMO CONTAGEM, NÃO COMO VALOR: sem cotação não existe
+              preço, e estimar aqui seria pôr número onde não há informação. Mas some da tela era
+              pior — é ele que diz que a verba ainda vai ser consumida. */}
+          {itensSemCotacao > 0 && (
+            <div className="mt-4 rounded-lg border border-torg-blue-100 bg-torg-blue-50/40 px-4 py-2.5 text-sm text-torg-dark">
+              <strong>{itensSemCotacao}</strong> item(ns) ainda sem cotação, em{" "}
+              <strong>{rmsComPendencia.size}</strong> RM(s) — a verba ainda vai ser consumida por eles.
+            </div>
+          )}
         </div>
 
         <OPAcoesClient
