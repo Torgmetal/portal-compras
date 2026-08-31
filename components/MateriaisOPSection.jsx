@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Loader2, Package, AlertCircle, CheckCircle2, Truck, Clock, Archive, XCircle, ShoppingCart, Filter, ChevronDown, ChevronUp, Download, ArrowUpDown } from "lucide-react";
 
 const fmtMoeda = (v) =>
@@ -92,6 +92,13 @@ export default function MateriaisOPSection({ opId }) {
   const [ordem, setOrdem] = useState({ campo: null, dir: "asc" });
   const [expandido, setExpandido] = useState(true);
   const [exportando, setExportando] = useState(false);
+  // a RM só é "isolada" quando o filtro casa EXATAMENTE com um número — digitar "04" filtra a tela
+  // mas não é uma RM, e o arquivo não pode sair com nome de RM nesse caso
+  const rmIsolada = useMemo(() => {
+    const v = String(fRM || "").trim();
+    if (!v) return "";
+    return (data?.itens || []).some((it) => it.rmNumero === v) ? v : "";
+  }, [fRM, data]);
   const [exportErro, setExportErro] = useState("");
 
   useEffect(() => {
@@ -137,10 +144,10 @@ export default function MateriaisOPSection({ opId }) {
         subtitulo: `Situacao de compra por item${filtro !== "TODOS" ? ` · filtro: ${STATUS_CONFIG[filtro]?.label}` : " · todos os status"}`,
         kpis: [
           `Recebido: ${resumo.RECEBIDO}  |  Aguardando entrega: ${resumo.COMPRADO}  |  Atendido por estoque: ${resumo.ESTOQUE}  |  Em cotacao: ${resumo.EM_COTACAO}  |  Nao comprado: ${resumo.NAO_COMPRADO}  |  Cancelado: ${resumo.CANCELADO}`,
-          `${filtrados.length} itens${pesoKg > 0 ? `  |  Peso solicitado (kg): ${pesoKg.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}  |  Peso recebido (kg): ${pesoRecebido.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}` : ""}`,
+          `${rmIsolada ? `${rmIsolada}  |  ` : ""}${filtrados.length} itens${pesoKg > 0 ? `  |  Peso solicitado (kg): ${pesoKg.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}  |  Peso recebido (kg): ${pesoRecebido.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}` : ""}`,
         ],
         totalColunas: headers.length,
-        nomePlanilha: `Materiais OP ${numero || ""}`.slice(0, 31),
+        nomePlanilha: (rmIsolada ? `${rmIsolada} - OP ${numero || ""}` : `Materiais OP ${numero || ""}`).slice(0, 31),
         codigoDoc: "REL-CMP-001",
       });
       ws.columns = [{ width: 12 }, { width: 14 }, { width: 40 }, { width: 14 }, { width: 12 }, { width: 11 }, { width: 6 }, { width: 12 }, { width: 20 }, { width: 20 }, { width: 10 }, { width: 12 }, { width: 14 }];
@@ -170,7 +177,12 @@ export default function MateriaisOPSection({ opId }) {
         { cor: "F3E8FF", label: "Roxo = estoque" },
         { cor: xl.CORES.LIGHT_ORANGE, label: "Laranja = em cotacao" },
       ], headers.length);
-      await xl.downloadWorkbook(workbook, `Torg_Materiais_OP-${numero || "s-n"}_${hoje}.xlsx`);
+      await xl.downloadWorkbook(
+        workbook,
+        rmIsolada
+          ? `Torg_${String(rmIsolada).replace(/[^\w-]+/g, "-")}_OP-${numero || "s-n"}_${hoje}.xlsx`
+          : `Torg_Materiais_OP-${numero || "s-n"}_${hoje}.xlsx`
+      );
     } catch (e) {
       setExportErro("Erro ao exportar: " + e.message);
     } finally {
@@ -269,11 +281,11 @@ export default function MateriaisOPSection({ opId }) {
           <button
             onClick={(e) => { e.stopPropagation(); exportarExcel(); }}
             disabled={exportando || !totalItens}
-            title="Exportar materiais para Excel (layout Torg)"
+            title={rmIsolada ? `Exportar só a ${rmIsolada} para Excel (layout Torg)` : "Exportar materiais para Excel (layout Torg)"}
             className="text-sm font-semibold text-torg-blue border border-torg-blue/30 hover:bg-torg-blue-50 px-3 py-1.5 rounded-lg inline-flex items-center gap-2 disabled:opacity-50"
           >
             {exportando ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-            Exportar
+            {rmIsolada ? `Exportar ${rmIsolada}` : "Exportar"}
           </button>
           {expandido ? <ChevronUp size={18} className="text-torg-gray" /> : <ChevronDown size={18} className="text-torg-gray" />}
         </div>
@@ -377,8 +389,23 @@ export default function MateriaisOPSection({ opId }) {
                   const receb = recebidoTxt(item);
                   return (
                     <tr key={item.id} className={`hover:bg-gray-50 ${st === "CANCELADO" ? "opacity-50" : ""}`} title={st === "CANCELADO" && item.canceladoMotivo ? `Cancelado: ${item.canceladoMotivo}` : undefined}>
-                      <td className="px-3 py-2 font-mono text-xs text-torg-blue whitespace-nowrap align-top">
-                        {item.rmNumero}
+                      <td className="px-3 py-2 font-mono text-xs whitespace-nowrap align-top">
+                        {/* ⚠ Vitor: "veja se é possível extrair a RM ao clicar nesse chip para
+                            poder comparar com o que foi comprado". Um clique isola a RM na tabela
+                            — e, como o Excel exporta o que está FILTRADO, o mesmo clique define o
+                            que sai na planilha. Clicar de novo devolve a lista inteira. */}
+                        <button
+                          type="button"
+                          onClick={() => setFRM(fRM === item.rmNumero ? "" : item.rmNumero)}
+                          title={fRM === item.rmNumero ? "Mostrar todas as RMs" : `Ver só a ${item.rmNumero} (e exportar só ela)`}
+                          className={`rounded px-1.5 py-0.5 font-mono text-xs hover:underline ${
+                            fRM === item.rmNumero
+                              ? "bg-torg-blue text-white hover:bg-torg-blue/90"
+                              : "text-torg-blue hover:bg-torg-blue-50"
+                          }`}
+                        >
+                          {item.rmNumero}
+                        </button>
                       </td>
                       <td className="px-3 py-2 align-top w-[300px] max-w-[300px]">
                         {(() => {
