@@ -5442,6 +5442,20 @@ model GrdRemessaPcp {
   emitidoPorId   String?
   emitidoPorNome String?
   emitidoEm      DateTime @default(now())
+
+  // ─── RECEBIMENTO ────────────────────────────────────────────────────────────────────────────
+  // Vitor (31/08/2026): "preencha o recebimento da GRD só pelo fato de enviar o e-mail, não precisa
+  // ter link para confirmar (…) dentro do portal já sabemos quem recebeu ou não".
+  //
+  // ⚠ O QUE FICA REGISTRADO É A REMESSA, e é ela que a guia prova: a quem foi enviada e quando.
+  // Escrever "confirmado por Fulano" sem que ninguém tenha clicado seria inventar um ato dentro de
+  // um documento auditado — o mesmo tipo de erro que a gente evita no data book, na direção
+  // contrária. "Recebimento por meio eletrônico", com destinatário e data do envio, é verdade e
+  // cumpre o que a ISO pede de uma guia de remessa.
+  recebidoPorNome  String?
+  recebidoPorEmail String?
+  enviadoEm        DateTime?
+
   createdAt      DateTime @default(now())
 
   @@unique([numero, ano])

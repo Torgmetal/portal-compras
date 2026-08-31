@@ -12,7 +12,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { gerarTokenForte } from "@/lib/token";
 import { sendEmail } from "@/lib/email";
 import { cabecalhoEmail } from "@/lib/email-layout";
 import { numGrdPcp } from "@/lib/grd-pcp-pdf";
@@ -88,21 +87,19 @@ export async function POST(req) {
     setor: remessa.setor, itens, emitidoEm: remessa.emitidoEm, emitidoPorNome: remessa.emitidoPorNome,
   };
 
-  let assinaturaLink = null;
+  // ─── O RECEBIMENTO É O PRÓPRIO ENVIO ────────────────────────────────────────────────────────
+  // Vitor (31/08/2026): "preenche o recebimento da GRD só pelo fato de enviar o e-mail, não precisa
+  // ter link para confirmar; só preciso deixar isso como se alguém tivesse recebido por conta da
+  // ISO — dentro do portal já sabemos quem recebeu ou não".
+  //
+  // ⚠ ENTÃO A GUIA REGISTRA A REMESSA, não uma confirmação. Escrever "confirmado por Fulano" sem
+  // que ninguém tenha clicado seria inventar um ato dentro de um documento auditado. O que vai
+  // impresso é o fato: a quem foi enviada e quando — "recebimento por meio eletrônico". É verdade,
+  // preenche o campo e é o que uma guia de remessa precisa provar. Quem de fato leu, o portal já
+  // sabe pelo acesso.
+  let enviado = false;
   if (b.para?.email) {
-    const envio = await prisma.envioAssinatura.create({
-      data: {
-        tipo: "GRD_PCP", revisao: 0, titulo: `${numGrdPcp(numero, ano)} · ${fmtOP(b.opNumero)}`,
-        snapshot, opNumero: b.opNumero, enviadoPorId: user.id,
-        assinaturas: {
-          create: [{ nome: b.para.nome, email: b.para.email, setor: remessa.setor, token: gerarTokenForte(32), ordem: 1, convidadoEm: new Date() }],
-        },
-      },
-      select: { id: true, assinaturas: { select: { token: true } } },
-    });
-    const base = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace.torg.com.br";
-    assinaturaLink = `${base}/assinar/${envio.assinaturas[0].token}`;
-    await sendEmail({
+    const res = await sendEmail({
       to: b.para.email,
       subject: `${numGrdPcp(numero, ano)} — desenhos da ${fmtOP(b.opNumero)} para o ${remessa.setor || "seu setor"}`,
       html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#0D1F3C">
@@ -113,27 +110,35 @@ export async function POST(req) {
             O PCP está remetendo <strong>${itens.length} desenho(s)</strong> da
             <strong>${escapeHtml(fmtOP(b.opNumero))}</strong>${remessa.setor ? ` para o setor <strong>${escapeHtml(remessa.setor)}</strong>` : ""}.
           </p>
-          <p style="margin:0 0 14px">Confira a guia e confirme o recebimento — a confirmação fica registrada com data e hora.</p>
-          <p style="text-align:center;margin:24px 0">
-            <a href="${assinaturaLink}" style="background:#006EAB;color:#fff;text-decoration:none;padding:13px 30px;border-radius:8px;font-weight:bold;display:inline-block">Conferir e confirmar o recebimento</a>
-          </p>
+          <p style="margin:0 0 14px">A guia segue registrada no portal com esta remessa.</p>
           <p style="margin:0;color:#5b6b7a;font-size:12px">${numGrdPcp(numero, ano)} · emitida por ${escapeHtml(remessa.emitidoPorNome || "PCP")}</p>
         </div>
       </div>`,
-      text: `${numGrdPcp(numero, ano)} — ${itens.length} desenho(s) da ${fmtOP(b.opNumero)}. Confirme em ${assinaturaLink}`,
+      text: `${numGrdPcp(numero, ano)} — ${itens.length} desenho(s) da ${fmtOP(b.opNumero)} remetidos ao ${remessa.setor || "setor"}.`,
       replyTo: user.email || undefined,
-    }).catch(() => null);
+    }).catch(() => ({ ok: false }));
+    enviado = !!res?.ok;
+  }
+
+  // ⚠ SÓ GRAVA O RECEBIMENTO SE O E-MAIL SAIU. Se o Resend falhou, ninguém recebeu nada — e uma
+  // guia dizendo que recebeu seria pior que uma guia em branco.
+  if (enviado) {
+    await prisma.grdRemessaPcp.update({
+      where: { id: remessa.id },
+      data: { recebidoPorNome: b.para.nome, recebidoPorEmail: b.para.email, enviadoEm: new Date() },
+    });
   }
 
   await prisma.auditLog.create({
     data: {
       userId: user.id, action: "EMITIR_GRD_PCP", entity: "GrdRemessaPcp", entityId: remessa.id,
-      diff: { numero, ano, opNumero: b.opNumero, setor: remessa.setor, docs: itens.length, para: b.para?.email || null },
+      diff: { numero, ano, opNumero: b.opNumero, setor: remessa.setor, docs: itens.length, para: b.para?.email || null, enviado },
     },
   }).catch(() => {});
 
   return NextResponse.json({
     ok: true, id: remessa.id, numero, ano, codigo: numGrdPcp(numero, ano),
-    docs: itens.length, assinaturaLink,
+    docs: itens.length, enviado,
+    recebidoPor: enviado ? b.para.nome : null,
   });
 }

@@ -76,7 +76,9 @@ export default function GrdClient() {
     if (!confirm(
       `Emitir a guia de remessa da OP-${opNumero}?\n\n` +
       "Entram os desenhos liberados que ainda não saíram em guia." +
-      (email ? "\n\nEle recebe por e-mail o link para confirmar o recebimento." : "\n\nSem e-mail, a guia sai com a linha para assinar à mão.")
+      (email
+        ? "\n\nA guia sai com o recebimento preenchido: remetida a essa pessoa, com data e hora."
+        : "\n\nSem e-mail, a guia sai com a linha para assinar à mão.")
     )) return;
     setEmitindo(true);
     try {
@@ -88,7 +90,9 @@ export default function GrdClient() {
       if (!r.ok) throw new Error(j.error || "Erro");
       alert(
         `${j.codigo} emitida com ${j.docs} documento(s).` +
-        (j.assinaturaLink ? `\n\nO link de confirmação foi enviado para ${email}.` : "\n\nImprima a guia e colha a assinatura no papel.")
+        (j.enviado
+          ? `\n\nRemetida a ${j.recebidoPor} (${email}) — o recebimento já consta na guia.`
+          : "\n\nImprima a guia e colha a assinatura no papel.")
       );
     } catch (e) { alert(e.message); } finally { setEmitindo(false); }
   }

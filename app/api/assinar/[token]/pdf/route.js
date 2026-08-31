@@ -40,13 +40,6 @@ export async function GET(_req, { params }) {
       snapshot: await comResponsaveis(prisma, docDoTipo(a.envio.tipo), a.envio.opNumero, snap),
       assinaturas,
     });
-  } else if (a.envio.tipo === "GRD_PCP") {
-    // ⚠ A GUIA JÁ NASCE COMPLETA NO SNAPSHOT. Diferente do relatório de inspeção, aqui não relemos
-    // o banco: a guia é o registro do que foi entregue NAQUELE dia, com o R que estava carimbado no
-    // papel. Se o CMR mudar depois, a guia continua provando a entrega — que é a única coisa que
-    // uma guia de remessa precisa provar.
-    const { gerarGuiaPcpPDF } = await import("@/lib/grd-pcp-pdf");
-    ({ bytes } = await gerarGuiaPcpPDF({ ...snap, assinaturas }));
   } else if (a.envio.tipo === "RELATORIO_INSPECAO") {
     // ⚠ aqui o snapshot guarda só o ID: o corpo do relatório são FOTOS, e copiar dezenas de URLs
     // pro snapshot só criaria uma segunda cópia pra desencontrar. O documento é relido do banco.
