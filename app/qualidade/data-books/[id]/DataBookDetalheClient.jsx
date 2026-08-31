@@ -28,6 +28,8 @@ export default function DataBookDetalheClient({ id, userId }) {
   const [emitindo, setEmitindo] = useState(false);
   const [revisando, setRevisando] = useState(false);
   const [enviandoAval, setEnviandoAval] = useState(false);
+  const [emailAval, setEmailAval] = useState("");
+  const [nomeAval, setNomeAval] = useState("");
   const [revisoes, setRevisoes] = useState(null);
   const [verHistorico, setVerHistorico] = useState(false);
   const [rastr, setRastr] = useState(null);
@@ -98,9 +100,15 @@ export default function DataBookDetalheClient({ id, userId }) {
     )) return;
     setEnviandoAval(true);
     try {
-      const res = await fetch(`/api/qualidade/data-books/${id}/avaliacao-cliente`, { method: "POST" });
+      const res = await fetch(`/api/qualidade/data-books/${id}/avaliacao-cliente`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clienteEmail: emailAval.trim() || null, clienteNome: nomeAval.trim() || null }),
+      });
       const j = await res.json();
       if (!res.ok || !j.success) throw new Error(j.error || "Erro");
+      alert(j.enviado
+        ? `Rascunho publicado no portal e link enviado para ${j.destino}.`
+        : "Rascunho publicado no portal do cliente. O e-mail não saiu — copie o link e mande por fora:\n\n" + j.link);
       await carregar();
     } catch (e) { alert(e.message); } finally { setEnviandoAval(false); }
   }
@@ -468,12 +476,30 @@ export default function DataBookDetalheClient({ id, userId }) {
                 emitida só volta para ele no fim, assinada.
               </p>
             </div>
+            {/* ⚠ O E-MAIL RESOLVE O PORTAL. Vitor (31/08/2026): "fui enviar para o cliente e diz que
+                a obra não tem cliente definido (…) cria um campo para informar o e-mail do cliente e,
+                de acordo com o cadastro de e-mail, já enviar para o portal dele". Antes eu mandava a
+                Qualidade sair daqui, publicar o portal no Comercial e voltar. Agora este campo
+                publica o portal (só com o Data Book), cadastra o destinatário e dispara o link.
+                Em branco: reaproveita quem já está cadastrado no portal da obra. */}
             {!data.avaliacaoOkEm && (
-              <button onClick={enviarParaAvaliacao} disabled={enviandoAval}
-                className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5 shrink-0">
-                {enviandoAval ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                {data.avaliacaoEnviadaEm ? "Mandar conferir de novo" : "Mandar o rascunho para o cliente"}
-              </button>
+              <div className="flex flex-wrap items-end gap-2 shrink-0">
+                <label className="text-[11px] text-torg-gray">
+                  Nome de quem confere
+                  <input value={nomeAval} onChange={(e) => setNomeAval(e.target.value)} placeholder="ex.: Davi"
+                    className="mt-0.5 block w-36 rounded-lg border border-gray-300 px-2 py-1.5 text-[12px] focus:border-torg-blue focus:ring-1 focus:ring-torg-blue" />
+                </label>
+                <label className="text-[11px] text-torg-gray">
+                  E-mail do cliente
+                  <input type="email" value={emailAval} onChange={(e) => setEmailAval(e.target.value)} placeholder="davi@cliente.com.br"
+                    className="mt-0.5 block w-56 rounded-lg border border-gray-300 px-2 py-1.5 text-[12px] focus:border-torg-blue focus:ring-1 focus:ring-torg-blue" />
+                </label>
+                <button onClick={enviarParaAvaliacao} disabled={enviandoAval}
+                  className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-2 hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">
+                  {enviandoAval ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                  {data.avaliacaoEnviadaEm ? "Mandar de novo" : "Enviar rascunho"}
+                </button>
+              </div>
             )}
           </div>
 
