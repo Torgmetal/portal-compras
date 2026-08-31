@@ -63,7 +63,12 @@ export default function ControleFinanceiroOP({ opId }) {
   if (!data) return null;
 
   const { pedidos, estoque, custoTotal, verba } = data;
-  const estourou = verba && verba.saldo < -0.005;
+  // ⚠ SEM VERBA ≠ VERBA ESTOURADA. Duas OPs (090 e 036-01) têm pedido emitido e nenhum item de
+  // contrato cadastrado. Sem esta distinção o card diria "estourou a verba em R$ 52.629,76", que é
+  // uma acusação falsa: a verba não foi ultrapassada, ela nunca foi lançada. Quem lê precisa saber
+  // que o que falta é cadastro, não dinheiro.
+  const semVerba = verba && verba.prevista <= 0;
+  const estourou = verba && !semVerba && verba.saldo < -0.005;
   const temEstoque = estoque.itens.length > 0;
   const temPedidos = pedidos.torg.lista.length > 0 || pedidos.fd.lista.length > 0;
 
@@ -143,24 +148,34 @@ export default function ControleFinanceiroOP({ opId }) {
             <div className="rounded-lg border border-gray-100 bg-gray-50/60 px-4 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-torg-gray">Realizado em pedidos</p>
               <p className="mt-0.5 text-lg font-semibold tabular-nums text-torg-dark">{fmtMoeda(verba.realizado)}</p>
-              <p className="text-xs text-torg-gray">{fmtPct(verba.pct)} da verba</p>
+              {!semVerba && <p className="text-xs text-torg-gray">{fmtPct(verba.pct)} da verba</p>}
             </div>
-            <div className={`rounded-lg border px-4 py-3 ${estourou ? "border-red-200 bg-red-50" : "border-emerald-100 bg-emerald-50/60"}`}>
+            <div className={`rounded-lg border px-4 py-3 ${
+              semVerba ? "border-amber-200 bg-amber-50" : estourou ? "border-red-200 bg-red-50" : "border-emerald-100 bg-emerald-50/60"
+            }`}>
               <p className="text-[11px] font-semibold uppercase tracking-wider text-torg-gray">
-                {estourou ? "Estourou a verba em" : "Saldo a comprar"}
+                {semVerba ? "Verba não cadastrada" : estourou ? "Estourou a verba em" : "Saldo a comprar"}
               </p>
-              <p className={`mt-0.5 text-lg font-semibold tabular-nums ${estourou ? "text-red-700" : "text-emerald-700"}`}>
-                {fmtMoeda(Math.abs(verba.saldo))}
-              </p>
+              {semVerba ? (
+                <p className="mt-0.5 text-xs leading-snug text-amber-900">
+                  Nenhum item de contrato lançado nesta OP — sem isso não dá para comparar.
+                </p>
+              ) : (
+                <p className={`mt-0.5 text-lg font-semibold tabular-nums ${estourou ? "text-red-700" : "text-emerald-700"}`}>
+                  {fmtMoeda(Math.abs(verba.saldo))}
+                </p>
+              )}
             </div>
           </div>
 
+          {!semVerba && (
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-100">
             <div
               className={`h-full rounded-full ${estourou ? "bg-red-500" : verba.pct >= 90 ? "bg-torg-orange" : "bg-torg-blue"}`}
               style={{ width: `${Math.min(100, Math.max(0, verba.pct))}%` }}
             />
           </div>
+          )}
 
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[560px] text-sm">
