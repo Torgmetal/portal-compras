@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FileText, GitCompareArrows, RotateCcw, Gauge, FolderKanban, ListChecks, ListOrdered, GanttChart } from "lucide-react";
+import { LayoutDashboard, FileText, GitCompareArrows, RotateCcw, Gauge, FolderKanban, ListChecks, ListOrdered, GanttChart, FileSpreadsheet } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -11,6 +11,10 @@ const ITENS = [
   { href: "/engenharia", label: "Visão Geral", icon: LayoutDashboard, exact: true },
   { href: "/engenharia/ops", label: "OPs", icon: FolderKanban },
   { href: "/engenharia/listas", label: "Listas (LE / LPC)", icon: ListChecks },
+  // ⚠ Vitor (31/08/2026): "a tela fica na engenharia e registra todas as informações". É a GRD que
+  // a Engenharia EMITE (FORM 09, da pasta 13. GRD) — não confundir com a do PCP, que nasce quando
+  // alguém imprime um desenho.
+  { href: "/engenharia/grd", label: "GRD", icon: FileSpreadsheet },
   // Tarefas dos cronogramas em ordem de prazo — só as que o Planejamento enviou. (Vitor 19/08.)
   { href: "/engenharia/sequencia", label: "Sequência", icon: ListOrdered },
   // ⚠⚠ CRONOGRAMA ≠ SEQUÊNCIA. A Sequência só mostra cronograma cujas tarefas o Planejamento

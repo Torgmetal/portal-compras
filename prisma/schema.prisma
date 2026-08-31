@@ -5374,3 +5374,46 @@ model MuralCiencia {
   @@unique([avisoId, userId])
   @@index([avisoId])
 }
+
+// ─── GRD DA ENGENHARIA (FORM 09) ──────────────────────────────────────────────────────────────
+// Vitor (31/08/2026): "a engenharia emite uma planilha padrão do Tekla e coloca numa pasta (…) hoje
+// não separamos por OP e sim por ordem numérica. Quero que puxe dessa pasta sempre que for colocada
+// uma nova GRD e no portal separe por OP (…) esse controle basicamente se faz necessário para
+// controlarmos o que foi liberado, pelo setor, data e a revisão atual — fechar o que pede o
+// procedimento da engenharia".
+//
+// ⚠ NÃO CONFUNDIR COM `GrdLiberacao`. Aquela nasce quando alguém IMPRIME um desenho no portal (a
+// GRD interna da produção). Esta é o documento que a ENGENHARIA emite ao liberar projeto — vem
+// pronta da pasta /Engenharia/13. GRD, no formato FORM 09.
+//
+// ⚠⚠ A CHAVE É O ARQUIVO, não o número. Revisão vira arquivo novo (`GRD-123_R01.xlsx`), e as duas
+// versões coexistem na pasta: guardar por número sozinho apagaria a R00 quando a R01 chegasse, e é
+// justamente o histórico de revisão que o procedimento pede.
+model GrdEngenharia {
+  id           String    @id @default(cuid())
+  numero       String
+  revisao      Int       @default(0)
+  arquivo      String
+  itemId       String    @unique // id do arquivo no SharePoint
+  data         DateTime?
+  de           String?
+  para         String? // o setor que recebeu (PCP, Produção…)
+  referencia   String? // cliente/obra como a Engenharia escreveu
+  opCodigo     String? // como veio na planilha: "T105B"
+  opNumero     String? // resolvido para o padrão do portal: "105"
+  opId         String?
+  pesoKg       Float?
+  area         String?
+  emitidoPor   String?
+  itens        Json      @default("[]") // [{item, documento, revisao, descricao, finalidade, situacao, copias}]
+  qtdDocs      Int       @default(0)
+  modificadoEm DateTime? // lastModifiedDateTime do arquivo, para detectar alteração
+  importadoEm  DateTime  @default(now())
+  avisadoEm    DateTime? // quando a Engenharia foi avisada desta GRD
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([numero, revisao])
+  @@index([opNumero])
+  @@index([data])
+}
