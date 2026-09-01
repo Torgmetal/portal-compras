@@ -33,6 +33,7 @@ export default function PainelBancadas({ conjuntos, onLiberar, ocupado }) {
   const [n, setN] = useState(4);
   const [inicio, setInicio] = useState(proximoUtilIso);
   const [baixando, setBaixando] = useState(false);
+  const [baixandoFolha, setBaixandoFolha] = useState(false);
 
   const distrib = useMemo(() => repartirPorBancada(conjuntos, n, { curva: RITMO_META }), [conjuntos, n]);
   // ⚠⚠ A JANELA É CONSEQUÊNCIA, NÃO ENTRADA. Vitor (01/09/2026): "não é programar um único dia, ela
@@ -150,6 +151,79 @@ export default function PainelBancadas({ conjuntos, onLiberar, ocupado }) {
     } finally { setBaixando(false); }
   }
 
+  // ⚠⚠ A FOLHA DO MONTADOR É OUTRO DOCUMENTO, NÃO A MESMA COM MENOS COLUNAS.
+  // Vitor (01/09/2026): "pode ser mais enxuta sim e com uma formatação maior para facilitar a
+  // leitura". A planilha do plano é para PLANEJAR — traz dias-bancada e o percentil da meta, que
+  // são números de quem reparte o serviço. Na mão do montador, dias-bancada não significa nada e
+  // ainda rouba a largura que a marca e a descrição precisam para serem lidas de longe, em pé,
+  // num galpão. Então:
+  //   • cinco colunas: Dia, Marca, Descrição, Qte, Peso — e uma sexta vazia para ele marcar
+  //   • RETRATO, não paisagem: com cinco colunas, paisagem só desperdiça papel e cabem menos linhas
+  //   • fonte 13 (contra 9 do relatório) e linha de 26pt
+  //   • prioridade vira a palavra "PRIORIDADE" na linha, em laranja — não uma coluna a mais
+  async function exportarFolhaMontador() {
+    setBaixandoFolha(true);
+    try {
+      const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais,
+              downloadWorkbook, CORES } = await import("@/lib/excel-relatorio");
+      const ops = [...new Set(conjuntos.map((c) => c.opNumero).filter(Boolean))];
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: "Ordem de Montagem",
+        subtitulo: `${ops.map((o) => `OP ${o}`).join(", ")} · inicio ${fmtDia(inicio + "T00:00:00Z")}`,
+        kpis: [],
+        totalColunas: 6,
+        nomePlanilha: "Ordem de montagem",
+        codigoDoc: "REL-PRD-011",
+      });
+      ws.pageSetup.orientation = "portrait";
+      ws.pageSetup.printTitlesRow = `1:${linhaInicio}`;
+      ws.columns = [{ width: 13 }, { width: 20 }, { width: 40 }, { width: 8 }, { width: 13 }, { width: 12 }];
+
+      let row = linhaInicio;
+      adicionarHeaderTabela(ws, row, ["Dia", "Marca", "Descricao", "Qte", "Peso (kg)", "Feito"]);
+      // ⚠ o helper fixa 9pt; aqui o cabeçalho precisa acompanhar o corpo, senão fica menor que os dados
+      for (let c = 1; c <= 6; c++) ws.getCell(row, c).font = { name: "Arial", size: 12, bold: true, color: { argb: "FFFFFF" } };
+      ws.getRow(row).height = 30;
+      row++;
+
+      for (const [iB, b] of porDia.entries()) {
+        const itens = b.dias.flatMap((d) => d.itens.map((it) => ({ ...it, _dia: d.dia })));
+        const un = itens.reduce((s2, it) => s2 + Math.max(1, Number(it.qte) || 1), 0);
+        const kg = itens.reduce((s2, it) => s2 + (Number(it.pesoTotalKg) || 0), 0);
+
+        ws.mergeCells(row, 1, row, 6);
+        const cab = ws.getCell(row, 1);
+        cab.value = `${b.bancada}      ${un} peca(s)      ${Math.round(kg).toLocaleString("pt-BR")} kg`;
+        cab.font = { name: "Arial", size: 16, bold: true, color: { argb: "FFFFFF" } };
+        cab.fill = { type: "pattern", pattern: "solid", fgColor: { argb: CORES.TORG_BLUE } };
+        cab.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+        ws.getRow(row).height = 34;
+        row++;
+
+        for (const it of itens) {
+          const q = Math.max(1, Number(it.qte) || 1);
+          const prio = it.prioridade != null;
+          adicionarLinhaTabela(ws, row, [
+            fmtDia(it._dia), it.marca,
+            (it.descricao || "") + (prio ? "   ★ PRIORIDADE" : ""),
+            q, Math.round(Number(it.pesoTotalKg) || 0), "",
+          ], {
+            fontSize: 13, rowHeight: 26, bold: prio,
+            ...(prio ? { fillColor: CORES.LIGHT_ORANGE } : {}),
+            alinhamento: { 3: "right", 4: "right" },
+          });
+          row++;
+        }
+        adicionarLinhaTotais(ws, row, ["", `${itens.length} conjunto(s)`, "", un, Math.round(kg), ""]);
+        row += 2;
+        if (iB < porDia.length - 1) ws.getRow(row - 1).addPageBreak();
+      }
+      await downloadWorkbook(workbook, `Ordem de montagem - ${ops.join("-")} - ${inicio}.xlsx`);
+    } catch (e) {
+      alert("Erro ao gerar a folha: " + (e?.message || e));
+    } finally { setBaixandoFolha(false); }
+  }
+
   if (!conjuntos.length) return null;
 
   return (
@@ -251,9 +325,17 @@ export default function PainelBancadas({ conjuntos, onLiberar, ocupado }) {
           Liberar e imprimir por bancada
         </button>
         <button
+          onClick={exportarFolhaMontador}
+          disabled={baixandoFolha}
+          title="Folha para entregar ao montador: uma por bancada, letra grande, sem os números de planejamento"
+          className="px-3 py-2 border border-torg-blue-100 text-torg-blue text-sm font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-2 disabled:opacity-50">
+          {baixandoFolha ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+          Folha do montador
+        </button>
+        <button
           onClick={exportarPlano}
           disabled={baixando}
-          title="Planilha com o que cada bancada faz, dia a dia"
+          title="Planilha do planejamento: dia a dia, com dias-bancada e prioridade"
           className="px-3 py-2 border border-torg-blue-100 text-torg-blue text-sm font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-2 disabled:opacity-50">
           {baixando ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
           Planilha do plano
