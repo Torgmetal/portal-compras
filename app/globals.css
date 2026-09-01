@@ -4,6 +4,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Menu lateral recolhível (ver components/ToggleSidebar.jsx). O aside dos módulos é
+   sempre `w-64 fixed left-0`, e o conteúdo é `main.ml-64`. Ao ligar `.menu-oculto`
+   no <html>, esconde o aside e zera a margem do conteúdo (com transição suave). */
+aside.fixed.left-0 { transition: transform 0.22s ease; }
+main.ml-64 { transition: margin-left 0.22s ease; }
+html.menu-oculto aside.fixed.left-0 { transform: translateX(-100%); pointer-events: none; }
+html.menu-oculto main.ml-64 { margin-left: 0 !important; }
+
 :root {
   --torg-blue: #006eab;
   --torg-dark: #002945;

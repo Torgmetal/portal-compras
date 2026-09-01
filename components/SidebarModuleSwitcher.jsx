@@ -25,6 +25,7 @@ import {
   ReceiptText,
 } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
+import ToggleSidebar from "@/components/ToggleSidebar";
 import { emSetembroAmarelo, LACO } from "@/lib/campanha";
 import { usarPrevia } from "@/lib/campanha-previa";
 
@@ -225,6 +226,7 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
 
   return (
     <div ref={ref} className="relative px-5 py-5 border-b border-torg-blue-100">
+      <div className="absolute top-2 right-2 z-10"><ToggleSidebar /></div>
       <button
         onClick={() => temMultiplos && setAberto((v) => !v)}
         className={`flex items-center gap-2 w-full group ${
