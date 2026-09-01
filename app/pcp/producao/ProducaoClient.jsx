@@ -26,6 +26,10 @@ import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 import SeparacaoModal from "@/components/SeparacaoModal";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import LiberacaoMaterial from "./LiberacaoMaterial";
+// ⚠ o download do ZIP vem da lib (era a TERCEIRA cópia da mesma função neste repositório); ela
+// suporta a pasta por bancada, que a cópia local não tinha.
+import { baixarZipLote } from "@/lib/desenhos-zip-cliente";
+import PainelBancadas from "@/app/producao/programacao/montagem/PainelBancadas";
 
 const MAX_LOTE = 80; // teto do /api/producao/desenhos/lote
 
@@ -143,9 +147,6 @@ export default function ProducaoClient() {
   const [verTodas, setVerTodas] = useState(false);
   const [materialAberto, setMaterialAberto] = useState(null); // liberação com o portão aberto
   const [erro, setErro] = useState("");
-  const [busca, setBusca] = useState("");
-  const [setorFiltro, setSetorFiltro] = useState("");
-  const [soPendentes, setSoPendentes] = useState(true);
 
   const [aberta, setAberta] = useState(null);   // opId expandida
   const [setorAba, setSetorAba] = useState(""); // setor da OP aberta
@@ -212,7 +213,7 @@ export default function ProducaoClient() {
     if (aberta === op.opId) { setAberta(null); setDetalhe(null); return; }
     // ⚠ abre no setor que o filtro já escolheu; sem filtro, no primeiro que tem fila — é onde a
     // obra está parada, e é a pergunta que o PCP faz ao clicar.
-    const setor = setorFiltro || op.setores.find((s) => s.pendenteKg > 0)?.setor || op.setores[0]?.setor || "";
+    const setor = op.setores.find((s) => s.pendenteKg > 0)?.setor || op.setores[0]?.setor || "";
     setAberta(op.opId); setSetorAba(setor); setDetalhe(null); setFiltroPecas(""); setFiltroProg("TODAS"); limparColunas(); setColAberta(null);
     carregarDetalhe(op.opId, setor);
   }
@@ -222,23 +223,15 @@ export default function ProducaoClient() {
     carregarDetalhe(op.opId, setor);
   }
 
-  const ops = useMemo(() => {
-    const q = busca.trim().toLowerCase();
-    return (dados?.ops || []).filter((o) => {
-      if (soPendentes && !(o.kg.pendente > 0) && !o.alertas.length) return false;
-      if (setorFiltro && !o.setores.some((s) => s.setor === setorFiltro && s.pendenteKg > 0)) return false;
-      if (!q) return true;
-      return [o.opNumero, o.cliente, o.obra, o.refCliente].some((x) => String(x || "").toLowerCase().includes(q));
-    });
-  }, [dados, busca, setorFiltro, soPendentes]);
+  // ⚠ A BARRA DE FILTROS SAIU (Vitor, 01/09/2026: "remova essa parte") — busca, abas de setor e a
+  // caixa "só o que tem fila ou alerta". O COMPORTAMENTO da caixa fica: ela vinha marcada, e obra
+  // sem fila nem alerta continua fora da lista. Tirar o controle e ligar tudo de volta encheria a
+  // tela com o que ele acabou de mandar limpar.
+  const ops = useMemo(
+    () => (dados?.ops || []).filter((o) => o.kg.pendente > 0 || o.alertas.length > 0),
+    [dados]
+  );
 
-  const setoresDisponiveis = useMemo(() => {
-    const m = new Map();
-    for (const o of dados?.ops || []) for (const s of o.setores) if (s.pendenteKg > 0) m.set(s.setor, s.label);
-    return [...m.entries()]
-      .map(([setor, label]) => ({ setor, label }))
-      .sort((a, b) => (ORDEM_SETOR[a.setor] ?? 99) - (ORDEM_SETOR[b.setor] ?? 99));
-  }, [dados]);
 
   // ── peças da OP aberta, já filtradas ──
   const pecas = useMemo(() => {
@@ -320,7 +313,7 @@ export default function ProducaoClient() {
       // ⚠ o erro do ZIP não pode mais sumir: as GRDs JÁ foram gravadas, então dizer só "liberado"
       // sem o arquivo na mão deixa a pessoa procurando um download que não aconteceu.
       let erroZip = null;
-      try { await baixarZip(j, detalhe.opNumero); } catch (e) { erroZip = e?.message || "falhou"; }
+      try { await baixarZipLote(j, detalhe.opNumero); } catch (e) { erroZip = e?.message || "falhou"; }
       setAviso({
         ok: !erroZip,
         texto: `${emitidas} desenho(s) liberado(s)`
@@ -429,6 +422,61 @@ export default function ProducaoClient() {
   // ⚠ E sem `try/catch` o erro sumia: o clique não fazia nada e não dizia nada, e o Vitor teve de
   // vir avisar que "não estou conseguindo baixar a planilha". Exportação que falha calada é pior
   // que exportação que falha — quem clica fica achando que o navegador travou.
+  // ── MONTAGEM: repartir entre bancadas, liberar e imprimir ──────────────────────────────────
+  // ⚠⚠ ISTO MORA AQUI PORQUE É AQUI QUE SE TRABALHA. Vitor (01/09/2026): "onde eu vou para
+  // selecionar as bancadas? está confuso demais o passo a passo". Eu tinha construído o painel em
+  // /pcp/montagem — outra tela, que ele nem usa. Passo a passo espalhado por duas telas não é passo
+  // a passo, é caça ao tesouro.
+  async function liberarEmBancadas(distrib, porDia) {
+    const bancadaPorId = {}, bancadaPorMarca = {}, diaPorId = {}, ids = [];
+    for (const b of distrib) for (const it of b.itens) {
+      bancadaPorId[it.id] = b.bancada; bancadaPorMarca[it.marca] = b.bancada; ids.push(it.id);
+    }
+    for (const b of porDia || []) for (const d of b.dias) {
+      const iso = d.dia.toISOString().slice(0, 10);
+      for (const it of d.itens) diaPorId[it.id] = iso;
+    }
+    if (!ids.length) return;
+    const nDias = new Set(Object.values(diaPorId)).size;
+    if (!confirm(`Liberar ${ids.length} conjunto(s) em ${distrib.length} bancada(s)`
+      + (nDias > 1 ? `, distribuídos em ${nDias} dias` : "") + `, e imprimir o maço?`)) return;
+
+    setImprimindo(true);
+    const erros = [];
+    try {
+      // ⚠ libera ANTES de imprimir: a impressão registra GRD, e emitir GRD de conjunto que o
+      // servidor recusou liberar seria assinar papel de peça que não vai ser montada.
+      const rl = await fetch("/api/producao/pecas/liberar-montagem", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, bancadaPorId, diaPorId }),
+      });
+      const jl = await rl.json();
+      if (!rl.ok) throw new Error(jl.error || "Erro ao liberar");
+      if (jl.bloqueados?.length) {
+        erros.push(...jl.bloqueados.map((b) => `${b.marca} não desceu — ${b.cortados}/${b.total} croquis cortados`));
+      }
+      const liberados = new Set(jl.liberadosIds || ids);
+      const marcas = [...new Set(distrib.flatMap((b) => b.itens.filter((i) => liberados.has(i.id)).map((i) => i.marca)))];
+      if (marcas.length) {
+        const r = await fetch("/api/producao/desenhos/lote", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ opNumero: detalhe.opNumero, marcas, setor: "MONTAGEM", acao: "IMPRIMIR", bancadaPorMarca }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || "Erro ao emitir os desenhos");
+        await baixarZipLote(j, detalhe.opNumero, "montagem");
+      }
+      setSel(new Set());
+      await carregarDetalhe(aberta, setorAba);
+      setAviso({ ok: !erros.length, texto: `${liberados.size} conjunto(s) liberado(s) em ${distrib.length} bancada(s).` });
+    } catch (e) {
+      erros.push(e.message);
+    } finally {
+      setImprimindo(false);
+      if (erros.length) alert("Terminou com pendências:\n\n" + erros.slice(0, 10).join("\n"));
+    }
+  }
+
   async function exportar() {
     if (!detalhe) return;
     const lista = pecas;
@@ -506,30 +554,6 @@ export default function ProducaoClient() {
         </div>
       </div>
 
-      {/* ── filtros ── */}
-      <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm flex items-center gap-2 flex-wrap">
-        <span className="relative">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-torg-gray-light" />
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="OP, cliente, obra ou ref."
-            className="text-sm border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 w-64 focus:border-torg-blue focus:ring-1 focus:ring-torg-blue" />
-        </span>
-        <span className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
-          <button onClick={() => setSetorFiltro("")}
-            className={`text-xs px-2.5 py-1.5 ${!setorFiltro ? "bg-torg-blue text-white" : "text-torg-gray hover:bg-gray-50"}`}>
-            Todos os setores
-          </button>
-          {setoresDisponiveis.map((s) => (
-            <button key={s.setor} onClick={() => setSetorFiltro(s.setor)}
-              className={`text-xs px-2.5 py-1.5 border-l border-gray-200 ${setorFiltro === s.setor ? "bg-torg-blue text-white" : "text-torg-gray hover:bg-gray-50"}`}>
-              {s.label}
-            </button>
-          ))}
-        </span>
-        <label className="inline-flex items-center gap-1.5 text-xs text-torg-gray cursor-pointer ml-auto">
-          <input type="checkbox" checked={soPendentes} onChange={(e) => setSoPendentes(e.target.checked)} className="accent-torg-blue" />
-          Só o que tem fila ou alerta
-        </label>
-      </div>
 
       {aviso && (
         <div className={`rounded-xl border px-4 py-3 text-sm flex items-start gap-2 ${aviso.ok ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-red-50 border-red-200 text-red-700"}`}>
@@ -547,9 +571,7 @@ export default function ProducaoClient() {
         /* ⚠ VAZIO NÃO É ERRO — é o estado normal quando o Planejamento não liberou nada. O texto
             precisa DIZER isso, senão a tela parece quebrada e alguém vai procurar a obra na mão. */
         <div className="bg-white border border-gray-100 rounded-xl p-10 text-center">
-          {busca || setorFiltro ? (
-            <p className="text-torg-gray">Nenhuma OP com fila para este filtro.</p>
-          ) : verTodas ? (
+          {verTodas ? (
             <p className="text-torg-gray">Nenhuma OP com fila.</p>
           ) : (
             <>
@@ -806,6 +828,19 @@ export default function ProducaoClient() {
                             que são as que dizem se a peça pode descer. Com largura automática, um perfil
                             comprido ("TBØ42.40X2.65 - INDUSTRIAL") empurrava tudo; fixa, ele corta e o
                             resto fica no lugar. O nome inteiro segue na dica. */}
+                        {/* ⚠⚠ O PAINEL DAS BANCADAS FICA AQUI, ENTRE A SELEÇÃO E A LISTA — é a
+                            ordem do trabalho: marca os conjuntos, vê como se reparte, libera.
+                            Vitor (01/09/2026): "onde eu vou para selecionar as bancadas? está
+                            confuso demais o passo a passo". */}
+                        {setorAba === "MONTAGEM" && sel.size > 0 && (
+                          <div className="px-3 pb-3">
+                            <PainelBancadas
+                              conjuntos={pecas.filter((p) => sel.has(p.id)).map((p) => ({ ...p, opNumero: detalhe.opNumero }))}
+                              onLiberar={liberarEmBancadas}
+                              ocupado={imprimindo}
+                            />
+                          </div>
+                        )}
                         <table className="w-full table-fixed text-[12px]">
                             <thead className="bg-gray-50 text-torg-gray">
                               <tr>
@@ -960,39 +995,3 @@ export default function ProducaoClient() {
   );
 }
 
-// ⚠ ZIP com UMA PASTA POR IMPRESSORA — plotter (A1/A2) e comum (A3/A4). Abrir uma aba por arquivo
-// era bloqueado pelo navegador e ainda deixava a pessoa imprimindo um a um. Mesmo caminho do painel
-// de despacho, de propósito: dois downloads diferentes do mesmo lote confundiriam a fábrica.
-// ⚠⚠ FATIA EM LOTES, como no painel de despacho. Vitor (01/09/2026): "tentei baixar 500 marcas da
-// OP 113 e não criou a pasta de download" — a rota tem teto por lote (cada A1 é baixado inteiro
-// para a memória da função) e 500 de uma vez voltava erro genérico.
-const POR_ZIP = 60;
-
-async function baixarZip(lote, opNumero) {
-  const todos = (lote.arquivos || []).map((a) => ({ itemId: a.itemId, nome: a.nome, formato: a.formato }));
-  if (!todos.length) throw new Error("Nenhum desenho para baixar.");
-  const partes = [];
-  for (let i = 0; i < todos.length; i += POR_ZIP) partes.push(todos.slice(i, i + POR_ZIP));
-
-  for (let k = 0; k < partes.length; k++) {
-    const r = await fetch("/api/producao/desenhos/lote/zip", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ opNumero, arquivos: partes[k] }),
-    });
-    if (!r.ok) {
-      const msg = (await r.json().catch(() => ({}))).error || "Erro ao montar o ZIP";
-      throw new Error(partes.length > 1 ? `Lote ${k + 1} de ${partes.length}: ${msg}` : msg);
-    }
-    const blob = await r.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    const nomeSrv = (r.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/)?.[1];
-    a.download = partes.length > 1
-      ? `OP-${opNumero} - desenhos ${k + 1} de ${partes.length}.zip`
-      : (nomeSrv || `OP-${opNumero} - desenhos.zip`);
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
-    if (k < partes.length - 1) await new Promise((res) => setTimeout(res, 800));
-  }
-}
