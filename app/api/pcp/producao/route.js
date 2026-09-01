@@ -120,6 +120,8 @@ export async function GET(req) {
           return {
             setor: s.setor, label: FLUXO_SETORES.find((f) => f.key === s.setor)?.label || s.setor,
             totalKg: Math.round(s.totalKg || 0), pendenteKg: Math.round(s.pendenteKg || 0),
+            // ⚠ peça e conjunto, para a aba mostrar a unidade certa em cada setor
+            pendenteUn: s.pendenteUn ?? 0, pendenteItens: s.pendenteItens ?? 0,
             pct: s.pct ?? 0, entrega: es.entrega || null, atrasoDias: es.atrasoDias || 0,
           };
         }),

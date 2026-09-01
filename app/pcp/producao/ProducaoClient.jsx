@@ -120,7 +120,9 @@ const SIT = {
 // distintos não filtra nada — para eles vale a busca por texto.
 const COLUNAS_FILTRO = [
   { key: "marca", label: "Marca", valor: (p) => p.marca || "—" },
-  { key: "perfil", label: "Perfil", valor: (p) => p.descricao || "—" },
+  // ⚠ a coluna se chamava "Perfil" e mostrava a DESCRIÇÃO — o filtro sempre leu `descricao`, então
+  // o dado estava certo e só o rótulo mentia. Pior na montagem, onde conjunto não tem perfil nenhum.
+  { key: "perfil", label: "Descrição", valor: (p) => p.descricao || "—" },
   { key: "programacao", label: "Programação", valor: (p) => (PROG[p.programacao?.situacao] || PROG.NAO_LANCADA).txt },
   { key: "situacao", label: "Situação", valor: (p) => SIT[situacaoDaPeca(p)].txt },
   { key: "material", label: "Material", valor: (p) => (p.material?.recebido ? (p.material.rastreio ? `R ${p.material.rastreio}` : "recebido") : "sem R") },
@@ -612,22 +614,21 @@ export default function ProducaoClient() {
                       <span className="text-sm text-torg-gray truncate">{o.cliente}{o.obra ? ` — ${o.obra}` : ""}</span>
                       {o.refCliente && <span className="text-[11px] text-torg-gray-light">ref. {o.refCliente}</span>}
                     </div>
+                    {/* ⚠⚠ HIERARQUIA, NÃO MENOS DADO. Vitor (01/09/2026): "está um pouco confuso a
+                        visualização". Os cinco números viviam na MESMA linha, do mesmo tamanho,
+                        competindo — "1d de atraso · 96.013 kg na fila · 197/197 programadas · 79
+                        liberadas · 9% Recebimento". Agora o que faz alguém PARAR (atraso, material)
+                        são selos; o resto vira uma linha de apoio, menor. Nenhum número saiu. */}
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       {o.atrasoDias > 0 ? (
-                        <span className="text-[11px] font-bold text-red-600 inline-flex items-center gap-1">
-                          <CalendarClock size={11} /> {o.atrasoDias}d de atraso
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 inline-flex items-center gap-1">
+                          <CalendarClock size={11} /> {o.atrasoDias} {o.atrasoDias === 1 ? "dia" : "dias"} de atraso
                         </span>
                       ) : (
-                        <span className="text-[11px] text-torg-gray inline-flex items-center gap-1">
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-torg-gray inline-flex items-center gap-1">
                           <CalendarClock size={11} /> entrega {fmtD(o.entrega)}
                         </span>
                       )}
-                      <span className="text-[11px] text-torg-gray tabular-nums">{fmtKg(o.kg.pendente)} na fila</span>
-                      {/* ⚠ os três números que decidem o dia do PCP: o que o programador programou, o
-                          que falta programar e o que já desceu para a fábrica (GRD impressa). */}
-                      <Conta n={o.pecas.lancadas} de={o.pecas.total} label="programadas" cor="text-sky-700" />
-                      {o.pecas.naoLancadas > 0 && <Conta n={o.pecas.naoLancadas} label="não programadas" cor="text-red-600" />}
-                      <Conta n={o.pecas.liberadas} label="liberadas" cor="text-emerald-700" />
                       {o.compra && <CompraChip compra={o.compra} opNumero={o.opNumero} mini />}
                       {o.alertas.map((a) => {
                         const t = ALERTA[a];
@@ -636,6 +637,26 @@ export default function ProducaoClient() {
                         ) : null;
                       })}
                     </div>
+                    {/* a barra é o CORTE — o portão da obra: nada anda enquanto ele não passa */}
+                    {(() => {
+                      const c = o.setores.find((x) => x.setor === "CORTE");
+                      const pct = c?.pct ?? null;
+                      return (
+                        <div className="flex items-center gap-2.5 mt-2 flex-wrap">
+                          {pct != null && (
+                            <span className="h-1.5 w-32 rounded-full bg-gray-100 overflow-hidden shrink-0" title={`Preparação ${pct}% pronta`}>
+                              <i className="block h-full bg-torg-blue" style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
+                            </span>
+                          )}
+                          <span className="text-[11px] text-torg-gray-light tabular-nums">
+                            {pct != null && <>corte {pct}% · </>}
+                            {fmtKg(o.kg.pendente)} na fila · {fmtN(o.pecas.lancadas)}/{fmtN(o.pecas.total)} programadas
+                            {o.pecas.naoLancadas > 0 && <span className="text-red-600 font-semibold"> · {fmtN(o.pecas.naoLancadas)} não programadas</span>}
+                            {" · "}{fmtN(o.pecas.liberadas)} liberadas
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -648,19 +669,37 @@ export default function ProducaoClient() {
                           TODOS os setores por onde ainda vai passar, então somar as abas dá muito
                           mais que o peso da obra. Croqui só existe na Preparação; conjunto vai de
                           Montagem a Expedição; avulsa é cortada e pula Montagem/Solda. */}
-                      {o.setores.map((s) => (
-                        <button key={s.setor} onClick={() => trocarSetor(o, s.setor)}
-                          title={`${s.label}: falta passar ${fmtKg(s.pendenteKg)} de ${fmtKg(s.totalKg)} (${s.pct}% pronto).${s.atrasoDias > 0 ? ` Atrasado ${s.atrasoDias} dia(s).` : s.entrega ? ` Até ${fmtD(s.entrega)}.` : ""} A mesma peça conta em cada setor por onde ainda vai passar — não some as abas.`}
-                          className={`text-[11px] px-2.5 py-1 rounded-lg border font-semibold ${
-                            setorAba === s.setor ? "bg-torg-blue text-white border-torg-blue"
-                            /* ⚠ o atraso POR SETOR vivia nos chips do cabeçalho, que saíram. Sem
-                               trazê-lo para cá, a informação sumiria junto — e é ela que diz QUAL
-                               setor está segurando a obra, não o atraso da OP inteira. */
-                            : s.atrasoDias > 0 ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                            : "border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
-                          {s.label} <span className="font-normal opacity-80">{fmtKg(s.pendenteKg)}</span>
-                        </button>
-                      ))}
+                      {/* ⚠⚠ A UNIDADE MUDA COM O SETOR. Vitor (01/09/2026): "vamos ter que prever
+                          em peças, pois isso não vai fechar". O corte se mede em kg — é a meta dele.
+                          Da montagem em diante, em PEÇA: as mesmas bancadas mantiveram 35→36 peças
+                          por dia enquanto o kg/dia caía de 4.312 para 1.425, porque a peça ficou
+                          três vezes mais leve. Sete abas em kg faziam a montagem parecer parada.
+                          ⚠ ZERO E "AINDA NÃO CHEGOU A VEZ" NÃO SÃO A MESMA COISA: setor sem fila
+                          mostra "—", não 0 kg. */}
+                      {o.setores.map((s) => {
+                        const emKg = s.setor === "CORTE";
+                        const vazio = (s.pendenteKg || 0) <= 0;
+                        const sel = setorAba === s.setor;
+                        return (
+                          <button key={s.setor} onClick={() => trocarSetor(o, s.setor)}
+                            title={`${s.label}: falta passar ${fmtKg(s.pendenteKg)} de ${fmtKg(s.totalKg)} (${s.pct}% pronto)${emKg ? "" : ` · ${fmtN(s.pendenteItens)} marca(s), ${fmtN(s.pendenteUn)} peça(s)`}.${s.atrasoDias > 0 ? ` Atrasado ${s.atrasoDias} dia(s).` : s.entrega ? ` Até ${fmtD(s.entrega)}.` : ""} A mesma peça conta em cada setor por onde ainda vai passar — não some as abas.`}
+                            className={`text-left px-2.5 py-1.5 rounded-lg border ${
+                              sel ? "bg-torg-blue text-white border-torg-blue"
+                              /* ⚠ o atraso POR SETOR diz QUAL setor está segurando a obra — o
+                                 atraso da OP inteira não diz. */
+                              : s.atrasoDias > 0 ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                              : vazio ? "border-gray-100 text-torg-gray-light"
+                              : "border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
+                            <span className="block text-[10px] font-bold uppercase tracking-wider opacity-90">{s.label}</span>
+                            <span className="block text-[13px] font-extrabold tabular-nums leading-tight">
+                              {vazio ? "—" : emKg ? fmtKg(s.pendenteKg) : fmtN(s.pendenteItens)}
+                            </span>
+                            <span className={`block text-[10px] ${sel ? "opacity-80" : "opacity-70"}`}>
+                              {vazio ? "nada na fila" : emKg ? `${fmtN(s.pendenteItens)} peças` : `marcas · ${fmtN(s.pendenteUn)} un · ${fmtKg(s.pendenteKg)}`}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
 
                     {carregandoDet ? (
@@ -671,12 +710,21 @@ export default function ProducaoClient() {
                       <>
                         <div className="px-3 py-2.5 border-b border-gray-100 space-y-2">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            {FILTROS.map((f) => (
+                            {/* ⚠⚠ SÓ O QUE EXISTE. Vitor (01/09/2026), sobre a tela confusa: a faixa
+                                mostrava "Todas 0 · Não iniciadas 0 · Não programadas 0 · Programadas
+                                0 · Iniciadas 0" — cinco zeros ocupando uma linha inteira e nenhum
+                                deles clicável com proveito. Chip vazio some; o selecionado fica
+                                sempre (senão o filtro ativo desapareceria e ninguém saberia por que
+                                a lista está curta). */}
+                            {FILTROS.filter((f) => contas[f.key] > 0 || filtroProg === f.key).map((f) => (
                               <button key={f.key} onClick={() => setFiltroProg(f.key)}
                                 className={`text-[11px] px-2 py-1 rounded-lg border font-semibold ${filtroProg === f.key ? "bg-torg-blue text-white border-torg-blue" : "border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
                                 {f.label} <span className="font-normal opacity-75 tabular-nums">{fmtN(contas[f.key])}</span>
                               </button>
                             ))}
+                            {FILTROS.every((f) => !contas[f.key]) && (
+                              <span className="text-[11px] text-torg-gray-light">nenhuma peça pendente neste setor</span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <input value={filtroPecas} onChange={(e) => setFiltroPecas(e.target.value)} placeholder="filtrar marca, perfil…"
@@ -694,12 +742,18 @@ export default function ProducaoClient() {
                             <span className="flex-1" />
                             {/* ⚠ com peça marcada, a lista sai SÓ das marcadas; sem marcar, da OP
                                 inteira — igual ao painel da TV. É o que deixa separar por lote. */}
+                            {/* ⚠ SEPARAÇÃO É DO CORTE. Vitor (01/09/2026): "não precisa o botão
+                                separação nesse caso para os perfis" — na montagem a unidade é o
+                                conjunto, que não tem perfil nem barra a separar. O botão some em
+                                vez de ficar cinza ocupando espaço. */}
+                            {(!setorAba || setorAba === "CORTE") && (
                             <button onClick={() => setSeparacao({ opId: aberta, obra: `${fmtOP(detalhe.opNumero)}${o.obra ? ` — ${o.obra}` : ""}`, setor: setorAba || null, ids: sel.size ? [...sel] : null })}
                               disabled={!detalhe}
                               title={sel.size ? `Lista de separação das ${sel.size} peça(s) marcadas` : "Lista de separação da OP inteira — material, barras, peso e o R de cada um"}
                               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-torg-blue-200 text-torg-blue hover:bg-torg-blue-50 disabled:opacity-40">
                               <Package size={13} /> Separação{sel.size ? ` (${sel.size})` : ""}
                             </button>
+                            )}
                             <button onClick={exportar} disabled={!pecas.length || exportando}
                               title="Baixa a lista filtrada em Excel, no padrão das planilhas da Torg"
                               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-torg-gray hover:bg-gray-50 disabled:opacity-40">
@@ -707,26 +761,41 @@ export default function ProducaoClient() {
                             </button>
                             {/* ⚠ a baixa é do PORTAL, não do Syneco — o rótulo diz o setor para ninguém
                                 baixar na aba errada achando que baixou na fábrica inteira. */}
-                            <button onClick={darBaixa} disabled={!sel.size || baixando || !setorAba}
+                            {/* ⚠⚠ AÇÃO QUE DEPENDE DE SELEÇÃO SÓ APARECE COM SELEÇÃO. Vitor
+                                (01/09/2026): "está um pouco confuso". Eram cinco botões lado a
+                                lado, três deles apagados — e botão cinza não ensina o que fazer,
+                                só ocupa espaço e faz a pessoa clicar para descobrir que não dá.
+                                Sem peça marcada a barra fica com o que funciona sempre (Separação e
+                                Planilha); marcou, aparecem as ações do lote. */}
+                            {sel.size > 0 && setorAba && (
+                            <button onClick={darBaixa} disabled={baixando}
                               title={sel.size ? `Marca como feita na ${SETOR_LABEL[setorAba] || setorAba} — registro do portal, não escreve no Syneco` : "Selecione as peças"}
                               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-40">
                               {baixando ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
                               Baixa manual{setorAba ? ` · ${SETOR_LABEL[setorAba] || setorAba}` : ""}
                             </button>
+                            )}
                             {/* ⚠ é a fila da produção: as peças sobem para o topo da aba do setor
                                 em /producao/prioridades e CONTINUAM aqui, só com a marcação nova. */}
-                            <button onClick={mandarParaProducao} disabled={!sel.size || mandando}
+                            {sel.size > 0 && (
+                            <button onClick={mandarParaProducao} disabled={mandando}
                               title={sel.size ? `Põe ${sel.size} peça(s) na fila da ${SETOR_LABEL[setorAba] || setorAba} no Painel de Produção` : "Selecione as peças"}
                               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-torg-blue text-white hover:opacity-90 disabled:opacity-40">
                               {mandando ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
                               Mandar p/ produção
                             </button>
-                            <button onClick={imprimirELiberar} disabled={!marcasSel.length || imprimindo}
+                            )}
+                            {marcasSel.length > 0 && (
+                            <button onClick={imprimirELiberar} disabled={imprimindo}
                               title={marcasSel.length ? `Imprime o desenho carimbado e registra a GRD de ${marcasSel.length} marca(s)` : "Selecione as peças"}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-torg-orange text-white hover:opacity-90 disabled:opacity-40">
                               {imprimindo ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />}
                               Imprimir e liberar
                             </button>
+                            )}
+                            {sel.size === 0 && (
+                              <span className="text-[11px] text-torg-gray-light">marque peças para liberar, dar baixa ou mandar p/ produção</span>
+                            )}
                           </div>
                         </div>
 
@@ -745,7 +814,7 @@ export default function ProducaoClient() {
                                     onChange={() => marcarTodas(pecas)} className="accent-torg-orange" />
                                 </th>
                                 <ThFiltro col="marca" label="Marca" larg="w-[17%]" className="px-2 py-2 text-left font-bold" {...fp} />
-                                <ThFiltro col="perfil" label="Perfil" larg="w-[12%]" className="px-2 py-2 text-left font-bold" {...fp} />
+                                <ThFiltro col="perfil" label="Descrição" larg="w-[12%]" className="px-2 py-2 text-left font-bold" {...fp} />
                                 <th className="px-2 py-2 text-right font-bold w-[10%]"
                                   title="Quantidade já feita neste setor sobre a quantidade da peça. O feito é o apontamento do Syneco ou a baixa do portal, o que for maior.">
                                   Feito / Qtd
@@ -888,14 +957,6 @@ export default function ProducaoClient() {
           ids={separacao.ids} onClose={() => setSeparacao(null)} />
       )}
     </div>
-  );
-}
-
-function Conta({ n, de, label, cor }) {
-  return (
-    <span className={`text-[11px] tabular-nums ${cor}`}>
-      <span className="font-bold">{fmtN(n)}</span>{de != null ? <span className="text-torg-gray-light">/{fmtN(de)}</span> : null} {label}
-    </span>
   );
 }
 
