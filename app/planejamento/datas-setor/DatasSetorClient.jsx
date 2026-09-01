@@ -82,8 +82,12 @@ export default function DatasSetorClient() {
                 <div className="mt-6 pt-5 border-t border-gray-100">
                   <div className="flex items-center gap-1 mb-3 border-b border-gray-100">
                     {[
-                      { k: "PCP", icone: Send, rotulo: "Liberar para o PCP" },
-                      { k: "MONTAGEM", icone: Wrench, rotulo: "Montagem — conjuntos" },
+                      // ⚠ os dois rótulos dizem o mesmo verbo e o SETOR de destino (Vitor,
+                      // 01/09/2026). "Liberar para o PCP" não dizia para qual setor, e
+                      // "Montagem — conjuntos" descrevia o conteúdo em vez da ação — lado a lado,
+                      // pareciam coisas de naturezas diferentes quando são o mesmo ato.
+                      { k: "PCP", icone: Send, rotulo: "Liberar para preparação" },
+                      { k: "MONTAGEM", icone: Wrench, rotulo: "Liberar para montagem" },
                     ].map(({ k, icone: Icone, rotulo }) => (
                       <button key={k} onClick={() => setAba(k)}
                         className={`px-3 py-2 text-sm font-semibold inline-flex items-center gap-2 border-b-2 -mb-px ${
