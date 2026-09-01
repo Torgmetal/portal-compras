@@ -78,10 +78,39 @@ export default function PainelBancadas({ conjuntos, onLiberar, ocupado }) {
       });
       ws.columns = [{ width: 14 }, { width: 11 }, { width: 10 }, { width: 16 }, { width: 34 },
                     { width: 7 }, { width: 11 }, { width: 12 }, { width: 11 }];
+      // ⚠⚠ UMA FOLHA POR BANCADA. Vitor (01/09/2026): "preciso que deixe formatado para a
+      // impressão sair uma folha por bancada, não quebrando a página, pois quero entregar essa
+      // relação aos montadores". A planilha deixou de ser só para conferência do planejamento: cada
+      // folha vai para a mão de UM montador, e folha com duas bancadas manda a pessoa trabalhar na
+      // lista de outro. Três coisas garantem isso, e as três precisam existir juntas:
+      //   1. quebra de página depois de cada bancada (mais abaixo);
+      //   2. `printTitlesRow` repetindo o cabeçalho Torg + os títulos das colunas em TODA folha —
+      //      sem isso, a bancada que passa de uma página vira uma tabela sem cabeçalho;
+      //   3. uma faixa com o nome da bancada abrindo o bloco, porque quem recebe a folha precisa
+      //      ler de quem ela é sem caçar na coluna 1.
+      // `fitToHeight: 0` (do criarRelatorioTorg) é o que permite a bancada grande passar para a
+      // segunda folha em vez de ser espremida até ficar ilegível.
+      const linhaCabecalho = linhaInicio;
+      ws.pageSetup.printTitlesRow = `1:${linhaCabecalho}`;
+
+      const faixaBancada = (linha, b, un, kg) => {
+        ws.mergeCells(linha, 1, linha, 9);
+        const c = ws.getCell(linha, 1);
+        c.value = `${b.bancada}   ·   ${b.dias.length} dia(s)   ·   ${un} peca(s)   ·   ${Math.round(kg).toLocaleString("pt-BR")} kg`;
+        c.font = { name: "Arial", size: 11, bold: true, color: { argb: "FFFFFF" } };
+        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: CORES.TORG_BLUE } };
+        c.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+        ws.getRow(linha).height = 22;
+      };
+
       let row = linhaInicio;
       adicionarHeaderTabela(ws, row, ["Bancada", "Dia", "OP", "Marca", "Descricao", "Qte", "Peso (kg)", "Dias-bancada", "Prioridade"]);
       row++;
-      for (const b of porDia) {
+      for (const [iB, b] of porDia.entries()) {
+        const totUn = b.dias.reduce((s2, d) => s2 + d.itens.reduce((s3, it) => s3 + Math.max(1, Number(it.qte) || 1), 0), 0);
+        const totKg = b.dias.reduce((s2, d) => s2 + d.itens.reduce((s3, it) => s3 + (Number(it.pesoTotalKg) || 0), 0), 0);
+        faixaBancada(row, b, totUn, totKg);
+        row++;
         let unB = 0, kgB = 0, diasB = 0;
         for (const d of b.dias) {
           for (const it of d.itens) {
@@ -105,6 +134,10 @@ export default function PainelBancadas({ conjuntos, onLiberar, ocupado }) {
         adicionarLinhaTotais(ws, row, [`${b.bancada} - total`, `${b.dias.length} dia(s)`, "", "", "",
           unB, Math.round(kgB), Number(diasB.toFixed(2)), ""]);
         row += 2;
+        // ⚠ a quebra vai DEPOIS da linha em branco (row-1), não depois do total: quebrando no total,
+        // a folha seguinte abriria com uma linha vazia antes da faixa da bancada.
+        // A última bancada não leva quebra — senão sai uma folha só com a legenda.
+        if (iB < porDia.length - 1) ws.getRow(row - 1).addPageBreak();
       }
       adicionarLegenda(ws, row, [
         { label: "Dias-bancada = quanto o conjunto consome de uma jornada de bancada" },
