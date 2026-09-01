@@ -55,6 +55,8 @@ export default function CmrLancarClient() {
   const [filtros, setFiltros] = useState({}); // { colKey: Set(valores) }
   const [ordenar, setOrdenar] = useState(null); // { key, dir }
   const [filtroAberto, setFiltroAberto] = useState(null); // { key, rect }
+  const [selecionada, setSelecionada] = useState(null); // id da linha clicada (marca a linha toda)
+  const [soSemCert, setSoSemCert] = useState(false); // filtro rápido: só os sem certificado
 
   // Normaliza cada item p/ o filtro/ordenação (rc derivado, cert, data formatada).
   const linhas = useMemo(() => (dados?.itens || []).map((it) => {
@@ -74,6 +76,7 @@ export default function CmrLancarClient() {
 
   const visiveis = useMemo(() => {
     let arr = linhas.filter((l) => passa(l, null));
+    if (soSemCert) arr = arr.filter((l) => !l.certOk);
     if (ordenar) {
       const col = COLUNAS.find((c) => c.key === ordenar.key);
       arr = [...arr].sort((a, b) => {
@@ -84,7 +87,7 @@ export default function CmrLancarClient() {
       });
     }
     return arr;
-  }, [linhas, passa, ordenar]);
+  }, [linhas, passa, ordenar, soSemCert]);
 
   const distintos = useCallback((colKey) => {
     const col = COLUNAS.find((c) => c.key === colKey);
@@ -347,19 +350,24 @@ export default function CmrLancarClient() {
         {/* Legenda + filtros ativos */}
         <div className="px-4 py-1.5 flex items-center gap-4 text-[11px] text-torg-gray border-b border-gray-50 flex-wrap">
           <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-yellow-200 border border-yellow-300" /> com certificado</span>
-          <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-100 border border-red-300" /> falta certificado</span>
+          <button onClick={() => setSoSemCert((v) => !v)} title="Clique para ver só os itens sem certificado"
+            className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 border ${soSemCert ? "bg-red-100 border-red-400 text-red-700 font-medium" : "border-transparent hover:bg-red-50"}`}>
+            <span className="w-3 h-3 rounded bg-red-100 border border-red-300" /> falta certificado{soSemCert ? " ✓" : ""}
+          </button>
           {(Object.keys(filtros).length > 0 || ordenar) && (
             <button onClick={() => { setFiltros({}); setOrdenar(null); }} className="ml-auto text-torg-blue hover:underline inline-flex items-center gap-1"><X size={12} /> Limpar filtros ({visiveis.length} de {linhas.length})</button>
           )}
         </div>
         <div className="overflow-auto max-h-[68vh]">
           <table className="text-[11px] whitespace-nowrap" style={{ minWidth: 1500 }}>
-            <thead className="bg-gray-100 sticky top-0 z-10"><tr className="text-[10px] text-gray-600 uppercase">
+            <thead className="bg-gray-100 sticky top-0 z-20"><tr className="text-[10px] text-gray-600 uppercase">
               {COLUNAS.map((col) => {
                 const ativo = !!filtros[col.key];
                 const ord = ordenar?.key === col.key ? ordenar.dir : null;
+                const sticky = col.key === "rc" ? "sticky left-0 z-30 bg-gray-100 min-w-[56px] max-w-[56px]"
+                  : col.key === "importRef" ? "sticky left-[56px] z-30 bg-gray-100 min-w-[80px]" : "";
                 return (
-                  <th key={col.key} className={`px-2.5 py-2 ${col.align === "right" ? "text-right" : "text-left"}`}>
+                  <th key={col.key} className={`px-2.5 py-2 ${col.align === "right" ? "text-right" : "text-left"} ${sticky}`}>
                     <button onClick={(e) => setFiltroAberto({ key: col.key, rect: e.currentTarget.getBoundingClientRect() })}
                       className={`inline-flex items-center gap-1 hover:text-torg-blue ${ativo || ord ? "text-torg-blue" : ""}`}>
                       {col.label}
@@ -373,10 +381,16 @@ export default function CmrLancarClient() {
             <tbody className="divide-y divide-gray-100">
               {dados === null ? <tr><td colSpan={14} className="px-3 py-8 text-center text-torg-gray"><Loader2 size={16} className="animate-spin inline" /></td></tr>
                 : visiveis.length === 0 ? <tr><td colSpan={14} className="px-3 py-8 text-center text-torg-gray">{linhas.length === 0 ? `Nenhum lançamento em ${ano}.` : "Nenhuma linha com os filtros atuais."}</td></tr>
-                : visiveis.map((l) => (
-                  <tr key={l.id} className={`align-top ${l.certOk ? "bg-yellow-50 hover:bg-yellow-100/70" : "bg-red-50 hover:bg-red-100/60"}`}>
-                    <td className="px-2.5 py-1 font-mono font-semibold">{l.rc}</td>
-                    <td className="px-2.5 py-1 font-mono text-torg-blue">{l.importRef}</td>
+                : visiveis.map((l) => {
+                  const sel = l.id === selecionada;
+                  // Fundo da linha (também aplicado nas células travadas p/ cobrir o scroll horizontal).
+                  const rowBg = sel ? "bg-torg-blue-100" : (l.certOk ? "bg-yellow-50" : "bg-red-50");
+                  const rowHover = sel ? "" : (l.certOk ? "hover:bg-yellow-100/70" : "hover:bg-red-100/60");
+                  return (
+                  <tr key={l.id} onClick={() => setSelecionada(sel ? null : l.id)}
+                    className={`align-top cursor-pointer ${rowBg} ${rowHover}`}>
+                    <td className={`px-2.5 py-1 font-mono font-semibold sticky left-0 z-10 min-w-[56px] max-w-[56px] ${rowBg}`}>{l.rc}</td>
+                    <td className={`px-2.5 py-1 font-mono text-torg-blue sticky left-[56px] z-10 min-w-[80px] ${rowBg}`}>{l.importRef}</td>
                     <td className="px-2.5 py-1 min-w-[360px] max-w-[560px] whitespace-normal break-words leading-snug" title={l.nome}><span className="line-clamp-2">{l.nome}</span></td>
                     <td className="px-2.5 py-1">{l.certOk ? l.numeroDocumento : <span className="text-red-600 font-medium">falta</span>}</td>
                     <td className="px-2.5 py-1 text-torg-gray">{l.numeroCorrida || "—"}</td>
@@ -390,7 +404,8 @@ export default function CmrLancarClient() {
                     <td className="px-2.5 py-1 text-right tabular-nums">{fmtNum(l.pesoKg)}</td>
                     <td className="px-2.5 py-1 min-w-[220px] max-w-[340px] whitespace-normal break-words leading-snug text-torg-gray" title={l.obs}><span className="line-clamp-2">{l.obs || "—"}</span></td>
                   </tr>
-                ))}
+                  );
+                })}
             </tbody>
           </table>
         </div>

@@ -45,9 +45,12 @@ export async function GET(req) {
     prisma.documentoQualidade.findMany({ where: { categoria: CMR_CAT, importRef: { not: null } }, select: { importRef: true }, distinct: ["importRef"], take: 20000 }),
   ]);
   const anos = [...new Set(anosRaw.map((r) => 2000 + Number(String(r.importRef).slice(0, 2))).filter((a) => a >= 2000 && a < 2100))].sort((a, b) => b - a);
-  // Esconde as "cascas" — R reservado, sem NENHUMA informação (só o índice). Aparecem quando
-  // o material chega e a linha é preenchida (na planilha ou aqui). Não são deletadas.
-  const itens = rows.filter((r) => !ehCascaVazia(r));
+  // Esconde só as "cascas" DO FINAL — R reservado (sem nenhuma info) cujos índices são MAIORES
+  // que o último R preenchido. Casca no MEIO (com R preenchido acima) continua aparecendo — é um
+  // furo real que precisa ser visto. `rows` vem ordenado por importRef desc.
+  let maxPreenchido = -1;
+  for (const r of rows) { if (!ehCascaVazia(r)) { maxPreenchido = Number(r.importRef); break; } }
+  const itens = rows.filter((r) => !ehCascaVazia(r) || Number(r.importRef) < maxPreenchido);
   return NextResponse.json({ success: true, ano, total: itens.length, itens, anos: anos.length ? anos : [ano] });
 }
 
