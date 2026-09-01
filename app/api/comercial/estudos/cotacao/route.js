@@ -18,15 +18,15 @@ import { sendEmail } from "@/lib/email";
 import { cabecalhoEmail } from "@/lib/email-layout";
 import { emailCotacaoTinta } from "@/lib/cotacao-tinta-email";
 import { emailCotacaoAco } from "@/lib/cotacao-aco-email";
+import { FAMILIAS_COTACAO, fornecedorAtende } from "@/lib/cotacao-familias";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-// família do vendor list por tipo de insumo — é o filtro que traz "os cadastrados"
-// ⚠ Vitor (01/09/2026): "no caso do aço, quando tivermos uma lista específica por tipo do material
-// seria interessante ter esse botão para podermos cotar também, pois isso é bem significativo para
-// nós; quando é apenas usado peso na família do perfil fica mais difícil para comprarmos".
-const FAMILIA = { TINTA: /tinta/i, ACO: /mat[ée]ria.?prima/i };
+// ⚠ O DE-PARA MORA EM lib/cotacao-familias.js. Vitor (01/09/2026): "terças Z também precisam
+// aparecer junto com a matéria prima, curvas de GC também (…) seria bom vc trazer separado para
+// não cometermos erro de enviar para cotação". Uma família de cotação junta várias categorias do
+// vendor list — quem vende terça Z é o mesmo mundo de quem vende perfil.
 
 export async function GET(req) {
   try { await requireRole(["ADMIN", "COMERCIAL", "COMPRAS"]); }
@@ -35,8 +35,7 @@ export async function GET(req) {
   const u = new URL(req.url);
   const tipo = String(u.searchParams.get("tipo") || "TINTA").toUpperCase();
   const estudoId = String(u.searchParams.get("estudoId") || "");
-  const rx = FAMILIA[tipo];
-  if (!rx) return NextResponse.json({ error: "Tipo de insumo desconhecido." }, { status: 400 });
+  if (!FAMILIAS_COTACAO[tipo]) return NextResponse.json({ error: "Família de cotação desconhecida." }, { status: 400 });
 
   const todos = await prisma.fornecedor.findMany({
     where: { ativo: true },
@@ -46,7 +45,7 @@ export async function GET(req) {
   // ⚠ SEM E-MAIL NÃO ENTRA NA LISTA: um fornecedor que não dá para chamar só ocuparia espaço e
   // criaria a impressão de que a cotação foi mais ampla do que foi.
   const fornecedores = todos
-    .filter((f) => f.email && rx.test(Array.isArray(f.categorias) ? f.categorias.join(" ") : String(f.categorias || "")))
+    .filter((f) => f.email && fornecedorAtende(f, tipo))
     .map((f) => ({ id: f.id, nome: f.nomeFantasia || f.razaoSocial, email: f.email, praca: [f.cidade, f.uf].filter(Boolean).join("/") }));
 
   const cotacoes = estudoId
@@ -113,9 +112,10 @@ export async function POST(req) {
     // concorrente, sem OP: é orçamento, não pedido.
     // ⚠ o corpo vem de lib/cotacao-tinta-email.js — a prévia que o Vitor revisa usa a MESMA
     // função, então o que ele aprova é literalmente o que sai.
-      const msg = b.tipo === "ACO"
-      ? emailCotacaoAco(f, s, { obra, numero: est?.numero, ano: est?.ano, token: f.token })
-      : emailCotacaoTinta(f, s, { obra, numero: est?.numero, ano: est?.ano, token: f.token });
+      // ⚠ TINTA tem e-mail próprio (área + esquema + perda); todo o resto — aço, telha, grade,
+    // fixador — é uma LISTA de itens, e o mesmo corpo serve. O que muda é o rótulo da família.
+    const ctx = { obra, numero: est?.numero, ano: est?.ano, token: f.token, familia: FAMILIAS_COTACAO[b.tipo]?.rotulo };
+    const msg = b.tipo === "TINTA" ? emailCotacaoTinta(f, s, ctx) : emailCotacaoAco(f, s, ctx);
     const r = await sendEmail({
       to: f.email, subject: msg.subject, html: msg.html, text: msg.text,
       replyTo: user.email || undefined,

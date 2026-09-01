@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload, Send } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { FAMILIAS_COTACAO, FAMILIA_DO_ITEM } from "@/lib/cotacao-familias";
 import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAPACIDADE_CARGA, EVENTOS_PAGAMENTO, PAGAMENTO_PADRAO, PRAZOS_PAGAMENTO, conferirPagamento, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa, resultadoDoCenario, sensibilidade, ALAVANCAS_SENSIVEIS, equilibrioConvergido, impostosDoCenario } from "@/lib/lqc";
 import { capacidadePorHora } from "@/lib/fabrica-horas";
 
@@ -683,6 +684,10 @@ function Material({ c, res, setComp, estudoId }) {
           se fosse para a obra toda ainda". Telha e calha eram número absoluto e continuavam
           inteiros com 70% da obra fora. Lançando por área, desmarcar um pacote tira a telha dele
           junto — que é o que acontece na obra. */}
+      {/* ⚠ AGRUPADO POR FAMÍLIA, e não numa lista só. Vitor (01/09/2026): "seria bom vc trazer
+          separado para não cometermos erro de enviar para cotação". Numa lista única, telha, grade
+          e chumbador ficam lado a lado e o botão de cotar vira uma armadilha: um clique distraído
+          manda telha para quem vende parafuso. Separado, o grupo E o botão são a mesma coisa. */}
       <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
         <p className="text-[12px] font-bold text-torg-dark px-4 py-2 bg-gray-50">Itens comerciais</p>
         <table className="w-full text-[12px]">
@@ -692,7 +697,12 @@ function Material({ c, res, setComp, estudoId }) {
               <th className="text-right px-4 py-1.5">Subtotal</th></tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {ITENS_COMERCIAIS.map((i) => {
+            {ITENS_COMERCIAIS.map((i, idxItem) => {
+              // ⚠ o cabeçalho do grupo entra quando a família MUDA — a lista já vem ordenada por
+              // família (ver ITENS_ORDENADOS), então isso basta e evita montar sub-tabelas.
+              const fam = FAMILIA_DO_ITEM[i.key] || null;
+              const famAnterior = idxItem > 0 ? (FAMILIA_DO_ITEM[ITENS_COMERCIAIS[idxItem - 1].key] || null) : undefined;
+              const abreGrupo = fam !== famAnterior;
               const calc = (res.grupos ? null : null) || (res.comerciaisDetalhe || []).find((x) => x.key === i.key);
               const cfg = it[i.key] || {};
               const porArea = cfg.porArea || {};
@@ -703,6 +713,22 @@ function Material({ c, res, setComp, estudoId }) {
               const aberta = expandido === i.key;
               return (
                 <Fragment key={i.key}>
+                  {abreGrupo && (
+                    <tr>
+                      <td colSpan={5} className="px-4 pt-3 pb-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-2">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-torg-blue">
+                            {fam ? FAMILIAS_COTACAO[fam]?.rotulo : "Sem família definida"}
+                          </span>
+                          {fam
+                            ? <BotaoCotarFamilia familia={fam} estudoId={estudoId} itens={ITENS_COMERCIAIS.filter((x) => FAMILIA_DO_ITEM[x.key] === fam)} it={it} areas={areas} />
+                            : <span className="text-[11px] text-torg-orange-700">
+                                sem fornecedor definido — não dá para cotar até alguém dizer qual família atende
+                              </span>}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                   <tr>
                     <td className="px-4 py-1">
                       <button onClick={() => setExpandido(aberta ? null : i.key)} className="text-left hover:text-torg-blue">
@@ -1208,6 +1234,107 @@ function ListaMaterialAco({ c, setComp, estudoId, res }) {
             </tbody>
           </table>
         </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── COTAR UMA FAMÍLIA DE ITENS COMERCIAIS ────────────────────────────────────────────────────
+// Vitor (01/09/2026): "trazer o botão de cotação nesses itens também, grade de piso e demais que
+// estiverem lá, seria bom vc trazer separado para não cometermos erro de enviar para cotação".
+//
+// ⚠⚠ O BOTÃO É DO GRUPO, e é isso que impede o erro. Um botão único no rodapé da tabela mandaria
+// tudo para todos; aqui cada família só enxerga os itens dela e só os fornecedores dela. Telha não
+// tem como sair para quem vende parafuso.
+//
+// ⚠ SÓ ENTRA ITEM COM QUANTIDADE. Mandar "Rufos — 0 m" para o fornecedor é pedir preço de nada, e
+// ele responde perguntando o que é. O botão desliga quando o grupo inteiro está zerado.
+function BotaoCotarFamilia({ familia, estudoId, itens, it, areas }) {
+  const [dados, setDados] = useState(null);
+  const [marcados, setMarcados] = useState(() => new Set());
+  const [abrir, setAbrir] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const [aviso, setAviso] = useState("");
+
+  const carregar = useCallback(() => {
+    if (!estudoId) return;
+    fetch(`/api/comercial/estudos/cotacao?tipo=${familia}&estudoId=${estudoId}`)
+      .then((r) => r.json()).then((j) => !j.error && setDados(j)).catch(() => {});
+  }, [estudoId, familia]);
+  useEffect(() => { if (abrir) carregar(); }, [abrir, carregar]);
+
+  // quantidade do item: soma por área quando existir, senão o número solto
+  const qtdDe = (k) => {
+    const cfg = it[k] || {};
+    const pa = cfg.porArea || {};
+    const soma = (areas || []).reduce((a, ar) => a + num(pa[ar]), 0);
+    return soma > 0 ? soma : num(cfg.qtd);
+  };
+  const lista = itens.map((i) => ({ key: i.key, descricao: i.rotulo, unidade: i.un, qtd: qtdDe(i.key), peso: null,
+                                    norma: null, bitola: (it[i.key] || {}).cor || null }))
+    .filter((i) => i.qtd > 0);
+
+  async function enviar() {
+    if (!marcados.size || !lista.length) return;
+    if (!confirm(`Enviar ${lista.length} item(ns) de ${FAMILIAS_COTACAO[familia]?.rotulo} para ${marcados.size} fornecedor(es)?`)) return;
+    setEnviando(true); setAviso("");
+    try {
+      const r = await fetch("/api/comercial/estudos/cotacao", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estudoId, tipo: familia, fornecedorIds: [...marcados], snapshot: { itens: lista, pesoKg: 0 } }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro");
+      setAviso(`Enviado a ${j.enviados} de ${j.convidados}.`);
+      setMarcados(new Set()); carregar();
+    } catch (e) { setAviso("Falha: " + e.message); } finally { setEnviando(false); }
+  }
+
+  const alterna = (id) => setMarcados((s2) => { const n = new Set(s2); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  if (!abrir) {
+    return (
+      <button onClick={() => setAbrir(true)} disabled={!lista.length}
+        title={lista.length ? "Escolher fornecedores e enviar" : "Nenhum item deste grupo tem quantidade lançada"}
+        className="text-[11px] font-semibold text-torg-blue border border-torg-blue-200 rounded px-2 py-1 hover:bg-torg-blue-50 disabled:opacity-40 inline-flex items-center gap-1">
+        <Send size={11} /> Cotar{lista.length ? ` (${lista.length})` : ""}
+      </button>
+    );
+  }
+
+  return (
+    <div className="w-full">
+      <div className="flex flex-wrap items-center gap-2">
+        {(dados?.fornecedores || []).map((f) => (
+          <label key={f.id}
+            className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] cursor-pointer ${
+              marcados.has(f.id) ? "border-torg-blue bg-torg-blue-50 text-torg-dark" : "border-gray-200 text-torg-gray"}`}>
+            <input type="checkbox" checked={marcados.has(f.id)} onChange={() => alterna(f.id)}
+              className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
+            {f.nome}
+          </label>
+        ))}
+        {dados && !dados.fornecedores.length && (
+          <span className="text-[11px] text-torg-orange-700">
+            Nenhum fornecedor cadastrado nesta família no vendor list.
+          </span>
+        )}
+        <button onClick={enviar} disabled={!marcados.size || enviando}
+          className="text-[11px] font-semibold text-white bg-torg-blue rounded px-2 py-1 hover:bg-torg-dark disabled:opacity-40">
+          {enviando ? "Enviando…" : `Enviar${marcados.size ? ` (${marcados.size})` : ""}`}
+        </button>
+        <button onClick={() => setAbrir(false)} className="text-[11px] text-torg-gray hover:text-torg-dark">fechar</button>
+      </div>
+      {aviso && <p className="mt-1 text-[11px] text-torg-dark">{aviso}</p>}
+      {(dados?.cotacoes || []).map((ct) => (
+        <p key={ct.id} className="mt-1 text-[11px] text-torg-gray">
+          {new Date(ct.enviadoEm).toLocaleDateString("pt-BR")}:{" "}
+          {ct.fornecedores.map((f) => (
+            <span key={f.id} className={`mr-2 ${f.respondidoEm ? "text-emerald-700" : ""}`}>
+              {f.nome}{f.valorTotal > 0 ? ` ${fmtR$(f.valorTotal)}` : f.respondidoEm ? " ✓" : ""}
+            </span>
+          ))}
+        </p>
       ))}
     </div>
   );
