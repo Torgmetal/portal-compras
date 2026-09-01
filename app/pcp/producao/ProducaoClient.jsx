@@ -784,7 +784,15 @@ export default function ProducaoClient() {
                             croqui que faltava, NADA avisa: o PCP já passou por ali, já imprimiu o
                             resto e não volta. A peça só reaparecia se alguém lembrasse dela.
                             ⚠ Esta faixa aparece COM OU SEM SELEÇÃO — é alerta, não convite, e alerta
-                            que só aparece quando você já limpou a seleção não alerta ninguém. */}
+                            que só aparece quando você já limpou a seleção não alerta ninguém.
+                            ⚠⚠ O RÓTULO AQUI É "LIBERADO PARA MONTAGEM", não "esperando descer".
+                            Vitor (01/09/2026): "para o PCP, na página da montagem deveria ser
+                            Liberado pra Montagem, pois aí vai saber que foi por conta do croqui que
+                            foi cortado". É o MESMO fato com dois donos: o Planejamento ESPERA (lá a
+                            faixa diz "esperando descer", ver MontagemConjuntos) e o PCP AGE. Dizer
+                            "esperando" a quem age é acusar de atraso quem acabou de receber a
+                            notícia — e some justamente o que interessa a ele: liberou porque o
+                            croqui saiu. */}
                         {setorAba === "MONTAGEM" && (() => {
                           const esperando = pecas.filter((p) => p.esperandoDescer);
                           if (!esperando.length) return null;
@@ -793,9 +801,9 @@ export default function ProducaoClient() {
                             <div className="mx-3 mb-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-[12px] text-amber-900 flex items-start gap-2 flex-wrap">
                               <BellRing size={15} className="text-amber-600 shrink-0 mt-0.5" />
                               <div className="flex-1 min-w-[240px]">
-                                <b>{esperando.length} conjunto(s) ficaram prontos e ainda não desceram.</b>{" "}
+                                <b>{esperando.length} conjunto(s) liberados para a montagem.</b>{" "}
                                 <span className="text-amber-800">
-                                  Foram programados, a impressão foi recusada por falta de croqui, e o corte já fechou o que faltava.
+                                  O croqui que faltava saiu do corte — agora estes têm todas as sub-peças e podem descer.
                                 </span>
                                 <div className="font-mono text-[11px] mt-1 text-amber-800">
                                   {marcas.slice(0, 12).join(", ")}{marcas.length > 12 ? ` … e mais ${marcas.length - 12}` : ""}
@@ -803,7 +811,7 @@ export default function ProducaoClient() {
                               </div>
                               <button onClick={() => setSel(new Set(esperando.map((p) => p.id)))}
                                 className="px-2.5 py-1.5 rounded-md bg-amber-600 text-white font-semibold whitespace-nowrap hover:bg-amber-700">
-                                marcar {esperando.length} e liberar
+                                imprimir os {esperando.length}
                               </button>
                             </div>
                           );

@@ -42,6 +42,25 @@ export async function GET(req) {
   // "montado" = apontamento do Syneco no setor Montagem — o lançamento de concluído da fábrica
   const montados = await produzidoPorMarca("Montagem", conjuntos.map((c) => c.marca));
 
+  // ⚠⚠ O QUE O PCP JÁ IMPRIMIU. Vitor (01/09/2026): "esse 'esperando para descer' seria
+  // interessante no planejamento". O mesmo fato tem dois donos: aqui o Planejamento ESPERA — ele
+  // programou o conjunto e quer saber se já desceu —, e no painel do PCP a mesma peça aparece como
+  // "liberado para montagem", porque lá quem lê é quem AGE.
+  //
+  // Liberar É imprimir a GRD, então a GRD é a prova de que o desenho está na mão da fábrica. Sem
+  // ela, o conjunto foi programado e parou.
+  const op = await prisma.oP.findUnique({ where: { id: opId }, select: { numero: true } });
+  const liberadas = new Set();
+  if (op?.numero) {
+    try {
+      const gs = await prisma.grdLiberacao.findMany({
+        where: { opNumero: op.numero, marca: { in: conjuntos.map((c) => c.marca) } },
+        select: { marca: true },
+      });
+      for (const g of gs) liberadas.add(String(g.marca || "").toUpperCase());
+    } catch { /* a GRD é informação: não pode derrubar a listagem */ }
+  }
+
   // ⚠⚠ POR QUE A MARCA NÃO ENTROU. Vitor (01/09/2026): "me deu que 8 números não foram encontrados,
   // preciso que me fale quais números é". Dizer QUAIS já dizíamos; o que faltava era o MOTIVO — sem
   // ele, "não encontrada" parece erro do portal, quando quase sempre é peça que legitimamente não
@@ -64,7 +83,10 @@ export async function GET(req) {
   }
 
   return NextResponse.json({
-    conjuntos: conjuntos.map((c) => ({ ...c, prontidao: calcularProntidao(c), conjuntoCroquis: undefined })),
+    conjuntos: conjuntos.map((c) => ({
+      ...c, prontidao: calcularProntidao(c), conjuntoCroquis: undefined,
+      liberado: liberadas.has(String(c.marca || "").toUpperCase()),
+    })),
     montados,
     motivos,
   });
