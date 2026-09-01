@@ -16,7 +16,7 @@
 // data olhando o cronograma, e o corte corre atrás. A prontidão fica na tela como INFORMAÇÃO, para
 // ele saber o que está pedindo; ordena a lista, mas não impede seleção nenhuma.
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, AlertCircle, CalendarClock, ArrowRight, CheckCircle2, X, Upload, Search, Clock } from "lucide-react";
+import { Loader2, AlertCircle, CalendarClock, ArrowRight, CheckCircle2, X, Upload, Search } from "lucide-react";
 
 const isoHoje = () => new Date().toISOString().split("T")[0];
 const isoDe = (v) => (v ? String(v).slice(0, 10) : "");
@@ -97,16 +97,6 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
   const prontos = useMemo(() => visiveis.filter((c) => c.prontidao?.pronto), [visiveis]);
   const montadosN = useMemo(() => lista.filter((c) => c.montado).length, [lista]);
 
-  // ⚠⚠ ESPERANDO DESCER. Vitor (01/09/2026): "esse 'esperando para descer' seria interessante no
-  // planejamento". Conjunto que o Planejamento PROGRAMOU, cujos croquis já saíram todos do corte, e
-  // que o PCP ainda não imprimiu — a GRD é a prova da impressão, e sem ela o desenho não está na
-  // mão de ninguém no chão de fábrica.
-  //
-  // ⚠ É o mesmo fato que no painel do PCP, com o rótulo trocado de propósito: lá diz "liberado para
-  // montagem" (quem lê AGE), aqui diz "esperando descer" (quem lê ESPERA e cobra). O dado é um só;
-  // quem muda é o dono da próxima ação.
-  const esperando = useMemo(() => lista.filter(
-    (c) => c.montagemDiaProgramado && !c.montado && !c.liberado && c.prontidao?.pronto), [lista]);
 
   const grupos = useMemo(() => {
     const hojeIso = isoHoje();
@@ -408,19 +398,6 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
 
         {/* Programado, dia a dia */}
         <div className="rounded-lg border border-gray-100 bg-gray-50/70">
-          {esperando.length > 0 && (
-            <div className="px-2.5 py-2 border-b border-amber-200 bg-amber-50 text-[11px] text-amber-900 rounded-t-lg">
-              <div className="flex items-baseline gap-1.5 flex-wrap">
-                <Clock size={12} className="shrink-0 self-center text-amber-600" />
-                <b>{esperando.length} esperando descer</b>
-                <span className="text-amber-800">— prontos e ainda não impressos pelo PCP.</span>
-              </div>
-              <p className="font-mono text-[10px] mt-1 text-amber-800 break-words">
-                {esperando.slice(0, 10).map((c) => c.marca).join(", ")}
-                {esperando.length > 10 ? ` … e mais ${esperando.length - 10}` : ""}
-              </p>
-            </div>
-          )}
           <div className="px-2.5 py-2 flex items-center gap-1.5 text-[10px] text-torg-gray bg-white border-b border-gray-100 rounded-t-lg">
             <CalendarClock size={11} />
             <span className="font-bold uppercase tracking-wide">programado</span>
