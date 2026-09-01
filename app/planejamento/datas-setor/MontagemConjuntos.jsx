@@ -155,7 +155,11 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
 
   async function lerArquivo(file) {
     try {
-      const XLSX = (await import("xlsx")).default;
+      // ⚠ SEM `.default`. O pacote xlsx é CommonJS; no build ESM o `.default` vem `undefined`, e
+      // `XLSX.read` estourava "Cannot read properties of undefined" em TODA planilha — o botão
+      // simplesmente não funcionava. O namespace do módulo é o objeto certo, como em todos os
+      // outros pontos do portal que leem xlsx no cliente.
+      const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
