@@ -36,6 +36,7 @@ const fmtDiaLongo = (iso) => {
 export default function MontagemConjuntos({ opId, marcoMontagem }) {
   const [conjuntos, setConjuntos] = useState(null);
   const [montados, setMontados] = useState({});
+  const [motivos, setMotivos] = useState({});
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
   const [colando, setColando] = useState(false);
@@ -58,6 +59,7 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
       if (!r.ok) throw new Error(j.error || "Erro ao carregar os conjuntos");
       setConjuntos(j.conjuntos || []);
       setMontados(j.montados || {});
+      setMotivos(j.motivos || {});
       setSel(new Set());
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
   }, [opId]);
@@ -149,7 +151,11 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
     }
     // ⚠ soma à seleção em vez de substituir: quem cola duas listas espera as duas
     setSel((prev) => { const n = new Set(prev); achadas.forEach((c) => n.add(c.id)); return n; });
-    setImportado({ achadas: achadas.length, faltando, montadas: achadas.filter((c) => c.montado).length });
+    // ⚠ CADA NÃO ENCONTRADA VEM COM O MOTIVO. "não encontrada" sozinho parece defeito do portal;
+    // quase sempre é peça que legitimamente não passa pela montagem (croqui, avulsa, item da LE).
+    // O que não casa com nada da obra é o único caso que merece investigação — e agora se distingue.
+    const detalhe = faltando.map((t) => ({ marca: t, motivo: motivos[t.toUpperCase()] || null }));
+    setImportado({ achadas: achadas.length, faltando, detalhe, montadas: achadas.filter((c) => c.montado).length });
     setColando(false); setTexto("");
   }
 
@@ -320,12 +326,26 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
               <b>{importado.achadas}</b> marca(s) selecionada(s).
               {importado.montadas > 0 && <> <span className="text-torg-gray">({importado.montadas} já montada(s) — não entram no plano.)</span></>}
               {importado.faltando.length > 0 && (
-                <div className="mt-1">
+                <div className="mt-1.5">
                   {/* ⚠ o que não casou APARECE: selecionar 60 de 80 em silêncio manda 20 peças para
-                      o limbo, e ninguém descobre até a bancada ficar sem o que montar. */}
-                  <b>{importado.faltando.length} não encontrada(s) nesta obra:</b>{" "}
-                  <span className="font-mono">{importado.faltando.slice(0, 20).join(", ")}</span>
-                  {importado.faltando.length > 20 && <> … e mais {importado.faltando.length - 20}</>}
+                      o limbo, e ninguém descobre até a bancada ficar sem o que montar.
+                      ⚠ E APARECE COM O MOTIVO, uma por linha: a lista corrida separada por vírgula
+                      não dava para conferir contra a planilha nem para copiar. */}
+                  <div className="flex items-baseline gap-2">
+                    <b>{importado.faltando.length} não entrou na seleção:</b>
+                    <button onClick={() => navigator.clipboard?.writeText(importado.faltando.join("\n"))}
+                      className="underline text-[11px] font-normal">copiar as marcas</button>
+                  </div>
+                  <ul className="mt-1 space-y-0.5">
+                    {(importado.detalhe || importado.faltando.map((m) => ({ marca: m, motivo: null }))).map((d) => (
+                      <li key={d.marca} className="flex items-baseline gap-1.5">
+                        <span className="font-mono font-bold">{d.marca}</span>
+                        <span className="text-[11px] font-normal">
+                          {d.motivo || "não existe nesta obra — confira a marca ou a obra selecionada"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
               <button onClick={() => setImportado(null)} className="underline mt-1">ok</button>

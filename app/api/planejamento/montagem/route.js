@@ -42,9 +42,31 @@ export async function GET(req) {
   // "montado" = apontamento do Syneco no setor Montagem — o lançamento de concluído da fábrica
   const montados = await produzidoPorMarca("Montagem", conjuntos.map((c) => c.marca));
 
+  // ⚠⚠ POR QUE A MARCA NÃO ENTROU. Vitor (01/09/2026): "me deu que 8 números não foram encontrados,
+  // preciso que me fale quais números é". Dizer QUAIS já dizíamos; o que faltava era o MOTIVO — sem
+  // ele, "não encontrada" parece erro do portal, quando quase sempre é peça que legitimamente não
+  // passa pela montagem (croqui, avulsa, item da lista de expedição).
+  //
+  // Devolve só marca + motivo das que NÃO são conjunto montável, para a tela classificar o que o
+  // usuário colou sem uma segunda chamada. É texto curto: numa obra de 900 marcas dá poucos KB.
+  const naoMontaveis = await prisma.pecaConjunto.findMany({
+    where: { opId, NOT: CONJUNTO_MONTAVEL },
+    select: { marca: true, tipoPeca: true, descricao: true, conjuntoCroquis: { select: { id: true }, take: 1 } },
+    take: 5000,
+  });
+  const motivos = {};
+  for (const c of naoMontaveis) {
+    const k = String(c.marca || "").trim().toUpperCase();
+    if (!k || motivos[k]) continue;
+    motivos[k] = c.tipoPeca === "CROQUI" ? "é croqui (sub-peça de um conjunto)"
+      : c.tipoPeca === "CONJUNTO" ? "conjunto sem croqui vinculado"
+      : "peça avulsa — não passa pela montagem";
+  }
+
   return NextResponse.json({
     conjuntos: conjuntos.map((c) => ({ ...c, prontidao: calcularProntidao(c), conjuntoCroquis: undefined })),
     montados,
+    motivos,
   });
 }
 
