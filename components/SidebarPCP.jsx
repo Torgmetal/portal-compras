@@ -25,7 +25,7 @@ const menu = [
   { href: "/pcp/fila-corte",   label: "Corte",            icon: ListOrdered },
   // ⚠ a fila da solda vem DEPOIS do corte no menu porque é depois no fluxo: corte → montagem →
   // solda. Entra na fila quem já teve a montagem apontada como concluída no Syneco.
-  { href: "/pcp/solda",        label: "Solda",            icon: Flame },
+  { href: "/pcp/fila-solda",   label: "Fila de Solda",    icon: Flame },
   // ⚠ o indicador ISO do setor mora no menu do setor, como nos outros — quem responde por ele é
   // quem opera, não a Qualidade.
   { href: "/pcp/indicadores",  label: "Indicadores",      icon: Gauge },
