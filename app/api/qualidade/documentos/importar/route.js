@@ -13,6 +13,7 @@ import { downloadSharedFile, downloadFileByPath } from "@/lib/sharepoint";
 import { isBlobUrlSegura } from "@/lib/blob-url";
 import { parseCMR } from "@/lib/parse-cmr";
 import { casarCertificados } from "@/lib/match-certificados";
+import { DO_CMR } from "@/lib/cmr-origens";
 
 export const runtime = "nodejs";
 // CMR é grande (~17MB): download do SharePoint + parse do ExcelJS pode passar de 60s
@@ -52,7 +53,7 @@ async function baixarEParsear(url) {
 
 async function refsExistentes(refs) {
   const existentes = await prisma.documentoQualidade.findMany({
-    where: { origem: "importacao_planilha", importRef: { in: refs } },
+    where: { ...DO_CMR, importRef: { in: refs } },
     select: { importRef: true },
   });
   return new Set(existentes.map((e) => e.importRef));

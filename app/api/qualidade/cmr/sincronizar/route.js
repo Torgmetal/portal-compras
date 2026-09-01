@@ -9,6 +9,7 @@ import { baixarCmrAtual } from "@/lib/sharepoint";
 import { parseCMR } from "@/lib/parse-cmr";
 import { conciliarRecebimentoCmr } from "@/lib/recebimento-cmr";
 import { aplicarAvancoSuprimentos } from "@/lib/cronograma-suprimentos";
+import { DO_CMR } from "@/lib/cmr-origens";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // planilha de ~17MB: download + parse passam de 60s
@@ -23,7 +24,7 @@ async function sincronizar(userId) {
 
   const refs = parsed.linhas.map((l) => l.importRef).filter(Boolean);
   const existentes = await prisma.documentoQualidade.findMany({
-    where: { origem: "importacao_planilha", importRef: { in: refs } },
+    where: { ...DO_CMR, importRef: { in: refs } },
     select: { importRef: true },
   });
   const jaTem = new Set(existentes.map((e) => e.importRef));

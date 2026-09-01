@@ -8,6 +8,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { mapearCertificados, casarCertificados } from "@/lib/match-certificados";
+import { DO_CMR } from "@/lib/cmr-origens";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -16,7 +17,7 @@ const bodySchema = z.object({ url: z.string().url().optional() });
 
 async function docsImportados() {
   return prisma.documentoQualidade.findMany({
-    where: { ativo: true, origem: "importacao_planilha", importRef: { not: null } },
+    where: { ativo: true, ...DO_CMR, importRef: { not: null } },
     select: { id: true, importRef: true, sharepointItemId: true },
   });
 }

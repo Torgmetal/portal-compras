@@ -18,6 +18,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { indiceCertificados, limparCacheCertificados } from "@/lib/rastreabilidade-certificados";
 import { conferir } from "@/lib/rastreio-tratativa";
+import { DO_CMR } from "@/lib/cmr-origens";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -55,7 +56,7 @@ async function levantar(forcar) {
   const { indice, arquivos, pastas } = await indiceCertificados(forcar);
 
   const docs = await prisma.documentoQualidade.findMany({
-    where: { ativo: true, origem: "importacao_planilha", importRef: { not: null } },
+    where: { ativo: true, ...DO_CMR, importRef: { not: null } },
     select: {
       id: true, importRef: true, sharepointItemId: true, opNumero: true, nome: true,
       numeroDocumento: true, numeroCorrida: true, nfNumero: true, pedidoCompra: true,
@@ -162,7 +163,7 @@ export async function POST(req) {
   const { indice } = await indiceCertificados(false);
   const docs = await prisma.documentoQualidade.findMany({
     where: {
-      ativo: true, origem: "importacao_planilha",
+      ativo: true, ...DO_CMR,
       importRef: { not: null }, sharepointItemId: null,
       ...(alvoOp ? { opNumero: alvoOp } : {}),
     },
