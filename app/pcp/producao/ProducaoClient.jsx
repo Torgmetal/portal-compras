@@ -671,7 +671,11 @@ export default function ProducaoClient() {
                 {open && (
                   <div className="border-t border-gray-100">
                     {/* abas de setor da OP */}
-                    <div className="flex items-center gap-1 px-3 pt-2.5 flex-wrap">
+                    {/* ⚠ GRADE, NÃO flex-wrap. Vitor (01/09/2026): "melhore o visual desses
+                        botões". Com largura livre, cada aba media o tamanho do seu próprio texto e
+                        a segunda fila não batia com a primeira — sete cartões de sete larguras.
+                        Colunas iguais alinham as duas filas e dão ao número um espaço fixo. */}
+                    <div className="grid gap-1.5 px-3 pt-2.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(158px, 1fr))" }}>
                       {/* ⚠⚠ O kg DA ABA É O QUE FALTA PASSAR NAQUELE SETOR — e não se somam.
                           Vitor (24/08/2026): "o que significam esses números". A mesma peça conta em
                           TODOS os setores por onde ainda vai passar, então somar as abas dá muito
@@ -686,24 +690,32 @@ export default function ProducaoClient() {
                           mostra "—", não 0 kg. */}
                       {o.setores.map((s) => {
                         const emKg = s.setor === "CORTE";
-                        const vazio = (s.pendenteKg || 0) <= 0;
+                        // ⚠ o vazio se mede NA UNIDADE DA ABA: a montagem aparecia "0" com
+                        // 15.064 kg ao lado porque o teste olhava só o kg. Se o que se conta ali é
+                        // marca, é a marca que decide se a fila está vazia.
+                        const vazio = emKg ? (s.pendenteKg || 0) <= 0 : (s.pendenteItens || 0) <= 0;
                         const sel = setorAba === s.setor;
                         return (
                           <button key={s.setor} onClick={() => trocarSetor(o, s.setor)}
                             title={`${s.label}: falta passar ${fmtKg(s.pendenteKg)} de ${fmtKg(s.totalKg)} (${s.pct}% pronto)${emKg ? "" : ` · ${fmtN(s.pendenteItens)} marca(s), ${fmtN(s.pendenteUn)} peça(s)`}.${s.atrasoDias > 0 ? ` Atrasado ${s.atrasoDias} dia(s).` : s.entrega ? ` Até ${fmtD(s.entrega)}.` : ""} A mesma peça conta em cada setor por onde ainda vai passar — não some as abas.`}
-                            className={`text-left px-2.5 py-1.5 rounded-lg border ${
+                            className={`text-left px-3 py-2 rounded-lg border transition-colors ${
                               sel ? "bg-torg-blue text-white border-torg-blue"
                               /* ⚠ o atraso POR SETOR diz QUAL setor está segurando a obra — o
                                  atraso da OP inteira não diz. */
                               : s.atrasoDias > 0 ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
                               : vazio ? "border-gray-100 text-torg-gray-light"
                               : "border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
-                            <span className="block text-[10px] font-bold uppercase tracking-wider opacity-90">{s.label}</span>
-                            <span className="block text-[13px] font-extrabold tabular-nums leading-tight">
-                              {vazio ? "—" : emKg ? fmtKg(s.pendenteKg) : fmtN(s.pendenteItens)}
+                            <span className="block text-[10px] font-bold uppercase tracking-wider opacity-90 truncate">{s.label}</span>
+                            {/* ⚠⚠ A UNIDADE FICA COLADA NO NÚMERO. Antes "187" ficava numa linha e a
+                                de baixo abria com um "marcas" órfão — o número sem unidade e a
+                                unidade sem número. Agora "187 marcas", e embaixo só o detalhe. */}
+                            <span className="block text-[15px] font-extrabold tabular-nums leading-none mt-0.5">
+                              {vazio ? "—" : emKg ? fmtKg(s.pendenteKg) : (
+                                <>{fmtN(s.pendenteItens)}<span className="text-[10px] font-semibold ml-1 opacity-75">marcas</span></>
+                              )}
                             </span>
-                            <span className={`block text-[10px] ${sel ? "opacity-80" : "opacity-70"}`}>
-                              {vazio ? "nada na fila" : emKg ? `${fmtN(s.pendenteItens)} peças` : `marcas · ${fmtN(s.pendenteUn)} un · ${fmtKg(s.pendenteKg)}`}
+                            <span className={`block text-[10px] mt-1 truncate ${sel ? "opacity-80" : "opacity-70"}`}>
+                              {vazio ? "nada na fila" : emKg ? `${fmtN(s.pendenteItens)} peças` : `${fmtN(s.pendenteUn)} un · ${fmtKg(s.pendenteKg)}`}
                             </span>
                           </button>
                         );
