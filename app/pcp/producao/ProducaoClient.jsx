@@ -69,13 +69,6 @@ const ORDEM_SETOR = Object.fromEntries(FLUXO.map(([k], i) => [k, i]));
 // ⚠ "Não iniciadas" é a UNIÃO das duas primeiras — é a pergunta que o Vitor faz ("o que não
 // iniciou"), e as parcelas continuam separadas porque a ação é diferente: uma se cobra do
 // programador, a outra se desce para a fábrica.
-const FILTROS = [
-  { key: "TODAS", label: "Todas" },
-  { key: "NAO_INICIADAS", label: "Não iniciadas" },
-  { key: "NAO_LANCADA", label: "Não programadas" },
-  { key: "PROGRAMADA", label: "Programadas" },
-  { key: "INICIADA", label: "Iniciadas" },
-];
 
 // ⚠⚠ A SITUAÇÃO DA PEÇA NO SETOR — não iniciado → em produção → finalizado.
 // Vitor (24/08/2026): "deixar como uma marcação mais clara do que estava com status de não iniciado
@@ -161,7 +154,6 @@ export default function ProducaoClient() {
   // é união de duas situações — a que o programador nem programou e a que ele programou e a fábrica não
   // pegou. As duas separadas também servem, porque a ação é diferente: uma se cobra do programador,
   // a outra se desce para a fábrica.
-  const [filtroProg, setFiltroProg] = useState("TODAS");
   const [baixando, setBaixando] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [mandando, setMandando] = useState(false);
@@ -181,6 +173,9 @@ export default function ProducaoClient() {
   const { filtros: filtroCol, setFiltros: setFiltroCol, passa: passaColuna, opcoesDaColuna, ativos: filtrosAtivos, limpar: limparColunas, rotulosAtivos } =
     useFiltroColunas(detalhe?.pecas || [], COLUNAS_FILTRO);
   const fp = { filtros: filtroCol, setFiltros: setFiltroCol, opcoesDaColuna, aberta: colAberta, setAberta: setColAberta };
+  // ⚠ material (o R) só faz sentido no CORTE: da montagem em diante a linha é o conjunto, e o R
+  // pertence a cada croqui que o compõe — ele sai no carimbo do desenho, posição por posição.
+  const mostraMaterial = !setorAba || setorAba === "CORTE";
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
@@ -214,12 +209,12 @@ export default function ProducaoClient() {
     // ⚠ abre no setor que o filtro já escolheu; sem filtro, no primeiro que tem fila — é onde a
     // obra está parada, e é a pergunta que o PCP faz ao clicar.
     const setor = op.setores.find((s) => s.pendenteKg > 0)?.setor || op.setores[0]?.setor || "";
-    setAberta(op.opId); setSetorAba(setor); setDetalhe(null); setFiltroPecas(""); setFiltroProg("TODAS"); limparColunas(); setColAberta(null);
+    setAberta(op.opId); setSetorAba(setor); setDetalhe(null); setFiltroPecas(""); limparColunas(); setColAberta(null);
     carregarDetalhe(op.opId, setor);
   }
 
   function trocarSetor(op, setor) {
-    setSetorAba(setor); setDetalhe(null); setFiltroPecas(""); setFiltroProg("TODAS"); limparColunas(); setColAberta(null);
+    setSetorAba(setor); setDetalhe(null); setFiltroPecas(""); limparColunas(); setColAberta(null);
     carregarDetalhe(op.opId, setor);
   }
 
@@ -234,32 +229,16 @@ export default function ProducaoClient() {
 
 
   // ── peças da OP aberta, já filtradas ──
+  // ⚠ OS CHIPS DE SITUAÇÃO SAÍRAM. Vitor (01/09/2026): "não precisa desses botões tbm pois já temos
+  // os filtros nas colunas". Eram duas maneiras de filtrar a MESMA coisa — a coluna Programação e a
+  // Situação já têm funil próprio, e dois controles para o mesmo recorte se contradizem na tela
+  // (chip dizendo "Programadas 47" com a coluna filtrada em outra coisa).
   const pecas = useMemo(() => {
-    let base = detalhe?.pecas || [];
-    if (filtroProg !== "TODAS") {
-      base = base.filter((p) => {
-        const sit = p.programacao?.situacao || "NAO_LANCADA";
-        if (filtroProg === "NAO_INICIADAS") return sit !== "INICIADA";
-        return sit === filtroProg;
-      });
-    }
-    base = base.filter((p) => passaColuna(p, null));
+    const base = (detalhe?.pecas || []).filter((p) => passaColuna(p, null));
     const q = filtroPecas.trim().toLowerCase();
     if (!q) return base;
     return base.filter((p) => [p.marca, p.descricao, p.perfil].some((x) => String(x || "").toLowerCase().includes(q)));
-  }, [detalhe, filtroPecas, filtroProg, passaColuna]);
-
-  // Contadores do filtro — o número ao lado do rótulo evita clicar para descobrir que está vazio.
-  const contas = useMemo(() => {
-    const t = { TODAS: 0, NAO_INICIADAS: 0, NAO_LANCADA: 0, PROGRAMADA: 0, INICIADA: 0 };
-    for (const p of detalhe?.pecas || []) {
-      const sit = p.programacao?.situacao || "NAO_LANCADA";
-      t.TODAS++;
-      if (sit !== "INICIADA") t.NAO_INICIADAS++;
-      if (t[sit] != null) t[sit]++;
-    }
-    return t;
-  }, [detalhe]);
+  }, [detalhe, filtroPecas, passaColuna]);
 
   const marcasSel = useMemo(() => [...new Set(pecas.filter((p) => sel.has(p.id)).map((p) => p.marca))], [pecas, sel]);
 
@@ -493,7 +472,7 @@ export default function ProducaoClient() {
       // ⚠ a planilha sai COM O FILTRO da tela, então ela precisa DIZER isso. Papel de 40 linhas que
       // parece a lista inteira leva alguém a concluir que o resto não existe.
       subtitulo: `${op?.cliente || ""}${op?.obra ? ` — ${op.obra}` : ""} · ${lista.length} peça(s)`
-        + (filtroProg !== "TODAS" ? ` · ${FILTROS.find((f) => f.key === filtroProg)?.label || filtroProg}` : "")
+
         + (filtrosAtivos ? ` · filtrado por ${rotulosAtivos.map((x) => x.toLowerCase()).join(", ")}` : "")
         + (filtroPecas.trim() ? ` · busca "${filtroPecas.trim()}"` : ""),
       kpis: [
@@ -732,21 +711,6 @@ export default function ProducaoClient() {
                       <>
                         <div className="px-3 py-2.5 border-b border-gray-100 space-y-2">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            {/* ⚠⚠ SÓ O QUE EXISTE. Vitor (01/09/2026), sobre a tela confusa: a faixa
-                                mostrava "Todas 0 · Não iniciadas 0 · Não programadas 0 · Programadas
-                                0 · Iniciadas 0" — cinco zeros ocupando uma linha inteira e nenhum
-                                deles clicável com proveito. Chip vazio some; o selecionado fica
-                                sempre (senão o filtro ativo desapareceria e ninguém saberia por que
-                                a lista está curta). */}
-                            {FILTROS.filter((f) => contas[f.key] > 0 || filtroProg === f.key).map((f) => (
-                              <button key={f.key} onClick={() => setFiltroProg(f.key)}
-                                className={`text-[11px] px-2 py-1 rounded-lg border font-semibold ${filtroProg === f.key ? "bg-torg-blue text-white border-torg-blue" : "border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
-                                {f.label} <span className="font-normal opacity-75 tabular-nums">{fmtN(contas[f.key])}</span>
-                              </button>
-                            ))}
-                            {FILTROS.every((f) => !contas[f.key]) && (
-                              <span className="text-[11px] text-torg-gray-light">nenhuma peça pendente neste setor</span>
-                            )}
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <input value={filtroPecas} onChange={(e) => setFiltroPecas(e.target.value)} placeholder="filtrar marca, perfil…"
@@ -857,7 +821,14 @@ export default function ProducaoClient() {
                                 <th className="px-2 py-2 text-right font-bold w-[10%]">Peso</th>
                                 <ThFiltro col="programacao" label="Programação" larg="w-[14%]" className="px-2 py-2 text-left font-bold" {...fp} />
                                 <ThFiltro col="situacao" label="Situação" larg="w-[15%]" dica="Não iniciado → em produção → finalizado. Finalizado é o que o Syneco fechou ou o que recebeu baixa no portal." className="px-2 py-2 text-left font-bold" {...fp} />
-                                <ThFiltro col="material" label="Material" larg="w-[11%]" className="px-2 py-2 text-left font-bold" {...fp} />
+                                {/* ⚠⚠ O R É DO CROQUI, NÃO DO CONJUNTO. Vitor (01/09/2026): "na aba
+                                    de conjuntos para montagem, solda, jato e acabamento e pintura
+                                    não precisamos informar o R". O conjunto é a soma de croquis de
+                                    materiais diferentes — a coluna só sabia dizer "sem R" em todas
+                                    as linhas, que é ruído com cara de pendência. */}
+                                {mostraMaterial && (
+                                  <ThFiltro col="material" label="Material" larg="w-[11%]" className="px-2 py-2 text-left font-bold" {...fp} />
+                                )}
                                 <ThFiltro col="grd" label="Liberado (GRD)" larg="w-[11%]" dica="Data em que o desenho foi impresso pelo portal e a GRD registrada — é o que prova que a peça desceu para a fábrica." className="px-2 py-2 text-left font-bold" {...fp} />
                               </tr>
                             </thead>
@@ -944,6 +915,7 @@ export default function ProducaoClient() {
                                         peça não cortada não tem R mesmo — é o estado normal, não um
                                         problema. E clica para abrir a rastreabilidade da OP, que é onde
                                         se descobre qual dos dois casos é. */}
+                                    {mostraMaterial && (
                                     <td className="px-2 py-1.5 truncate">
                                       <button onClick={() => setRastro(detalhe.opNumero)}
                                         title={p.material?.recebido
@@ -959,6 +931,7 @@ export default function ProducaoClient() {
                                         </span>
                                       </button>
                                     </td>
+                                    )}
                                     <td className="px-2 py-1.5 truncate">
                                       {p.grd ? (
                                         <span title={`GRD impressa por ${p.grd.por || "—"}${p.grd.impressoes > 1 ? ` · ${p.grd.impressoes} impressões` : ""}`}
@@ -971,7 +944,7 @@ export default function ProducaoClient() {
                                 );
                               })}
                               {!pecas.length && (
-                                <tr><td colSpan={9} className="px-3 py-8 text-center text-torg-gray">Nenhuma peça pendente neste setor.</td></tr>
+                                <tr><td colSpan={mostraMaterial ? 9 : 8} className="px-3 py-8 text-center text-torg-gray">Nenhuma peça pendente neste setor.</td></tr>
                               )}
                             </tbody>
                         </table>
