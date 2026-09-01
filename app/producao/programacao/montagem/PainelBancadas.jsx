@@ -14,7 +14,7 @@
 // que esse número" — e o ritmo NORMAL (mediana) é o piso. Mostrar só a meta viraria promessa que a
 // fábrica não bate todo dia; mostrar só a mediana desperdiça a capacidade que ela já provou ter.
 import { useState, useMemo } from "react";
-import { Loader2, Printer, AlertCircle, Flag, Users } from "lucide-react";
+import { Loader2, Printer, AlertCircle, Flag, Users, Download } from "lucide-react";
 import { repartirPorBancada, resumoDoLote, distribuirEmDias, ultimoDia, RITMO_META } from "@/lib/montagem-capacidade";
 
 const fmtKg = (v) => `${(Number(v) || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -32,6 +32,7 @@ function proximoUtilIso() {
 export default function PainelBancadas({ conjuntos, onLiberar, ocupado }) {
   const [n, setN] = useState(4);
   const [inicio, setInicio] = useState(proximoUtilIso);
+  const [baixando, setBaixando] = useState(false);
 
   const distrib = useMemo(() => repartirPorBancada(conjuntos, n, { curva: RITMO_META }), [conjuntos, n]);
   // ⚠⚠ A JANELA É CONSEQUÊNCIA, NÃO ENTRADA. Vitor (01/09/2026): "não é programar um único dia, ela
@@ -50,6 +51,72 @@ export default function PainelBancadas({ conjuntos, onLiberar, ocupado }) {
   }, [porDia]);
   const resumo = useMemo(() => resumoDoLote(conjuntos, n), [conjuntos, n]);
   const comPrioridade = useMemo(() => conjuntos.filter((c) => c.prioridade != null).length, [conjuntos]);
+
+  // ── A PLANILHA DO PLANO ────────────────────────────────────────────────────────────────────
+  // Vitor (01/09/2026): "onde eu posso extrair uma planilha onde informa o que cada bancada vai
+  // fazer?". O maço impresso vai para o encarregado; a planilha é para quem PLANEJA conferir e
+  // para a reunião — por isso sai com o plano inteiro, não só com o que está na tela.
+  //
+  // ⚠ Import dinâmico do ExcelJS: ele é pesado e não pode entrar no bundle de uma tela que a
+  // fábrica abre o dia inteiro (padrão da casa, ver lib/excel-relatorio).
+  async function exportarPlano() {
+    setBaixando(true);
+    try {
+      const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais,
+              adicionarLegenda, downloadWorkbook, CORES } = await import("@/lib/excel-relatorio");
+      const ops = [...new Set(conjuntos.map((c) => c.opNumero).filter(Boolean))];
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: "Plano de Montagem por Bancada",
+        subtitulo: `${ops.map((o) => `OP ${o}`).join(", ")} · início ${fmtDia(inicio + "T00:00:00Z")} · ${n} bancada(s)`,
+        kpis: [
+          `${conjuntos.length} conjuntos (${resumo.un} pc)  |  ${fmtKg(resumo.kg)}  |  ` +
+          `meta: ${resumo.diasMeta.toFixed(1)} dias uteis (fecha ${fim ? fmtDia(fim) : "-"})  |  ` +
+          `ritmo normal: ${resumo.diasNormal.toFixed(1)} dias`,
+        ],
+        totalColunas: 9,
+        nomePlanilha: "Montagem por bancada",
+        codigoDoc: "REL-PRD-010",
+      });
+      ws.columns = [{ width: 14 }, { width: 11 }, { width: 10 }, { width: 16 }, { width: 34 },
+                    { width: 7 }, { width: 11 }, { width: 12 }, { width: 11 }];
+      let row = linhaInicio;
+      adicionarHeaderTabela(ws, row, ["Bancada", "Dia", "OP", "Marca", "Descricao", "Qte", "Peso (kg)", "Dias-bancada", "Prioridade"]);
+      row++;
+      for (const b of porDia) {
+        let unB = 0, kgB = 0, diasB = 0;
+        for (const d of b.dias) {
+          for (const it of d.itens) {
+            const q = Math.max(1, Number(it.qte) || 1);
+            const kg = Number(it.pesoTotalKg) || 0;
+            unB += q; kgB += kg; diasB += it.custoDias || 0;
+            adicionarLinhaTabela(ws, row, [
+              b.bancada, fmtDia(d.dia), it.opNumero || "", it.marca, it.descricao || "",
+              q, Math.round(kg), Number((it.custoDias || 0).toFixed(2)),
+              it.prioridade != null ? `SIM (${it.prioridade})` : "",
+            ], {
+              ...(it.prioridade != null ? { fillColor: CORES.LIGHT_ORANGE } : {}),
+              // ⚠ número alinhado à direita: coluna de peso e quantidade encostada à esquerda é
+              // impossível de conferir de bater o olho
+              alinhamento: { 5: "right", 6: "right", 7: "right" },
+            });
+            row++;
+          }
+        }
+        // ⚠ um total POR BANCADA: é a linha que o encarregado confere contra o maço que recebeu
+        adicionarLinhaTotais(ws, row, [`${b.bancada} - total`, `${b.dias.length} dia(s)`, "", "", "",
+          unB, Math.round(kgB), Number(diasB.toFixed(2)), ""]);
+        row += 2;
+      }
+      adicionarLegenda(ws, row, [
+        { label: "Dias-bancada = quanto o conjunto consome de uma jornada de bancada" },
+        { label: "Ritmo por faixa de peso da peca (meta = percentil 75 do que a bancada ja fez)" },
+        { label: "Prioridade entra primeiro na fila e vai para bancadas diferentes" },
+      ], 9);
+      await downloadWorkbook(workbook, `Plano de montagem - ${ops.join("-")} - ${inicio}.xlsx`);
+    } catch (e) {
+      alert("Erro ao gerar a planilha: " + (e?.message || e));
+    } finally { setBaixando(false); }
+  }
 
   if (!conjuntos.length) return null;
 
@@ -142,6 +209,14 @@ export default function PainelBancadas({ conjuntos, onLiberar, ocupado }) {
           className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-2 disabled:opacity-50">
           {ocupado ? <Loader2 size={15} className="animate-spin" /> : <Printer size={15} />}
           Liberar e imprimir por bancada
+        </button>
+        <button
+          onClick={exportarPlano}
+          disabled={baixando}
+          title="Planilha com o que cada bancada faz, dia a dia"
+          className="px-3 py-2 border border-torg-blue-100 text-torg-blue text-sm font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-2 disabled:opacity-50">
+          {baixando ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+          Planilha do plano
         </button>
         <span className="text-[11px] text-torg-gray inline-flex items-center gap-1">
           <AlertCircle size={12} />
