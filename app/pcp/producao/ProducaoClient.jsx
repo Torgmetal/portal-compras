@@ -928,12 +928,18 @@ export default function ProducaoClient() {
                                     <td className="px-2 py-1.5 truncate">
                                       <button onClick={() => setRastro(detalhe.opNumero)}
                                         title={p.material?.recebido
-                                          ? `Recebido em ${fmtDH(p.material.dataRecebimento)}${p.material.nf ? ` · NF ${p.material.nf}` : ""}${p.material.corrida ? ` · corrida ${p.material.corrida}` : ""}. Clique para a rastreabilidade da OP.`
+                                          ? `Recebido em ${fmtDH(p.material.dataRecebimento)}${p.material.nf ? ` · NF ${p.material.nf}` : ""}${p.material.corrida ? ` · corrida ${p.material.corrida}` : ""}`
+                                            + (p.material.deOutraOp ? ` · MATERIAL DE ESTOQUE: o fardo entrou pela OP ${p.material.deOutraOp}` : "")
+                                            + (p.material.porTroca ? ` · R amarrado à mão${p.material.trocaPor ? ` por ${p.material.trocaPor}` : ""}` : "")
+                                            + ". Clique para a rastreabilidade da OP."
                                           : "Nenhum R casado com este perfil no CMR desta OP. Pode ser material que ainda não chegou, ou descrição que não bate com o cadastro do Almoxarifado. Clique para conferir a rastreabilidade."}
                                         className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold inline-flex items-center gap-1 max-w-full hover:brightness-95 ${
-                                          p.material?.recebido
-                                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                            : "bg-gray-50 text-torg-gray border-gray-200"}`}>
+                                          !p.material?.recebido ? "bg-gray-50 text-torg-gray border-gray-200"
+                                            /* ⚠ estoque de outra obra em ÂMBAR, não no verde de
+                                               "chegou para esta OP": são situações diferentes e a
+                                               cor é o que se lê rolando a lista. */
+                                            : p.material.deOutraOp ? "bg-amber-50 text-amber-700 border-amber-200"
+                                            : "bg-emerald-50 text-emerald-700 border-emerald-200"}`}>
                                         <Package size={9} className="shrink-0" />
                                         <span className="truncate">
                                           {p.material?.recebido ? (p.material.rastreio ? `R ${p.material.rastreio}` : "recebido") : "sem R"}
