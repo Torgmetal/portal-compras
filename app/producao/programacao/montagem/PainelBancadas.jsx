@@ -70,8 +70,7 @@ export default function PainelBancadas({ conjuntos, onLiberar, ocupado }) {
         subtitulo: `${ops.map((o) => `OP ${o}`).join(", ")} · início ${fmtDia(inicio + "T00:00:00Z")} · ${n} bancada(s)`,
         kpis: [
           `${conjuntos.length} conjuntos (${resumo.un} pc)  |  ${fmtKg(resumo.kg)}  |  ` +
-          `meta: ${resumo.diasMeta.toFixed(1)} dias uteis (fecha ${fim ? fmtDia(fim) : "-"})  |  ` +
-          `ritmo normal: ${resumo.diasNormal.toFixed(1)} dias`,
+          `meta: ${resumo.diasMeta.toFixed(1)} dias uteis (fecha ${fim ? fmtDia(fim) : "-"})`,
         ],
         totalColunas: 9,
         nomePlanilha: "Montagem por bancada",
@@ -149,9 +148,12 @@ export default function PainelBancadas({ conjuntos, onLiberar, ocupado }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
+        {/* ⚠ SÓ A META. Vitor (01/09/2026): "pode tirar essa informação, manter apenas meta". As
+            duas réguas lado a lado davam ao mesmo lote dois prazos, e quem lê escolhe o que
+            prefere — o que esvazia a meta. O ritmo normal (mediana) segue no motor, para o caso de
+            voltar a fazer falta. */}
         <Cx rot="na meta" val={`${resumo.diasMeta.toFixed(1)} dias`} sub={`${resumo.diasBancadaMeta.toFixed(1)} dias-bancada`} forte />
-        <Cx rot="ritmo normal" val={`${resumo.diasNormal.toFixed(1)} dias`} sub={`${resumo.diasBancadaNormal.toFixed(1)} dias-bancada`} />
         <Cx rot="por bancada / dia" val={`${Math.round(resumo.un / Math.max(0.1, resumo.diasMeta) / n)} peças`} sub="alvo da meta" />
         <Cx rot="fecha em" val={fim ? `${diaSemana(fim)} ${fmtDia(fim)}` : "—"}
           sub={`${diasCorridos.length} dia(s) úteis a partir de ${fmtDia(inicio + "T00:00:00Z")}`} />
