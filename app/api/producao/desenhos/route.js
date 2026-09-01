@@ -14,7 +14,7 @@ import { casaMarca } from "@/lib/pasta-engenharia";
 import { requireRole } from "@/lib/session";
 import { getAccessToken, acharPastaOp, uploadFileToFolder } from "@/lib/sharepoint";
 import { rastreioDoConjunto } from "@/lib/rastreio-peca";
-import { amarracoesDaOp, amarracaoDoPerfil, aplicarAmarracaoNosItens } from "@/lib/r-amarrado";
+import { amarracoesDaOp, aplicarAmarracaoNosItens, rDoMaterialDaObra } from "@/lib/r-amarrado";
 import { novaEntradaGrd } from "@/lib/grd-registro";
 import { conferirRComCroquis } from "@/lib/conferir-r";
 import { analisarMaterial } from "@/lib/material-liberacao";
@@ -182,13 +182,24 @@ export async function POST(req) {
       // uma vez só, pelo perfil do conjunto, e só quando NENHUMA posição tinha R — então croqui com
       // R amarrado saía em branco sempre que o conjunto misturava perfis ou já tinha uma posição
       // cortada.
-      itens = aplicarAmarracaoNosItens(itens, amarradas);
-      // peça avulsa (sem posições) continua precisando do caminho pela própria marca
+      // peça avulsa (sem posições) entra na lista pelo próprio perfil, para os dois preenchimentos
+      // abaixo valerem também para ela — sem R, a linha sintética é descartada no fim
       if (!itens.length) {
         const pc = await prisma.pecaConjunto.findFirst({ where: { opId, marca }, select: { perfil: true } });
-        const am = pc?.perfil ? amarracaoDoPerfil(amarradas, pc.perfil) : null;
-        if (am) itens = [{ marca, perfil: pc.perfil, situacao: "R_INDICADO", usadas: [{ rastreio: am.r, indicado: true, por: am.por || null }] }];
+        if (pc?.perfil) itens = [{ marca, perfil: pc.perfil, situacao: null, usadas: [] }];
       }
+      itens = aplicarAmarracaoNosItens(itens, amarradas);
+      // ⚠⚠ E O R DO MATERIAL DA PRÓPRIA OBRA (NA_OP) — o caminho que faltava, e o mais comum de
+      // todos. Ver rDoMaterialDaObra: na OP-113 os 27 perfis eram material da obra, sem amarração
+      // nenhuma a ler, e as 79 marcas saíram sem R. Vem DEPOIS da amarração porque amarrar é uma
+      // decisão humana explícita, e antes dela só o corte (fato) tem precedência.
+      const perfisDosItens = [...new Set(itens.map((i) => i.perfil).filter(Boolean))];
+      if (perfisDosItens.length) {
+        const { porPerfil } = await analisarMaterial(opNumero, perfisDosItens.map((perfil, ix) => ({ id: `p${ix}`, perfil })));
+        itens = aplicarAmarracaoNosItens(itens, rDoMaterialDaObra(porPerfil));
+      }
+      // linha sem R e sem situação é a sintética acima que não achou nada: não vai para o carimbo
+      itens = itens.filter((i) => i.situacao || (i.usadas || []).some((u) => u?.rastreio));
     }
   } catch {}
 
