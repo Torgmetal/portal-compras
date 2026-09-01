@@ -132,12 +132,28 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
   // ⚠ A MARCA É O PRIMEIRO CAMPO DA LINHA. Colar duas colunas do Excel traz "T97A1<TAB>25 kg" —
   // quebrar em tudo transformaria "25 kg" numa marca inexistente e encheria o aviso de lixo.
   // Quebra por LINHA e pega o 1º campo; linha única com vírgulas ainda vira lista.
+  // ⚠⚠ CABEÇALHO DE PLANILHA NÃO É MARCA. Vitor (01/09/2026) importou a "Lista de Conjuntos" da
+  // Engenharia e o portal acusou 8 não encontradas — que eram o próprio cabeçalho do arquivo:
+  // "LISTA DE CONJUNTOS", "Nº PROJETO:", "CLIENTE:", "OBRA:", "DATA:", "REVISÃO:", "MARCA" (o
+  // título da coluna) e "Total para:" (o rodapé). As 50 marcas reais entraram todas — o aviso
+  // assustava sem motivo, e um alarme falso recorrente ensina a ignorar o alarme.
+  //
+  // A regra é do domínio, não um chute: TODA marca da Torg tem dígito (T97A13, T97A-P63, 71262979,
+  // 105A-P23). Rótulo de cabeçalho não tem, ou termina em ":", ou começa com "TOTAL".
+  const ehMarca = (t) => {
+    const v = String(t || "").trim();
+    if (!v || v.endsWith(":")) return false;
+    const U = v.toUpperCase();
+    if (U === "MARCA" || U.startsWith("TOTAL")) return false;
+    return /\d/.test(v);
+  };
+
   const normalizar = (t) => {
     const linhas = String(t || "").split(/[\r\n]+/).map((l) => l.trim()).filter(Boolean);
     const brutos = linhas.length > 1
       ? linhas.map((l) => l.split(/[\t;]/)[0].trim())
       : linhas.flatMap((l) => l.split(/[,;\t]/).map((x) => x.trim()));
-    return [...new Set(brutos.filter(Boolean))];
+    return [...new Set(brutos.filter(Boolean).filter(ehMarca))];
   };
 
   function aplicarLista(textos) {
@@ -170,8 +186,13 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
       const wb = XLSX.read(buf, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const linhas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
-      // primeira coluna de cada linha
-      aplicarLista(linhas.map((l) => String(l?.[0] ?? "")).filter(Boolean));
+      // ⚠ COMEÇA DEPOIS DO CABEÇALHO DA COLUNA. A "Lista de Conjuntos" da Engenharia traz um bloco
+      // de identificação em cima (projeto, cliente, obra, data, revisão) e só então a linha "MARCA",
+      // que é onde os dados começam. Usar a estrutura do próprio arquivo é mais seguro que adivinhar
+      // quantas linhas pular — e o `ehMarca` continua de rede para arquivo sem esse cabeçalho.
+      const iCab = linhas.findIndex((l) => String(l?.[0] ?? "").trim().toUpperCase() === "MARCA");
+      const dados = iCab >= 0 ? linhas.slice(iCab + 1) : linhas;
+      aplicarLista(dados.map((l) => String(l?.[0] ?? "")).filter(Boolean));
     } catch (e) { setErro("Não consegui ler o arquivo: " + (e?.message || e)); }
   }
 
