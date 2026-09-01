@@ -1351,7 +1351,7 @@ function Fabricacao({ c, res, setComp, custoFabrica }) {
 
   return (
     <div className="space-y-4">
-      {custoFabrica && <CustoDaFabrica cf={custoFabrica} c={c} setComp={setComp} />}
+      {custoFabrica && <CustoDaFabrica cf={custoFabrica} c={c} setComp={setComp} res={res} />}
 
       <Quadro titulo="Fabricação por classe" grupo={g.fabricacao}
         vazio="Lance a classificação nas linhas do quantitativo — é ela que escolhe o preço." />
@@ -3678,10 +3678,18 @@ function Frete({ c, res, setComp }) {
  * dá a FORMA (peça leve custa mais por quilo — é física) e a medição dá o NÍVEL: calibrar é
  * escalar a tabela até a média dela, pesada pelo mix real, bater com o custo medido.
  */
-function CustoDaFabrica({ cf, c, setComp }) {
+function CustoDaFabrica({ cf, c, setComp, res }) {
   const [aberto, setAberto] = useState(false);
   const cal = cf.calibracao || {};
   const rota = c.rotaFabricacao || cf.rota || [];
+  // ⚠ MESMO ÍNDICE QUE A API USA (`resultado.demaos - 1`, preso em 0..2): se a tela calculasse a
+  // demão por conta própria, mostraria uma coluna e o motor usaria outra.
+  const demaos = res?.demaos || 1;
+  const iDem = Math.max(0, Math.min(2, demaos - 1));
+  // as classes que esta obra realmente tem — é sobre elas que a margem daqui é verdade
+  const nomesObra = new Set((c.resumos || []).filter((l) => l.ativo !== false)
+    .map((l) => String(l.classificacao || "").toUpperCase()).filter((x) => x && x !== "N/A"));
+  const classesDaObra = CLASSES.filter((x) => nomesObra.has(String(x.nome).toUpperCase()));
   const adotar = () => setComp({
     precos: {
       ...(c.precos || {}),
@@ -3703,16 +3711,87 @@ function CustoDaFabrica({ cf, c, setComp }) {
         <p className="text-[11px] text-torg-gray mt-0.5">
           Custo mensal de cada setor ÷ o que ele produz por mês. {cf.mesesConsiderados} meses ({cf.periodo}).
           Não é a tabela — é a folha, o rateio da casa e o apontamento do Syneco.
+          <strong className="text-torg-dark"> Inclui jato e pintura</strong>, porque os dois setores estão na rota.
         </p>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100">
         <Kpi r="Custo de industrialização" v={`${fmtR$(cf.custoPorKg)}/kg`} />
         <Kpi r={`Preço a ${cf.margemPct}% de margem`} v={`${fmtR$(cf.custoPorKg * (1 + cf.margemPct / 100) / (1 - cf.impostosVendaPct / 100))}/kg`} />
-        <Kpi r="Média da tabela (pelo mix)" v={`${fmtR$(cal.mediaTabela)}/kg`} />
-        <Kpi r="A tabela cobra" v={`${cal.diferencaPct > 0 ? "+" : ""}${cal.diferencaPct}%`}
+        <Kpi r={`Média da tabela · mix da fábrica${demaos ? ` · ${demaos} demão${demaos > 1 ? "s" : ""}` : ""}`} v={`${fmtR$(cal.mediaTabela)}/kg`} />
+        <Kpi r="A tabela cobra (mix da fábrica)" v={`${cal.diferencaPct > 0 ? "+" : ""}${cal.diferencaPct}%`}
           cor={cal.diferencaPct > 0 ? "text-green-700" : "text-red-600"} />
       </div>
+
+      {/* ─── O QUE VALE PARA ESTA OBRA ──────────────────────────────────────────────────────────
+          Vitor (01/09/2026), sobre a tela: "não está bem claro a composição" e "de acordo com a
+          quantidade de demão temos que ter uma variação de valores por kg da pintura também".
+
+          ⚠⚠ TRÊS NÚMEROS QUE MEDEM COISAS DIFERENTES ficavam lado a lado sem dizer isso, e a
+          leitura natural saía errada:
+            · o custo medido (R$/kg) JÁ INCLUI jato e pintura — são setores da rota;
+            · a linha "Fabricação por classe" mostra SÓ a parcela de fabricação da tabela;
+            · a média da tabela usa o mix da FÁBRICA, não o desta obra.
+          Comparando 3,14 (linha) com 3,56 (custo), parecia que a obra cobrava abaixo do custo. Não
+          cobrava: faltava somar a pintura, que na tabela é coluna separada e varia com a demão.
+
+          ⚠ A DEMÃO JÁ ENTRAVA NA CONTA (a API escolhe a coluna pelo `resultado.demaos`) — só não
+          aparecia. Agora a tela mostra qual coluna está valendo e quanto a pintura pesa nela. */}
+      {classesDaObra.length > 0 && (
+        <div className="px-4 py-3 border-t border-gray-100">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-torg-blue mb-1.5">
+            Nesta obra {demaos ? `· ${demaos} demão${demaos > 1 ? "s" : ""}` : ""}
+          </p>
+          <table className="w-full text-[12px]">
+            <thead className="text-[10px] uppercase text-torg-gray">
+              <tr>
+                <th className="text-left py-1">Classe</th>
+                <th className="text-right py-1">Fabricação</th>
+                <th className="text-right py-1">Pintura ({demaos || 1} demão{(demaos || 1) > 1 ? "s" : ""})</th>
+                <th className="text-right py-1">Tabela cheia</th>
+                <th className="text-right py-1">Custo medido</th>
+                <th className="text-right py-1">Margem</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {classesDaObra.map((cl) => {
+                const pint = cl.demaos?.[iDem] ?? 0;
+                const cheia = cl.fabricacao + pint;
+                const marg = cf.custoPorKg > 0 ? (cheia / cf.custoPorKg - 1) * 100 : 0;
+                return (
+                  <tr key={cl.key}>
+                    <td className="py-1.5 text-torg-dark">{cl.nome} <span className="text-torg-gray">· {cl.faixa}</span></td>
+                    <td className="py-1.5 text-right tabular-nums">{fmtR$(cl.fabricacao)}</td>
+                    <td className="py-1.5 text-right tabular-nums">{fmtR$(pint)}</td>
+                    <td className="py-1.5 text-right tabular-nums font-semibold text-torg-dark">{fmtR$(cheia)}</td>
+                    <td className="py-1.5 text-right tabular-nums text-torg-gray">{fmtR$(cf.custoPorKg)}</td>
+                    <td className={`py-1.5 text-right tabular-nums font-semibold ${marg >= 0 ? "text-green-700" : "text-red-600"}`}>
+                      {marg > 0 ? "+" : ""}{marg.toFixed(0)}%
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="mt-1.5 text-[11px] text-torg-gray">
+            A <strong>tabela cheia</strong> é o que se compara com o custo medido — as duas incluem
+            pintura. A linha “Fabricação por classe” abaixo mostra só a parcela de fabricação, porque
+            a pintura desta obra é precificada na aba Pintura, com tinta e mão de obra próprias.
+          </p>
+          {/* ⚠ a variação por demão é o pedido literal dele: ver quanto muda o R$/kg quando a
+              especificação pede uma demão a mais. */}
+          {classesDaObra.length === 1 && (
+            <p className="mt-1 text-[11px] text-torg-dark">
+              Se a especificação mudar de demão:{" "}
+              {[0, 1, 2].map((k) => (
+                <span key={k} className={`mr-3 ${k === iDem ? "font-semibold text-torg-blue" : "text-torg-gray"}`}>
+                  {k + 1} demão{k > 0 ? "s" : ""} → {fmtR$(classesDaObra[0].fabricacao + (classesDaObra[0].demaos?.[k] ?? 0))}/kg
+                </span>
+              ))}
+            </p>
+          )}
+        </div>
+      )}
 
       {aberto && (
         <div className="p-4 space-y-4 border-t border-gray-100">
