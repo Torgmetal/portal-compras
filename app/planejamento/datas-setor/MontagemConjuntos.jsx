@@ -16,11 +16,16 @@
 // data olhando o cronograma, e o corte corre atrás. A prontidão fica na tela como INFORMAÇÃO, para
 // ele saber o que está pedindo; ordena a lista, mas não impede seleção nenhuma.
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, AlertCircle, CalendarClock, ArrowRight, CheckCircle2, X, Upload } from "lucide-react";
+import { Loader2, AlertCircle, CalendarClock, ArrowRight, CheckCircle2, X, Upload, Search } from "lucide-react";
 
 const isoHoje = () => new Date().toISOString().split("T")[0];
 const isoDe = (v) => (v ? String(v).slice(0, 10) : "");
 const fmtKg = (v) => `${(Number(v) || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
+// ⚠ SEM ACENTO E EM CAIXA ALTA dos dois lados. Descrição de conjunto vem em CAIXA ALTA do Tekla
+// e às vezes acentuada ("CONSOLE", "PLATAFORMA DE INSPEÇÃO"); quem procura digita minúsculo e sem
+// acento. Comparar cru faria "inspecao" não achar "INSPEÇÃO".
+const semAcento = (v) => String(v || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+
 const fmtDiaLongo = (iso) => {
   if (!iso) return "";
   const d = new Date(iso + "T00:00:00Z");
@@ -39,6 +44,7 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
   const [okMsg, setOkMsg] = useState("");
   const [avisos, setAvisos] = useState([]);
   const [sel, setSel] = useState(new Set());
+  const [busca, setBusca] = useState("");
   // ⚠ o dia sugerido é o MARCO do cronograma, não hoje: é ele que o planejamento veio olhar.
   const [dia, setDia] = useState(marcoMontagem || isoHoje());
   const [agindo, setAgindo] = useState(false);
@@ -71,7 +77,22 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
     .sort((a, b) => (b.prontidao?.pct || 0) - (a.prontidao?.pct || 0)
       || String(a.marca).localeCompare(String(b.marca), "pt-BR", { numeric: true })),
     [lista]);
-  const prontos = useMemo(() => aProgramar.filter((c) => c.prontidao?.pronto), [aProgramar]);
+  // ⚠ A BUSCA CASA MARCA **OU** DESCRIÇÃO, e cada palavra digitada tem que aparecer em uma das
+  // duas (não precisam estar na mesma). "console t97" acha o CONSOLE da marca T97A13 — é assim que
+  // se procura de cabeça: um pedaço do nome e um pedaço do código.
+  const visiveis = useMemo(() => {
+    const termos = semAcento(busca).split(/\s+/).filter(Boolean);
+    if (!termos.length) return aProgramar;
+    return aProgramar.filter((c) => {
+      const alvo = `${semAcento(c.marca)} ${semAcento(c.descricao)}`;
+      return termos.every((t) => alvo.includes(t));
+    });
+  }, [aProgramar, busca]);
+
+  // ⚠⚠ OS BOTÕES DE MARCAR SEGUEM A BUSCA, NÃO A LISTA INTEIRA. Com a busca ligada, "marcar todos"
+  // marca o que está À VISTA — senão procurar "console", ver 2 cartões e clicar em marcar todos
+  // selecionaria os 29 da obra sem avisar, e o erro só apareceria na hora de liberar.
+  const prontos = useMemo(() => visiveis.filter((c) => c.prontidao?.pronto), [visiveis]);
   const montadosN = useMemo(() => lista.filter((c) => c.montado).length, [lista]);
 
   const grupos = useMemo(() => {
@@ -226,10 +247,29 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
                 <CheckCircle2 size={12} className="shrink-0 self-center" />
                 <span className="font-bold uppercase tracking-wide whitespace-nowrap">Conjuntos da obra</span>
                 <span className="text-torg-gray-light">·</span>
-                <span className="font-semibold tabular-nums whitespace-nowrap">{aProgramar.length} conjuntos</span>
-                <span className="font-normal tabular-nums whitespace-nowrap text-torg-gray">{fmtKg(somaKg(aProgramar))}</span>
+                <span className="font-semibold tabular-nums whitespace-nowrap">{visiveis.length} conjuntos</span>
+                <span className="font-normal tabular-nums whitespace-nowrap text-torg-gray">{fmtKg(somaKg(visiveis))}</span>
+                {busca.trim() && (
+                  <span className="font-normal tabular-nums whitespace-nowrap text-torg-gray-light">de {aProgramar.length}</span>
+                )}
               </div>
+
               {aProgramar.length > 0 && (
+                <div className="relative">
+                  <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-torg-gray-light pointer-events-none" />
+                  <input value={busca} onChange={(e) => setBusca(e.target.value)}
+                    placeholder="procurar marca ou descrição…"
+                    className="w-full pl-7 pr-7 py-1.5 rounded-md border border-emerald-200 bg-white text-[11px] text-torg-dark placeholder:text-torg-gray-light focus:outline-none focus:border-emerald-400" />
+                  {busca && (
+                    <button onClick={() => setBusca("")} title="limpar"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-torg-gray hover:bg-gray-100">
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {visiveis.length > 0 && (
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {prontos.length > 0 && (
                     <button onClick={() => marcarLista(prontos)}
@@ -237,9 +277,9 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
                       marcar os {prontos.length} prontos
                     </button>
                   )}
-                  <button onClick={() => marcarLista(aProgramar)}
+                  <button onClick={() => marcarLista(visiveis)}
                     className="px-2 py-1 rounded-md border border-gray-200 bg-white text-torg-gray font-semibold whitespace-nowrap hover:bg-gray-50">
-                    marcar todos
+                    {busca.trim() ? `marcar os ${visiveis.length} da busca` : "marcar todos"}
                   </button>
                   <button onClick={() => { setColando((v) => !v); setImportado(null); }}
                     className={`px-2 py-1 rounded-md border font-semibold whitespace-nowrap inline-flex items-center gap-1 ${
@@ -298,7 +338,15 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
                 Todos os conjuntos desta obra já estão programados ou montados.
               </p>
             )}
-            {aProgramar.map((c) => <Card key={c.id} c={c} sel={sel} onToggle={toggle} />)}
+            {/* ⚠ "a busca não achou" ≠ "não tem nada a programar": sem separar, quem procurou
+                errado concluiria que a obra acabou. */}
+            {aProgramar.length > 0 && visiveis.length === 0 && (
+              <p className="text-[11px] text-torg-gray italic py-4 text-center">
+                Nenhum conjunto com <b className="not-italic font-mono">{busca.trim()}</b> entre os {aProgramar.length} a programar.{" "}
+                <button onClick={() => setBusca("")} className="underline not-italic">limpar a busca</button>
+              </p>
+            )}
+            {visiveis.map((c) => <Card key={c.id} c={c} sel={sel} onToggle={toggle} />)}
           </div>
         </div>
 
