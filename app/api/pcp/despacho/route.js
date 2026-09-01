@@ -77,7 +77,7 @@ export async function GET(req) {
   const setor = url.searchParams.get("setor"); // opcional: escopo do setor pela ROTA da peça
   const todasRaw = await prisma.pecaConjunto.findMany({
     where: { opId },
-    select: { id: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoUnitKg: true, pesoTotalKg: true, qte: true, qteProduzida: true, corteConcluidoEm: true, status: true, destino: true, destinoTerceirizado: true, terceirizado: true, terceirizadoRecebidoEm: true, encaminhadoSetor: true, prioridade: true, baixaSetores: true, _count: { select: { conjuntoCroquis: true } } },
+    select: { id: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoUnitKg: true, pesoTotalKg: true, qte: true, qteProduzida: true, corteConcluidoEm: true, status: true, destino: true, destinoTerceirizado: true, terceirizado: true, terceirizadoRecebidoEm: true, encaminhadoSetor: true, prioridade: true, baixaSetores: true, montagemDiaProgramado: true, _count: { select: { conjuntoCroquis: true } } },
     orderBy: [{ marca: "asc" }],
   });
   // Descarta linhas-lixo do import (ex.: a linha "TOTAL" da Lista de Expedição que entrou como peça)
@@ -499,7 +499,23 @@ export async function GET(req) {
       travaConjuntos: tr ? tr.conjuntos.length : 0, travaMarcas: tr ? tr.conjuntos.slice(0, 12) : null, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p),
       // ⚠ a peça está sendo cortada sem ter sido liberada — a tela precisa dizer isso na linha
       foraDoLote: marcadasForaDoLote.has(p.id),
-      apontadoDesde: apontadoDesde.get(p.marca) || null, prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
+      apontadoDesde: apontadoDesde.get(p.marca) || null, prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null,
+      // ⚠⚠ "FICOU PRONTO E NINGUÉM VIU". Vitor (01/09/2026): "para essas peças que estão com a
+      // etiqueta amarela, assim que estiverem com todas as peças prontas do corte preciso alertar o
+      // PCP para ele enviar para produção essas peças que faltaram".
+      //
+      // O conjunto que o Planejamento programou mas cuja impressão foi RECUSADA (faltava croqui)
+      // fica parado com a etiqueta amarela. Quando o corte fecha o croqui que faltava, nada avisa:
+      // o PCP já passou por ali, já imprimiu o resto e não volta. A peça só reaparece se alguém
+      // lembrar dela.
+      //
+      // Os três sinais juntos são o que caracteriza o esquecimento — e é a AUSÊNCIA DE GRD que
+      // fecha o caso: sem ela, o desenho nunca foi impresso, então aquele conjunto não está na mão
+      // de ninguém no chão de fábrica. Conjunto que nunca foi programado não entra: esse não foi
+      // esquecido, só não chegou a vez dele.
+      montagemDiaProgramado: p.montagemDiaProgramado || null,
+      esperandoDescer: !!p.montagemDiaProgramado && mont?.prontoMontar === true
+        && !grdPorMarca.get(String(p.marca || "").toUpperCase()) };
   });
 
   // "Em aberto" = ainda SEM DESTINO. Antes exigia status "PENDENTE" — mas o status diz onde a

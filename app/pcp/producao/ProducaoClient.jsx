@@ -19,6 +19,7 @@ import Link from "next/link";
 import {
   Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, Printer, Search,
   Factory, Monitor, CalendarClock, Clock, Package, CheckCircle2, FileText, FileSpreadsheet, Send, Flag, X, Users,
+  BellRing,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import CompraChip, { ModalRastreabilidade } from "@/components/CompraChip";
@@ -161,7 +162,6 @@ export default function ProducaoClient() {
   // a outra se desce para a fábrica.
   const [baixando, setBaixando] = useState(false);
   const [exportando, setExportando] = useState(false);
-  const [mandando, setMandando] = useState(false);
   const [colAberta, setColAberta] = useState(null);
   // ⚠ a lista de separação é o papel do ALMOXARIFADO, não do PCP: sai por material, com barras,
   // peso e o R de cada um. Mesmo componente da TV — duas versões do mesmo papel divergiriam, e é
@@ -360,43 +360,6 @@ export default function ProducaoClient() {
   //
   // ⚠ E A OP PRECISA ESTAR "EM PRODUÇÃO", senão o painel da fábrica nem mostra a obra e a fila vai
   // para o vazio. Ligar junto evita o silêncio; o aviso diz que ligou.
-  async function mandarParaProducao() {
-    const alvo = pecas.filter((p) => sel.has(p.id));
-    if (!alvo.length || !detalhe) return;
-    const novas = alvo.filter((p) => p.prioridade == null);
-    if (!novas.length) {
-      setAviso({ ok: false, texto: "Todas as selecionadas já estão na fila da produção." });
-      return;
-    }
-    const op = ops.find((o) => o.opId === aberta);
-    const precisaLigar = !detalhe.emProducao;
-    if (!confirm(`Mandar ${novas.length} peça(s) para a produção?\n\nElas entram na fila da ${SETOR_LABEL[setorAba] || setorAba} no Painel de Produção, na ordem, e continuam nesta tela.${precisaLigar ? "\n\nA OP ainda não está marcada como \"em produção\" — vou ligar, senão o painel da fábrica não mostra a obra." : ""}`)) return;
-    setMandando(true); setAviso(null);
-    try {
-      if (precisaLigar) {
-        await fetch("/api/pcp/op-em-producao", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ opId: aberta, emProducao: true }),
-        });
-      }
-      const r = await fetch("/api/pcp/despacho", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: novas.map((p) => p.id), destino: "PRIORIDADE" }),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro ao mandar para produção");
-      setAviso({
-        ok: true,
-        texto: `${j.atualizados ?? novas.length} peça(s) na fila da ${SETOR_LABEL[setorAba] || setorAba}${op ? ` da ${fmtOP(op.opNumero)}` : ""}.`
-          + (precisaLigar ? " A OP foi marcada como em produção." : "")
-          + (j.descartados ? ` ${j.descartados} da lista de expedição foram descartadas (já estão na LPC).` : ""),
-      });
-      setSel(new Set());
-      await carregarDetalhe(aberta, setorAba);
-      carregar();
-    } catch (e) { setAviso({ ok: false, texto: e.message }); }
-    finally { setMandando(false); }
-  }
 
   // ⚠ Excel no PADRÃO DAS PLANILHAS (lib/excel-relatorio.js): cabeçalho ISO 9001 com logo. Import
   // dinâmico porque o exceljs é pesado e só quem clica precisa dele.
@@ -782,14 +745,6 @@ export default function ProducaoClient() {
                             )}
                             {/* ⚠ é a fila da produção: as peças sobem para o topo da aba do setor
                                 em /producao/prioridades e CONTINUAM aqui, só com a marcação nova. */}
-                            {sel.size > 0 && (
-                            <button onClick={mandarParaProducao} disabled={mandando}
-                              title={sel.size ? `Põe ${sel.size} peça(s) na fila da ${SETOR_LABEL[setorAba] || setorAba} no Painel de Produção` : "Selecione as peças"}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-torg-blue text-white hover:opacity-90 disabled:opacity-40">
-                              {mandando ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                              Mandar p/ produção
-                            </button>
-                            )}
                             {marcasSel.length > 0 && (
                             <button onClick={imprimirELiberar} disabled={imprimindo}
                               title={marcasSel.length ? `Imprime o desenho carimbado e registra a GRD de ${marcasSel.length} marca(s)` : "Selecione as peças"}
@@ -820,6 +775,39 @@ export default function ProducaoClient() {
                             informações"): esconder tudo até haver seleção deixa a aba com cara de
                             que não há nada a fazer. Agora a faixa diz quantos estão prontos e o
                             que marcar para chegar no painel. */}
+                        {/* ⚠⚠ O QUE FICOU PRONTO E NÃO DESCEU. Vitor (01/09/2026): "para essas peças
+                            que estão com a etiqueta amarela, assim que estiverem com todas as peças
+                            prontas do corte preciso alertar o PCP para ele enviar para produção
+                            essas peças que faltaram".
+                            O conjunto que o Planejamento programou mas cuja impressão foi RECUSADA
+                            por falta de croqui fica com a etiqueta amarela. Quando o corte fecha o
+                            croqui que faltava, NADA avisa: o PCP já passou por ali, já imprimiu o
+                            resto e não volta. A peça só reaparecia se alguém lembrasse dela.
+                            ⚠ Esta faixa aparece COM OU SEM SELEÇÃO — é alerta, não convite, e alerta
+                            que só aparece quando você já limpou a seleção não alerta ninguém. */}
+                        {setorAba === "MONTAGEM" && (() => {
+                          const esperando = pecas.filter((p) => p.esperandoDescer);
+                          if (!esperando.length) return null;
+                          const marcas = esperando.map((p) => p.marca);
+                          return (
+                            <div className="mx-3 mb-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-[12px] text-amber-900 flex items-start gap-2 flex-wrap">
+                              <BellRing size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                              <div className="flex-1 min-w-[240px]">
+                                <b>{esperando.length} conjunto(s) ficaram prontos e ainda não desceram.</b>{" "}
+                                <span className="text-amber-800">
+                                  Foram programados, a impressão foi recusada por falta de croqui, e o corte já fechou o que faltava.
+                                </span>
+                                <div className="font-mono text-[11px] mt-1 text-amber-800">
+                                  {marcas.slice(0, 12).join(", ")}{marcas.length > 12 ? ` … e mais ${marcas.length - 12}` : ""}
+                                </div>
+                              </div>
+                              <button onClick={() => setSel(new Set(esperando.map((p) => p.id)))}
+                                className="px-2.5 py-1.5 rounded-md bg-amber-600 text-white font-semibold whitespace-nowrap hover:bg-amber-700">
+                                marcar {esperando.length} e liberar
+                              </button>
+                            </div>
+                          );
+                        })()}
                         {setorAba === "MONTAGEM" && sel.size === 0 && (() => {
                           const prontos = pecas.filter((p) => p.prontoMontar === true).length;
                           return (
