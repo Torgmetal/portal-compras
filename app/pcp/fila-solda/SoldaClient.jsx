@@ -13,6 +13,7 @@
 import { useState, useMemo } from "react";
 import { Flame, Search, Loader2, AlertCircle, X, ArrowRight, CheckCircle2 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
+import PainelSolda from "./PainelSolda";
 
 const fmtKg = (v) => `${(Number(v) || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 const fmtData = (v) => (v ? new Date(v).toLocaleDateString("pt-BR") : "—");
@@ -97,6 +98,30 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
     } catch (e) { setErro(e.message); } finally { setAgindo(false); }
   }
 
+  // ⚠ O PAINEL DEVOLVE A REPARTIÇÃO INTEIRA — uma chamada por bancada, não uma por conjunto. Com 95
+  // marcas em 6 bancadas seriam 95 requisições; assim são 6.
+  async function sugerirEmLote(distrib) {
+    setAgindo(true); setErro(""); setOkMsg("");
+    try {
+      let total = 0, usadas = 0;
+      for (const b of distrib) {
+        const ids = b.itens.map((c) => c.id);
+        if (!ids.length) continue;
+        const r = await fetch("/api/pcp/solda", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids, bancada: b.bancada }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || `Erro ao gravar ${b.bancada}`);
+        total += j.atualizados ?? ids.length; usadas++;
+        const set = new Set(ids);
+        setConjuntos((prev) => prev.map((c) => (set.has(c.id) ? { ...c, soldaBancada: b.bancada, soldaBancadaEm: new Date().toISOString() } : c)));
+      }
+      setOkMsg(`${total} conjunto(s) repartidos entre ${usadas} bancada(s).`);
+      setSel(new Set());
+    } catch (e) { setErro(e.message); } finally { setAgindo(false); }
+  }
+
   return (
     <div className="p-6 space-y-4">
       <div>
@@ -155,6 +180,12 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
           </button>
           <button onClick={() => setSel(new Set())} className="ml-auto p-1.5 text-torg-gray hover:bg-white rounded-lg"><X size={14} /></button>
         </div>
+      )}
+
+      {/* ⚠ O PAINEL FICA ENTRE A SELEÇÃO E A LISTA — mesma ordem da montagem: marca os conjuntos,
+          vê como se reparte, grava. Sem seleção ele some, porque não há o que repartir. */}
+      {sel.size > 0 && (
+        <PainelSolda conjuntos={selecao} onSugerir={sugerirEmLote} ocupado={agindo} />
       )}
 
       <div className="bg-gray-50 rounded-xl border border-gray-100 border-t-4 border-t-torg-blue">
