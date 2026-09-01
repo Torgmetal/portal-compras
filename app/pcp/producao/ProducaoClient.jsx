@@ -122,6 +122,11 @@ const COLUNAS_FILTRO = [
   { key: "perfil", label: "Descrição", valor: (p) => p.descricao || "—" },
   { key: "programacao", label: "Programação", valor: (p) => (PROG[p.programacao?.situacao] || PROG.NAO_LANCADA).txt },
   { key: "situacao", label: "Situação", valor: (p) => SIT[situacaoDaPeca(p)].txt },
+  // ⚠ só faz sentido na Montagem — é a pergunta "esta marca pode descer?". Vitor (01/09/2026),
+  // depois do aviso de conjunto bloqueado: "os conjuntos vão retornar para a lista ou vai sumir,
+  // não temos um filtro para podermos filtrar essa parte?". Eles FICAM (o servidor só promove os
+  // que passaram), mas não havia como isolá-los — o dado vinha da API e a tela ignorava.
+  { key: "croquis", label: "Croquis", valor: (p) => (p.prontoMontar === true ? "pronto para montar" : p.prontoMontar === false ? "falta cortar" : "—") },
   { key: "material", label: "Material", valor: (p) => (p.material?.recebido ? (p.material.rastreio ? `R ${p.material.rastreio}` : "recebido") : "sem R") },
   { key: "grd", label: "Liberado (GRD)", valor: (p) => (p.grd ? "liberado" : "não liberado") },
 ];
@@ -176,6 +181,8 @@ export default function ProducaoClient() {
   // ⚠ material (o R) só faz sentido no CORTE: da montagem em diante a linha é o conjunto, e o R
   // pertence a cada croqui que o compõe — ele sai no carimbo do desenho, posição por posição.
   const mostraMaterial = !setorAba || setorAba === "CORTE";
+  // a prontidão dos croquis só existe na Montagem (é ela que decide se o conjunto desce)
+  const mostraCroquis = setorAba === "MONTAGEM";
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
@@ -826,6 +833,9 @@ export default function ProducaoClient() {
                                     não precisamos informar o R". O conjunto é a soma de croquis de
                                     materiais diferentes — a coluna só sabia dizer "sem R" em todas
                                     as linhas, que é ruído com cara de pendência. */}
+                                {mostraCroquis && (
+                                  <ThFiltro col="croquis" label="Croquis" larg="w-[13%]" dica="Quantos croquis deste conjunto já foram cortados. Só desce para a montagem quem está 100%." className="px-2 py-2 text-left font-bold" {...fp} />
+                                )}
                                 {mostraMaterial && (
                                   <ThFiltro col="material" label="Material" larg="w-[11%]" className="px-2 py-2 text-left font-bold" {...fp} />
                                 )}
@@ -924,6 +934,23 @@ export default function ProducaoClient() {
                                         peça não cortada não tem R mesmo — é o estado normal, não um
                                         problema. E clica para abrir a rastreabilidade da OP, que é onde
                                         se descobre qual dos dois casos é. */}
+                                    {mostraCroquis && (
+                                      <td className="px-2 py-1.5 truncate">
+                                        {p.totalCroquis ? (
+                                          <span
+                                            title={p.prontoMontar
+                                              ? `Os ${p.totalCroquis} croquis deste conjunto estão cortados — pode descer.`
+                                              : `Faltam cortar: ${(p.faltamCroquis || []).map((c) => `${c.marca} (${c.faltaQtd})`).join(", ") || "—"}`}
+                                            className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold whitespace-nowrap ${
+                                              p.prontoMontar
+                                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                                : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+                                            {p.totalCroquis - (p.faltamCroquis?.length || 0)}/{p.totalCroquis}
+                                            {p.prontoMontar ? " pronto" : ` · faltam ${p.faltamCroquis?.length || 0}`}
+                                          </span>
+                                        ) : <span className="text-torg-gray-light">—</span>}
+                                      </td>
+                                    )}
                                     {mostraMaterial && (
                                     <td className="px-2 py-1.5 truncate">
                                       <button onClick={() => setRastro(detalhe.opNumero)}
@@ -974,7 +1001,7 @@ export default function ProducaoClient() {
                                 );
                               })}
                               {!pecas.length && (
-                                <tr><td colSpan={mostraMaterial ? 9 : 8} className="px-3 py-8 text-center text-torg-gray">Nenhuma peça pendente neste setor.</td></tr>
+                                <tr><td colSpan={9 - (mostraMaterial ? 0 : 1) + (mostraCroquis ? 1 : 0)} className="px-3 py-8 text-center text-torg-gray">Nenhuma peça pendente neste setor.</td></tr>
                               )}
                             </tbody>
                         </table>
