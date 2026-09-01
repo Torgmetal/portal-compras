@@ -112,10 +112,10 @@ export default function FilaCorteClient({ pecasIniciais }) {
   // ⚠ "SEM DIA DEFINIDO" É PROGRAMAÇÃO ANTIGA, não erro. Até 01/09 a programação gravava só a
   // janela; essas peças ficam num grupo à parte, no fim, e voltam a ter dia quando alguém as
   // programa de novo. Somem sozinhas — não vale mexer nelas por trás.
-  const gruposDoDia = useMemo(() => {
+  const agruparPorDia = (lista) => {
     const hojeIso = isoHoje();
     const m = new Map();
-    for (const p of cols.PROGRAMADA) {
+    for (const p of lista) {
       const k = isoDe(p.corteDiaProgramado);
       if (!m.has(k)) m.set(k, []);
       m.get(k).push(p);
@@ -128,13 +128,18 @@ export default function FilaCorteClient({ pecasIniciais }) {
         atrasado: !!iso && iso < hojeIso,
         hoje: iso === hojeIso,
       }));
-  }, [cols.PROGRAMADA]);
+  };
+  const gruposDoDia = useMemo(() => agruparPorDia(cols.PROGRAMADA), [cols.PROGRAMADA]);
+  // ⚠⚠ EM CORTE TAMBÉM FICA VERMELHO. Vitor (01/09/2026): "havíamos programado em uma data, e ainda
+  // está executando, ela deve aparecer em vermelho lá". Peça que COMEÇOU sai da coluna Programado e
+  // perdia a visão por dia — então o atraso mais grave, o da peça em cima da máquina passando do
+  // dia, era justamente o único que a tela não mostrava.
+  const gruposEmCorte = useMemo(() => agruparPorDia(cols.EM_CORTE), [cols.EM_CORTE]);
 
   // peça programada para um dia que já passou e que ninguém cortou — é o vermelho da tela
-  const naoFeitasNoDia = useMemo(
-    () => gruposDoDia.filter((g) => g.atrasado).reduce((s, g) => s + g.lista.length, 0),
-    [gruposDoDia]
-  );
+  const contarAtrasadas = (gs) => gs.filter((g) => g.atrasado).reduce((s, g) => s + g.lista.length, 0);
+  const naoFeitasNoDia = useMemo(() => contarAtrasadas(gruposDoDia), [gruposDoDia]);
+  const emCorteAtrasadas = useMemo(() => contarAtrasadas(gruposEmCorte), [gruposEmCorte]);
   const atrasadas = useMemo(
     () => filtradas.filter((p) => !pecaCortada(p) && p.corteDataMetaFim && diaUTC(p.corteDataMetaFim) < hoje).length,
     [filtradas, hoje]
@@ -264,7 +269,9 @@ export default function FilaCorteClient({ pecasIniciais }) {
           sub={naoFeitasNoDia > 0 ? `${naoFeitasNoDia} fora do dia programado` : fmtKg(somaKg(cols.PROGRAMADA))}
           alerta={naoFeitasNoDia > 0} />
         <Kpi icon={Scissors} cor="bg-amber-600" label="Em corte" valor={`${cols.EM_CORTE.length} pç`}
-          sub={atrasadas > 0 ? `${atrasadas} atrasada(s)` : fmtKg(somaKg(cols.EM_CORTE))} alerta={atrasadas > 0} />
+          sub={emCorteAtrasadas > 0 ? `${emCorteAtrasadas} passaram do dia`
+            : atrasadas > 0 ? `${atrasadas} atrasada(s)` : fmtKg(somaKg(cols.EM_CORTE))}
+          alerta={emCorteAtrasadas > 0 || atrasadas > 0} />
         <Kpi icon={CheckCircle2} cor="bg-emerald-600" label="Cortadas (30d)" valor={`${cols.CORTADA.length} pç`}
           sub={noPrazo30d === null ? fmtKg(somaKg(cols.CORTADA)) : `${noPrazo30d}% no prazo`} />
       </div>
@@ -402,11 +409,28 @@ export default function FilaCorteClient({ pecasIniciais }) {
         </Coluna>
 
         <Coluna titulo="Em corte" cor="border-t-amber-500" lista={cols.EM_CORTE} sel={sel} onToggleColuna={toggleColuna}
-          vazio="Nada em corte agora — o Syneco move pra cá quando começa a dar baixa.">
-          {(p) => {
+          vazio="Nada em corte agora — o Syneco move pra cá quando começa a dar baixa."
+          grupos={gruposEmCorte}
+          cabecalhoGrupo={(g) => (
+            <div className={`flex items-center gap-1.5 flex-wrap px-2 py-1.5 rounded-md border text-[10px] ${
+              g.atrasado ? "bg-red-50 border-red-200 text-red-700"
+                : g.hoje ? "bg-amber-50 border-amber-200 text-amber-800"
+                : "bg-white border-gray-100 text-torg-gray"}`}>
+              <CalendarClock size={11} />
+              <span className="font-bold uppercase tracking-wide">
+                {g.iso ? fmtDiaLongo(g.iso) : "sem dia definido"}
+              </span>
+              <span className="font-semibold">{g.lista.length} pç · {fmtKg(g.kg)}</span>
+              {/* ⚠ aqui NÃO há botão de adiar: a peça já está na máquina. Empurrar o dia de quem
+                  está sendo cortada esconderia o atraso em vez de resolvê-lo — o que a tela tem de
+                  fazer é mostrar que passou do dia e continua aberta. */}
+              {g.atrasado && <span className="ml-auto font-bold">passou do dia e não fechou</span>}
+            </div>
+          )}>
+          {(p, i, g) => {
             const atrasoFim = p.corteDataMetaFim ? difDias(hoje, diaUTC(p.corteDataMetaFim)) : 0;
             return (
-              <CardPeca key={p.id} p={p} sel={sel} onToggle={toggle}>
+              <CardPeca key={p.id} p={p} sel={sel} onToggle={toggle} alerta={g?.atrasado}>
                 <span className="text-[10px] text-torg-gray inline-flex items-center gap-1">
                   <Clock size={11} />
                   {Number(p.qteProduzida) > 0
