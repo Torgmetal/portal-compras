@@ -198,14 +198,17 @@ export async function POST(req) {
   const marco = d.dataMarco ? new Date(`${d.dataMarco}T12:00:00Z`) : null;
   const desvio = desvioDoMarco(marco, agora);
 
-  // ⚠ atraso sem motivo não entra: é justamente o que Vitor pediu para medir. Adiantar não exige
-  // explicação — só o atraso, porque é o que custa prazo.
-  if (desvio != null && desvio > 0 && !String(d.desvioMotivo || "").trim()) {
-    return NextResponse.json({
-      error: `Esta frente está sendo liberada ${desvio} dia(s) depois do marco (${d.dataMarco}). Informe o motivo.`,
-      precisaMotivo: true, desvioDias: desvio,
-    }, { status: 400 });
-  }
+  // ⚠⚠ A TRAVA DO MARCO SAIU (Vitor, 01/09/2026: "essas datas do cronograma da forma que está não
+  // faz sentido, vamos desvincular isso por hora").
+  //
+  // Ela recusava a liberação atrasada sem motivo escrito, para medir o desvio contra o cronograma.
+  // Medido antes de tirar: em 8 liberações registradas desde agosto, 3 tinham marco, ZERO saíram
+  // depois dele e ZERO motivo foi escrito. O mecanismo nunca produziu um dado — e cobrava
+  // justificativa numa tela que precisa ser usada todo dia.
+  //
+  // ⚠ O DESVIO CONTINUA SENDO GRAVADO (`dataMarco`, `desvioDias`): a medição segue existindo, só
+  // deixou de bloquear. Se um dia o número passar a valer, é só voltar a exigir — o histórico não
+  // terá buracos.
 
   const dados = {
     opNumero: op.numero, frente: d.frente, setores: d.setores, prioridade: d.prioridade,
