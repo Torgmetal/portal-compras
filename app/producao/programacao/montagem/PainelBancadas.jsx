@@ -188,9 +188,14 @@ export default function PainelBancadas({ conjuntos, onLiberar, ocupado }) {
                   <td className="py-1.5 text-right tabular-nums font-semibold">{b.dias.toFixed(1)}</td>
                   {/* ⚠ dia a dia, com a carga de cada um: é o que a bancada vê como jornada */}
                   <td className="py-1.5 pl-3 text-[11px] text-torg-gray whitespace-nowrap">
+                    {/* ⚠ SEM ABREVIAÇÃO INVENTADA. Estava "2c" e o Vitor perguntou o que era —
+                        com razão: "c" de conjunto é código meu, não da fábrica. Rótulo que precisa
+                        de explicação não economiza espaço, custa uma pergunta. */}
                     {(porDia.find((x) => x.bancada === b.bancada)?.dias || []).map((d) => (
-                      <span key={d.dia.toISOString()} className="inline-block mr-2">
-                        <b className="text-torg-dark">{fmtDia(d.dia)}</b> {d.itens.length}c
+                      <span key={d.dia.toISOString()} className="inline-block mr-3"
+                        title={`${diaSemana(d.dia)} ${fmtDia(d.dia)}: ${d.itens.length} conjunto(s), ${d.un} peças, ${fmtKg(d.kg)}`}>
+                        <b className="text-torg-dark">{fmtDia(d.dia)}</b>{" "}
+                        {d.itens.length} {d.itens.length === 1 ? "conjunto" : "conjuntos"}
                       </span>
                     ))}
                   </td>
