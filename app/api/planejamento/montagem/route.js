@@ -12,8 +12,41 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { proximoDiaUtil, isoDia } from "@/lib/programacao-dia";
 import { calcularProntidao } from "@/lib/prontidao-conjunto";
+import { produzidoPorMarca } from "@/lib/conjuntos-setor";
 
 const ROLES = ["ADMIN", "PLANEJAMENTO", "PCP"];
+
+// GET ?opId=… → os conjuntos daquela obra, com a prontidão de cada um
+//
+// ⚠⚠ FILTRA POR opId, NÃO POR NÚMERO. A tela de Datas por setor trabalha com a OP-mãe ("105") e a
+// LPC grava a SUB-OBRA em opNumero ("T105A", "T105B") — casar por texto perderia a obra inteira ou
+// traria a errada. Ver a armadilha já anotada em PecaConjunto.opNumero.
+export async function GET(req) {
+  try { await requireRole(ROLES); }
+  catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  const opId = new URL(req.url).searchParams.get("opId");
+  if (!opId) return NextResponse.json({ error: "Informe a obra." }, { status: 400 });
+
+  const conjuntos = await prisma.pecaConjunto.findMany({
+    where: { opId, tipoPeca: "CONJUNTO" },
+    orderBy: [{ opNumero: "asc" }, { marca: "asc" }],
+    select: {
+      id: true, opNumero: true, marca: true, descricao: true, qte: true, pesoTotalKg: true, status: true,
+      montagemDiaProgramado: true, montagemDiaOriginal: true, montagemAdiado: true, montagemProgramadaPor: true,
+      conjuntoCroquis: { select: { croqui: { select: { marca: true, qte: true, qteProduzida: true } } } },
+    },
+    take: 2000,
+  });
+
+  // "montado" = apontamento do Syneco no setor Montagem — o lançamento de concluído da fábrica
+  const montados = await produzidoPorMarca("Montagem", conjuntos.map((c) => c.marca));
+
+  return NextResponse.json({
+    conjuntos: conjuntos.map((c) => ({ ...c, prontidao: calcularProntidao(c), conjuntoCroquis: undefined })),
+    montados,
+  });
+}
 
 const schema = z.discriminatedUnion("acao", [
   z.object({

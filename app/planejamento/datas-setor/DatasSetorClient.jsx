@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { CalendarClock, Loader2, AlertCircle, RefreshCw, Send } from "lucide-react";
+import { CalendarClock, Loader2, AlertCircle, RefreshCw, Send, Wrench } from "lucide-react";
 import LiberarFrentes from "./LiberarFrentes";
+import MontagemConjuntos from "./MontagemConjuntos";
 
 const fmtDia = (d) => (d ? new Date(d + "T12:00:00Z").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—");
 
@@ -10,6 +11,10 @@ export default function DatasSetorClient() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [opSel, setOpSel] = useState("");
+  // ⚠ duas abas na MESMA obra: liberar o corte para o PCP e marcar o dia da montagem. Vitor
+  // (01/09/2026): "não era isso, queria dentro da aba de datas por setor" — a primeira versão
+  // ficou numa tela própria e obrigava a escolher a obra de novo, longe do marco que a justifica.
+  const [aba, setAba] = useState("PCP");
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
@@ -100,14 +105,41 @@ export default function DatasSetorClient() {
                 {/* ⚠ a data acima é MARCO, não gatilho: quem libera é alguém, aqui, e o desvio
                     entre o marco e o dia da liberação fica gravado com o motivo. */}
                 <div className="mt-6 pt-5 border-t border-gray-100">
-                  <div className="flex items-baseline justify-between gap-3 mb-3 flex-wrap">
-                    <h3 className="font-bold text-torg-dark inline-flex items-center gap-2"><Send size={16} className="text-torg-blue" /> Liberar para o PCP</h3>
-                    <p className="text-[12px] text-torg-gray">
-                      As datas acima são o <b>marco</b> de início. Liberar é decisão — pode ser antes ou
-                      depois, e o desvio fica registrado.
-                    </p>
+                  <div className="flex items-center gap-1 mb-3 border-b border-gray-100">
+                    {[
+                      { k: "PCP", icone: Send, rotulo: "Liberar para o PCP" },
+                      { k: "MONTAGEM", icone: Wrench, rotulo: "Montagem — conjuntos" },
+                    ].map(({ k, icone: Icone, rotulo }) => (
+                      <button key={k} onClick={() => setAba(k)}
+                        className={`px-3 py-2 text-sm font-semibold inline-flex items-center gap-2 border-b-2 -mb-px ${
+                          aba === k ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
+                        <Icone size={15} /> {rotulo}
+                      </button>
+                    ))}
                   </div>
-                  <LiberarFrentes opId={op.opId} opNumero={op.opNumero} onMudou={carregar} />
+
+                  {aba === "PCP" ? (
+                    <>
+                      <p className="text-[12px] text-torg-gray mb-3">
+                        As datas acima são o <b>marco</b> de início. Liberar é decisão — pode ser antes ou
+                        depois, e o desvio fica registrado.
+                      </p>
+                      <LiberarFrentes opId={op.opId} opNumero={op.opNumero} onMudou={carregar} />
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[12px] text-torg-gray mb-3">
+                        O dia em que cada <b>conjunto</b> entra na montagem. Entram no plano os que têm
+                        <b> todas as sub peças cortadas</b>; o resto fica separado, para você ver e decidir.
+                      </p>
+                      {/* ⚠ o marco do cronograma vira a data sugerida — é ele que o planejamento
+                          veio olhar; abrir o campo em "hoje" convidaria a ignorar o combinado. */}
+                      <MontagemConjuntos
+                        opId={op.opId}
+                        marcoMontagem={op.datasSetorCrono?.MONTAGEM || op.datasSetor?.MONTAGEM || ""}
+                      />
+                    </>
+                  )}
                 </div>
               </>
             )}
