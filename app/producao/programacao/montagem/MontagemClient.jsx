@@ -3,7 +3,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Wrench, ChevronDown, ChevronUp, Filter, Search, CheckCircle2, Download,
-  Loader2, AlertCircle, ArrowRight, X, Package, Undo2, Printer,
+  Loader2, AlertCircle, ArrowRight, X, Package, Undo2, Printer, Flag,
 } from "lucide-react";
 import {
   criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
@@ -70,6 +70,23 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
   const [busca, setBusca] = useState("");
   const [selecionados, setSelecionados] = useState(new Set());
   const [imprimindo, setImprimindo] = useState(false);
+  const [marcandoPrio, setMarcandoPrio] = useState(false);
+
+  async function marcarPrioridade(valor) {
+    if (!selecionados.size) return;
+    setMarcandoPrio(true);
+    try {
+      const ids = [...selecionados];
+      const r = await fetch("/api/planejamento/liberacao/pecas", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, prioridade: valor }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao marcar");
+      const set = new Set(ids);
+      setConjuntos((prev) => prev.map((c) => (set.has(c.id) ? { ...c, prioridade: valor } : c)));
+    } catch (e) { alert(e.message); } finally { setMarcandoPrio(false); }
+  }
 
   // ── LIBERAR E IMPRIMIR, BANCADA A BANCADA ──────────────────────────────────────────────────
   // O caminho completo do pedido do Vitor (01/09/2026): libera para produção (status → Montagem,
@@ -589,6 +606,24 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
                 Liberar Montagem
               </button>
             )}
+            {/* ⚠⚠ PRIORIDADE É DO PLANEJAMENTO OU DO PCP. Vitor (01/09/2026): "pode ser que
+                tenhamos alguns conjuntos que serão prioridade (…) e isso pode ser definido pelo
+                setor de planejamento ou do pcp mesmo". Reusa a rota que já existe para o corte
+                (/api/planejamento/liberacao/pecas, perfis ADMIN/PLANEJAMENTO/PCP) — criar uma
+                segunda deixaria duas fontes para o mesmo campo. */}
+            <button
+              onClick={() => marcarPrioridade(1)}
+              disabled={imprimindo || marcandoPrio}
+              title="Entra na frente da fila e é distribuída antes de todo o resto"
+              className="px-3 py-1.5 border border-red-200 text-red-700 text-xs font-medium rounded-lg hover:bg-red-50 flex items-center gap-1.5 disabled:opacity-50">
+              {marcandoPrio ? <Loader2 size={13} className="animate-spin" /> : <Flag size={13} />} Prioridade
+            </button>
+            <button
+              onClick={() => marcarPrioridade(null)}
+              disabled={imprimindo || marcandoPrio}
+              className="px-2.5 py-1.5 border border-gray-200 text-torg-gray text-xs rounded-lg hover:bg-gray-50 disabled:opacity-50">
+              tirar
+            </button>
             <button
               onClick={imprimirConjuntos}
               disabled={imprimindo}
