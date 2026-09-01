@@ -6,6 +6,7 @@
 //   { acao: "concluir", ids }                                      → real fim = agora
 //   { acao: "reabrir", ids }                                       → desfaz conclusão
 //   { acao: "ordenar", idsOrdenados }                              → grava posição na fila
+//   { acao: "adiar", ids, para? "YYYY-MM-DD" }                      → leva o que não saiu p/ outro dia
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -13,6 +14,7 @@ import { SO_FABRICACAO } from "@/lib/lista-pecas";
 import { requireRole } from "@/lib/session";
 import { recalcularPmpCorte } from "@/lib/pmp-corte";
 import { buscarFilaCorte } from "@/lib/fila-corte";
+import { repartirPorDia, diasUteisDaJanela, proximoDiaUtil, isoDia } from "@/lib/programacao-dia";
 
 const ROLES = ["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"];
 
@@ -38,6 +40,12 @@ const schema = z.discriminatedUnion("acao", [
   z.object({ acao: z.literal("concluir"), ids: z.array(z.string()).min(1) }),
   z.object({ acao: z.literal("reabrir"), ids: z.array(z.string()).min(1) }),
   z.object({ acao: z.literal("ordenar"), idsOrdenados: z.array(z.string()).min(1).max(2000) }),
+  z.object({
+    acao: z.literal("adiar"),
+    ids: z.array(z.string()).min(1),
+    // sem data = próximo dia útil a partir do dia de cada peça
+    para: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  }),
 ]);
 
 export async function POST(req) {
@@ -54,6 +62,7 @@ export async function POST(req) {
 
   const agora = new Date();
   let atualizados = 0;
+  let diasProgramados = 0;
   const avisos = [];
 
   if (body.acao === "ordenar") {
@@ -72,18 +81,45 @@ export async function POST(req) {
     }
     // ⚠ ...SO_FABRICACAO é redundante hoje (a LE nunca chega a "CORTE"), mas a regra não pode
     // depender disso: "nunca programar nada que for por parte da LE" (Vitor, 29/08/2026).
+    const alvo = { id: { in: body.ids }, status: "CORTE", corteConcluidoEm: null, ...SO_FABRICACAO };
     const r = await prisma.pecaConjunto.updateMany({
-      where: { id: { in: body.ids }, status: "CORTE", corteConcluidoEm: null, ...SO_FABRICACAO },
+      where: alvo,
       data: { corteDataMetaInicio: inicio, corteDataMetaFim: fim },
     });
     atualizados = r.count;
     if (atualizados < body.ids.length) {
       avisos.push(`${body.ids.length - atualizados} peça(s) ignorada(s) — já concluída(s) ou fora do corte.`);
     }
+    // ⚠⚠ E O DIA DE CADA PEÇA. Vitor (01/09/2026): programação de mais de um dia tem de "ficar
+    // registrado para quais dias foram programados tais peças". A janela sozinha não responde
+    // "esta peça era de ontem" — sem isso não há vermelho nem adiamento possível.
+    // ⚠ NA ORDEM DA FILA: é ela que decide qual peça cai em qual dia (ver repartirPorDia).
+    const dias = diasUteisDaJanela(inicio, fim);
+    diasProgramados = dias.length;
+    const pecasProg = await prisma.pecaConjunto.findMany({
+      where: alvo, select: { id: true, pesoTotalKg: true },
+      orderBy: [{ corteOrdem: { sort: "asc", nulls: "last" } }, { marca: "asc" }],
+    });
+    const porDia = repartirPorDia(pecasProg, dias);
+    const grupos = new Map();
+    for (const [id, d] of porDia) {
+      const k = isoDia(d);
+      if (!grupos.has(k)) grupos.set(k, []);
+      grupos.get(k).push(id);
+    }
+    await prisma.$transaction([...grupos.entries()].flatMap(([iso, ids]) => {
+      const d = new Date(iso + "T00:00:00Z");
+      return [
+        prisma.pecaConjunto.updateMany({ where: { id: { in: ids } }, data: { corteDiaProgramado: d } }),
+        // ⚠ o ORIGINAL só se escreve uma vez — é dele que o atraso é contado
+        prisma.pecaConjunto.updateMany({ where: { id: { in: ids }, corteDiaOriginal: null }, data: { corteDiaOriginal: d } }),
+      ];
+    }));
   } else if (body.acao === "desprogramar") {
     const r = await prisma.pecaConjunto.updateMany({
       where: { id: { in: body.ids }, status: "CORTE", corteIniciadoEm: null },
-      data: { corteDataMetaInicio: null, corteDataMetaFim: null },
+      data: { corteDataMetaInicio: null, corteDataMetaFim: null,
+              corteDiaProgramado: null, corteDiaOriginal: null, corteAdiado: 0 },
     });
     atualizados = r.count;
     if (atualizados < body.ids.length) {
@@ -113,6 +149,40 @@ export async function POST(req) {
     if (atualizados < body.ids.length) {
       avisos.push(`${body.ids.length - atualizados} peça(s) ignorada(s) — sem programação ou já concluída(s).`);
     }
+  } else if (body.acao === "adiar") {
+    // ── LEVAR O QUE NÃO SAIU PARA OUTRO DIA ──────────────────────────────────────────────────
+    // Vitor (01/09/2026): "deixar de alguma forma levar para a data próxima para a execução".
+    //
+    // ⚠⚠ ADIAR NÃO APAGA O ATRASO. Só `corteDiaProgramado` se move; `corteDiaOriginal` fica onde
+    // estava e `corteAdiado` conta os empurrões. Movendo os dois, a peça arrastada a semana inteira
+    // apareceria sempre "em dia" — a tela existe justamente para mostrar o contrário.
+    //
+    // ⚠ A JANELA (meta início/fim) TAMBÉM NÃO SE MEXE: ela é o compromisso, e é dela que o PMP e o
+    // real × estimado derivam o atraso. Peça adiada para além do fim da janela é exatamente isso —
+    // uma peça fora do prazo, e a tela tem de poder dizer.
+    const alvo = await prisma.pecaConjunto.findMany({
+      where: { id: { in: body.ids }, status: "CORTE", corteConcluidoEm: null, corteDataMetaInicio: { not: null } },
+      select: { id: true, corteDiaProgramado: true, corteDataMetaInicio: true },
+    });
+    const destino = body.para ? new Date(body.para + "T00:00:00Z") : null;
+    const grupos = new Map();
+    for (const p of alvo) {
+      const base = p.corteDiaProgramado || p.corteDataMetaInicio;
+      const d = destino || proximoDiaUtil(base);
+      const k = isoDia(d);
+      if (!grupos.has(k)) grupos.set(k, []);
+      grupos.get(k).push(p.id);
+    }
+    await prisma.$transaction([...grupos.entries()].map(([iso, ids]) =>
+      prisma.pecaConjunto.updateMany({
+        where: { id: { in: ids } },
+        data: { corteDiaProgramado: new Date(iso + "T00:00:00Z"), corteAdiado: { increment: 1 } },
+      })
+    ));
+    atualizados = alvo.length;
+    if (atualizados < body.ids.length) {
+      avisos.push(`${body.ids.length - atualizados} peça(s) ignorada(s) — já concluída(s) ou sem programação.`);
+    }
   } else if (body.acao === "reabrir") {
     const r = await prisma.pecaConjunto.updateMany({
       where: { id: { in: body.ids }, status: "CORTE", corteConcluidoEm: { not: null } },
@@ -123,7 +193,7 @@ export async function POST(req) {
 
   // PMP: programar/desprogramar mudam o plano → recalcula metas das OPs afetadas
   let pmp = null;
-  if (["programar", "desprogramar"].includes(body.acao) && atualizados > 0) {
+  if (["programar", "desprogramar", "adiar"].includes(body.acao) && atualizados > 0) {
     try {
       const ops = await prisma.pecaConjunto.findMany({
         where: { id: { in: body.ids } },
@@ -149,7 +219,8 @@ export async function POST(req) {
           ids: (body.ids || body.idsOrdenados).slice(0, 20),
           total: (body.ids || body.idsOrdenados).length,
           atualizados,
-          ...(body.acao === "programar" ? { metaInicio: body.metaInicio, metaFim: body.metaFim } : {}),
+          ...(body.acao === "programar" ? { metaInicio: body.metaInicio, metaFim: body.metaFim, dias: diasProgramados } : {}),
+          ...(body.acao === "adiar" ? { para: body.para || "próximo dia útil" } : {}),
           ...(pmp ? { pmpMetas: pmp.metasGravadas } : {}),
         },
       },
@@ -157,5 +228,5 @@ export async function POST(req) {
   } catch {}
 
   const pecas = await buscarFilaCorte();
-  return NextResponse.json({ ok: true, atualizados, avisos, pecas });
+  return NextResponse.json({ ok: true, atualizados, avisos, pecas, diasProgramados });
 }

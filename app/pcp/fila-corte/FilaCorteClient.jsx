@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 import {
   ListOrdered, CalendarRange, Scissors, CheckCircle2, Loader2, AlertCircle,
   Play, Check, Undo2, X, ArrowUp, ArrowDown, ChevronsUp, Search,
-  Clock, Package, Layers,
+  Clock, Package, Layers, CalendarClock, ArrowRight,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import BotaoRelatorioDia from "@/components/BotaoRelatorioDia";
@@ -26,6 +26,15 @@ const fmtKg = (v) => {
   return `${kg.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 };
 const isoHoje = () => new Date().toISOString().split("T")[0];
+// ⚠ as datas chegam como ISO do JSON e são @db.Date (sem hora) — cortar em 10 evita qualquer
+// conversão de fuso, que aqui deslocaria o dia inteiro.
+const isoDe = (v) => (v ? String(v).slice(0, 10) : "");
+const fmtDiaLongo = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00Z");
+  const semana = d.toLocaleDateString("pt-BR", { weekday: "short", timeZone: "UTC" }).replace(".", "");
+  return `${semana} ${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" })}`;
+};
 
 // Peça cortada: conclusão manual OU baixa total no Syneco (Importar Syneco)
 const pecaCortada = (p) => !!p.corteConcluidoEm || (Number(p.qte) > 0 && Number(p.qteProduzida) >= Number(p.qte));
@@ -49,6 +58,8 @@ export default function FilaCorteClient({ pecasIniciais }) {
   const [modalProgramar, setModalProgramar] = useState(false);
   const [metaInicio, setMetaInicio] = useState(isoHoje());
   const [metaFim, setMetaFim] = useState(isoHoje());
+  const [modalAdiar, setModalAdiar] = useState(false);
+  const [adiarPara, setAdiarPara] = useState("");
   const [agindo, setAgindo] = useState(false);
   const [erro, setErro] = useState("");
   const [avisos, setAvisos] = useState([]);
@@ -93,6 +104,37 @@ export default function FilaCorteClient({ pecasIniciais }) {
   }, [pecas]);
 
   const somaKg = (arr) => arr.reduce((s, p) => s + (Number(p.pesoTotalKg) || 0), 0);
+
+  // ── A PROGRAMAÇÃO, DIA A DIA ───────────────────────────────────────────────────────────────
+  // Vitor (01/09/2026): "quando eu fizer uma programação para mais de um dia precisamos ter a visão
+  // separada no pcp para ficar registrado para quais dias foram programados tais peças".
+  //
+  // ⚠ "SEM DIA DEFINIDO" É PROGRAMAÇÃO ANTIGA, não erro. Até 01/09 a programação gravava só a
+  // janela; essas peças ficam num grupo à parte, no fim, e voltam a ter dia quando alguém as
+  // programa de novo. Somem sozinhas — não vale mexer nelas por trás.
+  const gruposDoDia = useMemo(() => {
+    const hojeIso = isoHoje();
+    const m = new Map();
+    for (const p of cols.PROGRAMADA) {
+      const k = isoDe(p.corteDiaProgramado);
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(p);
+    }
+    return [...m.entries()]
+      // sem dia vai para o fim; o resto em ordem de data
+      .sort((a, b) => (!a[0] ? 1 : !b[0] ? -1 : a[0].localeCompare(b[0])))
+      .map(([iso, lista]) => ({
+        iso, lista, kg: somaKg(lista),
+        atrasado: !!iso && iso < hojeIso,
+        hoje: iso === hojeIso,
+      }));
+  }, [cols.PROGRAMADA]);
+
+  // peça programada para um dia que já passou e que ninguém cortou — é o vermelho da tela
+  const naoFeitasNoDia = useMemo(
+    () => gruposDoDia.filter((g) => g.atrasado).reduce((s, g) => s + g.lista.length, 0),
+    [gruposDoDia]
+  );
   const atrasadas = useMemo(
     () => filtradas.filter((p) => !pecaCortada(p) && p.corteDataMetaFim && diaUTC(p.corteDataMetaFim) < hoje).length,
     [filtradas, hoje]
@@ -134,6 +176,17 @@ export default function FilaCorteClient({ pecasIniciais }) {
     } finally {
       setAgindo(false);
     }
+  };
+
+  // ── LEVAR PARA OUTRO DIA ────────────────────────────────────────────────────────────────────
+  // Vitor (01/09/2026): "aquilo que não foi executado na data programada ficar em vermelho e deixar
+  // de alguma forma levar para a data próxima para a execução".
+  // ⚠ Sem data = próximo dia útil de CADA peça (o servidor calcula): um lote adiado junto pode ter
+  // peças de dias diferentes, e empurrar todas para o mesmo dia juntaria carga que ninguém pediu.
+  const adiar = async (ids, para) => {
+    const ok = await agir({ acao: "adiar", ids, ...(para ? { para } : {}) },
+      para ? `levada(s) para ${fmtDiaLongo(para)}` : "levada(s) para o próximo dia útil");
+    if (ok) setModalAdiar(false);
   };
 
   const programar = async () => {
@@ -207,7 +260,9 @@ export default function FilaCorteClient({ pecasIniciais }) {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi icon={ListOrdered} cor="bg-torg-blue" label="Na fila" valor={`${cols.FILA.length} pç`} sub={fmtKg(somaKg(cols.FILA))} />
-        <Kpi icon={CalendarRange} cor="bg-torg-orange" label="Programado" valor={`${cols.PROGRAMADA.length} pç`} sub={fmtKg(somaKg(cols.PROGRAMADA))} />
+        <Kpi icon={CalendarRange} cor="bg-torg-orange" label="Programado" valor={`${cols.PROGRAMADA.length} pç`}
+          sub={naoFeitasNoDia > 0 ? `${naoFeitasNoDia} fora do dia programado` : fmtKg(somaKg(cols.PROGRAMADA))}
+          alerta={naoFeitasNoDia > 0} />
         <Kpi icon={Scissors} cor="bg-amber-600" label="Em corte" valor={`${cols.EM_CORTE.length} pç`}
           sub={atrasadas > 0 ? `${atrasadas} atrasada(s)` : fmtKg(somaKg(cols.EM_CORTE))} alerta={atrasadas > 0} />
         <Kpi icon={CheckCircle2} cor="bg-emerald-600" label="Cortadas (30d)" valor={`${cols.CORTADA.length} pç`}
@@ -244,6 +299,11 @@ export default function FilaCorteClient({ pecasIniciais }) {
             <button onClick={() => agir({ acao: "concluir", ids: [...sel] }, "concluída(s)")} disabled={agindo}
               className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 inline-flex items-center gap-1 disabled:opacity-50">
               <Check size={13} /> Concluir
+            </button>
+            <button onClick={() => { setAdiarPara(""); setModalAdiar(true); }} disabled={agindo}
+              title="Leva as peças selecionadas para outro dia, sem apagar o dia original"
+              className="px-3 py-1.5 border border-red-200 text-red-700 text-xs font-medium rounded-lg hover:bg-red-50 inline-flex items-center gap-1 disabled:opacity-50">
+              <ArrowRight size={13} /> Adiar…
             </button>
             <button onClick={() => agir({ acao: "desprogramar", ids: [...sel] }, "devolvida(s) à fila")} disabled={agindo}
               className="px-3 py-1.5 border border-gray-200 text-torg-gray text-xs rounded-lg hover:bg-gray-50 disabled:opacity-50">
@@ -291,20 +351,50 @@ export default function FilaCorteClient({ pecasIniciais }) {
         </Coluna>
 
         <Coluna titulo="Programado" cor="border-t-torg-orange" lista={cols.PROGRAMADA} sel={sel} onToggleColuna={toggleColuna}
-          vazio="Selecione peças da fila e clique em “Programar…”.">
-          {(p) => {
-            const dIni = difDias(hoje, diaUTC(p.corteDataMetaInicio));
+          vazio="Selecione peças da fila e clique em “Programar…”."
+          grupos={gruposDoDia}
+          cabecalhoGrupo={(g) => (
+            <div className={`flex items-center gap-1.5 flex-wrap px-2 py-1.5 rounded-md border text-[10px] ${
+              g.atrasado ? "bg-red-50 border-red-200 text-red-700"
+                : g.hoje ? "bg-amber-50 border-amber-200 text-amber-800"
+                : "bg-white border-gray-100 text-torg-gray"}`}>
+              <CalendarClock size={11} />
+              <span className="font-bold uppercase tracking-wide">
+                {g.iso ? fmtDiaLongo(g.iso) : "sem dia definido"}
+              </span>
+              <span className="font-semibold">{g.lista.length} pç · {fmtKg(g.kg)}</span>
+              {g.hoje && <span className="font-semibold">· hoje</span>}
+              {/* ⚠ o botão só existe no dia VENCIDO: adiar dia futuro não é "levar o que não saiu",
+                  é reprogramar — e para isso a ação certa é Programar…, que refaz o PMP. */}
+              {g.atrasado && (
+                <button onClick={() => adiar(g.lista.map((p) => p.id))} disabled={agindo}
+                  title="Leva as peças que não foram cortadas para o próximo dia útil"
+                  className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-50">
+                  <ArrowRight size={10} /> levar p/ o próximo dia
+                </button>
+              )}
+              {!g.iso && (
+                <span className="ml-auto italic">programação antiga — reprograme para repartir por dia</span>
+              )}
+            </div>
+          )}>
+          {(p, i, g) => {
+            const original = isoDe(p.corteDiaOriginal);
+            const moveu = original && original !== isoDe(p.corteDiaProgramado);
             return (
-              <CardPeca key={p.id} p={p} sel={sel} onToggle={toggle}>
+              <CardPeca key={p.id} p={p} sel={sel} onToggle={toggle} alerta={g?.atrasado}>
                 <span className="text-[10px] text-torg-gray inline-flex items-center gap-1">
-                  <CalendarRange size={11} /> Meta {fmtData(p.corteDataMetaInicio)} → {fmtData(p.corteDataMetaFim)}
+                  <CalendarRange size={11} /> janela {fmtData(p.corteDataMetaInicio)} → {fmtData(p.corteDataMetaFim)}
                 </span>
-                {dIni > 0 ? (
-                  <span className="text-[10px] font-semibold text-red-600">deveria ter começado há {dIni}d</span>
-                ) : dIni === 0 ? (
-                  <span className="text-[10px] font-semibold text-amber-600">começa hoje</span>
-                ) : (
-                  <span className="text-[10px] text-torg-gray">começa em {-dIni}d</span>
+                {/* ⚠⚠ O ATRASO CONTA DO DIA ORIGINAL, não do último adiamento — senão a peça
+                    empurrada a semana inteira apareceria sempre "em dia". */}
+                {moveu && (
+                  <span className="text-[10px] font-semibold text-red-600">
+                    era {fmtDiaLongo(original)} · adiada {p.corteAdiado}×
+                  </span>
+                )}
+                {!moveu && g?.atrasado && (
+                  <span className="text-[10px] font-semibold text-red-600">não foi cortada no dia</span>
                 )}
               </CardPeca>
             );
@@ -359,6 +449,42 @@ export default function FilaCorteClient({ pecasIniciais }) {
       </div>
 
       {/* Modal Programar */}
+      {modalAdiar && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !agindo && setModalAdiar(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-semibold text-torg-dark flex items-center gap-2"><ArrowRight size={16} className="text-red-600" /> Levar para outro dia</h3>
+              <button onClick={() => setModalAdiar(false)} disabled={agindo} className="text-torg-gray hover:text-torg-dark"><X size={16} /></button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-xs text-torg-gray">
+                <strong className="text-torg-dark">{sel.size} peça(s)</strong> · {fmtKg(somaKg(selecao))}
+              </p>
+              <div>
+                <label className="block text-xs font-medium text-torg-gray mb-1">Novo dia</label>
+                <input type="date" value={adiarPara} onChange={(e) => setAdiarPara(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" />
+                <p className="text-[11px] text-torg-gray mt-1">Em branco = próximo dia útil de cada peça.</p>
+              </div>
+              <p className="text-[11px] text-torg-gray bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                O <strong>dia original não se perde</strong>: a peça continua marcada como não feita na data em que foi
+                programada, e a tela conta quantas vezes ela já foi adiada. A janela e a meta do PMP também não mudam —
+                adiar não conserta o prazo, só diz onde a peça vai ser cortada agora.
+              </p>
+            </div>
+            <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+              <button onClick={() => setModalAdiar(false)} disabled={agindo}
+                className="px-4 py-2 text-sm text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
+              <button onClick={() => adiar([...sel], adiarPara || undefined)} disabled={agindo}
+                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 inline-flex items-center gap-2 disabled:opacity-50">
+                {agindo ? <Loader2 size={15} className="animate-spin" /> : <ArrowRight size={15} />}
+                Levar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modalProgramar && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !agindo && setModalProgramar(false)}>
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
@@ -384,8 +510,10 @@ export default function FilaCorteClient({ pecasIniciais }) {
                 </div>
               </div>
               <p className="text-[11px] text-torg-gray bg-torg-blue-50/50 border border-torg-blue-100 rounded-lg px-3 py-2">
-                As quantidades e o peso são distribuídos pelos <strong>dias úteis (seg–sex)</strong> do período e entram
-                como meta de <strong>Corte no PMP</strong>. As datas meta não mudam depois — o atraso aparece no kanban.
+                As peças são repartidas pelos <strong>dias úteis (seg–sex)</strong> do período — em blocos seguidos da
+                fila, equilibrados por <strong>peso</strong> — e cada uma passa a ter o <strong>seu dia</strong>, visível
+                na coluna Programado. O mesmo plano vira meta de <strong>Corte no PMP</strong>. A janela não muda depois:
+                o que não sair no dia fica em vermelho, e você leva para o próximo.
               </p>
             </div>
             <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
@@ -418,7 +546,9 @@ function Kpi({ icon: Icon, cor, label, valor, sub, alerta }) {
   );
 }
 
-function Coluna({ titulo, cor, lista, sel, onToggleColuna, vazio, children }) {
+// ⚠ `grupos` transforma a coluna em lista agrupada (a Programado, por dia) sem duplicar a casca:
+// mesmo cabeçalho, mesma seleção, mesma rolagem. Sem ele a coluna segue plana, como as outras.
+function Coluna({ titulo, cor, lista, sel, onToggleColuna, vazio, grupos, cabecalhoGrupo, children }) {
   const todas = lista.length > 0 && lista.every((p) => sel?.has(p.id));
   return (
     <div className={`bg-gray-50 rounded-xl border border-gray-100 border-t-4 ${cor}`}>
@@ -435,15 +565,24 @@ function Coluna({ titulo, cor, lista, sel, onToggleColuna, vazio, children }) {
       <div className="px-2 pb-2 space-y-1.5 max-h-[64vh] overflow-y-auto">
         {lista.length === 0
           ? <p className="text-[11px] text-torg-gray italic px-2 py-6 text-center">{vazio}</p>
-          : lista.map((p, i) => children(p, i))}
+          : grupos
+            ? grupos.map((g) => (
+                <div key={g.iso || "sem-dia"} className="space-y-1.5 pb-1">
+                  {cabecalhoGrupo(g)}
+                  {g.lista.map((p, i) => children(p, i, g))}
+                </div>
+              ))
+            : lista.map((p, i) => children(p, i))}
       </div>
     </div>
   );
 }
 
-function CardPeca({ p, sel, onToggle, pos, children }) {
+function CardPeca({ p, sel, onToggle, pos, alerta, children }) {
+  const borda = sel?.has(p.id) ? "border-torg-blue ring-1 ring-torg-blue"
+    : alerta ? "border-red-200 bg-red-50/40" : "border-gray-100";
   return (
-    <div className={`bg-white rounded-lg border p-2.5 text-xs space-y-1 ${sel?.has(p.id) ? "border-torg-blue ring-1 ring-torg-blue" : "border-gray-100"}`}>
+    <div className={`rounded-lg border p-2.5 text-xs space-y-1 ${alerta && !sel?.has(p.id) ? "" : "bg-white"} ${borda}`}>
       <div className="flex items-center gap-2">
         {onToggle && (
           <input type="checkbox" checked={sel?.has(p.id) || false} onChange={() => onToggle(p.id)} className="rounded border-gray-300" />

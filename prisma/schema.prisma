@@ -3000,6 +3000,16 @@ model PecaConjunto {
   corteOrdem             Int? // posição na fila (menor = corta primeiro)
   corteDataMetaInicio    DateTime?               @db.Date
   corteDataMetaFim       DateTime?               @db.Date
+  // ⚠ O DIA DA PEÇA, dentro da janela. Vitor (01/09/2026): "quando eu fizer uma programação para
+  // mais de um dia precisamos ter a visão separada no pcp para ficar registrado para quais dias
+  // foram programados tais peças". A janela acima é o compromisso e segue imutável; este é o dia em
+  // que a peça deve ser cortada, e é ELE que se move quando alguém adia.
+  corteDiaProgramado     DateTime?               @db.Date
+  // ⚠⚠ E O DIA ORIGINAL NÃO SE MOVE NUNCA. Adiar sem guardar isto apagaria o atraso: a peça
+  // empurrada três vezes apareceria sempre "em dia", que é o oposto do que a tela existe para
+  // mostrar. O vermelho conta daqui.
+  corteDiaOriginal       DateTime?               @db.Date
+  corteAdiado            Int                     @default(0) // quantas vezes foi empurrada
   corteIniciadoEm        DateTime? // real início do corte
   corteConcluidoEm       DateTime? // real fim do corte
   // Campos de produção (populados pelo Syneco)
