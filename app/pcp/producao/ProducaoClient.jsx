@@ -858,6 +858,15 @@ export default function ProducaoClient() {
                                       {/* ⚠ o número é a POSIÇÃO NA FILA da OP — é assim que a peça aparece
                                           ordenada no Painel de Produção, e é o que prova que ela foi
                                           mandada. Sem número, não foi. */}
+                                      {/* ⚠ cortada sem passar pela liberação — Vitor (01/09/2026)
+                                          pediu para trazer essas peças; trazê-las sem marcar faria
+                                          o recorte do Planejamento perder o sentido. */}
+                                      {p.foraDoLote && (
+                                        <span className="ml-1 text-[9px] px-1 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-semibold align-middle whitespace-nowrap"
+                                          title="Não está no lote liberado pelo Planejamento — a fábrica já apontou produção nela.">
+                                          fora do lote
+                                        </span>
+                                      )}
                                       {p.prioridade != null && (
                                         <span className="ml-1 text-[9px] font-bold text-torg-orange bg-torg-orange/10 rounded px-1 py-0.5 align-middle"
                                           title={`Na fila da produção, posição ${p.prioridade} desta OP`}>

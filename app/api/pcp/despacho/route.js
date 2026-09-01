@@ -136,7 +136,7 @@ export async function GET(req) {
   // ⚠ LIBERAÇÃO DE FRENTE INTEIRA (pecaIds nulo) NÃO RESTRINGE NADA — é o caso "desce tudo".
   // ⚠ E `?tudo=1` mostra a OP inteira, para quem precisa procurar uma peça que não foi liberada.
   const tudo = url.searchParams.get("tudo") === "1";
-  let escopo = semEntregues, liberacaoInfo = null;
+  let escopo = semEntregues, liberacaoInfo = null, marcadasForaDoLote = new Set();
   if (!tudo) {
     const libs = await prisma.liberacaoProducao.findMany({
       where: { opId, status: { in: ["LIBERADA", "EM_PRODUCAO"] } },
@@ -146,14 +146,32 @@ export async function GET(req) {
     if (libs.length) {
       const frenteInteira = libs.some((l) => !Array.isArray(l.pecaIds) || !l.pecaIds.length);
       const ids = new Set(libs.flatMap((l) => (Array.isArray(l.pecaIds) ? l.pecaIds : [])));
-      if (!frenteInteira && ids.size) escopo = semEntregues.filter((p) => ids.has(p.id));
+      // ⚠⚠ O QUE A FÁBRICA ESTÁ CORTANDO ENTRA, MESMO FORA DO LOTE LIBERADO. Vitor (01/09/2026):
+      // "preciso que traga essas peças que a fábrica está cortando para essa página".
+      //
+      // O caso real da OP-112: o Planejamento liberou 26 peças para o corte e a fábrica cortou
+      // OUTRAS 43. A aba Preparação mostrava as 26, todas em "não iniciado" — e a leitura era que
+      // nada tinha andado, quando 33 marcas já haviam fechado fora do recorte. Esconder produção
+      // que existe é pior que mostrar peça não liberada: uma some do radar, a outra é só um aviso.
+      //
+      // ⚠ ENTRA MARCADA. `foraDoLote` sinaliza a linha na tela — o PCP precisa VER que aquilo foi
+      // cortado sem passar pela liberação, senão o recorte perde o sentido e ninguém percebe que o
+      // chão está trabalhando por outra lista.
+      const temProducao = (p) => Number(p.qteProduzida) > 0 || !!p.corteConcluidoEm;
+      if (!frenteInteira && ids.size) escopo = semEntregues.filter((p) => ids.has(p.id) || temProducao(p));
+      const foraDoLote = new Set(
+        frenteInteira || !ids.size ? [] : escopo.filter((p) => !ids.has(p.id)).map((p) => p.id)
+      );
       liberacaoInfo = {
         lotes: libs.length, frenteInteira,
         pecasLiberadas: frenteInteira ? null : ids.size,
         dias: [...new Set(libs.map((l) => (l.dataProgramada ? l.dataProgramada.toISOString().slice(0, 10) : null)).filter(Boolean))],
         // ⚠ diz quanto ficou de fora: um recorte silencioso faz o PCP achar que a obra acabou
-        foraDoRecorte: frenteInteira ? 0 : semEntregues.length - escopo.length,
+        foraDoRecorte: frenteInteira ? 0 : semEntregues.filter((p) => !ids.has(p.id) && !temProducao(p)).length,
+        // e quantas entraram por estarem sendo cortadas sem liberação
+        cortandoForaDoLote: foraDoLote.size,
       };
+      marcadasForaDoLote = foraDoLote;
     }
   }
 
@@ -463,7 +481,9 @@ export async function GET(req) {
       // estava saindo na listagem.
       setorReal: realMapOp.get(p.marca) || null,
       montadoEm: montadoPorCroqui.get(p.marca) || null,
-      travaConjuntos: tr ? tr.conjuntos.length : 0, travaMarcas: tr ? tr.conjuntos.slice(0, 12) : null, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
+      travaConjuntos: tr ? tr.conjuntos.length : 0, travaMarcas: tr ? tr.conjuntos.slice(0, 12) : null, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p),
+      // ⚠ a peça está sendo cortada sem ter sido liberada — a tela precisa dizer isso na linha
+      foraDoLote: marcadasForaDoLote.has(p.id), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
   });
 
   // "Em aberto" = ainda SEM DESTINO. Antes exigia status "PENDENTE" — mas o status diz onde a
