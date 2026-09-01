@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useStore } from "@/lib/store";
-import { Loader2, Plus, ClipboardPaste, Save, Trash2, Search, Check, X, PackagePlus, Filter, ChevronDown, ArrowUp, ArrowDown, FileDown, RefreshCw } from "lucide-react";
+import { Loader2, Plus, ClipboardPaste, Save, Trash2, Search, Check, X, PackagePlus, Filter, ChevronDown, ArrowUp, ArrowDown, FileDown, RefreshCw, AlertCircle } from "lucide-react";
 
 const anoAtual = new Date().getFullYear();
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -57,6 +57,11 @@ export default function CmrLancarClient() {
   const [filtroAberto, setFiltroAberto] = useState(null); // { key, rect }
   const [selecionada, setSelecionada] = useState(null); // id da linha clicada (marca a linha toda)
   const [soSemCert, setSoSemCert] = useState(false); // filtro rápido: só os sem certificado
+  const [excluir, setExcluir] = useState(null);      // linha em confirmação de exclusão
+  const [confExcl, setConfExcl] = useState(false);   // checkbox de confirmação
+  const [excluindo, setExcluindo] = useState(false);
+  const [logAberto, setLogAberto] = useState(false);
+  const [logExcl, setLogExcl] = useState(null);
 
   // Normaliza cada item p/ o filtro/ordenação (rc derivado, cert, data formatada).
   const linhas = useMemo(() => (dados?.itens || []).map((it) => {
@@ -160,6 +165,26 @@ export default function CmrLancarClient() {
     } catch (e) { showToast(e.message, "erro"); } finally { setSalvando(false); }
   }
 
+  async function executarExcluir() {
+    if (!excluir || !confExcl) return;
+    setExcluindo(true);
+    try {
+      const r = await fetch(`/api/compras/cmr/${excluir.id}`, { method: "DELETE" });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error || "Falha ao excluir");
+      setDados((d) => d ? { ...d, itens: d.itens.filter((x) => x.id !== excluir.id), total: (d.total || 1) - 1 } : d);
+      const av = j.planilha && !j.planilha.ok ? " (⚠ não consegui limpar na planilha — rode Sincronizar)" : "";
+      showToast(`R ${excluir.importRef} excluído${av}`, "success");
+      setExcluir(null); setConfExcl(false);
+      if (logAberto) carregarLog();
+    } catch (e) { showToast(e.message, "erro"); } finally { setExcluindo(false); }
+  }
+  async function carregarLog() {
+    setLogExcl(null);
+    const j = await fetch("/api/compras/cmr/exclusoes").then((r) => r.json()).catch(() => null);
+    setLogExcl(j?.itens || []);
+  }
+
   const itens = dados?.itens || [];
 
   // Reconcilia com a planilha do SharePoint (puxa rastreio digitado direto no Excel e
@@ -220,7 +245,7 @@ export default function CmrLancarClient() {
       <div className="flex flex-wrap gap-2">
         <button onClick={() => { setModo(modo === "form" ? null : "form"); setForm(VAZIO); }}
           className={`text-sm font-medium rounded-lg px-4 py-2.5 inline-flex items-center gap-2 ${modo === "form" ? "bg-torg-blue text-white" : "bg-white border border-torg-blue-200 text-torg-blue hover:bg-torg-blue-50"}`}>
-          <Plus size={16} /> Lançar item (celular)
+          <Plus size={16} /> Lançar item
         </button>
         <button onClick={() => { setModo(modo === "massa" ? null : "massa"); setMassa([]); }}
           className={`text-sm font-medium rounded-lg px-4 py-2.5 inline-flex items-center gap-2 ${modo === "massa" ? "bg-torg-blue text-white" : "bg-white border border-torg-blue-200 text-torg-blue hover:bg-torg-blue-50"}`}>
@@ -345,14 +370,19 @@ export default function CmrLancarClient() {
               className="text-sm font-medium rounded-lg px-3 py-2 inline-flex items-center gap-2 bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
               {exportando ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />} <span className="hidden sm:inline">Exportar Excel</span>
             </button>
+            <button onClick={() => { const n = !logAberto; setLogAberto(n); if (n) carregarLog(); }} title="Ver o log de lançamentos excluídos"
+              className={`text-sm font-medium rounded-lg px-3 py-2 inline-flex items-center gap-2 border ${logAberto ? "bg-torg-dark text-white border-torg-dark" : "bg-white border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
+              <Trash2 size={15} /> <span className="hidden sm:inline">Exclusões</span>
+            </button>
           </div>
         </div>
         {/* Legenda + filtros ativos */}
         <div className="px-4 py-1.5 flex items-center gap-4 text-[11px] text-torg-gray border-b border-gray-50 flex-wrap">
           <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-yellow-200 border border-yellow-300" /> com certificado</span>
-          <button onClick={() => setSoSemCert((v) => !v)} title="Clique para ver só os itens sem certificado"
-            className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 border ${soSemCert ? "bg-red-100 border-red-400 text-red-700 font-medium" : "border-transparent hover:bg-red-50"}`}>
-            <span className="w-3 h-3 rounded bg-red-100 border border-red-300" /> falta certificado{soSemCert ? " ✓" : ""}
+          <button onClick={() => setSoSemCert((v) => !v)} title="Filtrar: mostrar só os itens sem certificado"
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 border text-[11px] font-semibold shadow-sm transition-colors ${soSemCert ? "bg-red-600 text-white border-red-600 hover:bg-red-700" : "bg-white text-red-700 border-red-300 hover:bg-red-50"}`}>
+            <AlertCircle size={13} /> Falta certificado
+            {soSemCert && <X size={13} className="ml-0.5" />}
           </button>
           {(Object.keys(filtros).length > 0 || ordenar) && (
             <button onClick={() => { setFiltros({}); setOrdenar(null); }} className="ml-auto text-torg-blue hover:underline inline-flex items-center gap-1"><X size={12} /> Limpar filtros ({visiveis.length} de {linhas.length})</button>
@@ -377,10 +407,11 @@ export default function CmrLancarClient() {
                   </th>
                 );
               })}
+              <th className="px-2.5 py-2 text-right">Ações</th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {dados === null ? <tr><td colSpan={14} className="px-3 py-8 text-center text-torg-gray"><Loader2 size={16} className="animate-spin inline" /></td></tr>
-                : visiveis.length === 0 ? <tr><td colSpan={14} className="px-3 py-8 text-center text-torg-gray">{linhas.length === 0 ? `Nenhum lançamento em ${ano}.` : "Nenhuma linha com os filtros atuais."}</td></tr>
+              {dados === null ? <tr><td colSpan={15} className="px-3 py-8 text-center text-torg-gray"><Loader2 size={16} className="animate-spin inline" /></td></tr>
+                : visiveis.length === 0 ? <tr><td colSpan={15} className="px-3 py-8 text-center text-torg-gray">{linhas.length === 0 ? `Nenhum lançamento em ${ano}.` : "Nenhuma linha com os filtros atuais."}</td></tr>
                 : visiveis.map((l) => {
                   const sel = l.id === selecionada;
                   // Fundo da linha (também aplicado nas células travadas p/ cobrir o scroll horizontal).
@@ -403,6 +434,10 @@ export default function CmrLancarClient() {
                     <td className="px-2.5 py-1 text-right tabular-nums">{fmtNum(l.quantidade)}</td>
                     <td className="px-2.5 py-1 text-right tabular-nums">{fmtNum(l.pesoKg)}</td>
                     <td className="px-2.5 py-1 min-w-[220px] max-w-[340px] whitespace-normal break-words leading-snug text-torg-gray" title={l.obs}><span className="line-clamp-2">{l.obs || "—"}</span></td>
+                    <td className="px-2.5 py-1 text-right">
+                      <button onClick={(e) => { e.stopPropagation(); setExcluir(l); setConfExcl(false); }} title="Excluir este lançamento"
+                        className="text-gray-300 hover:text-red-600 p-1 rounded hover:bg-red-50"><Trash2 size={14} /></button>
+                    </td>
                   </tr>
                   );
                 })}
@@ -410,6 +445,73 @@ export default function CmrLancarClient() {
           </table>
         </div>
       </div>
+
+      {/* Log de exclusões */}
+      {logAberto && (
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <p className="text-[12px] font-bold text-torg-dark inline-flex items-center gap-2"><Trash2 size={14} /> Lançamentos excluídos</p>
+            <button onClick={() => setLogAberto(false)} className="text-torg-gray hover:text-torg-dark"><X size={16} /></button>
+          </div>
+          <div className="overflow-x-auto">
+            {logExcl === null ? <p className="px-4 py-6 text-center text-torg-gray text-sm"><Loader2 size={15} className="animate-spin inline" /></p>
+              : logExcl.length === 0 ? <p className="px-4 py-6 text-center text-torg-gray text-sm">Nenhuma exclusão registrada.</p>
+              : (
+                <table className="w-full text-[12px] whitespace-nowrap">
+                  <thead className="bg-gray-50/60"><tr className="text-[10px] text-gray-500 uppercase">
+                    <th className="px-3 py-2 text-left">Data / hora</th><th className="px-3 py-2 text-left">Usuário</th><th className="px-3 py-2 text-left">Índice R</th><th className="px-3 py-2 text-left">Descrição</th><th className="px-3 py-2 text-left">Fornecedor</th><th className="px-3 py-2 text-left">NF</th><th className="px-3 py-2 text-left">Obra</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {logExcl.map((x) => (
+                      <tr key={x.id} className="hover:bg-gray-50/50">
+                        <td className="px-3 py-1.5 text-torg-gray">{new Date(x.quando).toLocaleString("pt-BR")}</td>
+                        <td className="px-3 py-1.5">{x.usuario}</td>
+                        <td className="px-3 py-1.5 font-mono text-torg-blue">{x.indiceR}</td>
+                        <td className="px-3 py-1.5 max-w-[360px] truncate" title={x.nome}>{x.nome}</td>
+                        <td className="px-3 py-1.5">{x.fornecedor || "—"}</td>
+                        <td className="px-3 py-1.5">{x.nf || "—"}</td>
+                        <td className="px-3 py-1.5 font-mono">{x.obra || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmação de exclusão (várias confirmações) */}
+      {excluir && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => !excluindo && setExcluir(null)}>
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+              <AlertCircle size={18} className="text-red-600" />
+              <h3 className="text-base font-bold text-torg-dark">Excluir lançamento CMR</h3>
+            </div>
+            <div className="px-5 py-4 space-y-3 text-sm">
+              <p className="text-torg-dark">Você está prestes a excluir o rastreio abaixo. <strong className="text-red-600">Esta ação é permanente.</strong></p>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-[13px] space-y-0.5">
+                <p><span className="text-torg-gray">Índice R:</span> <strong className="font-mono text-torg-blue">{excluir.importRef}</strong></p>
+                <p><span className="text-torg-gray">Material:</span> {excluir.nome}</p>
+                {excluir.fornecedor && <p><span className="text-torg-gray">Fornecedor:</span> {excluir.fornecedor}</p>}
+                {excluir.nfNumero && <p><span className="text-torg-gray">NF:</span> {excluir.nfNumero}</p>}
+              </div>
+              <p className="text-[12px] text-torg-gray">O índice R continua reservado na planilha (a linha é limpa), e a exclusão fica registrada no log com seu usuário e horário.</p>
+              <label className="flex items-start gap-2 cursor-pointer bg-red-50 border border-red-200 rounded-lg p-2.5">
+                <input type="checkbox" checked={confExcl} onChange={(e) => setConfExcl(e.target.checked)} className="mt-0.5" />
+                <span className="text-[13px] text-red-700">Confirmo que quero excluir o <strong>R {excluir.importRef}</strong> permanentemente.</span>
+              </label>
+            </div>
+            <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
+              <button onClick={() => { setExcluir(null); setConfExcl(false); }} disabled={excluindo} className="px-4 py-2 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
+              <button onClick={executarExcluir} disabled={!confExcl || excluindo}
+                className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                {excluindo ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />} Excluir R {excluir.importRef}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {filtroAberto && (
         <ColunaFiltro
