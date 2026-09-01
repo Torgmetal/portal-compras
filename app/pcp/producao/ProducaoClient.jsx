@@ -18,7 +18,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, Printer, Search,
-  Factory, Monitor, CalendarClock, Package, CheckCircle2, FileText, FileSpreadsheet, Send, Flag, X,
+  Factory, Monitor, CalendarClock, Clock, Package, CheckCircle2, FileText, FileSpreadsheet, Send, Flag, X,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import CompraChip, { ModalRastreabilidade } from "@/components/CompraChip";
@@ -952,6 +952,21 @@ export default function ProducaoClient() {
                                         <span title={`GRD impressa por ${p.grd.por || "—"}${p.grd.impressoes > 1 ? ` · ${p.grd.impressoes} impressões` : ""}`}
                                           className="text-[10px] text-emerald-700 font-semibold inline-flex items-center gap-1">
                                           <CheckCircle2 size={10} /> {fmtDH(p.grd.em)}
+                                        </span>
+                                      ) : p.apontadoDesde ? (
+                                        /* ⚠⚠ NÃO É GRD, E A CÉLULA DIZ ISSO. Vitor (01/09/2026):
+                                            "na coluna liberado já coloque a data que iniciou os
+                                            apontamentos". Para a peça que a fábrica cortou sem
+                                            passar pelo portal, "—" lia-se como "nunca desceu" —
+                                            quando o que houve foi descer por fora.
+                                            ⚠ Sai em CINZA e com o rótulo "apontou", não no verde da
+                                            GRD: GRD é o desenho impresso pelo portal, com R
+                                            carimbado e prova de auditoria; apontamento é a fábrica
+                                            dizendo que trabalhou. Pintar as duas igual faria a
+                                            coluna afirmar uma liberação que não existiu. */
+                                        <span title={`Sem GRD: este desenho não foi impresso pelo portal. A fábrica começou a apontar em ${fmtDH(p.apontadoDesde)}.`}
+                                          className="text-[10px] text-torg-gray inline-flex items-center gap-1">
+                                          <Clock size={10} /> apontou {fmtDH(p.apontadoDesde)}
                                         </span>
                                       ) : <span className="text-torg-gray-light">—</span>}
                                     </td>

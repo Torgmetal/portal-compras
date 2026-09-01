@@ -178,6 +178,15 @@ export async function GET(req) {
   // Reconciliação com o Syneco: quantidade PRODUZIDA no mesOrdem daquele setor, por marca
   // (extremo sincronismo portal×Syneco — o histórico e o export usam isto).
   const synecoQtd = new Map(); // marca → un produzidas no Syneco (no setor)
+  // ⚠⚠ QUANDO A FÁBRICA COMEÇOU, por marca. Vitor (01/09/2026): "na coluna liberado já coloque a
+  // data que iniciou os apontamentos". Para a peça que a fábrica cortou SEM passar pela liberação
+  // do portal (caso da OP-112), a coluna ficava em "—" e a leitura era "nunca desceu" — quando o
+  // que houve foi descer por fora. A data do apontamento é o que existe de verdade.
+  //
+  // ⚠ NÃO É GRD, e a tela precisa dizer isso: GRD é o desenho impresso pelo portal, com R
+  // carimbado e prova de auditoria; o apontamento é a fábrica dizendo que trabalhou. Misturar as
+  // duas na mesma célula, do mesmo jeito, transformaria a coluna numa afirmação falsa.
+  const apontadoDesde = new Map(); // marca → 1ª data de apontamento no setor
   if (setor) {
     try {
       const syn = await prisma.mesOrdem.groupBy({
@@ -186,6 +195,12 @@ export async function GET(req) {
         _sum: { produzidoUn: true },
       });
       for (const s of syn) if (s.item) synecoQtd.set(s.item, Math.round(s._sum?.produzidoUn || 0));
+      const ap = await prisma.mesApontamento.groupBy({
+        by: ["opSka"],
+        where: { AND: [{ opId }, whereSetorSyneco(setor), { produzidoUn: { gt: 0 } }] },
+        _min: { dataInicio: true },
+      });
+      for (const a of ap) if (a.opSka && a._min?.dataInicio) apontadoDesde.set(a.opSka, a._min.dataInicio.toISOString());
     } catch {}
   }
   // SETOR REAL de cada peça (Syneco de TODOS os setores + status + terceiro + encaminhamento).
@@ -483,7 +498,8 @@ export async function GET(req) {
       montadoEm: montadoPorCroqui.get(p.marca) || null,
       travaConjuntos: tr ? tr.conjuntos.length : 0, travaMarcas: tr ? tr.conjuntos.slice(0, 12) : null, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p),
       // ⚠ a peça está sendo cortada sem ter sido liberada — a tela precisa dizer isso na linha
-      foraDoLote: marcadasForaDoLote.has(p.id), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
+      foraDoLote: marcadasForaDoLote.has(p.id),
+      apontadoDesde: apontadoDesde.get(p.marca) || null, prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
   });
 
   // "Em aberto" = ainda SEM DESTINO. Antes exigia status "PENDENTE" — mas o status diz onde a
