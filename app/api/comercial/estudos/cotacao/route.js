@@ -17,12 +17,16 @@ import { gerarTokenForte } from "@/lib/token";
 import { sendEmail } from "@/lib/email";
 import { cabecalhoEmail } from "@/lib/email-layout";
 import { emailCotacaoTinta } from "@/lib/cotacao-tinta-email";
+import { emailCotacaoAco } from "@/lib/cotacao-aco-email";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 // família do vendor list por tipo de insumo — é o filtro que traz "os cadastrados"
-const FAMILIA = { TINTA: /tinta/i };
+// ⚠ Vitor (01/09/2026): "no caso do aço, quando tivermos uma lista específica por tipo do material
+// seria interessante ter esse botão para podermos cotar também, pois isso é bem significativo para
+// nós; quando é apenas usado peso na família do perfil fica mais difícil para comprarmos".
+const FAMILIA = { TINTA: /tinta/i, ACO: /mat[ée]ria.?prima/i };
 
 export async function GET(req) {
   try { await requireRole(["ADMIN", "COMERCIAL", "COMPRAS"]); }
@@ -109,7 +113,9 @@ export async function POST(req) {
     // concorrente, sem OP: é orçamento, não pedido.
     // ⚠ o corpo vem de lib/cotacao-tinta-email.js — a prévia que o Vitor revisa usa a MESMA
     // função, então o que ele aprova é literalmente o que sai.
-    const msg = emailCotacaoTinta(f, s, { obra, numero: est?.numero, ano: est?.ano, token: f.token });
+      const msg = b.tipo === "ACO"
+      ? emailCotacaoAco(f, s, { obra, numero: est?.numero, ano: est?.ano, token: f.token })
+      : emailCotacaoTinta(f, s, { obra, numero: est?.numero, ano: est?.ano, token: f.token });
     const r = await sendEmail({
       to: f.email, subject: msg.subject, html: msg.html, text: msg.text,
       replyTo: user.email || undefined,

@@ -45,6 +45,7 @@ export async function GET(_req, { params }) {
   });
 
   return NextResponse.json({
+    tipo: f.cotacao.tipo,
     fornecedor: f.nome,
     obra: [est?.orcamento?.cliente, est?.orcamento?.obra].filter(Boolean).join(" · ") || "obra em orçamento",
     enviadoEm: f.cotacao.enviadoEm,
@@ -58,6 +59,14 @@ export async function GET(_req, { params }) {
 
 const Body = z.object({
   contato: z.string().trim().min(2, "Informe seu nome.").max(120),
+  // ⚠ A LISTA DE AÇO usa o mesmo envelope das camadas de tinta: o portal é um só, e o tipo da
+  // consulta decide o que a tela pede. Duas rotas para "o fornecedor responde um preço" seria
+  // duplicar validação, token e histórico por uma diferença que é só de rótulo.
+  itens: z.array(z.object({
+    descricao: z.string().max(160).optional().nullable(),
+    precoKg: z.union([z.string(), z.number()]).optional().nullable(),
+    precoItem: z.union([z.string(), z.number()]).optional().nullable(),
+  })).default([]),
   camadas: z.array(z.object({
     camada: z.string().max(40).optional().nullable(),
     produto: z.string().max(120).optional().nullable(),
@@ -78,6 +87,7 @@ export async function POST(req, { params }) {
   const { token } = await params;
   const f = await achar(token);
   if (!f) return NextResponse.json({ error: "Link inválido ou expirado." }, { status: 404 });
+  const cot = f.cotacao;
 
   let b;
   try { b = Body.parse(await req.json()); }
@@ -94,11 +104,24 @@ export async function POST(req, { params }) {
   });
   const dil = num(b.diluenteLitros) * num(b.diluentePreco);
   const compB = num(b.componenteBQtd) * num(b.componenteBPreco);
-  const total = camadas.reduce((s, c) => s + c.subtotal, 0) + dil + compB;
+
+  // ⚠ NO AÇO O PREÇO PODE VIR DOS DOIS JEITOS: R$/kg (como o mercado cota) ou preço fechado do
+  // item. Aceitar só um obrigaria metade dos fornecedores a converter à mão — e é na conversão à
+  // mão que o número erra. Quando os dois vêm, o fechado manda: é o compromisso dele.
+  const pedidos = Array.isArray(cot?.snapshot?.itens) ? cot.snapshot.itens : [];
+  const itens = (b.itens || []).map((it, i) => {
+    const ref = pedidos[i] || {};
+    const precoKg = num(it.precoKg), fechado = num(it.precoItem);
+    const subtotal = fechado > 0 ? fechado : precoKg * (Number(ref.peso) || 0);
+    return { descricao: it.descricao || ref.descricao || null, pesoKg: Number(ref.peso) || 0, precoKg, precoItem: fechado, subtotal };
+  });
+
+  const total = camadas.reduce((s, c) => s + c.subtotal, 0) + dil + compB
+    + itens.reduce((s, i) => s + i.subtotal, 0);
 
   const resposta = {
     contato: limparTextoCurto(b.contato, 120),
-    camadas,
+    camadas, itens,
     diluente: { litros: num(b.diluenteLitros), preco: num(b.diluentePreco), subtotal: dil },
     componenteB: { qtd: num(b.componenteBQtd), preco: num(b.componenteBPreco), subtotal: compB },
     prazo: limparTextoCurto(b.prazo || "", 80),

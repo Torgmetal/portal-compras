@@ -18,7 +18,7 @@ const brl = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", c
 export default function ConsultaTintaClient({ token }) {
   const [d, setD] = useState(null);
   const [erro, setErro] = useState("");
-  const [f, setF] = useState({ contato: "", camadas: [], diluenteLitros: "", diluentePreco: "", componenteBQtd: "", componenteBPreco: "", prazo: "", validade: "", observacao: "" });
+  const [f, setF] = useState({ contato: "", camadas: [], itens: [], diluenteLitros: "", diluentePreco: "", componenteBQtd: "", componenteBPreco: "", prazo: "", validade: "", observacao: "" });
   const [enviando, setEnviando] = useState(false);
   const [pronto, setPronto] = useState(false);
 
@@ -27,10 +27,12 @@ export default function ConsultaTintaClient({ token }) {
       if (j.error) return setErro(j.error);
       setD(j);
       const base = (j.consulta?.camadas || []).map((c) => ({ camada: c.camada, produto: c.produto || "", galoes: "", litrosGalao: "", precoGalao: "" }));
+      const baseItens = (j.consulta?.itens || []).map((i) => ({ descricao: i.descricao, precoKg: "", precoItem: "" }));
       const r = j.resposta;
       setF({
         contato: r?.contato || "",
         camadas: r?.camadas?.length ? r.camadas.map((c) => ({ ...c, galoes: c.galoes || "", litrosGalao: c.litrosGalao || "", precoGalao: c.precoGalao || "" })) : base,
+        itens: r?.itens?.length ? r.itens.map((i) => ({ ...i, precoKg: i.precoKg || "", precoItem: i.precoItem || "" })) : baseItens,
         diluenteLitros: r?.diluente?.litros || "", diluentePreco: r?.diluente?.preco || "",
         componenteBQtd: r?.componenteB?.qtd || "", componenteBPreco: r?.componenteB?.preco || "",
         prazo: r?.prazo || "", validade: r?.validade || "", observacao: r?.observacao || "",
@@ -40,8 +42,13 @@ export default function ConsultaTintaClient({ token }) {
   }, [token]);
 
   const setC = (i, k, v) => setF((p) => ({ ...p, camadas: p.camadas.map((c, j) => (j === i ? { ...c, [k]: v } : c)) }));
+  const setI = (i, k, v) => setF((p) => ({ ...p, itens: p.itens.map((c, j) => (j === i ? { ...c, [k]: v } : c)) }));
+  const pedidos = d?.consulta?.itens || [];
+  // ⚠ o subtotal do item aceita os dois jeitos de cotar: R$/kg (o do mercado) ou preço fechado.
+  const subItem = (i, k) => n(i.precoItem) > 0 ? n(i.precoItem) : n(i.precoKg) * (Number(pedidos[k]?.peso) || 0);
   const total = f.camadas.reduce((s, c) => s + n(c.galoes) * n(c.precoGalao), 0)
-    + n(f.diluenteLitros) * n(f.diluentePreco) + n(f.componenteBQtd) * n(f.componenteBPreco);
+    + n(f.diluenteLitros) * n(f.diluentePreco) + n(f.componenteBQtd) * n(f.componenteBPreco)
+    + f.itens.reduce((s, i, k) => s + subItem(i, k), 0);
 
   async function enviar(e) {
     e.preventDefault();
@@ -61,23 +68,60 @@ export default function ConsultaTintaClient({ token }) {
   if (!d) return <Moldura><p className="text-sm text-gray-500">Carregando…</p></Moldura>;
 
   const c = d.consulta || {};
+  // ⚠ UM PORTAL, DOIS ASSUNTOS. O tipo decide o que a tela pede — tinta pergunta galões por demão,
+  // aço pergunta R$/kg por item. Duas telas separadas duplicariam token, histórico e o aviso de
+  // "isto é orçamento", que é a parte que não pode divergir.
+  const aco = d.tipo === "ACO";
   return (
     <Moldura>
       <p className="text-[13px] text-gray-600">Olá, <strong className="text-[#0D1F3C]">{d.fornecedor}</strong>.</p>
-      <h1 className="mt-1 text-[22px] font-bold text-[#0D1F3C]">Consulta técnica de tintas</h1>
+      <h1 className="mt-1 text-[22px] font-bold text-[#0D1F3C]">
+        {aco ? "Consulta de material — aço" : "Consulta técnica de tintas"}
+      </h1>
       <p className="mt-1 text-[13px] text-gray-600">
         Estamos <strong>orçando</strong> a obra {d.obra}. Ainda não é um pedido de compra — precisamos
-        do seu dimensionamento para fechar o preço.
+        {aco ? " do seu preço" : " do seu dimensionamento"} para fechar o orçamento.
       </p>
 
       <div className="mt-5 rounded-xl border border-gray-200 overflow-hidden">
-        <p className="px-4 py-2 bg-[#0D1F3C] text-white text-[12px] font-semibold">O que precisa ser pintado</p>
+        <p className="px-4 py-2 bg-[#0D1F3C] text-white text-[12px] font-semibold">
+          {aco ? "Material da obra" : "O que precisa ser pintado"}
+        </p>
         <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-3 gap-3 text-[13px]">
-          <div><span className="block text-[11px] text-gray-500">Área total</span><strong>{Number(c.areaM2 || 0).toLocaleString("pt-BR")} m²</strong></div>
-          <div><span className="block text-[11px] text-gray-500">Coeficiente de perda</span><strong>{c.perda ?? 45}%</strong></div>
-          {c.fabricante && <div><span className="block text-[11px] text-gray-500">Especificação do cliente</span><strong>{c.fabricante}</strong></div>}
+          {aco ? (
+            <>
+              <div><span className="block text-[11px] text-gray-500">Peso total</span><strong>{Number(c.pesoKg || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg</strong></div>
+              <div><span className="block text-[11px] text-gray-500">Itens na lista</span><strong>{(c.itens || []).length}</strong></div>
+            </>
+          ) : (
+            <>
+              <div><span className="block text-[11px] text-gray-500">Área total</span><strong>{Number(c.areaM2 || 0).toLocaleString("pt-BR")} m²</strong></div>
+              <div><span className="block text-[11px] text-gray-500">Coeficiente de perda</span><strong>{c.perda ?? 45}%</strong></div>
+              {c.fabricante && <div><span className="block text-[11px] text-gray-500">Especificação do cliente</span><strong>{c.fabricante}</strong></div>}
+            </>
+          )}
         </div>
-        {(c.camadas || []).length > 0 && (
+        {aco && (c.itens || []).length > 0 && (
+          <div className="max-h-64 overflow-auto border-t border-gray-100">
+            <table className="w-full text-[12.5px]">
+              <thead className="bg-gray-50 text-[10px] uppercase text-gray-500 sticky top-0">
+                <tr><th className="text-left px-4 py-1.5">Descrição</th><th className="text-left px-2 py-1.5">Norma</th>
+                  <th className="text-right px-2 py-1.5">Qtd</th><th className="text-right px-4 py-1.5">Peso</th></tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {c.itens.map((i, k) => (
+                  <tr key={k}>
+                    <td className="px-4 py-1.5">{i.descricao}{i.bitola ? <span className="block text-[11px] text-gray-500">{i.bitola}</span> : null}</td>
+                    <td className="px-2 py-1.5">{i.norma || "—"}</td>
+                    <td className="px-2 py-1.5 text-right">{i.qtd ? `${Number(i.qtd).toLocaleString("pt-BR")}${i.unidade ? ` ${i.unidade}` : ""}` : "—"}</td>
+                    <td className="px-4 py-1.5 text-right whitespace-nowrap">{i.peso ? `${Number(i.peso).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {!aco && (c.camadas || []).length > 0 && (
           <table className="w-full text-[12.5px] border-t border-gray-100">
             <thead className="bg-gray-50 text-[10px] uppercase text-gray-500">
               <tr><th className="text-left px-4 py-1.5">Demão</th><th className="text-left px-2 py-1.5">Produto / resina</th>
@@ -112,6 +156,59 @@ export default function ConsultaTintaClient({ token }) {
         </div>
       ) : (
         <form onSubmit={enviar} className="mt-5 space-y-4">
+          {aco ? (
+            <div className="rounded-xl border border-gray-200 overflow-hidden">
+              <p className="px-4 py-2 bg-gray-50 text-[12px] font-semibold text-[#0D1F3C]">
+                Seu preço para cada item
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[12.5px] min-w-[620px]">
+                  <thead className="bg-white text-[10px] uppercase text-gray-500 border-b border-gray-100">
+                    <tr>
+                      <th className="text-left px-3 py-1.5">Item</th>
+                      <th className="text-right px-2 py-1.5">Qtd</th>
+                      <th className="text-right px-2 py-1.5">Peso</th>
+                      <th className="text-right px-2 py-1.5 w-28">R$/kg</th>
+                      <th className="text-right px-2 py-1.5 w-32">ou preço fechado</th>
+                      <th className="text-right px-3 py-1.5">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {f.itens.map((it, k) => {
+                      const ped = pedidos[k] || {};
+                      return (
+                        <tr key={k}>
+                          <td className="px-3 py-1.5">
+                            <span className="block text-[#0D1F3C]">{ped.descricao || it.descricao}</span>
+                            {(ped.bitola || ped.norma) && (
+                              <span className="block text-[11px] text-gray-500">{[ped.bitola, ped.norma].filter(Boolean).join(" · ")}</span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5 text-right whitespace-nowrap">{ped.qtd ? `${Number(ped.qtd).toLocaleString("pt-BR")}${ped.unidade ? ` ${ped.unidade}` : ""}` : "—"}</td>
+                          <td className="px-2 py-1.5 text-right whitespace-nowrap">{ped.peso ? `${Number(ped.peso).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg` : "—"}</td>
+                          <td className="px-2 py-1.5">
+                            <input value={it.precoKg ?? ""} onChange={(e) => setI(k, "precoKg", e.target.value)}
+                              className="w-full rounded border border-gray-300 px-2 py-1 text-right text-[12.5px] focus:border-[#006EAB] focus:outline-none" />
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <input value={it.precoItem ?? ""} onChange={(e) => setI(k, "precoItem", e.target.value)}
+                              className="w-full rounded border border-gray-300 px-2 py-1 text-right text-[12.5px] focus:border-[#006EAB] focus:outline-none" />
+                          </td>
+                          <td className="px-3 py-1.5 text-right whitespace-nowrap font-medium">
+                            {subItem(it, k) > 0 ? brl(subItem(it, k)) : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className="px-3 py-2 text-[11px] text-gray-500 border-t border-gray-100">
+                Informe o R$/kg <em>ou</em> o preço fechado do item — o que for mais prático. Se
+                preencher os dois, vale o preço fechado.
+              </p>
+            </div>
+          ) : (
           <div className="rounded-xl border border-gray-200 overflow-hidden">
             <p className="px-4 py-2 bg-gray-50 text-[12px] font-semibold text-[#0D1F3C]">
               Quantos galões atendem esta área?
@@ -138,7 +235,7 @@ export default function ConsultaTintaClient({ token }) {
               <Campo r="Componente B (qtd)" v={f.componenteBQtd} on={(v) => setF({ ...f, componenteBQtd: v })} dir />
               <Campo r="R$ unitário" v={f.componenteBPreco} on={(v) => setF({ ...f, componenteBPreco: v })} dir />
             </div>
-          </div>
+          </div>)}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Campo r="Seu nome" v={f.contato} on={(v) => setF({ ...f, contato: v })} full />
