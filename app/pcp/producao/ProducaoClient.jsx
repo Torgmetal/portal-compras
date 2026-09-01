@@ -902,17 +902,36 @@ function Conta({ n, de, label, cor }) {
 // ⚠ ZIP com UMA PASTA POR IMPRESSORA — plotter (A1/A2) e comum (A3/A4). Abrir uma aba por arquivo
 // era bloqueado pelo navegador e ainda deixava a pessoa imprimindo um a um. Mesmo caminho do painel
 // de despacho, de propósito: dois downloads diferentes do mesmo lote confundiriam a fábrica.
+// ⚠⚠ FATIA EM LOTES, como no painel de despacho. Vitor (01/09/2026): "tentei baixar 500 marcas da
+// OP 113 e não criou a pasta de download" — a rota tem teto por lote (cada A1 é baixado inteiro
+// para a memória da função) e 500 de uma vez voltava erro genérico.
+const POR_ZIP = 60;
+
 async function baixarZip(lote, opNumero) {
-  const r = await fetch("/api/producao/desenhos/lote/zip", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ opNumero, arquivos: (lote.arquivos || []).map((a) => ({ itemId: a.itemId, nome: a.nome, formato: a.formato })) }),
-  });
-  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Erro ao montar o ZIP");
-  const blob = await r.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = (r.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/)?.[1] || `OP-${opNumero} - desenhos.zip`;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  const todos = (lote.arquivos || []).map((a) => ({ itemId: a.itemId, nome: a.nome, formato: a.formato }));
+  if (!todos.length) throw new Error("Nenhum desenho para baixar.");
+  const partes = [];
+  for (let i = 0; i < todos.length; i += POR_ZIP) partes.push(todos.slice(i, i + POR_ZIP));
+
+  for (let k = 0; k < partes.length; k++) {
+    const r = await fetch("/api/producao/desenhos/lote/zip", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ opNumero, arquivos: partes[k] }),
+    });
+    if (!r.ok) {
+      const msg = (await r.json().catch(() => ({}))).error || "Erro ao montar o ZIP";
+      throw new Error(partes.length > 1 ? `Lote ${k + 1} de ${partes.length}: ${msg}` : msg);
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const nomeSrv = (r.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/)?.[1];
+    a.download = partes.length > 1
+      ? `OP-${opNumero} - desenhos ${k + 1} de ${partes.length}.zip`
+      : (nomeSrv || `OP-${opNumero} - desenhos.zip`);
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    if (k < partes.length - 1) await new Promise((res) => setTimeout(res, 800));
+  }
 }

@@ -28,7 +28,15 @@ const schema = z.object({
     itemId: z.string().regex(/^[A-Za-z0-9_\-!.]+$/, "itemId inválido"),
     nome: z.string().min(1),
     formato: z.string().nullable().optional(),
-  })).min(1).max(20),
+  // ⚠⚠ O LIMITE ERA 20 E O ERRO NÃO DIZIA ISSO. Vitor (01/09/2026): "tentei baixar 500 marcas da
+  // OP 113 e não criou a pasta de download". O Zod recusava o corpo e a tela mostrava "erro ao
+  // montar o ZIP" — sem falar em limite, sem dizer quantos cabem. Agora o cliente FATIA em lotes
+  // (ver baixarZipLote) e este teto vale por lote.
+  //
+  // ⚠ POR QUE NÃO É ILIMITADO: cada A1 do SharePoint é baixado inteiro para a memória da função e
+  // o zip é montado lá dentro. Quinhentos desenhos de uma vez estouram a memória e o tempo da
+  // função — e o erro apareceria como um 502 sem explicação, que é pior que um limite claro.
+  })).min(1).max(60),
 });
 
 // A1/A2 = plotter; A3/A4 = impressora comum. Formato desconhecido vai pra plotter: errar pro lado

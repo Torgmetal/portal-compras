@@ -14,7 +14,7 @@ import { casaMarca } from "@/lib/pasta-engenharia";
 import { requireRole } from "@/lib/session";
 import { getAccessToken, acharPastaOp, uploadFileToFolder } from "@/lib/sharepoint";
 import { rastreioDoConjunto } from "@/lib/rastreio-peca";
-import { amarracoesDaOp, amarracaoDoPerfil } from "@/lib/r-amarrado";
+import { amarracoesDaOp, amarracaoDoPerfil, aplicarAmarracaoNosItens } from "@/lib/r-amarrado";
 import { novaEntradaGrd } from "@/lib/grd-registro";
 import { conferirRComCroquis } from "@/lib/conferir-r";
 import { analisarMaterial } from "@/lib/material-liberacao";
@@ -176,11 +176,19 @@ export async function POST(req) {
   // impresso ANTES de cortar — o papel saía "sem R" exatamente quando ele é necessário. Vitor
   // (25/08/2026): "imprime os desenhos para o setor já marca o R". Mesma regra do lote.
   try {
-    const semR = !itens.some((i) => (i.usadas || []).some((u) => u.rastreio));
-    if (semR && opId) {
-      const pc = await prisma.pecaConjunto.findFirst({ where: { opId, marca }, select: { perfil: true } });
-      const am = pc?.perfil ? amarracaoDoPerfil(await amarracoesDaOp(opNumero), pc.perfil) : null;
-      if (am) itens = [...itens, { marca, perfil: pc.perfil, situacao: "R_INDICADO", usadas: [{ rastreio: am.r, indicado: true, por: am.por || null }] }];
+    if (opId) {
+      const amarradas = await amarracoesDaOp(opNumero);
+      // ⚠ POR ITEM, pelo perfil DE CADA CROQUI (ver aplicarAmarracaoNosItens): antes isso era feito
+      // uma vez só, pelo perfil do conjunto, e só quando NENHUMA posição tinha R — então croqui com
+      // R amarrado saía em branco sempre que o conjunto misturava perfis ou já tinha uma posição
+      // cortada.
+      itens = aplicarAmarracaoNosItens(itens, amarradas);
+      // peça avulsa (sem posições) continua precisando do caminho pela própria marca
+      if (!itens.length) {
+        const pc = await prisma.pecaConjunto.findFirst({ where: { opId, marca }, select: { perfil: true } });
+        const am = pc?.perfil ? amarracaoDoPerfil(amarradas, pc.perfil) : null;
+        if (am) itens = [{ marca, perfil: pc.perfil, situacao: "R_INDICADO", usadas: [{ rastreio: am.r, indicado: true, por: am.por || null }] }];
+      }
     }
   } catch {}
 
