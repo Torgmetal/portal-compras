@@ -16,7 +16,7 @@
 // data olhando o cronograma, e o corte corre atrás. A prontidão fica na tela como INFORMAÇÃO, para
 // ele saber o que está pedindo; ordena a lista, mas não impede seleção nenhuma.
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, AlertCircle, CalendarClock, ArrowRight, CheckCircle2, X } from "lucide-react";
+import { Loader2, AlertCircle, CalendarClock, ArrowRight, CheckCircle2, X, Upload } from "lucide-react";
 
 const isoHoje = () => new Date().toISOString().split("T")[0];
 const isoDe = (v) => (v ? String(v).slice(0, 10) : "");
@@ -33,6 +33,9 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
   const [montados, setMontados] = useState({});
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
+  const [colando, setColando] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [importado, setImportado] = useState(null);
   const [okMsg, setOkMsg] = useState("");
   const [avisos, setAvisos] = useState([]);
   const [sel, setSel] = useState(new Set());
@@ -92,6 +95,55 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
   const selecao = useMemo(() => lista.filter((c) => sel.has(c.id)), [lista, sel]);
 
   const toggle = (id) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  // ── IMPORTAR A LISTA DE MARCAS ─────────────────────────────────────────────────────────────
+  // Vitor (01/09/2026): "precisa ter uma forma de importar uma lista, para poder selecionar essas
+  // peças de uma vez para enviar para o pcp". Marcar 28 no clique já é trabalho à toa; com 100 é
+  // inviável, e é justamente quando a lista vem pronta de fora (Excel da Engenharia, e-mail).
+  //
+  // ⚠ COLAR RESOLVE A MAIORIA. Copiar uma coluna do Excel dá uma marca por linha — não precisa de
+  // arquivo. O upload existe para quem prefere o arquivo, e lê a PRIMEIRA COLUNA da primeira aba.
+  //
+  // ⚠⚠ O QUE NÃO CASA TEM DE APARECER. Selecionar 60 de 80 em silêncio é pior que não selecionar:
+  // as 20 que ficaram de fora seguem para o PCP como se não existissem. A tela lista as não
+  // encontradas, com o texto que veio.
+  // ⚠ A MARCA É O PRIMEIRO CAMPO DA LINHA. Colar duas colunas do Excel traz "T97A1<TAB>25 kg" —
+  // quebrar em tudo transformaria "25 kg" numa marca inexistente e encheria o aviso de lixo.
+  // Quebra por LINHA e pega o 1º campo; linha única com vírgulas ainda vira lista.
+  const normalizar = (t) => {
+    const linhas = String(t || "").split(/[\r\n]+/).map((l) => l.trim()).filter(Boolean);
+    const brutos = linhas.length > 1
+      ? linhas.map((l) => l.split(/[\t;]/)[0].trim())
+      : linhas.flatMap((l) => l.split(/[,;\t]/).map((x) => x.trim()));
+    return [...new Set(brutos.filter(Boolean))];
+  };
+
+  function aplicarLista(textos) {
+    const pedidas = normalizar(textos.join("\n"));
+    if (!pedidas.length) return;
+    const porMarca = new Map(lista.map((c) => [String(c.marca).trim().toUpperCase(), c]));
+    const achadas = [], faltando = [];
+    for (const t of pedidas) {
+      const c = porMarca.get(t.toUpperCase());
+      if (c) achadas.push(c); else faltando.push(t);
+    }
+    // ⚠ soma à seleção em vez de substituir: quem cola duas listas espera as duas
+    setSel((prev) => { const n = new Set(prev); achadas.forEach((c) => n.add(c.id)); return n; });
+    setImportado({ achadas: achadas.length, faltando, montadas: achadas.filter((c) => c.montado).length });
+    setColando(false); setTexto("");
+  }
+
+  async function lerArquivo(file) {
+    try {
+      const XLSX = (await import("xlsx")).default;
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const linhas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
+      // primeira coluna de cada linha
+      aplicarLista(linhas.map((l) => String(l?.[0] ?? "")).filter(Boolean));
+    } catch (e) { setErro("Não consegui ler o arquivo: " + (e?.message || e)); }
+  }
+
   const marcarLista = (l) => {
     const ids = l.map((c) => c.id);
     const todas = ids.length > 0 && ids.every((id) => sel.has(id));
@@ -174,9 +226,51 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
                   </button>
                 )}
                 <button onClick={() => marcarLista(aProgramar)} className="underline font-semibold">todos</button>
+                <button onClick={() => { setColando((v) => !v); setImportado(null); }}
+                  className="underline font-semibold inline-flex items-center gap-1">
+                  <Upload size={11} /> importar lista
+                </button>
               </span>
             )}
           </div>
+
+          {colando && (
+            <div className="border-b border-gray-100 bg-torg-blue-50/40 p-2.5 space-y-2">
+              <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={4}
+                placeholder={"Cole as marcas — uma por linha (é o que sai ao copiar uma coluna do Excel).\nT97A1\nT97A13\nT97A100"}
+                className="w-full text-[12px] font-mono border border-gray-200 rounded-lg px-2 py-1.5" />
+              <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={() => aplicarLista([texto])} disabled={!texto.trim()}
+                  className="px-3 py-1.5 bg-torg-blue text-white text-[12px] font-medium rounded-lg disabled:opacity-50">
+                  Selecionar as marcas
+                </button>
+                <label className="text-[12px] text-torg-blue underline cursor-pointer">
+                  ou escolher um arquivo (.xlsx, .csv)
+                  <input type="file" accept=".xlsx,.xls,.csv,.txt" className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) lerArquivo(f); e.target.value = ""; }} />
+                </label>
+                <button onClick={() => { setColando(false); setTexto(""); }} className="text-[12px] text-torg-gray ml-auto">fechar</button>
+              </div>
+              <p className="text-[11px] text-torg-gray">Lê a primeira coluna da primeira aba. Marca já selecionada continua marcada.</p>
+            </div>
+          )}
+          {importado && (
+            <div className={`border-b p-2.5 text-[12px] ${importado.faltando.length ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}>
+              <b>{importado.achadas}</b> marca(s) selecionada(s).
+              {importado.montadas > 0 && <> <span className="text-torg-gray">({importado.montadas} já montada(s) — não entram no plano.)</span></>}
+              {importado.faltando.length > 0 && (
+                <div className="mt-1">
+                  {/* ⚠ o que não casou APARECE: selecionar 60 de 80 em silêncio manda 20 peças para
+                      o limbo, e ninguém descobre até a bancada ficar sem o que montar. */}
+                  <b>{importado.faltando.length} não encontrada(s) nesta obra:</b>{" "}
+                  <span className="font-mono">{importado.faltando.slice(0, 20).join(", ")}</span>
+                  {importado.faltando.length > 20 && <> … e mais {importado.faltando.length - 20}</>}
+                </div>
+              )}
+              <button onClick={() => setImportado(null)} className="underline mt-1">ok</button>
+            </div>
+          )}
+
           <div className="p-2 space-y-1.5 max-h-[46vh] overflow-y-auto">
             {/* ⚠ LISTA ÚNICA, TUDO SELECIONÁVEL. A prontidão ordena (mais cortado primeiro) e
                 aparece em cada cartão, mas não separa nem esconde ninguém: aqui o planejamento
