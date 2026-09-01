@@ -53,8 +53,6 @@ const schema = z.discriminatedUnion("acao", [
     acao: z.literal("programar"),
     ids: z.array(z.string()).min(1, "Selecione ao menos um conjunto"),
     dia: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida"),
-    // ⚠ só se ignora a prontidão com pedido EXPLÍCITO de quem programa — ver abaixo
-    forcar: z.boolean().optional(),
   }),
   z.object({ acao: z.literal("adiar"), ids: z.array(z.string()).min(1), para: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }),
   z.object({ acao: z.literal("desprogramar"), ids: z.array(z.string()).min(1) }),
@@ -77,42 +75,36 @@ export async function POST(req) {
   let afetados = [];
 
   if (body.acao === "programar") {
-    // ⚠⚠ A PRONTIDÃO É CONFERIDA NO SERVIDOR. A tela já filtra, mas a regra que decide se a fábrica
-    // pode montar não pode morar só no navegador: uma seleção antiga, uma aba aberta desde ontem ou
-    // um clique fora de ordem mandariam montar o que não está cortado.
+    // ⚠⚠ SEM TRAVA DE PRONTIDÃO. Vitor (01/09/2026): "para a liberação da montagem no planejamento
+    // não precisa estar com os croquis prontos para ele liberar, apenas colocar para poder lançar
+    // para o PCP". A versão anterior só deixava programar conjunto com TODOS os croquis cortados e
+    // exigia um `forcar` para o resto — isso invertia quem decide: o planejamento marca a data
+    // olhando o cronograma e a preparação, e o corte corre atrás. A prontidão continua aparecendo
+    // na tela, como informação; ela não é mais porteiro.
     const conjuntos = await prisma.pecaConjunto.findMany({
       where: { id: { in: body.ids }, tipoPeca: "CONJUNTO" },
-      select: {
-        id: true, marca: true,
-        conjuntoCroquis: { select: { croqui: { select: { marca: true, qte: true, qteProduzida: true } } } },
-      },
+      select: { id: true },
     });
-    const prontos = [], faltando = [];
-    for (const c of conjuntos) {
-      (calcularProntidao(c).pronto ? prontos : faltando).push(c);
-    }
-    // ⚠ "todas as sub peças prontas" é o critério do Vitor para MARCAR O DIA. A regra da metade
-    // ("pode montar") segue valendo para o fluxo da fábrica — são perguntas diferentes.
-    const alvo = body.forcar ? conjuntos : prontos;
-    if (!body.forcar && faltando.length) {
-      avisos.push(`${faltando.length} conjunto(s) fora do plano — ainda há croqui sem cortar: ${faltando.slice(0, 5).map((c) => c.marca).join(", ")}${faltando.length > 5 ? "…" : ""}.`);
-    }
-    if (alvo.length) {
+    if (conjuntos.length) {
       const dia = new Date(body.dia + "T00:00:00Z");
+      const ids = conjuntos.map((c) => c.id);
       await prisma.$transaction([
         prisma.pecaConjunto.updateMany({
-          where: { id: { in: alvo.map((c) => c.id) } },
+          where: { id: { in: ids } },
           data: { montagemDiaProgramado: dia, montagemProgramadaEm: agora, montagemProgramadaPor: user.name || null },
         }),
         // o original só se escreve uma vez — é dele que o atraso conta
         prisma.pecaConjunto.updateMany({
-          where: { id: { in: alvo.map((c) => c.id) }, montagemDiaOriginal: null },
+          where: { id: { in: ids }, montagemDiaOriginal: null },
           data: { montagemDiaOriginal: dia },
         }),
       ]);
     }
-    atualizados = alvo.length;
-    afetados = alvo.map((c) => ({ id: c.id, montagemDiaProgramado: body.dia }));
+    atualizados = conjuntos.length;
+    afetados = conjuntos.map((c) => ({ id: c.id, montagemDiaProgramado: body.dia }));
+    if (atualizados < body.ids.length) {
+      avisos.push(`${body.ids.length - atualizados} item(ns) ignorado(s) — não são conjuntos.`);
+    }
   } else if (body.acao === "adiar") {
     const alvo = await prisma.pecaConjunto.findMany({
       where: { id: { in: body.ids }, tipoPeca: "CONJUNTO", montagemDiaProgramado: { not: null } },
@@ -151,7 +143,7 @@ export async function POST(req) {
         userId: user.id, action: `MONTAGEM_${body.acao.toUpperCase()}`, entity: "PecaConjunto",
         entityId: body.ids.length === 1 ? body.ids[0] : `${body.ids.length} conjuntos`,
         diff: { acao: body.acao, total: body.ids.length, atualizados,
-                ...(body.acao === "programar" ? { dia: body.dia, forcado: !!body.forcar } : {}),
+                ...(body.acao === "programar" ? { dia: body.dia } : {}),
                 ...(body.acao === "adiar" ? { para: body.para || "próximo dia útil" } : {}) },
       },
     });

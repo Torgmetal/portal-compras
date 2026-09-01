@@ -9,9 +9,12 @@
 // está com a obra aberta, olhando o marco de cada setor. Tela separada obrigava a escolher a obra
 // duas vezes e deixava a data da montagem longe do marco que a justifica.
 //
-// ⚠ DUAS RÉGUAS DE PRONTIDÃO, separadas. "Todas as sub peças cortadas" é o critério para MARCAR O
-// DIA (pedido do Vitor); "pelo menos metade" segue sendo a regra da fábrica para PODER COMEÇAR
-// (decisão dele em 12/06). Misturar marcaria data para conjunto com croqui ainda na máquina.
+// ⚠⚠ A PRONTIDÃO NÃO TRAVA NADA. Vitor (01/09/2026, corrigindo a primeira versão): "para a
+// liberação da montagem no planejamento não precisa estar com os croquis prontos para ele liberar,
+// apenas colocar para poder lançar para o PCP". Eu tinha feito o contrário — só deixava programar
+// conjunto com TODOS os croquis cortados —, e isso invertia quem decide: o planejamento marca a
+// data olhando o cronograma, e o corte corre atrás. A prontidão fica na tela como INFORMAÇÃO, para
+// ele saber o que está pedindo; ordena a lista, mas não impede seleção nenhuma.
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Loader2, AlertCircle, CalendarClock, ArrowRight, CheckCircle2, X } from "lucide-react";
 
@@ -36,8 +39,6 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
   // ⚠ o dia sugerido é o MARCO do cronograma, não hoje: é ele que o planejamento veio olhar.
   const [dia, setDia] = useState(marcoMontagem || isoHoje());
   const [agindo, setAgindo] = useState(false);
-  const [verMetade, setVerMetade] = useState(false);
-  const [verSemCroqui, setVerSemCroqui] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!opId) return;
@@ -60,11 +61,14 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
     return { ...c, montado: feito >= q, emMontagem: feito > 0 && feito < q, feito, q };
   }), [conjuntos, montados]);
 
-  const aProgramar = useMemo(() => lista.filter((c) => !c.montagemDiaProgramado && !c.montado), [lista]);
+  // ⚠ ORDENA pela prontidão (mais cortado primeiro), mas TODOS entram na mesma lista e todos podem
+  // ser selecionados — a ordem ajuda a escolher, não decide por ninguém.
+  const aProgramar = useMemo(() => lista
+    .filter((c) => !c.montagemDiaProgramado && !c.montado)
+    .sort((a, b) => (b.prontidao?.pct || 0) - (a.prontidao?.pct || 0)
+      || String(a.marca).localeCompare(String(b.marca), "pt-BR", { numeric: true })),
+    [lista]);
   const prontos = useMemo(() => aProgramar.filter((c) => c.prontidao?.pronto), [aProgramar]);
-  const meioCaminho = useMemo(() => aProgramar.filter((c) => !c.prontidao?.pronto && c.prontidao?.liberavel), [aProgramar]);
-  const semCroqui = useMemo(() => aProgramar.filter((c) => (c.prontidao?.total || 0) === 0), [aProgramar]);
-  const semCorte = useMemo(() => aProgramar.filter((c) => (c.prontidao?.total || 0) > 0 && !c.prontidao?.podeLiberar), [aProgramar]);
   const montadosN = useMemo(() => lista.filter((c) => c.montado).length, [lista]);
 
   const grupos = useMemo(() => {
@@ -86,7 +90,6 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
 
   const somaKg = (arr) => arr.reduce((s, c) => s + (Number(c.pesoTotalKg) || 0), 0);
   const selecao = useMemo(() => lista.filter((c) => sel.has(c.id)), [lista, sel]);
-  const selForaDoPronto = selecao.some((c) => !c.prontidao?.pronto);
 
   const toggle = (id) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const marcarLista = (l) => {
@@ -128,8 +131,9 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
         <span><b className="text-emerald-700">{prontos.length}</b> prontos · {fmtKg(somaKg(prontos))}</span>
         <span><b className="text-torg-dark">{grupos.reduce((s, g) => s + g.lista.length, 0)}</b> programados</span>
         <span><b className="text-torg-dark">{montadosN}</b> já montados</span>
-        {meioCaminho.length > 0 && <span><b className="text-amber-700">{meioCaminho.length}</b> com ≥ metade</span>}
-        {semCorte.length > 0 && <span>{semCorte.length} sem corte suficiente</span>}
+        {aProgramar.length > prontos.length && (
+          <span>{aProgramar.length - prontos.length} ainda com croqui na máquina</span>
+        )}
       </div>
 
       {sel.size > 0 && (
@@ -138,7 +142,7 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
           <label className="text-[12px] text-torg-gray ml-1">Início da montagem</label>
           <input type="date" value={dia} onChange={(e) => setDia(e.target.value)}
             className="px-2 py-1 text-[12px] border border-gray-200 rounded-lg" />
-          <button onClick={() => agir({ acao: "programar", ids: [...sel], dia, forcar: selForaDoPronto }, "programado(s)")}
+          <button onClick={() => agir({ acao: "programar", ids: [...sel], dia }, "programado(s)")}
             disabled={agindo || !dia}
             className="px-3 py-1.5 bg-torg-blue text-white text-[12px] font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-1 disabled:opacity-50">
             {agindo ? <Loader2 size={12} className="animate-spin" /> : <CalendarClock size={12} />} Programar
@@ -151,11 +155,6 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
             className="px-2.5 py-1.5 border border-gray-200 text-torg-gray text-[12px] rounded-lg hover:bg-gray-50 disabled:opacity-50">
             Desprogramar
           </button>
-          {selForaDoPronto && (
-            <span className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-              tem conjunto sem todos os croquis cortados — vai entrar assim mesmo
-            </span>
-          )}
           <button onClick={() => setSel(new Set())} className="ml-auto p-1 text-torg-gray hover:bg-white rounded"><X size={13} /></button>
         </div>
       )}
@@ -165,41 +164,30 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
         <div className="rounded-lg border border-gray-100 bg-gray-50/70">
           <div className="px-2.5 py-2 flex items-center gap-1.5 text-[10px] text-emerald-800 bg-emerald-50 border-b border-emerald-100 rounded-t-lg">
             <CheckCircle2 size={11} />
-            <span className="font-bold uppercase tracking-wide">todas as sub peças cortadas</span>
-            <span className="font-semibold">{prontos.length} conj · {fmtKg(somaKg(prontos))}</span>
-            {prontos.length > 0 && <button onClick={() => marcarLista(prontos)} className="ml-auto underline font-semibold">selecionar todos</button>}
+            <span className="font-bold uppercase tracking-wide">conjuntos da obra</span>
+            <span className="font-semibold">{aProgramar.length} conj · {fmtKg(somaKg(aProgramar))}</span>
+            {aProgramar.length > 0 && (
+              <span className="ml-auto inline-flex items-center gap-2">
+                {prontos.length > 0 && (
+                  <button onClick={() => marcarLista(prontos)} className="underline font-semibold">
+                    só os 100% ({prontos.length})
+                  </button>
+                )}
+                <button onClick={() => marcarLista(aProgramar)} className="underline font-semibold">todos</button>
+              </span>
+            )}
           </div>
           <div className="p-2 space-y-1.5 max-h-[46vh] overflow-y-auto">
-            {prontos.length === 0 && <p className="text-[11px] text-torg-gray italic py-4 text-center">Nenhum conjunto com o corte completo nesta obra.</p>}
-            {prontos.map((c) => <Card key={c.id} c={c} sel={sel} onToggle={toggle} />)}
-
-            {meioCaminho.length > 0 && (
-              <>
-                <button onClick={() => setVerMetade((v) => !v)}
-                  className="w-full text-left px-2 py-1.5 rounded-md border border-amber-200 bg-amber-50 text-[10px] text-amber-800 font-bold uppercase tracking-wide">
-                  {verMetade ? "▾" : "▸"} {meioCaminho.length} com pelo menos metade cortada · {fmtKg(somaKg(meioCaminho))}
-                  <span className="block font-normal normal-case mt-0.5">a fábrica pode começar, mas ainda há croqui na máquina</span>
-                </button>
-                {verMetade && meioCaminho.map((c) => <Card key={c.id} c={c} sel={sel} onToggle={toggle} aviso />)}
-              </>
-            )}
-
-            {semCroqui.length > 0 && (
-              <>
-                <button onClick={() => setVerSemCroqui((v) => !v)}
-                  className="w-full text-left px-2 py-1.5 rounded-md border border-gray-200 bg-white text-[10px] text-torg-gray font-bold uppercase tracking-wide">
-                  {verSemCroqui ? "▾" : "▸"} {semCroqui.length} sem croqui vinculado · {fmtKg(somaKg(semCroqui))}
-                  <span className="block font-normal normal-case mt-0.5">não dá para medir a prontidão — LPC sem amarração ou conjunto de item comprado</span>
-                </button>
-                {verSemCroqui && semCroqui.map((c) => <Card key={c.id} c={c} sel={sel} onToggle={toggle} aviso />)}
-              </>
-            )}
-
-            {semCorte.length > 0 && (
-              <p className="text-[11px] text-torg-gray italic py-2 text-center border-t border-gray-100 mt-1">
-                + {semCorte.length} ainda sem corte suficiente · {fmtKg(somaKg(semCorte))}
+            {/* ⚠ LISTA ÚNICA, TUDO SELECIONÁVEL. A prontidão ordena (mais cortado primeiro) e
+                aparece em cada cartão, mas não separa nem esconde ninguém: aqui o planejamento
+                marca a data olhando o cronograma, e o corte corre atrás. Quem exige 100% é a
+                liberação do PCP, que é outra decisão e outra tela. */}
+            {aProgramar.length === 0 && (
+              <p className="text-[11px] text-torg-gray italic py-4 text-center">
+                Todos os conjuntos desta obra já estão programados ou montados.
               </p>
             )}
+            {aProgramar.map((c) => <Card key={c.id} c={c} sel={sel} onToggle={toggle} />)}
           </div>
         </div>
 

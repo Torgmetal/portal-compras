@@ -174,7 +174,9 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
   };
   const selecionarTodos = () => {
     if (filtroStatus === "CORTE") {
-      const prontos = filtrados.filter((c) => c.prontidao.podeLiberar && c.status === "CORTE");
+      // ⚠ 100% cortados — a liberação do PCP não desce conjunto com croqui na máquina (Vitor
+      // 01/09/2026). A regra da metade segue valendo como leitura ("pode montar"), não como porta.
+      const prontos = filtrados.filter((c) => c.prontidao.pronto && c.status === "CORTE");
       if (prontos.every((c) => selecionados.has(c.id))) {
         setSelecionados(new Set());
       } else {
@@ -204,10 +206,18 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
       try { data = await res.json(); } catch { throw new Error(`Erro ${res.status}`); }
       if (!res.ok) throw new Error(data.error || "Erro");
 
+      // ⚠ aplica só o que o SERVIDOR liberou: ele recusa conjunto que não está 100% cortado, e
+      // pintar a tela pela seleção mostraria como liberado o que ficou para trás.
+      const liberados = new Set(data.liberadosIds || [...selecionados]);
       setConjuntos((prev) =>
-        prev.map((c) => (selecionados.has(c.id) && c.status === "CORTE" ? { ...c, status: "MONTAGEM" } : c))
+        prev.map((c) => (liberados.has(c.id) && c.status === "CORTE" ? { ...c, status: "MONTAGEM" } : c))
       );
       setSelecionados(new Set());
+      if (data.bloqueados?.length) {
+        const lista = data.bloqueados.slice(0, 8).map((b) => `• ${b.marca} — ${b.cortados}/${b.total} croquis`).join("\n");
+        alert(`${data.bloqueados.length} conjunto(s) NÃO desceram: ainda há croqui por cortar.\n\n${lista}` +
+          (data.bloqueados.length > 8 ? `\n… e mais ${data.bloqueados.length - 8}.` : ""));
+      }
     } catch (e) {
       alert("Erro ao liberar: " + e.message);
     } finally {
@@ -513,12 +523,15 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
         <span className="text-[11px] text-torg-gray">
           {filtrados.length} conjunto{filtrados.length !== 1 ? "s" : ""} · {fmtKg(pesoFiltrados)}
         </span>
-        {filtroStatus === "CORTE" && filtrados.filter((c) => c.prontidao.podeLiberar).length > 0 && (
+        {/* ⚠ 100%, NÃO "pode montar". Vitor (01/09/2026): a liberação do PCP exige "os croquis que
+            estiverem 100% prontos". O rótulo "pode montar" (≥ metade) continua na tela como
+            leitura do estado, mas não é mais o que se seleciona para descer. */}
+        {filtroStatus === "CORTE" && filtrados.filter((c) => c.prontidao.pronto).length > 0 && (
           <button
             onClick={selecionarTodos}
             className="text-[11px] text-torg-blue hover:underline font-medium"
           >
-            Selecionar todos que podem montar ({filtrados.filter((c) => c.prontidao.podeLiberar).length})
+            Selecionar os 100% cortados ({filtrados.filter((c) => c.prontidao.pronto).length})
           </button>
         )}
         {filtroStatus === "MONTAGEM" && filtrados.length > 0 && (
@@ -551,7 +564,8 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
             const isExpanded = expandidos.has(c.id);
             const isSelected = selecionados.has(c.id);
             const pesoTotal = c.pesoTotalKg || 0;
-            const podeSelecionar = filtroStatus === "CORTE" ? prontidao.podeLiberar : c.status === "MONTAGEM";
+            // ⚠ só o 100% pode ser marcado para descer; ≥ metade continua visível, mas não seleciona
+            const podeSelecionar = filtroStatus === "CORTE" ? prontidao.pronto : c.status === "MONTAGEM";
 
             return (
               <div key={c.id} className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-all ${
