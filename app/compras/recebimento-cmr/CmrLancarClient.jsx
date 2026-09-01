@@ -60,8 +60,6 @@ export default function CmrLancarClient() {
   const [excluir, setExcluir] = useState(null);      // linha em confirmação de exclusão
   const [confExcl, setConfExcl] = useState(false);   // checkbox de confirmação
   const [excluindo, setExcluindo] = useState(false);
-  const [logAberto, setLogAberto] = useState(false);
-  const [logExcl, setLogExcl] = useState(null);
 
   // Normaliza cada item p/ o filtro/ordenação (rc derivado, cert, data formatada).
   const linhas = useMemo(() => (dados?.itens || []).map((it) => {
@@ -176,13 +174,7 @@ export default function CmrLancarClient() {
       const av = j.planilha && !j.planilha.ok ? " (⚠ não consegui limpar na planilha — rode Sincronizar)" : "";
       showToast(`R ${excluir.importRef} excluído${av}`, "success");
       setExcluir(null); setConfExcl(false);
-      if (logAberto) carregarLog();
     } catch (e) { showToast(e.message, "erro"); } finally { setExcluindo(false); }
-  }
-  async function carregarLog() {
-    setLogExcl(null);
-    const j = await fetch("/api/compras/cmr/exclusoes").then((r) => r.json()).catch(() => null);
-    setLogExcl(j?.itens || []);
   }
 
   const itens = dados?.itens || [];
@@ -370,10 +362,6 @@ export default function CmrLancarClient() {
               className="text-sm font-medium rounded-lg px-3 py-2 inline-flex items-center gap-2 bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
               {exportando ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />} <span className="hidden sm:inline">Exportar Excel</span>
             </button>
-            <button onClick={() => { const n = !logAberto; setLogAberto(n); if (n) carregarLog(); }} title="Ver o log de lançamentos excluídos"
-              className={`text-sm font-medium rounded-lg px-3 py-2 inline-flex items-center gap-2 border ${logAberto ? "bg-torg-dark text-white border-torg-dark" : "bg-white border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
-              <Trash2 size={15} /> <span className="hidden sm:inline">Exclusões</span>
-            </button>
           </div>
         </div>
         {/* Legenda + filtros ativos */}
@@ -445,40 +433,6 @@ export default function CmrLancarClient() {
           </table>
         </div>
       </div>
-
-      {/* Log de exclusões */}
-      {logAberto && (
-        <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <p className="text-[12px] font-bold text-torg-dark inline-flex items-center gap-2"><Trash2 size={14} /> Lançamentos excluídos</p>
-            <button onClick={() => setLogAberto(false)} className="text-torg-gray hover:text-torg-dark"><X size={16} /></button>
-          </div>
-          <div className="overflow-x-auto">
-            {logExcl === null ? <p className="px-4 py-6 text-center text-torg-gray text-sm"><Loader2 size={15} className="animate-spin inline" /></p>
-              : logExcl.length === 0 ? <p className="px-4 py-6 text-center text-torg-gray text-sm">Nenhuma exclusão registrada.</p>
-              : (
-                <table className="w-full text-[12px] whitespace-nowrap">
-                  <thead className="bg-gray-50/60"><tr className="text-[10px] text-gray-500 uppercase">
-                    <th className="px-3 py-2 text-left">Data / hora</th><th className="px-3 py-2 text-left">Usuário</th><th className="px-3 py-2 text-left">Índice R</th><th className="px-3 py-2 text-left">Descrição</th><th className="px-3 py-2 text-left">Fornecedor</th><th className="px-3 py-2 text-left">NF</th><th className="px-3 py-2 text-left">Obra</th>
-                  </tr></thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {logExcl.map((x) => (
-                      <tr key={x.id} className="hover:bg-gray-50/50">
-                        <td className="px-3 py-1.5 text-torg-gray">{new Date(x.quando).toLocaleString("pt-BR")}</td>
-                        <td className="px-3 py-1.5">{x.usuario}</td>
-                        <td className="px-3 py-1.5 font-mono text-torg-blue">{x.indiceR}</td>
-                        <td className="px-3 py-1.5 max-w-[360px] truncate" title={x.nome}>{x.nome}</td>
-                        <td className="px-3 py-1.5">{x.fornecedor || "—"}</td>
-                        <td className="px-3 py-1.5">{x.nf || "—"}</td>
-                        <td className="px-3 py-1.5 font-mono">{x.obra || "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-          </div>
-        </div>
-      )}
 
       {/* Modal de confirmação de exclusão (várias confirmações) */}
       {excluir && (

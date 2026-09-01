@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
-import { ClipboardList, GitCompareArrows } from "lucide-react";
+import { ClipboardList, GitCompareArrows, History } from "lucide-react";
 import CmrLancarClient from "./CmrLancarClient";
 import RecebimentoCmrClient from "./RecebimentoCmrClient";
+import CmrHistoricoClient from "./CmrHistoricoClient";
 
 export default function CmrPageClient() {
   const [aba, setAba] = useState("lancar");
@@ -16,9 +17,12 @@ export default function CmrPageClient() {
           <button onClick={() => setAba("conciliar")} className={`px-4 py-2 text-sm font-medium inline-flex items-center gap-1.5 ${aba === "conciliar" ? "bg-torg-blue text-white" : "text-torg-dark hover:bg-gray-50"}`}>
             <GitCompareArrows size={15} /> Conciliar
           </button>
+          <button onClick={() => setAba("historico")} className={`px-4 py-2 text-sm font-medium inline-flex items-center gap-1.5 ${aba === "historico" ? "bg-torg-blue text-white" : "text-torg-dark hover:bg-gray-50"}`}>
+            <History size={15} /> Histórico
+          </button>
         </div>
       </div>
-      {aba === "lancar" ? <CmrLancarClient /> : <RecebimentoCmrClient />}
+      {aba === "lancar" ? <CmrLancarClient /> : aba === "conciliar" ? <RecebimentoCmrClient /> : <CmrHistoricoClient />}
     </div>
   );
 }
