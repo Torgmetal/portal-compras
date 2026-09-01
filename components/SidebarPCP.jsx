@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Package, ListOrdered, FileText, Truck, FolderKanban, Printer, Factory, Gauge, Flame,
+  LayoutDashboard, Package, ListOrdered, FileText, Truck, FolderKanban, Printer, Factory, Gauge, Flame, Wrench,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -23,7 +23,14 @@ const menu = [
   // Controle de liberação de desenhos: quem levou qual desenho, quando e com qual R carimbado.
   { href: "/pcp/grd",          label: "GRD",              icon: Printer },
   { href: "/pcp/fila-corte",   label: "Corte",            icon: ListOrdered },
-  // ⚠ a fila da solda vem DEPOIS do corte no menu porque é depois no fluxo: corte → montagem →
+  // ⚠⚠ MONTAGEM VOLTOU AO MENU DO PCP (01/09/2026). Ela saiu em 19/08 por ser invólucro da tela da
+  // Produção — e continua sendo. O que mudou é que agora existe trabalho do PCP nela: liberar os
+  // conjuntos 100% cortados e imprimir o maço para o líder da fábrica, ambos pedidos do Vitor
+  // ("lá na página do pcp sim precisamos ter uma forma para podermos liberar os conjuntos"). Eu
+  // tinha construído as duas coisas sem devolver a porta de entrada, e ele foi procurar aqui:
+  // "confesso que não encontrei nada da parte de montagem no portal do PCP".
+  { href: "/pcp/montagem",     label: "Montagem",         icon: Wrench },
+  // ⚠ a fila da solda vem DEPOIS da montagem no menu porque é depois no fluxo: corte → montagem →
   // solda. Entra na fila quem já teve a montagem apontada como concluída no Syneco.
   { href: "/pcp/fila-solda",   label: "Fila de Solda",    icon: Flame },
   // ⚠ o indicador ISO do setor mora no menu do setor, como nos outros — quem responde por ele é
@@ -41,7 +48,7 @@ const menu = [
 //     Planejamento. Quem opera entra em Produção; a régua da fila agora é a data programada.
 //
 // FORA DO MENU DO PCP (Vitor 19/08/2026) — as PÁGINAS continuam no ar, só saíram daqui:
-//   /pcp/montagem · /pcp/solda · /pcp/acabamento · /pcp/jato · /pcp/pintura
+//   /pcp/solda · /pcp/acabamento · /pcp/jato · /pcp/pintura   (montagem VOLTOU em 01/09 — ver acima)
 //     São invólucros das mesmas telas da Produção (importam os Clients de
 //     /producao/programacao/…) e continuam no menu de lá. O PCP fica com o que é dele:
 //     programação, PMP, prioridades e corte.
