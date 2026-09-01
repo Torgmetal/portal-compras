@@ -1,4 +1,4 @@
-// PCP › Fila de Solda — o que saiu da montagem e ainda não foi soldado.
+// PCP › Solda — o que saiu da montagem e ainda não foi soldado.
 //
 // Vitor (01/09/2026): "depois que sair da montagem que foi dado o lançamento de concluído na
 // montagem deve ficar uma fila para podermos selecionar o que será feito na solda em cada bancada".
@@ -13,7 +13,7 @@ import { OP_VIVA } from "@/lib/op-viva";
 import SoldaClient from "./SoldaClient";
 import { CONJUNTO_MONTAVEL } from "@/lib/prontidao-conjunto";
 
-export const metadata = { title: "Workspace Torg — PCP · Fila de Solda" };
+export const metadata = { title: "Workspace Torg — PCP · Solda" };
 export const dynamic = "force-dynamic";
 
 export default async function PcpFilaSolda() {

@@ -32,7 +32,11 @@ const menu = [
   { href: "/pcp/montagem",     label: "Montagem",         icon: Wrench },
   // ⚠ a fila da solda vem DEPOIS da montagem no menu porque é depois no fluxo: corte → montagem →
   // solda. Entra na fila quem já teve a montagem apontada como concluída no Syneco.
-  { href: "/pcp/fila-solda",   label: "Fila de Solda",    icon: Flame },
+  // ⚠ "Solda", não "Fila de Solda". Vitor (01/09/2026), escolhendo entre as opções de arrumar o
+  // menu: as três esteiras — Corte, Montagem, Solda — são a mesma coisa e precisam ler como a
+  // mesma coisa. "Fila de" fazia a solda parecer outra categoria de tela, e o menu já mistura duas
+  // formas (por setor e por obra) sem dizer qual é qual.
+  { href: "/pcp/fila-solda",   label: "Solda",            icon: Flame },
   // ⚠ o indicador ISO do setor mora no menu do setor, como nos outros — quem responde por ele é
   // quem opera, não a Qualidade.
   { href: "/pcp/indicadores",  label: "Indicadores",      icon: Gauge },
