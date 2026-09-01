@@ -12,7 +12,8 @@ export async function POST(req) {
   try {
     const user = await requireRole(["ADMIN", "COMPRAS"]);
 
-    const resultado = await syncEntregas(prisma, { apenasPendentes: true });
+    // deadline 90s < maxDuration 120s: garante retorno JSON antes de o Vercel matar a função.
+    const resultado = await syncEntregas(prisma, { apenasPendentes: true, deadlineMs: 90_000 });
 
     await prisma.auditLog.create({
       data: {

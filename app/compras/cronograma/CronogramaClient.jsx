@@ -95,10 +95,11 @@ export default function CronogramaClient() {
     setSyncResult(null);
     try {
       const res = await fetch("/api/compras/cronograma/sync", { method: "POST" });
-      const data = await res.json();
+      // Resposta pode não ser JSON (ex.: página de erro do Vercel em timeout) — trata sem quebrar.
+      const data = await res.json().catch(() => ({ error: res.ok ? "Resposta inválida do servidor" : "A sincronização demorou demais — tente de novo (ela continua rodando em segundo plano no cron)." }));
       if (!res.ok) throw new Error(data.error || "Erro ao sincronizar");
       setSyncResult(data);
-      if (data.sincronizados > 0) fetchData();
+      fetchData();
     } catch (e) {
       setSyncResult({ error: e.message });
     } finally {
