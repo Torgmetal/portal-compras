@@ -1,13 +1,16 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ListTodo, GanttChart, ClipboardCheck, CalendarClock, PackageCheck, ClipboardList } from "lucide-react";
+import { ListTodo, GanttChart, ClipboardCheck, CalendarClock, PackageCheck, ClipboardList, Wrench } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/planejamento/cronogramas", label: "Cronogramas", icon: GanttChart },
   { href: "/planejamento/datas-setor", label: "Datas por setor", icon: CalendarClock },
+  // ⚠ logo depois das datas por setor: a data de início da montagem sai da mesma conversa — o
+  // planejamento olha o tempo da preparação e diz quando cada conjunto entra na bancada.
+  { href: "/planejamento/montagem", label: "Montagem", icon: Wrench },
   { href: "/planejamento/programacao-cargas", label: "Programação de Cargas", icon: PackageCheck },
   // ⚠ vizinho da Programação de Cargas de propósito: são os dois passos da mesma conversa —
   // a carga é o que vai viajar, o romaneio prévio é a relação que a Expedição confere e emite.

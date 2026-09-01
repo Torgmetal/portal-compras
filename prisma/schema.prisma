@@ -3010,6 +3010,23 @@ model PecaConjunto {
   // mostrar. O vermelho conta daqui.
   corteDiaOriginal       DateTime?               @db.Date
   corteAdiado            Int                     @default(0) // quantas vezes foi empurrada
+  // ── MONTAGEM ──────────────────────────────────────────────────────────────────────────────────
+  // Vitor (01/09/2026): "o planejamento programa de acordo com o tempo da preparação a data que
+  // deverá iniciar a montagem" — e "será por conjunto que tenha todas as sub peças prontas".
+  // ⚠ Só faz sentido em tipoPeca = CONJUNTO: croqui não se monta, se corta.
+  montagemDiaProgramado  DateTime?               @db.Date
+  montagemDiaOriginal    DateTime?               @db.Date // não se move; é dele que o atraso conta
+  montagemAdiado         Int                     @default(0)
+  montagemProgramadaEm   DateTime?
+  montagemProgramadaPor  String?
+  // ── SOLDA ─────────────────────────────────────────────────────────────────────────────────────
+  // ⚠⚠ A BANCADA AQUI É INTENÇÃO, NÃO ORDEM. Vitor (01/09/2026) escolheu "só registra a intenção":
+  // quem manda na bancada é o líder no chão. O portal organiza a fila e anota a sugestão; o que
+  // realmente aconteceu volta do Syneco (setor Solda, bancadas SOLDA 1..10). Não medir aderência
+  // contra este campo — ele não é promessa de ninguém.
+  soldaBancada           String?
+  soldaBancadaEm         DateTime?
+  soldaBancadaPor        String?
   corteIniciadoEm        DateTime? // real início do corte
   corteConcluidoEm       DateTime? // real fim do corte
   // Campos de produção (populados pelo Syneco)

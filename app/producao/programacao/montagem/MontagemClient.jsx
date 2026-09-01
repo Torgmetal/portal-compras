@@ -12,6 +12,7 @@ import {
 } from "@/lib/excel-relatorio";
 import { fmtOP } from "@/lib/utils";
 import BotaoRelatorioDia from "@/components/BotaoRelatorioDia";
+import { calcularProntidao } from "@/lib/prontidao-conjunto";
 import { MAQUINA_LABEL, MAQUINA_COR } from "@/lib/maquina-corte";
 
 const STATUS_LABEL = {
@@ -45,60 +46,8 @@ const fmtMm = (v) => {
 // Ordenação NATURAL (numérica): 1,2,3,…,10,11 em vez de 1,10,11,12,2.
 const cmpNatural = (a, b) => String(a ?? "").localeCompare(String(b ?? ""), undefined, { numeric: true, sensitivity: "base" });
 
-// Prontidão do conjunto para MONTAGEM (regra do Vitor):
-//   PRONTO    = todos os croquis 100% cortados
-//   LIBERAVEL = todos os croquis com PELO MENOS METADE cortada — a montagem
-//               pode começar antes de terminar todos os cortes
-//   PARCIAL   = tem corte feito, mas algum croqui abaixo da metade
-//   PENDENTE  = nada cortado
-// podeLiberar = PRONTO ou LIBERAVEL.
-function calcularProntidao(conjunto) {
-  const croquis = conjunto.conjuntoCroquis || [];
-  if (croquis.length === 0) {
-    return { pronto: false, liberavel: false, podeLiberar: false, total: 0, atendidos: 0, pct: 0, itens: [], categoria: "PENDENTE" };
-  }
-
-  let total = 0;
-  let atendidos = 0;
-  let comMetade = 0;
-  let comAlgo = 0;
-  const itens = [];
-
-  for (const rel of croquis) {
-    const c = rel.croqui;
-    if (!c) continue;
-    const necessario = (c.qte || 1);
-    const produzido = c.qteProduzida || 0;
-    const ok = produzido >= necessario;
-    const metade = produzido >= necessario / 2; // pelo menos metade cortada
-    total++;
-    if (ok) atendidos++;
-    if (metade) comMetade++;
-    if (produzido > 0) comAlgo++;
-    itens.push({
-      marca: c.marca,
-      descricao: c.descricao,
-      material: c.material,
-      qte: necessario,
-      qteProduzida: produzido,
-      falta: Math.max(0, necessario - produzido),
-      ok,
-      metade,
-      status: c.status,
-      maquina: c.maquina,
-      comprimentoMm: c.comprimentoMm,
-      pesoUnitKg: c.pesoUnitKg,
-    });
-  }
-
-  itens.sort((a, b) => cmpNatural(a.marca, b.marca));
-  const pct = total > 0 ? Math.round((atendidos / total) * 100) : 0;
-  const pronto = atendidos === total && total > 0;
-  const liberavel = !pronto && total > 0 && comMetade === total;
-  const podeLiberar = pronto || liberavel;
-  const categoria = pronto ? "PRONTO" : liberavel ? "LIBERAVEL" : comAlgo > 0 ? "PARCIAL" : "PENDENTE";
-  return { pronto, liberavel, podeLiberar, total, atendidos, pct, itens, categoria };
-}
+// ⚠ a prontidão vive em lib/prontidao-conjunto.js — a tela de programação da montagem usa a
+// MESMA conta, e duas cópias dela divergiriam sem ninguém ver.
 
 export default function MontagemClient({ conjuntosIniciais, userRole, apontamentos = {} }) {
   const router = useRouter();
