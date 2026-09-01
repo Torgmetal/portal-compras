@@ -12,6 +12,9 @@ import { BANCADAS, RITMO_META, RITMO_GUERRA, RITMO_NORMAL, repartirPorBancada, d
 import { gerarFolhaSolda } from "@/lib/folha-solda";
 
 const fmtKg = (v) => `${Math.round(Number(v) || 0).toLocaleString("pt-BR")} kg`;
+// ⚠ peça e peso do QUE FALTA soldar — ver custoDoConjunto em lib/solda-capacidade
+const unPend = (c) => (c?.qtePendente != null ? Math.max(0, Number(c.qtePendente) || 0) : Math.max(1, Number(c?.qte) || 1));
+const kgPend = (c) => (c?.pesoPendenteKg != null ? Number(c.pesoPendenteKg) || 0 : Number(c?.pesoTotalKg) || 0);
 const fmtN = (v) => (Number(v) || 0).toLocaleString("pt-BR");
 const isoHoje = () => new Date().toISOString().split("T")[0];
 const fmtDia = (iso) => {
@@ -59,8 +62,8 @@ export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, o
   const porDia = useMemo(() => distribuirEmDias(distrib, inicio), [distrib, inicio]);
 
   const resumo = useMemo(() => {
-    const un = conjuntos.reduce((s, c) => s + Math.max(1, Number(c.qte) || 1), 0);
-    const kg = conjuntos.reduce((s, c) => s + (Number(c.pesoTotalKg) || 0), 0);
+    const un = conjuntos.reduce((s, c) => s + unPend(c), 0);
+    const kg = conjuntos.reduce((s, c) => s + kgPend(c), 0);
     const dias = Math.max(0, ...porDia.map((b) => b.dias.length));
     const ops = [...new Set(conjuntos.map((c) => c.opNumero).filter(Boolean))];
     return { un, kg, dias, ops, diasBancada: distrib.reduce((s, b) => s + b.custo, 0) };
@@ -161,8 +164,8 @@ export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, o
           <tbody className="divide-y divide-gray-50">
             {porDia.map((b) => {
               const itens = b.dias.flatMap((d) => d.itens);
-              const un = itens.reduce((s, c) => s + Math.max(1, Number(c.qte) || 1), 0);
-              const kg = itens.reduce((s, c) => s + (Number(c.pesoTotalKg) || 0), 0);
+              const un = itens.reduce((s, c) => s + unPend(c), 0);
+              const kg = itens.reduce((s, c) => s + kgPend(c), 0);
               return (
                 <tr key={b.bancada}>
                   <td className="py-1.5 font-semibold text-torg-dark">{b.bancada}</td>

@@ -35,7 +35,15 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
       const q = Number(c.qte) || 1;
       const feitoMont = Number(montados[c.marca] || 0);
       const feitoSolda = Number(soldados[c.marca] || 0);
-      return { ...c, montado: feitoMont >= q, soldado: feitoSolda >= q, emSolda: feitoSolda > 0 && feitoSolda < q, feitoSolda, q };
+      // ⚠⚠ O QUE FALTA SOLDAR, não o conjunto inteiro. Vitor (01/09/2026): "no cálculo do dia você
+      // não está considerando as quantidades parciais". A marca 71811869 da OP-103 tem 4 peças com
+      // 3 já soldadas; contada cheia, ela sozinha inflava o prazo em quase um dia-bancada e a folha
+      // mandava o soldador refazer peça pronta.
+      const qtePendente = Math.max(0, q - feitoSolda);
+      return { ...c, montado: feitoMont >= q, soldado: feitoSolda >= q, emSolda: feitoSolda > 0 && feitoSolda < q,
+               feitoSolda, q, qtePendente,
+               // peso do que falta: peso por peça (do total cheio) × pendente
+               pesoPendenteKg: ((Number(c.pesoTotalKg) || 0) / q) * qtePendente };
     })
     // saiu da montagem e ainda não fechou a solda
     .filter((c) => c.montado && !c.soldado),
@@ -72,7 +80,8 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   }, [filtrados]);
 
   const semBancada = useMemo(() => filtrados.filter((c) => !c.soldaBancada).length, [filtrados]);
-  const somaKg = (arr) => arr.reduce((s, c) => s + (Number(c.pesoTotalKg) || 0), 0);
+  // ⚠ soma o peso do QUE FALTA soldar, não o do conjunto cheio
+  const somaKg = (arr) => arr.reduce((s, c) => s + (c.pesoPendenteKg != null ? Number(c.pesoPendenteKg) || 0 : Number(c.pesoTotalKg) || 0), 0);
   // ⚠⚠ A SELEÇÃO SAI DA FILA INTEIRA, NÃO DO FILTRO. Vitor (01/09/2026): "quero poder selecionar
   // peças de OPs diferentes para colocar em bancadas diferentes".
   //
