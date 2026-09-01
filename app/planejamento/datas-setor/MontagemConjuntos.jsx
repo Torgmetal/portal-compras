@@ -214,24 +214,41 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
       <div className="grid lg:grid-cols-2 gap-3">
         {/* A programar */}
         <div className="rounded-lg border border-gray-100 bg-gray-50/70">
-          <div className="px-2.5 py-2 flex items-center gap-1.5 text-[10px] text-emerald-800 bg-emerald-50 border-b border-emerald-100 rounded-t-lg">
-            <CheckCircle2 size={11} />
-            <span className="font-bold uppercase tracking-wide">conjuntos da obra</span>
-            <span className="font-semibold">{aProgramar.length} conj · {fmtKg(somaKg(aProgramar))}</span>
-            {aProgramar.length > 0 && (
-              <span className="ml-auto inline-flex items-center gap-2">
-                {prontos.length > 0 && (
-                  <button onClick={() => marcarLista(prontos)} className="underline font-semibold">
-                    só os 100% ({prontos.length})
+          {/* ⚠ 11px, não 10: com três botões e dois números, 10px obriga a quebrar palavra —
+              e "CONJUNTOS DA / OBRA" partido ao meio é o que fazia a faixa parecer amassada. */}
+          <div className="px-3 py-2.5 flex text-[11px] text-emerald-800 bg-emerald-50 border-b border-emerald-100 rounded-t-lg">
+            {/* ⚠⚠ DUAS LINHAS, NÃO UMA. Vitor (01/09/2026): "melhora isso aqui está horrível".
+                Título, contagem e três ações na mesma linha, num painel estreito, quebravam no meio
+                da palavra ("CONJUNTOS DA / OBRA", "1.451 / kg") e os links grudavam. Identidade em
+                cima, ações embaixo — cada uma com o seu espaço e nada quebrando. */}
+            <div className="w-full flex flex-col gap-2">
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <CheckCircle2 size={12} className="shrink-0 self-center" />
+                <span className="font-bold uppercase tracking-wide whitespace-nowrap">Conjuntos da obra</span>
+                <span className="text-torg-gray-light">·</span>
+                <span className="font-semibold tabular-nums whitespace-nowrap">{aProgramar.length} conjuntos</span>
+                <span className="font-normal tabular-nums whitespace-nowrap text-torg-gray">{fmtKg(somaKg(aProgramar))}</span>
+              </div>
+              {aProgramar.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {prontos.length > 0 && (
+                    <button onClick={() => marcarLista(prontos)}
+                      className="px-2 py-1 rounded-md border border-emerald-200 bg-white text-emerald-700 font-semibold whitespace-nowrap hover:bg-emerald-50">
+                      marcar os {prontos.length} prontos
+                    </button>
+                  )}
+                  <button onClick={() => marcarLista(aProgramar)}
+                    className="px-2 py-1 rounded-md border border-gray-200 bg-white text-torg-gray font-semibold whitespace-nowrap hover:bg-gray-50">
+                    marcar todos
                   </button>
-                )}
-                <button onClick={() => marcarLista(aProgramar)} className="underline font-semibold">todos</button>
-                <button onClick={() => { setColando((v) => !v); setImportado(null); }}
-                  className="underline font-semibold inline-flex items-center gap-1">
-                  <Upload size={11} /> importar lista
-                </button>
-              </span>
-            )}
+                  <button onClick={() => { setColando((v) => !v); setImportado(null); }}
+                    className={`px-2 py-1 rounded-md border font-semibold whitespace-nowrap inline-flex items-center gap-1 ${
+                      colando ? "border-torg-blue bg-torg-blue text-white" : "border-torg-blue-200 bg-white text-torg-blue hover:bg-torg-blue-50"}`}>
+                    <Upload size={11} /> importar lista
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {colando && (
