@@ -43,7 +43,8 @@ export default function PainelSolda({ conjuntos, onSugerir, ocupado }) {
     const un = conjuntos.reduce((s, c) => s + Math.max(1, Number(c.qte) || 1), 0);
     const kg = conjuntos.reduce((s, c) => s + (Number(c.pesoTotalKg) || 0), 0);
     const dias = Math.max(0, ...porDia.map((b) => b.dias.length));
-    return { un, kg, dias, diasBancada: distrib.reduce((s, b) => s + b.custo, 0) };
+    const ops = [...new Set(conjuntos.map((c) => c.opNumero).filter(Boolean))];
+    return { un, kg, dias, ops, diasBancada: distrib.reduce((s, b) => s + b.custo, 0) };
   }, [conjuntos, porDia, distrib]);
 
   async function exportarFolha() {
@@ -52,24 +53,34 @@ export default function PainelSolda({ conjuntos, onSugerir, ocupado }) {
       const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais,
               downloadWorkbook, CORES } = await import("@/lib/excel-relatorio");
       const ops = [...new Set(conjuntos.map((c) => c.opNumero).filter(Boolean))];
+      // ⚠⚠ COLUNA OP SÓ QUANDO O LOTE MISTURA OBRAS. Vitor (01/09/2026) pediu para poder juntar
+      // peças de OPs diferentes numa mesma repartição — e aí a folha SEM a OP deixa o soldador com
+      // uma marca que ele não sabe onde procurar. Com uma obra só a coluna é redundante e rouba a
+      // largura da descrição, que é o que ele lê de longe.
+      const varias = ops.length > 1;
+      const nCols = varias ? 7 : 6;
       const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
         titulo: "Ordem de Solda", subtitulo: `${ops.map((o) => `OP ${o}`).join(", ")} · inicio ${fmtDia(inicio)}`,
-        kpis: [], totalColunas: 6, nomePlanilha: "Ordem de solda", codigoDoc: "REL-PRD-012",
+        kpis: [], totalColunas: nCols, nomePlanilha: "Ordem de solda", codigoDoc: "REL-PRD-012",
       });
       // ⚠ mesmo formato da folha do montador: retrato, fonte 13, uma folha por bancada.
       ws.pageSetup.orientation = "portrait";
       ws.pageSetup.printTitlesRow = `1:${linhaInicio}`;
-      ws.columns = [{ width: 13 }, { width: 20 }, { width: 40 }, { width: 8 }, { width: 13 }, { width: 12 }];
+      ws.columns = varias
+        ? [{ width: 12 }, { width: 9 }, { width: 19 }, { width: 34 }, { width: 8 }, { width: 12 }, { width: 11 }]
+        : [{ width: 13 }, { width: 20 }, { width: 40 }, { width: 8 }, { width: 13 }, { width: 12 }];
       let row = linhaInicio;
-      adicionarHeaderTabela(ws, row, ["Dia", "Marca", "Descricao", "Qte", "Peso (kg)", "Feito"]);
-      for (let c = 1; c <= 6; c++) ws.getCell(row, c).font = { name: "Arial", size: 12, bold: true, color: { argb: "FFFFFF" } };
+      adicionarHeaderTabela(ws, row, varias
+        ? ["Dia", "OP", "Marca", "Descricao", "Qte", "Peso (kg)", "Feito"]
+        : ["Dia", "Marca", "Descricao", "Qte", "Peso (kg)", "Feito"]);
+      for (let c = 1; c <= nCols; c++) ws.getCell(row, c).font = { name: "Arial", size: 12, bold: true, color: { argb: "FFFFFF" } };
       ws.getRow(row).height = 30;
       row++;
       for (const [iB, b] of porDia.entries()) {
         const itens = b.dias.flatMap((d) => d.itens.map((it) => ({ ...it, _dia: d.dia })));
         const un = itens.reduce((s, it) => s + Math.max(1, Number(it.qte) || 1), 0);
         const kg = itens.reduce((s, it) => s + (Number(it.pesoTotalKg) || 0), 0);
-        ws.mergeCells(row, 1, row, 6);
+        ws.mergeCells(row, 1, row, nCols);
         const cab = ws.getCell(row, 1);
         cab.value = `${b.bancada}      ${un} peca(s)      ${Math.round(kg).toLocaleString("pt-BR")} kg`;
         cab.font = { name: "Arial", size: 16, bold: true, color: { argb: "FFFFFF" } };
@@ -78,13 +89,21 @@ export default function PainelSolda({ conjuntos, onSugerir, ocupado }) {
         ws.getRow(row).height = 34;
         row++;
         for (const it of itens) {
-          adicionarLinhaTabela(ws, row, [fmtDia(it._dia), it.marca, it.descricao || "",
-            Math.max(1, Number(it.qte) || 1), Math.round(Number(it.pesoTotalKg) || 0), ""],
-            { fontSize: 13, rowHeight: 26, alinhamento: { 0: "center", 3: "center", 4: "center", 5: "center" } });
+          const linha = varias
+            ? [fmtDia(it._dia), it.opNumero || "", it.marca, it.descricao || "", Math.max(1, Number(it.qte) || 1), Math.round(Number(it.pesoTotalKg) || 0), ""]
+            : [fmtDia(it._dia), it.marca, it.descricao || "", Math.max(1, Number(it.qte) || 1), Math.round(Number(it.pesoTotalKg) || 0), ""];
+          const centro = varias
+            ? { 0: "center", 1: "center", 4: "center", 5: "center", 6: "center" }
+            : { 0: "center", 3: "center", 4: "center", 5: "center" };
+          adicionarLinhaTabela(ws, row, linha, { fontSize: 13, rowHeight: 26, alinhamento: centro });
           row++;
         }
-        adicionarLinhaTotais(ws, row, ["", `${itens.length} conjunto(s)`, "", un, Math.round(kg), ""],
-          { fontSize: 13, rowHeight: 28, alinhamento: { 0: "center", 3: "center", 4: "center", 5: "center" } });
+        adicionarLinhaTotais(ws, row, varias
+          ? ["", "", `${itens.length} conjunto(s)`, "", un, Math.round(kg), ""]
+          : ["", `${itens.length} conjunto(s)`, "", un, Math.round(kg), ""],
+          { fontSize: 13, rowHeight: 28,
+            alinhamento: varias ? { 0: "center", 1: "center", 4: "center", 5: "center", 6: "center" }
+                                : { 0: "center", 3: "center", 4: "center", 5: "center" } });
         row += 2;
         if (iB < porDia.length - 1) ws.getRow(row - 1).addPageBreak();
       }
@@ -102,6 +121,11 @@ export default function PainelSolda({ conjuntos, onSugerir, ocupado }) {
         <Flame size={16} className="text-torg-orange" />
         <span className="font-semibold text-torg-dark">Repartir entre as bancadas</span>
         <span className="text-[12px] text-torg-gray">{fmtN(conjuntos.length)} conjuntos · {fmtN(resumo.un)} peças · {fmtKg(resumo.kg)}</span>
+        {resumo.ops.length > 1 && (
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-torg-blue-50 border border-torg-blue-100 text-torg-blue font-semibold">
+            {resumo.ops.length} OPs no lote
+          </span>
+        )}
         <span className="text-[11px] text-torg-gray ml-auto">bancadas:</span>
         <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
           {[1, 2, 3, 4, 5, 6].map((x) => (

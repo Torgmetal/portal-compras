@@ -72,7 +72,18 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
 
   const semBancada = useMemo(() => filtrados.filter((c) => !c.soldaBancada).length, [filtrados]);
   const somaKg = (arr) => arr.reduce((s, c) => s + (Number(c.pesoTotalKg) || 0), 0);
-  const selecao = useMemo(() => filtrados.filter((c) => sel.has(c.id)), [filtrados, sel]);
+  // ⚠⚠ A SELEÇÃO SAI DA FILA INTEIRA, NÃO DO FILTRO. Vitor (01/09/2026): "quero poder selecionar
+  // peças de OPs diferentes para colocar em bancadas diferentes".
+  //
+  // Saía de `filtrados`: quem filtrasse a OP-067, marcasse 12, trocasse o filtro para a OP-103 e
+  // marcasse mais 8, mandaria só 8 para o painel — as 12 primeiras sumiam em silêncio, porque
+  // deixaram de passar no filtro. E o cabeçalho piorava a armadilha, contando 20 no número e só 8
+  // no peso. O filtro serve para ACHAR a peça; o que está marcado é marcado.
+  const selecao = useMemo(() => fila.filter((c) => sel.has(c.id)), [fila, sel]);
+  // quantas das marcadas o filtro atual esconde — precisa aparecer, senão a pessoa não entende o total
+  const ocultasNaSelecao = useMemo(
+    () => selecao.length - filtrados.filter((c) => sel.has(c.id)).length, [selecao, filtrados, sel]);
+  const opsNaSelecao = useMemo(() => [...new Set(selecao.map((c) => c.opNumero).filter(Boolean))], [selecao]);
 
   const toggle = (id) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const marcarLista = (lista) => {
@@ -164,7 +175,18 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
 
       {sel.size > 0 && (
         <div className="bg-torg-blue-50/60 border border-torg-blue-100 rounded-xl px-3 py-2.5 flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-semibold text-torg-dark">{sel.size} conjunto(s) · {fmtKg(somaKg(selecao))}</span>
+          <span className="text-xs font-semibold text-torg-dark">{selecao.length} conjunto(s) · {fmtKg(somaKg(selecao))}</span>
+          {opsNaSelecao.length > 1 && (
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-white border border-torg-blue-200 text-torg-blue font-semibold">
+              {opsNaSelecao.length} OPs: {opsNaSelecao.map((o) => fmtOP(o)).join(", ")}
+            </span>
+          )}
+          {ocultasNaSelecao > 0 && (
+            <span title="Estão marcadas, mas o filtro atual não mostra. Continuam valendo."
+              className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800">
+              {ocultasNaSelecao} fora do filtro
+            </span>
+          )}
           <select value={bancadaEscolhida} onChange={(e) => setBancadaEscolhida(e.target.value)}
             className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg bg-white">
             {bancadas.length === 0 && <option value="">nenhuma bancada no Syneco</option>}
