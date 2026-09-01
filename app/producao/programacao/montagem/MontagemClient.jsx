@@ -14,6 +14,7 @@ import { fmtOP } from "@/lib/utils";
 import BotaoRelatorioDia from "@/components/BotaoRelatorioDia";
 import { calcularProntidao } from "@/lib/prontidao-conjunto";
 import { baixarZipLote } from "@/lib/desenhos-zip-cliente";
+import PainelBancadas from "./PainelBancadas";
 import { MAQUINA_LABEL, MAQUINA_COR } from "@/lib/maquina-corte";
 
 const STATUS_LABEL = {
@@ -69,6 +70,71 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
   const [busca, setBusca] = useState("");
   const [selecionados, setSelecionados] = useState(new Set());
   const [imprimindo, setImprimindo] = useState(false);
+
+  // ── LIBERAR E IMPRIMIR, BANCADA A BANCADA ──────────────────────────────────────────────────
+  // O caminho completo do pedido do Vitor (01/09/2026): libera para produção (status → Montagem,
+  // gravando a bancada de cada conjunto), emite os desenhos JÁ CARIMBADOS com o R dos croquis, e
+  // baixa um ZIP com uma pasta por bancada para o encarregado.
+  //
+  // ⚠ A ORDEM IMPORTA: libera ANTES de imprimir. A rota de impressão registra a GRD — o documento
+  // que prova o que desceu para o chão — e emitir GRD de conjunto que o servidor recusou liberar
+  // (por não estar 100% cortado) seria assinar papel de peça que não vai ser montada.
+  async function liberarEImprimir(distrib) {
+    const bancadaPorId = {}, bancadaPorMarca = {}, ids = [];
+    for (const b of distrib) {
+      for (const it of b.itens) {
+        bancadaPorId[it.id] = b.bancada;
+        bancadaPorMarca[it.marca] = b.bancada;
+        ids.push(it.id);
+      }
+    }
+    if (!ids.length) return;
+    if (!confirm(`Liberar ${ids.length} conjunto(s) para produção em ${distrib.length} bancada(s) e imprimir o maço?`)) return;
+
+    setImprimindo(true);
+    const erros = [];
+    try {
+      const rl = await fetch("/api/producao/pecas/liberar-montagem", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, bancadaPorId }),
+      });
+      const jl = await rl.json();
+      if (!rl.ok) throw new Error(jl.error || "Erro ao liberar");
+
+      // ⚠ imprime SÓ o que o servidor liberou: ele recusa conjunto sem os croquis 100% cortados
+      const liberados = new Set(jl.liberadosIds || ids);
+      setConjuntos((prev) => prev.map((c) => (liberados.has(c.id) && c.status === "CORTE"
+        ? { ...c, status: "MONTAGEM", montagemBancada: bancadaPorId[c.id] } : c)));
+      if (jl.bloqueados?.length) {
+        erros.push(...jl.bloqueados.map((b) => `${b.marca} não desceu — ${b.cortados}/${b.total} croquis`));
+      }
+
+      // uma chamada por OBRA: a rota do lote é por OP e a seleção atravessa obras
+      const porOp = new Map();
+      for (const b of distrib) for (const it of b.itens) {
+        if (!liberados.has(it.id)) continue;
+        if (!porOp.has(it.opNumero)) porOp.set(it.opNumero, []);
+        porOp.get(it.opNumero).push(it.marca);
+      }
+      for (const [opNumero, marcas] of porOp) {
+        try {
+          const r = await fetch("/api/producao/desenhos/lote", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ opNumero, marcas: [...new Set(marcas)], setor: "MONTAGEM", acao: "IMPRIMIR", bancadaPorMarca }),
+          });
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.error || "erro ao emitir");
+          await baixarZipLote(j, opNumero, "montagem");
+        } catch (e) { erros.push(`OP ${opNumero}: ${e.message}`); }
+      }
+      setSelecionados(new Set());
+    } catch (e) {
+      erros.push(e.message);
+    } finally {
+      setImprimindo(false);
+      if (erros.length) alert("Terminou com pendências:\n\n" + erros.slice(0, 10).join("\n"));
+    }
+  }
 
   // ── IMPRIMIR OS DESENHOS DOS CONJUNTOS (para o líder da fábrica) ────────────────────────────
   // Vitor (01/09/2026): "será feito a impressão dos conjuntos pelo pcp para entregar ao líder da
@@ -546,6 +612,15 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
         )}
       </div>
 
+      {/* ⚠ o painel só aparece com seleção: ele é a ferramenta de decidir, não um relatório fixo */}
+      {selecionados.size > 0 && (
+        <PainelBancadas
+          conjuntos={filtrados.filter((c) => selecionados.has(c.id))}
+          onLiberar={liberarEImprimir}
+          ocupado={imprimindo || liberando}
+        />
+      )}
+
       {/* Info: total filtrado */}
       <div className="flex items-center justify-between px-1">
         <span className="text-[11px] text-torg-gray">
@@ -622,6 +697,18 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
                         <span className="text-xs text-torg-blue font-mono">{fmtOP(c.opNumero)}</span>
                         {/* ⚠ o dia do planejamento fica NO CARTÃO, não só no recorte: o PCP tem de
                             saber de quando é a peça mesmo olhando a lista por status. */}
+                        {/* ⚠ a bancada atribuída fica no cartão: é o que o encarregado confere
+                            contra o maço impresso. Sem isso o papel e a tela divergem em silêncio. */}
+                        {c.montagemBancada && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold whitespace-nowrap">
+                            {c.montagemBancada}
+                          </span>
+                        )}
+                        {c.prioridade != null && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-700 font-bold whitespace-nowrap">
+                            prioridade {c.prioridade}
+                          </span>
+                        )}
                         {c.montagemDiaProgramado && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 font-semibold whitespace-nowrap">
                             montagem {fmtDiaCurto(c.montagemDiaProgramado)}

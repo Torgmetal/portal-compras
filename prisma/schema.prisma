@@ -3019,6 +3019,12 @@ model PecaConjunto {
   montagemAdiado         Int                     @default(0)
   montagemProgramadaEm   DateTime?
   montagemProgramadaPor  String?
+  // ⚠ A BANCADA QUE VAI MONTAR. Vitor (01/09/2026): a Larissa escolhe quantas bancadas usar "junto
+  // com o encarregado da fábrica" e o portal reparte. Guardado porque o maço impresso sai por
+  // bancada — se a atribuição se perdesse ao fechar a tela, o papel na mão do encarregado e o
+  // portal diriam coisas diferentes.
+  montagemBancada        String?
+  montagemBancadaEm      DateTime?
   // ── SOLDA ─────────────────────────────────────────────────────────────────────────────────────
   // ⚠⚠ A BANCADA AQUI É INTENÇÃO, NÃO ORDEM. Vitor (01/09/2026) escolheu "só registra a intenção":
   // quem manda na bancada é o líder no chão. O portal organiza a fila e anota a sugestão; o que

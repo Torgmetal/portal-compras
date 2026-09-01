@@ -10,6 +10,9 @@ import { calcularProntidao } from "@/lib/prontidao-conjunto";
 const schema = z.object({
   ids: z.array(z.string()).min(1, "Selecione ao menos um conjunto"),
   reverter: z.boolean().optional(),
+  // ⚠ marca/id → bancada. Gravado junto com a liberação para o papel que o encarregado recebe e a
+  // tela do portal contarem a mesma história. Ver lib/montagem-capacidade.js.
+  bancadaPorId: z.record(z.string(), z.string().max(60)).nullable().optional(),
 });
 
 export async function POST(req) {
@@ -72,6 +75,25 @@ export async function POST(req) {
           data: { status: statusPara, ultimoSetor: reverter ? "Corte" : "Montagem" },
         })
       : { count: 0 };
+
+    // grava a bancada de cada conjunto (uma chamada por bancada, não por peça)
+    if (!reverter && body.bancadaPorId && idsPermitidos.length) {
+      const porBancada = new Map();
+      for (const id of idsPermitidos) {
+        const b = body.bancadaPorId[id];
+        if (!b) continue;
+        if (!porBancada.has(b)) porBancada.set(b, []);
+        porBancada.get(b).push(id);
+      }
+      const agora = new Date();
+      await prisma.$transaction([...porBancada.entries()].map(([bancada, ids2]) =>
+        prisma.pecaConjunto.updateMany({ where: { id: { in: ids2 } }, data: { montagemBancada: bancada, montagemBancadaEm: agora } })
+      ));
+    }
+    // reverter limpa a bancada: voltar ao corte desfaz a atribuição
+    if (reverter && ids.length) {
+      await prisma.pecaConjunto.updateMany({ where: { id: { in: ids } }, data: { montagemBancada: null, montagemBancadaEm: null } });
+    }
 
     try {
       await prisma.auditLog.create({
