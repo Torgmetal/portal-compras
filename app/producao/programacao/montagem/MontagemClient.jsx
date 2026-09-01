@@ -19,6 +19,16 @@ import { MAQUINA_LABEL, MAQUINA_COR } from "@/lib/maquina-corte";
 const STATUS_LABEL = {
   PENDENTE: "Pendente", CORTE: "Corte", MONTAGEM: "Montagem", SOLDA: "Solda",
   ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura", EXPEDIDO: "Expedido",
+  // ⚠ não é status de peça: é o recorte do que o Planejamento programou. Ver o filtro abaixo.
+  PROGRAMADO: "Programados pelo planejamento",
+};
+
+const fmtDiaCurto = (v) => {
+  if (!v) return "—";
+  const iso = String(v).slice(0, 10);
+  const d = new Date(iso + "T00:00:00Z");
+  const semana = d.toLocaleDateString("pt-BR", { weekday: "short", timeZone: "UTC" }).replace(".", "");
+  return `${semana} ${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" })}`;
 };
 
 const PRONTIDAO_LABEL = {
@@ -126,7 +136,14 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
   const filtrados = useMemo(() => {
     return conjuntosEnriquecidos.filter((c) => {
       if (filtroOp && c.opNumero !== filtroOp) return false;
-      if (filtroStatus && c.status !== filtroStatus) return false;
+      // ⚠⚠ "PROGRAMADO" NÃO É STATUS. Vitor (01/09/2026): "na página do pcp não está aparecendo as
+      // peças de conjunto que programamos". O Planejamento marca o dia da montagem em conjuntos que
+      // ainda estão PENDENTE — e a tela do PCP só olhava `status`, então o que ele acabara de
+      // programar não existia aqui. Este recorte é por `montagemDiaProgramado`, atravessando o
+      // status, que é justamente o ponto: o PCP precisa ver o que foi pedido ANTES de virar corte.
+      if (filtroStatus === "PROGRAMADO") {
+        if (!c.montagemDiaProgramado) return false;
+      } else if (filtroStatus && c.status !== filtroStatus) return false;
       if (filtroProntidao === "MONTADO") {
         if (c.status !== "MONTAGEM") return false;
       } else if (filtroProntidao === "PODE_MONTAR") {
@@ -144,12 +161,15 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
         ) return false;
       }
       return true;
-    }).sort((a, b) => cmpNatural(a.opNumero, b.opNumero) || cmpNatural(a.marca, b.marca));
+    }).sort((a, b) => (filtroStatus === "PROGRAMADO"
+      ? String(a.montagemDiaProgramado || "").localeCompare(String(b.montagemDiaProgramado || ""))
+      : 0) || cmpNatural(a.opNumero, b.opNumero) || cmpNatural(a.marca, b.marca));
   }, [conjuntosEnriquecidos, filtroOp, filtroStatus, filtroProntidao, busca]);
 
   // Contadores
   const totalAguardando = useMemo(() => conjuntosEnriquecidos.filter((c) => c.status === "CORTE").length, [conjuntosEnriquecidos]);
   const totalProntos = useMemo(() => conjuntosEnriquecidos.filter((c) => c.status === "CORTE" && c.prontidao.podeLiberar).length, [conjuntosEnriquecidos]);
+  const totalProgramados = useMemo(() => conjuntosEnriquecidos.filter((c) => c.montagemDiaProgramado).length, [conjuntosEnriquecidos]);
   const totalEmMontagem = useMemo(() => conjuntosEnriquecidos.filter((c) => c.status === "MONTAGEM").length, [conjuntosEnriquecidos]);
 
   // Peso total dos conjuntos filtrados
@@ -394,7 +414,7 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <button
           onClick={() => { setFiltroStatus("CORTE"); setFiltroProntidao(""); setSelecionados(new Set()); }}
           className={`rounded-xl p-3 text-left transition-all bg-orange-50 text-orange-700 ${filtroStatus === "CORTE" && !filtroProntidao ? "ring-2 ring-offset-1 ring-orange-400" : ""}`}
@@ -418,6 +438,14 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
           <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">Em montagem</p>
           <p className="text-2xl font-extrabold tabular-nums">{totalEmMontagem}</p>
           <p className="text-[10px] opacity-70">liberados</p>
+        </button>
+        <button
+          onClick={() => { setFiltroStatus("PROGRAMADO"); setFiltroProntidao(""); setSelecionados(new Set()); }}
+          className={`rounded-xl p-3 text-left transition-all bg-violet-50 text-violet-700 ${filtroStatus === "PROGRAMADO" ? "ring-2 ring-offset-1 ring-violet-400" : ""}`}
+        >
+          <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">Programados</p>
+          <p className="text-2xl font-extrabold tabular-nums">{totalProgramados}</p>
+          <p className="text-[10px] opacity-70">com dia do planejamento</p>
         </button>
         <button
           onClick={() => { setFiltroStatus(""); setFiltroProntidao(""); setSelecionados(new Set()); }}
@@ -565,7 +593,11 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
             const isSelected = selecionados.has(c.id);
             const pesoTotal = c.pesoTotalKg || 0;
             // ⚠ só o 100% pode ser marcado para descer; ≥ metade continua visível, mas não seleciona
-            const podeSelecionar = filtroStatus === "CORTE" ? prontidao.pronto : c.status === "MONTAGEM";
+            // ⚠ no recorte "Programados" tudo é selecionável — é de lá que o PCP IMPRIME o maço
+            // para o líder. Liberar continua exigindo 100%, e quem barra isso é o servidor.
+            const podeSelecionar = filtroStatus === "PROGRAMADO" ? true
+              : filtroStatus === "CORTE" ? prontidao.pronto
+              : c.status === "MONTAGEM";
 
             return (
               <div key={c.id} className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-all ${
@@ -588,6 +620,14 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-torg-dark font-mono">{c.marca}</span>
                         <span className="text-xs text-torg-blue font-mono">{fmtOP(c.opNumero)}</span>
+                        {/* ⚠ o dia do planejamento fica NO CARTÃO, não só no recorte: o PCP tem de
+                            saber de quando é a peça mesmo olhando a lista por status. */}
+                        {c.montagemDiaProgramado && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 font-semibold whitespace-nowrap">
+                            montagem {fmtDiaCurto(c.montagemDiaProgramado)}
+                            {c.montagemAdiado > 0 ? ` · adiado ${c.montagemAdiado}×` : ""}
+                          </span>
+                        )}
                         {c.op?.cliente && (
                           <span className="text-[10px] text-torg-gray truncate max-w-[150px]">{c.op.cliente}</span>
                         )}
