@@ -8,7 +8,7 @@
 // dia de trabalho e outra com uma semana.
 import { useState, useMemo } from "react";
 import { Flame, Loader2, Download, ArrowRight } from "lucide-react";
-import { BANCADAS, RITMO_META, RITMO_GUERRA, RITMO_NORMAL, repartirPorBancada, distribuirEmDias } from "@/lib/solda-capacidade";
+import { BANCADAS, RITMO_META, RITMO_GUERRA, RITMO_NORMAL, repartirPorBancada, distribuirEmDias, ocupacaoDasBancadas } from "@/lib/solda-capacidade";
 import { gerarFolhaSolda } from "@/lib/folha-solda";
 
 const fmtKg = (v) => `${Math.round(Number(v) || 0).toLocaleString("pt-BR")} kg`;
@@ -30,14 +30,32 @@ const CURVAS = [
   { k: "NORMAL", rot: "dia comum", curva: RITMO_NORMAL, kgDia: 453 },
 ];
 
-export default function PainelSolda({ conjuntos, onSugerir, ocupado }) {
+export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, ocupado }) {
   const [n, setN] = useState(6);
   const [inicio, setInicio] = useState(isoHoje());
   const [curvaK, setCurvaK] = useState("GUERRA");
   const [baixando, setBaixando] = useState(false);
 
   const curva = (CURVAS.find((c) => c.k === curvaK) || CURVAS[0]).curva;
-  const distrib = useMemo(() => repartirPorBancada(conjuntos, n, { curva }), [conjuntos, n, curva]);
+
+  // ⚠⚠ A BANCADA OCUPADA SAI DA ROLETA. Vitor (01/09/2026): "a bancada que eu já selecionei não
+  // deve permitir eu selecionar ela também, até que eu selecione uma data posterior ao prazo que de
+  // fato ele vai levar" — e depois: "o seletor de solda não há necessidade, apenas o número de
+  // bancadas". As duas coisas juntas: você diz QUANTAS, o painel escolhe QUAIS entre as livres.
+  //
+  // O "prazo que de fato ele vai levar" é medido, não digitado: é a carga que sobrou naquela
+  // bancada (conjuntos gravados e ainda não soldados) convertida em dias pelo ritmo escolhido.
+  // Mudando a data de início para depois disso, a bancada volta a aparecer sozinha.
+  const ocupacao = useMemo(
+    () => ocupacaoDasBancadas(filaCompleta.filter((c) => c.soldaBancada), inicio, curva),
+    [filaCompleta, inicio, curva]);
+  const livres = useMemo(() => BANCADAS.filter((b) => !ocupacao[b] || ocupacao[b].livreEm <= inicio), [ocupacao, inicio]);
+  const ocupadas = useMemo(() => BANCADAS.filter((b) => !livres.includes(b)), [livres]);
+  // ⚠ n é o que ele PEDIU; usadas é o que dá para usar. A diferença aparece na tela — pedir 6 e
+  // receber 4 em silêncio é o tipo de coisa que só se descobre quando a folha sai errada.
+  const nomes = useMemo(() => livres.slice(0, n), [livres, n]);
+
+  const distrib = useMemo(() => repartirPorBancada(conjuntos, n, { curva, nomes }), [conjuntos, n, curva, nomes]);
   const porDia = useMemo(() => distribuirEmDias(distrib, inicio), [distrib, inicio]);
 
   const resumo = useMemo(() => {
@@ -68,7 +86,7 @@ export default function PainelSolda({ conjuntos, onSugerir, ocupado }) {
   // quando a tela muda. (E a tela ganhou "Planilha das bancadas", que emite do que está gravado.)
   async function liberar() {
     await exportarFolha();
-    await onSugerir(distrib);
+    await onSugerir(porDia);
   }
 
   if (!conjuntos.length) return null;
@@ -95,6 +113,22 @@ export default function PainelSolda({ conjuntos, onSugerir, ocupado }) {
           className="px-2 py-1 text-sm border border-gray-200 rounded-lg" />
       </div>
 
+      {(ocupadas.length > 0 || nomes.length < n) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+          {ocupadas.length > 0 && (
+            <div>
+              <b>Ocupadas nesta data:</b>{" "}
+              {ocupadas.map((b) => `${b} até ${fmtDia(ocupacao[b].livreEm)} (${ocupacao[b].conj} conj)`).join(" · ")}
+            </div>
+          )}
+          {nomes.length < n && (
+            <div className="mt-0.5">
+              Só <b>{nomes.length}</b> bancada(s) livre(s) — o plano abaixo usa essas. Mova o início para depois, ou solde com menos.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ⚠ as três réguas visíveis: sem isso o "200 t" viraria um número mágico dentro da conta */}
       <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
         <span className="text-torg-gray">ritmo:</span>
@@ -112,10 +146,10 @@ export default function PainelSolda({ conjuntos, onSugerir, ocupado }) {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <Cx rot="fecha em" val={`${resumo.dias} dia(s)`} sub={`${n} bancada(s)`} forte />
+        <Cx rot="fecha em" val={`${resumo.dias} dia(s)`} sub={`${nomes.length} bancada(s): ${nomes.map((b) => b.replace("SOLDA ", "")).join(", ") || "—"}`} forte />
         <Cx rot="carga total" val={`${resumo.diasBancada.toFixed(1)}`} sub="dias-bancada" />
         <Cx rot="por bancada/dia" val={`${Math.round(resumo.kg / Math.max(0.1, resumo.diasBancada))} kg`} sub="no ritmo escolhido" />
-        <Cx rot="peças/bancada" val={fmtN(Math.round(resumo.un / n))} sub="no total do lote" />
+        <Cx rot="peças/bancada" val={fmtN(Math.round(resumo.un / Math.max(1, nomes.length)))} sub="no total do lote" />
       </div>
 
       <div className="overflow-x-auto">

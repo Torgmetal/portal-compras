@@ -25,7 +25,7 @@ export default async function PcpFilaSolda() {
     select: {
       id: true, opNumero: true, marca: true, descricao: true, qte: true, pesoTotalKg: true, status: true,
       montagemDiaProgramado: true,
-      soldaBancada: true, soldaBancadaEm: true, soldaBancadaPor: true,
+      soldaBancada: true, soldaBancadaEm: true, soldaBancadaPor: true, soldaDiaProgramado: true,
       op: { select: { cliente: true, obra: true } },
     },
     take: 4000,

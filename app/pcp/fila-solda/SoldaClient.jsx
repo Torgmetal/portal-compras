@@ -11,7 +11,7 @@
 // ⚠ ENTRA NA FILA QUEM TERMINOU A MONTAGEM — pelo apontamento do Syneco, não por clique no portal.
 // Conjunto com montagem pela metade não é fila de solda: é montagem em andamento.
 import { useState, useMemo } from "react";
-import { Flame, Search, Loader2, AlertCircle, X, ArrowRight, CheckCircle2, Download } from "lucide-react";
+import { Flame, Search, Loader2, AlertCircle, X, CheckCircle2, Download, CalendarClock } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import PainelSolda from "./PainelSolda";
 import { gerarFolhaSolda } from "@/lib/folha-solda";
@@ -25,7 +25,7 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   const [filtroOp, setFiltroOp] = useState("");
   const [filtroBancada, setFiltroBancada] = useState("");
   const [busca, setBusca] = useState("");
-  const [bancadaEscolhida, setBancadaEscolhida] = useState(bancadas[0] || "");
+  const [novoDia, setNovoDia] = useState("");
   const [agindo, setAgindo] = useState(false);
   const [erro, setErro] = useState("");
   const [okMsg, setOkMsg] = useState("");
@@ -126,22 +126,49 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
 
   // ⚠ O PAINEL DEVOLVE A REPARTIÇÃO INTEIRA — uma chamada por bancada, não uma por conjunto. Com 95
   // marcas em 6 bancadas seriam 95 requisições; assim são 6.
+  // ⚠ SÓ A DATA — a rota aceita `dia` sem `bancada` justamente para isto: reenviar a bancada só
+  // para mudar o dia arriscaria trocá-la sem querer.
+  async function mudarDia() {
+    if (!novoDia || !selecao.length) return;
+    setAgindo(true); setErro(""); setOkMsg("");
+    try {
+      const ids = selecao.map((c) => c.id);
+      const r = await fetch("/api/pcp/solda", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, dia: novoDia }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao mudar a data");
+      const set = new Set(ids);
+      setConjuntos((prev) => prev.map((c) => (set.has(c.id) ? { ...c, soldaDiaProgramado: novoDia } : c)));
+      setOkMsg(`${j.atualizados} conjunto(s) movidos para ${novoDia.split("-").reverse().join("/")}.`);
+      setSel(new Set()); setNovoDia("");
+    } catch (e) { setErro(e.message); } finally { setAgindo(false); }
+  }
+
   async function sugerirEmLote(distrib) {
     setAgindo(true); setErro(""); setOkMsg("");
     try {
-      let total = 0, usadas = 0;
+      let total = 0; const usadas = new Set();
+      // ⚠⚠ UMA CHAMADA POR (BANCADA, DIA), não por bancada. Cada conjunto tem o SEU dia dentro da
+      // bancada — a repartição espalha por dias úteis. Gravando só o primeiro dia para a bancada
+      // inteira, uma peça marcada para quinta apareceria como se fosse de terça, e a ocupação
+      // (que lê esse dia) diria que a bancada vaga antes da hora.
       for (const b of distrib) {
-        const ids = b.itens.map((c) => c.id);
-        if (!ids.length) continue;
-        const r = await fetch("/api/pcp/solda", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ids, bancada: b.bancada }),
-        });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || `Erro ao gravar ${b.bancada}`);
-        total += j.atualizados ?? ids.length; usadas++;
-        const set = new Set(ids);
-        setConjuntos((prev) => prev.map((c) => (set.has(c.id) ? { ...c, soldaBancada: b.bancada, soldaBancadaEm: new Date().toISOString() } : c)));
+        for (const d of b.dias || []) {
+          const ids = d.itens.map((c) => c.id);
+          if (!ids.length) continue;
+          const r = await fetch("/api/pcp/solda", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids, bancada: b.bancada, dia: d.dia }),
+          });
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.error || `Erro ao gravar ${b.bancada}`);
+          total += j.atualizados ?? ids.length; usadas.add(b.bancada);
+          const set = new Set(ids);
+          setConjuntos((prev) => prev.map((c) => (set.has(c.id)
+            ? { ...c, soldaBancada: b.bancada, soldaBancadaEm: new Date().toISOString(), soldaDiaProgramado: d.dia } : c)));
+        }
       }
       setOkMsg(`${total} conjunto(s) repartidos entre ${usadas} bancada(s).`);
       setSel(new Set());
@@ -216,18 +243,24 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
               {ocultasNaSelecao} fora do filtro
             </span>
           )}
-          <select value={bancadaEscolhida} onChange={(e) => setBancadaEscolhida(e.target.value)}
-            className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg bg-white">
-            {bancadas.length === 0 && <option value="">nenhuma bancada no Syneco</option>}
-            {bancadas.map((b) => <option key={b} value={b}>{b}</option>)}
-          </select>
-          <button onClick={() => definir(bancadaEscolhida)} disabled={agindo || !bancadaEscolhida}
+          {/* ⚠ O SELETOR MANUAL DE BANCADA SAIU. Vitor (01/09/2026): "o seletor de solda não há
+              necessidade, apenas o número de bancadas". Quem reparte é o painel logo abaixo, que
+              conhece o custo de cada peça e pula a bancada ocupada — escolher a bancada à mão aqui
+              era a forma de furar essas duas coisas sem perceber. */}
+          {/* ⚠⚠ MUDAR A DATA. Vitor: "preciso alterar a data de um lançamento, isso pode ocorrer
+              com mais frequência". Fica junto da seleção porque é edição de lote: marca as peças
+              que escorregaram e move todas de uma vez. */}
+          <input type="date" value={novoDia} onChange={(e) => setNovoDia(e.target.value)}
+            className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg bg-white" />
+          <button onClick={mudarDia} disabled={agindo || !novoDia}
+            title={`Move ${selecao.length} conjunto(s) para esse dia — a bancada não muda`}
             className="px-3 py-1.5 bg-torg-blue text-white text-xs font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-1 disabled:opacity-50">
-            {agindo ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />} Sugerir bancada
+            {agindo ? <Loader2 size={13} className="animate-spin" /> : <CalendarClock size={13} />} Mudar a data
           </button>
           <button onClick={() => definir(null)} disabled={agindo}
+            title="Tira a bancada e a data — o conjunto volta para a fila sem destino"
             className="px-3 py-1.5 border border-gray-200 text-torg-gray text-xs rounded-lg hover:bg-gray-50 disabled:opacity-50">
-            Tirar sugestão
+            Tirar da bancada
           </button>
           <button onClick={() => setSel(new Set())} className="ml-auto p-1.5 text-torg-gray hover:bg-white rounded-lg"><X size={14} /></button>
         </div>
@@ -236,7 +269,7 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
       {/* ⚠ O PAINEL FICA ENTRE A SELEÇÃO E A LISTA — mesma ordem da montagem: marca os conjuntos,
           vê como se reparte, grava. Sem seleção ele some, porque não há o que repartir. */}
       {sel.size > 0 && (
-        <PainelSolda conjuntos={selecao} onSugerir={sugerirEmLote} ocupado={agindo} />
+        <PainelSolda conjuntos={selecao} filaCompleta={fila} onSugerir={sugerirEmLote} ocupado={agindo} />
       )}
 
       <div className="bg-gray-50 rounded-xl border border-gray-100 border-t-4 border-t-torg-blue">

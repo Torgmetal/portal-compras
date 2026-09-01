@@ -3033,6 +3033,9 @@ model PecaConjunto {
   soldaBancada           String?
   soldaBancadaEm         DateTime?
   soldaBancadaPor        String?
+  // ⚠ @db.Date: é o DIA do trabalho, não um instante. Timestamp aqui volta um dia ao converter
+  // para BRT — a armadilha já anotada em lib/data-br.js.
+  soldaDiaProgramado     DateTime? @db.Date
   corteIniciadoEm        DateTime? // real início do corte
   corteConcluidoEm       DateTime? // real fim do corte
   // Campos de produção (populados pelo Syneco)
