@@ -331,7 +331,7 @@ export default function CmrLancarClient() {
       {/* Lista do ano */}
       <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-[12px] font-bold text-torg-dark">Lançados em {ano} <span className="font-normal text-torg-gray">· {dados?.total ?? "…"} itens</span></p>
+          <p className="text-[13px] font-bold text-torg-dark">Controle de Materiais Rastreáveis - CMR <span className="font-normal text-torg-gray">· {ano} · {dados?.total ?? "…"} itens</span></p>
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
