@@ -6,6 +6,7 @@ import {
   Clock, Package, Layers, CalendarClock, ArrowRight,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
+import KpiSetor from "@/components/KpiSetor";
 import BotaoRelatorioDia from "@/components/BotaoRelatorioDia";
 import { MAQUINA_LABEL, MAQUINA_COR } from "@/lib/maquina-corte";
 
@@ -252,10 +253,13 @@ export default function FilaCorteClient({ pecasIniciais }) {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
-            <Scissors size={26} className="text-torg-blue" /> Fila de Corte
+          {/* ⚠ mesmo tamanho da esteira da Solda (xl, não 3xl). Vitor (01/09/2026): "deixa
+              parecida com a de solda, ficou mais clean". Título de 3xl empurra a lista para baixo
+              da dobra numa tela em que o assunto É a lista. */}
+          <h2 className="text-xl font-extrabold text-torg-dark flex items-center gap-2">
+            <Scissors size={20} className="text-torg-blue" /> Corte — fila da liberação
           </h2>
-          <p className="text-xs text-torg-gray mt-0.5">
+          <p className="text-xs text-torg-gray mt-1 max-w-3xl">
             Peças liberadas entram na fila → programe a meta de início/fim (alimenta o PMP) → acompanhe o real × estimado.
           </p>
         </div>
@@ -264,15 +268,15 @@ export default function FilaCorteClient({ pecasIniciais }) {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi icon={ListOrdered} cor="bg-torg-blue" label="Na fila" valor={`${cols.FILA.length} pç`} sub={fmtKg(somaKg(cols.FILA))} />
-        <Kpi icon={CalendarRange} cor="bg-torg-orange" label="Programado" valor={`${cols.PROGRAMADA.length} pç`}
+        <KpiSetor icon={ListOrdered} cor="bg-torg-blue" label="Na fila" valor={`${cols.FILA.length} pç`} sub={fmtKg(somaKg(cols.FILA))} />
+        <KpiSetor icon={CalendarRange} cor="bg-torg-orange" label="Programado" valor={`${cols.PROGRAMADA.length} pç`}
           sub={naoFeitasNoDia > 0 ? `${naoFeitasNoDia} fora do dia programado` : fmtKg(somaKg(cols.PROGRAMADA))}
           alerta={naoFeitasNoDia > 0} />
-        <Kpi icon={Scissors} cor="bg-amber-600" label="Em corte" valor={`${cols.EM_CORTE.length} pç`}
+        <KpiSetor icon={Scissors} cor="bg-amber-600" label="Em corte" valor={`${cols.EM_CORTE.length} pç`}
           sub={emCorteAtrasadas > 0 ? `${emCorteAtrasadas} passaram do dia`
             : atrasadas > 0 ? `${atrasadas} atrasada(s)` : fmtKg(somaKg(cols.EM_CORTE))}
           alerta={emCorteAtrasadas > 0 || atrasadas > 0} />
-        <Kpi icon={CheckCircle2} cor="bg-emerald-600" label="Cortadas (30d)" valor={`${cols.CORTADA.length} pç`}
+        <KpiSetor icon={CheckCircle2} cor="bg-emerald-600" label="Cortadas (30d)" valor={`${cols.CORTADA.length} pç`}
           sub={noPrazo30d === null ? fmtKg(somaKg(cols.CORTADA)) : `${noPrazo30d}% no prazo`} />
       </div>
 
@@ -557,19 +561,6 @@ export default function FilaCorteClient({ pecasIniciais }) {
 }
 
 // ─── componentes auxiliares ─────────────────────────────────────────────────
-function Kpi({ icon: Icon, cor, label, valor, sub, alerta }) {
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3.5 flex items-center gap-3">
-      <div className={`${cor} p-2 rounded-lg`}><Icon size={18} className="text-white" /></div>
-      <div className="min-w-0">
-        <p className="text-[10px] text-torg-gray uppercase tracking-wider">{label}</p>
-        <p className="text-lg font-extrabold text-torg-dark leading-tight">{valor}</p>
-        <p className={`text-[10px] ${alerta ? "text-red-600 font-semibold" : "text-torg-gray"}`}>{sub}</p>
-      </div>
-    </div>
-  );
-}
-
 // ⚠ `grupos` transforma a coluna em lista agrupada (a Programado, por dia) sem duplicar a casca:
 // mesmo cabeçalho, mesma seleção, mesma rolagem. Sem ele a coluna segue plana, como as outras.
 function Coluna({ titulo, cor, lista, sel, onToggleColuna, vazio, grupos, cabecalhoGrupo, children }) {

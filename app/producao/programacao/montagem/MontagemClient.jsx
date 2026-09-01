@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import {
   Wrench, ChevronDown, ChevronUp, Filter, Search, CheckCircle2, Download,
   Loader2, AlertCircle, ArrowRight, X, Package, Undo2, Printer, Flag,
+  Clock, CalendarClock, Layers,
 } from "lucide-react";
+import KpiSetor, { CabecalhoSetor } from "@/components/KpiSetor";
 import {
   criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
   adicionarLinhaTotais, adicionarLegenda,
@@ -497,57 +499,37 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
-            <Wrench size={24} className="text-blue-600" /> Programação de Montagem
+          {/* ⚠ mesmo tamanho e mesmo azul da esteira da Solda (xl + torg-blue, não 3xl + blue-600) */}
+          <h2 className="text-xl font-extrabold text-torg-dark flex items-center gap-2">
+            <Wrench size={20} className="text-torg-blue" /> Montagem — fila do corte
           </h2>
-          <p className="text-xs text-torg-gray mt-0.5">
+          <p className="text-xs text-torg-gray mt-1 max-w-3xl">
             Conjuntos aguardando montagem. Um conjunto só pode ser montado quando todos os seus croquis estiverem cortados.
           </p>
         </div>
       </div>
 
-      {/* KPIs */}
+      {/* ⚠⚠ CARTÃO BRANCO, COR SÓ NO ÍCONE. Vitor (01/09/2026): "mude a visualização da aba de
+          corte e montagem, deixa parecida com a de solda, ficou mais clean". Eram cinco blocos, um
+          de cada cor (laranja, verde, azul, violeta, cinza), com o número em 2xl — cinco coisas
+          gritando juntas e nenhuma se destacando. O filtro ligado agora é um ANEL, não uma troca de
+          fundo: cartão que muda de cor ao ser clicado faz procurar o que mudou na tela inteira. */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <button
-          onClick={() => { setFiltroStatus("CORTE"); setFiltroProntidao(""); setSelecionados(new Set()); }}
-          className={`rounded-xl p-3 text-left transition-all bg-orange-50 text-orange-700 ${filtroStatus === "CORTE" && !filtroProntidao ? "ring-2 ring-offset-1 ring-orange-400" : ""}`}
-        >
-          <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">Aguardando</p>
-          <p className="text-2xl font-extrabold tabular-nums">{totalAguardando}</p>
-          <p className="text-[10px] opacity-70">conjuntos no corte</p>
-        </button>
-        <button
-          onClick={() => { setFiltroStatus("CORTE"); setFiltroProntidao("PODE_MONTAR"); setSelecionados(new Set()); }}
-          className={`rounded-xl p-3 text-left transition-all bg-emerald-50 text-emerald-700 ${filtroProntidao === "PODE_MONTAR" ? "ring-2 ring-offset-1 ring-emerald-400" : ""}`}
-        >
-          <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">Prontos p/ montar</p>
-          <p className="text-2xl font-extrabold tabular-nums">{totalProntos}</p>
-          <p className="text-[10px] opacity-70">100% ou ≥ metade cortados</p>
-        </button>
-        <button
-          onClick={() => { setFiltroStatus("MONTAGEM"); setFiltroProntidao(""); setSelecionados(new Set()); }}
-          className={`rounded-xl p-3 text-left transition-all bg-blue-50 text-blue-700 ${filtroStatus === "MONTAGEM" ? "ring-2 ring-offset-1 ring-blue-400" : ""}`}
-        >
-          <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">Em montagem</p>
-          <p className="text-2xl font-extrabold tabular-nums">{totalEmMontagem}</p>
-          <p className="text-[10px] opacity-70">liberados</p>
-        </button>
-        <button
-          onClick={() => { setFiltroStatus("PROGRAMADO"); setFiltroProntidao(""); setSelecionados(new Set()); }}
-          className={`rounded-xl p-3 text-left transition-all bg-violet-50 text-violet-700 ${filtroStatus === "PROGRAMADO" ? "ring-2 ring-offset-1 ring-violet-400" : ""}`}
-        >
-          <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">Programados</p>
-          <p className="text-2xl font-extrabold tabular-nums">{totalProgramados}</p>
-          <p className="text-[10px] opacity-70">com dia do planejamento</p>
-        </button>
-        <button
-          onClick={() => { setFiltroStatus(""); setFiltroProntidao(""); setSelecionados(new Set()); }}
-          className={`rounded-xl p-3 text-left transition-all bg-gray-50 text-torg-gray ${filtroStatus === "" && !filtroProntidao ? "ring-2 ring-offset-1 ring-gray-400" : ""}`}
-        >
-          <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">Total</p>
-          <p className="text-2xl font-extrabold tabular-nums">{conjuntos.length}</p>
-          <p className="text-[10px] opacity-70">conjuntos importados</p>
-        </button>
+        <KpiSetor icon={Clock} cor="bg-torg-orange" label="Aguardando" valor={totalAguardando} sub="conjuntos no corte"
+          ativo={filtroStatus === "CORTE" && !filtroProntidao}
+          onClick={() => { setFiltroStatus("CORTE"); setFiltroProntidao(""); setSelecionados(new Set()); }} />
+        <KpiSetor icon={CheckCircle2} cor="bg-emerald-600" label="Prontos p/ montar" valor={totalProntos} sub="100% ou ≥ metade cortados"
+          ativo={filtroProntidao === "PODE_MONTAR"}
+          onClick={() => { setFiltroStatus("CORTE"); setFiltroProntidao("PODE_MONTAR"); setSelecionados(new Set()); }} />
+        <KpiSetor icon={Wrench} cor="bg-torg-blue" label="Em montagem" valor={totalEmMontagem} sub="liberados"
+          ativo={filtroStatus === "MONTAGEM"}
+          onClick={() => { setFiltroStatus("MONTAGEM"); setFiltroProntidao(""); setSelecionados(new Set()); }} />
+        <KpiSetor icon={CalendarClock} cor="bg-violet-600" label="Programados" valor={totalProgramados} sub="com dia do planejamento"
+          ativo={filtroStatus === "PROGRAMADO"}
+          onClick={() => { setFiltroStatus("PROGRAMADO"); setFiltroProntidao(""); setSelecionados(new Set()); }} />
+        <KpiSetor icon={Layers} cor="bg-gray-400" label="Total" valor={conjuntos.length} sub="conjuntos importados"
+          ativo={filtroStatus === "" && !filtroProntidao}
+          onClick={() => { setFiltroStatus(""); setFiltroProntidao(""); setSelecionados(new Set()); }} />
       </div>
 
       {/* Filtros — mesmo layout do Corte */}

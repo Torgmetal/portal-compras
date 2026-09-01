@@ -70,6 +70,31 @@ export default function PainelSolda({ conjuntos, onSugerir, ocupado }) {
         ? [{ width: 12 }, { width: 9 }, { width: 19 }, { width: 34 }, { width: 8 }, { width: 12 }, { width: 11 }]
         : [{ width: 13 }, { width: 20 }, { width: 40 }, { width: 8 }, { width: 13 }, { width: 12 }];
       let row = linhaInicio;
+
+      // ⚠⚠ A PRIMEIRA FOLHA É A DO LÍDER. Vitor (01/09/2026): "precisa apenas gerar a planilha para
+      // o líder e para cada bancada de solda". Antes o arquivo abria direto na bancada 1 e o líder
+      // teria de somar seis páginas de cabeça para saber o que distribuiu. Uma folha de resumo na
+      // frente responde isso de bater o olho — e as folhas seguintes ele destaca e entrega.
+      adicionarHeaderTabela(ws, row, ["Bancada", "Conjuntos", "Pecas", "Peso (kg)", "Dias", "Quando"]);
+      for (let c = 1; c <= 6; c++) ws.getCell(row, c).font = { name: "Arial", size: 12, bold: true, color: { argb: "FFFFFF" } };
+      ws.getRow(row).height = 30;
+      row++;
+      let sUn = 0, sKg = 0, sConj = 0;
+      for (const b of porDia) {
+        const it = b.dias.flatMap((d) => d.itens);
+        const u = it.reduce((s2, x) => s2 + Math.max(1, Number(x.qte) || 1), 0);
+        const k = it.reduce((s2, x) => s2 + (Number(x.pesoTotalKg) || 0), 0);
+        sUn += u; sKg += k; sConj += it.length;
+        adicionarLinhaTabela(ws, row, [b.bancada, it.length, u, Math.round(k), b.dias.length,
+          b.dias.length ? `${fmtDia(b.dias[0].dia)} a ${fmtDia(b.dias[b.dias.length - 1].dia)}` : "-"],
+          { fontSize: 13, rowHeight: 26, alinhamento: { 1: "center", 2: "center", 3: "center", 4: "center" } });
+        row++;
+      }
+      adicionarLinhaTotais(ws, row, ["TOTAL", sConj, sUn, Math.round(sKg), `${resumo.dias} dia(s)`, ""],
+        { fontSize: 13, rowHeight: 28, alinhamento: { 1: "center", 2: "center", 3: "center", 4: "center" } });
+      row += 2;
+      ws.getRow(row - 1).addPageBreak();
+
       adicionarHeaderTabela(ws, row, varias
         ? ["Dia", "OP", "Marca", "Descricao", "Qte", "Peso (kg)", "Feito"]
         : ["Dia", "Marca", "Descricao", "Qte", "Peso (kg)", "Feito"]);
@@ -111,6 +136,13 @@ export default function PainelSolda({ conjuntos, onSugerir, ocupado }) {
     } catch (e) {
       alert("Erro ao gerar a folha: " + (e?.message || e));
     } finally { setBaixando(false); }
+  }
+
+  // ⚠ grava a bancada e baixa a planilha no MESMO clique — eram dois botões e duas decisões para
+  // um ato só, e dava para gravar sem levar a folha (ou o contrário) sem perceber.
+  async function liberar() {
+    await onSugerir(distrib);
+    await exportarFolha();
   }
 
   if (!conjuntos.length) return null;
@@ -189,20 +221,26 @@ export default function PainelSolda({ conjuntos, onSugerir, ocupado }) {
       </div>
 
       <div className="flex items-center gap-2 flex-wrap pt-1">
-        <button onClick={() => onSugerir(distrib)} disabled={ocupado}
+        {/* ⚠⚠ LIBERAR NA SOLDA NÃO IMPRIME DESENHO NEM GERA GRD. Vitor (01/09/2026): "coloque a
+            opção para liberar na aba de solda, pois não precisa de GRD, precisa apenas gerar a
+            planilha para o líder e para cada bancada". A GRD existe para provar que o DESENHO desceu
+            — e o desenho já desceu na montagem, com o R carimbado. Emitir de novo na solda criaria
+            uma segunda GRD para a mesma marca e sujaria a auditoria com uma liberação que não
+            aconteceu. Aqui liberar é: grava a bancada e sai a planilha. */}
+        <button onClick={liberar} disabled={ocupado || baixando}
           className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-2 disabled:opacity-50">
-          {ocupado ? <Loader2 size={15} className="animate-spin" /> : <ArrowRight size={15} />}
-          Gravar a sugestão por bancada
+          {ocupado || baixando ? <Loader2 size={15} className="animate-spin" /> : <ArrowRight size={15} />}
+          Liberar para a solda
         </button>
         <button onClick={exportarFolha} disabled={baixando}
-          title="Folha para entregar ao soldador: uma por bancada, letra grande"
+          title="Só a planilha, sem gravar a bancada"
           className="px-3 py-2 border border-torg-blue-100 text-torg-blue text-sm font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-2 disabled:opacity-50">
           {baixando ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-          Folha do soldador
+          Só a planilha
         </button>
         {/* ⚠ a bancada continua sendo SUGESTÃO — quem manda nela é o líder no chão (decisão do
             Vitor em 01/09). O painel reparte e registra a intenção; não cobra aderência. */}
-        <span className="text-[11px] text-torg-gray">a bancada é sugestão — quem senta nela é decisão do líder</span>
+        <span className="text-[11px] text-torg-gray">sem GRD: o desenho já desceu na montagem. A bancada é sugestão — quem senta nela é do líder.</span>
       </div>
     </div>
   );
