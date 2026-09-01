@@ -196,6 +196,9 @@ export async function GET(req) {
 
       if (p.dataEntregaReal || cobertoPeloCmr) {
         statusCalc = "ENTREGUE";
+      } else if (p.statusEntrega === "PARCIAL" || p.recebimentos.length > 0) {
+        // Recebido em parte no Omie (ou com recebimento parcial registrado) — não é "atrasado puro".
+        statusCalc = "PARCIAL";
       } else if (prazo) {
         if (prazo < agora) {
           statusCalc = "ATRASADO";

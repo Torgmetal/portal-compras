@@ -23,13 +23,14 @@ const diasAte = (d) => {
 
 const STATUS_CFG = {
   ATRASADO:  { label: "Atrasado",     Icon: AlertTriangle, cor: "red",     badge: "bg-red-100 text-red-700",         dot: "bg-red-500",     border: "border-red-300",   headerBg: "bg-red-50" },
+  PARCIAL:   { label: "Receb. parcial", Icon: Package,     cor: "indigo",  badge: "bg-indigo-100 text-indigo-700",   dot: "bg-indigo-500",  border: "border-indigo-300", headerBg: "bg-indigo-50" },
   PROXIMO:   { label: "Próx. 7 dias", Icon: Clock,         cor: "amber",   badge: "bg-amber-100 text-amber-700",     dot: "bg-amber-500",   border: "border-amber-300", headerBg: "bg-amber-50" },
   NO_PRAZO:  { label: "No prazo",     Icon: CalendarDays,  cor: "sky",     badge: "bg-sky-100 text-sky-700",         dot: "bg-torg-blue",   border: "border-sky-300",   headerBg: "bg-sky-50" },
   SEM_PRAZO: { label: "Sem prazo",    Icon: Package,       cor: "gray",    badge: "bg-gray-100 text-gray-600",       dot: "bg-gray-400",    border: "border-gray-300",  headerBg: "bg-gray-50" },
   ENTREGUE:  { label: "Entregue",     Icon: CheckCircle2,  cor: "emerald", badge: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500", border: "border-emerald-300", headerBg: "bg-emerald-50" },
 };
 
-const KANBAN_ORDER = ["ATRASADO", "PROXIMO", "NO_PRAZO", "SEM_PRAZO", "ENTREGUE"];
+const KANBAN_ORDER = ["ATRASADO", "PARCIAL", "PROXIMO", "NO_PRAZO", "SEM_PRAZO", "ENTREGUE"];
 
 export default function CronogramaClient() {
   const [pedidosTodos, setPedidosTodos] = useState([]);

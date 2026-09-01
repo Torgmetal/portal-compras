@@ -3,14 +3,16 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { syncEntregas } from "@/lib/omie-recebimento";
 
-export const maxDuration = 60; // pode demorar com muitos pedidos
+export const maxDuration = 120; // re-checa só os pendentes (~39) → cabe folgado
 
-// POST — Sincroniza status de entrega com o Omie (manual via botão)
+// POST — Sincroniza status de entrega com o Omie (manual via botão).
+// Só os pedidos SEM entrega (os que podem mudar): rápido e corrige na hora os já
+// recebidos/encerrados no Omie que apareciam como "atrasado".
 export async function POST(req) {
   try {
     const user = await requireRole(["ADMIN", "COMPRAS"]);
 
-    const resultado = await syncEntregas(prisma);
+    const resultado = await syncEntregas(prisma, { apenasPendentes: true });
 
     await prisma.auditLog.create({
       data: {
