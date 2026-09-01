@@ -3,7 +3,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Wrench, ChevronDown, ChevronUp, Filter, Search, CheckCircle2, Download,
-  Loader2, AlertCircle, ArrowRight, X, Package, Undo2,
+  Loader2, AlertCircle, ArrowRight, X, Package, Undo2, Printer,
 } from "lucide-react";
 import {
   criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
@@ -13,6 +13,7 @@ import {
 import { fmtOP } from "@/lib/utils";
 import BotaoRelatorioDia from "@/components/BotaoRelatorioDia";
 import { calcularProntidao } from "@/lib/prontidao-conjunto";
+import { baixarZipLote } from "@/lib/desenhos-zip-cliente";
 import { MAQUINA_LABEL, MAQUINA_COR } from "@/lib/maquina-corte";
 
 const STATUS_LABEL = {
@@ -57,6 +58,52 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
   const [filtroProntidao, setFiltroProntidao] = useState("");
   const [busca, setBusca] = useState("");
   const [selecionados, setSelecionados] = useState(new Set());
+  const [imprimindo, setImprimindo] = useState(false);
+
+  // ── IMPRIMIR OS DESENHOS DOS CONJUNTOS (para o líder da fábrica) ────────────────────────────
+  // Vitor (01/09/2026): "será feito a impressão dos conjuntos pelo pcp para entregar ao líder da
+  // fabrica". Reusa a emissão carimbada que já existe (R, data, quem emitiu) e registra GRD —
+  // o maço que sai daqui é o mesmo documento auditável do corte, só que do setor Montagem.
+  //
+  // ⚠ UMA CHAMADA POR OBRA. A rota do lote é por OP e a seleção da tela atravessa obras; mandar
+  // tudo junto imprimiria desenho da obra errada ou simplesmente não acharia o arquivo.
+  async function imprimirConjuntos() {
+    const alvo = filtrados.filter((c) => selecionados.has(c.id));
+    if (!alvo.length) return;
+    const porOp = new Map();
+    for (const c of alvo) {
+      const k = c.opNumero;
+      if (!porOp.has(k)) porOp.set(k, []);
+      porOp.get(k).push(c.marca);
+    }
+    const total = alvo.length;
+    if (!confirm(`Imprimir ${total} conjunto(s) de ${porOp.size} obra(s)?\n\nSai um PDF por formato e fica registrada a GRD. Pode levar alguns minutos.`)) return;
+    setImprimindo(true);
+    const erros = [];
+    try {
+      for (const [opNumero, marcas] of porOp) {
+        try {
+          const r = await fetch("/api/producao/desenhos/lote", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ opNumero, marcas: [...new Set(marcas)], setor: "MONTAGEM", acao: "IMPRIMIR" }),
+          });
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.error || "erro ao emitir");
+          // ⚠ o que a rota RECUSOU precisa aparecer: peça sem material conferido fica de fora do
+          // maço, e o líder receberia um lote silenciosamente incompleto.
+          if (j.semMaterial?.length) {
+            erros.push(`OP ${opNumero}: ${j.semMaterial.length} sem material — ${j.semMaterial.slice(0, 3).map((x) => x.marca).join(", ")}`);
+          }
+          await baixarZipLote(j, opNumero, "conjuntos");
+        } catch (e) {
+          erros.push(`OP ${opNumero}: ${e.message}`);
+        }
+      }
+    } finally {
+      setImprimindo(false);
+      if (erros.length) alert("Terminou com pendências:\n\n" + erros.join("\n"));
+    }
+  }
   const [expandidos, setExpandidos] = useState(new Set());
   const [liberando, setLiberando] = useState(false);
   const [revertendo, setRevertendo] = useState(false);
@@ -438,6 +485,15 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
                 Liberar Montagem
               </button>
             )}
+            <button
+              onClick={imprimirConjuntos}
+              disabled={imprimindo}
+              title="Emite os desenhos carimbados dos conjuntos e registra a GRD — o maço para o líder da fábrica"
+              className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {imprimindo ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />}
+              Imprimir conjuntos
+            </button>
             {filtroStatus === "MONTAGEM" && (
               <button
                 onClick={reverterSelecionados}

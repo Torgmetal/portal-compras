@@ -1,29 +1,50 @@
-// Programação de Solda no PCP — mesma tela do portal da produção, com o apontamento do
-// Syneco do setor (inclui adiantados; quem já saiu conta só no Total geral).
+// PCP › Solda — a fila do que saiu da montagem e ainda não foi soldado.
+//
+// Vitor (01/09/2026): "depois que sair da montagem que foi dado o lançamento de concluído na
+// montagem deve ficar uma fila para podermos selecionar o que será feito na solda em cada bancada".
+import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { buscarConjuntosComApontamento } from "@/lib/conjuntos-setor";
-import SetorClient from "@/app/producao/programacao/SetorClient";
+import { produzidoPorMarca } from "@/lib/conjuntos-setor";
+import { OP_VIVA } from "@/lib/op-viva";
+import SoldaClient from "./SoldaClient";
 
 export const metadata = { title: "Workspace Torg — PCP · Solda" };
 export const dynamic = "force-dynamic";
 
-export default async function PcpSetor() {
+export default async function PcpSolda() {
   await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]);
-  const { pecas, apontamentos, apontamentosProximo, furos } =
-    await buscarConjuntosComApontamento("SOLDA", "Solda", "Acabamento");
+
+  const conjuntos = await prisma.pecaConjunto.findMany({
+    where: { tipoPeca: "CONJUNTO", ...OP_VIVA },
+    orderBy: [{ opNumero: "asc" }, { marca: "asc" }],
+    select: {
+      id: true, opNumero: true, marca: true, descricao: true, qte: true, pesoTotalKg: true, status: true,
+      montagemDiaProgramado: true,
+      soldaBancada: true, soldaBancadaEm: true, soldaBancadaPor: true,
+      op: { select: { cliente: true, obra: true } },
+    },
+    take: 4000,
+  });
+  const marcas = conjuntos.map((c) => c.marca);
+
+  const [montados, soldados, bancadasRaw] = await Promise.all([
+    produzidoPorMarca("Montagem", marcas),
+    produzidoPorMarca("Solda", marcas),
+    // ⚠ AS BANCADAS SAEM DO SYNECO, não de um cadastro novo. SOLDA 1..10 já são o que a fábrica
+    // aponta todo dia; inventar uma lista aqui criaria dois nomes para a mesma bancada.
+    prisma.mesOrdem.findMany({ where: { setor: "Solda" }, select: { maquina: true }, distinct: ["maquina"] }),
+  ]);
+
+  const bancadas = [...new Set(bancadasRaw.map((b) => String(b.maquina || "").trim()))]
+    .filter((b) => b && /\d/.test(b)) // descarta o "---" que vem do Syneco
+    .sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }));
 
   return (
-    <SetorClient
-      pecasIniciais={JSON.parse(JSON.stringify(pecas))}
-      apontamentos={JSON.parse(JSON.stringify(apontamentos))}
-      apontamentosProximo={JSON.parse(JSON.stringify(apontamentosProximo))}
-      furos={JSON.parse(JSON.stringify(furos))}
-      setorAtual="SOLDA"
-      setorAnterior="MONTAGEM"
-      setorProximo="ACABAMENTO"
-      titulo="Programação de Solda"
-      iconColor="text-orange-500"
-      codigoDoc="REL-PRD-005"
+    <SoldaClient
+      conjuntosIniciais={JSON.parse(JSON.stringify(conjuntos))}
+      montados={montados}
+      soldados={soldados}
+      bancadas={bancadas}
     />
   );
 }
