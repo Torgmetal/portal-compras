@@ -18,7 +18,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, Printer, Search,
-  Factory, Monitor, CalendarClock, Clock, Package, CheckCircle2, FileText, FileSpreadsheet, Send, Flag, X,
+  Factory, Monitor, CalendarClock, Clock, Package, CheckCircle2, FileText, FileSpreadsheet, Send, Flag, X, Users,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import CompraChip, { ModalRastreabilidade } from "@/components/CompraChip";
@@ -803,6 +803,29 @@ export default function ProducaoClient() {
                             ordem do trabalho: marca os conjuntos, vê como se reparte, libera.
                             Vitor (01/09/2026): "onde eu vou para selecionar as bancadas? está
                             confuso demais o passo a passo". */}
+                        {/* ⚠⚠ SEM SELEÇÃO, UM CONVITE — NÃO O VAZIO. Vitor tropeçou nisto duas vezes
+                            ("onde eu vou para selecionar as bancadas?" e "não encontro as
+                            informações"): esconder tudo até haver seleção deixa a aba com cara de
+                            que não há nada a fazer. Agora a faixa diz quantos estão prontos e o
+                            que marcar para chegar no painel. */}
+                        {setorAba === "MONTAGEM" && sel.size === 0 && (() => {
+                          const prontos = pecas.filter((p) => p.prontoMontar === true).length;
+                          return (
+                            <div className="mx-3 mb-3 rounded-lg border border-torg-blue-100 bg-torg-blue-50/50 px-3 py-2.5 text-[12px] text-torg-dark flex items-center gap-2 flex-wrap">
+                              <Users size={14} className="text-torg-blue shrink-0" />
+                              {prontos > 0 ? (
+                                <>
+                                  <b>{prontos}</b> conjunto(s) com todos os croquis cortados.
+                                  <button onClick={() => setSel(new Set(pecas.filter((p) => p.prontoMontar === true).map((p) => p.id)))}
+                                    className="text-torg-blue font-semibold underline">marcar os {prontos} prontos</button>
+                                  <span className="text-torg-gray">— aí aparece a repartição entre as bancadas, com o dia de cada uma.</span>
+                                </>
+                              ) : (
+                                <span className="text-torg-gray">Nenhum conjunto com todos os croquis cortados ainda. Filtre a coluna <b>Croquis</b> por “falta cortar” para ver o que está segurando.</span>
+                              )}
+                            </div>
+                          );
+                        })()}
                         {setorAba === "MONTAGEM" && sel.size > 0 && (
                           <div className="px-3 pb-3">
                             <PainelBancadas
