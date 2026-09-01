@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
-import { calcularProntidao } from "@/lib/prontidao-conjunto";
+import { calcularProntidao, CONJUNTO_MONTAVEL } from "@/lib/prontidao-conjunto";
 
 const schema = z.object({
   ids: z.array(z.string()).min(1, "Selecione ao menos um conjunto"),
@@ -57,8 +57,10 @@ export async function POST(req) {
     let idsPermitidos = ids;
     const bloqueados = [];
     if (!reverter) {
+      // ⚠ e o servidor recusa marca sem sub-peça (ver CONJUNTO_MONTAVEL): a tela já filtra, mas a
+      // regra não pode morar só nela — uma aba aberta desde ontem mandaria montar o que não monta.
       const conjuntos = await prisma.pecaConjunto.findMany({
-        where: { id: { in: ids }, tipoPeca: "CONJUNTO" },
+        where: { id: { in: ids }, ...CONJUNTO_MONTAVEL },
         select: {
           id: true, marca: true,
           conjuntoCroquis: { select: { croqui: { select: { marca: true, qte: true, qteProduzida: true } } } },

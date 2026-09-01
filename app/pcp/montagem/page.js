@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { produzidoPorMarca } from "@/lib/conjuntos-setor";
 import MontagemClient from "@/app/producao/programacao/montagem/MontagemClient";
+import { CONJUNTO_MONTAVEL } from "@/lib/prontidao-conjunto";
 
 export const metadata = { title: "Workspace Torg — PCP · Montagem" };
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ export default async function PcpMontagem() {
 
   // Conjuntos com seus croquis (relações) — mesma consulta da tela da Produção
   const conjuntos = await prisma.pecaConjunto.findMany({
-    where: { tipoPeca: "CONJUNTO" },
+    where: { ...CONJUNTO_MONTAVEL },
     orderBy: [{ opNumero: "asc" }, { marca: "asc" }],
     include: {
       op: { select: { id: true, numero: true, cliente: true, obra: true } },

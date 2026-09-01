@@ -11,7 +11,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { proximoDiaUtil, isoDia } from "@/lib/programacao-dia";
-import { calcularProntidao } from "@/lib/prontidao-conjunto";
+import { calcularProntidao, CONJUNTO_MONTAVEL } from "@/lib/prontidao-conjunto";
 import { produzidoPorMarca } from "@/lib/conjuntos-setor";
 
 const ROLES = ["ADMIN", "PLANEJAMENTO", "PCP"];
@@ -29,7 +29,7 @@ export async function GET(req) {
   if (!opId) return NextResponse.json({ error: "Informe a obra." }, { status: 400 });
 
   const conjuntos = await prisma.pecaConjunto.findMany({
-    where: { opId, tipoPeca: "CONJUNTO" },
+    where: { opId, ...CONJUNTO_MONTAVEL },
     orderBy: [{ opNumero: "asc" }, { marca: "asc" }],
     select: {
       id: true, opNumero: true, marca: true, descricao: true, qte: true, pesoTotalKg: true, status: true,

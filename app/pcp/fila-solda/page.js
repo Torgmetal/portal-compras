@@ -11,6 +11,7 @@ import { requireRole } from "@/lib/session";
 import { produzidoPorMarca } from "@/lib/conjuntos-setor";
 import { OP_VIVA } from "@/lib/op-viva";
 import SoldaClient from "./SoldaClient";
+import { CONJUNTO_MONTAVEL } from "@/lib/prontidao-conjunto";
 
 export const metadata = { title: "Workspace Torg — PCP · Fila de Solda" };
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export default async function PcpFilaSolda() {
   await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]);
 
   const conjuntos = await prisma.pecaConjunto.findMany({
-    where: { tipoPeca: "CONJUNTO", ...OP_VIVA },
+    where: { ...CONJUNTO_MONTAVEL, ...OP_VIVA },
     orderBy: [{ opNumero: "asc" }, { marca: "asc" }],
     select: {
       id: true, opNumero: true, marca: true, descricao: true, qte: true, pesoTotalKg: true, status: true,
