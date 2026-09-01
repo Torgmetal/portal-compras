@@ -83,7 +83,7 @@ export async function POST(req) {
     // na tela, como informação; ela não é mais porteiro.
     const conjuntos = await prisma.pecaConjunto.findMany({
       where: { id: { in: body.ids }, tipoPeca: "CONJUNTO" },
-      select: { id: true },
+      select: { id: true, opId: true, opNumero: true, pesoTotalKg: true },
     });
     if (conjuntos.length) {
       const dia = new Date(body.dia + "T00:00:00Z");
@@ -100,6 +100,61 @@ export async function POST(req) {
         }),
       ]);
     }
+    // ── E A LIBERAÇÃO PARA O PCP ────────────────────────────────────────────────────────────
+    // Vitor (01/09/2026): "apenas colocar para poder lançar para o PCP" — e, ao não achar nada na
+    // tela: "vc não está trazendo nessa tela? por isso que não estou achando?".
+    //
+    // ⚠⚠ EU TINHA CRIADO UM SEGUNDO MECANISMO DE LIBERAÇÃO. Marcar o dia gravava só
+    // `montagemDiaProgramado`, um campo que a tela de trabalho do PCP (/pcp/producao) não conhece.
+    // Aquela tela lê `LiberacaoProducao` — e como a única liberação da OP-113 era de CORTE, com 79
+    // croquis e nenhum conjunto, a aba Montagem listava zero enquanto o cabeçalho dizia 9.931 kg.
+    // Programar agora GRAVA A LIBERAÇÃO, que é o caminho que já existia para "descer para o PCP".
+    //
+    // ⚠ UMA LIBERAÇÃO POR FRENTE E POR DIA. A frente é o `opNumero` do conjunto (T113A) — é assim
+    // que o resto do portal separa sub-obra —, e o dia entra em `dataProgramada`. Reprogramar o
+    // mesmo conjunto no mesmo dia SOMA na liberação existente em vez de criar outra, senão a
+    // Central do PCP encheria de lotes repetidos a cada clique.
+    const porFrente = new Map();
+    for (const c of conjuntos) {
+      if (!c.opId) continue; // conjunto sem OP não desce: o PCP acha a fila pela OP
+      const k = `${c.opId}|${c.opNumero || ""}`;
+      const g = porFrente.get(k) || { opId: c.opId, frente: c.opNumero || "", ids: [], kg: 0 };
+      g.ids.push(c.id); g.kg += Number(c.pesoTotalKg) || 0;
+      porFrente.set(k, g);
+    }
+    const diaProg = new Date(`${body.dia}T12:00:00Z`);
+    for (const g of porFrente.values()) {
+      const existente = await prisma.liberacaoProducao.findFirst({
+        where: { opId: g.opId, frente: g.frente, dataProgramada: diaProg,
+                 status: { in: ["LIBERADA", "EM_PRODUCAO"] } },
+        select: { id: true, pecaIds: true, setores: true, totalPecas: true, totalKg: true },
+      });
+      if (existente) {
+        const atuais = Array.isArray(existente.pecaIds) ? existente.pecaIds : [];
+        const unidos = [...new Set([...atuais, ...g.ids])];
+        const setores = [...new Set([...(Array.isArray(existente.setores) ? existente.setores : []), "MONTAGEM"])];
+        await prisma.liberacaoProducao.update({
+          where: { id: existente.id },
+          data: { pecaIds: unidos, setores, totalPecas: unidos.length,
+                  totalKg: (Number(existente.totalKg) || 0) + g.kg },
+        });
+      } else {
+        const op = await prisma.oP.findUnique({ where: { id: g.opId }, select: { numero: true } });
+        await prisma.liberacaoProducao.create({
+          data: {
+            opId: g.opId, opNumero: op?.numero || g.frente, frente: g.frente,
+            setores: ["MONTAGEM"], prioridade: "MEDIA",
+            pecaIds: g.ids, dataProgramada: diaProg,
+            totalPecas: g.ids.length, totalKg: g.kg,
+            // ⚠ sem marco: o desvio do corte mede a liberação contra o cronograma; aqui o dia da
+            // montagem É a decisão do planejamento, não um atraso a explicar.
+            liberadoEm: agora, liberadoPorId: user.id, liberadoPorNome: user.name || null,
+            status: "LIBERADA",
+          },
+        });
+      }
+    }
+
     atualizados = conjuntos.length;
     afetados = conjuntos.map((c) => ({ id: c.id, montagemDiaProgramado: body.dia }));
     if (atualizados < body.ids.length) {
