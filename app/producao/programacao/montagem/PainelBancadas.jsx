@@ -210,11 +210,16 @@ export default function PainelBancadas({ conjuntos, onLiberar, ocupado }) {
           ], {
             fontSize: 13, rowHeight: 26, bold: prio,
             ...(prio ? { fillColor: CORES.LIGHT_ORANGE } : {}),
-            alinhamento: { 3: "right", 4: "right" },
+            // ⚠ CENTRALIZADO aqui, à direita no relatório de planejamento. Vitor (01/09/2026): "a do
+            // montador também precisa centralizar". São usos diferentes: no relatório se compara uma
+            // coluna inteira de cima a baixo, e aí a direita alinha a casa decimal; nesta folha se lê
+            // UMA linha por vez, em pé, e o número centrado na célula larga é o que salta.
+            alinhamento: { 0: "center", 3: "center", 4: "center", 5: "center" },
           });
           row++;
         }
-        adicionarLinhaTotais(ws, row, ["", `${itens.length} conjunto(s)`, "", un, Math.round(kg), ""]);
+        adicionarLinhaTotais(ws, row, ["", `${itens.length} conjunto(s)`, "", un, Math.round(kg), ""],
+          { fontSize: 13, rowHeight: 28, alinhamento: { 0: "center", 3: "center", 4: "center", 5: "center" } });
         row += 2;
         if (iB < porDia.length - 1) ws.getRow(row - 1).addPageBreak();
       }
