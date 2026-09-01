@@ -563,7 +563,7 @@ export default function ProducaoClient() {
             <>
               <p className="text-torg-dark font-semibold mb-1">Nada liberado para produzir.</p>
               <p className="text-[13px] text-torg-gray max-w-lg mx-auto">
-                A fila do PCP é montada pelo Planejamento, em <b>Datas por setor → Liberar para o PCP</b>,
+                A fila do PCP é montada pelo Planejamento, em <b>Programação PCP → Liberar para o PCP</b>,
                 por frente da obra e com prioridade.
                 {dados?.totalObras > 0 && <> Há {fmtN(dados.totalObras)} obra(s) com cronograma ativo esperando liberação.</>}
               </p>

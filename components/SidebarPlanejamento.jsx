@@ -7,7 +7,7 @@ import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/planejamento/cronogramas", label: "Cronogramas", icon: GanttChart },
-  { href: "/planejamento/datas-setor", label: "Datas por setor", icon: CalendarClock },
+  { href: "/planejamento/datas-setor", label: "Programação PCP", icon: CalendarClock },
   { href: "/planejamento/programacao-cargas", label: "Programação de Cargas", icon: PackageCheck },
   // ⚠ vizinho da Programação de Cargas de propósito: são os dois passos da mesma conversa —
   // a carga é o que vai viajar, o romaneio prévio é a relação que a Expedição confere e emite.

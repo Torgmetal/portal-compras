@@ -4,7 +4,6 @@ import { CalendarClock, Loader2, AlertCircle, RefreshCw, Send, Wrench } from "lu
 import LiberarFrentes from "./LiberarFrentes";
 import MontagemConjuntos from "./MontagemConjuntos";
 
-const fmtDia = (d) => (d ? new Date(d + "T12:00:00Z").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—");
 
 export default function DatasSetorClient() {
   const [dados, setDados] = useState(null);
@@ -27,7 +26,6 @@ export default function DatasSetorClient() {
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
 
-  const setores = dados?.setores || [];
   const ops = dados?.ops || [];
   const op = ops.find((o) => o.opNumero === opSel) || null;
 
@@ -40,8 +38,8 @@ export default function DatasSetorClient() {
         <div className="flex items-center gap-3">
           <div className="bg-torg-blue-50 p-2.5 rounded-xl"><CalendarClock size={24} className="text-torg-blue" /></div>
           <div>
-            <h1 className="text-2xl font-bold text-torg-dark">Datas por setor</h1>
-            <p className="text-sm text-torg-gray">O marco de cada setor vem do cronograma da obra · escolha a OP para liberar o que desce para o PCP</p>
+            <h1 className="text-2xl font-bold text-torg-dark">Programação PCP</h1>
+            <p className="text-sm text-torg-gray">Escolha a obra e libere o que desce para o PCP — o corte por frente e o dia de cada conjunto na montagem</p>
           </div>
         </div>
         <button onClick={carregar} className="p-2.5 rounded-xl bg-white border border-torg-blue-100 hover:border-torg-blue-300 text-torg-dark"><RefreshCw size={18} className={loading ? "animate-spin" : ""} /></button>
@@ -122,41 +120,11 @@ export default function DatasSetorClient() {
             )}
           </div>
 
-          {/* Visão geral */}
-          <div className="bg-white rounded-xl border border-torg-blue-100 overflow-hidden">
-            <div className="flex items-center justify-between p-5 pb-3">
-              <h2 className="font-bold text-torg-dark">Visão geral das obras</h2>
-              <span className="text-[11px] text-torg-gray"><b className="text-torg-dark">negrito</b> = informado · <span className="text-torg-gray-light italic">cinza</span> = sugerido pelo cronograma</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[820px]">
-                <thead>
-                  <tr className="text-xs text-torg-gray uppercase border-y border-torg-blue-50 bg-torg-blue-50/40">
-                    <th className="px-5 py-2 text-left font-medium">OP / Obra</th>
-                    {setores.map((s) => <th key={s.key} className="px-2 py-2 text-center font-medium">{s.label}</th>)}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-torg-blue-50">
-                  {ops.map((o) => (
-                    <tr key={o.opNumero} onClick={() => setOpSel(o.opNumero)} className={`cursor-pointer hover:bg-torg-blue-50/40 ${o.opNumero === opSel ? "bg-torg-blue-50/60" : ""}`}>
-                      <td className="px-5 py-2 whitespace-nowrap"><span className="font-semibold text-torg-dark tabular-nums">OP-{o.opNumero}</span> <span className="text-torg-gray">{o.obra}</span></td>
-                      {setores.map((s) => {
-                        const manual = o.datasSetor?.[s.key];
-                        const crono = o.datasSetorCrono?.[s.key];
-                        return (
-                          <td key={s.key} className="px-2 py-2 text-center tabular-nums whitespace-nowrap">
-                            {manual ? <span className="font-bold text-torg-dark">{fmtDia(manual)}</span>
-                              : crono ? <span className="text-torg-gray-light italic">{fmtDia(crono)}</span>
-                              : <span className="text-gray-300">—</span>}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {/* ⚠ A "VISÃO GERAL DAS OBRAS" SAIU (Vitor, 01/09/2026: "essa parte não faz mais
+              sentido"). Ela era a leitura da grade de marcos que acabou de sair: uma tabela de 30
+              obras × 7 setores para consultar data, numa tela em que a pessoa entra para LIBERAR
+              uma obra. Quem precisa da visão do prazo tem o Cronograma; aqui o que vale é a obra
+              aberta. */}
         </div>
       )}
     </div>
