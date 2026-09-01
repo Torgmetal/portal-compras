@@ -11,9 +11,10 @@
 // ⚠ ENTRA NA FILA QUEM TERMINOU A MONTAGEM — pelo apontamento do Syneco, não por clique no portal.
 // Conjunto com montagem pela metade não é fila de solda: é montagem em andamento.
 import { useState, useMemo } from "react";
-import { Flame, Search, Loader2, AlertCircle, X, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Flame, Search, Loader2, AlertCircle, X, ArrowRight, CheckCircle2, Download } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import PainelSolda from "./PainelSolda";
+import { gerarFolhaSolda } from "@/lib/folha-solda";
 
 const fmtKg = (v) => `${(Number(v) || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 const fmtData = (v) => (v ? new Date(v).toLocaleDateString("pt-BR") : "—");
@@ -86,6 +87,20 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   const opsNaSelecao = useMemo(() => [...new Set(selecao.map((c) => c.opNumero).filter(Boolean))], [selecao]);
 
   const toggle = (id) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  // ⚠⚠ EMITE DO QUE JÁ ESTÁ GRAVADO, sem depender de seleção. Vitor (01/09/2026): "fiz uma e não
+  // consegui emitir a planilha" — ele gravou 11 conjuntos na SOLDA 1, a seleção foi limpa, o painel
+  // sumiu e a folha foi junto. Agora a planilha do que está nas bancadas sai a qualquer momento.
+  const comBancada = useMemo(() => fila.filter((c) => c.soldaBancada), [fila]);
+  async function planilhaDasBancadas() {
+    setAgindo(true); setErro("");
+    try {
+      const nomes = [...new Set(comBancada.map((c) => c.soldaBancada))].sort();
+      await gerarFolhaSolda(nomes.map((b) => ({ bancada: b, itens: comBancada.filter((c) => c.soldaBancada === b) })), {
+        subtitulo: `${[...new Set(comBancada.map((c) => c.opNumero).filter(Boolean))].map((o) => `OP ${o}`).join(", ")} · o que está nas bancadas`,
+      });
+    } catch (e) { setErro(e.message); } finally { setAgindo(false); }
+  }
   const marcarLista = (lista) => {
     const ids = lista.map((c) => c.id);
     const todas = ids.length > 0 && ids.every((id) => sel.has(id));
@@ -144,6 +159,20 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
           <strong> sugestão para o líder</strong> — o que valeu de verdade continua vindo do apontamento.
         </p>
       </div>
+
+      {comBancada.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap text-[12px] bg-white border border-gray-100 rounded-xl px-3 py-2.5 shadow-sm">
+          <Flame size={14} className="text-torg-blue shrink-0" />
+          <span className="text-torg-dark"><b>{comBancada.length}</b> conjunto(s) já nas bancadas</span>
+          <span className="text-torg-gray">
+            {[...new Set(comBancada.map((c) => c.soldaBancada))].sort().join(" · ")}
+          </span>
+          <button onClick={planilhaDasBancadas} disabled={agindo}
+            className="ml-auto px-2.5 py-1.5 rounded-lg border border-torg-blue-200 text-torg-blue font-semibold hover:bg-torg-blue-50 inline-flex items-center gap-1.5 disabled:opacity-50">
+            {agindo ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Planilha das bancadas
+          </button>
+        </div>
+      )}
 
       {erro && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700 flex items-center gap-2"><AlertCircle size={14} /> {erro}</div>}
       {okMsg && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-xs text-emerald-800">{okMsg}</div>}

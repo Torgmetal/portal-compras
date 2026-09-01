@@ -9,6 +9,7 @@
 import { useState, useMemo } from "react";
 import { Flame, Loader2, Download, ArrowRight } from "lucide-react";
 import { BANCADAS, RITMO_META, RITMO_GUERRA, RITMO_NORMAL, repartirPorBancada, distribuirEmDias } from "@/lib/solda-capacidade";
+import { gerarFolhaSolda } from "@/lib/folha-solda";
 
 const fmtKg = (v) => `${Math.round(Number(v) || 0).toLocaleString("pt-BR")} kg`;
 const fmtN = (v) => (Number(v) || 0).toLocaleString("pt-BR");
@@ -50,89 +51,10 @@ export default function PainelSolda({ conjuntos, onSugerir, ocupado }) {
   async function exportarFolha() {
     setBaixando(true);
     try {
-      const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais,
-              downloadWorkbook, CORES } = await import("@/lib/excel-relatorio");
-      const ops = [...new Set(conjuntos.map((c) => c.opNumero).filter(Boolean))];
-      // ⚠⚠ COLUNA OP SÓ QUANDO O LOTE MISTURA OBRAS. Vitor (01/09/2026) pediu para poder juntar
-      // peças de OPs diferentes numa mesma repartição — e aí a folha SEM a OP deixa o soldador com
-      // uma marca que ele não sabe onde procurar. Com uma obra só a coluna é redundante e rouba a
-      // largura da descrição, que é o que ele lê de longe.
-      const varias = ops.length > 1;
-      const nCols = varias ? 7 : 6;
-      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
-        titulo: "Ordem de Solda", subtitulo: `${ops.map((o) => `OP ${o}`).join(", ")} · inicio ${fmtDia(inicio)}`,
-        kpis: [], totalColunas: nCols, nomePlanilha: "Ordem de solda", codigoDoc: "REL-PRD-012",
+      await gerarFolhaSolda(porDia.map((b) => ({ bancada: b.bancada, dias: b.dias, itens: b.dias.flatMap((d) => d.itens) })), {
+        subtitulo: `${[...new Set(conjuntos.map((c) => c.opNumero).filter(Boolean))].map((o) => `OP ${o}`).join(", ")} · inicio ${fmtDia(inicio)}`,
+        nomeArquivo: `Ordem de solda - ${[...new Set(conjuntos.map((c) => c.opNumero).filter(Boolean))].join("-")} - ${inicio}.xlsx`,
       });
-      // ⚠ mesmo formato da folha do montador: retrato, fonte 13, uma folha por bancada.
-      ws.pageSetup.orientation = "portrait";
-      ws.pageSetup.printTitlesRow = `1:${linhaInicio}`;
-      ws.columns = varias
-        ? [{ width: 12 }, { width: 9 }, { width: 19 }, { width: 34 }, { width: 8 }, { width: 12 }, { width: 11 }]
-        : [{ width: 13 }, { width: 20 }, { width: 40 }, { width: 8 }, { width: 13 }, { width: 12 }];
-      let row = linhaInicio;
-
-      // ⚠⚠ A PRIMEIRA FOLHA É A DO LÍDER. Vitor (01/09/2026): "precisa apenas gerar a planilha para
-      // o líder e para cada bancada de solda". Antes o arquivo abria direto na bancada 1 e o líder
-      // teria de somar seis páginas de cabeça para saber o que distribuiu. Uma folha de resumo na
-      // frente responde isso de bater o olho — e as folhas seguintes ele destaca e entrega.
-      adicionarHeaderTabela(ws, row, ["Bancada", "Conjuntos", "Pecas", "Peso (kg)", "Dias", "Quando"]);
-      for (let c = 1; c <= 6; c++) ws.getCell(row, c).font = { name: "Arial", size: 12, bold: true, color: { argb: "FFFFFF" } };
-      ws.getRow(row).height = 30;
-      row++;
-      let sUn = 0, sKg = 0, sConj = 0;
-      for (const b of porDia) {
-        const it = b.dias.flatMap((d) => d.itens);
-        const u = it.reduce((s2, x) => s2 + Math.max(1, Number(x.qte) || 1), 0);
-        const k = it.reduce((s2, x) => s2 + (Number(x.pesoTotalKg) || 0), 0);
-        sUn += u; sKg += k; sConj += it.length;
-        adicionarLinhaTabela(ws, row, [b.bancada, it.length, u, Math.round(k), b.dias.length,
-          b.dias.length ? `${fmtDia(b.dias[0].dia)} a ${fmtDia(b.dias[b.dias.length - 1].dia)}` : "-"],
-          { fontSize: 13, rowHeight: 26, alinhamento: { 1: "center", 2: "center", 3: "center", 4: "center" } });
-        row++;
-      }
-      adicionarLinhaTotais(ws, row, ["TOTAL", sConj, sUn, Math.round(sKg), `${resumo.dias} dia(s)`, ""],
-        { fontSize: 13, rowHeight: 28, alinhamento: { 1: "center", 2: "center", 3: "center", 4: "center" } });
-      row += 2;
-      ws.getRow(row - 1).addPageBreak();
-
-      adicionarHeaderTabela(ws, row, varias
-        ? ["Dia", "OP", "Marca", "Descricao", "Qte", "Peso (kg)", "Feito"]
-        : ["Dia", "Marca", "Descricao", "Qte", "Peso (kg)", "Feito"]);
-      for (let c = 1; c <= nCols; c++) ws.getCell(row, c).font = { name: "Arial", size: 12, bold: true, color: { argb: "FFFFFF" } };
-      ws.getRow(row).height = 30;
-      row++;
-      for (const [iB, b] of porDia.entries()) {
-        const itens = b.dias.flatMap((d) => d.itens.map((it) => ({ ...it, _dia: d.dia })));
-        const un = itens.reduce((s, it) => s + Math.max(1, Number(it.qte) || 1), 0);
-        const kg = itens.reduce((s, it) => s + (Number(it.pesoTotalKg) || 0), 0);
-        ws.mergeCells(row, 1, row, nCols);
-        const cab = ws.getCell(row, 1);
-        cab.value = `${b.bancada}      ${un} peca(s)      ${Math.round(kg).toLocaleString("pt-BR")} kg`;
-        cab.font = { name: "Arial", size: 16, bold: true, color: { argb: "FFFFFF" } };
-        cab.fill = { type: "pattern", pattern: "solid", fgColor: { argb: CORES.TORG_BLUE } };
-        cab.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
-        ws.getRow(row).height = 34;
-        row++;
-        for (const it of itens) {
-          const linha = varias
-            ? [fmtDia(it._dia), it.opNumero || "", it.marca, it.descricao || "", Math.max(1, Number(it.qte) || 1), Math.round(Number(it.pesoTotalKg) || 0), ""]
-            : [fmtDia(it._dia), it.marca, it.descricao || "", Math.max(1, Number(it.qte) || 1), Math.round(Number(it.pesoTotalKg) || 0), ""];
-          const centro = varias
-            ? { 0: "center", 1: "center", 4: "center", 5: "center", 6: "center" }
-            : { 0: "center", 3: "center", 4: "center", 5: "center" };
-          adicionarLinhaTabela(ws, row, linha, { fontSize: 13, rowHeight: 26, alinhamento: centro });
-          row++;
-        }
-        adicionarLinhaTotais(ws, row, varias
-          ? ["", "", `${itens.length} conjunto(s)`, "", un, Math.round(kg), ""]
-          : ["", `${itens.length} conjunto(s)`, "", un, Math.round(kg), ""],
-          { fontSize: 13, rowHeight: 28,
-            alinhamento: varias ? { 0: "center", 1: "center", 4: "center", 5: "center", 6: "center" }
-                                : { 0: "center", 3: "center", 4: "center", 5: "center" } });
-        row += 2;
-        if (iB < porDia.length - 1) ws.getRow(row - 1).addPageBreak();
-      }
-      await downloadWorkbook(workbook, `Ordem de solda - ${ops.join("-")} - ${inicio}.xlsx`);
     } catch (e) {
       alert("Erro ao gerar a folha: " + (e?.message || e));
     } finally { setBaixando(false); }
@@ -140,9 +62,13 @@ export default function PainelSolda({ conjuntos, onSugerir, ocupado }) {
 
   // ⚠ grava a bancada e baixa a planilha no MESMO clique — eram dois botões e duas decisões para
   // um ato só, e dava para gravar sem levar a folha (ou o contrário) sem perceber.
+  // ⚠⚠ A PLANILHA SAI ANTES DE GRAVAR. Vitor (01/09/2026): "fiz uma e não consegui emitir a
+  // planilha". Gravar limpa a seleção, o painel desmonta e leva o botão da folha junto — ele ficou
+  // com 11 conjuntos na SOLDA 1 e sem papel para entregar. Exportando primeiro, o arquivo já saiu
+  // quando a tela muda. (E a tela ganhou "Planilha das bancadas", que emite do que está gravado.)
   async function liberar() {
-    await onSugerir(distrib);
     await exportarFolha();
+    await onSugerir(distrib);
   }
 
   if (!conjuntos.length) return null;
