@@ -28,6 +28,11 @@ const schema = z.object({
     itemId: z.string().regex(/^[A-Za-z0-9_\-!.]+$/, "itemId inválido"),
     nome: z.string().min(1),
     formato: z.string().nullable().optional(),
+    // ⚠ a bancada que vai montar aquele conjunto — vira a pasta de cima no ZIP. Vitor
+    // (01/09/2026): "separa na pasta da obra as pastas com os conjuntos de cada bancada, e criar o
+    // zip para poder imprimir e entregar para o encarregado". Sem isso o encarregado recebe um maço
+    // único e reparte na mão, que é justamente o trabalho que a tela acabou de fazer.
+    pasta: z.string().max(60).nullable().optional(),
   // ⚠⚠ O LIMITE ERA 20 E O ERRO NÃO DIZIA ISSO. Vitor (01/09/2026): "tentei baixar 500 marcas da
   // OP 113 e não criou a pasta de download". O Zod recusava o corpo e a tela mostrava "erro ao
   // montar o ZIP" — sem falar em limite, sem dizer quantos cabem. Agora o cliente FATIA em lotes
@@ -67,7 +72,13 @@ export async function POST(req) {
         headers: { Authorization: `Bearer ${token}` }, redirect: "follow",
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      zip.file(`${destino(a.formato)}/${limpo(a.nome)}`, Buffer.from(await res.arrayBuffer()));
+      // ⚠ BANCADA POR FORA, IMPRESSORA POR DENTRO. Quem opera o ZIP é o encarregado: ele abre a
+      // pasta da bancada e manda cada subpasta para a fila certa. Invertendo, ele teria de entrar
+      // em duas pastas para juntar o maço de UMA bancada.
+      const caminho = a.pasta
+        ? `${limpo(a.pasta)}/${destino(a.formato)}/${limpo(a.nome)}`
+        : `${destino(a.formato)}/${limpo(a.nome)}`;
+      zip.file(caminho, Buffer.from(await res.arrayBuffer()));
     } catch (e) {
       falhas.push(`${a.nome}: ${e?.message || "falhou"}`);
     }

@@ -19,6 +19,9 @@ const schema = z.object({
   marcas: z.array(z.string()).min(1),
   setor: z.string().nullable().optional(),
   acao: z.enum(["EMITIR", "IMPRIMIR"]).default("EMITIR"),
+  // ⚠ marca → bancada de montagem. Faz o lote agrupar (e nomear) por bancada e devolver a `pasta`
+  // que o ZIP usa, para o encarregado receber um maço por bancada. Ausente = comportamento antigo.
+  bancadaPorMarca: z.record(z.string(), z.string().max(60)).nullable().optional(),
 });
 
 export async function POST(req) {
