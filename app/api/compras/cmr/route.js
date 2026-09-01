@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { CMR_CAT, prefixoAno, proximoIndiceR, mapearLancamento, aprenderReferencias } from "@/lib/cmr";
 import { appendLinhasCmr } from "@/lib/cmr-sharepoint";
+import { ehCascaVazia } from "@/lib/cmr-reconciliar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,7 +45,10 @@ export async function GET(req) {
     prisma.documentoQualidade.findMany({ where: { categoria: CMR_CAT, importRef: { not: null } }, select: { importRef: true }, distinct: ["importRef"], take: 20000 }),
   ]);
   const anos = [...new Set(anosRaw.map((r) => 2000 + Number(String(r.importRef).slice(0, 2))).filter((a) => a >= 2000 && a < 2100))].sort((a, b) => b - a);
-  return NextResponse.json({ success: true, ano, total, itens: rows, anos: anos.length ? anos : [ano] });
+  // Esconde as "cascas" — R reservado, sem NENHUMA informação (só o índice). Aparecem quando
+  // o material chega e a linha é preenchida (na planilha ou aqui). Não são deletadas.
+  const itens = rows.filter((r) => !ehCascaVazia(r));
+  return NextResponse.json({ success: true, ano, total: itens.length, itens, anos: anos.length ? anos : [ano] });
 }
 
 const lancSchema = z.object({

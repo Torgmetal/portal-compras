@@ -169,11 +169,11 @@ export default function CmrLancarClient() {
       const j = await r.json();
       if (!j.success) throw new Error(j.error || "Falha na reconciliação");
       const partes = [];
-      if (j.importados) partes.push(`${j.importados} vindo(s) do Excel`);
+      if (j.importados) partes.push(`${j.importados} novo(s) do Excel`);
+      if (j.completados) partes.push(`${j.completados} completado(s)`);
       if (j.enviados) partes.push(`${j.enviados} enviado(s) ao Excel`);
-      if (j.ignoradasSemIndice) partes.push(`${j.ignoradasSemIndice} sem índice R (ignorada)`);
       showToast(partes.length ? `Planilha sincronizada — ${partes.join(", ")}` : "Planilha já estava em dia", "success");
-      if (j.importados) carregar();
+      if (j.importados || j.completados) carregar();
     } catch (e) { showToast(e.message, "erro"); } finally { setReconciliando(false); }
   }
 
