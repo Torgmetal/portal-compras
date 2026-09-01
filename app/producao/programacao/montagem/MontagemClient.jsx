@@ -96,8 +96,8 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
   // ⚠ A ORDEM IMPORTA: libera ANTES de imprimir. A rota de impressão registra a GRD — o documento
   // que prova o que desceu para o chão — e emitir GRD de conjunto que o servidor recusou liberar
   // (por não estar 100% cortado) seria assinar papel de peça que não vai ser montada.
-  async function liberarEImprimir(distrib) {
-    const bancadaPorId = {}, bancadaPorMarca = {}, ids = [];
+  async function liberarEImprimir(distrib, porDia) {
+    const bancadaPorId = {}, bancadaPorMarca = {}, diaPorId = {}, ids = [];
     for (const b of distrib) {
       for (const it of b.itens) {
         bancadaPorId[it.id] = b.bancada;
@@ -105,15 +105,25 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
         ids.push(it.id);
       }
     }
+    // ⚠ o dia de cada conjunto vem do plano dia a dia: liberar não é "tudo para amanhã", é a
+    // programação dos próximos dias já distribuída (Vitor 01/09/2026).
+    for (const b of porDia || []) {
+      for (const d of b.dias) {
+        const iso = d.dia.toISOString().slice(0, 10);
+        for (const it of d.itens) diaPorId[it.id] = iso;
+      }
+    }
     if (!ids.length) return;
-    if (!confirm(`Liberar ${ids.length} conjunto(s) para produção em ${distrib.length} bancada(s) e imprimir o maço?`)) return;
+    const diasDistintos = new Set(Object.values(diaPorId)).size;
+    if (!confirm(`Liberar ${ids.length} conjunto(s) para produção em ${distrib.length} bancada(s)` +
+      (diasDistintos > 1 ? `, distribuídos em ${diasDistintos} dias` : "") + `, e imprimir o maço?`)) return;
 
     setImprimindo(true);
     const erros = [];
     try {
       const rl = await fetch("/api/producao/pecas/liberar-montagem", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids, bancadaPorId }),
+        body: JSON.stringify({ ids, bancadaPorId, diaPorId }),
       });
       const jl = await rl.json();
       if (!rl.ok) throw new Error(jl.error || "Erro ao liberar");
@@ -121,7 +131,7 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
       // ⚠ imprime SÓ o que o servidor liberou: ele recusa conjunto sem os croquis 100% cortados
       const liberados = new Set(jl.liberadosIds || ids);
       setConjuntos((prev) => prev.map((c) => (liberados.has(c.id) && c.status === "CORTE"
-        ? { ...c, status: "MONTAGEM", montagemBancada: bancadaPorId[c.id] } : c)));
+        ? { ...c, status: "MONTAGEM", montagemBancada: bancadaPorId[c.id], montagemDiaProgramado: diaPorId[c.id] || c.montagemDiaProgramado } : c)));
       if (jl.bloqueados?.length) {
         erros.push(...jl.bloqueados.map((b) => `${b.marca} não desceu — ${b.cortados}/${b.total} croquis`));
       }

@@ -13,6 +13,10 @@ const schema = z.object({
   // ⚠ marca/id → bancada. Gravado junto com a liberação para o papel que o encarregado recebe e a
   // tela do portal contarem a mesma história. Ver lib/montagem-capacidade.js.
   bancadaPorId: z.record(z.string(), z.string().max(60)).nullable().optional(),
+  // ⚠ id → dia (YYYY-MM-DD). Vitor (01/09/2026): "minha intenção não é programar um único dia, ela
+  // poderia muito bem já estar programando a montagem de dias para frente". A liberação grava o dia
+  // de CADA conjunto, calculado pela capacidade da bancada — ver lib/montagem-capacidade.
+  diaPorId: z.record(z.string(), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).nullable().optional(),
 });
 
 export async function POST(req) {
@@ -90,9 +94,31 @@ export async function POST(req) {
         prisma.pecaConjunto.updateMany({ where: { id: { in: ids2 } }, data: { montagemBancada: bancada, montagemBancadaEm: agora } })
       ));
     }
+    // e o dia de cada conjunto (uma chamada por dia, não por peça)
+    if (!reverter && body.diaPorId && idsPermitidos.length) {
+      const porDia = new Map();
+      for (const id of idsPermitidos) {
+        const d = body.diaPorId[id];
+        if (!d) continue;
+        if (!porDia.has(d)) porDia.set(d, []);
+        porDia.get(d).push(id);
+      }
+      const agora2 = new Date();
+      await prisma.$transaction([...porDia.entries()].flatMap(([d, ids2]) => {
+        const data = new Date(d + "T00:00:00Z");
+        return [
+          prisma.pecaConjunto.updateMany({ where: { id: { in: ids2 } },
+            data: { montagemDiaProgramado: data, montagemProgramadaEm: agora2, montagemProgramadaPor: user.name || null } }),
+          // ⚠ o original só se escreve uma vez — é dele que o atraso conta (mesma regra do corte)
+          prisma.pecaConjunto.updateMany({ where: { id: { in: ids2 }, montagemDiaOriginal: null },
+            data: { montagemDiaOriginal: data } }),
+        ];
+      }));
+    }
     // reverter limpa a bancada: voltar ao corte desfaz a atribuição
     if (reverter && ids.length) {
-      await prisma.pecaConjunto.updateMany({ where: { id: { in: ids } }, data: { montagemBancada: null, montagemBancadaEm: null } });
+      await prisma.pecaConjunto.updateMany({ where: { id: { in: ids } },
+        data: { montagemBancada: null, montagemBancadaEm: null, montagemDiaProgramado: null } });
     }
 
     try {
