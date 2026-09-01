@@ -56,6 +56,39 @@ export async function PUT(req, { params }) {
   const preMontagem = b.preMontagem ?? atual.preMontagem;
   const resultado = calcularLqc({ ...composicao, demaos, preMontagem });
 
+  // ── VINCULAR A UM ORÇAMENTO DEPOIS ──────────────────────────────────────────────────────────
+  // ⚠⚠ ANTES SÓ DAVA PARA VINCULAR NA CRIAÇÃO. Estudo que nascesse solto ficava solto para sempre,
+  // carregando um número da sequência própria — e foi assim que a LQC-292-26 (Suzuki/Geoprime)
+  // acabou com o mesmo número do orçamento 292-26 (outro cliente). Vitor (01/09/2026): "no
+  // workspace tá tendo conflito (…) precisamos que ajuste isso".
+  //
+  // ⚠ E VINCULAR RENUMERA. A regra da casa é que o número da LQC É o número do orçamento
+  // (LQC-283-26 = proposta 283-26). Vincular sem renumerar deixaria a proposta com dois números,
+  // que é o problema que o vínculo existe para resolver.
+  const vinculo = {};
+  if (b.orcamentoId !== undefined && b.orcamentoId !== atual.orcamentoId) {
+    if (!b.orcamentoId) {
+      vinculo.orcamentoId = null; // desvincular não mexe no número: ele já está em uso e impresso
+    } else {
+      const orc = await prisma.orcamento.findUnique({ where: { id: b.orcamentoId }, select: { numero: true } });
+      if (!orc) return NextResponse.json({ error: "Orçamento não encontrado." }, { status: 400 });
+      vinculo.orcamentoId = b.orcamentoId;
+      const n = Number(String(orc.numero || "").split("-")[0]);
+      if (Number.isFinite(n) && n > 0 && n !== atual.numero) {
+        // ⚠ não pode haver dois estudos do ano com o mesmo número — seria trocar um conflito por outro
+        const ocupado = await prisma.estudoFabricacao.findFirst({
+          where: { ano: atual.ano, numero: n, id: { not: id } }, select: { id: true },
+        });
+        if (ocupado) {
+          return NextResponse.json({
+            error: `Já existe outro estudo com o número ${n}-${String(atual.ano).slice(-2)} neste ano. Confira qual é o certo antes de vincular.`,
+          }, { status: 409 });
+        }
+        vinculo.numero = n;
+      }
+    }
+  }
+
   const estudo = await prisma.estudoFabricacao.update({
     where: { id },
     data: {
@@ -67,6 +100,7 @@ export async function PUT(req, { params }) {
       status: b.status ?? atual.status,
       observacoes: b.observacoes === undefined ? atual.observacoes : b.observacoes,
       ...(b.revisar ? { revisao: atual.revisao + 1 } : {}),
+      ...vinculo,
     },
   });
   await prisma.auditLog.create({

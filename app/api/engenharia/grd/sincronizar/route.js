@@ -100,3 +100,18 @@ export async function POST(req) {
     novas: r.novas.length, revisoes: r.revisoes.length, erros: r.erros, avisado,
   });
 }
+
+// ⚠⚠ O CRON DA VERCEL DISPARA **GET**. Esta rota nasceu só com POST (31/08/2026) e ficou agendada
+// em vercel.json — ou seja, o cron das 11h/17h/21h vinha levando 405 e falhando em silêncio desde
+// que foi criado. Cron que falha calado é pior que cron que não existe: a tela parecia atualizada.
+//
+// ⚠ GET só para o cron. Sincronizar tem efeito colateral (baixa planilhas, grava, dispara e-mail de
+// revisão); deixar isso acontecer porque alguém abriu a URL no navegador seria pedir problema.
+export async function GET(req) {
+  const auth = req.headers.get("authorization");
+  const doCron = !!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`;
+  if (!doCron) {
+    return NextResponse.json({ error: "Use POST para sincronizar." }, { status: 405 });
+  }
+  return POST(req);
+}

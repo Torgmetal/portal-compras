@@ -47,18 +47,70 @@ export async function POST(req) {
     if (Number.isFinite(n) && n > 0) numero = n;
   }
   if (!numero) {
-    const ultimo = await prisma.estudoFabricacao.findFirst({ where: { ano }, orderBy: { numero: "desc" }, select: { numero: true } });
-    numero = (ultimo?.numero || 0) + 1;
+    // ⚠⚠ O SEQUENCIAL SOLTO TEM DE PULAR OS ORÇAMENTOS TAMBÉM. O comentário acima já dizia que ele
+    // começa "depois do maior número do ano, para não colidir com um orçamento futuro" — mas a
+    // conta só olhava os ESTUDOS. Resultado real (01/09/2026): o último LQC era 291, o novo saiu
+    // 292, e já existia o orçamento 292-26 de outro cliente. Ficaram LQC-292-26 (Suzuki/Geoprime) e
+    // orçamento 292-26 (TESTE) com o mesmo número, sendo propostas diferentes — que é exatamente o
+    // conflito que o Vitor viu na tela.
+    //
+    // ⚠ Os dois números do ano entram na conta: o do estudo e o do orçamento. São a MESMA série aos
+    // olhos do Comercial (LQC-283-26 é a proposta 283-26), então não podem ter contadores separados.
+    const sufixo = `-${String(ano).slice(-2)}`;
+    const [ultimoEstudo, orcamentosDoAno] = await Promise.all([
+      prisma.estudoFabricacao.findFirst({ where: { ano }, orderBy: { numero: "desc" }, select: { numero: true } }),
+      prisma.orcamento.findMany({ where: { numero: { endsWith: sufixo } }, select: { numero: true } }),
+    ]);
+    const maiorOrc = orcamentosDoAno.reduce((m, o) => {
+      const n = Number(String(o.numero || "").split("-")[0]);
+      return Number.isFinite(n) && n > m ? n : m;
+    }, 0);
+    numero = Math.max(ultimoEstudo?.numero || 0, maiorOrc) + 1;
+  }
+
+  // ── AS DUAS PORTAS DÃO NO MESMO REGISTRO ────────────────────────────────────────────────────
+  // Vitor (01/09/2026): "dentro do workspace tem 02 lugares para criar uma nova proposta e os dois
+  // não se atualizam. Precisamos que ajuste isso para não ter esse conflito".
+  //
+  // ⚠⚠ ESTUDO SEM ORÇAMENTO AGORA CRIA O ORÇAMENTO. Pular o número do orçamento no sequencial (a
+  // conta acima) só ADIA a colisão: o estudo solto reserva o 293 e o próximo orçamento cadastrado
+  // também vai querer o 293. Enquanto o número existir de um lado só, as duas séries voltam a se
+  // cruzar. Criando o orçamento junto, a proposta passa a ser UM registro com UM número, e aparece
+  // nas duas telas na mesma hora.
+  //
+  // ⚠ ISSO NÃO DUPLICA COM A PLANILHA: a importação do SharePoint casa por `numero` e ATUALIZA o
+  // que já existe (nunca cria em cima). Quando o Comercial lançar a mesma proposta no Excel, ela
+  // encontra este registro e o completa.
+  let orcamentoId = b.orcamentoId || null;
+  let orcamentoCriado = null;
+  if (!orcamentoId) {
+    const numeroOrc = `${numero}-${String(ano).slice(-2)}`;
+    // ⚠ pode existir um orçamento com esse número que a conta acima não viu (corrida entre duas
+    // criações, importação rodando junto). Aproveita em vez de estourar o unique.
+    const existente = await prisma.orcamento.findUnique({ where: { numero: numeroOrc }, select: { id: true } });
+    if (existente) {
+      orcamentoId = existente.id;
+    } else {
+      orcamentoCriado = await prisma.orcamento.create({
+        data: {
+          numero: numeroOrc, cliente,
+          obra: String(b.obra || "").trim() || null,
+          vendedor: user.name || null,
+          criadoPorId: user.id,
+        },
+      });
+      orcamentoId = orcamentoCriado.id;
+    }
   }
 
   const estudo = await prisma.estudoFabricacao.create({
     data: {
       ano, numero, cliente,
       obra: String(b.obra || "").trim() || null,
-      orcamentoId: b.orcamentoId || null,
+      orcamentoId,
       metodo: b.metodo || "ESTIMATIVA",
       criadoPorId: user.id, criadoPorNome: user.name || null,
     },
   });
-  return NextResponse.json({ ok: true, estudo });
+  return NextResponse.json({ ok: true, estudo, orcamentoCriado: orcamentoCriado?.numero || null });
 }

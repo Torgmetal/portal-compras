@@ -94,29 +94,65 @@ async function processar(ano, aplicar, userId) {
   return { ...resumo, detalhe };
 }
 
+// ⚠⚠ O CRON DA VERCEL DISPARA **GET**, não POST — por isso a importação automática vive aqui e não
+// no POST. Cron apontado para rota que só tem POST devolve 405 e falha em silêncio; foi o primeiro
+// jeito que eu escrevi, e não teria funcionado nunca.
+//
+// ⚠ Para GENTE o GET continua sendo SIMULAÇÃO — é a rede que o arquivo inteiro descreve lá em cima
+// ("simula antes de gravar", 283 linhas mexendo na central). Só a chamada do cron aplica.
 export async function GET(req) {
-  try { await requireRole(ROLES); }
-  catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  const auth = req.headers.get("authorization");
+  const doCron = !!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`;
+  if (!doCron) {
+    try { await requireRole(ROLES); }
+    catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  }
   const ano = Number(new URL(req.url).searchParams.get("ano")) || new Date().getUTCFullYear();
   try {
-    return NextResponse.json({ simulacao: true, ...(await processar(ano, false, null)) });
+    const r = await processar(ano, doCron, null);
+    if (doCron && (r.criados > 0 || r.atualizados > 0 || r.revisoes > 0)) {
+      // ⚠ registra só quando MUDOU: uma linha por hora dizendo "nada mudou" enterraria as
+      // importações de verdade no log de auditoria.
+      await prisma.auditLog.create({
+        data: { userId: null, action: "IMPORTAR_ORCAMENTOS_SHAREPOINT", entity: "Orcamento",
+                entityId: String(ano), diff: { criados: r.criados, atualizados: r.atualizados, revisoes: r.revisoes, porCron: true } },
+      }).catch(() => {});
+    }
+    return NextResponse.json({ simulacao: !doCron, ...r });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 502 });
   }
 }
 
+// ⚠⚠ TAMBÉM RODA POR CRON. Vitor (01/09/2026): "quando eu insiro uma proposta na planilha do
+// servidor, ele não está atualizando dentro do workspace". A causa era simples e invisível: esta
+// importação SÓ existia como botão. Todo o resto do portal que lê fonte externa tem cron (Omie,
+// CMR, Syneco, GRD, engenharia); esta não tinha — então a planilha só chegava aqui se alguém
+// lembrasse de clicar, e quem insere a proposta no Excel não tem por que saber disso.
+//
+// ⚠ O cron é seguro porque a importação já é IDEMPOTENTE e não apaga nada: campo vazio na planilha
+// não sobrescreve (`semVazios`), e o que o portal guarda a mais — vínculo com a OP, observações —
+// sobrevive. Rodar de hora em hora não é diferente de clicar de hora em hora.
 export async function POST(req) {
-  let user;
-  try { user = await requireRole(ROLES); }
-  catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  const auth = req.headers.get("authorization");
+  const doCron = !!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`;
+  let user = null;
+  if (!doCron) {
+    try { user = await requireRole(ROLES); }
+    catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  }
   const body = await req.json().catch(() => ({}));
   const ano = Number(body.ano) || new Date().getUTCFullYear();
   try {
-    const r = await processar(ano, true, user.id);
-    await prisma.auditLog.create({
-      data: { userId: user.id, action: "IMPORTAR_ORCAMENTOS_SHAREPOINT", entity: "Orcamento",
-              entityId: String(ano), diff: { criados: r.criados, atualizados: r.atualizados, revisoes: r.revisoes } },
-    }).catch(() => {});
+    const r = await processar(ano, true, user?.id || null);
+    // ⚠ o cron só registra quando MUDOU alguma coisa: uma linha por hora dizendo "nada mudou"
+    // enterraria as importações de verdade no log de auditoria.
+    if (!doCron || r.criados > 0 || r.atualizados > 0 || r.revisoes > 0) {
+      await prisma.auditLog.create({
+        data: { userId: user?.id || null, action: "IMPORTAR_ORCAMENTOS_SHAREPOINT", entity: "Orcamento",
+                entityId: String(ano), diff: { criados: r.criados, atualizados: r.atualizados, revisoes: r.revisoes, porCron: doCron } },
+      }).catch(() => {});
+    }
     return NextResponse.json(r);
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 502 });
