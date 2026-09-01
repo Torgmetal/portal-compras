@@ -69,37 +69,14 @@ export default function DatasSetorClient() {
               <p className="text-sm text-torg-gray py-6 text-center">Escolha uma OP acima (ou clique numa linha da tabela) para ver os marcos e liberar para o PCP.</p>
             ) : (
               <>
-                {/* ⚠⚠ NÃO SE DIGITA MAIS DATA AQUI. Vitor (26/08/2026): "quando seleciono a obra
-                    não quero que traga mais esse campo para preencher as datas daquela maneira, a
-                    partir da OP que eu selecionar vc já traz a data informada no cronograma".
+                {/* ⚠ A GRADE DOS SETE MARCOS SAIU (Vitor, 01/09/2026: "pode tirar essa parte
+                    tbm"). Ela repetia, em sete cartões, o que a "Visão geral das obras" logo
+                    abaixo já mostra em tabela — e empurrava para baixo o que a pessoa vem fazer
+                    aqui, que é liberar. O DADO continua: o marco do cronograma segue alimentando a
+                    data sugerida da montagem (`datasSetorCrono.MONTAGEM`) e o desvio da liberação.
 
-                    O cronograma já é a data acordada da obra; redigitá-la criava uma segunda
-                    verdade que envelhecia sozinha. Aqui ela é MARCO: serve para medir o desvio da
-                    liberação, não para ser preenchida.
-
-                    ⚠ A data digitada à mão continua existindo no banco e continua mandando na TV
-                    de Prioridades — por isso aparece quando difere. Escondê-la faria dela uma
-                    regra invisível. */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-                  {setores.map((s) => {
-                    const crono = op.datasSetorCrono?.[s.key] || null;
-                    const manual = op.datasSetor?.[s.key] || null;
-                    const venceu = crono && crono < hojeISO;
-                    return (
-                      <div key={s.key} className={`rounded-lg border px-2.5 py-2 ${venceu ? "border-red-200 bg-red-50" : crono ? "border-torg-blue-100 bg-white" : "border-gray-100 bg-gray-50"}`}>
-                        <p className="text-[11px] font-semibold text-torg-dark truncate">{s.label}</p>
-                        <p className={`text-sm font-bold tabular-nums ${venceu ? "text-red-600" : crono ? "text-torg-dark" : "text-torg-gray-light"}`}>
-                          {crono ? fmtDia(crono) : "—"}
-                        </p>
-                        <p className="text-[10px] mt-0.5 h-3 truncate">
-                          {venceu ? <span className="text-red-500">venceu</span>
-                            : manual && manual !== crono ? <span className="text-torg-gray-light" title="data informada à mão — é ela que manda na TV de Prioridades">TV: {fmtDia(manual)}</span>
-                            : <span className="text-torg-gray-light">{crono ? "cronograma" : "sem tarefa"}</span>}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
+                    ⚠ A data digitada à mão também continua no banco e mandando na TV de
+                    Prioridades — ela não dependia desta tela para existir. */}
 
                 {/* ── liberar para o PCP, por frente ── */}
                 {/* ⚠ a data acima é MARCO, não gatilho: quem libera é alguém, aqui, e o desvio
