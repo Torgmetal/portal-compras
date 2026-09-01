@@ -143,6 +143,13 @@ export async function GET(req) {
     // ⚠ Por isso o casamento é feito DUAS VEZES: primeiro só com o que entrou nesta OP; e só quando
     // aqui não há nada é que vale o CMR da empresa (sobra de outra obra é uso legítimo — mas é a
     // segunda escolha, nunca a primeira).
+    // ⚠⚠ DECLARADA AQUI, ANTES DO PRIMEIRO USO. Ela estava depois do `if (am)` logo abaixo, e
+    // `const` não existe acima da própria linha: a primeira volta do map estourava
+    // "Cannot access 'am' before initialization" e a rota inteira devolvia 500 — a lista de
+    // separação não saía para NENHUMA OP, não só para a 112. O build do Next não pega isso; só
+    // estoura na hora de calcular, que é por que passou. Mesma armadilha já anotada em lib/lqc.js.
+    const am = amarracaoDoPerfil(amarradas, g.perfil);
+
     const hitOp = comoItensOp.length ? casarPerfilComOmie(g.perfil, comoItensOp) : null;
     const hit = hitOp || (comoItens.length ? casarPerfilComOmie(g.perfil, comoItens) : null);
     let opcoes = hit ? cmr.filter((c) => c.nome === hit.descricao).map(opcaoR) : [];
@@ -155,7 +162,6 @@ export async function GET(req) {
     // R indicado = o mais apontado pelas peças do grupo; sem isso, a entrada mais antiga da OP
     // ⚠ a amarração GANHA do mais apontado e do casamento por texto: alguém disse qual é o fardo,
     // com nome e motivo. Palpite não desempata decisão registrada.
-    const am = amarracaoDoPerfil(amarradas, g.perfil);
     const maisApontado = am?.r || [...g.rs.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
     const daOpAntiga = [...opcoes].filter((o) => o.daOp).sort((a, b) => String(a.recebidoEm || "").localeCompare(String(b.recebidoEm || "")))[0];
     // ⚠⚠ PEÇA SEM R AINDA PRECISA DIZER QUAL VAI USAR.
