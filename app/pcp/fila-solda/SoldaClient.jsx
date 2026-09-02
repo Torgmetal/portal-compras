@@ -34,6 +34,7 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   const [filtroBancada, setFiltroBancada] = useState("");
   const [busca, setBusca] = useState("");
   const [novoDia, setNovoDia] = useState("");
+  const [novaBancada, setNovaBancada] = useState("");
   const [agindo, setAgindo] = useState(false);
   const [erro, setErro] = useState("");
   const [okMsg, setOkMsg] = useState("");
@@ -222,6 +223,35 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
     } catch (e) { setErro(e.message); } finally { setAgindo(false); }
   }
 
+  // ⚠⚠ MUDAR A BANCADA DEPOIS. Vitor (01/09/2026): "também preciso da opção de poder mudar a
+  // bancada em caso de mudança".
+  //
+  // ⚠ NÃO É a volta do seletor que ele mandou tirar. Aquele escolhia a bancada NA HORA DE REPARTIR,
+  // e furava o painel — que conhece o custo de cada peça e pula a ocupada. Este MOVE o que já foi
+  // repartido, quando a realidade muda: soldador faltou, a máquina quebrou, o líder trocou. Repartir
+  // é conta; mover é fato consumado, e fato consumado não se discute com algoritmo.
+  //
+  // ⚠ MANTÉM O DIA. A rota aceita `bancada` sem `dia` justamente para isso: quem troca de máquina
+  // raramente quer trocar a data junto, e mandar as duas juntas apagaria a programação sem pedir.
+  async function mudarBancada() {
+    if (!novaBancada || !selecao.length) return;
+    setAgindo(true); setErro(""); setOkMsg("");
+    try {
+      const ids = selecao.map((c) => c.id);
+      const r = await fetch("/api/pcp/solda", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, bancada: novaBancada }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao mudar a bancada");
+      const set = new Set(ids);
+      setConjuntos((prev) => prev.map((c) => (set.has(c.id)
+        ? { ...c, soldaBancada: novaBancada, soldaBancadaEm: new Date().toISOString() } : c)));
+      setOkMsg(`${j.atualizados} conjunto(s) movidos para ${novaBancada}.`);
+      setSel(new Set()); setNovaBancada("");
+    } catch (e) { setErro(e.message); } finally { setAgindo(false); }
+  }
+
   async function sugerirEmLote(distrib) {
     setAgindo(true); setErro(""); setOkMsg("");
     try {
@@ -360,6 +390,19 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
           {/* ⚠⚠ MUDAR A DATA. Vitor: "preciso alterar a data de um lançamento, isso pode ocorrer
               com mais frequência". Fica junto da seleção porque é edição de lote: marca as peças
               que escorregaram e move todas de uma vez. */}
+          <select value={novaBancada} onChange={(e) => setNovaBancada(e.target.value)}
+            className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg bg-white">
+            <option value="">mover para…</option>
+            {BANCADAS.map((b) => {
+              const o = ocupadasHoje[b];
+              return <option key={b} value={b}>{b}{o ? ` (${o.conj} conj até ${fmtDiaLongo(o.livreEm)})` : " (livre)"}</option>;
+            })}
+          </select>
+          <button onClick={mudarBancada} disabled={agindo || !novaBancada}
+            title={`Move ${selecao.length} conjunto(s) para essa bancada — a data não muda`}
+            className="px-3 py-1.5 bg-torg-blue text-white text-xs font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-1 disabled:opacity-50">
+            {agindo ? <Loader2 size={13} className="animate-spin" /> : <Flame size={13} />} Mudar a bancada
+          </button>
           <input type="date" value={novoDia} onChange={(e) => setNovoDia(e.target.value)}
             className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg bg-white" />
           <button onClick={mudarDia} disabled={agindo || !novoDia}
