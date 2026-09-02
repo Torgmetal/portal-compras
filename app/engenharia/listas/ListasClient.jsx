@@ -226,9 +226,21 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
                   </div>
                   <div className="mt-2 max-h-40 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 pr-1">
                     {destinatarios.map((d) => (
-                      <label key={d.email} className="flex items-center gap-2 text-[12px] text-torg-dark cursor-pointer">
-                        <input type="checkbox" checked={sel.has(d.email)} onChange={() => toggleSel(d.email)} className="accent-torg-blue flex-shrink-0" />
-                        <span className="truncate">{d.nome}{d.setor ? <span className="text-torg-gray"> · {d.setor}</span> : null}</span>
+                      // ⚠⚠ O E-MAIL APARECE JUNTO DO NOME. Vitor (02/09/2026): "aparece o Carlos
+                      // Santos, ele não faz mais parte da empresa, porém o e-mail da produção ainda
+                      // existe". Metade destas contas é FUNCIONAL — `producao@`, `pcp@`, `comercial@`
+                      // — batizada com o nome de quem a ocupava. Quando a pessoa sai, o nome mente e
+                      // parece que o aviso vai para alguém que não trabalha mais aqui.
+                      //
+                      // Mostrar o endereço não conserta o cadastro (o nome ainda precisa ser
+                      // trocado), mas tira a dúvida na hora de enviar: quem lê vê que o destino é a
+                      // ÁREA, não a pessoa.
+                      <label key={d.email} className="flex items-start gap-2 text-[12px] text-torg-dark cursor-pointer">
+                        <input type="checkbox" checked={sel.has(d.email)} onChange={() => toggleSel(d.email)} className="accent-torg-blue flex-shrink-0 mt-0.5" />
+                        <span className="min-w-0">
+                          <span className="block truncate">{d.nome}{d.setor ? <span className="text-torg-gray"> · {d.setor}</span> : null}</span>
+                          <span className="block truncate text-[10px] text-torg-gray-light">{d.email}</span>
+                        </span>
                       </label>
                     ))}
                   </div>
