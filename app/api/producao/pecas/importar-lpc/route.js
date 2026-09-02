@@ -78,10 +78,20 @@ export async function POST(req) {
     nIncluidas: diffIncluidas.length, nRemovidas: diffRemovidas.length, nAlteradas: diffAlteradas.length,
   };
 
-  // Sobrescrever: deleta pecas LPC anteriores (cascade deleta ConjuntoCroqui)
+  // Sobrescrever: a marca sai da LPC — mas SÓ SOME se não estiver também na LE.
+  //
+  // ⚠⚠ APAGAR POR `fonte` ERA O QUE DESTRUÍA A OUTRA LISTA. Vitor (02/09/2026): "precisamos
+  // consertar isso, não pode ser feito gambiarra mais". Uma marca que está nas duas listas mora
+  // numa linha só (por causa do @@unique[opNumero, marca]); apagá-la porque saiu da LPC levava
+  // junto a presença dela na LE. Agora: quem está nas duas perde só o `naLPC`; quem era só da LPC
+  // é apagada de fato.
   if (sobrescrever) {
+    await prisma.pecaConjunto.updateMany({
+      where: { opNumero, naLPC: true, naLE: true },
+      data: { naLPC: false, fonte: "LE_IMPORT" },
+    });
     await prisma.pecaConjunto.deleteMany({
-      where: { opNumero, fonte: "LPC_IMPORT" },
+      where: { opNumero, naLPC: true, naLE: false },
     });
   }
 
@@ -107,6 +117,7 @@ export async function POST(req) {
             tipoPeca: "CONJUNTO",
             areaPinturaM2: c.areaPinturaM2,
             observacao: c.observacao ?? undefined, // undefined = não mexe (preserva no update; null no create)
+            naLPC: true, fonte: "LPC_IMPORT", // ⚠ pertencimento — ver o bloco naLE/naLPC no schema
           },
         });
         pieceIds.set(c.marca, existing.id);
@@ -126,6 +137,7 @@ export async function POST(req) {
             observacao: c.observacao ?? undefined, // undefined = não mexe (preserva no update; null no create)
             status: "PENDENTE",
             fonte: "LPC_IMPORT",
+            naLPC: true,
           },
         });
         pieceIds.set(c.marca, created.id);
@@ -159,6 +171,7 @@ export async function POST(req) {
             observacao: cr.observacao ?? undefined,
             statusPrep: existing.statusPrep || "PENDENTE",
             maquina: maq || existing.maquina,
+            naLPC: true, fonte: "LPC_IMPORT",
           },
         });
         pieceIds.set(cr.marca, existing.id);
@@ -182,6 +195,7 @@ export async function POST(req) {
             statusPrep: "PENDENTE",
             status: "PENDENTE",
             fonte: "LPC_IMPORT",
+            naLPC: true,
             maquina: maq,
           },
         });
@@ -214,6 +228,13 @@ export async function POST(req) {
             areaPinturaM2: a.areaPinturaM2,
             observacao: a.observacao ?? undefined,
             maquina: maq || existing.maquina,
+            // ⚠ A LINHA PASSA A PERTENCER À LPC. Sem isto, a marca que a LE criou primeiro
+            // continuava carimbada LE e sumia da lista de produção — o caso da OP-113.
+            // O `fonte` acompanha porque, para o fluxo de fábrica, a LPC é a lista que manda:
+            // peça que está na LPC é peça que se fabrica, tenha vindo por onde tiver vindo.
+            naLPC: true,
+            fonte: "LPC_IMPORT",
+            naLPC: true,
           },
         });
         pieceIds.set(a.marca, existing.id);
@@ -235,6 +256,7 @@ export async function POST(req) {
             observacao: a.observacao ?? undefined,
             status: "PENDENTE",
             fonte: "LPC_IMPORT",
+            naLPC: true,
             maquina: maq,
           },
         });

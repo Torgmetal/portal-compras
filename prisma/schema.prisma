@@ -2962,6 +2962,23 @@ model PecaConjunto {
   dataConcluida          DateTime?
   dataPrevista           DateTime?
   fonte                  String?
+  // ⚠⚠ PERTENCIMENTO ≠ PROCEDÊNCIA. Vitor (02/09/2026): "precisamos consertar isso, não pode ser
+  // feito gambiarra mais".
+  //
+  // O `fonte` vinha fazendo dois trabalhos: dizer QUAL IMPORTAÇÃO criou a linha e dizer DE QUAL
+  // LISTA a marca faz parte. Pertencimento não é valor único — a mesma marca pode estar na LE e na
+  // LPC —, então a última importação a tocar na linha ganhava e a outra lista perdia a marca.
+  //
+  // Foi o que quebrou a OP-113: a LE entrou primeiro com opNumero "113"; a LPC entrou depois com a
+  // mesma chave, achou as linhas prontas, atualizou-as e não mexeu no `fonte`. As 74 avulsas e 2
+  // conjuntos continuaram carimbados LE — sumiram da lista de produção, e o PORTAL DO CLIENTE
+  // avisou 76 marcas "excluídas" que nunca saíram de lugar nenhum.
+  //
+  // ⚠ O `@@unique([opNumero, marca])` é o que torna isto inevitável: não cabem duas linhas da mesma
+  // marca sob a mesma obra, então a LPC não cria a sua — ela herda a linha da LE. Com os dois
+  // sinalizadores, herdar deixa de custar a lista da outra.
+  naLE                   Boolean  @default(false)
+  naLPC                  Boolean  @default(false)
   observacao             String?
   criadoEm               DateTime                @default(now())
   atualizadoEm           DateTime                @updatedAt

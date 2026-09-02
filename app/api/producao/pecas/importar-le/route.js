@@ -86,10 +86,16 @@ export async function POST(req) {
     nIncluidas: diffIncluidas.length, nRemovidas: diffRemovidas.length, nAlteradas: diffAlteradas.length,
   };
 
-  // Se sobrescrever, deleta todas as pecas LE da OP primeiro
+  // Se sobrescrever: a marca sai da LE — mas SÓ SOME se não estiver também na LPC.
+  // ⚠ Simétrico ao da importação da LPC. Apagar por `fonte` levava junto a presença da marca na
+  // outra lista, porque as duas moram na MESMA linha (@@unique[opNumero, marca]).
   if (sobrescrever) {
+    await prisma.pecaConjunto.updateMany({
+      where: { opNumero, naLE: true, naLPC: true },
+      data: { naLE: false },
+    });
     await prisma.pecaConjunto.deleteMany({
-      where: { opNumero, fonte: "LE_IMPORT" },
+      where: { opNumero, naLE: true, naLPC: false },
     });
   }
 
@@ -104,7 +110,11 @@ export async function POST(req) {
   // a linha da LE nunca nascia e os números da LPC eram sobrescritos pelos da LE. Nessas cinco OPs
   // não há hoje UMA marca em comum entre as duas fontes — que é exatamente o rastro disso.
   const existentes = await prisma.pecaConjunto.findMany({
-    where: { opNumero, fonte: "LE_IMPORT" },
+    // ⚠⚠ SEM FILTRO DE FONTE. Antes buscava só as linhas LE_IMPORT: a marca que a LPC já tinha não
+    // era encontrada, o create batia no @@unique, e ela virava "ignorada" — a LE perdia a marca em
+    // silêncio. É o espelho do que quebrou a OP-113 do outro lado. Agora a linha existente é
+    // atualizada e ganha `naLE`, seja de quem for.
+    where: { opNumero },
     select: { id: true, marca: true },
   });
   const idPorMarca = new Map(existentes.map((e) => [e.marca, e.id]));
@@ -130,6 +140,9 @@ export async function POST(req) {
             // órfã na OP-111. Só preenche quando está vazio: nunca reescreve um vínculo existente.
             ...(op?.id ? { opId: op.id } : {}),
             ...(p.observacao ? { observacao: p.observacao } : {}), // só sobrescreve se a lista trouxer
+            // ⚠ a linha passa a pertencer à LE. O `fonte` NÃO é rebaixado: se a marca está na LPC,
+            // ela continua sendo peça de fabricação para o fluxo de fábrica.
+            naLE: true,
           },
         });
         atualizados++;
@@ -148,6 +161,7 @@ export async function POST(req) {
             observacao: p.observacao || null,
             status: "PENDENTE",
             fonte: "LE_IMPORT",
+            naLE: true,
           },
         });
         idPorMarca.set(p.marca, novo.id); // marca repetida na mesma planilha vira update
@@ -169,7 +183,7 @@ export async function POST(req) {
   // marca), NÃO a soma bruta do arquivo. O FORM 21 lista conjunto + componentes,
   // então parsed.pesoTotal dobra (Vitor 29/07: OP 104 = 13,6 t, não 27,2). A LE é
   // a fonte canônica do peso da OP.
-  const aggLE = await prisma.pecaConjunto.aggregate({ where: { opNumero, fonte: "LE_IMPORT" }, _sum: { pesoTotalKg: true } });
+  const aggLE = await prisma.pecaConjunto.aggregate({ where: { opNumero, naLE: true }, _sum: { pesoTotalKg: true } });
   const pesoRealLE = Math.round((aggLE._sum.pesoTotalKg || 0) * 100) / 100;
 
   // ⚠⚠ SEM REGISTRO NÃO HÁ COMO RESPONDER "EU IMPORTEI". A importação da LPC sempre gravou no

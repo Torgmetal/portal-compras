@@ -26,15 +26,17 @@ export async function GET(req) {
 
   // Cobertura por opId (link canônico — a LPC liga assim, 100%).
   const grpId = await prisma.pecaConjunto.groupBy({
-    by: ["opId", "fonte"],
-    where: { opId: { not: null }, fonte: { in: ["LE_IMPORT", "LPC_IMPORT"] } },
+    by: ["opId", "naLE", "naLPC"],
+    // ⚠ por PERTENCIMENTO (naLE/naLPC), não por `fonte`: a marca que está nas duas listas mora numa
+    // linha só, e contá-la pela procedência fazia uma das listas parecer vazia. Ver o schema.
+    where: { opId: { not: null }, OR: [{ naLE: true }, { naLPC: true }] },
     _count: { _all: true },
   });
   const porOpId = new Map(); // opId -> { LE, LPC }
   for (const g of grpId) {
     const e = porOpId.get(g.opId) || { LE: 0, LPC: 0 };
-    if (g.fonte === "LE_IMPORT") e.LE += g._count._all;
-    else if (g.fonte === "LPC_IMPORT") e.LPC += g._count._all;
+    if (g.naLE) e.LE += g._count._all;
+    if (g.naLPC) e.LPC += g._count._all;
     porOpId.set(g.opId, e);
   }
 
@@ -51,11 +53,11 @@ export async function GET(req) {
   // ⚠ ALARME FALSO AQUI NÃO É INCÔMODO, É DANO: a ação que ele induz (reimportar) APAGA e regrava a
   // lista. Custa uma consulta a mais e evita que a tela mande alguém mexer no que estava certo.
   const grpNum = await prisma.pecaConjunto.groupBy({
-    by: ["opNumero", "fonte"],
-    where: { fonte: { in: ["LE_IMPORT", "LPC_IMPORT"] } },
+    by: ["opNumero", "naLE", "naLPC"],
+    where: { OR: [{ naLE: true }, { naLPC: true }] },
     _count: { _all: true },
   });
-  const grpNumLE = grpNum.filter((g) => g.fonte === "LE_IMPORT");
+  const grpNumLE = grpNum.filter((g) => g.naLE);
   const numKey = (s) => { const m = String(s ?? "").match(/\d+/); return m ? parseInt(m[0], 10) : null; };
   const lePorNum = new Map(); // numKey -> nº de peças LE
   for (const g of grpNumLE) {
@@ -65,7 +67,7 @@ export async function GET(req) {
 
   const lpcPorNum = new Map();
   for (const g of grpNum) {
-    if (g.fonte !== "LPC_IMPORT") continue;
+    if (!g.naLPC) continue;
     const k = numKey(g.opNumero);
     if (k != null) lpcPorNum.set(k, (lpcPorNum.get(k) || 0) + g._count._all);
   }
