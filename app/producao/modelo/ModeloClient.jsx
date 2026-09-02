@@ -72,88 +72,103 @@ export default function ModeloClient({ ops }) {
   const urlModelo = modelo ? `/api/producao/modelo-3d?opId=${opId}&rel=${encodeURIComponent(modelo.rel)}` : null;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <label className="block text-[11px] text-torg-gray uppercase tracking-wide mb-1">Obra</label>
-          <select value={opId} onChange={(e) => setOpId(e.target.value)}
-            className="text-sm border border-gray-200 rounded-lg px-3 py-2 min-w-[280px]">
-            {ops.map((o) => <option key={o.id} value={o.id}>OP-{o.numero} — {o.obra || o.cliente || "sem obra"}</option>)}
-          </select>
-        </div>
+    // ⚠⚠ A OBRA OCUPA A TELA. Vitor (03/09/2026): "o layout externo está bem ruim". Estava — era
+    // um formulário com um quadro de 3D dentro: título grande, parágrafo de explicação, seletor
+    // solto e o modelo espremido em 560px. Visualizador de modelo é o contrário disso: a cena é a
+    // página, e todo o resto encolhe para caber numa faixa. É o que o Trimble faz, e é o que faz
+    // sentido — ninguém abre esta tela para ler texto.
+    // ⚠ `left-64` casa com o `ml-64` do layout de Produção e com a `w-64 fixed` da barra lateral
+    // (conferido nos dois arquivos). Fixo em vez de fluido porque a tela precisa da altura inteira
+    // da janela: dentro do `p-8` do layout, o modelo nunca passaria de meia tela.
+    <div data-tela-cheia className="fixed inset-y-0 right-0 left-64 flex flex-col bg-torg-dark">
+      {/* faixa de controle: tudo numa linha, escura, para a obra ficar sendo a única coisa clara */}
+      <div className="flex items-center gap-2 flex-wrap px-3 py-2 shrink-0 text-white/90">
+        <span className="text-[13px] font-bold tracking-tight mr-1">Obra em 3D</span>
+        <select value={opId} onChange={(e) => setOpId(e.target.value)}
+          className="text-[12px] bg-white/10 border border-white/15 rounded-md px-2 py-1 max-w-[300px] outline-none focus:border-white/40">
+          {ops.map((o) => <option key={o.id} value={o.id} className="text-torg-dark">OP-{o.numero} — {o.obra || o.cliente || "sem obra"}</option>)}
+        </select>
         {lista?.modelos?.length > 1 && (
-          <div>
-            <label className="block text-[11px] text-torg-gray uppercase tracking-wide mb-1">Modelo</label>
-            <select value={modelo?.rel || ""} onChange={(e) => { setModelo(lista.modelos.find((m) => m.rel === e.target.value)); setMarca(null); setPeca(null); }}
-              className="text-sm border border-gray-200 rounded-lg px-3 py-2 max-w-[420px]">
-              {lista.modelos.map((m) => (
-                <option key={m.rel} value={m.rel} disabled={m.grande}>
-                  {m.nome} {m.kb ? `· ${(m.kb / 1024).toFixed(1)} MB` : ""}{m.grande ? " (grande demais)" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select value={modelo?.rel || ""} onChange={(e) => { setModelo(lista.modelos.find((m) => m.rel === e.target.value)); setMarca(null); setPeca(null); }}
+            className="text-[12px] bg-white/10 border border-white/15 rounded-md px-2 py-1 max-w-[340px] outline-none focus:border-white/40">
+            {lista.modelos.map((m) => (
+              <option key={m.rel} value={m.rel} disabled={m.grande} className="text-torg-dark">
+                {m.nome}{m.kb ? ` · ${(m.kb / 1024).toFixed(1)} MB` : ""}{m.grande ? " (grande demais)" : ""}
+              </option>
+            ))}
+          </select>
         )}
-        <div className="flex gap-0.5 bg-gray-50 border border-gray-200 rounded-lg p-0.5 ml-auto">
-          {[["modelo", "Cores do modelo"], ["andamento", "Andamento na fábrica"]].map(([k, t]) => (
+
+        <div className="flex gap-0.5 bg-white/10 border border-white/15 rounded-md p-0.5">
+          {[["modelo", "Cores do modelo"], ["andamento", "Andamento"]].map(([k, t]) => (
             <button key={k} onClick={() => setModo(k)}
-              className={`text-[11.5px] font-semibold px-3 py-1.5 rounded-md ${modo === k ? "bg-torg-blue text-white" : "text-torg-gray hover:text-torg-blue"}`}>
+              className={`text-[11.5px] font-semibold px-2.5 py-1 rounded ${modo === k ? "bg-white text-torg-dark" : "text-white/70 hover:text-white"}`}>
               {t}
             </button>
           ))}
         </div>
+
         {lista?.resumo && modo === "andamento" && (
-          <div className="flex items-center gap-3 text-[12px] text-torg-gray">
-            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.pronta }} /> {lista.resumo.prontas} prontas</span>
-            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.andando }} /> {lista.resumo.andando} em produção</span>
-            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.parado }} /> {lista.resumo.marcas - lista.resumo.prontas - lista.resumo.andando} a fazer</span>
+          <div className="flex items-center gap-2.5 text-[11.5px] text-white/70">
+            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.pronta }} /> {lista.resumo.prontas}</span>
+            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.andando }} /> {lista.resumo.andando}</span>
+            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.parado }} /> {lista.resumo.marcas - lista.resumo.prontas - lista.resumo.andando}</span>
           </div>
+        )}
+
+        {marca && (
+          <button onClick={() => { setMarca(null); setPeca(null); }}
+            className="ml-auto text-[11.5px] text-white/60 hover:text-white">fechar a peça</button>
         )}
       </div>
 
-      {erro && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
-          <AlertCircle size={14} className="mt-0.5 shrink-0" /> <span>{erro}</span>
-        </div>
-      )}
-
-      {lista && !lista.modelos?.length && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-3 py-2.5">
-          Esta obra não tem modelo IFC na pasta da Engenharia. O arquivo é procurado em
-          <b> 2. Engenharia › 2.5 Projetos</b> — normalmente em <b>2.5.3 Modelo 3D</b>.
-        </div>
-      )}
-
-      {urlModelo && (
-        <div className="grid grid-cols-1 lg:grid-cols-[1.7fr_1fr] gap-0 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="border-b lg:border-b-0 lg:border-r border-gray-100">
-            {/* ⚠ `key` no url: trocar de modelo remonta a cena. Sem isso o visualizador manteria a
-                obra anterior na tela — e o painel passaria a responder por outra OP. */}
+      {/* corpo: cena + painel, ocupando tudo o que sobra */}
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row bg-white">
+        <div className="flex-1 min-h-0 relative">
+          {erro && (
+            <div className="absolute inset-0 grid place-items-center p-6 z-10 bg-white">
+              <p className="text-[13px] text-red-600 text-center max-w-sm inline-flex items-start gap-2">
+                <AlertCircle size={15} className="mt-0.5 shrink-0" /> {erro}
+              </p>
+            </div>
+          )}
+          {lista && !lista.modelos?.length && !erro && (
+            <div className="absolute inset-0 grid place-items-center p-6 z-10 bg-white">
+              <p className="text-[13px] text-torg-gray text-center max-w-md">
+                Esta obra não tem modelo IFC na pasta da Engenharia.<br />
+                <span className="text-[12px]">O arquivo é procurado em <b>2. Engenharia › 2.5 Projetos</b> — normalmente em <b>2.5.3 Modelo 3D</b>.</span>
+              </p>
+            </div>
+          )}
+          {!lista && !erro && (
+            <div className="absolute inset-0 grid place-items-center bg-white">
+              <p className="text-[13px] text-torg-gray inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> procurando o modelo…</p>
+            </div>
+          )}
+          {urlModelo && (
             <VisualizadorIfc key={urlModelo} url={urlModelo} onSelecionar={abrir}
-              selecionada={marca} cores={cores} modo={modo} altura={560} />
-          </div>
-
-          <div className="p-4">
-            {!marca && (
-              <div className="text-[13px] text-torg-gray">
-                <p className="font-semibold text-torg-dark mb-1">Clique numa peça do modelo.</p>
-                <p>Arraste para girar, role para o zoom. A cor mostra em que ponto da fábrica cada conjunto está.</p>
-              </div>
-            )}
-            {carregandoPeca && <p className="text-[13px] text-torg-gray inline-flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> buscando {marca}…</p>}
-            {peca?.erro && (
-              <div className="text-[13px]">
-                <p className="font-mono font-bold text-torg-dark">{marca}</p>
-                <p className="text-amber-700 mt-1">{peca.erro}</p>
-                <p className="text-[12px] text-torg-gray mt-1">
-                  Objeto do modelo sem marca correspondente na LPC — normalmente é eixo ou objeto auxiliar.
-                </p>
-              </div>
-            )}
-            {peca && !peca.erro && <Painel d={peca} />}
-          </div>
+              selecionada={marca} cores={cores} modo={modo} altura="fill" />
+          )}
         </div>
-      )}
+
+        {/* ⚠ o painel só existe quando há peça: coluna vazia ocupando um terço da tela rouba da obra
+            justamente quando não há nada a dizer. */}
+        {marca && (
+          <aside className="w-full lg:w-[360px] shrink-0 border-t lg:border-t-0 lg:border-l border-gray-200 overflow-y-auto bg-white">
+            <div className="p-4">
+              {carregandoPeca && <p className="text-[13px] text-torg-gray inline-flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> buscando {marca}…</p>}
+              {peca?.erro && (
+                <div className="text-[13px]">
+                  <p className="font-mono font-bold text-torg-dark">{marca}</p>
+                  <p className="text-amber-700 mt-1">{peca.erro}</p>
+                  <p className="text-[12px] text-torg-gray mt-1">Objeto do modelo sem marca na LPC — normalmente é eixo ou objeto auxiliar.</p>
+                </div>
+              )}
+              {peca && !peca.erro && <Painel d={peca} />}
+            </div>
+          </aside>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { Box } from "lucide-react";
 import ModeloClient from "./ModeloClient";
 
 export const metadata = { title: "Workspace Torg — Obra em 3D" };
@@ -16,19 +15,8 @@ export default async function PaginaModelo() {
     select: { id: true, numero: true, cliente: true, obra: true },
   })).sort((a, b) => (b.numero || "").localeCompare(a.numero || "", undefined, { numeric: true }));
 
-  return (
-    <div className="p-6 max-w-[1500px] mx-auto">
-      <div className="mb-4">
-        <h1 className="text-xl font-extrabold text-torg-dark flex items-center gap-2">
-          <Box size={20} className="text-torg-blue" /> Obra em 3D
-        </h1>
-        <p className="text-xs text-torg-gray mt-1 max-w-3xl">
-          O modelo que a Engenharia exportou do Tekla, lido direto da pasta da obra. Clique numa peça
-          para ver material, croquis do conjunto, o R de cada posição, onde ela está na fábrica e em
-          que dia foi liberada.
-        </p>
-      </div>
-      <ModeloClient ops={ops} />
-    </div>
-  );
+  // ⚠ sem cabeçalho nem moldura: o componente ocupa a janela inteira (ver ModeloClient). Título e
+  // explicação viviam aqui e empurravam o modelo para meia tela — numa tela de visualizador, o
+  // texto é o que sobra, não o que abre.
+  return <ModeloClient ops={ops} />;
 }

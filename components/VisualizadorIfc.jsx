@@ -20,6 +20,7 @@
 // ⚠ SEM REDE EXTERNA: o .wasm é servido de /wasm do próprio portal (copiado de node_modules no
 // build). O portal do cliente não pode depender de CDN nem de conta de terceiro.
 import { useEffect, useRef, useState, useCallback } from "react";
+import { Maximize2, Minimize2 } from "lucide-react";
 
 const COR_PADRAO = 0x9fb0bf;
 const COR_SEL = 0xf4801f;
@@ -36,6 +37,13 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
   const [estado, setEstado] = useState({ fase: "carregando", pct: 0 });
   const [info, setInfo] = useState(null);
   const [pronto, setPronto] = useState(false);
+  // ⚠⚠ TELA CHEIA DE VERDADE (API do navegador), não um "esconde a barra lateral". Vitor
+  // (03/09/2026): "seria bom ter uma tela maior para navegar (…) uma opção para poder preencher a
+  // tela toda". Num modelo de obra inteira, cada centímetro de tela é detalhe que se enxerga sem
+  // aproximar — e sair do navegador inteiro dá 15% a mais de altura que nenhum ajuste de layout
+  // consegue.
+  const [cheia, setCheia] = useState(false);
+  const caixa = useRef(null);
 
   // ⚠⚠ A CADEIA expressID → MARCA, montada UMA VEZ ao abrir o modelo.
   // Um IFCELEMENTASSEMBLY agrega suas peças por IFCRELAGGREGATES; a marca fica no campo Tag do
@@ -101,7 +109,10 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         const el = box.current;
         const cena = new THREE.Scene();
         cena.background = new THREE.Color(0xffffff);   // Vitor pediu fundo branco
-        const cam = new THREE.PerspectiveCamera(45, 1, 0.1, 5000);
+        // ⚠ 35° e não os 45° de praxe: lente mais fechada = menos distorção de perspectiva, que é o
+        // que dá o aspecto "chapado" e limpo do Tekla. Com 45° a viga do fundo afunila e a obra
+        // parece menor dentro do mesmo quadro.
+        const cam = new THREE.PerspectiveCamera(35, 1, 0.1, 5000);
         // ⚠ `preserveDrawingBuffer` permite ler o canvas depois de desenhado — é o que torna possível
         // salvar a vista como imagem (e foi como conferi a tela sem conseguir autenticar). Custa um
         // pouco de memória de vídeo; numa cena deste porte é irrelevante.
@@ -113,7 +124,7 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         rend.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
         el.innerHTML = "";
         el.appendChild(rend.domElement);
-        rend.setSize(el.clientWidth || 800, altura);
+        rend.setSize(el.clientWidth || 800, el.clientHeight || (typeof altura === "number" ? altura : 560));
         // ⚠⚠ ILUMINAÇÃO DE CAD, NÃO DE CENA. Vitor (03/09/2026): "não tem a mesma visão que tem no
         // Trimble Connect, é muito mais detalhado". Luz ambiente chapada some com o relevo: aba de
         // perfil, alma e enrijecedor ficam do mesmo tom e a peça vira um borrão. A hemisférica dá
@@ -216,14 +227,34 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         // ⚠ ENQUADRA PELA ESFERA QUE ENVOLVE A OBRA, não por um múltiplo do tamanho: a distância
         // certa depende do campo de visão da câmera, senão obra comprida sai cortada e obra
         // pequena fica um ponto no meio da tela.
-        cam.aspect = (el.clientWidth || 800) / altura; cam.updateProjectionMatrix();
+        cam.aspect = (el.clientWidth || 800) / (el.clientHeight || (typeof altura === "number" ? altura : 560)); cam.updateProjectionMatrix();
+        // ⚠⚠ ENQUADRA PELO QUE APARECE, NÃO PELA ESFERA. A esfera envolvente superestima muito numa
+        // obra comprida e estreita — a passarela da OP-089 tem 24 m de vão e 3 de largura, e a
+        // esfera trata as duas como 24. Resultado: a obra saía ocupando um terço da tela, com
+        // margem vazia dos dois lados.
+        //
+        // Aqui a distância é ajustada olhando para onde os 8 cantos da caixa caem na tela (espaço
+        // normalizado): duas voltas bastam para encostar a obra na borda com folga de 10%.
         const cx = new THREE.Box3().setFromObject(cena);
         const centro = cx.getCenter(new THREE.Vector3());
         const raio = cx.getSize(new THREE.Vector3()).length() / 2 || 5;
-        const dist = (raio / Math.sin((cam.fov * Math.PI / 180) / 2)) * 1.15;
         const dir = new THREE.Vector3(0.72, 0.48, 0.72).normalize();
+        const cantos = [];
+        for (const x of [cx.min.x, cx.max.x]) for (const y of [cx.min.y, cx.max.y]) for (const z of [cx.min.z, cx.max.z]) cantos.push(new THREE.Vector3(x, y, z));
+        let dist = (raio / Math.sin((cam.fov * Math.PI / 180) / 2)) * 1.15;
+        cam.near = Math.max(0.05, raio / 800); cam.far = raio * 40;
+        for (let volta = 0; volta < 2; volta++) {
+          cam.position.copy(centro).addScaledVector(dir, dist);
+          cam.lookAt(centro);
+          cam.updateProjectionMatrix(); cam.updateMatrixWorld(true);
+          let maior = 0;
+          for (const c of cantos) {
+            const p = c.clone().project(cam);
+            maior = Math.max(maior, Math.abs(p.x), Math.abs(p.y));
+          }
+          if (maior > 0.01) dist *= maior / 0.94;   // 0.94 = um respiro só na borda
+        }
         cam.position.copy(centro).addScaledVector(dir, dist);
-        cam.near = Math.max(0.05, dist / 800); cam.far = dist * 12;
         cam.lookAt(centro);
         cam.updateProjectionMatrix();
 
@@ -252,17 +283,27 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         //
         // ⚠ enquadra pela ESFERA envolvente e pelo campo de visão: distância fixa deixa obra
         // comprida cortada e obra pequena num ponto.
-        const irPara = (dirArr, alvo) => {
+        // ⚠ mesma conta do enquadramento inicial: vista trocada não pode encolher a obra.
+        const irPara = (dirArr) => {
           const cx2 = new THREE.Box3().setFromObject(cena);
-          const c2 = alvo || cx2.getCenter(new THREE.Vector3());
-          const r2 = (alvo ? raio * 0.18 : cx2.getSize(new THREE.Vector3()).length() / 2) || 5;
-          const d2 = (r2 / Math.sin((cam.fov * Math.PI / 180) / 2)) * 1.15;
-          cam.position.copy(c2).addScaledVector(new THREE.Vector3(...dirArr).normalize(), d2);
-          ctrl.target.copy(c2); cam.updateProjectionMatrix(); ctrl.update();
+          const c2 = cx2.getCenter(new THREE.Vector3());
+          const d = new THREE.Vector3(...dirArr).normalize();
+          const cantos2 = [];
+          for (const x of [cx2.min.x, cx2.max.x]) for (const y of [cx2.min.y, cx2.max.y]) for (const z of [cx2.min.z, cx2.max.z]) cantos2.push(new THREE.Vector3(x, y, z));
+          let d2 = (cx2.getSize(new THREE.Vector3()).length() / 2 || 5) / Math.sin((cam.fov * Math.PI / 180) / 2) * 1.15;
+          for (let v = 0; v < 2; v++) {
+            cam.position.copy(c2).addScaledVector(d, d2);
+            cam.lookAt(c2); cam.updateProjectionMatrix(); cam.updateMatrixWorld(true);
+            let maior = 0;
+            for (const c of cantos2) { const p = c.clone().project(cam); maior = Math.max(maior, Math.abs(p.x), Math.abs(p.y)); }
+            if (maior > 0.01) d2 *= maior / 0.94;
+          }
+          cam.position.copy(c2).addScaledVector(d, d2);
+          ctrl.target.copy(c2); cam.updateProjectionMatrix(); ctrl.update(); forcar = true;
         };
         const zoom = (f) => {
           const v = new THREE.Vector3().subVectors(cam.position, ctrl.target);
-          v.multiplyScalar(f); cam.position.copy(ctrl.target).add(v); ctrl.update();
+          v.multiplyScalar(f); cam.position.copy(ctrl.target).add(v); ctrl.update(); forcar = true;
         };
         // ⚠ enquadrar NA SELEÇÃO: é o gesto mais pedido num modelo grande — achar a peça que a
         // lista apontou sem caçar com o mouse.
@@ -276,17 +317,24 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
           const d3 = (r3 / Math.sin((cam.fov * Math.PI / 180) / 2)) * 2.2;
           const dir3 = new THREE.Vector3().subVectors(cam.position, ctrl.target).normalize();
           cam.position.copy(c3).addScaledVector(dir3, d3);
-          ctrl.target.copy(c3); ctrl.update();
+          ctrl.target.copy(c3); ctrl.update(); forcar = true;
         };
 
+        // ⚠ declarado ANTES dos observadores que o usam: `let` referenciado de um callback que
+        // dispare cedo demais estouraria em zona morta temporal.
+        let forcar = true;
         const medir = () => {
-          const w = el.clientWidth || 800, h = el.clientHeight || altura;
+          const w = el.clientWidth || 800, h = el.clientHeight || (typeof altura === "number" ? altura : 560);
           // ⚠ sem atualizar o CSS do canvas (3º argumento), o buffer fica 800×520 e o elemento
           // continua nos 300×150 padrão do <canvas> — a obra aparece espremida num canto.
           rend.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix();
         };
         medir();
         window.addEventListener("resize", medir);
+        // ⚠ a caixa muda de tamanho sem a janela mudar (painel lateral abre, layout se reorganiza).
+        // Sem observar isso, a cena fica esticada até alguém redimensionar o navegador.
+        const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => { medir(); forcar = true; }) : null;
+        ro?.observe(el);
 
         // ── clique ──
         const ray = new THREE.Raycaster(), pt = new THREE.Vector2();
@@ -310,7 +358,7 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         // à toa — e, num laptop, é o que faz o ventilador subir e o quadro cair justamente quando a
         // pessoa começa a girar. Com damping ligado o `update()` devolve `true` enquanto a inércia
         // corre, então o laço acompanha o movimento e dorme depois.
-        let raf = 0, forcar = true;
+        let raf = 0;
         const anima = () => {
           raf = requestAnimationFrame(anima);
           const mexeu = ctrl.update();
@@ -328,6 +376,7 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         limpar = () => {
           cancelAnimationFrame(raf);
           window.removeEventListener("resize", medir);
+          ro?.disconnect();
           rend.domElement.removeEventListener("pointerdown", down);
           rend.domElement.removeEventListener("pointermove", move);
           rend.domElement.removeEventListener("pointerup", up);
@@ -359,11 +408,29 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
     ref.current.pedirQuadro?.();
   }, [selecionada, cores, modo]);
 
+  useEffect(() => {
+    const ouvir = () => setCheia(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", ouvir);
+    return () => document.removeEventListener("fullscreenchange", ouvir);
+  }, []);
+  const alternarCheia = () => {
+    // ⚠ sai pelo Esc sozinho — é o gesto que a pessoa já tem; o botão é só o caminho de ida.
+    if (document.fullscreenElement) { document.exitFullscreen?.(); return; }
+    // ⚠ a tela cheia pega a TELA inteira (barra + modelo + painel da peça), não só a caixa do 3D:
+    // se pegasse só a caixa, clicar numa peça em tela cheia não mostraria dado nenhum — o painel
+    // estaria fora do elemento em tela cheia, e portanto invisível.
+    const alvo = caixa.current?.closest("[data-tela-cheia]") || caixa.current;
+    alvo?.requestFullscreen?.().catch(() => {});
+  };
+
   const rot = { carregando: "preparando…", baixando: "baixando o modelo…", lendo: "lendo o IFC…", montando: "montando as peças…" };
 
+  // ⚠ `altura="fill"` faz a cena ocupar o pai — é o que permite a tela do modelo ir de ponta a
+  // ponta em vez de viver dentro de um cartão com altura fixa.
+  const enche = altura === "fill";
   return (
-    <div className="relative bg-white" style={{ minHeight: altura }}>
-      <div ref={box} style={{ height: altura }} />
+    <div ref={caixa} className={`relative bg-white ${enche ? "h-full" : ""}`} style={enche ? undefined : { minHeight: altura }}>
+      <div ref={box} className={enche ? "h-full" : ""} style={enche ? undefined : { height: altura }} />
       {estado.fase !== "pronto" && estado.fase !== "erro" && (
         <div className="absolute inset-0 grid place-items-center bg-white/85">
           <p className="text-[13px] text-torg-gray">{rot[estado.fase] || "abrindo…"}</p>
@@ -401,6 +468,17 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
                 className="text-[10.5px] font-semibold px-2 py-1 rounded text-torg-gray hover:bg-torg-blue-50 hover:text-torg-blue disabled:opacity-35">ir até a peça</button>
             </div>
           </div>
+          {/* ⚠ o logo mora DENTRO da cena, no canto de baixo: a tela cheia esconde o portal inteiro,
+              e sem ele a obra ficaria flutuando sem dono — ainda mais numa tela de reunião ou num
+              print que vai para o cliente. Discreto de propósito: marca, não anúncio. */}
+          <img src="/torg-logo.png" alt="Torg Metal" draggable="false"
+            className="absolute left-4 bottom-4 h-9 opacity-70 pointer-events-none select-none" />
+
+          <button onClick={alternarCheia} title={cheia ? "Sair da tela cheia (Esc)" : "Preencher a tela"}
+            className="absolute right-3 top-[68px] bg-white/95 border border-gray-200 rounded-lg shadow-sm px-2 py-1 text-torg-gray hover:bg-torg-blue-50 hover:text-torg-blue">
+            {cheia ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </button>
+
           <div className="absolute right-3 bottom-3 flex flex-col bg-white/95 border border-gray-200 rounded-lg shadow-sm overflow-hidden">
             <button title="Aproximar" onClick={() => ref.current?.zoom?.(0.75)} className="px-2.5 py-1 text-torg-gray hover:bg-torg-blue-50 hover:text-torg-blue text-[15px] leading-none">+</button>
             <button title="Afastar" onClick={() => ref.current?.zoom?.(1.35)} className="px-2.5 py-1 text-torg-gray hover:bg-torg-blue-50 hover:text-torg-blue text-[15px] leading-none border-t border-gray-200">−</button>
