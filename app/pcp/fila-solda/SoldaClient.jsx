@@ -70,7 +70,10 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   // ⚠ o seletor lista só obra com pendência REAL — a não ser que você esteja olhando uma bancada,
   // quando o assunto passa a ser o que está lá dentro.
   const ops = useMemo(() => {
-    const base = filtroBancada ? fila.filter((c) => (filtroBancada === "__sem" ? !c.soldaBancada : c.soldaBancada === filtroBancada)) : aProgramar;
+    const base = !filtroBancada ? aProgramar
+      : filtroBancada === "__sem" ? fila.filter((c) => !c.soldaBancada)
+      : filtroBancada === "__prog" ? fila.filter((c) => c.soldaBancada)
+      : fila.filter((c) => c.soldaBancada === filtroBancada);
     return [...new Set(base.map((c) => c.opNumero).filter(Boolean))]
       .sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { numeric: true }));
   }, [fila, aProgramar, filtroBancada]);
@@ -82,6 +85,11 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
     return base.filter((c) => {
       if (filtroOp && c.opNumero !== filtroOp) return false;
       if (filtroBancada === "__sem") { if (c.soldaBancada) return false; }
+      // ⚠⚠ "PROGRAMADO" É O CAMINHO DE VOLTA. Vitor (01/09/2026): "eu programei a 102A e não
+      // consigo mais encontrar ela para desfazer". Tirar o programado da lista (pedido dele) deixou
+      // como única porta de volta adivinhar em QUAL bancada a obra caiu — e ninguém guarda isso. Ele
+      // pensa em OBRA; a bancada é consequência.
+      else if (filtroBancada === "__prog") { if (!c.soldaBancada) return false; }
       else if (filtroBancada && c.soldaBancada !== filtroBancada) return false;
       if (!q) return true;
       return [c.marca, c.descricao, c.op?.cliente, c.op?.obra].some((v) => String(v ?? "").toLowerCase().includes(q));
@@ -103,7 +111,9 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   //   • sem bancada escolhida, a pergunta é "o que falta programar" → agrupa por OBRA;
   //   • com uma bancada escolhida, a pergunta é "o que essa máquina faz e quando" → agrupa por DIA,
   //     e o dia é o título grande do bloco, não uma linha secundária.
-  const porDia = !!filtroBancada && filtroBancada !== "__sem";
+  // ⚠ por DIA só quando se olha UMA bancada. Em "programado" o assunto é a obra — agrupar por dia
+  // ali espalharia a 102A por vários blocos e o problema voltaria com outra roupa.
+  const porDia = !!filtroBancada && filtroBancada !== "__sem" && filtroBancada !== "__prog";
   const grupos = useMemo(() => {
     const m = new Map();
     for (const c of filtrados) {
@@ -359,6 +369,15 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
               </button>
             );
           })}
+          {/* ⚠ o chip que devolve o que foi programado — a porta de volta que faltava */}
+          <button onClick={() => setFiltroBancada(filtroBancada === "__prog" ? "" : "__prog")}
+            title="Tudo que já tem bancada, agrupado por obra — é por aqui que se desfaz"
+            className={`px-2.5 py-1.5 rounded-lg border text-left transition-colors ${
+              filtroBancada === "__prog" ? "border-torg-blue bg-torg-blue text-white"
+                : "border-torg-blue-200 bg-torg-blue-50 text-torg-blue hover:bg-torg-blue-100"}`}>
+            <span className="block text-[11px] font-bold uppercase tracking-wide truncate">programado</span>
+            <span className="block text-[10px] truncate opacity-80">{comBancada.length} conj · todas as bancadas</span>
+          </button>
           <button onClick={() => setFiltroBancada(filtroBancada === "__sem" ? "" : "__sem")}
             title="Conjuntos que ainda não foram para nenhuma bancada"
             className={`px-2.5 py-1.5 rounded-lg border text-left transition-colors ${
