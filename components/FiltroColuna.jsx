@@ -108,7 +108,19 @@ export function ThFiltro({ col, label, larg = "", dica, className = "", filtros,
     medir();
     window.addEventListener("resize", medir);
     window.addEventListener("scroll", medir, true);
-    return () => { window.removeEventListener("resize", medir); window.removeEventListener("scroll", medir, true); };
+    // ⚠⚠ E QUANDO A TABELA MUDA DE TAMANHO DEBAIXO DO MENU. Vitor (02/09/2026): "quando já clico
+    // você já aplica o filtro e aí a tela fica bugada". Marcar uma opção filtra na hora — é o
+    // comportamento do Excel e é o certo —, só que a tabela desaba de 150 linhas para 1, tudo à
+    // volta sobe, e o menu ficava parado onde o cabeçalho estava ANTES: descolado do botão, por
+    // cima do que não devia. `resize`/`scroll` não cobrem isso, porque a janela não mudou e a
+    // página não rolou; quem mudou foi o layout.
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(medir) : null;
+    ro?.observe(document.body);
+    return () => {
+      window.removeEventListener("resize", medir);
+      window.removeEventListener("scroll", medir, true);
+      ro?.disconnect();
+    };
   }, [aberto]);
 
   useEffect(() => {

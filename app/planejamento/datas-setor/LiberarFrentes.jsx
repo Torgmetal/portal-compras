@@ -62,7 +62,13 @@ const COLUNAS = [
   // é a célula.
   { key: "nc1",      label: "NC1",      valor: (p) => (p.temMaquina == null ? "não medido" : p.temMaquina ? "tem NC1" : "sem NC1") },
   { key: "material", label: "Material", valor: (p) => (!p.material ? "não medido"
-      : p.materialRInformado ? `estoque · R ${p.materialRInformado}`
+      // ⚠⚠ NO FILTRO VAI A CATEGORIA, NUNCA O NÚMERO DO R. Vitor (02/09/2026): "no filtro você não
+      // permite que eu selecione mais que 1 (…) a tela fica bugada". Eu tinha posto `estoque · R
+      // 250039` aqui — e como cada perfil tem o seu R, a lista de opções da coluna virou uma opção
+      // POR FARDO. Filtrar por "material de estoque" deixava de existir: viravam dez linhas quase
+      // iguais, e marcar uma sobrava um resultado só. O R é informação da célula e da planilha, não
+      // um critério de agrupamento.
+      : p.materialRInformado ? "estoque (R informado)"
       : p.materialPorTroca ? "entregue (R amarrado)" : MAT[p.material]?.rot || "recarregue a página") },
   { key: "desenho",  label: "Desenho",  valor: (p) => (p.temDesenho == null ? "não conferido" : p.temDesenho ? "tem desenho"
       : p.desenhoForaPadrao ? "outro nome" : "sem desenho") },
