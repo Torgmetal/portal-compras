@@ -698,24 +698,50 @@ function DocumentosDaArea({ grupos, token, cod }) {
   });
   const pesoSel = todos.filter((d) => sel.has(d.id)).reduce((t, d) => t + (d.tamanho || 0), 0);
 
+  // ⚠⚠ QUEBRA EM PARTES QUE CABEM. Vitor (01/09/2026): "certifique-se que no caso de arquivos muito
+  // pesados você extraia em um zip esses projetos para não ter erro".
+  //
+  // O ZIP é montado INTEIRO em memória no servidor, então existe um teto de bytes real. Mandar a
+  // seleção inteira e torcer dava um erro seco depois de trinta segundos de espera — com a pasta de
+  // fabricação (centenas de desenhos) isso passou a ser o caso comum, não a exceção.
+  //
+  // ⚠ O CORTE É POR TAMANHO, não por quantidade: cada item já traz o `tamanho`, e é o peso somado
+  // que derruba a função. Um arquivo sozinho maior que o teto vai na sua própria parte — cabe ao
+  // servidor recusá-lo com a mensagem certa, não a esta função escondê-lo.
+  const TETO_PARTE = 50 * 1024 * 1024;
+
   async function baixar() {
     setBaixando(true); setErro("");
     try {
-      const r = await fetch(`/api/portal/${token}/eng-zip${cod ? `?d=${encodeURIComponent(cod)}` : ""}`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: [...sel] }),
-      });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error(j.error || "Não consegui montar o download.");
+      const escolhidos = todos.filter((d) => sel.has(d.id));
+      const partes = [];
+      let atual = [], peso = 0;
+      for (const d of escolhidos) {
+        const t = Number(d.tamanho) || 0;
+        if (atual.length && peso + t > TETO_PARTE) { partes.push(atual); atual = []; peso = 0; }
+        atual.push(d); peso += t;
       }
-      const blob = await r.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `documentos-${(r.headers.get("content-disposition") || "").match(/OP-\d+/)?.[0] || "obra"}.zip`;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      if (atual.length) partes.push(atual);
+
+      for (let k = 0; k < partes.length; k++) {
+        const r = await fetch(`/api/portal/${token}/eng-zip${cod ? `?d=${encodeURIComponent(cod)}` : ""}`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: partes[k].map((d) => d.id) }),
+        });
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          throw new Error((j.error || "Não consegui montar o download.") + (partes.length > 1 ? ` (parte ${k + 1} de ${partes.length})` : ""));
+        }
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const obra = (r.headers.get("content-disposition") || "").match(/OP-\d+/)?.[0] || "obra";
+        // ⚠ o nome numera a parte: "documentos.zip (1)" na pasta de downloads não diz nada
+        a.download = partes.length > 1 ? `documentos-${obra}-parte-${k + 1}-de-${partes.length}.zip` : `documentos-${obra}.zip`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+      }
       setSel(new Set());
     } catch (e) { setErro(e.message); } finally { setBaixando(false); }
   }

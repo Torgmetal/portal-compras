@@ -24,8 +24,13 @@ const GRAPH = "https://graph.microsoft.com/v1.0";
 // diferente do volume do Data Book, que passa de 90 MB porque é repassado em stream. Uma seleção de
 // 25 desenhos com o modelo 3D junto passa fácil de 200 MB: a função morre sem dizer por quê e o
 // cliente vê só um download que falhou. Com o teto, ele lê o motivo e baixa em duas levas.
+// ⚠ O TETO QUE PROTEGE É O DE BYTES, não o de arquivos. Vitor (01/09/2026): "certifique-se que no
+// caso de arquivos muito pesados você extraia em um zip esses projetos para não ter erro". Desenho
+// de conjunto pesa ~120 KB: 60 arquivos barravam uma pasta de 240 que soma 31 MB — bem dentro do
+// limite de memória. O limite de contagem virou uma trava contra pedido absurdo, não contra o uso
+// normal; quem manda a memória embora é o total.
 const TETO_BYTES = 60 * 1024 * 1024;
-const TETO_ARQUIVOS = 60;
+const TETO_ARQUIVOS = 400;
 
 export async function POST(req, { params }) {
   const { token } = await params;

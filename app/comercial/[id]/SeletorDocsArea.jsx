@@ -157,6 +157,28 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea, tipo, nomeTi
             </button>
           );
         })}
+        {/* ⚠⚠ MARCAR A PASTA INTEIRA. Vitor (01/09/2026): "deixe uma caixa de seleção nos projetos
+            de fabricação, para podermos selecionar todos de uma vez". A pasta do cliente da OP-113
+            tem ~240 arquivos (o PDF e o DWG de cada conjunto) — marcar um a um não é trabalho, é
+            impedimento, e quem tenta desiste no meio e publica a obra pela metade.
+            ⚠ Marca o que está NA PASTA ABERTA, não o tipo inteiro: é o que está à vista, e é o que
+            a pessoa acha que está marcando. */}
+        {!carregando && (d?.arquivos || []).length > 1 && (() => {
+          const lista = d.arquivos;
+          const marcados = lista.filter((a) => sel.has(String(a.id))).length;
+          const todos = marcados === lista.length;
+          return (
+            <label className="flex items-center gap-2 px-3 py-2 bg-gray-50/80 border-b border-gray-100 cursor-pointer sticky top-0 z-10">
+              <input type="checkbox" checked={todos} className="accent-torg-orange"
+                ref={(el) => { if (el) el.indeterminate = marcados > 0 && !todos; }}
+                onChange={() => lista.forEach((a) => marcar(a, !todos))} />
+              <span className="text-[12px] font-semibold text-torg-dark">
+                {todos ? "desmarcar" : "marcar"} os {lista.length} arquivos desta pasta
+              </span>
+              {marcados > 0 && <span className="text-[11px] text-torg-gray ml-auto">{marcados} marcado(s)</span>}
+            </label>
+          );
+        })()}
         {!carregando && (d?.arquivos || []).map((a) => {
           const on = sel.has(String(a.id));
           const doc = sel.get(String(a.id));
