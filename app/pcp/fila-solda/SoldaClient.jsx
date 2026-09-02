@@ -149,6 +149,27 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   // sumiu e a folha foi junto. Agora a planilha do que está nas bancadas sai a qualquer momento.
   const comBancada = useMemo(() => fila.filter((c) => c.soldaBancada), [fila]);
   const ocupadasHoje = useMemo(() => ocupacaoDasBancadas(comBancada, isoHoje(), RITMO_META), [comBancada]);
+
+  // ⚠⚠ A TRAVA VALE PARA MOVER TAMBÉM. Vitor (01/09/2026): "precisa ter uma trava e não deixar
+  // colocar a bancada a data em que ela estiver em uso". Eu tinha deixado o mover livre argumentando
+  // que fato consumado não se discute com algoritmo — mas sem trava duas cargas caem na mesma
+  // bancada no mesmo dia e o plano vira ficção, que é pior que a rigidez.
+  //
+  // O dia que interessa é o da SELEÇÃO (o mais cedo dela; sem data, hoje): mover para uma bancada
+  // ocupada ATÉ DEPOIS desse dia é o que cria a sobreposição. Bancada que vaga antes é livre.
+  //
+  // ⚠ A própria bancada de origem nunca trava: mover de volta para onde já está não acrescenta
+  // carga nenhuma.
+  const diaAlvo = useMemo(() => {
+    const dias = selecao.map((c) => (c.soldaDiaProgramado ? String(c.soldaDiaProgramado).slice(0, 10) : null)).filter(Boolean);
+    return dias.length ? dias.sort()[0] : isoHoje();
+  }, [selecao]);
+  const bancadasDaSelecao = useMemo(() => new Set(selecao.map((c) => c.soldaBancada).filter(Boolean)), [selecao]);
+  const travada = (b) => {
+    if (bancadasDaSelecao.has(b)) return null;
+    const o = ocupadasHoje[b];
+    return o && o.livreEm > diaAlvo ? o : null;
+  };
   async function planilhaDasBancadas() {
     setAgindo(true); setErro("");
     try {
@@ -235,6 +256,10 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   // raramente quer trocar a data junto, e mandar as duas juntas apagaria a programação sem pedir.
   async function mudarBancada() {
     if (!novaBancada || !selecao.length) return;
+    // ⚠ confere de novo na hora de gravar: a seleção pode ter mudado depois de escolher a bancada
+    // no seletor, e aí a trava que valia deixa de valer (ou passa a valer).
+    const t = travada(novaBancada);
+    if (t) { setErro(`${novaBancada} está ocupada até ${fmtDiaLongo(t.livreEm)} — mude a data antes, ou escolha outra.`); return; }
     setAgindo(true); setErro(""); setOkMsg("");
     try {
       const ids = selecao.map((c) => c.id);
@@ -394,8 +419,12 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
             className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg bg-white">
             <option value="">mover para…</option>
             {BANCADAS.map((b) => {
-              const o = ocupadasHoje[b];
-              return <option key={b} value={b}>{b}{o ? ` (${o.conj} conj até ${fmtDiaLongo(o.livreEm)})` : " (livre)"}</option>;
+              const t = travada(b);
+              return (
+                <option key={b} value={b} disabled={!!t}>
+                  {b}{t ? ` — ocupada até ${fmtDiaLongo(t.livreEm)}` : ocupadasHoje[b] ? ` (${ocupadasHoje[b].conj} conj)` : " (livre)"}
+                </option>
+              );
             })}
           </select>
           <button onClick={mudarBancada} disabled={agindo || !novaBancada}
@@ -416,9 +445,9 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
             <CheckCircle2 size={13} /> Baixa manual
           </button>
           <button onClick={() => definir(null)} disabled={agindo}
-            title="Tira a bancada e a data — o conjunto volta para a fila sem destino"
-            className="px-3 py-1.5 border border-gray-200 text-torg-gray text-xs rounded-lg hover:bg-gray-50 disabled:opacity-50">
-            Tirar da bancada
+            title="Tira a bancada E a data — o conjunto volta para a fila sem destino, como se nunca tivesse sido programado"
+            className="px-3 py-1.5 border border-gray-200 text-torg-gray text-xs font-semibold rounded-lg hover:bg-gray-50 disabled:opacity-50 inline-flex items-center gap-1">
+            <X size={13} /> Tirar da programação
           </button>
           <button onClick={() => setSel(new Set())} className="ml-auto p-1.5 text-torg-gray hover:bg-white rounded-lg"><X size={14} /></button>
         </div>
