@@ -65,6 +65,23 @@ export async function GET(req) {
     if (k != null) lePorNum.set(k, (lePorNum.get(k) || 0) + g._count._all);
   }
 
+  // ⚠⚠ "A LE COBRE A LPC?" — a regra do Vitor (02/09/2026): "a LE e a LPC, a única diferença
+  // deveria estar nos itens que mandamos direto para a obra; a quantidade de conjuntos e marcas
+  // devem ser iguais. Na lista de expedição é todos eles e os acessórios".
+  //
+  // Vira verificação: toda marca da LPC que NÃO é croqui tem de estar na LE. Croqui é sub-peça e
+  // não se expede, por isso sai da conta. O que a LE tem a mais são os acessórios — e sobrar é
+  // esperado, faltar não é.
+  //
+  // ⚠ Isto teria pego a OP-113 antes do cliente: a LE estava três dias atrás da LPC e nada na tela
+  // dizia isso. Uma consulta só, agrupada por OP.
+  const faltamLE = await prisma.pecaConjunto.groupBy({
+    by: ["opId"],
+    where: { opId: { not: null }, naLPC: true, naLE: false, tipoPeca: { not: "CROQUI" } },
+    _count: { _all: true },
+  });
+  const semCoberturaLE = new Map(faltamLE.map((g) => [g.opId, g._count._all]));
+
   const lpcPorNum = new Map();
   for (const g of grpNum) {
     if (!g.naLPC) continue;
@@ -83,6 +100,8 @@ export async function GET(req) {
       // falta e ninguém saberia que a obra tem lista sem vínculo — que também precisa de conserto,
       // só que de outro tipo (ligar o opId, não reimportar).
       soltaLE: c.LE === 0 && leNum > 0, soltaLPC: c.LPC === 0 && lpcNum > 0,
+      // quantas marcas da LPC (fora croqui) a LE não tem
+      faltamNaLE: semCoberturaLE.get(op.id) || 0,
       nLE: Math.max(c.LE, leNum), nLPC: Math.max(c.LPC, lpcNum),
     };
   });
@@ -101,6 +120,7 @@ export async function GET(req) {
     semLE: linhas.filter((l) => !l.temLE).length,
     semLPC: linhas.filter((l) => !l.temLPC).length,
     semAlguma: linhas.filter((l) => !l.temLE || !l.temLPC).length,
+    semCobertura: linhas.filter((l) => l.faltamNaLE > 0).length,
     linhas,
   });
 }

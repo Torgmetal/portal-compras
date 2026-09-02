@@ -9,7 +9,17 @@ const STATUS_LABEL = {
 };
 
 // Badge ✓/✗ pra cada tipo de lista.
-function Marca({ tem, n }) {
+// ⚠⚠ "SOLTA" É UM TERCEIRO ESTADO, e existe para evitar o conserto errado. Lista solta é lista que
+// EXISTE, só não está vinculada à OP (`opId` nulo) — reimportar não resolve nada e ainda substitui
+// o conteúdo. Enquanto isso era mostrado como "falta", a leitura natural era reimportar; foi essa
+// leitura que fez a OP-113 perder 76 marcas e o cliente receber o aviso.
+function Marca({ tem, n, solta }) {
+  if (solta) return (
+    <span title={`${n} peça(s) existem, mas sem vínculo com esta OP. O conserto é ligar o vínculo — reimportar substituiria a lista.`}
+      className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 text-[12px] font-semibold">
+      solta ({n})
+    </span>
+  );
   return tem ? (
     <span title={`${n} peça(s) importada(s)`} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[12px] font-semibold">
       <Check size={13} /> tem
@@ -100,7 +110,7 @@ export default function CoberturaListas() {
           <h2 className="text-base font-bold text-torg-dark">Obras sem lista</h2>
           <p className="text-[13px] text-torg-gray">
             {dados
-              ? `${dados.semAlguma} de ${dados.total} obra(s) ${todas ? "" : "ativa(s) "}sem alguma lista · ${dados.semLPC} sem LPC · ${dados.semLE} sem LE`
+              ? `${dados.semAlguma} de ${dados.total} obra(s) ${todas ? "" : "ativa(s) "}sem alguma lista · ${dados.semLPC} sem LPC · ${dados.semLE} sem LE${dados.semCobertura ? ` · ${dados.semCobertura} com a LE atrás da LPC` : ""}`
               : "Cobertura de LE e LPC por OP"}
           </p>
         </div>
@@ -121,6 +131,22 @@ export default function CoberturaListas() {
             <button onClick={() => carregar(todas)} disabled={carregando} className="inline-flex items-center gap-1 text-torg-blue hover:underline disabled:opacity-50">
               {carregando ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Atualizar
             </button>
+          </div>
+
+          {/* ⚠⚠ O AVISO NÃO MANDA REIMPORTAR. Vitor (02/09/2026): "vale a pena olharmos com cuidado
+              antes de sairmos incluindo novas listas, deixa bem claro isso, pois a sua informação
+              estava nos fazendo errar".
+              A tela dizia "falta lista" e a leitura natural era reimportar — foi assim que a OP-113
+              perdeu 76 marcas e o cliente recebeu o aviso. Agora ela diz o FATO e nomeia o conserto
+              certo de cada caso, que quase nunca é reimportar. */}
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-[12px] text-amber-900">
+            <p className="font-semibold mb-1">Confira o arquivo antes de reimportar.</p>
+            <ul className="space-y-0.5 text-amber-800">
+              <li><b>solta</b> — a lista existe, só não está vinculada à OP. Reimportar não resolve; o conserto é ligar o vínculo.</li>
+              <li><b>LE atrás da LPC</b> — a LE não tem marcas que a LPC tem. Confira se a revisão na pasta é mais nova antes de trazer.</li>
+              <li><b>sem lista</b> — aí sim é importar. Confira que o arquivo é a revisão corrente e está completo.</li>
+            </ul>
+            <p className="mt-1.5 text-amber-800">Reimportar substitui a lista inteira pelo que estiver no arquivo — e o portal do cliente registra a diferença.</p>
           </div>
 
           {erro && <p className="text-[13px] text-red-600">Não consegui carregar: {erro}</p>}
@@ -144,7 +170,8 @@ export default function CoberturaListas() {
                     <th className="py-2 pr-3 font-semibold">Obra / Cliente</th>
                     <th className="py-2 pr-3 font-semibold whitespace-nowrap">Status</th>
                     <th className="py-2 pr-3 font-semibold text-center">LPC</th>
-                    <th className="py-2 font-semibold text-center">LE</th>
+                    <th className="py-2 pr-3 font-semibold text-center">LE</th>
+                    <th className="py-2 font-semibold text-center whitespace-nowrap" title="Toda marca da LPC que não é croqui tem de estar na LE. O que a LE tem a mais são os acessórios — sobrar é esperado, faltar não.">LE cobre a LPC?</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -156,9 +183,9 @@ export default function CoberturaListas() {
                         <div className="text-[11px] text-torg-gray truncate max-w-[260px]">{l.cliente}</div>
                       </td>
                       <td className="py-2 pr-3 text-torg-gray whitespace-nowrap">{STATUS_LABEL[l.status] || l.status}</td>
-                      <td className="py-2 pr-3 text-center"><Marca tem={l.temLPC} n={l.nLPC} /></td>
-                      <td className="py-2 text-center">
-                        <Marca tem={l.temLE} n={l.nLE} />
+                      <td className="py-2 pr-3 text-center"><Marca tem={l.temLPC} n={l.nLPC} solta={l.soltaLPC} /></td>
+                      <td className="py-2 pr-3 text-center">
+                        <Marca tem={l.temLE} n={l.nLE} solta={l.soltaLE} />
                         {/* o arquivo costuma JA ESTAR no servidor — o que falta e carregar */}
                         {ehAdmin && !l.temLE && (
                           <button onClick={() => verNoServidor(l.numero)} disabled={puxando === l.numero}
@@ -166,6 +193,22 @@ export default function CoberturaListas() {
                             {puxando === l.numero ? <Loader2 size={11} className="animate-spin" /> : <DownloadCloud size={11} />}
                             buscar no servidor
                           </button>
+                        )}
+                      </td>
+                      {/* ⚠ o fato, sem receita: quantas marcas da LPC a LE não tem. O que fazer
+                          depende da revisão que está na pasta, e isso a tela não sabe. */}
+                      <td className="py-2 text-center">
+                        {!l.temLPC || !l.temLE ? (
+                          <span className="text-torg-gray-light text-[12px]">—</span>
+                        ) : l.faltamNaLE > 0 ? (
+                          <span title="Marcas da LPC (fora croqui) que a LE não tem. Confira a revisão na pasta antes de reimportar."
+                            className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 text-[12px] font-semibold">
+                            {l.faltamNaLE} faltando
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[12px] font-semibold">
+                            <Check size={13} /> cobre
+                          </span>
                         )}
                       </td>
                     </tr>
