@@ -111,16 +111,28 @@ export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, o
             {resumo.ops.length} OPs no lote
           </span>
         )}
-        <span className="text-[11px] text-torg-gray ml-auto">bancadas:</span>
+        {/* ⚠ "quantas bancadas vão soldar", não "bancadas". Vitor (01/09/2026) precisou perguntar o
+            que o seletor fazia — e rótulo que exige pergunta é rótulo errado. O número é QUANTAS;
+            QUAIS quem escolhe é o painel, entre as livres na data. */}
+        <span className="text-[11px] text-torg-gray ml-auto">quantas bancadas vão soldar:</span>
         <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
           {[1, 2, 3, 4, 5, 6].map((x) => (
             <button key={x} onClick={() => setN(x)}
               className={`px-2.5 py-1 text-sm font-semibold ${x === n ? "bg-torg-blue text-white" : "bg-white text-torg-gray hover:bg-gray-50"}`}>{x}</button>
           ))}
         </div>
+        <span className="text-[11px] text-torg-gray">a partir de</span>
         <input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)}
           className="px-2 py-1 text-sm border border-gray-200 rounded-lg" />
       </div>
+      {/* ⚠ quais entraram, escrito por extenso: pedir 6 e receber 4 (bancada ocupada) precisa ser
+          legível sem abrir o cartão de resumo. */}
+      {nomes.length > 0 && (
+        <p className="text-[11px] text-torg-gray -mt-1">
+          vão soldar: <b className="text-torg-dark">{nomes.join(" · ")}</b>
+          {nomes.length < n && <span className="text-amber-700 font-semibold"> — as outras estão ocupadas nesta data</span>}
+        </p>
+      )}
 
       {(ocupadas.length > 0 || nomes.length < n) && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
