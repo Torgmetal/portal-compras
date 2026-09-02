@@ -198,27 +198,37 @@ export function Painel({ d }) {
         </Bloco>
       )}
 
+      {/* ⚠⚠ UMA LINHA POR PERFIL, E O MOTIVO QUANDO NÃO HÁ R. Vitor (03/09/2026), na foto de um
+          conjunto com a mesma cantoneira repetida onze vezes: "aqui não é real que está sem R, é?".
+          Era real — só que por prazo de fornecedor, não por furo de rastreio. "Sem R" sozinho, em
+          vermelho, acusa quem não tem culpa; agora a linha diz POR QUE não há R. */}
       <Bloco titulo="Rastreabilidade">
-        {d.rastreio?.length ? d.rastreio.map((r, i) => (
-          <div key={i} className="text-[12px] mb-1 last:mb-0">
-            <span className="font-mono font-semibold">{r.perfil}</span>
-            {r.usadas?.length ? r.usadas.map((u, k) => (
-              <span key={k} className="ml-2">
-                <span className="font-mono font-semibold text-emerald-700">R {u.r}</span>
-                {u.corrida && <span className="text-torg-gray"> · corrida {u.corrida}</span>}
-                {u.nf && <span className="text-torg-gray"> · NF {u.nf}</span>}
-                {u.indicado && <span className="text-torg-gray-light"> (indicado)</span>}
-              </span>
-            )) : <span className="ml-2 text-red-600 italic">sem R</span>}
-          </div>
-        )) : <p className="text-[12.5px] text-torg-gray italic">Sem rastreio ainda.</p>}
-        {d.material && (
-          <p className="text-[11.5px] text-torg-gray mt-1.5">
-            Material: {d.material.estado === "NA_OP" ? "entregue nesta obra"
-              : d.material.estado === "ESTOQUE" ? `de estoque${d.material.rInformado ? ` · R ${d.material.rInformado}` : " — sem o R informado"}`
-              : d.material.rotulo || "não comprado"}
-          </p>
-        )}
+        {d.rastreio?.length ? d.rastreio.map((r, i) => {
+          const mat = d.materialPorPerfil?.[r.perfil] || null;
+          return (
+            <div key={i} className="text-[12px] mb-1.5 last:mb-0">
+              <span className="font-mono font-semibold">{r.perfil}</span>
+              {r.posicoes > 1 && <span className="text-torg-gray-light ml-1">{r.posicoes}×</span>}
+              {r.usadas?.length ? r.usadas.map((u, k) => (
+                <span key={k} className="ml-2">
+                  <span className="font-mono font-semibold text-emerald-700">R {u.r}</span>
+                  {u.corrida && <span className="text-torg-gray"> · corrida {u.corrida}</span>}
+                  {u.nf && <span className="text-torg-gray"> · NF {u.nf}</span>}
+                  {u.indicado && <span className="text-torg-gray-light"> (indicado)</span>}
+                </span>
+              )) : (
+                <span className="ml-2">
+                  {mat?.estado === "ESTOQUE" && !mat.rInformado
+                    ? <span className="text-amber-700">{mat.rotulo === "aguardando entrega" ? "aço a caminho — sem entrada no CMR ainda" : `de estoque · ${mat.rotulo || "sem o R informado"}`}</span>
+                    : mat && mat.estado !== "NA_OP"
+                    ? <span className="text-amber-700">{mat.rotulo || "material não comprado"}</span>
+                    : <span className="text-red-600 italic">sem R</span>}
+                </span>
+              )}
+              {mat?.descricaoCmr && <span className="block text-[11px] text-torg-gray-light truncate" title={mat.descricaoCmr}>{mat.descricaoCmr}</span>}
+            </div>
+          );
+        }) : <p className="text-[12.5px] text-torg-gray italic">Sem rastreio ainda.</p>}
       </Bloco>
 
       <Bloco titulo="Onde está na fábrica">

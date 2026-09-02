@@ -106,9 +106,15 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         el.innerHTML = "";
         el.appendChild(rend.domElement);
         rend.setSize(el.clientWidth || 800, altura);
-        cena.add(new THREE.AmbientLight(0xffffff, 0.75));
-        const sol = new THREE.DirectionalLight(0xffffff, 0.9); sol.position.set(1, 2, 1.4); cena.add(sol);
-        const sol2 = new THREE.DirectionalLight(0xffffff, 0.35); sol2.position.set(-1, -0.6, -1); cena.add(sol2);
+        // ⚠⚠ ILUMINAÇÃO DE CAD, NÃO DE CENA. Vitor (03/09/2026): "não tem a mesma visão que tem no
+        // Trimble Connect, é muito mais detalhado". Luz ambiente chapada some com o relevo: aba de
+        // perfil, alma e enrijecedor ficam do mesmo tom e a peça vira um borrão. A hemisférica dá
+        // céu claro e chão escuro — é ela que faz a face de cima ler diferente da de baixo —, e as
+        // duas direcionais cruzadas revelam a face que ficaria preta.
+        cena.add(new THREE.HemisphereLight(0xffffff, 0xb8c4cf, 0.95));
+        const sol = new THREE.DirectionalLight(0xffffff, 0.75); sol.position.set(1, 2, 1.4); cena.add(sol);
+        const sol2 = new THREE.DirectionalLight(0xffffff, 0.35); sol2.position.set(-1.2, 0.6, -1); cena.add(sol2);
+        const sol3 = new THREE.DirectionalLight(0xffffff, 0.2); sol3.position.set(0, -1, 0.4); cena.add(sol3);
 
         // ── malha: uma por MARCA, para pintar e destacar por conjunto ──
         setEstado({ fase: "montando", pct: 0 });
@@ -143,14 +149,29 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         // quadro por causa das chamadas de desenho; por marca dá algumas centenas.
         const { mergeGeometries } = await import("three/examples/jsm/utils/BufferGeometryUtils.js");
         const malhas = new Map();
+        const arestas = new Map();
         for (const [marca, gs] of porMarca) {
           const junta = gs.length === 1 ? gs[0] : mergeGeometries(gs, false);
           if (!junta) continue;
           const cor = cores?.[marca] ? new THREE.Color(cores[marca]) : new THREE.Color(COR_PADRAO);
-          const mat = new THREE.MeshLambertMaterial({ color: cor, side: THREE.DoubleSide });
+          // ⚠ Phong com brilho baixo em vez de Lambert: o realce especular é o que dá a leitura de
+          // metal e separa a mesa da alma num perfil. Sem ele o aço parece papel.
+          const mat = new THREE.MeshPhongMaterial({ color: cor, shininess: 18, specular: 0x2a3540, side: THREE.DoubleSide, flatShading: false });
           const m = new THREE.Mesh(junta, mat);
           m.userData.marca = marca === "__sem_marca__" ? null : marca;
           cena.add(m); malhas.set(marca, m);
+
+          // ⚠⚠ AS ARESTAS SÃO O QUE FALTAVA. É o traço do contorno que separa uma peça da vizinha:
+          // sem ele, dois perfis cinza encostados viram um bloco só, e é exatamente essa a
+          // diferença que se nota contra o Trimble. Limiar de 25°: abaixo disso a aresta é curvatura
+          // de tubo e desenhá-la encheria a tela de risco.
+          try {
+            const eg = new THREE.EdgesGeometry(junta, 25);
+            const el = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x33465a, transparent: true, opacity: 0.5 }));
+            el.userData.aresta = marca;
+            el.raycast = () => {};        // aresta não recebe clique: quem responde é o sólido
+            cena.add(el); arestas.set(marca, el);
+          } catch { /* peça sem geometria de aresta: segue sem contorno, não é motivo de parar */ }
           gs.forEach((g2) => { if (g2 !== junta) g2.dispose(); });
         }
         api.CloseModel(modelID);
@@ -205,7 +226,7 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         const anima = () => { raf = requestAnimationFrame(anima); ctrl.update(); rend.render(cena, cam); };
         anima();
 
-        ref.current = { THREE, cena, malhas, rend, cam, ctrl };
+        ref.current = { THREE, cena, malhas, arestas, rend, cam, ctrl };
         setInfo({ conjuntos: total, malhas: malhas.size, geometrias: n });
         setEstado({ fase: "pronto" });
 
@@ -217,6 +238,7 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
           rend.domElement.removeEventListener("pointerup", up);
           ctrl.dispose();
           for (const m of malhas.values()) { m.geometry.dispose(); m.material.dispose(); }
+          for (const a of arestas.values()) { a.geometry.dispose(); a.material.dispose(); }
           rend.dispose();
           if (el) el.innerHTML = "";
         };

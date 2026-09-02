@@ -100,29 +100,60 @@ export async function GET(req) {
       const { porPerfil } = await analisarMaterial(op.numero, perfis.map((perfil, ix) => ({ id: `p${ix}`, perfil })));
       itens = aplicarAmarracaoNosItens(itens, rDoMaterialDaObra(porPerfil));
     }
-    rastreio = itens
-      .filter((i) => i.situacao || (i.usadas || []).some((u) => u?.rastreio))
-      .map((i) => ({
-        perfil: i.perfil, situacao: i.situacao,
-        usadas: (i.usadas || []).map((u) => ({
-          r: u.rastreio || null, corrida: u.corrida || null, certificado: u.certificado || null,
-          norma: u.norma || null, nf: u.nf || null, fornecedor: u.fornecedor || null,
-          material: u.material || null, indicado: !!u.indicado,
-        })),
-      }));
+    // ⚠⚠ UMA LINHA POR PERFIL, NÃO POR POSIÇÃO. Vitor (03/09/2026) mandou a foto de um conjunto com
+    // `L1.1/2''X1/8''  sem R` repetido ONZE vezes: o motor devolve uma entrada por posição da peça,
+    // e o conjunto tem onze cantoneiras iguais. Onze linhas idênticas não informam — escondem as
+    // outras posições e fazem parecer onze problemas onde há um.
+    const porPerfil = new Map();
+    for (const i of itens) {
+      if (!i.situacao && !(i.usadas || []).some((u) => u?.rastreio)) continue;
+      const k = String(i.perfil || "—");
+      const g = porPerfil.get(k) || { perfil: i.perfil, situacao: i.situacao, posicoes: 0, rs: new Map() };
+      g.posicoes++;
+      // ⚠ o R do CORTE ganha do indicado: se uma posição já foi cortada, aquele R é fato.
+      if (i.situacao === "R_DEFINIDO") g.situacao = "R_DEFINIDO";
+      for (const u of i.usadas || []) {
+        if (!u?.rastreio) continue;
+        if (!g.rs.has(u.rastreio) || (g.rs.get(u.rastreio).indicado && !u.indicado)) {
+          g.rs.set(u.rastreio, { r: u.rastreio, corrida: u.corrida || null, certificado: u.certificado || null,
+            norma: u.norma || null, nf: u.nf || null, fornecedor: u.fornecedor || null,
+            material: u.material || null, indicado: !!u.indicado });
+        }
+      }
+      porPerfil.set(k, g);
+    }
+    rastreio = [...porPerfil.values()].map((g) => ({
+      perfil: g.perfil, situacao: g.situacao, posicoes: g.posicoes, usadas: [...g.rs.values()],
+    }));
   } catch { /* rastreio é best-effort: sem ele o dossiê ainda vale */ }
 
   // ── status do material do perfil (entregue · estoque com R · aguardando · não comprado) ──
+  // ⚠⚠ "SEM R" SOZINHO ACUSA QUEM NÃO TEM CULPA. Vitor (03/09/2026): "aqui não é real que está sem
+  // R, é?". É real — mas por um motivo que a tela não dizia. Na OP-089 a `L1.1/2''X1/8''` e a
+  // `CH12.50X200` estão **aguardando entrega**: o pedido saiu, o aço não chegou, e por isso não há
+  // entrada no CMR desta obra para virar R. Ler "sem R" em vermelho ao lado de uma posição faz
+  // parecer furo de rastreabilidade quando é prazo de fornecedor.
+  //
+  // Por isso o material vem POR PERFIL, e não só o da primeira peça: cada posição do conjunto pode
+  // estar num estado diferente — uma comprada e entregue, a vizinha a caminho.
   let material = null;
+  const materialPorPerfil = {};
   try {
-    const { porPeca } = await analisarMaterial(op.numero, pecas.map((p) => ({ id: p.id, perfil: p.perfil })));
-    const v = porPeca.get(pecas[0].id);
-    if (v) material = {
+    const perfisTodos = [...new Set([...pecas.map((p) => p.perfil), ...rastreio.map((r) => r.perfil)].filter(Boolean))];
+    const { porPeca, porPerfil: mpp } = await analisarMaterial(op.numero, [
+      ...pecas.map((p) => ({ id: p.id, perfil: p.perfil })),
+      ...perfisTodos.map((perfil, ix) => ({ id: `r${ix}`, perfil })),
+    ]);
+    const resumir = (v) => v && ({
       estado: v.estado, falta: v.falta || null, rotulo: v.faltaRotulo || null,
       rInformado: v.rInformado || null, descricaoCmr: v.descricaoCmr || null,
-      // ⚠ como o PLANEJAMENTO lê isto — estoque com R declarado conta como resolvido
       statusPlanejamento: statusMaterialPlanejamento(v),
-    };
+    });
+    material = resumir(porPeca.get(pecas[0].id)) || null;
+    for (const pf of perfisTodos) {
+      const v = resumir(mpp.get(String(pf).trim().toUpperCase()));
+      if (v) materialPorPerfil[pf] = v;
+    }
   } catch { /* idem */ }
 
   // ── ONDE A PEÇA ESTÁ NA FÁBRICA. O status gravado só anda até o corte; daí em diante quem sabe
@@ -207,7 +238,7 @@ export async function GET(req) {
     })),
     croquis: comoConjunto.map((x) => ({ ...x.croqui, qtdNoConjunto: x.qtdNoConjunto })),
     conjuntos: comoCroqui.map((x) => ({ ...x.conjunto, qtdNoConjunto: x.qtdNoConjunto })),
-    rastreio, material,
+    rastreio, material, materialPorPerfil,
     fabrica: { setorAtual, trilha: trilha.map((t) => ({ ...t, kg: Math.round(t.kg) })) },
     liberacoes, relatorios,
     tiposRelatorio: TIPO_RELATORIO,
