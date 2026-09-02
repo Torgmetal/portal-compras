@@ -2324,6 +2324,16 @@ model NaoConformidade {
   setorRetrabalho     String?
   elaborador          String?
   resultadoReinspecao String?
+  // ⚠⚠ REINSPEÇÃO PRECISA DE QUEM E QUANDO PARA SER EVIDÊNCIA. Vitor (02/09/2026): "precisamos criar
+  // nas RNCs a forma de evidenciar que foi reinspecionado". O FORM 20 tem o campo do RESULTADO, e
+  // só ele o portal guardava — um texto sem autor nem data é afirmação, não evidência; numa
+  // auditoria, "foi reinspecionado" sem assinatura não sustenta o encerramento.
+  reinspecaoPor       String?
+  reinspecaoEm        DateTime? @db.Date
+  // ⚠ FOTOS SEPARADAS DAS DA OCORRÊNCIA (escolha do Vitor: "deixa o registro fotográfico separado
+  // nesse caso para ficar melhor"). No mesmo bloco, a foto do defeito e a do reparo não provam
+  // nada — quem audita precisa ver ANTES e DEPOIS, e saber qual é qual.
+  reinspecaoFotos     Json      @default("[]") // [{ url, legenda }]
   abrangencia         String?
   necessitaAcao       String? // CORRETIVA | PREVENTIVA | NAO_NECESSARIO
   motivoNaoAcao       String?

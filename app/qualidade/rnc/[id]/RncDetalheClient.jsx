@@ -18,6 +18,7 @@ export default function RncDetalheClient({ id }) {
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [subindo, setSubindo] = useState(false);
+  const [subindoRe, setSubindoRe] = useState(false);
   const [extraindo, setExtraindo] = useState(false);
   const [criandoPlano, setCriandoPlano] = useState(false);
   const [puxandoPeso, setPuxandoPeso] = useState(false);
@@ -31,6 +32,8 @@ export default function RncDetalheClient({ id }) {
       setD({
         ...r, data: dISO(r.data), prazoResposta: dISO(r.prazoResposta), realizadoEm: dISO(r.realizadoEm),
         anexos: Array.isArray(r.anexos) ? r.anexos : [],
+        reinspecaoEm: dISO(r.reinspecaoEm),
+        reinspecaoFotos: Array.isArray(r.reinspecaoFotos) ? r.reinspecaoFotos : [],
         pecas: Array.isArray(r.pecas) ? r.pecas : [],
         cincoPorques: Array.from({ length: 5 }, (_, i) => ({ porque: `${i + 1}º porquê`, resposta: (Array.isArray(r.cincoPorques) ? r.cincoPorques[i]?.resposta : "") || "" })),
       });
@@ -60,6 +63,7 @@ export default function RncDetalheClient({ id }) {
         pertinente: !!d.pertinente, recorrente: !!d.recorrente,
         numeroCliente: d.numeroCliente, programa: d.programa, jobCliente: d.jobCliente,
         respostaCliente: d.respostaCliente, anexos: d.anexos || [],
+        reinspecaoPor: d.reinspecaoPor, reinspecaoEm: d.reinspecaoEm || null, reinspecaoFotos: d.reinspecaoFotos || [],
         ...extra,
       };
       const r = await fetch(`/api/qualidade/rnc/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -111,6 +115,35 @@ export default function RncDetalheClient({ id }) {
       if (d.tipo === "CLIENTE" && alvo && precisa) await extrairDoAnexo(alvo);
     } catch (e) { setErro("Falha no anexo: " + e.message); } finally { setSubindo(false); }
   }
+  // ⚠⚠ FOTO DA REINSPEÇÃO É UM CAMPO À PARTE, NÃO MAIS UM ANEXO. Vitor (02/09/2026): "precisamos
+  // criar nas RNCs a forma de evidenciar que foi reinspecionado (…) deixa o registro fotográfico
+  // separado nesse caso para ficar melhor".
+  // A foto do defeito e a foto do defeito RESOLVIDO contam histórias opostas; jogadas no mesmo
+  // monte, o PDF mostra as duas embaixo de "REGISTRO FOTOGRÁFICO" e quem lê não sabe qual é o antes
+  // e qual é o depois — que é exatamente a evidência que a reinspeção existe para dar.
+  async function anexarReinspecao(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    setErro(""); setSubindoRe(true);
+    try {
+      const { upload } = await import("@vercel/blob/client");
+      const novos = [];
+      for (const file of files) {
+        const safe = (file.name || "foto").replace(/[^\w.-]+/g, "-");
+        const blob = await upload(`qualidade/rnc/reinspecao/${Date.now()}-${safe}`, file, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
+        novos.push({ url: blob.url, nome: file.name || "foto", tipo: file.type || "" });
+      }
+      const reinspecaoFotos = [...(d.reinspecaoFotos || []), ...novos];
+      setD((p) => ({ ...p, reinspecaoFotos }));
+      await salvar({ reinspecaoFotos });
+    } catch (e) { setErro("Falha no anexo: " + e.message); } finally { setSubindoRe(false); }
+  }
+  function removerFotoRe(url) {
+    const reinspecaoFotos = (d.reinspecaoFotos || []).filter((a) => a.url !== url);
+    setD((p) => ({ ...p, reinspecaoFotos }));
+    salvar({ reinspecaoFotos });
+  }
+
   function removerAnexo(url) {
     const anexos = (d.anexos || []).filter((a) => a.url !== url);
     setD((p) => ({ ...p, anexos }));
@@ -322,7 +355,38 @@ export default function RncDetalheClient({ id }) {
             )}
             {d.necessitaAcao === "NAO_NECESSARIO" && <Campo label="Motivo de não necessitar de ação"><input value={d.motivoNaoAcao || ""} onChange={(e) => set("motivoNaoAcao", e.target.value)} className="inp" /></Campo>}
             <Campo label="Abrangência"><input value={d.abrangencia || ""} onChange={(e) => set("abrangencia", e.target.value)} className="inp" /></Campo>
-            <Campo label="Resultado da reinspeção"><textarea value={d.resultadoReinspecao || ""} onChange={(e) => set("resultadoReinspecao", e.target.value)} rows={2} className="inp" /></Campo>
+          </Secao>
+
+          {/* ⚠⚠ REINSPEÇÃO — O FORM 20 TEM ESSE CAMPO E A TELA NÃO TINHA. Vitor (02/09/2026):
+              "precisamos ter todos os campos igual está lá, para evidenciar".
+              O que faltava não era o texto (esse já existia solto dentro de Tratamento), era a
+              EVIDÊNCIA: quem reinspecionou, quando, e a foto do resultado. Sem os três, o campo diz
+              que alguém achou que está bom — não prova que foi conferido.
+              ⚠ Bloco único, como no FORM 20: uma reinspeção por RNC. Se a peça voltar a reprovar, o
+              caso é outra RNC, não uma segunda linha aqui. */}
+          <Secao titulo="Reinspeção">
+            <p className="text-[12px] text-torg-gray -mt-1">Evidência de que o tratamento foi conferido — sai no PDF em seção própria.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Campo label="Reinspecionado por"><input value={d.reinspecaoPor || ""} onChange={(e) => set("reinspecaoPor", e.target.value)} placeholder="Nome de quem conferiu" className="inp" /></Campo>
+              <Campo label="Data da reinspeção"><input type="date" value={d.reinspecaoEm || ""} onChange={(e) => set("reinspecaoEm", e.target.value)} className="inp" /></Campo>
+            </div>
+            <Campo label="Resultado da reinspeção"><textarea value={d.resultadoReinspecao || ""} onChange={(e) => set("resultadoReinspecao", e.target.value)} rows={2} className="inp" placeholder="O que foi conferido e qual o resultado." /></Campo>
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Registro fotográfico da reinspeção</p>
+                <label className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-torg-blue-200 text-torg-blue text-[12px] font-medium cursor-pointer hover:bg-torg-blue-50 ${subindoRe ? "opacity-50 pointer-events-none" : ""}`}>
+                  {subindoRe ? <><Loader2 size={13} className="animate-spin" /> enviando…</> : <><Upload size={13} /> foto</>}
+                  <input type="file" accept="image/*" multiple disabled={subindoRe} className="hidden" onChange={(e) => { anexarReinspecao(e.target.files); e.target.value = ""; }} />
+                </label>
+              </div>
+              {(d.reinspecaoFotos || []).length === 0 ? (
+                <p className="text-[13px] text-torg-gray">Nenhuma foto da reinspeção.</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                  {d.reinspecaoFotos.map((a) => <AnexoCard key={a.url} a={a} onRemover={() => removerFotoRe(a.url)} />)}
+                </div>
+              )}
+            </div>
           </Secao>
 
           {/* Causa raiz */}
