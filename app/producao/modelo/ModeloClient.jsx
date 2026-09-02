@@ -146,7 +146,7 @@ export default function ModeloClient({ ops }) {
 }
 
 /** O dossiê — cada bloco vem de uma parte do portal que já existia, agora na mesma tela. */
-function Painel({ d }) {
+export function Painel({ d }) {
   const p = d.pecas?.[0] || {};
   const feitos = new Set((d.fabrica?.trilha || []).map((t) => t.setor));
   return (
