@@ -19,7 +19,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const ROLES = ["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO", "COMPRAS"];
+// ⚠ ALMOXARIFADO entra em 02/09/2026: quem sabe qual fardo dá para tirar é quem está na frente do
+// rack. Vitor: "o almoxarifado informa um R". O nome de quem declarou fica gravado na troca.
+const ROLES = ["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO", "COMPRAS", "ALMOXARIFADO"];
 
 export async function GET(req) {
   try { await requireRole(ROLES); }

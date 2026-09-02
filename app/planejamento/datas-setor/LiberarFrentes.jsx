@@ -14,7 +14,7 @@
 // custa prazo). O marco é congelado na liberação — recalcular o cronograma depois não pode apagar
 // um desvio já medido.
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, AlertCircle, Send, Check, X, Flag, CalendarClock, Wand2, Star, RefreshCw, Minus, FileWarning, Timer, FileDown, CalendarRange, FolderTree } from "lucide-react";
+import { Loader2, AlertCircle, Send, Check, X, Flag, CalendarClock, Wand2, Star, RefreshCw, Minus, FileWarning, Timer, FileDown, CalendarRange, FolderTree, PackageSearch } from "lucide-react";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import { estimarPrazo, somarDiasUteis, proximoDiaUtil, classeDaPeca, kgPorMetro } from "@/lib/prazo-preparacao";
 
@@ -103,6 +103,15 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   const [plano, setPlano] = useState(null);
   const [nDias, setNDias] = useState(5);
   const [pastas, setPastas] = useState(null);
+  // ⚠⚠ DECLARAR O FARDO DO ESTOQUE. Vitor (02/09/2026), na linha da T113A-P64 com "✕ não comprado":
+  // "onde eu informo o R aqui?" — e não havia onde. "então deixa onde aparece material não comprado
+  // você já coloca material a ser usado de estoque": a PORTA é a própria célula.
+  // ⚠ mas o que ela abre é por PERFIL, não por marca: a OP-113 tem 197 marcas em 40 perfis, e um
+  // campo por linha faria digitar o mesmo R cinco vezes em média (28 no UE200X75X20X3.00).
+  const [declarar, setDeclarar] = useState(null); // { perfil, ... } do payload `materiais`
+  const [rEscolhido, setREscolhido] = useState("");
+  const [motivoEstoque, setMotivoEstoque] = useState("");
+  const [salvandoR, setSalvandoR] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!opId) { setD(null); setLib(null); return; }
@@ -120,6 +129,28 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
   }, [opId]);
   useEffect(() => { carregar(); }, [carregar]);
+
+  // ⚠ REAPROVEITA A ROTA DO PCP (`/api/pcp/liberacao-material`), que já valida o que precisa ser
+  // validado: o R existe no CMR, e o R é do MESMO material do perfil — sem isso dava para amarrar
+  // uma chapa de 16 num W410 e o certificado do Data Book apontaria para um aço que a peça não é.
+  // Escrever uma segunda rota aqui seria escrever uma segunda versão dessas regras para divergir.
+  async function gravarEstoque() {
+    if (!declarar || !rEscolhido) return;
+    setSalvandoR(true); setErro("");
+    try {
+      const r = await fetch("/api/pcp/liberacao-material", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opNumero: d?.op?.numero, perfil: declarar.perfil, rUsado: rEscolhido,
+                               motivo: motivoEstoque.trim() || "material de estoque" }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Não consegui gravar o R.");
+      setDeclarar(null); setREscolhido(""); setMotivoEstoque("");
+      await carregar();
+    } catch (e) { setErro(e.message); } finally { setSalvandoR(false); }
+  }
+  const materialDoPerfil = (perfil) =>
+    (d?.materiais || []).find((m) => String(m.perfil || "").trim().toUpperCase() === String(perfil || "").trim().toUpperCase()) || null;
 
   // ⚠ conjunto fora da planilha: não se corta conjunto. Quem escolhe o dia escolhe peça P e avulsa.
   const base = useMemo(
@@ -844,6 +875,16 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                                 <Check size={13} className="shrink-0" /> R {p.materialPorTroca.r}
                               </span>
                             : <Check size={14} className="text-emerald-600" title={MAT.ENTREGUE.dica} />)
+                        : p.material === "ESTOQUE" && materialDoPerfil(p.perfil)?.fardos?.length
+                        // ⚠⚠ A PORTA FICA ONDE O PROBLEMA APARECE. Só no ESTOQUE: "não comprado" na
+                        // tela cobre dois casos que parecem um — material que existe em outra obra
+                        // (dá para declarar) e material que não existe em lugar nenhum (não há o
+                        // que declarar, e oferecer o botão seria mentir).
+                        ? <button type="button" onClick={() => { setDeclarar(materialDoPerfil(p.perfil)); setREscolhido(""); setMotivoEstoque(""); }}
+                            title={`Não foi comprado para esta obra, mas existe no estoque. Clique para apontar o fardo (vale para as ${materialDoPerfil(p.perfil).marcas} marca(s) de ${p.perfil}).`}
+                            className="inline-flex items-center gap-1 text-[11px] text-amber-700 whitespace-nowrap rounded px-1.5 py-0.5 border border-amber-200 bg-amber-50 hover:bg-amber-100">
+                            <PackageSearch size={12} className="shrink-0" /> usar de estoque
+                          </button>
                         : <span className="inline-flex items-center gap-1 text-[11px] text-red-600 whitespace-nowrap" title={MAT[p.material].dica}>
                             <X size={13} className="shrink-0" /> {MAT[p.material].rot}
                           </span>}
@@ -966,6 +1007,67 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
             {programandoSemana ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
             Gravar a programação ({fmtN(plano.dias.length)} liberação(ões))
           </button>
+        </div>
+      )}
+
+      {/* ⚠⚠ O QUE A CÉLULA ABRE. Por PERFIL, com os fardos que existem no CMR — R, obra de origem,
+          data, peso e corrida. O Planejamento não precisa decorar número de R nem saber o que tem
+          no rack: escolhe da lista, que já vem em FIFO (ver ORDEM_FIFO_CMR).
+          ⚠ MODAL, NÃO POPOVER: a tabela rola na horizontal e tem onze colunas; um balão ancorado na
+          célula sairia cortado pela borda do `overflow-x`, que é exatamente o que o Vitor viu
+          acontecer com o filtro de coluna. */}
+      {declarar && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setDeclarar(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[86vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-3.5 border-b border-gray-100 flex items-start gap-3">
+              <div>
+                <h3 className="text-[15px] font-bold text-torg-dark">Material de estoque — <span className="font-mono">{declarar.perfil}</span></h3>
+                <p className="text-[12px] text-torg-gray mt-0.5">
+                  Não foi comprado para esta obra. Aponte o fardo que vai sair do estoque — vale para
+                  as <b>{fmtN(declarar.marcas)} marca(s)</b> deste perfil ({fmtKg(declarar.pesoKg)}).
+                </p>
+                {declarar.descricaoCmr && <p className="text-[11px] text-torg-gray-light mt-1">{declarar.descricaoCmr}</p>}
+              </div>
+              <button onClick={() => setDeclarar(null)} className="ml-auto text-torg-gray hover:text-torg-dark"><X size={18} /></button>
+            </div>
+
+            <div className="px-5 py-4 space-y-1.5">
+              {declarar.fardos.map((f) => (
+                <button key={f.r} type="button" onClick={() => setREscolhido(f.r)}
+                  className={`w-full text-left rounded-lg border px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 ${
+                    rEscolhido === f.r ? "border-torg-blue bg-torg-blue-50/60 ring-1 ring-torg-blue" : "border-gray-200 hover:border-gray-300"}`}>
+                  <span className="font-mono text-[13px] font-bold text-torg-dark">R {f.r}</span>
+                  <span className="text-[12px] text-torg-gray">OP {f.opNumero || "—"}</span>
+                  {/* ⚠ `fmtD` lê em UTC de propósito: `recebidoEm` é uma data pura ("2026-08-26"); converter
+                      para BRT devolveria o dia anterior. */}
+                  <span className="text-[12px] text-torg-gray">{fmtD(f.recebidoEm)}</span>
+                  {f.pesoKg != null && <span className="text-[12px] text-torg-gray tabular-nums">{fmtKg(f.pesoKg)}</span>}
+                  {f.corrida && <span className="text-[11px] text-torg-gray-light">corrida {f.corrida}</span>}
+                  {rEscolhido === f.r && <Check size={14} className="text-torg-blue ml-auto shrink-0" />}
+                </button>
+              ))}
+            </div>
+
+            <div className="px-5 pb-4">
+              <label className="block text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1">Por que sai do estoque</label>
+              <input value={motivoEstoque} onChange={(e) => setMotivoEstoque(e.target.value)}
+                placeholder="Quantidade pequena, não entrou na RM da obra."
+                className="w-full text-[13px] border border-gray-200 rounded-lg px-3 py-2" />
+              {/* ⚠ o motivo fica no registro junto com o nome de quem declarou — é o que separa uma
+                  decisão assinada de um contorno do portão. */}
+            </div>
+
+            <div className="px-5 py-3 border-t border-gray-100 flex items-center gap-3">
+              <button onClick={gravarEstoque} disabled={!rEscolhido || salvandoR}
+                className="px-4 py-2 bg-torg-blue text-white text-[13px] font-semibold rounded-lg disabled:opacity-40 inline-flex items-center gap-2">
+                {salvandoR ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                Usar este fardo
+              </button>
+              <span className="text-[11.5px] text-torg-gray">
+                O PCP ainda pode trocar o R na separação, se sair outro fardo.
+              </span>
+            </div>
+          </div>
         </div>
       )}
 

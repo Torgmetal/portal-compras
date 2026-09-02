@@ -10,6 +10,7 @@ import { portaoDoDesenho, temDesenhoNaPasta, temMaquinaNaPasta } from "@/lib/pas
 import { analisarMaterial, statusMaterialPlanejamento } from "@/lib/material-liberacao";
 import { requireRole } from "@/lib/session";
 import { pecaCortada, poolDaPeca, POOLS } from "@/lib/liberacao-producao";
+import { DO_CMR, ORDEM_FIFO_CMR } from "@/lib/cmr-origens";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,8 +121,56 @@ export async function GET(req) {
     };
   });
 
+  // ⚠⚠ OS FARDOS QUE DÁ PARA DECLARAR, POR PERFIL. Vitor (02/09/2026), olhando a linha da T113A-P64
+  // com "✕ não comprado": "onde eu informo o R aqui?" — e não havia onde. O material existe no CMR,
+  // só está no nome de outra obra; a decisão de usar estoque não tinha lugar para morar, então a
+  // marca ficava barrada para sempre.
+  //
+  // ⚠ POR PERFIL, NUNCA POR MARCA. A OP-113 tem 197 marcas em 40 perfis — o mesmo R seria digitado
+  // cinco vezes em média, 28 no UE200X75X20X3.00. A célula da linha é só a PORTA; o que ela abre
+  // vale para todas as marcas daquele perfil de uma vez, e a tela diz isso antes de gravar.
+  //
+  // ⚠ SÓ ESTOQUE ENTRA AQUI. "Não comprado" na tela cobre dois casos que parecem um: o material que
+  // existe em outra obra (ESTOQUE — dá para declarar) e o que não existe em lugar nenhum
+  // (SEM_MATERIAL — não há o que declarar, e oferecer o botão seria mentir).
+  let materiais = [];
+  if (material?.porPerfil) {
+    const doEstoque = [...material.porPerfil.values()].filter((v) => v.estado === "ESTOQUE");
+    const descricoes = [...new Set(doEstoque.map((v) => v.descricaoCmr).filter(Boolean))];
+    // ⚠ sem `distinct`: é justamente a lista de FARDOS que interessa, não a de descrições. O
+    // `cmrGeral` de analisarMaterial é distinto por nome e devolveria uma opção só.
+    const linhas = descricoes.length
+      ? await prisma.documentoQualidade.findMany({
+          where: { categoria: "MATERIAL", ...DO_CMR, nome: { in: descricoes } },
+          select: { importRef: true, nome: true, opNumero: true, dataRecebimento: true, pesoKg: true, numeroCorrida: true },
+          orderBy: ORDEM_FIFO_CMR,
+          take: 400,
+        })
+      : [];
+    const porNome = new Map();
+    for (const l of linhas) {
+      if (!l.importRef) continue;
+      (porNome.get(l.nome) || porNome.set(l.nome, []).get(l.nome)).push({
+        r: l.importRef, opNumero: l.opNumero || null,
+        recebidoEm: l.dataRecebimento ? l.dataRecebimento.toISOString().slice(0, 10) : null,
+        pesoKg: l.pesoKg == null ? null : Math.round(l.pesoKg),
+        corrida: l.numeroCorrida || null,
+      });
+    }
+    materiais = doEstoque.map((v) => {
+      const dele = pecas.filter((x) => String(x.perfil || "").trim().toUpperCase() === String(v.perfil || "").trim().toUpperCase());
+      return {
+        perfil: v.perfil, descricaoCmr: v.descricaoCmr || null,
+        falta: v.falta || null, faltaRotulo: v.faltaRotulo || null,
+        rInformado: v.rInformado || null,
+        marcas: dele.length, pesoKg: Math.round(dele.reduce((t, x) => t + (x.pesoTotalKg || 0), 0)),
+        fardos: (porNome.get(v.descricaoCmr) || []).slice(0, 12),
+      };
+    }).sort((a, b) => b.pesoKg - a.pesoKg);
+  }
+
   return NextResponse.json({
-    op, temLpc: true, pecas, pools: POOLS,
+    op, temLpc: true, pecas, pools: POOLS, materiais,
     truncado: brutas.length > TETO ? brutas.length - TETO : 0,
     // ⚠ O PORTÃO VAI NA RESPOSTA para a tela desenhar exatamente o que o POST vai cobrar.
     pasta: {
