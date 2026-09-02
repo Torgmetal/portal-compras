@@ -85,7 +85,28 @@ export async function POST(req) {
   // numa linha só (por causa do @@unique[opNumero, marca]); apagá-la porque saiu da LPC levava
   // junto a presença dela na LE. Agora: quem está nas duas perde só o `naLPC`; quem era só da LPC
   // é apagada de fato.
+  // ⚠⚠ QUEM VAI SER APAGADO, GUARDADO ANTES — é o que salva a programação do Planejamento.
+  //
+  // Vitor (03/09/2026): "me explica melhor o porquê elas viram fantasma?". `LiberacaoProducao`
+  // guarda o **id** da peça em `pecaIds` (Json, sem chave estrangeira — o banco não sabe que
+  // aquilo aponta para PecaConjunto, então nada avisa e nada bloqueia). Reimportar a LPC apaga a
+  // marca que só existe na LPC e a recria a partir do arquivo, com id NOVO: a marca é a mesma, o
+  // desenho é o mesmo, o peso é o mesmo — só o ponteiro morreu.
+  //
+  // E todo CROQUI é LPC-only por natureza (croqui não se expede, então nunca está na LE). Ou seja:
+  // toda reimportação de LPC apagava todos os croquis da obra. Medido em 03/09/2026: 147 peças em
+  // três OPs tinham perdido a programação em silêncio — a 113 perdeu dois lotes inteiros (79 no
+  // corte de 03/09 e 47 na montagem de 30/09) e ninguém soube por dois dias.
+  //
+  // Como a marca sobrevive e o id não, o conserto é traduzir: id velho → marca (antes de apagar),
+  // marca → id novo (depois de recriar). Ver `remapearLiberacoes`, logo abaixo dos creates.
+  const marcaDoIdApagado = new Map();
   if (sobrescrever) {
+    const aApagar = await prisma.pecaConjunto.findMany({
+      where: { opNumero, naLPC: true, naLE: false },
+      select: { id: true, marca: true },
+    });
+    for (const x of aApagar) marcaDoIdApagado.set(x.id, x.marca);
     await prisma.pecaConjunto.updateMany({
       where: { opNumero, naLPC: true, naLE: true },
       data: { naLPC: false, fonte: "LE_IMPORT" },
@@ -297,6 +318,43 @@ export async function POST(req) {
     }
   }
 
+  // ⚠⚠ A PROGRAMAÇÃO SEGUE A MARCA, NÃO O ID. Traduz cada liberação viva desta OP: id apagado →
+  // marca → id recriado. A marca que saiu da lista de verdade (não veio no arquivo novo) não tem
+  // para onde apontar — ela sai da liberação e é CONTADA, para o Planejamento saber que precisa
+  // reprogramar aquilo em vez de descobrir semanas depois que a peça não estava na fila de ninguém.
+  //
+  // ⚠ Só mexe em liberação LIBERADA/EM_PRODUCAO: cancelada é histórico e não se reescreve.
+  const remap = { liberacoes: 0, pecas: 0, perdidas: 0, marcasPerdidas: [] };
+  if (sobrescrever && op && marcaDoIdApagado.size) {
+    try {
+      const libs = await prisma.liberacaoProducao.findMany({
+        where: { opId: op.id, status: { in: ["LIBERADA", "EM_PRODUCAO"] } },
+        select: { id: true, pecaIds: true },
+      });
+      for (const l of libs) {
+        const ids = Array.isArray(l.pecaIds) ? l.pecaIds : [];
+        if (!ids.length) continue;
+        let mudou = false;
+        const novos = [];
+        for (const id of ids) {
+          const marca = marcaDoIdApagado.get(id);
+          if (!marca) { novos.push(id); continue; }  // não foi apagada: segue igual
+          const idNovo = pieceIds.get(marca);
+          if (idNovo) { novos.push(idNovo); mudou = true; remap.pecas++; }
+          else { mudou = true; remap.perdidas++; if (remap.marcasPerdidas.length < 50) remap.marcasPerdidas.push(marca); }
+        }
+        if (!mudou) continue;
+        await prisma.liberacaoProducao.update({ where: { id: l.id }, data: { pecaIds: novos } });
+        remap.liberacoes++;
+      }
+    } catch (e) {
+      // ⚠ não aborta a importação: a lista já foi gravada, e falhar aqui só deixaria o remapeamento
+      // para a próxima. Mas registra, porque silêncio foi exatamente o que criou este problema.
+      console.error("[importar-lpc] remapeamento das liberações falhou:", e?.message);
+      remap.erro = e?.message || "falhou";
+    }
+  }
+
   // Audit log (nao-fatal — nao pode abortar uma importacao bem-sucedida)
   try {
     await prisma.auditLog.create({
@@ -342,6 +400,8 @@ export async function POST(req) {
     pesoTotal: parsed.pesoTotal,
     areaTotal: parsed.areaTotal,
     diff,
+    // o que aconteceu com a programação do Planejamento nesta importação
+    remap,
   });
 
   } catch (e) {

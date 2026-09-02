@@ -1406,6 +1406,31 @@ function ModalImportarLPC({ ops, onClose, onImportado }) {
                 </li>
                 <li>• Peso: {Number(resultado.pesoTotal).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg · Pintura: {Number(resultado.areaTotal).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} m²</li>
                 {!resultado.opEncontrada && <li className="text-yellow-700">⚠️ {fmtOP(resultado.opNumero)} não cadastrada — peças ficaram sem vínculo</li>}
+                {/* ⚠⚠ O QUE ACONTECEU COM A PROGRAMAÇÃO. Reimportar recria a peça com id novo, e a
+                    liberação do Planejamento guarda o id — antes de 03/09/2026 a programação
+                    simplesmente evaporava em silêncio (147 peças em 3 OPs). Agora ela é remapeada
+                    pela marca, e o que não deu para remapear aparece aqui em vez de sumir. */}
+                {resultado.remap?.pecas > 0 && (
+                  <li className="pt-1 border-t border-emerald-200 mt-1">
+                    🔗 {resultado.remap.pecas} peça(s) já programada(s) seguiram para a marca nova
+                    {resultado.remap.liberacoes > 1 ? ` em ${resultado.remap.liberacoes} liberações` : ""}
+                  </li>
+                )}
+                {resultado.remap?.perdidas > 0 && (
+                  <li className="text-yellow-700">
+                    ⚠️ {resultado.remap.perdidas} peça(s) programada(s) saíram da lista e precisam ser
+                    reprogramadas
+                    {resultado.remap.marcasPerdidas?.length > 0 && (
+                      <span className="block text-[11px] font-mono mt-0.5">
+                        {resultado.remap.marcasPerdidas.slice(0, 12).join(", ")}
+                        {resultado.remap.perdidas > 12 ? ` … +${resultado.remap.perdidas - 12}` : ""}
+                      </span>
+                    )}
+                  </li>
+                )}
+                {resultado.remap?.erro && (
+                  <li className="text-yellow-700">⚠️ não consegui remapear a programação ({resultado.remap.erro}) — confira os dias já programados</li>
+                )}
               </ul>
               <button
                 onClick={onImportado}
