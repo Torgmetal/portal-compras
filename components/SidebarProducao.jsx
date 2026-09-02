@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Box,
   Activity, FileText, Package, Factory, Map,
   PackageSearch, Wrench, Flame, Sparkles, Wind, Paintbrush, Truck, ListOrdered, Gauge,
 } from "lucide-react";
@@ -13,6 +14,9 @@ import SidebarUserFooter from "@/components/SidebarUserFooter";
 const menu = [
   { href: "/producao", label: "Painel de Produção", icon: Activity, exact: true },
   { href: "/producao/mapa", label: "Mapa da Produção", icon: Map },
+  // ⚠ logo abaixo do mapa: as duas respondem "onde está a obra", uma pela tabela e outra pelo
+  // modelo. Ver app/producao/modelo — o 3D é a porta, o dado continua vindo do portal.
+  { href: "/producao/modelo", label: "Obra em 3D", icon: Box },
   { href: "/producao/programacao/corte", label: "Programação", icon: Package, exact: true },
   { href: "/producao/programacao/fila-corte", label: "Corte", icon: ListOrdered },
   { href: "/producao/programacao/montagem", label: "Montagem", icon: Wrench },

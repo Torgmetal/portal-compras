@@ -54,9 +54,47 @@ export async function GET(req) {
 
   // ── listagem ──
   if (!rel) {
+    // ⚠⚠ O ANDAMENTO DE CADA MARCA VAI JUNTO, e é o que dá sentido ao 3D. Ver a obra em cinza não
+    // diz nada a ninguém; o que o setor quer enxergar é o que já passou e o que falta. Vem na
+    // listagem, e não a cada clique, porque o visualizador pinta a cena INTEIRA de uma vez — pedir
+    // marca por marca seriam centenas de idas ao servidor para montar uma tela.
+    //
+    // ⚠ O ESTÁGIO REAL VEM DO APONTAMENTO, não do `status` gravado: aquele só anda até o corte
+    // (ver lib/peca-setor-real). Peça sem apontamento é "a fazer", e é a maioria.
+    const pecas = await prisma.pecaConjunto.findMany({
+      where: { opId, naLPC: true },
+      select: { marca: true, status: true },
+    });
+    const apont = await prisma.$queryRaw`
+      SELECT "opSka", "setor", max("dataInicio") ult
+      FROM "MesApontamento" WHERE "opId" = ${opId} GROUP BY 1, 2`;
+    // opSka contém a marca ("T89C21-P3" traz "T89C21"): casa pelo maior nome que estiver dentro
+    const marcas = [...new Set(pecas.map((p) => p.marca).filter(Boolean))]
+      .sort((a, b) => b.length - a.length);
+    const setorDe = new Map();
+    for (const a of apont) {
+      const ska = String(a.opSka || "").toUpperCase();
+      const m = marcas.find((x) => ska.includes(x.toUpperCase()));
+      if (!m) continue;
+      const g = setorDe.get(m);
+      const d = a.ult ? a.ult.toISOString() : "";
+      if (!g || d > g.ult) setorDe.set(m, { setor: a.setor, ult: d });
+    }
+    const estados = {};
+    for (const m of marcas) {
+      const s = String(setorDe.get(m)?.setor || "").toLowerCase();
+      estados[m] = !s ? "parado"
+        : /pintura|acabamento/.test(s) ? "pronta"
+        : "andando";
+    }
     return NextResponse.json({
       op: { id: op.id, numero: op.numero, cliente: op.cliente, obra: op.obra },
-      modelos, tetoMb: TETO_MB,
+      modelos, tetoMb: TETO_MB, estados,
+      resumo: {
+        marcas: marcas.length,
+        prontas: Object.values(estados).filter((x) => x === "pronta").length,
+        andando: Object.values(estados).filter((x) => x === "andando").length,
+      },
     });
   }
 
