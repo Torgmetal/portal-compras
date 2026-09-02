@@ -59,8 +59,10 @@ async function carregar(opId) {
   const todos = documentosDoPortal(portal);
   const novos = todos.filter((d) => !jaAvisados.has(d.id));
 
+  // ⚠ só quem continua na lista. Quem saiu da obra fica no histórico (recebeu, abriu), mas não
+  // aparece mais para receber — ver `ativo` em PortalDestinatario.
   const destinatarios = await prisma.portalDestinatario.findMany({
-    where: { portalId: portal.id },
+    where: { portalId: portal.id, ativo: true },
     select: { id: true, nome: true, email: true, codigo: true, enviadoEm: true },
     orderBy: [{ enviadoEm: "asc" }],
   });
@@ -178,4 +180,50 @@ export async function POST(req, { params }) {
   }
 
   return NextResponse.json({ ok: enviados > 0, enviados, novos: d.novos.length, falhas: erros });
+}
+
+// PATCH {email, ativo} — tira alguém da lista de avisos (ou devolve).
+//
+// ⚠⚠ NÃO APAGA A LINHA. Vitor (02/09/2026): "aparece o Carlos Santos, ele não faz mais parte da
+// empresa". Apagar levaria junto o registro de que ele recebeu e abriu o portal, que é o que
+// responde "quem viu o quê" numa obra — e numa discussão de escopo isso vale.
+//
+// ⚠ ISTO NÃO CORTA O ACESSO DELE. Quem entra é o TOKEN do portal, igual para todos; o `codigo` só
+// identifica quem abriu. Link já enviado continua valendo — para cortar de verdade é preciso trocar
+// o token, o que derruba o de todo mundo. A tela diz isso.
+export async function PATCH(req, { params }) {
+  let user;
+  try { user = await requireRole(ROLES); }
+  catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  const { id } = await params;
+  const { email, ativo } = await req.json().catch(() => ({}));
+  if (!email) return NextResponse.json({ error: "Informe o e-mail." }, { status: 400 });
+
+  const op = await prisma.oP.findUnique({ where: { id }, select: { numero: true } });
+  const portal = op && await prisma.portalCliente.findUnique({ where: { opNumero: op.numero }, select: { id: true, opNumero: true, destinatarios: true } });
+  if (!portal) return NextResponse.json({ error: "Portal não encontrado." }, { status: 404 });
+
+  const r = await prisma.portalDestinatario.updateMany({
+    where: { portalId: portal.id, email: String(email).toLowerCase() },
+    data: { ativo: ativo !== false },
+  });
+
+  // ⚠ tira também da lista que a aba edita, senão o próximo "Publicar e enviar" o traz de volta —
+  // são duas listas diferentes, e foi essa divergência que fez o nome reaparecer.
+  if (ativo === false && Array.isArray(portal.destinatarios)) {
+    const limpa = portal.destinatarios.filter((d) => String(d?.email || "").toLowerCase() !== String(email).toLowerCase());
+    if (limpa.length !== portal.destinatarios.length) {
+      await prisma.portalCliente.update({ where: { id: portal.id }, data: { destinatarios: limpa } });
+    }
+  }
+
+  try {
+    await prisma.auditLog.create({
+      data: { userId: user.id, action: "PORTAL_DESTINATARIO", entity: "PortalCliente", entityId: portal.opNumero,
+              diff: { email, ativo: ativo !== false } },
+    });
+  } catch {}
+
+  return NextResponse.json({ ok: true, atualizados: r.count });
 }

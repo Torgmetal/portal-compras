@@ -470,6 +470,18 @@ function AvisoDocsNovos({ opId }) {
   if (!d || d.error) return null;
   const alvo = sel ?? (d.destinatarios || []).map((x) => x.email);
 
+  async function remover(email, nome) {
+    if (!confirm(`Tirar ${nome || email} da lista de avisos desta obra?\n\nO histórico de que ele recebeu e abriu fica registrado.\n\n⚠ Isto NÃO corta o acesso: o link já enviado continua funcionando, porque quem dá acesso é o token do portal, que é o mesmo para todos.`)) return;
+    try {
+      const r = await fetch(`/api/comercial/op/${opId}/portal/avisar`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, ativo: false }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Erro ao remover");
+      setSel(null); carregar();
+    } catch (e) { setMsg(e.message); }
+  }
+
   async function enviar() {
     setEnviando(true); setMsg("");
     try {
@@ -508,14 +520,24 @@ function AvisoDocsNovos({ opId }) {
           </ul>
           <div className="border-t border-gray-100 pt-2">
             <p className="text-[11px] font-semibold text-torg-dark mb-1">Para quem:</p>
+            {/* ⚠⚠ TIRAR DA LISTA ≠ TIRAR O ACESSO. Vitor (02/09/2026): "aparece o Carlos Santos, ele
+                não faz mais parte da empresa". O × tira a pessoa dos próximos avisos e da lista que
+                a aba edita — mas o link já enviado continua valendo, porque quem dá acesso é o
+                TOKEN do portal, igual para todos. Para cortar de verdade é preciso trocar o token, e
+                isso derruba o link de todo mundo. A dica no × diz isso. */}
             {(d.destinatarios || []).map((p) => {
               const on = alvo.includes(p.email);
               return (
-                <label key={p.id} className="flex items-center gap-2 text-[11px] py-0.5 cursor-pointer">
-                  <input type="checkbox" checked={on} className="accent-torg-orange"
-                    onChange={() => setSel(on ? alvo.filter((e) => e !== p.email) : [...alvo, p.email])} />
-                  <span className="truncate">{p.nome || p.email}</span>
-                </label>
+                <div key={p.id} className="flex items-center gap-2 text-[11px] py-0.5">
+                  <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                    <input type="checkbox" checked={on} className="accent-torg-orange"
+                      onChange={() => setSel(on ? alvo.filter((e) => e !== p.email) : [...alvo, p.email])} />
+                    <span className="truncate" title={p.email}>{p.nome || p.email}</span>
+                  </label>
+                  <button onClick={() => remover(p.email, p.nome)}
+                    title="Tira dos próximos avisos e da lista de envio. O histórico de quem recebeu e abriu fica. Não corta o acesso: o link já enviado continua valendo."
+                    className="text-torg-gray-light hover:text-red-600 shrink-0 px-1">×</button>
+                </div>
               );
             })}
           </div>

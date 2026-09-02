@@ -2512,6 +2512,14 @@ model PortalDestinatario {
 
   @@index([portalId])
   @@index([opNumero])
+  // ⚠⚠ SAI DA LISTA SEM SUMIR DO HISTÓRICO. Vitor (02/09/2026): "aparece o Carlos Santos, ele não
+  // faz mais parte da empresa". Apagar a linha levaria junto o registro de que ele recebeu e abriu
+  // o portal — e o histórico de acesso é o que responde "quem viu o quê" numa obra.
+  //
+  // ⚠ DESATIVAR NÃO CORTA O ACESSO. Quem entra é o TOKEN do portal, que é o mesmo para todos; o
+  // `codigo` só identifica quem abriu. Um link já enviado continua funcionando — para cortar de
+  // verdade é preciso trocar o token do portal, o que derruba o link de todo mundo.
+  ativo            Boolean   @default(true)
 }
 
 // Uma linha por evento — abertura e download. ⚠ O CONTADOR NÃO BASTA: "3 downloads" não diz QUAL
