@@ -188,8 +188,9 @@ export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, o
       <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
           <thead className="text-[10px] uppercase text-torg-gray-light border-b border-gray-100">
-            <tr><th className="text-left py-1">Bancada</th><th className="text-right">Conj</th><th className="text-right">Peças</th>
-                <th className="text-right">kg</th><th className="text-right">Dias</th><th className="text-left pl-3">Quando</th></tr>
+            <tr><th className="text-left py-1">Bancada</th><th className="text-right" title="Quantas marcas caíram nesta bancada">Conj</th>
+                <th className="text-right" title="Peças físicas — um conjunto pode ter mais de uma">Peças</th>
+                <th className="text-right">kg</th><th className="text-right" title="Dias úteis no ritmo escolhido — peça pesada custa mais dia que peça leve, por isso uma bancada com menos conjuntos pode levar o mesmo tempo">Dias</th><th className="text-left pl-3">Quando</th></tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {porDia.map((b) => {
@@ -204,7 +205,12 @@ export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, o
                   <td className="text-right tabular-nums">{fmtKg(kg)}</td>
                   <td className="text-right tabular-nums font-semibold">{b.dias.length}</td>
                   <td className="pl-3 text-torg-gray text-[11px]">
-                    {b.dias.length ? `${fmtDia(b.dias[0].dia)} → ${fmtDia(b.dias[b.dias.length - 1].dia)}` : "—"}
+                    {/* ⚠ um dia só não vira intervalo. Vitor (01/09/2026) perguntou o que a tabela
+                        queria dizer, e "qua 02/09 → qua 02/09" é ruído que atrapalha a leitura de
+                        quem já está decifrando cinco colunas. */}
+                    {!b.dias.length ? "—"
+                      : b.dias.length === 1 ? fmtDia(b.dias[0].dia)
+                      : `${fmtDia(b.dias[0].dia)} → ${fmtDia(b.dias[b.dias.length - 1].dia)}`}
                   </td>
                 </tr>
               );
