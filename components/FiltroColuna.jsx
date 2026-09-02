@@ -76,18 +76,27 @@ export function ThFiltro({ col, label, larg = "", dica, className = "", filtros,
   // perto do fim da janela e o menu abria para baixo, saindo pela borda — e como a página não tinha
   // o que rolar, a lista de opções simplesmente não existia para quem estava olhando.
   //
-  // Agora ele mede o espaço dos dois lados: vira para CIMA quando não cabe embaixo, e em qualquer
-  // caso limita a própria altura ao que sobra na janela, deixando a rolagem por conta da lista.
+  // ⚠⚠ E ABRIR PARA BAIXO ESTAVA TAPANDO A LISTA. Vitor (02/09/2026), depois da primeira correção:
+  // "ficou do mesmo jeito" — e o que ele não conseguia marcar não eram as opções do filtro, eram as
+  // PEÇAS: o menu descia do cabeçalho por cima das linhas, e com a tabela filtrada em 1 de 150 não
+  // havia o que rolar para tirá-las de baixo dele.
+  //
+  // Então a preferência inverteu: o menu abre para CIMA sempre que couber. Acima do cabeçalho fica
+  // a barra da tabela ("limpar filtro", "Planilha", a contagem) — tapar isso não custa nada; abaixo
+  // ficam as linhas, que são justamente o que se quer ver enquanto se filtra. Um filtro que esconde
+  // o resultado do próprio filtro não serve para nada.
+  //
+  // ⚠ Para baixo continua existindo, para quando NÃO cabe em cima (tabela no topo da janela).
   useEffect(() => {
     if (!aberto) return setPos(null);
     const medir = () => {
       const r = botaoRef.current?.getBoundingClientRect();
       if (!r) return;
-      const LARG = 256, MARGEM = 8;
+      const LARG = 256, MARGEM = 8, UTIL = 240; // UTIL = altura mínima para o menu ser usável
       const abaixo = window.innerHeight - r.bottom - MARGEM;
       const acima = r.top - MARGEM;
-      // ⚠ só vira quando cabe MELHOR em cima: perto do meio da tela, abrir para baixo é o esperado
-      const paraCima = abaixo < 240 && acima > abaixo;
+      // prefere CIMA; só desce quando em cima não cabe um menu usável e embaixo cabe mais
+      const paraCima = acima >= UTIL || acima >= abaixo;
       const left = Math.max(MARGEM, Math.min(r.left, window.innerWidth - LARG - MARGEM));
       // piso de 180px: menu menor que isso não mostra nem três opções, e aí é melhor deixar a lista
       // rolar dentro dele do que espremer o campo de busca e os botões
