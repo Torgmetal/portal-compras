@@ -108,7 +108,10 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
       });
   }, [filtrados, hojeIso]);
 
-  const semBancada = useMemo(() => filtrados.filter((c) => !c.soldaBancada).length, [filtrados]);
+  // ⚠ conta na FILA INTEIRA, não no filtrado: o chip "sem bancada" vive na faixa de cima, que
+  // resume a fila toda. Contando o filtrado, ele mostraria 0 assim que você clicasse numa bancada —
+  // e o número sumiria justamente quando serve para voltar.
+  const semBancada = useMemo(() => fila.filter((c) => !c.soldaBancada).length, [fila]);
   // ⚠ soma o peso do QUE FALTA soldar, não o do conjunto cheio
   const somaKg = (arr) => arr.reduce((s, c) => s + (c.pesoPendenteKg != null ? Number(c.pesoPendenteKg) || 0 : Number(c.pesoTotalKg) || 0), 0);
   // ⚠⚠ A SELEÇÃO SAI DA FILA INTEIRA, NÃO DO FILTRO. Vitor (01/09/2026): "quero poder selecionar
@@ -249,35 +252,59 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
       {/* ⚠⚠ AS BANCADAS LIVRES APARECEM. Vitor (01/09/2026): "e também mostrar as bancadas livres
           ainda". Sem isso, saber o que sobra exigia comparar de cabeça as seis com as que aparecem
           na lista — e o painel de repartição, que é quem escolhe, só existe depois da seleção. */}
-      {comBancada.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap text-[12px] bg-white border border-gray-100 rounded-xl px-3 py-2.5 shadow-sm">
+      {/* ⚠⚠ OS CHIPS SÃO O FILTRO. Vitor (01/09/2026): "acredito ser melhor poder clicar nesses
+          botões e você já trazer as peças destinadas para cada máquina, e ajuste para que fiquem
+          melhor alinhados. Não é necessário essas informações" (os três cartões de número).
+          Os cartões diziam totais que a própria lista já mostra; os chips dizem o mesmo E levam
+          para o lugar. Clicar num filtra a lista para aquela bancada — clicar de novo desfaz.
+          ⚠ GRADE, não flex-wrap: com larguras livres os chips quebravam desalinhados e o botão da
+          planilha caía sozinho na segunda linha, longe do assunto. */}
+      <div className="bg-white border border-gray-100 rounded-xl px-3 py-2.5 shadow-sm space-y-2">
+        <div className="flex items-center gap-2 flex-wrap text-[12px]">
           <Flame size={14} className="text-torg-blue shrink-0" />
-          <span className="text-torg-dark"><b>{comBancada.length}</b> conjunto(s) já nas bancadas</span>
-          {BANCADAS.map((b) => {
-            const o = ocupadasHoje[b];
-            return (
-              <span key={b} title={o ? `${o.conj} conjunto(s) · ${Math.round(o.kg).toLocaleString("pt-BR")} kg · vaga ${fmtDiaLongo(o.livreEm)}` : "sem nada programado"}
-                className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold ${
-                  o ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}>
-                {b.replace("SOLDA ", "S")}{o ? ` · até ${fmtDiaLongo(o.livreEm)}` : " · livre"}
-              </span>
-            );
-          })}
-          <button onClick={planilhaDasBancadas} disabled={agindo}
+          <span className="text-torg-dark"><b>{comBancada.length}</b> conjunto(s) nas bancadas</span>
+          <span className="text-torg-gray">· <b>{semBancada}</b> ainda sem bancada</span>
+          {filtroBancada && (
+            <button onClick={() => setFiltroBancada("")} className="text-torg-blue underline font-semibold">ver todas</button>
+          )}
+          <button onClick={planilhaDasBancadas} disabled={agindo || !comBancada.length}
             className="ml-auto px-2.5 py-1.5 rounded-lg border border-torg-blue-200 text-torg-blue font-semibold hover:bg-torg-blue-50 inline-flex items-center gap-1.5 disabled:opacity-50">
             {agindo ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Planilha das bancadas
           </button>
         </div>
-      )}
+        <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(132px, 1fr))" }}>
+          {BANCADAS.map((b) => {
+            const o = ocupadasHoje[b];
+            const ativo = filtroBancada === b;
+            return (
+              <button key={b} onClick={() => setFiltroBancada(ativo ? "" : b)}
+                title={o ? `${o.conj} conjunto(s) · ${Math.round(o.kg).toLocaleString("pt-BR")} kg · vaga ${fmtDiaLongo(o.livreEm)}` : "sem nada programado"}
+                className={`px-2.5 py-1.5 rounded-lg border text-left transition-colors ${
+                  ativo ? "border-torg-blue bg-torg-blue text-white"
+                    : o ? "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}>
+                <span className="block text-[11px] font-bold uppercase tracking-wide truncate">{b}</span>
+                <span className={`block text-[10px] truncate ${ativo ? "opacity-90" : "opacity-80"}`}>
+                  {o ? `${o.conj} conj · até ${fmtDiaLongo(o.livreEm)}` : "livre"}
+                </span>
+              </button>
+            );
+          })}
+          <button onClick={() => setFiltroBancada(filtroBancada === "__sem" ? "" : "__sem")}
+            title="Conjuntos que ainda não foram para nenhuma bancada"
+            className={`px-2.5 py-1.5 rounded-lg border text-left transition-colors ${
+              filtroBancada === "__sem" ? "border-torg-blue bg-torg-blue text-white"
+                : semBancada > 0 ? "border-gray-200 bg-gray-50 text-torg-gray hover:bg-gray-100"
+                : "border-gray-100 bg-white text-torg-gray-light"}`}>
+            <span className="block text-[11px] font-bold uppercase tracking-wide truncate">sem bancada</span>
+            <span className="block text-[10px] truncate opacity-80">{semBancada} conj</span>
+          </button>
+        </div>
+      </div>
 
       {erro && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700 flex items-center gap-2"><AlertCircle size={14} /> {erro}</div>}
       {okMsg && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-xs text-emerald-800">{okMsg}</div>}
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <Kpi cor="bg-torg-blue" label="Na fila da solda" valor={`${filtrados.length}`} sub={fmtKg(somaKg(filtrados))} />
-        <Kpi cor="bg-amber-500" label="Sem bancada sugerida" valor={`${semBancada}`} sub="esperando decisão do PCP" alerta={semBancada > 0} />
-        <Kpi cor="bg-emerald-600" label="Já em solda" valor={`${filtrados.filter((c) => c.emSolda).length}`} sub="o Syneco já apontou" />
-      </div>
 
       <div className="flex items-center gap-2 flex-wrap">
         <select value={filtroOp} onChange={(e) => setFiltroOp(e.target.value)}
@@ -411,15 +438,3 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   );
 }
 
-function Kpi({ cor, label, valor, sub, alerta }) {
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3.5 flex items-center gap-3">
-      <div className={`${cor} p-2 rounded-lg`}><Flame size={18} className="text-white" /></div>
-      <div className="min-w-0">
-        <p className="text-[10px] text-torg-gray uppercase tracking-wider">{label}</p>
-        <p className="text-lg font-extrabold text-torg-dark leading-tight">{valor}</p>
-        <p className={`text-[10px] ${alerta ? "text-amber-700 font-semibold" : "text-torg-gray"}`}>{sub}</p>
-      </div>
-    </div>
-  );
-}
