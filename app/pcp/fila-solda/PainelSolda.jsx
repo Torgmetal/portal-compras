@@ -111,19 +111,31 @@ export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, o
             {resumo.ops.length} OPs no lote
           </span>
         )}
-        {/* ⚠ "quantas bancadas vão soldar", não "bancadas". Vitor (01/09/2026) precisou perguntar o
-            que o seletor fazia — e rótulo que exige pergunta é rótulo errado. O número é QUANTAS;
-            QUAIS quem escolhe é o painel, entre as livres na data. */}
-        <span className="text-[11px] text-torg-gray ml-auto">quantas bancadas vão soldar:</span>
-        <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
-          {[1, 2, 3, 4, 5, 6].map((x) => (
-            <button key={x} onClick={() => setN(x)}
-              className={`px-2.5 py-1 text-sm font-semibold ${x === n ? "bg-torg-blue text-white" : "bg-white text-torg-gray hover:bg-gray-50"}`}>{x}</button>
-          ))}
+      </div>
+
+      {/* ⚠⚠ O RÓTULO EM CIMA DA RÉGUA, EM BLOCO. Vitor (01/09/2026): "isso aqui deve ficar bem
+          acima da régua para selecionar a quantidade de bancadas de solda".
+          Estava inline com `ml-auto`, então numa tela mais estreita a régua quebrava para a linha
+          seguinte e o rótulo ficava sozinho, apontando para o nada — foi como ele viu. Empilhado,
+          rótulo e controle não têm como se separar, seja qual for a largura.
+          ⚠ "quantas bancadas vão soldar", não "bancadas": ele precisou perguntar o que o seletor
+          fazia, e rótulo que exige pergunta é rótulo errado. O número é QUANTAS; QUAIS quem escolhe
+          é o painel, entre as livres na data. */}
+      <div className="flex items-end gap-4 flex-wrap">
+        <div>
+          <p className="text-[11px] font-semibold text-torg-gray mb-1">quantas bancadas vão soldar</p>
+          <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+            {[1, 2, 3, 4, 5, 6].map((x) => (
+              <button key={x} onClick={() => setN(x)}
+                className={`px-3 py-1.5 text-sm font-semibold ${x === n ? "bg-torg-blue text-white" : "bg-white text-torg-gray hover:bg-gray-50"}`}>{x}</button>
+            ))}
+          </div>
         </div>
-        <span className="text-[11px] text-torg-gray">a partir de</span>
-        <input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)}
-          className="px-2 py-1 text-sm border border-gray-200 rounded-lg" />
+        <div>
+          <p className="text-[11px] font-semibold text-torg-gray mb-1">a partir de</p>
+          <input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)}
+            className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg" />
+        </div>
       </div>
       {/* ⚠ quais entraram, escrito por extenso: pedir 6 e receber 4 (bancada ocupada) precisa ser
           legível sem abrir o cartão de resumo. */}
