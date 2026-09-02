@@ -21,6 +21,7 @@ import {
 } from "@/lib/fornecedor-categorias";
 import MapaCotacaoClient from "@/app/compras/painel-ops/[opId]/MapaCotacaoClient";
 import BotaoResumoFD from "@/app/compras/painel-ops/[opId]/BotaoResumoFD";
+import BotaoMapaCotacao from "./BotaoMapaCotacao";
 import { numeroBR } from "@/lib/numero-br";
 
 const fmtMoeda = (v) =>
@@ -240,6 +241,12 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
           <div>
             <p className="text-torg-gray text-xs">Cotações</p>
             <p className="text-torg-dark font-medium">{rm.cotacoes.length}</p>
+          </div>
+          {/* ⚠ ao lado da contagem de cotações, que é onde a pessoa está olhando quando decide
+              comparar. Só aparece quando há cotação recebida — ver BotaoMapaCotacao. */}
+          <div className="flex items-end">
+            <BotaoMapaCotacao rmId={rm.id} numero={rm.numero}
+              cotacoes={rm.cotacoes.filter((c) => c.status === "RECEBIDA").length} />
           </div>
         </div>
 
