@@ -10,7 +10,7 @@
 //
 // ⚠ ENTRA NA FILA QUEM TERMINOU A MONTAGEM — pelo apontamento do Syneco, não por clique no portal.
 // Conjunto com montagem pela metade não é fila de solda: é montagem em andamento.
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Flame, Search, Loader2, AlertCircle, X, CheckCircle2, Download, CalendarClock } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import PainelSolda from "./PainelSolda";
@@ -406,6 +406,12 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
                   : g.hoje ? "bg-amber-50 border-amber-300 text-amber-900"
                   : porDia && !g.chave ? "bg-gray-50 border-gray-200 text-torg-gray"
                   : "bg-white border-gray-200 text-torg-dark"}`}>
+                {/* ⚠⚠ A CAIXA DE SELEÇÃO DO BLOCO FICA NA ESQUERDA, alinhada com as das peças.
+                    Vitor (01/09/2026): "esse escrito selecionar do outro lado também não tem nada a
+                    ver, traga a caixa de seleção do lado esquerdo e tire esse escrito". Um link
+                    escrito "selecionar" na ponta oposta obrigava a atravessar a linha com o olho
+                    para fazer o que a caixa ao lado já faz — e nem parecia a mesma ação. */}
+                <CaixaGrupo lista={g.lista} sel={sel} onToggle={() => marcarLista(g.lista)} />
                 {porDia ? <CalendarClock size={14} className="shrink-0 self-center" /> : <Flame size={14} className="shrink-0 self-center text-torg-blue" />}
                 <span className="text-[13px] font-extrabold">
                   {porDia ? fmtDiaLongo(g.chave) : (g.chave ? fmtOP(g.chave) : "sem obra")}
@@ -413,7 +419,6 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
                 <span className="text-[12px] tabular-nums">{g.lista.length} conj · {g.un} pç · {fmtKg(g.kg)}</span>
                 {g.atrasado && <span className="text-[11px] font-bold uppercase tracking-wide">passou do dia</span>}
                 {g.hoje && <span className="text-[11px] font-bold uppercase tracking-wide">é hoje</span>}
-                <button onClick={() => marcarLista(g.lista)} className="ml-auto text-[11px] underline font-semibold">selecionar</button>
               </div>
               {g.lista.map((c) => (
                 <div key={c.id} className={`rounded-lg border p-2.5 text-xs space-y-1 ml-2 ${sel.has(c.id) ? "border-torg-blue ring-1 ring-torg-blue bg-white" : "bg-white border-gray-100"}`}>
@@ -425,9 +430,14 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
                       {c.qtePendente < c.q ? `${c.qtePendente} de ${c.q}` : `${c.q}×`} · {fmtKg(c.pesoPendenteKg ?? c.pesoTotalKg)}
                     </span>
                     {/* ⚠ na visão por dia a obra é o que falta na linha; na visão por obra, a bancada */}
-                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-torg-blue-50 text-torg-blue font-mono font-semibold whitespace-nowrap">
-                      {porDia ? fmtOP(c.opNumero) : (c.soldaBancada || fmtOP(c.opNumero))}
-                    </span>
+                    {/* ⚠ agrupando por OBRA, repetir a obra em cada linha é ruído: o bloco inteiro
+                        já é aquela obra. A etiqueta só aparece quando acrescenta — a obra na visão
+                        por dia, a bancada na visão por obra. */}
+                    {(porDia || c.soldaBancada) && (
+                      <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-torg-blue-50 text-torg-blue font-mono font-semibold whitespace-nowrap">
+                        {porDia ? fmtOP(c.opNumero) : c.soldaBancada}
+                      </span>
+                    )}
                   </div>
                   {c.descricao && <p className="text-[10px] text-torg-gray truncate">{c.descricao}</p>}
                   <div className="flex items-center gap-2 flex-wrap text-[10px]">
@@ -450,3 +460,16 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   );
 }
 
+// ⚠ `indeterminate` não existe como prop no React — só como propriedade do nó. Sem ele, o bloco com
+// parte das peças marcadas apareceria vazio, e clicar marcaria tudo sem avisar que já havia algo.
+function CaixaGrupo({ lista, sel, onToggle }) {
+  const ref = useRef(null);
+  const marcadas = lista.filter((c) => sel.has(c.id)).length;
+  const todas = marcadas === lista.length && lista.length > 0;
+  useEffect(() => { if (ref.current) ref.current.indeterminate = marcadas > 0 && !todas; }, [marcadas, todas]);
+  return (
+    <input ref={ref} type="checkbox" checked={todas} onChange={onToggle}
+      title={todas ? "Desmarcar o bloco" : "Marcar o bloco inteiro"}
+      className="rounded border-gray-300 shrink-0 self-center cursor-pointer" />
+  );
+}
