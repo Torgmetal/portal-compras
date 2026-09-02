@@ -118,6 +118,11 @@ export async function GET(req) {
       material: mat ? mat.estado : null,
       materialFalta: mat?.falta || null,
       materialRs: mat?.rs?.length || 0,
+      // ⚠⚠ O R DECLARADO TEM DE VOLTAR PARA A LINHA. Vitor (02/09/2026): "não gravou, selecionei e
+      // dei salvar e não aparece nada aqui". Tinha gravado — a célula é que continuava lendo só o
+      // `estado` (ESTOQUE), que não muda quando alguém aponta o fardo. Sem este campo a tela oferece
+      // "usar de estoque" para sempre, mesmo já tendo sido usado, e quem declarou acha que perdeu.
+      materialRInformado: mat?.rInformado || null,
     };
   });
 
@@ -169,6 +174,9 @@ export async function GET(req) {
     }).sort((a, b) => b.pesoKg - a.pesoKg);
   }
 
+  // material que a obra ainda deve: entregue resolve, e estoque com o fardo apontado também.
+  const pendenteDeMaterial = (x) => x.material && x.material !== "ENTREGUE" && !(x.material === "ESTOQUE" && x.materialRInformado);
+
   return NextResponse.json({
     op, temLpc: true, pecas, pools: POOLS, materiais,
     truncado: brutas.length > TETO ? brutas.length - TETO : 0,
@@ -185,9 +193,11 @@ export async function GET(req) {
     material: material ? {
       ...material.resumo,
       // ⚠ o resumo do lib conta ESTOQUE à parte; aqui ele já entrou na fila de compra
-      naoEntregue: pecas.filter((x) => x.material && x.material !== "ENTREGUE").length,
-      kgNaoEntregue: Math.round(pecas.filter((x) => x.material && x.material !== "ENTREGUE")
-        .reduce((a, x) => a + (x.pesoTotalKg || 0), 0)),
+      // ⚠⚠ menos o estoque JÁ DECLARADO: contá-lo como pendente deixaria o aviso vermelho
+      // "N peça(s) sem material entregue" na tela depois de a pessoa ter resolvido — e um aviso
+      // que não some quando o problema acaba é o jeito mais rápido de ensinar a ignorá-lo.
+      naoEntregue: pecas.filter(pendenteDeMaterial).length,
+      kgNaoEntregue: Math.round(pecas.filter(pendenteDeMaterial).reduce((a, x) => a + (x.pesoTotalKg || 0), 0)),
     } : null,
     // os dias já programados desta obra, para a tela mostrar a semana montada
     dias: [...abertas.reduce((m, l) => {

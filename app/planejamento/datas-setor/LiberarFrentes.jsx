@@ -47,6 +47,11 @@ const MAT = {
 };
 // ⚠ QUAL VALOR CONTA COMO ENTREGUE — inclui o nome antigo, pelo mesmo motivo acima.
 const MAT_OK = (v) => v === "ENTREGUE" || v === "NA_OP";
+// ⚠⚠ ESTOQUE COM R DECLARADO É MATERIAL RESOLVIDO — em todo lugar da tela, não só na célula.
+// A linha guarda o `estado` cru (ESTOQUE), que não muda quando alguém aponta o fardo; quem sabe se
+// foi apontado é o `materialRInformado`. Ler só o estado fazia a peça continuar contada como
+// pendente na barra de resumo e continuar fora da seleção "pronta para liberar" depois de declarada.
+const MAT_RESOLVIDO = (p) => MAT_OK(p?.material) || (p?.material === "ESTOQUE" && !!p?.materialRInformado);
 
 const NAT = { croqui: "Croqui", avulsa: "Marca", conjunto: "Conjunto" };
 
@@ -57,6 +62,7 @@ const COLUNAS = [
   // é a célula.
   { key: "nc1",      label: "NC1",      valor: (p) => (p.temMaquina == null ? "não medido" : p.temMaquina ? "tem NC1" : "sem NC1") },
   { key: "material", label: "Material", valor: (p) => (!p.material ? "não medido"
+      : p.materialRInformado ? `estoque · R ${p.materialRInformado}`
       : p.materialPorTroca ? "entregue (R amarrado)" : MAT[p.material]?.rot || "recarregue a página") },
   { key: "desenho",  label: "Desenho",  valor: (p) => (p.temDesenho == null ? "não conferido" : p.temDesenho ? "tem desenho"
       : p.desenhoForaPadrao ? "outro nome" : "sem desenho") },
@@ -177,7 +183,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   // conta — "não sabemos quanto tem de estoque mesmo". Aguardando entrega, cotação e não comprado
   // não entram; o PCP segue podendo usar estoque e informar o R, que é a etapa dele.
   const liberavel = (p) => !!d?.pasta?.confiavel && p.temDesenho === true && p.temMaquina !== false
-    && (!p.material || MAT_OK(p.material))
+    && (!p.material || MAT_RESOLVIDO(p))
     && !p.programadaEm;
   const selecionaveis = useMemo(() => f.filtradas.filter(liberavel), [f.filtradas]);
   const selecionadas = useMemo(() => f.filtradas.filter((p) => sel.has(p.id)), [f.filtradas, sel]);
@@ -270,6 +276,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
             : p.desenhoForaPadrao ? `outro nome: ${p.desenhoForaPadrao}` : "não tem") },
         { t: "NC1", w: 12, v: (p) => (p.temMaquina == null ? "não medido" : p.temMaquina ? "tem" : "não tem") },
         { t: "Material", w: 22, v: (p) => (!p.material ? "não medido"
+            : p.materialRInformado ? `estoque · R ${p.materialRInformado}`
             : p.materialPorTroca ? `entregue · R ${p.materialPorTroca.r} amarrado` : MAT[p.material]?.rot || p.material) },
         { t: "Perfil", w: 22, v: (p) => p.perfil || "" },
         { t: "Aço", w: 14, v: (p) => p.aco || "" },
@@ -868,6 +875,15 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                           aço. Agora aparece "?" pedindo recarga, que é o que o caso realmente é. */}
                       {!p.material ? <Minus size={13} className="text-torg-gray-light" title="Material não medido para esta peça" />
                         : !MAT[p.material] ? <span className="text-[11px] text-torg-gray-light" title="Esta página está desatualizada em relação ao servidor — recarregue (Cmd+Shift+R)">?</span>
+                        : p.material === "ESTOQUE" && p.materialRInformado
+                        // ⚠ continua CLICÁVEL: trocar o fardo é rotina (o que estava mais à mão no
+                        // rack pode não ser o que foi apontado), e sem porta de volta a única saída
+                        // seria mexer no banco.
+                        ? <button type="button" onClick={() => { const m = materialDoPerfil(p.perfil); if (m) { setDeclarar(m); setREscolhido(p.materialRInformado); setMotivoEstoque(""); } }}
+                            title={`Material de estoque — fardo R ${p.materialRInformado} apontado para o perfil ${p.perfil}. Clique para trocar.`}
+                            className="inline-flex items-center gap-1 text-[11px] text-emerald-700 whitespace-nowrap rounded px-1.5 py-0.5 hover:bg-emerald-50">
+                            <Check size={13} className="shrink-0" /> estoque · R {p.materialRInformado}
+                          </button>
                         : MAT_OK(p.material)
                         ? (p.materialPorTroca
                             ? <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 whitespace-nowrap"
