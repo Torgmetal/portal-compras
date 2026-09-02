@@ -86,6 +86,9 @@ export async function GET(req) {
       .map((x) => x.conjuntoId)
   );
 
+  // peso por peça, para somar o kg de cada dia já programado (ver `dias`, no fim da resposta)
+  const pesoPorPeca = new Map(brutas.map((p) => [p.id, Number(p.pesoTotalKg) || 0]));
+
   const pecas = brutas.slice(0, TETO).map((p) => {
     const natureza = p.tipoPeca === "CROQUI" ? "croqui"
       : p.tipoPeca === "CONJUNTO" && comCroqui.has(p.id) ? "conjunto"
@@ -200,12 +203,39 @@ export async function GET(req) {
       kgNaoEntregue: Math.round(pecas.filter(pendenteDeMaterial).reduce((a, x) => a + (x.pesoTotalKg || 0), 0)),
     } : null,
     // os dias já programados desta obra, para a tela mostrar a semana montada
+    // ⚠⚠ O DIA PRECISA DIZER O PESO, NÃO SÓ A CONTAGEM. O Planejamento (03/09/2026, via Vitor):
+    // "nessa tela não fica muito claro quanto de peso eu já soltei por dia (…) ou eu só devo
+    // imaginar mesmo já que limitei os 12.000 kg lá?".
+    // A meta do setor é em kg/dia e a esteira do corte é em kg — contar peça não responde nada:
+    // 33 peças podem ser 800 kg de cantoneira ou 9 t de chapa. Quem programa estava conferindo a
+    // própria meta de cabeça.
     dias: [...abertas.reduce((m, l) => {
       const k = l.dataProgramada ? l.dataProgramada.toISOString().slice(0, 10) : "";
-      const g = m.get(k) || { dia: k || null, lotes: 0, pecas: 0 };
-      g.lotes++; g.pecas += (Array.isArray(l.pecaIds) ? l.pecaIds.length : 0);
+      const g = m.get(k) || { dia: k || null, lotes: 0, pecas: 0, kg: 0, orfas: 0 };
+      g.lotes++;
+      const ids = Array.isArray(l.pecaIds) ? l.pecaIds : [];
+      // ⚠⚠ CONTA SÓ O QUE AINDA EXISTE — e diz quanto sumiu. Medido na OP-113 em 03/09/2026: das
+      // 250 peças liberadas, **126 apontam para ids que não existem mais** em PecaConjunto. Duas
+      // liberações inteiras estão órfãs (79 peças no corte de 03/09, 47 na montagem de 30/09), e a
+      // data bate com a reimportação da LPC daquela manhã, que recriou os croquis com ids novos.
+      //
+      // A liberação guarda o ID da peça; reimportar a lista troca o id e o ponteiro morre. O
+      // trabalho continua existindo (mesma marca, id novo) — o que se perdeu foi a PROGRAMAÇÃO
+      // dela, e a peça voltou para a fila de "a fazer" sem ninguém saber.
+      //
+      // Contar o id órfão como peça programada era mentir duas vezes: inflava o dia (123 onde há
+      // 44) e, agora que o peso entra, faria o chip dizer "123 pç · 9.728 kg" — número que não
+      // fecha e que quem lê conclui, com razão, que a tela está quebrada. O órfão sai da conta e
+      // aparece à parte, que é o único jeito de alguém ir reprogramar.
+      for (const id of ids) {
+        const kg = pesoPorPeca.get(id);
+        if (kg === undefined) { g.orfas++; continue; }
+        g.pecas++; g.kg += kg;
+      }
       return m.set(k, g);
-    }, new Map()).values()].sort((a, b) => String(a.dia).localeCompare(String(b.dia))),
+    }, new Map()).values()]
+      .map((g) => ({ ...g, kg: Math.round(g.kg) }))
+      .sort((a, b) => String(a.dia).localeCompare(String(b.dia))),
   });
 }
 

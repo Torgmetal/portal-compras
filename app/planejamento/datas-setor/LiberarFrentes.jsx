@@ -543,14 +543,42 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         </div>
       )}
 
+      {/* ⚠⚠ CADA DIA MOSTRA O PESO, E COMPARADO COM A META. O Planejamento (03/09/2026, via Vitor):
+          "não fica muito claro quanto de peso eu já soltei por dia (…) ou eu só devo imaginar mesmo
+          já que limitei os 12.000 kg lá?".
+          A meta do setor é kg/dia; contar peça não responde: 33 peças podem ser 800 kg de cantoneira
+          ou 9 t de chapa. Quem programava conferia a própria meta de cabeça.
+          ⚠ Âmbar quando o dia passou da meta — não bloqueia nada, só avisa que aquele dia está mais
+          cheio do que a esteira aguenta. Verde é dia dentro da meta. */}
       {d?.dias?.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
           <span className="uppercase text-torg-gray-light">Já programado</span>
-          {d.dias.map((x) => (
-            <span key={x.dia || "sem"} className="px-1.5 py-0.5 rounded border border-emerald-200 bg-emerald-50 text-emerald-800 font-semibold whitespace-nowrap">
-              {x.dia ? fmtD(x.dia) : "sem data"} · {fmtN(x.pecas)} pç
+          {d.dias.map((x) => {
+            const meta = Number(metaKg) || 0;
+            const passou = meta > 0 && x.kg > meta;
+            return (
+              <span key={x.dia || "sem"}
+                title={meta > 0 ? `${fmtKg(x.kg)} de ${fmtN(meta)} kg/dia da meta${passou ? " — dia acima da meta" : ""}` : fmtKg(x.kg)}
+                className={`px-1.5 py-0.5 rounded border font-semibold whitespace-nowrap ${
+                  passou ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+                {x.dia ? fmtD(x.dia) : "sem data"} · {fmtN(x.pecas)} pç · {fmtKg(x.kg)}
+                {/* ⚠ peça liberada cujo id não existe mais — a reimportação da lista troca o id e
+                    a programação daquela marca se perde. Sem este aviso o dia só encolhe sozinho. */}
+                {x.orfas > 0 && (
+                  <span className="ml-1 text-amber-700"
+                    title={`${x.orfas} peça(s) deste dia saíram da lista (a lista foi reimportada depois da liberação) — precisam ser programadas de novo`}>
+                    +{fmtN(x.orfas)} a reprogramar
+                  </span>
+                )}
+              </span>
+            );
+          })}
+          {/* o acumulado responde a outra pergunta da mesma pessoa: "quanto eu já soltei", no total */}
+          {d.dias.length > 1 && (
+            <span className="text-torg-gray">
+              total {fmtN(d.dias.reduce((s2, x) => s2 + x.pecas, 0))} pç · {fmtKg(d.dias.reduce((s2, x) => s2 + (x.kg || 0), 0))}
             </span>
-          ))}
+          )}
         </div>
       )}
 
