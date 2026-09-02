@@ -2576,6 +2576,15 @@ model PortalCliente {
   // para quem comprou a obra. Publicar o nome do arquivo é publicar a nossa nomenclatura.
   // { ENGENHARIA: [{ id, nome, nomeExibicao, pasta, tamanho, em }], QUALIDADE: [...], … }
   docsPorArea      Json?
+  // ⚠⚠ QUAIS DOCUMENTOS JÁ FORAM AVISADOS — lista de ids, não uma data. Vitor (01/09/2026):
+  // "preciso enviar para os envolvidos sobre alguns arquivos que adicionei (…) pensei em um botão
+  // para mandar o alerta".
+  //
+  // Por ids, e não por carimbo de tempo, porque o `em` que a seleção guarda é a data do ARQUIVO no
+  // servidor — um desenho de março escolhido hoje tem `em` de março e nunca seria "novo". A
+  // diferença entre o que está publicado e o que já foi avisado é o que o botão precisa saber.
+  docsAvisados     Json?
+  docsAvisadoEm    DateTime?
   // ⚠ PESO É PREÇO. Vitor (22/08/2026): "a lista LPC e LE deixe a opção de divulgar com e
   // sem peso, isso é importante para nós". Estrutura metálica se cota por R$/kg — publicar
   // o peso item a item entrega a base de cálculo do nosso preço a quem vai negociar o

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye, Upload, X, ImagePlus, FolderOpen, Plus, Trash2 } from "lucide-react";
 import { upload } from "@vercel/blob/client";
 import { SECOES, CAPAS, AREAS, AREAS_COM_SELETOR, TIPOS_ENGENHARIA, situacao } from "@/lib/portal-cliente";
@@ -430,6 +430,12 @@ export default function AbaPortalCliente({ opId, opNumero }) {
           className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5">
           <Send size={13} /> Publicar e enviar
         </button>
+        {/* ⚠⚠ AVISAR ≠ PUBLICAR. Vitor (01/09/2026): "preciso enviar para os envolvidos sobre
+            alguns arquivos que adicionei (…) pensei em um botão para mandar o alerta" e "eu só não
+            faria isso sempre que algum arquivo for adicionado, e sim quando eu quiser mandar".
+            Publicar coloca no ar; avisar conta que mudou. Separados de propósito: quem sobe dez
+            arquivos ao longo do dia manda UM aviso, e não dez. */}
+        {d.portal.status === "PUBLICADO" && <AvisoDocsNovos opId={opId} />}
       </div>
     </div>
   );
@@ -442,5 +448,84 @@ function Campo({ rot, v, on, ph = "", tipo = "text" }) {
       <input type={tipo} value={v ?? ""} placeholder={ph} onChange={(e) => on(e.target.value)}
         className="w-full text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
     </label>
+  );
+}
+
+// ─── AVISAR SOBRE DOCUMENTOS NOVOS ────────────────────────────────────────────
+// O botão só existe quando HÁ novidade — e diz quanta. Botão sempre aceso, que às vezes manda
+// e-mail vazio, é o que ensina o cliente a ignorar o aviso seguinte.
+function AvisoDocsNovos({ opId }) {
+  const [d, setD] = useState(null);
+  const [enviando, setEnviando] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [abrir, setAbrir] = useState(false);
+  const [sel, setSel] = useState(null); // null = todos
+
+  const carregar = useCallback(() => {
+    fetch(`/api/comercial/op/${opId}/portal/avisar`, { cache: "no-store" })
+      .then((r) => r.json()).then(setD).catch(() => {});
+  }, [opId]);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  if (!d || d.error) return null;
+  const alvo = sel ?? (d.destinatarios || []).map((x) => x.email);
+
+  async function enviar() {
+    setEnviando(true); setMsg("");
+    try {
+      const r = await fetch(`/api/comercial/op/${opId}/portal/avisar`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emails: alvo }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao enviar");
+      setMsg(`Aviso enviado para ${j.enviados} pessoa(s).`);
+      setAbrir(false); carregar();
+    } catch (e) { setMsg(e.message); } finally { setEnviando(false); }
+  }
+
+  if (!d.novos) {
+    return (
+      <span className="text-[11px] text-torg-gray self-center">
+        {d.avisadoEm ? `nada novo desde ${new Date(d.avisadoEm).toLocaleDateString("pt-BR")}` : "nenhum documento para avisar"}
+      </span>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <button onClick={() => setAbrir((v) => !v)}
+        className="text-[12px] font-semibold text-white bg-torg-orange rounded-lg px-3 py-1.5 hover:opacity-90 inline-flex items-center gap-1.5">
+        <Send size={13} /> Avisar sobre {d.novos} documento(s) novo(s)
+      </button>
+      {abrir && (
+        <div className="absolute right-0 bottom-full mb-2 w-80 bg-white border border-gray-200 rounded-xl shadow-lg p-3 z-20 space-y-2">
+          <p className="text-[11px] font-semibold text-torg-dark">O aviso vai listar:</p>
+          <ul className="text-[11px] text-torg-gray space-y-0.5 max-h-28 overflow-y-auto">
+            {(d.caixas || []).map((c) => (
+              <li key={c.caixa}><b className="text-torg-dark">{c.caixa}</b> · {c.nomes.length} arquivo(s)</li>
+            ))}
+          </ul>
+          <div className="border-t border-gray-100 pt-2">
+            <p className="text-[11px] font-semibold text-torg-dark mb-1">Para quem:</p>
+            {(d.destinatarios || []).map((p) => {
+              const on = alvo.includes(p.email);
+              return (
+                <label key={p.id} className="flex items-center gap-2 text-[11px] py-0.5 cursor-pointer">
+                  <input type="checkbox" checked={on} className="accent-torg-orange"
+                    onChange={() => setSel(on ? alvo.filter((e) => e !== p.email) : [...alvo, p.email])} />
+                  <span className="truncate">{p.nome || p.email}</span>
+                </label>
+              );
+            })}
+          </div>
+          <button onClick={enviar} disabled={enviando || !alvo.length}
+            className="w-full text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:opacity-90 disabled:opacity-50">
+            {enviando ? "enviando…" : `Enviar para ${alvo.length}`}
+          </button>
+        </div>
+      )}
+      {msg && <p className="absolute right-0 top-full mt-1 text-[11px] text-emerald-700 whitespace-nowrap">{msg}</p>}
+    </div>
   );
 }
