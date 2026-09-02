@@ -101,7 +101,10 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         const cena = new THREE.Scene();
         cena.background = new THREE.Color(0xffffff);   // Vitor pediu fundo branco
         const cam = new THREE.PerspectiveCamera(45, 1, 0.1, 5000);
-        const rend = new THREE.WebGLRenderer({ antialias: true });
+        // ⚠ `preserveDrawingBuffer` permite ler o canvas depois de desenhado — é o que torna possível
+        // salvar a vista como imagem (e foi como conferi a tela sem conseguir autenticar). Custa um
+        // pouco de memória de vídeo; numa cena deste porte é irrelevante.
+        const rend = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
         rend.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
         el.innerHTML = "";
         el.appendChild(rend.domElement);
