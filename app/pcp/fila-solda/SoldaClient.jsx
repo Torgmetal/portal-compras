@@ -57,19 +57,35 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
     .filter((c) => c.montado && !c.soldado),
     [conjuntos, montados, soldados]);
 
-  const ops = useMemo(() => [...new Set(fila.map((c) => c.opNumero).filter(Boolean))]
-    .sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { numeric: true })), [fila]);
+  // ⚠⚠ A LISTA PADRÃO É O QUE FALTA PROGRAMAR. Vitor (01/09/2026): "quando programarmos as peças
+  // das OPs na sua totalidade, precisamos que você tire elas da lista, pois fica confuso — só
+  // deixe o seletor para obras que estiverem sem programação de fato".
+  //
+  // A obra inteira programada continuava ocupando a tela como se pedisse decisão, e o seletor
+  // oferecia obras que não tinham mais nada a decidir. O que já foi programado não some do portal:
+  // ele passa a viver nos chips das bancadas, que é onde a pergunta deixa de ser "o que falta
+  // programar" e vira "o que a máquina vai fazer".
+  const aProgramar = useMemo(() => fila.filter((c) => !c.soldaBancada), [fila]);
+  // ⚠ o seletor lista só obra com pendência REAL — a não ser que você esteja olhando uma bancada,
+  // quando o assunto passa a ser o que está lá dentro.
+  const ops = useMemo(() => {
+    const base = filtroBancada ? fila.filter((c) => (filtroBancada === "__sem" ? !c.soldaBancada : c.soldaBancada === filtroBancada)) : aProgramar;
+    return [...new Set(base.map((c) => c.opNumero).filter(Boolean))]
+      .sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { numeric: true }));
+  }, [fila, aProgramar, filtroBancada]);
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    return fila.filter((c) => {
+    // sem bancada escolhida, a lista é só o que falta programar
+    const base = filtroBancada ? fila : aProgramar;
+    return base.filter((c) => {
       if (filtroOp && c.opNumero !== filtroOp) return false;
       if (filtroBancada === "__sem") { if (c.soldaBancada) return false; }
       else if (filtroBancada && c.soldaBancada !== filtroBancada) return false;
       if (!q) return true;
       return [c.marca, c.descricao, c.op?.cliente, c.op?.obra].some((v) => String(v ?? "").toLowerCase().includes(q));
     });
-  }, [fila, filtroOp, filtroBancada, busca]);
+  }, [fila, aProgramar, filtroOp, filtroBancada, busca]);
 
   // ⚠⚠ AGRUPA POR BANCADA **E POR DIA**. Vitor (01/09/2026): "preciso ver onde vejo a programação
   // do que selecionei para soldar, para podermos alterar datas, acompanhar, dar baixa manual".
@@ -77,36 +93,34 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   // aparecia em lugar nenhum. Agora cada bancada abre em dias, e o dia que já passou sem a solda
   // fechar aparece em vermelho: começar não é entregar.
   const hojeIso = isoHoje();
+
+  // ⚠⚠ UM EIXO POR VEZ. Vitor (01/09/2026): "ainda assim está bem difícil a visualização das datas
+  // da maneira que está, precisa ficar mais claro a carga de cada máquina e quando".
+  //
+  // Antes a lista aninhava BANCADA → DIA sempre, e com seis bancadas abertas ao mesmo tempo a data
+  // virava a terceira informação de cada bloco — ninguém achava. Agora o eixo é o contexto:
+  //   • sem bancada escolhida, a pergunta é "o que falta programar" → agrupa por OBRA;
+  //   • com uma bancada escolhida, a pergunta é "o que essa máquina faz e quando" → agrupa por DIA,
+  //     e o dia é o título grande do bloco, não uma linha secundária.
+  const porDia = !!filtroBancada && filtroBancada !== "__sem";
   const grupos = useMemo(() => {
     const m = new Map();
     for (const c of filtrados) {
-      const k = c.soldaBancada || "";
+      const k = porDia ? (c.soldaDiaProgramado ? String(c.soldaDiaProgramado).slice(0, 10) : "") : (c.opNumero || "");
       if (!m.has(k)) m.set(k, []);
       m.get(k).push(c);
     }
     return [...m.entries()]
+      // sem data (ou sem obra) primeiro: é o que espera decisão
       .sort((a, b) => (!a[0] ? -1 : !b[0] ? 1 : a[0].localeCompare(b[0], "pt-BR", { numeric: true })))
-      .map(([bancada, lista]) => {
-        const porDia = new Map();
-        for (const c of lista) {
-          const d = c.soldaDiaProgramado ? String(c.soldaDiaProgramado).slice(0, 10) : "";
-          if (!porDia.has(d)) porDia.set(d, []);
-          porDia.get(d).push(c);
-        }
-        return {
-          bancada, lista,
-          kg: lista.reduce((s, c) => s + (c.pesoPendenteKg ?? (Number(c.pesoTotalKg) || 0)), 0),
-          // sem data vem primeiro: é o que ainda precisa de decisão
-          dias: [...porDia.entries()].sort((a, b) => (!a[0] ? -1 : !b[0] ? 1 : a[0].localeCompare(b[0])))
-            .map(([dia, itens]) => ({
-              dia, itens,
-              kg: itens.reduce((s, c) => s + (c.pesoPendenteKg ?? (Number(c.pesoTotalKg) || 0)), 0),
-              atrasado: !!dia && dia < hojeIso,
-              hoje: dia === hojeIso,
-            })),
-        };
-      });
-  }, [filtrados, hojeIso]);
+      .map(([chave, lista]) => ({
+        chave, lista,
+        un: lista.reduce((s, c) => s + (c.qtePendente ?? c.q), 0),
+        kg: lista.reduce((s, c) => s + (c.pesoPendenteKg ?? (Number(c.pesoTotalKg) || 0)), 0),
+        atrasado: porDia && !!chave && chave < hojeIso,
+        hoje: porDia && chave === hojeIso,
+      }));
+  }, [filtrados, porDia, hojeIso]);
 
   // ⚠ conta na FILA INTEIRA, não no filtrado: o chip "sem bancada" vive na faixa de cima, que
   // resume a fila toda. Contando o filtrado, ele mostraria 0 assim que você clicasse numa bancada —
@@ -377,57 +391,55 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
         <div className="px-2 py-2 space-y-1.5 max-h-[70vh] overflow-y-auto">
           {grupos.length === 0 && (
             <p className="text-[11px] text-torg-gray italic px-2 py-8 text-center">
-              Nada na fila — nenhum conjunto com montagem concluída e solda aberta.
+              {filtroBancada
+                ? "Nada nesta bancada."
+                : "Nada a programar — tudo o que saiu da montagem já tem bancada. Clique numa bancada acima para ver o que ela vai fazer."}
             </p>
           )}
           {grupos.map((g) => (
-            <div key={g.bancada || "sem"} className="space-y-1.5 pb-1">
-              <div className={`flex items-center gap-1.5 flex-wrap px-2 py-1.5 rounded-md border text-[10px] ${
-                g.bancada ? "bg-white border-gray-100 text-torg-gray" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
-                <Flame size={11} />
-                <span className="font-bold uppercase tracking-wide">{g.bancada || "sem bancada sugerida"}</span>
-                <span className="font-semibold">{g.lista.length} conj · {fmtKg(g.kg)}</span>
-                <button onClick={() => marcarLista(g.lista)} className="ml-auto underline font-semibold">selecionar</button>
+            <div key={g.chave || "sem"} className="space-y-1.5 pb-2">
+              {/* ⚠⚠ O CABEÇALHO DO BLOCO É O ASSUNTO DO MOMENTO — a data quando se olha uma
+                  bancada, a obra quando se olha o que falta programar. Em 13px e negrito, não em
+                  10px de canto: era esse tamanho que fazia a data "sumir" na tela. */}
+              <div className={`flex items-baseline gap-2 flex-wrap px-2.5 py-2 rounded-lg border ${
+                g.atrasado ? "bg-red-50 border-red-200 text-red-800"
+                  : g.hoje ? "bg-amber-50 border-amber-300 text-amber-900"
+                  : porDia && !g.chave ? "bg-gray-50 border-gray-200 text-torg-gray"
+                  : "bg-white border-gray-200 text-torg-dark"}`}>
+                {porDia ? <CalendarClock size={14} className="shrink-0 self-center" /> : <Flame size={14} className="shrink-0 self-center text-torg-blue" />}
+                <span className="text-[13px] font-extrabold">
+                  {porDia ? fmtDiaLongo(g.chave) : (g.chave ? fmtOP(g.chave) : "sem obra")}
+                </span>
+                <span className="text-[12px] tabular-nums">{g.lista.length} conj · {g.un} pç · {fmtKg(g.kg)}</span>
+                {g.atrasado && <span className="text-[11px] font-bold uppercase tracking-wide">passou do dia</span>}
+                {g.hoje && <span className="text-[11px] font-bold uppercase tracking-wide">é hoje</span>}
+                <button onClick={() => marcarLista(g.lista)} className="ml-auto text-[11px] underline font-semibold">selecionar</button>
               </div>
-              {/* ⚠ dentro da bancada, um bloco por DIA. Vermelho = passou do dia e a solda não
-                  fechou; âmbar = é hoje. Sem data vem primeiro, que é o que espera decisão. */}
-              {g.dias.map((d) => (
-                <div key={d.dia || "sem"} className="space-y-1.5 pl-2">
-                  <div className={`flex items-center gap-1.5 flex-wrap px-2 py-1 rounded-md border text-[10px] ${
-                    d.atrasado ? "bg-red-50 border-red-200 text-red-700"
-                      : d.hoje ? "bg-amber-50 border-amber-200 text-amber-800"
-                      : d.dia ? "bg-white border-gray-100 text-torg-gray"
-                      : "bg-gray-50 border-gray-200 text-torg-gray"}`}>
-                    <CalendarClock size={11} />
-                    <span className="font-semibold">{fmtDiaLongo(d.dia)}</span>
-                    <span>{d.itens.length} conj · {fmtKg(d.kg)}</span>
-                    {d.atrasado && <span className="font-semibold">· passou do dia</span>}
-                    <button onClick={() => marcarLista(d.itens)} className="ml-auto underline font-semibold">selecionar o dia</button>
+              {g.lista.map((c) => (
+                <div key={c.id} className={`rounded-lg border p-2.5 text-xs space-y-1 ml-2 ${sel.has(c.id) ? "border-torg-blue ring-1 ring-torg-blue bg-white" : "bg-white border-gray-100"}`}>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} className="rounded border-gray-300" />
+                    <span className="font-mono font-bold text-torg-dark truncate">{c.marca}</span>
+                    {/* ⚠ o que FALTA soldar; o total só aparece quando é sobra */}
+                    <span className="text-torg-gray whitespace-nowrap">
+                      {c.qtePendente < c.q ? `${c.qtePendente} de ${c.q}` : `${c.q}×`} · {fmtKg(c.pesoPendenteKg ?? c.pesoTotalKg)}
+                    </span>
+                    {/* ⚠ na visão por dia a obra é o que falta na linha; na visão por obra, a bancada */}
+                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-torg-blue-50 text-torg-blue font-mono font-semibold whitespace-nowrap">
+                      {porDia ? fmtOP(c.opNumero) : (c.soldaBancada || fmtOP(c.opNumero))}
+                    </span>
                   </div>
-                  {d.itens.map((c) => (
-                    <div key={c.id} className={`rounded-lg border p-2.5 text-xs space-y-1 ${sel.has(c.id) ? "border-torg-blue ring-1 ring-torg-blue bg-white" : "bg-white border-gray-100"}`}>
-                      <div className="flex items-center gap-2">
-                        <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} className="rounded border-gray-300" />
-                        <span className="font-mono font-bold text-torg-dark truncate">{c.marca}</span>
-                        {/* ⚠ mostra o que FALTA soldar, e o total só quando é sobra: "1 de 4" evita
-                            o soldador procurar três peças que já estão prontas. */}
-                        <span className="text-torg-gray whitespace-nowrap">
-                          {c.qtePendente < c.q ? `${c.qtePendente} de ${c.q}` : `${c.q}×`} · {fmtKg(c.pesoPendenteKg ?? c.pesoTotalKg)}
-                        </span>
-                        <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-torg-blue-50 text-torg-blue font-mono font-semibold whitespace-nowrap">
-                          {fmtOP(c.opNumero)}
-                        </span>
-                      </div>
-                      {c.descricao && <p className="text-[10px] text-torg-gray truncate">{c.descricao}</p>}
-                      <div className="flex items-center gap-2 flex-wrap text-[10px]">
-                        <span className="text-emerald-700 font-semibold inline-flex items-center gap-1"><CheckCircle2 size={10} /> montagem concluída</span>
-                        {c.emSolda && <span className="text-torg-blue font-semibold">solda iniciada · {c.feitoSolda}/{c.q}</span>}
-                        {c.soldaBancada && c.soldaBancadaEm && (
-                          <span className="text-torg-gray">programada em {fmtData(c.soldaBancadaEm)}{c.soldaBancadaPor ? ` por ${c.soldaBancadaPor}` : ""}</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                  {c.descricao && <p className="text-[10px] text-torg-gray truncate">{c.descricao}</p>}
+                  <div className="flex items-center gap-2 flex-wrap text-[10px]">
+                    <span className="text-emerald-700 font-semibold inline-flex items-center gap-1"><CheckCircle2 size={10} /> montagem concluída</span>
+                    {c.emSolda && <span className="text-torg-blue font-semibold">solda iniciada · {c.feitoSolda}/{c.q}</span>}
+                    {!porDia && c.soldaDiaProgramado && (
+                      <span className="text-torg-gray">para {fmtDiaLongo(String(c.soldaDiaProgramado).slice(0, 10))}</span>
+                    )}
+                    {c.soldaBancadaEm && (
+                      <span className="text-torg-gray-light">programada em {fmtData(c.soldaBancadaEm)}{c.soldaBancadaPor ? ` por ${c.soldaBancadaPor}` : ""}</span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
