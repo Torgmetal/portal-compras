@@ -325,11 +325,19 @@ export default function RncDetalheClient({ id }) {
         )}
       </Secao>
 
-      {improcedente && (
-        <Secao titulo="Justificativa da improcedência">
-          <Campo label="Por que a RNC é improcedente (resposta ao cliente)">
+      {/* ⚠⚠ TAMBÉM NA PROCEDENTE. Vitor (02/09/2026): "não está saindo a justificativa da
+          improcedência OU PROCEDÊNCIA". Não saía da procedente porque não havia onde escrever —
+          o campo só aparecia quando a RNC era recusada.
+          Mas aceitar o apontamento também é uma decisão que precisa de motivo: é o que o cliente
+          lê para saber que analisamos, e é o que o auditor lê daqui a um ano para entender por que
+          esta virou não conformidade. O texto é o mesmo campo; o que muda é o que ele defende. */}
+      {cliente && (
+        <Secao titulo={improcedente ? "Justificativa da improcedência" : "Justificativa da procedência"}>
+          <Campo label={improcedente ? "Por que a RNC é improcedente (resposta ao cliente)" : "Por que o apontamento procede (resposta ao cliente)"}>
             <textarea value={d.respostaCliente || ""} onChange={(e) => set("respostaCliente", e.target.value)} rows={5} className="inp"
-              placeholder="Explique tecnicamente por que o apontamento do cliente não procede — este texto é a resposta ao cliente." />
+              placeholder={improcedente
+                ? "Explique tecnicamente por que o apontamento do cliente não procede — este texto é a resposta ao cliente."
+                : "Explique o que foi apurado e por que o apontamento procede — este texto é a resposta ao cliente."} />
           </Campo>
         </Secao>
       )}
