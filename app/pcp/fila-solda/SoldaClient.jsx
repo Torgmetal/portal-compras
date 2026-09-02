@@ -311,7 +311,9 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
             ? { ...c, soldaBancada: b.bancada, soldaBancadaEm: new Date().toISOString(), soldaDiaProgramado: d.dia } : c)));
         }
       }
-      setOkMsg(`${total} conjunto(s) repartidos entre ${usadas} bancada(s).`);
+      // ⚠ a mensagem DIZ ONDE FOI PARAR. Sem isso, o conjunto some da lista (que só mostra o que
+      // falta programar) e a pessoa fica sem saber para onde olhar — foi o que aconteceu com a 102A.
+      setOkMsg(`${total} conjunto(s) repartidos entre ${usadas} bancada(s). Para ver ou desfazer, clique em "programado" acima.`);
       setSel(new Set());
     } catch (e) { setErro(e.message); } finally { setAgindo(false); }
   }
@@ -482,9 +484,9 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
         <div className="px-2 py-2 space-y-1.5 max-h-[70vh] overflow-y-auto">
           {grupos.length === 0 && (
             <p className="text-[11px] text-torg-gray italic px-2 py-8 text-center">
-              {filtroBancada
-                ? "Nada nesta bancada."
-                : "Nada a programar — tudo o que saiu da montagem já tem bancada. Clique numa bancada acima para ver o que ela vai fazer."}
+              {filtroBancada === "__prog" ? "Nada programado ainda."
+                : filtroBancada ? "Nada nesta bancada."
+                : 'Nada a programar — tudo o que saiu da montagem já tem bancada. Clique em "programado" acima para ver (e desfazer) o que já foi.'}
             </p>
           )}
           {grupos.map((g) => (
