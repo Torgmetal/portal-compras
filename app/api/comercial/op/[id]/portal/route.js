@@ -162,7 +162,22 @@ export async function POST(req, { params }) {
     }
     enviado = enviados > 0;
     if (enviado) {
-      await prisma.portalCliente.update({ where: { id: portal.id }, data: { enviadoEm: new Date(), clienteEmail: lista[0].email } });
+      // ⚠⚠ O E-MAIL DE PUBLICAÇÃO JÁ ANUNCIA O QUE ESTÁ NO AR. Vitor (01/09/2026): "só o e-mail que
+      // listou todos os itens da aba da engenharia, não mostrou apenas os que foram adicionados".
+      //
+      // O aviso de "documentos novos" compara o que está publicado com o que já foi anunciado
+      // (`docsAvisados`). Sem carimbar aqui, esse conjunto nascia VAZIO e o primeiro aviso listava a
+      // obra inteira — tecnicamente correto ("nada foi anunciado ainda"), mas errado na prática:
+      // quem recebeu o link recebeu tudo junto com ele.
+      const doPortal = [];
+      const mapa = portal.docsPorArea || (portal.docsEngenharia ? { ENGENHARIA: portal.docsEngenharia } : {});
+      for (const lst of Object.values(mapa || {})) {
+        if (Array.isArray(lst)) for (const doc of lst) if (doc?.id) doPortal.push(String(doc.id));
+      }
+      await prisma.portalCliente.update({
+        where: { id: portal.id },
+        data: { enviadoEm: new Date(), clienteEmail: lista[0].email, docsAvisados: doPortal, docsAvisadoEm: new Date() },
+      });
     }
     totalEnvio = lista.length; okEnvio = enviados;
   }
