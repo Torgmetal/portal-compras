@@ -17,6 +17,7 @@ import { requireRole } from "@/lib/session";
 import { rastreioDaOp } from "@/lib/rastreio-peca";
 import { amarracoesDaOp, amarracaoDoPerfil } from "@/lib/r-amarrado";
 import { casarPerfilComOmie } from "@/lib/casar-omie";
+import { ORDEM_FIFO_CMR, compararFifoCmr } from "@/lib/cmr-origens";
 import { ehItemComprado } from "@/lib/item-comprado";
 import { dedupLpcLe } from "@/lib/pecas-producao";
 
@@ -70,7 +71,10 @@ export async function GET(req) {
   const cmr = await prisma.documentoQualidade.findMany({
     where: { categoria: "MATERIAL" },
     select: { importRef: true, nome: true, numeroCorrida: true, numeroDocumento: true, norma: true, fornecedor: true, pedidoCompra: true, nfNumero: true, dataRecebimento: true, pesoKg: true, quantidade: true, opNumero: true },
-    orderBy: [{ dataRecebimento: "desc" }],
+    // ⚠ lia em `desc` e desempatava por data com localeCompare — que dá 0 no empate e, com sort
+    // estável, deixava o R MAIS NOVO na frente. Era isso que fazia esta planilha discordar da tela
+    // do PCP no W150 da OP-113. Ver ORDEM_FIFO_CMR em lib/cmr-origens.js.
+    orderBy: ORDEM_FIFO_CMR,
   });
   // O matcher roda por PERFIL contra a lista de materiais; casar contra as 3.7 mil linhas seria
   // desperdício — são ~1,1 mil descrições DISTINTAS. Casa nas distintas e expande depois.
@@ -163,7 +167,7 @@ export async function GET(req) {
     // ⚠ a amarração GANHA do mais apontado e do casamento por texto: alguém disse qual é o fardo,
     // com nome e motivo. Palpite não desempata decisão registrada.
     const maisApontado = am?.r || [...g.rs.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-    const daOpAntiga = [...opcoes].filter((o) => o.daOp).sort((a, b) => String(a.recebidoEm || "").localeCompare(String(b.recebidoEm || "")))[0];
+    const daOpAntiga = [...opcoes].filter((o) => o.daOp).sort(compararFifoCmr)[0];
     // ⚠⚠ PEÇA SEM R AINDA PRECISA DIZER QUAL VAI USAR.
     // Vitor (24/08/2026): "no caso das peças que estiverem sem o R deve ser informado qual será
     // usado". Só peça CORTADA ganha R carimbado — então material que ainda não foi cortado e cujas
