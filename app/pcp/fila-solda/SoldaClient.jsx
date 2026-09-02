@@ -11,8 +11,9 @@
 // ⚠ ENTRA NA FILA QUEM TERMINOU A MONTAGEM — pelo apontamento do Syneco, não por clique no portal.
 // Conjunto com montagem pela metade não é fila de solda: é montagem em andamento.
 import { useState, useMemo, useRef, useEffect } from "react";
-import { Flame, Search, Loader2, AlertCircle, X, CheckCircle2, Download, CalendarClock } from "lucide-react";
+import { Flame, Search, Loader2, AlertCircle, X, CheckCircle2, Download, ArrowRight } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
+import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import PainelSolda from "./PainelSolda";
 import { gerarFolhaSolda } from "@/lib/folha-solda";
 import { BANCADAS, RITMO_META, ocupacaoDasBancadas } from "@/lib/solda-capacidade";
@@ -26,6 +27,17 @@ const fmtDiaLongo = (iso) => {
   const s = d.toLocaleDateString("pt-BR", { weekday: "short", timeZone: "UTC" }).replace(".", "");
   return `${s} ${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" })}`;
 };
+
+// ⚠ `valor` devolve TEXTO — é o que aparece na lista do funil e o que o filtro compara. Data crua
+// (2026-09-03) ordena bem mas ninguém reconhece; o rótulo em português é o que a pessoa procura.
+const COLUNAS = [
+  { key: "marca", label: "Marca", valor: (c) => c.marca || "—" },
+  { key: "descricao", label: "Descrição", valor: (c) => c.descricao || "—" },
+  { key: "op", label: "OP", valor: (c) => fmtOP(c.opNumero) || "—" },
+  { key: "bancada", label: "Bancada", valor: (c) => c.soldaBancada || "sem bancada" },
+  { key: "dia", label: "Dia", valor: (c) => (c._dia ? fmtDiaLongo(c._dia) : "sem data") },
+  { key: "situacao", label: "Situação", valor: (c) => (c.emSolda ? "soldando" : c.soldaBancada ? "programado" : "a programar") },
+];
 
 export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados = {}, bancadas = [] }) {
   const [conjuntos, setConjuntos] = useState(conjuntosIniciais);
@@ -113,25 +125,25 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   //     e o dia é o título grande do bloco, não uma linha secundária.
   // ⚠ por DIA só quando se olha UMA bancada. Em "programado" o assunto é a obra — agrupar por dia
   // ali espalharia a 102A por vários blocos e o problema voltaria com outra roupa.
-  const porDia = !!filtroBancada && filtroBancada !== "__sem" && filtroBancada !== "__prog";
-  const grupos = useMemo(() => {
-    const m = new Map();
-    for (const c of filtrados) {
-      const k = porDia ? (c.soldaDiaProgramado ? String(c.soldaDiaProgramado).slice(0, 10) : "") : (c.opNumero || "");
-      if (!m.has(k)) m.set(k, []);
-      m.get(k).push(c);
-    }
-    return [...m.entries()]
-      // sem data (ou sem obra) primeiro: é o que espera decisão
-      .sort((a, b) => (!a[0] ? -1 : !b[0] ? 1 : a[0].localeCompare(b[0], "pt-BR", { numeric: true })))
-      .map(([chave, lista]) => ({
-        chave, lista,
-        un: lista.reduce((s, c) => s + (c.qtePendente ?? c.q), 0),
-        kg: lista.reduce((s, c) => s + (c.pesoPendenteKg ?? (Number(c.pesoTotalKg) || 0)), 0),
-        atrasado: porDia && !!chave && chave < hojeIso,
-        hoje: porDia && chave === hojeIso,
-      }));
-  }, [filtrados, porDia, hojeIso]);
+  // ⚠⚠ TABELA COM FILTRO DE COLUNA, NÃO BLOCOS AGRUPADOS. Vitor (01/09/2026): "acho que vou querer
+  // as informações em forma de lista e filtro de excel igual fizemos em outras do portal, pois está
+  // terrível".
+  //
+  // Eu vinha empilhando eixos: agrupava por bancada, depois por dia, depois por obra conforme o
+  // contexto — e cada troca de agrupamento era uma regra nova que só eu sabia. Com a coluna
+  // filtrável, BANCADA e DIA viram apenas mais duas colunas: quem quer ver a SOLDA 4 de quinta
+  // filtra as duas, e não precisa aprender agrupamento nenhum. É o mesmo padrão do PCP e da
+  // Expedição (components/FiltroColuna), que ele já usa todo dia.
+  const linhas = useMemo(() => filtrados.map((c) => ({
+    ...c,
+    _dia: c.soldaDiaProgramado ? String(c.soldaDiaProgramado).slice(0, 10) : "",
+    _atrasado: !!c.soldaDiaProgramado && String(c.soldaDiaProgramado).slice(0, 10) < hojeIso,
+  })), [filtrados, hojeIso]);
+
+  const { filtradas: visiveis, filtros: filtroCol, setFiltros: setFiltroCol, opcoesDaColuna, limpar: limparCols, ativos: colsAtivas } =
+    useFiltroColunas(linhas, COLUNAS);
+  const [colAberta, setColAberta] = useState(null);
+  const fp = { filtros: filtroCol, setFiltros: setFiltroCol, opcoesDaColuna, aberta: colAberta, setAberta: setColAberta };
 
   // ⚠ conta na FILA INTEIRA, não no filtrado: o chip "sem bancada" vive na faixa de cima, que
   // resume a fila toda. Contando o filtrado, ele mostraria 0 assim que você clicasse numa bancada —
@@ -214,25 +226,6 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
 
   // ⚠ O PAINEL DEVOLVE A REPARTIÇÃO INTEIRA — uma chamada por bancada, não uma por conjunto. Com 95
   // marcas em 6 bancadas seriam 95 requisições; assim são 6.
-  // ⚠ SÓ A DATA — a rota aceita `dia` sem `bancada` justamente para isto: reenviar a bancada só
-  // para mudar o dia arriscaria trocá-la sem querer.
-  async function mudarDia() {
-    if (!novoDia || !selecao.length) return;
-    setAgindo(true); setErro(""); setOkMsg("");
-    try {
-      const ids = selecao.map((c) => c.id);
-      const r = await fetch("/api/pcp/solda", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids, dia: novoDia }),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro ao mudar a data");
-      const set = new Set(ids);
-      setConjuntos((prev) => prev.map((c) => (set.has(c.id) ? { ...c, soldaDiaProgramado: novoDia } : c)));
-      setOkMsg(`${j.atualizados} conjunto(s) movidos para ${novoDia.split("-").reverse().join("/")}.`);
-      setSel(new Set()); setNovoDia("");
-    } catch (e) { setErro(e.message); } finally { setAgindo(false); }
-  }
 
   // ⚠ BAIXA DO PORTAL, NÃO DO SYNECO. Registra que a solda terminou aqui dentro; o apontamento da
   // fábrica continua sendo a fonte. Serve para a peça que a fábrica soldou e não lançou — sem isso
@@ -264,26 +257,36 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   //
   // ⚠ MANTÉM O DIA. A rota aceita `bancada` sem `dia` justamente para isso: quem troca de máquina
   // raramente quer trocar a data junto, e mandar as duas juntas apagaria a programação sem pedir.
-  async function mudarBancada() {
-    if (!novaBancada || !selecao.length) return;
-    // ⚠ confere de novo na hora de gravar: a seleção pode ter mudado depois de escolher a bancada
-    // no seletor, e aí a trava que valia deixa de valer (ou passa a valer).
-    const t = travada(novaBancada);
-    if (t) { setErro(`${novaBancada} está ocupada até ${fmtDiaLongo(t.livreEm)} — mude a data antes, ou escolha outra.`); return; }
+  // ⚠⚠ UM SÓ "MOVER", com bancada e dia opcionais. Eram duas funções e dois botões, e a tela
+  // sugeria que fossem alternativas excludentes — daí o "parece que um anula o outro". A rota
+  // sempre aceitou cada campo sozinho (`bancada` sem `dia` e vice-versa); quem contava a história
+  // errada era a tela.
+  //
+  // ⚠ O QUE NÃO FOI PREENCHIDO NÃO VAI NO CORPO — mandar `null` apagaria o valor em vez de mantê-lo.
+  async function mover() {
+    if ((!novaBancada && !novoDia) || !selecao.length) return;
+    if (novaBancada) {
+      const t = travada(novaBancada);
+      if (t) { setErro(`${novaBancada} está ocupada até ${fmtDiaLongo(t.livreEm)} — mude o dia antes, ou escolha outra.`); return; }
+    }
     setAgindo(true); setErro(""); setOkMsg("");
     try {
       const ids = selecao.map((c) => c.id);
       const r = await fetch("/api/pcp/solda", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids, bancada: novaBancada }),
+        body: JSON.stringify({ ids, ...(novaBancada ? { bancada: novaBancada } : {}), ...(novoDia ? { dia: novoDia } : {}) }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro ao mudar a bancada");
+      if (!r.ok) throw new Error(j.error || "Erro ao mover");
       const set = new Set(ids);
-      setConjuntos((prev) => prev.map((c) => (set.has(c.id)
-        ? { ...c, soldaBancada: novaBancada, soldaBancadaEm: new Date().toISOString() } : c)));
-      setOkMsg(`${j.atualizados} conjunto(s) movidos para ${novaBancada}.`);
-      setSel(new Set()); setNovaBancada("");
+      setConjuntos((prev) => prev.map((c) => (set.has(c.id) ? {
+        ...c,
+        ...(novaBancada ? { soldaBancada: novaBancada, soldaBancadaEm: new Date().toISOString() } : {}),
+        ...(novoDia ? { soldaDiaProgramado: novoDia } : {}),
+      } : c)));
+      const oq = [novaBancada && `para ${novaBancada}`, novoDia && `para ${novoDia.split("-").reverse().join("/")}`].filter(Boolean).join(" e ");
+      setOkMsg(`${j.atualizados} conjunto(s) movidos ${oq}.`);
+      setSel(new Set()); setNovaBancada(""); setNovoDia("");
     } catch (e) { setErro(e.message); } finally { setAgindo(false); }
   }
 
@@ -413,6 +416,16 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
           <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Marca, cliente, obra…"
             className="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg w-64" />
         </div>
+        {/* ⚠ filtro de coluna ligado precisa de saída visível: no Excel a pessoa procura o funil
+            azul coluna a coluna, e aqui a tabela pode estar rolada longe do cabeçalho. */}
+        {colsAtivas > 0 && (
+          <button onClick={limparCols} className="text-[12px] text-torg-blue underline font-semibold">
+            limpar {colsAtivas} filtro(s) de coluna
+          </button>
+        )}
+        <span className="ml-auto text-[12px] text-torg-gray tabular-nums">
+          {visiveis.length} de {fila.length} na fila
+        </span>
       </div>
 
       {sel.size > 0 && (
@@ -429,16 +442,18 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
               {ocultasNaSelecao} fora do filtro
             </span>
           )}
-          {/* ⚠ O SELETOR MANUAL DE BANCADA SAIU. Vitor (01/09/2026): "o seletor de solda não há
-              necessidade, apenas o número de bancadas". Quem reparte é o painel logo abaixo, que
-              conhece o custo de cada peça e pula a bancada ocupada — escolher a bancada à mão aqui
-              era a forma de furar essas duas coisas sem perceber. */}
-          {/* ⚠⚠ MUDAR A DATA. Vitor: "preciso alterar a data de um lançamento, isso pode ocorrer
-              com mais frequência". Fica junto da seleção porque é edição de lote: marca as peças
-              que escorregaram e move todas de uma vez. */}
+          {/* ⚠⚠ UM "MOVER" SÓ, COM DOIS CAMPOS — NÃO DOIS BOTÕES. Vitor (01/09/2026): "esse mover
+              entre bancadas está terrível, confuso pra caramba, vários botões que parece que um
+              anula o outro".
+              Ele tinha razão e o defeito era meu: "Mudar a bancada" e "Mudar a data" pareciam
+              alternativas excludentes, quando são o MESMO ato com dois campos. Agora é um bloco
+              rotulado "mover para", com bancada e dia; preenche o que quer mudar e aplica. O que
+              ficar vazio não é tocado — e a rota já aceitava cada campo sozinho, era só a tela que
+              contava a história errada. */}
+          <span className="ml-2 pl-3 border-l border-torg-blue-200 text-[11px] font-semibold text-torg-gray">mover para</span>
           <select value={novaBancada} onChange={(e) => setNovaBancada(e.target.value)}
             className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg bg-white">
-            <option value="">mover para…</option>
+            <option value="">— manter a bancada —</option>
             {BANCADAS.map((b) => {
               const t = travada(b);
               return (
@@ -448,18 +463,16 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
               );
             })}
           </select>
-          <button onClick={mudarBancada} disabled={agindo || !novaBancada}
-            title={`Move ${selecao.length} conjunto(s) para essa bancada — a data não muda`}
-            className="px-3 py-1.5 bg-torg-blue text-white text-xs font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-1 disabled:opacity-50">
-            {agindo ? <Loader2 size={13} className="animate-spin" /> : <Flame size={13} />} Mudar a bancada
-          </button>
           <input type="date" value={novoDia} onChange={(e) => setNovoDia(e.target.value)}
+            title="Deixe vazio para manter o dia" placeholder="manter o dia"
             className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg bg-white" />
-          <button onClick={mudarDia} disabled={agindo || !novoDia}
-            title={`Move ${selecao.length} conjunto(s) para esse dia — a bancada não muda`}
-            className="px-3 py-1.5 bg-torg-blue text-white text-xs font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-1 disabled:opacity-50">
-            {agindo ? <Loader2 size={13} className="animate-spin" /> : <CalendarClock size={13} />} Mudar a data
+          <button onClick={mover} disabled={agindo || (!novaBancada && !novoDia)}
+            title={!novaBancada && !novoDia ? "Escolha a bancada, o dia, ou os dois" : `Aplica em ${selecao.length} conjunto(s)`}
+            className="px-3 py-1.5 bg-torg-blue text-white text-xs font-semibold rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-1 disabled:opacity-40">
+            {agindo ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />} Aplicar
           </button>
+
+          <span className="ml-2 pl-3 border-l border-torg-blue-200" />
           <button onClick={baixaManual} disabled={agindo}
             title="Marca como soldado no portal — para a peça que a fábrica fez e não lançou no Syneco"
             className="px-3 py-1.5 border border-emerald-200 text-emerald-700 text-xs font-semibold rounded-lg hover:bg-emerald-50 disabled:opacity-50 inline-flex items-center gap-1">
@@ -480,73 +493,65 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
         <PainelSolda conjuntos={selecao} filaCompleta={fila} onSugerir={sugerirEmLote} ocupado={agindo} />
       )}
 
-      <div className="bg-gray-50 rounded-xl border border-gray-100 border-t-4 border-t-torg-blue">
-        <div className="px-2 py-2 space-y-1.5 max-h-[70vh] overflow-y-auto">
-          {grupos.length === 0 && (
-            <p className="text-[11px] text-torg-gray italic px-2 py-8 text-center">
-              {filtroBancada === "__prog" ? "Nada programado ainda."
-                : filtroBancada ? "Nada nesta bancada."
-                : 'Nada a programar — tudo o que saiu da montagem já tem bancada. Clique em "programado" acima para ver (e desfazer) o que já foi.'}
-            </p>
-          )}
-          {grupos.map((g) => (
-            <div key={g.chave || "sem"} className="space-y-1.5 pb-2">
-              {/* ⚠⚠ O CABEÇALHO DO BLOCO É O ASSUNTO DO MOMENTO — a data quando se olha uma
-                  bancada, a obra quando se olha o que falta programar. Em 13px e negrito, não em
-                  10px de canto: era esse tamanho que fazia a data "sumir" na tela. */}
-              <div className={`flex items-baseline gap-2 flex-wrap px-2.5 py-2 rounded-lg border ${
-                g.atrasado ? "bg-red-50 border-red-200 text-red-800"
-                  : g.hoje ? "bg-amber-50 border-amber-300 text-amber-900"
-                  : porDia && !g.chave ? "bg-gray-50 border-gray-200 text-torg-gray"
-                  : "bg-white border-gray-200 text-torg-dark"}`}>
-                {/* ⚠⚠ A CAIXA DE SELEÇÃO DO BLOCO FICA NA ESQUERDA, alinhada com as das peças.
-                    Vitor (01/09/2026): "esse escrito selecionar do outro lado também não tem nada a
-                    ver, traga a caixa de seleção do lado esquerdo e tire esse escrito". Um link
-                    escrito "selecionar" na ponta oposta obrigava a atravessar a linha com o olho
-                    para fazer o que a caixa ao lado já faz — e nem parecia a mesma ação. */}
-                <CaixaGrupo lista={g.lista} sel={sel} onToggle={() => marcarLista(g.lista)} />
-                {porDia ? <CalendarClock size={14} className="shrink-0 self-center" /> : <Flame size={14} className="shrink-0 self-center text-torg-blue" />}
-                <span className="text-[13px] font-extrabold">
-                  {porDia ? fmtDiaLongo(g.chave) : (g.chave ? fmtOP(g.chave) : "sem obra")}
-                </span>
-                <span className="text-[12px] tabular-nums">{g.lista.length} conj · {g.un} pç · {fmtKg(g.kg)}</span>
-                {g.atrasado && <span className="text-[11px] font-bold uppercase tracking-wide">passou do dia</span>}
-                {g.hoje && <span className="text-[11px] font-bold uppercase tracking-wide">é hoje</span>}
-              </div>
-              {g.lista.map((c) => (
-                <div key={c.id} className={`rounded-lg border p-2.5 text-xs space-y-1 ml-2 ${sel.has(c.id) ? "border-torg-blue ring-1 ring-torg-blue bg-white" : "bg-white border-gray-100"}`}>
-                  <div className="flex items-center gap-2">
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="max-h-[70vh] overflow-auto">
+          <table className="w-full text-[12px] table-fixed">
+            <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="w-9 px-2 py-2">
+                  {/* ⚠ marcar TUDO QUE O FILTRO DEIXOU À VISTA — não a fila inteira. Marcar o que
+                      não se vê é como a seleção some pelo caminho. */}
+                  <CaixaGrupo lista={visiveis} sel={sel} onToggle={() => marcarLista(visiveis)} />
+                </th>
+                <ThFiltro col="marca" label="Marca" larg="w-[13%]" {...fp} />
+                <ThFiltro col="descricao" label="Descrição" larg="w-[26%]" {...fp} />
+                <ThFiltro col="op" label="OP" larg="w-[10%]" {...fp} />
+                <th className="px-2 py-2 text-right w-[9%] font-semibold text-torg-gray">Falta</th>
+                <th className="px-2 py-2 text-right w-[10%] font-semibold text-torg-gray">Peso</th>
+                <ThFiltro col="bancada" label="Bancada" larg="w-[13%]" {...fp} />
+                <ThFiltro col="dia" label="Dia" larg="w-[11%]" {...fp} />
+                <ThFiltro col="situacao" label="Situação" larg="w-[12%]" {...fp} />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {visiveis.length === 0 && (
+                <tr><td colSpan={9} className="px-3 py-10 text-center text-torg-gray italic">
+                  {filtroBancada === "__prog" ? "Nada programado ainda."
+                    : filtroBancada ? "Nada nesta bancada."
+                    : "Nada a programar — tudo o que saiu da montagem já tem bancada."}
+                </td></tr>
+              )}
+              {visiveis.map((c) => (
+                <tr key={c.id} onClick={() => toggle(c.id)}
+                  className={`cursor-pointer ${sel.has(c.id) ? "bg-torg-blue/5" : "hover:bg-gray-50/70"}`}>
+                  <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} className="rounded border-gray-300" />
-                    <span className="font-mono font-bold text-torg-dark truncate">{c.marca}</span>
-                    {/* ⚠ o que FALTA soldar; o total só aparece quando é sobra */}
-                    <span className="text-torg-gray whitespace-nowrap">
-                      {c.qtePendente < c.q ? `${c.qtePendente} de ${c.q}` : `${c.q}×`} · {fmtKg(c.pesoPendenteKg ?? c.pesoTotalKg)}
-                    </span>
-                    {/* ⚠ na visão por dia a obra é o que falta na linha; na visão por obra, a bancada */}
-                    {/* ⚠ agrupando por OBRA, repetir a obra em cada linha é ruído: o bloco inteiro
-                        já é aquela obra. A etiqueta só aparece quando acrescenta — a obra na visão
-                        por dia, a bancada na visão por obra. */}
-                    {(porDia || c.soldaBancada) && (
-                      <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-torg-blue-50 text-torg-blue font-mono font-semibold whitespace-nowrap">
-                        {porDia ? fmtOP(c.opNumero) : c.soldaBancada}
-                      </span>
-                    )}
-                  </div>
-                  {c.descricao && <p className="text-[10px] text-torg-gray truncate">{c.descricao}</p>}
-                  <div className="flex items-center gap-2 flex-wrap text-[10px]">
-                    <span className="text-emerald-700 font-semibold inline-flex items-center gap-1"><CheckCircle2 size={10} /> montagem concluída</span>
-                    {c.emSolda && <span className="text-torg-blue font-semibold">solda iniciada · {c.feitoSolda}/{c.q}</span>}
-                    {!porDia && c.soldaDiaProgramado && (
-                      <span className="text-torg-gray">para {fmtDiaLongo(String(c.soldaDiaProgramado).slice(0, 10))}</span>
-                    )}
-                    {c.soldaBancadaEm && (
-                      <span className="text-torg-gray-light">programada em {fmtData(c.soldaBancadaEm)}{c.soldaBancadaPor ? ` por ${c.soldaBancadaPor}` : ""}</span>
-                    )}
-                  </div>
-                </div>
+                  </td>
+                  <td className="px-2 py-1.5 font-mono font-bold text-torg-dark truncate" title={c.marca}>{c.marca}</td>
+                  <td className="px-2 py-1.5 text-torg-gray truncate" title={c.descricao || ""}>{c.descricao || "—"}</td>
+                  <td className="px-2 py-1.5 font-mono text-torg-blue truncate">{fmtOP(c.opNumero)}</td>
+                  {/* ⚠ "falta", não "qte": o que sobrou para soldar. O total só aparece quando é sobra. */}
+                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                    {c.qtePendente < c.q ? <span className="text-amber-700 font-semibold">{c.qtePendente} de {c.q}</span> : c.q}
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums text-torg-gray whitespace-nowrap">{fmtKg(c.pesoPendenteKg ?? c.pesoTotalKg)}</td>
+                  <td className="px-2 py-1.5 truncate">
+                    {c.soldaBancada
+                      ? <span className="font-semibold text-torg-dark">{c.soldaBancada}</span>
+                      : <span className="text-torg-gray-light">—</span>}
+                  </td>
+                  <td className={`px-2 py-1.5 whitespace-nowrap tabular-nums ${c._atrasado ? "text-red-700 font-semibold" : c._dia === hojeIso ? "text-amber-800 font-semibold" : "text-torg-gray"}`}>
+                    {c._dia ? fmtDiaLongo(c._dia) : "—"}
+                  </td>
+                  <td className="px-2 py-1.5 truncate">
+                    {c.emSolda ? <span className="text-torg-blue font-semibold">soldando {c.feitoSolda}/{c.q}</span>
+                      : c.soldaBancada ? <span className="text-emerald-700">programado</span>
+                      : <span className="text-torg-gray">a programar</span>}
+                  </td>
+                </tr>
               ))}
-            </div>
-          ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
