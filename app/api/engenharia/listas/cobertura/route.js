@@ -40,11 +40,22 @@ export async function GET(req) {
 
   // A LE (FORM21) costuma estar órfã: opId nulo e opNumero sem zero à esquerda
   // ("78" ↔ OP "078"). Casa também pelo número pra não marcar como faltante o que existe.
-  const grpNumLE = await prisma.pecaConjunto.groupBy({
-    by: ["opNumero"],
-    where: { fonte: "LE_IMPORT" },
+  // ⚠⚠ O RESGATE POR NÚMERO VALE PARA AS DUAS LISTAS. Vitor (02/09/2026): o Guilherme viu a OP-113
+  // marcada como sem lista neste filtro, reimportou a LPC para "resolver", e a reimportação
+  // substituiu a lista por uma menor — o cliente recebeu no portal um aviso de 76 marcas excluídas.
+  //
+  // A checagem da LE já tinha o resgate (LE órfã tem opId nulo e opNumero sem zero: "78" ↔ "078");
+  // a da LPC não tinha, e olhava só o opId. LPC com opId nulo — que é como a importação grava
+  // quando não consegue casar a obra — some da conta e a tela acusa falta onde não há.
+  //
+  // ⚠ ALARME FALSO AQUI NÃO É INCÔMODO, É DANO: a ação que ele induz (reimportar) APAGA e regrava a
+  // lista. Custa uma consulta a mais e evita que a tela mande alguém mexer no que estava certo.
+  const grpNum = await prisma.pecaConjunto.groupBy({
+    by: ["opNumero", "fonte"],
+    where: { fonte: { in: ["LE_IMPORT", "LPC_IMPORT"] } },
     _count: { _all: true },
   });
+  const grpNumLE = grpNum.filter((g) => g.fonte === "LE_IMPORT");
   const numKey = (s) => { const m = String(s ?? "").match(/\d+/); return m ? parseInt(m[0], 10) : null; };
   const lePorNum = new Map(); // numKey -> nº de peças LE
   for (const g of grpNumLE) {
@@ -52,13 +63,25 @@ export async function GET(req) {
     if (k != null) lePorNum.set(k, (lePorNum.get(k) || 0) + g._count._all);
   }
 
+  const lpcPorNum = new Map();
+  for (const g of grpNum) {
+    if (g.fonte !== "LPC_IMPORT") continue;
+    const k = numKey(g.opNumero);
+    if (k != null) lpcPorNum.set(k, (lpcPorNum.get(k) || 0) + g._count._all);
+  }
+
   const linhas = ops.map((op) => {
     const c = porOpId.get(op.id) || { LE: 0, LPC: 0 };
     const leNum = lePorNum.get(numKey(op.numero)) || 0; // LE casada por número (pega as órfãs)
+    const lpcNum = lpcPorNum.get(numKey(op.numero)) || 0; // idem para a LPC
     return {
       id: op.id, numero: op.numero, cliente: op.cliente, obra: op.obra, status: op.status,
-      temLE: c.LE > 0 || leNum > 0, temLPC: c.LPC > 0,
-      nLE: Math.max(c.LE, leNum), nLPC: c.LPC, // max evita dobrar quando já linkada E casada por número
+      temLE: c.LE > 0 || leNum > 0, temLPC: c.LPC > 0 || lpcNum > 0,
+      // ⚠ a linha diz quando a lista existe mas está SOLTA: sem isto, a tela pararia de acusar
+      // falta e ninguém saberia que a obra tem lista sem vínculo — que também precisa de conserto,
+      // só que de outro tipo (ligar o opId, não reimportar).
+      soltaLE: c.LE === 0 && leNum > 0, soltaLPC: c.LPC === 0 && lpcNum > 0,
+      nLE: Math.max(c.LE, leNum), nLPC: Math.max(c.LPC, lpcNum),
     };
   });
 
