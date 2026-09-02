@@ -310,6 +310,22 @@ export async function GET(req, { params }) {
         else if (["EM_COTACAO", "COTADO"].includes(it.status)) st = "EM_COTACAO";
         else st = "NAO_COMPRADO";
         if (st === "CANCELADO") continue; // item cancelado não é informação para o cliente
+        // ⚠⚠ DATA DE CHEGADA SÓ EM LINHA QUE CHEGOU. Vitor (02/09/2026), olhando o portal da
+        // OP-112: "essa lista já tem data de recebimento, por que não está como recebido?".
+        //
+        // A data vinha do CMR pelo NOME do material, e o status vinha do recebimento do item —
+        // duas fontes diferentes na mesma linha. Deu no que tinha que dar: "Comprado" ao lado de
+        // "31/08/2026" e de um R. Para quem lê, uma das duas colunas está mentindo.
+        //
+        // E o casamento por nome é otimista de propósito: ele acha o R do MATERIAL, não daquele
+        // item. Na 112 há três linhas do mesmo perfil UDCE 150x75x20x4,75 (39, 131 e 165 kg) e o
+        // CMR trouxe 178 kg — as duas primeiras fecham, a terceira recebeu 7,6 kg dos 165. As três
+        // exibiam a mesma data, como se as três tivessem chegado.
+        //
+        // O R continua vindo do nome (rastreabilidade é do material, e uma coluna vazia ensinaria
+        // que a obra não tem rastreio quando tem). A DATA passa a exigir que a linha esteja
+        // recebida — senão sai "—", que é a verdade.
+        const m = acharR(it.descricao);
         linhas.push({
           material: it.descricao,
           qtd: it.peso > 0 ? `${Math.round(it.peso)} kg` : `${it.qtd} ${it.unidade || ""}`.trim(),
@@ -320,9 +336,9 @@ export async function GET(req, { params }) {
           // `dataEntregaReal` no pedido — a coluna era "—" em toda linha. Mas o CMR, que já é
           // consultado aqui para achar o R, guarda `dataRecebimento`: a data existia ao lado do
           // número que já estava na tela, e só não estava sendo lida.
-          chegouEm: fmt(receb?.dataRecebimento || ped?.dataEntregaReal || acharR(it.descricao)?.em),
+          chegouEm: fmt(receb?.dataRecebimento || ped?.dataEntregaReal || (st === "RECEBIDO" ? m?.em : null)),
           nf: receb?.nfNumero || null,
-          ...(() => { const m = acharR(it.descricao); return { rastreio: m?.r || null, corrida: m?.corrida || null }; })(),
+          rastreio: m?.r || null, corrida: m?.corrida || null,
         });
       }
     }

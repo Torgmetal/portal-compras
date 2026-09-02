@@ -10,6 +10,7 @@ import { parseCMR } from "@/lib/parse-cmr";
 import { conciliarRecebimentoCmr } from "@/lib/recebimento-cmr";
 import { aplicarAvancoSuprimentos } from "@/lib/cronograma-suprimentos";
 import { DO_CMR } from "@/lib/cmr-origens";
+import { registrarExecucao } from "@/lib/cron-monitor";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // planilha de ~17MB: download + parse passam de 60s
@@ -80,11 +81,25 @@ export async function GET(req) {
   if (!secret || auth !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "não autorizado" }, { status: 401 });
   }
+  const t0 = Date.now();
+  // ⚠⚠ A CONCILIAÇÃO NÃO PODE SER REFÉM DO DOWNLOAD. Medido em 02/09/2026: o último recebimento de
+  // origem CMR é de **19/08** — o dia em que a rotina nasceu. De lá pra cá o Almoxarifado lançou e
+  // o Portal de Compras continuou dizendo "aguardando entrega" em 74 itens de 11 OPs (75.936 kg).
+  // O Vitor viu pelo lado do cliente: o portal da OP-112 mostrava "Comprado" numa linha que já
+  // trazia data de chegada e R.
+  //
+  // A causa é a ordem: `sincronizar()` baixa uma planilha de ~17MB do SharePoint e, se ela falha,
+  // o `try` inteiro cai no catch e a conciliação — que é só banco, não depende de rede nenhuma —
+  // nunca roda. Uma tarefa barata e confiável estava pendurada numa cara e frágil.
+  //
+  // Agora são passos independentes: o download pode falhar que a conciliação roda assim mesmo,
+  // sobre o CMR que já está gravado.
+  let r = null, erroSync = null;
+  try { r = await sincronizar(null); }
+  catch (e) { erroSync = e?.message || "falhou"; }
+
   try {
-    const r = await sincronizar(null);
-    // Com o CMR recém-atualizado, concilia o recebimento do Portal de Compras: material que o
-    // Almoxarifado lançou hoje deixa de aparecer como "aguardando entrega". Nunca derruba a sync
-    // do CMR — se a conciliação falhar, o CMR já está gravado e ela tenta de novo amanhã.
+    // Material que o Almoxarifado lançou deixa de aparecer como "aguardando entrega".
     let conciliacao = null;
     try {
       const c = await conciliarRecebimentoCmr({ simular: false });
@@ -106,8 +121,14 @@ export async function GET(req) {
     } catch (e) {
       suprimentos = { erro: e?.message || "falhou" };
     }
-    return NextResponse.json({ ok: true, ...r, conciliacao, suprimentos });
+    // ⚠⚠ HEARTBEAT. Este cron não registrava execução e não estava na lista do monitor — foi por
+    // isso que ele pôde parar em 19/08 sem ninguém saber. O monitor existe exatamente pra isso.
+    const msg = [erroSync ? `sync FALHOU: ${erroSync}` : `${r?.criados ?? 0} linha(s) nova(s)`,
+                 conciliacao?.erro ? `conciliação FALHOU: ${conciliacao.erro}` : `${conciliacao?.itens ?? 0} recebimento(s)`].join(" · ");
+    await registrarExecucao("cmr-sincronizar", { ok: !erroSync && !conciliacao?.erro, mensagem: msg, duracaoMs: Date.now() - t0 });
+    return NextResponse.json({ ok: !erroSync, erroSync, ...(r || {}), conciliacao, suprimentos });
   } catch (e) {
+    await registrarExecucao("cmr-sincronizar", { ok: false, mensagem: e.message, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ error: e.message }, { status: 502 });
   }
 }
