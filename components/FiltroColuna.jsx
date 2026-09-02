@@ -69,13 +69,32 @@ export function ThFiltro({ col, label, larg = "", dica, className = "", filtros,
   // ⚠⚠ O MENU É `fixed`, POSICIONADO PELO RECT DO BOTÃO — não `absolute`.
   // Estas tabelas vivem dentro de contêiner com `overflow-y-auto` e cabeçalho `sticky`: menu
   // absoluto seria CORTADO na borda da caixa, e o filtro pareceria abrir vazio.
+  //
+  // ⚠⚠ E `fixed` TROUXE O PROBLEMA SIMÉTRICO. Vitor (02/09/2026): "por conta do filtro não estou
+  // conseguindo selecionar vários quando é pequeno, por não deixar a página descer". Elemento
+  // `fixed` não aumenta a altura do documento: quando a tabela tem poucas linhas, o cabeçalho fica
+  // perto do fim da janela e o menu abria para baixo, saindo pela borda — e como a página não tinha
+  // o que rolar, a lista de opções simplesmente não existia para quem estava olhando.
+  //
+  // Agora ele mede o espaço dos dois lados: vira para CIMA quando não cabe embaixo, e em qualquer
+  // caso limita a própria altura ao que sobra na janela, deixando a rolagem por conta da lista.
   useEffect(() => {
     if (!aberto) return setPos(null);
     const medir = () => {
       const r = botaoRef.current?.getBoundingClientRect();
       if (!r) return;
-      const larguraMenu = 256;
-      setPos({ top: r.bottom + 4, left: Math.max(8, Math.min(r.left, window.innerWidth - larguraMenu - 8)) });
+      const LARG = 256, MARGEM = 8;
+      const abaixo = window.innerHeight - r.bottom - MARGEM;
+      const acima = r.top - MARGEM;
+      // ⚠ só vira quando cabe MELHOR em cima: perto do meio da tela, abrir para baixo é o esperado
+      const paraCima = abaixo < 240 && acima > abaixo;
+      const left = Math.max(MARGEM, Math.min(r.left, window.innerWidth - LARG - MARGEM));
+      // piso de 180px: menu menor que isso não mostra nem três opções, e aí é melhor deixar a lista
+      // rolar dentro dele do que espremer o campo de busca e os botões
+      const altura = Math.max(180, Math.min(420, paraCima ? acima : abaixo));
+      setPos(paraCima
+        ? { bottom: window.innerHeight - r.top + 4, left, altura }
+        : { top: r.bottom + 4, left, altura });
     };
     medir();
     window.addEventListener("resize", medir);
@@ -118,8 +137,8 @@ export function ThFiltro({ col, label, larg = "", dica, className = "", filtros,
       </button>
 
       {aberto && pos && (
-        <div ref={menuRef} style={{ top: pos.top, left: pos.left }}
-          className="fixed z-[100] w-64 bg-white border border-gray-200 rounded-xl shadow-lg p-2 font-normal normal-case text-torg-dark">
+        <div ref={menuRef} style={{ top: pos.top, bottom: pos.bottom, left: pos.left, maxHeight: pos.altura }}
+          className="fixed z-[100] w-64 bg-white border border-gray-200 rounded-xl shadow-lg p-2 font-normal normal-case text-torg-dark flex flex-col">
           <div className="flex items-center gap-1.5 mb-1.5">
             <input autoFocus value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="buscar…"
               className="flex-1 text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue outline-none" />
@@ -132,7 +151,10 @@ export function ThFiltro({ col, label, larg = "", dica, className = "", filtros,
             <button onClick={() => aplicar((s) => visiveis.forEach((o) => s.delete(o.v)))} className="text-torg-gray hover:underline">limpar</button>
             <span className="ml-auto text-torg-gray-light">{visiveis.length}</span>
           </div>
-          <div className="max-h-56 overflow-y-auto space-y-0.5">
+          {/* ⚠ a lista é quem rola, e ela herda o que sobrar da altura do menu — por isso `min-h-0`:
+              sem ele o filho de um flex não encolhe abaixo do próprio conteúdo e a caixa estoura a
+              janela de novo, que é o bug que isto veio consertar. */}
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-0.5">
             {visiveis.map((o) => (
               <label key={o.v} className="flex items-center gap-2 text-[12px] px-1 py-0.5 rounded hover:bg-gray-50 cursor-pointer">
                 <input type="checkbox" checked={!!sel?.has(o.v)}
