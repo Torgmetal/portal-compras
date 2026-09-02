@@ -190,7 +190,7 @@ export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, o
           <thead className="text-[10px] uppercase text-torg-gray-light border-b border-gray-100">
             <tr><th className="text-left py-1">Bancada</th><th className="text-right" title="Quantas marcas caíram nesta bancada">Conj</th>
                 <th className="text-right" title="Peças físicas — um conjunto pode ter mais de uma">Peças</th>
-                <th className="text-right">kg</th><th className="text-right" title="Dias úteis no ritmo escolhido — peça pesada custa mais dia que peça leve, por isso uma bancada com menos conjuntos pode levar o mesmo tempo">Dias</th><th className="text-left pl-3">Quando</th></tr>
+                <th className="text-right">kg</th><th className="text-right" title="Dias úteis no ritmo escolhido — peça pesada custa mais dia que peça leve, por isso uma bancada com menos conjuntos pode levar o mesmo tempo">Dias</th><th className="text-left pl-3 w-[24%]" title="Quanto de uma jornada cada dia desta bancada consome. É o que explica 1 conjunto pesado valer o mesmo que 4 leves.">Carga do dia</th><th className="text-left pl-3">Quando</th></tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {porDia.map((b) => {
@@ -204,6 +204,26 @@ export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, o
                   <td className="text-right tabular-nums">{fmtN(un)}</td>
                   <td className="text-right tabular-nums">{fmtKg(kg)}</td>
                   <td className="text-right tabular-nums font-semibold">{b.dias.length}</td>
+                  {/* ⚠⚠ A BARRA É O QUE FALTAVA EXPLICAR. Vitor (01/09/2026) perguntou o que a
+                      tabela queria dizer, olhando uma bancada com 1 conjunto de 698 kg e outra com
+                      4 somando 414 kg fecharem no mesmo dia. Em número, a régua parece arbitrária;
+                      em barra, vê-se que os dois dias estão igualmente cheios.
+                      ⚠ Uma barra por DIA, não uma só pela bancada: bancada de três dias com o
+                      último pela metade é informação de planejamento, não detalhe. */}
+                  <td className="pl-3">
+                    <div className="flex items-center gap-1">
+                      {b.dias.map((d) => {
+                        const pct = Math.min(100, Math.round((d.carga || 0) * 100));
+                        return (
+                          <span key={d.dia} title={`${fmtDia(d.dia)} · ${pct}% da jornada · ${d.itens.length} conj`}
+                            className="h-3 flex-1 min-w-[10px] rounded-sm bg-gray-100 overflow-hidden">
+                            <i className={`block h-full ${pct >= 95 ? "bg-torg-blue" : pct >= 60 ? "bg-torg-blue/70" : "bg-torg-blue/40"}`}
+                              style={{ width: `${Math.max(6, pct)}%` }} />
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </td>
                   <td className="pl-3 text-torg-gray text-[11px]">
                     {/* ⚠ um dia só não vira intervalo. Vitor (01/09/2026) perguntou o que a tabela
                         queria dizer, e "qua 02/09 → qua 02/09" é ruído que atrapalha a leitura de

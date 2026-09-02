@@ -47,6 +47,7 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   const [busca, setBusca] = useState("");
   const [novoDia, setNovoDia] = useState("");
   const [novaBancada, setNovaBancada] = useState("");
+  const [repartindo, setRepartindo] = useState(false);
   const [agindo, setAgindo] = useState(false);
   const [erro, setErro] = useState("");
   const [okMsg, setOkMsg] = useState("");
@@ -450,6 +451,17 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
               rotulado "mover para", com bancada e dia; preenche o que quer mudar e aplica. O que
               ficar vazio não é tocado — e a rota já aceitava cada campo sozinho, era só a tela que
               contava a história errada. */}
+          {/* ⚠⚠ REPARTIR É UM PASSO, NÃO UM PAINEL QUE BROTA. Vitor (01/09/2026): "precisamos
+              colocar ele em outro local, pois quando clicarmos ele aparecer me parece um pouco
+              estranho". O painel nascia embaixo da barra assim que havia seleção — empurrava a
+              tabela para baixo e a página pulava debaixo do cursor. Agora é um botão: marca,
+              clica, o painel abre por cima. O fluxo fica marca → reparte → libera, cada passo com
+              o seu clique. */}
+          <button onClick={() => setRepartindo(true)}
+            className="px-3 py-1.5 bg-torg-orange text-white text-xs font-semibold rounded-lg hover:opacity-90 inline-flex items-center gap-1">
+            <Flame size={13} /> Repartir entre bancadas
+          </button>
+
           <span className="ml-2 pl-3 border-l border-torg-blue-200 text-[11px] font-semibold text-torg-gray">mover para</span>
           <select value={novaBancada} onChange={(e) => setNovaBancada(e.target.value)}
             className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg bg-white">
@@ -487,10 +499,20 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
         </div>
       )}
 
-      {/* ⚠ O PAINEL FICA ENTRE A SELEÇÃO E A LISTA — mesma ordem da montagem: marca os conjuntos,
-          vê como se reparte, grava. Sem seleção ele some, porque não há o que repartir. */}
-      {sel.size > 0 && (
-        <PainelSolda conjuntos={selecao} filaCompleta={fila} onSugerir={sugerirEmLote} ocupado={agindo} />
+      {/* ⚠ ABRE POR CIMA, não empurrando a tabela. `fixed` + fundo escurecido: o painel é uma
+          decisão à parte, e sair dele devolve a lista exatamente onde estava. */}
+      {repartindo && sel.size > 0 && (
+        <div className="fixed inset-0 z-40 bg-black/40 flex items-start justify-center overflow-y-auto p-4 sm:p-8"
+          onClick={() => setRepartindo(false)}>
+          <div className="w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-white font-semibold text-sm">Repartir {selecao.length} conjunto(s) entre as bancadas</p>
+              <button onClick={() => setRepartindo(false)} className="text-white/80 hover:text-white p-1.5"><X size={18} /></button>
+            </div>
+            <PainelSolda conjuntos={selecao} filaCompleta={fila}
+              onSugerir={async (d) => { await sugerirEmLote(d); setRepartindo(false); }} ocupado={agindo} />
+          </div>
+        </div>
       )}
 
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
