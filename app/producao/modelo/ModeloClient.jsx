@@ -28,6 +28,11 @@ export default function ModeloClient({ ops }) {
   const [marca, setMarca] = useState(null);
   const [peca, setPeca] = useState(null);
   const [carregandoPeca, setCarregandoPeca] = useState(false);
+  // ⚠⚠ DUAS LEITURAS DO MESMO MODELO, e as duas são necessárias. A cor DO MODELO é a que a
+  // Engenharia deu no Tekla (viga azul, treliça amarela) — é como o pessoal reconhece a obra. A cor
+  // do ANDAMENTO responde outra pergunta: o que já passou pela fábrica. Misturar as duas seria
+  // perder as duas.
+  const [modo, setModo] = useState("modelo");
 
   // ── modelos e andamento da obra ──
   useEffect(() => {
@@ -89,8 +94,16 @@ export default function ModeloClient({ ops }) {
             </select>
           </div>
         )}
-        {lista?.resumo && (
-          <div className="flex items-center gap-3 text-[12px] text-torg-gray ml-auto">
+        <div className="flex gap-0.5 bg-gray-50 border border-gray-200 rounded-lg p-0.5 ml-auto">
+          {[["modelo", "Cores do modelo"], ["andamento", "Andamento na fábrica"]].map(([k, t]) => (
+            <button key={k} onClick={() => setModo(k)}
+              className={`text-[11.5px] font-semibold px-3 py-1.5 rounded-md ${modo === k ? "bg-torg-blue text-white" : "text-torg-gray hover:text-torg-blue"}`}>
+              {t}
+            </button>
+          ))}
+        </div>
+        {lista?.resumo && modo === "andamento" && (
+          <div className="flex items-center gap-3 text-[12px] text-torg-gray">
             <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.pronta }} /> {lista.resumo.prontas} prontas</span>
             <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.andando }} /> {lista.resumo.andando} em produção</span>
             <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.parado }} /> {lista.resumo.marcas - lista.resumo.prontas - lista.resumo.andando} a fazer</span>
@@ -117,7 +130,7 @@ export default function ModeloClient({ ops }) {
             {/* ⚠ `key` no url: trocar de modelo remonta a cena. Sem isso o visualizador manteria a
                 obra anterior na tela — e o painel passaria a responder por outra OP. */}
             <VisualizadorIfc key={urlModelo} url={urlModelo} onSelecionar={abrir}
-              selecionada={marca} cores={cores} altura={560} />
+              selecionada={marca} cores={cores} modo={modo} altura={560} />
           </div>
 
           <div className="p-4">

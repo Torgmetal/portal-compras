@@ -30,11 +30,12 @@ const COR_SEL = 0xf4801f;
  * @param {Record<string,string>} [cores]  marca → cor hex ("#0E7A5F"), para pintar por andamento
  * @param {string|null} [selecionada]      marca destacada de fora (a lista, por exemplo)
  */
-export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada, altura = 520 }) {
+export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada, altura = 520, modo = "modelo" }) {
   const box = useRef(null);
   const ref = useRef({});             // guarda three/api entre renders sem provocar re-render
   const [estado, setEstado] = useState({ fase: "carregando", pct: 0 });
   const [info, setInfo] = useState(null);
+  const [pronto, setPronto] = useState(false);
 
   // ⚠⚠ A CADEIA expressID → MARCA, montada UMA VEZ ao abrir o modelo.
   // Um IFCELEMENTASSEMBLY agrega suas peças por IFCRELAGGREGATES; a marca fica no campo Tag do
@@ -121,13 +122,26 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
 
         // ── malha: uma por MARCA, para pintar e destacar por conjunto ──
         setEstado({ fase: "montando", pct: 0 });
-        const porMarca = new Map();    // marca → array de geometrias
+        // ⚠⚠ AS CORES SÃO DO MODELO, NÃO MINHAS. Vitor (03/09/2026) mandou o print do MESMO arquivo
+        // no Trimble: viga azul, treliça amarela, pilar laranja, piso rosa. Eu pintava tudo de
+        // cinza e era essa a diferença que ele lia como "muito mais detalhado" — a cor separa o que
+        // a forma sozinha não separa, e ela já vem no IFC (1.630 IFCSTYLEDITEM neste arquivo).
+        //
+        // ⚠ Agrupa por MARCA + COR: um conjunto tem peças de cores diferentes (a treliça amarela
+        // com a chapa de ligação azul), e juntar tudo numa malha só apagaria isso. O clique continua
+        // devolvendo a marca — quem responde é o `userData`, não a malha.
+        const porChave = new Map();    // "marca|cor" → { marca, cor, gs: [] }
         let n = 0;
         api.StreamAllMeshes(modelID, (mesh) => {
           const marca = marcaDe.get(mesh.expressID) || null;
           const g = mesh.geometries;
           for (let i = 0; i < g.size(); i++) {
             const p = g.get(i);
+            const c = p.color;
+            // cor do IFC em 0..1; sem cor (raro) cai no cinza padrão
+            const hex = c && (c.x + c.y + c.z) > 0
+              ? (Math.round(c.x * 255) << 16) | (Math.round(c.y * 255) << 8) | Math.round(c.z * 255)
+              : COR_PADRAO;
             const geo = api.GetGeometry(modelID, p.geometryExpressID);
             const v = api.GetVertexArray(geo.GetVertexData(), geo.GetVertexDataSize());
             const ix = api.GetIndexArray(geo.GetIndexData(), geo.GetIndexDataSize());
@@ -142,8 +156,9 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
             bg.setIndex(new THREE.BufferAttribute(new Uint32Array(ix), 1));
             bg.applyMatrix4(new THREE.Matrix4().fromArray(p.flatTransformation));
             geo.delete();
-            const chave = marca || "__sem_marca__";
-            (porMarca.get(chave) || porMarca.set(chave, []).get(chave)).push(bg);
+            const chave = `${marca || "__sem_marca__"}|${hex}`;
+            const grupo = porChave.get(chave) || porChave.set(chave, { marca, hex, gs: [] }).get(chave);
+            grupo.gs.push(bg);
             n++;
           }
         });
@@ -151,18 +166,21 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         // ⚠ junta as geometrias de cada marca numa malha só: 1.500 objetos separados derrubam o
         // quadro por causa das chamadas de desenho; por marca dá algumas centenas.
         const { mergeGeometries } = await import("three/examples/jsm/utils/BufferGeometryUtils.js");
-        const malhas = new Map();
+        const malhas = new Map();     // chave → mesh
         const arestas = new Map();
-        for (const [marca, gs] of porMarca) {
+        for (const [chave, { marca, hex, gs }] of porChave) {
           const junta = gs.length === 1 ? gs[0] : mergeGeometries(gs, false);
           if (!junta) continue;
-          const cor = cores?.[marca] ? new THREE.Color(cores[marca]) : new THREE.Color(COR_PADRAO);
+          // ⚠ no modo "andamento" a cor do estado substitui a do modelo; no modo "modelo" vale o IFC
+          const doEstado = cores?.[marca];
+          const cor = new THREE.Color(modo === "andamento" && doEstado ? doEstado : hex);
           // ⚠ Phong com brilho baixo em vez de Lambert: o realce especular é o que dá a leitura de
           // metal e separa a mesa da alma num perfil. Sem ele o aço parece papel.
           const mat = new THREE.MeshPhongMaterial({ color: cor, shininess: 18, specular: 0x2a3540, side: THREE.DoubleSide, flatShading: false });
           const m = new THREE.Mesh(junta, mat);
-          m.userData.marca = marca === "__sem_marca__" ? null : marca;
-          cena.add(m); malhas.set(marca, m);
+          m.userData.marca = marca || null;
+          m.userData.hex = hex;
+          cena.add(m); malhas.set(chave, m);
 
           // ⚠⚠ AS ARESTAS SÃO O QUE FALTAVA. É o traço do contorno que separa uma peça da vizinha:
           // sem ele, dois perfis cinza encostados viram um bloco só, e é exatamente essa a
@@ -170,10 +188,9 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
           // de tubo e desenhá-la encheria a tela de risco.
           try {
             const eg = new THREE.EdgesGeometry(junta, 25);
-            const el = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x33465a, transparent: true, opacity: 0.5 }));
-            el.userData.aresta = marca;
+            const el = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x2b3a49, transparent: true, opacity: 0.42 }));
             el.raycast = () => {};        // aresta não recebe clique: quem responde é o sólido
-            cena.add(el); arestas.set(marca, el);
+            cena.add(el); arestas.set(chave, el);
           } catch { /* peça sem geometria de aresta: segue sem contorno, não é motivo de parar */ }
           gs.forEach((g2) => { if (g2 !== junta) g2.dispose(); });
         }
@@ -197,6 +214,39 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         const { OrbitControls } = await import("three/examples/jsm/controls/OrbitControls.js");
         const ctrl = new OrbitControls(cam, rend.domElement);
         ctrl.target.copy(centro); ctrl.enableDamping = true; ctrl.update();
+
+        // ⚠⚠ VISTAS PADRÃO E ZOOM SÃO CONVENÇÃO, NÃO ENFEITE. O print do Trimble que o Vitor mandou
+        // tem a roseta de navegação e o cursor de zoom no canto — quem trabalha com modelo procura
+        // esses controles por reflexo, e sem eles a única saída é arrastar até acertar.
+        //
+        // ⚠ enquadra pela ESFERA envolvente e pelo campo de visão: distância fixa deixa obra
+        // comprida cortada e obra pequena num ponto.
+        const irPara = (dirArr, alvo) => {
+          const cx2 = new THREE.Box3().setFromObject(cena);
+          const c2 = alvo || cx2.getCenter(new THREE.Vector3());
+          const r2 = (alvo ? raio * 0.18 : cx2.getSize(new THREE.Vector3()).length() / 2) || 5;
+          const d2 = (r2 / Math.sin((cam.fov * Math.PI / 180) / 2)) * 1.15;
+          cam.position.copy(c2).addScaledVector(new THREE.Vector3(...dirArr).normalize(), d2);
+          ctrl.target.copy(c2); cam.updateProjectionMatrix(); ctrl.update();
+        };
+        const zoom = (f) => {
+          const v = new THREE.Vector3().subVectors(cam.position, ctrl.target);
+          v.multiplyScalar(f); cam.position.copy(ctrl.target).add(v); ctrl.update();
+        };
+        // ⚠ enquadrar NA SELEÇÃO: é o gesto mais pedido num modelo grande — achar a peça que a
+        // lista apontou sem caçar com o mouse.
+        const focar = (marcaAlvo) => {
+          const alvos = [...malhas.values()].filter((m) => m.userData.marca === marcaAlvo);
+          if (!alvos.length) return;
+          const cx3 = new THREE.Box3();
+          for (const m of alvos) cx3.expandByObject(m);
+          const c3 = cx3.getCenter(new THREE.Vector3());
+          const r3 = Math.max(0.4, cx3.getSize(new THREE.Vector3()).length() / 2);
+          const d3 = (r3 / Math.sin((cam.fov * Math.PI / 180) / 2)) * 2.2;
+          const dir3 = new THREE.Vector3().subVectors(cam.position, ctrl.target).normalize();
+          cam.position.copy(c3).addScaledVector(dir3, d3);
+          ctrl.target.copy(c3); ctrl.update();
+        };
 
         const medir = () => {
           const w = el.clientWidth || 800, h = el.clientHeight || altura;
@@ -229,7 +279,8 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         const anima = () => { raf = requestAnimationFrame(anima); ctrl.update(); rend.render(cena, cam); };
         anima();
 
-        ref.current = { THREE, cena, malhas, arestas, rend, cam, ctrl };
+        ref.current = { THREE, cena, malhas, arestas, rend, cam, ctrl, irPara, zoom, focar, centro };
+        setPronto(true);
         setInfo({ conjuntos: total, malhas: malhas.size, geometrias: n });
         setEstado({ fase: "pronto" });
 
@@ -257,11 +308,13 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
   useEffect(() => {
     const { THREE, malhas } = ref.current || {};
     if (!THREE || !malhas) return;
-    for (const [marca, m] of malhas) {
-      const base = cores?.[marca] || `#${COR_PADRAO.toString(16)}`;
-      m.material.color.set(marca === selecionada ? `#${COR_SEL.toString(16)}` : base);
+    for (const [, m] of malhas) {
+      const marca = m.userData.marca;
+      const doEstado = cores?.[marca];
+      const base = modo === "andamento" && doEstado ? doEstado : m.userData.hex;
+      m.material.color.set(marca && marca === selecionada ? COR_SEL : base);
     }
-  }, [selecionada, cores]);
+  }, [selecionada, cores, modo]);
 
   const rot = { carregando: "preparando…", baixando: "baixando o modelo…", lendo: "lendo o IFC…", montando: "montando as peças…" };
 
@@ -279,9 +332,37 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         </div>
       )}
       {info && (
-        <div className="absolute left-3 top-3 text-[10.5px] font-semibold text-torg-gray bg-gray-50 border border-gray-200 rounded px-2 py-1">
+        <div className="absolute left-3 top-3 text-[10.5px] font-semibold text-torg-gray bg-gray-50/90 border border-gray-200 rounded px-2 py-1">
           {info.conjuntos} conjuntos · {info.geometrias} peças
         </div>
+      )}
+
+      {/* ⚠ controles no canto, sobre a cena — é onde quem usa modelo procura por reflexo */}
+      {pronto && (
+        <>
+          <div className="absolute right-3 top-3 flex flex-col gap-1 items-end">
+            <div className="flex gap-0.5 bg-white/95 border border-gray-200 rounded-lg p-0.5 shadow-sm">
+              {[["iso", "Isométrica", [0.72, 0.48, 0.72]], ["frente", "Frente", [0, 0, 1]],
+                ["lado", "Lateral", [1, 0, 0]], ["topo", "Topo", [0, 1, 0.001]]].map(([k, t, dir]) => (
+                <button key={k} title={t} onClick={() => ref.current?.irPara?.(dir)}
+                  className="text-[10.5px] font-semibold px-2 py-1 rounded text-torg-gray hover:bg-torg-blue-50 hover:text-torg-blue">
+                  {t}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-0.5 bg-white/95 border border-gray-200 rounded-lg p-0.5 shadow-sm">
+              <button title="Enquadrar tudo" onClick={() => ref.current?.irPara?.([0.72, 0.48, 0.72])}
+                className="text-[10.5px] font-semibold px-2 py-1 rounded text-torg-gray hover:bg-torg-blue-50 hover:text-torg-blue">enquadrar</button>
+              <button title="Aproximar da peça selecionada" onClick={() => selecionada && ref.current?.focar?.(selecionada)}
+                disabled={!selecionada}
+                className="text-[10.5px] font-semibold px-2 py-1 rounded text-torg-gray hover:bg-torg-blue-50 hover:text-torg-blue disabled:opacity-35">ir até a peça</button>
+            </div>
+          </div>
+          <div className="absolute right-3 bottom-3 flex flex-col bg-white/95 border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+            <button title="Aproximar" onClick={() => ref.current?.zoom?.(0.75)} className="px-2.5 py-1 text-torg-gray hover:bg-torg-blue-50 hover:text-torg-blue text-[15px] leading-none">+</button>
+            <button title="Afastar" onClick={() => ref.current?.zoom?.(1.35)} className="px-2.5 py-1 text-torg-gray hover:bg-torg-blue-50 hover:text-torg-blue text-[15px] leading-none border-t border-gray-200">−</button>
+          </div>
+        </>
       )}
     </div>
   );
