@@ -105,7 +105,11 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         // ⚠ `preserveDrawingBuffer` permite ler o canvas depois de desenhado — é o que torna possível
         // salvar a vista como imagem (e foi como conferi a tela sem conseguir autenticar). Custa um
         // pouco de memória de vídeo; numa cena deste porte é irrelevante.
-        const rend = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+        const rend = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, powerPreference: "high-performance" });
+        // ⚠⚠ ESPAÇO DE COR. As cores do IFC são sRGB; sem declarar isso, o three interpreta como
+        // linear e tudo sai lavado — o azul da viga vira azul-claro, o marrom do piso vira bege. Era
+        // parte do que fazia a imagem parecer "menos limpa" que a do Trimble.
+        rend.outputColorSpace = THREE.SRGBColorSpace;
         rend.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
         el.innerHTML = "";
         el.appendChild(rend.domElement);
@@ -167,7 +171,7 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         // quadro por causa das chamadas de desenho; por marca dá algumas centenas.
         const { mergeGeometries } = await import("three/examples/jsm/utils/BufferGeometryUtils.js");
         const malhas = new Map();     // chave → mesh
-        const arestas = new Map();
+        const arestasCruas = [];
         for (const [chave, { marca, hex, gs }] of porChave) {
           const junta = gs.length === 1 ? gs[0] : mergeGeometries(gs, false);
           if (!junta) continue;
@@ -176,23 +180,35 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
           const cor = new THREE.Color(modo === "andamento" && doEstado ? doEstado : hex);
           // ⚠ Phong com brilho baixo em vez de Lambert: o realce especular é o que dá a leitura de
           // metal e separa a mesa da alma num perfil. Sem ele o aço parece papel.
-          const mat = new THREE.MeshPhongMaterial({ color: cor, shininess: 18, specular: 0x2a3540, side: THREE.DoubleSide, flatShading: false });
+          // ⚠⚠ NÃO CONVERTER A COR À MÃO. O three já trata `new THREE.Color(hex)` como sRGB e
+          // converte sozinho (ColorManagement ligado por padrão). Um `convertSRGBToLinear()` aqui
+          // converte DUAS vezes: medido — o piso marrom da OP-089 virou vermelho-escuro e a obra
+          // inteira ficou pesada. O que faltava era só declarar o espaço de saída do renderizador.
+          const mat = new THREE.MeshPhongMaterial({ color: cor, shininess: 14, specular: 0x1e2833, side: THREE.DoubleSide, flatShading: false });
           const m = new THREE.Mesh(junta, mat);
           m.userData.marca = marca || null;
           m.userData.hex = hex;
           cena.add(m); malhas.set(chave, m);
 
-          // ⚠⚠ AS ARESTAS SÃO O QUE FALTAVA. É o traço do contorno que separa uma peça da vizinha:
-          // sem ele, dois perfis cinza encostados viram um bloco só, e é exatamente essa a
-          // diferença que se nota contra o Trimble. Limiar de 25°: abaixo disso a aresta é curvatura
-          // de tubo e desenhá-la encheria a tela de risco.
-          try {
-            const eg = new THREE.EdgesGeometry(junta, 25);
-            const el = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x2b3a49, transparent: true, opacity: 0.42 }));
-            el.raycast = () => {};        // aresta não recebe clique: quem responde é o sólido
-            cena.add(el); arestas.set(chave, el);
-          } catch { /* peça sem geometria de aresta: segue sem contorno, não é motivo de parar */ }
+          // ⚠⚠ AS ARESTAS SÃO O QUE SEPARA UMA PEÇA DA VIZINHA. Limiar de 25°: abaixo disso a
+          // aresta é curvatura de tubo e desenhá-la encheria a tela de risco.
+          // ⚠ COLETA AGORA, DESENHA NUMA MALHA SÓ DEPOIS. Uma LineSegments por conjunto seriam ~600
+          // chamadas de desenho a mais — junto com as 600 dos sólidos, é isso que faz o giro
+          // engasgar. Aresta não precisa de identidade própria: ela não é clicável nem pintada.
+          try { arestasCruas.push(new THREE.EdgesGeometry(junta, 25)); }
+          catch { /* peça sem geometria de aresta: segue sem contorno */ }
           gs.forEach((g2) => { if (g2 !== junta) g2.dispose(); });
+        }
+        // uma única malha de arestas para a obra inteira
+        let malhaArestas = null;
+        if (arestasCruas.length) {
+          const juntas = arestasCruas.length === 1 ? arestasCruas[0] : mergeGeometries(arestasCruas, false);
+          if (juntas) {
+            malhaArestas = new THREE.LineSegments(juntas, new THREE.LineBasicMaterial({ color: 0x243343, transparent: true, opacity: 0.38 }));
+            malhaArestas.raycast = () => {};
+            cena.add(malhaArestas);
+          }
+          arestasCruas.forEach((g2) => { if (g2 !== juntas) g2.dispose(); });
         }
         api.CloseModel(modelID);
 
@@ -213,7 +229,22 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
 
         const { OrbitControls } = await import("three/examples/jsm/controls/OrbitControls.js");
         const ctrl = new OrbitControls(cam, rend.domElement);
-        ctrl.target.copy(centro); ctrl.enableDamping = true; ctrl.update();
+        ctrl.target.copy(centro);
+        // ⚠⚠ O QUE FAZ A NAVEGAÇÃO PARECER A DO TEKLA. Vitor (03/09/2026): "no Tekla é muito mais
+        // fluida (…) você percebeu a navegação, precisamos deixar da mesma maneira".
+        //
+        // `zoomToCursor` é o maior de todos: no Tekla a roda aproxima do ponto onde está o cursor,
+        // não do centro da obra. Sem isso, aproximar de um detalhe vira uma sequência de zoom +
+        // arrasto + zoom — e é exatamente essa briga que se sente como travamento.
+        ctrl.zoomToCursor = true;
+        ctrl.enableDamping = true;
+        ctrl.dampingFactor = 0.09;      // inércia curta: acompanha a mão sem parecer escorregadia
+        ctrl.rotateSpeed = 0.65;        // padrão gira rápido demais num modelo deste tamanho
+        ctrl.zoomSpeed = 0.9;
+        ctrl.panSpeed = 0.85;
+        ctrl.screenSpacePanning = true; // arrastar move no plano da tela, como no Tekla
+        ctrl.maxPolarAngle = Math.PI;   // deixa passar por baixo da obra
+        ctrl.update();
 
         // ⚠⚠ VISTAS PADRÃO E ZOOM SÃO CONVENÇÃO, NÃO ENFEITE. O print do Trimble que o Vitor mandou
         // tem a roseta de navegação e o cursor de zoom no canto — quem trabalha com modelo procura
@@ -275,11 +306,21 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         rend.domElement.addEventListener("pointermove", move);
         rend.domElement.addEventListener("pointerup", up);
 
-        let raf = 0;
-        const anima = () => { raf = requestAnimationFrame(anima); ctrl.update(); rend.render(cena, cam); };
+        // ⚠⚠ DESENHA SÓ QUANDO MUDA. Redesenhar 60 vezes por segundo uma cena parada é queimar GPU
+        // à toa — e, num laptop, é o que faz o ventilador subir e o quadro cair justamente quando a
+        // pessoa começa a girar. Com damping ligado o `update()` devolve `true` enquanto a inércia
+        // corre, então o laço acompanha o movimento e dorme depois.
+        let raf = 0, forcar = true;
+        const anima = () => {
+          raf = requestAnimationFrame(anima);
+          const mexeu = ctrl.update();
+          if (mexeu || forcar) { rend.render(cena, cam); forcar = false; }
+        };
+        const pedirQuadro = () => { forcar = true; };
+        ctrl.addEventListener("change", pedirQuadro);
         anima();
 
-        ref.current = { THREE, cena, malhas, arestas, rend, cam, ctrl, irPara, zoom, focar, centro };
+        ref.current = { THREE, cena, malhas, rend, cam, ctrl, irPara, zoom, focar, centro, pedirQuadro };
         setPronto(true);
         setInfo({ conjuntos: total, malhas: malhas.size, geometrias: n });
         setEstado({ fase: "pronto" });
@@ -290,9 +331,10 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
           rend.domElement.removeEventListener("pointerdown", down);
           rend.domElement.removeEventListener("pointermove", move);
           rend.domElement.removeEventListener("pointerup", up);
+          ctrl.removeEventListener("change", pedirQuadro);
           ctrl.dispose();
           for (const m of malhas.values()) { m.geometry.dispose(); m.material.dispose(); }
-          for (const a of arestas.values()) { a.geometry.dispose(); a.material.dispose(); }
+          if (malhaArestas) { malhaArestas.geometry.dispose(); malhaArestas.material.dispose(); }
           rend.dispose();
           if (el) el.innerHTML = "";
         };
@@ -314,6 +356,7 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
       const base = modo === "andamento" && doEstado ? doEstado : m.userData.hex;
       m.material.color.set(marca && marca === selecionada ? COR_SEL : base);
     }
+    ref.current.pedirQuadro?.();
   }, [selecionada, cores, modo]);
 
   const rot = { carregando: "preparando…", baixando: "baixando o modelo…", lendo: "lendo o IFC…", montando: "montando as peças…" };
