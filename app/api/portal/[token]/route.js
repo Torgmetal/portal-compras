@@ -21,6 +21,41 @@ export const maxDuration = 60;
 
 const fmt = (d) => (d ? new Date(d).toISOString().slice(0, 10) : null);
 
+
+// ⚠⚠ A PASTA COMO PACOTE. Vitor (03/09/2026): "quero que o cliente veja como se fosse uma pasta,
+// onde ele seleciona ela e baixa por pacotes (…) na 118 temos várias listas na parte de diagrama de
+// montagem; para facilitar o entendimento colocamos em pasta, pois os arquivos saem renomeados do
+// Tekla dessa maneira". E, logo depois: "precisamos ter a opção de selecionar o projeto também —
+// ter as duas opções, tanto de projeto quanto a de pasta".
+//
+// A pasta de origem já era gravada em cada documento escolhido; só nunca tinha sido usada na
+// vitrine. Aqui ela vira agrupamento — e o arquivo continua aparecendo um a um dentro dela, porque
+// as duas formas de escolher têm de conviver.
+//
+// ⚠ SÓ QUANDO HÁ MAIS DE UMA PASTA. Um único grupo chamado "Fabricação" dentro da seção
+// "Projetos de fabricação" é uma caixa em volta de nada — repete o título e afasta o arquivo de
+// quem procura. Nesse caso a lista continua chapada, como hoje.
+//
+// ⚠ NOME É O ÚLTIMO SEGMENTO, não o caminho. O cliente não tem nada com
+// "2. Engenharia/2.5 Projetos/2.5.4 …" — ele quer ler "Eixo 10", que é como a Engenharia batizou.
+function subpastasDe(docs, item) {
+  const porPasta = new Map();
+  for (const d of docs) {
+    const cheio = String(d.pasta || "").replace(/\/+$/, "");
+    const nome = cheio ? cheio.split("/").filter(Boolean).pop() : "";
+    const chave = nome || "";
+    (porPasta.get(chave) || porPasta.set(chave, []).get(chave)).push(d);
+  }
+  if (porPasta.size < 2) return null;
+  return [...porPasta.entries()]
+    .sort((a, b) => (a[0] ? 0 : 1) - (b[0] ? 0 : 1) || String(a[0]).localeCompare(String(b[0]), "pt-BR", { numeric: true }))
+    .map(([nome, ds]) => ({
+      nome: nome || "Sem pasta",
+      itens: ds.map(item),
+      tamanho: ds.reduce((t, d) => t + (Number(d.tamanho) || 0), 0),
+    }));
+}
+
 export async function GET(req, { params }) {
   const { token } = await params;
   const portal = await prisma.portalCliente.findUnique({ where: { token } });
@@ -395,7 +430,7 @@ export async function GET(req, { params }) {
         const { porTipo } = agruparEngenharia(unicos(lista));
         dados.docsPorArea[ar] = TIPOS_ENGENHARIA
           .filter((t) => (porTipo.get(t.id) || []).length)
-          .map((t) => ({ assunto: t.nome, itens: porTipo.get(t.id).map(item) }));
+          .map((t) => ({ assunto: t.nome, itens: porTipo.get(t.id).map(item), subpastas: subpastasDe(porTipo.get(t.id), item) }));
         if (!dados.docsPorArea[ar].length) delete dados.docsPorArea[ar];
         continue;
       }

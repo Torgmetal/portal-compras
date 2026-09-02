@@ -4,6 +4,7 @@ import {
   Loader2, AlertCircle, ShieldCheck, CalendarRange, FileText, Award,
   BookCheck, Layers, Image as ImageIcon, ChevronRight, ChevronDown,
   Download, Package, ShoppingCart, Truck, Check, FileSpreadsheet, History,
+  FolderOpen,
 } from "lucide-react";
 import { AREAS, SECOES, SECAO } from "@/lib/portal-cliente";
 import MatrizComunicacao from "./MatrizComunicacao";
@@ -762,7 +763,54 @@ function DocumentosDaArea({ grupos, token, cod }) {
                   {marcadosNoGrupo === g.itens.length ? "desmarcar" : "selecionar todos"}
                 </button>
               </div>
-              <div className="grid sm:grid-cols-2 gap-1.5">
+
+              {/* ⚠⚠ AS PASTAS COMO PACOTE, quando a Engenharia separou em mais de uma. Vitor
+                  (03/09/2026): "quero que o cliente veja como se fosse uma pasta, onde ele
+                  seleciona ela e baixa por pacotes" — e, na mesma conversa, "precisamos ter a opção
+                  de selecionar o projeto também, ter as duas opções". Por isso a pasta é uma FAIXA
+                  com o botão de marcar tudo dela, e os arquivos seguem listados um a um embaixo.
+                  Uma pasta só não vira caixa: seria repetir o título da seção em volta de nada. */}
+              {g.subpastas?.length > 0 && (
+                <div className="space-y-2.5 mb-1.5">
+                  {g.subpastas.map((p) => {
+                    const naPasta = p.itens.filter((d) => sel.has(d.id)).length;
+                    const todosNaPasta = naPasta === p.itens.length;
+                    return (
+                      <div key={p.nome} className="border border-gray-100 rounded-lg overflow-hidden">
+                        <div className="flex items-center gap-2 flex-wrap bg-gray-50 border-b border-gray-100 px-3 py-1.5">
+                          <FolderOpen size={13} className="text-[#006EAB] shrink-0" />
+                          <span className="text-[12.5px] font-semibold truncate">{p.nome}</span>
+                          <span className="text-[11px] text-gray-400">{p.itens.length} arquivo{p.itens.length > 1 ? "s" : ""}{p.tamanho ? ` · ${fmtMB(p.tamanho)}` : ""}</span>
+                          <button onClick={() => marcarGrupo(p, !todosNaPasta)}
+                            className="ml-auto text-[11px] font-semibold text-[#006EAB] hover:underline">
+                            {todosNaPasta ? "desmarcar a pasta" : "selecionar a pasta"}
+                          </button>
+                        </div>
+                        <div className="grid sm:grid-cols-2 gap-1.5 p-2">
+                          {p.itens.map((doc) => {
+                            const on = sel.has(doc.id);
+                            return (
+                              <div key={doc.id}
+                                className={`flex items-center gap-2 border rounded-lg px-3 py-1.5 transition-colors ${on ? "border-[#006EAB] bg-[#006EAB]/5" : "border-gray-100 hover:border-[#006EAB]"}`}>
+                                <input type="checkbox" checked={on} onChange={(e) => marcar(doc.id, e.target.checked)}
+                                  aria-label={`Selecionar ${doc.nome}`} className="accent-[#006EAB] shrink-0" />
+                                <a href={`/api/portal/${token}/eng?id=${encodeURIComponent(doc.id)}${cod ? `&d=${encodeURIComponent(cod)}` : ""}`}
+                                  target="_blank" rel="noreferrer"
+                                  className="flex items-center gap-2 min-w-0 flex-1 hover:text-[#006EAB]">
+                                  <Download size={12} className="text-[#006EAB] shrink-0" />
+                                  <span className="text-[12px] truncate" title={doc.nome}>{doc.nome}</span>
+                                </a>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className={`grid sm:grid-cols-2 gap-1.5 ${g.subpastas?.length ? "hidden" : ""}`}>
                 {g.itens.map((doc) => {
                   const on = sel.has(doc.id);
                   return (
