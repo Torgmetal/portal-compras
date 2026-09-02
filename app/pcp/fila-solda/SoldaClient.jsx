@@ -15,9 +15,17 @@ import { Flame, Search, Loader2, AlertCircle, X, CheckCircle2, Download, Calenda
 import { fmtOP } from "@/lib/utils";
 import PainelSolda from "./PainelSolda";
 import { gerarFolhaSolda } from "@/lib/folha-solda";
+import { BANCADAS, RITMO_GUERRA, ocupacaoDasBancadas } from "@/lib/solda-capacidade";
 
 const fmtKg = (v) => `${(Number(v) || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 const fmtData = (v) => (v ? new Date(v).toLocaleDateString("pt-BR") : "—");
+const isoHoje = () => new Date().toISOString().split("T")[0];
+const fmtDiaLongo = (iso) => {
+  if (!iso) return "sem data";
+  const d = new Date(String(iso).slice(0, 10) + "T00:00:00Z");
+  const s = d.toLocaleDateString("pt-BR", { weekday: "short", timeZone: "UTC" }).replace(".", "");
+  return `${s} ${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" })}`;
+};
 
 export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados = {}, bancadas = [] }) {
   const [conjuntos, setConjuntos] = useState(conjuntosIniciais);
@@ -63,7 +71,12 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
     });
   }, [fila, filtroOp, filtroBancada, busca]);
 
-  // agrupa pela bancada sugerida; sem sugestão vem primeiro, que é o que precisa de decisão
+  // ⚠⚠ AGRUPA POR BANCADA **E POR DIA**. Vitor (01/09/2026): "preciso ver onde vejo a programação
+  // do que selecionei para soldar, para podermos alterar datas, acompanhar, dar baixa manual".
+  // Só por bancada, a tela dizia ONDE mas não QUANDO — e a data que ele acabou de programar não
+  // aparecia em lugar nenhum. Agora cada bancada abre em dias, e o dia que já passou sem a solda
+  // fechar aparece em vermelho: começar não é entregar.
+  const hojeIso = isoHoje();
   const grupos = useMemo(() => {
     const m = new Map();
     for (const c of filtrados) {
@@ -73,11 +86,27 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
     }
     return [...m.entries()]
       .sort((a, b) => (!a[0] ? -1 : !b[0] ? 1 : a[0].localeCompare(b[0], "pt-BR", { numeric: true })))
-      .map(([bancada, lista]) => ({
-        bancada, lista,
-        kg: lista.reduce((s, c) => s + (Number(c.pesoTotalKg) || 0), 0),
-      }));
-  }, [filtrados]);
+      .map(([bancada, lista]) => {
+        const porDia = new Map();
+        for (const c of lista) {
+          const d = c.soldaDiaProgramado ? String(c.soldaDiaProgramado).slice(0, 10) : "";
+          if (!porDia.has(d)) porDia.set(d, []);
+          porDia.get(d).push(c);
+        }
+        return {
+          bancada, lista,
+          kg: lista.reduce((s, c) => s + (c.pesoPendenteKg ?? (Number(c.pesoTotalKg) || 0)), 0),
+          // sem data vem primeiro: é o que ainda precisa de decisão
+          dias: [...porDia.entries()].sort((a, b) => (!a[0] ? -1 : !b[0] ? 1 : a[0].localeCompare(b[0])))
+            .map(([dia, itens]) => ({
+              dia, itens,
+              kg: itens.reduce((s, c) => s + (c.pesoPendenteKg ?? (Number(c.pesoTotalKg) || 0)), 0),
+              atrasado: !!dia && dia < hojeIso,
+              hoje: dia === hojeIso,
+            })),
+        };
+      });
+  }, [filtrados, hojeIso]);
 
   const semBancada = useMemo(() => filtrados.filter((c) => !c.soldaBancada).length, [filtrados]);
   // ⚠ soma o peso do QUE FALTA soldar, não o do conjunto cheio
@@ -101,6 +130,7 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   // consegui emitir a planilha" — ele gravou 11 conjuntos na SOLDA 1, a seleção foi limpa, o painel
   // sumiu e a folha foi junto. Agora a planilha do que está nas bancadas sai a qualquer momento.
   const comBancada = useMemo(() => fila.filter((c) => c.soldaBancada), [fila]);
+  const ocupadasHoje = useMemo(() => ocupacaoDasBancadas(comBancada, isoHoje(), RITMO_GUERRA), [comBancada]);
   async function planilhaDasBancadas() {
     setAgindo(true); setErro("");
     try {
@@ -155,6 +185,26 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
     } catch (e) { setErro(e.message); } finally { setAgindo(false); }
   }
 
+  // ⚠ BAIXA DO PORTAL, NÃO DO SYNECO. Registra que a solda terminou aqui dentro; o apontamento da
+  // fábrica continua sendo a fonte. Serve para a peça que a fábrica soldou e não lançou — sem isso
+  // ela fica na fila para sempre e o PCP reprograma o que já está pronto.
+  async function baixaManual() {
+    const alvo = selecao.filter((c) => c.qtePendente > 0);
+    if (!alvo.length) return;
+    if (!confirm(`Marcar ${alvo.length} conjunto(s) como soldados?\n\nÉ registro do portal — não escreve no Syneco.`)) return;
+    setAgindo(true); setErro(""); setOkMsg("");
+    try {
+      const r = await fetch("/api/pcp/despacho", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baixaSetor: "SOLDA", baixas: alvo.map((c) => ({ id: c.id, qtd: c.qtePendente })) }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao dar baixa");
+      setOkMsg(`${j.atualizados ?? alvo.length} conjunto(s) marcados como soldados. Recarregue para sumirem da fila.`);
+      setSel(new Set());
+    } catch (e) { setErro(e.message); } finally { setAgindo(false); }
+  }
+
   async function sugerirEmLote(distrib) {
     setAgindo(true); setErro(""); setOkMsg("");
     try {
@@ -196,13 +246,23 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
         </p>
       </div>
 
+      {/* ⚠⚠ AS BANCADAS LIVRES APARECEM. Vitor (01/09/2026): "e também mostrar as bancadas livres
+          ainda". Sem isso, saber o que sobra exigia comparar de cabeça as seis com as que aparecem
+          na lista — e o painel de repartição, que é quem escolhe, só existe depois da seleção. */}
       {comBancada.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap text-[12px] bg-white border border-gray-100 rounded-xl px-3 py-2.5 shadow-sm">
           <Flame size={14} className="text-torg-blue shrink-0" />
           <span className="text-torg-dark"><b>{comBancada.length}</b> conjunto(s) já nas bancadas</span>
-          <span className="text-torg-gray">
-            {[...new Set(comBancada.map((c) => c.soldaBancada))].sort().join(" · ")}
-          </span>
+          {BANCADAS.map((b) => {
+            const o = ocupadasHoje[b];
+            return (
+              <span key={b} title={o ? `${o.conj} conjunto(s) · ${Math.round(o.kg).toLocaleString("pt-BR")} kg · vaga ${fmtDiaLongo(o.livreEm)}` : "sem nada programado"}
+                className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold ${
+                  o ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}>
+                {b.replace("SOLDA ", "S")}{o ? ` · até ${fmtDiaLongo(o.livreEm)}` : " · livre"}
+              </span>
+            );
+          })}
           <button onClick={planilhaDasBancadas} disabled={agindo}
             className="ml-auto px-2.5 py-1.5 rounded-lg border border-torg-blue-200 text-torg-blue font-semibold hover:bg-torg-blue-50 inline-flex items-center gap-1.5 disabled:opacity-50">
             {agindo ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Planilha das bancadas
@@ -266,6 +326,11 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
             className="px-3 py-1.5 bg-torg-blue text-white text-xs font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-1 disabled:opacity-50">
             {agindo ? <Loader2 size={13} className="animate-spin" /> : <CalendarClock size={13} />} Mudar a data
           </button>
+          <button onClick={baixaManual} disabled={agindo}
+            title="Marca como soldado no portal — para a peça que a fábrica fez e não lançou no Syneco"
+            className="px-3 py-1.5 border border-emerald-200 text-emerald-700 text-xs font-semibold rounded-lg hover:bg-emerald-50 disabled:opacity-50 inline-flex items-center gap-1">
+            <CheckCircle2 size={13} /> Baixa manual
+          </button>
           <button onClick={() => definir(null)} disabled={agindo}
             title="Tira a bancada e a data — o conjunto volta para a fila sem destino"
             className="px-3 py-1.5 border border-gray-200 text-torg-gray text-xs rounded-lg hover:bg-gray-50 disabled:opacity-50">
@@ -297,24 +362,45 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
                 <span className="font-semibold">{g.lista.length} conj · {fmtKg(g.kg)}</span>
                 <button onClick={() => marcarLista(g.lista)} className="ml-auto underline font-semibold">selecionar</button>
               </div>
-              {g.lista.map((c) => (
-                <div key={c.id} className={`rounded-lg border p-2.5 text-xs space-y-1 ${sel.has(c.id) ? "border-torg-blue ring-1 ring-torg-blue bg-white" : "bg-white border-gray-100"}`}>
-                  <div className="flex items-center gap-2">
-                    <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} className="rounded border-gray-300" />
-                    <span className="font-mono font-bold text-torg-dark truncate">{c.marca}</span>
-                    <span className="text-torg-gray whitespace-nowrap">{c.qte}× · {fmtKg(c.pesoTotalKg)}</span>
-                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-torg-blue-50 text-torg-blue font-mono font-semibold whitespace-nowrap">
-                      {fmtOP(c.opNumero)}
-                    </span>
+              {/* ⚠ dentro da bancada, um bloco por DIA. Vermelho = passou do dia e a solda não
+                  fechou; âmbar = é hoje. Sem data vem primeiro, que é o que espera decisão. */}
+              {g.dias.map((d) => (
+                <div key={d.dia || "sem"} className="space-y-1.5 pl-2">
+                  <div className={`flex items-center gap-1.5 flex-wrap px-2 py-1 rounded-md border text-[10px] ${
+                    d.atrasado ? "bg-red-50 border-red-200 text-red-700"
+                      : d.hoje ? "bg-amber-50 border-amber-200 text-amber-800"
+                      : d.dia ? "bg-white border-gray-100 text-torg-gray"
+                      : "bg-gray-50 border-gray-200 text-torg-gray"}`}>
+                    <CalendarClock size={11} />
+                    <span className="font-semibold">{fmtDiaLongo(d.dia)}</span>
+                    <span>{d.itens.length} conj · {fmtKg(d.kg)}</span>
+                    {d.atrasado && <span className="font-semibold">· passou do dia</span>}
+                    <button onClick={() => marcarLista(d.itens)} className="ml-auto underline font-semibold">selecionar o dia</button>
                   </div>
-                  {c.descricao && <p className="text-[10px] text-torg-gray truncate">{c.descricao}</p>}
-                  <div className="flex items-center gap-2 flex-wrap text-[10px]">
-                    <span className="text-emerald-700 font-semibold inline-flex items-center gap-1"><CheckCircle2 size={10} /> montagem concluída</span>
-                    {c.emSolda && <span className="text-torg-blue font-semibold">solda iniciada · {c.feitoSolda}/{c.q}</span>}
-                    {c.soldaBancada && c.soldaBancadaEm && (
-                      <span className="text-torg-gray">sugerida em {fmtData(c.soldaBancadaEm)}{c.soldaBancadaPor ? ` por ${c.soldaBancadaPor}` : ""}</span>
-                    )}
-                  </div>
+                  {d.itens.map((c) => (
+                    <div key={c.id} className={`rounded-lg border p-2.5 text-xs space-y-1 ${sel.has(c.id) ? "border-torg-blue ring-1 ring-torg-blue bg-white" : "bg-white border-gray-100"}`}>
+                      <div className="flex items-center gap-2">
+                        <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} className="rounded border-gray-300" />
+                        <span className="font-mono font-bold text-torg-dark truncate">{c.marca}</span>
+                        {/* ⚠ mostra o que FALTA soldar, e o total só quando é sobra: "1 de 4" evita
+                            o soldador procurar três peças que já estão prontas. */}
+                        <span className="text-torg-gray whitespace-nowrap">
+                          {c.qtePendente < c.q ? `${c.qtePendente} de ${c.q}` : `${c.q}×`} · {fmtKg(c.pesoPendenteKg ?? c.pesoTotalKg)}
+                        </span>
+                        <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-torg-blue-50 text-torg-blue font-mono font-semibold whitespace-nowrap">
+                          {fmtOP(c.opNumero)}
+                        </span>
+                      </div>
+                      {c.descricao && <p className="text-[10px] text-torg-gray truncate">{c.descricao}</p>}
+                      <div className="flex items-center gap-2 flex-wrap text-[10px]">
+                        <span className="text-emerald-700 font-semibold inline-flex items-center gap-1"><CheckCircle2 size={10} /> montagem concluída</span>
+                        {c.emSolda && <span className="text-torg-blue font-semibold">solda iniciada · {c.feitoSolda}/{c.q}</span>}
+                        {c.soldaBancada && c.soldaBancadaEm && (
+                          <span className="text-torg-gray">programada em {fmtData(c.soldaBancadaEm)}{c.soldaBancadaPor ? ` por ${c.soldaBancadaPor}` : ""}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
