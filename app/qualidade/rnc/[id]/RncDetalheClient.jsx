@@ -356,39 +356,53 @@ export default function RncDetalheClient({ id }) {
             {d.necessitaAcao === "NAO_NECESSARIO" && <Campo label="Motivo de não necessitar de ação"><input value={d.motivoNaoAcao || ""} onChange={(e) => set("motivoNaoAcao", e.target.value)} className="inp" /></Campo>}
             <Campo label="Abrangência"><input value={d.abrangencia || ""} onChange={(e) => set("abrangencia", e.target.value)} className="inp" /></Campo>
           </Secao>
+        </>
+      )}
 
-          {/* ⚠⚠ REINSPEÇÃO — O FORM 20 TEM ESSE CAMPO E A TELA NÃO TINHA. Vitor (02/09/2026):
-              "precisamos ter todos os campos igual está lá, para evidenciar".
-              O que faltava não era o texto (esse já existia solto dentro de Tratamento), era a
-              EVIDÊNCIA: quem reinspecionou, quando, e a foto do resultado. Sem os três, o campo diz
-              que alguém achou que está bom — não prova que foi conferido.
-              ⚠ Bloco único, como no FORM 20: uma reinspeção por RNC. Se a peça voltar a reprovar, o
-              caso é outra RNC, não uma segunda linha aqui. */}
-          <Secao titulo="Reinspeção">
-            <p className="text-[12px] text-torg-gray -mt-1">Evidência de que o tratamento foi conferido — sai no PDF em seção própria.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Campo label="Reinspecionado por"><input value={d.reinspecaoPor || ""} onChange={(e) => set("reinspecaoPor", e.target.value)} placeholder="Nome de quem conferiu" className="inp" /></Campo>
-              <Campo label="Data da reinspeção"><input type="date" value={d.reinspecaoEm || ""} onChange={(e) => set("reinspecaoEm", e.target.value)} className="inp" /></Campo>
-            </div>
-            <Campo label="Resultado da reinspeção"><textarea value={d.resultadoReinspecao || ""} onChange={(e) => set("resultadoReinspecao", e.target.value)} rows={2} className="inp" placeholder="O que foi conferido e qual o resultado." /></Campo>
-            <div>
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Registro fotográfico da reinspeção</p>
-                <label className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-torg-blue-200 text-torg-blue text-[12px] font-medium cursor-pointer hover:bg-torg-blue-50 ${subindoRe ? "opacity-50 pointer-events-none" : ""}`}>
-                  {subindoRe ? <><Loader2 size={13} className="animate-spin" /> enviando…</> : <><Upload size={13} /> foto</>}
-                  <input type="file" accept="image/*" multiple disabled={subindoRe} className="hidden" onChange={(e) => { anexarReinspecao(e.target.files); e.target.value = ""; }} />
-                </label>
-              </div>
-              {(d.reinspecaoFotos || []).length === 0 ? (
-                <p className="text-[13px] text-torg-gray">Nenhuma foto da reinspeção.</p>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-                  {d.reinspecaoFotos.map((a) => <AnexoCard key={a.url} a={a} onRemover={() => removerFotoRe(a.url)} />)}
-                </div>
-              )}
-            </div>
-          </Secao>
+      {/* ⚠⚠ REINSPEÇÃO — O FORM 20 TEM ESSE CAMPO E A TELA NÃO TINHA. Vitor (02/09/2026):
+          "precisamos ter todos os campos igual está lá, para evidenciar".
+          O que faltava não era o texto (esse já existia solto dentro de Tratamento), era a
+          EVIDÊNCIA: quem reinspecionou, quando, e a foto do resultado. Sem os três, o campo diz
+          que alguém achou que está bom — não prova que foi conferido.
+          ⚠ Bloco único, como no FORM 20: uma reinspeção por RNC. Se a peça voltar a reprovar, o
+          caso é outra RNC, não uma segunda linha aqui.
 
+          ⚠⚠ FICA FORA DO BLOCO DE ANÁLISE, e isso é decisão, não descuido. Vitor (02/09/2026): "a
+          evidência de reinspeção não está aparecendo na RNC para podermos anexar as imagens do
+          resultado final" — a tela esconde tratamento, causa raiz e plano quando a RNC de cliente
+          está marcada IMPROCEDENTE (não existe tratamento para o que não é não conformidade), e a
+          reinspeção tinha ido junto por tabela.
+          Mas é na improcedente que ela mais importa: a reinspeção é a PROVA de que conferimos e o
+          apontamento não procede. Esconder o campo tirava do caminho justamente a evidência que
+          nos defende — e o PDF já imprimia a seção, então havia um espaço no documento que
+          ninguém conseguia preencher pela tela. */}
+      <Secao titulo="Reinspeção">
+        <p className="text-[12px] text-torg-gray -mt-1">Evidência de que o tratamento foi conferido — sai no PDF em seção própria.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Campo label="Reinspecionado por"><input value={d.reinspecaoPor || ""} onChange={(e) => set("reinspecaoPor", e.target.value)} placeholder="Nome de quem conferiu" className="inp" /></Campo>
+          <Campo label="Data da reinspeção"><input type="date" value={d.reinspecaoEm || ""} onChange={(e) => set("reinspecaoEm", e.target.value)} className="inp" /></Campo>
+        </div>
+        <Campo label="Resultado da reinspeção"><textarea value={d.resultadoReinspecao || ""} onChange={(e) => set("resultadoReinspecao", e.target.value)} rows={2} className="inp" placeholder="O que foi conferido e qual o resultado." /></Campo>
+        <div>
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Registro fotográfico da reinspeção</p>
+            <label className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-torg-blue-200 text-torg-blue text-[12px] font-medium cursor-pointer hover:bg-torg-blue-50 ${subindoRe ? "opacity-50 pointer-events-none" : ""}`}>
+              {subindoRe ? <><Loader2 size={13} className="animate-spin" /> enviando…</> : <><Upload size={13} /> foto</>}
+              <input type="file" accept="image/*" multiple disabled={subindoRe} className="hidden" onChange={(e) => { anexarReinspecao(e.target.files); e.target.value = ""; }} />
+            </label>
+          </div>
+          {(d.reinspecaoFotos || []).length === 0 ? (
+            <p className="text-[13px] text-torg-gray">Nenhuma foto da reinspeção.</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+              {d.reinspecaoFotos.map((a) => <AnexoCard key={a.url} a={a} onRemover={() => removerFotoRe(a.url)} />)}
+            </div>
+          )}
+        </div>
+      </Secao>
+
+      {mostrarAnalise && (
+        <>
           {/* Causa raiz */}
           <Secao titulo="Análise de causa raiz">
             <Campo label="Causas da não conformidade"><textarea value={d.causas || ""} onChange={(e) => set("causas", e.target.value)} rows={2} className="inp" /></Campo>
