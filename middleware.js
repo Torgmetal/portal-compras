@@ -276,6 +276,10 @@ export const config = {
     // ⚠ `equipe` entra aqui pelo mesmo motivo de `obras` e `estrutura-3d`: são ARQUIVOS de /public.
     // Sem a exceção, o middleware manda a foto para o /entrar (307) e o portal do cliente — que é
     // público — mostra as iniciais no lugar do rosto, sem erro nenhum na tela.
-    "/((?!_next/static|_next/image|favicon.ico|obras|torg-logo.*|estrutura-3d|equipe|laco-setembro).*)",
+    // ⚠ `wasm` é o motor do visualizador de modelo 3D (web-ifc). Ele é buscado pelo NAVEGADOR, e no
+    // portal do cliente não há sessão nenhuma — sem a exceção o middleware devolve o HTML do
+    // /entrar no lugar do binário e o visualizador morre com "both async and sync fetching of the
+    // wasm failed", que não diz a ninguém que o problema é de rota.
+    "/((?!_next/static|_next/image|favicon.ico|obras|torg-logo.*|estrutura-3d|equipe|laco-setembro|wasm).*)",
   ],
 };

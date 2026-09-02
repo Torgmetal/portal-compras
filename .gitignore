@@ -29,3 +29,6 @@ node_modules/
 *.Zone.Identifier
 *Zone.Identifier
 *:Zone.Identifier
+
+# motor do visualizador de IFC — copiado de node_modules no build (scripts/copiar-wasm.mjs)
+public/wasm/
