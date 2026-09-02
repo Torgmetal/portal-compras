@@ -15,7 +15,7 @@ import { Flame, Search, Loader2, AlertCircle, X, CheckCircle2, Download, Calenda
 import { fmtOP } from "@/lib/utils";
 import PainelSolda from "./PainelSolda";
 import { gerarFolhaSolda } from "@/lib/folha-solda";
-import { BANCADAS, RITMO_GUERRA, ocupacaoDasBancadas } from "@/lib/solda-capacidade";
+import { BANCADAS, RITMO_META, ocupacaoDasBancadas } from "@/lib/solda-capacidade";
 
 const fmtKg = (v) => `${(Number(v) || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 const fmtData = (v) => (v ? new Date(v).toLocaleDateString("pt-BR") : "—");
@@ -147,7 +147,7 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   // consegui emitir a planilha" — ele gravou 11 conjuntos na SOLDA 1, a seleção foi limpa, o painel
   // sumiu e a folha foi junto. Agora a planilha do que está nas bancadas sai a qualquer momento.
   const comBancada = useMemo(() => fila.filter((c) => c.soldaBancada), [fila]);
-  const ocupadasHoje = useMemo(() => ocupacaoDasBancadas(comBancada, isoHoje(), RITMO_GUERRA), [comBancada]);
+  const ocupadasHoje = useMemo(() => ocupacaoDasBancadas(comBancada, isoHoje(), RITMO_META), [comBancada]);
   async function planilhaDasBancadas() {
     setAgindo(true); setErro("");
     try {

@@ -8,7 +8,7 @@
 // dia de trabalho e outra com uma semana.
 import { useState, useMemo } from "react";
 import { Flame, Loader2, Download, ArrowRight } from "lucide-react";
-import { BANCADAS, RITMO_META, RITMO_GUERRA, RITMO_NORMAL, repartirPorBancada, distribuirEmDias, ocupacaoDasBancadas } from "@/lib/solda-capacidade";
+import { BANCADAS, RITMO_CONSERVADOR, RITMO_META, RITMO_COMPLEXAS, repartirPorBancada, distribuirEmDias, ocupacaoDasBancadas } from "@/lib/solda-capacidade";
 import { gerarFolhaSolda } from "@/lib/folha-solda";
 
 const fmtKg = (v) => `${Math.round(Number(v) || 0).toLocaleString("pt-BR")} kg`;
@@ -23,20 +23,26 @@ const fmtDia = (iso) => {
   return `${s} ${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" })}`;
 };
 
-// ⚠ AS TRÊS RÉGUAS APARECEM, e a de guerra é a padrão. Vitor (01/09/2026): "a meta tem que ser
-// acima de 200 ton" e "vamos para a guerra, precisa ser o desafio maior para validarmos". Mostrar
-// as três lado a lado é o que deixa o desafio honesto: dá para ver quanto ele pede a mais do que a
-// fábrica faz hoje, em vez de esconder o número dentro da conta.
+// ⚠ AS TRÊS RÉGUAS APARECEM, e a meta é a padrão. Vitor (01/09/2026): "a meta tem que ser acima de
+// 200 ton" e "vamos para a guerra, precisa ser o desafio maior para validarmos". Mostrar as três
+// lado a lado é o que deixa o desafio honesto: dá para ver quanto ele pede a mais do que a fábrica
+// faz hoje, em vez de esconder o número dentro da conta.
+//
+// ⚠⚠ OS NOMES SÃO DO VITOR (01/09/2026): "deixa o guerra como meta, o do meio conservador e o
+// último peças complexas". Não é só rótulo — muda o uso do terceiro. Ele era "dia comum" (a mediana
+// medida) e servia só para enxergar; agora é o ritmo que se escolhe QUANDO O LOTE É DIFÍCIL, que é
+// o caso em que planejar pela média estoura o prazo. O número não mudou, a pergunta que ele
+// responde mudou.
 const CURVAS = [
-  { k: "GUERRA", rot: "guerra · 200 t/mês", curva: RITMO_GUERRA, kgDia: 1588 },
-  { k: "META", rot: "meta · o que já se faz", curva: RITMO_META, kgDia: 918 },
-  { k: "NORMAL", rot: "dia comum", curva: RITMO_NORMAL, kgDia: 453 },
+  { k: "META", rot: "meta · 200 t/mês", curva: RITMO_META, kgDia: 1588 },
+  { k: "CONSERVADOR", rot: "conservador", curva: RITMO_CONSERVADOR, kgDia: 918 },
+  { k: "COMPLEXAS", rot: "peças complexas", curva: RITMO_COMPLEXAS, kgDia: 453 },
 ];
 
 export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, ocupado }) {
   const [n, setN] = useState(6);
   const [inicio, setInicio] = useState(isoHoje());
-  const [curvaK, setCurvaK] = useState("GUERRA");
+  const [curvaK, setCurvaK] = useState("META");
   const [baixando, setBaixando] = useState(false);
 
   const curva = (CURVAS.find((c) => c.k === curvaK) || CURVAS[0]).curva;
