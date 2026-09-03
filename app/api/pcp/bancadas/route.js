@@ -36,7 +36,7 @@ export async function GET() {
   const conj = await prisma.pecaConjunto.findMany({
     where: { ...CONJUNTO_MONTAVEL, ...OP_VIVA, montagemDiaProgramado: { not: null } },
     select: {
-      id: true, marca: true, descricao: true, qte: true, pesoTotalKg: true,
+      id: true, marca: true, descricao: true, qte: true, pesoTotalKg: true, opId: true,
       montagemDiaProgramado: true, montagemBancada: true, status: true,
       op: { select: { numero: true } },
     },
@@ -44,12 +44,33 @@ export async function GET() {
     take: 4000,
   });
 
+  // ⚠⚠ QUANTO JÁ FOI MONTADO, por marca. Vitor (03/09/2026): "mesmo caso apontamento da baixa: se
+  // ficar algo em aberto, mostra atraso".
+  //
+  // ⚠ AQUI o `mesOrdem` é o certo, e não o apontamento por dia: o que se quer é o ACUMULADO da
+  // marca ("quanto desse conjunto já saiu"), não uma série diária — é para série que o mesOrdem
+  // mente, por ser cumulativo (ver torg_syneco_apontamento_fonte).
+  const opIds = [...new Set(conj.map((c) => c.opId).filter(Boolean))];
+  const marcas = [...new Set(conj.map((c) => c.marca).filter(Boolean))];
+  let montadoPorMarca = new Map();
+  if (opIds.length && marcas.length) {
+    try {
+      const ordens = await prisma.mesOrdem.groupBy({
+        by: ["item"],
+        where: { opId: { in: opIds }, item: { in: marcas }, setor: { in: ["Montagem", "Solda"] } },
+        _sum: { produzidoUn: true },
+      });
+      montadoPorMarca = new Map(ordens.map((o) => [o.item, Number(o._sum.produzidoUn) || 0]));
+    } catch { /* Syneco fora não derruba a agenda */ }
+  }
+
   return NextResponse.json({
     conjuntos: conj.map((c) => ({
       id: c.id, marca: c.marca, descricao: c.descricao || null,
       opNumero: c.op?.numero || null, qte: c.qte || 1,
       pesoTotalKg: Math.round(Number(c.pesoTotalKg) || 0),
       dia: iso(c.montagemDiaProgramado), bancada: c.montagemBancada || null,
+      montadoUn: Math.min(c.qte || 1, montadoPorMarca.get(c.marca) || 0),
       // ⚠ o que já entrou na montagem não é previsão, é o que está na bancada AGORA — a barra
       // precisa distinguir, senão remarcar o dia de algo em curso parece inofensivo.
       andando: c.status === "MONTAGEM",

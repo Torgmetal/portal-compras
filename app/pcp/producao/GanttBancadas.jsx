@@ -123,6 +123,34 @@ export default function GanttBancadas({ recarga = 0 }) {
       l.ultimo = barras.length ? Math.max(...barras.map((b) => b.fim)) : -1;
     }
 
+    // ⚠⚠ O KANBAN DE CARGA. Vitor (03/09/2026): "mesmo caso kanban de carga de montagem por bancada,
+    // aí mesmo caso apontamento da baixa: se ficar algo em aberto mostra atraso". O Gantt responde
+    // "quando"; o kanban responde "quanto entregou" — planejado × apontado, dia a dia, por bancada.
+    for (const l of linhas) {
+      const cards = new Map();
+      for (const c of cs) {
+        if (l.sem ? c.bancada : c.bancada !== l.key) continue;
+        if (!c.dia) continue;
+        if (!cards.has(c.dia)) cards.set(c.dia, { dia: c.dia, kg: 0, un: 0, feitoUn: 0, feitoKg: 0, itens: 0 });
+        const g = cards.get(c.dia);
+        const qte = c.qte || 1;
+        const feito = Math.min(qte, c.montadoUn || 0);
+        g.itens++; g.un += qte; g.kg += c.pesoTotalKg || 0;
+        g.feitoUn += feito;
+        // ⚠ kg feito PROPORCIONAL às peças montadas: conjunto com 2 de 4 peças não é nada nem tudo.
+        g.feitoKg += qte > 0 ? ((c.pesoTotalKg || 0) * feito) / qte : 0;
+      }
+      l.cards = [...cards.values()]
+        .map((g) => ({
+          ...g,
+          feitoKg: Math.round(g.feitoKg), kg: Math.round(g.kg),
+          abertoUn: g.un - g.feitoUn,
+          fechou: g.feitoUn >= g.un,
+          atrasado: g.dia < hoje && g.feitoUn < g.un,
+        }))
+        .sort((a, b) => a.dia.localeCompare(b.dia));
+    }
+
     // rodapé: peças no dia e o custo em dias-bancada, na mesma régua da programação
     const nBanc = Math.max(1, linhas.filter((l) => !l.sem).length);
     const rodape = dias.map((d) => {
@@ -223,6 +251,41 @@ export default function GanttBancadas({ recarga = 0 }) {
               );
             })}
           </div>
+        </div>
+      </div>
+
+      {/* ⚠ o kanban fica debaixo do Gantt, na mesma tela: o Gantt diz quando a bancada trabalha e o
+          kanban diz o que ela entregou. Separá-los obrigaria a comparar duas telas de cabeça. */}
+      <div className="px-4 pt-3 pb-1 border-t border-gray-100">
+        <p className="text-[12.5px] font-semibold text-torg-dark mb-2">Carga por bancada — planejado × apontado</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          {g.linhas.map((l) => (
+            <div key={l.key} className={`border rounded-lg overflow-hidden ${l.sem ? "border-amber-200" : "border-gray-100"}`}>
+              <p className={`px-3 py-1.5 text-[12px] font-semibold ${l.sem ? "bg-amber-50 text-amber-800" : "bg-gray-50 text-torg-dark"}`}>
+                {l.nome}
+              </p>
+              {!l.cards?.length ? (
+                <p className="px-3 py-2 text-[11.5px] text-torg-gray-light">nada programado</p>
+              ) : l.cards.map((c) => {
+                const pct = c.un > 0 ? Math.min(1, c.feitoUn / c.un) : 0;
+                return (
+                  <div key={c.dia} className={`px-3 py-2 border-t border-gray-100 ${c.atrasado ? "bg-red-50/50" : c.dia === g.hoje ? "bg-torg-blue-50/30" : ""}`}>
+                    <p className="text-[11px] text-torg-gray-light">
+                      {rotDia(c.dia)} · planejado {fmtN(c.kg)} kg / {fmtN(c.un)} pç
+                    </p>
+                    <span className="block h-1.5 rounded-full bg-gray-200 overflow-hidden my-1">
+                      <span className={`block h-1.5 ${c.atrasado ? "bg-red-500" : c.fechou ? "bg-emerald-500" : "bg-torg-blue"}`}
+                        style={{ width: `${pct * 100}%` }} />
+                    </span>
+                    <p className={`text-[11px] ${c.atrasado ? "text-red-700" : c.fechou ? "text-emerald-700" : "text-torg-gray-light"}`}>
+                      {c.feitoUn > 0 ? <>apontado {fmtN(c.feitoKg)} kg</> : "ainda sem apontamento"}
+                      {c.fechou ? " · fechou" : c.abertoUn > 0 && <> · {fmtN(c.abertoUn)} peças em aberto</>}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
 
