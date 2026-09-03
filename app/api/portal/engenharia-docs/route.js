@@ -16,7 +16,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { acharPastaOp, getAccessToken } from "@/lib/sharepoint";
+import { acharPastaOp, getAccessToken, listAllFilesRecursive } from "@/lib/sharepoint";
 import { AREA, AREAS_COM_SELETOR, TIPO_ENG, TIPOS_ENGENHARIA, tipoDoDocEng } from "@/lib/portal-cliente";
 import { raizesDoTipo, conteudoDoTipo, caminhosDasRaizes } from "@/lib/portal-eng-pastas";
 
@@ -42,8 +42,15 @@ const RAIZ_DA_AREA = {
 // para buscar os arquivos em pdf". A pasta da Qualidade tem modelo em .xls
 // (MODELO-RELATORIO-FOTOGRAFICO-OPXX_DATA.xls) e planilha de trabalho no meio dos relatórios — e
 // arquivo editável publicado é revisão que sai da nossa mão sem carimbo.
+//
+// ⚠⚠ E NA ENGENHARIA TAMBÉM SE FILTRA. Vitor (03/09/2026): "só leve para o portal arquivos pdf, dwg
+// e excel; word ou txt você deve ignorar". Faz sentido: o cliente recebe desenho (pdf/dwg), lista
+// (excel) e o modelo (ifc/step). Word e txt na pasta de projeto são rascunho, ata, anotação — coisa
+// nossa que nunca foi feita para sair daqui, e que aparecia no seletor pedindo para ser marcada por
+// engano.
 const EXTENSOES_DA_AREA = {
   QUALIDADE: ["pdf"],
+  ENGENHARIA: ["pdf", "dwg", "dxf", "xlsx", "xls", "xlsm", "ifc", "step", "stp"],
 };
 
 export async function GET(req) {
@@ -80,6 +87,46 @@ export async function GET(req) {
   // navegaria o servidor inteiro a partir de uma tela do portal.
   const pedido = so(u.searchParams.get("caminho")).replace(/^\/+|\/+$/g, "");
   const rel = pedido.split("/").filter((x) => x && x !== "." && x !== "..").join("/");
+
+  // ⚠⚠ LEVAR A PASTA INTEIRA. Vitor (03/09/2026): "o seletor da pasta em si não foi criado, vc só
+  // dá a opção de selecionar o arquivo, não a pasta para que fique ela toda dentro para ele baixar —
+  // pensa assim: teria uma pasta dentro da aba da engenharia com o nome dela e dentro dela os
+  // projetos". Marcar arquivo por arquivo numa pasta de 240 desenhos não é escolha, é digitação.
+  //
+  // ⚠ A pasta é EXPANDIDA na hora da escolha, não guardada como "pasta". O portal publica uma lista
+  // de arquivos escolhidos — e é isso que garante que revisão nova que aparecer depois NÃO entre
+  // sozinha no portal do cliente. Quem publica decide o que sai; a pasta é o atalho, não a regra.
+  const tudoDe = so(u.searchParams.get("tudoDe"));
+  if (tudoDe) {
+    const relTudo = tudoDe.replace(/^\/+|\/+$/g, "").split("/").filter((x) => x && x !== "." && x !== "..").join("/");
+    if (!relTudo) return NextResponse.json({ error: "Informe a pasta." }, { status: 400 });
+    // ⚠ na Engenharia a pasta tem de estar DENTRO das raízes do tipo — o mesmo cerco da navegação.
+    if (area === "ENGENHARIA") {
+      const raizes = await raizesDoTipo(tipo, listarRel);
+      const permitidas = caminhosDasRaizes(raizes);
+      const dentro = permitidas.some((p) => relTudo === p || relTudo.startsWith(`${p}/`));
+      if (!dentro) return NextResponse.json({ error: "Essa pasta está fora deste tipo de documento." }, { status: 400 });
+    }
+    const exts0 = EXTENSOES_DA_AREA[area] || null;
+    const achados = await listAllFilesRecursive(process.env.SHAREPOINT_DRIVE_ID, `${base}/${relTudo}`, {
+      maxDepth: 4, supportedTypes: exts0 || null,
+    });
+    // ⚠ teto: pasta com milhares de arquivos derruba a tela e o portal. Acima disso, quem publica
+    // desce um nível e leva as subpastas uma a uma.
+    if (achados.length > 500) {
+      return NextResponse.json({ error: `Esta pasta tem ${achados.length} arquivos — leve as subpastas uma a uma.` }, { status: 400 });
+    }
+    const nomePasta = relTudo.split("/").filter(Boolean).pop() || "";
+    return NextResponse.json({
+      pasta: nomePasta,
+      arquivos: achados.map((a) => ({
+        id: a.id, nome: a.name, tamanho: a.size, em: a.lastModified,
+        // ⚠ a `pasta` é o que o cliente vê como nome do pacote (ver subpastasDe na rota do portal):
+        // guardo o caminho relativo, e é o último pedaço dele que vira o título da pasta lá.
+        pasta: String(a.folderPath || "").replace(`${base}/`, ""),
+      })),
+    });
+  }
 
   // ── Engenharia: só as pastas dos quatro tipos ──
   if (area === "ENGENHARIA") {

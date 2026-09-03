@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, FolderOpen, Folder, Check, AlertCircle, RefreshCw, ChevronRight, FileText, CornerLeftUp, Pencil, X, Lock, Trash2 } from "lucide-react";
+import { Loader2, FolderOpen, Folder, FolderPlus, Check, AlertCircle, RefreshCw, ChevronRight, FileText, CornerLeftUp, Pencil, X, Lock, Trash2 } from "lucide-react";
 
 const kb = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round((n || 0) / 1024))} KB`);
 
@@ -54,6 +54,30 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea, tipo, nomeTi
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
   }, [opNumero, area, tipo]);
   useEffect(() => { carregar(null); }, [carregar]);
+
+  // ⚠ a pasta é EXPANDIDA aqui: o portal continua publicando uma LISTA de arquivos escolhidos, e é
+  // isso que impede revisão nova de entrar sozinha depois. A pasta é o atalho, não a regra.
+  const [levando, setLevando] = useState(null);
+  async function levarPasta(cam) {
+    setLevando(cam); setErro("");
+    try {
+      const q = new URLSearchParams({ opNumero, area, tudoDe: cam });
+      if (tipo) q.set("tipo", tipo);
+      const r = await fetch(`/api/portal/engenharia-docs?${q}`, { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Não consegui ler a pasta.");
+      const arqs = j.arquivos || [];
+      if (!arqs.length) throw new Error("Esta pasta não tem arquivos publicáveis.");
+      setSel((m) => {
+        const n = new Map(m);
+        for (const a of arqs) {
+          n.set(String(a.id), { id: a.id, nome: a.nome, nomeExibicao: n.get(String(a.id))?.nomeExibicao || null, pasta: a.pasta || cam, tamanho: a.tamanho, em: a.em });
+        }
+        return n;
+      });
+      setAviso(`${arqs.length} arquivo(s) de "${j.pasta || cam}" marcados — salve para publicar.`);
+    } catch (e) { setErro(e.message); } finally { setLevando(null); }
+  }
 
   const marcar = (a, ligar) => setSel((m) => {
     const n = new Map(m);
@@ -146,15 +170,30 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea, tipo, nomeTi
         {!carregando && (d?.pastas || []).map((f) => {
           // ⚠ o aviso de OBSOLETO na pasta: é como a revisão antiga vaza para o cliente.
           const suspeita = /obsolet/i.test(f.nome);
+          const cam = f.caminho ?? (caminho ? `${caminho}/${f.nome}` : f.nome);
           return (
-            <button key={f.caminho || f.nome} onClick={() => carregar(f.caminho ?? (caminho ? `${caminho}/${f.nome}` : f.nome))}
-              className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50/60 text-left">
+            <div key={cam} className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50/60">
               <Folder size={14} className="text-torg-blue shrink-0" />
-              <span className="text-[12px] font-semibold text-torg-dark truncate flex-1">{f.nome}</span>
+              <button onClick={() => carregar(cam)} className="text-[12px] font-semibold text-torg-dark truncate flex-1 text-left">
+                {f.nome}
+              </button>
               {suspeita && <span className="text-[10px] text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 shrink-0">obsoleto?</span>}
               {f.itens != null && <span className="text-[11px] text-torg-gray shrink-0">{f.itens}</span>}
-              <ChevronRight size={13} className="text-torg-gray-light shrink-0" />
-            </button>
+              {/* ⚠⚠ LEVAR A PASTA INTEIRA. Vitor (03/09/2026): "o seletor da pasta em si não foi
+                  criado (…) pensa assim: teria uma pasta dentro da aba da engenharia com o nome dela
+                  e dentro dela os projetos". Entrar na pasta e marcar 240 desenhos não é escolher,
+                  é digitar. O botão traz tudo o que está dentro (inclusive subpastas), e no portal
+                  do cliente eles aparecem agrupados com o nome da pasta, para baixar de uma vez. */}
+              <button onClick={() => levarPasta(cam)} disabled={levando === cam}
+                title="Levar todos os arquivos desta pasta para o portal"
+                className="shrink-0 text-[11px] font-semibold text-torg-blue hover:underline disabled:opacity-50 inline-flex items-center gap-1">
+                {levando === cam ? <Loader2 size={11} className="animate-spin" /> : <FolderPlus size={12} />}
+                levar a pasta
+              </button>
+              <button onClick={() => carregar(cam)} className="shrink-0 text-torg-gray-light hover:text-torg-blue">
+                <ChevronRight size={13} />
+              </button>
+            </div>
           );
         })}
         {/* ⚠⚠ MARCAR A PASTA INTEIRA. Vitor (01/09/2026): "deixe uma caixa de seleção nos projetos
