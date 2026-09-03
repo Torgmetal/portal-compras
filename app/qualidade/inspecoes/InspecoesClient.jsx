@@ -442,9 +442,15 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
   // não está lá — ele é o desenho do arranjo, não de uma peça. Por isso o escopo muda de sentido
   // aqui: "Diagrama de montagem" ou "Conjunto", e a lista traz PDFs da pasta da obra.
   const ehPreMontagem = tipo === "PRE_MONTAGEM";
-  const [escopo, setEscopo] = useState(tipo === "PRE_MONTAGEM" ? "MONTAGEM" : "CONJUNTO");
+  const [escopo, setEscopo] = useState("CONJUNTO");
   const [projetos, setProjetos] = useState(null);
   const [q, setQ] = useState("");
+  // ⚠⚠ FILTRO, NÃO PORTA DE ENTRADA. Vitor (03/09/2026): "preciso que permita que eu possa criar um
+  // relatório mesmo que eu não selecione se é um conjunto ou um diagrama de montagem". A tela
+  // obrigava escolher a família ANTES de ver qualquer projeto — quem não sabia de cabeça em qual
+  // pasta o desenho vivia ficava travado num palpite. Agora a lista vem com as duas famílias
+  // juntas, e este filtro só estreita a busca por quem já sabe o que quer.
+  const [famFiltro, setFamFiltro] = useState("");
   const [pecas, setPecas] = useState(null);
   const [sel, setSel] = useState([]);
   const [inspetor, setInspetor] = useState("");
@@ -486,18 +492,17 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
     return () => { vivo = false; clearTimeout(t); };
   }, [op, q, escopo]);
 
-  // os projetos da obra (pré-montagem): montagem ou conjunto, conforme o escopo
+  // os projetos da obra (pré-montagem): as duas famílias juntas — ver nota do famFiltro acima.
   useEffect(() => {
     if (!ehPreMontagem || !op) { setProjetos(null); return; }
     let vivo = true;
     setProjetos(null);
-    const familia = escopo === "CONJUNTO" ? "conjunto" : "montagem";
-    fetch(`/api/qualidade/inspecoes/projetos?opNumero=${encodeURIComponent(op.numero)}&familia=${familia}`)
+    fetch(`/api/qualidade/inspecoes/projetos?opNumero=${encodeURIComponent(op.numero)}`)
       .then((r) => r.json())
       .then((j) => { if (vivo) setProjetos(j.projetos || []); })
       .catch(() => vivo && setProjetos([]));
     return () => { vivo = false; };
-  }, [ehPreMontagem, op, escopo]);
+  }, [ehPreMontagem, op]);
 
   // trocar de escopo/OP invalida a seleção e a prévia
   useEffect(() => { setSel([]); setListaAberta(true); }, [op, escopo]);
@@ -573,16 +578,11 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
               </select>
             </label>
 
-            {ehDimensional && (
+            {ehDimensional && !ehPreMontagem && (
             <div>
-              <span className="block text-[10px] font-semibold text-torg-gray mb-1">
-                {ehPreMontagem ? "Projeto a inspecionar" : "Escopo"}
-              </span>
+              <span className="block text-[10px] font-semibold text-torg-gray mb-1">Escopo</span>
               <div className="grid grid-cols-2 gap-2">
-                {(ehPreMontagem
-                  ? [["MONTAGEM", "Diagrama de montagem", "pasta Montagem"], ["CONJUNTO", "Conjunto", "pasta Conjunto"]]
-                  : [["CONJUNTO", "Conjunto", "um por relatório"], ["AVULSAS", "Peças avulsas", "agrupadas"]]
-                ).map(([v, t, sub]) => (
+                {[["CONJUNTO", "Conjunto", "um por relatório"], ["AVULSAS", "Peças avulsas", "agrupadas"]].map(([v, t, sub]) => (
                   <button key={v} onClick={() => setEscopo(v)}
                     className={`text-left rounded-lg border px-2.5 py-1.5 ${escopo === v ? "border-torg-blue bg-torg-blue/5" : "border-gray-200"}`}>
                     <span className="block text-[12px] font-semibold text-torg-dark">{t}</span>
@@ -628,24 +628,41 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="buscar projeto…"
                   autoCorrect="off" spellCheck={false}
                   className="w-full text-[12px] font-mono border border-gray-200 rounded-lg px-2 py-1.5 mb-1.5 focus:border-torg-blue outline-none" />
+                {/* ⚠ FILTRO OPCIONAL, não escolha obrigatória — a lista já veio com as duas
+                    famílias. Quem sabe o que procura estreita aqui; quem não sabe, não precisa. */}
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  {[["", "Todos"], ["montagem", "Montagem"], ["conjunto", "Conjunto"]].map(([v, t]) => (
+                    <button key={v || "todos"} onClick={() => setFamFiltro(v)}
+                      className={`text-[10px] font-semibold rounded-full px-2 py-0.5 border ${
+                        famFiltro === v ? "border-torg-blue bg-torg-blue text-white" : "border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
                   <div className="border border-gray-100 rounded-lg max-h-56 overflow-y-auto">
                     {projetos === null && (
                       <p className="p-2 text-[12px] text-torg-gray inline-flex items-center gap-1.5">
                         <Loader2 size={12} className="animate-spin" /> procurando os projetos na pasta da obra…
                       </p>
                     )}
-                    {projetos?.filter((pr) => !q || pr.nome.toLowerCase().includes(q.toLowerCase())).slice(0, 300).map((pr) => {
+                    {projetos
+                      ?.filter((pr) => !q || pr.nome.toLowerCase().includes(q.toLowerCase()))
+                      .filter((pr) => !famFiltro || pr.familia === famFiltro)
+                      .slice(0, 300).map((pr) => {
                       const on = sel.includes(pr.nome);
                       return (
                         <button key={pr.caminho} onClick={() => alternar(pr.nome)}
-                          className={`w-full text-left px-2 py-1.5 text-[12px] border-b border-gray-50 last:border-0 ${on ? "bg-torg-blue/10 font-semibold text-torg-dark" : "text-torg-dark hover:bg-gray-50"}`}>
-                          {pr.nome}
+                          className={`w-full text-left px-2 py-1.5 text-[12px] border-b border-gray-50 last:border-0 flex items-center gap-1.5 ${on ? "bg-torg-blue/10 font-semibold text-torg-dark" : "text-torg-dark hover:bg-gray-50"}`}>
+                          <span className="flex-1 truncate">{pr.nome}</span>
+                          <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-torg-gray-light">
+                            {pr.familia === "montagem" ? "montagem" : "conjunto"}
+                          </span>
                         </button>
                       );
                     })}
                     {projetos && !projetos.length && (
                       <p className="p-2 text-[12px] text-torg-gray">
-                        Nenhum PDF nessa pasta desta OP. Dá para anexar o projeto depois, dentro do relatório.
+                        Nenhum PDF nas pastas de montagem ou conjunto desta OP. Dá para anexar o projeto depois, dentro do relatório.
                       </p>
                     )}
                     {projetos && projetos.length > 300 && !q && (

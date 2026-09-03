@@ -38,7 +38,14 @@ export async function GET(req) {
 
   const url = new URL(req.url);
   const opNumero = String(url.searchParams.get("opNumero") || "").trim();
-  const familia = url.searchParams.get("familia") === "conjunto" ? "conjunto" : "montagem";
+  // ⚠⚠ "AMBOS" É O PADRÃO. Vitor (03/09/2026): "preciso que permita que eu possa criar um relatório
+  // mesmo que eu não selecione se é um conjunto ou um diagrama de montagem". Antes o parâmetro só
+  // aceitava um dos dois, e a tela obrigava escolher ANTES de ver a lista — quem não sabia de cabeça
+  // em qual pasta o desenho vivia ficava travado num palpite. Agora as duas famílias entram juntas
+  // por padrão, cada projeto marcado com a sua, e o filtro por família fica como refinamento
+  // opcional, não como porta de entrada.
+  const fam = String(url.searchParams.get("familia") || "").toLowerCase();
+  const familias = fam === "conjunto" || fam === "montagem" ? [fam] : ["conjunto", "montagem"];
   if (!opNumero) return NextResponse.json({ error: "OP obrigatória" }, { status: 400 });
 
   const { driveId, fontes, erros } = await resolverPastasDaSecao("02", opNumero);
@@ -46,22 +53,37 @@ export async function GET(req) {
     return NextResponse.json({ projetos: [], erro: erros?.[0] || "Pasta de projetos não encontrada." });
   }
 
-  const rx = familia === "conjunto" ? /conjunto/i : /montagem/i;
-  const raizes = fontes.filter((f) => rx.test(f.label));
-  if (!raizes.length) return NextResponse.json({ projetos: [], erro: `Nenhuma pasta de ${familia} nesta OP.` });
+  const projetos = [];
+  const erroPorFamilia = [];
+  for (const familia of familias) {
+    const rx = familia === "conjunto" ? /conjunto/i : /montagem/i;
+    const raizes = fontes.filter((f) => rx.test(f.label));
+    if (!raizes.length) { erroPorFamilia.push(familia); continue; }
 
-  const achados = [];
-  for (const r of raizes) await pdfsDaPasta(driveId, r.path, 0, achados);
+    const achados = [];
+    for (const r of raizes) await pdfsDaPasta(driveId, r.path, 0, achados);
 
-  // ⚠ o mesmo desenho aparece nas duas arrumações (molde novo e pasta do cliente). Dedup pelo
-  // NOME: o inspetor não deve escolher entre duas linhas idênticas sem saber a diferença.
-  const vistos = new Set();
-  const projetos = achados.filter((p) => {
-    const k = p.nome.toUpperCase();
-    if (vistos.has(k)) return false;
-    vistos.add(k);
-    return true;
-  }).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { numeric: true }));
+    // ⚠ o mesmo desenho aparece nas duas arrumações (molde novo e pasta do cliente). Dedup pelo
+    // NOME: o inspetor não deve escolher entre duas linhas idênticas sem saber a diferença. O dedup
+    // é DENTRO da família — conjunto e montagem são pastas diferentes, e um nome igual entre elas
+    // não é a mesma coisa duas vezes.
+    const vistos = new Set();
+    for (const p of achados) {
+      const k = p.nome.toUpperCase();
+      if (vistos.has(k)) continue;
+      vistos.add(k);
+      projetos.push({ ...p, familia });
+    }
+  }
+  projetos.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { numeric: true }));
 
+  if (!projetos.length) {
+    return NextResponse.json({
+      projetos: [],
+      erro: erroPorFamilia.length === familias.length
+        ? `Nenhuma pasta de ${familias.join(" ou ")} nesta OP.`
+        : "Nenhum PDF encontrado nessas pastas desta OP.",
+    });
+  }
   return NextResponse.json({ projetos, total: projetos.length });
 }
