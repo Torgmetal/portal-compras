@@ -15,7 +15,11 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(req, { params }) {
-  try { await requireRole(["ADMIN", "QUALIDADE"]); }
+  // ⚠ O INSPETOR DE CAMPO TAMBÉM LÊ. Vitor (03/09/2026): "no relatório de pré-montagem consegue
+  // trazer os desenhos que criamos nos relatórios para ele ter referência das cotas?". Ele está com
+  // a peça na frente e precisa ver ONDE fica a cota A — sem isso mede pelo nome e erra de lugar.
+  // Continua SÓ LEITURA (é um GET de geometria); quem marca cota é a Qualidade, no computador.
+  try { await requireRole(["ADMIN", "QUALIDADE", "QUALIDADE_CAMPO"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const marca = String(new URL(req.url).searchParams.get("marca") || "").trim().toUpperCase();
