@@ -103,7 +103,7 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea, tipo, nomeTi
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao salvar");
       if (limparFora) setFora([]);
-      setAviso(`${j.escolhidos} documento(s) publicados em ${rotulo}.`);
+      setAviso(`${j.escolhidos} documento(s) publicados em ${rotulo}.${j.aviso ? ` ${j.aviso}` : ""}`);
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
   }
 

@@ -242,12 +242,19 @@ export async function POST(req) {
   const atual = await prisma.portalCliente.findUnique({ where: { opNumero }, select: { docsPorArea: true, docsEngenharia: true, mostrarPeso: true } });
   const RX_LISTA = /(^|[^A-Z])(LPC|LE)([^A-Z]|$)|lista de (pe[çc]a|produ|expedi)/i;
   const crua = limpo.filter((d) => /\.xls[xm]?$/i.test(d.nome) && RX_LISTA.test(d.nome));
-  if (crua.length && atual?.mostrarPeso !== true) {
-    return NextResponse.json({
-      error: `${crua.length} arquivo(s) parecem ser a LPC/LE original da Engenharia (${crua.slice(0, 3).map((d) => d.nome).join(", ")}). O portal já publica essas listas no template Torg e SEM peso — o arquivo da pasta traz o peso item a item. Use a seção "Lista de peças (LPC)" do portal, ou ligue "divulgar o peso" se a obra realmente permite.`,
-      listaCrua: true, arquivos: crua.map((d) => d.nome),
-    }, { status: 409 });
-  }
+
+  // ⚠⚠ AVISA, NÃO BARRA. Vitor (03/09/2026): "mas ele não está deixando publicar os projetos".
+  // Estava mesmo: seis planilhas com cara de LPC bloqueavam a gravação INTEIRA — os 1.319 desenhos
+  // de fabricação junto. Guarda que impede o trabalho legítimo por causa de um caso duvidoso é
+  // guarda mal desenhada.
+  //
+  // E o risco que ela protegia deixou de existir na entrega: quando a obra não liberou o peso, a
+  // COLUNA DE PESO é removida da planilha na hora em que o cliente baixa (ver lib/excel-padronizar
+  // e a rota /api/portal/[token]/eng). O arquivo continua íntegro no servidor; o que sai é sem
+  // peso, igual à LPC que o portal gera. Aqui fica o aviso, para quem publica saber o que vai.
+  const avisoLista = crua.length && atual?.mostrarPeso !== true
+    ? `${crua.length} planilha(s) da Engenharia vão com a coluna de peso removida na entrega ao cliente (${crua.slice(0, 3).map((d) => d.nome).join(", ")}${crua.length > 3 ? "…" : ""}), porque esta obra não liberou o peso. Para enviá-las com peso, ligue "divulgar o peso" no portal da obra.`
+    : null;
   const mapa = { ...(atual?.docsPorArea || (atual?.docsEngenharia ? { ENGENHARIA: atual.docsEngenharia } : {})) };
 
   // ⚠⚠ O MESMO ARQUIVO, DE DUAS PASTAS, É UM SÓ PARA O CLIENTE. A OP-112 tinha 29 documentos na
@@ -289,5 +296,5 @@ export async function POST(req) {
       diff: { op: opNumero, area, tipo: tipo || null, documentos: limpo.length, nomes: limpo.slice(0, 20).map((d) => d.nomeExibicao || d.nome) } },
   }).catch(() => {});
 
-  return NextResponse.json({ ok: true, area, tipo: tipo || null, escolhidos: limpo.length, total: (mapa[area] || []).length });
+  return NextResponse.json({ ok: true, area, tipo: tipo || null, escolhidos: limpo.length, total: (mapa[area] || []).length, aviso: avisoLista || undefined });
 }

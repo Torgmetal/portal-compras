@@ -77,6 +77,9 @@ export async function GET(req, { params }) {
         const tratada = await padronizarPlanilha(buf, {
           titulo: String(doc.nomeExibicao || doc.nome).replace(/\.[a-z]+$/i, ""),
           subtitulo: [`OP-${portal.opNumero}`, doc.pasta || ""].filter(Boolean).join(" · "),
+          // ⚠ obra que não liberou o peso não recebe coluna de peso — nem no arquivo que veio da
+          // pasta. É a mesma regra da LPC e da LE que o portal gera (Vitor: "peso é preço").
+          semPeso: portal.mostrarPeso !== true,
         });
         if (tratada) { buf = tratada; nomeSaida = String(doc.nome).replace(/\.[a-z]+$/i, "") + ".xlsx"; }
       } catch { /* qualquer tropeço: entrega o arquivo original */ }
