@@ -60,7 +60,27 @@ export async function GET(req, { params }) {
     const auth = { Authorization: `Bearer ${await getAccessToken()}` };
     const r = await fetch(`${GRAPH}/drives/${process.env.SHAREPOINT_DRIVE_ID}/items/${encodeURIComponent(id)}/content`, { headers: auth, redirect: "follow" });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const buf = Buffer.from(await r.arrayBuffer());
+    let buf = Buffer.from(await r.arrayBuffer());
+    let nomeSaida = doc.nome;
+
+    // ⚠⚠ PLANILHA SAI COM A CARA DA CASA. Vitor (03/09/2026): "vou precisar anexar algumas planilhas
+    // em excel — vc consegue tratar elas e dar a nossa cara sem sair aquela porcaria que sai do
+    // Tekla?". A lista exportada do Tekla chega com fonte de sistema, coluna estourada e nenhum
+    // cabeçalho — e sai da nossa mão parecendo saída de máquina.
+    //
+    // ⚠ NENHUMA CÉLULA É MEXIDA: muda a moldura (capa, cabeçalho, larguras, rodapé ISO), não o dado.
+    // E se a planilha não for uma tabela reconhecível, vai como veio — enfeitar o que não é tabela
+    // estraga mais do que arruma.
+    if (/\.(xlsx|xls|xlsm)$/i.test(doc.nome)) {
+      try {
+        const { padronizarPlanilha } = await import("@/lib/excel-padronizar");
+        const tratada = await padronizarPlanilha(buf, {
+          titulo: String(doc.nomeExibicao || doc.nome).replace(/\.[a-z]+$/i, ""),
+          subtitulo: [`OP-${portal.opNumero}`, doc.pasta || ""].filter(Boolean).join(" · "),
+        });
+        if (tratada) { buf = tratada; nomeSaida = String(doc.nome).replace(/\.[a-z]+$/i, "") + ".xlsx"; }
+      } catch { /* qualquer tropeço: entrega o arquivo original */ }
+    }
     await prisma.portalCliente.update({ where: { id: portal.id }, data: { ultimoAcessoEm: new Date() } }).catch(() => {});
     await registrarAcesso(req, {
       portal, codigo: new URL(req.url).searchParams.get("d"), evento: "DOWNLOAD",
@@ -68,8 +88,10 @@ export async function GET(req, { params }) {
     });
     return new NextResponse(buf, {
       headers: {
-        "Content-Type": r.headers.get("content-type") || "application/octet-stream",
-        "Content-Disposition": dispArquivo(doc.nome, "attachment"),
+        "Content-Type": nomeSaida !== doc.nome
+          ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          : r.headers.get("content-type") || "application/octet-stream",
+        "Content-Disposition": dispArquivo(nomeSaida, "attachment"),
       },
     });
   } catch (e) {
