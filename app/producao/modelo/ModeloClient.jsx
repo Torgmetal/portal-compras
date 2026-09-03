@@ -20,6 +20,12 @@ const COR_TIPO = {
   "Guarda-corpo": "#c4682e", Escada: "#6d8496", Piso: "#a8b3bd", Parafuso: "#5b6b7a",
 };
 
+// ⚠ data curta em pt-BR sem depender de fuso do servidor: aqui é o navegador quem formata.
+function dataCurta(iso) {
+  try { return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }); }
+  catch { return ""; }
+}
+
 const COR = { pronta: "#0E7A5F", andando: "#B4761E", parado: "#9FB0BF" };
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -378,7 +384,11 @@ export default function ModeloClient({ ops }) {
           </div>
         )}
 
-        {lista?.resumo && modo === "andamento" && (
+        {modo === "andamento" && lista?.apontamento && !lista.apontamento.comProducao && (
+          <span className="text-[11.5px] text-amber-300">sem apontamento no Syneco — tudo em cinza</span>
+        )}
+
+        {lista?.resumo && modo === "andamento" && lista?.apontamento?.comProducao > 0 && (
           <div className="flex items-center gap-2.5 text-[11.5px] text-white/70">
             <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.pronta }} /> {lista.resumo.prontas}</span>
             <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.andando }} /> {lista.resumo.andando}</span>
@@ -476,11 +486,18 @@ export default function ModeloClient({ ops }) {
                 </div>
               </div>
 
-              {setores.length > 0 && (
-                <div>
-                  <p className="text-[10.5px] font-semibold text-torg-gray uppercase tracking-wide mb-1">
-                    Onde está na fábrica <span className="normal-case font-normal text-[10px]">· pelo apontamento</span>
-                  </p>
+              {/* ⚠⚠ O BLOCO APARECE MESMO SEM DADO, e é de propósito. Vitor (03/09/2026): "os
+                  apontamentos estão todos atrasados, não consigo ter certeza do que está pronto" —
+                  e, na OP-118, não estavam atrasados: não existiam. Obra sem apontamento pintada de
+                  cinza é indistinguível de obra parada. Quando não há, a tela diz que não há. */}
+              <div>
+                <p className="text-[10.5px] font-semibold text-torg-gray uppercase tracking-wide mb-1">
+                  Onde está na fábrica
+                  {lista?.apontamento?.ultimo && (
+                    <span className="normal-case font-normal text-[10px]"> · até {dataCurta(lista.apontamento.ultimo)}</span>
+                  )}
+                </p>
+                {setores.length > 0 ? (
                   <div className="space-y-0.5">
                     {setores.map(([t, qt]) => (
                       <label key={t} className="flex items-center gap-2 text-[12.5px] text-torg-dark hover:bg-torg-blue-50/60 rounded px-1.5 py-1 cursor-pointer">
@@ -490,8 +507,14 @@ export default function ModeloClient({ ops }) {
                       </label>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <p className="text-[11.5px] text-amber-700 px-1.5 leading-snug">
+                    Esta obra ainda não tem produção lançada no Syneco
+                    {lista?.apontamento?.marcas ? ` (${lista.apontamento.marcas} marcas na lista, nenhuma com ordem apontada)` : " e não tem lista importada no portal"}.
+                    Sem isso não dá para dizer o que está pronto — o modelo mostra a obra, não o andamento.
+                  </p>
+                )}
+              </div>
 
               <div className="border-t border-gray-200 pt-3 text-[12px] text-torg-gray space-y-0.5">
                 <p><b className="text-torg-dark">{soma.grupos}</b> item(ns) · <b className="text-torg-dark">{soma.pecas}</b> peça(s)</p>

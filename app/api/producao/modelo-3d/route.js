@@ -59,43 +59,57 @@ export async function GET(req) {
     // listagem, e não a cada clique, porque o visualizador pinta a cena INTEIRA de uma vez — pedir
     // marca por marca seriam centenas de idas ao servidor para montar uma tela.
     //
-    // ⚠ O ESTÁGIO REAL VEM DO APONTAMENTO, não do `status` gravado: aquele só anda até o corte
-    // (ver lib/peca-setor-real). Peça sem apontamento é "a fazer", e é a maioria.
+    // ⚠⚠ A FONTE É O MesOrdem, NÃO O MesApontamento. Vitor (03/09/2026): "no IFC estão todos
+    // atrasados bem dizer, não consigo ter certeza do que realmente está pronto". Antes eu casava a
+    // marca por PEDAÇO do `opSka` do apontamento — casamento por substring, que erra para os dois
+    // lados. O MesOrdem tem `item` = a marca inteira e `produzidoUn` por setor: é a mesma fonte que
+    // as telas de chão de fábrica usam (ver lib/conjuntos-setor), então o 3D passa a contar a mesma
+    // história que o resto do portal.
+    //
+    // ⚠ E as marcas saem da LE também, não só da LPC: obra que ainda não teve LPC importada (a
+    // OP-118 é assim) tem a LE com as mesmas marcas do modelo — sem isso o 3D não casava nada.
     const pecas = await prisma.pecaConjunto.findMany({
-      where: { opId, naLPC: true },
-      select: { marca: true, status: true },
+      where: { opId, OR: [{ naLPC: true }, { naLE: true }] },
+      select: { marca: true },
     });
-    const apont = await prisma.$queryRaw`
-      SELECT "opSka", "setor", max("dataInicio") ult
-      FROM "MesApontamento" WHERE "opId" = ${opId} GROUP BY 1, 2`;
-    // opSka contém a marca ("T89C21-P3" traz "T89C21"): casa pelo maior nome que estiver dentro
-    const marcas = [...new Set(pecas.map((p) => p.marca).filter(Boolean))]
-      .sort((a, b) => b.length - a.length);
-    const setorDe = new Map();
-    for (const a of apont) {
-      const ska = String(a.opSka || "").toUpperCase();
-      const m = marcas.find((x) => ska.includes(x.toUpperCase()));
-      if (!m) continue;
-      const g = setorDe.get(m);
-      const d = a.ult ? a.ult.toISOString() : "";
-      if (!g || d > g.ult) setorDe.set(m, { setor: a.setor, ult: d });
+    const marcas = [...new Set(pecas.map((p) => p.marca).filter(Boolean))];
+
+    // ⚠ ordem física da fábrica: o setor VALENDO é o mais avançado com produção lançada.
+    const CADEIA = ["Montagem", "Solda", "Acabamento", "Jato", "Pintura"];
+    const ordens = marcas.length
+      ? await prisma.mesOrdem.findMany({
+          where: { item: { in: marcas }, setor: { in: CADEIA } },
+          select: { item: true, setor: true, produzidoUn: true, dataFim: true },
+        })
+      : [];
+
+    const feitoEm = new Map();       // marca → Set(setor com produção)
+    let ultimo = null;
+    for (const o of ordens) {
+      if ((o.produzidoUn || 0) <= 0) continue;
+      if (!feitoEm.has(o.item)) feitoEm.set(o.item, new Set());
+      feitoEm.get(o.item).add(o.setor);
+      if (o.dataFim && (!ultimo || o.dataFim > ultimo)) ultimo = o.dataFim;
     }
-    const estados = {};
-    // ⚠⚠ O SETOR VAI JUNTO, e não só o estado. Vitor (03/09/2026): "quero que tenha a opção de
-    // clicar no setor e mostrar as peças que estão naquele setor". O estado responde "andou ou
-    // não"; o setor responde ONDE está — que é o que faz alguém ir até a bancada certa.
-    const setores = {};
+
+    const estados = {}, setores = {};
     for (const m of marcas) {
-      const bruto = String(setorDe.get(m)?.setor || "").trim();
-      const s = bruto.toLowerCase();
-      estados[m] = !s ? "parado"
-        : /pintura|acabamento/.test(s) ? "pronta"
-        : "andando";
-      if (bruto) setores[m] = bruto;
+      const feitos = feitoEm.get(m);
+      const ondeEsta = feitos ? [...CADEIA].reverse().find((s) => feitos.has(s)) : null;
+      estados[m] = !ondeEsta ? "parado" : ondeEsta === "Pintura" ? "pronta" : "andando";
+      if (ondeEsta) setores[m] = ondeEsta;
     }
+
     return NextResponse.json({
       op: { id: op.id, numero: op.numero, cliente: op.cliente, obra: op.obra },
       modelos, tetoMb: TETO_MB, estados, setores,
+      // ⚠ a data e a contagem viajam junto para a tela poder DIZER quando não há apontamento, em
+      // vez de pintar tudo de cinza e deixar quem olha achando que a obra está parada.
+      apontamento: {
+        marcas: marcas.length,
+        comProducao: feitoEm.size,
+        ultimo: ultimo ? ultimo.toISOString() : null,
+      },
       resumo: {
         marcas: marcas.length,
         prontas: Object.values(estados).filter((x) => x === "pronta").length,
