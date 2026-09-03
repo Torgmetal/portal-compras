@@ -14,7 +14,7 @@
 // deixar como sem informação para não levantar suspeita". Nada nesta tela pode dizer "não apontado",
 // "pendente" ou "não conferido" — é a mesma regra dos documentos ao cliente.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Box, SlidersHorizontal, Search, EyeOff, Eye } from "lucide-react";
+import { Loader2, Box, SlidersHorizontal, Search, EyeOff, Eye, FileSpreadsheet } from "lucide-react";
 import VisualizadorIfc from "@/components/VisualizadorIfc";
 
 const SEM = "sem informação";
@@ -42,6 +42,7 @@ export default function ModeloObraCliente({ token }) {
   const [busca, setBusca] = useState("");
   const [esconderResto, setEsconderResto] = useState(false);
   const [ocultos, setOcultos] = useState(() => new Set());
+  const [baixando, setBaixando] = useState(false);
 
   useEffect(() => {
     let vivo = true;
@@ -120,6 +121,48 @@ export default function ModeloObraCliente({ token }) {
     return novo;
   });
 
+  async function exportar() {
+    setBaixando(true);
+    try {
+      const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarRodapeISO, downloadWorkbook } =
+        await import("@/lib/excel-relatorio");
+      const alvo = (selecionados || indice || []).slice()
+        .sort((a, b) => String(a.marca || a.tipo).localeCompare(String(b.marca || b.tipo), "pt-BR", { numeric: true }));
+      const nivelDoItem = (x) => (daObra
+        ? niveisNaTela.find((nv) => x.marca && nv.marcas.has(chaveMarca(x.marca)))?.rotulo || ""
+        : niveisNaTela.find((nv) => nv.chave === x.nivel)?.rotulo || "");
+      const COLS = [
+        { t: "Tipo", w: 14, v: (x) => x.tipo || "" },
+        { t: "Marca", w: 24, v: (x) => x.marca || "" },
+        { t: "Nível", w: 24, v: nivelDoItem },
+        { t: "Cota base (mm)", w: 15, dir: "right", v: (x) => (x.cota == null ? "" : Math.round(x.cota * 1000)) },
+        { t: "Qtd", w: 9, dir: "right", v: (x) => x.pecas || 0 },
+        { t: "Peso do modelo (kg)", w: 19, dir: "right", v: (x) => (x.pesoKg == null ? "" : Math.round(x.pesoKg)) },
+      ];
+      const alinhamento = COLS.map((c) => c.dir || "left");
+      const foco = [...fNiveis].map((k) => niveisNaTela.find((nv) => nv.chave === k)?.rotulo).filter(Boolean);
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: `Modelo 3D — OP-${lista?.obra?.numero || ""}`,
+        subtitulo: [lista?.obra?.obra || lista?.obra?.cliente || "", modelo?.nome || "",
+          foco.length ? `Seleção: ${foco.join(", ")}` : "Modelo inteiro"].filter(Boolean).join(" · "),
+        kpis: [`${alvo.length} item(ns)`, `${alvo.reduce((t, x) => t + (x.pecas || 0), 0)} peça(s)`],
+        totalColunas: COLS.length, nomePlanilha: "Modelo 3D", codigoDoc: "REL-ENG-002",
+      });
+      ws.columns = COLS.map((c) => ({ width: c.w }));
+      let l = linhaInicio;
+      adicionarHeaderTabela(ws, l, COLS.map((c) => c.t)); l++;
+      ws.views = [{ state: "frozen", ySplit: l - 1 }];
+      for (const x of alvo) {
+        adicionarLinhaTabela(ws, l, COLS.map((c) => c.v(x)), { alinhamento });
+        ws.getCell(l, 4).numFmt = "#,##0"; ws.getCell(l, 6).numFmt = "#,##0";
+        l++;
+      }
+      adicionarRodapeISO(ws, l + 1, COLS.length);
+      await downloadWorkbook(workbook, `Modelo 3D - OP-${lista?.obra?.numero || ""}.xlsx`);
+    } catch { /* sem alarde na tela do cliente */ }
+    finally { setBaixando(false); }
+  }
+
   const abrir = useCallback((item) => {
     setSel(item || null);
     const m = item?.marca;
@@ -174,7 +217,11 @@ export default function ModeloObraCliente({ token }) {
 
       {/* ⚠ o modelo é a peça central da seção: altura generosa, painel ao lado só quando há peça
           escolhida — coluna vazia num portal de cliente parece defeito. */}
-      <div className="flex flex-col lg:flex-row gap-0 border border-gray-200 rounded-xl overflow-hidden bg-white">
+      {/* ⚠⚠ `data-tela-cheia` É O QUE MANTÉM OS FILTROS EM TELA CHEIA. Vitor (03/09/2026): "no modo
+          tela cheia vc tira os filtros, precisa deixar". O botão de tela cheia procura este atributo
+          para saber o que levar junto (ver components/VisualizadorIfc); sem ele, sobrava só a caixa
+          do 3D — e tela cheia sem filtro é justamente quando se precisa mais dele. */}
+      <div data-tela-cheia className="flex flex-col lg:flex-row gap-0 border border-gray-200 rounded-xl overflow-hidden bg-white">
         {painel && indice && (
           <aside className="w-full lg:w-[260px] shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200 overflow-y-auto" style={{ maxHeight: 560 }}>
             <div className="p-3.5 space-y-3.5">
@@ -215,6 +262,16 @@ export default function ModeloObraCliente({ token }) {
                   ))}
                 </div>
               </div>
+
+              {/* ⚠ EXPORTAR O QUE ESTÁ EM FOCO. Vitor (03/09/2026): "não tem o botão para eles
+                  extraírem caso queira selecionar um nível para ver as peças que compõem o nível".
+                  Sai no padrão das planilhas da casa, com marca, tipo, nível, quantidade e peso —
+                  os mesmos campos que ele já recebe na LE. */}
+              <button onClick={exportar} disabled={baixando}
+                className="w-full text-[12px] font-semibold px-3 py-2 rounded-md bg-[#006EAB] text-white hover:bg-[#005A8C] disabled:opacity-50 inline-flex items-center justify-center gap-2">
+                {baixando ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />}
+                {selecionados ? "Exportar a seleção" : "Exportar a lista"}
+              </button>
 
               <label className="flex items-center gap-2 text-[12px] text-[#0D1F3C] cursor-pointer border-t border-gray-100 pt-2.5">
                 <input type="checkbox" checked={esconderResto} onChange={(e) => setEsconderResto(e.target.checked)} className="accent-[#006EAB]" />
