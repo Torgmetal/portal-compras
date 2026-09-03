@@ -13,8 +13,8 @@
 // ⚠⚠ FALTA DE DADO SE ESCREVE "SEM INFORMAÇÃO". Vitor: "se por acaso não estiver apontado no CMR
 // deixar como sem informação para não levantar suspeita". Nada nesta tela pode dizer "não apontado",
 // "pendente" ou "não conferido" — é a mesma regra dos documentos ao cliente.
-import { useCallback, useEffect, useState } from "react";
-import { Loader2, Box } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Loader2, Box, SlidersHorizontal, Search, EyeOff, Eye } from "lucide-react";
 import VisualizadorIfc from "@/components/VisualizadorIfc";
 
 const SEM = "sem informação";
@@ -29,6 +29,19 @@ export default function ModeloObraCliente({ token }) {
   const [sel, setSel] = useState(null);
   const [peca, setPeca] = useState(null);
   const [buscando, setBuscando] = useState(false);
+  // ⚠⚠ O CLIENTE NAVEGA IGUAL. Vitor (03/09/2026): "no portal do cliente não está dando os filtros
+  // que falamos (…) não dá nada do que dá no da produção". Ele tem razão: eu tinha entregue só o
+  // visualizador com o dossiê. O que muda entre as duas telas é O QUE SE LÊ da peça, não o que se
+  // consegue fazer com o modelo — girar, filtrar por nível, isolar e procurar servem aos dois.
+  const [indice, setIndice] = useState(null);
+  const [niveisGeo, setNiveisGeo] = useState([]);
+  const [niveisObra, setNiveisObra] = useState(null);
+  const [fNiveis, setFNiveis] = useState(() => new Set());
+  const [fTipos, setFTipos] = useState(() => new Set());
+  const [painel, setPainel] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [esconderResto, setEsconderResto] = useState(false);
+  const [ocultos, setOcultos] = useState(() => new Set());
 
   useEffect(() => {
     let vivo = true;
@@ -43,6 +56,69 @@ export default function ModeloObraCliente({ token }) {
       .catch(() => vivo && setErro("Modelo indisponível."));
     return () => { vivo = false; };
   }, [token]);
+
+  useEffect(() => {
+    let vivo = true;
+    fetch(`/api/portal/${token}/niveis`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => vivo && setNiveisObra(j?.achou ? j : { achou: false, niveis: [] }))
+      .catch(() => vivo && setNiveisObra({ achou: false, niveis: [] }));
+    return () => { vivo = false; };
+  }, [token]);
+
+  const receberIndice = useCallback(({ indice: ix, niveis: nv }) => { setIndice(ix); setNiveisGeo(nv); }, []);
+
+  const chaveMarca = (m) => String(m || "").toUpperCase().replace(/\s/g, "");
+  const daObra = !!niveisObra?.achou && niveisObra.niveis?.length > 0;
+
+  const niveisNaTela = useMemo(() => {
+    if (!daObra) return niveisGeo;
+    return niveisObra.niveis.map((nv, i) => ({
+      chave: `o${i}`, rotulo: nv.rotulo, marcas: new Set((nv.marcas || []).map(chaveMarca)), daObra: true,
+    }));
+  }, [daObra, niveisObra, niveisGeo]);
+
+  const selecionados = useMemo(() => {
+    if (!indice) return null;
+    if (!fNiveis.size && !fTipos.size) return null;
+    const alvo = daObra && fNiveis.size
+      ? new Set(niveisNaTela.filter((nv) => fNiveis.has(nv.chave)).flatMap((nv) => [...nv.marcas]))
+      : null;
+    return indice.filter((x) =>
+      (!fNiveis.size || (alvo ? x.marca && alvo.has(chaveMarca(x.marca)) : fNiveis.has(x.nivel)))
+      && (!fTipos.size || fTipos.has(x.tipo)));
+  }, [indice, fNiveis, fTipos, daObra, niveisNaTela]);
+
+  const visiveis = useMemo(() => (selecionados ? new Set(selecionados.map((x) => x.id)) : null), [selecionados]);
+
+  const tipos = useMemo(() => {
+    const c = new Map();
+    for (const x of indice || []) c.set(x.tipo, (c.get(x.tipo) || 0) + 1);
+    return [...c.entries()].sort((a, b) => b[1] - a[1]);
+  }, [indice]);
+
+  const contaNivel = useMemo(() => {
+    const c = new Map();
+    for (const nv of niveisNaTela) {
+      c.set(nv.chave, nv.daObra
+        ? (indice || []).filter((x) => x.marca && nv.marcas.has(chaveMarca(x.marca))).length
+        : (indice || []).filter((x) => x.nivel === nv.chave).length);
+    }
+    return c;
+  }, [niveisNaTela, indice]);
+
+  const listados = useMemo(() => {
+    const base = selecionados || indice || [];
+    const t = busca.trim().toUpperCase();
+    if (!t) return base;
+    return base.filter((x) => String(x.marca || "").toUpperCase().includes(t) || String(x.tipo || "").toUpperCase().includes(t));
+  }, [selecionados, indice, busca]);
+
+  const alternar = (setar, valor) => setar((antes) => {
+    const novo = new Set(antes);
+    if (novo.has(valor)) novo.delete(valor); else novo.add(valor);
+    return novo;
+  });
 
   const abrir = useCallback((item) => {
     setSel(item || null);
@@ -72,6 +148,7 @@ export default function ModeloObraCliente({ token }) {
 
   return (
     <div className="space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
       {lista.modelos.length > 1 && (
         <select value={modelo?.rel || ""} onChange={(e) => { setModelo(lista.modelos.find((m) => m.rel === e.target.value)); setSel(null); setPeca(null); }}
           className="text-[13px] border border-gray-200 rounded-lg px-3 py-2 max-w-full outline-none focus:border-[#006EAB]">
@@ -80,19 +157,107 @@ export default function ModeloObraCliente({ token }) {
           ))}
         </select>
       )}
+        {indice && (
+          <button onClick={() => setPainel((v) => !v)}
+            className={`text-[12.5px] font-semibold px-3 py-2 rounded-lg border inline-flex items-center gap-2 ${
+              painel || selecionados ? "bg-[#0D1F3C] text-white border-[#0D1F3C]" : "border-gray-200 text-gray-600 hover:border-[#006EAB] hover:text-[#006EAB]"}`}>
+            <SlidersHorizontal size={13} />
+            {selecionados ? `${selecionados.length} em foco` : "Níveis e tipos"}
+          </button>
+        )}
+        {ocultos.size > 0 && (
+          <button onClick={() => setOcultos(new Set())} className="text-[12px] text-[#006EAB] hover:underline inline-flex items-center gap-1">
+            <Eye size={12} /> mostrar {ocultos.size} oculta(s)
+          </button>
+        )}
+      </div>
 
       {/* ⚠ o modelo é a peça central da seção: altura generosa, painel ao lado só quando há peça
           escolhida — coluna vazia num portal de cliente parece defeito. */}
       <div className="flex flex-col lg:flex-row gap-0 border border-gray-200 rounded-xl overflow-hidden bg-white">
+        {painel && indice && (
+          <aside className="w-full lg:w-[260px] shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200 overflow-y-auto" style={{ maxHeight: 560 }}>
+            <div className="p-3.5 space-y-3.5">
+              <div className="flex items-center justify-between">
+                <h4 className="text-[12px] font-bold text-[#0D1F3C] uppercase tracking-wide">Filtrar a vista</h4>
+                {selecionados && (
+                  <button onClick={() => { setFNiveis(new Set()); setFTipos(new Set()); }} className="text-[11px] text-[#006EAB] hover:underline">limpar</button>
+                )}
+              </div>
+
+              {niveisNaTela.length > 1 && (
+                <div>
+                  <p className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Níveis</p>
+                  <div className="space-y-0.5">
+                    {niveisNaTela.map((nv) => {
+                      const qt = contaNivel.get(nv.chave) || 0;
+                      return (
+                        <label key={nv.chave} className={`flex items-center gap-2 text-[12.5px] rounded px-1.5 py-1 cursor-pointer hover:bg-gray-50 ${qt ? "text-[#0D1F3C]" : "text-gray-400"}`}>
+                          <input type="checkbox" checked={fNiveis.has(nv.chave)} onChange={() => alternar(setFNiveis, nv.chave)} className="accent-[#006EAB]" />
+                          <span className="flex-1">{nv.rotulo}</span>
+                          <span className="text-[11px] text-gray-400 tabular-nums">{qt}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <p className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Tipos</p>
+                <div className="space-y-0.5">
+                  {tipos.map(([t, qt]) => (
+                    <label key={t} className="flex items-center gap-2 text-[12.5px] text-[#0D1F3C] rounded px-1.5 py-1 cursor-pointer hover:bg-gray-50">
+                      <input type="checkbox" checked={fTipos.has(t)} onChange={() => alternar(setFTipos, t)} className="accent-[#006EAB]" />
+                      <span className="flex-1">{t}</span>
+                      <span className="text-[11px] text-gray-400 tabular-nums">{qt}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-[12px] text-[#0D1F3C] cursor-pointer border-t border-gray-100 pt-2.5">
+                <input type="checkbox" checked={esconderResto} onChange={(e) => setEsconderResto(e.target.checked)} className="accent-[#006EAB]" />
+                Ocultar o resto
+              </label>
+
+              <div className="border-t border-gray-100 pt-2">
+                <div className="relative mb-1">
+                  <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="procurar marca…"
+                    className="w-full text-[12px] pl-6 pr-2 py-1.5 border border-gray-200 rounded-md outline-none focus:border-[#006EAB]" />
+                </div>
+                <p className="text-[10.5px] text-gray-400 px-1.5 pb-1">{listados.length} item(ns)</p>
+                <div className="max-h-[220px] overflow-y-auto">
+                  {listados.slice(0, 300).map((x) => (
+                    <button key={x.id} onClick={() => abrir(x)}
+                      className={`w-full text-left text-[12px] px-1.5 py-1 rounded flex items-baseline gap-2 hover:bg-gray-50 ${sel?.id === x.id ? "bg-orange-50" : ""}`}>
+                      <span className="font-mono text-[#0D1F3C] truncate">{x.marca || x.tipo}</span>
+                      <span className="ml-auto text-[11px] text-gray-400 shrink-0">{x.pecas}×</span>
+                    </button>
+                  ))}
+                  {listados.length > 300 && <p className="text-[11px] text-gray-400 px-1.5 py-1">…e mais {listados.length - 300}. Use a busca.</p>}
+                </div>
+              </div>
+            </div>
+          </aside>
+        )}
+
         <div className="flex-1 min-w-0 min-h-0 relative" style={{ height: 560 }}>
           {url && (
-            <VisualizadorIfc key={url} url={url} onSelecionar={abrir} selecionada={sel?.id || null} altura="fill" />
+            <VisualizadorIfc key={url} url={url} onSelecionar={abrir} onIndice={receberIndice}
+              visiveis={visiveis} ocultos={ocultos} esconderResto={esconderResto}
+              selecionada={sel?.id || null} altura="fill" />
           )}
         </div>
 
         {sel && (
           <aside className="w-full lg:w-[330px] shrink-0 border-t lg:border-t-0 lg:border-l border-gray-200 overflow-y-auto" style={{ maxHeight: 560 }}>
             <div className="p-4 space-y-3">
+              <button onClick={() => setOcultos((v) => new Set(v).add(sel.id))}
+                className="text-[11.5px] text-gray-500 hover:text-[#0D1F3C] inline-flex items-center gap-1.5 border border-gray-200 rounded-md px-2 py-1">
+                <EyeOff size={12} /> ocultar esta peça
+              </button>
               {buscando && <p className="text-[13px] text-gray-500 inline-flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> buscando…</p>}
 
               {!buscando && !peca && (
