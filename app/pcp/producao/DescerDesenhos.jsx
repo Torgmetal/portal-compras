@@ -19,9 +19,10 @@
 // programação coisa que estiverem erradas lá". A marca continua na LPC — o que sai é o dia. E o
 // servidor recusa tirar o que o Syneco já apontou (ver a rota).
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Printer, CalendarX } from "lucide-react";
+import { Loader2, Printer, CalendarX, CalendarCheck, AlertTriangle } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
+import { repartirPorBancada, distribuirEmDias, RITMO_META, BANCADAS } from "@/lib/montagem-capacidade";
 import ProntoParaMontar from "./ProntoParaMontar";
 import FaltaPreparar from "./FaltaPreparar";
 
@@ -38,6 +39,13 @@ const fmtDiaCurto = (d) => {
   return `${sem} ${dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" })}`;
 };
 const somaKg = (a) => a.reduce((s, x) => s + (x.kg || 0), 0);
+const isoDe = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d || "").slice(0, 10));
+// ⚠ começa no próximo dia ÚTIL: programar para sábado é programar para ninguém.
+const proximoUtil = () => {
+  const d = new Date();
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
 
 export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor }) {
   // ⚠⚠ AS ABAS DEPENDEM DO SETOR. Vitor (03/09/2026): "quando estamos na aba de planejamento não
@@ -52,6 +60,12 @@ export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor }) {
   const [aberta, setAberta] = useState(null);
   const [tirando, setTirando] = useState(false);
   const [erro, setErro] = useState("");
+  // ⚠ programar bancada AQUI também. Vitor (03/09/2026): "quando seleciono através de um filtro
+  // você só dá a opção de descer, não vejo como programar em bancadas ou até mesmo ver um alerta".
+  // Quem filtra por um dia e vê 30 conjuntos sem posto precisa resolver ali, não noutra aba.
+  const [nBanc, setNBanc] = useState(2);
+  const [inicioBanc, setInicioBanc] = useState(proximoUtil);
+  const [programando, setProgramando] = useState(false);
 
   // ⚠ só a CONTAGEM, para o número da aba existir antes de alguém clicar nela — quem não abre a
   // aba precisa saber que há trabalho ali.
@@ -110,6 +124,69 @@ export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor }) {
   // gesto da manhã, e obrigar a marcar 60 linhas antes seria trabalho à toa.
   const alvoDescer = (escolhidos.length ? escolhidos : vis).filter((l) => l.ok);
   const todosVis = vis.length > 0 && vis.every((l) => sel.has(l.id));
+
+  // ⚠⚠ O ALERTA DA SELEÇÃO. Antes o rodapé só dizia quantos desciam; o que trava, o que está sem
+  // posto e o que já desceu ficava para a pessoa contar na tabela.
+  const alerta = useMemo(() => {
+    const base = escolhidos.length ? escolhidos : vis;
+    const podem = base.filter((l) => l.ok);
+    const motivos = new Map();
+    for (const l of base.filter((x) => !x.ok)) {
+      const k = l.motivo || "travado";
+      motivos.set(k, (motivos.get(k) || 0) + 1);
+    }
+    return {
+      base, podem,
+      travados: base.length - podem.length,
+      motivos: [...motivos.entries()],
+      semBancada: setor === "MONTAGEM" ? base.filter((l) => !l.bancada).length : 0,
+      kg: somaKg(base),
+    };
+  }, [escolhidos, vis, setor]);
+
+  // ⚠ a mesma repartição de "Pronto para montar" (lib/montagem-capacidade): peça por faixa de peso.
+  // Uma segunda conta aqui daria dois prazos para o mesmo lote.
+  const paraBancada = useMemo(
+    () => (escolhidos.length ? escolhidos : vis).map((l) => ({ ...l, pesoTotalKg: l.kg })),
+    [escolhidos, vis],
+  );
+  const distrib = useMemo(
+    () => (setor === "MONTAGEM" ? repartirPorBancada(paraBancada, nBanc, { curva: RITMO_META }) : []),
+    [paraBancada, nBanc, setor],
+  );
+  const porDia = useMemo(
+    () => (distrib.length && inicioBanc ? distribuirEmDias(distrib, new Date(`${inicioBanc}T00:00:00Z`)) : []),
+    [distrib, inicioBanc],
+  );
+  const fechaEm = useMemo(() => {
+    const ds = porDia.flatMap((b) => (b.dias || []).map((x) => isoDe(x.dia))).sort();
+    return ds[ds.length - 1] || null;
+  }, [porDia]);
+
+  async function programarBancadas() {
+    const bancadaPorId = {}, diaPorId = {}, ids = [];
+    for (const b of distrib) for (const it of b.itens) { bancadaPorId[it.id] = b.bancada; ids.push(it.id); }
+    for (const b of porDia) for (const d of (b.dias || [])) for (const it of d.itens) diaPorId[it.id] = isoDe(d.dia);
+    if (!ids.length) return;
+    if (!confirm(`Programar ${ids.length} conjunto(s) em ${distrib.filter((b) => b.itens.length).length} bancada(s), `
+      + `de ${fmtDiaCurto(inicioBanc)} a ${fmtDiaCurto(fechaEm)}?\n\nRegrava o dia e a bancada de cada um.`)) return;
+    setProgramando(true); setErro("");
+    try {
+      const r = await fetch("/api/producao/pecas/liberar-montagem", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, bancadaPorId, diaPorId }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao programar");
+      // ⚠ o servidor recusa conjunto sem os croquis 100% cortados — e é isso que o alerta acima
+      // já avisa. O que ele barrou tem de aparecer, senão parece que entrou tudo.
+      if (j.bloqueados?.length) {
+        setErro(`${j.bloqueados.length} não entraram: ${j.bloqueados.slice(0, 5).map((b) => `${b.marca} (${b.cortados}/${b.total} croquis)`).join(", ")}`);
+      }
+      setSel(new Set());
+      setRecarga((v) => v + 1);
+    } catch (e) { setErro(e.message); } finally { setProgramando(false); }
+  }
 
   function alternar(id) { setSel((p) => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; }); }
 
@@ -236,6 +313,61 @@ export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor }) {
               </tbody>
             </table>
           </div>
+
+          {/* ⚠ o alerta fala do que a pessoa ESTÁ olhando: o que ela marcou, ou — se não marcou nada
+              — o que sobrou do filtro. É o mesmo alvo dos botões, senão o aviso descreveria um
+              conjunto e o botão agiria sobre outro. */}
+          <div className="flex items-center gap-2 flex-wrap mt-2.5 text-[12px] bg-gray-50/70 border border-gray-100 rounded-lg px-3 py-2">
+            <span className="font-semibold text-torg-dark">
+              {escolhidos.length ? `${fmtN(escolhidos.length)} marcados` : `${fmtN(vis.length)} à vista`}
+            </span>
+            <span className="text-torg-gray-light">·</span>
+            <span className="text-emerald-700">{fmtN(alerta.podem.length)} podem descer</span>
+            {alerta.travados > 0 && (
+              <>
+                <span className="text-torg-gray-light">·</span>
+                <span className="text-amber-800 inline-flex items-center gap-1">
+                  <AlertTriangle size={12} />
+                  {fmtN(alerta.travados)} não descem
+                  <span className="text-amber-700">({alerta.motivos.map(([m, n]) => `${fmtN(n)} ${m.toLowerCase()}`).join(", ")})</span>
+                </span>
+              </>
+            )}
+            {alerta.semBancada > 0 && (
+              <>
+                <span className="text-torg-gray-light">·</span>
+                <span className="text-amber-800">{fmtN(alerta.semBancada)} sem bancada</span>
+              </>
+            )}
+            <span className="ml-auto text-torg-gray">{fmtKg(alerta.kg)}</span>
+          </div>
+
+          {/* ⚠ PROGRAMAR BANCADA SÓ NA MONTAGEM: na preparação quem carrega a data é o lote do
+              Planejamento, e bancada não existe. */}
+          {setor === "MONTAGEM" && (
+            <div className="flex items-center gap-2 flex-wrap mt-2 bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg px-3 py-2">
+              <span className="text-[12px] font-semibold text-torg-dark">Programar em bancadas</span>
+              <div className="flex items-center gap-1">
+                {BANCADAS.map((_, i) => (
+                  <button key={i} onClick={() => setNBanc(i + 1)}
+                    className={`w-6 h-6 text-[11.5px] font-semibold rounded-md border ${
+                      nBanc === i + 1 ? "bg-torg-blue text-white border-torg-blue"
+                        : "bg-white border-gray-200 text-torg-gray hover:border-torg-blue-300"}`}>{i + 1}</button>
+                ))}
+              </div>
+              <span className="text-[11px] text-torg-gray">começa em</span>
+              <input type="date" value={inicioBanc} onChange={(e) => setInicioBanc(e.target.value)}
+                className="border border-gray-200 rounded-md px-2 py-1 text-[11.5px] bg-white outline-none focus:border-torg-blue" />
+              <span className="text-[11px] text-torg-gray-light">
+                {fechaEm ? <>fecha em <b className="text-torg-dark">{fmtDiaCurto(fechaEm)}</b></> : "nada para repartir"}
+              </span>
+              <button onClick={programarBancadas} disabled={programando || !distrib.some((b) => b.itens.length)}
+                className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-torg-blue text-white hover:opacity-90 disabled:opacity-40">
+                {programando ? <Loader2 size={13} className="animate-spin" /> : <CalendarCheck size={13} />}
+                Programar {fmtN(distrib.filter((b) => b.itens.length).length)} bancada(s)
+              </button>
+            </div>
+          )}
 
           {erro && <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">{erro}</p>}
 
