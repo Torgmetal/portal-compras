@@ -14,13 +14,24 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 
-const SETORES = ["CORTE", "PREPARACAO", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA"];
+// ⚠⚠ SÓ OS DOIS QUE SE PROGRAMAM AQUI. Vitor (03/09/2026): "esses setores pode tirar" (solda,
+// acabamento, jato e pintura) — nenhum deles recebe liberação por esta tela, então cada botão era
+// um clique que só podia dar lista vazia.
+//
+// ⚠ E CORTE É PREPARAÇÃO. Vitor, na mesma mensagem: "corte e preparação são a mesma coisa — usar
+// preparação como nome e unificar os dois". O banco grava CORTE desde sempre; o nome que a fábrica
+// fala é preparação. A rota trata os dois como um só (ver /api/planejamento/liberacao/carga), então
+// aqui fica só o nome certo, sem mexer em registro nenhum.
+const SETORES = [
+  { key: "PREPARACAO", nome: "Preparação" },
+  { key: "MONTAGEM", nome: "Montagem" },
+];
 const fmtN = (n) => new Intl.NumberFormat("pt-BR").format(Math.round(Number(n) || 0));
 const fmtKg = (n) => `${fmtN(n)} kg`;
 const fmtD = (iso) => { try { const [a, m, d] = iso.split("-"); return `${d}/${m}`; } catch { return iso; } };
 
 export default function CargaDosDias({ opId, recarga }) {
-  const [setor, setSetor] = useState("CORTE");
+  const [setor, setSetor] = useState("PREPARACAO");
   const [metaKg, setMetaKg] = useState(12000);
   const [carga, setCarga] = useState(null);
 
@@ -54,10 +65,10 @@ export default function CargaDosDias({ opId, recarga }) {
             diferentes, e a barra deixaria de significar alguma coisa. */}
         <div className="ml-auto flex items-center gap-1 flex-wrap">
           {SETORES.map((s) => (
-            <button key={s} onClick={() => setSetor(s)}
-              className={`text-[11px] font-semibold px-2 py-1 rounded-md border ${
-                setor === s ? "bg-torg-blue text-white border-torg-blue" : "border-gray-200 text-torg-gray hover:border-torg-blue-300 hover:text-torg-blue"}`}>
-              {s.charAt(0) + s.slice(1).toLowerCase()}
+            <button key={s.key} onClick={() => setSetor(s.key)}
+              className={`text-[11.5px] font-semibold px-2.5 py-1 rounded-md border ${
+                setor === s.key ? "bg-torg-blue text-white border-torg-blue" : "border-gray-200 text-torg-gray hover:border-torg-blue-300 hover:text-torg-blue"}`}>
+              {s.nome}
             </button>
           ))}
           <label className="ml-2 text-[11px] text-torg-gray inline-flex items-center gap-1.5">

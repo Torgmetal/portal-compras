@@ -9,6 +9,11 @@
 // ⚠ O setor filtra de verdade: `LiberacaoProducao.setores` é a lista do que desceu naquele lote
 // (["CORTE","MONTAGEM"]). Somar tudo misturaria a esteira do corte com a bancada da montagem, que
 // têm metas diferentes e nem sequer disputam a mesma máquina.
+//
+// ⚠⚠ CORTE E PREPARAÇÃO SÃO A MESMA COISA. Vitor (03/09/2026): "lembre-se, corte e preparação são
+// a mesma coisa — usar preparação como nome e unificar os dois". O banco tem os lotes gravados como
+// CORTE (é o que a tela de liberação sempre escreveu); o nome que a fábrica usa é preparação. Então
+// PREPARACAO aqui abrange os dois, e nenhum registro antigo precisa ser mexido.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -37,8 +42,10 @@ export async function GET(req) {
     take: 4000,
   });
 
-  const doSetor = setor
-    ? abertas.filter((l) => (Array.isArray(l.setores) ? l.setores : []).map(String).includes(setor))
+  const EQUIVALE = { PREPARACAO: ["PREPARACAO", "CORTE"], CORTE: ["PREPARACAO", "CORTE"] };
+  const aceita = EQUIVALE[setor] || (setor ? [setor] : null);
+  const doSetor = aceita
+    ? abertas.filter((l) => (Array.isArray(l.setores) ? l.setores : []).map(String).some((x) => aceita.includes(x)))
     : abertas;
   if (!doSetor.length) return NextResponse.json({ setor: setor || null, dias: [] });
 
