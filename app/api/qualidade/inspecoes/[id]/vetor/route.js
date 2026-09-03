@@ -38,7 +38,9 @@ export async function GET(req, { params }) {
   const bytes = await baixarDesenho(origem);
   if (!bytes) return NextResponse.json({ error: "Não consegui abrir o desenho no servidor." }, { status: 502 });
 
-  const v = await vetoresDaVista(bytes).catch(() => null);
+  // ⚠ RECORTE MANUAL VALE POR CIMA DO AUTOMÁTICO — mesma caixa que vai para o PDF final
+  // (gerarDimensionalPDF), para a marcação de cota nunca divergir do relatório impresso.
+  const v = await vetoresDaVista(bytes, { caixaManual: d.recorte || null }).catch(() => null);
   if (!v) return NextResponse.json({ error: "Não consegui ler a geometria deste desenho." }, { status: 422 });
 
   return NextResponse.json({ marca: d.marca, ...v });

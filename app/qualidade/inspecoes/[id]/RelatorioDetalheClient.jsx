@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, FileText, Lock, FolderOpen } from "lucide-react";
+import { Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, FileText, Lock, FolderOpen, Crop } from "lucide-react";
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
 import MarcadorCotas from "./MarcadorCotas";
+import RecorteDesenho from "./RecorteDesenho";
 import FormEVS from "./FormEVS";
 import FormUS from "./FormUS";
 import FormPintura from "./FormPintura";
@@ -35,6 +36,11 @@ export default function RelatorioDetalheClient({ id }) {
   const [marcaVista, setMarcaVista] = useState(null);
   // painel de escolha do projeto no servidor (pasta Montagem / Conjunto da Engenharia)
   const [escolhendo, setEscolhendo] = useState(false);
+  // ⚠⚠ RECORTE MANUAL. Vitor (03/09/2026): "quero poder colocar o projeto dentro do relatório e
+  // poder mover ele dentro para mostrar apenas o que eu selecionar" — troca o lugar da marcação de
+  // cotas por este painel enquanto ajusta, porque os dois disputam o mesmo espaço e mexem na mesma
+  // imagem (mudar o recorte com a marcação aberta ao lado só confundiria qual dos dois manda).
+  const [ajustandoRecorte, setAjustandoRecorte] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -159,6 +165,18 @@ export default function RelatorioDetalheClient({ id }) {
             )}
             <AnexarProjeto relatorioId={id} anexado={!!desenhos[0]?.anexado} travado={travado}
               onMudou={carregar} />
+            {/* ⚠⚠ RECORTE MANUAL. Vitor (03/09/2026): "quero poder colocar o projeto dentro do
+                relatório e poder mover ele dentro para mostrar apenas o que eu selecionar" — o
+                automático (recortarVista) erra em folha com várias vistas parecidas, como um
+                diagrama de montagem. Este botão troca o quadro de cotas por um seletor da folha
+                inteira, onde a pessoa arrasta o próprio retângulo. */}
+            {!travado && desenhos.length > 0 && (
+              <button onClick={() => setAjustandoRecorte((v) => !v)}
+                className={`text-[11px] font-semibold rounded-lg px-2 py-0.5 inline-flex items-center gap-1 ${
+                  ajustandoRecorte ? "bg-torg-orange text-white" : "text-torg-blue border border-torg-blue-200 hover:bg-torg-blue-50"}`}>
+                <Crop size={11} /> {ajustandoRecorte ? "marcar cotas" : "ajustar recorte"}
+              </button>
+            )}
           </div>
 
           {escolhendo && (
@@ -172,7 +190,15 @@ export default function RelatorioDetalheClient({ id }) {
               conjunto ou diagrama de montagem, escolha na pasta da obra.
             </p>
           )}
-          {desenhos.length > 0 && (
+          {desenhos.length > 0 && ajustandoRecorte && (
+            <RecorteDesenho
+              relatorioId={id}
+              marca={marcaAtual}
+              onSalvo={() => { setAjustandoRecorte(false); carregar(); }}
+              onCancelar={() => setAjustandoRecorte(false)}
+            />
+          )}
+          {desenhos.length > 0 && !ajustandoRecorte && (
           <MarcadorCotas
             relatorioId={id}
             marca={marcaAtual}
