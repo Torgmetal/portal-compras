@@ -39,14 +39,13 @@ const fmtDiaCurto = (d) => {
 };
 const somaKg = (a) => a.reduce((s, x) => s + (x.kg || 0), 0);
 
-export default function DescerDesenhos({ onDescer, ocupado }) {
+export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor }) {
   // ⚠⚠ AS ABAS DEPENDEM DO SETOR. Vitor (03/09/2026): "quando estamos na aba de planejamento não
   // precisa mostrar pronto para montar, pois aí que fica confuso; já quando aperto a tela da
   // montagem, aí sim você tem que mostrar uma aba onde está escrito falta descer vira falta
   // preparar, e o outro botão que hoje é pronto para montar você vai manter assim".
   const [aba, setAba] = useState("PROGRAMADO");
   const [nProntos, setNProntos] = useState(null);
-  const [setor, setSetor] = useState("PREPARACAO");
   const [d, setD] = useState(null);
   const [recarga, setRecarga] = useState(0);
   const [sel, setSel] = useState(() => new Set());
@@ -161,7 +160,7 @@ export default function DescerDesenhos({ onDescer, ocupado }) {
             sentido na montagem, e escondê-lo atrás da aba deixaria a pessoa sem como voltar. */}
         <div className="ml-auto flex items-center gap-1 pb-1.5">
           {SETORES.map((s) => (
-            <button key={s.key} onClick={() => setSetor(s.key)}
+            <button key={s.key} onClick={() => onSetor(s.key)}
               className={`text-[11.5px] font-semibold px-2.5 py-1 rounded-md border ${
                 setor === s.key ? "bg-torg-blue text-white border-torg-blue"
                   : "bg-white border-gray-200 text-torg-gray hover:border-torg-blue-300 hover:text-torg-blue"}`}>

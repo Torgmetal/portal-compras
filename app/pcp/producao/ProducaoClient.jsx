@@ -32,6 +32,7 @@ import LiberacaoMaterial from "./LiberacaoMaterial";
 import { baixarZipLote } from "@/lib/desenhos-zip-cliente";
 import DescerDesenhos from "./DescerDesenhos";
 import GanttBancadas from "./GanttBancadas";
+import KanbanPreparacao from "./KanbanPreparacao";
 import PainelBancadas from "@/app/producao/programacao/montagem/PainelBancadas";
 
 const MAX_LOTE = 80; // teto do /api/producao/desenhos/lote
@@ -146,6 +147,8 @@ export default function ProducaoClient() {
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
   const [verTodas, setVerTodas] = useState(false);
+  // ⚠ o setor mora AQUI porque manda em duas coisas: as abas do painel e o quadro de baixo.
+  const [setorPainel, setSetorPainel] = useState("PREPARACAO");
   const [materialAberto, setMaterialAberto] = useState(null); // liberação com o portão aberto
   const [erro, setErro] = useState("");
 
@@ -577,13 +580,14 @@ export default function ProducaoClient() {
       {/* ⚠⚠ A AÇÃO ANTES DA LISTA. Vitor (03/09/2026): "ela está perdida para conseguir descer os
           desenhos para os setores". O caminho normal deixa de depender de achar a peça numa tabela
           de centenas — a lista de obras continua abaixo, para o resto do trabalho. */}
-      <DescerDesenhos onDescer={descerDoPainel} ocupado={imprimindo} />
+      <DescerDesenhos onDescer={descerDoPainel} ocupado={imprimindo} setor={setorPainel} onSetor={setSetorPainel} />
 
-      {/* ⚠ BLOCO PRÓPRIO, LOGO ABAIXO DO PAINEL. Vitor (03/09/2026): "não acho que deve ficar em aba
-          própria, deixa na mesma aba que estamos no pcp/producao" — e "em uma parte da tela separada
-          para não ficar apertando botão e ficar uma zona". Quem programa precisa ver a agenda das
-          bancadas e o painel ao mesmo tempo. */}
-      <GanttBancadas />
+      {/* ⚠ BLOCO PRÓPRIO, LOGO ABAIXO DO PAINEL, E QUE SEGUE O SETOR. Vitor (03/09/2026): "não acho
+          que deve ficar em aba própria, deixa na mesma aba que estamos no pcp/producao" e "se eu
+          estou na aba de preparação você precisa mostrar o kanban de preparação; se estou na página
+          de montagem preciso que mostre a página de montagem". Quem programa vê o painel e o quadro
+          do seu setor ao mesmo tempo — sem trocar de tela e sem apertar botão. */}
+      {setorPainel === "MONTAGEM" ? <GanttBancadas /> : <KanbanPreparacao />}
 
       {loading ? (
         <div className="flex items-center justify-center py-20 gap-3 text-torg-gray"><Loader2 size={22} className="animate-spin" /> Carregando…</div>
