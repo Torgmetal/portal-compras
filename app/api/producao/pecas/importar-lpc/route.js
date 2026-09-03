@@ -101,6 +101,19 @@ export async function POST(req) {
   // Como a marca sobrevive e o id não, o conserto é traduzir: id velho → marca (antes de apagar),
   // marca → id novo (depois de recriar). Ver `remapearLiberacoes`, logo abaixo dos creates.
   const marcaDoIdApagado = new Map();
+  // ⚠⚠ QUEM JÁ EXISTIA, PARA SABER QUEM É NOVO. Vitor (03/09/2026): "o correto é apenas alertar as
+  // peças novas, não tirar tudo da programação; deixar em aberto para programar apenas as peças
+  // novas importadas".
+  //
+  // A programação das marcas ANTIGAS é preservada pelo remapeamento (id velho → marca → id novo),
+  // então reimportar não deve custar retrabalho. O que sobra sem programação é o que a revisão
+  // TROUXE — e isso ninguém tinha como saber: a lista voltava com 900 marcas e nada dizia quais
+  // eram as 12 novas. Guardando o retrato de antes, o import passa a dizer exatamente o que falta
+  // programar.
+  const marcasAntes = new Set(
+    (await prisma.pecaConjunto.findMany({ where: { opNumero, naLPC: true }, select: { marca: true } }))
+      .map((x) => x.marca),
+  );
   if (sobrescrever) {
     const aApagar = await prisma.pecaConjunto.findMany({
       where: { opNumero, naLPC: true, naLE: false },
@@ -324,7 +337,11 @@ export async function POST(req) {
   // reprogramar aquilo em vez de descobrir semanas depois que a peça não estava na fila de ninguém.
   //
   // ⚠ Só mexe em liberação LIBERADA/EM_PRODUCAO: cancelada é histórico e não se reescreve.
-  const remap = { liberacoes: 0, pecas: 0, perdidas: 0, marcasPerdidas: [] };
+  // ⚠ AS NOVAS DA REVISÃO — o que a lista trouxe e ainda não está na fila de ninguém. Só marca de
+  // FABRICAÇÃO conta: croqui e avulsa é o que desce para o corte; conjunto entra pela montagem.
+  const novasMarcas = [...pieceIds.keys()].filter((m) => !marcasAntes.has(m));
+  const remap = { liberacoes: 0, pecas: 0, perdidas: 0, marcasPerdidas: [],
+                  novas: novasMarcas.length, amostraNovas: novasMarcas.slice(0, 50) };
   if (sobrescrever && op && marcaDoIdApagado.size) {
     try {
       const libs = await prisma.liberacaoProducao.findMany({

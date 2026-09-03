@@ -206,6 +206,47 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
             {res.marcas != null && <span>Marcas: {fmt(res.marcas)}</span>}
             {res.pesoTotal != null && <span>Peso: {fmt(Math.round(res.pesoTotal))} kg</span>}
           </div>
+          {/* ⚠⚠ O QUE A REVISÃO TROUXE — e o que ela levou. Vitor (03/09/2026): "vamos perder
+              programação já feita e teríamos retrabalho; o correto é apenas alertar as peças novas,
+              não tirar tudo da programação; deixar em aberto para programar apenas as peças novas
+              importadas".
+              A programação das marcas antigas é preservada pelo importador (id velho → marca → id
+              novo). O que fica sem programação é só o que a revisão ACRESCENTOU — e isso ninguém
+              tinha como saber: a lista voltava com centenas de marcas e nada dizia quais eram as
+              novas. */}
+          {res.remap && (res.remap.novas > 0 || res.remap.pecas > 0 || res.remap.perdidas > 0) && (
+            <div className="mt-2.5 rounded-lg border border-sky-200 bg-sky-50/70 p-3 text-[12px] text-sky-900">
+              <p className="font-semibold flex items-start gap-1.5"><Info size={13} className="mt-0.5 flex-shrink-0" /> O que isto fez com a programação do PCP</p>
+              <ul className="mt-1.5 space-y-1">
+                {res.remap.pecas > 0 && (
+                  <li><b>{fmt(res.remap.pecas)}</b> peça(s) já programadas <b>continuam programadas</b> — a fila do PCP não se perdeu.</li>
+                )}
+                {res.remap.novas > 0 && (
+                  <li>
+                    <b>{fmt(res.remap.novas)}</b> marca(s) <b>novas</b> entraram e ainda <b>não estão programadas</b> — só elas precisam ser liberadas.
+                    {res.remap.amostraNovas?.length > 0 && (
+                      <span className="block font-mono text-[11px] text-sky-800 mt-0.5">
+                        {res.remap.amostraNovas.slice(0, 20).join(", ")}
+                        {res.remap.novas > 20 ? ` … e mais ${fmt(res.remap.novas - 20)}` : ""}
+                      </span>
+                    )}
+                  </li>
+                )}
+                {res.remap.perdidas > 0 && (
+                  <li className="text-amber-800">
+                    <b>{fmt(res.remap.perdidas)}</b> marca(s) que estavam programadas <b>saíram da lista</b> e foram tiradas da liberação.
+                    {res.remap.marcasPerdidas?.length > 0 && (
+                      <span className="block font-mono text-[11px] mt-0.5">
+                        {res.remap.marcasPerdidas.slice(0, 20).join(", ")}
+                        {res.remap.perdidas > 20 ? ` … e mais ${fmt(res.remap.perdidas - 20)}` : ""}
+                      </span>
+                    )}
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+
           {revArquivo && (
             revLabel
               ? <p className="mt-2 text-[12px] text-torg-gray">Revisão do arquivo: <b className="text-torg-dark">{revLabel}</b>. Reenviar a mesma revisão substitui o arquivo no servidor.</p>
