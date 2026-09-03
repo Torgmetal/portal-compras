@@ -4,7 +4,7 @@ import {
   Loader2, AlertCircle, ShieldCheck, CalendarRange, FileText, Award,
   BookCheck, Layers, Image as ImageIcon, ChevronRight, ChevronDown,
   Download, Package, ShoppingCart, Truck, Check, FileSpreadsheet, History,
-  FolderOpen, Box, MessageCircle,
+  FolderOpen, Box,
 } from "lucide-react";
 import { AREAS, SECOES, SECAO } from "@/lib/portal-cliente";
 import ModeloObraCliente from "./ModeloObraCliente";
@@ -108,7 +108,10 @@ export default function PortalClienteView({ token }) {
     // própria (e o modelo some sozinho se a obra não tiver IFC publicado). Ligou a seção, a aba
     // existe — senão a aba "Modelo 3D" nasceria escondida justamente na obra que acabou de ligá-la.
     MODELO_NAVEGAVEL: tem("MODELO_NAVEGAVEL"),
-    ASSISTENTE: tem("ASSISTENTE"),
+    // ⚠ o Torguinho NÃO é conteúdo de aba: ele flutua no canto da página inteira (ver
+    // TorguinhoCliente). Marcar como conteúdo faria a aba "Modelo 3D" existir só por causa dele,
+    // numa obra que nem publicou modelo.
+    ASSISTENTE: false,
   };
   const secoesDaArea = (a) => {
     const base = SECOES.filter((x) => x.area === a && conteudo[x.id]);
@@ -285,13 +288,6 @@ export default function PortalClienteView({ token }) {
         {/* ⚠ O MODELO VEM PRIMEIRO na Engenharia: é a obra inteira numa imagem, e é por ele que o
             cliente encontra a peça sobre a qual quer perguntar. Lista depois — quem já sabe a marca
             vai direto nela; quem não sabe, acha girando o modelo. */}
-        {mostrar("ASSISTENTE") && (
-          <Bloco icone={MessageCircle} titulo="Perguntar ao Torguinho"
-            sub="O assistente da Torg para esta obra — peso, etapa, expedição e rastreabilidade de cada peça.">
-            <TorguinhoCliente token={token} />
-          </Bloco>
-        )}
-
         {mostrar("MODELO_NAVEGAVEL") && (
           <Bloco icone={Box} titulo="Modelo 3D da obra"
             sub="Gire, aproxime e clique numa peça para ver marca, peso, etapa e rastreabilidade.">
@@ -531,6 +527,14 @@ export default function PortalClienteView({ token }) {
           </p>
         </div>
       </footer>
+
+      {/* ⚠⚠ O TORGUINHO FLUTUA, não ocupa seção. Vitor (03/09/2026): "e se ao invés de ficar um chat
+          bot vc só deixar a informação que o Torguinho pode ajudar eles e automaticamente ele
+          aparece lá embaixo para eles? não fica mais limpo?". Fica: o cliente entra no portal para
+          ver o modelo e os documentos, e um campo de conversa no meio disso pede atenção que ele não
+          quis dar. No canto, o Torguinho está sempre à mão e nunca no caminho — e vale na página
+          toda, não só na aba do modelo. */}
+      {tem("ASSISTENTE") && <TorguinhoCliente token={token} obra={op.obra || op.numero} />}
     </main>
   );
 }
