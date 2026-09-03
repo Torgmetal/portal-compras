@@ -5,7 +5,7 @@ import {
   Loader2, ArrowLeft, Camera, FileText, Check, Send, AlertCircle,
   ChevronRight, ExternalLink, Plus, X, ShieldCheck, Ruler, Trash2,
 } from "lucide-react";
-import { TIPO_LABEL, TIPOS_RELATORIO, usaCotas } from "@/lib/qualidade-campo";
+import { TIPO_LABEL, TIPOS_RELATORIO, usaCotas, pendenciasParaAssinatura } from "@/lib/qualidade-campo";
 
 /**
  * INSPEÇÕES — as fotos do celular viram relatório aqui, no computador.
@@ -754,11 +754,28 @@ function EnviarAssinatura({ relatorio, onFechar, onEnviado }) {
     } catch (e) { alert(e.message); } finally { setEnviando(false); }
   }
 
+  // ⚠⚠ AS PENDÊNCIAS APARECEM ANTES DO CLIQUE. Vitor (03/09/2026): "para os relatórios que não
+  // estiverem definidas todas as medidas mencionadas para conferência e o quantitativo você precisa
+  // bloquear para envio de assinatura". O servidor barra de qualquer jeito (é lá que a regra vale);
+  // aqui a tela DIZ o que falta, senão a pessoa preenche os destinatários e leva um erro no fim.
+  const pendencias = relatorio.envioAssinaturaId ? [] : pendenciasParaAssinatura(relatorio);
+
   return (
     <div className="mt-3 border-t border-gray-100 pt-3">
       <p className="text-[11px] font-semibold text-torg-gray mb-2 inline-flex items-center gap-1.5">
         <ShieldCheck size={13} className="text-torg-blue" /> Enviar para assinatura eletrônica
       </p>
+      {pendencias.length > 0 && (
+        <div className="mb-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <p className="text-[12px] font-semibold text-amber-900">Ainda não pode ir para assinatura:</p>
+          <ul className="mt-1 space-y-0.5">
+            {pendencias.map((p, i) => (
+              <li key={i} className="text-[11.5px] text-amber-800">• {p}</li>
+            ))}
+          </ul>
+          <p className="text-[11px] text-amber-700 mt-1">Abra o relatório para completar.</p>
+        </div>
+      )}
       <div className="space-y-2">
         {linhas.map((l, i) => (
           <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1.4fr_auto_auto_auto] gap-2 items-center">
@@ -788,7 +805,7 @@ function EnviarAssinatura({ relatorio, onFechar, onEnviado }) {
           className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={11} /> outro destinatário</button>
         <div className="flex items-center gap-2">
           <button onClick={onFechar} className="text-[12px] text-torg-gray px-2 py-1">Fechar</button>
-          <button onClick={enviar} disabled={enviando}
+          <button onClick={enviar} disabled={enviando || pendencias.length > 0}
             className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-50">
             {enviando ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Enviar
           </button>

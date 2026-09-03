@@ -15,7 +15,7 @@ import { requireRole } from "@/lib/session";
 import { gerarTokenForte } from "@/lib/token";
 import { gerarPDFdoRelatorio } from "@/lib/relatorio-render";
 import { vincularNoDataBook } from "@/lib/relatorio-inspecao";
-import { TIPO_LABEL } from "@/lib/qualidade-campo";
+import { TIPO_LABEL, pendenciasParaAssinatura } from "@/lib/qualidade-campo";
 import { sendEmail } from "@/lib/email";
 import { cabecalhoEmail } from "@/lib/email-layout";
 import { baseUrlDe } from "@/lib/databook-assinaturas";
@@ -55,6 +55,28 @@ export async function POST(req, { params }) {
   const assinantes = dest.filter((d) => d.assina);
   const copias = dest.filter((d) => !d.assina);
   if (!assinantes.length) return NextResponse.json({ error: "Marque ao menos uma pessoa como ASSINANTE — só com cópias o documento nunca é assinado." }, { status: 400 });
+
+  // ⚠⚠ NÃO MANDA ASSINAR RELATÓRIO PELA METADE. Vitor (03/09/2026): "para os relatórios que não
+  // estiverem definidas todas as medidas mencionadas para conferência e o quantitativo você precisa
+  // bloquear para envio de assinatura".
+  //
+  // Enviar é FECHAR: o relatório vira somente leitura e entra no data book. Com a coluna "Dimensão
+  // Encontrada" em branco, o que se pede é que alguém assine uma conferência que não foi feita.
+  //
+  // ⚠ A trava é no SERVIDOR, não só no botão: o mesmo POST é alcançável por outro caminho, e uma
+  // regra que só existe na tela é uma regra que um dia não vale.
+  //
+  // ⚠ Só barra no PRIMEIRO envio (`!rel.envioAssinaturaId`). Reenviar para quem ainda não assinou é
+  // outro ato — ali o documento já está fechado e não há mais o que preencher.
+  if (!rel.envioAssinaturaId) {
+    const faltam = pendenciasParaAssinatura(rel);
+    if (faltam.length) {
+      return NextResponse.json({
+        error: `O relatório ainda não pode ir para assinatura:\n\n• ${faltam.join("\n• ")}`,
+        pendencias: faltam,
+      }, { status: 409 });
+    }
+  }
 
   // ⚠ Reenviar não recomeça: se já existe envio, o link de quem ainda não assinou continua valendo
   // e só entram os destinatários novos. Recriar o envio invalidaria assinatura já colhida.
