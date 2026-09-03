@@ -26,13 +26,31 @@ function AvisoListas({ opNumero, secoes }) {
     secoes.includes("LPC") && !d.lpc && "LPC",
     secoes.includes("LE") && !d.le && "Lista de Expedição",
   ].filter(Boolean);
-  if (!faltando.length) return null;
+  // ⚠⚠ CERTIFICADO QUE O CLIENTE NÃO CONSEGUE BAIXAR. Vitor (03/09/2026), sobre o portal do Davi:
+  // "ele não está conseguindo acessar os certificados para fazer o download". A linha do CMR existe
+  // (material, corrida, número), mas o PDF nunca foi casado — e no portal isso não dá erro nenhum:
+  // a linha aparece e o botão de baixar simplesmente não é desenhado. Sem este aviso, só o cliente
+  // descobre.
+  const semArq = secoes.includes("CERTIFICADOS") ? (d.certsSemArquivo || 0) : 0;
+  if (!faltando.length && !semArq) return null;
   return (
-    <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
-      <b>{faltando.join(" e ")} sem itens importados nesta obra.</b> A seção não vai aparecer no
-      portal — o cliente receberia uma planilha em branco. Peça à Engenharia para importar a lista;
-      publicar o arquivo da pasta no lugar entrega o peso item a item.
-    </p>
+    <div className="space-y-2">
+      {faltando.length > 0 && (
+        <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
+          <b>{faltando.join(" e ")} sem itens importados nesta obra.</b> A seção não vai aparecer no
+          portal — o cliente receberia uma planilha em branco. Peça à Engenharia para importar a lista;
+          publicar o arquivo da pasta no lugar entrega o peso item a item.
+        </p>
+      )}
+      {semArq > 0 && (
+        <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
+          <b>{semArq} de {d.certs} certificados sem o PDF vinculado.</b> Eles aparecem na lista do
+          cliente — com material, corrida e número —, mas <b>sem botão de baixar</b>: o portal não
+          tem arquivo para entregar. A linha vem do CMR; o PDF é casado no Recebimento/Controle de
+          Documentos. Enquanto não casar, o cliente vê o certificado existir e não consegue pegá-lo.
+        </p>
+      )}
+    </div>
   );
 }
 

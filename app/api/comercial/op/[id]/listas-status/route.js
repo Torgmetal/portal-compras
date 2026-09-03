@@ -26,9 +26,24 @@ export async function GET(req, { params }) {
   // peças importadas e a seção funcionando no portal. Aviso que mente sobre um dado correto é pior
   // que aviso nenhum: manda procurar problema onde não há, e a saída "óbvia" é publicar o xlsx cru
   // da pasta — que é exatamente o que este aviso existe para evitar.
-  const [lpc, le] = await Promise.all([
+  // ⚠⚠ CERTIFICADO LISTADO SEM ARQUIVO ATRÁS. Vitor (03/09/2026), sobre o portal do Davi (OP-089):
+  // "ele não está conseguindo acessar os certificados para fazer o download".
+  //
+  // Medido em 03/09/2026: a OP-089 lista 41 certificados e 19 não têm PDF nenhum vinculado — e não
+  // era só ela (114, 094, 113 e 112 estavam em 100%). A linha vem do CMR (importação de planilha),
+  // que traz material, corrida e número do certificado; o PDF é casado depois, e o que não casou
+  // fica sem arquivo. No portal isso não dá erro: a linha aparece e o botão de baixar simplesmente
+  // não é desenhado — o cliente vê o certificado existir e não consegue pegá-lo.
+  //
+  // ⚠ O AVISO É INTERNO, de propósito. No portal a regra é não declarar furo nosso (a linha fica
+  // sem botão e pronto); aqui, na tela de quem publica, o número tem de aparecer antes do envio.
+  const [lpc, le, certs, certsSemArquivo] = await Promise.all([
     prisma.pecaConjunto.count({ where: { opId: op.id, fonte: "LPC_IMPORT" } }),
     prisma.pecaConjunto.count({ where: { opId: op.id, fonte: "LE_IMPORT" } }),
+    prisma.documentoQualidade.count({ where: { opNumero: num, ativo: true, categoria: "MATERIAL" } }),
+    prisma.documentoQualidade.count({
+      where: { opNumero: num, ativo: true, categoria: "MATERIAL", sharepointItemId: null, arquivoUrl: null },
+    }),
   ]);
-  return NextResponse.json({ lpc, le });
+  return NextResponse.json({ lpc, le, certs, certsSemArquivo });
 }
