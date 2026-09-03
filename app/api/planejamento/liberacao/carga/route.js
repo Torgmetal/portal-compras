@@ -127,6 +127,92 @@ export async function POST(req) {
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const body = await req.json().catch(() => ({}));
+
+  // ── TIRAR UM LOTE DO DIA ─────────────────────────────────────────────────────────────────────
+  //
+  // Vitor (03/09/2026), sobre os dois lotes de montagem da OP-105 em 04/09: "pode tirar do dia
+  // 04/09 pois foi um teste, nem começamos nada dela na montagem, apenas na preparação".
+  //
+  // ⚠⚠ CANCELAR A LIBERAÇÃO NÃO BASTA — e é aqui que estava a armadilha. A liberação para a
+  // montagem muda o STATUS da peça (CORTE → MONTAGEM) e grava bancada e dia. Cancelando só o lote,
+  // as peças ficariam paradas em "MONTAGEM": a rota que libera para a montagem só pega peça em
+  // CORTE (`status: statusDe`), então elas seriam PULADAS na hora de redistribuir — some do dia
+  // errado e não aparece no dia certo.
+  //
+  // ⚠ SÓ O QUE NÃO COMEÇOU. Se o Syneco já lançou produção na peça, ela não volta: o registro do
+  // chão de fábrica manda, e desfazer programação de peça que já está sendo feita é inventar uma
+  // história diferente da que aconteceu.
+  if (body?.acao === "cancelarLote") {
+    const id = String(body?.id || "");
+    if (!id) return NextResponse.json({ error: "Informe o lote." }, { status: 400 });
+
+    const lote = await prisma.liberacaoProducao.findUnique({
+      where: { id },
+      select: { id: true, opNumero: true, frente: true, setores: true, pecaIds: true, status: true, dataProgramada: true },
+    });
+    if (!lote) return NextResponse.json({ error: "Lote não encontrado." }, { status: 404 });
+    if (!["LIBERADA", "EM_PRODUCAO"].includes(lote.status)) {
+      return NextResponse.json({ error: "Este lote já não está aberto." }, { status: 409 });
+    }
+
+    const pecaIds = (Array.isArray(lote.pecaIds) ? lote.pecaIds : []).map(String);
+    const ehMontagem = (Array.isArray(lote.setores) ? lote.setores : []).map(String).includes("MONTAGEM");
+
+    let revertidas = 0, comProducao = 0;
+    if (ehMontagem && pecaIds.length) {
+      const pecas = await prisma.pecaConjunto.findMany({
+        where: { id: { in: pecaIds }, status: "MONTAGEM" },
+        select: { id: true, marca: true },
+      });
+      // ⚠ o apontamento é por MARCA (é assim que o Syneco casa) — ver lib/conjuntos-setor
+      const marcas = [...new Set(pecas.map((p) => p.marca).filter(Boolean))];
+      const ordens = marcas.length
+        ? await prisma.mesOrdem.findMany({
+            where: { item: { in: marcas }, setor: { in: ["Montagem", "Solda"] } },
+            select: { item: true, produzidoUn: true },
+          })
+        : [];
+      const iniciadas = new Set(ordens.filter((o) => (o.produzidoUn || 0) > 0).map((o) => o.item));
+      const podem = pecas.filter((p) => !iniciadas.has(p.marca)).map((p) => p.id);
+      comProducao = pecas.length - podem.length;
+
+      if (podem.length) {
+        // mesma limpeza do "Reverter para Corte" (ver /api/producao/pecas/liberar-montagem)
+        await prisma.pecaConjunto.updateMany({
+          where: { id: { in: podem } },
+          data: {
+            status: "CORTE", ultimoSetor: "Corte",
+            montagemBancada: null, montagemBancadaEm: null, montagemDiaProgramado: null,
+          },
+        });
+        revertidas = podem.length;
+      }
+    }
+
+    await prisma.liberacaoProducao.update({
+      where: { id },
+      data: {
+        status: "CANCELADA", canceladaEm: new Date(),
+        canceladaMotivo: String(body?.motivo || "").trim() || "Tirado do dia pelo painel da carga.",
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user?.id || null, action: "CANCELAR_LIBERACAO_PRODUCAO",
+        entity: "LiberacaoProducao", entityId: id,
+        diff: {
+          op: lote.opNumero, frente: lote.frente, setores: lote.setores,
+          dia: lote.dataProgramada ? lote.dataProgramada.toISOString().slice(0, 10) : null,
+          pecas: pecaIds.length, revertidas, comProducao,
+          motivo: String(body?.motivo || "").trim() || null,
+        },
+      },
+    }).catch(() => {});
+
+    return NextResponse.json({ ok: true, revertidas, comProducao, pecas: pecaIds.length });
+  }
+
   if (body?.acao !== "limparOrfaos") return NextResponse.json({ error: "Ação desconhecida." }, { status: 400 });
 
   const abertas = await prisma.liberacaoProducao.findMany({

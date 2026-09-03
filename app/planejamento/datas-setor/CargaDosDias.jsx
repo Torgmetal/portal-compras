@@ -42,6 +42,7 @@ export default function CargaDosDias({ opId, recarga }) {
   // perde o registro de quem liberou e quando.
   const [aberto, setAberto] = useState(null);   // dia expandido
   const [movendo, setMovendo] = useState(null); // id do lote em gravação
+  const [tirando, setTirando] = useState(null); // id do lote sendo cancelado
 
   useEffect(() => {
     let vivo = true;
@@ -98,6 +99,38 @@ export default function CargaDosDias({ opId, recarga }) {
       if (!r.ok) throw new Error(j.error || "Não consegui remarcar.");
       setRecarregou((v) => v + 1);
     } catch (e) { alert(e.message); } finally { setMovendo(null); }
+  }
+
+  /**
+   * Tira o lote do dia de vez — o lançamento que não devia ter acontecido.
+   *
+   * ⚠ Não é o mesmo que remarcar: remarcar move trabalho real para outro dia; isto CANCELA o lote.
+   * Vitor (03/09/2026), sobre os dois lotes de montagem da OP-105: "foi um teste, nem começamos
+   * nada dela na montagem".
+   *
+   * ⚠ E as peças voltam para o corte junto (só as que não têm produção lançada) — senão ficariam
+   * paradas em "MONTAGEM" e a rota que redistribui, que só pega peça em CORTE, as pularia.
+   */
+  async function tirarLote(lote, dia) {
+    if (!confirm(
+      `Tirar ${lote.obra}${lote.frente ? ` · ${lote.frente}` : ""} do dia ${fmtD(dia)}?\n\n` +
+      `São ${fmtN(lote.pecas)} peça(s) · ${fmtKg(lote.kg)}.\n\n` +
+      "O lote é CANCELADO (não remarcado) e as peças que ainda não começaram voltam para o corte, " +
+      "prontas para serem liberadas de novo. Peça com produção lançada no Syneco não é mexida."
+    )) return;
+    setTirando(lote.id);
+    try {
+      const r = await fetch("/api/planejamento/liberacao/carga", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "cancelarLote", id: lote.id }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Não consegui tirar o lote.");
+      if (j.comProducao > 0) {
+        alert(`${j.comProducao} peça(s) já têm produção lançada e ficaram como estavam. As outras ${j.revertidas} voltaram para o corte.`);
+      }
+      setRecarregou((v) => v + 1);
+    } catch (e) { alert(e.message); } finally { setTirando(null); }
   }
 
   const todosDias = carga?.dias || [];
@@ -211,6 +244,14 @@ export default function CargaDosDias({ opId, recarga }) {
                                 onChange={(e) => moverLote(lo, e.target.value)}
                                 className="border border-gray-200 rounded-md px-2 py-1 text-[11.5px] outline-none focus:border-torg-blue disabled:opacity-50" />
                               {movendo === lo.id && <Loader2 size={12} className="animate-spin text-torg-blue" />}
+                              {/* ⚠ separado do "mover": remarcar é trabalho real que muda de dia;
+                                  tirar é lançamento que não devia existir. Confundir os dois faz
+                                  alguém cancelar carga de verdade achando que só mudou a data. */}
+                              <button onClick={() => tirarLote(lo, x.dia)} disabled={tirando === lo.id}
+                                title="cancelar este lote e devolver as peças ao corte"
+                                className="text-[11px] font-semibold text-torg-gray hover:text-red-700 border border-gray-200 hover:border-red-200 rounded-md px-2 py-1 disabled:opacity-50 inline-flex items-center gap-1">
+                                {tirando === lo.id && <Loader2 size={11} className="animate-spin" />} tirar do dia
+                              </button>
                             </div>
                           ))}
                         </div>
