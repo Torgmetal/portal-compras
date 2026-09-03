@@ -30,6 +30,7 @@ import LiberacaoMaterial from "./LiberacaoMaterial";
 // ⚠ o download do ZIP vem da lib (era a TERCEIRA cópia da mesma função neste repositório); ela
 // suporta a pasta por bancada, que a cópia local não tinha.
 import { baixarZipLote } from "@/lib/desenhos-zip-cliente";
+import DescerDesenhos from "./DescerDesenhos";
 import PainelBancadas from "@/app/producao/programacao/montagem/PainelBancadas";
 
 const MAX_LOTE = 80; // teto do /api/producao/desenhos/lote
@@ -426,6 +427,63 @@ export default function ProducaoClient() {
     }
   }
 
+  /**
+   * DESCER OS DESENHOS DE UMA OBRA pelo painel do topo.
+   *
+   * ⚠ MESMO POST do botão "Imprimir e liberar" (`/api/producao/desenhos/lote`, acao IMPRIMIR): é o
+   * mesmo ato — o que muda é só quem escolheu as marcas. Um segundo caminho de gravação daria duas
+   * regras de GRD para consertar quando algo mudasse.
+   *
+   * ⚠ RESPEITA O TETO DO LOTE. A rota tem limite por chamada; o painel fatia e emenda os avisos,
+   * em vez de recusar e mandar a pessoa dividir na mão — ela não escolheu marca nenhuma, escolheu
+   * "descer o que está pronto".
+   */
+  async function descerDoPainel({ opNumero, setor, marcas }) {
+    if (!marcas?.length) return;
+    // ⚠ O BANCO GRAVA "CORTE"; a fábrica fala "preparação". O painel usa o nome da fábrica, mas o
+    // que vai para a GRD tem de ser a mesma chave que o resto do portal escreve — senão a mesma
+    // liberação aparece com dois setores diferentes no histórico.
+    const setorChave = setor === "PREPARACAO" ? "CORTE" : setor;
+    if (!confirm(`Descer ${marcas.length} desenho(s) da ${fmtOP(opNumero)} para a ${SETOR_LABEL[setorChave] || setorChave}?\n\n`
+      + "Cada um sai carimbado com a rastreabilidade e a GRD fica registrada. Pode levar alguns minutos.")) return;
+    setImprimindo(true); setAviso(null);
+    const blocos = [];
+    for (let i = 0; i < marcas.length; i += MAX_LOTE) blocos.push(marcas.slice(i, i + MAX_LOTE));
+    let emitidas = 0; const semDesenho = []; const erros = [];
+    try {
+      for (const bloco of blocos) {
+        const r = await fetch("/api/producao/desenhos/lote", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ opNumero, marcas: bloco, setor: setorChave, acao: "IMPRIMIR" }),
+        });
+        const j = await r.json();
+        if (!r.ok) { erros.push(j.error || "erro ao emitir"); continue; }
+        emitidas += Number(j.emitidas) || 0;
+        if (j.semDesenho?.length) semDesenho.push(...j.semDesenho);
+        // ⚠ baixa bloco a bloco: segurar tudo para juntar num ZIP só guardaria dezenas de MB na
+        // memória do navegador, e a GRD do bloco JÁ está gravada — o arquivo não pode ficar preso.
+        if (Number(j.emitidas) > 0) {
+          try { await baixarZipLote(j, opNumero); } catch (e) { erros.push(`download: ${e?.message || "falhou"}`); }
+        }
+      }
+      // ⚠ ZERO EMITIDAS NÃO É SUCESSO — mesma armadilha do botão da tabela (Vitor, 24/08/2026:
+      // "estou tentando imprimir os projetos mas não está indo", com a tela dizendo que foi).
+      if (!emitidas) {
+        setAviso({ ok: false, texto: `Nenhum desenho foi encontrado para as ${marcas.length} marca(s), então nada desceu.`
+          + (semDesenho.length ? ` Sem desenho na pasta: ${semDesenho.slice(0, 8).join(", ")}${semDesenho.length > 8 ? ` e mais ${semDesenho.length - 8}` : ""}.` : "")
+          + " Confira se os PDFs estão em 2. Engenharia › 2.5 Projetos › 2.5.2 Fabricação." });
+        return;
+      }
+      setAviso({ ok: !erros.length,
+        texto: `${emitidas} desenho(s) desceram para a ${SETOR_LABEL[setorChave] || setorChave} na ${fmtOP(opNumero)}.`
+          + (semDesenho.length ? ` ${semDesenho.length} sem desenho na pasta.` : "")
+          + (erros.length ? ` Com pendências: ${erros.slice(0, 3).join(" · ")}` : "") });
+      if (aberta) await carregarDetalhe(aberta, setorAba);
+      carregar();
+    } catch (e) { setAviso({ ok: false, texto: e.message }); }
+    finally { setImprimindo(false); }
+  }
+
   async function exportar() {
     if (!detalhe) return;
     const lista = pecas;
@@ -511,6 +569,11 @@ export default function ProducaoClient() {
           <button onClick={() => setAviso(null)} className="text-xs underline shrink-0">fechar</button>
         </div>
       )}
+
+      {/* ⚠⚠ A AÇÃO ANTES DA LISTA. Vitor (03/09/2026): "ela está perdida para conseguir descer os
+          desenhos para os setores". O caminho normal deixa de depender de achar a peça numa tabela
+          de centenas — a lista de obras continua abaixo, para o resto do trabalho. */}
+      <DescerDesenhos onDescer={descerDoPainel} ocupado={imprimindo} />
 
       {loading ? (
         <div className="flex items-center justify-center py-20 gap-3 text-torg-gray"><Loader2 size={22} className="animate-spin" /> Carregando…</div>
