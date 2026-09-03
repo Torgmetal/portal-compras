@@ -353,6 +353,9 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
             await pausa();
           }
           const { eid, geoId, cor: c, m } = brutos[b];
+          // ⚠ solta a referência assim que usa: são 13.874 entradas, e segurar todas até o fim
+          // soma um pico de memória bem no momento em que ela está mais disputada.
+          brutos[b] = null;
           const marca = marcaDe.get(eid) || null;
           const asm = asmDe.get(eid) ?? null;
           const parafuso = parafusoDe.get(eid) || null;
@@ -408,6 +411,17 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         const arestasCruas = [];
         const porItem = new Map();
         const semCor = tonsVistos.size <= 1;
+        // ⚠⚠ OBRA GRANDE NÃO LEVA CONTORNO. Vitor (03/09/2026): "continua branco e a página sai do
+        // ar". A malha de arestas é o que mais pesa: para cada grupo o motor percorre todos os
+        // triângulos procurando quinas, e o resultado é outra geometria do tamanho da primeira. Numa
+        // passarela de 2.950 peças isso é barato e o desenho fica lindo; na caldeira da OP-118, com
+        // 13.874 peças e 3.032 conjuntos, é o dobro de tudo em memória — e é aí que a aba morre.
+        //
+        // Acima do limite a obra abre sem contorno: perde um pouco de definição entre peças
+        // encostadas e ABRE, que é o que importa. O limite é de geometrias, não de megabytes: é o
+        // número que manda no custo.
+        const TETO_ARESTAS = 6000;
+        const comArestas = n <= TETO_ARESTAS;
         // ⚠ a junção é a segunda parte cara: mesclar geometrias e extrair as arestas de 3.000 grupos
         // leva segundos. Mesmo respiro, mesma barra andando.
         let feitos = 0;
@@ -461,8 +475,10 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
           // ⚠ COLETA AGORA, DESENHA NUMA MALHA SÓ DEPOIS. Uma LineSegments por conjunto seriam ~600
           // chamadas de desenho a mais — junto com as 600 dos sólidos, é isso que faz o giro
           // engasgar. Aresta não precisa de identidade própria: ela não é clicável nem pintada.
-          try { arestasCruas.push(new THREE.EdgesGeometry(junta, 25)); }
-          catch { /* peça sem geometria de aresta: segue sem contorno */ }
+          if (comArestas) {
+            try { arestasCruas.push(new THREE.EdgesGeometry(junta, 25)); }
+            catch { /* peça sem geometria de aresta: segue sem contorno */ }
+          }
           gs.forEach((g2) => { if (g2 !== junta) g2.dispose(); });
         }
         // uma única malha de arestas para a obra inteira
