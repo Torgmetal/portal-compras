@@ -21,6 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2, CalendarCheck, Printer } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import { baixarZipLote } from "@/lib/desenhos-zip-cliente";
+import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import {
   repartirPorBancada, distribuirEmDias, resumoDoLote, custoDoConjunto, RITMO_META,
 } from "@/lib/montagem-capacidade";
@@ -53,6 +54,7 @@ export default function ProntoParaMontar({ onProgramado }) {
   const [inicio, setInicio] = useState(proximoUtil);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [aberta, setAberta] = useState(null);
 
   useEffect(() => {
     let vivo = true;
@@ -66,6 +68,14 @@ export default function ProntoParaMontar({ onProgramado }) {
   }, []);
 
   const conjuntos = lista || [];
+  // ⚠ o filtro é só para ENXERGAR: quem entra na conta continua sendo o que está MARCADO. Marcar,
+  // filtrar por outra obra e ver o prazo mudar sozinho seria uma armadilha.
+  const COLS = useMemo(() => [
+    { key: "op", label: "OP", valor: (c) => fmtOP(c.opNumero) },
+    { key: "marca", label: "marca", valor: (c) => c.marca || "" },
+  ], []);
+  const { filtros, setFiltros, filtradas: vis, opcoesDaColuna, ativos, limpar } = useFiltroColunas(conjuntos, COLS);
+  const cab = { filtros, setFiltros, opcoesDaColuna, aberta, setAberta };
   const escolhidos = useMemo(() => conjuntos.filter((c) => sel.has(c.id)), [conjuntos, sel]);
   const distrib = useMemo(() => repartirPorBancada(escolhidos, n, { curva: RITMO_META }), [escolhidos, n]);
   const porDia = useMemo(
@@ -80,7 +90,7 @@ export default function ProntoParaMontar({ onProgramado }) {
   const fecha = diasUsados[diasUsados.length - 1] || null;
 
   const alternar = (id) => setSel((p) => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; });
-  const todos = conjuntos.length > 0 && sel.size === conjuntos.length;
+  const todos = vis.length > 0 && vis.every((c) => sel.has(c.id));
 
   // ⚠⚠ PROGRAMAR E IMPRIMIR SÃO DOIS ATOS, e o botão de cada um diz qual é. Vitor (03/09/2026):
   // "aí sim, depois de tudo isso, você deixar imprimir os projetos, as listas de bancadas com as
@@ -164,6 +174,7 @@ export default function ProntoParaMontar({ onProgramado }) {
     <div className="px-4 pt-3 pb-3">
       <p className="text-[12.5px] text-torg-gray mb-3">
         Conjuntos que a <b className="text-torg-dark">preparação já terminou</b> — todos os croquis cortados — e que ainda não têm dia de montagem.
+        {ativos > 0 && <button onClick={limpar} className="ml-2 text-[11px] text-torg-blue hover:underline">limpar filtro</button>}
       </p>
 
       <div className="border border-gray-100 rounded-lg overflow-auto max-h-[340px] mb-3">
@@ -171,11 +182,11 @@ export default function ProntoParaMontar({ onProgramado }) {
           <thead className="bg-gray-50 text-torg-gray-light sticky top-0">
             <tr className="text-left">
               <th className="px-3 py-2 w-8">
-                <input type="checkbox" checked={todos} onChange={() => setSel(todos ? new Set() : new Set(conjuntos.map((c) => c.id)))}
+                <input type="checkbox" checked={todos} onChange={() => setSel(todos ? new Set() : new Set(vis.map((c) => c.id)))}
                   className="rounded border-gray-300" />
               </th>
-              <th className="py-2 font-semibold w-[80px]">OP</th>
-              <th className="py-2 font-semibold w-[110px]">marca</th>
+              <ThFiltro col="op" label="OP" larg="w-[86px]" className="py-2 font-semibold" {...cab} />
+              <ThFiltro col="marca" label="marca" larg="w-[116px]" className="py-2 font-semibold" {...cab} />
               <th className="py-2 font-semibold">descrição</th>
               <th className="py-2 font-semibold text-right w-[56px]">peças</th>
               <th className="py-2 font-semibold text-right w-[76px]">kg</th>
@@ -183,7 +194,7 @@ export default function ProntoParaMontar({ onProgramado }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {conjuntos.map((c) => (
+            {vis.map((c) => (
               <tr key={c.id} onClick={() => alternar(c.id)}
                 className={`cursor-pointer ${sel.has(c.id) ? "bg-torg-blue/5" : "hover:bg-gray-50/70"}`}>
                 <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>

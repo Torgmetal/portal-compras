@@ -1,14 +1,16 @@
-// GET /api/pcp/descer?setor=PREPARACAO|MONTAGEM&dia=YYYY-MM-DD
-//   → o que está PROGRAMADO para aquele dia, e o que dá para descer de fato.
+// GET  /api/pcp/descer?setor=PREPARACAO|MONTAGEM
+//   → TUDO o que o Planejamento programou para o setor, com o dia de cada item.
+// POST /api/pcp/descer  { setor, ids[], motivo }
+//   → tira da programação o que entrou errado.
 //
 // Vitor (03/09/2026), sobre a Larissa: "ela está perdida para conseguir descer os desenhos para os
 // setores" — e, sobre a primeira versão desta rota: "não ficou nada bom, ficou pior do que antes;
 // eu não faço nem ideia de como está a programação".
 //
-// ⚠⚠ O DIA É O ASSUNTO, NÃO O ESTOQUE. A primeira versão listava tudo que faltava descer, por obra,
-// sem dia nenhum: virou um inventário de 1.195 itens que não responde "o que é para hoje". Quem
-// abre o PCP de manhã tem UMA pergunta — o que está programado para hoje e o que dá para soltar —
-// e é essa que a rota responde.
+// ⚠⚠ SÓ O QUE FOI PROGRAMADO — mas de TODOS os dias, não de um só. A primeira versão listava o
+// estoque inteiro sem dia nenhum (inventário de 1.195 itens); a segunda prendeu tudo a um dia e
+// setas de navegação. Vitor (03/09/2026): "vamos tirar essa seleção de data, traga os filtros tipo
+// excel para as abas" — o dia virou COLUNA, e quem quer o dia de hoje filtra por ele.
 //
 // ⚠ DE ONDE VEM A PROGRAMAÇÃO, por setor (não é a mesma coisa):
 //   PREPARAÇÃO → a data do LOTE liberado (`LiberacaoProducao.dataProgramada`), que é como o
@@ -42,15 +44,9 @@ export async function GET(req) {
   const setor = String(url.searchParams.get("setor") || "PREPARACAO").toUpperCase();
   if (!["PREPARACAO", "MONTAGEM"].includes(setor)) return NextResponse.json({ error: "Setor inválido." }, { status: 400 });
   const ehMontagem = setor === "MONTAGEM";
-  const dia = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get("dia") || "")
-    ? url.searchParams.get("dia")
-    : new Date().toISOString().slice(0, 10);
 
-  // ── quais peças estão programadas para este dia ──────────────────────────────────────────────
+  // ── quais peças estão programadas ────────────────────────────────────────────────────────────
   let pecas = [];
-  // ⚠ os dias QUE TÊM ALGO — a tela usa para as setas andarem só onde há trabalho, em vez de a
-  // pessoa clicar dia a dia num calendário vazio.
-  let diasComAlgo = [];
 
   if (ehMontagem) {
     // ⚠ CONJUNTO DA LPC (ver CONJUNTO_MONTAVEL — a LE não é produção).
@@ -65,40 +61,41 @@ export async function GET(req) {
       },
       take: 4000,
     });
-    diasComAlgo = [...new Set(todos.map((p) => iso(p.montagemDiaProgramado)).filter(Boolean))].sort();
-    pecas = todos.filter((p) => iso(p.montagemDiaProgramado) === dia)
-      .map((p) => ({ ...p, bancada: p.montagemBancada || null }));
+    pecas = todos.map((p) => ({ ...p, dia: iso(p.montagemDiaProgramado), bancada: p.montagemBancada || null }));
   } else {
     // ⚠ NA PREPARAÇÃO QUEM CARREGA A DATA É O LOTE, não a peça: é assim que o Planejamento programa
     // o corte (ver /api/planejamento/liberacao).
     const lotes = await prisma.liberacaoProducao.findMany({
       where: { status: { in: ["LIBERADA", "EM_PRODUCAO"] } },
-      select: { pecaIds: true, dataProgramada: true, setores: true },
+      select: { id: true, frente: true, pecaIds: true, dataProgramada: true, setores: true },
       take: 4000,
     });
     // ⚠ CORTE E PREPARAÇÃO SÃO A MESMA COISA (Vitor, 03/09/2026): o banco grava CORTE, a fábrica
     // fala preparação.
     const doSetor = lotes.filter((l) => (Array.isArray(l.setores) ? l.setores : []).some((s) => s === "CORTE" || s === "PREPARACAO"));
-    const diaDaPeca = new Map();
+    const daPeca = new Map();
     for (const l of doSetor) {
       const d = iso(l.dataProgramada);
-      for (const id of (Array.isArray(l.pecaIds) ? l.pecaIds : [])) if (!diaDaPeca.has(id)) diaDaPeca.set(id, d);
+      for (const id of (Array.isArray(l.pecaIds) ? l.pecaIds : [])) {
+        if (!daPeca.has(id)) daPeca.set(id, { dia: d, loteId: l.id, frente: l.frente || null });
+      }
     }
-    diasComAlgo = [...new Set([...diaDaPeca.values()].filter(Boolean))].sort();
-    const ids = [...diaDaPeca.entries()].filter(([, d]) => d === dia).map(([id]) => id);
-    pecas = ids.length
+    const ids = [...daPeca.keys()];
+    const achadas = ids.length
       ? await prisma.pecaConjunto.findMany({
           where: { id: { in: ids }, ...SO_FABRICACAO, NOT: { tipoPeca: "CONJUNTO" } },
           select: {
             id: true, marca: true, descricao: true, qte: true, pesoTotalKg: true, opId: true,
             statusEstoque: true, op: { select: { numero: true } },
           },
+          take: 6000,
         })
       : [];
+    pecas = achadas.map((p) => ({ ...p, ...(daPeca.get(p.id) || {}) }));
   }
 
   if (!pecas.length) {
-    return NextResponse.json({ setor, dia, diasComAlgo, prontos: [], travados: [], jaDesceram: 0 });
+    return NextResponse.json({ setor, prontos: [], travados: [], jaDesceram: 0 });
   }
 
   // ── o que já desceu: a GRD é o registro ──────────────────────────────────────────────────────
@@ -137,17 +134,138 @@ export async function GET(req) {
       id: p.id, marca: p.marca, descricao: p.descricao || null,
       opNumero: p.op?.numero || null, qte: p.qte || 0,
       kg: Math.round(Number(p.pesoTotalKg) || 0),
-      bancada: p.bancada || null,
+      dia: p.dia || null, bancada: p.bancada || null,
+      frente: p.frente || null, loteId: p.loteId || null,
     };
     if (motivo) travados.push({ ...item, motivo, porque });
     else prontos.push(item);
   }
 
-  const ordem = (a, b) => String(a.opNumero).localeCompare(String(b.opNumero)) || String(a.marca).localeCompare(String(b.marca), "pt-BR", { numeric: true });
+  // ⚠ ordena pelo DIA primeiro: sem as setas de navegação, é a ordem do dia que faz a lista ser
+  // uma programação e não um monte.
+  const ordem = (a, b) => String(a.dia || "9999").localeCompare(String(b.dia || "9999"))
+    || String(a.opNumero).localeCompare(String(b.opNumero))
+    || String(a.marca).localeCompare(String(b.marca), "pt-BR", { numeric: true });
   return NextResponse.json({
-    setor, dia, diasComAlgo,
+    setor,
     prontos: prontos.sort(ordem),
     travados: travados.sort(ordem),
     jaDesceram,
   });
+}
+
+// ─── TIRAR DA PROGRAMAÇÃO ──────────────────────────────────────────────────────
+// Vitor (03/09/2026): "deixe uma forma para eu poder tirar da programação coisa que estiverem
+// erradas lá". É desfazer o que o Planejamento (ou esta própria tela) programou — não é excluir
+// peça: a marca continua na LPC, só volta a não ter dia.
+//
+// ⚠⚠ NÃO TIRA O QUE JÁ ANDOU. Se o Syneco já registrou produção na marca, a peça está na bancada:
+// apagar o dia esconderia trabalho em curso. A rota devolve quantas ficaram e por quê — é a mesma
+// trava do "tirar do dia" do painel da carga.
+export async function POST(req) {
+  let user;
+  try { user = await requireRole(ROLES); }
+  catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  const body = await req.json().catch(() => ({}));
+  const setor = String(body?.setor || "").toUpperCase();
+  if (!["PREPARACAO", "MONTAGEM"].includes(setor)) return NextResponse.json({ error: "Setor inválido." }, { status: 400 });
+  const ids = [...new Set((Array.isArray(body?.ids) ? body.ids : []).map(String).filter(Boolean))].slice(0, 3000);
+  if (!ids.length) return NextResponse.json({ error: "Nada selecionado." }, { status: 400 });
+  const motivo = String(body?.motivo || "").trim() || "Tirado da programação pelo PCP.";
+
+  if (setor === "MONTAGEM") {
+    const pecas = await prisma.pecaConjunto.findMany({
+      where: { id: { in: ids }, montagemDiaProgramado: { not: null } },
+      select: { id: true, marca: true, status: true, montagemDiaProgramado: true, montagemBancada: true },
+    });
+    if (!pecas.length) return NextResponse.json({ tirados: 0, comProducao: 0 });
+
+    // ⚠ o apontamento casa por MARCA (é assim que o Syneco fecha — ver lib/conjuntos-setor).
+    const marcas = [...new Set(pecas.map((p) => p.marca).filter(Boolean))];
+    const ordens = marcas.length
+      ? await prisma.mesOrdem.findMany({
+          where: { item: { in: marcas }, setor: { in: ["Montagem", "Solda"] } },
+          select: { item: true, produzidoUn: true },
+        })
+      : [];
+    const iniciadas = new Set(ordens.filter((o) => (o.produzidoUn || 0) > 0).map((o) => o.item));
+    const podem = pecas.filter((p) => !iniciadas.has(p.marca));
+    const comProducao = pecas.length - podem.length;
+    if (!podem.length) return NextResponse.json({ tirados: 0, comProducao });
+
+    const limpar = { montagemBancada: null, montagemBancadaEm: null, montagemDiaProgramado: null };
+    // ⚠ DOIS updates porque só quem entrou em MONTAGEM volta para CORTE; quem ainda estava em
+    // PENDENTE/CORTE só perde o dia. Um update só mudaria o status de quem nunca o teve.
+    const naMontagem = podem.filter((p) => p.status === "MONTAGEM").map((p) => p.id);
+    const resto = podem.filter((p) => p.status !== "MONTAGEM").map((p) => p.id);
+    if (naMontagem.length) {
+      await prisma.pecaConjunto.updateMany({
+        where: { id: { in: naMontagem } },
+        data: { ...limpar, status: "CORTE", ultimoSetor: "Corte" },
+      });
+    }
+    if (resto.length) await prisma.pecaConjunto.updateMany({ where: { id: { in: resto } }, data: limpar });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user?.id || null, action: "TIRAR_DA_PROGRAMACAO",
+        entity: "PecaConjunto", entityId: podem[0].id,
+        diff: { setor, motivo, tirados: podem.length, comProducao, marcas: podem.slice(0, 50).map((p) => p.marca) },
+      },
+    });
+    return NextResponse.json({ tirados: podem.length, comProducao });
+  }
+
+  // ── PREPARAÇÃO: quem carrega o dia é o LOTE, então a peça sai do lote ────────────────────────
+  const lotes = await prisma.liberacaoProducao.findMany({
+    where: { status: { in: ["LIBERADA", "EM_PRODUCAO"] } },
+    select: { id: true, opNumero: true, frente: true, setores: true, pecaIds: true, totalPecas: true, totalKg: true },
+    take: 4000,
+  });
+  const alvo = new Set(ids);
+  let tirados = 0, lotesMexidos = 0, lotesVazios = 0;
+  for (const l of lotes) {
+    const atuais = (Array.isArray(l.pecaIds) ? l.pecaIds : []).map(String);
+    const ficam = atuais.filter((id) => !alvo.has(id));
+    if (ficam.length === atuais.length) continue;
+    tirados += atuais.length - ficam.length;
+    lotesMexidos++;
+
+    if (!ficam.length) {
+      // ⚠ lote sem peça nenhuma não é lote vazio, é lote cancelado: deixá-lo LIBERADA faria a
+      // obra continuar na fila do PCP sem ter o que fazer nela.
+      await prisma.liberacaoProducao.update({
+        where: { id: l.id },
+        data: { status: "CANCELADA", canceladaEm: new Date(), canceladaMotivo: motivo, pecaIds: [], totalPecas: 0, totalKg: 0 },
+      });
+      lotesVazios++;
+      continue;
+    }
+    // ⚠ recalcula peso e quantidade: um lote que perde peça e mantém o total mentiria na carga
+    // do dia (o painel do Planejamento soma esses campos).
+    const restantes = await prisma.pecaConjunto.findMany({
+      where: { id: { in: ficam } },
+      select: { qte: true, pesoTotalKg: true },
+    });
+    await prisma.liberacaoProducao.update({
+      where: { id: l.id },
+      data: {
+        pecaIds: ficam,
+        totalPecas: restantes.reduce((s, p) => s + (p.qte || 0), 0),
+        totalKg: Math.round(restantes.reduce((s, p) => s + (Number(p.pesoTotalKg) || 0), 0)),
+      },
+    });
+  }
+
+  if (tirados) {
+    await prisma.auditLog.create({
+      data: {
+        userId: user?.id || null, action: "TIRAR_DA_PROGRAMACAO",
+        entity: "LiberacaoProducao", entityId: null,
+        diff: { setor, motivo, tirados, lotesMexidos, lotesCancelados: lotesVazios },
+      },
+    });
+  }
+  return NextResponse.json({ tirados, lotesMexidos, lotesCancelados: lotesVazios, comProducao: 0 });
 }

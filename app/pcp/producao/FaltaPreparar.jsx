@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useState, Fragment } from "react";
 import { Loader2, ChevronRight } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
+import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 
 const fmtN = (n) => new Intl.NumberFormat("pt-BR").format(Math.round(Number(n) || 0));
 const fmt1 = (n) => (Math.round((Number(n) || 0) * 10) / 10).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -27,6 +28,7 @@ export default function FaltaPreparar({ setor }) {
   const [itens, setItens] = useState(null);
   const [sel, setSel] = useState(() => new Set());
   const [aberto, setAberto] = useState(null);
+  const [aberta, setAberta] = useState(null);
   // ⚠ MESMA META DO PAINEL DE CARGA (12.000 kg/dia). Dois números para a mesma capacidade fariam a
   // mesma seleção ter dois prazos dependendo da tela em que se olha.
   const [metaKg, setMetaKg] = useState(12000);
@@ -42,11 +44,22 @@ export default function FaltaPreparar({ setor }) {
   }, [setor]);
 
   const lista = itens || [];
+  // ⚠ mesmo funil das outras tabelas (components/FiltroColuna). A conta do prazo segue o que está
+  // MARCADO, não o que está filtrado: filtrar por outra obra e ver o prazo mudar sozinho seria uma
+  // armadilha.
+  const COLS = useMemo(() => [
+    { key: "op", label: "OP", valor: (l) => fmtOP(l.opNumero) },
+    { key: "marca", label: setor === "MONTAGEM" ? "conjunto" : "marca", valor: (l) => l.marca || "" },
+    { key: "perfil", label: "perfil", valor: (l) => l.perfil || l.descricao || "" },
+    { key: "material", label: "material", valor: (l) => l.material || "" },
+  ], [setor]);
+  const { filtros, setFiltros, filtradas: vis, opcoesDaColuna, ativos, limpar } = useFiltroColunas(lista, COLS);
+  const cab = { filtros, setFiltros, opcoesDaColuna, aberta, setAberta };
   const escolhidos = useMemo(() => lista.filter((x) => sel.has(x.id)), [lista, sel]);
   const meta = Number(metaKg) || 0;
   const dias = meta > 0 ? somaKg(escolhidos) / meta : 0;
   const alternar = (id) => setSel((p) => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; });
-  const todos = lista.length > 0 && sel.size === lista.length;
+  const todos = vis.length > 0 && vis.every((x) => sel.has(x.id));
 
   if (!itens) {
     return <p className="px-4 py-4 text-[12.5px] text-torg-gray inline-flex items-center gap-2">
@@ -66,22 +79,23 @@ export default function FaltaPreparar({ setor }) {
     return (
       <div className="px-4 pt-3 pb-3">
         <p className="text-[12.5px] text-torg-gray mb-3">
-          <b className="text-torg-dark">{fmtN(lista.length)} conjuntos</b> não podem montar porque ainda falta croqui no corte.
+          <b className="text-torg-dark">{fmtN(vis.length)} conjuntos</b> não podem montar porque ainda falta croqui no corte.
           Clique para ver quais peças seguram cada um.
+          {ativos > 0 && <button onClick={limpar} className="ml-2 text-[11px] text-torg-blue hover:underline">limpar filtro</button>}
         </p>
         <div className="border border-gray-100 rounded-lg overflow-auto max-h-[420px]">
           <table className="w-full text-[12px]">
             <thead className="bg-gray-50 text-torg-gray-light sticky top-0">
               <tr className="text-left">
-                <th className="px-3 py-2 font-semibold w-[80px]">OP</th>
-                <th className="py-2 font-semibold w-[110px]">conjunto</th>
+                <ThFiltro col="op" label="OP" larg="w-[86px]" className="px-3 py-2 font-semibold" {...cab} />
+                <ThFiltro col="marca" label="conjunto" larg="w-[116px]" className="py-2 font-semibold" {...cab} />
                 <th className="py-2 font-semibold">descrição</th>
                 <th className="py-2 font-semibold text-right w-[76px]">kg</th>
                 <th className="px-3 py-2 font-semibold text-right w-[110px]">croquis</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {lista.map((c) => (
+              {vis.map((c) => (
                 <Fragment key={c.id}>
                   <tr onClick={() => setAberto(aberto === c.id ? null : c.id)}
                     className={`cursor-pointer ${aberto === c.id ? "bg-torg-blue-50/40" : "hover:bg-gray-50/70"}`}>
@@ -128,7 +142,8 @@ export default function FaltaPreparar({ setor }) {
   return (
     <div className="px-4 pt-3 pb-3">
       <p className="text-[12.5px] text-torg-gray mb-3">
-        <b className="text-torg-dark">{fmtN(lista.length)} peças</b> esperando corte. Marque o que vai entrar e o prazo sai do peso que o setor faz por dia.
+        <b className="text-torg-dark">{fmtN(vis.length)} peças</b> esperando corte. Marque o que vai entrar e o prazo sai do peso que o setor faz por dia.
+        {ativos > 0 && <button onClick={limpar} className="ml-2 text-[11px] text-torg-blue hover:underline">limpar filtro</button>}
       </p>
 
       <div className="border border-gray-100 rounded-lg overflow-auto max-h-[340px] mb-3">
@@ -136,19 +151,19 @@ export default function FaltaPreparar({ setor }) {
           <thead className="bg-gray-50 text-torg-gray-light sticky top-0">
             <tr className="text-left">
               <th className="px-3 py-2 w-8">
-                <input type="checkbox" checked={todos} onChange={() => setSel(todos ? new Set() : new Set(lista.map((x) => x.id)))}
+                <input type="checkbox" checked={todos} onChange={() => setSel(todos ? new Set() : new Set(vis.map((x) => x.id)))}
                   className="rounded border-gray-300" />
               </th>
-              <th className="py-2 font-semibold w-[80px]">OP</th>
-              <th className="py-2 font-semibold w-[110px]">marca</th>
-              <th className="py-2 font-semibold">perfil</th>
-              <th className="py-2 font-semibold w-[90px]">material</th>
+              <ThFiltro col="op" label="OP" larg="w-[86px]" className="py-2 font-semibold" {...cab} />
+              <ThFiltro col="marca" label="marca" larg="w-[116px]" className="py-2 font-semibold" {...cab} />
+              <ThFiltro col="perfil" label="perfil" className="py-2 font-semibold" {...cab} />
+              <ThFiltro col="material" label="material" larg="w-[104px]" className="py-2 font-semibold" {...cab} />
               <th className="py-2 font-semibold text-right w-[70px]">qtd</th>
               <th className="px-3 py-2 font-semibold text-right w-[76px]">kg</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {lista.map((p) => (
+            {vis.map((p) => (
               <tr key={p.id} onClick={() => alternar(p.id)}
                 className={`cursor-pointer ${sel.has(p.id) ? "bg-torg-blue/5" : "hover:bg-gray-50/70"}`}>
                 <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
