@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X, Eraser, ZoomIn, ZoomOut, Magnet, ArrowLeftRight } from "lucide-react";
+import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X, Eraser, ZoomIn, ZoomOut, Magnet, ArrowLeftRight, Minus, Plus } from "lucide-react";
 import { layoutCotas, setaEm, PADDING } from "@/lib/cota-marcacao";
 
 /**
@@ -529,6 +529,19 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     onChange(cotas.map((x, k) => (k === i ? { ...x, lado: novo } : x)));
   }
 
+  // ⚠⚠ MAIS COMPRIDA OU MAIS CURTA. Vitor (03/09/2026): "seria bom poder ajustar a altura dela
+  // também... deixar mais comprida ou mais curta". `afastamento` é a distância da linha de cota até
+  // a peça, na mesma unidade do desenho; PADDING - 6 é o teto (lib/cota-marcacao.js corta ali de
+  // qualquer jeito, senão a linha sairia da folga reservada e seria cortada no desenho e no PDF).
+  function ajustarAfastamento(i, delta) {
+    const c = cotas[i];
+    if (!c || c.ax == null) return;
+    const atual = c.afastamento != null ? c.afastamento : 12;
+    const novo = Math.max(6, Math.min(PADDING - 6, atual + delta));
+    registrar();
+    onChange(cotas.map((x, k) => (k === i ? { ...x, afastamento: novo } : x)));
+  }
+
   if (erro) return <p className="text-[12px] text-red-600 inline-flex items-center gap-1.5"><AlertCircle size={14} /> {erro}</p>;
   if (!dados) return <p className="text-[12px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={14} className="animate-spin" /> lendo o desenho…</p>;
 
@@ -636,10 +649,16 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
               <span className="text-torg-dark flex-1">{c.descricao}</span>
               <span className="font-mono text-torg-dark">{c.projetoMm ?? "—"}</span>
               <span className="text-torg-gray w-14 text-right">{c.tolerancia || ""}</span>
-              {c.ax != null && (
+              {c.ax != null && (<>
+                <span className="inline-flex items-center rounded border border-gray-200 overflow-hidden shrink-0">
+                  <button onClick={() => ajustarAfastamento(i, -8)} title="Linha mais curta (mais perto da peça)"
+                    className="text-torg-gray hover:text-torg-blue hover:bg-torg-blue-50 px-1 py-0.5"><Minus size={11} /></button>
+                  <button onClick={() => ajustarAfastamento(i, 8)} title="Linha mais comprida (mais longe da peça)"
+                    className="text-torg-gray hover:text-torg-blue hover:bg-torg-blue-50 px-1 py-0.5 border-l border-gray-200"><Plus size={11} /></button>
+                </span>
                 <button onClick={() => trocarLado(i)} title="Trocar de lado a linha de chamada desta cota"
                   className="text-torg-gray hover:text-torg-blue"><ArrowLeftRight size={13} /></button>
-              )}
+              </>)}
               <button onClick={() => remover(i)} className="text-torg-gray hover:text-red-600"><Trash2 size={13} /></button>
             </li>
           ))}

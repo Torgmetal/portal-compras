@@ -140,6 +140,9 @@ export async function PATCH(req, { params }) {
       // "quero poder fazer isso marcando mas podendo ajustar ela". Sem gravar aqui, a escolha
       // sumia ao salvar e voltava a decidir pela metade da folha (ver lib/cota-marcacao.js).
       lado: ["topo", "base", "esq", "dir"].includes(l?.lado) ? l.lado : null,
+      // ⚠ idem para o afastamento (comprimento da linha) — Vitor (03/09/2026): "poder ajustar a
+      // altura dela também... deixar mais comprida ou mais curta".
+      afastamento: num(l?.afastamento),
       // ── a junta inspecionada (visual de solda) ──
       eps: l?.eps ? String(l.eps).slice(0, 30) : null,
       soldador: l?.soldador ? String(l.soldador).slice(0, 40) : null,
