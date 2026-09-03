@@ -101,6 +101,9 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   const [metaKg, setMetaKg] = useState(12000);
   const [sugestao, setSugestao] = useState(null);
   const [setores, setSetores] = useState([]);
+  // ⚠ a carga do dia é da FÁBRICA e muda quando se troca o setor da tela — por isso vem de uma
+  // busca própria, e não de dentro dos dados da obra.
+  const [carga, setCarga] = useState(null);
   const [prioridade, setPrioridade] = useState("MEDIA");
   const [motivo, setMotivo] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -141,6 +144,20 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
   }, [opId]);
   useEffect(() => { carregar(); }, [carregar]);
+
+  // ⚠ recarrega quando o setor muda E depois de cada liberação (`d` muda): o dia que acabou de ser
+  // preenchido tem de aparecer cheio na barra, senão a pessoa programa duas vezes o mesmo dia.
+  useEffect(() => {
+    let vivo = true;
+    const q = new URLSearchParams();
+    if (setores[0]) q.set("setor", setores[0]);
+    if (opId) q.set("opId", opId);
+    fetch(`/api/planejamento/liberacao/carga?${q}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => vivo && setCarga(j?.dias ? j : { dias: [] }))
+      .catch(() => vivo && setCarga({ dias: [] }));
+    return () => { vivo = false; };
+  }, [setores, opId, d]);
 
   // ⚠ REAPROVEITA A ROTA DO PCP (`/api/pcp/liberacao-material`), que já valida o que precisa ser
   // validado: o R existe no CMR, e o R é do MESMO material do perfil — sem isso dava para amarrar
@@ -543,41 +560,77 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         </div>
       )}
 
-      {/* ⚠⚠ CADA DIA MOSTRA O PESO, E COMPARADO COM A META. O Planejamento (03/09/2026, via Vitor):
-          "não fica muito claro quanto de peso eu já soltei por dia (…) ou eu só devo imaginar mesmo
-          já que limitei os 12.000 kg lá?".
-          A meta do setor é kg/dia; contar peça não responde: 33 peças podem ser 800 kg de cantoneira
-          ou 9 t de chapa. Quem programava conferia a própria meta de cabeça.
-          ⚠ Âmbar quando o dia passou da meta — não bloqueia nada, só avisa que aquele dia está mais
-          cheio do que a esteira aguenta. Verde é dia dentro da meta. */}
-      {d?.dias?.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-          <span className="uppercase text-torg-gray-light">Já programado</span>
-          {d.dias.map((x) => {
-            const meta = Number(metaKg) || 0;
-            const passou = meta > 0 && x.kg > meta;
-            return (
-              <span key={x.dia || "sem"}
-                title={meta > 0 ? `${fmtKg(x.kg)} de ${fmtN(meta)} kg/dia da meta${passou ? " — dia acima da meta" : ""}` : fmtKg(x.kg)}
-                className={`px-1.5 py-0.5 rounded border font-semibold whitespace-nowrap ${
-                  passou ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
-                {x.dia ? fmtD(x.dia) : "sem data"} · {fmtN(x.pecas)} pç · {fmtKg(x.kg)}
-                {/* ⚠ peça liberada cujo id não existe mais — a reimportação da lista troca o id e
-                    a programação daquela marca se perde. Sem este aviso o dia só encolhe sozinho. */}
-                {x.orfas > 0 && (
-                  <span className="ml-1 text-amber-700"
-                    title={`${x.orfas} peça(s) deste dia saíram da lista (a lista foi reimportada depois da liberação) — precisam ser programadas de novo`}>
-                    +{fmtN(x.orfas)} a reprogramar
-                  </span>
-                )}
-              </span>
-            );
-          })}
-          {/* o acumulado responde a outra pergunta da mesma pessoa: "quanto eu já soltei", no total */}
-          {d.dias.length > 1 && (
-            <span className="text-torg-gray">
-              total {fmtN(d.dias.reduce((s2, x) => s2 + x.pecas, 0))} pç · {fmtKg(d.dias.reduce((s2, x) => s2 + (x.kg || 0), 0))}
+      {/* ⚠⚠ A CARGA DO DIA É DA FÁBRICA, NÃO DA OBRA. Vitor (03/09/2026): "não precisa ser apenas
+          de uma OP, mostre tudo que foi para aquele dia" — e ele tem razão, porque a meta de
+          12.000 kg/dia é do SETOR: a máquina é uma só. Medido em 03/09: o corte de 02/09 tinha
+          3.358 kg de duas obras (OP-105 e OP-113), e a tela mostrava 1.856 — a fatia desta.
+          Alguém encheria a terça achando que sobrava espaço.
+
+          ⚠ A BARRA VEM ANTES DO NÚMERO porque a pergunta é "cabe no dia?". A parte escura é esta
+          obra, a clara são as outras, e o traço é a meta: em um segundo se lê o que estava sendo
+          conferido de cabeça. Ver o desenho aprovado em 03/09/2026. */}
+      {carga?.dias?.length > 0 && (
+        <div className="border border-gray-200 rounded-xl overflow-hidden">
+          <div className="flex items-baseline gap-2 px-3 py-2 border-b border-gray-100 bg-gray-50/60">
+            <span className="text-[11px] uppercase tracking-wide text-torg-gray-light font-semibold">Carga já programada</span>
+            <span className="text-[11px] text-torg-gray">
+              {setores[0] ? `setor ${setores[0].toLowerCase()}` : "todos os setores"} · meta {fmtN(Number(metaKg) || 0)} kg/dia · a fábrica inteira
             </span>
+          </div>
+
+          <table className="w-full text-[12px]">
+            <tbody>
+              {carga.dias.map((x) => {
+                const meta = Number(metaKg) || 0;
+                const teto = Math.max(meta, ...carga.dias.map((y) => y.kg || 0)) || 1;
+                const pct = meta > 0 ? Math.round((x.kg / meta) * 100) : null;
+                const passou = meta > 0 && x.kg > meta;
+                const larg = (v) => `${Math.min(100, Math.round((v / teto) * 100))}%`;
+                return (
+                  <tr key={x.dia || "sem"} className="border-b border-gray-50 last:border-0">
+                    <td className="px-3 py-1.5 whitespace-nowrap font-semibold">
+                      {x.dia ? fmtD(x.dia) : <span className="text-torg-gray-light font-normal">sem data</span>}
+                    </td>
+                    <td className="py-1.5 w-full">
+                      <div className="relative h-4 rounded bg-gray-100 overflow-hidden min-w-[160px]"
+                        title={x.obras.map((o) => `${o.obra}: ${fmtKg(o.kg)}`).join(" · ")}>
+                        {/* ⚠ duas faixas na mesma barra: a desta obra e a das outras. Uma barra só
+                            responderia "o dia está cheio" sem dizer de quem é o que está lá. */}
+                        <span className={`absolute inset-y-0 left-0 ${passou ? "bg-amber-500" : "bg-emerald-600"}`} style={{ width: larg(x.minhaKg) }} />
+                        <span className={`absolute inset-y-0 ${passou ? "bg-amber-300" : "bg-emerald-300"}`}
+                          style={{ left: larg(x.minhaKg), width: larg(Math.max(0, x.kg - x.minhaKg)) }} />
+                        {meta > 0 && <span className="absolute -top-0.5 -bottom-0.5 w-0.5 bg-torg-gray-light" style={{ left: larg(meta) }} />}
+                      </div>
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-semibold tabular-nums whitespace-nowrap">{fmtKg(x.kg)}</td>
+                    <td className="px-1 py-1.5 text-right tabular-nums text-torg-gray-light whitespace-nowrap w-12">{pct == null ? "—" : `${pct}%`}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-torg-gray whitespace-nowrap">{fmtN(x.pecas)} pç</td>
+                    <td className="px-3 py-1.5 text-torg-gray-light whitespace-nowrap max-w-[220px] truncate">
+                      {x.obras.map((o) => o.obra).join(" · ")}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          <div className="flex items-center gap-4 flex-wrap px-3 py-2 border-t border-gray-100 text-[11.5px] text-torg-gray">
+            <span><b className="text-torg-dark">{fmtKg(carga.dias.reduce((a, x) => a + (x.kg || 0), 0))}</b> programados · {fmtN(carga.dias.reduce((a, x) => a + x.pecas, 0))} peças</span>
+            {Number(metaKg) > 0 && (
+              <span>{fmtN(Math.round((carga.dias.reduce((a, x) => a + (x.kg || 0), 0) / Number(metaKg)) * 10) / 10)} dias de meta</span>
+            )}
+            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm bg-emerald-600 inline-block" /> esta obra</span>
+            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm bg-emerald-300 inline-block" /> outras obras</span>
+          </div>
+
+          {/* ⚠ o órfão sai de dentro do dia e vira UM aviso com caminho: dentro da linha ele
+              poluía a leitura e não dava o que fazer. */}
+          {carga.dias.some((x) => x.orfas > 0) && (
+            <div className="px-3 py-2 border-t border-amber-200 bg-amber-50 text-[11.5px] text-amber-800">
+              <b>{fmtN(carga.dias.reduce((a, x) => a + x.orfas, 0))} peça(s) perderam a programação</b> — a lista foi
+              reimportada depois da liberação e elas voltaram para "a fazer".
+              {" "}({carga.dias.filter((x) => x.orfas > 0).map((x) => `${x.dia ? fmtD(x.dia) : "sem data"}: ${fmtN(x.orfas)}`).join(" · ")})
+            </div>
           )}
         </div>
       )}
