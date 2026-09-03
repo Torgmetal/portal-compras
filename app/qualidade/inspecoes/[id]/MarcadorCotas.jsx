@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X, Eraser, ZoomIn, ZoomOut, Magnet } from "lucide-react";
+import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X, Eraser, ZoomIn, ZoomOut, Magnet, ArrowLeftRight } from "lucide-react";
 import { layoutCotas, setaEm, PADDING } from "@/lib/cota-marcacao";
 
 /**
@@ -513,6 +513,22 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     onChange(restantes);
   }
 
+  // ⚠⚠ TROCAR O LADO. Vitor (03/09/2026): "eu preciso conseguir editar para qual lado eu quero que
+  // a representação da cota vai ficar, hoje você escolhe por mim... quero poder fazer isso marcando
+  // mas podendo ajustar ela". O palpite automático (metade da folha) é só ponto de partida — grava
+  // `lado` na cota para valer por cima dele daqui pra frente (ver lib/cota-marcacao.js).
+  function trocarLado(i) {
+    const c = cotas[i];
+    if (!c || c.ax == null) return;
+    const vertical = Math.abs(c.by - c.ay) > Math.abs(c.bx - c.ax);
+    const atual = layoutCotas([c], dados.largura, dados.altura)[0]?.lado;
+    const novo = vertical
+      ? (atual === "dir" ? "esq" : "dir")
+      : (atual === "topo" ? "base" : "topo");
+    registrar();
+    onChange(cotas.map((x, k) => (k === i ? { ...x, lado: novo } : x)));
+  }
+
   if (erro) return <p className="text-[12px] text-red-600 inline-flex items-center gap-1.5"><AlertCircle size={14} /> {erro}</p>;
   if (!dados) return <p className="text-[12px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={14} className="animate-spin" /> lendo o desenho…</p>;
 
@@ -620,6 +636,10 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
               <span className="text-torg-dark flex-1">{c.descricao}</span>
               <span className="font-mono text-torg-dark">{c.projetoMm ?? "—"}</span>
               <span className="text-torg-gray w-14 text-right">{c.tolerancia || ""}</span>
+              {c.ax != null && (
+                <button onClick={() => trocarLado(i)} title="Trocar de lado a linha de chamada desta cota"
+                  className="text-torg-gray hover:text-torg-blue"><ArrowLeftRight size={13} /></button>
+              )}
               <button onClick={() => remover(i)} className="text-torg-gray hover:text-red-600"><Trash2 size={13} /></button>
             </li>
           ))}

@@ -136,6 +136,10 @@ export async function PATCH(req, { params }) {
       // ── a cota marcada no desenho (dimensional) ──
       letra: l?.letra ? String(l.letra).slice(0, 3) : null,
       ax: num(l?.ax), ay: num(l?.ay), bx: num(l?.bx), by: num(l?.by),
+      // ⚠ o lado ESCOLHIDO À MÃO da linha de chamada (topo/base/esq/dir) — Vitor (03/09/2026):
+      // "quero poder fazer isso marcando mas podendo ajustar ela". Sem gravar aqui, a escolha
+      // sumia ao salvar e voltava a decidir pela metade da folha (ver lib/cota-marcacao.js).
+      lado: ["topo", "base", "esq", "dir"].includes(l?.lado) ? l.lado : null,
       // ── a junta inspecionada (visual de solda) ──
       eps: l?.eps ? String(l.eps).slice(0, 30) : null,
       soldador: l?.soldador ? String(l.soldador).slice(0, 40) : null,
