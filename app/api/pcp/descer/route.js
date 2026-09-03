@@ -113,7 +113,12 @@ export async function GET(req) {
   let jaDesceram = 0;
   for (const p of pecas) {
     const marca = String(p.marca || "").trim().toUpperCase();
-    if (jaDesceu.has(marca)) { jaDesceram++; continue; }
+    // ⚠⚠ O QUE JÁ DESCEU CONTINUA NA LISTA. Vitor (03/09/2026): "não consigo reimprimir, quero que
+    // use a lógica que temos na tela abaixo". Sumir com a linha depois de imprimir tirava a única
+    // forma de emitir o desenho de novo (folha rasgada, marca que voltou para a bancada) — a
+    // tabela de baixo sempre mostrou a marca com a GRD ao lado, e é assim que tem de ser aqui.
+    const desceu = jaDesceu.has(marca);
+    if (desceu) jaDesceram++;
 
     // ⚠ ORDEM DOS MOTIVOS = ordem de quem resolve. Croqui é da preparação (interno, do dia);
     // desenho é Engenharia; material é Compras. Mostrar o mais próximo primeiro evita mandar
@@ -131,7 +136,7 @@ export async function GET(req) {
     if (!motivo && !ehMontagem && p.statusEstoque === "SEM_MATERIAL") { motivo = "MATERIAL"; porque = "aço não entregue nesta obra"; }
 
     const item = {
-      id: p.id, marca: p.marca, descricao: p.descricao || null,
+      id: p.id, marca: p.marca, descricao: p.descricao || null, jaDesceu: desceu,
       opNumero: p.op?.numero || null, qte: p.qte || 0,
       kg: Math.round(Number(p.pesoTotalKg) || 0),
       dia: p.dia || null, bancada: p.bancada || null,

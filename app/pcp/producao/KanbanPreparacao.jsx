@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import FilaCorteClient from "@/app/pcp/fila-corte/FilaCorteClient";
 
-export default function KanbanPreparacao() {
+export default function KanbanPreparacao({ recarga = 0 }) {
   const [pecas, setPecas] = useState(null);
   const [erro, setErro] = useState("");
 
@@ -23,7 +23,7 @@ export default function KanbanPreparacao() {
       .then((j) => { if (!vivo) return; if (j?.error) setErro(j.error); setPecas(j?.pecas || []); })
       .catch((e) => { if (vivo) { setErro(e.message); setPecas([]); } });
     return () => { vivo = false; };
-  }, []);
+  }, [recarga]);
 
   if (!pecas) {
     return (

@@ -51,18 +51,19 @@ const rotDia = (d) => {
 // horizontal (onde essa obra está espalhada) se perde.
 const CORES = ["#1E4E8C", "#C2621A", "#2A7A70", "#6B4E9E", "#8C1E3F", "#4E7A1E"];
 
-export default function GanttBancadas() {
+export default function GanttBancadas({ recarga = 0 }) {
   const [dados, setDados] = useState(null);
   const [aberto, setAberto] = useState(null);
 
   useEffect(() => {
     let vivo = true;
+    setDados(null);
     fetch("/api/pcp/bancadas", { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => vivo && setDados(j?.conjuntos || []))
       .catch(() => vivo && setDados([]));
     return () => { vivo = false; };
-  }, []);
+  }, [recarga]);
 
   const g = useMemo(() => {
     const cs = dados || [];

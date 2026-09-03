@@ -47,7 +47,7 @@ const proximoUtil = () => {
   return d.toISOString().slice(0, 10);
 };
 
-export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor }) {
+export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor, onMudou }) {
   // ⚠⚠ AS ABAS DEPENDEM DO SETOR. Vitor (03/09/2026): "quando estamos na aba de planejamento não
   // precisa mostrar pronto para montar, pois aí que fica confuso; já quando aperto a tela da
   // montagem, aí sim você tem que mostrar uma aba onde está escrito falta descer vira falta
@@ -102,7 +102,11 @@ export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor }) {
   // ⚠ UMA LISTA SÓ. "Pode descer" virou valor da coluna situação em vez de tabela à parte: com
   // filtro de coluna, duas tabelas seriam dois filtros para a mesma pergunta.
   const linhas = useMemo(() => {
-    const p = (d?.prontos || []).map((x) => ({ ...x, ok: true, situacao: "Pode descer" }));
+    // ⚠ TRÊS ESTADOS, não dois: pode descer, já desceu (reimprimível) e travado. Antes o que já
+    // tinha GRD sumia da lista, e com ele sumia a reimpressão.
+    const p = (d?.prontos || []).map((x) => ({
+      ...x, ok: !x.jaDesceu, situacao: x.jaDesceu ? "Já desceu — dá para reimprimir" : "Pode descer",
+    }));
     const t = (d?.travados || []).map((x) => ({ ...x, ok: false, situacao: x.porque || x.motivo || "travado" }));
     return [...p, ...t];
   }, [d]);
@@ -122,7 +126,12 @@ export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor }) {
   const escolhidos = vis.filter((l) => sel.has(l.id));
   // ⚠ sem seleção o botão vale para TUDO que está à vista: filtrar por dia e mandar descer é o
   // gesto da manhã, e obrigar a marcar 60 linhas antes seria trabalho à toa.
-  const alvoDescer = (escolhidos.length ? escolhidos : vis).filter((l) => l.ok);
+  //
+  // ⚠⚠ MAS SÓ REIMPRIME O QUE FOR MARCADO À MÃO. Sem seleção o botão pega apenas o que ainda não
+  // desceu: um "descer tudo que está à vista" que reimprime a obra inteira todo dia entupiria a
+  // plotter e encheria a GRD de emissão que ninguém pediu.
+  const alvoDescer = escolhidos.length ? escolhidos.filter((l) => !l.motivo) : vis.filter((l) => l.ok);
+  const reimpressoes = alvoDescer.filter((l) => l.jaDesceu).length;
   const todosVis = vis.length > 0 && vis.every((l) => sel.has(l.id));
 
   // ⚠⚠ O ALERTA DA SELEÇÃO. Antes o rodapé só dizia quantos desciam; o que trava, o que está sem
@@ -137,7 +146,8 @@ export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor }) {
     }
     return {
       base, podem,
-      travados: base.length - podem.length,
+      jaDesceram: base.filter((l) => l.jaDesceu).length,
+      travados: base.filter((l) => !!l.motivo).length,
       motivos: [...motivos.entries()],
       semBancada: setor === "MONTAGEM" ? base.filter((l) => !l.bancada).length : 0,
       kg: somaKg(base),
@@ -185,12 +195,19 @@ export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor }) {
       }
       setSel(new Set());
       setRecarga((v) => v + 1);
+      // ⚠ o quadro de baixo (bancadas / kanban) tem fetch próprio: sem avisar, o conjunto acabava
+      // de ser programado e a agenda continuava mostrando o mundo de antes.
+      onMudou?.();
     } catch (e) { setErro(e.message); } finally { setProgramando(false); }
   }
 
   function alternar(id) { setSel((p) => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; }); }
 
   async function descer() {
+    if (!alvoDescer.length) return;
+    // ⚠ reimprimir emite GRD de novo: quem manda tem de saber que está reemitindo, não descendo.
+    if (reimpressoes > 0 && !confirm(`${reimpressoes} desses desenhos JÁ desceram e vão ser reimpressos `
+      + "(sai uma nova GRD para cada). Continuar?")) return;
     // ⚠ agrupa por OBRA porque a emissão é por OP (a rota do lote recebe `opNumero`).
     const porOp = new Map();
     for (const p of alvoDescer) {
@@ -200,6 +217,7 @@ export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor }) {
     }
     await onDescer?.({ setor, porObra: [...porOp.entries()].map(([opNumero, marcas]) => ({ opNumero, marcas })) });
     setRecarga((v) => v + 1);
+    onMudou?.();
   }
 
   async function tirar() {
@@ -217,6 +235,7 @@ export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor }) {
       if (j.comProducao > 0) setErro(`${j.comProducao} ficaram: o Syneco já apontou produção nelas.`);
       setSel(new Set());
       setRecarga((v) => v + 1);
+      onMudou?.();
     } catch (e) { setErro(e.message); } finally { setTirando(false); }
   }
 
@@ -323,6 +342,12 @@ export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor }) {
             </span>
             <span className="text-torg-gray-light">·</span>
             <span className="text-emerald-700">{fmtN(alerta.podem.length)} podem descer</span>
+            {alerta.jaDesceram > 0 && (
+              <>
+                <span className="text-torg-gray-light">·</span>
+                <span className="text-torg-gray">{fmtN(alerta.jaDesceram)} já {alerta.jaDesceram === 1 ? "desceu" : "desceram"} (marque para reimprimir)</span>
+              </>
+            )}
             {alerta.travados > 0 && (
               <>
                 <span className="text-torg-gray-light">·</span>
@@ -375,7 +400,7 @@ export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor }) {
             <button onClick={descer} disabled={ocupado || !alvoDescer.length}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-torg-orange text-white hover:opacity-90 disabled:opacity-40">
               {ocupado ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />}
-              Descer {fmtN(alvoDescer.length)}
+              {reimpressoes === alvoDescer.length && alvoDescer.length ? "Reimprimir" : "Descer"} {fmtN(alvoDescer.length)}
             </button>
             <button onClick={tirar} disabled={tirando || !escolhidos.length}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg border border-gray-200 text-torg-gray hover:border-amber-300 hover:text-amber-800 disabled:opacity-40">
