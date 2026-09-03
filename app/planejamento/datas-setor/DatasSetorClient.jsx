@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { CalendarClock, Loader2, AlertCircle, RefreshCw, Send, Wrench } from "lucide-react";
 import LiberarFrentes from "./LiberarFrentes";
+import CargaDosDias from "./CargaDosDias";
 import MontagemConjuntos from "./MontagemConjuntos";
 
 
@@ -14,9 +15,12 @@ export default function DatasSetorClient() {
   // (01/09/2026): "não era isso, queria dentro da aba de datas por setor" — a primeira versão
   // ficou numa tela própria e obrigava a escolher a obra de novo, longe do marco que a justifica.
   const [aba, setAba] = useState("PCP");
+  // ⚠ o painel de carga tem de recarregar depois de cada liberação: o dia que acabou de ser
+  // preenchido precisa aparecer cheio, senão alguém o programa duas vezes.
+  const [recarga, setRecarga] = useState(0);
 
   const carregar = useCallback(async () => {
-    setLoading(true); setErro("");
+    setLoading(true); setErro(""); setRecarga((n) => n + 1);
     try {
       const res = await fetch("/api/planejamento/datas-setor", { cache: "no-store" });
       const j = await res.json();
@@ -51,6 +55,12 @@ export default function DatasSetorClient() {
         <div className="flex flex-col items-center justify-center py-24 text-center"><AlertCircle size={40} className="text-red-500 mb-3" /><p className="text-red-600 mb-3">{erro}</p><button onClick={carregar} className="text-sm bg-white border border-torg-blue-100 px-4 py-2 rounded-lg inline-flex items-center gap-2"><RefreshCw size={14} /> Tentar de novo</button></div>
       ) : (
         <div className="space-y-6">
+          {/* ⚠⚠ FIXO ACIMA DO SELETOR. Vitor (03/09/2026): "deixe isso travado logo acima do seletor
+              de OP, não para aparecer quando clicarmos na OP". A carga do dia é da FÁBRICA — quem
+              chega para programar precisa ver o que já desceu ANTES de escolher a obra, senão
+              escolhe a obra e o dia por instinto e confere depois. */}
+          <CargaDosDias opId={op?.opId || null} recarga={recarga} />
+
           {/* Seletor + formulário */}
           <div className="bg-white rounded-xl border border-torg-blue-100 p-5">
             <div className="flex flex-wrap items-end gap-3 mb-4">
