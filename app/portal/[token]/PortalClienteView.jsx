@@ -4,10 +4,11 @@ import {
   Loader2, AlertCircle, ShieldCheck, CalendarRange, FileText, Award,
   BookCheck, Layers, Image as ImageIcon, ChevronRight, ChevronDown,
   Download, Package, ShoppingCart, Truck, Check, FileSpreadsheet, History,
-  FolderOpen, Box,
+  FolderOpen, Box, MessageCircle,
 } from "lucide-react";
 import { AREAS, SECOES, SECAO } from "@/lib/portal-cliente";
 import ModeloObraCliente from "./ModeloObraCliente";
+import TorguinhoCliente from "./TorguinhoCliente";
 import MatrizComunicacao from "./MatrizComunicacao";
 import SeloSetembroAmarelo from "@/components/SeloSetembroAmarelo";
 
@@ -279,6 +280,13 @@ export default function PortalClienteView({ token }) {
         {/* ⚠ O MODELO VEM PRIMEIRO na Engenharia: é a obra inteira numa imagem, e é por ele que o
             cliente encontra a peça sobre a qual quer perguntar. Lista depois — quem já sabe a marca
             vai direto nela; quem não sabe, acha girando o modelo. */}
+        {mostrar("ASSISTENTE") && (
+          <Bloco icone={MessageCircle} titulo="Perguntar ao Torguinho"
+            sub="Tire dúvidas sobre as peças desta obra — peso, etapa, expedição e rastreabilidade.">
+            <TorguinhoCliente token={token} />
+          </Bloco>
+        )}
+
         {mostrar("MODELO_NAVEGAVEL") && (
           <Bloco icone={Box} titulo="Modelo 3D da obra"
             sub="Gire, aproxime e clique numa peça para ver marca, peso, etapa e rastreabilidade.">
