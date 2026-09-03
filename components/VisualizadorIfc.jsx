@@ -22,6 +22,18 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Maximize2, Minimize2, Loader2 } from "lucide-react";
 
+// ⚠⚠ O NAVEGADOR PRECISA RESPIRAR. Vitor (03/09/2026): "a página para carregar o modelo IFC trava
+// algumas vezes e tenho que colocar em aguardar, pois aparece que a página está sem resposta".
+// Estava tudo numa tacada só na linha principal: ler o IFC, converter 13.874 peças em geometria e
+// juntar tudo. Enquanto isso o navegador não processa nem o próprio relógio, e a partir de uns
+// poucos segundos ele conclui que a aba morreu.
+//
+// `pausa()` devolve o controle ao navegador entre os lotes. O tempo TOTAL até abrir é praticamente
+// o mesmo; o que muda é que a aba continua viva, a barra de progresso anda e ninguém precisa
+// escolher "aguardar" num aviso de página travada.
+const pausa = () => new Promise((r) => setTimeout(r, 0));
+const LOTE = 250;
+
 const COR_PADRAO = 0x9fb0bf;
 const COR_SEL = 0xf4801f;
 
@@ -70,7 +82,9 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
   // Medido no export do Tekla 2025 da OP-089: 148 conjuntos, 197 parafusos, 680 peças com nível.
   const PSETS = new Set(["Tekla Common", "Tekla Bolt", "Tekla Assembly"]);
 
-  const lerModelo = (api, modelID, WebIFC) => {
+  // ⚠ async por causa dos respiros: são três varreduras grandes (assemblies, property sets e as
+  // ligações entre eles) e num modelo de porte a soma passa de dez segundos.
+  const lerModelo = async (api, modelID, WebIFC, aoAndar) => {
     const val = (v) => (v && typeof v === "object" && "value" in v ? v.value : v);
     const marcaDe = new Map(), tipoDe = new Map(), nivelDe = new Map(), parafusoDe = new Map();
     // ⚠⚠ O CONJUNTO É O ASSEMBLY, NÃO A MARCA. Parecem a mesma coisa e não são: a mesma marca se
@@ -134,6 +148,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
       const conteudo = new Map();
       const psets = api.GetLineIDsWithType(modelID, WebIFC.IFCPROPERTYSET);
       for (let i = 0; i < psets.size(); i++) {
+        if (i % 400 === 0) { aoAndar?.(Math.round((i / Math.max(1, psets.size())) * 60)); await pausa(); }
         const id = psets.get(i);
         const l = api.GetLine(modelID, id, true);
         const nome = val(l?.Name);
@@ -148,6 +163,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
       const liga = api.GetLineIDsWithType(modelID, WebIFC.IFCRELDEFINESBYPROPERTIES);
       const num = (x) => { const n = parseFloat(String(x ?? "").replace(",", ".")); return Number.isFinite(n) ? n : null; };
       for (let i = 0; i < liga.size(); i++) {
+        if (i % 400 === 0) { aoAndar?.(60 + Math.round((i / Math.max(1, liga.size())) * 40)); await pausa(); }
         const l = api.GetLine(modelID, liga.get(i));
         const ps = conteudo.get(l?.RelatingPropertyDefinition?.value);
         if (!ps) continue;
@@ -249,7 +265,8 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         api.SetWasmPath("/wasm/", true);
         await api.Init();
         const modelID = api.OpenModel(bytes, { COORDINATE_TO_ORIGIN: true });
-        const { marcaDe, asmDe, tipoDe, nivelDe, parafusoDe, pesoDoAsm, total } = lerModelo(api, modelID, WebIFC);
+        const { marcaDe, asmDe, tipoDe, nivelDe, parafusoDe, pesoDoAsm, total } =
+          await lerModelo(api, modelID, WebIFC, (pct) => setEstado({ fase: "lendo", pct }));
 
         // ── cena ──
         const el = box.current;
@@ -305,23 +322,48 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         // OP-089 tem viga verde, chapa roxa, corrimão amarelo). Uma cor só na obra inteira = arquivo
         // sem cor, e aí vale mais pintar por tipo.
         const tonsVistos = new Set();
+
+        // ⚠⚠ O QUE ACONTECE DENTRO DO STREAM TEM DE SER BARATO. A varredura do web-ifc é UMA chamada
+        // que não devolve o controle até acabar — então aqui dentro só se anota a referência
+        // (qual peça, qual geometria, cor e posição). A conversão em malha, que é o caro, sai depois,
+        // em lotes com respiro. Sem isto, um modelo de 37 MB congelava a aba por dezenas de segundos.
+        const brutos = [];
         api.StreamAllMeshes(modelID, (mesh) => {
           const eid = mesh.expressID;
+          const g = mesh.geometries;
+          for (let i = 0; i < g.size(); i++) {
+            const p = g.get(i);
+            const c = p.color;
+            brutos.push({
+              eid,
+              geoId: p.geometryExpressID,
+              // ⚠ cópia: o vetor do wasm é reaproveitado depois que o callback retorna.
+              cor: c ? { x: c.x, y: c.y, z: c.z } : null,
+              m: Array.from(p.flatTransformation),
+            });
+          }
+        });
+
+        setEstado({ fase: "montando", pct: 0 });
+        for (let b = 0; b < brutos.length; b++) {
+          if (!vivo) return;
+          if (b % LOTE === 0) {
+            setEstado({ fase: "montando", pct: Math.round((b / Math.max(1, brutos.length)) * 100) });
+            await pausa();
+          }
+          const { eid, geoId, cor: c, m } = brutos[b];
           const marca = marcaDe.get(eid) || null;
           const asm = asmDe.get(eid) ?? null;
           const parafuso = parafusoDe.get(eid) || null;
           const tipo = tipoDe.get(eid) || (parafuso ? "Parafuso" : "Peça");
           const cota = nivelDe.get(eid) ?? null;
-          const g = mesh.geometries;
-          for (let i = 0; i < g.size(); i++) {
-            const p = g.get(i);
-            const c = p.color;
+          {
             // cor do IFC em 0..1; sem cor (raro) cai no cinza padrão
             const hex = c && (c.x + c.y + c.z) > 0
               ? (Math.round(c.x * 255) << 16) | (Math.round(c.y * 255) << 8) | Math.round(c.z * 255)
               : COR_PADRAO;
             if (tonsVistos.size < 8) tonsVistos.add(hex);
-            const geo = api.GetGeometry(modelID, p.geometryExpressID);
+            const geo = api.GetGeometry(modelID, geoId);
             const v = api.GetVertexArray(geo.GetVertexData(), geo.GetVertexDataSize());
             const ix = api.GetIndexArray(geo.GetIndexData(), geo.GetIndexDataSize());
             const pos = new Float32Array(v.length / 2), nor = new Float32Array(v.length / 2);
@@ -333,7 +375,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
             bg.setAttribute("position", new THREE.BufferAttribute(pos, 3));
             bg.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
             bg.setIndex(new THREE.BufferAttribute(new Uint32Array(ix), 1));
-            bg.applyMatrix4(new THREE.Matrix4().fromArray(p.flatTransformation));
+            bg.applyMatrix4(new THREE.Matrix4().fromArray(m));
             // ⚠⚠ A COTA TAMBÉM SAI DA GEOMETRIA. O "Bottom elevation" só existe no export do Tekla
             // com os psets dele; o da OP-118 (formato AISC) não tem nenhum, e sem isto a obra
             // inteira ficaria num nível só. A altura do ponto mais baixo da peça responde a mesma
@@ -356,7 +398,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
             else if (Number.isFinite(yMin)) grupo.alturas.push(yMin);
             n++;
           }
-        });
+        }
 
         // ⚠ junta as geometrias de cada marca numa malha só: 1.500 objetos separados derrubam o
         // quadro por causa das chamadas de desenho; por marca dá algumas centenas.
@@ -365,7 +407,16 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         const arestasCruas = [];
         const porItem = new Map();
         const semCor = tonsVistos.size <= 1;
+        // ⚠ a junção é a segunda parte cara: mesclar geometrias e extrair as arestas de 3.000 grupos
+        // leva segundos. Mesmo respiro, mesma barra andando.
+        let feitos = 0;
         for (const [chave, { item, marca, hex, tipo, parafuso, asm, gs, ids, cotas, alturas }] of porChave) {
+          if (!vivo) return;
+          if (feitos % 60 === 0) {
+            setEstado({ fase: "juntando", pct: Math.round((feitos / Math.max(1, porChave.size)) * 100) });
+            await pausa();
+          }
+          feitos++;
           const junta = gs.length === 1 ? gs[0] : mergeGeometries(gs, false);
           if (!junta) continue;
           // ⚠ no modo "andamento" a cor do estado substitui a do modelo; no modo "modelo" vale o IFC
@@ -682,7 +733,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
     alvo?.requestFullscreen?.().catch(() => {});
   };
 
-  const rot = { carregando: "preparando…", baixando: "baixando o modelo…", lendo: "lendo o IFC…", montando: "montando as peças…" };
+  const rot = { carregando: "preparando…", baixando: "baixando o modelo…", lendo: "lendo o IFC…", montando: "montando as peças…", juntando: "acabando o desenho…" };
 
   // ⚠ `altura="fill"` faz a cena ocupar o pai — é o que permite a tela do modelo ir de ponta a
   // ponta em vez de viver dentro de um cartão com altura fixa.
@@ -702,6 +753,13 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
               <Loader2 size={14} className="animate-spin" />
               {rot[estado.fase] || "abrindo…"}
             </div>
+            {/* ⚠ a barra não é enfeite: num modelo grande são dezenas de segundos, e sem sinal de
+                avanço a pessoa conclui que travou — que foi exatamente o que aconteceu. */}
+            {estado.pct > 0 && (
+              <div className="w-44 h-1 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full bg-torg-orange transition-all duration-200" style={{ width: `${Math.min(100, estado.pct)}%` }} />
+              </div>
+            )}
           </div>
         </div>
       )}
