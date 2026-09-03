@@ -180,11 +180,19 @@ export default function ModeloObraCliente({ token }) {
   // ⚠ nem erro nem lista vazia viram explicação: o cliente lê uma linha neutra, não o motivo. É a
   // mesma regra dos documentos — buraco nosso se resolve aqui dentro, não na tela dele.
   if (erro) return <p className="text-[13px] text-gray-500">O modelo desta obra não está disponível aqui.</p>;
+  // ⚠ a espera tem cara, não é uma linha de texto perdida num cartão branco: com a marca e o
+  // compasso girando, parece o portal trabalhando — que é o que está acontecendo.
   if (!lista) {
     return (
-      <p className="text-[13px] text-gray-500 inline-flex items-center gap-2">
-        <Loader2 size={13} className="animate-spin" /> abrindo o modelo da obra…
-      </p>
+      <div className="h-40 grid place-items-center">
+        <div className="flex flex-col items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/torg-logo.png" alt="Torg Metal" className="h-8 opacity-80" />
+          <p className="text-[12.5px] text-gray-500 inline-flex items-center gap-2">
+            <Loader2 size={13} className="animate-spin" /> abrindo o modelo da obra…
+          </p>
+        </div>
+      </div>
     );
   }
   if (!lista.modelos?.length) return <p className="text-[13px] text-gray-500">O modelo desta obra não está disponível aqui.</p>;

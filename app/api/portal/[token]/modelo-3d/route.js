@@ -4,16 +4,16 @@
 // Vitor (03/09/2026): "conseguimos ter a opção de disponibilizar esse painel no portal do cliente
 // para eles conseguirem olhar e navegar no modelo".
 //
-// ⚠⚠ SÓ O QUE ESTÁ NA PASTA DO CLIENTE. Internamente o portal lê qualquer IFC de 2.5 Projetos;
-// aqui não. A Engenharia já tem uma pasta que significa "isto vai para o cliente" — a 2.5.5 — e é
-// só dela que este endpoint serve. O modelo de trabalho, a revisão velha e o estudo que ninguém
-// aprovou ficam de fora por construção, não por lembrança de quem publica.
+// ⚠⚠ SÓ O QUE FOI MARCADO. Internamente o portal lê qualquer IFC da pasta 2.5 Projetos; aqui não.
+// O cliente recebe exatamente os arquivos que alguém escolheu na seleção de documentos da
+// Engenharia (Vitor, 03/09/2026: "quero selecionar qual IFC vamos colocar, pois temos o com telha e
+// o sem telha"). Modelo de trabalho, revisão velha e estudo não aprovado ficam de fora porque
+// ninguém os marcou — e é a mesma marcação que publica o download, então a decisão é uma só.
 //
 // ⚠ E só com a seção MODELO_3D ligada no portal da obra: publicar o modelo é decisão por obra.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { inventarioEngenharia } from "@/lib/pasta-engenharia";
-import { downloadFileByPath, acharPastaOp } from "@/lib/sharepoint";
+import { getAccessToken } from "@/lib/sharepoint";
 import { secoesDoPortal, tipoDoDocEng } from "@/lib/portal-cliente";
 
 export const runtime = "nodejs";
@@ -21,8 +21,6 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const TETO_MB = 60;
-// o modelo do cliente mora aqui — o caminho casa por código, não pelo nome da pasta
-const RX_CLIENTE = /2\.5\.5/;
 
 async function abrir(token) {
   const portal = await prisma.portalCliente.findUnique({ where: { token } });
@@ -38,37 +36,28 @@ export async function GET(req, { params }) {
   const { token } = await params;
   const ctx = await abrir(token);
   if (ctx.erro) return NextResponse.json({ error: ctx.erro }, { status: ctx.status });
-  const { op } = ctx;
+  const { op, portal } = ctx;
+
+  // ⚠⚠ NÃO SE VARRE O SHAREPOINT PARA ABRIR O MODELO. Vitor (03/09/2026): "o modelo IFC do portal
+  // está abrindo em branco, parece que não carrega". Não estava quebrado: estava esperando. A
+  // listagem varria a árvore da Engenharia inteira (1.400 documentos na OP-118) só para achar dois
+  // arquivos — vinte segundos de tela branca antes de a primeira coisa aparecer.
+  //
+  // E era varredura desnecessária: os IFCs que vão ao cliente são os que alguém MARCOU, e a marcação
+  // já guarda id, nome e tamanho. A lista sai do próprio registro do portal, em milissegundos, e o
+  // download vai pelo id do item — o mesmo caminho do download de documento (rota /eng).
+  const escolhidos = (portal.docsPorArea?.ENGENHARIA || portal.docsEngenharia || [])
+    .filter((d) => d?.id && /\.ifc$/i.test(String(d?.nome || "")) && tipoDoDocEng(d) === "MODELO_3D");
+
+  const modelos = escolhidos.map((d) => ({
+    nome: d.nomeExibicao || d.nome,
+    rel: String(d.id),
+    kb: Number(d.tamanho) ? Math.round(Number(d.tamanho) / 1024) : null,
+    em: d.em || null,
+    grande: Number(d.tamanho) > TETO_MB * 1024 * 1024,
+  }));
 
   const rel = new URL(req.url).searchParams.get("rel");
-  const inv = await inventarioEngenharia(op.numero);
-  if (!inv.achou) return NextResponse.json({ error: "Modelo não disponível." }, { status: 404 });
-
-  // ⚠⚠ QUAL IFC VAI, QUEM ESCOLHE É QUEM PUBLICA. Vitor (03/09/2026): "quero selecionar qual IFC
-  // vamos colocar, pois temos o com telha e o sem telha, então preciso selecionar o correto".
-  // E a escolha não ganhou tela nova: vale a MESMA marcação de documentos da Engenharia (a que já
-  // publica o arquivo para download). Um lugar só para decidir — marcar o arquivo publica o
-  // download E abre o modelo; desmarcar tira os dois. Duas telas para a mesma decisão é como uma
-  // obra acaba com o modelo errado aberto e o certo disponível para baixar.
-  const escolhidos = new Set(
-    (ctx.portal.docsPorArea?.ENGENHARIA || ctx.portal.docsEngenharia || [])
-      .filter((d) => /\.ifc$/i.test(String(d?.nome || "")) && tipoDoDocEng(d) === "MODELO_3D")
-      .map((d) => String(d.nome).trim().toLowerCase())
-  );
-
-  const modelos = (inv.ifc || [])
-    .filter((a) => RX_CLIENTE.test(String(a.rel || "")))
-    // ⚠ sem nenhum IFC marcado, a seção não mostra modelo: publicar tudo o que estiver na pasta é
-    // exatamente o que ele não quer.
-    .filter((a) => escolhidos.has(String(a.nome || "").trim().toLowerCase()))
-    .map((a) => ({
-      nome: a.nome,
-      rel: a.rel ? `${a.rel}/${a.nome}` : a.nome,
-      kb: a.kb ?? null, em: a.em || null,
-      grande: (a.kb || 0) > TETO_MB * 1024,
-    }))
-    .sort((a, b) => String(b.em).localeCompare(String(a.em)));
-
   if (!rel) {
     return NextResponse.json({
       obra: { numero: op.numero, cliente: op.cliente, obra: op.obra },
@@ -76,25 +65,27 @@ export async function GET(req, { params }) {
     });
   }
 
-  // ⚠ comparação exata contra a lista que acabamos de montar: o caminho nunca vem do navegador.
+  // ⚠ o id tem de estar na lista que acabamos de montar: o caminho nunca vem do navegador.
   const escolhido = modelos.find((m) => m.rel === rel);
   if (!escolhido) return NextResponse.json({ error: "Modelo não encontrado." }, { status: 404 });
   if (escolhido.grande) return NextResponse.json({ error: "Modelo grande demais para abrir no navegador." }, { status: 413 });
 
-  const base = await acharPastaOp(op.numero);
-  if (!base) return NextResponse.json({ error: "Modelo não disponível." }, { status: 404 });
-
-  let buf;
-  try { buf = await downloadFileByPath({ driveId: process.env.SHAREPOINT_DRIVE_ID, fullPath: `${base}/2. Engenharia/2.5 Projetos/${escolhido.rel}` }); }
-  catch { return NextResponse.json({ error: "Não consegui abrir o modelo agora." }, { status: 502 }); }
-
-  return new Response(buf, {
-    status: 200,
-    headers: {
-      "Content-Type": "application/octet-stream",
-      "Content-Length": String(buf.length),
-      "Cache-Control": "private, max-age=3600",
-      "Content-Disposition": `inline; filename="${encodeURIComponent(escolhido.nome)}"`,
-    },
-  });
+  try {
+    const auth = { Authorization: `Bearer ${await getAccessToken()}` };
+    const r = await fetch(`https://graph.microsoft.com/v1.0/drives/${process.env.SHAREPOINT_DRIVE_ID}/items/${encodeURIComponent(rel)}/content`,
+      { headers: auth, redirect: "follow", cache: "no-store" });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const buf = Buffer.from(await r.arrayBuffer());
+    return new Response(buf, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Length": String(buf.length),
+        "Cache-Control": "private, max-age=3600",
+        "Content-Disposition": `inline; filename="${encodeURIComponent(escolhido.nome)}"`,
+      },
+    });
+  } catch {
+    return NextResponse.json({ error: "Não consegui abrir o modelo agora." }, { status: 502 });
+  }
 }
