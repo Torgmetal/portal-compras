@@ -258,12 +258,16 @@ export default function ModeloClient({ ops }) {
       )}
 
       {/* corpo: cena + painéis, ocupando tudo o que sobra */}
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row bg-white">
+      {/* ⚠⚠ SEMPRE EM COLUNAS LADO A LADO. Estava `flex-col lg:flex-row`: abaixo de 1024 px de
+          janela os painéis iam para BAIXO da cena — e como a cena ocupa a altura toda, o painel da
+          peça nascia fora da tela. O sintoma era o pior possível: clicar na peça parecia não fazer
+          nada. Numa tela de modelo 3D, painel ao lado é o único arranjo que funciona. */}
+      <div className="flex-1 min-h-0 flex flex-row bg-white">
         {/* ⚠ o filtro fica À ESQUERDA e o dossiê à direita: são movimentos opostos — um escolhe o
             que ver, o outro lê o que foi escolhido — e disputar o mesmo lado faria um fechar o
             outro justamente quando se usa os dois juntos. */}
         {painel && indice && (
-          <aside className="w-full lg:w-[290px] shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200 overflow-y-auto bg-white">
+          <aside className="w-[290px] max-w-[38vw] shrink-0 border-r border-gray-200 overflow-y-auto bg-white">
             <div className="p-3.5 space-y-3.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-[12px] font-bold text-torg-dark uppercase tracking-wide">Filtrar a vista</h3>
@@ -342,7 +346,12 @@ export default function ModeloClient({ ops }) {
           </aside>
         )}
 
-        <div className="flex-1 min-h-0 relative">
+        {/* ⚠⚠ `min-w-0` É O QUE FAZ O PAINEL APARECER. Item de flex nasce com `min-width:auto`, ou
+            seja, não encolhe abaixo do conteúdo — e o conteúdo aqui é um canvas com largura em
+            pixels, do tamanho da janela. Sem isto a cena se recusava a estreitar e empurrava o
+            painel para fora da tela (medido: o painel nascia em x=1440 numa janela de 1440). O
+            clique funcionava o tempo todo; o que não aparecia era a resposta. */}
+        <div className="flex-1 min-w-0 min-h-0 relative">
           {erro && (
             <div className="absolute inset-0 grid place-items-center p-6 z-10 bg-white">
               <p className="text-[13px] text-red-600 text-center max-w-sm inline-flex items-start gap-2">
@@ -372,7 +381,7 @@ export default function ModeloClient({ ops }) {
         {/* ⚠ o painel só existe quando há peça: coluna vazia ocupando um terço da tela rouba da obra
             justamente quando não há nada a dizer. */}
         {sel && (
-          <aside className="w-full lg:w-[360px] shrink-0 border-t lg:border-t-0 lg:border-l border-gray-200 overflow-y-auto bg-white">
+          <aside className="w-[360px] max-w-[42vw] shrink-0 border-l border-gray-200 overflow-y-auto bg-white">
             <div className="p-4">
               {sel.parafuso && <PainelParafuso p={sel.parafuso} qtd={sel.pecas} />}
               {sel.marca && carregandoPeca && <p className="text-[13px] text-torg-gray inline-flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> buscando {sel.marca}…</p>}

@@ -71,9 +71,11 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
     try {
       // ── 1. marca ──
       const marcaDoAsm = new Map();
+      const conjuntos = new Set();     // TODO conjunto, tenha marca ou não
       const asms = api.GetLineIDsWithType(modelID, WebIFC.IFCELEMENTASSEMBLY);
       for (let i = 0; i < asms.size(); i++) {
         const id = asms.get(i);
+        conjuntos.add(id);
         const tag = String(val(api.GetLine(modelID, id)?.Tag) || "").replace(/\(\?\)/g, "").trim();
         // ⚠⚠ MARCA VAZIA NÃO É MARCA. Quando a numeração ainda não rodou, o Tekla exporta a Tag como
         // "V0(?)", "S0(?)" ou "0(?)" — foi o caso do executivo da OP-089, com os 148 conjuntos
@@ -81,19 +83,25 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         // ir buscar na LPC uma marca que não existe. Marca de verdade tem número diferente de zero.
         if (tag && !/^[A-Za-z]*0*$/.test(tag)) marcaDoAsm.set(id, tag);
       }
-      total = marcaDoAsm.size;
+      total = conjuntos.size;
+      // ⚠⚠ O CONJUNTO EXISTE MESMO SEM MARCA, e ignorar isso quebrou a tela: quando o modelo sai do
+      // Tekla sem numeração, pular os assemblies sem marca deixava TODA peça sem conjunto — as 2.950
+      // viravam um item só. O clique acendia a obra inteira de laranja e o painel abria dizendo
+      // "sem marca" para o modelo todo. Marca é um DADO do conjunto, não a razão dele existir.
       const rels = api.GetLineIDsWithType(modelID, WebIFC.IFCRELAGGREGATES);
       for (let i = 0; i < rels.size(); i++) {
         const l = api.GetLine(modelID, rels.get(i));
-        const marca = marcaDoAsm.get(l?.RelatingObject?.value);
-        if (!marca) continue;
-        const asm = l.RelatingObject.value;
+        const asm = l?.RelatingObject?.value;
+        if (asm == null || !conjuntos.has(asm)) continue;
+        const marca = marcaDoAsm.get(asm) || null;
         for (const f of l?.RelatedObjects || []) {
           if (f?.value == null) continue;
-          marcaDe.set(f.value, marca); asmDe.set(f.value, asm);
+          if (marca) marcaDe.set(f.value, marca);
+          asmDe.set(f.value, asm);
         }
       }
-      for (const [id, m] of marcaDoAsm) { marcaDe.set(id, m); asmDe.set(id, id); }
+      for (const id of conjuntos) asmDe.set(id, id);
+      for (const [id, m] of marcaDoAsm) marcaDe.set(id, m);
 
       // ── 2. tipo ──
       for (const [tipoIfc, rotulo] of [
