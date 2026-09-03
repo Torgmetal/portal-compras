@@ -17,7 +17,7 @@ import { registrarAcesso } from "@/lib/portal-acesso";
 import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
 const GRAPH = "https://graph.microsoft.com/v1.0";
 
 // ⚠⚠ TETO DE TAMANHO E DE QUANTIDADE. O ZIP é montado INTEIRO em memória (PizZip não faz stream) —
@@ -29,8 +29,16 @@ const GRAPH = "https://graph.microsoft.com/v1.0";
 // de conjunto pesa ~120 KB: 60 arquivos barravam uma pasta de 240 que soma 31 MB — bem dentro do
 // limite de memória. O limite de contagem virou uma trava contra pedido absurdo, não contra o uso
 // normal; quem manda a memória embora é o total.
-const TETO_BYTES = 60 * 1024 * 1024;
-const TETO_ARQUIVOS = 400;
+// ⚠⚠ O TETO SUBIU, E O QUE O PERMITIU FOI A MEMÓRIA. Vitor (03/09/2026): "o limite de download das
+// pastas é de 49 MB?". Era 60 aqui e 50 no navegador — e uma pasta de fabricação com 1.300 desenhos
+// passa disso com folga, então a pessoa recebia o pacote picado em oito partes.
+//
+// O zip é montado INTEIRO em memória (o PizZip não faz stream), então o teto é memória de verdade,
+// não capricho. A função passou a 3 GB no vercel.json; com STORE (sem compressão — PDF e DWG já
+// vêm comprimidos, comprimir de novo só gasta CPU) o pico é mais ou menos o dobro do pacote. 200 MB
+// cabe com folga larga.
+const TETO_BYTES = 200 * 1024 * 1024;
+const TETO_ARQUIVOS = 800;
 
 export async function POST(req, { params }) {
   const { token } = await params;

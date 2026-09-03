@@ -25,6 +25,10 @@
     },
     "app/api/relatorio/aceite/[token]/pdf/route.js": {
       "memory": 3009
+    },
+    "app/api/portal/[token]/eng-zip/route.js": {
+      "memory": 3009,
+      "maxDuration": 300
     }
   },
   "crons": [

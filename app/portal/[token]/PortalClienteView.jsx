@@ -752,7 +752,10 @@ function DocumentosDaArea({ grupos, token, cod }) {
   // ⚠ O CORTE É POR TAMANHO, não por quantidade: cada item já traz o `tamanho`, e é o peso somado
   // que derruba a função. Um arquivo sozinho maior que o teto vai na sua própria parte — cabe ao
   // servidor recusá-lo com a mensagem certa, não a esta função escondê-lo.
-  const TETO_PARTE = 50 * 1024 * 1024;
+  // ⚠ 150 MB por parte (o servidor aceita 200) e no máximo 700 arquivos: o corte por TAMANHO
+  // sozinho deixava passar uma parte com 1.300 desenhos leves, acima do teto de contagem lá.
+  const TETO_PARTE = 150 * 1024 * 1024;
+  const TETO_PARTE_ARQS = 700;
 
   // ⚠⚠ BAIXAR A PASTA INTEIRA NUM CLIQUE. Vitor (03/09/2026, cobrando): "vc ainda não arrumou a
   // opção de conseguir selecionar a pasta e vc levar ela toda para o portal deles e deixar eles
@@ -767,7 +770,7 @@ function DocumentosDaArea({ grupos, token, cod }) {
       let atual = [], peso = 0;
       for (const d of escolhidos) {
         const t = Number(d.tamanho) || 0;
-        if (atual.length && peso + t > TETO_PARTE) { partes.push(atual); atual = []; peso = 0; }
+        if (atual.length && (peso + t > TETO_PARTE || atual.length >= TETO_PARTE_ARQS)) { partes.push(atual); atual = []; peso = 0; }
         atual.push(d); peso += t;
       }
       if (atual.length) partes.push(atual);
