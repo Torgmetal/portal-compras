@@ -17,7 +17,7 @@ import { useEffect, useMemo, useState, Fragment } from "react";
 import { Loader2, ChevronRight } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
-import { diasDoLote, rotuloMaquina } from "@/lib/capacidade-preparacao";
+import { diasDoLote, rotuloMaquina, META_KG_DIA_PREPARACAO } from "@/lib/capacidade-preparacao";
 
 const fmtN = (n) => new Intl.NumberFormat("pt-BR").format(Math.round(Number(n) || 0));
 const fmt1 = (n) => (Math.round((Number(n) || 0) * 10) / 10).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -32,9 +32,10 @@ export default function FaltaPreparar({ setor }) {
   const [sel, setSel] = useState(() => new Set());
   const [aberto, setAberto] = useState(null);
   const [aberta, setAberta] = useState(null);
-  // ⚠ MESMA META DO PAINEL DE CARGA (12.000 kg/dia). Dois números para a mesma capacidade fariam a
-  // mesma seleção ter dois prazos dependendo da tela em que se olha.
-  const [metaKg, setMetaKg] = useState(12000);
+  // ⚠ MESMA META DO RESTO DO PORTAL (lib/capacidade-preparacao, hoje 10.000 kg/dia com os dois
+  // turnos). Dois números para a mesma capacidade fariam a mesma seleção ter dois prazos
+  // dependendo da tela em que se olha — era o que acontecia: 6.000 na carga, 12.000 aqui.
+  const [metaKg, setMetaKg] = useState(META_KG_DIA_PREPARACAO);
 
   useEffect(() => {
     let vivo = true;

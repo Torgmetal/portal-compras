@@ -4,6 +4,7 @@
 // onde há espaço para encaixar uma obra.
 import { NextResponse } from "next/server";
 import { OP_VIVA } from "@/lib/op-viva";
+import { META_KG_DIA_PREPARACAO } from "@/lib/capacidade-preparacao";
 import { SO_FABRICACAO } from "@/lib/lista-pecas";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -16,7 +17,11 @@ export const maxDuration = 30;
 // subestima a capacidade porque inclui dias de baixa alimentação da máquina,
 // então usamos a meta do setor como capacidade de planejamento. O ritmo real
 // medido continua exposto (ritmoRealKgDia) só como referência.
-const META_PREPARACAO_KG_DIA = 6000;
+//
+// ⚠ A META MORA NUM LUGAR SÓ (lib/capacidade-preparacao). Aqui era 6.000 e no painel do PCP eram
+// 12.000: o mesmo lote dava dois prazos conforme a tela. Vitor (03/09/2026) fechou em 10.000, com
+// os dois turnos.
+const META_PREPARACAO_KG_DIA = META_KG_DIA_PREPARACAO;
 
 // Soma N dias úteis (seg–sex) a partir de hoje (BRT), retorna ISO YYYY-MM-DD
 function slotLivreISO(diasUteis) {

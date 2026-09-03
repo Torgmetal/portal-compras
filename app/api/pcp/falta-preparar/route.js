@@ -21,7 +21,7 @@ import { SO_FABRICACAO } from "@/lib/lista-pecas";
 import { OP_VIVA } from "@/lib/op-viva";
 import { pecaCortada } from "@/lib/liberacao-producao";
 import { opIdsNaFilaDoPcp } from "@/lib/op-na-fila-pcp";
-import { capacidadePorMaquina, normalizaMaquina, META_KG_DIA_PREPARACAO } from "@/lib/capacidade-preparacao";
+import { capacidadePorMaquina, normalizaMaquina, META_KG_DIA_PREPARACAO, DIAS_AMOSTRA } from "@/lib/capacidade-preparacao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -127,7 +127,16 @@ export async function GET(req) {
   // ⚠ a capacidade é MEDIDA do apontamento, por máquina (ver lib/capacidade-preparacao): a meta
   // agregada de 12 t não enxerga que 12 t de cantoneira é outro dia que 12 t de perfil.
   let cap = { capacidade: {}, amostra: {}, totalKgDia: 0 };
-  try { cap = await capacidadePorMaquina(); } catch { /* sem apontamento a tela cai na meta agregada */ }
+  try {
+    const desde = new Date();
+    desde.setDate(desde.getDate() - DIAS_AMOSTRA);
+    const aps = await prisma.mesApontamento.findMany({
+      where: { dataInicio: { gte: desde }, produzidoKg: { gt: 0 }, setor: { contains: "corte", mode: "insensitive" } },
+      select: { maquina: true, dataInicio: true, produzidoKg: true },
+      take: 60000,
+    });
+    cap = capacidadePorMaquina(aps);
+  } catch { /* sem apontamento a tela cai na meta agregada */ }
 
   return NextResponse.json({
     setor, todas, itens,
