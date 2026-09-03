@@ -485,7 +485,12 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     const base = !vertical
       ? (lado === "topo" ? my - dados.altura : -my)
       : (lado === "dir" ? mx - dados.largura : -mx);
-    return Math.max(6, Math.min(PADDING - 6, base));
+    // ⚠⚠ O PISO É NEGATIVO — é o que deixa a cota entrar EM CIMA do desenho. Vitor (03/09/2026):
+    // "você não deixa eu colocar ela em cima do desenho, ou seja não consigo colocar ela onde eu
+    // preciso". Com piso 6 a linha ficava presa na folga em volta da peça; num diagrama de montagem
+    // a medida a conferir mora no meio do desenho. Mesmos limites de lib/cota-marcacao.js.
+    const dim = vertical ? dados.largura : dados.altura;
+    return Math.max(-(dim + PADDING - 6), Math.min(PADDING - 6, base));
   }
 
   function aoPressionar(e) {
@@ -599,11 +604,16 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
   // também... deixar mais comprida ou mais curta". `afastamento` é a distância da linha de cota até
   // a peça, na mesma unidade do desenho; PADDING - 6 é o teto (lib/cota-marcacao.js corta ali de
   // qualquer jeito, senão a linha sairia da folga reservada e seria cortada no desenho e no PDF).
+  //
+  // ⚠ o piso é NEGATIVO: passar de zero é a cota entrando por cima do desenho, que é onde a medida
+  // costuma morar num diagrama de montagem. Mesmos limites do arrasto e de lib/cota-marcacao.js.
   function ajustarAfastamento(i, delta) {
     const c = cotas[i];
     if (!c || c.ax == null) return;
     const atual = c.afastamento != null ? c.afastamento : 12;
-    const novo = Math.max(6, Math.min(PADDING - 6, atual + delta));
+    const vertical = Math.abs(c.by - c.ay) > Math.abs(c.bx - c.ax);
+    const dim = vertical ? dados.largura : dados.altura;
+    const novo = Math.max(-(dim + PADDING - 6), Math.min(PADDING - 6, atual + delta));
     registrar();
     onChange(cotas.map((x, k) => (k === i ? { ...x, afastamento: novo } : x)));
   }
