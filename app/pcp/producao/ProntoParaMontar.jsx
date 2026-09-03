@@ -18,8 +18,9 @@
 // ⚠ O CÁLCULO É O MESMO DO RESTO DO PORTAL (lib/montagem-capacidade): peça por faixa de peso, não
 // kg. Uma segunda régua aqui daria ao mesmo lote dois prazos.
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, CalendarCheck } from "lucide-react";
+import { Loader2, CalendarCheck, Printer } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
+import { baixarZipLote } from "@/lib/desenhos-zip-cliente";
 import {
   repartirPorBancada, distribuirEmDias, resumoDoLote, custoDoConjunto, RITMO_META,
 } from "@/lib/montagem-capacidade";
@@ -81,13 +82,27 @@ export default function ProntoParaMontar({ onProgramado }) {
   const alternar = (id) => setSel((p) => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; });
   const todos = conjuntos.length > 0 && sel.size === conjuntos.length;
 
-  async function programar() {
+  // ⚠⚠ PROGRAMAR E IMPRIMIR SÃO DOIS ATOS, e o botão de cada um diz qual é. Vitor (03/09/2026):
+  // "aí sim, depois de tudo isso, você deixar imprimir os projetos, as listas de bancadas com as
+  // datas que estão previstas para iniciar e terminar, e os pacotes por bancadas, igual temos hoje
+  // quando apertamos em imprimir". Quem só quer fechar a semana programa; quem vai entregar o maço
+  // ao encarregado imprime junto.
+  //
+  // ⚠ A ORDEM IMPORTA: LIBERA ANTES DE IMPRIMIR (mesma razão da tela da Montagem). A rota de
+  // impressão registra a GRD — o papel que prova o que desceu — e o servidor recusa conjunto que
+  // não está 100% cortado. Imprimir antes seria assinar GRD de peça que ele vai barrar.
+  async function programar({ imprimir = false } = {}) {
     if (!escolhidos.length) return;
-    const bancadaPorId = {}, diaPorId = {}, ids = [];
-    for (const b of distrib) for (const it of b.itens) { bancadaPorId[it.id] = b.bancada; ids.push(it.id); }
+    const bancadaPorId = {}, bancadaPorMarca = {}, diaPorId = {}, ids = [];
+    const opDoId = new Map(), marcaDoId = new Map();
+    for (const b of distrib) for (const it of b.itens) {
+      bancadaPorId[it.id] = b.bancada; bancadaPorMarca[it.marca] = b.bancada; ids.push(it.id);
+      opDoId.set(it.id, it.opNumero); marcaDoId.set(it.id, it.marca);
+    }
     for (const b of porDia) for (const d of (b.dias || [])) for (const it of d.itens) diaPorId[it.id] = iso(d.dia);
     if (!confirm(`Programar ${ids.length} conjunto(s) em ${distrib.length} bancada(s), de ${fmtDiaCurto(inicio)} a ${fmtDiaCurto(fecha)}?\n\n`
-      + "Grava o dia e a bancada de cada um. O desenho desce depois, pela aba ao lado.")) return;
+      + (imprimir ? "Grava o dia e a bancada de cada um e baixa o maço, com uma pasta por bancada."
+                  : "Grava o dia e a bancada de cada um. O desenho desce depois, pela aba ao lado."))) return;
     setSalvando(true); setErro("");
     try {
       const r = await fetch("/api/producao/pecas/liberar-montagem", {
@@ -102,6 +117,32 @@ export default function ProntoParaMontar({ onProgramado }) {
         setErro(`${j.bloqueados.length} não entraram: ${j.bloqueados.slice(0, 5).map((b) => `${b.marca} (${b.cortados}/${b.total} croquis)`).join(", ")}`);
       }
       const feitos = new Set(j.liberadosIds || ids);
+
+      if (imprimir) {
+        // ⚠ UMA CHAMADA POR OBRA: a rota do lote é por OP e a seleção atravessa obras. Mandar tudo
+        // junto imprimiria desenho da obra errada — ou simplesmente não acharia o arquivo.
+        const porOp = new Map();
+        for (const id of feitos) {
+          const op = opDoId.get(id); if (!op) continue;
+          if (!porOp.has(op)) porOp.set(op, []);
+          porOp.get(op).push(marcaDoId.get(id));
+        }
+        const falhas = [];
+        for (const [opNumero, marcas] of porOp) {
+          try {
+            const r2 = await fetch("/api/producao/desenhos/lote", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ opNumero, marcas: [...new Set(marcas)], setor: "MONTAGEM", acao: "IMPRIMIR", bancadaPorMarca }),
+            });
+            const j2 = await r2.json();
+            if (!r2.ok) throw new Error(j2.error || "erro ao emitir");
+            await baixarZipLote(j2, opNumero, "montagem");
+          } catch (e) { falhas.push(`OP ${fmtOP(opNumero)}: ${e?.message || "falhou"}`); }
+        }
+        imprimirListaBancadas(distrib, porDia, feitos);
+        if (falhas.length) setErro((v) => [v, ...falhas].filter(Boolean).join(" · "));
+      }
+
       setLista((prev) => (prev || []).filter((c) => !feitos.has(c.id)));
       setSel((p) => { const s = new Set(p); feitos.forEach((id) => s.delete(id)); return s; });
       onProgramado?.();
@@ -212,17 +253,79 @@ export default function ProntoParaMontar({ onProgramado }) {
       {erro && <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">{erro}</p>}
 
       <div className="flex items-center gap-2.5 flex-wrap">
-        <button onClick={programar} disabled={salvando || !escolhidos.length}
+        <button onClick={() => programar()} disabled={salvando || !escolhidos.length}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-torg-orange text-white hover:opacity-90 disabled:opacity-40">
           {salvando ? <Loader2 size={13} className="animate-spin" /> : <CalendarCheck size={13} />}
           Programar as {distrib.filter((b) => b.itens.length).length || n} bancadas
         </button>
+        <button onClick={() => programar({ imprimir: true })} disabled={salvando || !escolhidos.length}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg border border-torg-blue text-torg-blue bg-white hover:bg-torg-blue-50 disabled:opacity-40">
+          <Printer size={13} />
+          Programar e imprimir
+        </button>
         <span className="text-[11px] text-torg-gray-light">
-          grava o dia e a bancada de cada conjunto · o desenho desce depois, pela aba ao lado
+          programar grava o dia e a bancada · imprimir sai com os projetos, a lista de cada bancada e os pacotes separados por bancada
         </span>
       </div>
     </div>
   );
+}
+
+// ─── A LISTA DE CADA BANCADA, para o encarregado ───────────────────────────────
+// Vitor (03/09/2026): "as listas de bancadas com as datas que estão previstas para iniciar e
+// terminar". É o papel que fica na bancada — por isso o cabeçalho de cada bloco repete a data, e a
+// folha quebra por bancada: um encarregado não deve receber a lista do vizinho junto.
+//
+// ⚠ SÓ O QUE O SERVIDOR LIBEROU (`feitos`): imprimir o que ele barrou mandaria montar conjunto que
+// voltou para a máquina.
+function imprimirListaBancadas(distrib, porDia, feitos) {
+  const blocos = distrib
+    .map((b) => {
+      const itens = b.itens.filter((it) => feitos.has(it.id));
+      if (!itens.length) return null;
+      const dias = (porDia.find((x) => x.bancada === b.bancada)?.dias || []).map((d) => iso(d.dia));
+      const diaDoId = new Map();
+      for (const d of (porDia.find((x) => x.bancada === b.bancada)?.dias || [])) {
+        for (const it of d.itens) diaDoId.set(it.id, iso(d.dia));
+      }
+      return { bancada: b.bancada, ini: dias[0] || null, fim: dias[dias.length - 1] || null, itens, diaDoId };
+    })
+    .filter(Boolean);
+  if (!blocos.length) return;
+
+  const esc = (t) => String(t ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<title>Montagem — lista por bancada</title><style>
+  @page { size: A4; margin: 12mm; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; }
+  .bl { page-break-after: always; }
+  .bl:last-child { page-break-after: auto; }
+  h1 { font-size: 15px; margin: 0 0 2px; color: #0D1F3C; }
+  .sub { font-size: 11px; color: #555; margin: 0 0 10px; }
+  .faixa { border-top: 3px solid #F4801F; margin: 4px 0 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { background: #0D1F3C; color: #fff; text-align: left; padding: 4px 6px; font-weight: 600; }
+  td { border-bottom: 1px solid #e5e5e5; padding: 3px 6px; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+</style></head><body>
+${blocos.map((b) => `<div class="bl">
+  <h1>Montagem — ${esc(b.bancada)}</h1>
+  <p class="sub">previsto de <b>${fmtDiaSemana(b.ini)}</b> a <b>${fmtDiaSemana(b.fim)}</b> · ${b.itens.length} conjunto(s)</p>
+  <div class="faixa"></div>
+  <table><thead><tr><th>dia</th><th>OP</th><th>conjunto</th><th>descrição</th><th class="num">peças</th><th class="num">kg</th></tr></thead><tbody>
+  ${b.itens.map((it) => `<tr><td>${esc(fmtDiaCurto(b.diaDoId.get(it.id)))}</td><td>${esc(fmtOP(it.opNumero))}</td>`
+    + `<td><b>${esc(it.marca)}</b></td><td>${esc(it.descricao || "")}</td>`
+    + `<td class="num">${fmtN(it.qte)}</td><td class="num">${fmtN(it.pesoTotalKg)}</td></tr>`).join("")}
+  </tbody></table>
+</div>`).join("")}
+</body></html>`;
+
+  const w = window.open("", "_blank");
+  if (!w) return; // bloqueador de pop-up — o ZIP já baixou, não vale travar o fluxo por causa da folha
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  w.print();
 }
 
 function Cx({ rot, val, sub }) {
