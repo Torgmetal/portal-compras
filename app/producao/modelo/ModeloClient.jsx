@@ -173,6 +173,22 @@ export default function ModeloClient({ ops }) {
       || String(x.tipo || "").toUpperCase().includes(t));
   }, [selecionados, indice, busca]);
 
+  // ⚠⚠ OS PARAFUSOS DO NÍVEL. Vitor (03/09/2026): "não lista os parafusos dos níveis". Eles estão
+  // no segundo bloco da planilha da Engenharia, com quantidade de montagem, norma e acabamento —
+  // sem eles a lista do nível está incompleta para quem vai montar.
+  const parafusosDoNivel = useMemo(() => {
+    if (!daObra) return [];
+    const alvo = niveisObra.niveis.filter((_, i) => !fNiveis.size || fNiveis.has(`o${i}`));
+    const c = new Map();
+    for (const nv of alvo) {
+      for (const p of nv.consumiveis || []) {
+        const k = `${p.tipo}|${p.descricao}|${p.norma}|${p.acabamento}`;
+        c.set(k, { ...p, qtd: (c.get(k)?.qtd || 0) + (p.qtd || 0) });
+      }
+    }
+    return [...c.values()].sort((a, b) => a.tipo.localeCompare(b.tipo) || a.descricao.localeCompare(b.descricao));
+  }, [daObra, niveisObra, fNiveis]);
+
   const soma = useMemo(() => {
     const alvo = selecionados || indice || [];
     return {
@@ -235,40 +251,80 @@ export default function ModeloClient({ ops }) {
       const nivelDoItem = (x) => (daObra
         ? niveisNaTela.find((nv) => x.marca && nv.marcas.has(chaveMarca(x.marca)))?.rotulo || ""
         : rotNivel(x.nivel));
+      // ⚠⚠ SEIS COLUNAS, NÃO TREZE. A primeira versão levava bitola, comprimento, furo, porca,
+      // arruela e "aperta em" como colunas próprias — vazias em 99% das linhas, porque só parafuso
+      // preenche. Treze colunas em A4 paisagem com ajuste para uma página só espremem tudo a ponto
+      // de não se ler, e coluna vazia em massa é o que faz a planilha parecer quebrada. O parafuso
+      // ganhou bloco próprio embaixo, que é como a própria lista da Engenharia é montada.
       const COLS = [
         { t: "Tipo", w: 14, v: (x) => x.tipo || "" },
         { t: "Marca / especificação", w: 30, v: (x) => x.marca || x.parafuso?.nome || "sem marca no modelo" },
-        { t: "Norma", w: 12, v: (x) => x.parafuso?.norma || "" },
-        { t: "Nível", w: 20, v: nivelDoItem },
+        { t: "Nível", w: 24, v: nivelDoItem },
         // ⚠ mm, não metro: é a unidade do projeto e da montagem (Vitor, 03/09/2026).
         { t: "Cota base (mm)", w: 15, dir: "right", v: (x) => (x.cota == null ? "" : Math.round(x.cota * 1000)) },
-        { t: "Qtd", w: 8, dir: "right", v: (x) => x.pecas || 0 },
-        { t: "Peso do modelo (kg)", w: 18, dir: "right", v: (x) => (x.pesoKg == null ? "" : Math.round(x.pesoKg)) },
-        { t: "Bitola (mm)", w: 12, dir: "right", v: (x) => x.parafuso?.bitolaMm ?? "" },
-        { t: "Compr. (mm)", w: 12, dir: "right", v: (x) => x.parafuso?.compMm ?? "" },
-        { t: "Furo (mm)", w: 11, dir: "right", v: (x) => x.parafuso?.furoMm ?? "" },
-        { t: "Porca", w: 16, v: (x) => x.parafuso?.porca || "" },
-        { t: "Arruela", w: 16, v: (x) => x.parafuso?.arruela || "" },
-        { t: "Aperta em", w: 12, v: (x) => x.parafuso?.local || "" },
+        { t: "Qtd", w: 9, dir: "right", v: (x) => x.pecas || 0 },
+        { t: "Peso do modelo (kg)", w: 19, dir: "right", v: (x) => (x.pesoKg == null ? "" : Math.round(x.pesoKg)) },
       ];
       const alinhamento = COLS.map((c) => c.dir || "left");
       const filtrado = !!selecionados;
+
+      // ⚠ os parafusos vêm da lista da Engenharia (quantidade real de montagem, com norma e
+      // acabamento), e do modelo quando o IFC os traz. Quando há nível marcado, só os daqueles.
+      const niveisDoRecorte = daObra
+        ? niveisObra.niveis.filter((_, i) => !fNiveis.size || fNiveis.has(`o${i}`))
+        : [];
+      const parafusos = [
+        // ⚠ a ordem das colunas acompanha a LARGURA da tabela de cima — a planilha tem um jogo de
+        // larguras só, e um bloco embaixo com outra ordem sai com o nível cortado na coluna estreita.
+        ...niveisDoRecorte.flatMap((nv) => (nv.consumiveis || []).map((c) => [
+          c.tipo, c.descricao, nv.rotulo, c.norma, c.qtd, c.acabamento,
+        ])),
+        ...(selecionados || indice || []).filter((x) => x.parafuso).map((x) => [
+          "PARAFUSO", x.parafuso.nome, "do modelo", x.parafuso.norma, x.pecas,
+          x.parafuso.local ? `aperta ${/obra|field|site/i.test(x.parafuso.local) ? "na obra" : `na ${String(x.parafuso.local).toLowerCase()}`}` : "",
+        ]),
+      ];
+
       const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
         titulo: `Modelo 3D — OP-${op?.numero || ""}`,
         subtitulo: [
           op?.obra || op?.cliente || "",
           modelo?.nome || "",
           filtrado
-            ? `Seleção: ${[...fNiveis].map(rotNivel).filter(Boolean).join(", ") || "todos os níveis"}${fTipos.size ? ` · ${[...fTipos].join(", ")}` : ""}`
+            ? `Seleção: ${[...fNiveis].map(rotNivel).filter(Boolean).join(", ") || "todos os níveis"}${fTipos.size ? ` · ${[...fTipos].join(", ")}` : ""}${fSetores.size ? ` · ${[...fSetores].join(", ")}` : ""}`
             : "Modelo inteiro",
         ].filter(Boolean).join(" · "),
-        kpis: [`${soma.grupos} item(ns)`, `${soma.pecas} peça(s)`, `${Math.round(soma.kg)} kg (modelo)`],
+        kpis: [`${soma.grupos} item(ns)`, `${soma.pecas} peça(s)`, soma.kg ? `${Math.round(soma.kg).toLocaleString("pt-BR")} kg (modelo)` : "peso não informado no modelo"],
         totalColunas: COLS.length, nomePlanilha: "Modelo 3D", codigoDoc: "REL-ENG-002",
       });
       ws.columns = COLS.map((c) => ({ width: c.w }));
+
       let l = linhaInicio;
       adicionarHeaderTabela(ws, l, COLS.map((c) => c.t)); l++;
-      for (const x of alvo) { adicionarLinhaTabela(ws, l, COLS.map((c) => c.v(x)), { alinhamento }); l++; }
+      // ⚠ congela no cabeçalho: são 3.032 conjuntos na OP-118, e rolar sem cabeçalho é adivinhar
+      // qual coluna é qual da linha 200 em diante.
+      ws.views = [{ state: "frozen", ySplit: l - 1 }];
+      for (const x of alvo) {
+        adicionarLinhaTabela(ws, l, COLS.map((c) => c.v(x)), { alinhamento });
+        // ⚠ milhar com ponto na coluna de peso e de cota: 12400 e 12.400 se leem diferente.
+        ws.getCell(l, 4).numFmt = "#,##0";
+        ws.getCell(l, 6).numFmt = "#,##0";
+        l++;
+      }
+
+      if (parafusos.length) {
+        l += 1;
+        const CP = [
+          { t: "Tipo" }, { t: "Descrição" }, { t: "Nível" },
+          { t: "Norma" }, { t: "Qtd", dir: "right" }, { t: "Acabamento" },
+        ];
+        adicionarLinhaTabela(ws, l, ["Parafusos, porcas e arruelas", "", "", "", "", ""], { bold: true, fontSize: 10 });
+        l++;
+        adicionarHeaderTabela(ws, l, CP.map((c) => c.t)); l++;
+        const alinP = CP.map((c) => c.dir || "left");
+        for (const p of parafusos) { adicionarLinhaTabela(ws, l, p, { alinhamento: alinP }); l++; }
+      }
+
       adicionarRodapeISO(ws, l + 1, COLS.length);
       await downloadWorkbook(workbook, `Modelo 3D - OP-${op?.numero || ""}${filtrado ? " - selecao" : ""}.xlsx`);
     } catch (e) { setErro(`Não consegui gerar a planilha: ${e?.message || e}`); }
@@ -442,6 +498,23 @@ export default function ModeloClient({ ops }) {
                 {soma.kg > 0 && <p><b className="text-torg-dark">{Math.round(soma.kg).toLocaleString("pt-BR")}</b> kg no modelo</p>}
                 {soma.parafusos > 0 && <p><b className="text-torg-dark">{soma.parafusos}</b> parafuso(s)</p>}
               </div>
+
+              {parafusosDoNivel.length > 0 && (
+                <details className="border-t border-gray-200 pt-2" open={fNiveis.size > 0 && fNiveis.size < 4}>
+                  <summary className="text-[10.5px] font-semibold text-torg-gray uppercase tracking-wide cursor-pointer">
+                    Parafusos {fNiveis.size ? "do nível" : "da obra"} · {parafusosDoNivel.reduce((t, p) => t + (p.qtd || 0), 0)} peças
+                  </summary>
+                  <div className="mt-1 space-y-0.5">
+                    {parafusosDoNivel.map((p, i) => (
+                      <div key={i} className="flex items-baseline gap-2 text-[11.5px] px-1.5">
+                        <span className="text-torg-dark truncate">{p.descricao}</span>
+                        <span className="text-[10.5px] text-torg-gray truncate">{[p.norma, p.acabamento].filter(Boolean).join(" · ")}</span>
+                        <span className="ml-auto text-torg-dark tabular-nums shrink-0">{p.qtd}</span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
 
               <div className="flex items-center gap-3 flex-wrap text-[11.5px]">
                 <label className="inline-flex items-center gap-1.5 cursor-pointer text-torg-dark">
