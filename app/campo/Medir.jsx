@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2, Camera, X } from "lucide-react";
 import LeitorQR from "./LeitorQR";
+import VistaCotas from "./VistaCotas";
 import { marcaDoQR, TIPOS_RELATORIO, usaCotas } from "@/lib/qualidade-campo";
 import Pintura from "./Pintura";
 import { ParametrosLP, IndicacaoLP } from "./Lp";
@@ -218,6 +219,11 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   // superficiais e metal base são OBSERVADOS na hora, com a peça na frente. Quem monta o relatório
   // no computador não tem como saber se a junta foi escovada ou está como soldada.
   const [cond, setCond] = useState({});
+  // ⚠ OBSERVAÇÃO GERAL DO RELATÓRIO. Vitor (03/09/2026): "crie um campo de observação geral para o
+  // relatório além dos campos das cotas que você já colocou". A `obs` de cada linha diz o que houve
+  // NAQUELA cota; esta vale para o documento inteiro (condição da peça, o que atrapalhou a medição,
+  // o que o cliente pediu na hora) e sai no quadro COMENTÁRIOS da folha.
+  const [observacoes, setObservacoes] = useState("");
   // as tintas que a obra recebeu (CMR) — escolher preenche produto, fabricante, lote e validade
   const [tintas, setTintas] = useState([]);
   const [plp, setPlp] = useState(null);
@@ -240,6 +246,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         setResultado(j.relatorio.resultadoInspecao || null);
         setLinhas(Array.isArray(j.relatorio.linhas) ? j.relatorio.linhas : []);
         setEquipamentos(Array.isArray(j.relatorio.equipamentos) ? j.relatorio.equipamentos : []);
+        setObservacoes(j.relatorio.observacoes || "");
         const r0 = j.relatorio.resultados || {};
         setCond({
           iluminacao: r0.iluminacao ?? "", tecnica: r0.tecnica || "", condicoes: r0.condicoes || "",
@@ -401,7 +408,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       }));
       const r = await fetch(`/api/campo/relatorios/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ medidas, equipamentos, assumirInspetor: !rel.inspetor, condicoes: ehDim ? undefined : (({ __espec, ...resto }) => resto)(cond), resultadoInspecao: resultado }),
+        body: JSON.stringify({ medidas, equipamentos, observacoes, assumirInspetor: !rel.inspetor, condicoes: ehDim ? undefined : (({ __espec, ...resto }) => resto)(cond), resultadoInspecao: resultado }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
@@ -409,6 +416,9 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       onVoltar();
     } catch (e) { alert(e.message); } finally { setSalvando(false); }
   }
+
+  // ⚠ mede a mesma coisa que o servidor: tem medida preenchida e nenhum instrumento escolhido.
+  const faltaInstrumento = !equipamentos.length && linhas.some((l) => l?.encontradoMm != null);
 
   const lux = Number(cond.iluminacao);
   const luxBaixo = Number.isFinite(lux) && lux > 0 && lux < LUX_MINIMO;
@@ -516,6 +526,23 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
             </select>
           </label>
 
+        </div>
+      )}
+
+      {/* ⚠⚠ O DESENHO, ANTES DA LISTA. Vitor (03/09/2026): "no relatório de pré-montagem consegue
+          trazer os desenhos que criamos nos relatórios para ele ter referência das cotas?".
+          A lista dizia "Cota A · 1250 ± 3" e mais nada — o inspetor sabia o VALOR mas não ONDE
+          medir, e numa peça grande isso é medir o vão errado e aprovar a peça errada. Vem ANTES da
+          lista de propósito: primeiro se olha onde é, depois se anota quanto deu. */}
+      {ehDim && rel.desenhos?.length > 0 && linhas.some((l) => l.letra) && (
+        <div className="mt-4 bg-white border border-gray-200 rounded-2xl p-3">
+          <VistaCotas
+            relatorioId={id}
+            marca={rel.desenhos[0]?.marca || null}
+            cotas={linhas.filter((l) => l.letra)}
+            ocultos={rel.resultados?.ocultosDesenho || []}
+            linhasOcultas={rel.resultados?.linhasOcultasDesenho || []}
+          />
         </div>
       )}
 
@@ -765,7 +792,29 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         )}
       </div>
 
-      <button onClick={salvar} disabled={salvando}
+      {/* ⚠ OBSERVAÇÃO GERAL, separada da observação de cada cota. Vitor (03/09/2026): "crie um campo
+          de observação geral para o relatório além dos campos das cotas que você já colocou". Sai no
+          quadro COMENTÁRIOS da folha. */}
+      <div className="mt-4 bg-white border border-gray-200 rounded-2xl p-3">
+        <p className="text-[13px] font-semibold text-torg-dark">Observação geral</p>
+        <p className="text-[11.5px] text-torg-gray mt-0.5 mb-2">
+          Vale para o relatório inteiro — o que atrapalhou a medição, a condição da peça, o que foi combinado na hora.
+        </p>
+        <textarea rows={3} value={observacoes} onChange={(e) => setObservacoes(e.target.value)}
+          placeholder="opcional"
+          className="w-full text-[15px] border border-gray-200 rounded-xl px-3 py-2 focus:border-torg-blue outline-none" />
+      </div>
+
+      {/* ⚠ O INSTRUMENTO É CONDIÇÃO PARA GRAVAR MEDIDA. Vitor (03/09/2026): "o inspetor de campo não
+          pode gravar as medidas sem colocar o instrumento que usou". O servidor barra de qualquer
+          jeito; aqui o botão avisa ANTES, para a pessoa não preencher a tela toda e levar um erro. */}
+      {faltaInstrumento && (
+        <p className="mt-4 text-[13px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+          Selecione acima o instrumento que você usou — sem isso as medidas não podem ser gravadas.
+        </p>
+      )}
+
+      <button onClick={salvar} disabled={salvando || faltaInstrumento}
         className="mt-5 w-full bg-torg-blue text-white active:bg-torg-dark rounded-2xl py-5 text-lg font-semibold inline-flex items-center justify-center gap-2.5 disabled:opacity-60">
         {salvando ? <Loader2 size={22} className="animate-spin" /> : <Save size={22} />} Gravar medidas
       </button>

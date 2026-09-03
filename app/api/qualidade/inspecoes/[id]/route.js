@@ -263,6 +263,28 @@ export async function PATCH(req, { params }) {
     }
   }
 
+  // ⚠⚠ MEDIDA SEM INSTRUMENTO NÃO SE GRAVA. Vitor (03/09/2026): "o inspetor de campo não pode
+  // gravar as medidas sem colocar o instrumento que usou".
+  //
+  // É a primeira coisa que um auditor cobra: uma dimensão encontrada sem dizer com o que foi medida
+  // não é evidência de nada — e, ao contrário do bloqueio da assinatura, aqui a cobrança tem de ser
+  // NA HORA. Depois que o inspetor sai de perto da peça, ninguém lembra qual trena estava na mão.
+  //
+  // ⚠ Só barra quando a gravação TRAZ medida. Salvar observação, resultado ou a marcação da cota
+  // continua livre — o instrumento só é exigido de quem está registrando o que mediu.
+  const equipDepois = dados.equipamentos !== undefined ? dados.equipamentos : (Array.isArray(rel.equipamentos) ? rel.equipamentos : []);
+  if (Array.isArray(dados.linhas) && !equipDepois.length) {
+    const antes = Array.isArray(rel.linhas) ? rel.linhas : [];
+    const tinha = new Set(antes.filter((l) => l?.encontradoMm != null).map((l) => `${l.letra || ""}|${l.encontradoMm}`));
+    const novaMedida = dados.linhas.some((l) => l?.encontradoMm != null && !tinha.has(`${l.letra || ""}|${l.encontradoMm}`));
+    if (novaMedida) {
+      return NextResponse.json({
+        error: "Informe o instrumento usado antes de gravar a dimensão encontrada — um ensaio sem dizer com o que foi medido não vale como registro.",
+        faltaInstrumento: true,
+      }, { status: 409 });
+    }
+  }
+
   const atualizado = await prisma.relatorioInspecao.update({ where: { id }, data: dados });
 
   // ⚠ BACKUP NA PASTA DA OBRA, na APROVAÇÃO. Vitor (22/08/2026): "salvar os relatórios em PDF na

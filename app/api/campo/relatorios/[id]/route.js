@@ -31,6 +31,11 @@ export async function GET(_req, { params }) {
       id: true, codigo: true, tipo: true, titulo: true, opNumero: true, marcas: true,
       linhas: true, resultados: true, equipamentos: true, inspetor: true, envioAssinaturaId: true,
       revisao: true, resultadoInspecao: true, revisoes: true,
+      // a observação geral do relatório, que o celular também edita
+      observacoes: true,
+      // ⚠ o DESENHO com as cotas marcadas — é a referência que o inspetor precisa ter na mão para
+      // saber ONDE medir cada cota (ver a nota em app/campo/Medir.jsx)
+      desenhos: true,
     },
   });
   if (!rel) return NextResponse.json({ error: "Relatório não encontrado." }, { status: 404 });
@@ -62,6 +67,8 @@ export async function PATCH(req, { params }) {
       id: true, codigo: true, linhas: true, resultados: true, envioAssinaturaId: true,
       revisao: true, resultadoInspecao: true, revisoes: true, inspetor: true,
       tipo: true, opNumero: true, opId: true, marcas: true, rncId: true,
+      // ⚠ preciso do que JÁ está gravado para saber se a medida vai entrar sem instrumento
+      equipamentos: true,
     },
   });
   if (!rel) return NextResponse.json({ error: "Relatório não encontrado." }, { status: 404 });
@@ -157,8 +164,38 @@ export async function PATCH(req, { params }) {
       vencido: !!e?.vencido,
     }));
   }
+  // ⚠ OBSERVAÇÃO GERAL DO RELATÓRIO. Vitor (03/09/2026): "crie um campo de observação geral para o
+  // relatório além dos campos das cotas que você já colocou". A `obs` de cada linha diz o que houve
+  // NAQUELA cota; isto é o que vale para o documento inteiro (condição da peça, o que atrapalhou a
+  // medição, o que o cliente pediu na hora) — é o quadro COMENTÁRIOS da folha.
+  if (body.observacoes !== undefined) {
+    dados.observacoes = String(body.observacoes || "").trim().slice(0, 1000) || null;
+  }
   // quem mediu assina o campo do inspetor, se ainda estiver vazio
   if (body.assumirInspetor) dados.inspetor = user.name || null;
+
+  // ⚠⚠ MEDIDA SEM INSTRUMENTO NÃO SE GRAVA. Vitor (03/09/2026): "o inspetor de campo não pode
+  // gravar as medidas sem colocar o instrumento que usou".
+  //
+  // É a primeira coisa que um auditor cobra: dimensão encontrada sem dizer com o que foi medida não
+  // é evidência de nada. E aqui a cobrança tem de ser NA HORA — depois que o inspetor sai de perto
+  // da peça, ninguém lembra qual trena estava na mão.
+  //
+  // ⚠ Só barra quando a gravação TRAZ medida nova. Salvar só a observação, o resultado ou uma junta
+  // continua livre.
+  {
+    const equipDepois = dados.equipamentos !== undefined
+      ? dados.equipamentos
+      : (Array.isArray(rel.equipamentos) ? rel.equipamentos : []);
+    const antes = new Set(originais.filter((l) => l?.encontradoMm != null).map((l, i) => `${i}|${l.encontradoMm}`));
+    const temMedidaNova = medidas.some((m) => m?.encontradoMm != null && !antes.has(`${m.i}|${num(m.encontradoMm)}`));
+    if (temMedidaNova && !equipDepois.length) {
+      return NextResponse.json({
+        error: "Selecione o instrumento que você usou antes de gravar as medidas — sem isso o ensaio não vale como registro.",
+        faltaInstrumento: true,
+      }, { status: 409 });
+    }
+  }
 
   // ⚠ O RESULTADO GERAL É QUEM FECHA (ou não) O RELATÓRIO. Só APROVADO fecha: reprovado volta para
   // reparo e "exame complementar" ainda vai ter ensaio — nos dois o relatório continua aberto, que
