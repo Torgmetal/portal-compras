@@ -324,44 +324,39 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         // sem cor, e aí vale mais pintar por tipo.
         const tonsVistos = new Set();
 
-        // ⚠⚠ O QUE ACONTECE DENTRO DO STREAM TEM DE SER BARATO. A varredura do web-ifc é UMA chamada
-        // que não devolve o controle até acabar — então aqui dentro só se anota a referência
-        // (qual peça, qual geometria, cor e posição). A conversão em malha, que é o caro, sai depois,
-        // em lotes com respiro. Sem isto, um modelo de 37 MB congelava a aba por dezenas de segundos.
-        const brutos = [];
-        api.StreamAllMeshes(modelID, (mesh) => {
-          const eid = mesh.expressID;
-          const g = mesh.geometries;
-          for (let i = 0; i < g.size(); i++) {
-            const p = g.get(i);
-            const c = p.color;
-            brutos.push({
-              eid,
-              geoId: p.geometryExpressID,
-              // ⚠ cópia: o vetor do wasm é reaproveitado depois que o callback retorna.
-              cor: c ? { x: c.x, y: c.y, z: c.z } : null,
-              m: Array.from(p.flatTransformation),
-            });
-          }
-        });
+        // ⚠⚠ A GEOMETRIA SÓ EXISTE DENTRO DO CALLBACK — e isso me custou uma tela branca. Para
+        // não travar a aba, eu tinha passado a só ANOTAR as referências durante a varredura e a
+        // converter depois, em lotes. O motor, porém, LIBERA a geometria conforme entrega: chamar
+        // `GetGeometry` depois devolve vazio. O resultado era o pior tipo de defeito — 3.036 objetos
+        // na cena, nenhum erro no console, e a caixa envolvente da obra inteira vindo vazia
+        // (Infinity/-Infinity), com a câmera enquadrando o nada.
+        //
+        // A saída que serve às duas coisas: uma primeira passada BARATA só para colher os ids, e
+        // depois `StreamMeshes` em lotes — a geometria é gerada e convertida dentro do callback de
+        // cada lote (correto), com um respiro entre lotes (a aba continua viva).
+        const ids = [];
+        api.StreamAllMeshes(modelID, (mesh) => { ids.push(mesh.expressID); });
 
         setEstado({ fase: "montando", pct: 0 });
-        for (let b = 0; b < brutos.length; b++) {
+        for (let inicio = 0; inicio < ids.length; inicio += LOTE) {
           if (!vivo) return;
-          if (b % LOTE === 0) {
-            setEstado({ fase: "montando", pct: Math.round((b / Math.max(1, brutos.length)) * 100) });
-            await pausa();
-          }
-          const { eid, geoId, cor: c, m } = brutos[b];
-          // ⚠ solta a referência assim que usa: são 13.874 entradas, e segurar todas até o fim
-          // soma um pico de memória bem no momento em que ela está mais disputada.
-          brutos[b] = null;
-          const marca = marcaDe.get(eid) || null;
-          const asm = asmDe.get(eid) ?? null;
-          const parafuso = parafusoDe.get(eid) || null;
-          const tipo = tipoDe.get(eid) || (parafuso ? "Parafuso" : "Peça");
-          const cota = nivelDe.get(eid) ?? null;
-          {
+          setEstado({ fase: "montando", pct: Math.round((inicio / Math.max(1, ids.length)) * 100) });
+          await pausa();
+          const lote = ids.slice(inicio, inicio + LOTE);
+          api.StreamMeshes(modelID, lote, (mesh) => {
+            const eid = mesh.expressID;
+            const g = mesh.geometries;
+            for (let i = 0; i < g.size(); i++) {
+              const p = g.get(i);
+              const c = p.color;
+              const geoId = p.geometryExpressID;
+              const m = p.flatTransformation;
+              const marca = marcaDe.get(eid) || null;
+              const asm = asmDe.get(eid) ?? null;
+              const parafuso = parafusoDe.get(eid) || null;
+              const tipo = tipoDe.get(eid) || (parafuso ? "Parafuso" : "Peça");
+              const cota = nivelDe.get(eid) ?? null;
+              {
             // cor do IFC em 0..1; sem cor (raro) cai no cinza padrão
             const hex = c && (c.x + c.y + c.z) > 0
               ? (Math.round(c.x * 255) << 16) | (Math.round(c.y * 255) << 8) | Math.round(c.z * 255)
@@ -401,7 +396,9 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
             if (cota != null) grupo.cotas.push(cota);
             else if (Number.isFinite(yMin)) grupo.alturas.push(yMin);
             n++;
-          }
+              }
+            }
+          });
         }
 
         // ⚠ junta as geometrias de cada marca numa malha só: 1.500 objetos separados derrubam o
