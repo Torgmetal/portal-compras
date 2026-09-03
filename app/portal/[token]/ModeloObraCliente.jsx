@@ -58,7 +58,9 @@ export default function ModeloObraCliente({ token }) {
 
   const url = modelo ? `/api/portal/${token}/modelo-3d?rel=${encodeURIComponent(modelo.rel)}` : null;
 
-  if (erro) return null;                       // seção ligada sem modelo publicado: não ocupa espaço
+  // ⚠ nem erro nem lista vazia viram explicação: o cliente lê uma linha neutra, não o motivo. É a
+  // mesma regra dos documentos — buraco nosso se resolve aqui dentro, não na tela dele.
+  if (erro) return <p className="text-[13px] text-gray-500">O modelo desta obra não está disponível aqui.</p>;
   if (!lista) {
     return (
       <p className="text-[13px] text-gray-500 inline-flex items-center gap-2">
@@ -66,7 +68,7 @@ export default function ModeloObraCliente({ token }) {
       </p>
     );
   }
-  if (!lista.modelos?.length) return null;
+  if (!lista.modelos?.length) return <p className="text-[13px] text-gray-500">O modelo desta obra não está disponível aqui.</p>;
 
   return (
     <div className="space-y-3">

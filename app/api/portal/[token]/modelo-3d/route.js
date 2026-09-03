@@ -14,7 +14,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { inventarioEngenharia } from "@/lib/pasta-engenharia";
 import { downloadFileByPath, acharPastaOp } from "@/lib/sharepoint";
-import { secoesDoPortal } from "@/lib/portal-cliente";
+import { secoesDoPortal, tipoDoDocEng } from "@/lib/portal-cliente";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,8 +44,23 @@ export async function GET(req, { params }) {
   const inv = await inventarioEngenharia(op.numero);
   if (!inv.achou) return NextResponse.json({ error: "Modelo não disponível." }, { status: 404 });
 
+  // ⚠⚠ QUAL IFC VAI, QUEM ESCOLHE É QUEM PUBLICA. Vitor (03/09/2026): "quero selecionar qual IFC
+  // vamos colocar, pois temos o com telha e o sem telha, então preciso selecionar o correto".
+  // E a escolha não ganhou tela nova: vale a MESMA marcação de documentos da Engenharia (a que já
+  // publica o arquivo para download). Um lugar só para decidir — marcar o arquivo publica o
+  // download E abre o modelo; desmarcar tira os dois. Duas telas para a mesma decisão é como uma
+  // obra acaba com o modelo errado aberto e o certo disponível para baixar.
+  const escolhidos = new Set(
+    (ctx.portal.docsPorArea?.ENGENHARIA || ctx.portal.docsEngenharia || [])
+      .filter((d) => /\.ifc$/i.test(String(d?.nome || "")) && tipoDoDocEng(d) === "MODELO_3D")
+      .map((d) => String(d.nome).trim().toLowerCase())
+  );
+
   const modelos = (inv.ifc || [])
     .filter((a) => RX_CLIENTE.test(String(a.rel || "")))
+    // ⚠ sem nenhum IFC marcado, a seção não mostra modelo: publicar tudo o que estiver na pasta é
+    // exatamente o que ele não quer.
+    .filter((a) => escolhidos.has(String(a.nome || "").trim().toLowerCase()))
     .map((a) => ({
       nome: a.nome,
       rel: a.rel ? `${a.rel}/${a.nome}` : a.nome,

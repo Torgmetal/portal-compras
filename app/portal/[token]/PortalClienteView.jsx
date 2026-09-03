@@ -104,6 +104,11 @@ export default function PortalClienteView({ token }) {
     DOCUMENTOS: tem("DOCUMENTOS") && dados.documentos?.length > 0,
     PLANOS: tem("PLANOS") && (dados.planos?.length > 0 || !!dados.planosAceite),
     FOTOS: tem("FOTOS") && portal.fotos?.length > 0,
+    // ⚠ estes dois não dependem de dado carregado aqui: o modelo e o assistente buscam por conta
+    // própria (e o modelo some sozinho se a obra não tiver IFC publicado). Ligou a seção, a aba
+    // existe — senão a aba "Modelo 3D" nasceria escondida justamente na obra que acabou de ligá-la.
+    MODELO_NAVEGAVEL: tem("MODELO_NAVEGAVEL"),
+    ASSISTENTE: tem("ASSISTENTE"),
   };
   const secoesDaArea = (a) => {
     const base = SECOES.filter((x) => x.area === a && conteudo[x.id]);
@@ -730,10 +735,15 @@ function DocumentosDaArea({ grupos, token, cod }) {
   // servidor recusá-lo com a mensagem certa, não a esta função escondê-lo.
   const TETO_PARTE = 50 * 1024 * 1024;
 
-  async function baixar() {
+  // ⚠⚠ BAIXAR A PASTA INTEIRA NUM CLIQUE. Vitor (03/09/2026, cobrando): "vc ainda não arrumou a
+  // opção de conseguir selecionar a pasta e vc levar ela toda para o portal deles e deixar eles
+  // baixarem a pasta como um todo". Marcar a pasta e depois procurar o botão de baixar embaixo é
+  // um passo a mais em cima do que ele pediu — a pasta agora baixa direto, sem passar pela seleção.
+  // A seleção continua existindo para quem quer montar um pacote misto.
+  async function baixar(lista) {
     setBaixando(true); setErro("");
     try {
-      const escolhidos = todos.filter((d) => sel.has(d.id));
+      const escolhidos = Array.isArray(lista) && lista.length ? lista : todos.filter((d) => sel.has(d.id));
       const partes = [];
       let atual = [], peso = 0;
       for (const d of escolhidos) {
@@ -801,8 +811,12 @@ function DocumentosDaArea({ grupos, token, cod }) {
                           <span className="text-[12.5px] font-semibold truncate">{p.nome}</span>
                           <span className="text-[11px] text-gray-400">{p.itens.length} arquivo{p.itens.length > 1 ? "s" : ""}{p.tamanho ? ` · ${fmtMB(p.tamanho)}` : ""}</span>
                           <button onClick={() => marcarGrupo(p, !todosNaPasta)}
-                            className="ml-auto text-[11px] font-semibold text-[#006EAB] hover:underline">
-                            {todosNaPasta ? "desmarcar a pasta" : "selecionar a pasta"}
+                            className="ml-auto text-[11px] text-gray-500 hover:text-[#006EAB] hover:underline">
+                            {todosNaPasta ? "desmarcar" : "selecionar"}
+                          </button>
+                          <button onClick={() => baixar(p.itens)} disabled={baixando}
+                            className="text-[11px] font-semibold text-white bg-[#006EAB] hover:bg-[#005A8C] disabled:opacity-50 rounded-md px-2 py-1 inline-flex items-center gap-1">
+                            <Download size={11} /> baixar a pasta
                           </button>
                         </div>
                         <div className="grid sm:grid-cols-2 gap-1.5 p-2">
