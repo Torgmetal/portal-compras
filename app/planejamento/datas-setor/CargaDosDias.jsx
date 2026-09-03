@@ -11,7 +11,7 @@
 //
 // ⚠ A BARRA VEM ANTES DO NÚMERO porque a pergunta é "cabe no dia?". Faixa escura é a obra aberta
 // (quando há uma), clara são as outras, e o traço é a meta.
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { Loader2 } from "lucide-react";
 
 // ⚠⚠ SÓ OS DOIS QUE SE PROGRAMAM AQUI. Vitor (03/09/2026): "esses setores pode tirar" (solda,
@@ -36,6 +36,12 @@ export default function CargaDosDias({ opId, recarga }) {
   const [carga, setCarga] = useState(null);
   const [limpando, setLimpando] = useState(false);
   const [recarregou, setRecarregou] = useState(0);
+  // ⚠⚠ ABRIR O DIA PARA CONSERTÁ-LO. Vitor (03/09/2026), sobre a OP-105 com 35 t num dia de meta
+  // 12 t: "precisamos corrigir isso". Ver que o dia estourou não adianta se a tela não diz QUAIS
+  // lotes o encheram nem deixa remarcá-los — a saída era cancelar a liberação e refazer, o que
+  // perde o registro de quem liberou e quando.
+  const [aberto, setAberto] = useState(null);   // dia expandido
+  const [movendo, setMovendo] = useState(null); // id do lote em gravação
 
   useEffect(() => {
     let vivo = true;
@@ -71,6 +77,27 @@ export default function CargaDosDias({ opId, recarga }) {
       if (!r.ok) throw new Error(j.error || "Não consegui limpar.");
       setRecarregou((v) => v + 1);
     } catch (e) { alert(e.message); } finally { setLimpando(false); }
+  }
+
+  /**
+   * Remarca UM lote para outro dia — é como se desafoga um dia estourado.
+   *
+   * ⚠ Move o lote INTEIRO, não parte dele. Partir a liberação em duas mudaria o registro do que
+   * desceu junto para a fábrica; quem precisa dividir libera de novo pela obra, que é o caminho que
+   * já existe e deixa rastro.
+   */
+  async function moverLote(lote, novoDia) {
+    if (!novoDia || novoDia === aberto) return;
+    setMovendo(lote.id);
+    try {
+      const r = await fetch("/api/planejamento/liberacao", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: lote.id, dataProgramada: novoDia }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Não consegui remarcar.");
+      setRecarregou((v) => v + 1);
+    } catch (e) { alert(e.message); } finally { setMovendo(null); }
   }
 
   const todosDias = carga?.dias || [];
@@ -139,8 +166,12 @@ export default function CargaDosDias({ opId, recarga }) {
               {dias.map((x) => {
                 const pct = meta > 0 ? Math.round((x.kg / meta) * 100) : null;
                 const passou = meta > 0 && x.kg > meta;
+                const abrivel = x.dia && (x.lotes?.length || 0) > 0;
                 return (
-                  <tr key={x.dia || "sem"} className="border-b border-gray-50 last:border-0">
+                  <Fragment key={x.dia || "sem"}>
+                  <tr onClick={() => abrivel && setAberto(aberto === x.dia ? null : x.dia)}
+                    title={abrivel ? "abrir para remarcar os lotes deste dia" : undefined}
+                    className={`border-b border-gray-50 last:border-0 ${abrivel ? "cursor-pointer hover:bg-gray-50/70" : ""} ${aberto === x.dia ? "bg-torg-blue-50/40" : ""}`}>
                     <td className="px-4 py-1.5 whitespace-nowrap font-bold">
                       {x.dia ? fmtD(x.dia) : <span className="text-torg-gray-light font-normal">sem data</span>}
                     </td>
@@ -160,6 +191,33 @@ export default function CargaDosDias({ opId, recarga }) {
                       {x.obras.map((o) => o.obra).join(" · ")}
                     </td>
                   </tr>
+                  {/* ⚠ os lotes do dia, para remarcar. Só abre no clique: aberto sempre, a tabela
+                      viraria uma parede de linhas e a leitura "cabe no dia?" se perderia. */}
+                  {aberto === x.dia && (
+                    <tr className="bg-torg-blue-50/40 border-b border-gray-100">
+                      <td colSpan={6} className="px-4 py-2">
+                        <p className="text-[11px] text-torg-gray mb-1.5">
+                          O que foi liberado para {fmtD(x.dia)}
+                          {passou && <span className="text-amber-700 font-semibold"> — o dia passou da meta; remarque um lote para aliviar.</span>}
+                        </p>
+                        <div className="space-y-1">
+                          {x.lotes.map((lo) => (
+                            <div key={lo.id} className="flex items-center gap-2 flex-wrap bg-white border border-gray-100 rounded-md px-2.5 py-1.5">
+                              <span className="font-semibold text-torg-dark">{lo.obra}</span>
+                              {lo.frente && <span className="text-torg-gray-light">{lo.frente}</span>}
+                              <span className="tabular-nums text-torg-gray">{fmtKg(lo.kg)} · {fmtN(lo.pecas)} pç</span>
+                              <span className="ml-auto text-[11px] text-torg-gray">mover para</span>
+                              <input type="date" defaultValue={x.dia} disabled={movendo === lo.id}
+                                onChange={(e) => moverLote(lo, e.target.value)}
+                                className="border border-gray-200 rounded-md px-2 py-1 text-[11.5px] outline-none focus:border-torg-blue disabled:opacity-50" />
+                              {movendo === lo.id && <Loader2 size={12} className="animate-spin text-torg-blue" />}
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })}
             </tbody>

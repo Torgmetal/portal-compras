@@ -62,7 +62,7 @@ export async function GET(req) {
     const k = l.dataProgramada ? l.dataProgramada.toISOString().slice(0, 10) : "";
     const g = porDia.get(k) || porDia.set(k, {
       dia: k || null, kg: 0, pecas: 0, orfas: 0,
-      minhaKg: 0, minhasPecas: 0, obras: new Map(),
+      minhaKg: 0, minhasPecas: 0, obras: new Map(), lotes: [],
     }).get(k);
 
     const lista = Array.isArray(l.pecaIds) ? l.pecaIds.map(String) : [];
@@ -79,6 +79,17 @@ export async function GET(req) {
     const o = g.obras.get(nome) || { obra: nome, kg: 0, pecas: 0, minha: opId ? l.opId === opId : false };
     o.kg += kgLote; o.pecas += nLote;
     g.obras.set(nome, o);
+
+    // ⚠⚠ O LOTE VAI JUNTO, e é o que permite CONSERTAR o dia. Vitor (03/09/2026), sobre a OP-105
+    // com 35 t num dia de meta 12 t: "precisamos corrigir isso". Saber que o dia estourou não
+    // adianta se a tela não diz QUAIS lotes o encheram nem deixa remarcá-los — a saída era cancelar
+    // a liberação e refazer, perdendo o registro de quem liberou e quando.
+    if (nLote > 0) {
+      g.lotes.push({
+        id: l.id, obra: nome, opId: l.opId, frente: l.frente || null,
+        kg: Math.round(kgLote), pecas: nLote, minha: opId ? l.opId === opId : false,
+      });
+    }
   }
 
   const dias = [...porDia.values()]
@@ -86,6 +97,8 @@ export async function GET(req) {
       ...g,
       kg: Math.round(g.kg), minhaKg: Math.round(g.minhaKg),
       obras: [...g.obras.values()].map((o) => ({ ...o, kg: Math.round(o.kg) })).sort((a, b) => b.kg - a.kg),
+      // o mais pesado primeiro: é dele que se tira carga para desafogar o dia
+      lotes: g.lotes.sort((a, b) => b.kg - a.kg),
     }))
     .sort((a, b) => (a.dia || "9999").localeCompare(b.dia || "9999"));
 

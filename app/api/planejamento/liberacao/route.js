@@ -240,6 +240,12 @@ const schemaPatch = z.object({
   setores: z.array(z.enum(KEYS)).min(1).optional(),
   status: z.enum(["LIBERADA", "EM_PRODUCAO", "CONCLUIDA", "CANCELADA"]).optional(),
   motivo: z.string().max(400).nullable().optional(),
+  // ⚠⚠ REMARCAR O DIA. Vitor (03/09/2026), sobre a OP-105 com 35 t num dia só (meta 12 t):
+  // "precisamos corrigir isso". Não havia como: o PATCH mexia em prioridade, setores e status, e a
+  // data só se escrevia na criação — para tirar carga de um dia sobrecarregado era preciso cancelar
+  // o lote e liberar tudo de novo, o que troca o registro de lugar e perde o histórico.
+  // "YYYY-MM-DD" (o dia é do calendário da fábrica, não instante).
+  dataProgramada: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida.").nullable().optional(),
 });
 
 export async function PATCH(req) {
@@ -266,12 +272,20 @@ export async function PATCH(req) {
     ...(d.status ? { status: d.status } : {}),
     ...(d.status === "CONCLUIDA" ? { concluidaEm: new Date() } : {}),
     ...(d.status === "CANCELADA" ? { canceladaEm: new Date(), canceladaMotivo: (d.motivo || "").trim() } : {}),
+    // ⚠ MEIO-DIA UTC, como o resto da programação. O servidor roda em UTC: gravando meia-noite, o
+    // dia lido em horário de Brasília cai na véspera e a carga aparece um dia antes do combinado.
+    ...(d.dataProgramada !== undefined
+      ? { dataProgramada: d.dataProgramada ? new Date(`${d.dataProgramada}T12:00:00.000Z`) : null }
+      : {}),
   };
   const lib = await prisma.liberacaoProducao.update({ where: { id: d.id }, data: dados });
 
   await prisma.auditLog.create({
     data: { userId: user?.id || null, action: "ALTERAR_LIBERACAO_PRODUCAO", entity: "LiberacaoProducao", entityId: lib.id,
-      diff: { de: { prioridade: atual.prioridade, status: atual.status, setores: atual.setores }, para: dados } },
+      diff: {
+        de: { prioridade: atual.prioridade, status: atual.status, setores: atual.setores, dataProgramada: atual.dataProgramada },
+        para: dados,
+      } },
   }).catch(() => {});
 
   return NextResponse.json({ ok: true, liberacao: lib });
