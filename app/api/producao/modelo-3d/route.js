@@ -81,15 +81,21 @@ export async function GET(req) {
       if (!g || d > g.ult) setorDe.set(m, { setor: a.setor, ult: d });
     }
     const estados = {};
+    // ⚠⚠ O SETOR VAI JUNTO, e não só o estado. Vitor (03/09/2026): "quero que tenha a opção de
+    // clicar no setor e mostrar as peças que estão naquele setor". O estado responde "andou ou
+    // não"; o setor responde ONDE está — que é o que faz alguém ir até a bancada certa.
+    const setores = {};
     for (const m of marcas) {
-      const s = String(setorDe.get(m)?.setor || "").toLowerCase();
+      const bruto = String(setorDe.get(m)?.setor || "").trim();
+      const s = bruto.toLowerCase();
       estados[m] = !s ? "parado"
         : /pintura|acabamento/.test(s) ? "pronta"
         : "andando";
+      if (bruto) setores[m] = bruto;
     }
     return NextResponse.json({
       op: { id: op.id, numero: op.numero, cliente: op.cliente, obra: op.obra },
-      modelos, tetoMb: TETO_MB, estados,
+      modelos, tetoMb: TETO_MB, estados, setores,
       resumo: {
         marcas: marcas.length,
         prontas: Object.values(estados).filter((x) => x === "pronta").length,

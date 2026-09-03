@@ -20,7 +20,7 @@
 // ⚠ SEM REDE EXTERNA: o .wasm é servido de /wasm do próprio portal (copiado de node_modules no
 // build). O portal do cliente não pode depender de CDN nem de conta de terceiro.
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, Loader2 } from "lucide-react";
 
 const COR_PADRAO = 0x9fb0bf;
 const COR_SEL = 0xf4801f;
@@ -40,11 +40,13 @@ const COR_TIPO = {
  * @param {string} url      de onde baixar o IFC (rota do portal)
  * @param {(item:object|null)=>void} onSelecionar  o item do índice clicado (conjunto ou parafuso)
  * @param {(dados:{indice:object[],niveis:object[]})=>void} [onIndice]  o que o modelo tem dentro
- * @param {Set<string>|null} [visiveis]    chaves em foco; o resto fica translúcido (null = tudo)
+ * @param {Set<string>|null} [visiveis]    itens em foco; o resto fica translúcido (null = tudo)
+ * @param {Set<string>} [ocultos]          itens que somem da cena (o "ocultar" da tela)
+ * @param {boolean} [esconderResto]        em vez de apagar o que está fora do filtro, some com ele
  * @param {Record<string,string>} [cores]  marca → cor hex ("#0E7A5F"), para pintar por andamento
  * @param {string|null} [selecionada]      chave destacada de fora (a lista, por exemplo)
  */
-export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis, cores, selecionada, altura = 520, modo = "modelo" }) {
+export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis, ocultos, esconderResto, cores, selecionada, altura = 520, modo = "modelo" }) {
   const box = useRef(null);
   const ref = useRef({});             // guarda three/api entre renders sem provocar re-render
   const [estado, setEstado] = useState({ fase: "carregando", pct: 0 });
@@ -635,6 +637,13 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
     if (!THREE || !malhas) return;
     for (const [, m] of malhas) {
       const fora = !!visiveis && !visiveis.has(m.userData.item);
+      // ⚠⚠ OCULTAR É DIFERENTE DE APAGAR. Vitor (03/09/2026): "precisamos ter uma opção para
+      // podermos sumir com algum item ou nível (…) para conseguir visualizar melhor as peças
+      // selecionadas". Translúcido guarda a referência da obra; oculto limpa a frente. As duas
+      // servem, em momentos diferentes — quem escolhe é quem está olhando.
+      const some = ocultos?.has(m.userData.item) || (esconderResto && fora);
+      m.visible = !some;
+      if (some) { m.userData.foraDoFiltro = true; continue; }
       const doEstado = cores?.[m.userData.marca];
       const base = modo === "andamento" && doEstado ? doEstado : m.userData.hex;
       m.userData.foraDoFiltro = fora;
@@ -647,9 +656,16 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
     }
     // ⚠ a obra inteira tem UMA malha de arestas (é o que segura o quadro); com filtro ligado ela
     // não tem como apagar só a parte de fora, então enfraquece junto.
-    if (arestas) arestas.material.opacity = visiveis ? 0.1 : 0.38;
+    if (arestas) {
+      arestas.material.opacity = visiveis ? 0.1 : 0.38;
+      // ⚠⚠ A ARESTA TAMBÉM TEM DE SUMIR. A obra inteira tem UMA malha de contorno (é o que segura
+      // o quadro), e ela não sabe filtrar: com "ocultar o resto" ligado, os sólidos sumiam e o
+      // desenho de arame de tudo continuava na tela — o que, para quem olha, é o filtro não ter
+      // funcionado. Some junto; a parte em foco continua legível porque está sólida e colorida.
+      arestas.visible = !(esconderResto && !!visiveis) && !(ocultos?.size > 0 && !visiveis);
+    }
     ref.current.pedirQuadro?.();
-  }, [selecionada, cores, modo, visiveis]);
+  }, [selecionada, cores, modo, visiveis, ocultos, esconderResto]);
 
   useEffect(() => {
     const ouvir = () => setCheia(!!document.fullscreenElement);
@@ -674,9 +690,19 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
   return (
     <div ref={caixa} className={`relative bg-white ${enche ? "h-full" : ""}`} style={enche ? undefined : { minHeight: altura }}>
       <div ref={box} className={enche ? "h-full" : ""} style={enche ? undefined : { height: altura }} />
+      {/* ⚠ ABRIR MODELO DEMORA — a estrutura da OP-118 tem 37 MB e 13.874 peças, e são dezenas de
+          segundos de tela parada. Tela branca com uma linha de texto, nesse tempo, parece travada;
+          com a marca e o compasso girando, parece o portal trabalhando. É o mesmo tratamento das
+          telas de portal (ver app/portal/[token]). */}
       {estado.fase !== "pronto" && estado.fase !== "erro" && (
-        <div className="absolute inset-0 grid place-items-center bg-white/85">
-          <p className="text-[13px] text-torg-gray">{rot[estado.fase] || "abrindo…"}</p>
+        <div className="absolute inset-0 grid place-items-center bg-white/92">
+          <div className="flex flex-col items-center gap-3">
+            <img src="/torg-logo.png" alt="Torg Metal" className="h-10 opacity-90" />
+            <div className="flex items-center gap-2 text-[12.5px] text-torg-gray">
+              <Loader2 size={14} className="animate-spin" />
+              {rot[estado.fase] || "abrindo…"}
+            </div>
+          </div>
         </div>
       )}
       {estado.fase === "erro" && (

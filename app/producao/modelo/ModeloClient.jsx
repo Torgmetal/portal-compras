@@ -10,7 +10,7 @@
 // portal, pela marca — é por isso que o clique precisava ser nosso, e não do visualizador de
 // terceiro. Ver components/VisualizadorIfc.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, AlertCircle, Star, SlidersHorizontal, FileSpreadsheet } from "lucide-react";
+import { Loader2, AlertCircle, Star, SlidersHorizontal, FileSpreadsheet, Search, Eye, EyeOff } from "lucide-react";
 import VisualizadorIfc from "@/components/VisualizadorIfc";
 
 // ⚠ as mesmas cores do visualizador (components/VisualizadorIfc), em hexa de CSS: a legenda tem de
@@ -43,9 +43,22 @@ export default function ModeloClient({ ops }) {
   // ⚠ modelo sem cor nenhuma no arquivo: o portal passa a pintar por tipo, e o botão precisa dizer
   // isso — senão "Cores do modelo" vira mentira na tela.
   const [semCor, setSemCor] = useState(false);
-  const [niveis, setNiveis] = useState([]);
+  const [niveis, setNiveis] = useState([]);           // faixas medidas na geometria (reserva)
+  // ⚠⚠ O NÍVEL DA OBRA VEM DA ENGENHARIA. Vitor (03/09/2026) mandou o caminho: a pasta
+  // "2.5.4 Montagem / Lista de Peças por Nível" já tem uma planilha por nível, com as marcas
+  // dentro — "EL +3100 @ +3265", em milímetro, do jeito que se fala na montagem. Enquanto ela não
+  // chega (ou quando a obra não tem), valem as faixas que o visualizador mede na geometria.
+  const [niveisObra, setNiveisObra] = useState(null);
   const [fNiveis, setFNiveis] = useState(() => new Set());
   const [fTipos, setFTipos] = useState(() => new Set());
+  // ⚠ setor de fabricação: onde a peça está AGORA, pelo apontamento do Syneco (vem na listagem
+  // junto com o andamento). É o "clicar no setor e ver as peças" que o Vitor pediu.
+  const [fSetores, setFSetores] = useState(() => new Set());
+  const [busca, setBusca] = useState("");
+  // ⚠ dois jeitos de tirar da frente: apagar (guarda a referência da obra) e ocultar (limpa a
+  // vista). O primeiro é o padrão; o segundo é para quando a peça atrás é o que importa.
+  const [esconderResto, setEsconderResto] = useState(false);
+  const [ocultos, setOcultos] = useState(() => new Set());
   const [painel, setPainel] = useState(false);
   const [baixando, setBaixando] = useState(false);
   // ⚠⚠ DUAS LEITURAS DO MESMO MODELO, e as duas são necessárias. A cor DO MODELO é a que a
@@ -60,6 +73,12 @@ export default function ModeloClient({ ops }) {
     let vivo = true;
     setLista(null); setErro(""); setModelo(null); setSel(null); setPeca(null);
     setIndice(null); setNiveis([]); setFNiveis(new Set()); setFTipos(new Set()); setSemCor(false);
+    setFSetores(new Set()); setOcultos(new Set()); setBusca("");
+    setNiveisObra(null);
+    fetch(`/api/producao/modelo-3d/niveis?opId=${opId}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => vivo && setNiveisObra(j?.achou ? j : { achou: false, niveis: [] }))
+      .catch(() => vivo && setNiveisObra({ achou: false, niveis: [] }));
     fetch(`/api/producao/modelo-3d?opId=${opId}`, { cache: "no-store" })
       .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
       .then(({ ok, j }) => {
@@ -87,11 +106,52 @@ export default function ModeloClient({ ops }) {
   // ⚠⚠ O FILTRO É UMA LISTA DE CHAVES, não um "esconde". Níveis e tipos se cruzam (o nível +4,20
   // E só as vigas), e vários níveis podem estar marcados ao mesmo tempo — foi o pedido: "posso
   // fazer uma seleção de várias áreas e você listar as peças?".
+  // ⚠ marca casa por texto normalizado: a planilha escreve "T118B256" e o Tag do IFC também, mas
+  // um espaço à toa de um lado quebraria o cruzamento inteiro sem dar sinal nenhum.
+  const chaveMarca = (m) => String(m || "").toUpperCase().replace(/\s/g, "");
+
+  const daObra = !!niveisObra?.achou && niveisObra.niveis?.length > 0;
+  const niveisNaTela = useMemo(() => {
+    if (!daObra) return niveis;
+    return niveisObra.niveis.map((nv, i) => ({
+      chave: `o${i}`, rotulo: nv.rotulo, marcas: new Set((nv.marcas || []).map(chaveMarca)), daObra: true,
+    }));
+  }, [daObra, niveisObra, niveis]);
+
+  const setorDe = useCallback((x) => (x?.marca ? lista?.setores?.[x.marca] || null : null), [lista]);
+
+  const setores = useMemo(() => {
+    const c = new Map();
+    for (const x of indice || []) {
+      const s = setorDe(x);
+      if (s) c.set(s, (c.get(s) || 0) + 1);
+    }
+    return [...c.entries()].sort((a, b) => b[1] - a[1]);
+  }, [indice, setorDe]);
+
   const selecionados = useMemo(() => {
     if (!indice) return null;
     if (!fNiveis.size && !fTipos.size) return null;
-    return indice.filter((x) => (!fNiveis.size || fNiveis.has(x.nivel)) && (!fTipos.size || fTipos.has(x.tipo)));
-  }, [indice, fNiveis, fTipos]);
+    // quando o nível é o da Engenharia, quem manda é a lista de marcas dele
+    const alvo = daObra && fNiveis.size
+      ? new Set(niveisNaTela.filter((nv) => fNiveis.has(nv.chave)).flatMap((nv) => [...nv.marcas]))
+      : null;
+    return indice.filter((x) =>
+      (!fNiveis.size || (alvo ? x.marca && alvo.has(chaveMarca(x.marca)) : fNiveis.has(x.nivel)))
+      && (!fTipos.size || fTipos.has(x.tipo))
+      && (!fSetores.size || fSetores.has(setorDe(x))));
+  }, [indice, fNiveis, fTipos, fSetores, daObra, niveisNaTela, lista]);
+
+  // quantos itens do modelo cada nível pega — é o número que aparece na lista de marcação
+  const contaNivel = useMemo(() => {
+    const c = new Map();
+    for (const nv of niveisNaTela) {
+      c.set(nv.chave, nv.daObra
+        ? (indice || []).filter((x) => x.marca && nv.marcas.has(chaveMarca(x.marca))).length
+        : (indice || []).filter((x) => x.nivel === nv.chave).length);
+    }
+    return c;
+  }, [niveisNaTela, indice]);
   const visiveis = useMemo(() => (selecionados ? new Set(selecionados.map((x) => x.id)) : null), [selecionados]);
 
   const tipos = useMemo(() => {
@@ -99,6 +159,19 @@ export default function ModeloClient({ ops }) {
     for (const x of indice || []) c.set(x.tipo, (c.get(x.tipo) || 0) + 1);
     return [...c.entries()].sort((a, b) => b[1] - a[1]);
   }, [indice]);
+
+  // ⚠⚠ SEM BUSCA A LISTA NÃO SERVE numa obra grande: a 118 tem 3.032 conjuntos e a tela mostra os
+  // 400 primeiros. Vitor: "se não vai mostrar todas as peças para poder clicar, deixe um campo para
+  // podermos pesquisar a peça". Procura por marca, tipo ou especificação de parafuso.
+  const listados = useMemo(() => {
+    const base = selecionados || indice || [];
+    const t = busca.trim().toUpperCase().replace(/\s+/g, " ");
+    if (!t) return base;
+    return base.filter((x) =>
+      String(x.marca || "").toUpperCase().includes(t)
+      || String(x.parafuso?.nome || "").toUpperCase().includes(t)
+      || String(x.tipo || "").toUpperCase().includes(t));
+  }, [selecionados, indice, busca]);
 
   const soma = useMemo(() => {
     const alvo = selecionados || indice || [];
@@ -158,13 +231,17 @@ export default function ModeloClient({ ops }) {
         await import("@/lib/excel-relatorio");
       const alvo = (selecionados || indice || []).slice().sort((a, b) =>
         (a.tipo || "").localeCompare(b.tipo || "") || String(a.marca || a.parafuso?.nome).localeCompare(String(b.marca || b.parafuso?.nome)));
-      const rotNivel = (k) => niveis.find((x) => x.chave === k)?.rotulo || "";
+      const rotNivel = (k) => niveisNaTela.find((x) => x.chave === k)?.rotulo || "";
+      const nivelDoItem = (x) => (daObra
+        ? niveisNaTela.find((nv) => x.marca && nv.marcas.has(chaveMarca(x.marca)))?.rotulo || ""
+        : rotNivel(x.nivel));
       const COLS = [
         { t: "Tipo", w: 14, v: (x) => x.tipo || "" },
         { t: "Marca / especificação", w: 30, v: (x) => x.marca || x.parafuso?.nome || "sem marca no modelo" },
         { t: "Norma", w: 12, v: (x) => x.parafuso?.norma || "" },
-        { t: "Nível", w: 16, v: (x) => rotNivel(x.nivel) },
-        { t: "Cota base (m)", w: 13, dir: "right", v: (x) => (x.cota == null ? "" : Number(x.cota.toFixed(3))) },
+        { t: "Nível", w: 20, v: nivelDoItem },
+        // ⚠ mm, não metro: é a unidade do projeto e da montagem (Vitor, 03/09/2026).
+        { t: "Cota base (mm)", w: 15, dir: "right", v: (x) => (x.cota == null ? "" : Math.round(x.cota * 1000)) },
         { t: "Qtd", w: 8, dir: "right", v: (x) => x.pecas || 0 },
         { t: "Peso do modelo (kg)", w: 18, dir: "right", v: (x) => (x.pesoKg == null ? "" : Math.round(x.pesoKg)) },
         { t: "Bitola (mm)", w: 12, dir: "right", v: (x) => x.parafuso?.bitolaMm ?? "" },
@@ -293,20 +370,25 @@ export default function ModeloClient({ ops }) {
             <div className="p-3.5 space-y-3.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-[12px] font-bold text-torg-dark uppercase tracking-wide">Filtrar a vista</h3>
-                {selecionados && (
-                  <button onClick={() => { setFNiveis(new Set()); setFTipos(new Set()); }}
+                {(selecionados || fSetores.size) && (
+                  <button onClick={() => { setFNiveis(new Set()); setFTipos(new Set()); setFSetores(new Set()); }}
                     className="text-[11px] text-torg-blue hover:underline">limpar</button>
                 )}
               </div>
 
-              {niveis.length > 1 && (
+              {niveisNaTela.length > 1 && (
                 <div>
-                  <p className="text-[10.5px] font-semibold text-torg-gray uppercase tracking-wide mb-1">Níveis</p>
+                  <p className="text-[10.5px] font-semibold text-torg-gray uppercase tracking-wide mb-1">
+                    Níveis {daObra
+                      ? <span className="normal-case font-normal text-[10px] text-torg-blue">· da Engenharia</span>
+                      : <span className="normal-case font-normal text-[10px]">· medidos no modelo</span>}
+                  </p>
                   <div className="space-y-0.5">
-                    {niveis.map((nv) => {
-                      const qt = indice.filter((x) => x.nivel === nv.chave).length;
+                    {niveisNaTela.map((nv) => {
+                      const qt = contaNivel.get(nv.chave) || 0;
                       return (
-                        <label key={nv.chave} className="flex items-center gap-2 text-[12.5px] text-torg-dark hover:bg-torg-blue-50/60 rounded px-1.5 py-1 cursor-pointer">
+                        <label key={nv.chave}
+                          className={`flex items-center gap-2 text-[12.5px] rounded px-1.5 py-1 cursor-pointer hover:bg-torg-blue-50/60 ${qt ? "text-torg-dark" : "text-torg-gray"}`}>
                           <input type="checkbox" checked={fNiveis.has(nv.chave)} onChange={() => alternar(setFNiveis, nv.chave)}
                             className="accent-torg-blue" />
                           <span className="flex-1">{nv.rotulo}</span>
@@ -315,6 +397,13 @@ export default function ModeloClient({ ops }) {
                       );
                     })}
                   </div>
+                  {/* ⚠ nível da lista com zero no modelo é sinal, não enfeite: ou a marca ainda não
+                      entrou no IFC, ou o modelo aberto é de outra parte da obra. */}
+                  {daObra && [...contaNivel.values()].some((v) => !v) && (
+                    <p className="text-[10.5px] text-amber-700 mt-1 px-1.5">
+                      Nível com 0 não tem nenhuma marca deste modelo.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -331,10 +420,39 @@ export default function ModeloClient({ ops }) {
                 </div>
               </div>
 
+              {setores.length > 0 && (
+                <div>
+                  <p className="text-[10.5px] font-semibold text-torg-gray uppercase tracking-wide mb-1">
+                    Onde está na fábrica <span className="normal-case font-normal text-[10px]">· pelo apontamento</span>
+                  </p>
+                  <div className="space-y-0.5">
+                    {setores.map(([t, qt]) => (
+                      <label key={t} className="flex items-center gap-2 text-[12.5px] text-torg-dark hover:bg-torg-blue-50/60 rounded px-1.5 py-1 cursor-pointer">
+                        <input type="checkbox" checked={fSetores.has(t)} onChange={() => alternar(setFSetores, t)} className="accent-torg-blue" />
+                        <span className="flex-1">{t}</span>
+                        <span className="text-[11px] text-torg-gray tabular-nums">{qt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="border-t border-gray-200 pt-3 text-[12px] text-torg-gray space-y-0.5">
                 <p><b className="text-torg-dark">{soma.grupos}</b> item(ns) · <b className="text-torg-dark">{soma.pecas}</b> peça(s)</p>
                 {soma.kg > 0 && <p><b className="text-torg-dark">{Math.round(soma.kg).toLocaleString("pt-BR")}</b> kg no modelo</p>}
                 {soma.parafusos > 0 && <p><b className="text-torg-dark">{soma.parafusos}</b> parafuso(s)</p>}
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap text-[11.5px]">
+                <label className="inline-flex items-center gap-1.5 cursor-pointer text-torg-dark">
+                  <input type="checkbox" checked={esconderResto} onChange={(e) => setEsconderResto(e.target.checked)} className="accent-torg-blue" />
+                  Ocultar o resto
+                </label>
+                {ocultos.size > 0 && (
+                  <button onClick={() => setOcultos(new Set())} className="text-torg-blue hover:underline inline-flex items-center gap-1">
+                    <Eye size={12} /> mostrar {ocultos.size} oculta(s)
+                  </button>
+                )}
               </div>
 
               <button onClick={exportar} disabled={baixando}
@@ -345,8 +463,22 @@ export default function ModeloClient({ ops }) {
 
               {/* ⚠ a lista vem DEPOIS do resumo e do botão: quem abriu o filtro quer saber quanto
                   deu e levar para a planilha; a lista é conferência, e conferência é o que se rola. */}
-              <div className="border-t border-gray-200 pt-2 max-h-[38vh] overflow-y-auto">
-                {(selecionados || indice).slice(0, 400).map((x) => (
+              <div className="border-t border-gray-200 pt-2">
+                <div className="relative mb-1">
+                  <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-torg-gray" />
+                  <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="procurar marca, tipo, parafuso…"
+                    className="w-full text-[12px] pl-6 pr-6 py-1.5 border border-gray-200 rounded-md outline-none focus:border-torg-blue" />
+                  {busca && (
+                    <button onClick={() => setBusca("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-torg-gray hover:text-torg-dark text-[13px] leading-none">×</button>
+                  )}
+                </div>
+                <p className="text-[10.5px] text-torg-gray px-1.5 pb-1">
+                  {listados.length} item(ns){busca ? " encontrados" : ""}
+                </p>
+              </div>
+
+              <div className="max-h-[34vh] overflow-y-auto">
+                {listados.slice(0, 400).map((x) => (
                   <button key={x.id} onClick={() => abrir(x)}
                     className={`w-full text-left text-[12px] px-1.5 py-1 rounded flex items-baseline gap-2 hover:bg-torg-blue-50/60 ${sel?.id === x.id ? "bg-orange-50" : ""}`}>
                     {/* ⚠ tipo e cota vão junto porque nem todo modelo tem marca: sem eles, a lista de
@@ -358,9 +490,9 @@ export default function ModeloClient({ ops }) {
                     <span className="ml-auto text-[11px] text-torg-gray shrink-0">{x.pecas}×</span>
                   </button>
                 ))}
-                {(selecionados || indice).length > 400 && (
+                {listados.length > 400 && (
                   <p className="text-[11px] text-torg-gray px-1.5 py-1">
-                    …e mais {(selecionados || indice).length - 400}. A planilha leva todos.
+                    …e mais {listados.length - 400}. Use a busca para chegar na peça, ou exporte a planilha com todos.
                   </p>
                 )}
               </div>
@@ -396,7 +528,8 @@ export default function ModeloClient({ ops }) {
           )}
           {urlModelo && (
             <VisualizadorIfc key={urlModelo} url={urlModelo} onSelecionar={abrir} onIndice={receberIndice}
-              visiveis={visiveis} selecionada={sel?.id || null} cores={cores} modo={modo} altura="fill" />
+              visiveis={visiveis} ocultos={ocultos} esconderResto={esconderResto}
+              selecionada={sel?.id || null} cores={cores} modo={modo} altura="fill" />
           )}
         </div>
 
@@ -405,6 +538,17 @@ export default function ModeloClient({ ops }) {
         {sel && (
           <aside className="w-[360px] max-w-[42vw] shrink-0 border-l border-gray-200 overflow-y-auto bg-white">
             <div className="p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <button onClick={() => setOcultos((v) => new Set(v).add(sel.id))}
+                  className="text-[11.5px] text-torg-gray hover:text-torg-dark inline-flex items-center gap-1.5 border border-gray-200 rounded-md px-2 py-1">
+                  <EyeOff size={12} /> ocultar esta peça
+                </button>
+                {ocultos.size > 0 && (
+                  <button onClick={() => setOcultos(new Set())} className="text-[11.5px] text-torg-blue hover:underline">
+                    mostrar as {ocultos.size} ocultas
+                  </button>
+                )}
+              </div>
               {sel.parafuso && <PainelParafuso p={sel.parafuso} qtd={sel.pecas} />}
               {sel.marca && carregandoPeca && <p className="text-[13px] text-torg-gray inline-flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> buscando {sel.marca}…</p>}
               {sel.marca && peca?.erro && (
