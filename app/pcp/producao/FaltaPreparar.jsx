@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState, Fragment } from "react";
 import { Loader2, ChevronRight } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
+import { diasDoLote, rotuloMaquina } from "@/lib/capacidade-preparacao";
 
 const fmtN = (n) => new Intl.NumberFormat("pt-BR").format(Math.round(Number(n) || 0));
 const fmt1 = (n) => (Math.round((Number(n) || 0) * 10) / 10).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -27,6 +28,7 @@ const somaQt = (a) => a.reduce((s, x) => s + (x.qte || 0), 0);
 export default function FaltaPreparar({ setor }) {
   const [itens, setItens] = useState(null);
   const [naoLancadas, setNaoLancadas] = useState(null);
+  const [cap, setCap] = useState(null);
   const [sel, setSel] = useState(() => new Set());
   const [aberto, setAberto] = useState(null);
   const [aberta, setAberta] = useState(null);
@@ -36,10 +38,10 @@ export default function FaltaPreparar({ setor }) {
 
   useEffect(() => {
     let vivo = true;
-    setItens(null); setNaoLancadas(null); setSel(new Set()); setAberto(null);
+    setItens(null); setNaoLancadas(null); setCap(null); setSel(new Set()); setAberto(null);
     fetch(`/api/pcp/falta-preparar?setor=${setor}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((j) => { if (!vivo) return; setItens(j?.itens || []); setNaoLancadas(j?.naoLancadas || null); })
+      .then((j) => { if (!vivo) return; setItens(j?.itens || []); setNaoLancadas(j?.naoLancadas || null); setCap(j || null); })
       .catch(() => vivo && setItens([]));
     return () => { vivo = false; };
   }, [setor]);
@@ -58,7 +60,27 @@ export default function FaltaPreparar({ setor }) {
   const cab = { filtros, setFiltros, opcoesDaColuna, aberta, setAberta };
   const escolhidos = useMemo(() => lista.filter((x) => sel.has(x.id)), [lista, sel]);
   const meta = Number(metaKg) || 0;
-  const dias = meta > 0 ? somaKg(escolhidos) / meta : 0;
+  // ⚠⚠ O DIA É DO GARGALO, não da soma. Vitor (03/09/2026): "veja para você ajustar isso de acordo
+  // com os apontamentos e que de fato atenda essa meta". 12 t só de cantoneira não é o mesmo dia
+  // que 12 t de perfil — a capacidade de cada máquina sai medida do Syneco (p75 dos dias
+  // apontados), e quem fecha o dia é a máquina mais carregada.
+  const carga = useMemo(() => {
+    const porMaq = {};
+    for (const p of escolhidos) {
+      const k = p.maquinaChave || "";
+      porMaq[k] = (porMaq[k] || 0) + (p.kg || 0);
+    }
+    const { dias: diasGargalo, porMaquina, gargalo } = diasDoLote(porMaq, cap?.capacidade || {});
+    const kg = somaKg(escolhidos);
+    return {
+      kg, porMaquina, gargalo,
+      // ⚠ sem apontamento de uma máquina, o gargalo não existe: cai na meta agregada, e a tela diz
+      // que caiu — número sem origem é pior que número faltando.
+      dias: diasGargalo > 0 ? diasGargalo : (meta > 0 ? kg / meta : 0),
+      medido: diasGargalo > 0,
+    };
+  }, [escolhidos, cap, meta]);
+  const dias = carga.dias;
   const alternar = (id) => setSel((p) => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; });
   const todos = vis.length > 0 && vis.every((x) => sel.has(x.id));
 
@@ -204,10 +226,49 @@ export default function FaltaPreparar({ setor }) {
           <span className="text-[11px] text-torg-gray">kg/dia</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <Cx rot="peso do lote" val={fmtKg(somaKg(escolhidos))} sub={`${fmtN(somaQt(escolhidos))} peças`} />
-          <Cx rot="leva" val={`${fmt1(dias)} dias`} sub="pelo peso que o setor faz" />
-          <Cx rot="por dia" val={meta > 0 ? fmtKg(meta) : "—"} sub="capacidade do setor" />
+          <Cx rot="peso do lote" val={fmtKg(carga.kg)} sub={`${fmtN(somaQt(escolhidos))} peças`} />
+          <Cx rot="leva" val={`${fmt1(dias)} dias`}
+            sub={carga.medido ? `gargalo: ${rotuloMaquina(carga.gargalo)}` : "pela meta do setor (sem apontamento)"} />
+          <Cx rot="fecha a meta em" val={meta > 0 ? `${fmt1(carga.kg / meta)} dias` : "—"} sub={`meta ${fmtKg(meta)}/dia`} />
         </div>
+
+        {carga.porMaquina.length > 0 && (
+          <div className="mt-3 border-t border-gray-200 pt-2.5">
+            <p className="text-[11px] text-torg-gray-light mb-1.5">
+              carga por máquina · capacidade medida no Syneco (p75 dos dias apontados)
+            </p>
+            <table className="w-full text-[11.5px]">
+              <tbody>
+                {carga.porMaquina.map((m) => {
+                  const pct = m.capacidade > 0 ? Math.min(1, m.kg / m.capacidade) : 0;
+                  const estoura = m.dias != null && m.dias > 1.001;
+                  return (
+                    <tr key={m.maquina || "sem"}>
+                      <td className="py-1 w-[110px] text-torg-dark">{rotuloMaquina(m.maquina)}</td>
+                      <td className="py-1 w-[160px]">
+                        <span className="block h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                          <span className={`block h-1.5 ${estoura ? "bg-red-500" : "bg-torg-blue"}`} style={{ width: `${pct * 100}%` }} />
+                        </span>
+                      </td>
+                      <td className="py-1 pl-2 tabular-nums text-torg-gray whitespace-nowrap">
+                        {fmtN(m.kg)} de {m.capacidade > 0 ? `${fmtN(m.capacidade)} kg/dia` : "sem medição"}
+                      </td>
+                      <td className={`py-1 pl-2 text-right tabular-nums whitespace-nowrap ${estoura ? "text-red-700 font-semibold" : "text-torg-gray-light"}`}>
+                        {m.dias != null ? `${fmt1(m.dias)} dia(s)` : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {cap?.capacidadeTotal > 0 && cap.capacidadeTotal < meta && (
+              <p className="text-[11px] text-amber-800 mt-1.5">
+                Juntas, as máquinas sustentam {fmtKg(cap.capacidadeTotal)}/dia no apontamento — abaixo da meta de {fmtKg(meta)}.
+                Para fechar o dia a mistura do lote tem de puxar para as máquinas com folga.
+              </p>
+            )}
+          </div>
+        )}
         <p className="text-[11px] text-torg-gray-light mt-2">
           ⚠ estimativa — quem cria a liberação do lote continua sendo o Planejamento, por frente da obra.
         </p>

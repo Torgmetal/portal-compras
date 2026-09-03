@@ -21,6 +21,7 @@ import { SO_FABRICACAO } from "@/lib/lista-pecas";
 import { OP_VIVA } from "@/lib/op-viva";
 import { pecaCortada } from "@/lib/liberacao-producao";
 import { opIdsNaFilaDoPcp } from "@/lib/op-na-fila-pcp";
+import { capacidadePorMaquina, normalizaMaquina, META_KG_DIA_PREPARACAO } from "@/lib/capacidade-preparacao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -115,13 +116,23 @@ export async function GET(req) {
       id: p.id, opNumero: p.op?.numero || null, marca: p.marca, descricao: p.descricao || null,
       perfil: p.perfil || null, material: p.material || null,
       qte: p.qte || 0, feito: p.qteProduzida || 0,
+      // ⚠ o nome da máquina vem em dois dialetos (LPC "LASER_CHAPA", Syneco "LASER CHAPA"): a tela
+      // agrupa pelo normalizado, senão a mesma máquina aparece duas vezes com metade da carga.
+      maquinaChave: normalizaMaquina(p.maquina),
       kg: Math.round(Number(p.pesoTotalKg) || 0),
       comprimentoMm: p.comprimentoMm || null, maquina: p.maquina || null,
       semMaterial: p.statusEstoque === "SEM_MATERIAL",
     }));
 
+  // ⚠ a capacidade é MEDIDA do apontamento, por máquina (ver lib/capacidade-preparacao): a meta
+  // agregada de 12 t não enxerga que 12 t de cantoneira é outro dia que 12 t de perfil.
+  let cap = { capacidade: {}, amostra: {}, totalKgDia: 0 };
+  try { cap = await capacidadePorMaquina(); } catch { /* sem apontamento a tela cai na meta agregada */ }
+
   return NextResponse.json({
     setor, todas, itens,
+    metaKgDia: META_KG_DIA_PREPARACAO,
+    capacidade: cap.capacidade, amostraDias: cap.amostra, capacidadeTotal: cap.totalKgDia,
     naoLancadas: {
       n: semOrdem.length,
       obras: [...new Set(semOrdem.map((p) => p.op?.numero).filter(Boolean))].sort(),
