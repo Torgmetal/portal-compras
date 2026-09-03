@@ -243,13 +243,21 @@ export async function PATCH(req, { params }) {
       }
     }
 
+    // ⚠ mesmo cuidado do teto das linhas, logo abaixo: "esconder marcas" num diagrama de montagem
+    // esconde centenas de rótulos de uma vez, e truncar em silêncio faz o texto voltar no PDF.
     if (Array.isArray(r.ocultosDesenho)) {
-      dados.resultados.ocultosDesenho = r.ocultosDesenho.slice(0, 800)
+      dados.resultados.ocultosDesenho = r.ocultosDesenho.slice(0, 5000)
         .map((o) => ({ x: num(o?.x), y: num(o?.y), w: num(o?.w), h: num(o?.h), tx: num(o?.tx), ty: num(o?.ty) }))
         .filter((o) => o.x != null && o.y != null);
     }
+    // ⚠⚠ O TETO PRECISA COBRIR O DESENHO INTEIRO. Vitor (03/09/2026): "as linhas que foram apagadas
+    // aparecem ainda no PDF, não são todas mas algumas aparecem". Com 4000 o corte era invisível: a
+    // tela guarda TODAS as apagadas em memória (e por isso some ali), mas só as 4000 primeiras eram
+    // gravadas — o PDF lê do banco, então o excedente reaparecia. Uma vista densa passa de 3.400
+    // segmentos (ver lib/vista-desenho), e a borracha de caixa apaga centenas de uma vez, então
+    // 4000 era um teto que se atingia de verdade. 20.000 cobre apagar o desenho inteiro.
     if (Array.isArray(r.linhasOcultasDesenho)) {
-      dados.resultados.linhasOcultasDesenho = r.linhasOcultasDesenho.slice(0, 4000)
+      dados.resultados.linhasOcultasDesenho = r.linhasOcultasDesenho.slice(0, 20000)
         .map((l) => (Array.isArray(l) ? l.slice(0, 4).map(num) : null))
         .filter((l) => l && l.length === 4 && l.every((v) => v != null));
     }
