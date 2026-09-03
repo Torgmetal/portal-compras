@@ -73,13 +73,27 @@ export default function CargaDosDias({ opId, recarga }) {
     } catch (e) { alert(e.message); } finally { setLimpando(false); }
   }
 
-  const dias = carga?.dias || [];
+  const todosDias = carga?.dias || [];
+  // ⚠⚠ DIA VAZIO NÃO É DIA. Vitor (03/09/2026), vendo 09/09 e 30/09 com "0 kg · 0 pç": "precisamos
+  // ajustar essas coisas aqui, teve lançamentos errado".
+  //
+  // Esses dias não têm carga nenhuma: existem só porque a liberação da OP-113 aponta para 95 peças
+  // que a reimportação da lista apagou. A linha some do gráfico, mas o AVISO continua contando —
+  // ele é quem explica o que houve, e é ele que tem o botão de limpar.
+  //
+  // ⚠ E some depois de limpar também: com `pecaIds` vazio a liberação continua gerando o dia no
+  // servidor, então sem este filtro o "tirar da contagem" zeraria o aviso e deixaria as duas
+  // linhas fantasmas na tela — parecendo que não resolveu.
+  //
+  // ⚠ `pecas > 0` com `kg === 0` FICA: é peça sem peso cadastrado, que é problema de cadastro, não
+  // linha fantasma — e escondê-la sumiria com trabalho que existe de verdade.
+  const dias = todosDias.filter((x) => (x.kg || 0) > 0 || (x.pecas || 0) > 0);
   const meta = Number(metaKg) || 0;
   const teto = Math.max(meta, ...dias.map((x) => x.kg || 0)) || 1;
   const larg = (v) => `${Math.min(100, Math.round((v / teto) * 100))}%`;
   const totalKg = dias.reduce((a, x) => a + (x.kg || 0), 0);
   const totalPc = dias.reduce((a, x) => a + (x.pecas || 0), 0);
-  const orfas = dias.reduce((a, x) => a + (x.orfas || 0), 0);
+  const orfas = todosDias.reduce((a, x) => a + (x.orfas || 0), 0);
 
   return (
     <div className="bg-white rounded-xl border border-torg-blue-100 overflow-hidden">
@@ -110,10 +124,16 @@ export default function CargaDosDias({ opId, recarga }) {
         <p className="px-4 py-4 text-[12.5px] text-torg-gray inline-flex items-center gap-2">
           <Loader2 size={13} className="animate-spin" /> lendo o que já desceu…
         </p>
-      ) : !dias.length ? (
+      ) : !dias.length && !orfas ? (
         <p className="px-4 py-4 text-[12.5px] text-torg-gray">Nada programado neste setor.</p>
       ) : (
         <>
+          {/* ⚠ o aviso das órfãs vive FORA do `if` da tabela: quando todos os dias do setor são
+              fantasmas (o caso da OP-113, 95 peças mortas em 09/09 e 30/09), a lista fica vazia e
+              era justamente aí que o aviso — e o botão de limpar — sumiam da tela. */}
+          {!dias.length ? (
+            <p className="px-4 py-4 text-[12.5px] text-torg-gray">Nada programado neste setor.</p>
+          ) : (<>
           <table className="w-full text-[12px]">
             <tbody>
               {dias.map((x) => {
@@ -151,13 +171,14 @@ export default function CargaDosDias({ opId, recarga }) {
             {opId && <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm bg-emerald-600 inline-block" /> obra aberta</span>}
             <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm bg-emerald-300 inline-block" /> {opId ? "outras obras" : "todas as obras"}</span>
           </div>
+          </>)}
 
           {orfas > 0 && (
             <div className="px-4 py-2 border-t border-amber-200 bg-amber-50 text-[11.5px] text-amber-800 flex items-start gap-3 flex-wrap">
               <span className="flex-1 min-w-[280px]">
                 <b>{fmtN(orfas)} peça(s) perderam a programação</b> — a lista foi reimportada depois da
                 liberação e elas voltaram para "a fazer".
-                {" "}({dias.filter((x) => x.orfas > 0).map((x) => `${x.dia ? fmtD(x.dia) : "sem data"}: ${fmtN(x.orfas)}`).join(" · ")})
+                {" "}({todosDias.filter((x) => x.orfas > 0).map((x) => `${x.dia ? fmtD(x.dia) : "sem data"}: ${fmtN(x.orfas)}`).join(" · ")})
                 {" "}Libere-as de novo pela obra; o importador já não perde mais a programação nas próximas listas.
               </span>
               <button onClick={limparOrfaos} disabled={limpando}
