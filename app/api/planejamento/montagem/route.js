@@ -52,14 +52,22 @@ export async function GET(req) {
   // usuário colou sem uma segunda chamada. É texto curto: numa obra de 900 marcas dá poucos KB.
   const naoMontaveis = await prisma.pecaConjunto.findMany({
     where: { opId, NOT: CONJUNTO_MONTAVEL },
-    select: { marca: true, tipoPeca: true, descricao: true, conjuntoCroquis: { select: { id: true }, take: 1 } },
+    select: { marca: true, tipoPeca: true, naLPC: true, descricao: true, conjuntoCroquis: { select: { id: true }, take: 1 } },
     take: 5000,
   });
+  // ⚠⚠ A MARCA QUE ESTÁ NA LISTA MONTÁVEL NÃO GANHA MOTIVO. Desde que a produção passou a ler só a
+  // LPC (ver CONJUNTO_MONTAVEL), toda marca tem um gêmeo vindo da LE — e ele cai aqui. Sem esta
+  // guarda, a tela diria "não é montável" de uma marca que está montável logo acima, porque o
+  // gêmeo errado chegou primeiro no laço.
+  const montaveis = new Set(conjuntos.map((c) => String(c.marca || "").trim().toUpperCase()));
   const motivos = {};
   for (const c of naoMontaveis) {
     const k = String(c.marca || "").trim().toUpperCase();
-    if (!k || motivos[k]) continue;
+    if (!k || motivos[k] || montaveis.has(k)) continue;
     motivos[k] = c.tipoPeca === "CROQUI" ? "é croqui (sub-peça de um conjunto)"
+      // ⚠ o motivo da LE vem ANTES do "sem croqui": o registro da LE às vezes TEM croqui grudado
+      // por engano, e dizer "sem croqui vinculado" mandaria procurar um problema que não é o dele.
+      : c.naLPC === false ? "está na LE (expedição), não na LPC — produção lê a LPC"
       : c.tipoPeca === "CONJUNTO" ? "conjunto sem croqui vinculado"
       : "peça avulsa — não passa pela montagem";
   }
