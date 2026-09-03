@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X, Eraser, ZoomIn, ZoomOut } from "lucide-react";
+import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X, Eraser, ZoomIn, ZoomOut, Magnet } from "lucide-react";
 import { layoutCotas, setaEm, PADDING } from "@/lib/cota-marcacao";
 
 /**
@@ -44,6 +44,11 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
   // remover algumas cotas, meio que apagando isso do desenho?". O que ele apaga aqui some TAMBÉM do
   // PDF — é coberto de branco sobre a vista embutida, do mesmo jeito que as tabelas já eram.
   const [borracha, setBorracha] = useState(false);
+  // ⚠⚠ ÍMÃ COM DESLIGA. Vitor (03/09/2026): "o clique gruda no ponto errado... precisa ser mais
+  // preciso para marcar essas cotas" — e "não precisa identificar cotas sozinho pois você não
+  // entende sozinho". Fica ligado por padrão (é o que ajuda na maioria dos cliques); desligado, o
+  // clique vale exatamente onde o mouse está, sem tentar adivinhar o vértice certo.
+  const [imaLigado, setImaLigado] = useState(true);
   // ⚠ CONTADOR DE REDESENHO. Precisa existir aqui em cima porque o efeito que pinta o canvas
   // depende dele — ver a nota na dependência.
   const [tick, setTick] = useState(0);
@@ -248,6 +253,12 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     const r = cv.current.getBoundingClientRect();
     const x = e.clientX - r.left, y = e.clientY - r.top;
     const [dx, dy] = paraDesenho(x, y, L);
+    // ⚠⚠ O ÍMÃ TEM DESLIGA. Vitor (03/09/2026): "o clique gruda no ponto errado... precisa ser mais
+    // preciso". Num desenho denso (hachura, símbolo de solda, cota do próprio Tekla) sobra vértice
+    // perto de qualquer clique, e o mais próximo geometricamente nem sempre é o que a pessoa mirou —
+    // eu não tenho como adivinhar QUAL vértice é o certo olhando só distância. Em vez de tentar
+    // acertar sozinho, dou o controle: com o ímã desligado, o ponto é exatamente onde o mouse está.
+    if (!imaLigado) return [dx, dy];
     // imã: o vértice mais próximo dentro do raio
     let melhor = null, dist = SNAP / L.esc;
     for (const v of vertices()) {
@@ -511,10 +522,23 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
         <p className="text-[11px] text-torg-gray">
           {borracha
             ? "Arraste uma caixa para apagar tudo dentro dela, ou clique num item. Some aqui e no PDF."
-            : pendente ? "Agora clique no segundo ponto da cota." : "Clique em dois pontos do desenho para criar uma cota. O clique gruda no traço."}
+            : pendente ? "Agora clique no segundo ponto da cota." : imaLigado
+              ? "Clique em dois pontos do desenho para criar uma cota. O clique gruda no traço."
+              : "Clique em dois pontos do desenho para criar uma cota. Ímã desligado — o ponto é exatamente onde o mouse está."}
           {pendente && <button onClick={() => setPendente(null)} className="ml-2 text-torg-blue inline-flex items-center gap-1"><Undo2 size={11} /> cancelar</button>}
         </p>
         <span className="flex items-center gap-2 shrink-0">
+          {/* ⚠⚠ Vitor (03/09/2026): "o clique gruda no ponto errado... não precisa identificar
+              cotas sozinho pois você não entende sozinho" — num desenho denso o vértice mais perto
+              geometricamente nem sempre é o que a pessoa mirou, e eu não tenho como adivinhar qual é
+              o certo. Em vez de tentar acertar sozinho, desligar o ímã dá o controle: o clique vale
+              o pixel exato. */}
+          <button onClick={() => setImaLigado((v) => !v)}
+            title={imaLigado ? "Ímã ligado — o clique gruda no traço mais próximo" : "Ímã desligado — o clique vale o ponto exato"}
+            className={`text-[11px] inline-flex items-center gap-1 font-medium rounded px-1.5 py-0.5 border ${
+              imaLigado ? "text-torg-blue border-torg-blue-200 hover:bg-torg-blue-50" : "bg-torg-orange text-white border-torg-orange"}`}>
+            <Magnet size={12} /> {imaLigado ? "ímã ligado" : "ímã desligado"}
+          </button>
           <button onClick={() => { setBorracha((v) => !v); setPendente(null); setRascunho(null); }}
             className={`text-[11px] inline-flex items-center gap-1 font-medium rounded px-1.5 py-0.5 border ${
               borracha ? "bg-torg-orange text-white border-torg-orange" : "text-torg-blue border-torg-blue-200 hover:bg-torg-blue-50"}`}>
