@@ -194,6 +194,38 @@ export async function POST(req) {
     }
   }
 
+  // ⚠⚠ NA MONTAGEM SÓ ENTRA CONJUNTO. Vitor (03/09/2026): "peguei um erro aqui, você programou
+  // todas as posições em montagem; na montagem só pode ficar os conjuntos dessa obra".
+  //
+  // A posição (croqui P1, P2…) é peça de corte: ela vira conjunto na bancada, não é montada
+  // sozinha. Liberar posição para a montagem enche a fila do setor com trabalho que não existe lá
+  // e estraga a conta do prazo — a régua da montagem é peças por faixa de peso (ver
+  // lib/montagem-capacidade), e uma posição de 8 kg entra como se fosse um conjunto a montar.
+  //
+  // ⚠ A CONFERÊNCIA É AQUI, não só na tela — mesmo motivo do portão do desenho, logo acima: filtro
+  // de tela é sugestão, e um POST fora dela (ou uma aba aberta desde ontem) passa por cima.
+  // A rota que libera pelo chão de fábrica já fazia isso com CONJUNTO_MONTAVEL
+  // (/api/producao/pecas/liberar-montagem); faltava no caminho do Planejamento.
+  //
+  // ⚠ RECUSA, não filtra em silêncio: quem selecionou 100 e viu 30 descerem tem de saber por quê —
+  // filtrar calado faria a pessoa achar que liberou tudo.
+  if (d.pecaIds?.length && (d.setores || []).includes("MONTAGEM")) {
+    const naoConjunto = await prisma.pecaConjunto.findMany({
+      where: { id: { in: d.pecaIds }, NOT: { tipoPeca: "CONJUNTO" } },
+      select: { marca: true }, take: 20,
+    });
+    if (naoConjunto.length) {
+      const amostra = naoConjunto.slice(0, 8).map((p) => p.marca).filter(Boolean);
+      return NextResponse.json({
+        error: `A seleção tem ${naoConjunto.length === 20 ? "20+" : naoConjunto.length} posição(ões) de corte`
+          + `${amostra.length ? ` (${amostra.join(", ")}${naoConjunto.length > amostra.length ? "…" : ""})` : ""}`
+          + ". Na montagem só entra CONJUNTO — a posição é peça de corte e vira conjunto na bancada."
+          + " Tire as posições da seleção e libere de novo.",
+        posicoes: naoConjunto.length,
+      }, { status: 400 });
+    }
+  }
+
   const agora = new Date();
   const marco = d.dataMarco ? new Date(`${d.dataMarco}T12:00:00Z`) : null;
   const desvio = desvioDoMarco(marco, agora);

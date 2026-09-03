@@ -752,10 +752,28 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
             <span className="text-[10px] uppercase text-torg-gray-light">Descem</span>
             {(lib?.setores || []).map((sx) => {
               const on = setores.includes(sx.key);
+              // ⚠⚠ MONTAGEM NÃO SE LIBERA DAQUI. Vitor (03/09/2026): "peguei um erro aqui, você
+              // programou todas as posições em montagem; na montagem só pode ficar os conjuntos
+              // dessa obra".
+              //
+              // Esta lista é de POSIÇÃO (a `base` tira os conjuntos de propósito — "não se corta
+              // conjunto"), então marcar Montagem aqui só podia mandar posição para a bancada: a
+              // peça P vira conjunto NA montagem, não é montada sozinha. A montagem tem aba
+              // própria, ao lado, que lista conjunto e reparte por bancada e dia.
+              //
+              // ⚠ desabilitado, não escondido: sumir o botão faria procurar o que não existe mais.
+              // A rota recusa de qualquer jeito (ver /api/planejamento/liberacao) — aqui é só para
+              // ninguém tentar.
+              const ehMontagem = sx.key === "MONTAGEM";
               return (
-                <button key={sx.key} onClick={() => setSetores((v) => (on ? v.filter((k) => k !== sx.key) : [...v, sx.key]))}
-                  title={lib?.datasSetor?.[sx.key] || lib?.datasSetorCrono?.[sx.key] ? `marco ${fmtD(lib?.datasSetorCrono?.[sx.key] || lib?.datasSetor?.[sx.key])}` : "sem marco no cronograma"}
-                  className={`text-[11px] px-2 py-0.5 rounded-lg border ${on ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue"}`}>
+                <button key={sx.key} disabled={ehMontagem}
+                  onClick={() => !ehMontagem && setSetores((v) => (on ? v.filter((k) => k !== sx.key) : [...v, sx.key]))}
+                  title={ehMontagem
+                    ? "A montagem se libera na aba \"Liberar para montagem\", que lista conjuntos — aqui a lista é de posições de corte."
+                    : (lib?.datasSetor?.[sx.key] || lib?.datasSetorCrono?.[sx.key] ? `marco ${fmtD(lib?.datasSetorCrono?.[sx.key] || lib?.datasSetor?.[sx.key])}` : "sem marco no cronograma")}
+                  className={`text-[11px] px-2 py-0.5 rounded-lg border ${ehMontagem
+                    ? "bg-gray-50 text-torg-gray-light border-gray-100 cursor-not-allowed line-through"
+                    : on ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue"}`}>
                   {sx.label}
                 </button>
               );
