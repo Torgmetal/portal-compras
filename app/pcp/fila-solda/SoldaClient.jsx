@@ -188,6 +188,17 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
     return dias.length ? dias.sort()[0] : isoHoje();
   }, [selecao]);
   const bancadasDaSelecao = useMemo(() => new Set(selecao.map((c) => c.soldaBancada).filter(Boolean)), [selecao]);
+  // ⚠⚠ SEM BANCADA AINDA ≠ MUDANDO DE BANCADA. Vitor (03/09/2026): "não ficou claro ainda para
+  // podermos colocar na bancada eu pelo menos não consegui identificar".
+  //
+  // O bloco "mover para" nasceu para TROCAR quem já tinha bancada (por isso o texto "manter a
+  // bancada" e o dia opcional) — mas é o único jeito de atribuir bancada direto, sem passar pelo
+  // painel de repartição. Para peça nova esse texto não quer dizer nada (não há o que "manter"), e
+  // aplicar só a bancada sem dia gravava um conjunto "programado" sem dia — sumia da carga do dia
+  // sem avisar. Quando a seleção inteira é nova, o bloco vira "colocar na bancada" e passa a exigir
+  // os dois campos, para nunca soltar bancada sem dia.
+  const todosNovos = selecao.length > 0 && bancadasDaSelecao.size === 0;
+  const faltaParaMover = todosNovos ? (!novaBancada || !novoDia) : (!novaBancada && !novoDia);
   const travada = (b) => {
     if (bancadasDaSelecao.has(b)) return null;
     const o = ocupadasHoje[b];
@@ -265,7 +276,7 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
   //
   // ⚠ O QUE NÃO FOI PREENCHIDO NÃO VAI NO CORPO — mandar `null` apagaria o valor em vez de mantê-lo.
   async function mover() {
-    if ((!novaBancada && !novoDia) || !selecao.length) return;
+    if (faltaParaMover || !selecao.length) return;
     if (novaBancada) {
       const t = travada(novaBancada);
       if (t) { setErro(`${novaBancada} está ocupada até ${fmtDiaLongo(t.livreEm)} — mude o dia antes, ou escolha outra.`); return; }
@@ -469,14 +480,18 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
               clica, o painel abre por cima. O fluxo fica marca → reparte → libera, cada passo com
               o seu clique. */}
           <button onClick={() => setRepartindo(true)}
+            title="Reparte automaticamente por dia útil entre várias bancadas, respeitando a ocupação de cada uma"
             className="px-3 py-1.5 bg-torg-orange text-white text-xs font-semibold rounded-lg hover:opacity-90 inline-flex items-center gap-1">
             <Flame size={13} /> Repartir entre bancadas
           </button>
 
-          <span className="ml-2 pl-3 border-l border-torg-blue-200 text-[11px] font-semibold text-torg-gray">mover para</span>
+          <span className="ml-2 pl-3 border-l border-torg-blue-200 text-[11px] font-semibold text-torg-gray">
+            {todosNovos ? "colocar na bancada" : "mover para"}
+          </span>
           <select value={novaBancada} onChange={(e) => setNovaBancada(e.target.value)}
+            title="Coloca TODOS os selecionados nesta bancada e neste dia de uma vez — sem repartir por dia automaticamente"
             className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg bg-white">
-            <option value="">— manter a bancada —</option>
+            <option value="">{todosNovos ? "— escolha a bancada —" : "— manter a bancada —"}</option>
             {BANCADAS.map((b) => {
               const t = travada(b);
               return (
@@ -487,10 +502,11 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
             })}
           </select>
           <input type="date" value={novoDia} onChange={(e) => setNovoDia(e.target.value)}
-            title="Deixe vazio para manter o dia" placeholder="manter o dia"
-            className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg bg-white" />
-          <button onClick={mover} disabled={agindo || (!novaBancada && !novoDia)}
-            title={!novaBancada && !novoDia ? "Escolha a bancada, o dia, ou os dois" : `Aplica em ${selecao.length} conjunto(s)`}
+            title={todosNovos ? "Obrigatório: peça sem bancada precisa de um dia para entrar na carga do setor" : "Deixe vazio para manter o dia"}
+            placeholder={todosNovos ? "escolha o dia" : "manter o dia"}
+            className={`px-2 py-1.5 text-sm border rounded-lg bg-white ${todosNovos && !novoDia ? "border-amber-300" : "border-gray-200"}`} />
+          <button onClick={mover} disabled={agindo || faltaParaMover}
+            title={!novaBancada ? "Escolha a bancada" : todosNovos && !novoDia ? "Escolha também o dia — peça nova precisa de data para entrar na carga" : `Aplica em ${selecao.length} conjunto(s)`}
             className="px-3 py-1.5 bg-torg-blue text-white text-xs font-semibold rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-1 disabled:opacity-40">
             {agindo ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />} Aplicar
           </button>
