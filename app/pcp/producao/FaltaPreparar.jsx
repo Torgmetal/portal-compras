@@ -26,6 +26,7 @@ const somaQt = (a) => a.reduce((s, x) => s + (x.qte || 0), 0);
 
 export default function FaltaPreparar({ setor }) {
   const [itens, setItens] = useState(null);
+  const [naoLancadas, setNaoLancadas] = useState(null);
   const [sel, setSel] = useState(() => new Set());
   const [aberto, setAberto] = useState(null);
   const [aberta, setAberta] = useState(null);
@@ -35,10 +36,10 @@ export default function FaltaPreparar({ setor }) {
 
   useEffect(() => {
     let vivo = true;
-    setItens(null); setSel(new Set()); setAberto(null);
+    setItens(null); setNaoLancadas(null); setSel(new Set()); setAberto(null);
     fetch(`/api/pcp/falta-preparar?setor=${setor}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((j) => vivo && setItens(j?.itens || []))
+      .then((j) => { if (!vivo) return; setItens(j?.itens || []); setNaoLancadas(j?.naoLancadas || null); })
       .catch(() => vivo && setItens([]));
     return () => { vivo = false; };
   }, [setor]);
@@ -66,12 +67,22 @@ export default function FaltaPreparar({ setor }) {
       <Loader2 size={13} className="animate-spin" /> vendo o que falta preparar…
     </p>;
   }
+  // ⚠ o aviso do que o programador ainda não lançou aparece mesmo com a lista vazia: fila vazia
+  // com 261 peças esperando lançamento não é "está em dia", é o contrário.
+  const avisoNaoLancadas = naoLancadas?.n > 0 ? (
+    <p className="text-[11.5px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+      <b>{fmtN(naoLancadas.n)} peças</b> {naoLancadas.obras?.length ? `da${naoLancadas.obras.length > 1 ? "s obras" : " obra"} ${naoLancadas.obras.map(fmtOP).join(", ")} ` : ""}
+      ainda não foram lançadas pelo programador (sem ordem no Syneco) — não entram na fila da preparação.
+      {naoLancadas.amostra?.length > 0 && <span className="text-amber-700"> ex.: {naoLancadas.amostra.join(", ")}…</span>}
+    </p>
+  ) : null;
+
   if (!lista.length) {
-    return <p className="px-4 py-4 text-[12.5px] text-torg-gray">
+    return <div className="px-4 py-4">{avisoNaoLancadas}<p className="text-[12.5px] text-torg-gray">
       {setor === "MONTAGEM"
         ? "Nenhum conjunto esperando croqui — a preparação está em dia com a montagem."
         : "Nada esperando corte nas obras abertas."}
-    </p>;
+    </p></div>;
   }
 
   // ── MONTAGEM: listagem tipo LPC, conjunto → croquis que faltam ───────────────────────────────
@@ -141,6 +152,7 @@ export default function FaltaPreparar({ setor }) {
   // ── PREPARAÇÃO: seleciona as peças e o prazo sai do PESO por dia ─────────────────────────────
   return (
     <div className="px-4 pt-3 pb-3">
+      {avisoNaoLancadas}
       <p className="text-[12.5px] text-torg-gray mb-3">
         <b className="text-torg-dark">{fmtN(vis.length)} peças</b> esperando corte. Marque o que vai entrar e o prazo sai do peso que o setor faz por dia.
         {ativos > 0 && <button onClick={limpar} className="ml-2 text-[11px] text-torg-blue hover:underline">limpar filtro</button>}

@@ -89,11 +89,28 @@ export async function GET(req) {
     take: 4000,
   });
 
-  const itens = pecas
-    // ⚠ `pecaCortada` é a MESMA régua do painel de corte e da fila (lib/liberacao-producao): status
-    // "CORTE" não quer dizer cortada, quer dizer que está NO corte. Medir aqui de outro jeito faria
-    // a mesma peça aparecer feita numa tela e pendente noutra.
-    .filter((p) => !pecaCortada(p))
+  // ⚠⚠ PEÇA NÃO LANÇADA NÃO É FILA DA PREPARAÇÃO. Vitor (03/09/2026): "tem peças da 97B que estão
+  // como falta preparar, porém o Gabriel nem programou ainda". Peça lançada = tem `MesOrdem` (é
+  // assim que o Syneco existe — ver torg_programacao_syneco). Na OP-097, as 437 em CORTE têm ordem
+  // e as 261 em PENDENTE não têm nenhuma: o trabalho delas é do PROGRAMADOR, não do setor, e
+  // misturá-las fazia a tela cobrar da preparação o que ainda não chegou nela.
+  //
+  // ⚠ Mas o número não some: quem não foi lançado volta como aviso, porque é justamente aí que o
+  // PCP tem de ir cobrar.
+  const opIds = [...new Set(pecas.map((p) => p.opId).filter(Boolean))];
+  const ordens = opIds.length
+    ? await prisma.mesOrdem.findMany({ where: { opId: { in: opIds } }, select: { opId: true, item: true } })
+    : [];
+  const chave = (opId, marca) => `${opId}|${String(marca || "").trim().toUpperCase()}`;
+  const lancada = new Set(ordens.map((o) => chave(o.opId, o.item)));
+
+  // ⚠ `pecaCortada` é a MESMA régua do painel de corte e da fila (lib/liberacao-producao): status
+  // "CORTE" não quer dizer cortada, quer dizer que está NO corte. Medir aqui de outro jeito faria
+  // a mesma peça aparecer feita numa tela e pendente noutra.
+  const abertas = pecas.filter((p) => !pecaCortada(p));
+  const semOrdem = abertas.filter((p) => !lancada.has(chave(p.opId, p.marca)));
+  const itens = abertas
+    .filter((p) => lancada.has(chave(p.opId, p.marca)))
     .map((p) => ({
       id: p.id, opNumero: p.op?.numero || null, marca: p.marca, descricao: p.descricao || null,
       perfil: p.perfil || null, material: p.material || null,
@@ -103,5 +120,12 @@ export async function GET(req) {
       semMaterial: p.statusEstoque === "SEM_MATERIAL",
     }));
 
-  return NextResponse.json({ setor, todas, itens });
+  return NextResponse.json({
+    setor, todas, itens,
+    naoLancadas: {
+      n: semOrdem.length,
+      obras: [...new Set(semOrdem.map((p) => p.op?.numero).filter(Boolean))].sort(),
+      amostra: semOrdem.slice(0, 8).map((p) => p.marca),
+    },
+  });
 }
