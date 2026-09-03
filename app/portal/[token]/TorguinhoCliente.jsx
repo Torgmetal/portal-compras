@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, Loader2, X, MessageCircle } from "lucide-react";
 import { emSetembroAmarelo, TORGUINHO_LACO } from "@/lib/campanha";
+import { fraseDoDiaCliente } from "@/lib/torguinho-frases-cliente";
 
 const AVATAR = emSetembroAmarelo() ? TORGUINHO_LACO : "/torguinho.png";
 
@@ -81,6 +82,11 @@ export default function TorguinhoCliente({ token, obra }) {
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {!msgs.length && (
               <div className="space-y-3">
+                {/* ⚠ a frase vem ANTES do "o que eu faço", e em outro peso: é o cumprimento, não a
+                    instrução. Uma por dia — quem abre duas vezes não acha que a página fala sozinha. */}
+                <p className="text-[13px] text-[#0D1F3C] italic leading-relaxed border-l-2 border-[#F4801F] pl-3">
+                  {fraseDoDiaCliente()}
+                </p>
                 <p className="text-[13px] text-gray-600 leading-relaxed">
                   Posso ajudar com as peças desta obra: peso, quantidade, em que etapa estão, o que já
                   embarcou e em qual romaneio, a rastreabilidade do material e os relatórios de inspeção.
