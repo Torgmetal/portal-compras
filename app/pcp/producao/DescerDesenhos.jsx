@@ -19,7 +19,7 @@
 // programação coisa que estiverem erradas lá". A marca continua na LPC — o que sai é o dia. E o
 // servidor recusa tirar o que o Syneco já apontou (ver a rota).
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Printer, CalendarX, CalendarCheck, AlertTriangle } from "lucide-react";
+import { Loader2, Printer, CalendarX, CalendarCheck, AlertTriangle, FileSpreadsheet } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import { repartirPorBancada, distribuirEmDias, RITMO_META, BANCADAS } from "@/lib/montagem-capacidade";
@@ -47,7 +47,7 @@ const proximoUtil = () => {
   return d.toISOString().slice(0, 10);
 };
 
-export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor, onMudou }) {
+export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor, onMudou, onSeparacao }) {
   // ⚠⚠ AS ABAS DEPENDEM DO SETOR. Vitor (03/09/2026): "quando estamos na aba de planejamento não
   // precisa mostrar pronto para montar, pois aí que fica confuso; já quando aperto a tela da
   // montagem, aí sim você tem que mostrar uma aba onde está escrito falta descer vira falta
@@ -202,6 +202,30 @@ export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor, onMu
   }
 
   function alternar(id) { setSel((p) => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; }); }
+
+  // ⚠⚠ A PLANILHA DE SEPARAÇÃO VEM ANTES DO PAPEL. Vitor (03/09/2026): "antes de liberar para
+  // imprimir os projetos, peça para que ela imprima a planilha que montamos e dê para a separação
+  // conferir (…) pode ser que na hora da separação tenha um material que esteja mais fácil, o que
+  // não teria problema: cabe à separação informar ao PCP qual R foi usado e ela muda isso dentro da
+  // página dela; feito isso ela libera e imprime os projetos".
+  //
+  // ⚠ É a planilha que JÁ EXISTE (REL-PCP-006, no padrão do portal): perfil, barras, peso unitário
+  // e total, o R de cada material e os Rs disponíveis para trocar. Uma segunda lista aqui seria
+  // outro papel dizendo outra coisa sobre o mesmo fardo.
+  const opsDaSelecao = [...new Set((escolhidos.length ? escolhidos : vis).map((l) => l.opId).filter(Boolean))];
+  function abrirSeparacao() {
+    const base = escolhidos.length ? escolhidos : vis;
+    if (opsDaSelecao.length !== 1) {
+      setErro("A lista de separação é por obra. Filtre uma OP só (o funil da coluna OP) e abra de novo.");
+      return;
+    }
+    onSeparacao?.({
+      opId: opsDaSelecao[0],
+      obra: fmtOP(base[0]?.opNumero),
+      setor: "CORTE",
+      ids: base.map((l) => l.id),
+    });
+  }
 
   async function descer() {
     if (!alvoDescer.length) return;
@@ -402,13 +426,21 @@ export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor, onMu
               {ocupado ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />}
               {reimpressoes === alvoDescer.length && alvoDescer.length ? "Reimprimir" : "Descer"} {fmtN(alvoDescer.length)}
             </button>
+            {setor !== "MONTAGEM" && (
+              <button onClick={abrirSeparacao} disabled={!(escolhidos.length || vis.length)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg border border-torg-blue text-torg-blue bg-white hover:bg-torg-blue-50 disabled:opacity-40">
+                <FileSpreadsheet size={13} />
+                Planilha de separação
+              </button>
+            )}
             <button onClick={tirar} disabled={tirando || !escolhidos.length}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg border border-gray-200 text-torg-gray hover:border-amber-300 hover:text-amber-800 disabled:opacity-40">
               {tirando ? <Loader2 size={13} className="animate-spin" /> : <CalendarX size={13} />}
               Tirar da programação{escolhidos.length ? ` (${fmtN(escolhidos.length)})` : ""}
             </button>
             <span className="text-[11px] text-torg-gray-light">
-              {escolhidos.length ? "vale para o que está marcado" : "sem marcar nada, descer vale para tudo que está à vista"} ·
+              {escolhidos.length ? "vale para o que está marcado" : "sem marcar nada, descer vale para tudo que está à vista"}
+              {setor !== "MONTAGEM" && <> · a separação confere a planilha e informa o R antes de o projeto descer</>} ·
               {" "}imprime carimbado e registra a GRD
             </span>
           </div>

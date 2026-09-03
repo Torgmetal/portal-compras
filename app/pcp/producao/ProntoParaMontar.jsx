@@ -149,7 +149,7 @@ export default function ProntoParaMontar({ onProgramado }) {
             await baixarZipLote(j2, opNumero, "montagem");
           } catch (e) { falhas.push(`OP ${fmtOP(opNumero)}: ${e?.message || "falhou"}`); }
         }
-        imprimirListaBancadas(distrib, porDia, feitos);
+        await planilhaDeBancadas(distrib, porDia, feitos);
         if (falhas.length) setErro((v) => [v, ...falhas].filter(Boolean).join(" · "));
       }
 
@@ -282,61 +282,69 @@ export default function ProntoParaMontar({ onProgramado }) {
   );
 }
 
-// ─── A LISTA DE CADA BANCADA, para o encarregado ───────────────────────────────
-// Vitor (03/09/2026): "as listas de bancadas com as datas que estão previstas para iniciar e
-// terminar". É o papel que fica na bancada — por isso o cabeçalho de cada bloco repete a data, e a
-// folha quebra por bancada: um encarregado não deve receber a lista do vizinho junto.
+// ─── A LISTA DE CADA BANCADA, no padrão das planilhas ──────────────────────────
+// Vitor (03/09/2026): "a lista não pode ser esse pdf ridículo que você fez, use a nossa planilha
+// como disse" — a planilha é a do portal inteiro (lib/excel-relatorio, ISO 9001 com logo e rodapé),
+// a mesma da lista de separação e das outras listas do PCP.
+//
+// ⚠ SEPARADO POR BANCADA, numa folha só: cada bancada tem seu bloco e seu subtotal, e o autofiltro
+// do Excel deixa o encarregado ficar só com a dele. Um arquivo por bancada obrigaria cinco
+// downloads para imprimir um lote.
 //
 // ⚠ SÓ O QUE O SERVIDOR LIBEROU (`feitos`): imprimir o que ele barrou mandaria montar conjunto que
 // voltou para a máquina.
-function imprimirListaBancadas(distrib, porDia, feitos) {
+//
+// ⚠ import DINÂMICO do exceljs (padrão do portal): a lib é pesada e não pode entrar no bundle de
+// quem só abre a tela.
+async function planilhaDeBancadas(distrib, porDia, feitos) {
   const blocos = distrib
     .map((b) => {
       const itens = b.itens.filter((it) => feitos.has(it.id));
       if (!itens.length) return null;
-      const dias = (porDia.find((x) => x.bancada === b.bancada)?.dias || []).map((d) => iso(d.dia));
       const diaDoId = new Map();
       for (const d of (porDia.find((x) => x.bancada === b.bancada)?.dias || [])) {
         for (const it of d.itens) diaDoId.set(it.id, iso(d.dia));
       }
+      const dias = [...new Set(itens.map((it) => diaDoId.get(it.id)).filter(Boolean))].sort();
       return { bancada: b.bancada, ini: dias[0] || null, fim: dias[dias.length - 1] || null, itens, diaDoId };
     })
     .filter(Boolean);
   if (!blocos.length) return;
 
-  const esc = (t) => String(t ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
-<title>Montagem — lista por bancada</title><style>
-  @page { size: A4; margin: 12mm; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; }
-  .bl { page-break-after: always; }
-  .bl:last-child { page-break-after: auto; }
-  h1 { font-size: 15px; margin: 0 0 2px; color: #0D1F3C; }
-  .sub { font-size: 11px; color: #555; margin: 0 0 10px; }
-  .faixa { border-top: 3px solid #F4801F; margin: 4px 0 10px; }
-  table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  th { background: #0D1F3C; color: #fff; text-align: left; padding: 4px 6px; font-weight: 600; }
-  td { border-bottom: 1px solid #e5e5e5; padding: 3px 6px; }
-  .num { text-align: right; font-variant-numeric: tabular-nums; }
-</style></head><body>
-${blocos.map((b) => `<div class="bl">
-  <h1>Montagem — ${esc(b.bancada)}</h1>
-  <p class="sub">previsto de <b>${fmtDiaSemana(b.ini)}</b> a <b>${fmtDiaSemana(b.fim)}</b> · ${b.itens.length} conjunto(s)</p>
-  <div class="faixa"></div>
-  <table><thead><tr><th>dia</th><th>OP</th><th>conjunto</th><th>descrição</th><th class="num">peças</th><th class="num">kg</th></tr></thead><tbody>
-  ${b.itens.map((it) => `<tr><td>${esc(fmtDiaCurto(b.diaDoId.get(it.id)))}</td><td>${esc(fmtOP(it.opNumero))}</td>`
-    + `<td><b>${esc(it.marca)}</b></td><td>${esc(it.descricao || "")}</td>`
-    + `<td class="num">${fmtN(it.qte)}</td><td class="num">${fmtN(it.pesoTotalKg)}</td></tr>`).join("")}
-  </tbody></table>
-</div>`).join("")}
-</body></html>`;
+  const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, adicionarRodapeISO, downloadWorkbook } =
+    await import("@/lib/excel-relatorio");
 
-  const w = window.open("", "_blank");
-  if (!w) return; // bloqueador de pop-up — o ZIP já baixou, não vale travar o fluxo por causa da folha
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  w.print();
+  const headers = ["Bancada", "Dia previsto", "OP", "Conjunto", "Descrição", "Peças", "Peso (kg)", "Montado (visto)"];
+  const totalPc = blocos.reduce((s, b) => s + b.itens.reduce((x, i) => x + (i.qte || 0), 0), 0);
+  const totalKg = blocos.reduce((s, b) => s + b.itens.reduce((x, i) => x + (i.pesoTotalKg || 0), 0), 0);
+  const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+    titulo: "Programação da montagem por bancada",
+    subtitulo: `${blocos.map((b) => `${b.bancada}: ${fmtDiaCurto(b.ini)} a ${fmtDiaCurto(b.fim)}`).join(" · ")}`,
+    kpis: [`${fmtN(blocos.length)} bancadas`, `${fmtN(totalPc)} peças`, `${fmtN(totalKg)} kg`],
+    totalColunas: headers.length, nomePlanilha: "Bancadas", codigoDoc: "REL-PCP-007",
+  });
+  ws.columns = [{ width: 16 }, { width: 14 }, { width: 10 }, { width: 18 }, { width: 38 }, { width: 10 }, { width: 13 }, { width: 18 }];
+
+  let row = linhaInicio;
+  adicionarHeaderTabela(ws, row, headers); row++;
+  for (const b of blocos) {
+    const de = row;
+    for (const it of b.itens.slice().sort((x, y) => String(b.diaDoId.get(x.id)).localeCompare(String(b.diaDoId.get(y.id))) || String(x.marca).localeCompare(String(y.marca), "pt-BR", { numeric: true }))) {
+      adicionarLinhaTabela(ws, row, [
+        b.bancada, fmtDiaCurto(b.diaDoId.get(it.id)), fmtOP(it.opNumero), it.marca, it.descricao || "",
+        it.qte || 0, Number(it.pesoTotalKg) || 0, "",
+      ], { alinhamento: { 1: "center", 2: "center", 5: "center", 6: "right" } });
+      row++;
+    }
+    adicionarLinhaTotais(ws, row, [
+      `TOTAL ${b.bancada}`, "", "", "", "",
+      { formula: `SUM(F${de}:F${row - 1})` }, { formula: `SUM(G${de}:G${row - 1})` }, "",
+    ]);
+    row += 2;
+  }
+  adicionarRodapeISO(ws, row + 1, headers.length, { elaboradoPor: "PCP" });
+  const hoje = new Date().toISOString().slice(0, 10);
+  await downloadWorkbook(workbook, `Programacao_montagem_bancadas_${hoje}.xlsx`);
 }
 
 function Cx({ rot, val, sub }) {

@@ -583,7 +583,7 @@ export default function ProducaoClient() {
       {/* ⚠⚠ A AÇÃO ANTES DA LISTA. Vitor (03/09/2026): "ela está perdida para conseguir descer os
           desenhos para os setores". O caminho normal deixa de depender de achar a peça numa tabela
           de centenas — a lista de obras continua abaixo, para o resto do trabalho. */}
-      <DescerDesenhos onDescer={descerDoPainel} ocupado={imprimindo} setor={setorPainel} onSetor={setSetorPainel} onMudou={() => setRecargaQuadro((v) => v + 1)} />
+      <DescerDesenhos onDescer={descerDoPainel} ocupado={imprimindo} setor={setorPainel} onSetor={setSetorPainel} onMudou={() => setRecargaQuadro((v) => v + 1)} onSeparacao={setSeparacao} />
 
       {/* ⚠ BLOCO PRÓPRIO, LOGO ABAIXO DO PAINEL, E QUE SEGUE O SETOR. Vitor (03/09/2026): "não acho
           que deve ficar em aba própria, deixa na mesma aba que estamos no pcp/producao" e "se eu

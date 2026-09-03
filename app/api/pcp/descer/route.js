@@ -139,7 +139,7 @@ export async function GET(req) {
       id: p.id, marca: p.marca, descricao: p.descricao || null, jaDesceu: desceu,
       opNumero: p.op?.numero || null, qte: p.qte || 0,
       kg: Math.round(Number(p.pesoTotalKg) || 0),
-      dia: p.dia || null, bancada: p.bancada || null,
+      opId: p.opId || null, dia: p.dia || null, bancada: p.bancada || null,
       frente: p.frente || null, loteId: p.loteId || null,
     };
     if (motivo) travados.push({ ...item, motivo, porque });
