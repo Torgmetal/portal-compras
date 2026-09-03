@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Printer, ChevronLeft, ChevronRight } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import ProntoParaMontar from "./ProntoParaMontar";
+import FaltaPreparar from "./FaltaPreparar";
 
 const SETORES = [
   { key: "PREPARACAO", nome: "Preparação" },
@@ -40,7 +41,7 @@ export default function DescerDesenhos({ onDescer, ocupado }) {
   // iria mostrar o que temos de conjuntos disponíveis para montar". São dois momentos do dia —
   // programar a bancada (o que a preparação terminou) e soltar o desenho (o que está programado) —
   // e ele pediu os dois no mesmo lugar, não em telas separadas.
-  const [aba, setAba] = useState("DESCER");
+  const [aba, setAba] = useState("PROGRAMADO");
   const [nProntos, setNProntos] = useState(null);
   const [setor, setSetor] = useState("PREPARACAO");
   const [dia, setDia] = useState(hojeIso);
@@ -68,6 +69,21 @@ export default function DescerDesenhos({ onDescer, ocupado }) {
     return () => { vivo = false; };
   }, [setor, dia, recarga]);
 
+  // ⚠⚠ AS ABAS DEPENDEM DO SETOR. Vitor (03/09/2026): "quando estamos na aba de planejamento não
+  // precisa mostrar pronto para montar, pois aí que fica confuso; já quando aperto a tela da
+  // montagem, aí sim você tem que mostrar uma aba onde está escrito falta descer vira falta
+  // preparar, e o outro botão que hoje é pronto para montar você vai manter assim".
+  const abas = [
+    { k: "PROGRAMADO", rot: "Programado planejamento", n: null },
+    { k: "PREPARAR", rot: "Falta preparar", n: null },
+    ...(setor === "MONTAGEM" ? [{ k: "MONTAR", rot: "Pronto para montar", n: nProntos }] : []),
+  ];
+  // ⚠ trocar para a preparação com "Pronto para montar" aberta deixaria a tela em branco sem dizer
+  // por quê; volta para a aba que existe nos dois setores.
+  useEffect(() => {
+    if (!abas.some((t) => t.k === aba)) setAba("PROGRAMADO");
+  }, [setor]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const prontos = d?.prontos || [];
   const travados = d?.travados || [];
   const previsto = prontos.length + travados.length;
@@ -92,10 +108,7 @@ export default function DescerDesenhos({ onDescer, ocupado }) {
   return (
     <div className="bg-white rounded-xl border border-torg-blue-100 overflow-hidden mb-4">
       <div className="flex items-end gap-1 px-4 pt-2 border-b border-gray-100 bg-gray-50/60">
-        {[
-          { k: "DESCER", rot: "Falta descer", n: null },
-          { k: "MONTAR", rot: "Pronto para montar", n: nProntos },
-        ].map((t) => (
+        {abas.map((t) => (
           <button key={t.k} onClick={() => setAba(t.k)}
             className={`text-[12.5px] px-3 py-2 -mb-px border-b-2 inline-flex items-center gap-1.5 ${
               aba === t.k ? "border-torg-blue text-torg-blue font-semibold" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
@@ -105,10 +118,24 @@ export default function DescerDesenhos({ onDescer, ocupado }) {
             )}
           </button>
         ))}
+        {/* ⚠ o setor sobe para o topo porque agora ele MANDA nas abas: "Pronto para montar" só faz
+            sentido na montagem, e escondê-lo atrás da aba deixaria a pessoa sem como voltar. */}
+        <div className="ml-auto flex items-center gap-1 pb-1.5">
+          {SETORES.map((s) => (
+            <button key={s.key} onClick={() => setSetor(s.key)}
+              className={`text-[11.5px] font-semibold px-2.5 py-1 rounded-md border ${
+                setor === s.key ? "bg-torg-blue text-white border-torg-blue"
+                  : "bg-white border-gray-200 text-torg-gray hover:border-torg-blue-300 hover:text-torg-blue"}`}>
+              {s.nome}
+            </button>
+          ))}
+        </div>
       </div>
 
       {aba === "MONTAR" ? (
         <ProntoParaMontar onProgramado={() => setRecarga((v) => v + 1)} />
+      ) : aba === "PREPARAR" ? (
+        <FaltaPreparar setor={setor} />
       ) : (
       <>
       <div className="flex items-center gap-2 flex-wrap px-4 py-2.5 border-b border-gray-100 bg-gray-50/60">
@@ -123,16 +150,6 @@ export default function DescerDesenhos({ onDescer, ocupado }) {
           {dia !== hojeIso() && (
             <button onClick={() => setDia(hojeIso())} className="ml-1 text-[11px] text-torg-blue hover:underline">hoje</button>
           )}
-        </div>
-        <div className="ml-auto flex items-center gap-1">
-          {SETORES.map((s) => (
-            <button key={s.key} onClick={() => setSetor(s.key)}
-              className={`text-[11.5px] font-semibold px-2.5 py-1 rounded-md border ${
-                setor === s.key ? "bg-torg-blue text-white border-torg-blue"
-                  : "border-gray-200 text-torg-gray hover:border-torg-blue-300 hover:text-torg-blue"}`}>
-              {s.nome}
-            </button>
-          ))}
         </div>
       </div>
 
