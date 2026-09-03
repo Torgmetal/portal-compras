@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X, Eraser, ZoomIn, ZoomOut, Magnet, ArrowLeftRight, Minus, Plus } from "lucide-react";
+import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X, Eraser, ZoomIn, ZoomOut, Ruler, ArrowLeftRight, Minus, Plus } from "lucide-react";
 import { layoutCotas, setaEm, PADDING } from "@/lib/cota-marcacao";
 
 /**
@@ -10,19 +10,20 @@ import { layoutCotas, setaEm, PADDING } from "@/lib/cota-marcacao";
  * relatório eu conseguir fazer a cota no desenho específico?" — e, sobre a referência: "colocarmos
  * cota simples e referenciamos como cota A B C".
  *
- * A pessoa clica em dois pontos do desenho e nasce a cota A; depois a B, a C. Cada uma leva nome,
- * especificação e tolerância, igual ao modelo em Excel dele (`( A ) Interno · Espec. 1250mm +/- 3mm`).
+ * Em "gerar cota", a pessoa clica em dois pontos do desenho e nasce a cota A; depois a B, a C. Cada
+ * uma leva nome, especificação e tolerância, igual ao modelo em Excel dele (`( A ) Interno · Espec.
+ * 1250mm +/- 3mm`).
  *
- * ⚠ O CLIQUE GRUDA NO TRAÇO. O desenho chega em vetor, então dá para prender o ponto no vértice
- * mais próximo — a cota nasce na coordenada real do projeto, não onde o mouse caiu. Sem isso, medir
- * em cima de uma imagem erraria alguns milímetros a cada clique.
+ * ⚠⚠ SÃO TRÊS MODOS, E O PADRÃO NÃO CRIA NADA. Fora de "gerar cota" e da borracha, o clique serve
+ * só para PEGAR uma cota já feita e arrastá-la. Enquanto criar cota era o comportamento padrão do
+ * clique, arrastar era impossível: pegar a linha já marcava o primeiro ponto de uma cota nova.
  *
  * ⚠ A COTA APONTA, NÃO MEDE. O valor de projeto é o que se digita em "Espec."; a linha só mostra
- * ONDE medir. É por isso que não é preciso descobrir a escala do PDF.
+ * ONDE medir. É por isso que não é preciso descobrir a escala do PDF — nem prender o clique no
+ * traço, que era o que fazia a cota nascer longe de onde a pessoa mirou.
  */
 
 const LETRAS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const SNAP = 12; // px de imã
 
 // Marca de peça do Tekla — o grosso do ruído, e nada que se meça.
 //
@@ -44,6 +45,8 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
   // não um toque — senão o clique cairia direto no fluxo de criar cota nova.
   const [arrastoCota, setArrastoCota] = useState(null); // índice em `cotas`, ou null
   const arrastoCotaRef = useRef(false);
+  // ⚠ só para o cursor virar mãozinha sobre a linha — sem isso nada na tela diz que ela se pega.
+  const [sobreCota, setSobreCota] = useState(false);
   // ⚠ a tolerância SE LEMBRA entre as cotas: digitar "3" a cada uma é trabalho à toa. Vive aqui, e
   // não dentro do formulário, justamente para sobreviver ao fecha-e-abre de cada cota.
   const [tol, setTol] = useState("3");
@@ -51,11 +54,16 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
   // remover algumas cotas, meio que apagando isso do desenho?". O que ele apaga aqui some TAMBÉM do
   // PDF — é coberto de branco sobre a vista embutida, do mesmo jeito que as tabelas já eram.
   const [borracha, setBorracha] = useState(false);
-  // ⚠⚠ ÍMÃ COM DESLIGA. Vitor (03/09/2026): "o clique gruda no ponto errado... precisa ser mais
-  // preciso para marcar essas cotas" — e "não precisa identificar cotas sozinho pois você não
-  // entende sozinho". Fica ligado por padrão (é o que ajuda na maioria dos cliques); desligado, o
-  // clique vale exatamente onde o mouse está, sem tentar adivinhar o vértice certo.
-  const [imaLigado, setImaLigado] = useState(true);
+  // ⚠⚠ CRIAR COTA É UM MODO, NÃO O COMPORTAMENTO PADRÃO DO CLIQUE. Vitor (03/09/2026): "a cota
+  // ainda não anda livremente, e quero que a marcação da cota só seja gerada caso eu clicar no
+  // botão... coloque o botão de gerar cota".
+  //
+  // Era esse o motivo de a cota não arrastar: QUALQUER clique no desenho já era o primeiro ponto de
+  // uma cota nova, então tentar pegar a linha para mover disparava a criação — e o segundo clique
+  // (soltar noutro lugar) fechava uma cota que ninguém pediu. Com o modo separado, o clique solto
+  // no desenho não cria nada: serve para pegar e arrastar. Só dentro de "gerar cota" o clique marca
+  // ponto.
+  const [gerando, setGerando] = useState(false);
   // ⚠ CONTADOR DE REDESENHO. Precisa existir aqui em cima porque o efeito que pinta o canvas
   // depende dele — ver a nota na dependência.
   const [tick, setTick] = useState(0);
@@ -104,14 +112,6 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     const esc = Math.min(dispL / W, dispA / H) * zoom;
     return { esc, larg: W * esc, alt: H * esc };
   }, [dados, amplo, zoom]);
-
-  // vértices para o imã
-  const vertices = useCallback(() => {
-    if (!dados) return [];
-    const v = [];
-    for (const [x1, y1, x2, y2] of dados.segs) { v.push([x1, y1]); v.push([x2, y2]); }
-    return v;
-  }, [dados]);
 
   // coordenada JÁ com a folga (é o que `layoutCotas` devolve)
   const telaPad = (p, L) => [p[0] * L.esc, L.alt - p[1] * L.esc];
@@ -255,24 +255,22 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     return () => { window.removeEventListener("resize", f); clearTimeout(t); };
   }, [amplo]);
 
+  /**
+   * O ponto do desenho sob o cursor — EXATAMENTE onde o mouse está.
+   *
+   * ⚠⚠ SEM ÍMÃ. Vitor (03/09/2026): "o clique gruda no ponto errado... precisa ser mais preciso" e
+   * "não precisa identificar cotas sozinho pois você não entende sozinho". O ímã prendia o clique no
+   * vértice mais próximo, mas num desenho denso (hachura, símbolo de solda, cota do próprio Tekla)
+   * sobra vértice perto de qualquer clique e o mais próximo geometricamente quase nunca é o que a
+   * pessoa mirou — e não há como adivinhar qual é o certo só pela distância.
+   *
+   * ⚠ E não faz falta: a cota APONTA, não mede (o valor vem de "Espec."), então o pixel exato do
+   * clique é informação suficiente — errar por meio milímetro não muda o que se manda medir.
+   */
   function pontoDoEvento(e) {
     const L = layout(); if (!L) return null;
     const r = cv.current.getBoundingClientRect();
-    const x = e.clientX - r.left, y = e.clientY - r.top;
-    const [dx, dy] = paraDesenho(x, y, L);
-    // ⚠⚠ O ÍMÃ TEM DESLIGA. Vitor (03/09/2026): "o clique gruda no ponto errado... precisa ser mais
-    // preciso". Num desenho denso (hachura, símbolo de solda, cota do próprio Tekla) sobra vértice
-    // perto de qualquer clique, e o mais próximo geometricamente nem sempre é o que a pessoa mirou —
-    // eu não tenho como adivinhar QUAL vértice é o certo olhando só distância. Em vez de tentar
-    // acertar sozinho, dou o controle: com o ímã desligado, o ponto é exatamente onde o mouse está.
-    if (!imaLigado) return [dx, dy];
-    // imã: o vértice mais próximo dentro do raio
-    let melhor = null, dist = SNAP / L.esc;
-    for (const v of vertices()) {
-      const d = Math.hypot(v[0] - dx, v[1] - dy);
-      if (d < dist) { dist = d; melhor = v; }
-    }
-    return melhor || [dx, dy];
+    return paraDesenho(e.clientX - r.left, e.clientY - r.top, L);
   }
 
   /**
@@ -496,6 +494,9 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
       setSelecao({ x0: p[0], y0: p[1], x1: p[0], y1: p[1] });
       return;
     }
+    // ⚠ dentro de "gerar cota" o mouse está marcando ponto, não pegando linha: arrastar ali roubaria
+    // o clique que a pessoa deu para fechar a cota.
+    if (gerando) return;
     const i = cotaNoPonto(e);
     if (i == null) return;
     registrar();
@@ -539,6 +540,9 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     // ⚠ na borracha quem manda é o soltar (`aoSoltar`): é lá que se sabe se houve arrasto — caixa —
     // ou só um toque. Tratar aqui apagaria duas vezes.
     if (borracha) return;
+    // ⚠⚠ SÓ EM "GERAR COTA" O CLIQUE MARCA PONTO. Fora do modo, o clique no desenho não cria nada —
+    // é o que devolve o arrasto da cota (ver a nota do estado `gerando`).
+    if (!gerando) return;
     // ⚠ acabou de arrastar uma cota — este clique é o mesmo gesto que soltou o arrasto, não um novo
     // toque para criar cota.
     if (arrastoCotaRef.current) return;
@@ -613,24 +617,22 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
         <p className="text-[11px] text-torg-gray">
           {borracha
             ? "Arraste uma caixa para apagar tudo dentro dela, ou clique num item. Some aqui e no PDF."
-            : pendente ? "Agora clique no segundo ponto da cota." : imaLigado
-              ? "Clique em dois pontos do desenho para criar uma cota (o clique gruda no traço) ou arraste a linha de uma cota já criada para ajustar a distância."
-              : "Clique em dois pontos do desenho para criar uma cota (ímã desligado — o ponto é exatamente onde o mouse está) ou arraste a linha de uma cota já criada para ajustar a distância."}
+            : gerando
+              ? (pendente ? "Agora clique no segundo ponto da cota." : "Clique em dois pontos do desenho para criar a cota — o ponto é exatamente onde o mouse está.")
+              : "Arraste a linha de uma cota para aproximar ou afastar. Para criar uma cota nova, ligue “gerar cota”."}
           {pendente && <button onClick={() => setPendente(null)} className="ml-2 text-torg-blue inline-flex items-center gap-1"><Undo2 size={11} /> cancelar</button>}
         </p>
         <span className="flex items-center gap-2 shrink-0">
-          {/* ⚠⚠ Vitor (03/09/2026): "o clique gruda no ponto errado... não precisa identificar
-              cotas sozinho pois você não entende sozinho" — num desenho denso o vértice mais perto
-              geometricamente nem sempre é o que a pessoa mirou, e eu não tenho como adivinhar qual é
-              o certo. Em vez de tentar acertar sozinho, desligar o ímã dá o controle: o clique vale
-              o pixel exato. */}
-          <button onClick={() => setImaLigado((v) => !v)}
-            title={imaLigado ? "Ímã ligado — o clique gruda no traço mais próximo" : "Ímã desligado — o clique vale o ponto exato"}
+          {/* ⚠⚠ CRIAR COTA É MODO. Vitor (03/09/2026): "quero que a marcação da cota só seja gerada
+              caso eu clicar no botão... coloque o botão de gerar cota". Antes todo clique no desenho
+              já marcava ponto, e por isso não dava para pegar a linha de uma cota e arrastar. */}
+          <button onClick={() => { setGerando((v) => !v); setBorracha(false); setPendente(null); setRascunho(null); }}
+            title={gerando ? "Clicando dois pontos você cria a cota" : "Ligar para marcar uma cota nova no desenho"}
             className={`text-[11px] inline-flex items-center gap-1 font-medium rounded px-1.5 py-0.5 border ${
-              imaLigado ? "text-torg-blue border-torg-blue-200 hover:bg-torg-blue-50" : "bg-torg-orange text-white border-torg-orange"}`}>
-            <Magnet size={12} /> {imaLigado ? "ímã ligado" : "ímã desligado"}
+              gerando ? "bg-torg-orange text-white border-torg-orange" : "text-torg-blue border-torg-blue-200 hover:bg-torg-blue-50"}`}>
+            <Ruler size={12} /> {gerando ? "marcando cota" : "Gerar cota"}
           </button>
-          <button onClick={() => { setBorracha((v) => !v); setPendente(null); setRascunho(null); }}
+          <button onClick={() => { setBorracha((v) => !v); setGerando(false); setPendente(null); setRascunho(null); }}
             className={`text-[11px] inline-flex items-center gap-1 font-medium rounded px-1.5 py-0.5 border ${
               borracha ? "bg-torg-orange text-white border-torg-orange" : "text-torg-blue border-torg-blue-200 hover:bg-torg-blue-50"}`}>
             <Eraser size={12} /> {borracha ? "apagando" : "Apagar"}
@@ -677,15 +679,21 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
               if (novo != null) onChange(cotas.map((x, k) => (k === arrastoCota ? { ...x, afastamento: novo } : x)));
               return;
             }
+            // ⚠ a mira só existe onde o clique vale alguma coisa: fora de "gerar cota" ela sugeriria
+            // que basta clicar para marcar, e não é mais o caso.
+            if (!gerando) { if (hover) setHover(null); setSobreCota(cotaNoPonto(e) != null); return; }
             setHover(pontoDoEvento(e));
           }}
           onMouseLeave={() => {
-            setHover(null); setSelecao(null);
+            setHover(null); setSelecao(null); setSobreCota(false);
             // ⚠ soltar o botão FORA do canvas não dispara o mouseup dele — sem isto o arrasto ficava
             // "preso" e o próximo clique dentro do desenho ainda tentaria mover a cota.
             if (arrastoCota != null) { setArrastoCota(null); setTimeout(() => { arrastoCotaRef.current = false; }, 0); }
           }}
-          className={`block ${borracha ? "cursor-cell" : arrastoCota != null ? "cursor-grabbing" : "cursor-crosshair"}`} />
+          className={`block ${borracha ? "cursor-cell"
+            : arrastoCota != null ? "cursor-grabbing"
+            : gerando ? "cursor-crosshair"
+            : sobreCota ? "cursor-grab" : "cursor-default"}`} />
       </div>
       </div>
 
