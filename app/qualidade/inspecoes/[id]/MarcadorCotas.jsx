@@ -37,6 +37,13 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
   const [hover, setHover] = useState(null);
   const [rascunho, setRascunho] = useState(null); // { ax, ay, bx, by } esperando nome/espec
   const [amplo, setAmplo] = useState(false); // tela cheia — Vitor pediu mais área para marcar
+  // ⚠⚠ ARRASTAR A LINHA DA COTA. Vitor (03/09/2026): "o botão de + e - está bem ruim, não tem como
+  // de selecionar a cota e mover com o mouse?" — os botões continuam para ajuste fino, mas agora dá
+  // para clicar na linha (não nas extensões) e arrastar. O `ref` existe porque o `click` que o
+  // navegador dispara logo depois do `mouseup` do arrasto precisa saber que aquilo foi um arrasto,
+  // não um toque — senão o clique cairia direto no fluxo de criar cota nova.
+  const [arrastoCota, setArrastoCota] = useState(null); // índice em `cotas`, ou null
+  const arrastoCotaRef = useRef(false);
   // ⚠ a tolerância SE LEMBRA entre as cotas: digitar "3" a cada uma é trabalho à toa. Vive aqui, e
   // não dentro do formulário, justamente para sobreviver ao fecha-e-abre de cada cota.
   const [tol, setTol] = useState("3");
@@ -448,22 +455,74 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     if (linhas.length && onLinhas) onLinhas([...(linhasOcultas || []), ...linhas]);
   }
 
+  /** A LINHA de uma cota (não as extensões) sob o cursor — o alvo do arrasto. */
+  function cotaNoPonto(e) {
+    const L = layout(); if (!L || !dados) return null;
+    const r = cv.current.getBoundingClientRect();
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    const marcas = layoutCotas(cotas, dados.largura, dados.altura);
+    const tol = 7; // px de tolerância na tela — a linha é fina, exigir o pixel exato frustraria
+    let melhor = null, dist = tol;
+    marcas.forEach((m, i) => {
+      if (!m) return;
+      const a = telaPad(m.linha.a, L), b = telaPad(m.linha.b, L);
+      const dx = b[0] - a[0], dy = b[1] - a[1];
+      const len2 = dx * dx + dy * dy;
+      const t = len2 ? Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / len2)) : 0;
+      const d = Math.hypot(px - (a[0] + t * dx), py - (a[1] + t * dy));
+      if (d < dist) { dist = d; melhor = i; }
+    });
+    return melhor;
+  }
+
+  /** O afastamento que a posição atual do mouse implica, para a cota `i` sendo arrastada. */
+  function afastamentoDoArrasto(i, e) {
+    const c = cotas[i]; if (!c || c.ax == null) return null;
+    const p = cru(e); if (!p) return null;
+    const [mx, my] = p;
+    const vertical = Math.abs(c.by - c.ay) > Math.abs(c.bx - c.ax);
+    const lado = c.lado === "topo" || c.lado === "base" || c.lado === "esq" || c.lado === "dir"
+      ? c.lado
+      : layoutCotas([c], dados.largura, dados.altura)[0]?.lado;
+    const base = !vertical
+      ? (lado === "topo" ? my - dados.altura : -my)
+      : (lado === "dir" ? mx - dados.largura : -mx);
+    return Math.max(6, Math.min(PADDING - 6, base));
+  }
+
   function aoPressionar(e) {
-    if (!borracha) return;
-    const p = cru(e); if (!p) return;
-    setSelecao({ x0: p[0], y0: p[1], x1: p[0], y1: p[1] });
+    if (borracha) {
+      const p = cru(e); if (!p) return;
+      setSelecao({ x0: p[0], y0: p[1], x1: p[0], y1: p[1] });
+      return;
+    }
+    const i = cotaNoPonto(e);
+    if (i == null) return;
+    registrar();
+    arrastoCotaRef.current = true;
+    setArrastoCota(i);
   }
 
   function aoSoltar(e) {
-    if (!borracha || !selecao) return;
-    const p = cru(e);
-    const sel = p ? { ...selecao, x1: p[0], y1: p[1] } : selecao;
-    setSelecao(null);
-    const L = layout();
-    const arrastou = L && (Math.abs(sel.x1 - sel.x0) * L.esc > 4 || Math.abs(sel.y1 - sel.y0) * L.esc > 4);
-    // arrasto curto é CLIQUE: apaga só o item sob o cursor
-    if (arrastou) apagarNaCaixa(sel);
-    else apagarNoPonto(e);
+    if (borracha) {
+      if (!selecao) return;
+      const p = cru(e);
+      const sel = p ? { ...selecao, x1: p[0], y1: p[1] } : selecao;
+      setSelecao(null);
+      const L = layout();
+      const arrastou = L && (Math.abs(sel.x1 - sel.x0) * L.esc > 4 || Math.abs(sel.y1 - sel.y0) * L.esc > 4);
+      // arrasto curto é CLIQUE: apaga só o item sob o cursor
+      if (arrastou) apagarNaCaixa(sel);
+      else apagarNoPonto(e);
+      return;
+    }
+    if (arrastoCota != null) {
+      setArrastoCota(null);
+      // ⚠ o `click` do navegador dispara IMEDIATAMENTE depois deste `mouseup`, ainda no mesmo giro
+      // de eventos — zerar a ref síncrona aqui deixaria o clique passar direto pro fluxo de criar
+      // cota. O `setTimeout(…, 0)` empurra a limpeza para depois desse clique específico.
+      setTimeout(() => { arrastoCotaRef.current = false; }, 0);
+    }
   }
 
   /** Apaga o item sob o cursor — texto primeiro, traço depois. */
@@ -480,6 +539,9 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     // ⚠ na borracha quem manda é o soltar (`aoSoltar`): é lá que se sabe se houve arrasto — caixa —
     // ou só um toque. Tratar aqui apagaria duas vezes.
     if (borracha) return;
+    // ⚠ acabou de arrastar uma cota — este clique é o mesmo gesto que soltou o arrasto, não um novo
+    // toque para criar cota.
+    if (arrastoCotaRef.current) return;
     const p = pontoDoEvento(e); if (!p) return;
     if (!pendente) { setPendente(p); return; }
     setRascunho({ ax: pendente[0], ay: pendente[1], bx: p[0], by: p[1] });
@@ -552,8 +614,8 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
           {borracha
             ? "Arraste uma caixa para apagar tudo dentro dela, ou clique num item. Some aqui e no PDF."
             : pendente ? "Agora clique no segundo ponto da cota." : imaLigado
-              ? "Clique em dois pontos do desenho para criar uma cota. O clique gruda no traço."
-              : "Clique em dois pontos do desenho para criar uma cota. Ímã desligado — o ponto é exatamente onde o mouse está."}
+              ? "Clique em dois pontos do desenho para criar uma cota (o clique gruda no traço) ou arraste a linha de uma cota já criada para ajustar a distância."
+              : "Clique em dois pontos do desenho para criar uma cota (ímã desligado — o ponto é exatamente onde o mouse está) ou arraste a linha de uma cota já criada para ajustar a distância."}
           {pendente && <button onClick={() => setPendente(null)} className="ml-2 text-torg-blue inline-flex items-center gap-1"><Undo2 size={11} /> cancelar</button>}
         </p>
         <span className="flex items-center gap-2 shrink-0">
@@ -610,10 +672,20 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
           onMouseDown={aoPressionar} onMouseUp={aoSoltar}
           onMouseMove={(e) => {
             if (borracha) { if (selecao) { const p = cru(e); if (p) setSelecao((s0) => ({ ...s0, x1: p[0], y1: p[1] })); } return; }
+            if (arrastoCota != null) {
+              const novo = afastamentoDoArrasto(arrastoCota, e);
+              if (novo != null) onChange(cotas.map((x, k) => (k === arrastoCota ? { ...x, afastamento: novo } : x)));
+              return;
+            }
             setHover(pontoDoEvento(e));
           }}
-          onMouseLeave={() => { setHover(null); setSelecao(null); }}
-          className={`block ${borracha ? "cursor-cell" : "cursor-crosshair"}`} />
+          onMouseLeave={() => {
+            setHover(null); setSelecao(null);
+            // ⚠ soltar o botão FORA do canvas não dispara o mouseup dele — sem isto o arrasto ficava
+            // "preso" e o próximo clique dentro do desenho ainda tentaria mover a cota.
+            if (arrastoCota != null) { setArrastoCota(null); setTimeout(() => { arrastoCotaRef.current = false; }, 0); }
+          }}
+          className={`block ${borracha ? "cursor-cell" : arrastoCota != null ? "cursor-grabbing" : "cursor-crosshair"}`} />
       </div>
       </div>
 
