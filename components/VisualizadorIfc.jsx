@@ -25,6 +25,17 @@ import { Maximize2, Minimize2 } from "lucide-react";
 const COR_PADRAO = 0x9fb0bf;
 const COR_SEL = 0xf4801f;
 
+// ⚠⚠ QUANDO O ARQUIVO NÃO TRAZ COR. Vitor (03/09/2026): "abri o modelo 3D da 118 e ele apareceu
+// cinza". E está mesmo: aquele IFC saiu no formato AISC, com ZERO IFCSTYLEDITEM e ZERO
+// IFCCOLOURRGB — não é o portal que perdeu a cor, é o arquivo que não tem nenhuma. Obra inteira
+// cinza não se lê: não dá para separar pilar de viga, nem enxergar o contravento no meio do pórtico.
+// Nesse caso o portal pinta por TIPO, que é informação que todo IFC tem (vem da entidade) e é a
+// mesma leitura que o Tekla dá por classe.
+const COR_TIPO = {
+  Pilar: 0x2e7d5b, Viga: 0x3d6fa5, Barra: 0x8a6bb0, Chapa: 0xc19a2b,
+  "Guarda-corpo": 0xc4682e, Escada: 0x6d8496, Piso: 0xa8b3bd, Parafuso: 0x5b6b7a,
+};
+
 /**
  * @param {string} url      de onde baixar o IFC (rota do portal)
  * @param {(item:object|null)=>void} onSelecionar  o item do índice clicado (conjunto ou parafuso)
@@ -180,19 +191,34 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
   // ela vem contínua: 125 valores distintos, de +0,05 a +4,76. Quem pergunta "que peças formam
   // aquele nível" está falando de patamar, não de milímetro: agrupo por vão de 70 cm, que é o que
   // separa piso de piso sem picar o mesmo estrado em cinco níveis.
-  const agruparNiveis = (cotas) => {
+  const agruparNiveis = (cotas, desloc = 0) => {
     const ord = [...new Set(cotas.filter((x) => x != null))].sort((a, b) => a - b);
-    const faixas = [];
-    for (const c of ord) {
-      const ult = faixas[faixas.length - 1];
-      if (ult && c - ult.min <= 0.7) ult.max = c;
-      else faixas.push({ min: c, max: c });
+    const juntar = (tol) => {
+      const fx = [];
+      for (const c of ord) {
+        const ult = fx[fx.length - 1];
+        if (ult && c - ult.min <= tol) ult.max = c;
+        else fx.push({ min: c, max: c });
+      }
+      return fx;
+    };
+    // ⚠⚠ A FOLGA SE AJUSTA À OBRA. Com 70 cm fixos, a passarela da OP-089 (5 m de altura) dava 6
+    // níveis — certo — mas a torre da OP-118 (20 m) dava 25, uma lista que ninguém percorre. Vou
+    // afrouxando até caber em 12 patamares: é o mesmo raciocínio de quem olha a obra e enxerga
+    // "o piso de baixo, o mezanino, a plataforma" em vez de milímetro.
+    let faixas = juntar(0.7);
+    for (const tol of [1.2, 2, 3, 4.5, 7, 12]) {
+      if (faixas.length <= 12) break;
+      faixas = juntar(tol);
     }
-    return faixas.map((f, i) => ({
-      chave: `n${i}`,
-      rotulo: `Nível ${f.min >= 0 ? "+" : ""}${f.min.toFixed(2).replace(".", ",")} m`,
-      min: f.min, max: f.max,
-    }));
+    return faixas.map((f, i) => {
+      const v = f.min - desloc;
+      return {
+        chave: `n${i}`,
+        rotulo: `Nível ${v >= 0 ? "+" : ""}${v.toFixed(2).replace(".", ",")} m`,
+        min: f.min, max: f.max,
+      };
+    });
   };
 
   useEffect(() => {
@@ -271,6 +297,12 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         // real de quem está olhando a ligação.
         const porChave = new Map();    // chave → { marca, hex, tipo, parafuso, gs, ids, cotas }
         let n = 0;
+        // ⚠⚠ "SEM COR" SE MEDE PELA VARIEDADE, NÃO PELO VALOR. Primeiro tentei olhar se a cor vinha
+        // zerada e não funcionou: quando o IFC não tem estilo nenhum, o motor devolve UMA cor padrão
+        // para tudo — cor existe, só que é sempre a mesma. Um modelo de verdade tem dezenas (o da
+        // OP-089 tem viga verde, chapa roxa, corrimão amarelo). Uma cor só na obra inteira = arquivo
+        // sem cor, e aí vale mais pintar por tipo.
+        const tonsVistos = new Set();
         api.StreamAllMeshes(modelID, (mesh) => {
           const eid = mesh.expressID;
           const marca = marcaDe.get(eid) || null;
@@ -286,6 +318,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
             const hex = c && (c.x + c.y + c.z) > 0
               ? (Math.round(c.x * 255) << 16) | (Math.round(c.y * 255) << 8) | Math.round(c.z * 255)
               : COR_PADRAO;
+            if (tonsVistos.size < 8) tonsVistos.add(hex);
             const geo = api.GetGeometry(modelID, p.geometryExpressID);
             const v = api.GetVertexArray(geo.GetVertexData(), geo.GetVertexDataSize());
             const ix = api.GetIndexArray(geo.GetIndexData(), geo.GetIndexDataSize());
@@ -299,6 +332,12 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
             bg.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
             bg.setIndex(new THREE.BufferAttribute(new Uint32Array(ix), 1));
             bg.applyMatrix4(new THREE.Matrix4().fromArray(p.flatTransformation));
+            // ⚠⚠ A COTA TAMBÉM SAI DA GEOMETRIA. O "Bottom elevation" só existe no export do Tekla
+            // com os psets dele; o da OP-118 (formato AISC) não tem nenhum, e sem isto a obra
+            // inteira ficaria num nível só. A altura do ponto mais baixo da peça responde a mesma
+            // pergunta e existe em qualquer arquivo — é medida, não campo preenchido.
+            bg.computeBoundingBox();
+            const yMin = bg.boundingBox?.min?.y;
             geo.delete();
             // ⚠ o ITEM é o que a pessoa seleciona (um conjunto, ou um parafuso por especificação);
             // a CHAVE é a malha, que ainda separa por cor dentro do mesmo conjunto — é o que
@@ -308,10 +347,11 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
               : asm != null ? `a${asm}` : "solto";
             const chave = `${item}|${hex}`;
             const grupo = porChave.get(chave)
-              || porChave.set(chave, { item, marca, hex, tipo, parafuso, asm, gs: [], ids: new Set(), cotas: [] }).get(chave);
+              || porChave.set(chave, { item, marca, hex, tipo, parafuso, asm, gs: [], ids: new Set(), cotas: [], alturas: [] }).get(chave);
             grupo.gs.push(bg);
             grupo.ids.add(eid);
             if (cota != null) grupo.cotas.push(cota);
+            else if (Number.isFinite(yMin)) grupo.alturas.push(yMin);
             n++;
           }
         });
@@ -322,12 +362,14 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         const malhas = new Map();     // chave → mesh
         const arestasCruas = [];
         const porItem = new Map();
-        for (const [chave, { item, marca, hex, tipo, parafuso, asm, gs, ids, cotas }] of porChave) {
+        const semCor = tonsVistos.size <= 1;
+        for (const [chave, { item, marca, hex, tipo, parafuso, asm, gs, ids, cotas, alturas }] of porChave) {
           const junta = gs.length === 1 ? gs[0] : mergeGeometries(gs, false);
           if (!junta) continue;
           // ⚠ no modo "andamento" a cor do estado substitui a do modelo; no modo "modelo" vale o IFC
           const doEstado = cores?.[marca];
-          const cor = new THREE.Color(modo === "andamento" && doEstado ? doEstado : hex);
+          const base = semCor ? COR_TIPO[tipo] ?? COR_PADRAO : hex;
+          const cor = new THREE.Color(modo === "andamento" && doEstado ? doEstado : base);
           // ⚠ Phong com brilho baixo em vez de Lambert: o realce especular é o que dá a leitura de
           // metal e separa a mesa da alma num perfil. Sem ele o aço parece papel.
           // ⚠⚠ NÃO CONVERTER A COR À MÃO. O three já trata `new THREE.Color(hex)` como sRGB e
@@ -341,7 +383,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
           // peso do conjunto entrava como peso de parafuso (792 kg de parafuso!) e a cor de
           // andamento pintava o parafuso com o status da peça soldada.
           m.userData.marca = parafuso ? null : marca || null;
-          m.userData.hex = hex;
+          m.userData.hex = base;
           m.userData.chave = chave;
           m.userData.item = item;
           cena.add(m); malhas.set(chave, m);
@@ -358,6 +400,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
           }).get(item);
           for (const i2 of ids) reg.ids.add(i2);
           for (const c of cotas) reg.cota = reg.cota == null ? c : Math.min(reg.cota, c);
+          if (!cotas.length) for (const h of alturas) reg.cota = reg.cota == null ? h : Math.min(reg.cota, h);
 
           // ⚠⚠ AS ARESTAS SÃO O QUE SEPARA UMA PEÇA DA VIZINHA. Limiar de 25°: abaixo disso a
           // aresta é curvatura de tubo e desenhá-la encheria a tela de risco.
@@ -386,11 +429,21 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         // cópia aqui faria o painel receber um item sem `pecas` e sem `nivel`.
         const indice = [...porItem.values()];
         for (const x of indice) { x.pecas = x.ids.size; delete x.ids; }
-        const niveis = agruparNiveis(indice.map((x) => x.cota));
+        // ⚠⚠ COTA MEDIDA É RELATIVA, COTA DE PROJETO É ABSOLUTA. Quando a altura sai da geometria, o
+        // zero é onde o motor pousou o modelo (na OP-118 isso dava "Nível −14,63 m", que não existe
+        // em projeto nenhum). Aí o nível passa a contar do ponto mais baixo da obra para cima, que é
+        // como se fala no chão de fábrica. Quando a cota vem do Tekla, ela É a de projeto e fica
+        // como está.
+        const cotas = indice.map((x) => x.cota).filter((x) => x != null);
+        const desloc = nivelDe.size === 0 && cotas.length ? Math.min(...cotas) : 0;
+        const niveis = agruparNiveis(indice.map((x) => x.cota), desloc);
         for (const it of indice) {
           it.nivel = it.cota == null ? null
             : (niveis.find((f) => it.cota >= f.min && it.cota <= f.max) || niveis[0])?.chave || null;
         }
+        // ⚠ a cota da peça acompanha o deslocamento do nível: senão a lista mostrava "Pilar · −0,08"
+        // logo abaixo do rótulo "Nível +0,00 m", que é o mesmo lugar com dois números.
+        if (desloc) for (const it of indice) if (it.cota != null) it.cota -= desloc;
 
         // ── enquadra ──
         // ⚠ ENQUADRA PELA ESFERA QUE ENVOLVE A OBRA, não por um múltiplo do tamanho: a distância
@@ -544,7 +597,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         ref.current = { THREE, cena, malhas, arestas: malhaArestas, indice, rend, cam, ctrl, irPara, zoom, focar, centro, pedirQuadro };
         setPronto(true);
         setInfo({ conjuntos: total, malhas: malhas.size, geometrias: n });
-        onIndice?.({ indice, niveis });
+        onIndice?.({ indice, niveis, semCor });
         setEstado({ fase: "pronto" });
 
         limpar = () => {

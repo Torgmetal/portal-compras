@@ -13,6 +13,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, AlertCircle, Star, SlidersHorizontal, FileSpreadsheet } from "lucide-react";
 import VisualizadorIfc from "@/components/VisualizadorIfc";
 
+// ⚠ as mesmas cores do visualizador (components/VisualizadorIfc), em hexa de CSS: a legenda tem de
+// bater com a obra na tela, e duas listas separadas divergem no primeiro ajuste.
+const COR_TIPO = {
+  Pilar: "#2e7d5b", Viga: "#3d6fa5", Barra: "#8a6bb0", Chapa: "#c19a2b",
+  "Guarda-corpo": "#c4682e", Escada: "#6d8496", Piso: "#a8b3bd", Parafuso: "#5b6b7a",
+};
+
 const COR = { pronta: "#0E7A5F", andando: "#B4761E", parado: "#9FB0BF" };
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -33,6 +40,9 @@ export default function ModeloClient({ ops }) {
   // conseguimos colocar para fazer um filtro?". O índice vem do próprio IFC — nível pela cota de
   // base, tipo pela entidade, parafuso pelo pset do Tekla — e é montado uma vez, ao abrir.
   const [indice, setIndice] = useState(null);
+  // ⚠ modelo sem cor nenhuma no arquivo: o portal passa a pintar por tipo, e o botão precisa dizer
+  // isso — senão "Cores do modelo" vira mentira na tela.
+  const [semCor, setSemCor] = useState(false);
   const [niveis, setNiveis] = useState([]);
   const [fNiveis, setFNiveis] = useState(() => new Set());
   const [fTipos, setFTipos] = useState(() => new Set());
@@ -49,7 +59,7 @@ export default function ModeloClient({ ops }) {
     if (!opId) return;
     let vivo = true;
     setLista(null); setErro(""); setModelo(null); setSel(null); setPeca(null);
-    setIndice(null); setNiveis([]); setFNiveis(new Set()); setFTipos(new Set());
+    setIndice(null); setNiveis([]); setFNiveis(new Set()); setFTipos(new Set()); setSemCor(false);
     fetch(`/api/producao/modelo-3d?opId=${opId}`, { cache: "no-store" })
       .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
       .then(({ ok, j }) => {
@@ -70,7 +80,9 @@ export default function ModeloClient({ ops }) {
 
   // ⚠ o visualizador entrega o índice pronto uma vez; guardar numa função estável evita remontar
   // a cena a cada render do pai (a dependência do efeito lá dentro é a URL, mas o React avisa).
-  const receberIndice = useCallback(({ indice: ix, niveis: nv }) => { setIndice(ix); setNiveis(nv); }, []);
+  const receberIndice = useCallback(({ indice: ix, niveis: nv, semCor: sc }) => {
+    setIndice(ix); setNiveis(nv); setSemCor(!!sc);
+  }, []);
 
   // ⚠⚠ O FILTRO É UMA LISTA DE CHAVES, não um "esconde". Níveis e tipos se cruzam (o nível +4,20
   // E só as vigas), e vários níveis podem estar marcados ao mesmo tempo — foi o pedido: "posso
@@ -215,13 +227,23 @@ export default function ModeloClient({ ops }) {
         )}
 
         <div className="flex gap-0.5 bg-white/10 border border-white/15 rounded-md p-0.5">
-          {[["modelo", "Cores do modelo"], ["andamento", "Andamento"]].map(([k, t]) => (
+          {[["modelo", semCor ? "Cores por tipo" : "Cores do modelo"], ["andamento", "Andamento"]].map(([k, t]) => (
             <button key={k} onClick={() => setModo(k)}
               className={`text-[11.5px] font-semibold px-2.5 py-1 rounded ${modo === k ? "bg-white text-torg-dark" : "text-white/70 hover:text-white"}`}>
               {t}
             </button>
           ))}
         </div>
+
+        {semCor && modo === "modelo" && indice && (
+          <div className="flex items-center gap-2.5 text-[11.5px] text-white/70 flex-wrap">
+            {tipos.filter(([t]) => COR_TIPO[t]).slice(0, 6).map(([t, qt]) => (
+              <span key={t} className="inline-flex items-center gap-1.5">
+                <i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR_TIPO[t] }} /> {t} <span className="text-white/40">{qt}</span>
+              </span>
+            ))}
+          </div>
+        )}
 
         {lista?.resumo && modo === "andamento" && (
           <div className="flex items-center gap-2.5 text-[11.5px] text-white/70">
