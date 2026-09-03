@@ -42,3 +42,30 @@ h1, h2, h3, h4 {
 .text-\[11px\] { font-size: 13px !important; }
 .text-\[12px\] { font-size: 13px !important; }
 .text-\[13px\] { font-size: 14px !important; }
+
+/* ─── TELA CHEIA DO MODELO 3D ──────────────────────────────────────────────────
+   Vitor (03/09/2026): "no modo tela cheia ainda está cortando boa parte da tela na parte de baixo,
+   deixar de fato a tela cheia mesmo".
+
+   ⚠⚠ O ELEMENTO EM TELA CHEIA PASSA A OCUPAR A JANELA, MAS OS FILHOS NÃO SABEM DISSO. No portal do
+   cliente a cena tem altura fixa (560 px, para a página caber num scroll normal) — em tela cheia
+   ela continuava com 560 px e sobrava tela preta embaixo. Regra de CSS porque é exatamente disso
+   que se trata: a MESMA marcação em outro contexto de apresentação.
+
+   O alvo é o `[data-tela-cheia]` que o botão usa para saber o que levar junto (ver
+   components/VisualizadorIfc). */
+[data-tela-cheia]:fullscreen {
+  height: 100vh;
+  max-height: 100vh;
+  border-radius: 0;
+  border: 0;
+}
+[data-tela-cheia]:fullscreen [data-cena-3d] {
+  height: auto !important;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+[data-tela-cheia]:fullscreen [data-painel-3d] {
+  max-height: none !important;
+  height: auto;
+}

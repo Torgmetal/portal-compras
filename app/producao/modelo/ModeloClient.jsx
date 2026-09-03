@@ -432,7 +432,7 @@ export default function ModeloClient({ ops }) {
             que ver, o outro lê o que foi escolhido — e disputar o mesmo lado faria um fechar o
             outro justamente quando se usa os dois juntos. */}
         {painel && indice && (
-          <aside className="w-[290px] max-w-[38vw] shrink-0 border-r border-gray-200 overflow-y-auto bg-white">
+          <aside data-painel-3d className="w-[290px] max-w-[38vw] shrink-0 border-r border-gray-200 overflow-y-auto bg-white">
             <div className="p-3.5 space-y-3.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-[12px] font-bold text-torg-dark uppercase tracking-wide">Filtrar a vista</h3>
@@ -601,7 +601,7 @@ export default function ModeloClient({ ops }) {
             pixels, do tamanho da janela. Sem isto a cena se recusava a estreitar e empurrava o
             painel para fora da tela (medido: o painel nascia em x=1440 numa janela de 1440). O
             clique funcionava o tempo todo; o que não aparecia era a resposta. */}
-        <div className="flex-1 min-w-0 min-h-0 relative">
+        <div data-cena-3d className="flex-1 min-w-0 min-h-0 relative">
           {erro && (
             <div className="absolute inset-0 grid place-items-center p-6 z-10 bg-white">
               <p className="text-[13px] text-red-600 text-center max-w-sm inline-flex items-start gap-2">
@@ -632,7 +632,7 @@ export default function ModeloClient({ ops }) {
         {/* ⚠ o painel só existe quando há peça: coluna vazia ocupando um terço da tela rouba da obra
             justamente quando não há nada a dizer. */}
         {sel && (
-          <aside className="w-[360px] max-w-[42vw] shrink-0 border-l border-gray-200 overflow-y-auto bg-white">
+          <aside data-painel-3d className="w-[360px] max-w-[42vw] shrink-0 border-l border-gray-200 overflow-y-auto bg-white">
             <div className="p-4">
               <div className="flex items-center gap-3 mb-3">
                 <button onClick={() => setOcultos((v) => new Set(v).add(sel.id))}

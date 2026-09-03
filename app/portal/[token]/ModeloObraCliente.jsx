@@ -191,7 +191,12 @@ export default function ModeloObraCliente({ token }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* ⚠⚠ A BARRA ENTRA NA TELA CHEIA. Vitor (03/09/2026): "dê a opção para apertar no menu de
+          níveis e tipos dentro da tela cheia também". O `data-tela-cheia` é o que o botão procura
+          para saber o que levar junto — estava só no quadro do 3D, então o seletor de modelo e o
+          botão de filtros ficavam de fora justamente onde mais se precisa deles. */}
+      <div data-tela-cheia className="flex flex-col gap-3 bg-white">
+      <div className="flex items-center gap-2 flex-wrap px-0 pt-0">
       {lista.modelos.length > 1 && (
         <select value={modelo?.rel || ""} onChange={(e) => { setModelo(lista.modelos.find((m) => m.rel === e.target.value)); setSel(null); setPeca(null); }}
           className="text-[13px] border border-gray-200 rounded-lg px-3 py-2 max-w-full outline-none focus:border-[#006EAB]">
@@ -221,9 +226,9 @@ export default function ModeloObraCliente({ token }) {
           tela cheia vc tira os filtros, precisa deixar". O botão de tela cheia procura este atributo
           para saber o que levar junto (ver components/VisualizadorIfc); sem ele, sobrava só a caixa
           do 3D — e tela cheia sem filtro é justamente quando se precisa mais dele. */}
-      <div data-tela-cheia className="flex flex-col lg:flex-row gap-0 border border-gray-200 rounded-xl overflow-hidden bg-white">
+      <div className="flex flex-col lg:flex-row gap-0 border border-gray-200 rounded-xl overflow-hidden bg-white flex-1 min-h-0">
         {painel && indice && (
-          <aside className="w-full lg:w-[260px] shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200 overflow-y-auto" style={{ maxHeight: 560 }}>
+          <aside data-painel-3d className="w-full lg:w-[260px] shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200 overflow-y-auto" style={{ maxHeight: 560 }}>
             <div className="p-3.5 space-y-3.5">
               <div className="flex items-center justify-between">
                 <h4 className="text-[12px] font-bold text-[#0D1F3C] uppercase tracking-wide">Filtrar a vista</h4>
@@ -300,7 +305,7 @@ export default function ModeloObraCliente({ token }) {
           </aside>
         )}
 
-        <div className="flex-1 min-w-0 min-h-0 relative" style={{ height: 560 }}>
+        <div data-cena-3d className="flex-1 min-w-0 min-h-0 relative" style={{ height: 560 }}>
           {url && (
             <VisualizadorIfc key={url} url={url} onSelecionar={abrir} onIndice={receberIndice}
               visiveis={visiveis} ocultos={ocultos} esconderResto={esconderResto}
@@ -309,7 +314,7 @@ export default function ModeloObraCliente({ token }) {
         </div>
 
         {sel && (
-          <aside className="w-full lg:w-[330px] shrink-0 border-t lg:border-t-0 lg:border-l border-gray-200 overflow-y-auto" style={{ maxHeight: 560 }}>
+          <aside data-painel-3d className="w-full lg:w-[330px] shrink-0 border-t lg:border-t-0 lg:border-l border-gray-200 overflow-y-auto" style={{ maxHeight: 560 }}>
             <div className="p-4 space-y-3">
               <button onClick={() => setOcultos((v) => new Set(v).add(sel.id))}
                 className="text-[11.5px] text-gray-500 hover:text-[#0D1F3C] inline-flex items-center gap-1.5 border border-gray-200 rounded-md px-2 py-1">
@@ -382,6 +387,8 @@ export default function ModeloObraCliente({ token }) {
             </div>
           </aside>
         )}
+      </div>
+
       </div>
 
       <p className="text-[12px] text-gray-400 inline-flex items-center gap-1.5">
