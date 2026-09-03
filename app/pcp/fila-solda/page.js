@@ -32,12 +32,21 @@ export default async function PcpFilaSolda() {
   });
   const marcas = conjuntos.map((c) => c.marca);
 
-  const [montados, soldados, bancadasRaw] = await Promise.all([
+  // ⚠⚠ A FILA JÁ DÁ BAIXA — o que faltava era DIZER isso. Vitor (03/09/2026): "não sei se vc deu
+  // baixa nos apontamentos do dia". Dá: `soldados` desconta o que o Syneco apontou, inclusive
+  // quantidade parcial. Só que nada na tela mostrava até quando o apontamento chegou, e quem
+  // programa não tem como confiar num desconto invisível. Agora a data do último apontamento de
+  // solda vai junto e aparece no cabeçalho.
+  const [montados, soldados, bancadasRaw, ultimoAp] = await Promise.all([
     produzidoPorMarca("Montagem", marcas),
     produzidoPorMarca("Solda", marcas),
     // ⚠ AS BANCADAS SAEM DO SYNECO, não de um cadastro novo. SOLDA 1..10 já são o que a fábrica
     // aponta todo dia; inventar uma lista aqui criaria dois nomes para a mesma bancada.
     prisma.mesOrdem.findMany({ where: { setor: "Solda" }, select: { maquina: true }, distinct: ["maquina"] }),
+    prisma.mesApontamento.findFirst({
+      where: { setor: { contains: "Solda", mode: "insensitive" } },
+      orderBy: { dataInicio: "desc" }, select: { dataInicio: true },
+    }),
   ]);
 
   const bancadas = [...new Set(bancadasRaw.map((b) => String(b.maquina || "").trim()))]
@@ -50,6 +59,7 @@ export default async function PcpFilaSolda() {
       montados={montados}
       soldados={soldados}
       bancadas={bancadas}
+      apontadoAte={ultimoAp?.dataInicio ? ultimoAp.dataInicio.toISOString() : null}
     />
   );
 }

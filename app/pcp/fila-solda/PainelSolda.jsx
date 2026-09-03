@@ -43,6 +43,16 @@ export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, o
   const [n, setN] = useState(6);
   const [inicio, setInicio] = useState(isoHoje());
   const [curvaK, setCurvaK] = useState("META");
+  // ⚠⚠ ESCOLHER A BANCADA DE NOVO. Vitor (03/09/2026): "está um pouco confuso a seleção de bancada
+  // na parte da solda, não consigo selecionar para onde eu quero levar as peças".
+  //
+  // Em 01/09 ele tinha pedido o contrário ("o seletor de solda não há necessidade, apenas o número
+  // de bancadas") e eu tirei a escolha inteira — o painel passou a dizer QUAIS entre as livres. Na
+  // prática as duas coisas convivem: no dia a dia ninguém quer escolher, mas quando há um motivo
+  // (a peça grande vai na bancada do pórtico, aquele soldador está naquela) a escolha automática
+  // vira uma parede. Agora o número continua sendo o caminho rápido, e marcar bancadas específicas
+  // passa a mandar sobre ele.
+  const [escolhidas, setEscolhidas] = useState([]);
   const [baixando, setBaixando] = useState(false);
 
   const curva = (CURVAS.find((c) => c.k === curvaK) || CURVAS[0]).curva;
@@ -62,9 +72,13 @@ export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, o
   const ocupadas = useMemo(() => BANCADAS.filter((b) => !livres.includes(b)), [livres]);
   // ⚠ n é o que ele PEDIU; usadas é o que dá para usar. A diferença aparece na tela — pedir 6 e
   // receber 4 em silêncio é o tipo de coisa que só se descobre quando a folha sai errada.
-  const nomes = useMemo(() => livres.slice(0, n), [livres, n]);
+  // ⚠ escolha manual manda; sem escolha, valem as N primeiras livres (o comportamento de sempre).
+  const nomes = useMemo(
+    () => (escolhidas.length ? BANCADAS.filter((b) => escolhidas.includes(b)) : livres.slice(0, n)),
+    [escolhidas, livres, n]);
+  const alternar = (b) => setEscolhidas((p) => (p.includes(b) ? p.filter((x) => x !== b) : [...p, b]));
 
-  const distrib = useMemo(() => repartirPorBancada(conjuntos, n, { curva, nomes }), [conjuntos, n, curva, nomes]);
+  const distrib = useMemo(() => repartirPorBancada(conjuntos, nomes.length || n, { curva, nomes }), [conjuntos, n, curva, nomes]);
   const porDia = useMemo(() => distribuirEmDias(distrib, inicio), [distrib, inicio]);
 
   const resumo = useMemo(() => {
@@ -131,6 +145,34 @@ export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, o
             ))}
           </div>
         </div>
+        {/* ⚠ as bancadas por extenso, clicáveis: a ocupada aparece com o dia em que vaga, para a
+            escolha ser informada em vez de bloqueada. Quem quiser insistir nela, insiste — o painel
+            avisa, não impede. */}
+        <div>
+          <p className="text-[11px] font-semibold text-torg-gray mb-1">
+            ou escolha as bancadas {escolhidas.length > 0 && (
+              <button onClick={() => setEscolhidas([])} className="ml-1 font-normal text-torg-blue hover:underline">voltar ao automático</button>
+            )}
+          </p>
+          <div className="flex gap-1 flex-wrap">
+            {BANCADAS.map((b) => {
+              const ocup = ocupacao[b];
+              const livre = !ocup || ocup.livreEm <= inicio;
+              const on = escolhidas.includes(b) || (!escolhidas.length && nomes.includes(b));
+              return (
+                <button key={b} onClick={() => alternar(b)}
+                  title={livre ? "livre nesta data" : `ocupada até ${fmtDia(ocup.livreEm)}`}
+                  className={`px-2.5 py-1.5 text-[12px] font-semibold rounded-lg border ${
+                    on ? "bg-torg-blue text-white border-torg-blue"
+                       : livre ? "bg-white text-torg-gray border-gray-200 hover:border-torg-blue-300"
+                               : "bg-gray-50 text-torg-gray-light border-gray-200"}`}>
+                  {b}{!livre && <span className="ml-1 text-[10px] font-normal">até {fmtDia(ocup.livreEm).slice(-5)}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div>
           <p className="text-[11px] font-semibold text-torg-gray mb-1">a partir de</p>
           <input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)}

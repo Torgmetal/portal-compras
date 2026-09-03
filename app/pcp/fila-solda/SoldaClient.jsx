@@ -39,7 +39,7 @@ const COLUNAS = [
   { key: "situacao", label: "Situação", valor: (c) => (c.emSolda ? "soldando" : c.soldaBancada ? "programado" : "a programar") },
 ];
 
-export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados = {}, bancadas = [] }) {
+export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados = {}, bancadas = [], apontadoAte = null }) {
   const [conjuntos, setConjuntos] = useState(conjuntosIniciais);
   const [sel, setSel] = useState(new Set());
   const [filtroOp, setFiltroOp] = useState("");
@@ -331,6 +331,17 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
         <p className="text-xs text-torg-gray mt-1 max-w-3xl">
           Conjuntos com a <strong>montagem concluída</strong> (baixa do Syneco) e a solda ainda aberta. A bancada aqui é
           <strong> sugestão para o líder</strong> — o que valeu de verdade continua vindo do apontamento.
+        </p>
+        {/* ⚠⚠ DIZER ATÉ QUANDO A BAIXA CHEGOU. Vitor (03/09/2026): "não sei se vc deu baixa nos
+            apontamentos do dia". A fila já desconta o soldado — inclusive quantidade parcial —, mas
+            desconto invisível não se confia: quem programa precisa saber se o que está vendo já
+            considera o turno de ontem. A data do último apontamento de solda responde isso numa
+            linha. */}
+        <p className="text-[11.5px] text-torg-gray-light mt-1">
+          {apontadoAte
+            ? <>Fila já descontada do que foi soldado — último apontamento de solda em <strong className="text-torg-gray">{fmtData(apontadoAte)}</strong>.</>
+            : "Sem apontamento de solda no Syneco ainda."}
+          {" "}Conjunto com solda parcial continua na fila, só com o que falta.
         </p>
       </div>
 
