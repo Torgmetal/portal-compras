@@ -31,6 +31,7 @@ import LiberacaoMaterial from "./LiberacaoMaterial";
 // suporta a pasta por bancada, que a cópia local não tinha.
 import { baixarZipLote } from "@/lib/desenhos-zip-cliente";
 import DescerDesenhos from "./DescerDesenhos";
+import GanttBancadas from "./GanttBancadas";
 import PainelBancadas from "@/app/producao/programacao/montagem/PainelBancadas";
 
 const MAX_LOTE = 80; // teto do /api/producao/desenhos/lote
@@ -577,6 +578,12 @@ export default function ProducaoClient() {
           desenhos para os setores". O caminho normal deixa de depender de achar a peça numa tabela
           de centenas — a lista de obras continua abaixo, para o resto do trabalho. */}
       <DescerDesenhos onDescer={descerDoPainel} ocupado={imprimindo} />
+
+      {/* ⚠ BLOCO PRÓPRIO, LOGO ABAIXO DO PAINEL. Vitor (03/09/2026): "não acho que deve ficar em aba
+          própria, deixa na mesma aba que estamos no pcp/producao" — e "em uma parte da tela separada
+          para não ficar apertando botão e ficar uma zona". Quem programa precisa ver a agenda das
+          bancadas e o painel ao mesmo tempo. */}
+      <GanttBancadas />
 
       {loading ? (
         <div className="flex items-center justify-center py-20 gap-3 text-torg-gray"><Loader2 size={22} className="animate-spin" /> Carregando…</div>
