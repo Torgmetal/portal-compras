@@ -275,7 +275,10 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
    * maior para o menor — numa cadeia, o total costuma ser o que interessa.
    */
   function candidatos(r) {
-    if (!r) return [];
+    // ⚠ COTA SEM MARCAÇÃO NO DESENHO não tem ponta nenhuma para procurar número perto — é a cota
+    // que Vitor (03/09/2026) pediu para "adicionar sem marcar no desenho" (uma cota do projeto que
+    // ninguém carimbou como A/B/C ainda). Sem esta guarda o cálculo seguinte trabalha com NaN.
+    if (!r || r.ax == null || r.bx == null) return [];
     const nums = (dados.textos || [])
       .map((t) => ({ ...t, n: /^\d{1,5}$/.test(String(t.s).trim()) ? parseInt(t.s, 10) : null }))
       .filter((t) => t.n != null);
@@ -561,10 +564,24 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
       </div>
       </div>
 
+      {/* ⚠⚠ COTA SEM MARCAR NO DESENHO. Vitor (03/09/2026): "preciso colocar as cotas que tem no
+          projeto para a cota encontrada sem estar pré agendada" — uma dimensão do projeto que
+          ninguém carimbou A/B/C ainda (não precisa de linha de chamada) também precisa de um jeito
+          de entrar na tabela. Reaproveita a MESMA barra do clique-clique: só nasce sem ax/ay/bx/by,
+          então não desenha linha nenhuma no desenho (layoutCotas já pula cota sem ponta) — mas
+          ganha letra, projeto e encontrado do mesmo jeito. */}
+      {!rascunho && !borracha && (
+        <button onClick={() => { setPendente(null); setRascunho({}); }}
+          className="mt-1.5 text-[11px] text-torg-blue hover:text-torg-dark font-medium">
+          + cota sem marcação no desenho
+        </button>
+      )}
+
       {rascunho && (
         <BarraCota
           letra={LETRAS[cotas.length] || "?"}
           valores={candidatos(rascunho)}
+          semDesenho={rascunho.ax == null}
           tol={tol} onTol={setTol}
           onConfirmar={confirmar}
           onCancelar={() => setRascunho(null)}
@@ -609,13 +626,13 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
  * ⚠ O campo de digitar continua, para o desenho que não declara o número. Não dá para depender só
  * da leitura: nem toda cota está escrita na folha.
  */
-function BarraCota({ letra, valores, tol, onTol, onConfirmar, onCancelar }) {
+function BarraCota({ letra, valores, semDesenho, tol, onTol, onConfirmar, onCancelar }) {
   const [outro, setOutro] = useState("");
   return (
     <div className="mt-2 p-2.5 bg-torg-blue-50 border border-torg-blue-200 rounded-lg">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="w-6 h-6 rounded-full bg-torg-blue text-white font-bold text-[11px] inline-flex items-center justify-center shrink-0">{letra}</span>
-        <span className="text-[12px] font-semibold text-torg-dark">Cota {letra}</span>
+        <span className="text-[12px] font-semibold text-torg-dark">Cota {letra}{semDesenho ? " · sem marcação no desenho" : ""}</span>
 
         {valores.length > 0 ? (
           <span className="flex items-center gap-1.5 flex-wrap">
@@ -628,7 +645,9 @@ function BarraCota({ letra, valores, tol, onTol, onConfirmar, onCancelar }) {
             ))}
           </span>
         ) : (
-          <span className="text-[10px] text-torg-gray">não achei número no desenho aqui</span>
+          <span className="text-[10px] text-torg-gray">
+            {semDesenho ? "digite o valor de projeto abaixo" : "não achei número no desenho aqui"}
+          </span>
         )}
 
         <span className="flex-1" />
