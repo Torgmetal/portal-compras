@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye, Upload, X, ImagePlus, FolderOpen, Plus, Trash2, Images } from "lucide-react";
 import SeletorFotos from "@/components/SeletorFotos";
+import { MODELOS_EMAIL, MODELO_EMAIL } from "@/lib/portal-email-modelos";
 import { upload } from "@vercel/blob/client";
 import { SECOES, CAPAS, AREAS, AREAS_COM_SELETOR, TIPOS_ENGENHARIA, situacao } from "@/lib/portal-cliente";
 import SeletorDocsArea from "./SeletorDocsArea";
@@ -42,6 +43,10 @@ export default function AbaPortalCliente({ opId, opNumero }) {
   const [aviso, setAviso] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [banco, setBanco] = useState(false);   // o banco de fotos aberto
+  // ⚠⚠ O MODELO É DO ENVIO, NÃO DA OBRA. Vitor (03/09/2026): "será apenas para esse envio ok, para
+  // os próximos volta ao normal". Por isso ele mora no estado da TELA e volta ao padrão a cada vez
+  // que ela abre — nada é gravado. Anúncio de novidade repetido em todo reenvio vira ruído.
+  const [modeloEmail, setModeloEmail] = useState("PADRAO");
   const [copiado, setCopiado] = useState(false);
 
   useEffect(() => {
@@ -145,7 +150,7 @@ export default function AbaPortalCliente({ opId, opNumero }) {
       });
       const r = await fetch(`/api/comercial/op/${opId}/portal`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enviar, clienteEmail: f.clienteEmail, contato: f.contato, destinatarios: f.destinatarios }),
+        body: JSON.stringify({ enviar, clienteEmail: f.clienteEmail, contato: f.contato, destinatarios: f.destinatarios, modeloEmail }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao publicar");
@@ -438,6 +443,17 @@ export default function AbaPortalCliente({ opId, opNumero }) {
       {aviso && <p className="text-[12px] text-emerald-700">{aviso}</p>}
 
       <div className="flex items-center justify-end gap-2 flex-wrap">
+        <label className="mr-auto flex items-center gap-2 text-[12px] text-torg-gray">
+          Texto do e-mail:
+          <select value={modeloEmail} onChange={(e) => setModeloEmail(e.target.value)}
+            className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-torg-blue max-w-[320px]"
+            title={MODELO_EMAIL[modeloEmail]?.resumo || ""}>
+            {MODELOS_EMAIL.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+          </select>
+          {modeloEmail !== "PADRAO" && (
+            <span className="text-[11px] text-amber-700">vale só para este envio</span>
+          )}
+        </label>
         <button onClick={salvar} disabled={salvando}
           className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-3 py-1.5 hover:bg-torg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">
           {salvando ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Salvar

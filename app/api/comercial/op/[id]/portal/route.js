@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarTokenForte } from "@/lib/token";
 import { sendEmail } from "@/lib/email";
+import { modeloDeEmail } from "@/lib/portal-email-modelos";
 import { cabecalhoEmail } from "@/lib/email-layout";
 import { normalizarSecoes, mensagemPadrao, secoesDoPortal } from "@/lib/portal-cliente";
 
@@ -121,6 +122,7 @@ export async function POST(req, { params }) {
     // ⚠ Reenviar para o MESMO e-mail reaproveita o código — senão o histórico de quem já abriu se
     // partiria em duas pessoas a cada reenvio.
     const obra = r.op.obra || `OP-${String(r.op.numero).padStart(3, "0")}`;
+    const modelo = modeloDeEmail(b?.modeloEmail);
     let enviados = 0;
     for (const pessoa of lista) {
       const jaTem = await prisma.portalDestinatario.findFirst({ where: { portalId: portal.id, email: pessoa.email } });
@@ -135,15 +137,14 @@ export async function POST(req, { params }) {
             },
           });
       const linkPessoal = `${link}?d=${dest.codigo}`;
-      const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#0D1F3C">
-        ${cabecalhoEmail("Portal da Obra")}
+      // ⚠⚠ O MODELO É DESTE ENVIO, não da obra. Vitor (03/09/2026): "será apenas para esse envio ok,
+      // para os próximos volta ao normal". Por isso ele vem no corpo da requisição e não é gravado
+      // em lugar nenhum: o próximo envio, sem escolher nada, sai no convite de sempre.
+      const html = `<div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#0D1F3C">
+        ${cabecalhoEmail(modelo.faixa)}
         <div style="border:1px solid #e7ecf2;border-top:none;border-radius:0 0 8px 8px;padding:22px 26px">
           <p style="margin:0 0 12px">Olá${pessoa.nome ? `, <strong>${pessoa.nome}</strong>` : ""},</p>
-          <p style="margin:0 0 14px">
-            Preparamos um portal para você acompanhar a fabricação de <strong>${obra}</strong>: cronograma,
-            relatórios de inspeção aprovados, certificados de matéria-prima com rastreabilidade e os
-            documentos da obra — atualizados conforme ela avança.
-          </p>
+          ${modelo.corpo({ obra })}
           <p style="text-align:center;margin:24px 0">
             <a href="${linkPessoal}" style="background:#006EAB;color:#fff;text-decoration:none;padding:13px 30px;border-radius:8px;font-size:15px;font-weight:bold;display:inline-block">Abrir o portal da obra</a>
           </p>
