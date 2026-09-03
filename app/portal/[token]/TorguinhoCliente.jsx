@@ -13,6 +13,16 @@
 // responde.
 import { useEffect, useRef, useState } from "react";
 import { Send, Loader2 } from "lucide-react";
+import { emSetembroAmarelo, TORGUINHO_LACO } from "@/lib/campanha";
+
+// ⚠⚠ O TORGUINHO APARECE. Vitor (03/09/2026): "poderia colocar ele lá né, ficaria mais
+// profissional e eles conheceriam ele". Um balão de texto sem rosto é um chatbot genérico; com o
+// personagem, o cliente sabe COM QUEM está falando — e é a mesma cara que ele já vê nos e-mails e
+// no portal interno. Mascote não é enfeite: é o que faz o assistente parecer parte da Torg.
+//
+// ⚠ o laço de Setembro Amarelo vale aqui também, pela mesma razão do portal interno: campanha da
+// casa não se esconde do cliente (ver lib/campanha).
+const AVATAR = emSetembroAmarelo() ? TORGUINHO_LACO : "/torguinho.png";
 
 const SUGESTOES = [
   "Quanto pesa a peça …?",
@@ -51,6 +61,16 @@ export default function TorguinhoCliente({ token }) {
       <div className="max-h-[420px] overflow-y-auto p-4 space-y-3">
         {!msgs.length && (
           <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-[#F4801F] shrink-0 bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={AVATAR} alt="Torguinho" className="w-full h-full object-cover" />
+              </div>
+              <div>
+                <p className="text-[14px] font-bold text-[#0D1F3C]">Oi! Eu sou o Torguinho.</p>
+                <p className="text-[12px] text-gray-500">O assistente da Torg Metal para esta obra.</p>
+              </div>
+            </div>
             <p className="text-[13.5px] text-gray-600">
               Pergunte sobre as peças desta obra — peso, quantidade, em que etapa estão, o que já
               embarcou e em qual romaneio, a rastreabilidade do material e os relatórios de inspeção.
@@ -67,7 +87,13 @@ export default function TorguinhoCliente({ token }) {
         )}
 
         {msgs.map((m, i) => (
-          <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
+          <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start items-end gap-2"}>
+            {m.role !== "user" && (
+              <div className="w-7 h-7 rounded-full overflow-hidden border border-gray-200 shrink-0 bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={AVATAR} alt="" className="w-full h-full object-cover" />
+              </div>
+            )}
             <div className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-[13.5px] whitespace-pre-wrap leading-relaxed ${
               m.role === "user" ? "bg-[#0D1F3C] text-white" : "bg-gray-50 text-[#0D1F3C] border border-gray-100"}`}>
               {m.content}
@@ -76,9 +102,15 @@ export default function TorguinhoCliente({ token }) {
         ))}
 
         {pensando && (
-          <p className="text-[12.5px] text-gray-400 inline-flex items-center gap-2">
-            <Loader2 size={12} className="animate-spin" /> consultando a obra…
-          </p>
+          <div className="flex items-end gap-2">
+            <div className="w-7 h-7 rounded-full overflow-hidden border border-gray-200 shrink-0 bg-white">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={AVATAR} alt="" className="w-full h-full object-cover" />
+            </div>
+            <p className="text-[12.5px] text-gray-400 inline-flex items-center gap-2">
+              <Loader2 size={12} className="animate-spin" /> consultando a obra…
+            </p>
+          </div>
         )}
         <div ref={fim} />
       </div>

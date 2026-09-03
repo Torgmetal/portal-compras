@@ -287,7 +287,7 @@ export default function PortalClienteView({ token }) {
             vai direto nela; quem não sabe, acha girando o modelo. */}
         {mostrar("ASSISTENTE") && (
           <Bloco icone={MessageCircle} titulo="Perguntar ao Torguinho"
-            sub="Tire dúvidas sobre as peças desta obra — peso, etapa, expedição e rastreabilidade.">
+            sub="O assistente da Torg para esta obra — peso, etapa, expedição e rastreabilidade de cada peça.">
             <TorguinhoCliente token={token} />
           </Bloco>
         )}
