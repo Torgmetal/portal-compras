@@ -293,7 +293,7 @@ export default function DescerDesenhos({ onDescer, ocupado, setor, onSetor, onMu
       {aba === "MONTAR" ? (
         <ProntoParaMontar onProgramado={() => setRecarga((v) => v + 1)} />
       ) : aba === "PREPARAR" ? (
-        <FaltaPreparar setor={setor} />
+        <FaltaPreparar setor={setor} onDescer={onDescer} ocupado={ocupado} onMudou={onMudou} />
       ) : !d ? (
         <p className="px-4 py-4 text-[12.5px] text-torg-gray inline-flex items-center gap-2">
           <Loader2 size={13} className="animate-spin" /> vendo a programação…

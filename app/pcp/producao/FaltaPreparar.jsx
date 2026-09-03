@@ -14,21 +14,44 @@
 //                trabalho do setor ANTERIOR: serve para cobrar, não para agir — por isso não tem
 //                seleção nem botão aqui.
 import { useEffect, useMemo, useState, Fragment } from "react";
-import { Loader2, ChevronRight } from "lucide-react";
+import { Loader2, ChevronRight, CalendarCheck, Printer } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
+import DiasPreparacao from "./DiasPreparacao";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import { diasDoLote, rotuloMaquina, META_KG_DIA_PREPARACAO } from "@/lib/capacidade-preparacao";
 
 const fmtN = (n) => new Intl.NumberFormat("pt-BR").format(Math.round(Number(n) || 0));
 const fmt1 = (n) => (Math.round((Number(n) || 0) * 10) / 10).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const fmtKg = (n) => `${fmtN(n)} kg`;
+const fmtDia = (d) => (d ? new Date(`${d}T00:00:00Z`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" }) : "—");
 const somaKg = (a) => a.reduce((s, x) => s + (x.kg || 0), 0);
 const somaQt = (a) => a.reduce((s, x) => s + (x.qte || 0), 0);
+// ⚠ começa no próximo dia ÚTIL: programar para sábado é programar para ninguém.
+const proximoUtil = () => {
+  const d = new Date();
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
+// último dia útil do lote, contando os dias que o gargalo leva
+const fimDoLote = (iso, dias) => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  let faltam = Math.max(1, Math.ceil(dias || 1)) - 1;
+  while (faltam > 0) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    const s = d.getUTCDay();
+    if (s !== 0 && s !== 6) faltam--;
+  }
+  return d.toISOString().slice(0, 10);
+};
 
-export default function FaltaPreparar({ setor }) {
+export default function FaltaPreparar({ setor, onDescer, ocupado, onMudou }) {
   const [itens, setItens] = useState(null);
   const [naoLancadas, setNaoLancadas] = useState(null);
   const [cap, setCap] = useState(null);
+  const [inicio, setInicio] = useState(proximoUtil);
+  const [salvando, setSalvando] = useState("");
+  const [aviso, setAviso] = useState(null);
+  const [recarga, setRecarga] = useState(0);
   const [sel, setSel] = useState(() => new Set());
   const [aberto, setAberto] = useState(null);
   const [aberta, setAberta] = useState(null);
@@ -45,7 +68,7 @@ export default function FaltaPreparar({ setor }) {
       .then((j) => { if (!vivo) return; setItens(j?.itens || []); setNaoLancadas(j?.naoLancadas || null); setCap(j || null); })
       .catch(() => vivo && setItens([]));
     return () => { vivo = false; };
-  }, [setor]);
+  }, [setor, recarga]);
 
   const lista = itens || [];
   // ⚠ mesmo funil das outras tabelas (components/FiltroColuna). A conta do prazo segue o que está
@@ -84,6 +107,49 @@ export default function FaltaPreparar({ setor }) {
   const dias = carga.dias;
   const alternar = (id) => setSel((p) => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; });
   const todos = vis.length > 0 && vis.every((x) => sel.has(x.id));
+
+  // ⚠⚠ SÓ PROGRAMAR × PROGRAMAR E LIBERAR. Vitor (03/09/2026): "você vai solicitar a data que está
+  // prevendo colocar em produção e vai dar a opção de apenas programar ou programar e liberar, que
+  // seria nesse ato que vai sair o croqui controlado". São dois momentos: fechar o dia (que ainda
+  // muda) e soltar o papel (que vira GRD e não volta atrás).
+  //
+  // ⚠ QUEM PROGRAMA É A FILA DE CORTE que já existe (/api/pcp/fila-corte, ação "programar"): ela
+  // grava `corteDiaProgramado` peça a peça e guarda o `corteDiaOriginal` uma única vez — é dele que
+  // o atraso é contado. Programar por outro caminho apagaria a origem do atraso.
+  async function programar({ liberar = false } = {}) {
+    if (!escolhidos.length) return;
+    const fim = fimDoLote(inicio, dias);
+    const txt = `Programar ${escolhidos.length} peça(s) para ${fmtDia(inicio)}`
+      + (fim !== inicio ? ` a ${fmtDia(fim)}` : "")
+      + ` (${fmt1(dias)} dia(s) pelo gargalo${carga.medido ? `: ${rotuloMaquina(carga.gargalo)}` : ""})?`
+      + (liberar ? "\n\nE liberar já: sai o croqui controlado e a GRD fica registrada." : "\n\nSó marca o dia — o papel sai depois.");
+    if (!confirm(txt)) return;
+    setSalvando(liberar ? "liberar" : "programar"); setAviso(null);
+    try {
+      const r = await fetch("/api/pcp/fila-corte", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "programar", ids: escolhidos.map((x) => x.id), metaInicio: inicio, metaFim: fim }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao programar");
+
+      if (liberar) {
+        // ⚠ agrupa por OBRA porque a emissão é por OP — mesma regra do painel ao lado.
+        const porOp = new Map();
+        for (const p of escolhidos) {
+          if (!p.opNumero) continue;
+          const l = porOp.get(p.opNumero) || [];
+          l.push(p.marca); porOp.set(p.opNumero, l);
+        }
+        await onDescer?.({ setor: "PREPARACAO", porObra: [...porOp.entries()].map(([opNumero, marcas]) => ({ opNumero, marcas })) });
+      } else {
+        setAviso(`${escolhidos.length} peça(s) programadas para ${fmtDia(inicio)}${fim !== inicio ? ` a ${fmtDia(fim)}` : ""}.`);
+      }
+      setSel(new Set());
+      setRecarga((v) => v + 1);
+      onMudou?.();
+    } catch (e) { setAviso(`Erro: ${e.message}`); } finally { setSalvando(""); }
+  }
 
   if (!itens) {
     return <p className="px-4 py-4 text-[12.5px] text-torg-gray inline-flex items-center gap-2">
@@ -270,9 +336,37 @@ export default function FaltaPreparar({ setor }) {
             )}
           </div>
         )}
+        <div className="flex items-center gap-2 flex-wrap mt-3 border-t border-gray-200 pt-2.5">
+          <span className="text-[12px] text-torg-gray">entra em produção</span>
+          <input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)}
+            className="border border-gray-200 rounded-md px-2 py-1 text-[11.5px] bg-white outline-none focus:border-torg-blue" />
+          {escolhidos.length > 0 && (
+            <span className="text-[11px] text-torg-gray-light">
+              termina em <b className="text-torg-dark">{fmtDia(fimDoLote(inicio, dias))}</b>
+            </span>
+          )}
+          <button onClick={() => programar()} disabled={!!salvando || !escolhidos.length}
+            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg border border-gray-200 text-torg-gray hover:border-torg-blue-300 hover:text-torg-blue disabled:opacity-40">
+            {salvando === "programar" ? <Loader2 size={13} className="animate-spin" /> : <CalendarCheck size={13} />}
+            Só programar
+          </button>
+          <button onClick={() => programar({ liberar: true })} disabled={!!salvando || ocupado || !escolhidos.length}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-torg-orange text-white hover:opacity-90 disabled:opacity-40">
+            {salvando === "liberar" || ocupado ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />}
+            Programar e liberar
+          </button>
+        </div>
+        {aviso && <p className="text-[11.5px] text-torg-dark bg-white border border-gray-200 rounded-lg px-3 py-2 mt-2">{aviso}</p>}
         <p className="text-[11px] text-torg-gray-light mt-2">
-          ⚠ estimativa — quem cria a liberação do lote continua sendo o Planejamento, por frente da obra.
+          liberar emite o croqui controlado com o R de cada material e registra a GRD · confira a planilha de separação antes
         </p>
+      </div>
+
+      {/* ⚠ o acompanhamento fica LOGO ABAIXO de quem programa: é olhando o dia de ontem que se
+          decide o de amanhã, e mandar a pessoa procurar isso noutra tela quebraria a decisão em
+          duas. */}
+      <div className="-mx-4 mt-3 border-t border-gray-100">
+        <DiasPreparacao recarga={recarga} />
       </div>
     </div>
   );
