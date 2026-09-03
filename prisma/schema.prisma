@@ -215,6 +215,7 @@ model OP {
   @@index([status])
   @@index([status, createdAt])
   @@index([createdById, status])
+  fotosObra            FotoObra[]
 }
 
 model ProducaoSemanal {
@@ -5612,4 +5613,31 @@ model CotacaoEstudoFornecedor {
   cotacao CotacaoEstudo @relation(fields: [cotacaoId], references: [id], onDelete: Cascade)
 
   @@index([cotacaoId])
+}
+
+// ─── O BANCO DE FOTOS DA OBRA ─────────────────────────────────────────────────
+// Vitor (03/09/2026): "quando adicionarmos uma foto em algum lugar quero que ela fique em todos os
+// lugares que temos para colocar foto, para não ter que ficar subindo sempre no portal, assim vc
+// cria um banco de dados".
+//
+// ⚠⚠ A FOTO É DA OBRA, NÃO DA TELA. Hoje cada lugar guarda o próprio [{url, legenda}] dentro do
+// seu registro (o portal do cliente no PortalCliente.fotos, o relatório de status nos blocos) — e
+// por isso a mesma foto de pintura era subida três vezes, com três legendas diferentes. Aqui ela
+// entra UMA vez e fica disponível em todo lugar que pede foto. Os campos por tela continuam
+// existindo: o banco é a fonte, o registro de cada tela continua sendo a ESCOLHA daquela tela.
+model FotoObra {
+  id          String   @id @default(cuid())
+  url         String
+  legenda     String?
+  opId        String?
+  opNumero    String?
+  // de onde ela entrou: PORTAL | RELATORIO | AVULSA — serve para achar e para saber a procedência
+  origem      String   @default("AVULSA")
+  criadoEm    DateTime @default(now())
+  criadoPorId String?
+
+  op          OP?      @relation(fields: [opId], references: [id], onDelete: SetNull)
+
+  @@index([opId])
+  @@index([criadoEm])
 }

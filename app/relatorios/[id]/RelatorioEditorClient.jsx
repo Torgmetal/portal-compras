@@ -3,8 +3,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, FileDown, Plus, Trash2,
-  ImagePlus, ChevronUp, ChevronDown, X, GripVertical, CheckCircle2, Mail, Send, Check, Users,
+  ImagePlus, Images, ChevronUp, ChevronDown, X, GripVertical, CheckCircle2, Mail, Send, Check, Users,
 } from "lucide-react";
+import SeletorFotos from "@/components/SeletorFotos";
 import { useStore } from "@/lib/store";
 
 const uid = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
@@ -42,6 +43,7 @@ export default function RelatorioEditorClient({ id }) {
   const [dirty, setDirty] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [subindo, setSubindo] = useState(0); // fotos em upload no momento
+  const [banco, setBanco] = useState(null);  // índice do bloco que abriu o banco de fotos
   const fileRefs = useRef({});
 
   // Envio ao cliente
@@ -152,6 +154,12 @@ export default function RelatorioEditorClient({ id }) {
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || "Falha no upload");
         setBlocos((p) => p.map((b, idx) => (idx === i ? { ...b, fotos: [...(b.fotos || []), { url: d.url, legenda: "" }] } : b)));
+        // ⚠ entra no banco de fotos sozinha: a mesma foto de obra costuma ir para o relatório e
+        // para o portal do cliente, e subir duas vezes é o que o Vitor pediu para acabar.
+        fetch("/api/fotos", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fotos: [{ url: d.url }], opNumero, origem: "RELATORIO" }),
+        }).catch(() => {});
         marcar();
       } catch (e) { showToast(e.message || "Falha ao subir foto", "error"); }
       finally { setSubindo((n) => n - 1); }
@@ -303,11 +311,25 @@ export default function RelatorioEditorClient({ id }) {
                 <ImagePlus size={22} />
                 <span className="text-[11px] mt-1">Adicionar foto</span>
               </button>
+              {/* ⚠ o banco fica ao lado do upload, não escondido num menu: a foto que já existe é o
+                  caminho curto, e caminho curto que não se vê ninguém usa. */}
+              <button onClick={() => setBanco(i)}
+                className="aspect-video border-2 border-dashed border-gray-200 rounded-lg flex flex-col items-center justify-center text-torg-gray hover:border-torg-blue hover:text-torg-blue transition-colors">
+                <Images size={22} />
+                <span className="text-[11px] mt-1">Do banco</span>
+              </button>
               <input ref={(el) => (fileRefs.current[b.id] = el)} type="file" accept="image/*" multiple className="hidden"
                 onChange={(e) => { addFotos(i, e.target.files); e.target.value = ""; }} />
             </div>
           </div>
         ))}
+
+        <SeletorFotos aberto={banco !== null} opNumero={opNumero} onFechar={() => setBanco(null)}
+          jaUsadas={(blocos[banco]?.fotos || []).map((x) => x.url)}
+          onEscolher={(novas) => {
+            setBlocos((p) => p.map((b, idx) => (idx === banco ? { ...b, fotos: [...(b.fotos || []), ...novas] } : b)));
+            marcar();
+          }} />
 
         <button onClick={addBloco} className="w-full py-3 border-2 border-dashed border-gray-200 rounded-xl text-torg-gray hover:border-torg-blue hover:text-torg-blue font-medium inline-flex items-center justify-center gap-2 transition-colors">
           <Plus size={18} /> Adicionar bloco

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye, Upload, X, ImagePlus, FolderOpen, Plus, Trash2 } from "lucide-react";
+import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye, Upload, X, ImagePlus, FolderOpen, Plus, Trash2, Images } from "lucide-react";
+import SeletorFotos from "@/components/SeletorFotos";
 import { upload } from "@vercel/blob/client";
 import { SECOES, CAPAS, AREAS, AREAS_COM_SELETOR, TIPOS_ENGENHARIA, situacao } from "@/lib/portal-cliente";
 import SeletorDocsArea from "./SeletorDocsArea";
@@ -40,6 +41,7 @@ export default function AbaPortalCliente({ opId, opNumero }) {
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [banco, setBanco] = useState(false);   // o banco de fotos aberto
   const [copiado, setCopiado] = useState(false);
 
   useEffect(() => {
@@ -104,6 +106,14 @@ export default function AbaPortalCliente({ opId, opNumero }) {
           const novas = [];
           for (const a2 of arqs) novas.push({ url: await subir(a2), legenda: "" });
           setF((p) => ({ ...p, fotos: [...(p.fotos || []), ...novas].slice(0, 24) }));
+          // ⚠⚠ TODA FOTO SUBIDA ENTRA NO BANCO, sem ninguém pedir. Vitor (03/09/2026): "para não
+          // ter que ficar subindo sempre no portal". Se o registro dependesse de um botão
+          // "adicionar ao banco", o banco nasceria vazio — quem sobe a foto está resolvendo o
+          // portal de hoje, não pensando na próxima tela que vai precisar dela.
+          fetch("/api/fotos", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fotos: novas, opId, origem: "PORTAL" }),
+          }).catch(() => {});
         } else {
           set(alvo, await subir(arqs[0]));
         }
@@ -265,6 +275,10 @@ export default function AbaPortalCliente({ opId, opNumero }) {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
         <div className="flex items-center justify-between gap-3 mb-1">
           <h4 className="text-sm font-semibold text-torg-dark">Registro fotográfico</h4>
+          <button onClick={() => setBanco(true)} disabled={salvando}
+            className="text-[11.5px] px-2.5 py-1 rounded-md border border-gray-200 text-torg-gray hover:border-torg-blue hover:text-torg-blue inline-flex items-center gap-1.5">
+            <Images size={12} /> do banco
+          </button>
           <button onClick={() => escolherArquivo("fotos")} disabled={salvando}
             className="text-[11px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-2.5 py-1 hover:bg-torg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">
             <Upload size={12} /> subir fotos
@@ -273,6 +287,13 @@ export default function AbaPortalCliente({ opId, opNumero }) {
         <p className="text-[11px] text-torg-gray mb-3">
           A obra em imagens — fabricação, pintura, expedição. A legenda é o que dá sentido à foto.
         </p>
+        <SeletorFotos aberto={banco} opId={opId} onFechar={() => setBanco(false)}
+          jaUsadas={(f.fotos || []).map((x) => x.url)}
+          onEscolher={(novas) => {
+            setF((p) => ({ ...p, fotos: [...(p.fotos || []), ...novas].slice(0, 24) }));
+            setAviso("Fotos trazidas do banco — salve para gravar.");
+          }} />
+
         {!(f.fotos || []).length ? (
           <p className="text-[12px] text-torg-gray">Nenhuma foto ainda.</p>
         ) : (

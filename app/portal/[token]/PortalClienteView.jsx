@@ -501,12 +501,19 @@ export default function PortalClienteView({ token }) {
         )}
         {mostrar("FOTOS") && (
           <Bloco icone={ImageIcon} titulo="A obra em imagens" sub={`${portal.fotos.length} registros`}>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {/* ⚠ FOTO DE OBRA É PARA SER VISTA. Vitor (03/09/2026): "aumente um pouco a
+                visualização das fotos (…) hoje está bem pouca a visualização". Passou de três
+                colunas de 160 px para duas de 288 px — quase o triplo de área por foto — e cada uma
+                abre em tamanho cheio no clique, que é o que alguém faz quando quer olhar de perto
+                uma solda ou um acabamento. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {portal.fotos.map((f, i) => (
                 <figure key={i} className="rounded-xl overflow-hidden border border-gray-100 bg-white">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.url} alt={f.legenda || ""} className="w-full h-40 object-cover" />
-                  {f.legenda && <figcaption className="text-[11px] text-gray-500 px-3 py-2">{f.legenda}</figcaption>}
+                  <a href={f.url} target="_blank" rel="noreferrer" title="abrir a foto em tamanho cheio">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={f.url} alt={f.legenda || ""} className="w-full h-56 sm:h-72 object-cover hover:opacity-95 transition-opacity" />
+                  </a>
+                  {f.legenda && <figcaption className="text-[12px] text-gray-500 px-3 py-2">{f.legenda}</figcaption>}
                 </figure>
               ))}
             </div>
