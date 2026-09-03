@@ -802,13 +802,29 @@ function DocumentosDaArea({ grupos, token, cod }) {
           const marcadosNoGrupo = g.itens.filter((d) => sel.has(d.id)).length;
           return (
             <div key={g.assunto}>
-              <div className="flex items-center gap-2 mb-1.5">
-                <p className="text-[13px] font-semibold">
-                  {g.assunto} <span className="text-gray-400 font-normal">{g.itens.length}</span>
-                </p>
+              {/* ⚠⚠ TODO GRUPO É UMA PASTA, inclusive o que vem numa pasta só. Vitor (03/09/2026):
+                  "a pasta de diagrama de montagem deixe igual vc deixou a do projeto, minimizada, e
+                  dê a opção do cliente baixar por pasta". O Diagrama de montagem cai numa pasta
+                  única, então não entrava no agrupamento por subpasta e ficava aberto e sem botão —
+                  duas regras diferentes para a mesma coisa, dependendo de como a Engenharia
+                  arrumou os arquivos. Agora a faixa é do GRUPO, e a subpasta é o nível de dentro. */}
+              <div className="flex items-center gap-2 flex-wrap bg-gray-50 border border-gray-100 rounded-lg px-3 py-1.5 mb-1.5">
+                <button onClick={() => abrirPasta(g.assunto)} className="flex items-center gap-2 min-w-0 flex-1 text-left">
+                  {pastasAbertas.has(g.assunto) ? <ChevronDown size={13} className="text-[#006EAB] shrink-0" /> : <ChevronRight size={13} className="text-[#006EAB] shrink-0" />}
+                  <FolderOpen size={13} className="text-[#006EAB] shrink-0" />
+                  <span className="text-[13px] font-semibold truncate">{g.assunto}</span>
+                </button>
+                <span className="text-[11px] text-gray-400 shrink-0">
+                  {g.itens.length} arquivo{g.itens.length > 1 ? "s" : ""}
+                  {g.subpastas?.length ? ` · ${g.subpastas.length} pastas` : ""}
+                </span>
                 <button onClick={() => marcarGrupo(g, marcadosNoGrupo !== g.itens.length)}
-                  className="text-[11px] text-[#006EAB] hover:underline">
-                  {marcadosNoGrupo === g.itens.length ? "desmarcar" : "selecionar todos"}
+                  className="text-[11px] text-gray-500 hover:text-[#006EAB] hover:underline shrink-0">
+                  {marcadosNoGrupo === g.itens.length ? "desmarcar" : "selecionar"}
+                </button>
+                <button onClick={() => baixar(g.itens)} disabled={baixando}
+                  className="shrink-0 text-[11px] font-semibold text-white bg-[#006EAB] hover:bg-[#005A8C] disabled:opacity-50 rounded-md px-2 py-1 inline-flex items-center gap-1">
+                  <Download size={11} /> baixar a pasta
                 </button>
               </div>
 
@@ -818,8 +834,8 @@ function DocumentosDaArea({ grupos, token, cod }) {
                   de selecionar o projeto também, ter as duas opções". Por isso a pasta é uma FAIXA
                   com o botão de marcar tudo dela, e os arquivos seguem listados um a um embaixo.
                   Uma pasta só não vira caixa: seria repetir o título da seção em volta de nada. */}
-              {g.subpastas?.length > 0 && (
-                <div className="space-y-2.5 mb-1.5">
+              {g.subpastas?.length > 0 && pastasAbertas.has(g.assunto) && (
+                <div className="space-y-2.5 mb-1.5 pl-3">
                   {g.subpastas.map((p) => {
                     const naPasta = p.itens.filter((d) => sel.has(d.id)).length;
                     const todosNaPasta = naPasta === p.itens.length;
@@ -871,7 +887,7 @@ function DocumentosDaArea({ grupos, token, cod }) {
                 </div>
               )}
 
-              <div className={`grid sm:grid-cols-2 gap-1.5 ${g.subpastas?.length ? "hidden" : ""}`}>
+              <div className={`grid sm:grid-cols-2 gap-1.5 pl-3 ${g.subpastas?.length || !pastasAbertas.has(g.assunto) ? "hidden" : ""}`}>
                 {g.itens.map((doc) => {
                   const on = sel.has(doc.id);
                   return (
