@@ -113,7 +113,7 @@ export async function GET(req) {
     });
     // ⚠ teto: pasta com milhares de arquivos derruba a tela e o portal. Acima disso, quem publica
     // desce um nível e leva as subpastas uma a uma.
-    if (achados.length > 500) {
+    if (achados.length > 1500) {
       return NextResponse.json({ error: `Esta pasta tem ${achados.length} arquivos — leve as subpastas uma a uma.` }, { status: 400 });
     }
     const nomePasta = relTudo.split("/").filter(Boolean).pop() || "";
@@ -216,7 +216,12 @@ export async function POST(req) {
   // ⚠ guarda id, nome do arquivo, NOME DE EXIBIÇÃO e pasta. O nome de exibição é o que o cliente
   // lê; o nome do arquivo fica para quem for procurá-lo no servidor depois — os dois precisam
   // conviver, senão ninguém acha o original quando o cliente pergunta sobre "Projeto de montagem".
-  const limpo = docs.slice(0, 300)
+  // ⚠⚠ O TETO É POR OBRA INTEIRA, e 300 era pouco. Vitor (03/09/2026): "só consigo colocar 300
+  // arquivos de uma vez, preciso colocar muito mais". A OP-118 tem pasta de fabricação com mais de
+  // 500 desenhos, e o corte silencioso era o pior dos mundos: a pessoa marcava tudo, salvava, e o
+  // que passou de 300 simplesmente não estava lá. Agora vão 3.000 — o que limita de verdade é o
+  // tamanho do JSON no registro, e nesse porte ele ainda é pequeno (3.000 × ~200 B ≈ 600 KB).
+  const limpo = docs.slice(0, 3000)
     .filter((d) => d?.id && d?.nome)
     .map((d) => ({
       id: String(d.id), nome: so(d.nome).slice(0, 200),

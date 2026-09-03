@@ -720,6 +720,14 @@ function DocumentosDaArea({ grupos, token, cod }) {
   const [sel, setSel] = useState(() => new Set());
   const [baixando, setBaixando] = useState(false);
   const [erro, setErro] = useState("");
+  // ⚠ nasce vazio = todas as pastas fechadas. Quem quer o índice vê o índice; quem quer os arquivos
+  // abre a pasta — e quem quer a pasta inteira nem precisa abrir, o botão de baixar está na faixa.
+  const [pastasAbertas, setPastasAbertas] = useState(() => new Set());
+  const abrirPasta = (nome) => setPastasAbertas((p) => {
+    const n = new Set(p);
+    if (n.has(nome)) n.delete(nome); else n.add(nome);
+    return n;
+  });
 
   const todos = grupos.flatMap((g) => g.itens);
   const marcar = (id, on) => setSel((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n; });
@@ -811,12 +819,21 @@ function DocumentosDaArea({ grupos, token, cod }) {
                   {g.subpastas.map((p) => {
                     const naPasta = p.itens.filter((d) => sel.has(d.id)).length;
                     const todosNaPasta = naPasta === p.itens.length;
+                    // ⚠⚠ PASTA NASCE FECHADA. Vitor (03/09/2026): "tem como deixar as pastas
+                    // minimizadas no portal da engenharia? pois elas aparecem abertas e fica muito
+                    // extensas". Numa obra com seis pastas de 200 desenhos, a página aberta é uma
+                    // rolagem de mil linhas antes de chegar na seção seguinte — o cliente perde a
+                    // noção do que existe. Fechada, ele vê o índice; abre a que interessa.
+                    const aberta = pastasAbertas.has(p.nome);
                     return (
                       <div key={p.nome} className="border border-gray-100 rounded-lg overflow-hidden">
                         <div className="flex items-center gap-2 flex-wrap bg-gray-50 border-b border-gray-100 px-3 py-1.5">
-                          <FolderOpen size={13} className="text-[#006EAB] shrink-0" />
-                          <span className="text-[12.5px] font-semibold truncate">{p.nome}</span>
-                          <span className="text-[11px] text-gray-400">{p.itens.length} arquivo{p.itens.length > 1 ? "s" : ""}{p.tamanho ? ` · ${fmtMB(p.tamanho)}` : ""}</span>
+                          <button onClick={() => abrirPasta(p.nome)} className="flex items-center gap-2 min-w-0 flex-1 text-left">
+                            {aberta ? <ChevronDown size={13} className="text-[#006EAB] shrink-0" /> : <ChevronRight size={13} className="text-[#006EAB] shrink-0" />}
+                            <FolderOpen size={13} className="text-[#006EAB] shrink-0" />
+                            <span className="text-[12.5px] font-semibold truncate">{p.nome}</span>
+                          </button>
+                          <span className="text-[11px] text-gray-400 shrink-0">{p.itens.length} arquivo{p.itens.length > 1 ? "s" : ""}{p.tamanho ? ` · ${fmtMB(p.tamanho)}` : ""}</span>
                           <button onClick={() => marcarGrupo(p, !todosNaPasta)}
                             className="ml-auto text-[11px] text-gray-500 hover:text-[#006EAB] hover:underline">
                             {todosNaPasta ? "desmarcar" : "selecionar"}
@@ -826,7 +843,7 @@ function DocumentosDaArea({ grupos, token, cod }) {
                             <Download size={11} /> baixar a pasta
                           </button>
                         </div>
-                        <div className="grid sm:grid-cols-2 gap-1.5 p-2">
+                        <div className={`grid sm:grid-cols-2 gap-1.5 p-2 ${aberta ? "" : "hidden"}`}>
                           {p.itens.map((doc) => {
                             const on = sel.has(doc.id);
                             return (

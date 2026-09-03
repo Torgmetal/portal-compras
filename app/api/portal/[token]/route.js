@@ -38,6 +38,19 @@ const fmt = (d) => (d ? new Date(d).toISOString().slice(0, 10) : null);
 //
 // ⚠ NOME É O ÚLTIMO SEGMENTO, não o caminho. O cliente não tem nada com
 // "2. Engenharia/2.5 Projetos/2.5.4 …" — ele quer ler "Eixo 10", que é como a Engenharia batizou.
+// ⚠⚠ O PDF AO LADO DO SEU DWG. Vitor (03/09/2026): "deixe sempre em ordem o número do projeto; o
+// que tem pdf tem que ficar junto com o projeto dele em DWG para não ficar bagunçado". Ordenar pelo
+// nome cru separa os dois: todos os .dwg de um lado e todos os .pdf do outro, porque a extensão
+// entra na comparação. Ordenando pelo nome SEM extensão, o par do mesmo desenho encosta — e a
+// comparação numérica põe o T118-10 depois do T118-9, não antes.
+const semExt = (n) => String(n || "").replace(/\.[a-z0-9]+$/i, "");
+const ext = (n) => (String(n || "").split(".").pop() || "").toLowerCase();
+function ordemDeProjeto(a, b) {
+  const na = semExt(a?.nome), nb = semExt(b?.nome);
+  return na.localeCompare(nb, "pt-BR", { numeric: true, sensitivity: "base" })
+    || ext(a?.nome).localeCompare(ext(b?.nome));
+}
+
 function subpastasDe(docs, item) {
   const porPasta = new Map();
   for (const d of docs) {
@@ -51,7 +64,7 @@ function subpastasDe(docs, item) {
     .sort((a, b) => (a[0] ? 0 : 1) - (b[0] ? 0 : 1) || String(a[0]).localeCompare(String(b[0]), "pt-BR", { numeric: true }))
     .map(([nome, ds]) => ({
       nome: nome || "Sem pasta",
-      itens: ds.map(item),
+      itens: ds.slice().sort(ordemDeProjeto).map(item),
       tamanho: ds.reduce((t, d) => t + (Number(d.tamanho) || 0), 0),
     }));
 }
@@ -430,7 +443,11 @@ export async function GET(req, { params }) {
         const { porTipo } = agruparEngenharia(unicos(lista));
         dados.docsPorArea[ar] = TIPOS_ENGENHARIA
           .filter((t) => (porTipo.get(t.id) || []).length)
-          .map((t) => ({ assunto: t.nome, itens: porTipo.get(t.id).map(item), subpastas: subpastasDe(porTipo.get(t.id), item) }));
+          .map((t) => ({
+            assunto: t.nome,
+            itens: porTipo.get(t.id).slice().sort(ordemDeProjeto).map(item),
+            subpastas: subpastasDe(porTipo.get(t.id), item),
+          }));
         if (!dados.docsPorArea[ar].length) delete dados.docsPorArea[ar];
         continue;
       }
@@ -439,10 +456,14 @@ export async function GET(req, { params }) {
       for (const d of unicos(lista)) {
         const k = d.pasta || "Documentos";
         const g = porPasta.get(k) || { assunto: k, itens: [] };
-        g.itens.push(item(d));
+        g.crus = g.crus || [];
+        g.crus.push(d);
         porPasta.set(k, g);
       }
-      dados.docsPorArea[ar] = [...porPasta.values()];
+      dados.docsPorArea[ar] = [...porPasta.values()].map((g) => ({
+        assunto: g.assunto,
+        itens: (g.crus || []).slice().sort(ordemDeProjeto).map(item),
+      }));
     }
     dados.engenharia = dados.docsPorArea.ENGENHARIA || null;
   }
