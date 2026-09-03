@@ -18,6 +18,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Printer, ChevronLeft, ChevronRight } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
+import ProntoParaMontar from "./ProntoParaMontar";
 
 const SETORES = [
   { key: "PREPARACAO", nome: "Preparação" },
@@ -35,10 +36,27 @@ const fmtDia = (d) => {
 const somaKg = (a) => a.reduce((s, x) => s + (x.kg || 0), 0);
 
 export default function DescerDesenhos({ onDescer, ocupado }) {
+  // ⚠⚠ DUAS ABAS, o desenho que o Vitor aprovou (03/09/2026): "uma abinha logo ao lado (…) onde
+  // iria mostrar o que temos de conjuntos disponíveis para montar". São dois momentos do dia —
+  // programar a bancada (o que a preparação terminou) e soltar o desenho (o que está programado) —
+  // e ele pediu os dois no mesmo lugar, não em telas separadas.
+  const [aba, setAba] = useState("DESCER");
+  const [nProntos, setNProntos] = useState(null);
   const [setor, setSetor] = useState("PREPARACAO");
   const [dia, setDia] = useState(hojeIso);
   const [d, setD] = useState(null);
   const [recarga, setRecarga] = useState(0);
+
+  // ⚠ só a CONTAGEM, para o número da aba existir antes de alguém clicar nela — quem não abre a
+  // aba precisa saber que há trabalho ali.
+  useEffect(() => {
+    let vivo = true;
+    fetch("/api/pcp/prontos-montar", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => vivo && setNProntos((j?.conjuntos || []).length))
+      .catch(() => vivo && setNProntos(0));
+    return () => { vivo = false; };
+  }, [recarga]);
 
   useEffect(() => {
     let vivo = true;
@@ -73,6 +91,26 @@ export default function DescerDesenhos({ onDescer, ocupado }) {
 
   return (
     <div className="bg-white rounded-xl border border-torg-blue-100 overflow-hidden mb-4">
+      <div className="flex items-end gap-1 px-4 pt-2 border-b border-gray-100 bg-gray-50/60">
+        {[
+          { k: "DESCER", rot: "Falta descer", n: null },
+          { k: "MONTAR", rot: "Pronto para montar", n: nProntos },
+        ].map((t) => (
+          <button key={t.k} onClick={() => setAba(t.k)}
+            className={`text-[12.5px] px-3 py-2 -mb-px border-b-2 inline-flex items-center gap-1.5 ${
+              aba === t.k ? "border-torg-blue text-torg-blue font-semibold" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
+            {t.rot}
+            {t.n > 0 && (
+              <span className={`text-[10.5px] rounded-full px-1.5 py-0.5 ${aba === t.k ? "bg-torg-blue text-white" : "bg-gray-200 text-torg-gray"}`}>{t.n}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {aba === "MONTAR" ? (
+        <ProntoParaMontar onProgramado={() => setRecarga((v) => v + 1)} />
+      ) : (
+      <>
       <div className="flex items-center gap-2 flex-wrap px-4 py-2.5 border-b border-gray-100 bg-gray-50/60">
         <div className="flex items-center gap-1">
           <button onClick={() => anterior && setDia(anterior)} disabled={!anterior}
@@ -186,6 +224,8 @@ export default function DescerDesenhos({ onDescer, ocupado }) {
             </div>
           )}
         </>
+      )}
+      </>
       )}
     </div>
   );
