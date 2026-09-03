@@ -98,6 +98,18 @@ export default function ModeloClient({ ops }) {
     };
   }, [selecionados, indice]);
 
+  // ⚠⚠ MODELO SEM NUMERAÇÃO PRECISA AVISAR, e não fingir que está tudo certo. Quando o IFC sai do
+  // Tekla antes de rodar a Numeração, a marca vem como "V0(?)" — prefixo, zero e a interrogação que
+  // é o próprio Tekla dizendo "esta posição não está atribuída". Aconteceu no executivo da OP-089
+  // (SEAZ10, 03/06): 148 conjuntos, nenhuma marca. Sem marca o clique não tem como puxar R, croqui
+  // nem setor — e quem abre a tela precisa saber disso ANTES de concluir que o portal está cego.
+  const semNumeracao = useMemo(() => {
+    const conj = (indice || []).filter((x) => !x.parafuso);
+    if (conj.length < 5) return null;
+    const com = conj.filter((x) => x.marca).length;
+    return com / conj.length < 0.2 ? { total: conj.length, com } : null;
+  }, [indice]);
+
   const alternar = (setar, valor) => setar((antes) => {
     const novo = new Set(antes);
     if (novo.has(valor)) novo.delete(valor); else novo.add(valor);
@@ -233,6 +245,17 @@ export default function ModeloClient({ ops }) {
             className="ml-auto text-[11.5px] text-white/60 hover:text-white">fechar a peça</button>
         )}
       </div>
+
+      {semNumeracao && (
+        <div className="shrink-0 px-3 py-1.5 bg-amber-50 border-b border-amber-200 text-[11.5px] text-amber-900 flex items-start gap-2">
+          <AlertCircle size={13} className="mt-0.5 shrink-0" />
+          <span>
+            <b>Modelo sem numeração do Tekla</b> — {semNumeracao.com} de {semNumeracao.total} conjuntos têm marca.
+            Dá para navegar, medir e filtrar, mas o clique não puxa R, croqui nem setor: a marca é a chave.
+            {lista?.modelos?.length > 1 && " Veja se outro modelo desta obra já saiu numerado."}
+          </span>
+        </div>
+      )}
 
       {/* corpo: cena + painéis, ocupando tudo o que sobra */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row bg-white">
