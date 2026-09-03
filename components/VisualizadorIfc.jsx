@@ -27,11 +27,13 @@ const COR_SEL = 0xf4801f;
 
 /**
  * @param {string} url      de onde baixar o IFC (rota do portal)
- * @param {(marca:string|null)=>void} onSelecionar  chamado com a marca do conjunto clicado
+ * @param {(item:object|null)=>void} onSelecionar  o item do índice clicado (conjunto ou parafuso)
+ * @param {(dados:{indice:object[],niveis:object[]})=>void} [onIndice]  o que o modelo tem dentro
+ * @param {Set<string>|null} [visiveis]    chaves em foco; o resto fica translúcido (null = tudo)
  * @param {Record<string,string>} [cores]  marca → cor hex ("#0E7A5F"), para pintar por andamento
- * @param {string|null} [selecionada]      marca destacada de fora (a lista, por exemplo)
+ * @param {string|null} [selecionada]      chave destacada de fora (a lista, por exemplo)
  */
-export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada, altura = 520, modo = "modelo" }) {
+export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis, cores, selecionada, altura = 520, modo = "modelo" }) {
   const box = useRef(null);
   const ref = useRef({});             // guarda three/api entre renders sem provocar re-render
   const [estado, setEstado] = useState({ fase: "carregando", pct: 0 });
@@ -45,36 +47,144 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
   const [cheia, setCheia] = useState(false);
   const caixa = useRef(null);
 
-  // ⚠⚠ A CADEIA expressID → MARCA, montada UMA VEZ ao abrir o modelo.
-  // Um IFCELEMENTASSEMBLY agrega suas peças por IFCRELAGGREGATES; a marca fica no campo Tag do
-  // assembly (medido no export do Tekla 2025 da OP-089: 246 das 250 marcas casaram com a LPC).
-  // Fazer essa subida a cada clique custaria uma varredura por clique — e o clique tem de ser
-  // instantâneo, senão a tela parece travada.
-  const montarMapa = (api, modelID) => {
-    const marcaDe = new Map();        // expressID da peça → marca do conjunto
-    const marcaDoAsm = new Map();     // expressID do assembly → marca
+  // ⚠⚠ O QUE SE LÊ DO MODELO, TUDO NUMA PASSADA SÓ. São quatro perguntas diferentes e uma
+  // varredura só do arquivo — refazer isso a cada clique travaria a tela:
+  //   1. a MARCA do conjunto (Tag do IFCELEMENTASSEMBLY, via IFCRELAGGREGATES)
+  //   2. o TIPO da peça (viga, chapa, parafuso… pelo tipo da entidade IFC)
+  //   3. o NÍVEL (pset "Tekla Common" → "Bottom elevation", ex.: ' +4.382')
+  //   4. o PARAFUSO inteiro (pset "Tekla Bolt": nome, norma, bitola, comprimento, porca, arruela
+  //      e se aperta na obra ou na fábrica)
+  // Medido no export do Tekla 2025 da OP-089: 148 conjuntos, 197 parafusos, 680 peças com nível.
+  const PSETS = new Set(["Tekla Common", "Tekla Bolt", "Tekla Assembly"]);
+
+  const lerModelo = (api, modelID, WebIFC) => {
+    const val = (v) => (v && typeof v === "object" && "value" in v ? v.value : v);
+    const marcaDe = new Map(), tipoDe = new Map(), nivelDe = new Map(), parafusoDe = new Map();
+    // ⚠⚠ O CONJUNTO É O ASSEMBLY, NÃO A MARCA. Parecem a mesma coisa e não são: a mesma marca se
+    // repete pela obra (e há modelo em que o Tekla exporta a marca vazia — no executivo da OP-089
+    // TODOS os assemblies saíram como "V0"). Agrupando por marca, 148 conjuntos viraram 21 blocos,
+    // cada clique acendia meia obra e o nível saía do primeiro pedaço que aparecesse.
+    const asmDe = new Map();          // peça → expressID do conjunto
+    const pesoDoAsm = new Map();      // conjunto → kg do modelo
+    let total = 0;
+
     try {
-      const asms = api.GetLineIDsWithType(modelID, 4123344466 /* IFCELEMENTASSEMBLY */);
+      // ── 1. marca ──
+      const marcaDoAsm = new Map();
+      const asms = api.GetLineIDsWithType(modelID, WebIFC.IFCELEMENTASSEMBLY);
       for (let i = 0; i < asms.size(); i++) {
         const id = asms.get(i);
-        const l = api.GetLine(modelID, id);
-        const tag = l?.Tag?.value;
-        if (tag) marcaDoAsm.set(id, String(tag).replace(/\(\?\)/g, "").trim());
+        const tag = String(val(api.GetLine(modelID, id)?.Tag) || "").replace(/\(\?\)/g, "").trim();
+        // ⚠⚠ MARCA VAZIA NÃO É MARCA. Quando a numeração ainda não rodou, o Tekla exporta a Tag como
+        // "V0(?)", "S0(?)" ou "0(?)" — foi o caso do executivo da OP-089, com os 148 conjuntos
+        // saindo como "V0". Tratar isso como marca faria a lista virar 98 linhas iguais e o portal
+        // ir buscar na LPC uma marca que não existe. Marca de verdade tem número diferente de zero.
+        if (tag && !/^[A-Za-z]*0*$/.test(tag)) marcaDoAsm.set(id, tag);
       }
-      const rels = api.GetLineIDsWithType(modelID, 160246688 /* IFCRELAGGREGATES */);
+      total = marcaDoAsm.size;
+      const rels = api.GetLineIDsWithType(modelID, WebIFC.IFCRELAGGREGATES);
       for (let i = 0; i < rels.size(); i++) {
         const l = api.GetLine(modelID, rels.get(i));
-        const pai = l?.RelatingObject?.value;
-        const marca = marcaDoAsm.get(pai);
+        const marca = marcaDoAsm.get(l?.RelatingObject?.value);
         if (!marca) continue;
-        for (const f of l?.RelatedObjects || []) if (f?.value != null) marcaDe.set(f.value, marca);
+        const asm = l.RelatingObject.value;
+        for (const f of l?.RelatedObjects || []) {
+          if (f?.value == null) continue;
+          marcaDe.set(f.value, marca); asmDe.set(f.value, asm);
+        }
       }
-      // o próprio assembly também responde, para o caso de o mesh vir no nível dele
-      for (const [id, m] of marcaDoAsm) marcaDe.set(id, m);
+      for (const [id, m] of marcaDoAsm) { marcaDe.set(id, m); asmDe.set(id, id); }
+
+      // ── 2. tipo ──
+      for (const [tipoIfc, rotulo] of [
+        [WebIFC.IFCBEAM, "Viga"], [WebIFC.IFCCOLUMN, "Pilar"], [WebIFC.IFCPLATE, "Chapa"],
+        [WebIFC.IFCMEMBER, "Barra"], [WebIFC.IFCSLAB, "Piso"], [WebIFC.IFCRAILING, "Guarda-corpo"],
+        [WebIFC.IFCSTAIRFLIGHT, "Escada"], [WebIFC.IFCMECHANICALFASTENER, "Parafuso"],
+        [WebIFC.IFCBUILDINGELEMENTPROXY, "Outros"],
+      ]) {
+        if (!tipoIfc) continue;
+        const ids = api.GetLineIDsWithType(modelID, tipoIfc);
+        for (let i = 0; i < ids.size(); i++) tipoDe.set(ids.get(i), rotulo);
+      }
+
+      // ── 3 e 4. os property sets do Tekla ──
+      // ⚠ `true` no GetLine traz as propriedades já embutidas: uma chamada por conjunto de
+      // propriedades em vez de uma por propriedade (aqui, 3.213 em vez de ~11.000).
+      const conteudo = new Map();
+      const psets = api.GetLineIDsWithType(modelID, WebIFC.IFCPROPERTYSET);
+      for (let i = 0; i < psets.size(); i++) {
+        const id = psets.get(i);
+        const l = api.GetLine(modelID, id, true);
+        const nome = val(l?.Name);
+        if (!PSETS.has(nome)) continue;
+        const p = {};
+        for (const h of l?.HasProperties || []) {
+          const k = val(h?.Name);
+          if (k) p[k] = val(h?.NominalValue);
+        }
+        conteudo.set(id, { nome, p });
+      }
+      const liga = api.GetLineIDsWithType(modelID, WebIFC.IFCRELDEFINESBYPROPERTIES);
+      const num = (x) => { const n = parseFloat(String(x ?? "").replace(",", ".")); return Number.isFinite(n) ? n : null; };
+      for (let i = 0; i < liga.size(); i++) {
+        const l = api.GetLine(modelID, liga.get(i));
+        const ps = conteudo.get(l?.RelatingPropertyDefinition?.value);
+        if (!ps) continue;
+        for (const o of l?.RelatedObjects || []) {
+          const id = o?.value;
+          if (id == null) continue;
+          if (ps.nome === "Tekla Common") {
+            const b = num(ps.p["Bottom elevation"]);
+            if (b != null) nivelDe.set(id, b);
+          } else if (ps.nome === "Tekla Bolt") {
+            parafusoDe.set(id, {
+              nome: String(ps.p["Bolt Name"] || "").trim() || "parafuso",
+              norma: String(ps.p["Bolt standard"] || "").trim(),
+              bitolaMm: num(ps.p["Bolt size"]),
+              compMm: num(ps.p["Bolt length"]),
+              furoMm: num(ps.p["Bolt hole diameter"]),
+              porca: String(ps.p["Nut name"] || "").trim(),
+              porcaTipo: String(ps.p["Nut type"] || "").trim(),
+              arruela: String(ps.p["Washer name"] || "").trim(),
+              arruelaTipo: String(ps.p["Washer type"] || "").trim(),
+              // ⚠ "Location" no Tekla é ONDE O PARAFUSO APERTA: 'Obra' é montagem no campo,
+              // 'Oficina'/'Workshop' é fábrica. É a informação que mais muda a vida de quem
+              // separa material — e é por isso que ela entra na chave do agrupamento.
+              local: String(ps.p["Location"] || "").trim(),
+            });
+          } else if (ps.nome === "Tekla Assembly") {
+            // ⚠⚠ SÓ NO PRÓPRIO CONJUNTO. O Tekla amarra o pset "Tekla Assembly" a TODAS as peças do
+            // conjunto, não só ao conjunto — somar por peça multiplicava o peso pelo número de
+            // peças: a passarela da OP-089, de 1,5 t, aparecia com 186 t.
+            const kg = num(ps.p["Assembly/Cast unit weight"]);
+            if (kg != null && marcaDoAsm.has(id)) pesoDoAsm.set(id, kg);
+          }
+        }
+      }
     } catch (e) {
-      console.error("[ifc] falha ao montar o mapa de marcas:", e?.message);
+      console.error("[ifc] falha ao ler o modelo:", e?.message);
     }
-    return { marcaDe, total: marcaDoAsm.size };
+    return { marcaDe, asmDe, tipoDe, nivelDe, parafusoDe, pesoDoAsm, total };
+  };
+
+  // ⚠⚠ NÍVEL SAI DE AGRUPAMENTO, NÃO DE CAMPO PRONTO. O IFC do Tekla traz UM andar só
+  // (IFCBUILDINGSTOREY = 1 na OP-089) — o que existe de verdade é a cota de base de cada peça, e
+  // ela vem contínua: 125 valores distintos, de +0,05 a +4,76. Quem pergunta "que peças formam
+  // aquele nível" está falando de patamar, não de milímetro: agrupo por vão de 70 cm, que é o que
+  // separa piso de piso sem picar o mesmo estrado em cinco níveis.
+  const agruparNiveis = (cotas) => {
+    const ord = [...new Set(cotas.filter((x) => x != null))].sort((a, b) => a - b);
+    const faixas = [];
+    for (const c of ord) {
+      const ult = faixas[faixas.length - 1];
+      if (ult && c - ult.min <= 0.7) ult.max = c;
+      else faixas.push({ min: c, max: c });
+    }
+    return faixas.map((f, i) => ({
+      chave: `n${i}`,
+      rotulo: `Nível ${f.min >= 0 ? "+" : ""}${f.min.toFixed(2).replace(".", ",")} m`,
+      min: f.min, max: f.max,
+    }));
   };
 
   useEffect(() => {
@@ -103,7 +213,7 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         api.SetWasmPath("/wasm/", true);
         await api.Init();
         const modelID = api.OpenModel(bytes, { COORDINATE_TO_ORIGIN: true });
-        const { marcaDe, total } = montarMapa(api, modelID);
+        const { marcaDe, asmDe, tipoDe, nivelDe, parafusoDe, pesoDoAsm, total } = lerModelo(api, modelID, WebIFC);
 
         // ── cena ──
         const el = box.current;
@@ -145,10 +255,21 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         // ⚠ Agrupa por MARCA + COR: um conjunto tem peças de cores diferentes (a treliça amarela
         // com a chapa de ligação azul), e juntar tudo numa malha só apagaria isso. O clique continua
         // devolvendo a marca — quem responde é o `userData`, não a malha.
-        const porChave = new Map();    // "marca|cor" → { marca, cor, gs: [] }
+        //
+        // ⚠⚠ PARAFUSO É GRUPO À PARTE, e por especificação. Um parafuso não tem marca (não é peça
+        // fabricada, é item comprado), então cairia todo no balaio "sem marca" e o clique não
+        // saberia dizer qual é. Agrupando por especificação — nome, norma e onde aperta — o clique
+        // responde "1/2\" x 1 1/2\" A325N, aperta na obra, são 37 nesta obra", que é a pergunta
+        // real de quem está olhando a ligação.
+        const porChave = new Map();    // chave → { marca, hex, tipo, parafuso, gs, ids, cotas }
         let n = 0;
         api.StreamAllMeshes(modelID, (mesh) => {
-          const marca = marcaDe.get(mesh.expressID) || null;
+          const eid = mesh.expressID;
+          const marca = marcaDe.get(eid) || null;
+          const asm = asmDe.get(eid) ?? null;
+          const parafuso = parafusoDe.get(eid) || null;
+          const tipo = tipoDe.get(eid) || (parafuso ? "Parafuso" : "Peça");
+          const cota = nivelDe.get(eid) ?? null;
           const g = mesh.geometries;
           for (let i = 0; i < g.size(); i++) {
             const p = g.get(i);
@@ -171,9 +292,18 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
             bg.setIndex(new THREE.BufferAttribute(new Uint32Array(ix), 1));
             bg.applyMatrix4(new THREE.Matrix4().fromArray(p.flatTransformation));
             geo.delete();
-            const chave = `${marca || "__sem_marca__"}|${hex}`;
-            const grupo = porChave.get(chave) || porChave.set(chave, { marca, hex, gs: [] }).get(chave);
+            // ⚠ o ITEM é o que a pessoa seleciona (um conjunto, ou um parafuso por especificação);
+            // a CHAVE é a malha, que ainda separa por cor dentro do mesmo conjunto — é o que
+            // preserva a treliça amarela com a chapa de ligação azul.
+            const item = parafuso
+              ? `pf|${parafuso.nome}|${parafuso.norma}|${parafuso.local}`
+              : asm != null ? `a${asm}` : "solto";
+            const chave = `${item}|${hex}`;
+            const grupo = porChave.get(chave)
+              || porChave.set(chave, { item, marca, hex, tipo, parafuso, asm, gs: [], ids: new Set(), cotas: [] }).get(chave);
             grupo.gs.push(bg);
+            grupo.ids.add(eid);
+            if (cota != null) grupo.cotas.push(cota);
             n++;
           }
         });
@@ -183,7 +313,8 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         const { mergeGeometries } = await import("three/examples/jsm/utils/BufferGeometryUtils.js");
         const malhas = new Map();     // chave → mesh
         const arestasCruas = [];
-        for (const [chave, { marca, hex, gs }] of porChave) {
+        const porItem = new Map();
+        for (const [chave, { item, marca, hex, tipo, parafuso, asm, gs, ids, cotas }] of porChave) {
           const junta = gs.length === 1 ? gs[0] : mergeGeometries(gs, false);
           if (!junta) continue;
           // ⚠ no modo "andamento" a cor do estado substitui a do modelo; no modo "modelo" vale o IFC
@@ -197,9 +328,28 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
           // inteira ficou pesada. O que faltava era só declarar o espaço de saída do renderizador.
           const mat = new THREE.MeshPhongMaterial({ color: cor, shininess: 14, specular: 0x1e2833, side: THREE.DoubleSide, flatShading: false });
           const m = new THREE.Mesh(junta, mat);
-          m.userData.marca = marca || null;
+          // ⚠⚠ PARAFUSO NÃO HERDA A MARCA DO CONJUNTO. Ele está dentro do assembly, então o mapa de
+          // marcas responde "V0" para ele também — e aí a lista mostrava marca no lugar da bitola, o
+          // peso do conjunto entrava como peso de parafuso (792 kg de parafuso!) e a cor de
+          // andamento pintava o parafuso com o status da peça soldada.
+          m.userData.marca = parafuso ? null : marca || null;
           m.userData.hex = hex;
+          m.userData.chave = chave;
+          m.userData.item = item;
           cena.add(m); malhas.set(chave, m);
+
+          const reg = porItem.get(item) || porItem.set(item, {
+            id: item, marca: parafuso ? null : marca || null, tipo, parafuso,
+            // ⚠ a cota do conjunto é a MENOR das peças dele: ele pertence ao nível em que apoia,
+            // não ao ponto mais alto que alcança — senão um pilar que sobe do térreo ao mezanino
+            // seria contado como peça do mezanino.
+            // ⚠ conta de peça é por CONJUNTO de ids, não soma: a mesma peça aparece em duas
+            // malhas quando tem duas cores, e somar contaria em dobro (197 parafusos viravam 374).
+            cota: null, ids: new Set(),
+            pesoKg: !parafuso && asm != null ? (pesoDoAsm.get(asm) ?? null) : null,
+          }).get(item);
+          for (const i2 of ids) reg.ids.add(i2);
+          for (const c of cotas) reg.cota = reg.cota == null ? c : Math.min(reg.cota, c);
 
           // ⚠⚠ AS ARESTAS SÃO O QUE SEPARA UMA PEÇA DA VIZINHA. Limiar de 25°: abaixo disso a
           // aresta é curvatura de tubo e desenhá-la encheria a tela de risco.
@@ -222,6 +372,17 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
           arestasCruas.forEach((g2) => { if (g2 !== juntas) g2.dispose(); });
         }
         api.CloseModel(modelID);
+
+        // ── níveis ──
+        // ⚠ fecha a conta NO PRÓPRIO objeto: o clique devolve o item que está no `porItem`, e uma
+        // cópia aqui faria o painel receber um item sem `pecas` e sem `nivel`.
+        const indice = [...porItem.values()];
+        for (const x of indice) { x.pecas = x.ids.size; delete x.ids; }
+        const niveis = agruparNiveis(indice.map((x) => x.cota));
+        for (const it of indice) {
+          it.nivel = it.cota == null ? null
+            : (niveis.find((f) => it.cota >= f.min && it.cota <= f.max) || niveis[0])?.chave || null;
+        }
 
         // ── enquadra ──
         // ⚠ ENQUADRA PELA ESFERA QUE ENVOLVE A OBRA, não por um múltiplo do tamanho: a distância
@@ -307,8 +468,8 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         };
         // ⚠ enquadrar NA SELEÇÃO: é o gesto mais pedido num modelo grande — achar a peça que a
         // lista apontou sem caçar com o mouse.
-        const focar = (marcaAlvo) => {
-          const alvos = [...malhas.values()].filter((m) => m.userData.marca === marcaAlvo);
+        const focar = (itemAlvo) => {
+          const alvos = [...malhas.values()].filter((m) => m.userData.item === itemAlvo);
           if (!alvos.length) return;
           const cx3 = new THREE.Box3();
           for (const m of alvos) cx3.expandByObject(m);
@@ -347,8 +508,12 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
           pt.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
           pt.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
           ray.setFromCamera(pt, cam);
-          const hit = ray.intersectObjects([...malhas.values()], false)[0];
-          onSelecionar?.(hit?.object?.userData?.marca || null);
+          // ⚠ o que está apagado pelo filtro não recebe clique: senão a peça de trás, que a pessoa
+          // acabou de tirar da vista, roubaria a seleção da que ela está olhando.
+          const alvos = [...malhas.values()].filter((m) => !m.userData.foraDoFiltro);
+          const hit = ray.intersectObjects(alvos, false)[0];
+          const item = hit?.object?.userData?.item || null;
+          onSelecionar?.(item ? porItem.get(item) || null : null);
         };
         rend.domElement.addEventListener("pointerdown", down);
         rend.domElement.addEventListener("pointermove", move);
@@ -368,9 +533,10 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
         ctrl.addEventListener("change", pedirQuadro);
         anima();
 
-        ref.current = { THREE, cena, malhas, rend, cam, ctrl, irPara, zoom, focar, centro, pedirQuadro };
+        ref.current = { THREE, cena, malhas, arestas: malhaArestas, indice, rend, cam, ctrl, irPara, zoom, focar, centro, pedirQuadro };
         setPronto(true);
         setInfo({ conjuntos: total, malhas: malhas.size, geometrias: n });
+        onIndice?.({ indice, niveis });
         setEstado({ fase: "pronto" });
 
         limpar = () => {
@@ -395,18 +561,34 @@ export default function VisualizadorIfc({ url, onSelecionar, cores, selecionada,
     return () => { vivo = false; limpar(); };
   }, [url]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ⚠ destaque vindo de fora (clique na lista) — sem remontar a cena
+  // ⚠⚠ COR, DESTAQUE E FILTRO NUM EFEITO SÓ. São três coisas que mexem na mesma propriedade do
+  // material; separadas em efeitos diferentes, a ordem em que o React os roda decide quem ganha —
+  // e o sintoma seria a peça filtrada voltar a acender sozinha ao trocar o modo de cor.
+  //
+  // ⚠ O QUE SAI DO FILTRO FICA TRANSLÚCIDO, NÃO SOME. Vitor (03/09/2026): "consigo deixar opaco as
+  // outras peças (…) como se fosse uma vista da área selecionada". Sumir com o resto tira a
+  // referência: a pessoa perde a noção de onde aquele nível fica dentro da obra. A 7% de opacidade
+  // o contorno da obra continua legível e o nível escolhido salta.
   useEffect(() => {
-    const { THREE, malhas } = ref.current || {};
+    const { THREE, malhas, arestas } = ref.current || {};
     if (!THREE || !malhas) return;
     for (const [, m] of malhas) {
-      const marca = m.userData.marca;
-      const doEstado = cores?.[marca];
+      const fora = !!visiveis && !visiveis.has(m.userData.item);
+      const doEstado = cores?.[m.userData.marca];
       const base = modo === "andamento" && doEstado ? doEstado : m.userData.hex;
-      m.material.color.set(marca && marca === selecionada ? COR_SEL : base);
+      m.userData.foraDoFiltro = fora;
+      m.material.color.set(fora ? 0xc3ccd6 : m.userData.item === selecionada ? COR_SEL : base);
+      m.material.transparent = fora;
+      m.material.opacity = fora ? 0.07 : 1;
+      // ⚠ sem isto a peça apagada continua escondendo quem está atrás dela: o buffer de
+      // profundidade não sabe de transparência.
+      m.material.depthWrite = !fora;
     }
+    // ⚠ a obra inteira tem UMA malha de arestas (é o que segura o quadro); com filtro ligado ela
+    // não tem como apagar só a parte de fora, então enfraquece junto.
+    if (arestas) arestas.material.opacity = visiveis ? 0.1 : 0.38;
     ref.current.pedirQuadro?.();
-  }, [selecionada, cores, modo]);
+  }, [selecionada, cores, modo, visiveis]);
 
   useEffect(() => {
     const ouvir = () => setCheia(!!document.fullscreenElement);
