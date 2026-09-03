@@ -1,20 +1,23 @@
-// GET /api/pcp/descer?setor=PREPARACAO|MONTAGEM
-//   → o que ainda NÃO desceu para o setor, na fábrica inteira, e o que trava cada um.
+// GET /api/pcp/descer?setor=PREPARACAO|MONTAGEM&dia=YYYY-MM-DD
+//   → o que está PROGRAMADO para aquele dia, e o que dá para descer de fato.
 //
-// Vitor (03/09/2026), sobre a Larissa: "a tela é no PCP, mas a questão é que ela está perdida para
-// conseguir descer os desenhos para os setores".
+// Vitor (03/09/2026), sobre a Larissa: "ela está perdida para conseguir descer os desenhos para os
+// setores" — e, sobre a primeira versão desta rota: "não ficou nada bom, ficou pior do que antes;
+// eu não faço nem ideia de como está a programação".
 //
-// ⚠⚠ A TELA NÃO PODE ESPERAR QUE ELA SAIBA O QUE PROCURAR. Hoje o botão "Imprimir e liberar" só
-// nasce depois de marcar linha numa tabela de centenas — quem abre o PCP não vê caminho nenhum,
-// só um texto cinza dizendo "marque peças". Esta rota responde a pergunta do dia antes de qualquer
-// clique: quantos faltam descer, quais dão para descer agora, e por que os outros não dão.
+// ⚠⚠ O DIA É O ASSUNTO, NÃO O ESTOQUE. A primeira versão listava tudo que faltava descer, por obra,
+// sem dia nenhum: virou um inventário de 1.195 itens que não responde "o que é para hoje". Quem
+// abre o PCP de manhã tem UMA pergunta — o que está programado para hoje e o que dá para soltar —
+// e é essa que a rota responde.
 //
-// ⚠ POR SETOR, NÃO POR OBRA. Mesma escolha do painel de carga (Vitor: "não precisa ser apenas de
-// uma OP, mostre tudo que foi para aquele dia"): quem trabalha o dia da preparação atende a fábrica
-// inteira, e obrigar a abrir obra por obra para descobrir onde há trabalho é o que faz perder.
+// ⚠ DE ONDE VEM A PROGRAMAÇÃO, por setor (não é a mesma coisa):
+//   PREPARAÇÃO → a data do LOTE liberado (`LiberacaoProducao.dataProgramada`), que é como o
+//                Planejamento programa o corte.
+//   MONTAGEM   → o dia de CADA conjunto (`PecaConjunto.montagemDiaProgramado`), gravado pela
+//                repartição por bancada.
 //
-// ⚠ NENHUMA REGRA NOVA AQUI. Prontidão vem de `calcularProntidao`, o desenho de `portaoDoDesenho`,
-// a GRD de `GrdLiberacao` — as mesmas fontes que a liberação já cobra. Uma segunda régua faria a
+// ⚠ NENHUMA REGRA NOVA: prontidão vem de `calcularProntidao`, o desenho de `portaoDoDesenho`, o que
+// já desceu da `GrdLiberacao` — as mesmas fontes que a liberação cobra. Uma segunda régua faria a
 // tela dizer "pode" e o POST responder "não pode".
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -29,120 +32,122 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const ROLES = ["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"];
-
-// ⚠ CORTE E PREPARAÇÃO SÃO A MESMA COISA (Vitor, 03/09/2026). O banco grava CORTE; a fábrica fala
-// preparação. Mesmo tratamento do painel de carga.
-const STATUS_DO_SETOR = { PREPARACAO: ["CORTE"], MONTAGEM: ["MONTAGEM"] };
+const iso = (d) => (d ? new Date(d).toISOString().slice(0, 10) : null);
 
 export async function GET(req) {
   try { await requireRole(ROLES); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
-  const setor = String(new URL(req.url).searchParams.get("setor") || "PREPARACAO").toUpperCase();
-  if (!STATUS_DO_SETOR[setor]) return NextResponse.json({ error: "Setor inválido." }, { status: 400 });
+  const url = new URL(req.url);
+  const setor = String(url.searchParams.get("setor") || "PREPARACAO").toUpperCase();
+  if (!["PREPARACAO", "MONTAGEM"].includes(setor)) return NextResponse.json({ error: "Setor inválido." }, { status: 400 });
   const ehMontagem = setor === "MONTAGEM";
+  const dia = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get("dia") || "")
+    ? url.searchParams.get("dia")
+    : new Date().toISOString().slice(0, 10);
 
-  // ── quem é candidato a descer ────────────────────────────────────────────────────────────────
-  //
-  // ⚠ Na montagem, o candidato é o CONJUNTO da LPC (ver CONJUNTO_MONTAVEL — a LE não é produção).
-  // Na preparação, é a peça que está no corte: croqui e avulsa, nunca conjunto — conjunto não se
-  // corta.
-  const where = ehMontagem
-    ? { ...CONJUNTO_MONTAVEL, ...OP_VIVA, status: { in: STATUS_DO_SETOR[setor] } }
-    : {
-        ...SO_FABRICACAO, ...OP_VIVA, status: { in: STATUS_DO_SETOR[setor] },
-        NOT: { tipoPeca: "CONJUNTO" },
-      };
+  // ── quais peças estão programadas para este dia ──────────────────────────────────────────────
+  let pecas = [];
+  // ⚠ os dias QUE TÊM ALGO — a tela usa para as setas andarem só onde há trabalho, em vez de a
+  // pessoa clicar dia a dia num calendário vazio.
+  let diasComAlgo = [];
 
-  const pecas = await prisma.pecaConjunto.findMany({
-    where,
-    select: {
-      id: true, marca: true, descricao: true, qte: true, pesoTotalKg: true, opId: true,
-      perfil: true, statusEstoque: true,
-      op: { select: { id: true, numero: true, cliente: true, obra: true } },
-      ...(ehMontagem
-        ? { conjuntoCroquis: { select: { croqui: { select: { qte: true, qteProduzida: true } } } } }
-        : {}),
-    },
-    take: 6000,
-  });
-  if (!pecas.length) return NextResponse.json({ setor, obras: [], total: { prontos: 0, travados: 0, jaDesceram: 0 } });
+  if (ehMontagem) {
+    // ⚠ CONJUNTO DA LPC (ver CONJUNTO_MONTAVEL — a LE não é produção).
+    const base = { ...CONJUNTO_MONTAVEL, ...OP_VIVA, montagemDiaProgramado: { not: null } };
+    const todos = await prisma.pecaConjunto.findMany({
+      where: base,
+      select: {
+        id: true, marca: true, descricao: true, qte: true, pesoTotalKg: true, opId: true,
+        montagemDiaProgramado: true, montagemBancada: true,
+        op: { select: { numero: true } },
+        conjuntoCroquis: { select: { croqui: { select: { qte: true, qteProduzida: true } } } },
+      },
+      take: 4000,
+    });
+    diasComAlgo = [...new Set(todos.map((p) => iso(p.montagemDiaProgramado)).filter(Boolean))].sort();
+    pecas = todos.filter((p) => iso(p.montagemDiaProgramado) === dia)
+      .map((p) => ({ ...p, bancada: p.montagemBancada || null }));
+  } else {
+    // ⚠ NA PREPARAÇÃO QUEM CARREGA A DATA É O LOTE, não a peça: é assim que o Planejamento programa
+    // o corte (ver /api/planejamento/liberacao).
+    const lotes = await prisma.liberacaoProducao.findMany({
+      where: { status: { in: ["LIBERADA", "EM_PRODUCAO"] } },
+      select: { pecaIds: true, dataProgramada: true, setores: true },
+      take: 4000,
+    });
+    // ⚠ CORTE E PREPARAÇÃO SÃO A MESMA COISA (Vitor, 03/09/2026): o banco grava CORTE, a fábrica
+    // fala preparação.
+    const doSetor = lotes.filter((l) => (Array.isArray(l.setores) ? l.setores : []).some((s) => s === "CORTE" || s === "PREPARACAO"));
+    const diaDaPeca = new Map();
+    for (const l of doSetor) {
+      const d = iso(l.dataProgramada);
+      for (const id of (Array.isArray(l.pecaIds) ? l.pecaIds : [])) if (!diaDaPeca.has(id)) diaDaPeca.set(id, d);
+    }
+    diasComAlgo = [...new Set([...diaDaPeca.values()].filter(Boolean))].sort();
+    const ids = [...diaDaPeca.entries()].filter(([, d]) => d === dia).map(([id]) => id);
+    pecas = ids.length
+      ? await prisma.pecaConjunto.findMany({
+          where: { id: { in: ids }, ...SO_FABRICACAO, NOT: { tipoPeca: "CONJUNTO" } },
+          select: {
+            id: true, marca: true, descricao: true, qte: true, pesoTotalKg: true, opId: true,
+            statusEstoque: true, op: { select: { numero: true } },
+          },
+        })
+      : [];
+  }
+
+  if (!pecas.length) {
+    return NextResponse.json({ setor, dia, diasComAlgo, prontos: [], travados: [], jaDesceram: 0 });
+  }
 
   // ── o que já desceu: a GRD é o registro ──────────────────────────────────────────────────────
-  // ⚠ LIBERAR É IMPRIMIR A GRD (decisão do Vitor): não existe estado "liberado" no banco, o que
-  // prova que a peça desceu é a GRD emitida. Por isso a mesma consulta serve de "já desceu".
+  // ⚠ LIBERAR É IMPRIMIR A GRD (decisão do Vitor): não há estado "liberado" no banco.
   const marcas = [...new Set(pecas.map((p) => String(p.marca || "").trim().toUpperCase()).filter(Boolean))];
-  const grds = marcas.length
-    ? await prisma.grdLiberacao.findMany({ where: { marca: { in: marcas } }, select: { marca: true } })
-    : [];
+  const grds = await prisma.grdLiberacao.findMany({ where: { marca: { in: marcas } }, select: { marca: true } });
   const jaDesceu = new Set(grds.map((g) => String(g.marca || "").trim().toUpperCase()));
 
-  // ── o portão do desenho, uma vez por obra ────────────────────────────────────────────────────
-  const opIds = [...new Set(pecas.map((p) => p.opId).filter(Boolean))];
   const portoes = new Map();
-  for (const opId of opIds) {
+  for (const opId of [...new Set(pecas.map((p) => p.opId).filter(Boolean))]) {
     portoes.set(opId, await portaoDoDesenho(prisma, opId).catch(() => null));
   }
 
-  // ── classifica cada peça ─────────────────────────────────────────────────────────────────────
-  const porObra = new Map();
+  const prontos = [], travados = [];
+  let jaDesceram = 0;
   for (const p of pecas) {
-    const chave = p.opId || "sem-op";
-    const g = porObra.get(chave) || porObra.set(chave, {
-      opId: p.opId, opNumero: p.op?.numero || null, cliente: p.op?.cliente || null, obra: p.op?.obra || null,
-      prontos: [], travados: [], jaDesceram: 0, kgProntos: 0,
-    }).get(chave);
-
     const marca = String(p.marca || "").trim().toUpperCase();
-    if (jaDesceu.has(marca)) { g.jaDesceram++; continue; }
+    if (jaDesceu.has(marca)) { jaDesceram++; continue; }
 
-    // ⚠ ORDEM DOS MOTIVOS = ordem de quem resolve. O croqui que falta é da preparação (interno e
-    // do dia); desenho é Engenharia; material é Compras. Mostrar o mais próximo primeiro evita
-    // mandar cobrar fornecedor por peça que só falta cortar.
-    let motivo = null;
+    // ⚠ ORDEM DOS MOTIVOS = ordem de quem resolve. Croqui é da preparação (interno, do dia);
+    // desenho é Engenharia; material é Compras. Mostrar o mais próximo primeiro evita mandar
+    // cobrar fornecedor por peça que só falta cortar.
+    let motivo = null, porque = null;
     if (ehMontagem) {
       const pr = calcularProntidao(p);
-      if (!pr.pronto) motivo = { tipo: "CROQUI", texto: `faltam ${pr.total - pr.atendidos} de ${pr.total} croquis no corte` };
+      if (!pr.pronto) { motivo = "CROQUI"; porque = `faltam ${pr.total - pr.atendidos} de ${pr.total} croquis`; }
     }
     if (!motivo) {
-      // ⚠ `null` = a obra nunca foi conferida. Não é "sem desenho": afirmar que falta o que não se
-      // mediu mandaria cobrar a Engenharia por engano.
-      const tem = temDesenhoNaPasta(portoes.get(p.opId), p.marca);
-      if (tem === false) motivo = { tipo: "DESENHO", texto: "sem PDF em 2.5.2 Fabricação" };
+      // ⚠ `null` = obra nunca conferida. Não é "sem desenho": afirmar o que não se mediu mandaria
+      // cobrar a Engenharia por engano.
+      if (temDesenhoNaPasta(portoes.get(p.opId), p.marca) === false) { motivo = "DESENHO"; porque = "sem PDF em 2.5.2 Fabricação"; }
     }
-    if (!motivo && !ehMontagem && p.statusEstoque === "SEM_MATERIAL") {
-      motivo = { tipo: "MATERIAL", texto: "aço não entregue nesta obra" };
-    }
+    if (!motivo && !ehMontagem && p.statusEstoque === "SEM_MATERIAL") { motivo = "MATERIAL"; porque = "aço não entregue nesta obra"; }
 
     const item = {
       id: p.id, marca: p.marca, descricao: p.descricao || null,
-      qte: p.qte || 0, kg: Math.round(Number(p.pesoTotalKg) || 0),
+      opNumero: p.op?.numero || null, qte: p.qte || 0,
+      kg: Math.round(Number(p.pesoTotalKg) || 0),
+      bancada: p.bancada || null,
     };
-    if (motivo) g.travados.push({ ...item, motivo: motivo.tipo, porque: motivo.texto });
-    else { g.prontos.push(item); g.kgProntos += Number(p.pesoTotalKg) || 0; }
+    if (motivo) travados.push({ ...item, motivo, porque });
+    else prontos.push(item);
   }
 
-  const obras = [...porObra.values()]
-    .map((g) => ({
-      ...g, kgProntos: Math.round(g.kgProntos),
-      // ⚠ o que trava vai AGRUPADO por motivo: cinco linhas dizendo "sem PDF" é uma informação só,
-      // e quem lê precisa saber para quem ligar, não reler o mesmo texto.
-      travadosPorMotivo: Object.entries(
-        g.travados.reduce((a, t) => { (a[t.porque] ??= []).push(t.marca); return a; }, {}),
-      ).map(([porque, marcasT]) => ({ porque, marcas: marcasT, n: marcasT.length }))
-        .sort((a, b) => b.n - a.n),
-    }))
-    // obra com trabalho pronto primeiro: é onde o dia dela começa
-    .sort((a, b) => b.prontos.length - a.prontos.length || String(a.opNumero).localeCompare(String(b.opNumero)));
-
+  const ordem = (a, b) => String(a.opNumero).localeCompare(String(b.opNumero)) || String(a.marca).localeCompare(String(b.marca), "pt-BR", { numeric: true });
   return NextResponse.json({
-    setor,
-    obras,
-    total: {
-      prontos: obras.reduce((s, o) => s + o.prontos.length, 0),
-      kgProntos: obras.reduce((s, o) => s + o.kgProntos, 0),
-      travados: obras.reduce((s, o) => s + o.travados.length, 0),
-      jaDesceram: obras.reduce((s, o) => s + o.jaDesceram, 0),
-    },
+    setor, dia, diasComAlgo,
+    prontos: prontos.sort(ordem),
+    travados: travados.sort(ordem),
+    jaDesceram,
   });
 }
