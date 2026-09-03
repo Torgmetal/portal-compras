@@ -20,6 +20,7 @@ import { calcularProntidao, CONJUNTO_MONTAVEL } from "@/lib/prontidao-conjunto";
 import { SO_FABRICACAO } from "@/lib/lista-pecas";
 import { OP_VIVA } from "@/lib/op-viva";
 import { pecaCortada } from "@/lib/liberacao-producao";
+import { opIdsNaFilaDoPcp } from "@/lib/op-na-fila-pcp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,13 +32,19 @@ export async function GET(req) {
   try { await requireRole(ROLES); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
-  const setor = String(new URL(req.url).searchParams.get("setor") || "PREPARACAO").toUpperCase();
+  const sp = new URL(req.url).searchParams;
+  const setor = String(sp.get("setor") || "PREPARACAO").toUpperCase();
   if (!["PREPARACAO", "MONTAGEM"].includes(setor)) return NextResponse.json({ error: "Setor inválido." }, { status: 400 });
+
+  // ⚠ a MESMA régua da lista de obras logo abaixo na tela (ver lib/op-na-fila-pcp).
+  const todas = sp.get("todas") === "1";
+  const naFila = todas ? null : [...await opIdsNaFilaDoPcp()];
+  const soDaFila = naFila ? { opId: { in: naFila } } : {};
 
   // ── MONTAGEM: o conjunto travado, com os croquis que faltam ──────────────────────────────────
   if (setor === "MONTAGEM") {
     const conj = await prisma.pecaConjunto.findMany({
-      where: { ...CONJUNTO_MONTAVEL, ...OP_VIVA, status: { in: ["PENDENTE", "CORTE"] } },
+      where: { ...CONJUNTO_MONTAVEL, ...OP_VIVA, ...soDaFila, status: { in: ["PENDENTE", "CORTE"] } },
       select: {
         id: true, marca: true, descricao: true, qte: true, pesoTotalKg: true,
         op: { select: { numero: true } },
@@ -64,7 +71,7 @@ export async function GET(req) {
         })),
       });
     }
-    return NextResponse.json({ setor, itens });
+    return NextResponse.json({ setor, todas, itens });
   }
 
   // ── PREPARAÇÃO: a peça que ainda não foi cortada ─────────────────────────────────────────────
@@ -72,7 +79,7 @@ export async function GET(req) {
   // ⚠ CONJUNTO NÃO SE CORTA (ver a nota em LiberarFrentes): quem passa pela máquina é croqui e
   // avulsa. Incluir conjunto aqui encheria a fila do corte com o que ela não faz.
   const pecas = await prisma.pecaConjunto.findMany({
-    where: { ...SO_FABRICACAO, ...OP_VIVA, NOT: { tipoPeca: "CONJUNTO" }, status: { in: ["PENDENTE", "CORTE"] } },
+    where: { ...SO_FABRICACAO, ...OP_VIVA, ...soDaFila, NOT: { tipoPeca: "CONJUNTO" }, status: { in: ["PENDENTE", "CORTE"] } },
     select: {
       id: true, marca: true, descricao: true, perfil: true, material: true, qte: true, qteProduzida: true,
       pesoTotalKg: true, comprimentoMm: true, maquina: true, statusEstoque: true,
@@ -96,5 +103,5 @@ export async function GET(req) {
       semMaterial: p.statusEstoque === "SEM_MATERIAL",
     }));
 
-  return NextResponse.json({ setor, itens });
+  return NextResponse.json({ setor, todas, itens });
 }

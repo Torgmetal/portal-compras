@@ -25,6 +25,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { calcularProntidao, CONJUNTO_MONTAVEL } from "@/lib/prontidao-conjunto";
 import { OP_VIVA } from "@/lib/op-viva";
+import { opIdsNaFilaDoPcp } from "@/lib/op-na-fila-pcp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,14 +33,21 @@ export const maxDuration = 60;
 
 const ROLES = ["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"];
 
-export async function GET() {
+export async function GET(req) {
   try { await requireRole(ROLES); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  // ⚠ a MESMA régua da lista de obras logo abaixo na tela (ver lib/op-na-fila-pcp): obra que o
+  // Planejamento não colocou na fila não entra aqui, senão a fila da montagem enche de obra
+  // terminada — foi a OP-103 aparecendo aqui que o Vitor pegou em 03/09/2026.
+  const todas = new URL(req.url).searchParams.get("todas") === "1";
+  const naFila = todas ? null : [...await opIdsNaFilaDoPcp()];
+  const soDaFila = naFila ? { opId: { in: naFila } } : {};
 
   const conjuntos = await prisma.pecaConjunto.findMany({
     // ⚠ PENDENTE ou CORTE = ainda não entrou na montagem. O conjunto não se corta (ver
     // CONJUNTO_MONTAVEL), então ele costuma esperar em PENDENTE; daí para frente já andou.
-    where: { ...CONJUNTO_MONTAVEL, ...OP_VIVA, montagemDiaProgramado: null, status: { in: ["PENDENTE", "CORTE"] } },
+    where: { ...CONJUNTO_MONTAVEL, ...OP_VIVA, ...soDaFila, montagemDiaProgramado: null, status: { in: ["PENDENTE", "CORTE"] } },
     select: {
       id: true, marca: true, descricao: true, qte: true, pesoTotalKg: true, prioridade: true,
       op: { select: { numero: true } },
@@ -57,5 +65,5 @@ export async function GET() {
       prioridade: c.prioridade ?? null,
     }));
 
-  return NextResponse.json({ conjuntos: prontos });
+  return NextResponse.json({ todas, conjuntos: prontos });
 }
