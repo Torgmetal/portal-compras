@@ -242,6 +242,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
   useEffect(() => {
     let vivo = true;
     let limpar = () => {};
+    let limparInsistencia = () => {};
     (async () => {
       try {
         const THREE = await import("three");
@@ -648,12 +649,27 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         anima();
 
         ref.current = { THREE, cena, malhas, arestas: malhaArestas, indice, rend, cam, ctrl, irPara, zoom, focar, centro, pedirQuadro };
+
+        // ⚠⚠ REDE DE SEGURANÇA DO PRIMEIRO QUADRO. A cena só é desenhada quando algo pede (é o que
+        // faz o ventilador ficar quieto). Se o primeiro pedido acontecer antes de o navegador ter
+        // dado ao canvas o tamanho final — layout que ainda está assentando, fonte que chega
+        // atrasada, painel que abre —, o único quadro desenhado é o errado e a tela fica branca com
+        // a obra inteira carregada atrás. Alguns pedidos nos primeiros segundos custam nada e
+        // eliminam a classe inteira de "abriu em branco".
+        const insistir = [80, 250, 600, 1200, 2500].map((ms) => setTimeout(() => {
+          if (!vivo) return;
+          medir();
+          forcar = true;
+        }, ms));
+        limparInsistencia = () => insistir.forEach(clearTimeout);
+
         setPronto(true);
         setInfo({ conjuntos: total, malhas: malhas.size, geometrias: n });
         onIndice?.({ indice, niveis, semCor });
         setEstado({ fase: "pronto" });
 
         limpar = () => {
+          limparInsistencia();
           cancelAnimationFrame(raf);
           window.removeEventListener("resize", medir);
           ro?.disconnect();

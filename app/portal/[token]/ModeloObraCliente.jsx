@@ -234,6 +234,9 @@ export default function ModeloObraCliente({ token }) {
           tela cheia vc tira os filtros, precisa deixar". O botão de tela cheia procura este atributo
           para saber o que levar junto (ver components/VisualizadorIfc); sem ele, sobrava só a caixa
           do 3D — e tela cheia sem filtro é justamente quando se precisa mais dele. */}
+      {/* ⚠ o `flex-1 min-h-0` aqui serve à TELA CHEIA (o pai vira coluna de 100vh e esta linha
+          precisa esticar). Fora dela o contêiner tem altura automática, e quem manda é a altura do
+          quadro da cena. */}
       <div className="flex flex-col lg:flex-row gap-0 border border-gray-200 rounded-xl overflow-hidden bg-white flex-1 min-h-0">
         {painel && indice && (
           <aside data-painel-3d className="w-full lg:w-[260px] shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200 overflow-y-auto" style={{ maxHeight: 560 }}>
@@ -313,7 +316,12 @@ export default function ModeloObraCliente({ token }) {
           </aside>
         )}
 
-        <div data-cena-3d className="flex-1 min-w-0 min-h-0 relative" style={{ height: 560 }}>
+        {/* ⚠⚠ `flex-1` SÓ QUANDO A LINHA É LINHA. Vitor (03/09/2026): "olha aí, está branco o
+            modelo". O quadro tem 560 px de altura fixa, mas abaixo de 1024 px o contêiner vira
+            COLUNA — e aí `flex-1` passa a valer no eixo vertical, com base 0: a altura de 560
+            morria e o canvas nascia com 300 px de altura desenhando nada. Em coluna ele é um bloco
+            de altura própria; em linha, o item que estica. */}
+        <div data-cena-3d className="w-full lg:flex-1 min-w-0 relative" style={{ height: 560 }}>
           {url && (
             <VisualizadorIfc key={url} url={url} onSelecionar={abrir} onIndice={receberIndice}
               visiveis={visiveis} ocultos={ocultos} esconderResto={esconderResto}
