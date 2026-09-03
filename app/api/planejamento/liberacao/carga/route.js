@@ -91,3 +91,60 @@ export async function GET(req) {
 
   return NextResponse.json({ setor: setor || null, dias });
 }
+
+
+// ⚠⚠ LIMPAR O QUE APONTA PARA O VAZIO. Vitor (03/09/2026), sobre o aviso das peças órfãs: "sobre
+// essa questão poderia ajustar".
+//
+// O estrago é anterior à correção que já entrou no importador (hoje a reimportação remapeia a
+// programação pela MARCA — ver /api/producao/pecas/importar-lpc). O que sobrou não dá para
+// reconstruir com honestidade: na OP-113 são 126 ponteiros mortos e só 73 peças hoje sem
+// programação, e nada diz QUAIS eram. Adivinhar criaria uma programação falsa, que é pior do que a
+// falta dela.
+//
+// O que dá para fazer é tirar o ponteiro morto: a liberação para de contar peça que não existe, o
+// aviso some, e as peças afetadas seguem em "a fazer" — onde alguém as libera de novo pelo caminho
+// normal. Nenhuma peça é apagada e nenhuma programação é inventada.
+//
+// ⚠ E não roda sozinho: é botão. Escrita em produção com efeito visível no chão de fábrica se faz
+// com alguém clicando e sabendo o que vai acontecer.
+export async function POST(req) {
+  let user;
+  try { user = await requireRole(["ADMIN", "PLANEJAMENTO", "PCP"]); }
+  catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  const body = await req.json().catch(() => ({}));
+  if (body?.acao !== "limparOrfaos") return NextResponse.json({ error: "Ação desconhecida." }, { status: 400 });
+
+  const abertas = await prisma.liberacaoProducao.findMany({
+    where: { status: { in: ["LIBERADA", "EM_PRODUCAO"] } },
+    select: { id: true, opId: true, frente: true, pecaIds: true, op: { select: { numero: true } } },
+    take: 4000,
+  });
+  const ids = [...new Set(abertas.flatMap((l) => (Array.isArray(l.pecaIds) ? l.pecaIds : []).map(String)))];
+  const vivos = new Set(
+    (ids.length ? await prisma.pecaConjunto.findMany({ where: { id: { in: ids } }, select: { id: true } }) : [])
+      .map((p) => p.id)
+  );
+
+  let lotes = 0, removidos = 0;
+  const detalhe = [];
+  for (const l of abertas) {
+    const atuais = (Array.isArray(l.pecaIds) ? l.pecaIds : []).map(String);
+    const limpos = atuais.filter((id) => vivos.has(id));
+    if (limpos.length === atuais.length) continue;
+    await prisma.liberacaoProducao.update({ where: { id: l.id }, data: { pecaIds: limpos } });
+    lotes++; removidos += atuais.length - limpos.length;
+    detalhe.push({ op: l.op?.numero || null, frente: l.frente, perdidas: atuais.length - limpos.length });
+  }
+
+  if (removidos) {
+    await prisma.auditLog.create({
+      data: {
+        userId: user?.id || null, action: "LIBERACAO_LIMPAR_ORFAOS", entity: "LiberacaoProducao",
+        entityId: null, diff: { lotes, removidos, detalhe },
+      },
+    }).catch(() => {});
+  }
+  return NextResponse.json({ ok: true, lotes, removidos, detalhe });
+}

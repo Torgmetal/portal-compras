@@ -34,6 +34,8 @@ export default function CargaDosDias({ opId, recarga }) {
   const [setor, setSetor] = useState("PREPARACAO");
   const [metaKg, setMetaKg] = useState(12000);
   const [carga, setCarga] = useState(null);
+  const [limpando, setLimpando] = useState(false);
+  const [recarregou, setRecarregou] = useState(0);
 
   useEffect(() => {
     let vivo = true;
@@ -45,7 +47,31 @@ export default function CargaDosDias({ opId, recarga }) {
       .then((j) => vivo && setCarga(j?.dias ? j : { dias: [] }))
       .catch(() => vivo && setCarga({ dias: [] }));
     return () => { vivo = false; };
-  }, [setor, opId, recarga]);
+  }, [setor, opId, recarga, recarregou]);
+
+  // ⚠⚠ O AVISO PASSA A TER SAÍDA. O ponteiro morto não dá para reconstruir com honestidade (na
+  // OP-113 são 126 ids perdidos e só 73 peças hoje sem programação — nada diz quais eram), então o
+  // que se faz é TIRAR o ponteiro: a liberação para de contar peça que não existe e as afetadas
+  // seguem em "a fazer", para serem liberadas de novo pelo caminho normal. Nada é apagado e nenhuma
+  // programação é inventada.
+  async function limparOrfaos() {
+    const total = (carga?.dias || []).reduce((a, x) => a + (x.orfas || 0), 0);
+    if (!confirm(
+      `Isto remove ${total} ponteiro(s) para peças que não existem mais.\n\n` +
+      "As peças afetadas continuam em \"a fazer\" e precisam ser liberadas de novo — o que muda é " +
+      "que o dia para de contá-las e o aviso sai da tela.\n\nConfirma?"
+    )) return;
+    setLimpando(true);
+    try {
+      const r = await fetch("/api/planejamento/liberacao/carga", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "limparOrfaos" }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Não consegui limpar.");
+      setRecarregou((v) => v + 1);
+    } catch (e) { alert(e.message); } finally { setLimpando(false); }
+  }
 
   const dias = carga?.dias || [];
   const meta = Number(metaKg) || 0;
@@ -127,10 +153,17 @@ export default function CargaDosDias({ opId, recarga }) {
           </div>
 
           {orfas > 0 && (
-            <div className="px-4 py-2 border-t border-amber-200 bg-amber-50 text-[11.5px] text-amber-800">
-              <b>{fmtN(orfas)} peça(s) perderam a programação</b> — a lista foi reimportada depois da
-              liberação e elas voltaram para "a fazer".
-              {" "}({dias.filter((x) => x.orfas > 0).map((x) => `${x.dia ? fmtD(x.dia) : "sem data"}: ${fmtN(x.orfas)}`).join(" · ")})
+            <div className="px-4 py-2 border-t border-amber-200 bg-amber-50 text-[11.5px] text-amber-800 flex items-start gap-3 flex-wrap">
+              <span className="flex-1 min-w-[280px]">
+                <b>{fmtN(orfas)} peça(s) perderam a programação</b> — a lista foi reimportada depois da
+                liberação e elas voltaram para "a fazer".
+                {" "}({dias.filter((x) => x.orfas > 0).map((x) => `${x.dia ? fmtD(x.dia) : "sem data"}: ${fmtN(x.orfas)}`).join(" · ")})
+                {" "}Libere-as de novo pela obra; o importador já não perde mais a programação nas próximas listas.
+              </span>
+              <button onClick={limparOrfaos} disabled={limpando}
+                className="shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-md border border-amber-300 bg-white text-amber-800 hover:bg-amber-100 disabled:opacity-50 inline-flex items-center gap-1.5">
+                {limpando && <Loader2 size={11} className="animate-spin" />} tirar da contagem
+              </button>
             </div>
           )}
         </>
