@@ -26,6 +26,9 @@ function moduloNegado(path, token) {
   // ⚠ o /admin vem ANTES do atalho de ADMIN — é o único gate por TIPO, não por módulo, e
   // esquecê-lo aqui abriria a administração pra qualquer pessoa logada.
   if (path.startsWith("/admin") && !isAdmin) return "ADMIN";
+  // A tela de versão/atualizações é de controle interno — só ADMIN. Precisa vir ANTES do
+  // atalho de ADMIN abaixo, pelo mesmo motivo do /admin: é gate por TIPO, não por módulo.
+  if (path.startsWith("/versao") && !isAdmin) return "ADMIN";
   if (isAdmin) return null;
   const modulos = token?.modulos ?? [];
   const tem = (...req) => req.some((m) => modulos.includes(m));

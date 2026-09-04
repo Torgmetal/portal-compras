@@ -1,7 +1,9 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, GitCommit, Package, Rocket } from "lucide-react";
 import { VERSAO_ATUAL, CHANGELOG, BUILD_HASH, BUILD_DATE, BUILD_TITULO } from "@/lib/versao";
 import dadosBuild from "@/versao-build.json";
+import { getSession } from "@/lib/session";
 
 export const metadata = { title: "Versão do Portal — Torg" };
 
@@ -12,6 +14,9 @@ export const metadata = { title: "Versão do Portal — Torg" };
  * de um `git log` em tempo de build, porque o clone que a Vercel faz do repositório é raso
  * (traria só os últimos commits). Ver scripts/gerar-versao.js.
  *
+ * Só ADMIN entra: o middleware já barra, e a checagem aqui é a segunda tranca — se um dia o
+ * matcher do middleware mudar, a tela não fica exposta por tabela.
+ *
  * O CHANGELOG de `lib/versao.js` continua sendo a lista curada de MARCOS (mantida na mão);
  * os commits abaixo são o registro fino de cada deploy.
  *
@@ -19,7 +24,11 @@ export const metadata = { title: "Versão do Portal — Torg" };
  * lista dele — vem do build (BUILD_TITULO) e aparece no cartão do topo. Por isso a lista
  * começa em `build - 1`.
  */
-export default function VersaoPage() {
+export default async function VersaoPage() {
+  const session = await getSession();
+  if (!session?.user) redirect("/entrar?callbackUrl=/versao");
+  if (session.user.tipo !== "ADMIN") redirect("/sem-acesso?modulo=ADMIN");
+
   const commits = dadosBuild.commits ?? [];
 
   return (

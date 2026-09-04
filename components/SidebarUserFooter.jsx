@@ -50,13 +50,25 @@ export default function SidebarUserFooter() {
       </div>
       {/* Carimbo da versão no ar. O número de build sobe a cada commit que vai pro Vercel,
           então dá pra conferir num relance se a pessoa está vendo a atualização mais recente. */}
-      <Link
-        href="/versao"
-        className="mt-3 block text-[10px] text-torg-gray/70 tabular-nums hover:text-torg-blue transition-colors"
-        title={`Commit ${BUILD_HASH} — build de ${BUILD_DATE}. Clique para ver as atualizações.`}
-      >
-        {VERSAO_LABEL}
-      </Link>
+      {/* A tela de atualizações é só do ADMIN, então só ele recebe o link. Os demais continuam
+          vendo o número — é o que a pessoa lê de volta quando o suporte pergunta em que versão
+          ela está —, mas sem um link que só levaria ao /sem-acesso. */}
+      {isAdmin ? (
+        <Link
+          href="/versao"
+          className="mt-3 block text-[10px] text-torg-gray/70 tabular-nums hover:text-torg-blue transition-colors"
+          title={`Commit ${BUILD_HASH} — build de ${BUILD_DATE}. Clique para ver as atualizações.`}
+        >
+          {VERSAO_LABEL}
+        </Link>
+      ) : (
+        <p
+          className="mt-3 text-[10px] text-torg-gray/70 tabular-nums select-text"
+          title={`Commit ${BUILD_HASH} — build de ${BUILD_DATE}`}
+        >
+          {VERSAO_LABEL}
+        </p>
+      )}
     </div>
   );
 }
