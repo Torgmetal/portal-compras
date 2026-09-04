@@ -77,7 +77,7 @@ export async function GET(req) {
   const setor = url.searchParams.get("setor"); // opcional: escopo do setor pela ROTA da peça
   const todasRaw = await prisma.pecaConjunto.findMany({
     where: { opId },
-    select: { id: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoUnitKg: true, pesoTotalKg: true, qte: true, qteProduzida: true, corteConcluidoEm: true, status: true, destino: true, destinoTerceirizado: true, terceirizado: true, terceirizadoRecebidoEm: true, encaminhadoSetor: true, prioridade: true, baixaSetores: true, montagemDiaProgramado: true, _count: { select: { conjuntoCroquis: true } } },
+    select: { id: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoUnitKg: true, pesoTotalKg: true, qte: true, qteProduzida: true, corteConcluidoEm: true, status: true, destino: true, destinoTerceirizado: true, terceirizado: true, terceirizadoRecebidoEm: true, encaminhadoSetor: true, prioridade: true, baixaSetores: true, montagemDiaProgramado: true, corteDiaProgramado: true, _count: { select: { conjuntoCroquis: true } } },
     orderBy: [{ marca: "asc" }],
   });
   // Descarta linhas-lixo do import (ex.: a linha "TOTAL" da Lista de Expedição que entrou como peça)
@@ -158,7 +158,24 @@ export async function GET(req) {
       // cortado sem passar pela liberação, senão o recorte perde o sentido e ninguém percebe que o
       // chão está trabalhando por outra lista.
       const temProducao = (p) => Number(p.qteProduzida) > 0 || !!p.corteConcluidoEm;
-      if (!frenteInteira && ids.size) escopo = semEntregues.filter((p) => ids.has(p.id) || temProducao(p));
+      // ⚠⚠ TUDO QUE O PLANEJAMENTO SOLTOU TEM DE APARECER. Vitor (04/09/2026): "tudo que o Gabriel
+      // liberar precisa aparecer para ela; se ela não programou na data que ele estimou, aí vamos
+      // ver de outra maneira".
+      //
+      // São DOIS "programado" e a tela só conhecia um: o Planejamento tanto libera um lote (que
+      // grava `pecaIds`) quanto programa a peça direto — dia de montagem por bancada, dia de corte
+      // na fila. O segundo caminho não passa por `LiberacaoProducao`, então a peça ficava invisível
+      // para o PCP: na OP-097 eram 87 conjuntos com bancada e dia marcados que a Larissa não via
+      // (caso da T97A136, 04/09/2026).
+      //
+      // ⚠ E cobre o ponteiro órfão: a reimportação da lista apaga e recria as peças, e o `pecaIds`
+      // é Json sem chave estrangeira — o lote de corte de 31/08 da 097 ficou com 20 de 20 ids
+      // apontando para peça que não existe mais. Se a peça recriada tiver dia programado, ela
+      // volta a aparecer por aqui em vez de sumir calada.
+      const programado = (p) => !!p.montagemDiaProgramado || !!p.corteDiaProgramado;
+      if (!frenteInteira && ids.size) {
+        escopo = semEntregues.filter((p) => ids.has(p.id) || temProducao(p) || programado(p));
+      }
       const foraDoLote = new Set(
         frenteInteira || !ids.size ? [] : escopo.filter((p) => !ids.has(p.id)).map((p) => p.id)
       );
@@ -167,7 +184,11 @@ export async function GET(req) {
         pecasLiberadas: frenteInteira ? null : ids.size,
         dias: [...new Set(libs.map((l) => (l.dataProgramada ? l.dataProgramada.toISOString().slice(0, 10) : null)).filter(Boolean))],
         // ⚠ diz quanto ficou de fora: um recorte silencioso faz o PCP achar que a obra acabou
-        foraDoRecorte: frenteInteira ? 0 : semEntregues.filter((p) => !ids.has(p.id) && !temProducao(p)).length,
+        foraDoRecorte: frenteInteira ? 0 : semEntregues.filter((p) => !ids.has(p.id) && !temProducao(p) && !programado(p)).length,
+        // ⚠ ponteiro que não existe mais: a liberação diz que soltou N peças e M delas foram
+        // apagadas por uma reimportação da lista. Silenciar isso faz o lote parecer menor do que
+        // foi — e some trabalho que alguém combinou.
+        ponteirosPerdidos: frenteInteira ? 0 : [...ids].filter((id) => !semEntregues.some((p) => p.id === id)).length,
         // e quantas entraram por estarem sendo cortadas sem liberação
         cortandoForaDoLote: foraDoLote.size,
       };
@@ -499,6 +520,10 @@ export async function GET(req) {
       travaConjuntos: tr ? tr.conjuntos.length : 0, travaMarcas: tr ? tr.conjuntos.slice(0, 12) : null, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p),
       // ⚠ a peça está sendo cortada sem ter sido liberada — a tela precisa dizer isso na linha
       foraDoLote: marcadasForaDoLote.has(p.id),
+      // ⚠ e o dia programado vai junto, para a linha distinguir os dois motivos de estar "fora do
+      // lote": a fábrica cortou por fora, ou o Planejamento programou direto (dia/bancada).
+      montagemDiaProgramado: p.montagemDiaProgramado || null,
+      corteDiaProgramado: p.corteDiaProgramado || null,
       apontadoDesde: apontadoDesde.get(p.marca) || null, prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null,
       // ⚠⚠ "FICOU PRONTO E NINGUÉM VIU". Vitor (01/09/2026): "para essas peças que estão com a
       // etiqueta amarela, assim que estiverem com todas as peças prontas do corte preciso alertar o

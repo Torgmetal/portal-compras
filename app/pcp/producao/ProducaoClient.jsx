@@ -880,7 +880,9 @@ export default function ProducaoClient() {
                                           o recorte do Planejamento perder o sentido. */}
                                       {p.foraDoLote && (
                                         <span className="ml-1 text-[9px] px-1 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-semibold align-middle whitespace-nowrap"
-                                          title="Não está no lote liberado pelo Planejamento — a fábrica já apontou produção nela.">
+                                          title={p.montagemDiaProgramado || p.corteDiaProgramado
+                                            ? "Não veio num lote liberado — foi programada direto pelo Planejamento (dia/bancada)."
+                                            : "Não está no lote liberado pelo Planejamento — a fábrica já apontou produção nela."}>
                                           fora do lote
                                         </span>
                                       )}
