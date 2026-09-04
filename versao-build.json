@@ -1,0 +1,156 @@
+{
+  "build": 2773,
+  "gerado": "2026-09-04T21:31:36.718Z",
+  "commits": [
+    {
+      "hash": "304ba5196b",
+      "data": "04/09/2026",
+      "titulo": "Inspetor de campo: o caminho até a tela de inspeções no computador"
+    },
+    {
+      "hash": "bf1ab9fee6",
+      "data": "04/09/2026",
+      "titulo": "Inspetor de campo preenche o relatório no computador (sem abrir a Qualidade inteira)"
+    },
+    {
+      "hash": "6ac3bb28d2",
+      "data": "04/09/2026",
+      "titulo": "Pintura: a relação de peças sai 100%, sem reticência"
+    },
+    {
+      "hash": "8103accd07",
+      "data": "04/09/2026",
+      "titulo": "Portal de campo: prévia do relatório, multi-lote, validade e N/A na tela do inspetor"
+    },
+    {
+      "hash": "302f01ac4a",
+      "data": "04/09/2026",
+      "titulo": "Pintura: vários lotes por demão, validade junto e N/A nos ensaios fora do PIT"
+    },
+    {
+      "hash": "f901e16d38",
+      "data": "04/09/2026",
+      "titulo": "Comunicado do RH: envio por e-mail via batch (parava de chegar a metade da fabrica)"
+    },
+    {
+      "hash": "201a510308",
+      "data": "04/09/2026",
+      "titulo": "Modelo 3D do cliente: filtro \"Onde está\" por etapa de fabricacao"
+    },
+    {
+      "hash": "fe95f465ab",
+      "data": "04/09/2026",
+      "titulo": "Portal do cliente: a NF vem do CMR, como a data e o R ja vinham"
+    },
+    {
+      "hash": "1a2778d686",
+      "data": "04/09/2026",
+      "titulo": "Portal do cliente: RM na tabela de compras e as fotos do recebimento na mesma aba"
+    },
+    {
+      "hash": "0342fc9069",
+      "data": "04/09/2026",
+      "titulo": "Portal do cliente: NF e RM viram escolha por obra, na configuracao do portal"
+    },
+    {
+      "hash": "6fd95b5684",
+      "data": "04/09/2026",
+      "titulo": "Compras: anexar fotos do material chegando, no proprio recebimento"
+    },
+    {
+      "hash": "3076790954",
+      "data": "04/09/2026",
+      "titulo": "Portal do cliente: clicar na RM abre a requisicao, sem valor nenhum"
+    },
+    {
+      "hash": "6fba7e8ee0",
+      "data": "04/09/2026",
+      "titulo": "Portal do colaborador: fim do loop de redirect que dava tela branca ao logar"
+    },
+    {
+      "hash": "b755ff6dca",
+      "data": "04/09/2026",
+      "titulo": "Portal do cliente: a rastreabilidade fecha a corrente RM -> pedido -> NF -> R"
+    },
+    {
+      "hash": "49ee57abc3",
+      "data": "04/09/2026",
+      "titulo": "Portal do cliente: a rastreabilidade passa a mostrar a NF de compra e o kg comprado"
+    },
+    {
+      "hash": "b4b8d229cf",
+      "data": "04/09/2026",
+      "titulo": "Vocabulario: o setor CORTE se le \"Preparacao\" em toda tela"
+    },
+    {
+      "hash": "cfa6f3dbd0",
+      "data": "04/09/2026",
+      "titulo": "Portal do cliente: a etapa da peça volta a aparecer, e o R vem junto"
+    },
+    {
+      "hash": "a824523fe0",
+      "data": "04/09/2026",
+      "titulo": "Portal do cliente: a peca aparecia com quantidade e peso em dobro"
+    },
+    {
+      "hash": "16902bb517",
+      "data": "04/09/2026",
+      "titulo": "Rastreabilidade: a mesma marca na LPC e na LE contava duas vezes"
+    },
+    {
+      "hash": "7c2cce8f9d",
+      "data": "04/09/2026",
+      "titulo": "Modelo 3D: clicar na peça volta a selecionar (o guarda de arrasto nao perdoava)"
+    },
+    {
+      "hash": "9995843eaa",
+      "data": "04/09/2026",
+      "titulo": "PCP: programar nao e liberar - so entra quem ja passou por aqui"
+    },
+    {
+      "hash": "03a879c753",
+      "data": "04/09/2026",
+      "titulo": "Montagem: campo de busca no painel Programado, igual ao do verde"
+    },
+    {
+      "hash": "71afd60598",
+      "data": "04/09/2026",
+      "titulo": "Error boundaries: tela amigavel + mensagem real (diagnostico do erro do portal)"
+    },
+    {
+      "hash": "8e85552df6",
+      "data": "04/09/2026",
+      "titulo": "PCP: o que o Planejamento programou direto passa a aparecer para a Larissa"
+    },
+    {
+      "hash": "4f821b791d",
+      "data": "04/09/2026",
+      "titulo": "Pedido sai na base que o fornecedor cotou; o rescale de preco sai"
+    },
+    {
+      "hash": "c4ad114ff5",
+      "data": "04/09/2026",
+      "titulo": "Usuario externo sai das comunicacoes da empresa (Lais Stival)"
+    },
+    {
+      "hash": "a076fd106e",
+      "data": "03/09/2026",
+      "titulo": "Portal do cliente: o link passa a vencer em 180 dias, com renovar e trocar"
+    },
+    {
+      "hash": "d35c305071",
+      "data": "03/09/2026",
+      "titulo": "Links publicos: noindex nas 16 paginas que estavam sem"
+    },
+    {
+      "hash": "647da2e1e9",
+      "data": "03/09/2026",
+      "titulo": "PCP: sai a faixa de frentes do topo do cartao da obra"
+    },
+    {
+      "hash": "dbd07f4b24",
+      "data": "03/09/2026",
+      "titulo": "Carga da producao: a preparacao contava cada peca duas vezes"
+    }
+  ]
+}

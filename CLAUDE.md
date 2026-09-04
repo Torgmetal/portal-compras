@@ -45,6 +45,23 @@ Three env vars that differ between Vercel and local:
 | `DIRECT_URL` | empty | same value as `DATABASE_URL_UNPOOLED` (the Neon connection string **without** `-pooler` in the host) — required for `prisma migrate` and `prisma db push` |
 | `NEXTAUTH_SECRET` | may be empty in production | generate with `openssl rand -base64 32` |
 
+### Número de build (versão exibida no portal)
+
+O rodapé da barra lateral mostra `v<VERSAO_ATUAL> · build <N>`, onde `N` é a contagem de commits.
+Instale o hook uma vez por clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+O hook `.githooks/pre-commit` roda `scripts/gerar-versao.js`, que grava `versao-build.json` e o
+inclui no próprio commit. `next.config.js` lê esse arquivo e expõe `NEXT_PUBLIC_BUILD_NUMERO`.
+
+> **Por que arquivo e não `git rev-list` no build:** a Vercel faz clone **raso** do repositório, então
+> contar commits durante o build lá devolveria ~10 em vez do número real. O número precisa viajar
+> dentro do commit. Sem o hook instalado, o número **congela** — o hash e a data do build (no
+> `title` do rótulo) continuam corretos, mas rode `npm run versao` antes de commitar.
+
 ### Branches
 
 Time atual: Vitor (diretor) e Matheus.

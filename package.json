@@ -8,6 +8,7 @@
     "start": "next start",
     "postinstall": "prisma generate",
     "atualizar": "node scripts/atualizar.mjs",
+    "versao": "node scripts/gerar-versao.js",
     "checar": "npx --yes eslint@9 --no-config-lookup -c eslint.undef.config.mjs app lib components"
   },
   "prisma": {

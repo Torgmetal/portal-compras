@@ -15,6 +15,9 @@ node_modules/
 .env.production
 .vercel
 
+# Anotações locais de credenciais — pelo nome, é o que este arquivo tende a guardar
+chaves
+
 # Configuração local do Claude Code Desktop (não versionada — cada dev tem a sua)
 .claude/settings.local.json
 

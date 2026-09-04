@@ -1,0 +1,5 @@
+#!/bin/sh
+# Atualiza o número de build a cada commit e inclui o arquivo no próprio commit.
+# Instalação (uma vez por clone): git config core.hooksPath .githooks
+node scripts/gerar-versao.js || exit 1
+git add versao-build.json

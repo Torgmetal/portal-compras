@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { LogOut, Settings, KeyRound } from "lucide-react";
+import { VERSAO_LABEL, BUILD_HASH, BUILD_DATE } from "@/lib/versao";
 
 export default function SidebarUserFooter() {
   const { data: session } = useSession();
@@ -47,6 +48,15 @@ export default function SidebarUserFooter() {
           <LogOut size={14} /> Sair
         </button>
       </div>
+      {/* Carimbo da versão no ar. O número de build sobe a cada commit que vai pro Vercel,
+          então dá pra conferir num relance se a pessoa está vendo a atualização mais recente. */}
+      <Link
+        href="/versao"
+        className="mt-3 block text-[10px] text-torg-gray/70 tabular-nums hover:text-torg-blue transition-colors"
+        title={`Commit ${BUILD_HASH} — build de ${BUILD_DATE}. Clique para ver as atualizações.`}
+      >
+        {VERSAO_LABEL}
+      </Link>
     </div>
   );
 }

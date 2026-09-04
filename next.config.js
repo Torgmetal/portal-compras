@@ -16,6 +16,19 @@ function getGitInfo() {
 
 const { hash, date } = getGitInfo();
 
+// Número de build (contagem de commits) — vem do arquivo, NÃO do git.
+// A Vercel clona o repo raso, então contar commits no build daria um número errado lá.
+// O arquivo é atualizado pelo hook .githooks/pre-commit (ver scripts/gerar-versao.js).
+function getBuildNumero() {
+  try {
+    return String(require("./versao-build.json").build ?? "");
+  } catch {
+    return "";
+  }
+}
+
+const buildNumero = getBuildNumero();
+
 // Headers de segurança aplicados a todas as respostas.
 // CSP aqui é enxuta e SEGURA de impor (não afeta carregamento de script/style):
 //   - frame-ancestors 'none'  → anti-clickjacking (substitui X-Frame-Options)
@@ -55,6 +68,7 @@ const nextConfig = {
     // Disponíveis em qualquer componente via process.env
     NEXT_PUBLIC_BUILD_HASH: hash,
     NEXT_PUBLIC_BUILD_DATE: date,
+    NEXT_PUBLIC_BUILD_NUMERO: buildNumero,
   },
   async headers() {
     return [
