@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAcesso } from "@/lib/session";
 import { conferirBanco } from "@/lib/banco-esperado";
+import { conferirEtapaPortalXSyneco } from "@/lib/conferencias";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -129,9 +130,35 @@ const ALVO_MONTAGEM = {
   montagemDiaProgramado: { not: null },
 };
 
-export async function GET() {
+export async function GET(req) {
   try { await requireAcesso({ tipos: ["ADMIN"] }); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  // ⚠ as CONFERÊNCIAS vêm num pedido à parte: elas varrem obra por obra contra o Syneco e levam
+  // ~13 s. Junto das tarefas, a tela inteira ficaria esperando por elas — e o que a pessoa veio
+  // fazer (aplicar um ajuste) é o que aparece primeiro.
+  if (new URL(req.url).searchParams.get("so") === "conferencias") {
+    const conferencias = [];
+    try {
+      const etapa = await conferirEtapaPortalXSyneco();
+      conferencias.push({
+        id: "etapa-portal-syneco",
+        titulo: "Etapa da peça: portal × fábrica",
+        porque: "Compara o que o portal mostra com o que o Syneco apontou. Foi assim que a OP-112 apareceu parada para o cliente enquanto a fábrica cortava as peças dela.",
+        ok: etapa.length === 0,
+        achados: etapa.map((x) => x.texto),
+        detalhe: etapa.length === 0
+          ? "nenhuma obra com produção apontada e etapa vazia no portal"
+          : `${etapa.length} obra(s) para olhar`,
+      });
+    } catch (e) {
+      conferencias.push({
+        id: "etapa-portal-syneco", titulo: "Etapa da peça: portal × fábrica",
+        ok: null, achados: [], detalhe: `não consegui conferir: ${e?.message || "erro"}`,
+      });
+    }
+    return NextResponse.json({ conferencias, alertas: conferencias.filter((c) => c.ok === false).length });
+  }
 
   const tarefas = [];
   for (const t of TAREFAS) {
