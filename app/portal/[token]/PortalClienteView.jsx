@@ -139,8 +139,11 @@ export default function PortalClienteView({ token }) {
     // emitido, que cresce enquanto a obra anda. A seção de Certificados mostra a lista real.
     dados.relatorios?.length && { v: dados.relatorios.length, r: "relatórios de inspeção aprovados" },
     dados.lpc?.totalConjuntos && { v: dados.lpc.totalConjuntos, r: "conjuntos fabricados" },
-    // ⚠ o peso total só entra quando a obra liberou o peso — ver mostrarPeso em lib/portal-cliente
-    dados.lpc?.pesoKg && { v: fmtKg(dados.lpc.pesoKg), r: "de estrutura" },
+    // ⚠⚠ O PESO NÃO ENTRA NA CAPA. Vitor (04/09/2026), apontando o "16.555 kg de estrutura":
+    // "precisa tirar essa informação da página do cliente". Mesmo motivo do número de certificados
+    // que saiu antes: número na capa vira compromisso. O peso da LPC é o que a lista tem HOJE — ele
+    // muda a cada revisão de projeto, e o cliente lê como o peso contratado da obra.
+    // O peso continua onde ele significa alguma coisa: nas seções que dizem de onde o número veio.
   ].filter(Boolean);
 
   return (
