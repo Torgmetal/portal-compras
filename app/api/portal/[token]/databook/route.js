@@ -14,7 +14,7 @@
 // que o cliente justamente deixou de ter aceitado.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { secoesDoPortal } from "@/lib/portal-cliente";
+import { secoesDoPortal, portalExpirado } from "@/lib/portal-cliente";
 import { isBlobUrlSegura } from "@/lib/blob-url";
 import { dispArquivo } from "@/lib/arquivo-http";
 
@@ -27,7 +27,7 @@ export async function GET(req, { params }) {
   if (!Number.isInteger(volume) || volume < 1) return new NextResponse("Volume não informado.", { status: 400 });
 
   const portal = await prisma.portalCliente.findUnique({ where: { token } });
-  if (!portal || portal.status !== "PUBLICADO") return new NextResponse("Link inválido.", { status: 404 });
+  if (!portal || portal.status !== "PUBLICADO" || portalExpirado(portal)) return new NextResponse("Link inválido.", { status: 404 });
 
   // ⚠ a seção desligada tem de desligar o download junto: sem isto o bloco some da tela e o
   // arquivo segue ao alcance de quem souber o endereço. Mesmo raciocínio da rota /doc.

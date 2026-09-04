@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { pecaParaCliente, panoramaDaObra } from "@/lib/portal-obra-consulta";
-import { secoesDoPortal } from "@/lib/portal-cliente";
+import { secoesDoPortal, portalExpirado } from "@/lib/portal-cliente";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -24,7 +24,7 @@ export async function GET(req, { params }) {
   if (!rl.success) return NextResponse.json({ error: "Muitas consultas seguidas. Aguarde um instante." }, { status: 429, headers: rateLimitHeaders(rl) });
 
   const portal = await prisma.portalCliente.findUnique({ where: { token } });
-  if (!portal || portal.status !== "PUBLICADO") return NextResponse.json({ error: "Link inválido." }, { status: 404 });
+  if (!portal || portal.status !== "PUBLICADO" || portalExpirado(portal)) return NextResponse.json({ error: "Link inválido." }, { status: 404 });
   if (!secoesDoPortal(portal).includes("MODELO_NAVEGAVEL")) return NextResponse.json({ error: "Indisponível." }, { status: 403 });
 
   const op = await prisma.oP.findFirst({ where: { numero: portal.opNumero }, select: { id: true, numero: true } });

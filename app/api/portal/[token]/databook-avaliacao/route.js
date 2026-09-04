@@ -14,7 +14,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { secoesDoPortal } from "@/lib/portal-cliente";
+import { secoesDoPortal, portalExpirado } from "@/lib/portal-cliente";
 import { destinatarioDoCodigo, registrarAcesso } from "@/lib/portal-acesso";
 import { limparTextoCurto } from "@/lib/html";
 
@@ -34,7 +34,7 @@ export async function POST(req, { params }) {
   const { token } = await params;
 
   const portal = await prisma.portalCliente.findUnique({ where: { token } });
-  if (!portal || portal.status !== "PUBLICADO") {
+  if (!portal || portal.status !== "PUBLICADO" || portalExpirado(portal)) {
     return NextResponse.json({ success: false, error: "Link inválido." }, { status: 404 });
   }
   if (!secoesDoPortal(portal).includes("DATABOOK")) {

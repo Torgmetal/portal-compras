@@ -8,7 +8,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { baixarDocumento, resolverDriveServidor } from "@/lib/databook-arquivo";
-import { secoesDoPortal } from "@/lib/portal-cliente";
+import { secoesDoPortal, portalExpirado } from "@/lib/portal-cliente";
 import { registrarAcesso } from "@/lib/portal-acesso";
 import { dispArquivo } from "@/lib/arquivo-http";
 
@@ -21,7 +21,7 @@ export async function GET(req, { params }) {
   if (!id) return new NextResponse("Documento não informado.", { status: 400 });
 
   const portal = await prisma.portalCliente.findUnique({ where: { token } });
-  if (!portal || portal.status !== "PUBLICADO") return new NextResponse("Link inválido.", { status: 404 });
+  if (!portal || portal.status !== "PUBLICADO" || portalExpirado(portal)) return new NextResponse("Link inválido.", { status: 404 });
 
   const doc = await prisma.documentoQualidade.findFirst({
     where: { id, opNumero: portal.opNumero, ativo: true },

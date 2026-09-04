@@ -4,7 +4,7 @@ import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye, Upload, X, 
 import SeletorFotos from "@/components/SeletorFotos";
 import { MODELOS_EMAIL, MODELO_EMAIL } from "@/lib/portal-email-modelos";
 import { upload } from "@vercel/blob/client";
-import { SECOES, CAPAS, AREAS, AREAS_COM_SELETOR, TIPOS_ENGENHARIA, situacao } from "@/lib/portal-cliente";
+import { SECOES, CAPAS, AREAS, AREAS_COM_SELETOR, TIPOS_ENGENHARIA, situacao, diasParaExpirar, expiraEmPortal, VALIDADE_PORTAL_DIAS } from "@/lib/portal-cliente";
 import SeletorDocsArea from "./SeletorDocsArea";
 import HistoricoPortal from "./HistoricoPortal";
 
@@ -160,7 +160,7 @@ export default function AbaPortalCliente({ opId, opNumero }) {
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
   }
 
-  async function publicar(enviar) {
+  async function publicar(enviar, extra = {}) {
     setSalvando(true); setErro(""); setAviso("");
     try {
       await fetch(`/api/comercial/op/${opId}/portal`, {
@@ -168,15 +168,29 @@ export default function AbaPortalCliente({ opId, opNumero }) {
       });
       const r = await fetch(`/api/comercial/op/${opId}/portal`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enviar, clienteEmail: f.clienteEmail, contato: f.contato, destinatarios: f.destinatarios, modeloEmail }),
+        body: JSON.stringify({ enviar, clienteEmail: f.clienteEmail, contato: f.contato, destinatarios: f.destinatarios, modeloEmail, ...extra }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao publicar");
-      setD((p) => ({ ...p, portal: { ...p.portal, token: j.link.split("/").pop(), status: "PUBLICADO" } }));
-      setAviso(enviar
-        ? (j.enviado ? `Publicado e enviado para ${j.enviados} de ${j.total} destinatário(s).` : "Publicado — mas o e-mail falhou; o link já vale.")
-        : "Publicado.");
+      setD((p) => ({ ...p, portal: { ...p.portal, token: j.link.split("/").pop(), status: "PUBLICADO", publicadoEm: new Date().toISOString() } }));
+      setAviso(extra.novoLink
+        ? "Link trocado. O endereço antigo parou de valer agora — reenvie o novo aos destinatários."
+        : extra.renovar
+          ? `Acesso renovado por mais ${VALIDADE_PORTAL_DIAS} dias.`
+          : enviar
+            ? (j.enviado ? `Publicado e enviado para ${j.enviados} de ${j.total} destinatário(s).` : "Publicado — mas o e-mail falhou; o link já vale.")
+            : "Publicado.");
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
+  }
+
+  // ⚠⚠ TROCAR O LINK É IRREVERSÍVEL E DERRUBA QUEM ESTÁ COM O ENDEREÇO ANTIGO — inclusive quem
+  // deveria continuar acessando. É a revogação de verdade (alguém saiu da empresa do cliente), e
+  // por isso pergunta antes.
+  function trocarLink() {
+    if (!confirm("Gerar um link novo para este portal?\n\n"
+      + "O endereço atual para de valer NA HORA, para todo mundo que o tiver — inclusive quem deveria "
+      + "continuar acessando. Depois é preciso reenviar o link novo aos destinatários.")) return;
+    publicar(false, { novoLink: true });
   }
 
   return (
@@ -491,6 +505,36 @@ export default function AbaPortalCliente({ opId, opNumero }) {
             Publicar coloca no ar; avisar conta que mudou. Separados de propósito: quem sobe dez
             arquivos ao longo do dia manda UM aviso, e não dez. */}
         {d.portal.status === "PUBLICADO" && <AvisoDocsNovos opId={opId} />}
+
+        {/* ⚠⚠ A VALIDADE FICA AO LADO DO BOTÃO QUE A RESOLVE. Vitor (03/09/2026), sobre os links
+            públicos: "ok, vamos mudar isso". O acesso vence em 180 dias contados da publicação —
+            avisar só no dia em que quebra transformaria a proteção em chamado de suporte. */}
+        {d.portal.status === "PUBLICADO" && d.portal.publicadoEm && (() => {
+          const dias = diasParaExpirar(d.portal);
+          const fim = expiraEmPortal(d.portal);
+          const venceu = dias != null && dias <= 0;
+          const perto = dias != null && dias > 0 && dias <= 30;
+          return (
+            <div className={`w-full flex items-center gap-2 flex-wrap text-[11.5px] mt-1 pt-2 border-t border-gray-100 ${
+              venceu ? "text-red-700" : perto ? "text-amber-800" : "text-torg-gray"}`}>
+              <span>
+                {venceu
+                  ? <>O acesso do cliente <b>venceu</b> em {fim.toLocaleDateString("pt-BR")} — o link atual não abre mais.</>
+                  : <>Acesso do cliente válido até <b>{fim.toLocaleDateString("pt-BR")}</b>{perto && <> · faltam {dias} dia(s)</>}</>}
+              </span>
+              <button onClick={() => publicar(false, { renovar: true })} disabled={salvando}
+                className="text-[11.5px] font-semibold text-torg-blue hover:underline disabled:opacity-50">
+                renovar por mais {VALIDADE_PORTAL_DIAS} dias
+              </button>
+              <span className="text-torg-gray-light">·</span>
+              <button onClick={trocarLink} disabled={salvando}
+                title="Gera outro endereço e derruba o atual na hora — para quando alguém não deve mais ter acesso"
+                className="text-[11.5px] font-semibold text-torg-gray hover:text-red-700 hover:underline disabled:opacity-50">
+                trocar o link
+              </button>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

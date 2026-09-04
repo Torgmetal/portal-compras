@@ -84,10 +84,23 @@ export async function POST(req, { params }) {
   const b = await req.json().catch(() => ({}));
   // ⚠ o token é gerado UMA VEZ e reaproveitado. Portal é endereço: trocar o link a cada
   // publicação faria o cliente perder o que já tinha salvo — e nos obrigaria a explicar por quê.
-  const token = r.portal.token || gerarTokenForte(32);
+  //
+  // ⚠⚠ AS DUAS EXCEÇÕES, e elas existem por segurança (ver lib/portal-cliente):
+  //   `renovar`   → o acesso vence em 180 dias contados da publicação; renovar reescreve essa data
+  //                 e é o momento em que alguém olha quem ainda deve ter acesso.
+  //   `novoLink`  → gera outro token e DERRUBA o antigo na hora. É a revogação de verdade, para
+  //                 quando alguém sai da empresa do cliente e não dá para esperar o prazo — quem
+  //                 tiver o link velho passa a ver "acesso venceu", e o cliente recebe o novo.
+  const novoLink = b.novoLink === true;
+  const token = novoLink || !r.portal.token ? gerarTokenForte(32) : r.portal.token;
+  const renovaData = novoLink || b.renovar === true || !r.portal.publicadoEm;
   const portal = await prisma.portalCliente.update({
     where: { id: r.portal.id },
-    data: { token, status: "PUBLICADO", publicadoEm: r.portal.publicadoEm || new Date(), criadoPorId: r.portal.criadoPorId || user.id },
+    data: {
+      token, status: "PUBLICADO",
+      publicadoEm: renovaData ? new Date() : r.portal.publicadoEm,
+      criadoPorId: r.portal.criadoPorId || user.id,
+    },
   });
 
   const base = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace.torg.com.br";

@@ -5,7 +5,7 @@
 // aceitou. Plano nunca enviado não aparece no portal (não há o que mostrar ao cliente).
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { secoesDoPortal } from "@/lib/portal-cliente";
+import { secoesDoPortal, portalExpirado } from "@/lib/portal-cliente";
 import { gerarPlanoClientePDF } from "@/lib/plano-cliente-pdf";
 import { comResponsaveis } from "@/lib/planos-aceite";
 import { registrarAcesso } from "@/lib/portal-acesso";
@@ -20,7 +20,7 @@ export async function GET(req, { params }) {
   if (doc !== "PIT" && doc !== "PLP") return new NextResponse("Documento inválido.", { status: 400 });
 
   const portal = await prisma.portalCliente.findUnique({ where: { token } });
-  if (!portal || portal.status !== "PUBLICADO") return new NextResponse("Link inválido.", { status: 404 });
+  if (!portal || portal.status !== "PUBLICADO" || portalExpirado(portal)) return new NextResponse("Link inválido.", { status: 404 });
   if (!secoesDoPortal(portal).includes("PLANOS")) {
     return new NextResponse("Este documento não faz parte do portal desta obra.", { status: 403 });
   }

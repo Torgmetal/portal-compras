@@ -12,7 +12,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import PizZip from "pizzip";
 import { getAccessToken } from "@/lib/sharepoint";
-import { secoesDoPortal, tipoDoDocEng } from "@/lib/portal-cliente";
+import { secoesDoPortal, tipoDoDocEng, portalExpirado } from "@/lib/portal-cliente";
 import { registrarAcesso } from "@/lib/portal-acesso";
 import { dispArquivo } from "@/lib/arquivo-http";
 
@@ -50,7 +50,7 @@ export async function POST(req, { params }) {
   }
 
   const portal = await prisma.portalCliente.findUnique({ where: { token } });
-  if (!portal || portal.status !== "PUBLICADO") return NextResponse.json({ error: "Link inválido." }, { status: 404 });
+  if (!portal || portal.status !== "PUBLICADO" || portalExpirado(portal)) return NextResponse.json({ error: "Link inválido." }, { status: 404 });
   if (!secoesDoPortal(portal).includes("DOCUMENTOS")) {
     return NextResponse.json({ error: "Estes documentos não fazem parte do portal desta obra." }, { status: 403 });
   }

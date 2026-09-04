@@ -9,7 +9,7 @@
 // enfeite. Aqui, quando a obra não liberou, a coluna simplesmente não existe no arquivo.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { secoesDoPortal } from "@/lib/portal-cliente";
+import { secoesDoPortal, portalExpirado } from "@/lib/portal-cliente";
 import { LISTAS, pecasDaLista, sincronizarRevisao } from "@/lib/portal-listas";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais } from "@/lib/excel-relatorio";
 import { dispArquivo } from "@/lib/arquivo-http";
@@ -20,7 +20,7 @@ export const maxDuration = 60;
 async function abrirPortal(token, chave) {
   if (!LISTAS[chave]) return { erro: new NextResponse("Lista inválida.", { status: 400 }) };
   const portal = await prisma.portalCliente.findUnique({ where: { token } });
-  if (!portal || portal.status !== "PUBLICADO") return { erro: new NextResponse("Link inválido.", { status: 404 }) };
+  if (!portal || portal.status !== "PUBLICADO" || portalExpirado(portal)) return { erro: new NextResponse("Link inválido.", { status: 404 }) };
   // ⚠ a SEÇÃO tem de estar ligada. Desligar a LPC na configuração precisa fechar também o
   // download, senão o botão some da tela e o arquivo continua ao alcance de quem souber o endereço.
   if (!secoesDoPortal(portal).includes(LISTAS[chave].secao))

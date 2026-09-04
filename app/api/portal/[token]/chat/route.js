@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
-import { secoesDoPortal } from "@/lib/portal-cliente";
+import { secoesDoPortal, portalExpirado } from "@/lib/portal-cliente";
 import { FERRAMENTAS, executarFerramenta, promptDoCliente } from "@/lib/portal-assistente";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 
@@ -38,7 +38,7 @@ export async function POST(req, { params }) {
   }
 
   const portal = await prisma.portalCliente.findUnique({ where: { token } });
-  if (!portal || portal.status !== "PUBLICADO") return NextResponse.json({ error: "Link inválido." }, { status: 404 });
+  if (!portal || portal.status !== "PUBLICADO" || portalExpirado(portal)) return NextResponse.json({ error: "Link inválido." }, { status: 404 });
   if (!secoesDoPortal(portal).includes("ASSISTENTE")) return NextResponse.json({ error: "Indisponível." }, { status: 403 });
 
   const op = await prisma.oP.findFirst({

@@ -6,7 +6,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { niveisDaMontagem } from "@/lib/niveis-montagem";
-import { secoesDoPortal } from "@/lib/portal-cliente";
+import { secoesDoPortal, portalExpirado } from "@/lib/portal-cliente";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +15,7 @@ export const maxDuration = 120;
 export async function GET(req, { params }) {
   const { token } = await params;
   const portal = await prisma.portalCliente.findUnique({ where: { token } });
-  if (!portal || portal.status !== "PUBLICADO") return NextResponse.json({ achou: false, niveis: [] }, { status: 404 });
+  if (!portal || portal.status !== "PUBLICADO" || portalExpirado(portal)) return NextResponse.json({ achou: false, niveis: [] }, { status: 404 });
   if (!secoesDoPortal(portal).includes("MODELO_NAVEGAVEL")) return NextResponse.json({ achou: false, niveis: [] }, { status: 403 });
 
   try {

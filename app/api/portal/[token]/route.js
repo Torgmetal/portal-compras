@@ -12,7 +12,7 @@ import { ordenarCompras } from "@/lib/item-comprado";
 import { registrarAcesso, destinatarioDoCodigo } from "@/lib/portal-acesso";
 import { statusDosPlanos } from "@/lib/planos-aceite";
 import { prisma } from "@/lib/prisma";
-import { secoesDoPortal, mensagemPadrao, CAPA_PADRAO, TIPOS_ENGENHARIA, agruparEngenharia } from "@/lib/portal-cliente";
+import { secoesDoPortal, mensagemPadrao, CAPA_PADRAO, TIPOS_ENGENHARIA, agruparEngenharia, portalExpirado } from "@/lib/portal-cliente";
 import { pecasDaLista, sincronizarRevisao, revisaoParaOCliente } from "@/lib/portal-listas";
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
 
@@ -74,6 +74,15 @@ export async function GET(req, { params }) {
   const portal = await prisma.portalCliente.findUnique({ where: { token } });
   if (!portal || portal.status !== "PUBLICADO") {
     return NextResponse.json({ error: "Link inválido ou ainda não publicado." }, { status: 404 });
+  }
+  // ⚠ VENCIDO NÃO É INVÁLIDO, e a mensagem tem de dizer qual dos dois é: quem recebe "link
+  // inválido" acha que errou o endereço e não pede nada; quem lê "o acesso venceu" pede o link
+  // novo. Sem essa diferença, a validade viraria só um chamado de suporte.
+  if (portalExpirado(portal)) {
+    return NextResponse.json({
+      error: "O acesso a este portal venceu. Peça um link novo ao seu contato na Torg Metal.",
+      expirado: true,
+    }, { status: 410 });
   }
 
   const op = await prisma.oP.findFirst({

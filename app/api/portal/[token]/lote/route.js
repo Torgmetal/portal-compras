@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
 import PizZip from "pizzip";
 import { prisma } from "@/lib/prisma";
 import { baixarDocumento, resolverDriveServidor } from "@/lib/databook-arquivo";
-import { secoesDoPortal } from "@/lib/portal-cliente";
+import { secoesDoPortal, portalExpirado } from "@/lib/portal-cliente";
 import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
@@ -21,7 +21,7 @@ const MAX = 60;
 export async function POST(req, { params }) {
   const { token } = await params;
   const portal = await prisma.portalCliente.findUnique({ where: { token } });
-  if (!portal || portal.status !== "PUBLICADO") return NextResponse.json({ error: "Link inválido." }, { status: 404 });
+  if (!portal || portal.status !== "PUBLICADO" || portalExpirado(portal)) return NextResponse.json({ error: "Link inválido." }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
   const ids = Array.isArray(body?.ids) ? [...new Set(body.ids.filter(Boolean))] : [];

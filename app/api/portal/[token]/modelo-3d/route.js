@@ -14,7 +14,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAccessToken } from "@/lib/sharepoint";
-import { secoesDoPortal, tipoDoDocEng } from "@/lib/portal-cliente";
+import { secoesDoPortal, tipoDoDocEng, portalExpirado } from "@/lib/portal-cliente";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ const TETO_MB = 60;
 
 async function abrir(token) {
   const portal = await prisma.portalCliente.findUnique({ where: { token } });
-  if (!portal || portal.status !== "PUBLICADO") return { erro: "Link inválido ou ainda não publicado.", status: 404 };
+  if (!portal || portal.status !== "PUBLICADO" || portalExpirado(portal)) return { erro: "Link inválido ou ainda não publicado.", status: 404 };
   const ativas = secoesDoPortal(portal);
   if (!ativas.includes("MODELO_NAVEGAVEL")) return { erro: "Esta obra não publica o modelo 3D.", status: 403 };
   const op = await prisma.oP.findFirst({ where: { numero: portal.opNumero }, select: { id: true, numero: true, obra: true, cliente: true } });
