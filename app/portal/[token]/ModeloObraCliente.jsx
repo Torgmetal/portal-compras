@@ -14,7 +14,7 @@
 // deixar como sem informação para não levantar suspeita". Nada nesta tela pode dizer "não apontado",
 // "pendente" ou "não conferido" — é a mesma regra dos documentos ao cliente.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Box, SlidersHorizontal, Search, EyeOff, Eye, FileSpreadsheet } from "lucide-react";
+import { Loader2, Box, SlidersHorizontal, Search, EyeOff, Eye, FileSpreadsheet, X } from "lucide-react";
 import VisualizadorIfc from "@/components/VisualizadorIfc";
 
 const SEM = "sem informação";
@@ -27,6 +27,9 @@ export default function ModeloObraCliente({ token }) {
   const [modelo, setModelo] = useState(null);
   const [erro, setErro] = useState("");
   const [sel, setSel] = useState(null);
+  // ⚠ a RM abre por cima do painel, não troca a tela: o cliente estava olhando a peça e quer
+  // conferir de onde ela veio — tirá-lo da peça para responder isso seria perder o lugar.
+  const [rm, setRm] = useState(null);        // { numero, ...dados } | { numero, carregando } | { numero, erro }
   const [peca, setPeca] = useState(null);
   const [buscando, setBuscando] = useState(false);
   // ⚠⚠ O CLIENTE NAVEGA IGUAL. Vitor (03/09/2026): "no portal do cliente não está dando os filtros
@@ -173,6 +176,14 @@ export default function ModeloObraCliente({ token }) {
       .then(({ ok, j }) => setPeca(ok ? j : null))
       .catch(() => setPeca(null))
       .finally(() => setBuscando(false));
+  }, [token]);
+
+  const abrirRm = useCallback((numero) => {
+    setRm({ numero, carregando: true });
+    fetch(`/api/portal/${token}/rm?numero=${encodeURIComponent(numero)}`, { cache: "no-store" })
+      .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => setRm(ok ? { numero, ...j } : { numero, erro: j.error || SEM }))
+      .catch(() => setRm({ numero, erro: SEM }));
   }, [token]);
 
   const url = modelo ? `/api/portal/${token}/modelo-3d?rel=${encodeURIComponent(modelo.rel)}` : null;
@@ -329,6 +340,62 @@ export default function ModeloObraCliente({ token }) {
           )}
         </div>
 
+        {/* ⚠⚠ A RM SEM VALOR NENHUM. Vitor (04/09/2026): "uma vista da RM sem valores seria ótimo".
+            O que o cliente vê é o que a obra PEDIU — item, material, quantidade e peso —, nunca o
+            que custou: `RMItem` guarda preço, e a rota escolhe os campos um a um por causa disso. */}
+        {rm && (
+          <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/30 p-0 sm:p-6"
+            onClick={() => setRm(null)}>
+            <div onClick={(e) => e.stopPropagation()}
+              className="bg-white w-full sm:max-w-2xl max-h-[85vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl shadow-xl">
+              <div className="flex items-start gap-3 px-5 py-4 border-b border-gray-100 sticky top-0 bg-white">
+                <div className="min-w-0">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Requisição de material</p>
+                  <h4 className="font-mono text-[16px] font-bold text-[#0D1F3C]">{rm.numero}</h4>
+                  {rm.descricao && <p className="text-[13px] text-gray-600 mt-0.5">{rm.descricao}</p>}
+                </div>
+                <button onClick={() => setRm(null)} className="ml-auto p-1 text-gray-500 hover:text-[#0D1F3C]"><X size={16} /></button>
+              </div>
+              <div className="px-5 py-4">
+                {rm.carregando ? (
+                  <p className="text-[13px] text-gray-500 inline-flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> abrindo…</p>
+                ) : rm.erro ? (
+                  <p className="text-[13px] text-gray-500">{rm.erro}</p>
+                ) : (
+                  <>
+                    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[13px] mb-4">
+                      <dt className="text-gray-500">Solicitada em</dt>
+                      <dd className="text-[#0D1F3C]">{rm.solicitadaEm ? fmtData(rm.solicitadaEm) : SEM}</dd>
+                      <dt className="text-gray-500">Setor</dt><dd className="text-[#0D1F3C]">{rm.setor || SEM}</dd>
+                      <dt className="text-gray-500">Peso total</dt><dd className="text-[#0D1F3C]">{fmtKg(rm.pesoTotalKg) || SEM}</dd>
+                    </dl>
+                    <table className="w-full text-[12.5px]">
+                      <thead>
+                        <tr className="text-left text-gray-500 border-b border-gray-200">
+                          <th className="py-1.5 font-medium">Item</th>
+                          <th className="py-1.5 font-medium">Material</th>
+                          <th className="py-1.5 font-medium text-right">Qtd</th>
+                          <th className="py-1.5 font-medium text-right">Peso</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {(rm.itens || []).map((it, i) => (
+                          <tr key={i}>
+                            <td className="py-1.5 text-[#0D1F3C]">{it.descricao}</td>
+                            <td className="py-1.5 text-gray-600">{it.material || "—"}{it.tratamento ? ` · ${it.tratamento}` : ""}</td>
+                            <td className="py-1.5 text-right text-gray-600 whitespace-nowrap">{it.qtd ?? "—"} {it.unidade || ""}</td>
+                            <td className="py-1.5 text-right text-gray-600 whitespace-nowrap">{it.pesoKg ? fmtKg(it.pesoKg) : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {sel && (
           <aside data-painel-3d className="w-full lg:w-[330px] shrink-0 border-t lg:border-t-0 lg:border-l border-gray-200 overflow-y-auto" style={{ maxHeight: 560 }}>
             <div className="p-4 space-y-3">
@@ -402,7 +469,10 @@ export default function ModeloObraCliente({ token }) {
                                     (04/09/2026) pediu os dois primeiros. */}
                                 {(r.pedido || r.rm) && (
                                   <span className="block">
-                                    {r.rm && <>RM {r.rm}</>}
+                                    {r.rm && (
+                                      <button onClick={() => abrirRm(r.rm)}
+                                        className="text-[#006EAB] hover:underline font-semibold">RM {r.rm}</button>
+                                    )}
                                     {r.rm && r.pedido ? " · " : ""}
                                     {r.pedido && <>pedido {r.pedido}</>}
                                   </span>
