@@ -21,7 +21,7 @@ import { fmtOP } from "@/lib/utils";
 import BotaoRelatorioDia from "@/components/BotaoRelatorioDia";
 
 const STATUS_LABEL = {
-  PENDENTE: "Pendente", CORTE: "Corte", MONTAGEM: "Montagem", SOLDA: "Solda",
+  PENDENTE: "Pendente", CORTE: "Preparação", MONTAGEM: "Montagem", SOLDA: "Solda",
   ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura", EXPEDIDO: "Expedido",
 };
 

@@ -23,7 +23,7 @@ import {
 
 const STATUS_PIPELINE = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
 const STATUS_LABEL = {
-  PENDENTE: "Pendente", CORTE: "Corte", MONTAGEM: "Montagem", SOLDA: "Solda",
+  PENDENTE: "Pendente", CORTE: "Preparação", MONTAGEM: "Montagem", SOLDA: "Solda",
   ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura", EXPEDIDO: "Expedido",
 };
 

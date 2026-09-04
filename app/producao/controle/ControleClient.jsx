@@ -11,7 +11,7 @@ import { fmtOP } from "@/lib/utils";
 
 const SETORES = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDICAO"];
 const SETOR_LABELS = {
-  CORTE: "Corte", MONTAGEM: "Montagem", SOLDA: "Solda",
+  CORTE: "Preparação", MONTAGEM: "Montagem", SOLDA: "Solda",
   ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura", EXPEDICAO: "Expedição",
 };
 const SETOR_COLORS = {

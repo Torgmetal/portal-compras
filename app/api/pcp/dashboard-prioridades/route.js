@@ -12,7 +12,10 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 const FLUXO = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA"];
-const SETOR_NOME = { CORTE: "Corte", MONTAGEM: "Montagem", SOLDA: "Solda", ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura" };
+// ⚠ o rótulo do CORTE é "Preparação". Vitor (04/09/2026): "corte não existe mais, vira tudo
+// preparação". A CHAVE continua CORTE (é o status no banco e o setor que o Syneco devolve);
+// o que muda é só o que a pessoa lê.
+const SETOR_NOME = { CORTE: "Preparação", MONTAGEM: "Montagem", SOLDA: "Solda", ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura" };
 
 // Dias ÚTEIS (seg–sex) de HOJE (BRT) até a data alvo, inclusive. Sem calendário
 // de feriados (assunção combinada). Se o alvo já passou → 0.

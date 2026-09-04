@@ -20,7 +20,7 @@ import PainelBancadas from "./PainelBancadas";
 import { MAQUINA_LABEL, MAQUINA_COR } from "@/lib/maquina-corte";
 
 const STATUS_LABEL = {
-  PENDENTE: "Pendente", CORTE: "Corte", MONTAGEM: "Montagem", SOLDA: "Solda",
+  PENDENTE: "Pendente", CORTE: "Preparação", MONTAGEM: "Montagem", SOLDA: "Solda",
   ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura", EXPEDIDO: "Expedido",
   // ⚠ não é status de peça: é o recorte do que o Planejamento programou. Ver o filtro abaixo.
   PROGRAMADO: "Programados pelo planejamento",
