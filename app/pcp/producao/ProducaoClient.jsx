@@ -27,7 +27,6 @@ import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 import SeparacaoModal from "@/components/SeparacaoModal";
 import CargaProducao from "./CargaProducao";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
-import LiberacaoMaterial from "./LiberacaoMaterial";
 // ⚠ o download do ZIP vem da lib (era a TERCEIRA cópia da mesma função neste repositório); ela
 // suporta a pasta por bancada, que a cópia local não tinha.
 import { baixarZipLote } from "@/lib/desenhos-zip-cliente";
@@ -145,7 +144,6 @@ export default function ProducaoClient() {
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
   const [verTodas, setVerTodas] = useState(false);
-  const [materialAberto, setMaterialAberto] = useState(null); // liberação com o portão aberto
   const [erro, setErro] = useState("");
 
   const [aberta, setAberta] = useState(null);   // opId expandida
@@ -548,34 +546,6 @@ export default function ProducaoClient() {
             const open = aberta === o.opId;
             return (
               <div key={o.opId} className={`bg-white rounded-xl border shadow-[0_1px_3px_rgba(0,41,69,0.06)] overflow-hidden ${open ? "border-torg-blue-200" : "border-gray-100"}`}>
-                {/* ⚠ O QUE O PLANEJAMENTO LIBEROU, no topo do cartão. Sem isto o PCP vê a obra e não
-                    sabe QUAL frente foi mandada nem com que prioridade — que é a informação toda. */}
-                {/* ⚠ O PORTÃO DO MATERIAL fica NA LIBERAÇÃO, não na OP: cada frente liberada tem o
-                    seu material, e é por frente que o PCP decide o que imprimir. */}
-                {o.liberacoes?.length > 0 && (
-                  <div className="px-4 pt-2.5 pb-2 border-b border-gray-50">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {o.liberacoes.map((l) => {
-                        const aberto = materialAberto === l.id;
-                        return (
-                          <button key={l.id} onClick={(e) => { e.stopPropagation(); setMaterialAberto(aberto ? null : l.id); }}
-                            title={[`liberada por ${l.liberadoPorNome || "—"}`, l.desvioMotivo, "clique para conferir o material"].filter(Boolean).join(" · ")}
-                            className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold hover:opacity-80 ${aberto ? "ring-2 ring-torg-blue " : ""}${l.prioridade === "ALTA" ? "bg-red-50 text-red-700 border-red-200" : l.prioridade === "BAIXA" ? "bg-gray-100 text-torg-gray border-gray-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
-                            {l.frente} · {(l.setores || []).join(" ")}
-                            {l.desvioDias > 0 && <span className="ml-1 font-normal">{l.desvioDias}d após o marco</span>}
-                          </button>
-                        );
-                      })}
-                      <span className="text-[10px] text-torg-gray-light ml-1">clique na frente para conferir o material</span>
-                    </div>
-                    {o.liberacoes.some((l) => l.id === materialAberto) && (
-                      <div onClick={(e) => e.stopPropagation()} className="mt-2.5 bg-gray-50/60 border border-gray-100 rounded-lg p-3">
-                        <LiberacaoMaterial liberacaoId={materialAberto} opNumero={o.numero}
-                          onImprimir={(ids) => { setSel(new Set(ids)); abrir(o); }} />
-                      </div>
-                    )}
-                  </div>
-                )}
                 {/* ⚠ DIV, NÃO BUTTON. A linha carrega o CompraChip, que é um botão com modal
                     próprio — botão dentro de botão é HTML inválido e o React avisa em cada
                     render. O chevron é o botão de verdade (é por ele que o teclado abre a OP);
