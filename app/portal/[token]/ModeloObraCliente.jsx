@@ -73,8 +73,15 @@ export default function ModeloObraCliente({ token }) {
     let vivo = true;
     fetch(`/api/portal/${token}/niveis`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((j) => vivo && setNiveisObra(j?.achou ? j : { achou: false, niveis: [] }))
-      .catch(() => vivo && setNiveisObra({ achou: false, niveis: [] }));
+      // ⚠⚠ `achou` FALA DOS NÍVEIS, NÃO DO RESTO DA RESPOSTA. Vitor (05/09/2026): "estou na 112 e
+      // deu esse erro, o que não é verdade, pois já temos vários apontamentos dela". A resposta
+      // trazia 67 marcas com etapa e 167 tipos — e esta linha jogava tudo fora quando a obra não
+      // tinha níveis de montagem (`achou: false`), guardando um objeto vazio no lugar. O filtro de
+      // etapa e o de tipo dependiam de dados que a tela recebia e descartava.
+      .then((j) => vivo && setNiveisObra({
+        achou: !!j?.achou, niveis: j?.niveis || [], setores: j?.setores || {}, tipos: j?.tipos || {},
+      }))
+      .catch(() => vivo && setNiveisObra({ achou: false, niveis: [], setores: {}, tipos: {} }));
     return () => { vivo = false; };
   }, [token]);
 
