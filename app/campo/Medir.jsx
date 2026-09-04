@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2, Camera, X } from "lucide-react";
+import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2, Camera, X, FileText } from "lucide-react";
 import LeitorQR from "./LeitorQR";
 import VistaCotas from "./VistaCotas";
 import { marcaDoQR, TIPOS_RELATORIO, usaCotas } from "@/lib/qualidade-campo";
@@ -818,6 +818,18 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         className="mt-5 w-full bg-torg-blue text-white active:bg-torg-dark rounded-2xl py-5 text-lg font-semibold inline-flex items-center justify-center gap-2.5 disabled:opacity-60">
         {salvando ? <Loader2 size={22} className="animate-spin" /> : <Save size={22} />} Gravar medidas
       </button>
+
+      {/* ⚠ VER ANTES DE ENTREGAR. Vitor (04/09/2026): "na tela da Lais ela não consegue visualizar
+          o relatório antes, como uma prévia". Quem mede preenchia às cegas e só via o documento
+          depois, com a Qualidade — erro de digitação voltava dias depois. Abre em outra aba: o PDF
+          é do estado GRAVADO, então o aviso diz para gravar primeiro. */}
+      <a href={`/api/qualidade/inspecoes/${id}/pdf`} target="_blank" rel="noreferrer"
+        className="mt-2.5 w-full bg-white border-2 border-torg-blue text-torg-blue active:bg-torg-blue/5 rounded-2xl py-4 text-[15px] font-semibold inline-flex items-center justify-center gap-2">
+        <FileText size={19} /> Ver prévia do relatório
+      </a>
+      <p className="mt-1.5 text-center text-[12px] text-torg-gray">
+        A prévia mostra o que já foi gravado — grave as medidas antes de conferir.
+      </p>
     </Tela>
   );
 }

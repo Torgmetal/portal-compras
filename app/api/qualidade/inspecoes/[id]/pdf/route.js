@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { baixarDesenho, garantirDesenhos } from "@/lib/relatorio-dimensional";
-import { usaCotas } from "@/lib/qualidade-campo";
+import { usaCotas, PERFIS_CAMPO } from "@/lib/qualidade-campo";
 import { gerarPDFdoRelatorio } from "@/lib/relatorio-render";
 import { dispArquivo } from "@/lib/arquivo-http";
 
@@ -11,7 +11,12 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(req, { params }) {
-  try { await requireRole(["ADMIN", "QUALIDADE"]); }
+  // ⚠ O INSPETOR VÊ A PRÉVIA DO QUE ELE MESMO PREENCHEU. Vitor (04/09/2026): "na tela da Lais ela
+  // não consegue visualizar o relatório antes, como uma prévia". Ela tem só o módulo
+  // QUALIDADE_CAMPO, e a rota exigia ADMIN/QUALIDADE — quem mede no galpão preenchia às cegas e só
+  // descobria erro de digitação quando o documento já estava com a Qualidade. É LEITURA: emitir,
+  // assinar e enviar continuam fora do portal de campo.
+  try { await requireRole(PERFIS_CAMPO); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const { id } = await params;

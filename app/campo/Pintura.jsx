@@ -50,27 +50,77 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
     ...((plp?.demaos || []).map((x) => x.cor)),
   ].filter(Boolean))];
 
-  function escolherLote(campo, campoVal, comp, id) {
+  // ⚠⚠ UMA DEMÃO USA MAIS DE UM LOTE. Vitor (04/09/2026): "no preenchimento do lote da tinta você
+  // não permite colocar vários números de uma vez". Duas latas do mesmo componente numa demão é o
+  // normal, e o seletor TROCAVA o lote anterior — quem tentava registrar as duas ficava digitando
+  // por cima do próprio registro. Agora o seletor ACRESCENTA, e cada lote vira um chip.
+  //
+  // ⚠ A VALIDADE ANDA JUNTO, na mesma ordem: lote e validade são listas paralelas, senão não se
+  // sabe qual validade é de qual lata. "—" quando o CMR não tem a data, para não desalinhar.
+  const partes = (v) => String(v || "").split("·").map((x) => x.trim()).filter(Boolean);
+  const juntar = (a) => a.join(" · ");
+
+  function somarLote(campo, campoVal, comp, id) {
     const t = porComp(comp).find((x) => x.id === id);
+    if (!t) return;
     const bloco = { ...(dem[aba] || {}) };
-    if (!t) { bloco[campo] = ""; bloco[campoVal] = ""; }
-    else {
-      bloco[campo] = t.lote || "";
-      if (t.validade) bloco[campoVal] = String(t.validade).slice(0, 10);
-      // Produto recebe o TIPO, sem a cor — ela tem campo próprio logo abaixo
-      if (comp === "A") { bloco.produto = t.tipo || t.produto; if (t.fabricante) bloco.fabricante = t.fabricante; }
+    const lotes = partes(bloco[campo]);
+    const vals = partes(bloco[campoVal]);
+    const novo = t.lote || "";
+    if (novo && !lotes.includes(novo)) {
+      lotes.push(novo);
+      vals.push(t.validade ? String(t.validade).slice(0, 10) : "—");
+      bloco[campo] = juntar(lotes);
+      bloco[campoVal] = juntar(vals);
     }
+    // Produto recebe o TIPO, sem a cor — ela tem campo próprio logo abaixo
+    if (comp === "A") { bloco.produto = t.tipo || t.produto; if (t.fabricante) bloco.fabricante = t.fabricante; }
+    set("demaos", { ...dem, [aba]: bloco });
+  }
+
+  function tirarLote(campo, campoVal, i) {
+    const bloco = { ...(dem[aba] || {}) };
+    const lotes = partes(bloco[campo]); const vals = partes(bloco[campoVal]);
+    lotes.splice(i, 1); vals.splice(i, 1);
+    bloco[campo] = juntar(lotes); bloco[campoVal] = juntar(vals);
     set("demaos", { ...dem, [aba]: bloco });
   }
 
   const SelLote = ({ rot, campo, campoVal, comp }) => {
     const lista = porComp(comp);
-    if (!lista.length) return <Txt rot={rot} v={dem[aba]?.[campo]} onMudar={(v) => setDem(aba, campo, v)} />;
-    // o valor guardado é o LOTE; o seletor casa por ele para reabrir marcado
-    const atual = lista.find((t) => t.lote === dem[aba]?.[campo])?.id || "";
+    const lotes = partes(dem[aba]?.[campo]);
     return (
-      <Sel rot={rot} v={atual} onMudar={(v) => escolherLote(campo, campoVal, comp, v)}
-        opcoes={lista.map((t) => ({ v: t.id, t: `${t.lote ? `${t.lote} · ` : ""}${t.produto}` }))} />
+      <div>
+        <span className="block text-[12px] text-torg-gray mb-1">{rot}</span>
+        {lotes.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-1.5">
+            {lotes.map((lt, i) => (
+              <span key={`${lt}-${i}`} className="inline-flex items-center gap-1.5 text-[13px] bg-torg-blue/10 text-torg-blue border border-torg-blue/30 rounded-xl px-2.5 py-1.5">
+                {lt}
+                <button type="button" onClick={() => tirarLote(campo, campoVal, i)} className="font-bold px-0.5 active:text-red-600">×</button>
+              </span>
+            ))}
+          </div>
+        )}
+        {lista.length ? (
+          <select value="" onChange={(e) => { somarLote(campo, campoVal, comp, e.target.value); e.target.value = ""; }}
+            className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none">
+            <option value="">+ lote…</option>
+            {lista.map((t) => <option key={t.id} value={t.id}>{t.lote ? `${t.lote} · ` : ""}{t.produto}</option>)}
+          </select>
+        ) : (
+          // sem tinta no CMR da obra, digita — mas continua sendo lista: separe por " · "
+          <input value={dem[aba]?.[campo] ?? ""} onChange={(e) => setDem(aba, campo, e.target.value)}
+            placeholder="lote 1 · lote 2"
+            className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none" />
+        )}
+        <label className="block mt-1.5">
+          <span className="block text-[11px] text-torg-gray mb-1">Validade{lotes.length > 1 ? " (na ordem dos lotes)" : ""}</span>
+          <input value={dem[aba]?.[campoVal] ?? ""} onChange={(e) => setDem(aba, campoVal, e.target.value)}
+            placeholder="aaaa-mm-dd"
+            className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-2.5 focus:border-torg-blue outline-none" />
+        </label>
+      </div>
     );
   };
 
@@ -135,6 +185,13 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
               </p>
             )}
           </div>
+
+          {/* ⚠⚠ N/A É RESPOSTA, VAZIO NÃO É. Vitor (04/09/2026): "o teste de salinidade não tem
+              campo para podermos informar número ou N/A, e pull-off precisamos ter que colocar
+              N/A". Os dois ensaios nem existiam nesta tela — quem media no galpão não tinha onde
+              registrar, e campo em branco não distingue "não se aplica" de "esqueceram". */}
+          <TxtNA rot="Poeira (ISO 8502-3)" v={cond.poeira} onMudar={(v) => set("poeira", v)} />
+          <TxtNA rot="Salinidade — Bresle (ISO 8502-6/9)" v={cond.salinidade} onMudar={(v) => set("salinidade", v)} />
         </div>
       </div>
 
@@ -230,6 +287,20 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
           <Txt rot="Inspeção visual" v={dem[aba]?.visual} onMudar={(v) => setDem(aba, "visual", v)} />
         </div>
       </div>
+
+      {/* ── ADERÊNCIA PULL-OFF ─────────────────────────────────────────────────
+          Vale para o relatório, não para a demão: é um ensaio do esquema pronto. */}
+      <div>
+        <p className="text-[12px] font-semibold text-torg-gray mb-1.5">Aderência — pull-off</p>
+        <div className="space-y-2.5">
+          <TxtNA rot="Equipamento" v={cond.pullOffEquip} onMudar={(v) => set("pullOffEquip", v)} />
+          <div className="grid grid-cols-2 gap-2">
+            <TxtNA rot="Valor obtido (MPa)" tipo="number" v={cond.pullOffValor} onMudar={(v) => set("pullOffValor", v)} />
+            <TxtNA rot="Mínimo exigido (MPa)" tipo="number" v={cond.pullOffMin} onMudar={(v) => set("pullOffMin", v)} />
+          </div>
+          <TxtNA rot="Tipo de ruptura" v={cond.pullOffRuptura} onMudar={(v) => set("pullOffRuptura", v)} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -242,6 +313,27 @@ function Txt({ rot, v, onMudar, tipo = "text" }) {
       <input type={tipo} inputMode={tipo === "number" ? "decimal" : undefined} value={v ?? ""}
         onChange={(e) => onMudar(e.target.value)}
         className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none" />
+    </label>
+  );
+}
+
+/** Campo que aceita número/texto OU N/A — com o botão do lado do rótulo, no tamanho do dedo. */
+function TxtNA({ rot, v, onMudar, tipo = "text" }) {
+  const na = v === "N/A";
+  return (
+    <label className="block">
+      <span className="flex items-center gap-2 text-[12px] text-torg-gray mb-1">
+        <span>{rot}</span>
+        <button type="button" onClick={() => onMudar(na ? "" : "N/A")}
+          className={`text-[11px] font-bold rounded-lg px-2 py-0.5 border ${
+            na ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-gray border-gray-300"}`}>
+          N/A
+        </button>
+      </span>
+      <input type={na ? "text" : tipo} inputMode={!na && tipo === "number" ? "decimal" : undefined}
+        value={v ?? ""} disabled={na} onChange={(e) => onMudar(e.target.value)}
+        className={`w-full text-base border-2 rounded-xl px-3 py-3 outline-none ${
+          na ? "border-gray-200 bg-gray-100 text-torg-gray" : "border-gray-200 focus:border-torg-blue"}`} />
     </label>
   );
 }

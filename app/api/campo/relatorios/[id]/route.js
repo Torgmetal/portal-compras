@@ -225,6 +225,8 @@ export async function PATCH(req, { params }) {
                      "limpeza", "intemperismo", "prepData", "prepIni", "prepFim", "rugObtido",
                      "poeira", "salinidade", "tempo", "prepTAmb", "prepTSup", "prepOrvalho",
                      "prepUmidade", "laudo",
+                     // aderência pull-off: valor OU "N/A" — quem faz o ensaio é quem está na peça
+                     "pullOffEquip", "pullOffValor", "pullOffMin", "pullOffRuptura",
                      // líquido penetrante — o que o inspetor mede/registra no galpão
                      "tipoPenetrante", "penetranteMarca", "penetranteLote", "tempoPenetracao",
                      "metodo", "removedor", "removedorLote", "tempoSecagem", "temperatura",
@@ -254,7 +256,9 @@ export async function PATCH(req, { params }) {
         if (!bloco || typeof bloco !== "object") continue;
         const limpo = { ...(dados.resultados.demaos[d] || {}) };
         for (const [k, v] of Object.entries(bloco)) {
-          limpo[k] = v == null || v === "" ? null : String(v).slice(0, 120);
+          // ⚠ 300 e não 120: lote e validade são LISTAS ("L1 · L2 · L3"), porque uma demão usa mais
+          // de uma lata. Com o corte antigo, a partir do quarto lote o registro era truncado.
+          limpo[k] = v == null || v === "" ? null : String(v).slice(0, 300);
         }
         dados.resultados.demaos[d] = limpo;
       }
