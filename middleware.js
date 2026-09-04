@@ -147,6 +147,18 @@ export default withAuth(
       }
     }
 
+    // ⚠ INSPETOR DE CAMPO NO PORTAL DA QUALIDADE: manda para as Inspeções em vez de negar.
+    // Ele entra aqui para preencher o relatório no computador, mas o card da home, o seletor de
+    // módulos e qualquer link salvo apontam para /qualidade (controle de documentos), que é do
+    // módulo inteiro — ele acertava a senha e batia no "sem acesso" logo depois.
+    if (token && token.tipo !== "ADMIN" && path.startsWith("/qualidade") && !path.startsWith("/qualidade/inspecoes")
+        && !path.startsWith("/api/")) {
+      const mods = token.modulos ?? [];
+      if (!mods.includes("QUALIDADE") && mods.includes("QUALIDADE_CAMPO")) {
+        return NextResponse.redirect(new URL("/qualidade/inspecoes", req.url));
+      }
+    }
+
     // Falta de módulo: 403 na API, página explicativa no navegador. NUNCA o login.
     const falta = token ? moduloNegado(path, token) : null;
     if (falta) {

@@ -69,7 +69,13 @@ function LoginForm() {
         // Quem tem SÓ `QUALIDADE_CAMPO` não tem módulo interno nenhum: caía no destino padrão "/" e
         // batia numa página sem permissão logo depois de acertar a senha. É o acesso do inspetor —
         // inclusive o de fora —, e o lugar dele é /campo.
-        else if (s?.user?.tipo !== "ADMIN" && (s?.user?.modulos || []).length === 1 && (s.user.modulos[0]?.modulo ?? s.user.modulos[0]) === "QUALIDADE_CAMPO") destino = "/campo";
+        // ⚠ ...MAS NÃO POR CIMA DE ONDE ELE QUIS IR. O inspetor agora também preenche o relatório
+        // no computador (/qualidade/inspecoes): quem clicou nesse link e fez login era jogado para
+        // /campo assim mesmo, e nunca chegava na tela — foi o "ainda não" de 04/09/2026.
+        else if (s?.user?.tipo !== "ADMIN" && (s?.user?.modulos || []).length === 1 && (s.user.modulos[0]?.modulo ?? s.user.modulos[0]) === "QUALIDADE_CAMPO") {
+          const pedido = String(callbackUrl || "");
+          destino = pedido.startsWith("/qualidade/inspecoes") || pedido.startsWith("/campo") ? pedido : "/campo";
+        }
         else if (!destino) destino = homePorRole(s?.user?.role);
       } catch {
         if (!destino) destino = "/";
