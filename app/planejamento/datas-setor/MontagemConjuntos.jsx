@@ -46,6 +46,10 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
   const [avisos, setAvisos] = useState([]);
   const [sel, setSel] = useState(new Set());
   const [busca, setBusca] = useState("");
+  // ⚠ busca PRÓPRIA do painel programado. Vitor (04/09/2026): "seria bom ter o campo de pesquisar
+  // igual tem na aba verde". São duas perguntas diferentes — "o que ainda vou programar" e "em que
+  // dia caiu aquela marca" —, e uma busca só serviria mal às duas.
+  const [buscaProg, setBuscaProg] = useState("");
   // ⚠ o dia sugerido é o MARCO do cronograma, não hoje: é ele que o planejamento veio olhar.
   const [dia, setDia] = useState(marcoMontagem || isoHoje());
   const [agindo, setAgindo] = useState(false);
@@ -98,8 +102,14 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
   const montadosN = useMemo(() => lista.filter((c) => c.montado).length, [lista]);
 
 
+  const casa = (c, termos) => {
+    if (!termos.length) return true;
+    const alvo = `${semAcento(c.marca)} ${semAcento(c.descricao)}`;
+    return termos.every((t) => alvo.includes(t));
+  };
   const grupos = useMemo(() => {
     const hojeIso = isoHoje();
+    const termos = semAcento(buscaProg).split(/\s+/).filter(Boolean);
     const m = new Map();
     for (const c of lista.filter((c) => c.montagemDiaProgramado && !c.montado)) {
       const k = isoDe(c.montagemDiaProgramado);
@@ -107,13 +117,22 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
       m.get(k).push(c);
     }
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([iso, l]) => ({
-      iso, lista: l,
+      iso,
+      // ⚠⚠ `todos` É O DIA INTEIRO e `lista` é o que a busca deixou à vista. O peso e o botão de
+      // adiar continuam olhando o DIA, não o recorte: mover só o que está filtrado deixaria o resto
+      // do dia para trás sem ninguém ver.
+      todos: l, lista: l.filter((c) => casa(c, termos)),
       kg: l.reduce((s, c) => s + (Number(c.pesoTotalKg) || 0), 0),
       // ⚠ vermelho = passou do dia e a montagem não terminou. Começar não é entregar.
       atrasado: !!iso && iso < hojeIso,
       hoje: iso === hojeIso,
-    }));
-  }, [lista]);
+    })).filter((g) => g.lista.length > 0 || !termos.length);
+  }, [lista, buscaProg]);
+  const progFiltrando = buscaProg.trim().length > 0;
+  const progTotal = useMemo(
+    () => lista.filter((c) => c.montagemDiaProgramado && !c.montado).length,
+    [lista],
+  );
 
   const somaKg = (arr) => arr.reduce((s, c) => s + (Number(c.pesoTotalKg) || 0), 0);
   const selecao = useMemo(() => lista.filter((c) => sel.has(c.id)), [lista, sel]);
@@ -398,13 +417,45 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
 
         {/* Programado, dia a dia */}
         <div className="rounded-lg border border-gray-100 bg-gray-50/70">
-          <div className="px-2.5 py-2 flex items-center gap-1.5 text-[10px] text-torg-gray bg-white border-b border-gray-100 rounded-t-lg">
-            <CalendarClock size={11} />
-            <span className="font-bold uppercase tracking-wide">programado</span>
-            <span className="font-semibold">{grupos.reduce((s, g) => s + g.lista.length, 0)} conj</span>
+          {/* ⚠ MESMO DESENHO DO PAINEL VERDE, em cinza. Vitor (04/09/2026): "seria bom ter o campo
+              de pesquisar igual tem na aba verde" — identidade e contagem em cima, busca embaixo. */}
+          <div className="px-2.5 py-2 flex text-[10px] text-torg-gray bg-white border-b border-gray-100 rounded-t-lg">
+            <div className="w-full flex flex-col gap-2">
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <CalendarClock size={11} className="shrink-0 self-center" />
+                <span className="font-bold uppercase tracking-wide">programado</span>
+                <span className="font-semibold tabular-nums">{grupos.reduce((s, g) => s + g.lista.length, 0)} conj</span>
+                {progFiltrando && (
+                  <span className="font-normal tabular-nums text-torg-gray-light">de {progTotal}</span>
+                )}
+              </div>
+              {progTotal > 0 && (
+                <div className="relative">
+                  <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-torg-gray-light pointer-events-none" />
+                  <input value={buscaProg} onChange={(e) => setBuscaProg(e.target.value)}
+                    placeholder="procurar marca ou descrição…"
+                    className="w-full pl-7 pr-7 py-1.5 rounded-md border border-gray-200 bg-white text-[11px] text-torg-dark placeholder:text-torg-gray-light focus:outline-none focus:border-torg-blue" />
+                  {buscaProg && (
+                    <button onClick={() => setBuscaProg("")} title="limpar"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-torg-gray hover:bg-gray-100">
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <div className="p-2 space-y-1.5 max-h-[46vh] overflow-y-auto">
-            {grupos.length === 0 && <p className="text-[11px] text-torg-gray italic py-6 text-center">Nada programado — selecione conjuntos ao lado e marque o dia.</p>}
+            {/* ⚠ "a busca não achou" ≠ "não há nada programado": sem separar, quem procurou uma
+                marca que caiu noutro dia acha que a programação sumiu. */}
+            {grupos.length === 0 && (progFiltrando ? (
+              <p className="text-[11px] text-torg-gray italic py-6 text-center">
+                Nenhum conjunto com <b className="not-italic font-mono">{buscaProg.trim()}</b> entre os {progTotal} programados.{" "}
+                <button onClick={() => setBuscaProg("")} className="underline not-italic">limpar a busca</button>
+              </p>
+            ) : (
+              <p className="text-[11px] text-torg-gray italic py-6 text-center">Nada programado — selecione conjuntos ao lado e marque o dia.</p>
+            ))}
             {grupos.map((g) => (
               <div key={g.iso} className="space-y-1.5 pb-1">
                 <div className={`flex items-center gap-1.5 flex-wrap px-2 py-1.5 rounded-md border text-[10px] ${
@@ -413,11 +464,16 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
                     : "bg-white border-gray-100 text-torg-gray"}`}>
                   <CalendarClock size={11} />
                   <span className="font-bold uppercase tracking-wide">{fmtDiaLongo(g.iso)}</span>
-                  <span className="font-semibold">{g.lista.length} conj · {fmtKg(g.kg)}</span>
+                  <span className="font-semibold">
+                    {g.lista.length}{progFiltrando && g.todos.length !== g.lista.length ? ` de ${g.todos.length}` : ""} conj · {fmtKg(g.kg)}
+                  </span>
                   {g.hoje && <span className="font-semibold">· hoje</span>}
                   {g.atrasado && (
-                    <button onClick={() => agir({ acao: "adiar", ids: g.lista.map((c) => c.id) }, "levado(s) para o próximo dia útil")}
+                    <button onClick={() => agir({ acao: "adiar", ids: g.todos.map((c) => c.id) }, "levado(s) para o próximo dia útil")}
                       disabled={agindo}
+                      title={progFiltrando && g.todos.length !== g.lista.length
+                        ? `Leva os ${g.todos.length} do dia, não só os ${g.lista.length} da busca`
+                        : "Leva o dia inteiro para o próximo dia útil"}
                       className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-50">
                       <ArrowRight size={10} /> levar p/ o próximo dia
                     </button>
