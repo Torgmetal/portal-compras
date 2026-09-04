@@ -78,14 +78,33 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
   // vira a dica do campo — e o "Preencher" do painel é que grava.
   const doPlp = plp ? camposDoRelatorioPintura(plp) : {};
 
+  // ⚠⚠ UM DEMÃO USA MAIS DE UM LOTE. Vitor (04/09/2026): "no preenchimento do lote da tinta você
+  // não permite colocar vários números de uma vez". Duas latas do mesmo componente numa demão é o
+  // normal, e o seletor trocava o lote anterior em vez de somar — quem tentava registrar os dois
+  // ficava digitando por cima do próprio registro.
+  //
+  // ⚠ A VALIDADE ANDA JUNTO, na mesma ordem: lote e validade viram listas paralelas, senão não se
+  // sabe qual validade é de qual lata.
+  const partes = (v) => String(v || "").split("·").map((x) => x.trim()).filter(Boolean);
+  const juntar = (a2) => a2.join(" · ");
+
   function escolherLote(n, k, idTinta) {
     const t = tintas.find((x) => x.id === idTinta);
     const cfg = CAMPO_LOTE[k];
     const bloco = { ...(dem[n] || {}) };
-    if (!t) { bloco[k] = ""; bloco[cfg.val] = ""; }
-    else {
-      bloco[k] = t.lote || "";
-      if (t.validade) bloco[cfg.val] = String(t.validade).slice(0, 10);
+    if (!t) { setResultado("demaos", { ...dem, [n]: bloco }); return; }
+    const lotes = partes(bloco[k]);
+    const vals = partes(bloco[cfg.val]);
+    const novoLote = t.lote || "";
+    if (novoLote && !lotes.includes(novoLote)) {
+      lotes.push(novoLote);
+      // ⚠ a lista de validades acompanha por POSIÇÃO — "—" quando o CMR não tem a data, para as
+      // duas listas continuarem alinhadas.
+      vals.push(t.validade ? String(t.validade).slice(0, 10) : "—");
+      bloco[k] = juntar(lotes);
+      bloco[cfg.val] = juntar(vals);
+    }
+    {
       // a base manda no produto e no fabricante do relatório
       // no campo Produto vai o TIPO, sem a cor — ela tem campo próprio
       if (cfg.comp === "A") { bloco.produto = t.tipo || t.produto; if (t.fabricante) bloco.fabricante = t.fabricante; }
@@ -111,9 +130,23 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
   };
   const setRug = (i, v) => { const a = [...rug]; a[i] = v; setResultado("rugLeituras", a); };
 
-  const Campo = ({ rot, k, tipo = "text", opcoes = null, largura = "" }) => (
+  // ⚠⚠ N/A É RESPOSTA, VAZIO NÃO É. Vitor (04/09/2026): "o teste de salinidade não tem campo para
+  // podermos informar número ou N/A, e Pull-off precisamos ter que colocar N/A". Campo em branco
+  // num relatório assinado é ambíguo — não se sabe se o ensaio não se aplicava ou se esqueceram.
+  // "N/A" é o inspetor dizendo que conferiu e não se aplica.
+  const Campo = ({ rot, k, tipo = "text", opcoes = null, largura = "", na = false }) => (
     <label className={`block ${largura}`}>
-      <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">{rot}</span>
+      <span className="flex items-center gap-1.5 text-[10px] font-semibold text-torg-gray mb-0.5">
+        <span>{rot}</span>
+        {na && !travado && (
+          <button type="button" onClick={() => setResultado(k, res[k] === "N/A" ? "" : "N/A")}
+            title={res[k] === "N/A" ? "voltar a preencher" : "marcar como não aplicável"}
+            className={`ml-auto text-[9px] px-1.5 py-0.5 rounded border font-bold ${
+              res[k] === "N/A" ? "bg-torg-dark text-white border-torg-dark" : "border-gray-200 text-torg-gray hover:border-torg-blue"}`}>
+            N/A
+          </button>
+        )}
+      </span>
       {opcoes ? (
         <select value={res[k] || ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
           className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue disabled:bg-gray-50">
@@ -121,7 +154,8 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
           {opcoes.map((o) => <option key={o.id || o} value={o.id || o}>{o.nome || o}</option>)}
         </select>
       ) : (
-        <input type={tipo} value={res[k] ?? ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
+        <input type={res[k] === "N/A" ? "text" : tipo} value={res[k] ?? ""} disabled={travado || res[k] === "N/A"}
+          onChange={(e) => setResultado(k, e.target.value)}
           placeholder={doPlp[k] != null && typeof doPlp[k] !== "object" ? String(doPlp[k]) : ""}
           className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
       )}
@@ -166,8 +200,11 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
           {esc.intemperismo && <Campo rot="Grau de intemperismo" k="intemperismo" opcoes={GRAUS_INTEMPERISMO} />}
           <Campo rot="Tipo de abrasivo" k="abrasivo" />
           <Campo rot="Rugosidade especificada (PLP)" k="rugEspec" />
-          {esc.poeira && <Campo rot="Poeira (ISO 8502-3)" k="poeira" />}
-          {esc.salinidade && <Campo rot="Salinidade — Bresle (ISO 8502-6/9)" k="salinidade" />}
+          {/* ⚠ SEMPRE NA TELA, com N/A. Antes sumiam quando o PIT não pedia — e o inspetor que
+              media assim mesmo não tinha onde escrever, nem havia como registrar que não se
+              aplicava. O escopo do PIT vira DICA, não portão. */}
+          <Campo rot={`Poeira (ISO 8502-3)${esc.poeira ? "" : " · fora do PIT"}`} k="poeira" na />
+          <Campo rot={`Salinidade — Bresle (ISO 8502-6/9)${esc.salinidade ? "" : " · fora do PIT"}`} k="salinidade" na />
         </div>
 
         {/* ⚠ item 5.5.1.1: o perfil é a MÉDIA DE CINCO MEDIÇÕES, entre 50 e 90 µm ou conforme PLP */}
@@ -249,17 +286,38 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
                   return (
                   <td key={n} className="py-1 px-0.5">
                     {lote && listaLote.length ? (
-                      // ⚠ o valor guardado é o LOTE (texto); o seletor casa por ele para reabrir
-                      // marcado. Guardar o id do documento amarraria o relatório a um registro do
-                      // CMR que pode ser reimportado.
-                      <select value={listaLote.find((t) => t.lote === dem[n]?.[k])?.id || ""} disabled={travado}
-                        onChange={(e) => escolherLote(n, k, e.target.value)}
-                        className="w-full text-[11px] border border-gray-200 rounded px-1 py-0.5 disabled:bg-gray-50">
-                        <option value="">—</option>
-                        {listaLote.map((t) => (
-                          <option key={t.id} value={t.id}>{t.lote ? `${t.lote} · ` : ""}{t.produto}</option>
-                        ))}
-                      </select>
+                      // ⚠ o valor guardado é o LOTE (texto), nunca o id do documento: amarrar ao
+                      // registro do CMR quebraria o relatório na próxima reimportação.
+                      <div className="space-y-0.5">
+                        {partes(dem[n]?.[k]).length > 0 && (
+                          <div className="flex flex-wrap gap-0.5">
+                            {partes(dem[n]?.[k]).map((lt, i) => (
+                              <span key={`${lt}-${i}`} className="inline-flex items-center gap-0.5 text-[10px] bg-torg-blue-50 text-torg-blue border border-torg-blue-100 rounded px-1">
+                                {lt}
+                                {!travado && (
+                                  <button type="button" title="tirar este lote"
+                                    onClick={() => {
+                                      const bloco = { ...(dem[n] || {}) };
+                                      const ls = partes(bloco[k]); const vs = partes(bloco[lote.val]);
+                                      ls.splice(i, 1); vs.splice(i, 1);
+                                      bloco[k] = juntar(ls); bloco[lote.val] = juntar(vs);
+                                      setResultado("demaos", { ...dem, [n]: bloco });
+                                    }}
+                                    className="text-torg-gray hover:text-red-600 leading-none">×</button>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <select value="" disabled={travado}
+                          onChange={(e) => { escolherLote(n, k, e.target.value); e.target.value = ""; }}
+                          className="w-full text-[11px] border border-gray-200 rounded px-1 py-0.5 disabled:bg-gray-50">
+                          <option value="">+ lote…</option>
+                          {listaLote.map((t) => (
+                            <option key={t.id} value={t.id}>{t.lote ? `${t.lote} · ` : ""}{t.produto}</option>
+                          ))}
+                        </select>
+                      </div>
                     ) : (opcoes || dyn) ? (
                       <select value={dem[n]?.[k] || ""} disabled={travado} onChange={(e) => setDemao(n, k, e.target.value)}
                         className="w-full text-[11px] border border-gray-200 rounded px-1 py-0.5 disabled:bg-gray-50">
@@ -320,18 +378,22 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
       </div>
       )}
 
-      {/* ── pull-off: só quando o PIT da obra pede ────────────────────────────────── */}
-      {esc.pullOff && (
-        <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
-          <p className="text-[12px] font-bold text-torg-dark mb-2">Aderência — pull-off</p>
-          <div className="grid sm:grid-cols-4 gap-2.5">
-            <Campo rot="Equipamento" k="pullOffEquip" />
-            <Campo rot="Valor obtido (MPa)" k="pullOffValor" tipo="number" />
-            <Campo rot="Mínimo exigido (MPa)" k="pullOffMin" tipo="number" />
-            <Campo rot="Tipo de ruptura" k="pullOffRuptura" />
-          </div>
+      {/* ── pull-off ─────────────────────────────────────────────────────────────────
+          ⚠ O BLOCO NÃO SOME MAIS quando o PIT não pede. Vitor (04/09/2026): "Pull-off precisamos
+          ter que colocar N/A". Esconder impedia as duas coisas: registrar o ensaio feito por fora
+          do PIT e registrar que ele não se aplicava. */}
+      <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
+        <p className="text-[12px] font-bold text-torg-dark mb-2">
+          Aderência — pull-off
+          {!esc.pullOff && <span className="ml-1.5 text-[10px] font-normal text-torg-gray">· fora do PIT desta obra</span>}
+        </p>
+        <div className="grid sm:grid-cols-4 gap-2.5">
+          <Campo rot="Equipamento" k="pullOffEquip" na />
+          <Campo rot="Valor obtido (MPa)" k="pullOffValor" tipo="number" na />
+          <Campo rot="Mínimo exigido (MPa)" k="pullOffMin" tipo="number" na />
+          <Campo rot="Tipo de ruptura" k="pullOffRuptura" na />
         </div>
-      )}
+      </div>
     </div>
   );
 }
