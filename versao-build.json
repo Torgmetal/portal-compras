@@ -1,11 +1,71 @@
 {
-  "build": 2774,
-  "gerado": "2026-09-04T21:32:59.531Z",
+  "build": 2786,
+  "gerado": "2026-09-04T21:35:09.434Z",
   "commits": [
     {
-      "hash": "15c48b1d58",
+      "hash": "c580949fbb",
+      "data": "04/09/2026",
+      "titulo": "Tela de versão mostra a mudança que está no ar, não só a anterior"
+    },
+    {
+      "hash": "8a89bdb89d",
       "data": "04/09/2026",
       "titulo": "Versão no rodapé: dá pra saber qual atualização está no ar"
+    },
+    {
+      "hash": "6b6c7c8f1e",
+      "data": "04/09/2026",
+      "titulo": "Manutenção: varrer o banco sozinha, em vez de eu lembrar de escrever cada coluna"
+    },
+    {
+      "hash": "dc2f0abdb0",
+      "data": "04/09/2026",
+      "titulo": "Manutenção: baixa da preparação da OP-113"
+    },
+    {
+      "hash": "a710a4167e",
+      "data": "04/09/2026",
+      "titulo": "Pintura: moldura vazia não sai, e as fotos saem agrupadas por ensaio"
+    },
+    {
+      "hash": "828966b2a5",
+      "data": "04/09/2026",
+      "titulo": "Liberar: dizer que o motivo do atraso está travando o botão"
+    },
+    {
+      "hash": "f791cf48aa",
+      "data": "04/09/2026",
+      "titulo": "Foto de ensaio por área de evidência (e as seis molduras que saíam vazias)"
+    },
+    {
+      "hash": "6668c25814",
+      "data": "04/09/2026",
+      "titulo": "Portal do cliente: tirar o peso da estrutura da capa"
+    },
+    {
+      "hash": "c35b0e3968",
+      "data": "04/09/2026",
+      "titulo": "Pintura: umidade/temperatura na tabela das demãos e as fotos TODAS no PDF"
+    },
+    {
+      "hash": "50b456dc78",
+      "data": "04/09/2026",
+      "titulo": "Admin › Manutenção do banco: aplicar os ajustes pendentes com um clique"
+    },
+    {
+      "hash": "c353422992",
+      "data": "04/09/2026",
+      "titulo": "Lote liberado sobrevive à reimportação: casar também pela marca"
+    },
+    {
+      "hash": "53c001a404",
+      "data": "04/09/2026",
+      "titulo": "Liberar para montagem: conjunto PENDENTE também desce (197 lotes ficaram invisíveis)"
+    },
+    {
+      "hash": "d894f5a919",
+      "data": "04/09/2026",
+      "titulo": "Foto do ensaio: reduzir antes de subir (o \"is not valid JSON\" era o teto de 4,5 MB)"
     },
     {
       "hash": "304ba5196b",
@@ -91,66 +151,6 @@
       "hash": "cfa6f3dbd0",
       "data": "04/09/2026",
       "titulo": "Portal do cliente: a etapa da peça volta a aparecer, e o R vem junto"
-    },
-    {
-      "hash": "a824523fe0",
-      "data": "04/09/2026",
-      "titulo": "Portal do cliente: a peca aparecia com quantidade e peso em dobro"
-    },
-    {
-      "hash": "16902bb517",
-      "data": "04/09/2026",
-      "titulo": "Rastreabilidade: a mesma marca na LPC e na LE contava duas vezes"
-    },
-    {
-      "hash": "7c2cce8f9d",
-      "data": "04/09/2026",
-      "titulo": "Modelo 3D: clicar na peça volta a selecionar (o guarda de arrasto nao perdoava)"
-    },
-    {
-      "hash": "9995843eaa",
-      "data": "04/09/2026",
-      "titulo": "PCP: programar nao e liberar - so entra quem ja passou por aqui"
-    },
-    {
-      "hash": "03a879c753",
-      "data": "04/09/2026",
-      "titulo": "Montagem: campo de busca no painel Programado, igual ao do verde"
-    },
-    {
-      "hash": "71afd60598",
-      "data": "04/09/2026",
-      "titulo": "Error boundaries: tela amigavel + mensagem real (diagnostico do erro do portal)"
-    },
-    {
-      "hash": "8e85552df6",
-      "data": "04/09/2026",
-      "titulo": "PCP: o que o Planejamento programou direto passa a aparecer para a Larissa"
-    },
-    {
-      "hash": "4f821b791d",
-      "data": "04/09/2026",
-      "titulo": "Pedido sai na base que o fornecedor cotou; o rescale de preco sai"
-    },
-    {
-      "hash": "c4ad114ff5",
-      "data": "04/09/2026",
-      "titulo": "Usuario externo sai das comunicacoes da empresa (Lais Stival)"
-    },
-    {
-      "hash": "a076fd106e",
-      "data": "03/09/2026",
-      "titulo": "Portal do cliente: o link passa a vencer em 180 dias, com renovar e trocar"
-    },
-    {
-      "hash": "d35c305071",
-      "data": "03/09/2026",
-      "titulo": "Links publicos: noindex nas 16 paginas que estavam sem"
-    },
-    {
-      "hash": "647da2e1e9",
-      "data": "03/09/2026",
-      "titulo": "PCP: sai a faixa de frentes do topo do cartao da obra"
     }
   ]
 }

@@ -57,6 +57,10 @@ git config core.hooksPath .githooks
 O hook `.githooks/pre-commit` roda `scripts/gerar-versao.js`, que grava `versao-build.json` e o
 inclui no próprio commit. `next.config.js` lê esse arquivo e expõe `NEXT_PUBLIC_BUILD_NUMERO`.
 
+> **Depois de um `git pull`/rebase** o número gravado fica atrás da contagem real por alguns
+> commits; o hook realinha sozinho no commit seguinte (ele usa o maior entre a contagem atual e o
+> valor gravado, então nunca anda pra trás).
+
 > **Por que arquivo e não `git rev-list` no build:** a Vercel faz clone **raso** do repositório, então
 > contar commits durante o build lá devolveria ~10 em vez do número real. O número precisa viajar
 > dentro do commit. Sem o hook instalado, o número **congela** — o hash e a data do build (no
