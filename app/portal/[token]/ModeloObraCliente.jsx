@@ -300,18 +300,31 @@ export default function ModeloObraCliente({ token }) {
               {setores.length > 0 && (
                 <div>
                   <p className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Onde está</p>
+                  {/* ⚠⚠ UMA ETAPA POR VEZ, e não caixinhas que somam. Vitor (05/09/2026): "clico em
+                      qual área eu quero saber e aparecem apenas as peças apontadas naquele setor;
+                      clico no outro, acende apenas a do outro". Com caixas de marcar, dois cliques
+                      mostravam a UNIÃO das duas etapas — o cliente pensa que trocou de etapa e está
+                      vendo as duas. Aqui clicar troca; clicar de novo na mesma volta a obra inteira. */}
                   <div className="space-y-0.5">
-                    {setores.map(([st, qt]) => (
-                      <label key={st} className="flex items-center gap-2 text-[12.5px] text-[#0D1F3C] rounded px-1.5 py-1 cursor-pointer hover:bg-gray-50">
-                        <input type="checkbox" checked={fSetores.has(st)} onChange={() => alternar(setFSetores, st)} className="accent-[#006EAB]" />
-                        {/* ⚠ "Corte" e "Preparação" são o mesmo setor para quem olha de fora — o
-                            Syneco é que separa as operações 10 e 20 (ver lib/portal-obra-consulta). */}
-                        <span className="flex-1">{st === "Corte" || st === "Preparação" ? "Preparação" : st}</span>
-                        <span className="text-[11px] text-gray-400 tabular-nums">{qt}</span>
-                      </label>
-                    ))}
+                    {setores.map(([st, qt]) => {
+                      const ativo = fSetores.has(st);
+                      return (
+                        <button key={st} type="button"
+                          onClick={() => setFSetores(ativo ? new Set() : new Set([st]))}
+                          aria-pressed={ativo}
+                          className={`w-full flex items-center gap-2 text-[12.5px] rounded px-1.5 py-1 text-left transition-colors ${
+                            ativo ? "bg-[#006EAB] text-white font-semibold" : "text-[#0D1F3C] hover:bg-gray-50"}`}>
+                          {/* ⚠ "Corte" e "Preparação" são o mesmo setor para quem olha de fora — o
+                              Syneco é que separa as operações 10 e 20 (ver lib/portal-obra-consulta). */}
+                          <span className="flex-1">{st === "Corte" || st === "Preparação" ? "Preparação" : st}</span>
+                          <span className={`text-[11px] tabular-nums ${ativo ? "text-white/80" : "text-gray-400"}`}>{qt}</span>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <p className="text-[10.5px] text-gray-400 mt-1">peça sem apontamento não entra em nenhuma etapa</p>
+                  <p className="text-[10.5px] text-gray-400 mt-1">
+                    {fSetores.size ? "clique de novo na etapa para ver a obra inteira" : "peça sem apontamento não entra em nenhuma etapa"}
+                  </p>
                 </div>
               )}
 
