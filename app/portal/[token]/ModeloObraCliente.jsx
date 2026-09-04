@@ -379,8 +379,13 @@ export default function ModeloObraCliente({ token }) {
                       <ul className="space-y-1 text-[12.5px]">
                         {peca.rastreio.map((r, i) => (
                           <li key={i}>
-                            <span className="text-[#0D1F3C]">{r.material || "material"}</span>
-                            <span className="text-gray-500"> · corrida {r.corrida}</span>
+                            {/* ⚠ o R vem PRIMEIRO. Vitor (04/09/2026): "não está trazendo o número
+                                da Rastreabilidade" — é por ele que se acha o material e o
+                                certificado, e é o mesmo número que aparece no carimbo do desenho e
+                                na §02 do data book. A corrida é atributo do R, não o contrário. */}
+                            {r.r && <span className="font-mono font-semibold text-[#0D1F3C]">R {r.r}</span>}
+                            <span className="text-[#0D1F3C]">{r.r ? " · " : ""}{r.material || "material"}</span>
+                            {r.corrida && <span className="text-gray-500"> · corrida {r.corrida}</span>}
                             {r.norma && <span className="text-gray-500"> · {r.norma}</span>}
                             {r.certificado && <span className="text-gray-500 block">certificado {r.certificado}</span>}
                           </li>
