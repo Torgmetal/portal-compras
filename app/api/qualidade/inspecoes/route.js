@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { podeFecharRelatorio } from "@/lib/qualidade-campo";
 import { criarRelatorio, vincularNoDataBook } from "@/lib/relatorio-inspecao";
 
 export const runtime = "nodejs";
@@ -21,8 +22,13 @@ const PERFIS = ["ADMIN", "QUALIDADE", "QUALIDADE_CAMPO"];
 const PERFIS_FECHAR = ["ADMIN", "QUALIDADE"];
 
 export async function GET(req) {
-  try { await requireRole(PERFIS); }
+  let quem;
+  try { quem = await requireRole(PERFIS); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  // ⚠⚠ O TOKEN É A ASSINATURA. Quem recebe o link assina como aquela pessoa — então ele só vai
+  // para quem já é responsável por convidar (ADMIN/QUALIDADE). O inspetor de campo lê a mesma
+  // lista, e mandar o token dele junto seria dar a chance de assinar pelo cliente.
+  const podeVerToken = podeFecharRelatorio(quem);
 
   const url = new URL(req.url);
   const opNumero = url.searchParams.get("opNumero");
@@ -57,7 +63,7 @@ export async function GET(req) {
   const assinaturas = envios.length
     ? await prisma.assinaturaDocumento.findMany({
         where: { envioId: { in: envios } },
-        select: { envioId: true, nome: true, setor: true, email: true, assinadoEm: true },
+        select: { envioId: true, nome: true, setor: true, email: true, assinadoEm: true, token: podeVerToken },
       })
     : [];
   const porEnvio = new Map();

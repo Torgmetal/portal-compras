@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Loader2, ArrowLeft, Camera, FileText, Check, Send, AlertCircle,
-  ChevronRight, ExternalLink, Plus, X, ShieldCheck, Ruler, Trash2,
+  ChevronRight, ExternalLink, Plus, X, ShieldCheck, Ruler, Trash2, Link2,
 } from "lucide-react";
 import { TIPO_LABEL, TIPOS_RELATORIO, usaCotas, pendenciasParaAssinatura } from "@/lib/qualidade-campo";
 
@@ -317,11 +317,27 @@ function Relatorio({ r, onMudou, podeFechar = true }) {
       {r.assinaturas.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {r.assinaturas.map((a) => (
-            <span key={a.email} className={`text-[10px] px-2 py-0.5 rounded-full border ${
+            <span key={a.email} className={`text-[10px] px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${
               a.assinadoEm ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-50 text-torg-gray border-gray-200"
             }`}>
               {a.assinadoEm ? <Check size={9} className="inline mr-0.5" /> : null}
               {a.nome}{a.setor ? ` · ${a.setor}` : ""}
+              {/* ⚠ O LINK VALE SOZINHO — quando o e-mail não sai (limite do provedor, endereço
+                  errado), copiar e mandar por fora destrava o documento no mesmo minuto. Só quem
+                  convida enxerga: o token É a assinatura daquela pessoa. */}
+              {!a.assinadoEm && a.token && (
+                <button title="Copiar o link de assinatura desta pessoa"
+                  onClick={() => {
+                    const url = `${window.location.origin}/assinar/${a.token}`;
+                    navigator.clipboard?.writeText(url).then(
+                      () => alert(`Link de ${a.nome} copiado:\n\n${url}`),
+                      () => prompt("Copie o link de assinatura:", url),
+                    );
+                  }}
+                  className="text-torg-blue hover:text-torg-dark">
+                  <Link2 size={11} />
+                </button>
+              )}
             </span>
           ))}
         </div>
@@ -755,8 +771,19 @@ function EnviarAssinatura({ relatorio, onFechar, onEnviado }) {
         body: JSON.stringify({ destinatarios: dest }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro");
-      alert(`${j.enviados} assinante(s) convidado(s)${j.emCopia ? ` e ${j.emCopia} em cópia` : ""}.${j.jaEstavam ? ` ${j.jaEstavam} já tinham sido convidados.` : ""}`);
+      if (r.status >= 400) throw new Error(j.error || "Erro");
+      // ⚠⚠ NENHUM E-MAIL SAIU É ERRO, NÃO AVISO. Vitor (04/09/2026): "fui mandar um relatório para
+      // assinar e não foi". A tela dizia "0 assinante(s) convidado(s)" — tecnicamente verdade, e
+      // fácil de ler como sucesso. Agora diz o motivo do provedor e o que fazer: o link da
+      // assinatura continua valendo e pode ser mandado por fora.
+      if (!j.enviados && !j.emCopia) {
+        const motivo = (j.falhas || []).map((f) => `· ${f.email}: ${f.erro}`).join("\n") || "sem detalhe do provedor";
+        alert(`NENHUM e-mail saiu.\n\n${motivo}\n\nO envio ficou registrado e os links de assinatura estão válidos — dá para copiar o link de cada assinante no quadro do relatório e mandar por fora enquanto o e-mail não volta.`);
+      } else {
+        const parciais = (j.falhas || []).length ? `\n\nNão saíram:\n${j.falhas.map((f) => `· ${f.email}: ${f.erro}`).join("\n")}` : "";
+        const semAnexo = j.semAnexo ? `\n\n${j.semAnexo} e-mail(s) foram sem o PDF anexo (o link tem o documento).` : "";
+        alert(`${j.enviados} assinante(s) convidado(s)${j.emCopia ? ` e ${j.emCopia} em cópia` : ""}.${j.jaEstavam ? ` ${j.jaEstavam} já tinham sido convidados.` : ""}${semAnexo}${parciais}`);
+      }
       onEnviado();
     } catch (e) { alert(e.message); } finally { setEnviando(false); }
   }

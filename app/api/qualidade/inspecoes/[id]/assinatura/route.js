@@ -126,7 +126,11 @@ export async function POST(req, { params }) {
   ).toString("base64");
   const base = baseUrlDe(req);
 
-  let enviados = 0, novos = 0;
+  let enviados = 0, novos = 0, semAnexoN = 0;
+  // ⚠ POR QUE NÃO FOI, e não só "quantos foram". O envio anterior devolveu `enviados: 0` e a tela
+  // disse "0 assinante(s) convidado(s)" — sem motivo, sem o que fazer. O erro do provedor (limite
+  // da conta, endereço recusado, anexo grande) é a única informação que resolve.
+  const falhas = [];
   for (const d of assinantes) {
     if (emails.has(d.email.toLowerCase())) continue;
     const token = gerarTokenForte(24);
@@ -144,12 +148,23 @@ export async function POST(req, { params }) {
         <p style="margin:0;font-size:12px;color:#5a6b78">Ao assinar, ficam registrados a sua confirmação, a <strong>data/hora</strong> e o <strong>IP</strong> do acesso.${d.setor ? ` Papel: ${d.setor}.` : ""}</p>
       </div>
     </div>`;
-    const r = await sendEmail({
+    // ⚠⚠ SE FALHAR COM O ANEXO, TENTA SEM ELE. Vitor (04/09/2026): "fui mandar um relatório para
+    // assinar e não foi". Os três convites voltaram com `enviados: 0` — e o relatório tinha 11
+    // fotos, 3 MB de PDF (4 MB em base64, por destinatário). O link da assinatura já dá acesso ao
+    // documento: perder o convite inteiro por causa do anexo é trocar o essencial pelo cômodo.
+    let r = await sendEmail({
       to: d.email, subject: titulo, html,
       attachments: [{ filename: `${rel.codigo}.pdf`, content: pdfB64 }],
       replyTo: user.email || undefined,
-    }).catch(() => ({ ok: false }));
-    if (r?.ok) enviados++;
+    }).catch((e) => ({ ok: false, error: e?.message }));
+    if (!r?.ok) {
+      const semAnexo = await sendEmail({
+        to: d.email, subject: titulo, html, replyTo: user.email || undefined,
+      }).catch((e) => ({ ok: false, error: e?.message }));
+      if (semAnexo?.ok) r = { ...semAnexo, semAnexo: true };
+      else falhas.push({ email: d.email, erro: r?.error || semAnexo?.error || "não foi possível enviar" });
+    }
+    if (r?.ok) { enviados++; if (r.semAnexo) semAnexoN++; }
   }
 
   // ── CÓPIAS: recebem o documento, sem link e sem linha no quadro de assinaturas ──
@@ -167,8 +182,9 @@ export async function POST(req, { params }) {
       to: c.email, subject: `${titulo} (cópia)`, html,
       attachments: [{ filename: `${rel.codigo}.pdf`, content: pdfB64 }],
       replyTo: user.email || undefined,
-    }).catch(() => ({ ok: false }));
+    }).catch((e) => ({ ok: false, error: e?.message }));
     if (r?.ok) emCopia++;
+    else falhas.push({ email: c.email, erro: r?.error || "não foi possível enviar a cópia" });
   }
 
   // o documento na seção do data book passa a apontar pro PDF do relatório
@@ -178,9 +194,15 @@ export async function POST(req, { params }) {
   await prisma.auditLog.create({
     data: {
       userId: user.id, action: "ENVIAR_RELATORIO_INSPECAO_ASSINATURA", entity: "RelatorioInspecao", entityId: id,
-      diff: { codigo: rel.codigo, destinatarios: dest.length, assinantes: assinantes.length, copias: copias.length, novos, enviados, emCopia, vinculo },
+      diff: { codigo: rel.codigo, destinatarios: dest.length, assinantes: assinantes.length, copias: copias.length, novos, enviados, emCopia, semAnexo: semAnexoN, falhas, vinculo },
     },
   }).catch(() => {});
 
-  return NextResponse.json({ ok: true, envioId, novos, enviados, emCopia, jaEstavam: assinantes.length - novos, vinculo });
+  // ⚠ `ok` diz se ALGUÉM recebeu. Devolver ok:true com zero e-mails enviados é o que fez o
+  // relatório parecer despachado sem nunca ter saído.
+  return NextResponse.json({
+    ok: enviados > 0 || emCopia > 0,
+    envioId, novos, enviados, emCopia, semAnexo: semAnexoN, falhas,
+    jaEstavam: assinantes.length - novos, vinculo,
+  });
 }
