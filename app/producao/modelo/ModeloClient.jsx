@@ -498,14 +498,29 @@ export default function ModeloClient({ ops }) {
                   )}
                 </p>
                 {setores.length > 0 ? (
+                  /* ⚠⚠ UMA ETAPA POR VEZ, igual ao portal do cliente. Vitor (05/09/2026): "clico em
+                     qual área eu quero saber e aparecem apenas as peças apontadas naquele setor;
+                     clico no outro, acende apenas a do outro" — e, sobre somar duas aqui dentro:
+                     "não é útil não, pode deixar como vamos fazer no portal do cliente". Caixa de
+                     marcar mostrava a UNIÃO das etapas: quem trocava de setor via os dois e lia
+                     como se fosse um. */
                   <div className="space-y-0.5">
-                    {setores.map(([t, qt]) => (
-                      <label key={t} className="flex items-center gap-2 text-[12.5px] text-torg-dark hover:bg-torg-blue-50/60 rounded px-1.5 py-1 cursor-pointer">
-                        <input type="checkbox" checked={fSetores.has(t)} onChange={() => alternar(setFSetores, t)} className="accent-torg-blue" />
-                        <span className="flex-1">{t}</span>
-                        <span className="text-[11px] text-torg-gray tabular-nums">{qt}</span>
-                      </label>
-                    ))}
+                    {setores.map(([t, qt]) => {
+                      const ativo = fSetores.has(t);
+                      return (
+                        <button key={t} type="button"
+                          onClick={() => setFSetores(ativo ? new Set() : new Set([t]))}
+                          aria-pressed={ativo}
+                          className={`w-full flex items-center gap-2 text-[12.5px] rounded px-1.5 py-1 text-left transition-colors ${
+                            ativo ? "bg-torg-blue text-white font-semibold" : "text-torg-dark hover:bg-torg-blue-50/60"}`}>
+                          <span className="flex-1">{t}</span>
+                          <span className={`text-[11px] tabular-nums ${ativo ? "text-white/80" : "text-torg-gray"}`}>{qt}</span>
+                        </button>
+                      );
+                    })}
+                    {fSetores.size > 0 && (
+                      <p className="text-[10.5px] text-torg-gray px-1.5 pt-0.5">clique de novo na etapa para ver a obra inteira</p>
+                    )}
                   </div>
                 ) : (
                   <p className="text-[11.5px] text-amber-700 px-1.5 leading-snug">
