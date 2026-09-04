@@ -37,7 +37,13 @@ export async function GET(req, { params }) {
     }
     const marca = searchParams.get("marca");
     if (!marca) return NextResponse.json({ error: "Informe a marca." }, { status: 400 });
-    const d = await pecaParaCliente({ opId: op.id, opNumero: op.numero, marca });
+    // ⚠ o que vem DA COMPRA é escolhido por portal (seções RASTREIO_NF / RASTREIO_RM). O rastreio
+    // em si — R, corrida, certificado, norma — não é desligável: é o que o portal promete.
+    const secoes = secoesDoPortal(portal);
+    const d = await pecaParaCliente({
+      opId: op.id, opNumero: op.numero, marca,
+      mostrar: { nf: secoes.includes("RASTREIO_NF"), rm: secoes.includes("RASTREIO_RM") },
+    });
     if (!d) return NextResponse.json({ error: "Esta marca não está nas listas desta obra." }, { status: 404 });
     return NextResponse.json(d);
   } catch {

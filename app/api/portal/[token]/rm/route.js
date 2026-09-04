@@ -34,7 +34,13 @@ export async function GET(req, { params }) {
   if (!portal || portal.status !== "PUBLICADO" || portalExpirado(portal)) {
     return NextResponse.json({ error: "Link inválido." }, { status: 404 });
   }
-  if (!secoesDoPortal(portal).includes("MODELO_NAVEGAVEL")) {
+  const secoes = secoesDoPortal(portal);
+  if (!secoes.includes("MODELO_NAVEGAVEL")) {
+    return NextResponse.json({ error: "Indisponível." }, { status: 403 });
+  }
+  // ⚠ a trava vale AQUI também, não só na tela: esconder o número da RM no painel e deixar a rota
+  // aberta seria uma cortina, não uma escolha — bastaria adivinhar o número.
+  if (!secoes.includes("RASTREIO_RM")) {
     return NextResponse.json({ error: "Indisponível." }, { status: 403 });
   }
 
