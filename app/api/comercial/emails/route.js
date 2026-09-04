@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { SEM_EXTERNOS } from "@/lib/usuarios-internos";
 
 export const runtime = "nodejs";
 
@@ -12,7 +13,7 @@ export async function GET() {
   catch (e) { return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const users = await prisma.user.findMany({
-    where: { ativo: true, tipo: { not: "FUNCIONARIO" }, modulos: { some: { modulo: "COMERCIAL" } } },
+    where: { ativo: true, ...SEM_EXTERNOS, tipo: { not: "FUNCIONARIO" }, modulos: { some: { modulo: "COMERCIAL" } } },
     select: { name: true, email: true },
     orderBy: { name: "asc" },
   });

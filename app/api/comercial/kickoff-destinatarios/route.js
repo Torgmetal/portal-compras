@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { SEM_EXTERNOS } from "@/lib/usuarios-internos";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,8 @@ export async function GET() {
 
   // email é obrigatório no modelo User — sem filtro de null
   const users = await prisma.user.findMany({
-    where: { ativo: true },
+    // ⚠ sem os externos: o kick off é conversa da casa (ver lib/usuarios-internos)
+    where: { ativo: true, ...SEM_EXTERNOS },
     select: { name: true, email: true, tipo: true, modulos: { select: { modulo: true } } },
   });
 

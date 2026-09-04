@@ -11,6 +11,7 @@ import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { htmlAvisoSeguranca, ASSUNTO_AVISO, AVISO_PADRAO } from "@/lib/aviso-seguranca-email";
 import { z } from "zod";
+import { SEM_EXTERNOS } from "@/lib/usuarios-internos";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,9 @@ export const maxDuration = 120;
 
 // ⚠ SÓ USUÁRIO INTERNO. CLIENTE não tem nada a ver com isto, e FUNCIONARIO entra por CPF em
 // /colaborador — o "Esqueci minha senha" citado no texto não é a porta dele.
-const ondeInternos = { ativo: true, tipo: { in: ["USUARIO", "ADMIN"] } };
+// ⚠ e SEM OS EXTERNOS: quem só entra para assinar/elaborar não é destinatário de aviso da
+// empresa (ver lib/usuarios-internos).
+const ondeInternos = { ativo: true, tipo: { in: ["USUARIO", "ADMIN"] }, ...SEM_EXTERNOS };
 
 async function destinatarios() {
   return prisma.user.findMany({

@@ -16,6 +16,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { SEM_EXTERNOS } from "@/lib/usuarios-internos";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ export async function GET(req) {
 
   const modulo = new URL(req.url).searchParams.get("modulo") || "ENGENHARIA";
   const pessoas = await prisma.user.findMany({
-    where: { ativo: true, tipo: { in: ["ADMIN", "USUARIO"] }, modulos: { some: { modulo } } },
+    where: { ativo: true, ...SEM_EXTERNOS, tipo: { in: ["ADMIN", "USUARIO"] }, modulos: { some: { modulo } } },
     select: { id: true, name: true, setor: true },
     orderBy: { name: "asc" },
   });

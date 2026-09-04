@@ -10,6 +10,7 @@ import { sendEmail } from "@/lib/email";
 import { cabecalhoEmail } from "@/lib/email-layout";
 import { escapeHtml } from "@/lib/html";
 import { baseUrlDe } from "@/lib/databook-assinaturas";
+import { SEM_EXTERNOS } from "@/lib/usuarios-internos";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -41,7 +42,7 @@ export async function POST(req, { params }) {
   if (!vaga) return NextResponse.json({ success: false, error: "Vaga não encontrada" }, { status: 404 });
 
   const users = await prisma.user.findMany({
-    where: { ativo: true, tipo: { not: "FUNCIONARIO" } },
+    where: { ativo: true, ...SEM_EXTERNOS, tipo: { not: "FUNCIONARIO" } },
     select: { name: true, email: true, tipo: true, modulos: true },
   });
 
