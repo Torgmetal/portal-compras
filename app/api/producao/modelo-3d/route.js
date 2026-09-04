@@ -14,6 +14,7 @@
 // inteiro (mesmo cuidado de lib/blob-url).
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { etapaDasMarcas } from "@/lib/portal-obra-consulta";
 import { requireRole } from "@/lib/session";
 import { inventarioEngenharia } from "@/lib/pasta-engenharia";
 import { downloadFileByPath, acharPastaOp } from "@/lib/sharepoint";
@@ -92,10 +93,17 @@ export async function GET(req) {
       if (o.dataFim && (!ultimo || o.dataFim > ultimo)) ultimo = o.dataFim;
     }
 
+    // ⚠⚠ A ETAPA SAI DE UMA FUNÇÃO SÓ — `etapaDasMarcas`, a mesma do portal do cliente. Vitor
+    // (05/09/2026): "como vamos fazer para que você não perca mais essa rota, para não passarmos
+    // inverdades para os setores e para os clientes?". Esta rota tinha a SUA cópia da leitura, e a
+    // cópia não sabia o que a outra aprendeu: quem é apontado no corte é o CROQUI, então conjunto
+    // sem apontamento próprio ficava "parado" — cinza no modelo — enquanto a fábrica cortava as
+    // peças dele. Duas leituras da mesma pergunta é como a tela passa a mentir sem ninguém mexer
+    // nela. Aqui e no portal, agora, é a mesma função.
+    const mapa = await etapaDasMarcas(op.id, marcas);
     const estados = {}, setores = {};
     for (const m of marcas) {
-      const feitos = feitoEm.get(m);
-      const ondeEsta = feitos ? [...CADEIA].reverse().find((s) => feitos.has(s)) : null;
+      const ondeEsta = mapa.get(m) || null;
       estados[m] = !ondeEsta ? "parado" : ondeEsta === "Pintura" ? "pronta" : "andando";
       if (ondeEsta) setores[m] = ondeEsta;
     }
