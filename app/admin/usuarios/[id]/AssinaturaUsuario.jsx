@@ -35,7 +35,8 @@ export default function AssinaturaUsuario({ id = null, tem = false, onMudar = nu
       const blob = await prepararAssinatura(file, { rotacao: rot });
       setPrevia((p) => { if (p?.url) URL.revokeObjectURL(p.url); return { url: URL.createObjectURL(blob), blob }; });
       if (novo) aoPreparar?.(blob);
-    } catch (e) { setErro(e.message); setPrevia(null); if (novo) aoPreparar?.(null); }
+      return blob;
+    } catch (e) { setErro(e.message); setPrevia(null); if (novo) aoPreparar?.(null); return null; }
     finally { setProcessando(false); }
   }
 
@@ -44,7 +45,14 @@ export default function AssinaturaUsuario({ id = null, tem = false, onMudar = nu
     e.target.value = "";
     if (!file) return;
     setArquivo(file); setRotacao(0);
-    await tratar(file, 0);
+    const blob = await tratar(file, 0);
+    // ⚠⚠ SALVA SOZINHO. Vitor (04/09/2026): "já está anexado de ambos" — e não estava: nem o
+    // Alexandre nem a Fabrine tinham imagem no cadastro, e o log não registra upload nenhum.
+    // A prévia tratada é IDÊNTICA a uma assinatura já salva (mesma moldura, mesma imagem), então
+    // escolher o arquivo parecia ter guardado; o que guardava de verdade era um botãozinho
+    // "usar esta" ao lado. Quem fechava a tela levava o cadastro vazio sem saber — e o documento
+    // saía com a linha em branco depois de a pessoa já ter assinado.
+    if (blob && !novo && id) await salvar(blob);
   }
 
   async function girar() {
@@ -53,12 +61,15 @@ export default function AssinaturaUsuario({ id = null, tem = false, onMudar = nu
     if (arquivo) await tratar(arquivo, r);
   }
 
-  async function salvar() {
-    if (!previa?.blob || !id) return;
+  async function salvar(blobDireto = null) {
+    // ⚠ o blob vem por parâmetro quando o salvamento é automático: `setPrevia` é assíncrono e o
+    // estado ainda não valeria aqui.
+    const blob = blobDireto || previa?.blob;
+    if (!blob || !id) return;
     setErro(""); setProcessando(true);
     try {
       const fd = new FormData();
-      fd.append("file", new File([previa.blob], "assinatura.png", { type: "image/png" }));
+      fd.append("file", new File([blob], "assinatura.png", { type: "image/png" }));
       const r = await fetch(`/api/admin/usuarios/${id}/assinatura`, { method: "POST", body: fd });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "Erro ao salvar.");
@@ -98,9 +109,10 @@ export default function AssinaturaUsuario({ id = null, tem = false, onMudar = nu
             <div className="flex flex-col gap-1.5">
               {previa ? (
                 <>
-                  <p className="text-[11px] text-torg-gray max-w-xs">
-                    Prévia tratada — fundo removido e recortada. Se estiver deitada, gire.
-                    {novo && " Ela é salva junto com o usuário."}
+                  <p className={`text-[11px] max-w-xs ${novo ? "text-torg-gray" : "text-amber-800 font-semibold"}`}>
+                    {novo
+                      ? "Prévia tratada — fundo removido e recortada. Se estiver deitada, gire. Ela é salva junto com o usuário."
+                      : "⚠ Esta versão girada AINDA NÃO ESTÁ SALVA — clique em “Salvar assinatura”."}
                   </p>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <button type="button" onClick={girar} disabled={processando}
@@ -108,16 +120,16 @@ export default function AssinaturaUsuario({ id = null, tem = false, onMudar = nu
                       <RotateCw size={12} /> girar
                     </button>
                     {!novo && (
-                      <button type="button" onClick={salvar} disabled={processando}
-                        className="text-[11px] font-semibold text-white bg-torg-blue rounded-lg px-2.5 py-1 hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1">
-                        {processando ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} usar esta
+                      <button type="button" onClick={() => salvar()} disabled={processando}
+                        className="text-[12px] font-semibold text-white bg-amber-600 rounded-lg px-3 py-1.5 hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5">
+                        {processando ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Salvar assinatura
                       </button>
                     )}
                   </div>
                 </>
               ) : (
                 <>
-                  {salvo && <p className="text-[11px] text-emerald-700">Assinatura salva.</p>}
+                  {salvo && <p className="text-[11px] text-emerald-700 font-semibold">✓ Assinatura salva no cadastro.</p>}
                   <button type="button" onClick={remover} disabled={processando}
                     className="text-[11px] font-semibold text-red-600 border border-red-200 rounded-lg px-2.5 py-1 hover:bg-red-50 disabled:opacity-50 inline-flex items-center gap-1">
                     <Trash2 size={12} /> remover
