@@ -315,7 +315,7 @@ export async function GET(req, { params }) {
               select: { qtdRecebida: true, nfNumero: true, dataRecebimento: true },
               orderBy: { dataRecebimento: "desc" }, take: 1,
             },
-            pedidoOmie: { select: { numeroPedido: true, dataEntregaReal: true, statusEntrega: true, status: true } },
+            pedidoOmie: { select: { numeroPedido: true, dataEntregaReal: true, statusEntrega: true, status: true, nfNumero: true } },
           },
         },
       },
@@ -329,13 +329,13 @@ export async function GET(req, { params }) {
     const normal = (t) => String(t || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
     const certsDaOP = await prisma.documentoQualidade.findMany({
       where: { opNumero: portal.opNumero, ativo: true, categoria: "MATERIAL", importRef: { not: null } },
-      select: { nome: true, importRef: true, numeroCorrida: true, dataRecebimento: true },
+      select: { nome: true, importRef: true, numeroCorrida: true, dataRecebimento: true, nfNumero: true },
       take: 800,
     });
     const rPorMaterial = new Map();
     for (const c of certsDaOP) {
       const k = normal(c.nome);
-      if (k && !rPorMaterial.has(k)) rPorMaterial.set(k, { r: c.importRef, corrida: c.numeroCorrida, em: c.dataRecebimento });
+      if (k && !rPorMaterial.has(k)) rPorMaterial.set(k, { r: c.importRef, corrida: c.numeroCorrida, em: c.dataRecebimento, nf: c.nfNumero });
     }
     const acharR = (desc) => {
       const k = normal(desc);
@@ -398,7 +398,14 @@ export async function GET(req, { params }) {
           // consultado aqui para achar o R, guarda `dataRecebimento`: a data existia ao lado do
           // número que já estava na tela, e só não estava sendo lida.
           chegouEm: fmt(receb?.dataRecebimento || ped?.dataEntregaReal || (st === "RECEBIDO" ? m?.em : null)),
-          nf: receb?.nfNumero || null,
+          // ⚠⚠ A NF SEGUE A DATA: vem do CMR quando não está no recebimento. Vitor (04/09/2026):
+          // "no portal ainda falta o número da NF". Medido na OP-112: nenhum dos 8 pedidos tem
+          // `nfNumero` e a RM não tem linha de recebimento — mas 100% do CMR das obras vivas tem a
+          // nota. O número existia ao lado do R que já estava na tela, e só não estava sendo lido.
+          //
+          // ⚠ e só em linha RECEBIDA, pela mesma razão da data: mostrar a nota de um material que
+          // chegou para outra linha diria que esta chegou.
+          nf: receb?.nfNumero || ped?.nfNumero || (st === "RECEBIDO" ? m?.nf : null) || null,
           rastreio: m?.r || null, corrida: m?.corrida || null,
         });
       }
