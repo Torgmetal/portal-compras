@@ -93,9 +93,21 @@ export default withAuth(
     // aparecia para quem mais precisa dele. Liberada só esta rota, que é de leitura do próprio
     // comunicado e registro da própria ciência; o resto de /api/rh continua fechado.
     const COMUNICADO = "/api/mural/pendente";
-    if (token?.tipo === "FUNCIONARIO" && !path.startsWith("/meu-rh") && !path.startsWith("/api/meu-rh") && path !== COMUNICADO) {
+    // ⚠⚠ /colaborador É O PORTAL DELE — NÃO PODE SER BOUNCEADO. A canônica hoje é /colaborador
+    // (o /meu-rh só redireciona pra cá). Se este portão empurrar o funcionário de /colaborador para
+    // /meu-rh, o /meu-rh redireciona de volta pra /colaborador → LOOP de 307, e o App Router
+    // seguindo essa cadeia no cliente quebra com "null ... parallelRoutes.get" (tela branca "após
+    // logar"). Então: /colaborador e /meu-rh ficam LIBERADOS, e o desvio dos internos aponta para a
+    // canônica /colaborador (não /meu-rh, que só bounceia de novo).
+    if (
+      token?.tipo === "FUNCIONARIO" &&
+      !path.startsWith("/colaborador") &&
+      !path.startsWith("/meu-rh") &&
+      !path.startsWith("/api/meu-rh") &&
+      path !== COMUNICADO
+    ) {
       if (path.startsWith("/api/")) return NextResponse.json({ error: "Sem acesso" }, { status: 403 });
-      return NextResponse.redirect(new URL("/meu-rh", req.url));
+      return NextResponse.redirect(new URL("/colaborador", req.url));
     }
 
     // ⚠⚠ CLIENTE NÃO ENTRA NO PORTAL. Vitor (28/08/2026): o acesso do cliente existe para ASSINAR
