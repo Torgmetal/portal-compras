@@ -106,7 +106,13 @@ export default function ModeloObraCliente({ token }) {
     () => new Map(Object.entries(niveisObra?.setores || {}).map(([m, st]) => [chaveMarca(m), st])),
     [niveisObra],
   );
-  const setorDe = useCallback((x) => (x?.marca ? setoresPorMarca.get(chaveMarca(x.marca)) || null : null), [setoresPorMarca]);
+  // ⚠ "Corte" e "Preparação" viram UMA etapa já aqui, não só no rótulo: com o conjunto entrando
+  // pela preparação e o croqui pelo corte, a lista mostraria duas linhas "Preparação" com contagens
+  // diferentes — o mesmo nome duas vezes é pior que o nome errado.
+  const setorDe = useCallback((x) => {
+    const st = x?.marca ? setoresPorMarca.get(chaveMarca(x.marca)) || null : null;
+    return st === "Corte" ? "Preparação" : st;
+  }, [setoresPorMarca]);
 
   // ⚠⚠ O TIPO VEM DA LISTA quando ela sabe o nome. Vitor (05/09/2026): "quando colocamos em vigas
   // ele seleciona algumas coisas sem sentido; teria que pegar nas listas os nomes das peças —

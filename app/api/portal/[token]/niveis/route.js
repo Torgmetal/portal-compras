@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { niveisDaMontagem } from "@/lib/niveis-montagem";
 import { secoesDoPortal, portalExpirado } from "@/lib/portal-cliente";
-import { setorDasMarcas } from "@/lib/portal-obra-consulta";
+import { etapaDasMarcas } from "@/lib/portal-obra-consulta";
 import { tiposPorMarca } from "@/lib/tipo-peca";
 
 export const runtime = "nodejs";
@@ -41,7 +41,8 @@ export async function GET(req, { params }) {
           where: { opId: op.id }, select: { marca: true, descricao: true }, take: 6000,
         });
         const marcas = pecas.map((p) => p.marca).filter(Boolean);
-        const mapa = await setorDasMarcas([...new Set(marcas)]);
+        // ⚠ conta o conjunto pelos croquis dele — quem é apontado no corte é o croqui
+        const mapa = await etapaDasMarcas(op.id, [...new Set(marcas)]);
         setores = Object.fromEntries(mapa);
         tipos = tiposPorMarca(pecas);
       }
