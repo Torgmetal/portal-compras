@@ -1,6 +1,7 @@
 // GET — o PDF do relatório, com as fotos e o quadro de assinaturas.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { completarImagens } from "@/lib/assinatura-cadastro";
 import { requireRole } from "@/lib/session";
 import { baixarDesenho, garantirDesenhos } from "@/lib/relatorio-dimensional";
 import { usaCotas, PERFIS_CAMPO } from "@/lib/qualidade-campo";
@@ -32,12 +33,14 @@ export async function GET(req, { params }) {
     select: { url: true, marca: true, origemMarca: true, observacao: true, capturadaEm: true, autorNome: true, evidencia: true },
   });
 
+  // ⚠ quem assinou antes de ter imagem no cadastro ganha a imagem de agora — ver
+  // lib/assinatura-imagem.js. Sem isto, anexar a assinatura depois não mudava o documento.
   const assinaturas = rel.envioAssinaturaId
-    ? await prisma.assinaturaDocumento.findMany({
+    ? await completarImagens(await prisma.assinaturaDocumento.findMany({
         where: { envioId: rel.envioAssinaturaId },
-        select: { nome: true, setor: true, assinadoEm: true, ip: true, imagemUrl: true },
+        select: { email: true, nome: true, setor: true, assinadoEm: true, ip: true, imagemUrl: true },
         orderBy: { nome: "asc" },
-      })
+      }))
     : null;
 
   // ── UMA REVISÃO ANTERIOR? ───────────────────────────────────────────────────────────────────

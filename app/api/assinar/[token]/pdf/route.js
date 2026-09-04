@@ -2,6 +2,7 @@
 // já com o quadro de assinaturas eletrônicas atualizado.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { completarImagens } from "@/lib/assinatura-cadastro";
 import { gerarPlanoTreinamentoPDF } from "@/lib/plano-treinamento-pdf";
 import { gerarCronogramaAuditoriaPDF } from "@/lib/cronograma-auditoria-pdf";
 import { baixarDesenho } from "@/lib/relatorio-dimensional";
@@ -21,11 +22,12 @@ export async function GET(_req, { params }) {
   if (!a) return new NextResponse("Link inválido.", { status: 404 });
 
   const snap = a.envio.snapshot || {};
-  const assinaturas = await prisma.assinaturaDocumento.findMany({
+  // ⚠ idem à tela interna: imagem que faltava no snapshot vem do cadastro atual
+  const assinaturas = await completarImagens(await prisma.assinaturaDocumento.findMany({
     where: { envioId: a.envioId },
-    select: { nome: true, setor: true, assinadoEm: true, ip: true, imagemUrl: true },
+    select: { email: true, nome: true, setor: true, assinadoEm: true, ip: true, imagemUrl: true },
     orderBy: { nome: "asc" },
-  });
+  }));
 
   let bytes;
   if (a.envio.tipo === "PLANO_TREINAMENTO") {
