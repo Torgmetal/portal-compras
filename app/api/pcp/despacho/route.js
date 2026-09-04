@@ -125,6 +125,19 @@ export async function GET(req) {
   const romaneioSemProducao = noRomaneioSemProducao(noSetor, marcasEntregues);
   const semEntregues = entregues.length ? noSetor.filter((p) => !entregueAExpedicao(p, marcasEntregues)) : noSetor;
 
+  // ⚠ as marcas que JÁ TIVERAM DESENHO IMPRESSO nesta OP — a GRD é o registro de que desceu. Sobe
+  // para cá porque o escopo abaixo precisa dela; o detalhe (quem, quando, quantas cópias) continua
+  // sendo montado mais adiante, por setor.
+  const grdEmitidas = new Set(
+    (await prisma.grdLiberacao.findMany({
+      // ⚠ sem filtrar por setor, igual à consulta detalhada mais abaixo: o `setor` gravado na GRD
+      // tem valores soltos do passado ("preparacao", "PCP") e casar por ele faria a peça sumir da
+      // lista por causa de um rótulo antigo.
+      where: { opNumero: opInfo?.numero || undefined },
+      select: { marca: true },
+    }).catch(() => [])).map((g) => String(g.marca || "").trim().toUpperCase())
+  );
+
   // ⚠⚠ SÓ O QUE O PLANEJAMENTO LIBEROU. Vitor (26/08/2026): "na pagina do pcp eu importei apenas as
   // peças Z da OP 105 vc puxou 100% da OP 105".
   //
@@ -172,9 +185,20 @@ export async function GET(req) {
       // é Json sem chave estrangeira — o lote de corte de 31/08 da 097 ficou com 20 de 20 ids
       // apontando para peça que não existe mais. Se a peça recriada tiver dia programado, ela
       // volta a aparecer por aqui em vez de sumir calada.
-      const programado = (p) => !!p.montagemDiaProgramado || !!p.corteDiaProgramado;
+      // ⚠⚠ PROGRAMAR NÃO É LIBERAR — e essa distinção custou uma correção no mesmo dia.
+      // Vitor (04/09/2026), depois de eu abrir demais: "a A230 em diante aparece na lista, porém a
+      // engenharia não liberou os projetos ainda; nesse caso, se o planejamento nem liberou, não
+      // deveria aparecer para o PCP".
+      //
+      // Marcar dia e bancada é ensaio: o Planejamento distribui a carga para ver o prazo, sem que a
+      // Engenharia tenha soltado o projeto. Trazer isso para o PCP é mandar descer desenho que não
+      // existe. Quem entra sem estar no lote é só quem JÁ PASSOU por aqui — a fábrica apontou
+      // produção, ou o desenho já foi impresso (a GRD é o registro de que desceu). Foi assim que a
+      // T97A136 voltou a aparecer (GRD impressa hoje) sem trazer junto os 61 do bloco das 09:45,
+      // que não têm liberação nem GRD.
+      const jaDesceu = (p) => grdEmitidas.has(String(p.marca || "").trim().toUpperCase());
       if (!frenteInteira && ids.size) {
-        escopo = semEntregues.filter((p) => ids.has(p.id) || temProducao(p) || programado(p));
+        escopo = semEntregues.filter((p) => ids.has(p.id) || temProducao(p) || jaDesceu(p));
       }
       const foraDoLote = new Set(
         frenteInteira || !ids.size ? [] : escopo.filter((p) => !ids.has(p.id)).map((p) => p.id)
@@ -184,7 +208,7 @@ export async function GET(req) {
         pecasLiberadas: frenteInteira ? null : ids.size,
         dias: [...new Set(libs.map((l) => (l.dataProgramada ? l.dataProgramada.toISOString().slice(0, 10) : null)).filter(Boolean))],
         // ⚠ diz quanto ficou de fora: um recorte silencioso faz o PCP achar que a obra acabou
-        foraDoRecorte: frenteInteira ? 0 : semEntregues.filter((p) => !ids.has(p.id) && !temProducao(p) && !programado(p)).length,
+        foraDoRecorte: frenteInteira ? 0 : semEntregues.filter((p) => !ids.has(p.id) && !temProducao(p) && !jaDesceu(p)).length,
         // ⚠ ponteiro que não existe mais: a liberação diz que soltou N peças e M delas foram
         // apagadas por uma reimportação da lista. Silenciar isso faz o lote parecer menor do que
         // foi — e some trabalho que alguém combinou.
