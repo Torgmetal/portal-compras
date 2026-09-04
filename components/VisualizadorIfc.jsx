@@ -627,11 +627,24 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
 
         // ── clique ──
         const ray = new THREE.Raycaster(), pt = new THREE.Vector2();
-        let arrastou = false;
-        const down = () => { arrastou = false; };
-        const move = () => { arrastou = true; };
+        // ⚠⚠ ARRASTAR PRECISA DE TOLERÂNCIA. Vitor (04/09/2026): "nos modelos 3D, tanto do painel de
+        // produção quanto do painel do cliente, você tirou a opção de apertar nas peças e aparecer
+        // as informações". Não tirei — o guarda de arrasto é que não perdoava: qualquer
+        // `pointermove` entre apertar e soltar cancelava a seleção, e o navegador dispara move com
+        // um pixel de tremida. No trackpad isso é quase todo clique, e piora quanto mais pesado o
+        // modelo (mais tempo entre o down e o up). Agora só conta como giro de câmera quem andou
+        // mais de 5 px.
+        const TOLERANCIA_PX = 5;
+        let ini = null, arrastou = false;
+        const down = (ev) => { ini = { x: ev.clientX, y: ev.clientY }; arrastou = false; };
+        const move = (ev) => {
+          if (!ini) return;
+          if (Math.hypot(ev.clientX - ini.x, ev.clientY - ini.y) > TOLERANCIA_PX) arrastou = true;
+        };
         const up = (ev) => {
-          if (arrastou) return;                 // girou a câmera: não é seleção
+          const girou = arrastou;
+          ini = null; arrastou = false;
+          if (girou) return;                    // girou a câmera: não é seleção
           const r = rend.domElement.getBoundingClientRect();
           pt.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
           pt.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
