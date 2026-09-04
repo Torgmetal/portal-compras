@@ -796,10 +796,21 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
 
           {/* ⚠ o motivo do atraso continua obrigatório: é o que o Vitor pediu para medir. Só aparece
               quando faz falta, em vez de ocupar linha em toda liberação. */}
+          {/* ⚠⚠ E DIZ QUE É OBRIGATÓRIO. Gabriel (04/09/2026): "selecionando as peças da T97B, o
+              botão de liberar não está clicável — estou esquecendo de algo?". Estava travado por
+              este campo em branco, dois dias depois do marco, e nada na tela dizia isso: o aviso
+              existia só para "escolha um setor". Campo obrigatório que não se anuncia trava a
+              pessoa sem ela saber no quê. */}
           {desvio > 0 && (
-            <input value={motivo} onChange={(e) => setMotivo(e.target.value)}
-              placeholder="Por que não começou no marco? ex.: material não chegou, desenho em revisão"
-              className="w-full text-[12px] border border-gray-200 rounded-lg px-2.5 py-1.5 focus:border-torg-blue outline-none" />
+            <div>
+              <label className="block text-[11px] font-semibold text-red-700 mb-1">
+                Motivo do atraso — obrigatório ({desvio} dia{desvio > 1 ? "s" : ""} depois do marco)
+              </label>
+              <input value={motivo} onChange={(e) => setMotivo(e.target.value)}
+                placeholder="Por que não começou no marco? ex.: material não chegou, desenho em revisão"
+                className={`w-full text-[12px] border rounded-lg px-2.5 py-1.5 outline-none ${
+                  motivo.trim() ? "border-gray-200 focus:border-torg-blue" : "border-red-300 bg-red-50/40 focus:border-red-500"}`} />
+            </div>
           )}
 
           <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-2">
@@ -809,6 +820,10 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
               Liberar {fmtN(somaSel.n)} peça(s){dia ? ` para ${fmtD(dia)}` : ""}
             </button>
             {!setores.length && <span className="text-[11px] text-red-600">escolha ao menos um setor</span>}
+            {/* o mesmo aviso ao lado do botão: quem olha para o botão desabilitado não olha para cima */}
+            {desvio > 0 && !motivo.trim() && (
+              <span className="text-[11px] text-red-600 font-semibold">escreva o motivo do atraso acima para liberar</span>
+            )}
             {!dia && <span className="text-[11px] text-amber-700">sem dia informado — não vai gerar a pasta de NC1/IGS</span>}
             <span className="text-[11px] text-torg-gray-light">o PCP gera a separação, imprime os projetos e libera para os setores</span>
           </div>
