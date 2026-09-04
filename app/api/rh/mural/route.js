@@ -5,8 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { sendEmail } from "@/lib/email";
-import { escapeHtml } from "@/lib/html";
+import { enviarAvisoPorEmail } from "@/lib/mural-broadcast";
 import { isBlobUrlSegura } from "@/lib/blob-url";
 import { z } from "zod";
 
@@ -20,24 +19,6 @@ const schema = z.object({
   fixado: z.boolean().optional().default(false),
   enviarEmail: z.boolean().optional().default(false),
 });
-
-function montarHtml({ titulo, corpo, autor, imagemUrl }) {
-  const imgHtml = imagemUrl
-    ? `<img src="${imagemUrl}" alt="" style="max-width:100%;height:auto;border-radius:8px;margin:0 0 14px;display:block" />`
-    : "";
-  return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto">
-    <div style="background:#0D1F3C;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0">
-      <strong style="font-size:16px">📢 Comunicado do RH — Torg Metal</strong>
-    </div>
-    <div style="height:4px;background:#F4801F;"></div>
-    <div style="border:1px solid #eee;border-top:none;border-radius:0 0 12px 12px;padding:20px">
-      <h2 style="color:#002945;margin:0 0 10px">${escapeHtml(titulo)}</h2>
-      ${imgHtml}
-      <div style="color:#333;font-size:14px;line-height:1.6;white-space:pre-wrap">${escapeHtml(corpo)}</div>
-      <p style="margin-top:22px;font-size:12px;color:#888">${autor ? escapeHtml(autor) + " · " : ""}Você recebeu este comunicado por fazer parte da equipe Torg. Veja todos os avisos no portal do funcionário.</p>
-    </div>
-  </div>`;
-}
 
 export async function GET() {
   try { await requireRole(["ADMIN", "RH"]); }
@@ -69,31 +50,21 @@ export async function POST(req) {
   });
 
   // Broadcast por e-mail (best-effort: uma falha de envio não desfaz o aviso).
-  let emailEnviados = 0; const emailFalhas = [];
+  // ⚠ Via Resend Batch (lib/mural-broadcast): uma requisição só, sem estourar o
+  // rate limit que fazia o comunicado chegar a só parte dos funcionários. As falhas
+  // voltam discriminadas — o RH vê quantas e pode reenviar.
+  let emailEnviados = 0; let emailFalhas = [];
   if (enviarEmail) {
-    const funcs = await prisma.funcionario.findMany({
-      where: { ativo: true, email: { not: null } },
-      select: { email: true },
-    });
-    const destinos = [...new Set(funcs.map((f) => (f.email || "").trim()).filter(Boolean))];
-    const html = montarHtml({ titulo, corpo, autor: user.name, imagemUrl });
-    const text = `Comunicado do RH — Torg Metal\n\n${titulo}\n\n${corpo}`;
-    const subject = `📢 ${titulo}`;
-    // Envio individual (preserva privacidade) em lotes p/ não estourar o tempo.
-    const LOTE = 6;
-    for (let i = 0; i < destinos.length; i += LOTE) {
-      const chunk = destinos.slice(i, i + LOTE);
-      const res = await Promise.all(chunk.map((to) => sendEmail({ to, subject, html, text }).catch(() => ({ ok: false }))));
-      res.forEach((r, j) => { if (r?.ok) emailEnviados++; else emailFalhas.push(chunk[j]); });
-    }
-    await prisma.muralAviso.update({
-      where: { id: aviso.id },
-      data: { emailEnviadoEm: new Date(), emailDestinatarios: emailEnviados },
-    }).catch(() => {});
+    const r = await enviarAvisoPorEmail(prisma, aviso, user.name);
+    emailEnviados = r.enviados;
+    emailFalhas = r.falhas;
   }
 
   await prisma.auditLog.create({
-    data: { userId: user.id, action: "CRIAR_MURAL_AVISO", entity: "MuralAviso", entityId: aviso.id, diff: { titulo, enviarEmail, emailEnviados } },
+    data: {
+      userId: user.id, action: "CRIAR_MURAL_AVISO", entity: "MuralAviso", entityId: aviso.id,
+      diff: { titulo, enviarEmail, emailEnviados, emailFalhas: emailFalhas.length, falhas: emailFalhas.slice(0, 50) },
+    },
   }).catch(() => {});
 
   return NextResponse.json({ success: true, id: aviso.id, emailEnviados, emailFalhas: emailFalhas.length });

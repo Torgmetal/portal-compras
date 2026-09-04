@@ -29,6 +29,7 @@ export default function MuralClient() {
   const [fixado, setFixado] = useState(false);
   const [enviarEmail, setEnviarEmail] = useState(false);
   const [publicando, setPublicando] = useState(false);
+  const [reenviando, setReenviando] = useState(null);
 
   // Sugestões
   const [feedbacks, setFeedbacks] = useState([]);
@@ -105,6 +106,18 @@ export default function MuralClient() {
       setAvisos((prev) => prev.filter((a) => a.id !== id));
       showToast("Comunicado excluído", "success");
     } catch (e) { showToast(e.message, "error"); }
+  };
+
+  const reenviar = async (a) => {
+    if (!confirm(`Reenviar "${a.titulo}" por e-mail para TODOS os funcionários ativos com e-mail?\n\nQuem já recebeu pode receber novamente.`)) return;
+    setReenviando(a.id);
+    try {
+      const r = await fetch(`/api/rh/mural/${a.id}/reenviar`, { method: "POST" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Falha ao reenviar");
+      showToast(`Reenviado: ${d.enviados}/${d.total} e-mails${d.emailFalhas ? ` · ${d.emailFalhas} falha(s)` : ""}`, d.emailFalhas ? "error" : "success");
+      await carregarAvisos();
+    } catch (e) { showToast(e.message, "error"); } finally { setReenviando(null); }
   };
 
   const mudarStatusFb = async (id, status) => {
@@ -233,6 +246,11 @@ export default function MuralClient() {
                         title="Lista de presença para a fábrica assinar (quem não tem acesso ao portal)">
                         <ClipboardSignature size={13} /> Lista de presença
                       </a>
+                      <button onClick={() => reenviar(a)} disabled={reenviando === a.id}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-torg-orange/40 px-2.5 py-1.5 text-[11px] font-medium text-torg-orange transition hover:bg-torg-orange/10 disabled:opacity-50"
+                        title="Reenviar por e-mail a todos os funcionários ativos com e-mail">
+                        {reenviando === a.id ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />} Reenviar
+                      </button>
                       <button onClick={() => excluir(a.id)} className="text-red-400 hover:text-red-600" title="Excluir"><Trash2 size={16} /></button>
                     </div>
                   </div>
