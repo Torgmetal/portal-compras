@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { FileCheck2, BookCheck, PackageCheck, ClipboardCheck, ClipboardList, Gauge, AlertOctagon, FolderTree, Ruler, Camera } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -26,13 +27,21 @@ const menu = [
 
 export default function SidebarQualidade() {
   const pathname = usePathname();
+  // ⚠ O INSPETOR SÓ TEM INSPEÇÕES AQUI. Ele entra no Portal da Qualidade para preencher o
+  // relatório no computador (Vitor, 04/09/2026), mas o resto do menu — data book, controle de
+  // documentos, auditorias, calibração, CMR — é do módulo QUALIDADE e o middleware barra. Mostrar
+  // o link seria oferecer uma porta que bate na cara de quem clica.
+  const { data: session } = useSession();
+  const mods = session?.user?.modulos || [];
+  const soCampo = session?.user?.tipo !== "ADMIN" && !mods.includes("QUALIDADE") && mods.includes("QUALIDADE_CAMPO");
+  const itens = soCampo ? menu.filter((m) => m.href === "/qualidade/inspecoes") : menu;
 
   return (
     <aside className="w-64 bg-white border-r border-torg-blue-100 flex flex-col h-screen fixed left-0 top-0 print:hidden">
       <SidebarModuleSwitcher moduloAtual="Portal da Qualidade" />
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {menu.map((m) => {
+        {itens.map((m) => {
           const Icon = m.icon;
           // Casa por SEGMENTO (href exato ou href + "/") — senão "/qualidade/auditorias"
           // acenderia junto em "/qualidade/auditorias-internas" (prefixo compartilhado).

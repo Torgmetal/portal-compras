@@ -55,6 +55,10 @@ function moduloNegado(path, token) {
   if (path.startsWith("/planejamento/tarefas")) return null;
   if (path.startsWith("/planejamento")) return nega("PLANEJAMENTO", "PRODUCAO");
   if (path.startsWith("/pcp")) return nega("PCP", "PLANEJAMENTO", "PRODUCAO");
+  // ⚠ Inspeções: o INSPETOR preenche o relatório no computador também (Vitor, 04/09/2026: "ela
+  // precisa ter a tela do computador também para preencher"). Só esta parte da Qualidade — data
+  // book, controle de documentos, auditorias, calibração e CMR continuam do módulo inteiro.
+  if (path.startsWith("/qualidade/inspecoes")) return nega("QUALIDADE", "QUALIDADE_CAMPO");
   if (path.startsWith("/qualidade")) return nega("QUALIDADE");
   if (path.startsWith("/relatorios")) return nega("COMERCIAL", "PRODUCAO", "ENGENHARIA", "PCP", "QUALIDADE");
   // /rm aberto para todos os modulos (historico visivel para todos)

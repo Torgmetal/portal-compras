@@ -22,7 +22,10 @@ const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", 
 // Quem assina. Vitor: "nós vamos assinar, o inspetor e o cliente".
 const PAPEIS = ["Torg Metal", "Inspetor", "Cliente"];
 
-export default function InspecoesClient() {
+// ⚠ `podeFechar` vem do servidor (ver page.js): o INSPETOR entra para preencher, mas enviar para
+// assinatura e apagar continuam de quem responde pelo documento. O servidor barra de novo — isto
+// aqui é para o botão não existir, e não para a pessoa clicar e levar um erro.
+export default function InspecoesClient({ podeFechar = true }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [montando, setMontando] = useState(null); // { opNumero, tipo, opId }
@@ -191,7 +194,7 @@ export default function InspecoesClient() {
                 <span className="text-[11px] text-torg-gray ml-1.5">{o.relatorios.length} relatório{o.relatorios.length > 1 ? "s" : ""}</span>
               </p>
               <div className="space-y-2">
-                {o.relatorios.map((r) => <Relatorio key={r.id} r={r} onMudou={carregar} />)}
+                {o.relatorios.map((r) => <Relatorio key={r.id} r={r} onMudou={carregar} podeFechar={podeFechar} />)}
               </div>
             </div>
           ))}
@@ -243,7 +246,7 @@ function agruparRelatorios(relatorios) {
     }));
 }
 
-function Relatorio({ r, onMudou }) {
+function Relatorio({ r, onMudou, podeFechar = true }) {
   const [abrindo, setAbrindo] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   const assinadas = r.assinaturas.filter((a) => a.assinadoEm).length;
@@ -296,14 +299,18 @@ function Relatorio({ r, onMudou }) {
             className="text-[12px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium">
             <ExternalLink size={13} /> PDF
           </a>
-          <button onClick={() => setAbrindo((v) => !v)}
-            className="text-[12px] text-torg-blue border border-torg-blue-200 hover:bg-torg-blue-50 rounded-lg px-2.5 py-1 inline-flex items-center gap-1.5 font-medium">
-            <Send size={13} /> {r.envioAssinaturaId ? "Assinaturas" : "Enviar p/ assinatura"}
-          </button>
-          <button onClick={excluir} disabled={excluindo} title="Apagar relatório"
-            className="text-torg-gray hover:text-red-600 disabled:opacity-40 p-1">
-            {excluindo ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-          </button>
+          {podeFechar && (
+            <>
+              <button onClick={() => setAbrindo((v) => !v)}
+                className="text-[12px] text-torg-blue border border-torg-blue-200 hover:bg-torg-blue-50 rounded-lg px-2.5 py-1 inline-flex items-center gap-1.5 font-medium">
+                <Send size={13} /> {r.envioAssinaturaId ? "Assinaturas" : "Enviar p/ assinatura"}
+              </button>
+              <button onClick={excluir} disabled={excluindo} title="Apagar relatório"
+                className="text-torg-gray hover:text-red-600 disabled:opacity-40 p-1">
+                {excluindo ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              </button>
+            </>
+          )}
         </div>
       </div>
 

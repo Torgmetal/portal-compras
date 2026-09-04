@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 export async function POST(req, { params }) {
-  try { await requireRole(["ADMIN", "QUALIDADE"]); }
+  try { await requireRole(["ADMIN", "QUALIDADE", "QUALIDADE_CAMPO"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const { id } = await params;

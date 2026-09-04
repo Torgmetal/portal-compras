@@ -104,7 +104,9 @@ const MODULOS = [
     desc: "Documentos e data books (NBR 16775)",
     icon: ShieldCheck,
     cor: "bg-torg-blue-100 text-torg-blue",
-    modulos: ["QUALIDADE"],
+    // ⚠ o inspetor de campo entra para preencher o relatório no computador (Vitor, 04/09/2026) —
+    // e lá dentro a Sidebar da Qualidade mostra só Inspeções, que é o que o middleware libera.
+    modulos: ["QUALIDADE", "QUALIDADE_CAMPO"],
   },
   {
     href: "/relatorios",
@@ -210,6 +212,10 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
     }
   }, [aberto]);
 
+  // ⚠ quem tem só o perfil de campo entra na Qualidade PELAS INSPEÇÕES: /qualidade (controle de
+  // documentos) é do módulo inteiro e o middleware barra — o card levaria direto ao "sem acesso".
+  const soCampoQualidade = !isAdmin && !userModulos.includes("QUALIDADE") && userModulos.includes("QUALIDADE_CAMPO");
+
   // Filtrar módulos acessíveis por tipo/modulos
   const modulosVisiveis = MODULOS.filter((m) => {
     if (!session?.user) return false;
@@ -218,7 +224,11 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
     if (m.modulos === null) return true; // liberado pra todos os logados
     if (isAdmin) return true;
     return m.modulos.some(mod => userModulos.includes(mod));
-  });
+  }).map((m) => (
+    soCampoQualidade && m.href === "/qualidade"
+      ? { ...m, href: "/qualidade/inspecoes", desc: "Preencher relatórios de inspeção" }
+      : m
+  ));
 
   // Só mostra o switcher se tem mais de 1 módulo acessível
   const mostrarLaco = emSetembroAmarelo() || usarPrevia();

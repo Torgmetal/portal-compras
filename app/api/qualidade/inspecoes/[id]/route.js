@@ -12,7 +12,13 @@ import { usaCotas } from "@/lib/qualidade-campo";
 
 export const runtime = "nodejs";
 
-const PERFIS = ["ADMIN", "QUALIDADE"];
+// ⚠ O INSPETOR DE CAMPO PREENCHE AQUI TAMBÉM (Vitor, 04/09/2026: "ela precisa ter a tela do
+// computador também para preencher"). Ler e lançar medição é o trabalho dele; FECHAR o documento
+// (emitir, enviar para assinatura, excluir) continua de quem responde por ele — ver
+// `podeFecharRelatorio`.
+const PERFIS = ["ADMIN", "QUALIDADE", "QUALIDADE_CAMPO"];
+// fechar o documento: só quem responde por ele
+const PERFIS_FECHAR = ["ADMIN", "QUALIDADE"];
 const RESULTADOS = new Set(["APROVADO", "REPROVADO", "RETRABALHAR", null]);
 
 export async function GET(_req, { params }) {
@@ -330,7 +336,7 @@ export async function PATCH(req, { params }) {
  */
 export async function DELETE(_req, { params }) {
   let user;
-  try { user = await requireRole(PERFIS); }
+  try { user = await requireRole(PERFIS_FECHAR); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const rel = await prisma.relatorioInspecao.findUnique({

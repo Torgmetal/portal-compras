@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/session";
 export const runtime = "nodejs";
 
 export async function GET() {
-  try { await requireRole(["ADMIN", "QUALIDADE"]); }
+  try { await requireRole(["ADMIN", "QUALIDADE", "QUALIDADE_CAMPO"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const ops = await prisma.oP.findMany({
