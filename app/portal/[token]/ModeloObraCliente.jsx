@@ -387,7 +387,18 @@ export default function ModeloObraCliente({ token }) {
                             <span className="text-[#0D1F3C]">{r.r ? " · " : ""}{r.material || "material"}</span>
                             {r.corrida && <span className="text-gray-500"> · corrida {r.corrida}</span>}
                             {r.norma && <span className="text-gray-500"> · {r.norma}</span>}
-                            {r.certificado && <span className="text-gray-500 block">certificado {r.certificado}</span>}
+                            {/* ⚠ segunda linha: o que PROVA a origem — certificado, nota fiscal e o
+                                peso comprado naquele R. Vitor (04/09/2026) pediu a NF e o kg; é o
+                                mesmo conjunto que vai no data book §02. */}
+                            {(r.certificado || r.nf || r.compradoKg) && (
+                              <span className="text-gray-500 block">
+                                {r.certificado && <>certificado {r.certificado}</>}
+                                {r.certificado && (r.nf || r.compradoKg) ? " · " : ""}
+                                {r.nf && <>NF {r.nf}</>}
+                                {r.nf && r.compradoKg ? " · " : ""}
+                                {r.compradoKg ? <>{fmtKg(r.compradoKg)} comprados</> : null}
+                              </span>
+                            )}
                           </li>
                         ))}
                       </ul>
