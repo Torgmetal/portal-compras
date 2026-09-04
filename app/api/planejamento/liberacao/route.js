@@ -13,6 +13,7 @@ import { frentesDaOp, desvioDoMarco, PRIORIDADES, SETORES_LIBERAVEIS } from "@/l
 import { FLUXO_SETORES, datasSetorDoCronograma } from "@/lib/prioridades-setor";
 import { portaoDoDesenho } from "@/lib/pasta-engenharia";
 import { analisarMaterial, statusMaterialPlanejamento } from "@/lib/material-liberacao";
+import { chavesDasPecas } from "@/lib/liberacao-pecas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -121,8 +122,8 @@ export async function POST(req) {
   // ⚠ as marcas vêm do BANCO, não do que o cliente mandou: o corpo do POST traz ids, e é o id que
   // se resolve em marca aqui. Confiar numa marca enviada pela tela seria o mesmo furo de novo.
   const alvo = d.pecaIds?.length
-    ? await prisma.pecaConjunto.findMany({ where: { id: { in: d.pecaIds }, opId: op.id }, select: { id: true, marca: true, perfil: true, pesoTotalKg: true } })
-    : await prisma.pecaConjunto.findMany({ where: { opId: op.id, fonte: "LPC_IMPORT", opNumero: d.frente }, select: { id: true, marca: true, perfil: true, pesoTotalKg: true } });
+    ? await prisma.pecaConjunto.findMany({ where: { id: { in: d.pecaIds }, opId: op.id }, select: { id: true, marca: true, opNumero: true, perfil: true, pesoTotalKg: true } })
+    : await prisma.pecaConjunto.findMany({ where: { opId: op.id, fonte: "LPC_IMPORT", opNumero: d.frente }, select: { id: true, marca: true, opNumero: true, perfil: true, pesoTotalKg: true } });
 
   // ⚠⚠ SEM MATERIAL NÃO SE PROGRAMA. Vitor (26/08/2026): "vc não deve programar aquilo que não tem
   // em estoque, marcar o que tem de outra obra até ok, mas o que não tem não pode".
@@ -247,6 +248,9 @@ export async function POST(req) {
     dataMarco: marco, desvioDias: desvio, desvioMotivo: (d.desvioMotivo || "").trim() || null,
     observacao: (d.observacao || "").trim() || null,
     pecaIds: d.pecaIds?.length ? d.pecaIds : null,
+    // ⚠ a mesma seleção pela chave natural — é o que sobrevive à reimportação da lista, que apaga e
+    // recria as peças com id novo. As marcas saem do BANCO (`alvo`), não do que a tela mandou.
+    pecaMarcas: d.pecaIds?.length ? chavesDasPecas(alvo) : null,
     dataProgramada: d.dataProgramada ? new Date(`${d.dataProgramada}T12:00:00Z`) : null,
     metaKg: d.metaKg ?? null, totalKg: d.totalKg ?? null, totalPecas: d.totalPecas ?? null,
     liberadoEm: agora, liberadoPorId: user?.id || null, liberadoPorNome: user?.name || user?.email || null,

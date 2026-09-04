@@ -5414,6 +5414,11 @@ model LiberacaoProducao {
   // problema que a lista por OP tinha: o PCP recebe 6.653 peças e não sabe o que é do dia.
   // Vazio = a frente inteira (compatível com as liberações feitas antes desta coluna existir).
   pecaIds         Json?
+  // ⚠⚠ AS MESMAS PEÇAS PELA CHAVE NATURAL ("opNumero|MARCA") — porque o id NÃO SOBREVIVE à
+  // reimportação da lista: a peça é apagada e recriada com id novo, e o lote fica apontando para o
+  // nada. Em 04/09/2026 eram 275 ponteiros mortos em 11 lotes (a OP-113 com 254 de 260). Ver
+  // lib/liberacao-pecas.js.
+  pecaMarcas      Json?
   // ⚠ O DIA EM QUE ESTE LOTE DEVE SER CORTADO. Vitor (26/08/2026): "preciso de um botão para gerar
   // a demanda e marcar a data, e já deixar permitido para eu fazer isso já vários dias para já
   // deixar pronto essa programação". Sem ela, liberar era sempre "para agora".

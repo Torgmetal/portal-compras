@@ -15,6 +15,7 @@ import { whereSetorSyneco, normalizeSetorSyneco } from "@/lib/syneco-dia";
 import { ehItemComprado } from "@/lib/item-comprado";
 import { dedupLpcLe, renumerarPrioridades, ehLinhaLixo } from "@/lib/pecas-producao";
 import { materialPorPerfil, statusCompraPorOp } from "@/lib/status-compra";
+import { pecasDosLotes } from "@/lib/liberacao-pecas";
 import { croquiCortado, setorRealIndex, mapaSetorReal, FLUXO_SETORES, soloPassaNoSetor } from "@/lib/prioridades-setor";
 import { z } from "zod";
 
@@ -153,12 +154,17 @@ export async function GET(req) {
   if (!tudo) {
     const libs = await prisma.liberacaoProducao.findMany({
       where: { opId, status: { in: ["LIBERADA", "EM_PRODUCAO"] } },
-      select: { id: true, frente: true, dataProgramada: true, pecaIds: true, prioridade: true },
+      select: { id: true, frente: true, dataProgramada: true, pecaIds: true, pecaMarcas: true, prioridade: true },
       orderBy: [{ dataProgramada: "asc" }, { liberadoEm: "asc" }],
     }).catch(() => []);
     if (libs.length) {
       const frenteInteira = libs.some((l) => !Array.isArray(l.pecaIds) || !l.pecaIds.length);
-      const ids = new Set(libs.flatMap((l) => (Array.isArray(l.pecaIds) ? l.pecaIds : [])));
+      // ⚠⚠ O LOTE SE RESOLVE PELO ID **E PELA MARCA**. O id não sobrevive à reimportação da lista
+      // (peça apagada e recriada), e o lote passava a apontar para o nada: 275 ponteiros mortos em
+      // 11 lotes em 04/09/2026, a OP-113 com 254 de 260 — o PCP abria a obra e não via o recorte
+      // que o Planejamento tinha feito. A marca sobrevive. Ver lib/liberacao-pecas.js.
+      const resolvido = pecasDosLotes(libs, semEntregues);
+      const ids = resolvido.ids;
       // ⚠⚠ O QUE A FÁBRICA ESTÁ CORTANDO ENTRA, MESMO FORA DO LOTE LIBERADO. Vitor (01/09/2026):
       // "preciso que traga essas peças que a fábrica está cortando para essa página".
       //
@@ -212,7 +218,10 @@ export async function GET(req) {
         // ⚠ ponteiro que não existe mais: a liberação diz que soltou N peças e M delas foram
         // apagadas por uma reimportação da lista. Silenciar isso faz o lote parecer menor do que
         // foi — e some trabalho que alguém combinou.
-        ponteirosPerdidos: frenteInteira ? 0 : [...ids].filter((id) => !semEntregues.some((p) => p.id === id)).length,
+        // ⚠ agora só conta o que a marca TAMBÉM não salvou — `ids` já só tem peça que existe
+        ponteirosPerdidos: frenteInteira ? 0 : resolvido.mortos,
+        // quantas o casamento por marca trouxe de volta (mede se a rede de segurança está pegando)
+        recuperadasPorMarca: frenteInteira ? 0 : resolvido.recuperados,
         // e quantas entraram por estarem sendo cortadas sem liberação
         cortandoForaDoLote: foraDoLote.size,
       };

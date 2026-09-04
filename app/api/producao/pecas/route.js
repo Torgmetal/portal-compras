@@ -108,6 +108,32 @@ export async function DELETE(req) {
   }
 
   try {
+    // ⚠⚠ APAGAR PEÇA CORTA A PROGRAMAÇÃO DO PLANEJAMENTO — e isso era silencioso.
+    //
+    // `LiberacaoProducao.pecaIds` é Json sem chave estrangeira: o banco não sabe que aquilo aponta
+    // para peças, então apagar não avisa nem bloqueia. Foi assim que a OP-113 perdeu o recorte —
+    // 268 peças apagadas por aqui em 03/09/2026, minutos antes de a lista ser reimportada, e os
+    // lotes ficaram com 254 de 260 ponteiros mortos. Quem apagou não tinha como saber.
+    //
+    // ⚠ NÃO limpa a liberação: a marca costuma voltar na reimportação seguinte, e o casamento por
+    // marca (`pecaMarcas`) devolve o lote inteiro. O que faltava era DIZER que mexeu.
+    let lotesAfetados = 0;
+    try {
+      const alvo = porIds
+        ? { id: { in: idsParaDeletar } }
+        : { opNumero: { in: opsParaDeletar } };
+      const pecas = await prisma.pecaConjunto.findMany({ where: alvo, select: { id: true, opId: true } });
+      const opIds = [...new Set(pecas.map((p) => p.opId).filter(Boolean))];
+      if (opIds.length) {
+        const libs = await prisma.liberacaoProducao.findMany({
+          where: { opId: { in: opIds }, status: { in: ["LIBERADA", "EM_PRODUCAO"] } },
+          select: { pecaIds: true },
+        });
+        const apagados = new Set(pecas.map((p) => p.id));
+        lotesAfetados = libs.filter((l) => (Array.isArray(l.pecaIds) ? l.pecaIds : []).some((id) => apagados.has(id))).length;
+      }
+    } catch { /* aviso não pode impedir a exclusão */ }
+
     const deleted = await prisma.pecaConjunto.deleteMany({
       where: porIds ? { id: { in: idsParaDeletar } } : { opNumero: { in: opsParaDeletar } },
     });
@@ -119,14 +145,16 @@ export async function DELETE(req) {
           action: porIds ? "DELETE_PECAS_SELECIONADAS" : "DELETE_PECAS_LOTE",
           entity: "PecaConjunto",
           entityId: (porIds ? idsParaDeletar : opsParaDeletar).slice(0, 50).join(","),
-          diff: porIds ? { ids: idsParaDeletar.length, totalRemovidas: deleted.count } : { ops: opsParaDeletar, totalRemovidas: deleted.count },
+          diff: porIds
+            ? { ids: idsParaDeletar.length, totalRemovidas: deleted.count, lotesAfetados }
+            : { ops: opsParaDeletar, totalRemovidas: deleted.count, lotesAfetados },
         },
       });
     } catch (auditErr) {
       console.error("[pecas DELETE] falha no audit log:", auditErr?.message);
     }
 
-    return NextResponse.json({ ok: true, removidas: deleted.count, ...(porIds ? { ids: idsParaDeletar.length } : { ops: opsParaDeletar }) });
+    return NextResponse.json({ ok: true, removidas: deleted.count, lotesAfetados, ...(porIds ? { ids: idsParaDeletar.length } : { ops: opsParaDeletar }) });
   } catch (e) {
     console.error("[pecas DELETE] erro:", e?.message);
     return NextResponse.json({ error: e?.message || "Erro ao excluir" }, { status: 500 });

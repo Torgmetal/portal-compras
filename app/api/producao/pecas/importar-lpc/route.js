@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { parseLPC } from "@/lib/parse-lpc";
 import { classificarMaquina } from "@/lib/maquina-corte";
+import { chaveDaPeca } from "@/lib/liberacao-pecas";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // LPC grande faz upsert peça a peça; 60s estourava (timeout → HTML → "token JSON")
@@ -369,6 +370,42 @@ export async function POST(req) {
       // para a próxima. Mas registra, porque silêncio foi exatamente o que criou este problema.
       console.error("[importar-lpc] remapeamento das liberações falhou:", e?.message);
       remap.erro = e?.message || "falhou";
+    }
+  }
+
+  // ⚠⚠ REDE DE SEGURANÇA PELA MARCA — vale para QUALQUER apagamento, não só o desta importação.
+  //
+  // O remapeamento acima só conserta o que ELE apagou (`marcaDoIdApagado`). Peça apagada por outro
+  // caminho — outra importação, exclusão manual, lista trocada de opNumero — deixava o lote
+  // apontando para o nada, calado: em 04/09/2026 eram 275 ponteiros mortos em 11 lotes, a OP-113
+  // com 254 de 260. Aqui os ids são reescritos a partir da CHAVE NATURAL gravada na liberação
+  // (`pecaMarcas`), que a reimportação não muda. Ver lib/liberacao-pecas.js.
+  if (op) {
+    try {
+      // ⚠ filtra em JS e não no `where`: campo Json nulo em Prisma distingue JsonNull de DbNull, e
+      // errar isso aqui derrubaria a importação inteira por causa da rede de segurança.
+      const libs = (await prisma.liberacaoProducao.findMany({
+        where: { opId: op.id, status: { in: ["LIBERADA", "EM_PRODUCAO"] } },
+        select: { id: true, pecaIds: true, pecaMarcas: true },
+      })).filter((l) => Array.isArray(l.pecaMarcas) && l.pecaMarcas.length);
+      if (libs.length) {
+        const vivas = await prisma.pecaConjunto.findMany({
+          where: { opId: op.id }, select: { id: true, marca: true, opNumero: true },
+        });
+        const porChave = new Map(vivas.map((p) => [chaveDaPeca(p), p.id]));
+        for (const l of libs) {
+          const chaves = Array.isArray(l.pecaMarcas) ? l.pecaMarcas : [];
+          if (!chaves.length) continue;
+          const novos = chaves.map((c) => porChave.get(c)).filter(Boolean);
+          const antes = Array.isArray(l.pecaIds) ? l.pecaIds : [];
+          if (novos.length === antes.length && novos.every((id, i) => id === antes[i])) continue;
+          await prisma.liberacaoProducao.update({ where: { id: l.id }, data: { pecaIds: novos } });
+          remap.porMarca = (remap.porMarca || 0) + 1;
+        }
+      }
+    } catch (e) {
+      console.error("[importar-lpc] recasamento por marca falhou:", e?.message);
+      remap.erroMarca = e?.message || "falhou";
     }
   }
 
