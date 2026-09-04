@@ -38,7 +38,20 @@ export async function POST(req) {
 
     const { ids, reverter } = body;
 
-    const statusDe = reverter ? "MONTAGEM" : "CORTE";
+    // ⚠⚠ DE ONDE O CONJUNTO PODE VIR — E POR QUE "PENDENTE" ENTRA AQUI.
+    //
+    // Vitor (04/09/2026): "no PCP eu programei dois lotes para fabricação... consegui imprimir os
+    // projetos, porém não aparece na programação". O conjunto recebia dia e bancada, o desenho saía
+    // com GRD, e ele não aparecia em painel nenhum de montagem — porque a virada de status exigia
+    // `status: "CORTE"`, e conjunto que nunca teve apontamento de corte no Syneco fica PENDENTE.
+    // O `updateMany` casava ZERO linhas e não reclamava; as gravações de dia e bancada logo abaixo
+    // não filtram status, então a peça ficava pela metade: com dia marcado e sem setor nenhum.
+    // Eram 197 conjuntos assim — 185 da OP-097 (programados de 02 a 08/09) e 12 da 105.
+    //
+    // ⚠ Aceitar PENDENTE não afrouxa nada: quem decide se o conjunto desce é a PRONTIDÃO acima
+    // (todos os croquis cortados), que roda antes e é o portão de verdade. O status do CONJUNTO
+    // nunca disse nada sobre isso — quem passa pelo corte são os croquis dele.
+    const statusDe = reverter ? ["MONTAGEM"] : ["PENDENTE", "CORTE"];
     const statusPara = reverter ? "CORTE" : "MONTAGEM";
 
     // ⚠⚠ SÓ DESCE CONJUNTO 100% CORTADO. Vitor (01/09/2026): "lá na página do pcp sim precisamos ter
@@ -77,7 +90,7 @@ export async function POST(req) {
 
     const result = idsPermitidos.length
       ? await prisma.pecaConjunto.updateMany({
-          where: { id: { in: idsPermitidos }, status: statusDe },
+          where: { id: { in: idsPermitidos }, status: { in: statusDe } },
           data: { status: statusPara, ultimoSetor: reverter ? "Corte" : "Montagem" },
         })
       : { count: 0 };
