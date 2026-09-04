@@ -7,6 +7,7 @@ import CotacaoFornecedorForm from "./CotacaoFornecedorForm";
 
 
 export const metadata = {
+  robots: { index: false, follow: false },
   title: "Workspace Torg — Upload de Cotação",
 };
 

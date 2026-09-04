@@ -2,6 +2,7 @@ import MarketingShell from "@/components/MarketingShell";
 import { Truck, Mail, FileText } from "lucide-react";
 
 export const metadata = {
+  robots: { index: false, follow: false },
   title: "Workspace Torg — Portal de Fornecedores",
   description: "Acesso restrito para envio de cotações por link único.",
 };

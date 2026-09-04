@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import EntregaFornecedorForm from "./EntregaFornecedorForm";
 
 export const metadata = {
+  robots: { index: false, follow: false },
   title: "Workspace Torg — Previsao de Entrega",
 };
 
