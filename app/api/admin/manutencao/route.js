@@ -67,7 +67,63 @@ const TAREFAS = [
       return `${r.count} conjunto(s) regularizado(s)`;
     },
   },
+  {
+    id: "baixa-preparacao-113",
+    titulo: "Baixa da preparação da OP-113",
+    porque:
+      "Vitor (04/09/2026): a preparação da 113 está concluída e a obra já está em acabamento e pintura. A fábrica não aponta Preparação no Syneco (115 ordens, zero produzido), então o portal nunca ficaria sabendo sozinho: as peças seguem na fila do corte e os lotes de corte seguem abertos.",
+    async checar() {
+      const op = await opDaObra("113");
+      if (!op) return { falta: false, detalhe: "OP-113 não encontrada" };
+      const [pecas, libs] = await Promise.all([
+        prisma.pecaConjunto.count({ where: alvoPreparacao(op.id) }),
+        prisma.liberacaoProducao.count({ where: alvoLotesCorte(op.id) }),
+      ]);
+      return {
+        falta: pecas > 0 || libs > 0,
+        detalhe: pecas || libs ? `${pecas} peça(s) sem baixa · ${libs} lote(s) de corte aberto(s)` : "já dada",
+      };
+    },
+    async aplicar() {
+      const op = await opDaObra("113");
+      if (!op) throw new Error("OP-113 não encontrada");
+      const agora = new Date();
+      // ⚠ SÓ A PREPARAÇÃO. Conjunto (montagem), solda, acabamento e pintura NÃO são tocados aqui:
+      // dizer que a preparação acabou é o que ele afirmou; declarar os outros setores concluídos
+      // seria inventar produção que ninguém apontou.
+      const r = await prisma.pecaConjunto.updateMany({
+        where: alvoPreparacao(op.id),
+        data: { corteConcluidoEm: agora, status: "CORTE", ultimoSetor: "Corte" },
+      });
+      // quem nunca teve início ganha início = conclusão (mesma regra da fila de corte)
+      await prisma.pecaConjunto.updateMany({
+        where: { opId: op.id, corteConcluidoEm: { not: null }, corteIniciadoEm: null },
+        data: { corteIniciadoEm: agora },
+      });
+      const l = await prisma.liberacaoProducao.updateMany({
+        where: alvoLotesCorte(op.id),
+        data: { status: "CONCLUIDA", concluidaEm: agora },
+      });
+      return `${r.count} peça(s) com baixa e ${l.count} lote(s) de corte fechado(s)`;
+    },
+  },
 ];
+
+const opDaObra = (numero) => prisma.oP.findFirst({ where: { numero }, select: { id: true } });
+
+/** Croqui e avulsa da obra que ainda não têm o corte concluído — conjunto entra pela montagem. */
+const alvoPreparacao = (opId) => ({
+  opId,
+  NOT: { tipoPeca: "CONJUNTO" },
+  corteConcluidoEm: null,
+});
+
+/** Lotes de corte ainda abertos da obra. */
+const alvoLotesCorte = (opId) => ({
+  opId,
+  status: { in: ["LIBERADA", "EM_PRODUCAO"] },
+  setores: { array_contains: ["CORTE"] },
+});
 
 const ALVO_MONTAGEM = {
   tipoPeca: "CONJUNTO",
