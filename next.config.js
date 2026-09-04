@@ -8,13 +8,17 @@ function getGitInfo() {
       .toString()
       .trim()
       .replace(/'/g, "");
-    return { hash, date };
+    // O TÍTULO do commit no ar precisa vir daqui, não do versao-build.json: aquele arquivo é
+    // gravado ANTES do commit existir, então nunca conteria a mudança que está sendo publicada.
+    // O clone raso da Vercel não tem o histórico todo, mas tem o HEAD — que é o que falta.
+    const titulo = execSync("git log -1 --format=%s").toString().trim();
+    return { hash, date, titulo };
   } catch {
-    return { hash: "local", date: new Date().toLocaleDateString("pt-BR") };
+    return { hash: "local", date: new Date().toLocaleDateString("pt-BR"), titulo: "" };
   }
 }
 
-const { hash, date } = getGitInfo();
+const { hash, date, titulo } = getGitInfo();
 
 // Número de build (contagem de commits) — vem do arquivo, NÃO do git.
 // A Vercel clona o repo raso, então contar commits no build daria um número errado lá.
@@ -69,6 +73,7 @@ const nextConfig = {
     NEXT_PUBLIC_BUILD_HASH: hash,
     NEXT_PUBLIC_BUILD_DATE: date,
     NEXT_PUBLIC_BUILD_NUMERO: buildNumero,
+    NEXT_PUBLIC_BUILD_TITULO: titulo,
   },
   async headers() {
     return [

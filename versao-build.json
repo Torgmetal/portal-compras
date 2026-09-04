@@ -1,7 +1,12 @@
 {
-  "build": 2773,
-  "gerado": "2026-09-04T21:31:36.718Z",
+  "build": 2774,
+  "gerado": "2026-09-04T21:32:59.531Z",
   "commits": [
+    {
+      "hash": "15c48b1d58",
+      "data": "04/09/2026",
+      "titulo": "Versão no rodapé: dá pra saber qual atualização está no ar"
+    },
     {
       "hash": "304ba5196b",
       "data": "04/09/2026",
@@ -146,11 +151,6 @@
       "hash": "647da2e1e9",
       "data": "03/09/2026",
       "titulo": "PCP: sai a faixa de frentes do topo do cartao da obra"
-    },
-    {
-      "hash": "dbd07f4b24",
-      "data": "03/09/2026",
-      "titulo": "Carga da producao: a preparacao contava cada peca duas vezes"
     }
   ]
 }

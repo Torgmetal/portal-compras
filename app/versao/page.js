@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, GitCommit, Package, Rocket } from "lucide-react";
-import { VERSAO_ATUAL, CHANGELOG, BUILD_HASH, BUILD_DATE } from "@/lib/versao";
+import { VERSAO_ATUAL, CHANGELOG, BUILD_HASH, BUILD_DATE, BUILD_TITULO } from "@/lib/versao";
 import dadosBuild from "@/versao-build.json";
 
 export const metadata = { title: "Versão do Portal — Torg" };
@@ -14,6 +14,10 @@ export const metadata = { title: "Versão do Portal — Torg" };
  *
  * O CHANGELOG de `lib/versao.js` continua sendo a lista curada de MARCOS (mantida na mão);
  * os commits abaixo são o registro fino de cada deploy.
+ *
+ * ⚠ O arquivo é gravado ANTES do commit existir, então o commit que está no ar NÃO está na
+ * lista dele — vem do build (BUILD_TITULO) e aparece no cartão do topo. Por isso a lista
+ * começa em `build - 1`.
  */
 export default function VersaoPage() {
   const commits = dadosBuild.commits ?? [];
@@ -39,6 +43,9 @@ export default function VersaoPage() {
               <h1 className="text-2xl font-semibold text-torg-dark tabular-nums">
                 v{VERSAO_ATUAL} · build {dadosBuild.build}
               </h1>
+              {BUILD_TITULO && (
+                <p className="mt-1 text-sm text-torg-dark">{BUILD_TITULO}</p>
+              )}
               <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
                 <div>
                   <dt className="text-torg-gray text-xs">Commit</dt>
@@ -56,7 +63,7 @@ export default function VersaoPage() {
         {/* Atualizações recentes — uma linha por commit publicado */}
         <section className="mb-10">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-torg-dark uppercase tracking-wide mb-3">
-            <GitCommit size={16} className="text-torg-orange" /> Atualizações recentes
+            <GitCommit size={16} className="text-torg-orange" /> Atualizações anteriores
           </h2>
           {commits.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8 text-center">
@@ -74,7 +81,7 @@ export default function VersaoPage() {
                   </span>
                   <span className="flex-1 text-sm text-torg-dark">{c.titulo}</span>
                   <span className="text-[11px] text-torg-gray/70 tabular-nums shrink-0">
-                    build {dadosBuild.build - i}
+                    build {dadosBuild.build - 1 - i}
                   </span>
                 </li>
               ))}
