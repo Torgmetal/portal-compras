@@ -14,7 +14,7 @@
 // deixar como sem informação para não levantar suspeita". Nada nesta tela pode dizer "não apontado",
 // "pendente" ou "não conferido" — é a mesma regra dos documentos ao cliente.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Box, SlidersHorizontal, Search, EyeOff, Eye, FileSpreadsheet, X } from "lucide-react";
+import { Loader2, Box, SlidersHorizontal, Search, EyeOff, Eye, FileSpreadsheet, X, Factory } from "lucide-react";
 import VisualizadorIfc from "@/components/VisualizadorIfc";
 
 const SEM = "sem informação";
@@ -45,6 +45,11 @@ export default function ModeloObraCliente({ token }) {
   const [fNiveis, setFNiveis] = useState(() => new Set());
   const [fTipos, setFTipos] = useState(() => new Set());
   const [painel, setPainel] = useState(false);
+  // ⚠ botão PRÓPRIO para a etapa. Vitor (05/09/2026): "não encontro o filtro para ver as etapas de
+  // fabricação, tem que ser um botão ao lado de Níveis e tipos". Estava dentro do painel de
+  // filtros, junto de nível e tipo — geometria e estado no mesmo lugar, e a pergunta mais comum do
+  // cliente ("onde está minha peça?") escondida atrás de um botão que fala de outra coisa.
+  const [painelEtapa, setPainelEtapa] = useState(false);
   const [busca, setBusca] = useState("");
   const [esconderResto, setEsconderResto] = useState(false);
   const [ocultos, setOcultos] = useState(() => new Set());
@@ -96,6 +101,10 @@ export default function ModeloObraCliente({ token }) {
     const ordem = ["Corte", "Preparação", "Montagem", "Solda", "Acabamento", "Jato", "Pintura"];
     return [...c.entries()].sort((a2, b2) => ordem.indexOf(a2[0]) - ordem.indexOf(b2[0]));
   }, [indice, setorDe]);
+
+  // ⚠ "Corte" e "Preparação" são a mesma etapa para quem olha de fora — o Syneco é que separa as
+  // operações 10 e 20 (ver lib/portal-obra-consulta).
+  const rotuloEtapa = (st) => (st === "Corte" || st === "Preparação" ? "Preparação" : st);
 
   const selecionados = useMemo(() => {
     if (!indice) return null;
@@ -245,8 +254,43 @@ export default function ModeloObraCliente({ token }) {
             className={`text-[12.5px] font-semibold px-3 py-2 rounded-lg border inline-flex items-center gap-2 ${
               painel || selecionados ? "bg-[#0D1F3C] text-white border-[#0D1F3C]" : "border-gray-200 text-gray-600 hover:border-[#006EAB] hover:text-[#006EAB]"}`}>
             <SlidersHorizontal size={13} />
-            {selecionados ? `${selecionados.length} em foco` : "Níveis e tipos"}
+            {/* ⚠ "Filtro", não "Níveis e tipos". Vitor (05/09/2026) — depois que a etapa ganhou
+                botão próprio, o painel deixou de ser só nível e tipo. */}
+            {selecionados ? `${selecionados.length} em foco` : "Filtro"}
           </button>
+        )}
+        {indice && setores.length > 0 && (
+          <div className="relative">
+            <button onClick={() => setPainelEtapa((v) => !v)}
+              className={`text-[12.5px] font-semibold px-3 py-2 rounded-lg border inline-flex items-center gap-2 ${
+                fSetores.size ? "bg-[#006EAB] text-white border-[#006EAB]" : "border-gray-200 text-gray-600 hover:border-[#006EAB] hover:text-[#006EAB]"}`}>
+              <Factory size={13} />
+              {fSetores.size ? rotuloEtapa([...fSetores][0]) : "Etapa de fabricação"}
+            </button>
+            {painelEtapa && (
+              <div className="absolute left-0 top-full mt-1 z-30 w-[250px] bg-white border border-gray-200 rounded-xl shadow-lg p-2">
+                <p className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide px-1.5 mb-1">Onde está</p>
+                <div className="space-y-0.5">
+                  {setores.map(([st, qt]) => {
+                    const ativo = fSetores.has(st);
+                    return (
+                      <button key={st} type="button"
+                        onClick={() => { setFSetores(ativo ? new Set() : new Set([st])); setPainelEtapa(false); }}
+                        aria-pressed={ativo}
+                        className={`w-full flex items-center gap-2 text-[12.5px] rounded px-1.5 py-1.5 text-left transition-colors ${
+                          ativo ? "bg-[#006EAB] text-white font-semibold" : "text-[#0D1F3C] hover:bg-gray-50"}`}>
+                        <span className="flex-1">{rotuloEtapa(st)}</span>
+                        <span className={`text-[11px] tabular-nums ${ativo ? "text-white/80" : "text-gray-400"}`}>{qt}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10.5px] text-gray-400 mt-1.5 px-1.5">
+                  {fSetores.size ? "clique de novo na etapa para ver a obra inteira" : "peça sem apontamento não entra em nenhuma etapa"}
+                </p>
+              </div>
+            )}
+          </div>
         )}
         {ocultos.size > 0 && (
           <button onClick={() => setOcultos(new Set())} className="text-[12px] text-[#006EAB] hover:underline inline-flex items-center gap-1">
@@ -293,41 +337,9 @@ export default function ModeloObraCliente({ token }) {
                 </div>
               )}
 
-              {/* ⚠⚠ ETAPA DE FABRICAÇÃO, e ela vem primeiro. Vitor (04/09/2026): "quero que o cliente
-                  clique no status e só apareçam as peças que estão sendo apontadas naquele setor".
-                  É a pergunta que o cliente faz olhando a obra — "onde está a minha peça?" —, então
-                  fica acima de nível e tipo, que são geometria. */}
-              {setores.length > 0 && (
-                <div>
-                  <p className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Onde está</p>
-                  {/* ⚠⚠ UMA ETAPA POR VEZ, e não caixinhas que somam. Vitor (05/09/2026): "clico em
-                      qual área eu quero saber e aparecem apenas as peças apontadas naquele setor;
-                      clico no outro, acende apenas a do outro". Com caixas de marcar, dois cliques
-                      mostravam a UNIÃO das duas etapas — o cliente pensa que trocou de etapa e está
-                      vendo as duas. Aqui clicar troca; clicar de novo na mesma volta a obra inteira. */}
-                  <div className="space-y-0.5">
-                    {setores.map(([st, qt]) => {
-                      const ativo = fSetores.has(st);
-                      return (
-                        <button key={st} type="button"
-                          onClick={() => setFSetores(ativo ? new Set() : new Set([st]))}
-                          aria-pressed={ativo}
-                          className={`w-full flex items-center gap-2 text-[12.5px] rounded px-1.5 py-1 text-left transition-colors ${
-                            ativo ? "bg-[#006EAB] text-white font-semibold" : "text-[#0D1F3C] hover:bg-gray-50"}`}>
-                          {/* ⚠ "Corte" e "Preparação" são o mesmo setor para quem olha de fora — o
-                              Syneco é que separa as operações 10 e 20 (ver lib/portal-obra-consulta). */}
-                          <span className="flex-1">{st === "Corte" || st === "Preparação" ? "Preparação" : st}</span>
-                          <span className={`text-[11px] tabular-nums ${ativo ? "text-white/80" : "text-gray-400"}`}>{qt}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[10.5px] text-gray-400 mt-1">
-                    {fSetores.size ? "clique de novo na etapa para ver a obra inteira" : "peça sem apontamento não entra em nenhuma etapa"}
-                  </p>
-                </div>
-              )}
-
+              {/* ⚠ a ETAPA saiu daqui: virou botão próprio na barra, ao lado deste (Vitor,
+                  05/09/2026: "tem que ser um botão ao lado de Níveis e tipos"). Aqui ficou o que é
+                  GEOMETRIA — nível e tipo. */}
               <div>
                 <p className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Tipos</p>
                 <div className="space-y-0.5">
