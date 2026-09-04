@@ -8,6 +8,7 @@ import { resolverCodProjetoPorOp, resolverCodProjetoPorNome } from "@/lib/omie-p
 import { previsaoEntregaDDMMYYYY } from "@/lib/prazo-entrega";
 import { TEXTO_CERTIFICADO_QUALIDADE } from "@/lib/certificado-qualidade";
 import { reavaliarStatusRM } from "@/lib/rm-status";
+import { itensDoPedido, divergenciaProposta } from "@/lib/pedido-itens";
 
 // RMs Consumíveis (INTERNA) não têm obra própria → vinculam ao projeto geral.
 const PROJETO_CONSUMIVEL = "OP 000 - GERAL TORG";
@@ -117,76 +118,23 @@ export async function POST(req, { params }) {
   for (const grupo of grupos.values()) {
     const { cotacao, linhas } = grupo;
 
-    const itensPayloadBase = linhas.map((l) => {
-      const ipiPct = Number(l.cotItem.ipiPct) || 0;
-      const precoBruto = Number(l.cotItem.precoUnit) || 0;
-      const precoComIPI = precoBruto * (1 + ipiPct / 100);
-      // Itens com abatimento de estoque (qtdPecasCotada setado): usa a qtdCotada
-      // liquida; se o fornecedor zerou a qtd, reconstroi o liquido pela proporcao
-      // de barras. Itens sem abatimento (incl. cotacoes legadas): comportamento
-      // original — peso cheio da RM, com fallback na qtdCotada.
-      let qtdKg;
-      if (l.cotItem.qtdPecasCotada != null) {
-        const pesoRm = Number(l.rmItem.peso) || 0;
-        const qtdRm = Number(l.rmItem.qtd) || 0;
-        const pesoLiquido = pesoRm > 0 && qtdRm > 0
-          ? Math.round((pesoRm * Number(l.cotItem.qtdPecasCotada) / qtdRm) * 100) / 100
-          : Number(l.cotItem.qtdPecasCotada);
-        qtdKg = Number(l.cotItem.qtdCotada) > 0 ? Number(l.cotItem.qtdCotada) : pesoLiquido;
-      } else {
-        qtdKg = l.rmItem.peso > 0 ? Number(l.rmItem.peso) : Number(l.cotItem.qtdCotada) || 0;
-      }
-      return {
-        codigo: l.codigoOmieItem || null,
-        descricao: l.rmItem.descricao,
-        // qtd vai em KG quando é cotado por peso (aço) → unidade TEM que ser KG,
-        // não a original da RM (barra/pç), senão o Omie fica com kg rotulado errado.
-        unidade: (Number(l.rmItem.peso) || 0) > 0 ? "KG" : (l.rmItem.unidade || "KG"),
-        qtd: qtdKg,
-        precoUnit: precoComIPI,
-      };
-    });
-    const totalCalculado = itensPayloadBase.reduce((s, it) => s + it.qtd * it.precoUnit, 0);
+    // ⚠ a regra dos itens mora em lib/pedido-itens: as duas rotas que geram pedido (por RM e por
+    // OP) precisam da MESMA conta, senão o mesmo fornecedor recebe dois números conforme a tela de
+    // onde o comprador clicou.
+    const { itens: itensPayload, alertas } = itensDoPedido(linhas);
+    const total = itensPayload.reduce((s, it) => s + it.qtd * it.precoUnit, 0);
 
-    // Rescale dos preços pro total do pedido bater com a proposta do fornecedor.
-    // SÓ vale quando o pedido cobre a proposta INTEIRA: todos os itens que o
-    // fornecedor cotou (preço>0) são vencedores e entram neste pedido. Em split — o
-    // comprador levou só parte dos itens desse fornecedor, o resto foi pra outro —
-    // o totalProposta é o total da proposta cheia e NÃO tem relação com o subconjunto
-    // vencedor; rescalar aí INFLA os preços (num caso real chegou a 21x num item que
-    // ficou sozinho no pedido).
-    // Cobrindo a proposta inteira, o totalProposta é o total da NF do fornecedor —
-    // em fornecedor tipo GERDAU já vem com frete/ICMS-ST/demais cobranças embutidos,
-    // então o pedido DEVE bater com ele mesmo ficando acima da soma dos itens. Aceita
-    // frete pra cima (até 3x) e desconto de fechamento pra baixo (até 15%); fora dessa
-    // faixa o totalProposta é suspeito (typo/extra-zero) → usa o preço cotado direto.
     const totalProposta = Number(cotacao.totalProposta) || 0;
     const itensComPrecoCot = (cotacao.itens || []).filter((i) => Number(i.precoUnit) > 0);
     const cobrePropostaInteira =
       itensComPrecoCot.length > 0 && linhas.length === itensComPrecoCot.length;
-    const fatorProposta =
-      totalProposta > 0 && totalCalculado > 0 ? totalProposta / totalCalculado : 1;
-    const aplicarRescale =
-      cobrePropostaInteira &&
-      fatorProposta >= 0.85 &&
-      fatorProposta <= 3 &&
-      Math.abs(totalCalculado - totalProposta) > 0.01;
-    let itensPayload = itensPayloadBase;
-    if (aplicarRescale) {
-      itensPayload = itensPayloadBase.map((it) => ({
-        ...it,
-        precoUnit: Math.round(it.precoUnit * fatorProposta * 10000) / 10000,
-      }));
-    }
+    const divergencia = divergenciaProposta(totalProposta, total, cobrePropostaInteira);
 
-    const total = itensPayload.reduce((s, it) => s + it.qtd * it.precoUnit, 0);
     const temIPI = linhas.some((l) => Number(l.cotItem.ipiPct) > 0);
     const observacaoBase = [
       `Pedido via Workspace Torg — RM ${rm.numero} (${rm.descricao || "Interna"})`,
       temIPI ? "Preço unitário inclui IPI" : null,
-      aplicarRescale
-        ? `Preços ajustados pro total bater com proposta (R$ ${totalProposta.toFixed(2)})` : null,
-      cotacao.numeroProposta ? `Proposta forn.: ${cotacao.numeroProposta}` : null,
+      divergencia.texto,
       cotacao.observacao || null,
     ].filter(Boolean).join(" | ");
     // RM de matéria-prima (ENGENHARIA): requisitos de certificado vão na observação EXTERNA
@@ -347,6 +295,11 @@ export async function POST(req, { params }) {
       numeroPedido: pedidoCriado?.numero_pedido || null,
       anexos: resAnexos ? { anexados: resAnexos.anexados, erros: resAnexos.erros?.length || 0 } : null,
       erro: erroPedido,
+      // ⚠ o que o portal NÃO decidiu sozinho volta para a tela: quantidade fora da base cotada e
+      // total da proposta que não fecha com a soma dos itens. Antes isso era "corrigido" no preço
+      // e ninguém via.
+      alertas,
+      divergencia: divergencia.texto || null,
     });
 
     await new Promise((r) => setTimeout(r, 1500));

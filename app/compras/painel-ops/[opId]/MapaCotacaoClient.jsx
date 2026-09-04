@@ -1145,12 +1145,29 @@ function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalG
                     {result && result.length > 0 && (
                       <div className="mt-2 pt-2 border-t border-gray-100 text-xs space-y-1">
                         {result.map((r, idx) => (
-                          <div key={idx} className={r.sucesso ? "text-torg-orange-700" : "text-red-700"}>
-                            {r.sucesso ? (
-                              <>✓ Pedido {r.numeroPedido || r.codigoPedido}{r.isFD ? " (Fat. Direto)" : ""} criado — {fmtMoeda(r.total)}</>
-                            ) : (
-                              <>✗ {r.erro}</>
+                          <div key={idx} className="space-y-1">
+                            <div className={r.sucesso ? "text-torg-orange-700" : "text-red-700"}>
+                              {r.sucesso ? (
+                                <>✓ Pedido {r.numeroPedido || r.codigoPedido}{r.isFD ? " (Fat. Direto)" : ""} criado — {fmtMoeda(r.total)}</>
+                              ) : (
+                                <>✗ {r.erro}</>
+                              )}
+                            </div>
+                            {/* ⚠⚠ O QUE O PORTAL NÃO DECIDIU SOZINHO APARECE. Vitor (04/09/2026):
+                                "você precisa verificar uma forma de ficar confiável esses números".
+                                Antes, quantidade fora da base e proposta que não fechava eram
+                                acomodadas reescrevendo o preço unitário — o total ficava bonito e o
+                                fornecedor recebia um preço que nunca cotou. */}
+                            {r.divergencia && (
+                              <div className="text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                {r.divergencia}
+                              </div>
                             )}
+                            {r.alertas?.length > 0 && r.alertas.map((al, k) => (
+                              <div key={k} className="text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                <b>{al.descricao}</b> — {al.motivo}
+                              </div>
+                            ))}
                           </div>
                         ))}
                       </div>
