@@ -12,9 +12,16 @@
 // (`produzidoUn < planejadoUn`), com o saldo em peso. O status da PecaConjunto só é mantido até o
 // corte (ver torg_peca_setor_real) e não saberia dizer o que está parado no jato.
 //
-// ⚠ CORTE E PREPARAÇÃO SÃO A MESMA COLUNA: o Syneco separa a operação 10 (Corte) da 20 (Preparação)
-// e só aponta em "Corte"; para quem olha a carga é um setor só, e somá-los separado dobraria as
-// colunas do quadro sem dizer nada novo.
+// ⚠⚠ A COLUNA "PREPARAÇÃO" LÊ SÓ A OPERAÇÃO "CORTE" DO SYNECO — e isso custou um número errado.
+// Vitor (03/09/2026): "aqui precisa verificar, pois não temos todo esse peso na preparação
+// planejado de fato". A causa: as ordens nascem para a ROTA INTEIRA, então a MESMA marca tem uma
+// ordem em "Corte" (op. 10) e outra em "Preparação" (op. 20) — e a fábrica só aponta em "Corte".
+// Somando as duas, cada peça entrava duas vezes e a segunda metade nunca baixava: a coluna dizia
+// 111.614 kg onde havia 38.709. Medido em 03/09: 4.384 apontamentos em "Corte" e ZERO em
+// "Preparação", nos últimos 90 dias.
+//
+// ⚠ A REGRA GERAL: só entra ordem de operação que a fábrica FECHA. Fila que não baixa não é carga,
+// é ruído — e ruído que só cresce.
 //
 // ⚠ O RITMO É MEDIDO, no p75 dos dias com apontamento (90 dias) — mesma régua da capacidade das
 // máquinas. A média carrega o dia em que o setor mal rodou; o melhor dia é exceção.
@@ -35,7 +42,10 @@ export const ORDEM_SETORES = ["Preparação", "Montagem", "Solda", "Jato", "Pint
 const semAcento = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 function coluna(setor) {
   const n = semAcento(setor);
-  if (n === "corte" || n === "preparacao") return "Preparação";
+  // a operação 10 é a que a fábrica aponta; ela É a fila da preparação
+  if (n === "corte") return "Preparação";
+  // ⚠ a operação 20 ("Preparação") é a mesma peça de novo, e nunca recebe baixa — ver a nota acima
+  if (n === "preparacao") return null;
   const achado = ORDEM_SETORES.find((s) => semAcento(s) === n);
   return achado || null;
 }
