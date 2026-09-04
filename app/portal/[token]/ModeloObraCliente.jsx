@@ -397,6 +397,16 @@ export default function ModeloObraCliente({ token }) {
                                 {r.nf && <>NF {r.nf}</>}
                                 {r.nf && r.compradoKg ? " · " : ""}
                                 {r.compradoKg ? <>{fmtKg(r.compradoKg)} comprados</> : null}
+                                {/* ⚠ a corrente documental: RM (o que a obra pediu) → pedido (o que
+                                    foi comprado) → NF → R → corrida → certificado. Vitor
+                                    (04/09/2026) pediu os dois primeiros. */}
+                                {(r.pedido || r.rm) && (
+                                  <span className="block">
+                                    {r.rm && <>RM {r.rm}</>}
+                                    {r.rm && r.pedido ? " · " : ""}
+                                    {r.pedido && <>pedido {r.pedido}</>}
+                                  </span>
+                                )}
                               </span>
                             )}
                           </li>
