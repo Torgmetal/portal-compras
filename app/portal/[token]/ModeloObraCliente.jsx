@@ -92,7 +92,14 @@ export default function ModeloObraCliente({ token }) {
 
   // ⚠ o setor vem do apontamento (mapa marca → setor); peça sem apontamento não tem etapa e não
   // entra em filtro nenhum — dizer que ela está "em preparação" sem lastro seria inventar.
-  const setorDe = useCallback((x) => (x?.marca ? niveisObra?.setores?.[x.marca] || null : null), [niveisObra]);
+  // ⚠ o casamento é pela marca NORMALIZADA (mesma `chaveMarca` dos níveis): a marca do modelo vem
+  // do Tekla e a do mapa vem da lista — um espaço ou uma caixa diferente fazia a etapa não casar e
+  // o filtro inteiro sumir da tela, sem erro nenhum.
+  const setoresPorMarca = useMemo(
+    () => new Map(Object.entries(niveisObra?.setores || {}).map(([m, st]) => [chaveMarca(m), st])),
+    [niveisObra],
+  );
+  const setorDe = useCallback((x) => (x?.marca ? setoresPorMarca.get(chaveMarca(x.marca)) || null : null), [setoresPorMarca]);
 
   // ⚠⚠ O TIPO VEM DA LISTA quando ela sabe o nome. Vitor (05/09/2026): "quando colocamos em vigas
   // ele seleciona algumas coisas sem sentido; teria que pegar nas listas os nomes das peças —
@@ -100,9 +107,13 @@ export default function ModeloObraCliente({ token }) {
   // quase tudo que é barra: terça, tesoura, contraventamento e tirante viravam "Viga".
   // Sem nome na lista (croqui e avulsa trazem o perfil, que é bitola e não tipo), vale o do IFC —
   // que para chapa e parafuso acerta. Ver lib/tipo-peca.js.
-  const tipoDe = useCallback(
-    (x) => (x?.marca ? niveisObra?.tipos?.[String(x.marca).trim().toUpperCase()] : null) || x?.tipo || null,
+  const tiposPorMarca = useMemo(
+    () => new Map(Object.entries(niveisObra?.tipos || {}).map(([m, t]) => [chaveMarca(m), t])),
     [niveisObra],
+  );
+  const tipoDe = useCallback(
+    (x) => (x?.marca ? tiposPorMarca.get(chaveMarca(x.marca)) : null) || x?.tipo || null,
+    [tiposPorMarca],
   );
 
   const setores = useMemo(() => {
@@ -270,7 +281,7 @@ export default function ModeloObraCliente({ token }) {
             {selecionados ? `${selecionados.length} em foco` : "Filtro"}
           </button>
         )}
-        {indice && setores.length > 0 && (
+        {indice && (
           <div className="relative">
             <button onClick={() => setPainelEtapa((v) => !v)}
               className={`text-[12.5px] font-semibold px-3 py-2 rounded-lg border inline-flex items-center gap-2 ${
@@ -281,6 +292,16 @@ export default function ModeloObraCliente({ token }) {
             {painelEtapa && (
               <div className="absolute left-0 top-full mt-1 z-30 w-[250px] bg-white border border-gray-200 rounded-xl shadow-lg p-2">
                 <p className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide px-1.5 mb-1">Onde está</p>
+                {/* ⚠⚠ SEM APONTAMENTO, O BOTÃO EXPLICA — não some. Vitor (05/09/2026): "o botão de
+                    etapa de fabricação ainda não aparece no portal do cliente". Ele sumia quando a
+                    obra não tinha nenhuma peça apontada no Syneco, e sumir é indistinguível de
+                    defeito: fica-se procurando um botão que a tela decidiu esconder. */}
+                {setores.length === 0 && (
+                  <p className="text-[11.5px] text-amber-700 px-1.5 py-1 leading-snug">
+                    Esta obra ainda não tem produção apontada na fábrica — quando a primeira peça for
+                    apontada, as etapas aparecem aqui.
+                  </p>
+                )}
                 <div className="space-y-0.5">
                   {setores.map(([st, qt]) => {
                     const ativo = fSetores.has(st);
