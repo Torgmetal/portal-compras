@@ -94,6 +94,17 @@ export default function ModeloObraCliente({ token }) {
   // entra em filtro nenhum — dizer que ela está "em preparação" sem lastro seria inventar.
   const setorDe = useCallback((x) => (x?.marca ? niveisObra?.setores?.[x.marca] || null : null), [niveisObra]);
 
+  // ⚠⚠ O TIPO VEM DA LISTA quando ela sabe o nome. Vitor (05/09/2026): "quando colocamos em vigas
+  // ele seleciona algumas coisas sem sentido; teria que pegar nas listas os nomes das peças —
+  // colunas, tesouras, terças". O tipo do modelo é a CLASSE DO IFC, e o Tekla exporta como IfcBeam
+  // quase tudo que é barra: terça, tesoura, contraventamento e tirante viravam "Viga".
+  // Sem nome na lista (croqui e avulsa trazem o perfil, que é bitola e não tipo), vale o do IFC —
+  // que para chapa e parafuso acerta. Ver lib/tipo-peca.js.
+  const tipoDe = useCallback(
+    (x) => (x?.marca ? niveisObra?.tipos?.[String(x.marca).trim().toUpperCase()] : null) || x?.tipo || null,
+    [niveisObra],
+  );
+
   const setores = useMemo(() => {
     const c = new Map();
     for (const x of indice || []) { const st = setorDe(x); if (st) c.set(st, (c.get(st) || 0) + 1); }
@@ -114,17 +125,17 @@ export default function ModeloObraCliente({ token }) {
       : null;
     return indice.filter((x) =>
       (!fNiveis.size || (alvo ? x.marca && alvo.has(chaveMarca(x.marca)) : fNiveis.has(x.nivel)))
-      && (!fTipos.size || fTipos.has(x.tipo))
+      && (!fTipos.size || fTipos.has(tipoDe(x)))
       && (!fSetores.size || fSetores.has(setorDe(x))));
-  }, [indice, fNiveis, fTipos, fSetores, daObra, niveisNaTela, setorDe]);
+  }, [indice, fNiveis, fTipos, fSetores, daObra, niveisNaTela, setorDe, tipoDe]);
 
   const visiveis = useMemo(() => (selecionados ? new Set(selecionados.map((x) => x.id)) : null), [selecionados]);
 
   const tipos = useMemo(() => {
     const c = new Map();
-    for (const x of indice || []) c.set(x.tipo, (c.get(x.tipo) || 0) + 1);
+    for (const x of indice || []) { const t = tipoDe(x); if (t) c.set(t, (c.get(t) || 0) + 1); }
     return [...c.entries()].sort((a, b) => b[1] - a[1]);
-  }, [indice]);
+  }, [indice, tipoDe]);
 
   const contaNivel = useMemo(() => {
     const c = new Map();
@@ -140,7 +151,7 @@ export default function ModeloObraCliente({ token }) {
     const base = selecionados || indice || [];
     const t = busca.trim().toUpperCase();
     if (!t) return base;
-    return base.filter((x) => String(x.marca || "").toUpperCase().includes(t) || String(x.tipo || "").toUpperCase().includes(t));
+    return base.filter((x) => String(x.marca || "").toUpperCase().includes(t) || String(tipoDe(x) || "").toUpperCase().includes(t));
   }, [selecionados, indice, busca]);
 
   const alternar = (setar, valor) => setar((antes) => {
@@ -160,7 +171,7 @@ export default function ModeloObraCliente({ token }) {
         ? niveisNaTela.find((nv) => x.marca && nv.marcas.has(chaveMarca(x.marca)))?.rotulo || ""
         : niveisNaTela.find((nv) => nv.chave === x.nivel)?.rotulo || "");
       const COLS = [
-        { t: "Tipo", w: 14, v: (x) => x.tipo || "" },
+        { t: "Tipo", w: 14, v: (x) => tipoDe(x) || "" },
         { t: "Marca", w: 24, v: (x) => x.marca || "" },
         { t: "Nível", w: 24, v: nivelDoItem },
         { t: "Cota base (mm)", w: 15, dir: "right", v: (x) => (x.cota == null ? "" : Math.round(x.cota * 1000)) },
@@ -379,7 +390,7 @@ export default function ModeloObraCliente({ token }) {
                   {listados.slice(0, 300).map((x) => (
                     <button key={x.id} onClick={() => abrir(x)}
                       className={`w-full text-left text-[12px] px-1.5 py-1 rounded flex items-baseline gap-2 hover:bg-gray-50 ${sel?.id === x.id ? "bg-orange-50" : ""}`}>
-                      <span className="font-mono text-[#0D1F3C] truncate">{x.marca || x.tipo}</span>
+                      <span className="font-mono text-[#0D1F3C] truncate">{x.marca || tipoDe(x)}</span>
                       <span className="ml-auto text-[11px] text-gray-400 shrink-0">{x.pecas}×</span>
                     </button>
                   ))}
@@ -479,7 +490,8 @@ export default function ModeloObraCliente({ token }) {
                 <>
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <h4 className="font-mono text-[17px] font-bold text-[#0D1F3C]">{peca.marca}</h4>
-                    <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full border border-gray-200 bg-gray-50 text-gray-600">{peca.tipo}</span>
+                    {/* ⚠ o mesmo tipo do filtro: da lista quando ela nomeia, do IFC quando não */}
+                    <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full border border-gray-200 bg-gray-50 text-gray-600">{tipoDe(peca) || peca.tipo}</span>
                     <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full border ${
                       peca.etapa === "expedida" ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                       : peca.etapa === SEM ? "border-gray-200 bg-gray-50 text-gray-500"
