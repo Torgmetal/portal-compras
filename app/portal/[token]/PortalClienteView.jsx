@@ -308,15 +308,47 @@ export default function PortalClienteView({ token }) {
             sub={`${dados.compras.recebidos} de ${dados.compras.total} recebidos`}>
             <Tabela
               quebra={[0]} larguraMin={780}
-              cols={["Material", "Qtd.", "Situação", "Pedido", "Chegou em", "NF", "Rastreio"]}
+              /* ⚠ a RM diz DE ONDE a obra pediu, e vem antes do pedido porque é o que acontece
+                 antes: requisição → cotação → pedido → nota. */
+              cols={["Material", "Qtd.", "Situação", "RM", "Pedido", "Chegou em", "NF", "Rastreio"]}
               linhas={dados.compras.itens.slice(0, 200).map((c) => [
                 c.material, c.qtd,
                 <span key="s" className={c.status === "Recebido" ? "text-emerald-700 font-semibold" : ""}>{c.status}</span>,
+                c.rm || "—",
                 c.pedido || "—", fmtD(c.chegouEm), c.nf || "—",
                 c.rastreio ? <span key="r" className="font-mono text-[#006EAB]">R {c.rastreio}</span> : "—",
               ])}
               rodape={dados.compras.itens.length > 200 ? `e mais ${dados.compras.itens.length - 200} itens.` : null}
             />
+
+            {/* ⚠⚠ A PROVA DE QUE O MATERIAL CHEGOU. Vitor (04/09/2026): "precisa ficar dentro da aba
+                de compras do painel do cliente". Agrupada por NOTA FISCAL, que é a coluna que ele
+                acabou de ler na tabela acima — é assim que a foto se liga à linha. */}
+            {dados.compras.fotos?.length > 0 && (
+              <div className="mt-5 pt-4 border-t border-gray-100">
+                <p className="text-[13px] font-semibold text-[#0D1F3C] mb-2">Recebimento do material</p>
+                <div className="space-y-3">
+                  {dados.compras.fotos.map((g, i) => (
+                    <div key={i}>
+                      <p className="text-[11.5px] text-gray-500 mb-1.5">
+                        {g.nf ? <>NF {g.nf}</> : "sem nota informada"}
+                        {g.fotos[0]?.em ? <> · {fmtD(g.fotos[0].em)}</> : null}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {g.fotos.map((f) => (
+                          <a key={f.id} href={f.url} target="_blank" rel="noopener noreferrer"
+                            title="abrir a foto">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={f.url} alt={`Recebimento${g.nf ? ` da NF ${g.nf}` : ""}`}
+                              className="w-20 h-20 object-cover rounded-lg border border-gray-200 hover:border-[#006EAB]" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </Bloco>
         )}
 

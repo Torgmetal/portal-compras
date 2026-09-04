@@ -384,6 +384,10 @@ export async function GET(req, { params }) {
         // recebida — senão sai "—", que é a verdade.
         const m = acharR(it.descricao);
         linhas.push({
+          // ⚠ DE ONDE A OBRA PEDIU. Vitor (04/09/2026): "o bom também era listar a RM que foi
+          // solicitada, para ficar fácil ver de onde foi solicitado". A RM já estava na consulta —
+          // a tabela é montada a partir dela —, só não descia para a linha.
+          rm: rm.numero,
           material: it.descricao,
           qtd: it.peso > 0 ? `${Math.round(it.peso)} kg` : `${it.qtd} ${it.unidade || ""}`.trim(),
           status: ROTULO[st] || st,
@@ -400,14 +404,41 @@ export async function GET(req, { params }) {
       }
     }
     const conta = (r) => linhas.filter((l) => l.status === r).length;
+    // ⚠⚠ AS FOTOS DO RECEBIMENTO, agrupadas por NOTA FISCAL. Vitor (04/09/2026): "precisa ficar
+    // dentro da aba de compras do painel do cliente". Por NF e não por pedido porque é a nota que o
+    // cliente enxerga na tabela acima — é assim que ele liga a foto à linha que está lendo.
+    //
+    // ⚠ SÓ A IMAGEM E A DATA. A observação interna do documento diz fornecedor e nº do pedido; aqui
+    // desce só o que prova a chegada, sem a nossa cadeia junto.
+    let fotosRecebimento = [];
+    if (tem("RECEBIMENTO_FOTOS")) {
+      const fotos = await prisma.documentoQualidade.findMany({
+        where: { categoria: "EVIDENCIA_RECEBIMENTO", opNumero: portal.opNumero, ativo: true },
+        select: { id: true, arquivoUrl: true, nfNumero: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
+        take: 200,
+      }).catch(() => []);
+      const porNf = new Map();
+      for (const f of fotos) {
+        const k = f.nfNumero || "—";
+        if (!porNf.has(k)) porNf.set(k, { nf: f.nfNumero || null, fotos: [] });
+        porNf.get(k).fotos.push({ id: f.id, url: f.arquivoUrl, em: f.createdAt ? f.createdAt.toISOString() : null });
+      }
+      fotosRecebimento = [...porNf.values()];
+    }
+
     dados.compras = {
       total: linhas.length,
+      fotos: fotosRecebimento,
       recebidos: conta("Recebido"),
       // ⚠ A ORDEM É A DA OBRA, NÃO A ALFABÉTICA. Vitor (26/08/2026): "deixe os perfis nas
       // primeiras linhas, depois os acessórios como telhas, calhas, rufos, depois o lanternim e por
       // último os parafusos". Em ordem alfabética a lista abria com ARRUELA e AUTOBROCANTE — três
       // telas de fixador antes do primeiro perfil, e a impressão é de uma obra feita de parafuso.
-      itens: linhas.sort((a2, b2) => ordenarCompras(a2.material, b2.material)).slice(0, 400),
+      // ⚠ a RM só desce quando a obra escolheu mostrá-la (seção RASTREIO_RM) — a mesma trava do
+      // painel da peça no 3D, para as duas telas contarem a mesma história.
+      itens: linhas.map((l) => (tem("RASTREIO_RM") ? l : { ...l, rm: null }))
+        .sort((a2, b2) => ordenarCompras(a2.material, b2.material)).slice(0, 400),
     };
   }
 
