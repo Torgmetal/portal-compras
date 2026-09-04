@@ -10,6 +10,8 @@ import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOE
 import { criteriosDoDefeito, ONDE_VALE } from "@/lib/aws-d11";
 import { RESULTADO_LABEL } from "@/lib/revisao-inspecao";
 import { numeroBR } from "@/lib/numero-br";
+import { reduzImagem } from "@/lib/imagem-cliente";
+import { lerJson } from "@/lib/resposta-json";
 import {
   APARELHOS, CABECOTES, ANGULOS, ACOPLANTES, BLOCOS_PADRAO, FACES,
   TIPOS_CARREGAMENTO, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL,
@@ -345,13 +347,23 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
     setEnviandoFoto(true);
     try {
       for (const arq of arquivos) {
+        // ⚠⚠ REDUZIR ANTES DE SUBIR — ESTA TELA MANDAVA A FOTO CRUA.
+        // Vitor (04/09/2026): "ao anexar as fotos no relatório de pintura deu esse erro:
+        // Unexpected token 'A', "An error o"... is not valid JSON". Não é erro de JSON: acima de
+        // ~4,5 MB a rota serverless nem chega a rodar e a plataforma devolve uma página HTML de
+        // erro ("An error occurred…"), que o `r.json()` tenta ler. Foto de câmera boa passa disso
+        // fácil, e o iPhone ainda manda HEIC, que a rota recusa.
+        // A tela do computador já reduzia (app/qualidade/.../Fotos.jsx) — só esta ficou de fora,
+        // apesar de o comentário da rota afirmar que a foto "chega já reduzida". Ver
+        // [[torg_upload_4mb]].
+        const blob = await reduzImagem(arq);
         const fd = new FormData();
-        fd.append("file", arq);
+        fd.append("file", new File([blob], "foto.jpg", { type: "image/jpeg" }));
         fd.append("opNumero", op.numero);
         fd.append("tipo", rel.tipo);
         fd.append("relatorioId", id);
         const r = await fetch("/api/campo/foto", { method: "POST", body: fd });
-        const j = await r.json();
+        const j = await lerJson(r);
         if (!r.ok) throw new Error(j.error || "Erro ao enviar");
         setFotos((p) => [...p, j.foto || j]);
       }

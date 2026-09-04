@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Camera, Loader2, X, AlertTriangle } from "lucide-react";
 import { reduzImagem } from "@/lib/imagem-cliente";
+import { lerJson } from "@/lib/resposta-json";
 
 // ─── AS FOTOS DO ENSAIO, EM QUALQUER RELATÓRIO ────────────────────────────────
 // Vitor (22/08/2026): "estou sentindo falta de um campo para anexar as fotos dos
@@ -47,7 +48,8 @@ export default function Fotos({ rel, travado }) {
         fd.append("tipo", rel.tipo);
         fd.append("relatorioId", rel.id);
         const r = await fetch("/api/campo/foto", { method: "POST", body: fd });
-        const j = await r.json();
+        // ⚠ erro de plataforma vem em HTML, não em JSON — ver lib/resposta-json.js
+        const j = await lerJson(r);
         if (!r.ok) throw new Error(j.error || "Falha ao enviar a foto.");
       }
       await carregar();
