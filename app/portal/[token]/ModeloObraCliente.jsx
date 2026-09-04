@@ -39,6 +39,9 @@ export default function ModeloObraCliente({ token }) {
   const [indice, setIndice] = useState(null);
   const [niveisGeo, setNiveisGeo] = useState([]);
   const [niveisObra, setNiveisObra] = useState(null);
+  // ⚠ filtro por ETAPA DE FABRICAÇÃO. Vitor (04/09/2026): "quero que o cliente clique no status e
+  // só apareçam as peças que estão sendo apontadas naquele setor".
+  const [fSetores, setFSetores] = useState(() => new Set());
   const [fNiveis, setFNiveis] = useState(() => new Set());
   const [fTipos, setFTipos] = useState(() => new Set());
   const [painel, setPainel] = useState(false);
@@ -82,16 +85,29 @@ export default function ModeloObraCliente({ token }) {
     }));
   }, [daObra, niveisObra, niveisGeo]);
 
+  // ⚠ o setor vem do apontamento (mapa marca → setor); peça sem apontamento não tem etapa e não
+  // entra em filtro nenhum — dizer que ela está "em preparação" sem lastro seria inventar.
+  const setorDe = useCallback((x) => (x?.marca ? niveisObra?.setores?.[x.marca] || null : null), [niveisObra]);
+
+  const setores = useMemo(() => {
+    const c = new Map();
+    for (const x of indice || []) { const st = setorDe(x); if (st) c.set(st, (c.get(st) || 0) + 1); }
+    // ⚠ ordem da ROTA, não a alfabética nem a por quantidade: o cliente lê o caminho da peça.
+    const ordem = ["Corte", "Preparação", "Montagem", "Solda", "Acabamento", "Jato", "Pintura"];
+    return [...c.entries()].sort((a2, b2) => ordem.indexOf(a2[0]) - ordem.indexOf(b2[0]));
+  }, [indice, setorDe]);
+
   const selecionados = useMemo(() => {
     if (!indice) return null;
-    if (!fNiveis.size && !fTipos.size) return null;
+    if (!fNiveis.size && !fTipos.size && !fSetores.size) return null;
     const alvo = daObra && fNiveis.size
       ? new Set(niveisNaTela.filter((nv) => fNiveis.has(nv.chave)).flatMap((nv) => [...nv.marcas]))
       : null;
     return indice.filter((x) =>
       (!fNiveis.size || (alvo ? x.marca && alvo.has(chaveMarca(x.marca)) : fNiveis.has(x.nivel)))
-      && (!fTipos.size || fTipos.has(x.tipo)));
-  }, [indice, fNiveis, fTipos, daObra, niveisNaTela]);
+      && (!fTipos.size || fTipos.has(x.tipo))
+      && (!fSetores.size || fSetores.has(setorDe(x))));
+  }, [indice, fNiveis, fTipos, fSetores, daObra, niveisNaTela, setorDe]);
 
   const visiveis = useMemo(() => (selecionados ? new Set(selecionados.map((x) => x.id)) : null), [selecionados]);
 
@@ -255,7 +271,7 @@ export default function ModeloObraCliente({ token }) {
               <div className="flex items-center justify-between">
                 <h4 className="text-[12px] font-bold text-[#0D1F3C] uppercase tracking-wide">Filtrar a vista</h4>
                 {selecionados && (
-                  <button onClick={() => { setFNiveis(new Set()); setFTipos(new Set()); }} className="text-[11px] text-[#006EAB] hover:underline">limpar</button>
+                  <button onClick={() => { setFNiveis(new Set()); setFTipos(new Set()); setFSetores(new Set()); }} className="text-[11px] text-[#006EAB] hover:underline">limpar</button>
                 )}
               </div>
 
@@ -274,6 +290,28 @@ export default function ModeloObraCliente({ token }) {
                       );
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* ⚠⚠ ETAPA DE FABRICAÇÃO, e ela vem primeiro. Vitor (04/09/2026): "quero que o cliente
+                  clique no status e só apareçam as peças que estão sendo apontadas naquele setor".
+                  É a pergunta que o cliente faz olhando a obra — "onde está a minha peça?" —, então
+                  fica acima de nível e tipo, que são geometria. */}
+              {setores.length > 0 && (
+                <div>
+                  <p className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Onde está</p>
+                  <div className="space-y-0.5">
+                    {setores.map(([st, qt]) => (
+                      <label key={st} className="flex items-center gap-2 text-[12.5px] text-[#0D1F3C] rounded px-1.5 py-1 cursor-pointer hover:bg-gray-50">
+                        <input type="checkbox" checked={fSetores.has(st)} onChange={() => alternar(setFSetores, st)} className="accent-[#006EAB]" />
+                        {/* ⚠ "Corte" e "Preparação" são o mesmo setor para quem olha de fora — o
+                            Syneco é que separa as operações 10 e 20 (ver lib/portal-obra-consulta). */}
+                        <span className="flex-1">{st === "Corte" || st === "Preparação" ? "Preparação" : st}</span>
+                        <span className="text-[11px] text-gray-400 tabular-nums">{qt}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-[10.5px] text-gray-400 mt-1">peça sem apontamento não entra em nenhuma etapa</p>
                 </div>
               )}
 
