@@ -248,9 +248,6 @@ export async function POST(req) {
     dataMarco: marco, desvioDias: desvio, desvioMotivo: (d.desvioMotivo || "").trim() || null,
     observacao: (d.observacao || "").trim() || null,
     pecaIds: d.pecaIds?.length ? d.pecaIds : null,
-    // ⚠ a mesma seleção pela chave natural — é o que sobrevive à reimportação da lista, que apaga e
-    // recria as peças com id novo. As marcas saem do BANCO (`alvo`), não do que a tela mandou.
-    pecaMarcas: d.pecaIds?.length ? chavesDasPecas(alvo) : null,
     dataProgramada: d.dataProgramada ? new Date(`${d.dataProgramada}T12:00:00Z`) : null,
     metaKg: d.metaKg ?? null, totalKg: d.totalKg ?? null, totalPecas: d.totalPecas ?? null,
     liberadoEm: agora, liberadoPorId: user?.id || null, liberadoPorNome: user?.name || user?.email || null,
@@ -259,6 +256,20 @@ export async function POST(req) {
   // ⚠ CREATE, NÃO UPSERT. O upsert por (opId, frente) sobrescrevia a liberação anterior da mesma
   // frente — o dia 2 apagava o dia 1, e a programação da semana nunca existiria.
   const lib = await prisma.liberacaoProducao.create({ data: { opId: op.id, ...dados } });
+
+  // ⚠ A MESMA SELEÇÃO PELA CHAVE NATURAL ("opNumero|MARCA") — é o que sobrevive à reimportação da
+  // lista, que apaga e recria as peças com id novo (ver lib/liberacao-pecas.js). As marcas saem do
+  // BANCO (`alvo`), nunca do que a tela mandou.
+  //
+  // ⚠ Gravada DEPOIS e sem derrubar a liberação: enquanto a coluna não existir no banco (Admin →
+  // Manutenção do banco), liberar continua funcionando como sempre — só sem a rede de segurança.
+  if (d.pecaIds?.length) {
+    try {
+      await prisma.liberacaoProducao.update({ where: { id: lib.id }, data: { pecaMarcas: chavesDasPecas(alvo) } });
+    } catch (e) {
+      console.error("[liberacao] não consegui gravar pecaMarcas:", e?.message);
+    }
+  }
 
   await prisma.auditLog.create({
     data: { userId: user?.id || null, action: "LIBERAR_PRODUCAO", entity: "LiberacaoProducao", entityId: lib.id,

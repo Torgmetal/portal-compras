@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, Target, Bot, Activity, Mail } from "lucide-react";
+import { Users, Target, Bot, Activity, Mail, Wrench } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -11,6 +11,7 @@ const menu = [
   { href: "/admin/metas",     label: "Metas",     icon: Target },
   { href: "/admin/torguinho", label: "Torguinho", icon: Bot },
   { href: "/admin/sincronizacoes", label: "Sincronizações", icon: Activity },
+  { href: "/admin/manutencao", label: "Manutenção do banco", icon: Wrench },
 ];
 
 export default function SidebarAdmin() {
