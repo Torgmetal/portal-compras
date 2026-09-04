@@ -10,6 +10,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAcesso } from "@/lib/session";
+import { conferirBanco } from "@/lib/banco-esperado";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -22,29 +23,26 @@ export const maxDuration = 60;
  */
 const TAREFAS = [
   {
-    id: "foto-evidencia",
-    titulo: "Área de evidência nas fotos de inspeção",
-    porque: "Sem esta coluna, cada foto do relatório continua caindo num monte só, fora das seis molduras do registro fotográfico.",
+    // ⚠⚠ ESTA NÃO É ESCRITA À MÃO — ela VARRE. Vitor (04/09/2026): "terá alguma coisa que vai
+    // varrer sozinho?". As duas tarefas de coluna abaixo existiram porque eu lembrei de escrevê-las;
+    // esquecer uma é derrubar a tela em produção com "column does not exist". Esta compara o modelo
+    // do Prisma (o mesmo que gera as consultas) com o banco e cobra o que faltar — inclusive o que
+    // eu criar amanhã. Ver lib/banco-esperado.js.
+    id: "colunas-faltando",
+    titulo: "Colunas que o código espera e o banco não tem",
+    porque: "Varredura automática do modelo contra o banco. Coluna que o código usa e o banco não tem derruba a tela com \"column does not exist\" — e é o que mais trava correção nova.",
     async checar() {
-      const falta = !(await temColuna("FotoInspecao", "evidencia"));
-      return { falta, detalhe: falta ? "coluna ausente" : "coluna existe" };
+      const { criaveis, revisar } = await conferirBanco(prisma);
+      const partes = [];
+      if (criaveis.length) partes.push(`${criaveis.length} coluna(s) a criar: ${criaveis.slice(0, 6).map((c) => `${c.tabela}.${c.coluna}`).join(", ")}${criaveis.length > 6 ? "…" : ""}`);
+      if (revisar.length) partes.push(`${revisar.length} para conferir à mão: ${revisar.slice(0, 4).map((r) => `${r.tabela}${r.coluna ? "." + r.coluna : ""} (${r.motivo})`).join("; ")}${revisar.length > 4 ? "…" : ""}`);
+      return { falta: criaveis.length > 0, detalhe: partes.join(" · ") || "banco em dia com o modelo" };
     },
     async aplicar() {
-      await prisma.$executeRawUnsafe(`ALTER TABLE "FotoInspecao" ADD COLUMN IF NOT EXISTS "evidencia" TEXT`);
-      return "coluna criada";
-    },
-  },
-  {
-    id: "liberacao-peca-marcas",
-    titulo: "Marca das peças no lote liberado",
-    porque: "É o que faz o lote do Planejamento sobreviver à reimportação da lista. Sem ela, apagar e reimportar peças mata o recorte de novo (275 ponteiros mortos em 11 lotes em 04/09/2026).",
-    async checar() {
-      const falta = !(await temColuna("LiberacaoProducao", "pecaMarcas"));
-      return { falta, detalhe: falta ? "coluna ausente" : "coluna existe" };
-    },
-    async aplicar() {
-      await prisma.$executeRawUnsafe(`ALTER TABLE "LiberacaoProducao" ADD COLUMN IF NOT EXISTS "pecaMarcas" JSONB`);
-      return "coluna criada";
+      const { criaveis, revisar } = await conferirBanco(prisma);
+      for (const c of criaveis) await prisma.$executeRawUnsafe(c.sql);
+      const extra = revisar.length ? ` · ${revisar.length} continua(m) para conferir à mão` : "";
+      return `${criaveis.length} coluna(s) criada(s)${extra}`;
     },
   },
   {
@@ -130,14 +128,6 @@ const ALVO_MONTAGEM = {
   status: "PENDENTE",
   montagemDiaProgramado: { not: null },
 };
-
-async function temColuna(tabela, coluna) {
-  const r = await prisma.$queryRawUnsafe(
-    `SELECT 1 FROM information_schema.columns WHERE table_name = $1 AND column_name = $2 LIMIT 1`,
-    tabela, coluna,
-  );
-  return Array.isArray(r) && r.length > 0;
-}
 
 export async function GET() {
   try { await requireAcesso({ tipos: ["ADMIN"] }); }
