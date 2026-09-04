@@ -30,9 +30,6 @@ import LiberacaoMaterial from "./LiberacaoMaterial";
 // ⚠ o download do ZIP vem da lib (era a TERCEIRA cópia da mesma função neste repositório); ela
 // suporta a pasta por bancada, que a cópia local não tinha.
 import { baixarZipLote } from "@/lib/desenhos-zip-cliente";
-import DescerDesenhos from "./DescerDesenhos";
-import GanttBancadas from "./GanttBancadas";
-import KanbanPreparacao from "./KanbanPreparacao";
 import PainelBancadas from "@/app/producao/programacao/montagem/PainelBancadas";
 
 const MAX_LOTE = 80; // teto do /api/producao/desenhos/lote
@@ -147,11 +144,6 @@ export default function ProducaoClient() {
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
   const [verTodas, setVerTodas] = useState(false);
-  // ⚠ o setor mora AQUI porque manda em duas coisas: as abas do painel e o quadro de baixo.
-  const [setorPainel, setSetorPainel] = useState("PREPARACAO");
-  // ⚠ o quadro de baixo busca sozinho; sem este contador ele continuaria mostrando o mundo de antes
-  // logo depois de o painel programar ou tirar alguma coisa.
-  const [recargaQuadro, setRecargaQuadro] = useState(0);
   const [materialAberto, setMaterialAberto] = useState(null); // liberação com o portão aberto
   const [erro, setErro] = useState("");
 
@@ -434,66 +426,6 @@ export default function ProducaoClient() {
     }
   }
 
-  /**
-   * DESCER O QUE ESTÁ PRONTO NO DIA, pelo painel do topo.
-   *
-   * ⚠ MESMO POST do botão "Imprimir e liberar" (`/api/producao/desenhos/lote`, acao IMPRIMIR): é o
-   * mesmo ato — o que muda é só quem escolheu as marcas. Um segundo caminho de gravação daria duas
-   * regras de GRD para consertar quando algo mudasse.
-   *
-   * ⚠ O DIA CRUZA OBRAS, a emissão é por OP. Ela escolheu "descer o que está pronto hoje"; separar
-   * por obra e respeitar o teto do lote é trabalho do portal, não dela.
-   */
-  async function descerDoPainel({ setor, porObra }) {
-    const total = (porObra || []).reduce((s, o) => s + o.marcas.length, 0);
-    if (!total) return;
-    // ⚠ O BANCO GRAVA "CORTE"; a fábrica fala "preparação". A GRD tem de sair com a mesma chave que
-    // o resto do portal escreve, senão a mesma liberação aparece com dois setores no histórico.
-    const setorChave = setor === "PREPARACAO" ? "CORTE" : setor;
-    const nOps = porObra.length;
-    if (!confirm(`Descer ${total} desenho(s) para a ${SETOR_LABEL[setorChave] || setorChave}`
-      + (nOps > 1 ? `, de ${nOps} obras` : ` da ${fmtOP(porObra[0].opNumero)}`) + "?\n\n"
-      + "Cada um sai carimbado com a rastreabilidade e a GRD fica registrada. Pode levar alguns minutos.")) return;
-
-    setImprimindo(true); setAviso(null);
-    let emitidas = 0; const semDesenho = []; const erros = [];
-    try {
-      for (const { opNumero, marcas } of porObra) {
-        for (let i = 0; i < marcas.length; i += MAX_LOTE) {
-          const bloco = marcas.slice(i, i + MAX_LOTE);
-          const r = await fetch("/api/producao/desenhos/lote", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ opNumero, marcas: bloco, setor: setorChave, acao: "IMPRIMIR" }),
-          });
-          const j = await r.json();
-          if (!r.ok) { erros.push(`${fmtOP(opNumero)}: ${j.error || "erro ao emitir"}`); continue; }
-          emitidas += Number(j.emitidas) || 0;
-          if (j.semDesenho?.length) semDesenho.push(...j.semDesenho);
-          // ⚠ baixa bloco a bloco: a GRD do bloco JÁ está gravada, então o arquivo não pode ficar
-          // preso esperando o resto — e juntar tudo num ZIP só guardaria dezenas de MB na memória.
-          if (Number(j.emitidas) > 0) {
-            try { await baixarZipLote(j, opNumero); } catch (e) { erros.push(`download ${fmtOP(opNumero)}: ${e?.message || "falhou"}`); }
-          }
-        }
-      }
-      // ⚠ ZERO EMITIDAS NÃO É SUCESSO — mesma armadilha do botão da tabela (Vitor, 24/08/2026:
-      // "estou tentando imprimir os projetos mas não está indo", com a tela dizendo que foi).
-      if (!emitidas) {
-        setAviso({ ok: false, texto: `Nenhum desenho foi encontrado para as ${total} marca(s), então nada desceu.`
-          + (semDesenho.length ? ` Sem desenho na pasta: ${semDesenho.slice(0, 8).join(", ")}${semDesenho.length > 8 ? ` e mais ${semDesenho.length - 8}` : ""}.` : "")
-          + " Confira se os PDFs estão em 2. Engenharia › 2.5 Projetos › 2.5.2 Fabricação." });
-        return;
-      }
-      setAviso({ ok: !erros.length,
-        texto: `${emitidas} desenho(s) desceram para a ${SETOR_LABEL[setorChave] || setorChave}.`
-          + (semDesenho.length ? ` ${semDesenho.length} sem desenho na pasta.` : "")
-          + (erros.length ? ` Com pendências: ${erros.slice(0, 3).join(" · ")}` : "") });
-      if (aberta) await carregarDetalhe(aberta, setorAba);
-      carregar();
-    } catch (e) { setAviso({ ok: false, texto: e.message }); }
-    finally { setImprimindo(false); }
-  }
-
   async function exportar() {
     if (!detalhe) return;
     const lista = pecas;
@@ -579,18 +511,6 @@ export default function ProducaoClient() {
           <button onClick={() => setAviso(null)} className="text-xs underline shrink-0">fechar</button>
         </div>
       )}
-
-      {/* ⚠⚠ A AÇÃO ANTES DA LISTA. Vitor (03/09/2026): "ela está perdida para conseguir descer os
-          desenhos para os setores". O caminho normal deixa de depender de achar a peça numa tabela
-          de centenas — a lista de obras continua abaixo, para o resto do trabalho. */}
-      <DescerDesenhos onDescer={descerDoPainel} ocupado={imprimindo} setor={setorPainel} onSetor={setSetorPainel} onMudou={() => setRecargaQuadro((v) => v + 1)} onSeparacao={setSeparacao} />
-
-      {/* ⚠ BLOCO PRÓPRIO, LOGO ABAIXO DO PAINEL, E QUE SEGUE O SETOR. Vitor (03/09/2026): "não acho
-          que deve ficar em aba própria, deixa na mesma aba que estamos no pcp/producao" e "se eu
-          estou na aba de preparação você precisa mostrar o kanban de preparação; se estou na página
-          de montagem preciso que mostre a página de montagem". Quem programa vê o painel e o quadro
-          do seu setor ao mesmo tempo — sem trocar de tela e sem apertar botão. */}
-      {setorPainel === "MONTAGEM" ? <GanttBancadas recarga={recargaQuadro} /> : <KanbanPreparacao recarga={recargaQuadro} />}
 
       {loading ? (
         <div className="flex items-center justify-center py-20 gap-3 text-torg-gray"><Loader2 size={22} className="animate-spin" /> Carregando…</div>
