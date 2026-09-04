@@ -84,7 +84,7 @@ export async function POST(req, { params }) {
   const fotos = await prisma.fotoInspecao.findMany({
     where: { relatorioId: id },
     orderBy: { capturadaEm: "asc" },
-    select: { url: true, marca: true, origemMarca: true, observacao: true, capturadaEm: true, autorNome: true },
+    select: { url: true, marca: true, origemMarca: true, observacao: true, capturadaEm: true, autorNome: true, evidencia: true },
   });
 
   const titulo = `${rel.codigo} — ${TIPO_LABEL[rel.tipo] || "Relatório de inspeção"} · OP-${rel.opNumero}`;

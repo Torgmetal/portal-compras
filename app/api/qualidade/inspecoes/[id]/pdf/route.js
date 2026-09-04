@@ -29,7 +29,7 @@ export async function GET(req, { params }) {
   const fotos = await prisma.fotoInspecao.findMany({
     where: { relatorioId: id },
     orderBy: { capturadaEm: "asc" },
-    select: { url: true, marca: true, origemMarca: true, observacao: true, capturadaEm: true, autorNome: true },
+    select: { url: true, marca: true, origemMarca: true, observacao: true, capturadaEm: true, autorNome: true, evidencia: true },
   });
 
   const assinaturas = rel.envioAssinaturaId

@@ -10,6 +10,7 @@ import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { PERFIS_CAMPO, tipoValido, ORIGENS_MARCA } from "@/lib/qualidade-campo";
+import { evidenciaValida } from "@/lib/fotos-evidencia";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -40,6 +41,9 @@ export async function POST(req) {
   // caminho.
   const relatorioId = String(form.get("relatorioId") || "").trim() || null;
   const origemMarca = String(form.get("origemMarca") || "").trim() || null;
+  // ⚠ a ÁREA de evidência (rugosidade, salinidade, espessura…) — é ela que faz a foto cair na
+  // moldura certa da folha 2 em vez de virar mais uma imagem solta no fim do PDF.
+  const evidencia = String(form.get("evidencia") || "").trim() || null;
   const observacao = String(form.get("observacao") || "").trim().slice(0, 500) || null;
   // instrumentos marcados no celular, em SNAPSHOT — ver o comentário do modelo
   let equipamentos = null;
@@ -61,6 +65,7 @@ export async function POST(req) {
   if (!opNumero) return NextResponse.json({ error: "Escolha a OP." }, { status: 400 });
   if (!tipoValido(tipo)) return NextResponse.json({ error: "Tipo de relatório inválido." }, { status: 400 });
   if (origemMarca && !ORIGENS_MARCA.includes(origemMarca)) return NextResponse.json({ error: "Origem da marca inválida." }, { status: 400 });
+  if (!evidenciaValida(tipo, evidencia)) return NextResponse.json({ error: "Área de evidência inválida." }, { status: 400 });
   if (file.size > MAX) return NextResponse.json({ error: `Imagem muito grande (máx ${MAX / 1024 / 1024} MB).` }, { status: 413 });
 
   const mime = (file.type || "").toLowerCase();
@@ -74,12 +79,12 @@ export async function POST(req) {
 
   const foto = await prisma.fotoInspecao.create({
     data: {
-      opId, opNumero, tipo, marca, origemMarca, observacao, equipamentos, relatorioId,
+      opId, opNumero, tipo, marca, origemMarca, observacao, equipamentos, relatorioId, evidencia,
       url: blob.url, tamanho: buf.length,
       // quem tirou é o que faz a foto valer como evidência — sem isso é só uma imagem
       autorId: user.id, autorNome: user.name || user.email || null,
     },
-    select: { id: true, url: true, marca: true, origemMarca: true, observacao: true, equipamentos: true, capturadaEm: true },
+    select: { id: true, url: true, marca: true, origemMarca: true, observacao: true, equipamentos: true, capturadaEm: true, evidencia: true },
   });
 
   return NextResponse.json({ ok: true, foto });
@@ -99,11 +104,43 @@ export async function GET(req) {
 
   const fotos = await prisma.fotoInspecao.findMany({
     where: relatorioId ? { relatorioId } : { opNumero, ...(tipo ? { tipo } : {}) },
-    select: { id: true, url: true, marca: true, origemMarca: true, observacao: true, equipamentos: true, capturadaEm: true, autorNome: true, tipo: true },
+    select: { id: true, url: true, marca: true, origemMarca: true, observacao: true, equipamentos: true, capturadaEm: true, autorNome: true, tipo: true, evidencia: true },
     orderBy: { capturadaEm: relatorioId ? "asc" : "desc" },
     take: 60,
   });
   return NextResponse.json({ fotos });
+}
+
+// PATCH — muda a ÁREA de evidência de uma foto que já está no relatório.
+//
+// ⚠ Existe por causa do acervo: as fotos anteriores a 04/09/2026 não têm área, e sem um jeito de
+// classificar elas continuariam para sempre fora das molduras. Serve também para quem anexou no
+// bloco errado — sem isso a saída seria apagar a evidência e fotografar de novo.
+export async function PATCH(req) {
+  let user;
+  try { user = await requireRole(PERFIS_CAMPO); }
+  catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  let corpo;
+  try { corpo = await req.json(); } catch { return NextResponse.json({ error: "Corpo inválido." }, { status: 400 }); }
+  const id = String(corpo?.id || "");
+  const evidencia = String(corpo?.evidencia || "").trim() || null;
+  if (!id) return NextResponse.json({ error: "id obrigatório" }, { status: 400 });
+
+  const foto = await prisma.fotoInspecao.findUnique({ where: { id }, select: { tipo: true, relatorioId: true } });
+  if (!foto) return NextResponse.json({ error: "Foto não encontrada." }, { status: 404 });
+  if (!evidenciaValida(foto.tipo, evidencia)) return NextResponse.json({ error: "Área de evidência inválida." }, { status: 400 });
+
+  // mesma trava do DELETE: documento enviado para assinatura não se remonta
+  const rel = foto.relatorioId
+    ? await prisma.relatorioInspecao.findUnique({ where: { id: foto.relatorioId }, select: { envioAssinaturaId: true, codigo: true } })
+    : null;
+  if (rel?.envioAssinaturaId) {
+    return NextResponse.json({ error: `A foto faz parte do ${rel.codigo}, que já foi enviado para assinatura.` }, { status: 409 });
+  }
+
+  await prisma.fotoInspecao.update({ where: { id }, data: { evidencia } });
+  return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(req) {

@@ -12,6 +12,7 @@ import { RESULTADO_LABEL } from "@/lib/revisao-inspecao";
 import { numeroBR } from "@/lib/numero-br";
 import { reduzImagem } from "@/lib/imagem-cliente";
 import { lerJson } from "@/lib/resposta-json";
+import { evidenciasDoTipo } from "@/lib/fotos-evidencia";
 import {
   APARELHOS, CABECOTES, ANGULOS, ACOPLANTES, BLOCOS_PADRAO, FACES,
   TIPOS_CARREGAMENTO, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL,
@@ -238,6 +239,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   // foto vale muito mais na conversa com o cliente do que a mesma junta descrita em texto.
   const [fotos, setFotos] = useState([]);
   const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const [areaFoto, setAreaFoto] = useState("");
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -308,6 +310,8 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   // demão, não por peça. Sem esta separação ela caía nos controles do visual de solda e
   // o inspetor via descontinuidade, soldador e EPS num relatório de pintura.
   const ehPintura = rel.tipo === "PINTURA";
+  // as áreas de evidência do tipo (hoje só a pintura tem) — ver lib/fotos-evidencia.js
+  const areasFoto = evidenciasDoTipo(rel.tipo);
   // ⚠ o LP tem junta como o visual de solda, mas o que se registra é OUTRA COISA: número
   // da indicação, local, tamanho e tipo (IL/IA/INR) — não soldador, EPS e descontinuidade.
   const ehLp = rel.tipo === "LP";
@@ -362,6 +366,10 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         fd.append("opNumero", op.numero);
         fd.append("tipo", rel.tipo);
         fd.append("relatorioId", id);
+        // ⚠ de qual ENSAIO é a foto — é o que a leva para a moldura certa da folha de registro
+        // fotográfico. No celular fica antes do botão: quem está no galpão escolhe uma vez e
+        // fotografa quantas precisar daquele teste.
+        if (areaFoto) fd.append("evidencia", areaFoto);
         const r = await fetch("/api/campo/foto", { method: "POST", body: fd });
         const j = await lerJson(r);
         if (!r.ok) throw new Error(j.error || "Erro ao enviar");
@@ -749,6 +757,13 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         <p className="text-[12px] font-semibold text-torg-gray mb-1.5">
           Fotos {fotos.length > 0 && <span className="font-normal">· {fotos.length}</span>}
         </p>
+        {areasFoto.length > 0 && (
+          <select value={areaFoto} onChange={(e) => setAreaFoto(e.target.value)}
+            className="w-full mb-2 border border-gray-200 rounded-xl px-3 py-2.5 text-[14px] bg-white">
+            <option value="">Área da foto — escolha o ensaio</option>
+            {areasFoto.map((a) => <option key={a.k} value={a.k}>{a.rot}</option>)}
+          </select>
+        )}
         <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={receberFotos} />
         <button onClick={() => fileRef.current?.click()} disabled={enviandoFoto}
           className="w-full bg-white border-2 border-torg-blue text-torg-blue active:bg-torg-blue/5 rounded-xl py-3.5 text-[15px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60">

@@ -50,7 +50,7 @@ export async function GET(_req, { params }) {
     const fotos = await prisma.fotoInspecao.findMany({
       where: { relatorioId: rel.id },
       orderBy: { capturadaEm: "asc" },
-      select: { url: true, marca: true, origemMarca: true, observacao: true, capturadaEm: true, autorNome: true },
+      select: { url: true, marca: true, origemMarca: true, observacao: true, capturadaEm: true, autorNome: true, evidencia: true },
     });
     // ⚠ o MESMO despacho da tela interna (lib/relatorio-render.js). Antes esta rota mandava
     // tudo que não fosse dimensional para o gerador antigo, e quem assinava recebia uma folha

@@ -46,7 +46,7 @@ export async function GET(_req, { params }) {
   const [fotos, assinaturas] = await Promise.all([
     prisma.fotoInspecao.findMany({
       where: { relatorioId: id },
-      select: { id: true, url: true, marca: true, origemMarca: true, observacao: true, capturadaEm: true, autorNome: true },
+      select: { id: true, url: true, marca: true, origemMarca: true, observacao: true, capturadaEm: true, autorNome: true, evidencia: true },
       orderBy: { capturadaEm: "asc" },
     }),
     rel.envioAssinaturaId

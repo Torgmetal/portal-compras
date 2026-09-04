@@ -5189,6 +5189,10 @@ model FotoInspecao {
   autorNome   String?
   capturadaEm DateTime @default(now())
   relatorioId String? // preenchido quando a foto entra num relatório montado no portal
+  // Em qual ÁREA de evidência do relatório a foto entra (lib/fotos-evidencia.js): no de pintura,
+  // rugosidade / salinidade / espessura / aderência X / pull-off / outros. Nulo = foto sem área,
+  // que é o caso de tudo que veio antes de 04/09/2026 e do que o celular manda solto.
+  evidencia   String?
   createdAt   DateTime @default(now())
 
   @@index([opNumero, tipo])
