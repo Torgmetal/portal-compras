@@ -2113,10 +2113,17 @@ function Bdi({ c, res, setComp }) {
           BDI = (1 + administração + seguro + risco) ÷ (1 − impostos − factoring − margem − comissões) − 1.
           Os três primeiros são custo indireto; os quatro últimos incidem sobre a venda.
         </p>
-        <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {/* ⚠ CAMPO DE RÓTULO LONGO NÃO PODE EMPURRAR O SEU. Vitor (05/09/2026): "alinhe essas
+            partes". "Administração do escritório central (%)" e "Despesas financeiras (factoring)
+            (%)" ocupam duas linhas; como o rótulo, o campo e a nota eram irmãos num bloco, a caixa
+            desses dois descia e a linha inteira ficava em degrau. Cada célula agora é uma coluna
+            flex da altura da linha, com o rótulo ocupando a sobra: as caixas e as notas "sobre o
+            custo / sobre a venda" caem na mesma altura, independente de quantas linhas o texto
+            tenha. */}
+        <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-3">
           {[...noCusto, ...naVenda].map((campo) => (
-            <label key={campo.key} className="text-[11px] text-torg-dark">
-              {campo.nome} (%)
+            <label key={campo.key} className="flex h-full flex-col text-[11px] text-torg-dark">
+              <span className="flex-1 leading-snug">{campo.nome} <span className="text-torg-gray">(%)</span></span>
               <Inp value={bdi[campo.key] ?? ""} onChange={(e) => set(campo.key, e.target.value)} className="block mt-1 w-full text-right" />
               <span className="block text-[10px] text-torg-gray mt-0.5">{campo.onde === "custo" ? "sobre o custo" : "sobre a venda"}</span>
             </label>
