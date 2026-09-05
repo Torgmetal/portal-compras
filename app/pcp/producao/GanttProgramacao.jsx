@@ -204,6 +204,13 @@ const CSS = `
   .gpcp table.marcas td{padding:5px 8px;border-bottom:1px solid #f2f5f9;vertical-align:middle}
   .gpcp table.marcas td.num{text-align:right;font-variant-numeric:tabular-nums}
   .gpcp table.marcas tr.sel{background:#eef6fb}
+  /* ⚠ o total fica GRUDADO no fim da tabela. O mesmo número existe no cabeçalho do painel, mas ele
+     rola para fora assim que a lista anda - e é olhando a lista que se pergunta "quanto disso já
+     saiu?". Vitor (05/09/2026): "eu havia pedido que nessa tela você colocasse a quantidade de peças
+     totais e quantas foram produzidas". */
+  .gpcp table.marcas tfoot td{position:sticky;bottom:0;background:#f4f7fa;padding:7px 8px;
+                  border-top:2px solid var(--linha);border-bottom:0;z-index:1}
+  .gpcp table.marcas tfoot td.num{text-align:right;font-variant-numeric:tabular-nums}
   .gpcp .pilha{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;
          padding:2px 6px;border-radius:10px}
   .gpcp .pilha.ok{background:#e6f4ea;color:#136c35}
@@ -869,7 +876,20 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
             ? '<span class="pilha ok" title="impressa por '+(i.g.por||"—")+(i.g.n>1?" · "+i.g.n+" cópias":"")+'">✓ '+dbr(i.g.em)+(i.g.n>1?" ·"+i.g.n+"×":"")+'</span>'
             : '<span class="pilha nao">não impressa</span>')+'</td></tr>';
     }
-    h += '</tbody></table>';
+    h += '</tbody>';
+    /* soma a lista MOSTRADA (o filtro "só os não impressos" muda o conjunto), não apenas as 300 que
+       cabem na tela — senão o total mentiria justo na OP grande, que é quando ele importa. */
+    const somaQ = mostra.reduce((a,i)=>a+i.q,0);
+    const somaF = mostra.reduce((a,i)=>a+(i.f||0),0);
+    const somaKg = mostra.reduce((a,i)=>a+i.kg,0);
+    h += '<tfoot><tr><td></td>'
+      + '<td><b>Total</b> <span style="color:#5b6a7d">· '+mostra.length+' marca'+(mostra.length===1?'':'s')
+      + (soNaoImpressos?', só as não impressas':'')+'</span></td>'
+      + (temPerfil?'<td></td>':'')
+      + '<td class="num"><b>'+somaQ.toLocaleString("pt-BR")+'</b></td>'
+      + '<td class="num"><b'+(somaF?' style="color:#136c35"':'')+'>'+somaF.toLocaleString("pt-BR")+'</b>'
+      + ' <span style="color:#5b6a7d">('+Math.round(somaQ?somaF/somaQ*100:0)+'%)</span></td>'
+      + '<td class="num"><b>'+nkg(somaKg)+'</b></td><td></td></tr></tfoot></table>';
     if(mostra.length > teto) h += '<div class="dica">Mostrando '+teto+' de '+mostra.length+' marcas. Os botões abaixo agem sobre a lista inteira.</div>';
     h += '<div class="dica"><b>GRD = impressão.</b> No portal não existe estado "liberado" separado: a GRD nasce quando o '
       + 'desenho é impresso, e reimprimir a mesma marca soma uma cópia no registro em vez de criar outra GRD. '

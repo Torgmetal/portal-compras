@@ -1,9 +1,9 @@
 {
   "build": 2875,
-  "gerado": "2026-09-05T20:11:00.172Z",
+  "gerado": "2026-09-05T22:21:16.561Z",
   "commits": [
     {
-      "hash": "02fd4772",
+      "hash": "1a72b0f6",
       "data": "05/09/2026",
       "titulo": "Gantt do PCP: a barra enche pelo apontamento, e vermelho passa a ser só atraso"
     },
