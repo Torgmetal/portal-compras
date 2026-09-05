@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { faseDaTarefa } from "@/lib/cronograma-syneco";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,5 +46,35 @@ export async function GET(req, { params }) {
       where: { opNumero: num, ativo: true, categoria: "MATERIAL", sharepointItemId: null, arquivoUrl: null },
     }),
   ]);
-  return NextResponse.json({ lpc, le, certs, certsSemArquivo });
+  // ⚠⚠ CRONOGRAMA VELHO É NÚMERO VELHO NA CARA DO CLIENTE. Vitor (05/09/2026), montando o portal da
+  // OP-085: "os avanços lá estão todos errados". Não estavam errados por defeito de conta — estavam
+  // parados: a última sincronização daquele cronograma foi **31/05**, 96 dias antes. Tudo o que o
+  // cliente leria ali foi digitado em maio.
+  //
+  // ⚠ E tem o segundo motivo, que só se enxerga olhando os NOMES: o avanço automático do Syneco só
+  // casa linha cujo nome é uma FASE (Preparação, Montagem, Solda, Jato, Acabamento, Pintura). Na 085
+  // as linhas de fabricação são pacotes — "Estrutura suporte, acessos e cobertura", "Guarda corpo",
+  // "Galvanização a fogo" —, então nenhuma recebe medição e o cronograma inteiro depende de alguém
+  // digitar. Quem publica precisa saber disso ANTES de mandar o link.
+  //
+  // ⚠ O aviso é INTERNO, como o dos certificados: no portal não se declara furo nosso.
+  let cronograma = null;
+  try {
+    const cron = await prisma.cronograma.findFirst({
+      where: { ativo: true, opId: op.id },
+      orderBy: { ultimoSync: "desc" },
+      select: { ultimoSync: true, tarefas: { select: { nome: true, departamento: true, isSummary: true } } },
+    });
+    if (cron) {
+      const fab = (cron.tarefas || []).filter((t) => !t.isSummary && t.departamento === "FABRICACAO");
+      cronograma = {
+        atualizadoEm: cron.ultimoSync,
+        dias: Math.round((Date.now() - new Date(cron.ultimoSync)) / 86400000),
+        fabricacao: fab.length,
+        medidas: fab.filter((t) => faseDaTarefa(t.nome)).length,
+      };
+    }
+  } catch { /* o aviso é acessório: falhar aqui não pode derrubar a tela de quem publica */ }
+
+  return NextResponse.json({ lpc, le, certs, certsSemArquivo, cronograma });
 }

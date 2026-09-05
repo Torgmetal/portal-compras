@@ -32,7 +32,17 @@ function AvisoListas({ opNumero, secoes }) {
   // a linha aparece e o botão de baixar simplesmente não é desenhado. Sem este aviso, só o cliente
   // descobre.
   const semArq = secoes.includes("CERTIFICADOS") ? (d.certsSemArquivo || 0) : 0;
-  if (!faltando.length && !semArq) return null;
+  // ⚠⚠ CRONOGRAMA PARADO É NÚMERO VELHO NA CARA DO CLIENTE. Vitor (05/09/2026), montando o portal da
+  // OP-085: "os avanços lá estão todos errados" — e estavam parados desde 31/05, 96 dias antes.
+  // O portal mostra a data de atualização, mas em cinza pequeno; quem publica precisa ver isso ANTES
+  // de mandar o link.
+  const cron = secoes.includes("CRONOGRAMA") ? d.cronograma : null;
+  const velho = cron && cron.dias >= 30 ? cron : null;
+  // ⚠ e o segundo motivo: o avanço automático do Syneco só casa linha cujo NOME é uma fase. Obra
+  // cujas linhas de fabricação são pacotes ("Guarda corpo", "Estrutura suporte") depende inteira de
+  // alguém digitar — e ninguém digita.
+  const semMedicao = cron && cron.fabricacao > 0 && cron.medidas === 0 ? cron : null;
+  if (!faltando.length && !semArq && !velho && !semMedicao) return null;
   return (
     <div className="space-y-2">
       {faltando.length > 0 && (
@@ -40,6 +50,21 @@ function AvisoListas({ opNumero, secoes }) {
           <b>{faltando.join(" e ")} sem itens importados nesta obra.</b> A seção não vai aparecer no
           portal — o cliente receberia uma planilha em branco. Peça à Engenharia para importar a lista;
           publicar o arquivo da pasta no lugar entrega o peso item a item.
+        </p>
+      )}
+      {velho && (
+        <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
+          <b>O cronograma desta obra não é atualizado há {velho.dias} dias</b> (última sincronização em{" "}
+          {new Date(velho.atualizadoEm).toLocaleDateString("pt-BR")}). O cliente veria as datas e o
+          avanço desse dia. Reimporte o cronograma antes de publicar.
+        </p>
+      )}
+      {semMedicao && (
+        <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
+          <b>Nenhuma das {semMedicao.fabricacao} linhas de fabricação recebe avanço do Syneco.</b> O
+          automático só casa linha cujo nome é uma fase — Preparação, Montagem, Solda, Jato,
+          Acabamento, Pintura. Aqui o avanço depende de alguém digitar; nomeando as linhas por fase
+          (a área separa os pacotes), ele passa a vir do chão de fábrica.
         </p>
       )}
       {semArq > 0 && (
