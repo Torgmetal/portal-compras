@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload, Send } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { FAMILIAS_COTACAO, FAMILIA_DO_ITEM } from "@/lib/cotacao-familias";
-import { montarCronogramaPrevio, textoDaProposta, PADRAO_CRONOGRAMA } from "@/lib/cronograma-previo";
+import { montarCronogramaPrevio, textoDaProposta, comprasEspeciais, PADRAO_CRONOGRAMA } from "@/lib/cronograma-previo";
 import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAPACIDADE_CARGA, EVENTOS_PAGAMENTO, PAGAMENTO_PADRAO, PRAZOS_PAGAMENTO, conferirPagamento, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa, resultadoDoCenario, sensibilidade, ALAVANCAS_SENSIVEIS, equilibrioConvergido, impostosDoCenario } from "@/lib/lqc";
 import { capacidadePorHora } from "@/lib/fabrica-horas";
 
@@ -231,10 +231,37 @@ function CronogramaPrevio({ c, res, e, setComp }) {
 
   const pesoKg = num(res.pesoTotal);
   const cargas = res.cargas?.totalCargas || 0;
+  const especiais = comprasEspeciais(res);
   const cron = montarCronogramaPrevio(
-    { pesoKg, cargas },
+    { pesoKg, cargas, comprasEspeciais: especiais },
     { ...Object.fromEntries(Object.keys(ref).map((k) => [k, vale(k)])), inicio: cfg.inicio || null },
   );
+  // ── o que vai na folha (o cálculo é sempre inteiro; muda o que o cliente vê) ──
+  const folha = cfg.folha || {};
+  const setFolha = (k, v) => setComp({ cronograma: { ...cfg, folha: { ...folha, [k]: v } } });
+  const ocultas = new Set(folha.etapasOcultas || []);
+  const alternarEtapa = (k) => {
+    const nova = new Set(ocultas);
+    if (nova.has(k)) nova.delete(k); else nova.add(k);
+    setFolha("etapasOcultas", [...nova]);
+  };
+  const [baixando, setBaixando] = useState(false);
+  const baixarPdf = async () => {
+    setBaixando(true);
+    try {
+      const r2 = await fetch(`/api/comercial/estudos/${e.id}/cronograma-pdf`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cfg: { ...Object.fromEntries(Object.keys(ref).map((k) => [k, vale(k)])), inicio: cfg.inicio || null }, folha }),
+      });
+      if (!r2.ok) throw new Error((await r2.json().catch(() => ({}))).error || "Falha ao gerar o PDF");
+      const blob = await r2.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `Cronograma preliminar ${e.obra || e.cliente || ""}.pdf`.trim();
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch (err) { alert(err.message); } finally { setBaixando(false); }
+  };
   const texto = textoDaProposta(cron, { obra: e.obra || null });
   const total = Math.max(1, cron.resumo.totalUteis);
   const dt = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—");
@@ -363,6 +390,47 @@ function CronogramaPrevio({ c, res, e, setComp }) {
                 </table>
               </div>
             )}
+          </div>
+
+          {/* ⚠⚠ NEM TUDO QUE O ESTUDO SABE VAI PARA O CLIENTE. Vitor (05/09/2026): "precisamos ter
+              como editar as informações, pois tem horas que não vamos querer usar a quantidade de
+              cargas para mostrar ao cliente". O cálculo continua inteiro — muda o que a folha
+              mostra, e a escolha fica gravada no estudo. */}
+          <div className="bg-white border border-gray-100 rounded-xl p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+              <p className="text-[12px] font-bold text-torg-dark">O que vai na folha do cliente</p>
+              <button onClick={baixarPdf} disabled={baixando}
+                className="text-[11px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-1.5 disabled:opacity-50">
+                {baixando ? "gerando…" : "Baixar PDF"}
+              </button>
+            </div>
+            <label className="block text-[11px] text-torg-dark mb-3">
+              Título da folha
+              <Inp value={folha.titulo ?? ""} placeholder="CRONOGRAMA PRELIMINAR DE FORNECIMENTO"
+                onChange={(ev) => setFolha("titulo", ev.target.value)} className="block mt-1 w-full" />
+            </label>
+            <label className="flex items-center gap-2 text-[12px] text-torg-dark mb-3">
+              <input type="checkbox" checked={folha.mostrarCargas !== false} onChange={(ev) => setFolha("mostrarCargas", ev.target.checked)} />
+              Mostrar as cargas (quantidade, intervalo e quadro de entregas)
+              {folha.mostrarCargas === false && <span className="text-[10px] text-torg-gray">— a folha mostra a fabricação e a primeira entrega no lugar</span>}
+            </label>
+            <p className="text-[11px] font-semibold text-torg-dark mb-1">Etapas na folha</p>
+            <div className="space-y-1 mb-3">
+              {cron.fases.map((f2) => (
+                <div key={f2.key} className="flex items-center gap-2 text-[12px]">
+                  <input type="checkbox" checked={!ocultas.has(f2.key)} onChange={() => alternarEtapa(f2.key)} />
+                  <Inp value={folha.rotulos?.[f2.key] ?? ""} placeholder={f2.nome}
+                    onChange={(ev) => setFolha("rotulos", { ...(folha.rotulos || {}), [f2.key]: ev.target.value })}
+                    className="w-64" />
+                  <span className="text-[11px] text-torg-gray">{Math.round(f2.dias * 7 / 5)} dias</span>
+                </div>
+              ))}
+            </div>
+            <label className="block text-[11px] text-torg-dark">
+              Observação (entra no fim das premissas)
+              <Inp value={folha.observacao ?? ""} onChange={(ev) => setFolha("observacao", ev.target.value)}
+                className="block mt-1 w-full" placeholder="ex.: prazo condicionado à liberação da área pelo cliente" />
+            </label>
           </div>
 
           <div className="bg-white border border-gray-100 rounded-xl p-4">
