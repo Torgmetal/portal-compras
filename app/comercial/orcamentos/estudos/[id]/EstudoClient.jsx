@@ -4,6 +4,7 @@ import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload, Send } from "luci
 import { useStore } from "@/lib/store";
 import { FAMILIAS_COTACAO, FAMILIA_DO_ITEM } from "@/lib/cotacao-familias";
 import { montarCronogramaPrevio, textoDaProposta, comprasEspeciais, PADRAO_CRONOGRAMA } from "@/lib/cronograma-previo";
+import { cadenciaPorClasse } from "@/lib/lqc";
 import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAPACIDADE_CARGA, EVENTOS_PAGAMENTO, PAGAMENTO_PADRAO, PRAZOS_PAGAMENTO, conferirPagamento, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa, resultadoDoCenario, sensibilidade, ALAVANCAS_SENSIVEIS, equilibrioConvergido, impostosDoCenario } from "@/lib/lqc";
 import { capacidadePorHora } from "@/lib/fabrica-horas";
 
@@ -444,6 +445,65 @@ function CronogramaPrevio({ c, res, e, setComp }) {
             <p className="text-[12px] text-torg-dark leading-relaxed bg-gray-50 border border-gray-100 rounded-lg p-3">{texto}</p>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+
+/** A cadência traduzida por tipo de estrutura, e o que o MIX desta obra faz com ela. */
+function CadenciaPorClasse({ cadencia, res }) {
+  const d = cadenciaPorClasse(cadencia, res.pesoPorClasse || {});
+  const temMix = d.pesoTotal > 0;
+  return (
+    <div className="px-4 py-3 border-t border-gray-100 bg-white">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
+        <p className="text-[12px] font-bold text-torg-dark">Por tipo de estrutura</p>
+        <p className="text-[11px] text-torg-gray">
+          {cadencia.toLocaleString("pt-BR")} kg/mês é a régua do <b>{d.referencia}</b>; as demais saem da razão entre os custos de fabricação da tabela.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[12px]" style={{ minWidth: 560 }}>
+          <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
+            <tr><th className="text-left px-3 py-1.5">Classe</th><th className="text-left px-2 py-1.5">Faixa</th>
+              <th className="text-right px-2 py-1.5">Fabricação</th><th className="text-right px-2 py-1.5">Cadência</th>
+              <th className="text-right px-2 py-1.5">Nesta obra</th><th className="text-right px-3 py-1.5">Meses</th></tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {d.classes.map((c2) => (
+              <tr key={c2.key} className={c2.pesoKg > 0 ? "" : "text-torg-gray/60"}>
+                <td className="px-3 py-1.5 font-semibold text-torg-dark">{c2.nome}</td>
+                <td className="px-2 py-1.5 text-torg-gray">{c2.faixa}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{fmtR$(c2.fabricacaoRsKg)}/kg</td>
+                <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{Math.round(c2.kgMes).toLocaleString("pt-BR")} kg/mês</td>
+                <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{c2.pesoKg > 0 ? `${Math.round(c2.pesoKg).toLocaleString("pt-BR")} kg` : "—"}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{c2.meses > 0 ? c2.meses.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : "—"}</td>
+              </tr>
+            ))}
+            {temMix && (
+              <tr className="bg-torg-blue-50/50 font-bold text-torg-dark">
+                <td className="px-3 py-2" colSpan={3}>Esta obra — {d.mistura}</td>
+                <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">{Math.round(d.obraKgMes).toLocaleString("pt-BR")} kg/mês</td>
+                <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">{Math.round(d.pesoTotal).toLocaleString("pt-BR")} kg</td>
+                <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{d.mesesTotal.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {!temMix && (
+        <p className="text-[11px] text-torg-gray mt-2">
+          O quantitativo desta obra está sem classificação — sem ela a cadência da obra é a da régua, e o prazo pode
+          estar otimista se a estrutura for leve.
+        </p>
+      )}
+      {temMix && Math.abs(d.obraKgMes - cadencia) / (cadencia || 1) > 0.08 && (
+        <p className="text-[11px] text-torg-dark bg-[#FFF7ED] border border-[#F4801F]/30 rounded-lg px-3 py-2 mt-2">
+          Pelo mix, esta obra roda a <strong>{Math.round(d.obraKgMes).toLocaleString("pt-BR")} kg/mês</strong> —
+          {d.obraKgMes < cadencia ? " menos" : " mais"} que a régua de {cadencia.toLocaleString("pt-BR")}.
+          É esse número que o prazo deveria usar.
+        </p>
       )}
     </div>
   );
@@ -2767,13 +2827,20 @@ function Cenario({ e, res, mexer, fabrica }) {
   // obra carrega. Por isso é escolha do estudo, e não um número fixo.
   const cadencia = numeroBr(cfg.cadenciaKgMes) || fabrica?.capacidadeKgMes || 0;
 
+  // ⚠⚠ A CADÊNCIA QUE VALE PARA ESTA OBRA É A DO MIX DELA. Vitor (05/09/2026): "na parte de
+  // cadência você deveria fazer um resumo de tipos de estrutura". A régua escolhida acima é a da
+  // classe de referência; obra de guarda-corpo come muito mais fábrica por quilo que obra pesada, e
+  // é o consumo real que decide quantos meses de casa esta obra carrega. Ver `cadenciaPorClasse`.
+  const porClasse = cadenciaPorClasse(cadencia, res.pesoPorClasse || {});
+  const cadenciaObra = porClasse.pesoTotal > 0 ? porClasse.obraKgMes : cadencia;
+
   // ⚠ O CUSTO DO DINHEIRO ENTRA NO RESULTADO, NÃO SÓ NUM QUADRO À PARTE. Os meses entre pagar o
   // aço e receber a medição custam juro real; deixá-los fora do resultado é dar lucro de mentira.
   // Por isso a conta roda em duas passadas: a primeira acha o imposto, a segunda usa o fluxo.
   const conta = (cen, mods = {}) => {
     const preco = numeroBr(cen.preco) * (1 + (mods.precoPct || 0) / 100);
     const comum = {
-      capacidadeKgMes: cadencia * (1 + (mods.cadenciaPct || 0) / 100),
+      capacidadeKgMes: cadenciaObra * (1 + (mods.cadenciaPct || 0) / 100),
       custoOperacionalMes: fabrica?.custoOperacionalMes || 0,
       acoPct: mods.acoPct || 0,
       mesesExtra: mods.mesesExtra || 0,
@@ -3243,6 +3310,13 @@ function Cadencia({ fabrica, cfg, mexer, res, cadencia }) {
         </div>
       </div>
 
+      {/* ⚠⚠ UM kg/mês SÓ MENTE. A fábrica que faz 250 t de estrutura pesada não faz 250 t de
+          guarda-corpo: a mesma tonelada de extra leve tem muito mais peça, corte, solda e pintura.
+          Vitor (05/09/2026): "na parte de cadência você deveria fazer um resumo de tipos de
+          estrutura". A proporção sai da própria tabela de classes — a coluna de fabricação (R$/kg)
+          É o índice de dificuldade. Ver `cadenciaPorClasse` em lib/lqc. */}
+      <CadenciaPorClasse cadencia={cadencia} res={res} />
+
       <div className="overflow-x-auto">
         <table className="w-full text-[12px]" style={{ minWidth: 560 }}>
           <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
@@ -3564,11 +3638,21 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
         <div className="mt-3 pt-3 border-t border-gray-100">
           <p className="text-[11px] font-semibold text-torg-dark">Quanto da fábrica esta obra ocupa</p>
           <div className="flex flex-wrap gap-2 mt-2 items-stretch">
-            {[{ v: "", r: "Rateada", a: `${Math.round(Math.min(1, meses > 0 ? mesesConsumo / meses : 1) * 100)}% — só o que a obra come` },
-              { v: "100", r: "Fábrica dedicada", a: "a obra paga a casa inteira" }].map((o) => (
+            {/* ⚠⚠ RATEADA É O PADRÃO, E TEM DE SER. Vitor (05/09/2026): "nessa parte sempre prever
+                como rateada". Cobrar a casa inteira de uma obra que ocupa metade da fábrica infla
+                o preço e perde a concorrência; e a folga não é prejuízo desta obra — é fábrica que
+                o Comercial tem para vender. Dedicada só quando o contrato realmente reserva a
+                fábrica (turno exclusivo, obra que trava a linha).
+                ⚠ E o rateio é POR CONSUMO REAL, não por peso puro: `mesesConsumo` já usa a cadência
+                do MIX da obra, então guarda-corpo, que come mais fábrica por quilo, carrega mais
+                casa que estrutura pesada do mesmo peso. */}
+            {[{ v: "", r: "Rateada", pad: true, a: `${Math.round(Math.min(1, meses > 0 ? mesesConsumo / meses : 1) * 100)}% — os meses de fábrica que a obra consome` },
+              { v: "100", r: "Fábrica dedicada", a: "só quando o contrato reserva a linha" }].map((o) => (
               <button key={o.r} type="button" onClick={() => set("ocupacaoPct", o.v)}
                 className={`text-left border rounded-lg px-3 py-2 transition ${(cfg.ocupacaoPct ?? "") === o.v ? "border-torg-blue bg-torg-blue-50/50" : "border-gray-200 hover:border-gray-300"}`}>
-                <span className="block text-[11px] font-semibold text-torg-dark whitespace-nowrap">{o.r}</span>
+                <span className="block text-[11px] font-semibold text-torg-dark whitespace-nowrap">
+                  {o.r}{o.pad ? <span className="ml-1 text-[9px] uppercase tracking-wider text-torg-orange-700">padrão</span> : null}
+                </span>
                 <span className="block text-[10px] text-torg-gray">{o.a}</span>
               </button>
             ))}
@@ -3588,6 +3672,24 @@ function FluxoDoDinheiro({ res, base, fabrica, cfg, mexer, c }) {
                   banca a ociosidade sozinha — {fmtR$(fabrica.custoOperacionalMes * (meses - mesesConsumo))} a mais no custo.</>
               : <> A obra enche o prazo, então rateada e dedicada dão no mesmo.</>}
           </p>
+          {/* ⚠ O RATEIO SÓ SE JULGA EM R$/kg. Em reais totais ninguém sabe se está caro; ao lado do
+              que a tabela de industrialização cobra, a pergunta vira simples: esta obra paga a
+              fábrica que usa? */}
+          {res.pesoTotal > 0 && fabrica?.custoOperacionalMes > 0 && (() => {
+            const casaObra = meses * fabrica.custoOperacionalMes * ocupacao;
+            const casaPorKg = casaObra / res.pesoTotal;
+            const cobraPorKg = res.pesoTotal > 0 ? (res.totais?.industrializacao?.subtotal || 0) / res.pesoTotal : 0;
+            const dif = cobraPorKg - casaPorKg;
+            return (
+              <p className={`text-[11px] mt-2 rounded-lg px-3 py-2 border ${dif >= 0 ? "text-torg-dark bg-green-50 border-green-200" : "text-torg-dark bg-[#FFF7ED] border-[#F4801F]/30"}`}>
+                Rateio desta obra: <strong>{fmtR$(casaObra)}</strong> de casa, ou <strong>{fmtR$(casaPorKg)}/kg</strong>.
+                A tabela de industrialização cobra <strong>{fmtR$(cobraPorKg)}/kg</strong> —{" "}
+                {dif >= 0
+                  ? <>sobra {fmtR$(dif)}/kg para o resultado.</>
+                  : <>faltam {fmtR$(Math.abs(dif))}/kg, que hoje saem do BDI sem aparecer.</>}
+              </p>
+            );
+          })()}
         </div>
 
         <p className="text-[11px] text-torg-gray mt-2">
