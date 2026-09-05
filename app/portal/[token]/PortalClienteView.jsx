@@ -355,7 +355,7 @@ export default function PortalClienteView({ token }) {
           </Bloco>
         )}
 
-        {mostrar("CRONOGRAMA") && <Cronograma d={dados.cronograma} />}
+        {mostrar("CRONOGRAMA") && <Cronograma d={dados.cronograma} detalhado={tem("CRONOGRAMA_DETALHE")} />}
         {mostrar("CERTIFICADOS") && (
           <Certificados token={token} lista={dados.certificados} />
         )}
@@ -1113,7 +1113,7 @@ const COR_SETOR = { COMERCIAL: "#8494A8", ENGENHARIA: "#4A9DD9", FABRICACAO: "#0
 const NOME_SETOR = { COMERCIAL: "Comercial", ENGENHARIA: "Engenharia", FABRICACAO: "Fabricação", EXPEDICAO: "Expedição" };
 const MES_CURTO = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
-function Cronograma({ d }) {
+function Cronograma({ d, detalhado = true }) {
   const tarefas = (d.tarefas || []).filter((t) => t.inicio && t.fim);
 
   // ⚠⚠ O AVANÇO VEM PRONTO, E É O MESMO DO PLANEJAMENTO. Vitor (05/09/2026): "esse avanço tem que
@@ -1164,6 +1164,33 @@ function Cronograma({ d }) {
   const proxima = tarefas
     .filter((t) => t.setor === "EXPEDICAO" && new Date(`${t.fim}T12:00:00`) >= hoje)
     .sort((a, b) => (a.fim < b.fim ? -1 : 1))[0];
+
+  // ⚠⚠ O RESUMO CONTINUA EXISTINDO, por escolha de quem publica. Vitor (05/09/2026): "deveria ter a
+  // opção de ser esse detalhado ou o primeiro que criamos, aquele mais básico". Obra com cronograma
+  // bem mantido merece a linha do tempo; obra cujo planejamento ainda está grosso fica melhor no
+  // resumo — detalhar o que não existe expõe a falha, não a informação.
+  if (!detalhado) {
+    return (
+      <Bloco icone={CalendarRange} titulo="Cronograma da obra"
+        sub={`${fmtD(d.inicio)} a ${fmtD(d.fim)}${d.atualizadoEm ? ` · atualizado em ${fmtD(d.atualizadoEm)}` : ""}`}>
+        <div className="space-y-3">
+          {(d.frentes || []).map((f, i) => (
+            <div key={i}>
+              <div className="flex items-baseline justify-between gap-3 mb-1">
+                <span className="text-[14px] font-semibold capitalize">{f.nome.toLowerCase()}</span>
+                <span className="text-[12px] text-gray-500 tabular-nums shrink-0">
+                  {fmtD(f.inicio)} — {fmtD(f.fim)} · <strong className="text-[#0D1F3C]">{f.percentual}%</strong>
+                </span>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-[#006EAB] rounded-full" style={{ width: `${Math.min(100, f.percentual)}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </Bloco>
+    );
+  }
 
   return (
     <Bloco icone={CalendarRange} titulo="Cronograma da obra"

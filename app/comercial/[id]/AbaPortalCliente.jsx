@@ -409,13 +409,23 @@ export default function AbaPortalCliente({ opId, opNumero }) {
                 <div className="grid sm:grid-cols-2 gap-2">
                   {doGrupo.map((s) => {
                     const on = f.secoes.includes(s.id);
+                    // ⚠ SUB-OPÇÃO NÃO VIVE SOZINHA. "Cronograma detalhado" depende do "Cronograma
+                    // da obra": ligado sem o pai, viraria uma escolha que não muda nada na tela do
+                    // cliente — e ninguém descobriria por quê.
+                    const travada = s.depende && !f.secoes.includes(s.depende);
                     return (
-                      <label key={s.id} className={`flex items-start gap-2.5 border rounded-lg px-3 py-2.5 cursor-pointer ${on ? "border-torg-blue bg-torg-blue/5" : "border-gray-200"}`}>
-                        <input type="checkbox" checked={on} className="mt-0.5 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
+                      <label key={s.id}
+                        className={`flex items-start gap-2.5 border rounded-lg px-3 py-2.5 ${
+                          travada ? "border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed"
+                            : on ? "border-torg-blue bg-torg-blue/5 cursor-pointer" : "border-gray-200 cursor-pointer"}${s.depende ? " sm:ml-6" : ""}`}>
+                        <input type="checkbox" checked={on && !travada} disabled={travada}
+                          className="mt-0.5 rounded border-gray-300 text-torg-blue focus:ring-torg-blue disabled:opacity-50"
                           onChange={() => set("secoes", on ? f.secoes.filter((x) => x !== s.id) : [...f.secoes, s.id])} />
                         <span className="min-w-0">
                           <span className="block text-[13px] font-semibold text-torg-dark">{s.nome}</span>
-                          <span className="block text-[11px] text-torg-gray">{s.resumo}</span>
+                          <span className="block text-[11px] text-torg-gray">
+                            {travada ? `Ligue "${SECOES.find((x) => x.id === s.depende)?.nome}" para escolher.` : s.resumo}
+                          </span>
                         </span>
                       </label>
                     );
