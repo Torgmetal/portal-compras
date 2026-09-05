@@ -1,156 +1,156 @@
 {
-  "build": 2790,
-  "gerado": "2026-09-05T13:26:28.410Z",
+  "build": 2841,
+  "gerado": "2026-09-05T15:03:33.635Z",
   "commits": [
     {
-      "hash": "2e29deebe4",
+      "hash": "01c7e33bdb",
+      "data": "05/09/2026",
+      "titulo": "Instala os quality gates de ESLint (teto de 350 linhas)"
+    },
+    {
+      "hash": "9c2a2fdbec",
       "data": "05/09/2026",
       "titulo": "Quebra o RMComprasClient (4231 linhas) em módulos por responsabilidade"
     },
     {
-      "hash": "7c86c84048",
-      "data": "04/09/2026",
-      "titulo": "Tela de versão é só do ADMIN"
+      "hash": "408af6fac0",
+      "data": "05/09/2026",
+      "titulo": "Cenário: cadência por tipo de estrutura e rateio da casa pelo consumo real"
     },
     {
-      "hash": "3ad77d4c22",
-      "data": "04/09/2026",
-      "titulo": "Realinha o número de build depois do rebase"
+      "hash": "2429d9e64e",
+      "data": "05/09/2026",
+      "titulo": "Estudo: aba Qualidade, com os inspetores por dia, kg ou verba"
     },
     {
-      "hash": "3469c4c36b",
-      "data": "04/09/2026",
-      "titulo": "Envio para assinatura: dizer por que não foi, tentar sem o anexo e dar o link"
+      "hash": "efee8fc628",
+      "data": "05/09/2026",
+      "titulo": "Cronograma: folha à parte, com o que vai ao cliente editável"
     },
     {
-      "hash": "c580949fbb",
-      "data": "04/09/2026",
-      "titulo": "Tela de versão mostra a mudança que está no ar, não só a anterior"
+      "hash": "9db2876640",
+      "data": "05/09/2026",
+      "titulo": "Cronograma: sem datas por padrão e uma linha de compra por material sob medida"
     },
     {
-      "hash": "8a89bdb89d",
-      "data": "04/09/2026",
-      "titulo": "Versão no rodapé: dá pra saber qual atualização está no ar"
+      "hash": "4cb4eef620",
+      "data": "05/09/2026",
+      "titulo": "Cronograma: cadência pela meta da fábrica (250 t/mês) e fatia da obra"
     },
     {
-      "hash": "6b6c7c8f1e",
-      "data": "04/09/2026",
-      "titulo": "Manutenção: varrer o banco sozinha, em vez de eu lembrar de escrever cada coluna"
+      "hash": "47bc680477",
+      "data": "05/09/2026",
+      "titulo": "Cronograma: engenharia com teto e liberação parcial para a fábrica"
     },
     {
-      "hash": "dc2f0abdb0",
-      "data": "04/09/2026",
-      "titulo": "Manutenção: baixa da preparação da OP-113"
+      "hash": "cc9fa8820c",
+      "data": "05/09/2026",
+      "titulo": "Cronograma vira seção da proposta, no estilo do documento"
     },
     {
-      "hash": "a710a4167e",
-      "data": "04/09/2026",
-      "titulo": "Pintura: moldura vazia não sai, e as fotos saem agrupadas por ensaio"
+      "hash": "cbd985244c",
+      "data": "05/09/2026",
+      "titulo": "Cronograma prévio em PDF — a folha que acompanha a proposta"
     },
     {
-      "hash": "828966b2a5",
-      "data": "04/09/2026",
-      "titulo": "Liberar: dizer que o motivo do atraso está travando o botão"
+      "hash": "f4d84f9a30",
+      "data": "05/09/2026",
+      "titulo": "Ritmo e prazos: alinhar as caixas pelo rótulo, não pelo rodapé"
     },
     {
-      "hash": "f791cf48aa",
-      "data": "04/09/2026",
-      "titulo": "Foto de ensaio por área de evidência (e as seis molduras que saíam vazias)"
+      "hash": "1d54cda77f",
+      "data": "05/09/2026",
+      "titulo": "Estudo: cronograma prévio para compor a proposta"
     },
     {
-      "hash": "6668c25814",
-      "data": "04/09/2026",
-      "titulo": "Portal do cliente: tirar o peso da estrutura da capa"
+      "hash": "b19a3a44c8",
+      "data": "05/09/2026",
+      "titulo": "Condições de pagamento: alinhar a linha da parcela"
     },
     {
-      "hash": "c35b0e3968",
-      "data": "04/09/2026",
-      "titulo": "Pintura: umidade/temperatura na tabela das demãos e as fotos TODAS no PDF"
+      "hash": "3fa8f489b4",
+      "data": "05/09/2026",
+      "titulo": "BDI: alinhar os campos quando o rótulo ocupa duas linhas"
     },
     {
-      "hash": "50b456dc78",
-      "data": "04/09/2026",
-      "titulo": "Admin › Manutenção do banco: aplicar os ajustes pendentes com um clique"
+      "hash": "3024cc2874",
+      "data": "05/09/2026",
+      "titulo": "Resumo do estudo: botão \"Composição do preço\""
     },
     {
-      "hash": "c353422992",
-      "data": "04/09/2026",
-      "titulo": "Lote liberado sobrevive à reimportação: casar também pela marca"
+      "hash": "7ada8e3e16",
+      "data": "05/09/2026",
+      "titulo": "Aditivo: acrescentar linhas de verba a um aditivo já criado"
     },
     {
-      "hash": "53c001a404",
-      "data": "04/09/2026",
-      "titulo": "Liberar para montagem: conjunto PENDENTE também desce (197 lotes ficaram invisíveis)"
+      "hash": "81d8a82d53",
+      "data": "05/09/2026",
+      "titulo": "Planilha comercial: o aço precificado por perfil não tinha dono"
     },
     {
-      "hash": "d894f5a919",
-      "data": "04/09/2026",
-      "titulo": "Foto do ensaio: reduzir antes de subir (o \"is not valid JSON\" era o teto de 4,5 MB)"
+      "hash": "fe8051232e",
+      "data": "05/09/2026",
+      "titulo": "Manutenção: amarrar num clique a origem do aço da OP-085"
     },
     {
-      "hash": "304ba5196b",
-      "data": "04/09/2026",
-      "titulo": "Inspetor de campo: o caminho até a tela de inspeções no computador"
+      "hash": "9fc27ff1ad",
+      "data": "05/09/2026",
+      "titulo": "Perfil sem material: a mesma chapa escrita de outro jeito também é candidata"
     },
     {
-      "hash": "bf1ab9fee6",
-      "data": "04/09/2026",
-      "titulo": "Inspetor de campo preenche o relatório no computador (sem abrir a Qualidade inteira)"
+      "hash": "5de7eeeab7",
+      "data": "05/09/2026",
+      "titulo": "Data book: o certificado do R declarado também entra na seção"
     },
     {
-      "hash": "6ac3bb28d2",
-      "data": "04/09/2026",
-      "titulo": "Pintura: a relação de peças sai 100%, sem reticência"
+      "hash": "330657ccbf",
+      "data": "05/09/2026",
+      "titulo": "Perfil sem material: um R para todos os perfis do mesmo material"
     },
     {
-      "hash": "8103accd07",
-      "data": "04/09/2026",
-      "titulo": "Portal de campo: prévia do relatório, multi-lote, validade e N/A na tela do inspetor"
+      "hash": "12fce9de93",
+      "data": "05/09/2026",
+      "titulo": "Painel de administração e alerta dos crons: só quem administra o portal"
     },
     {
-      "hash": "302f01ac4a",
-      "data": "04/09/2026",
-      "titulo": "Pintura: vários lotes por demão, validade junto e N/A nos ensaios fora do PIT"
+      "hash": "1926214154",
+      "data": "05/09/2026",
+      "titulo": "Data book: cobertura e vedação não entram no livro"
     },
     {
-      "hash": "f901e16d38",
+      "hash": "81c2b22403",
       "data": "04/09/2026",
-      "titulo": "Comunicado do RH: envio por e-mail via batch (parava de chegar a metade da fabrica)"
+      "titulo": "Casar certificados: ler a árvore inteira, não a pasta do ano corrente"
     },
     {
-      "hash": "201a510308",
+      "hash": "53f7b27b27",
       "data": "04/09/2026",
-      "titulo": "Modelo 3D do cliente: filtro \"Onde está\" por etapa de fabricacao"
+      "titulo": "Rastreabilidade: U dobrado se compra como chapa"
     },
     {
-      "hash": "fe95f465ab",
+      "hash": "b7e1d51531",
       "data": "04/09/2026",
-      "titulo": "Portal do cliente: a NF vem do CMR, como a data e o R ja vinham"
+      "titulo": "Rastreabilidade: barra redonda de 1\" não pode casar com a de 1/2\""
     },
     {
-      "hash": "1a2778d686",
+      "hash": "686b61a557",
       "data": "04/09/2026",
-      "titulo": "Portal do cliente: RM na tabela de compras e as fotos do recebimento na mesma aba"
+      "titulo": "Data book: .dwg não é anexo do livro, e imagem vira página em vez de erro"
     },
     {
-      "hash": "0342fc9069",
+      "hash": "5f60a15ae2",
       "data": "04/09/2026",
-      "titulo": "Portal do cliente: NF e RM viram escolha por obra, na configuracao do portal"
+      "titulo": "Rastreabilidade: reconhecer o ferro chato (FC) e a chapa lançada como \"PERFIL DB FQ\""
     },
     {
-      "hash": "6fd95b5684",
+      "hash": "9b47417952",
       "data": "04/09/2026",
-      "titulo": "Compras: anexar fotos do material chegando, no proprio recebimento"
+      "titulo": "Cronograma: ajuste à mão também conta como atualização"
     },
     {
-      "hash": "3076790954",
+      "hash": "d08ce53de1",
       "data": "04/09/2026",
-      "titulo": "Portal do cliente: clicar na RM abre a requisicao, sem valor nenhum"
-    },
-    {
-      "hash": "6fba7e8ee0",
-      "data": "04/09/2026",
-      "titulo": "Portal do colaborador: fim do loop de redirect que dava tela branca ao logar"
+      "titulo": "Portal: avisar quem publica quando o cronograma está parado ou sem medição"
     }
   ]
 }
