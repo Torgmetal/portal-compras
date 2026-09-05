@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { resolverPastasDaSecao, listarPasta, secaoNavega, arquivosDaPasta } from "@/lib/databook-pastas";
 import { estaFechado, erroPrecisaRevisao } from "@/lib/databook-revisao";
+import { RX_ANEXAVEL } from "@/lib/databook-anexo";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -91,9 +92,22 @@ export async function POST(req, { params }) {
 
   let body;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Body inválido" }, { status: 400 }); }
-  const escolhidos = Array.isArray(body?.arquivos) ? [...body.arquivos] : [];
+  // ⚠⚠ O ARQUIVO AVULSO TAMBÉM PASSA PELA PENEIRA. A varredura de pasta já filtrava por extensão,
+  // mas o que a pessoa marca um a um no navegador entrava como veio — e foi assim que o .dwg de
+  // IPPE1088P1-LD/LE entrou no data book da OP-085 ao lado do .pdf do mesmo desenho: o gerador
+  // tentava mesclar o CAD e o livro saía com "Pendências desta geração". (Vitor, 04/09/2026.)
+  const brutos = Array.isArray(body?.arquivos) ? [...body.arquivos] : [];
+  const recusados = brutos.filter((a) => a?.nome && !RX_ANEXAVEL.test(a.nome));
+  const escolhidos = brutos.filter((a) => !a?.nome || RX_ANEXAVEL.test(a.nome));
   const pastas = Array.isArray(body?.pastas) ? body.pastas : [];
-  if (!escolhidos.length && !pastas.length) return NextResponse.json({ error: "Nenhum arquivo selecionado." }, { status: 400 });
+  if (!escolhidos.length && !pastas.length) {
+    if (recusados.length) {
+      return NextResponse.json({
+        error: `O data book mescla PDF e imagem. ${recusados.length === 1 ? "O arquivo selecionado não é" : "Os arquivos selecionados não são"} anexável: ${recusados.slice(0, 5).map((a) => a.nome).join(", ")}${recusados.length > 5 ? "…" : ""}.`,
+      }, { status: 400 });
+    }
+    return NextResponse.json({ error: "Nenhum arquivo selecionado." }, { status: 400 });
+  }
 
   const { driveId, fontes } = await resolverPastasDaSecao(secao.numero, secao.dataBook?.opNumero);
   if (!driveId) return NextResponse.json({ error: "Servidor indisponível." }, { status: 502 });
@@ -106,6 +120,10 @@ export async function POST(req, { params }) {
   // tela abrir dezenas de requisições só pra montar o pedido.
   let truncado = false, varridas = 0;
   const ignorados = new Map();
+  for (const a of recusados) {
+    const ext = (String(a.nome).match(/\.([a-z0-9]+)$/i)?.[1] || "?").toLowerCase();
+    ignorados.set(ext, (ignorados.get(ext) || 0) + 1);
+  }
   for (const pasta of pastas) {
     const caminho = String(pasta?.path || "");
     // ⚠ mesma trava do GET: só dentro das fontes desta seção. Sem isto, um `path` livre no body
