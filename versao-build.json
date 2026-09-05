@@ -1,7 +1,12 @@
 {
-  "build": 2848,
-  "gerado": "2026-09-05T15:04:00.631Z",
+  "build": 2849,
+  "gerado": "2026-09-05T15:05:27.458Z",
   "commits": [
+    {
+      "hash": "12f22bed62",
+      "data": "05/09/2026",
+      "titulo": "Skills e plugins passam a viver no projeto, não no perfil"
+    },
     {
       "hash": "a5b930cf07",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "12fce9de93",
       "data": "05/09/2026",
       "titulo": "Painel de administração e alerta dos crons: só quem administra o portal"
-    },
-    {
-      "hash": "1926214154",
-      "data": "05/09/2026",
-      "titulo": "Data book: cobertura e vedação não entram no livro"
     }
   ]
 }
