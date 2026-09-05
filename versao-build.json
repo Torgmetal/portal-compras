@@ -1,7 +1,22 @@
 {
-  "build": 2856,
-  "gerado": "2026-09-05T16:52:29.750Z",
+  "build": 2859,
+  "gerado": "2026-09-05T18:24:29.176Z",
   "commits": [
+    {
+      "hash": "7aeae94bea",
+      "data": "05/09/2026",
+      "titulo": "Reancora o snapshot do LQC: o peso sem classe agora aparece no frete"
+    },
+    {
+      "hash": "702e604f3b",
+      "data": "05/09/2026",
+      "titulo": "Montagem: a aba passa a trazer a referência medida da casa"
+    },
+    {
+      "hash": "0c525498fd",
+      "data": "05/09/2026",
+      "titulo": "Estudo: montagem em campo, e margem própria para o item comercial"
+    },
     {
       "hash": "6ee939a8d9",
       "data": "05/09/2026",
@@ -136,21 +151,6 @@
       "hash": "1d54cda77f",
       "data": "05/09/2026",
       "titulo": "Estudo: cronograma prévio para compor a proposta"
-    },
-    {
-      "hash": "b19a3a44c8",
-      "data": "05/09/2026",
-      "titulo": "Condições de pagamento: alinhar a linha da parcela"
-    },
-    {
-      "hash": "3fa8f489b4",
-      "data": "05/09/2026",
-      "titulo": "BDI: alinhar os campos quando o rótulo ocupa duas linhas"
-    },
-    {
-      "hash": "3024cc2874",
-      "data": "05/09/2026",
-      "titulo": "Resumo do estudo: botão \"Composição do preço\""
     }
   ]
 }
