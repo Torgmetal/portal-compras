@@ -47,10 +47,33 @@ export async function POST(req, { params }) {
   // Certificados de material da OP (rastreabilidade importada do CMR), filtrados pelo
   // grupo da seção: seção 04 aço estrutural, seção 05 fixadores, seção 15 tintas. Outras seções: todos.
   const grupos = gruposDaSecao(secao.numero);
-  const todos = await prisma.documentoQualidade.findMany({
+  const daOp = await prisma.documentoQualidade.findMany({
     where: { ativo: true, categoria: "MATERIAL", opNumero },
     select: { id: true, nome: true },
   });
+
+  // ── O AÇO QUE ENTROU POR OUTRA OBRA ─────────────────────────────────────────────────────────
+  //
+  // Vitor (05/09/2026), fechando a OP-085: "possa ser que eu comprei material em nome de outro
+  // cliente e o recebimento não fica sabendo". Quando alguém declara na Conferência de
+  // Rastreabilidade que aquele perfil veio do R tal — um R lançado sob OUTRA obra — a §02 passa a
+  // carimbar esse R na peça. Só que esta rota buscava certificado por `opNumero`, então o
+  // certificado DESSE R nunca entrava na seção: o livro citaria um R cujo certificado não está nele.
+  //
+  // Puxar o R declarado é a mesma regra já usada na §06 (arame) e na granalha da §15: o que entra é
+  // o lote que o motor de rastreio efetivamente aponta para esta obra, não o que a coluna OBRA diz.
+  const rsDeclarados = [...new Set(
+    (await prisma.trocaRastreabilidade.findMany({ where: { opNumero }, select: { rUsado: true } }))
+      .map((t) => t.rUsado).filter(Boolean)
+  )];
+  const declarados = rsDeclarados.length
+    ? await prisma.documentoQualidade.findMany({
+        where: { ativo: true, categoria: "MATERIAL", importRef: { in: rsDeclarados } },
+        select: { id: true, nome: true },
+      })
+    : [];
+  const idsDaOp = new Set(daOp.map((d) => d.id));
+  const todos = [...daOp, ...declarados.filter((d) => !idsDaOp.has(d.id))];
   // ── seção 06 NÃO SE RESOLVE POR OP ───────────────────────────────────────────────────────────────
   //
   // O arame entra no CMR SEM OP (é estoque geral, não é comprado por obra). A busca acima, que
