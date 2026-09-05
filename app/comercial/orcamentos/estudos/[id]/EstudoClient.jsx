@@ -4,7 +4,7 @@ import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload, Send } from "luci
 import { useStore } from "@/lib/store";
 import { FAMILIAS_COTACAO, FAMILIA_DO_ITEM } from "@/lib/cotacao-familias";
 import { montarCronogramaPrevio, textoDaProposta, comprasEspeciais, PADRAO_CRONOGRAMA } from "@/lib/cronograma-previo";
-import { cadenciaPorClasse, decisaoTerceirizar, margemPorMesDeFabrica, PRECO_TERCEIRO_CLASSE, MONTAGEM_PADRAO, MARGEM_COMERCIAIS_PADRAO } from "@/lib/lqc";
+import { cadenciaPorClasse, decisaoTerceirizar, margemPorMesDeFabrica, PRECO_TERCEIRO_CLASSE, MONTAGEM_PADRAO, MARGEM_COMERCIAIS_PADRAO, MONTAGEM_REFERENCIA, referenciaMontagem } from "@/lib/lqc";
 import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAPACIDADE_CARGA, EVENTOS_PAGAMENTO, PAGAMENTO_PADRAO, PRAZOS_PAGAMENTO, conferirPagamento, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa, resultadoDoCenario, sensibilidade, ALAVANCAS_SENSIVEIS, equilibrioConvergido, impostosDoCenario } from "@/lib/lqc";
 import { capacidadePorHora } from "@/lib/fabrica-horas";
 
@@ -667,6 +667,25 @@ function MontagemCampo({ c, res, setComp }) {
   const comerciais = (res.itensComerciais || []).filter((i) => i.qtd > 0);
   const ativo = cfg.ativo === true || num(cfg.estruturaRsKg) > 0 || num(cfg.equipamentosVb) > 0;
 
+  // ⚠⚠ CAMPO EM BRANCO EMPURRA O ORÇAMENTISTA A CHUTAR. Vitor (05/09/2026): "precisa trazer as
+  // informações para ficar fácil… precisa ter sentido e lógica". A referência sai das 22 LQCs de
+  // 2026 que têm montagem, por FAIXA DE PESO — o R$/kg despenca com o tamanho da obra (739 t saem
+  // por 1,92 e 25 t por 6,25), então uma mediana só mentiria nas duas pontas.
+  const pesoKg = num(res.pesoTotal);
+  const ref = referenciaMontagem(pesoKg);
+  const equipSugerido = Math.round((ref.equipamentosRsKg * pesoKg) / 1000) * 1000;
+  const usarReferencia = () => setComp({
+    montagem: {
+      ...cfg, ativo: true,
+      estruturaRsKg: String(ref.estruturaRsKg),
+      despesasPct: String(MONTAGEM_REFERENCIA.despesasPct),
+      equipamentosVb: String(equipSugerido),
+      porItem: Object.fromEntries(comerciais
+        .filter((i) => MONTAGEM_REFERENCIA.porItem[i.key])
+        .map((i) => [i.key, String(MONTAGEM_REFERENCIA.porItem[i.key].valor)])),
+    },
+  });
+
   return (
     <div className="space-y-4 max-w-5xl">
       <p className="text-[12px] text-torg-gray">
@@ -677,21 +696,35 @@ function MontagemCampo({ c, res, setComp }) {
       </p>
 
       <div className="bg-white border border-gray-100 rounded-xl p-4">
-        <label className="flex items-center gap-2 text-[12px] text-torg-dark mb-3">
-          <input type="checkbox" checked={ativo} onChange={(e) => set("ativo", e.target.checked)} />
-          <strong>Esta obra tem montagem em campo</strong>
-          <span className="text-torg-gray">— desmarcado, o bloco não entra no custo nem na proposta</span>
-        </label>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <label className="flex items-center gap-2 text-[12px] text-torg-dark">
+            <input type="checkbox" checked={ativo} onChange={(e) => set("ativo", e.target.checked)} />
+            <strong>Esta obra tem montagem em campo</strong>
+            <span className="text-torg-gray">— desmarcado, o bloco não entra no custo nem na proposta</span>
+          </label>
+          <button type="button" onClick={usarReferencia}
+            className="text-[11px] font-semibold text-torg-blue border border-torg-blue-200 hover:bg-torg-blue-50 rounded-lg px-2.5 py-1">
+            Preencher com a referência da casa
+          </button>
+        </div>
+        <p className="text-[11px] text-torg-dark bg-torg-blue-50/50 border border-torg-blue-200 rounded-lg px-3 py-2 mb-3">
+          Obra de <strong>{Math.round(pesoKg / 1000).toLocaleString("pt-BR")} t</strong> — faixa <strong>{ref.rotulo}</strong>.
+          Nas {ref.n} obras dessa faixa a casa cobrou <strong>{fmtR$(ref.estruturaRsKg)}/kg</strong> de montagem da estrutura,
+          <strong> {MONTAGEM_REFERENCIA.despesasPct}%</strong> de despesas e canteiro sobre a mão de obra, e
+          <strong> {fmtR$(ref.equipamentosRsKg)}/kg</strong> de equipamento — o que daria {fmtR$(equipSugerido)} nesta obra.
+          <span className="block text-torg-gray mt-0.5">
+            O equipamento costuma custar MAIS que o montador (na LQC-253, R$ 942 mil de guindaste contra R$ 642 mil de mão de obra) — é o campo que mais fica em branco.
+          </span>
+        </p>
         {ativo && (
           <div className="grid sm:grid-cols-3 gap-x-4 gap-y-3">
-            {[["estruturaRsKg", "Estrutura", "R$ por kg montado"],
-              ["despesasPct", "Despesas e canteiro", `% sobre a mão de obra — padrão ${MONTAGEM_PADRAO.despesasPct}`],
-              ["equipamentosVb", "Equipamentos", "verba — guindaste, plataforma"]].map(([k, rot, ajuda]) => (
+            {[["estruturaRsKg", "Estrutura", "só a mão de obra do montador, R$/kg", ref.estruturaRsKg],
+              ["despesasPct", "Despesas e canteiro", "% sobre a mão de obra — alojamento, EPI, canteiro", MONTAGEM_REFERENCIA.despesasPct],
+              ["equipamentosVb", "Equipamentos", "verba — guindaste, plataforma, munck", equipSugerido]].map(([k, rot, ajuda, sug]) => (
               <label key={k} className="flex flex-col text-[11px] text-torg-dark">
                 <span className="min-h-[2.75em] leading-snug">{rot}</span>
-                <Inp value={cfg[k] ?? ""} placeholder={k === "despesasPct" ? String(MONTAGEM_PADRAO.despesasPct) : ""}
-                  onChange={(e) => set(k, e.target.value)} className="block mt-1 w-full text-right" />
-                <span className="block text-[10px] text-torg-gray mt-0.5">{ajuda}</span>
+                <Inp value={cfg[k] ?? ""} placeholder={String(sug)} onChange={(e) => set(k, e.target.value)} className="block mt-1 w-full text-right" />
+                <span className="block text-[10px] text-torg-gray mt-0.5">{ajuda} · casa: <b>{k === "despesasPct" ? `${sug}%` : fmtR$(sug)}</b></span>
               </label>
             ))}
           </div>
@@ -720,7 +753,15 @@ function MontagemCampo({ c, res, setComp }) {
                     <tr key={i.key}>
                       <td className="px-4 py-1.5">{i.rotulo}</td>
                       <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{Number(i.qtd).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} {i.un}</td>
-                      <td className="px-2 py-1.5 text-right"><Inp value={cfg.porItem?.[i.key] ?? ""} onChange={(e) => setItem(i.key, e.target.value)} className="w-24 text-right" /></td>
+                      <td className="px-2 py-1.5 text-right">
+                        <Inp value={cfg.porItem?.[i.key] ?? ""} placeholder={String(MONTAGEM_REFERENCIA.porItem[i.key]?.valor ?? "")}
+                          onChange={(e) => setItem(i.key, e.target.value)} className="w-24 text-right" />
+                        {MONTAGEM_REFERENCIA.porItem[i.key] && (
+                          <span className="block text-[9px] text-torg-gray mt-0.5">
+                            casa {fmtR$(MONTAGEM_REFERENCIA.porItem[i.key].valor)}/{i.un} ({MONTAGEM_REFERENCIA.porItem[i.key].n} obras)
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(l?.subtotal || 0)}</td>
                     </tr>
                   );
