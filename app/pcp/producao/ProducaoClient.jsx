@@ -22,6 +22,7 @@ import CompraChip, { ModalRastreabilidade } from "@/components/CompraChip";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 import SeparacaoModal from "@/components/SeparacaoModal";
 import CargaProducao from "./CargaProducao";
+import GanttProgramacao from "./GanttProgramacao";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 // ⚠ o download do ZIP vem da lib (era a TERCEIRA cópia da mesma função neste repositório); ela
 // suporta a pasta por bancada, que a cópia local não tinha.
@@ -506,6 +507,11 @@ export default function ProducaoClient() {
           <button onClick={() => setAviso(null)} className="text-xs underline shrink-0">fechar</button>
         </div>
       )}
+
+      {/* ⚠ NO TOPO DE TUDO. Vitor (05/09/2026): "na PÁGINA do PCP, quero que crie acima desse painel
+          um gantt que seja visualmente fácil de ver". É o quadro de QUANDO — dia, bancada e o que
+          não cabe —, e é dele que se decide o que abrir na lista abaixo. */}
+      <GanttProgramacao />
 
       {/* ⚠ ANTES DA LISTA. Vitor (03/09/2026): "no painel do PCP você consegue criar o kanban para
           termos ideia da carga da produção?". É o retrato de onde o trabalho está acumulado — a
