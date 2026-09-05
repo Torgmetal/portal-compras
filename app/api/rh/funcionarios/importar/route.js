@@ -25,7 +25,7 @@ function parseData(val) {
   }
   const s = String(val).trim();
   // dd/mm/yyyy ou dd-mm-yyyy
-  const brMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  const brMatch = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
   if (brMatch) {
     const d = new Date(`${brMatch[3]}-${brMatch[2].padStart(2, "0")}-${brMatch[1].padStart(2, "0")}`);
     return isNaN(d.getTime()) ? null : d;

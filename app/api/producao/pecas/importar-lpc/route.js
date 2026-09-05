@@ -272,7 +272,6 @@ export async function POST(req) {
             // peça que está na LPC é peça que se fabrica, tenha vindo por onde tiver vindo.
             naLPC: true,
             fonte: "LPC_IMPORT",
-            naLPC: true,
           },
         });
         pieceIds.set(a.marca, existing.id);

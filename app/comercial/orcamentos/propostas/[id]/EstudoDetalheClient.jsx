@@ -1374,8 +1374,8 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
     const todosItens = [];
     let pesoTotal = null;
     let composicao = null;
-    let observacoes = [];
-    let docsAnalisados = [];
+    const observacoes = [];
+    const docsAnalisados = [];
 
     // Filtrar docIds com base no filtro selecionado
     const docIdsFiltrados = docsParaIA.map((d) => d.id);

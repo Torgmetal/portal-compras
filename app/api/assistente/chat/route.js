@@ -93,7 +93,7 @@ export async function POST(req) {
   const systemPrompt = buildSystemPrompt(user, configDb?.instrucaoExtra);
 
   // ─── Injeta os anexos na última mensagem do usuário ────────────
-  let messages = [...historico];
+  const messages = [...historico];
   if (anexos.length && messages.length) {
     const ultima = messages[messages.length - 1];
     if (ultima?.role === "user") {

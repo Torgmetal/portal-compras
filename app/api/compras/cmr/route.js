@@ -83,7 +83,7 @@ export async function POST(req) {
   const ano = body.ano || new Date().getFullYear();
   const pre = prefixoAno(ano);
   // Sequencial inicial do ano; incrementa em memória (evita corrida entre as linhas do lote).
-  let base = await proximoIndiceR(ano); // ex.: 261206
+  const base = await proximoIndiceR(ano); // ex.: 261206
   let seq = Number(String(base).slice(2));
 
   const criados = [];

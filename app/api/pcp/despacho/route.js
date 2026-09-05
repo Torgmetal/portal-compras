@@ -304,7 +304,7 @@ export async function GET(req) {
   // peça que não dê sequência de montagem; se faltar uma peça de 1 kg você não deve ignorar".
   // O peso engana: na OP-089, 42 croquis somando 1.144 kg seguram 17 guarda-corpos. Aqui a
   // prioridade é POR QUANTO DESTRAVA, não por peso.
-  let travaPorCroqui = new Map();
+  const travaPorCroqui = new Map();
   if (setor === "CORTE") {
     try {
       const links = await prisma.conjuntoCroqui.findMany({
@@ -434,7 +434,7 @@ export async function GET(req) {
   // ⚠ MONTADO É PROPRIEDADE DO CONJUNTO, LIDA DO LADO DO CROQUI. O mesmo critério que o Corte já
   // usava para saber que um conjunto não trava mais: apontamento no Syneco em Montagem ou adiante,
   // baixa de Montagem no portal, ou peça expedida.
-  let montadoPorCroqui = new Map();
+  const montadoPorCroqui = new Map();
   try {
     const links = await prisma.conjuntoCroqui.findMany({
       where: { conjunto: { opId } },
@@ -571,7 +571,6 @@ export async function GET(req) {
       // fecha o caso: sem ela, o desenho nunca foi impresso, então aquele conjunto não está na mão
       // de ninguém no chão de fábrica. Conjunto que nunca foi programado não entra: esse não foi
       // esquecido, só não chegou a vez dele.
-      montagemDiaProgramado: p.montagemDiaProgramado || null,
       esperandoDescer: !!p.montagemDiaProgramado && mont?.prontoMontar === true
         && !grdPorMarca.get(String(p.marca || "").toUpperCase()) };
   });

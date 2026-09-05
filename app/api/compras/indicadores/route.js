@@ -130,7 +130,7 @@ async function calcularScorecard(dataInicio, dataFim) {
     // Declinar é um retorno do fornecedor (não vai cotar), não uma cotação
     // ignorada — não conta como RFQ em aberto contra ele.
     const declinadas = cots.filter((c) => c.status === "DECLINADA").length;
-    let rfqsEnviadas = cots.length - declinadas;
+    const rfqsEnviadas = cots.length - declinadas;
     let rfqsNoPrazo = 0;
     for (const c of cots) {
       if (c.recebidaEm) {

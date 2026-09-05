@@ -91,7 +91,7 @@ export async function GET(req) {
       select: { dataValidade: true, funcionarioId: true },
     });
 
-    let totalDocs = todos.length;
+    const totalDocs = todos.length;
     let vencidos = 0;
     let vencendo30 = 0;
     let vencendo60 = 0;

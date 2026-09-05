@@ -215,7 +215,7 @@ export default function ConsultaExpedicao({ opId, readOnly = false, focoPendente
   // Extrai a 1ª marca conhecida de uma célula/texto (tokeniza — aceita "T45 - Viga").
   function marcaNaCelula(cell) {
     for (const tok of String(cell ?? "").split(/[\s,;|"'\t]+/)) {
-      const t = tok.trim().toUpperCase().replace(/^[.,;:(\[]+|[.,;:)\]]+$/g, "");
+      const t = tok.trim().toUpperCase().replace(/^[.,;:([]+|[.,;:)\]]+$/g, "");
       if (t.length < 2) continue;
       const m = conhecidas.get(t);
       if (m) return { m, key: t };

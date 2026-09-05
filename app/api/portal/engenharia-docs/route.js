@@ -150,7 +150,7 @@ export async function GET(req) {
   // ── demais áreas: navega a OP inteira, a partir da pasta natural ──
   const inicial = RAIZ_DA_AREA[area] || "";
   const atual = pedido === "" && !u.searchParams.has("caminho") ? inicial : rel;
-  let itens = await listarRel(atual);
+  const itens = await listarRel(atual);
   if (itens === null) {
     // ⚠ pasta padrão que não existe nesta obra não é erro: cai na raiz da OP e diz por quê.
     const naRaiz = (await listarRel("")) || [];

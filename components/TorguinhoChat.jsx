@@ -30,7 +30,7 @@ function MensagemTexto({ texto }) {
 
         // Processa negrito **texto**
         const partes = [];
-        let resto = linha.replace(/^[-•*]\s/, "").replace(/^\d+\.\s/, "");
+        const resto = linha.replace(/^[-•*]\s/, "").replace(/^\d+\.\s/, "");
         const regexNegrito = /\*\*(.+?)\*\*/g;
         let lastIndex = 0;
         let match;

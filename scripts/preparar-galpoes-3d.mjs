@@ -34,6 +34,9 @@ const r2 = esconder(html, "note"); html = r2.html;          // nota técnica de 
 // <three-d-stage> — CSS do documento não alcança shadow. Este <script> faz um poll e injeta um
 // <style>.toolbar{display:none} no shadowRoot. Roda na 1ª parse e o setInterval sobrevive à
 // reconstrução do DOM pelo bundler (o interval vive no window).
+// eslint-disable-next-line no-useless-escape -- `<\/script>` é o idioma defensivo de
+// quem emite HTML de dentro de uma string JS: o \ some na avaliação, mas evita que
+// um `</script>` literal feche a tag cedo se este texto for embutido inline algum dia.
 const SCRIPT = `<script>(function(){var n=0,t=setInterval(function(){n++;var s=document.querySelector('three-d-stage'),r=s&&s.shadowRoot;if(r&&!r.getElementById('torg-no-toolbar')){var e=document.createElement('style');e.id='torg-no-toolbar';e.textContent='.toolbar{display:none!important}';r.appendChild(e);}if((r&&r.getElementById('torg-no-toolbar'))||n>100)clearInterval(t);},100);})();<\/script>\n`;
 const addScript = !html.includes("torg-no-toolbar");
 if (addScript && html.includes("</body>")) html = html.replace("</body>", SCRIPT + "</body>");

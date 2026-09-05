@@ -11,7 +11,7 @@ export async function GET() {
     return NextResponse.json({ ativo: false });
   }
 
-  let config = await prisma.configAssistente.findFirst();
+  const config = await prisma.configAssistente.findFirst();
   if (!config) {
     // Default: ativo para todos
     return NextResponse.json({ ativo: true, modulosHabilitados: [], modelo: "claude-haiku-4-5" });

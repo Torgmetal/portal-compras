@@ -19,7 +19,7 @@ export async function GET(_req, { params }) {
     .catch(() => {});
 
   // Equipe: resumo em dois grupos — Administrativo e Fábrica (nº de funcionários ATIVOS).
-  let equipe = [];
+  const equipe = [];
   let totalFuncionarios = 0;
   try {
     const setores = await prisma.setor.findMany({

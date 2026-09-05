@@ -1,7 +1,12 @@
 {
-  "build": 2843,
-  "gerado": "2026-09-05T15:03:40.861Z",
+  "build": 2844,
+  "gerado": "2026-09-05T15:03:41.113Z",
   "commits": [
+    {
+      "hash": "6248e7d95f",
+      "data": "05/09/2026",
+      "titulo": "Base de testes: vitest, mock do Prisma e o snapshot que trava o calcularLqc"
+    },
     {
       "hash": "7599eeffd7",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "686b61a557",
       "data": "04/09/2026",
       "titulo": "Data book: .dwg não é anexo do livro, e imagem vira página em vez de erro"
-    },
-    {
-      "hash": "5f60a15ae2",
-      "data": "04/09/2026",
-      "titulo": "Rastreabilidade: reconhecer o ferro chato (FC) e a chapa lançada como \"PERFIL DB FQ\""
     }
   ]
 }

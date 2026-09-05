@@ -69,11 +69,14 @@ export default defineConfig([
     rules: {
       "no-useless-escape": "warn", // baseline: 32
       "prefer-const": "warn", // baseline: 26
-      "no-control-regex": "warn", // baseline: 16
+      // "no-control-regex" não fica aqui: ver o bloco dos sanitizadores.
       "no-irregular-whitespace": "warn", // baseline: 5
       "no-dupe-keys": "warn", // baseline: 3 — são bugs reais, prioridade no burndown
       "no-unused-vars": "warn", // baseline: 4292
-      "no-empty": "warn", // baseline: 2
+      // `catch (_) {}` é idioma deliberado aqui (best-effort que não pode
+      // derrubar o fluxo principal). O bloco de app/lib/components já permitia;
+      // scripts/ também merece.
+      "no-empty": ["warn", { allowEmptyCatch: true }],
       "no-case-declarations": "warn", // baseline: 1
     },
   },
@@ -154,6 +157,25 @@ export default defineConfig([
     ],
     rules: {
       "quality/no-direct-data-access": "off",
+    },
+  },
+  {
+    // ⚠ AS 16 OCORRÊNCIAS DE no-control-regex SÃO TODAS O MESMO IDIOMA, e é o
+    // idioma correto: `[^\x00-\xFF]` (fora do WinAnsi) e `[\x00-\x1F\x7F]`
+    // (caracteres de controle) são exatamente o que um sanitizador de PDF e de
+    // HTML precisa casar. A regra não tem um único acerto neste repositório.
+    //
+    // Escopada aos sanitizadores em vez de desligada no projeto: um `[\x00-…]`
+    // que apareça fora desta lista continua sendo reportado, que é quando a
+    // regra de fato serviria pra alguma coisa.
+    files: [
+      "lib/*-pdf.js",
+      "lib/html.js",
+      "lib/carimbo-desenho.js",
+      "lib/omie-pedido-compra.js",
+    ],
+    rules: {
+      "no-control-regex": "off",
     },
   },
   {

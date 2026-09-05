@@ -74,7 +74,7 @@ REGRAS DE MATCHING (rmIndex):
     (2POL de aba, 1/4 de espessura — a ordem aba×espessura pode inverter). "BARRED 3/4" ↔ "BARRA REDONDA … 3/4POL".
 - Mesma CATEGORIA + mesma dimensão principal (tolerância ±0,5mm pra chapas) + grade compatível → match
 - CONSUMÍVEIS/INSUMOS (casa por tipo + medida/bitola, ignorando marca):
-  • "DISCO DE CORTE 9\"" ↔ "DISCO CORTE 230MM" (9" = 230mm)
+  • "DISCO DE CORTE 9"" ↔ "DISCO CORTE 230MM" (9" = 230mm)
   • "ELETRODO 7018 3,25" ↔ "ELETRODO E7018 3.25MM" ↔ "ELETRODO 7018 Ø3,25"
   • "ARAME MIG ER70S-6 1,2" ↔ "ARAME SÓLIDO 1.2MM ER70S6"
   • "RESPIRADOR PFF2 C/ VÁLVULA" ↔ "MÁSCARA PFF2 VALVULADA"
@@ -134,7 +134,7 @@ function round2(n) {
 
 function sanitizeItens(itens, rmCount) {
   return (itens || []).map((it) => {
-    let precoUnit = Number(it.precoUnit) || 0;
+    const precoUnit = Number(it.precoUnit) || 0;
     const qtd = Number(it.qtd) || 0;
     const totalDeclarado = it.totalBruto != null ? Number(it.totalBruto) : null;
     const warnings = [];
