@@ -36,7 +36,7 @@ const CSS = `
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
   }
   .gpcp .wrap{height:var(--alt);display:flex;flex-direction:column}
-  .gpcp .topo, .gpcp .barra, .gpcp .aviso{flex:0 0 auto}
+  .gpcp .topo, .gpcp .barra{flex:0 0 auto}
 
   .gpcp .topo{background:var(--navy);border-radius:10px 10px 0 0;padding:10px 18px;color:#fff;
         border-bottom:3px solid var(--laranja);display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
@@ -57,10 +57,6 @@ const CSS = `
   .gpcp .rot{font-size:11px;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.5px;font-weight:700}
   .gpcp .leg{display:flex;gap:10px;align-items:center;font-size:11px;color:var(--tinta-2);margin-left:auto}
   .gpcp .leg i{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:4px}
-  .gpcp .aviso{display:flex;align-items:center;gap:10px;font-size:12px;color:#8a5600;
-         background:#fff7e8;border:1px solid #f2d9ab;border-top:0;padding:6px 18px;line-height:1.45}
-  .gpcp .aviso b{color:#7a4a00}
-  .gpcp .aviso .txt{flex:1 1 320px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
   .gpcp /* ── grade ─────────────────────────────────────────────────────── */
   .quadro{flex:1 1 auto;min-height:180px;display:flex;background:var(--papel);
@@ -131,6 +127,17 @@ const CSS = `
   .gpcp .corta{position:absolute;top:0;bottom:0;width:9px;background:rgba(0,0,0,.22);
          display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff}
   .gpcp .corta.e{left:0;border-radius:5px 0 0 5px} .gpcp .corta.d{right:0;border-radius:0 5px 5px 0}
+  /* ⚠ AS PONTAS ESTICAM A BARRA. Matheus (05/09/2026): "deixe as pontas das barras quando
+     colocar mouse em cima uma seta para arrastar os dias, assim consigo puxar para sábado se
+     eu quiser e tirar de segunda". Só aparecem no hover para não competir com o arraste do
+     bloco inteiro, que é o gesto de todo dia. */
+  .gpcp .barra-op .pux{position:absolute;top:0;bottom:0;width:11px;cursor:ew-resize;opacity:0;
+         display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1;
+         color:#fff;background:rgba(0,0,0,.30);transition:opacity .12s;pointer-events:auto;z-index:2}
+  .gpcp .barra-op .pux.e{left:0;border-radius:5px 0 0 5px}
+  .gpcp .barra-op .pux.d{right:0;border-radius:0 5px 5px 0}
+  .gpcp .barra-op:hover .pux{opacity:1}
+  .gpcp .barra-op.esticando{outline:2px dashed var(--laranja);outline-offset:-2px}
   .gpcp .semgrd{position:absolute;right:3px;top:3px;width:7px;height:7px;border-radius:50%;
           background:#ffd27a;box-shadow:0 0 0 1.5px rgba(0,0,0,.25)}
 
@@ -263,7 +270,6 @@ const MARKUP = `<div class="wrap">
     </span>
   </div>
 
-  <div id="gp-vencidas"></div>
   <div id="gp-aviso"></div>
   <div class="quadro"><div class="rolagem" id="gp-grade"></div></div>
 
@@ -351,6 +357,15 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   const dFim = d0(diasComDado[diasComDado.length-1]||HOJE); dFim.setUTCDate(dFim.getUTCDate()+90);
   const DIAS=[]; for(const d=new Date(dIni); d<=dFim; d.setUTCDate(d.getUTCDate()+1)) DIAS.push(isoD(d));
   const IDX = new Map(DIAS.map((s,i)=>[s,i]));
+
+  // A coluna de dia útil a partir de i (o próprio i, se já for útil). Sábado e domingo
+  // são visíveis e recebem barra, mas só quando alguém os escolhe de propósito puxando
+  // a ponta — mover o bloco inteiro nunca joga trabalho no fim de semana sozinho.
+  function encostaNoUtil(i){
+    let k = Math.max(0, Math.min(DIAS.length-1, i));
+    while(k < DIAS.length-1 && fdsISO(DIAS[k])) k++;
+    return k;
+  }
 
   // Os N dias que uma quebra ocupa a partir de uma coluna. Pula sábado e domingo,
   // porque "dividir em 3 dias" numa sexta significa sex/seg/ter para quem programa.
@@ -548,7 +563,8 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
                +  (cabe && r.adiado>0?'<span class="selo">adiada '+r.adiado+'×</span>':"")
                +  (cabe && r.feitas>0?'<span class="selo">'+pend+' a fazer</span>':"")
                +  (r.semGrd?'<div class="semgrd" title="'+r.semGrd+' sem GRD"></div>':"")
-               +  (r.ini<inicio?'<div class="corta e">◀</div>':"")+(r.fim>inicio+larg-1?'<div class="corta d">▶</div>':"")
+               +  (r.ini<inicio?'<div class="corta e">◀</div>':'<div class="pux e" data-pux="e" title="Arraste para começar antes ou depois">‹</div>')
+               +  (r.fim>inicio+larg-1?'<div class="corta d">▶</div>':'<div class="pux d" data-pux="d" title="Arraste para terminar antes ou depois">›</div>')
                +  '</div>';
         }
         html += '</div>'+(naJanela?'<div class="cargas">':'<div class="cargas" hidden>');
@@ -569,23 +585,29 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   /* ── arraste ────────────────────────────────────────────────────────────────── */
   let arr = null;
   const BORDA = 46, PASSO = 16;
-  function autoRolar(e){
+  // ⚠ RECEBE O ESTADO, não fecha sobre `arr`. Enquanto só o bloco inteiro era arrastável,
+  // `arr` era o único estado possível; com o esticar pela ponta existe um segundo (`est`) e
+  // a versão antiga escrevia em `arr` null — "Cannot set properties of null".
+  function autoRolar(e, st){
+    if(!st) return;
     const rol = raiz.querySelector(".rolagem"), r = rol.getBoundingClientRect();
     let vy=0, vx=0;
     if(e.clientY < r.top+BORDA) vy=-PASSO; else if(e.clientY > r.bottom-BORDA) vy=PASSO;
     if(e.clientX < r.left+BORDA) vx=-PASSO; else if(e.clientX > r.right-BORDA) vx=PASSO;
-    if(!vy && !vx){ arr.rolando=null; return; }
-    arr.rolando = {vx,vy};
-    if(arr.raf) return;
-    const passo = ()=>{ if(!arr||!arr.rolando){ if(arr) arr.raf=null; return; }
-      rol.scrollTop += arr.rolando.vy; rol.scrollLeft += arr.rolando.vx; arr.raf = requestAnimationFrame(passo); };
-    arr.raf = requestAnimationFrame(passo);
+    if(!vy && !vx){ st.rolando=null; return; }
+    st.rolando = {vx,vy};
+    if(st.raf) return;
+    const passo = ()=>{ if(!st.rolando){ st.raf=null; return; }
+      rol.scrollTop += st.rolando.vy; rol.scrollLeft += st.rolando.vx; st.raf = requestAnimationFrame(passo); };
+    st.raf = requestAnimationFrame(passo);
   }
   function limparAlvos(){ for(const c of grade.querySelectorAll(".cel.alvo,.cel.proibido")) c.classList.remove("alvo","proibido"); }
   function pegar(e){
     if(e.button!==0) return;
     const el = e.currentTarget;
     const r = montarRuns().find(x=>x.id===el.dataset.run); if(!r) return;
+    const pux = e.target.closest && e.target.closest("[data-pux]");
+    if(pux){ e.stopPropagation(); esticar(e, r, el, pux.dataset.pux); return; }
     const cx = el.getBoundingClientRect();
     arr = { el, r, x0:e.clientX, y0:e.clientY, dx:e.clientX-cx.left, dy:e.clientY-cx.top, alvo:null, moveu:false,
             offCols: Math.max(0, Math.floor((e.clientX-cx.left)/COL)) };
@@ -601,7 +623,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     if(!arr) return;
     if(!arr.moveu && Math.abs(e.clientX-arr.x0)+Math.abs(e.clientY-arr.y0) < 5) return;
     if(!arr.moveu){ arr.moveu = true; arr.el.classList.add("arrastando"); document.body.style.userSelect="none"; }
-    autoRolar(e);
+    autoRolar(e, arr);
     arr.g.style.left = (e.clientX-arr.dx)+"px";
     arr.g.style.top  = (e.clientY-arr.dy)+"px";
     arr.g.style.display="none";
@@ -614,13 +636,106 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     const permitido = setor === arr.r.setor;
     const dur = arr.r.fim - arr.r.ini + 1;
     const cels = [...lin.querySelectorAll(".cel")];
-    const j = Math.max(0, cels.indexOf(cel) - arr.offCols);
+    // ⚠ SOLTAR NO FIM DE SEMANA ESCORREGA PARA A SEGUNDA. Matheus (05/09/2026): "os
+    // sábados e domingo por padrão pule eles". Mover o bloco é a operação de todo dia e
+    // não pode plantar trabalho no sábado por descuido; para isso existe a ponta da
+    // barra, que é deliberada. A prévia já mostra onde vai cair, então não há surpresa
+    // depois de soltar.
+    const jBruto = Math.max(0, cels.indexOf(cel) - arr.offCols);
+    const j = Math.max(0, encostaNoUtil(inicio + jBruto) - inicio);
     for(let k=0;k<dur;k++){ const c = cels[j+k]; if(c) c.classList.add(permitido?"alvo":"proibido"); }
-    if(!permitido) return;
+    if(!permitido || !cels[j]) return;
     arr.alvo = { setor, recurso:rec, iAlvo: inicio + j };
     const rc = cels[j].getBoundingClientRect();
     arr.g.style.left = (rc.left+3)+"px"; arr.g.style.top = (rc.top+5)+"px"; arr.g.style.width = (dur*COL-7)+"px";
   }
+  /* ── esticar pela ponta ─────────────────────────────────────────────────────── */
+  // ⚠⚠ QUAIS DIAS DO INTERVALO RECEBEM TRABALHO — a regra inteira em uma frase:
+  //
+  //   os dias ÚTEIS do intervalo, mais o sábado ou domingo em que a PONTA parou.
+  //
+  // Puxar de sexta para o sábado programa o sábado, que é o pedido. Puxar de sexta até
+  // a segunda NÃO programa o sábado e o domingo do caminho: passar por cima deles indo
+  // para a segunda não é querer trabalhar no fim de semana. Fim de semana entra quando
+  // é ele que você encostou.
+  function diasDoIntervalo(a, b){
+    const ini = Math.min(a,b), fim = Math.max(a,b);
+    const cols = [];
+    for(let i=ini;i<=fim;i++) if(!fdsISO(DIAS[i]) || i===a || i===b) cols.push(i);
+    return cols.length ? cols : [ini];
+  }
+
+  // Reparte os itens do run entre os dias escolhidos. Usa a capacidade da bancada quando
+  // ela existe (o mesmo critério do "quebrar"); sem bancada definida, divide pelo custo,
+  // que é o melhor que dá para fazer sem saber a capacidade de nada.
+  function repartirPorDias(r, cols){
+    const meus = new Set(r.lotes.map(l=>l.uid));
+    const cap = capDe(r.setor, r.recurso);
+    const slots = cols.map(i=>({ dia: DIAS[i], cap: cap||1,
+      base: cap ? carga(r.setor, r.recurso, DIAS[i], meus) : 0, carga:0, itens:[] }));
+    for(const it of [...r.itens].sort((a,b)=>custoItem(b,r.setor)-custoItem(a,r.setor))){
+      let alvo = slots[0], livre = -Infinity;
+      for(const sl of slots){ const l = sl.cap - sl.base - sl.carga; if(l > livre + 1e-9){ livre = l; alvo = sl; } }
+      alvo.itens.push(it); alvo.carga += custoItem(it, r.setor);
+    }
+    return slots.filter(sl=>sl.itens.length);
+  }
+
+  let est = null;
+  function esticar(e, r, el, lado){
+    const lin = el.closest(".linha[data-row]"); if(!lin) return;
+    est = { r, el, lado, lin, ini:r.ini, fim:r.fim, moveu:false, x0:e.clientX };
+    el.classList.add("esticando");
+    window.addEventListener("pointermove", moverPonta);
+    window.addEventListener("pointerup", soltarPonta, { once:true });
+    e.preventDefault();
+  }
+  function moverPonta(e){
+    if(!est) return;
+    if(!est.moveu && Math.abs(e.clientX-est.x0) < 4) return;
+    est.moveu = true;
+    autoRolar(e, est);
+    const cels = [...est.lin.querySelectorAll(".cel")];
+    let idx = cels.findIndex(c=>{ const b=c.getBoundingClientRect(); return e.clientX>=b.left && e.clientX<b.right; });
+    if(idx<0) idx = e.clientX < cels[0].getBoundingClientRect().left ? 0 : cels.length-1;
+    const col = inicio + idx;
+    // uma ponta nunca atravessa a outra: o bloco tem no mínimo um dia
+    if(est.lado==="e") est.ini = Math.min(col, est.r.fim); else est.fim = Math.max(col, est.r.ini);
+    limparAlvos();
+    const cols = diasDoIntervalo(est.ini, est.fim);
+    for(const i of cols){ const c = cels[i-inicio]; if(c) c.classList.add("alvo"); }
+    const a = Math.max(est.ini, inicio), b = Math.min(est.fim, inicio+cels.length-1);
+    if(cels[a-inicio]){
+      est.el.style.left = ((a-inicio)*COL+3)+"px";
+      est.el.style.width = ((b-a+1)*COL-7)+"px";
+    }
+  }
+  function soltarPonta(){
+    window.removeEventListener("pointermove", moverPonta);
+    if(!est) return;
+    if(est.raf) cancelAnimationFrame(est.raf);
+    const { r, el, moveu, ini, fim } = est; est = null;
+    el.classList.remove("esticando"); limparAlvos();
+    if(!moveu || (ini===r.ini && fim===r.fim)){ desenhar(); return; }
+    const cols = diasDoIntervalo(ini, fim);
+    const slots = repartirPorDias(r, cols);
+    if(!slots.length){ desenhar(); return; }
+    const antes = r.lotes.map(l=>({...l, itens:l.itens}));
+    const novos = slots.map(sl=>novoLote({
+      setor:r.setor, recurso:r.recurso, dia:sl.dia, op:r.op, obra:r.obra,
+      recursoOrig: antes[0].recursoOrig, diaOrig: antes[0].diaOrig, adiado: r.adiado,
+      itens: sl.itens, pecas:0, kg:0, custo:0, feitas:0,
+    }));
+    const fds = cols.filter(i=>fdsISO(DIAS[i]));
+    registrar({
+      setor:r.setor, op:r.op, pecas:r.pecas, kg:r.kg, antes, novos,
+      rotulo: '<b>'+nomeRec(r.setor, r.recurso)+'</b> · esticada para <b>'+cols.length+' dia'+(cols.length>1?"s":"")+'</b>'
+            + ' <span class="de-para">('+dbr(DIAS[cols[0]])+' a '+dbr(DIAS[cols[cols.length-1]])+')</span>'
+            + (fds.length ? ' <b>· inclui '+fds.map(i=>dbr(DIAS[i])).join(" e ")+'</b>' : ''),
+    });
+    redesenhar();
+  }
+
   function soltar(){
     window.removeEventListener("pointermove", mover);
     if(!arr) return;
@@ -633,8 +748,15 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     const delta = a.iAlvo - r.ini;
     if(delta===0 && a.recurso===r.recurso){ desenhar(); return; }
     const antes = r.lotes.map(l=>({...l, itens:l.itens}));
-    const novos = r.lotes.map(l=>novoLote({ ...l, itens:l.itens,
-        recurso: a.recurso, dia: DIAS[Math.max(0, Math.min(DIAS.length-1, IDX.get(l.dia)+delta))] }));
+    // Quem estava em dia útil continua em dia útil: se o deslocamento cru cair num
+    // sábado, escorrega para a segunda. Quem VOCÊ colocou no fim de semana de propósito
+    // (puxando a ponta) anda em dias corridos e continua lá — mover o bloco não desfaz
+    // uma decisão que alguém tomou.
+    const novos = r.lotes.map(l=>{
+      const cru = Math.max(0, Math.min(DIAS.length-1, IDX.get(l.dia)+delta));
+      const destino = fdsISO(l.dia) ? cru : encostaNoUtil(cru);
+      return novoLote({ ...l, itens:l.itens, recurso: a.recurso, dia: DIAS[destino] });
+    });
     registrar({
       setor:r.setor, op:r.op, pecas:r.pecas, kg:r.kg,
       rotulo: (r.recurso!==a.recurso ? '<b>'+nomeRec(r.setor,r.recurso)+'</b><span class="seta">→</span><b>'+nomeRec(a.setor,a.recurso)+'</b> · ' : '<b>'+nomeRec(a.setor,a.recurso)+'</b> · ')
@@ -980,22 +1102,6 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   for(const b of raiz.querySelectorAll(".abas button")) b.onclick = ()=>{ abaP=b.dataset.aba; pintarPainel(); };
   const aoTeclar = (e)=>{ if(e.key==="Escape" && painel) fecharPainel(); };
   window.addEventListener("keydown", aoTeclar);
-
-  /* ── programação vencida ────────────────────────────────────────────────────── */
-  (function(){
-    const atrasadas = LOTES.filter(l=>l.dia < HOJE && l.pecas > l.feitas);
-    if(!atrasadas.length) return;
-    const porSetor = {};
-    for(const l of atrasadas){ const s=porSetor[l.setor]||(porSetor[l.setor]={n:0,pc:0,kg:0,dia:l.dia});
-      s.n++; s.pc+=l.pecas-l.feitas; s.kg+=l.kg; if(l.dia<s.dia) s.dia=l.dia; }
-    const txt = Object.entries(porSetor).map(([s,v])=>s.toLowerCase()+": "+v.n+" programações · "
-        + v.pc.toLocaleString("pt-BR")+" peças · "+nkg(v.kg)+" kg, a mais antiga de "+dbr(v.dia)).join(" · ");
-    $("vencidas").innerHTML =
-      '<div class="aviso"><span class="txt" title="'+txt.replace(/"/g,"&quot;")+'"><b>Programação em dia já vencido</b> — '+txt+'</span>'
-      + '<button class="btn" id="gp-irVenc">Ver</button></div>';
-    $("irVenc").onclick = ()=>{
-      inicio = Math.max(0, Math.min(...atrasadas.map(l=>IDX.get(l.dia)).filter(x=>x!=null))-1); redesenhar(); };
-  })();
 
   $("rodape").innerHTML =
     '<b>O que está aqui:</b> '+LOTES.length+' programações reais ('+SETORES.map(s=>LOTES.filter(l=>l.setor===s).length+" "+s.toLowerCase()).join(" · ")

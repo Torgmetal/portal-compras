@@ -1,7 +1,12 @@
 {
-  "build": 2868,
-  "gerado": "2026-09-05T19:14:14.506Z",
+  "build": 2869,
+  "gerado": "2026-09-05T19:26:22.005Z",
   "commits": [
+    {
+      "hash": "6df7bcda55",
+      "data": "05/09/2026",
+      "titulo": "PCP: o erro da listagem passa a dizer o que aconteceu"
+    },
     {
       "hash": "71cef05ab1",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "3e5e68233c",
       "data": "05/09/2026",
       "titulo": "Cenário: fazer aqui ou terceirizar, decidido por classe"
-    },
-    {
-      "hash": "408af6fac0",
-      "data": "05/09/2026",
-      "titulo": "Cenário: cadência por tipo de estrutura e rateio da casa pelo consumo real"
     }
   ]
 }
