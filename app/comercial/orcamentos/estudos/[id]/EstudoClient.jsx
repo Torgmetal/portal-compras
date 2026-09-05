@@ -258,8 +258,8 @@ function CronogramaPrevio({ c, res, e, setComp }) {
             ["producaoKgDiaUtil", "Fabricação", "kg por dia útil"],
             ["diasCarregamento", "Carregamento", "dias após a última peça"],
           ].map(([k, rot, ajuda]) => (
-            <label key={k} className="flex h-full flex-col text-[11px] text-torg-dark">
-              <span className="flex-1 leading-snug">
+            <label key={k} className="flex flex-col text-[11px] text-torg-dark">
+              <span className="min-h-[2.75em] leading-snug">
                 {rot}
                 {mexido(k) && <span className="text-torg-orange-700" title="valor digitado, diferente da referência da casa"> ·alterado</span>}
               </span>
@@ -267,10 +267,10 @@ function CronogramaPrevio({ c, res, e, setComp }) {
               <span className="block text-[10px] text-torg-gray mt-0.5">{ajuda}</span>
             </label>
           ))}
-          <label className="flex h-full flex-col text-[11px] text-torg-dark">
-            <span className="flex-1 leading-snug">Início previsto</span>
+          <label className="flex flex-col text-[11px] text-torg-dark">
+            <span className="min-h-[2.75em] leading-snug">Início previsto</span>
             <Inp type="date" value={cfg.inicio || ""} onChange={(ev) => set("inicio", ev.target.value)} className="block mt-1 w-full" />
-            <span className="block text-[10px] text-torg-gray mt-0.5">opcional — só para virar datas</span>
+            <span className="block text-[10px] text-torg-gray mt-0.5">opcional — gera as datas</span>
           </label>
         </div>
         {Object.keys(ref).some(mexido) && (
@@ -2304,14 +2304,17 @@ function Bdi({ c, res, setComp }) {
         {/* ⚠ CAMPO DE RÓTULO LONGO NÃO PODE EMPURRAR O SEU. Vitor (05/09/2026): "alinhe essas
             partes". "Administração do escritório central (%)" e "Despesas financeiras (factoring)
             (%)" ocupam duas linhas; como o rótulo, o campo e a nota eram irmãos num bloco, a caixa
-            desses dois descia e a linha inteira ficava em degrau. Cada célula agora é uma coluna
-            flex da altura da linha, com o rótulo ocupando a sobra: as caixas e as notas "sobre o
-            custo / sobre a venda" caem na mesma altura, independente de quantas linhas o texto
-            tenha. */}
+            desses dois descia e a linha inteira ficava em degrau.
+
+            ⚠ E O QUE ALINHA É O RÓTULO, NÃO O RODAPÉ. A primeira tentativa esticava o rótulo
+            (`flex-1`) e ancorava a célula embaixo — funciona enquanto todas as notas de rodapé
+            têm o mesmo número de linhas. No cronograma, onde uma nota quebra em duas, a caixa
+            daquela célula subia sozinha (Vitor, 05/09/2026: "ajuste as linhas"). Reservar duas
+            linhas de altura para o rótulo alinha as caixas por cima, que é o que se lê. */}
         <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-3">
           {[...noCusto, ...naVenda].map((campo) => (
-            <label key={campo.key} className="flex h-full flex-col text-[11px] text-torg-dark">
-              <span className="flex-1 leading-snug">{campo.nome} <span className="text-torg-gray">(%)</span></span>
+            <label key={campo.key} className="flex flex-col text-[11px] text-torg-dark">
+              <span className="min-h-[2.75em] leading-snug">{campo.nome} <span className="text-torg-gray">(%)</span></span>
               <Inp value={bdi[campo.key] ?? ""} onChange={(e) => set(campo.key, e.target.value)} className="block mt-1 w-full text-right" />
               <span className="block text-[10px] text-torg-gray mt-0.5">{campo.onde === "custo" ? "sobre o custo" : "sobre a venda"}</span>
             </label>
