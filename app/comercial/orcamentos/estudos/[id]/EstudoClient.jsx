@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload, Send } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { FAMILIAS_COTACAO, FAMILIA_DO_ITEM } from "@/lib/cotacao-familias";
+import { montarCronogramaPrevio, textoDaProposta, PADRAO_CRONOGRAMA } from "@/lib/cronograma-previo";
 import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAPACIDADE_CARGA, EVENTOS_PAGAMENTO, PAGAMENTO_PADRAO, PRAZOS_PAGAMENTO, conferirPagamento, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa, resultadoDoCenario, sensibilidade, ALAVANCAS_SENSIVEIS, equilibrioConvergido, impostosDoCenario } from "@/lib/lqc";
 import { capacidadePorHora } from "@/lib/fabrica-horas";
 
@@ -47,6 +48,7 @@ const ABAS = [
   { k: "BDI", r: "Impostos e BDI" },
   { k: "COMERCIAL", r: "Resumo", planilha: "PLANILHA COMERCIAL" },
   { k: "CENARIO", r: "Cenário financeiro" },
+  { k: "CRONOGRAMA", r: "Cronograma prévio", ajuda: "prazo e cargas para a proposta" },
 ];
 
 export default function EstudoClient({ id }) {
@@ -178,6 +180,192 @@ export default function EstudoClient({ id }) {
       {aba === "BDI" && <Bdi c={c} res={res} setComp={setComp} />}
       {aba === "COMERCIAL" && <PlanilhaComercial res={res} e={e} />}
       {aba === "CENARIO" && <Cenario e={e} res={res} mexer={mexer} fabrica={d.fabrica} />}
+      {aba === "CRONOGRAMA" && <CronogramaPrevio c={c} res={res} e={e} setComp={setComp} />}
+    </div>
+  );
+}
+
+
+/**
+ * CRONOGRAMA PRÉVIO — o prazo que vai na proposta.
+ *
+ * Vitor (05/09/2026): "após o cenário financeiro precisamos de uma forma de gerar um cronograma
+ * prévio para compor na proposta… temos que ter um tempo médio para engenharia, compras, produção
+ * e, de acordo com a média de carga prevista, deixar a representação das cargas e de quantos em
+ * quantos dias vamos ter entregas".
+ *
+ * ⚠ O NÚMERO NASCE MEDIDO, NÃO CHUTADO. Os ritmos vêm das obras que já rodaram (medidos em
+ * /api/comercial/estudos/prazos) e aparecem escritos na tela, com a amostra. Quem quiser mudar,
+ * muda — e o que foi mudado fica marcado, para ninguém confundir referência com decisão.
+ */
+function CronogramaPrevio({ c, res, e, setComp }) {
+  const cfg = c.cronograma || {};
+  const [medido, setMedido] = useState(null);
+  const [copiado, setCopiado] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    fetch("/api/comercial/estudos/prazos").then((r) => r.json())
+      .then((j) => { if (vivo && !j.error) setMedido(j); }).catch(() => {});
+    return () => { vivo = false; };
+  }, []);
+
+  const set = (k, v) => setComp({ cronograma: { ...cfg, [k]: v } });
+  // referência = o que a casa mediu; se ainda não mediu, o padrão conservador da lib
+  const ref = {
+    engenhariaKgDiaUtil: medido?.engenhariaKgDiaUtil || PADRAO_CRONOGRAMA.engenhariaKgDiaUtil,
+    comprasDias: medido?.comprasDias || PADRAO_CRONOGRAMA.comprasDias,
+    producaoKgDiaUtil: medido?.producaoKgDiaUtil || PADRAO_CRONOGRAMA.producaoKgDiaUtil,
+    comprasInicioPct: PADRAO_CRONOGRAMA.comprasInicioPct,
+    diasCarregamento: PADRAO_CRONOGRAMA.diasCarregamento,
+  };
+  const vale = (k) => (cfg[k] === "" || cfg[k] == null ? ref[k] : num(cfg[k]));
+  const mexido = (k) => cfg[k] !== "" && cfg[k] != null && num(cfg[k]) !== ref[k];
+
+  const pesoKg = num(res.pesoTotal);
+  const cargas = res.cargas?.totalCargas || 0;
+  const cron = montarCronogramaPrevio(
+    { pesoKg, cargas },
+    { ...Object.fromEntries(Object.keys(ref).map((k) => [k, vale(k)])), inicio: cfg.inicio || null },
+  );
+  const texto = textoDaProposta(cron, { obra: e.obra || null });
+  const total = Math.max(1, cron.resumo.totalUteis);
+  const dt = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—");
+
+  return (
+    <div className="space-y-4 max-w-5xl">
+      <p className="text-[12px] text-torg-gray">
+        O prazo sai do RITMO da casa vezes o peso do escopo — não de um número redondo. Engenharia e
+        fabricação em quilos por dia útil; compras em dias, que é como o fornecedor promete. As fases
+        se sobrepõem: a compra do aço começa com a estrutura ainda em detalhamento.
+      </p>
+
+      <div className="bg-white border border-gray-100 rounded-xl p-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+          <p className="text-[12px] font-bold text-torg-dark">Ritmo e prazos</p>
+          {medido && (
+            <p className="text-[11px] text-torg-gray">
+              Medido nas obras da casa: engenharia <b>{medido.engenhariaKgDiaUtil?.toLocaleString("pt-BR")} kg/dia</b> ({medido.amostras.engenharia} obras) ·
+              compras <b>{medido.comprasDias} dias</b> ({medido.amostras.compras}) ·
+              fabricação <b>{medido.producaoKgDiaUtil?.toLocaleString("pt-BR")} kg/dia</b> ({medido.amostras.producao})
+            </p>
+          )}
+        </div>
+        <div className="grid sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-3">
+          {[
+            ["engenhariaKgDiaUtil", "Engenharia", "kg por dia útil"],
+            ["comprasDias", "Compras", "dias até o aço chegar"],
+            ["comprasInicioPct", "Compra começa em", "% da engenharia"],
+            ["producaoKgDiaUtil", "Fabricação", "kg por dia útil"],
+            ["diasCarregamento", "Carregamento", "dias após a última peça"],
+          ].map(([k, rot, ajuda]) => (
+            <label key={k} className="flex h-full flex-col text-[11px] text-torg-dark">
+              <span className="flex-1 leading-snug">
+                {rot}
+                {mexido(k) && <span className="text-torg-orange-700" title="valor digitado, diferente da referência da casa"> ·alterado</span>}
+              </span>
+              <Inp value={cfg[k] ?? ""} placeholder={String(ref[k])} onChange={(ev) => set(k, ev.target.value)} className="block mt-1 w-full text-right" />
+              <span className="block text-[10px] text-torg-gray mt-0.5">{ajuda}</span>
+            </label>
+          ))}
+          <label className="flex h-full flex-col text-[11px] text-torg-dark">
+            <span className="flex-1 leading-snug">Início previsto</span>
+            <Inp type="date" value={cfg.inicio || ""} onChange={(ev) => set("inicio", ev.target.value)} className="block mt-1 w-full" />
+            <span className="block text-[10px] text-torg-gray mt-0.5">opcional — só para virar datas</span>
+          </label>
+        </div>
+        {Object.keys(ref).some(mexido) && (
+          <button onClick={() => setComp({ cronograma: { inicio: cfg.inicio || "" } })}
+            className="mt-3 text-[11px] font-semibold text-torg-blue hover:underline">
+            voltar ao ritmo medido da casa
+          </button>
+        )}
+      </div>
+
+      {pesoKg <= 0 ? (
+        <div className="bg-white border border-gray-100 rounded-xl p-6 text-center text-[12px] text-torg-gray">
+          Sem peso no escopo — o cronograma sai do quantitativo.
+        </div>
+      ) : (
+        <>
+          <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-[12px] font-bold text-torg-dark">
+                {cron.resumo.totalCorridos} dias corridos · {Number(pesoKg).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg
+              </p>
+              <p className="text-[11px] text-torg-gray">
+                {cron.resumo.dataInicio ? <>{dt(cron.resumo.dataInicio)} → {dt(cron.resumo.dataFim)} · </> : null}
+                {cron.resumo.totalUteis} dias úteis
+              </p>
+            </div>
+            <div className="p-4 space-y-2">
+              {cron.fases.map((f) => (
+                <div key={f.key} className="flex items-center gap-3">
+                  <div className="w-40 shrink-0">
+                    <p className="text-[12px] font-semibold text-torg-dark">{f.nome}</p>
+                    <p className="text-[10px] text-torg-gray leading-tight">{f.detalhe}</p>
+                  </div>
+                  <div className="flex-1 h-6 bg-gray-50 rounded relative min-w-0">
+                    <div className="absolute top-0 bottom-0 rounded flex items-center px-2"
+                      style={{ left: `${(f.inicio / total) * 100}%`, width: `${Math.max(1.5, (f.dias / total) * 100)}%`, background: f.cor }}>
+                      <span className="text-[10px] font-semibold text-white whitespace-nowrap">{f.dias} d</span>
+                    </div>
+                  </div>
+                  <div className="w-32 shrink-0 text-right text-[10px] text-torg-gray tabular-nums">
+                    {cron.resumo.dataInicio ? <>{dt(f.dataInicio)} → {dt(f.dataFim)}</> : <>dia {f.inicio} → {f.fim}</>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <p className="text-[12px] font-bold text-torg-dark">
+                Entregas — {cargas} {cargas === 1 ? "carga" : "cargas"}
+                {cron.resumo.intervaloEntregasCorridos > 0 && <span className="text-torg-gray font-normal"> · uma a cada {cron.resumo.intervaloEntregasCorridos} dias</span>}
+              </p>
+              <p className="text-[11px] text-torg-gray mt-0.5">
+                As cargas saem da aba de Frete, por classe de estrutura, e acompanham a fabricação.
+              </p>
+            </div>
+            {cargas === 0 ? (
+              <p className="px-4 py-6 text-center text-[12px] text-torg-gray">Nenhuma carga calculada — confira a aba Frete.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-[12px]">
+                  <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
+                    <tr><th className="text-left px-4 py-2">Carga</th><th className="text-right px-2 py-2">Dia útil</th>
+                      <th className="text-right px-2 py-2">Dia corrido</th><th className="text-right px-2 py-2">Data</th>
+                      <th className="text-right px-4 py-2">Peso</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {cron.entregas.map((x) => (
+                      <tr key={x.n}>
+                        <td className="px-4 py-1.5">{x.n}ª carga</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">{x.diaUtil}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">{Math.round((x.diaUtil * 7) / 5)}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">{dt(x.data)}</td>
+                        <td className="px-4 py-1.5 text-right tabular-nums">{x.kg.toLocaleString("pt-BR")} kg</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white border border-gray-100 rounded-xl p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
+              <p className="text-[12px] font-bold text-torg-dark">Para a proposta</p>
+              <button onClick={() => { navigator.clipboard?.writeText(texto); setCopiado(true); setTimeout(() => setCopiado(false), 2000); }}
+                className="text-[11px] font-semibold text-torg-blue hover:underline">
+                {copiado ? "copiado" : "copiar texto"}
+              </button>
+            </div>
+            <p className="text-[12px] text-torg-dark leading-relaxed bg-gray-50 border border-gray-100 rounded-lg p-3">{texto}</p>
+          </div>
+        </>
+      )}
     </div>
   );
 }
