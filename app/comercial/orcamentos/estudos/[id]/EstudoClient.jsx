@@ -4,7 +4,7 @@ import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload, Send } from "luci
 import { useStore } from "@/lib/store";
 import { FAMILIAS_COTACAO, FAMILIA_DO_ITEM } from "@/lib/cotacao-familias";
 import { montarCronogramaPrevio, textoDaProposta, comprasEspeciais, PADRAO_CRONOGRAMA } from "@/lib/cronograma-previo";
-import { cadenciaPorClasse, decisaoTerceirizar, PRECO_TERCEIRO_CLASSE } from "@/lib/lqc";
+import { cadenciaPorClasse, decisaoTerceirizar, margemPorMesDeFabrica, PRECO_TERCEIRO_CLASSE } from "@/lib/lqc";
 import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAPACIDADE_CARGA, EVENTOS_PAGAMENTO, PAGAMENTO_PADRAO, PRAZOS_PAGAMENTO, conferirPagamento, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa, resultadoDoCenario, sensibilidade, ALAVANCAS_SENSIVEIS, equilibrioConvergido, impostosDoCenario } from "@/lib/lqc";
 import { capacidadePorHora } from "@/lib/fabrica-horas";
 
@@ -484,6 +484,17 @@ function FazerOuTerceirizar({ cadencia, res, cfg, mexer, fabrica, analise }) {
   const temPreco = d.linhas.length > 0;
   const ganham = d.linhas.filter((l) => l.difKg < 0);
 
+  // ⚠⚠ COM A FÁBRICA CHEIA A CONTA VIRA DE CABEÇA PARA BAIXO. Vitor (05/09/2026): "e se a demanda
+  // da fábrica estiver cheia e eu decidir terceirizar média, pesada e extra pesada, qual seria a
+  // forma de eu ganhar dinheiro com isso?". Com fábrica sobrando decide-se pelo custo do quilo;
+  // com fábrica CHEIA, cada quilo feito aqui tira o lugar de outro, e o que decide é a MARGEM POR
+  // MÊS DE FÁBRICA. Fica dentro o que rende mais por mês — e é a pesada, que roda 2,25× mais quilo
+  // no mesmo tempo. Ver `margemPorMesDeFabrica`.
+  const cheia = !!cfg.fabricaCheia;
+  const rende = margemPorMesDeFabrica(res, cad).filter((x) => x.pesoKg > 0);
+  const casaMes = fabrica?.custoOperacionalMes || 0;
+  const porMes = new Map(rende.map((x) => [x.key, x]));
+
   return (
     <div className="px-4 py-3 border-t border-gray-100 bg-white">
       <p className="text-[12px] font-bold text-torg-dark">Fazer aqui ou terceirizar</p>
@@ -505,6 +516,11 @@ function FazerOuTerceirizar({ cadencia, res, cfg, mexer, fabrica, analise }) {
         ))}
       </div>
 
+      <label className="flex items-center gap-2 text-[12px] text-torg-dark mt-3">
+        <input type="checkbox" checked={cheia} onChange={(ev) => set("fabricaCheia", ev.target.checked)} />
+        A fábrica está cheia — decidir por <strong>margem por mês</strong>, não por custo do quilo
+      </label>
+
       {!temPreco ? (
         <p className="text-[11px] text-torg-gray mt-3">O quantitativo desta obra ainda não tem classe lançada — sem ela não dá para comparar por tipo de estrutura.</p>
       ) : (
@@ -516,7 +532,7 @@ function FazerOuTerceirizar({ cadencia, res, cfg, mexer, fabrica, analise }) {
                   <th className="text-right px-2 py-1.5">Dentro</th><th className="text-right px-2 py-1.5">Terceiro R$/kg</th>
                   <th className="text-right px-2 py-1.5">Posto aqui</th>
                   <th className="text-right px-2 py-1.5">Diferença</th><th className="text-right px-2 py-1.5">Libera</th>
-                  <th className="text-right px-3 py-1.5">A fábrica liberada rende</th></tr>
+                  <th className="text-right px-3 py-1.5">{cheia ? "Rende por mês aqui" : "A fábrica liberada rende"}</th></tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {d.linhas.map((l) => (
@@ -534,12 +550,28 @@ function FazerOuTerceirizar({ cadencia, res, cfg, mexer, fabrica, analise }) {
                       {l.diferenca <= 0 ? "−" : "+"} {fmtR$(Math.abs(l.diferenca))}
                     </td>
                     <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{l.mesesLiberados.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} mês</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{fmtR$(l.ganhoCapacidade)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">
+                      {cheia
+                        ? (porMes.get(l.key)
+                            ? <span className={porMes.get(l.key).margemMes >= casaMes ? "text-green-700 font-semibold" : "text-red-600 font-semibold"}>{fmtR$(porMes.get(l.key).margemMes)}</span>
+                            : "—")
+                        : fmtR$(l.ganhoCapacidade)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {cheia && rende.length > 0 && (
+            <p className="text-[11px] text-torg-dark bg-torg-blue-50/50 border border-torg-blue-200 rounded-lg px-3 py-2 mt-3">
+              Fábrica cheia: o mês vale mais em <strong>{rende[0].nome.toLowerCase()}</strong> ({fmtR$(rende[0].margemMes)}/mês)
+              e menos em <strong>{rende[rende.length - 1].nome.toLowerCase()}</strong> ({fmtR$(rende[rende.length - 1].margemMes)}/mês).
+              {casaMes > 0 && rende[rende.length - 1].margemMes < casaMes
+                ? <> A casa custa {fmtR$(casaMes)}/mês — um mês inteiro de {rende[rende.length - 1].nome.toLowerCase()} não se paga.</>
+                : null}
+              {" "}Terceirize de baixo para cima: sai primeiro o que rende menos por mês, não o que é mais caro por quilo.
+            </p>
+          )}
           <p className="text-[11px] text-torg-dark bg-torg-blue-50/50 border border-torg-blue-200 rounded-lg px-3 py-2 mt-3">
             {ganham.length > 0
               ? <>Terceirizar <strong>{ganham.map((l) => l.nome.toLowerCase()).join(" e ")}</strong> já sai mais barato que fazer aqui —{" "}
