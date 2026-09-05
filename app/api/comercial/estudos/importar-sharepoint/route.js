@@ -107,6 +107,18 @@ async function processar(ano, aplicar, user) {
         // ⚠ NÃO entra na conta — entra como CONFERÊNCIA. É o valor que foi ao cliente; tê-lo ao
         // lado do que o portal calcula é o que denuncia na hora um custo que saiu errado.
         ...(lido.precoPlanilha ? { precoPlanilha: lido.precoPlanilha } : {}),
+        // ⚠⚠ OS TRÊS BLOCOS DA PLANILHA, SEPARADOS. Auditoria de 05/09/2026: comparar o preço do
+        // portal com o TOTAL GERAL da planilha era comparar escopos diferentes — o total soma
+        // fornecimento + itens comerciais + montagem, e o portal só calcula o primeiro. Guardar o
+        // subtotal de cada bloco é o que permite conferir o que dá para conferir e deixar visível
+        // o que o estudo ainda não modela (montagem em campo).
+        ...(lido.blocosPlanilha ? { blocosPlanilha: lido.blocosPlanilha } : {}),
+        // ⚠ E OS ITENS COMERCIAIS AGORA ENTRAM NA CONTA. O motor já tinha o cadastro (telha, calha,
+        // rufo, grade, steel deck, linha de vida) e a planilha já traz quantidade e preço unitário
+        // — a importação simplesmente descartava. Na LQC-253 são R$ 4,76 milhões que ficavam fora.
+        ...(lido.itensComerciais && Object.keys(lido.itensComerciais).length
+          ? { itensComerciais: lido.itensComerciais }
+          : {}),
       };
       const resultado = calcularLqc(composicao);
       const dados = {
