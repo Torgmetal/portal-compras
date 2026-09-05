@@ -1,7 +1,12 @@
 {
-  "build": 2847,
-  "gerado": "2026-09-05T15:04:00.504Z",
+  "build": 2848,
+  "gerado": "2026-09-05T15:04:00.631Z",
   "commits": [
+    {
+      "hash": "a5b930cf07",
+      "data": "05/09/2026",
+      "titulo": "Quebra a pior função do repositório: PATCH de tarefa, complexidade 140 -> 31"
+    },
     {
       "hash": "65f66ebca6",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "1926214154",
       "data": "05/09/2026",
       "titulo": "Data book: cobertura e vedação não entram no livro"
-    },
-    {
-      "hash": "81c2b22403",
-      "data": "04/09/2026",
-      "titulo": "Casar certificados: ler a árvore inteira, não a pasta do ano corrente"
     }
   ]
 }

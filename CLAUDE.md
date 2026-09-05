@@ -155,6 +155,42 @@ Routes that exceed the default 10-second limit declare `export const maxDuration
 - Client components use `"use client"`; keep server-only logic in API routes or lib modules
 - Zod validation on all API route inputs
 
+## Skills e plugins do time
+
+Ficam **no projeto** (`.claude/`), não no perfil de cada um — quem clonar o repo
+recebe tudo junto. Nada aqui precisa de instalação manual, com uma exceção
+anotada abaixo.
+
+| O quê | Onde | Gatilho |
+|---|---|---|
+| `superpowers` (plugin, 14 skills) | `.claude/settings.json` → `enabledPlugins` | automático |
+| `caveman` (skill) | `.claude/skills/caveman/` | `/caveman` |
+| `graphify` (skill) | `.claude/skills/graphify/` | `/graphify` |
+
+**superpowers** entra via `enabledPlugins` + `extraKnownMarketplaces` no
+`.claude/settings.json`. Na primeira vez que você abrir o repo, o Claude Code
+baixa o marketplace `anthropics/claude-plugins-official` sozinho. São skills de
+*processo* — brainstorming, TDD, depuração sistemática, revisão — que decidem
+**quando** parar para perguntar e verificar, antes de sair codando.
+
+⚠ **`graphify` precisa de um CLI Python que NÃO está no repo** (são ~200 MB).
+A skill em si funciona; o comando não. Para instalar:
+
+```bash
+python3 -m venv --without-pip ~/.claude/skills/graphify/.venv
+curl -sS https://bootstrap.pypa.io/get-pip.py | ~/.claude/skills/graphify/.venv/bin/python3 -
+~/.claude/skills/graphify/.venv/bin/pip install graphifyy
+ln -sf ~/.claude/skills/graphify/.venv/bin/graphify ~/.local/bin/graphify
+```
+
+O venv existe porque o Python do Ubuntu 24.04+ é *externally managed* (PEP 668)
+e recusa `pip install` direto. Em outra distro, `pip install graphifyy` basta.
+
+⚠ **`npx skills add <repo>` instala no diretório do projeto por padrão, e traz o
+pacote INTEIRO do repositório** — o caveman, por exemplo, são 20 skills, não uma.
+Se for adicionar outra, use `--skill <nome>` para escolher, e revise o
+`git status` antes de commitar.
+
 ## Padrões de qualidade
 
 Consolidados nas Fases 1 e 2 (gestão de usuários). Aplicar em todos os módulos novos.
