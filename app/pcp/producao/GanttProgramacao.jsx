@@ -97,6 +97,12 @@ const CSS = `
   .gpcp .dia .dsem{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--tinta-2);font-weight:700}
   .gpcp .dia .dnum{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
   .gpcp .dia.hoje{background:#fff4e8} .gpcp .dia.hoje .dnum{color:var(--laranja)}
+  /* ⚠ FIM DE SEMANA APARECE, MAS NÃO SE DISFARÇA DE DIA ÚTIL. A coluna é sombreada
+     nas três camadas (cabeçalho, células e barra de carga) para que ninguém solte uma
+     programação no sábado achando que é sexta. "hoje" ganha do sombreado. */
+  .gpcp .dia.fds{background:#f2f5f9} .gpcp .dia.fds .dsem{color:#93a3b8}
+  .gpcp .dia.fds .dnum{color:#8fa0b5} .gpcp .dia.hoje.fds{background:#fff4e8}
+  .gpcp .cel.fds{background:#f7f9fc} .gpcp .cg.fds{background:#f2f5f9}
   .gpcp .dia .dmes{font-size:9.5px;color:var(--tinta-2);text-transform:uppercase}
 
   .gpcp .setor{display:flex;background:#eef2f7;border-bottom:1px solid var(--linha);border-top:1px solid var(--linha);
@@ -294,7 +300,9 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   const $ = (id) => raiz.querySelector("#gp-" + id);
   const { avisar, recarregar, baixarZip } = ajuda;
 
-  const COL = 106, JANELA = 13, MAX_LOTE = 80;
+  // JANELA 14 = duas semanas CHEIAS agora que sábado e domingo têm coluna. Com 13 a
+  // grade cortava no meio de uma semana e o olho perdia o ritmo de sete.
+  const COL = 106, JANELA = 14, MAX_LOTE = 80;
 
   /* ── recursos ───────────────────────────────────────────────────────────────── */
   const RECURSOS = {
@@ -326,14 +334,37 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   /* ── calendário ─────────────────────────────────────────────────────────────── */
   const d0 = (s)=>new Date(s+"T00:00:00Z");
   const isoD = (d)=>d.toISOString().slice(0,10);
-  const ehUtil = (d)=>{const w=d.getUTCDay();return w>=1&&w<=5;};
+  // ⚠ SÁBADO E DOMINGO APARECEM. Matheus (05/09/2026): "coloque no gantt sábados e
+  // domingo, caso for precisar trabalhar ser possível". Antes o calendário pulava o
+  // fim de semana, e o que não tem coluna não pode receber uma barra — não havia como
+  // programar um sábado nem para dizer que ele existe.
+  //
+  // Aparecer não é virar dia normal: a coluna vem sombreada, e a quebra em N dias
+  // PULA o fim de semana (ver diasDaQuebra). Fim de semana é possível, nunca
+  // automático — quem quiser trabalhar no sábado arrasta a barra para lá.
+  const ehFimDeSemana = (d)=>{const w=d.getUTCDay();return w===0||w===6;};
+  const fdsISO = (s)=>ehFimDeSemana(d0(s));
   const DSEM = ["dom","seg","ter","qua","qui","sex","sáb"];
   const MES = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
   const diasComDado = [...new Set(LOTES.map(l=>l.dia))].sort();
   const dIni = d0(diasComDado[0]||HOJE); dIni.setUTCDate(dIni.getUTCDate()-40);
   const dFim = d0(diasComDado[diasComDado.length-1]||HOJE); dFim.setUTCDate(dFim.getUTCDate()+90);
-  const UTEIS=[]; for(const d=new Date(dIni); d<=dFim; d.setUTCDate(d.getUTCDate()+1)) if(ehUtil(d)) UTEIS.push(isoD(d));
-  const IDX = new Map(UTEIS.map((s,i)=>[s,i]));
+  const DIAS=[]; for(const d=new Date(dIni); d<=dFim; d.setUTCDate(d.getUTCDate()+1)) DIAS.push(isoD(d));
+  const IDX = new Map(DIAS.map((s,i)=>[s,i]));
+
+  // Os N dias que uma quebra ocupa a partir de uma coluna. Pula sábado e domingo,
+  // porque "dividir em 3 dias" numa sexta significa sex/seg/ter para quem programa.
+  // A exceção é começar NUM fim de semana: aí a escolha já foi deliberada e os dias
+  // seguem corridos.
+  function diasDaQuebra(ini, n){
+    const corrido = fdsISO(DIAS[Math.min(DIAS.length-1, ini)]);
+    const fora = [];
+    for(let i=ini; i<DIAS.length && fora.length<n; i++){
+      if(corrido || !fdsISO(DIAS[i])) fora.push(i);
+    }
+    while(fora.length && fora.length<n) fora.push(fora[fora.length-1]);
+    return fora.length ? fora : [Math.min(DIAS.length-1, ini)];
+  }
 
   const nkg = (n)=>Math.round(n).toLocaleString("pt-BR");
   const n1 = (n)=>(Math.round(n*10)/10).toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1});
@@ -362,8 +393,8 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     return melhor;
   }
   function janelaDeHoje(){
-    const i = UTEIS.findIndex(d=>d>=HOJE);
-    return Math.max(0, Math.min(UTEIS.length-JANELA, (i<0?UTEIS.length-JANELA:i)-2));
+    const i = DIAS.findIndex(d=>d>=HOJE);
+    return Math.max(0, Math.min(DIAS.length-JANELA, (i<0?DIAS.length-JANELA:i)-2));
   }
   inicio = janelaDeHoje();
 
@@ -390,6 +421,12 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   };
 
   /* ── runs (dias seguidos da mesma OP no mesmo recurso = 1 barra) ────────────── */
+  // true quando tudo o que existe entre duas colunas é sábado/domingo.
+  function soPulaFds(a, b){
+    if(b <= a+1) return false;
+    for(let i=a+1; i<b; i++) if(!fdsISO(DIAS[i])) return false;
+    return true;
+  }
   function montarRuns(){
     const grupos = new Map();
     for(const l of lotes){
@@ -404,12 +441,22 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
       let atual=null;
       for(const l of arr){
         const i = IDX.get(l.dia); if(i==null) continue;
-        if(atual && i === atual.fim+1){ atual.fim=i; atual.lotes.push(l); }
+        // ⚠ O VÃO DO FIM DE SEMANA NÃO PARTE A BARRA. Depois que sábado e domingo
+        // ganharam coluna, sexta e segunda deixaram de ser vizinhas — e uma OP de
+        // sexta-a-segunda viraria DUAS barras, ou seja, dois blocos para arrastar no
+        // lugar de um. Se o buraco entre um lote e o outro é só fim de semana, é a
+        // mesma corrida: a barra segue inteira por cima, e o sombreado das colunas é
+        // que diz que ali não se trabalha.
+        if(atual && (i === atual.fim+1 || soPulaFds(atual.fim, i))){ atual.fim=i; atual.lotes.push(l); }
         else { atual={ setor:l.setor, recurso:l.recurso, op:l.op, obra:l.obra, ini:i, fim:i, lotes:[l] }; runs.push(atual); }
       }
     }
     for(const r of runs){
       r.id = r.setor+"|"+(r.recurso||"—")+"|"+r.op+"|"+r.ini;
+      // dias TRABALHADOS, não colunas ocupadas: uma barra que atravessa o fim de
+      // semana cobre 4 colunas e trabalha 2 dias. Contar coluna diria "4 dias" e
+      // ainda entraria como padrão na quebra.
+      r.dias = new Set(r.lotes.map(l=>l.dia)).size;
       r.pecas = r.lotes.reduce((s,l)=>s+l.pecas,0);
       r.kg = r.lotes.reduce((s,l)=>s+l.kg,0);
       r.feitas = r.lotes.reduce((s,l)=>s+l.feitas,0);
@@ -441,12 +488,12 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   const grade = $("grade");
   function desenhar(){
     const runs = montarRuns();
-    const janela = UTEIS.slice(inicio, inicio+JANELA);
+    const janela = DIAS.slice(inicio, inicio+JANELA);
     const larg = janela.length;
     let html = '<div class="linha cabdia"><div class="rotulo">Setor / recurso</div><div class="trilho" style="width:'+(larg*COL)+'px"><div class="celulas">';
     for(const s of janela){
       const d=d0(s);
-      html += '<div class="dia'+(s===HOJE?" hoje":"")+'"><div class="dsem">'+DSEM[d.getUTCDay()]+'</div>'
+      html += '<div class="dia'+(s===HOJE?" hoje":"")+(fdsISO(s)?" fds":"")+'"><div class="dsem">'+DSEM[d.getUTCDay()]+'</div>'
            +  '<div class="dnum">'+String(d.getUTCDate()).padStart(2,"0")+'</div>'
            +  '<div class="dmes">'+MES[d.getUTCMonth()]+'</div></div>';
     }
@@ -482,16 +529,16 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
         html += '<div class="rotulo"><b>'+rec.nome+'</b>'
              +  (rec.obs?'<small>'+rec.obs+'</small>':(rec.cap>1?'<small>meta '+nkg(rec.cap)+' kg/dia</small>':'<small>1 bancada-dia</small>'))+'</div>';
         html += '<div class="trilho" style="width:'+(larg*COL)+'px"><div class="celulas">';
-        for(const s of janela) html += '<div class="cel" data-dia="'+s+'"></div>';
+        for(const s of janela) html += '<div class="cel'+(fdsISO(s)?" fds":"")+'" data-dia="'+s+'"></div>';
         html += '</div><div class="barras">';
         for(const r of meus){
           if(r.fim<inicio || r.ini>=inicio+larg) continue;
           const a = Math.max(r.ini,inicio), b = Math.min(r.fim, inicio+larg-1);
           const x = (a-inicio)*COL+3, w = (b-a+1)*COL-7;
-          const cabe = w >= 200, dias = r.fim-r.ini+1, pend = r.pecas-r.feitas;
+          const cabe = w >= 200, dias = r.dias, pend = r.pecas-r.feitas;
           const foco = painel && painel.setor===r.setor && painel.recurso===r.recurso && painel.op===r.op && painel.ini===r.ini;
           const dica = "OP-"+r.op+(r.obra?" — "+r.obra:"")+"\n"+rec.nome+" · "
-            + (dias>1 ? dbr(UTEIS[r.ini])+" a "+dbr(UTEIS[r.fim])+" ("+dias+" dias)" : dbr(UTEIS[r.ini]))
+            + (dias>1 ? dbr(DIAS[r.ini])+" a "+dbr(DIAS[r.fim])+" ("+dias+" dias)" : dbr(DIAS[r.ini]))
             + "\n"+r.pecas+" peças · "+nkg(r.kg)+" kg"
             + (r.semGrd ? "\n"+r.semGrd+" projeto(s) ainda sem GRD impressa" : "\nprojetos todos impressos")
             + "\n\nclique para ver os projetos · arraste para remanejar";
@@ -507,7 +554,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
         html += '</div>'+(naJanela?'<div class="cargas">':'<div class="cargas" hidden>');
         for(const s of janela){
           const o = ocup(setor, rec.k, s);
-          html += '<div class="cg '+classeOc(o)+'">'
+          html += '<div class="cg '+classeOc(o)+(fdsISO(s)?" fds":"")+'">'
                +  (o>0 ? '<div class="f" style="width:'+Math.min(100,o*100)+'%"></div>' : "")
                +  (o>=0.005 ? '<span>'+Math.round(o*100)+'%</span>' : "")+'</div>';
         }
@@ -587,11 +634,11 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     if(delta===0 && a.recurso===r.recurso){ desenhar(); return; }
     const antes = r.lotes.map(l=>({...l, itens:l.itens}));
     const novos = r.lotes.map(l=>novoLote({ ...l, itens:l.itens,
-        recurso: a.recurso, dia: UTEIS[Math.max(0, Math.min(UTEIS.length-1, IDX.get(l.dia)+delta))] }));
+        recurso: a.recurso, dia: DIAS[Math.max(0, Math.min(DIAS.length-1, IDX.get(l.dia)+delta))] }));
     registrar({
       setor:r.setor, op:r.op, pecas:r.pecas, kg:r.kg,
       rotulo: (r.recurso!==a.recurso ? '<b>'+nomeRec(r.setor,r.recurso)+'</b><span class="seta">→</span><b>'+nomeRec(a.setor,a.recurso)+'</b> · ' : '<b>'+nomeRec(a.setor,a.recurso)+'</b> · ')
-             + (delta ? '<b>'+dbr(UTEIS[r.ini])+'</b><span class="seta">→</span><b>'+dbr(UTEIS[r.ini+delta])+'</b>' : '<b>'+dbr(UTEIS[r.ini])+'</b>'),
+             + (delta ? '<b>'+dbr(DIAS[r.ini])+'</b><span class="seta">→</span><b>'+dbr(DIAS[r.ini+delta])+'</b>' : '<b>'+dbr(DIAS[r.ini])+'</b>'),
       antes, novos,
     });
     if(painel && painel.setor===r.setor && painel.op===r.op && painel.ini===r.ini)
@@ -652,7 +699,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   function abrirPainel(r){
     painel = { setor:r.setor, recurso:r.recurso, op:r.op, ini:r.ini };
     abaP = "projetos"; selMarcas = new Set(); soNaoImpressos = false;
-    quebraBancadas = null; quebraDias = r.fim - r.ini + 1;
+    quebraBancadas = null; quebraDias = r.dias;
     $("painel").hidden = false;
     desenhar(); pintarPainel();
   }
@@ -661,11 +708,11 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   function pintarPainel(){
     const r = acharRun(painel);
     if(!r){ fecharPainel(); return; }
-    const dias = r.fim-r.ini+1;
+    const dias = r.dias;
     $("pOp").textContent = "OP-"+r.op;
     $("pObra").textContent = r.obra || "";
     $("pSub").innerHTML =
-      nomeRec(r.setor, r.recurso)+" · " + (dias>1 ? dbr(UTEIS[r.ini])+" a "+dbr(UTEIS[r.fim])+" ("+dias+" dias)" : dbr(UTEIS[r.ini]))
+      nomeRec(r.setor, r.recurso)+" · " + (dias>1 ? dbr(DIAS[r.ini])+" a "+dbr(DIAS[r.fim])+" ("+dias+" dias)" : dbr(DIAS[r.ini]))
       + " · " + r.pecas.toLocaleString("pt-BR")+" peças · "+nkg(r.kg)+" kg"
       + (r.setor==="CORTE" ? "" : " · "+n1(r.custo)+" dias-bancada");
     for(const b of raiz.querySelectorAll(".abas button")) b.classList.toggle("on", b.dataset.aba===abaP);
@@ -765,7 +812,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     const meus = new Set(r.lotes.map(l=>l.uid));
     for(const x of recs){
       let o = 0;
-      for(let k=0;k<quebraDias;k++) o = Math.max(o, ocup(r.setor, x.k, UTEIS[Math.min(UTEIS.length-1,r.ini+k)], meus));
+      for(const i of diasDaQuebra(r.ini, quebraDias)) o = Math.max(o, ocup(r.setor, x.k, DIAS[i], meus));
       h += '<button class="chip'+(quebraBancadas.has(x.k)?" on":"")+'" data-b="'+x.k+'">'+x.nome
         + ' <small class="'+classeOc(o)+'">'+(o>0?Math.round(o*100)+"%":"livre")+'</small></button>';
     }
@@ -780,7 +827,8 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     h += '<div class="bloco"><h4>Em quantos dias</h4>'
       + '<div style="display:flex;align-items:center;gap:9px">'
       + '<input class="num-in" type="number" min="1" max="15" id="gp-qDias" value="'+quebraDias+'">'
-      + '<span style="color:#5b6a7d;font-size:11.5px">dias úteis a partir de <b>'+dbr(UTEIS[r.ini])+'</b></span>'
+      + '<span style="color:#5b6a7d;font-size:11.5px">a partir de <b>'+dbr(DIAS[r.ini])+'</b>'
+      + (fdsISO(DIAS[r.ini]) ? ' · dias corridos, incluindo o fim de semana' : ' · pulando sábado e domingo')+'</span>'
       + '<button class="btn mini" id="gp-qAuto" style="margin-left:auto">Achar o que cabe</button></div></div>';
 
     const alvos = [...quebraBancadas];
@@ -818,7 +866,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
         + 'para cada" empata por acaso e entrega a obra na mão errada.</div>';
       $("pCorpo").innerHTML = h;
       $("pFoot").innerHTML =
-          '<div class="info">'+r.pecas+' peças · hoje em <b>'+(r.fim-r.ini+1)+' dia(s)</b> '
+          '<div class="info">'+r.pecas+' peças · hoje em <b>'+r.dias+' dia(s)</b> '
         + (r.recurso ? 'na '+nomeRec(r.setor,r.recurso) : 'sem '+(cortePorMaquina?"máquina":"bancada"))
         + ' <span class="seta">→</span> passariam a ocupar <b>'+plano.usados+' '
         + (cortePorMaquina?"dia(s)":"bancada-dia(s)")+'</b>.</div>'
@@ -853,8 +901,9 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     if(!bancadas.length) return null;
     const meus = new Set(r.lotes.map(l=>l.uid));
     const slots = [];
-    for(const b of bancadas) for(let k=0;k<nDias;k++){
-      const dia = UTEIS[Math.min(UTEIS.length-1, r.ini+k)];
+    const cols = diasDaQuebra(r.ini, nDias);
+    for(const b of bancadas) for(const i of cols){
+      const dia = DIAS[i];
       const cap = capDe(r.setor, b);
       slots.push({ recurso:b, dia, cap, base: carga(r.setor, b, dia, meus), carga:0, itens:[] });
     }
@@ -907,8 +956,9 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   $("limpar").onclick = ()=>{ for(let k=alteracoes.length-1;k>=0;k--) desfazer(k); };
 
   /* ── controles ──────────────────────────────────────────────────────────────── */
-  $("ant").onclick = ()=>{ inicio=Math.max(0,inicio-5); redesenhar(); };
-  $("prox").onclick = ()=>{ inicio=Math.min(UTEIS.length-JANELA,inicio+5); redesenhar(); };
+  // 7 e não 5: o botão diz "Semana", e semana agora tem sete colunas.
+  $("ant").onclick = ()=>{ inicio=Math.max(0,inicio-7); redesenhar(); };
+  $("prox").onclick = ()=>{ inicio=Math.min(DIAS.length-JANELA,inicio+7); redesenhar(); };
   $("agora").onclick = ()=>{ inicio = janelaMaisCheia(); redesenhar(); };
   for(const b of raiz.querySelectorAll(".barra [data-setor]")){
     b.onclick = ()=>{ const s=b.dataset.setor;

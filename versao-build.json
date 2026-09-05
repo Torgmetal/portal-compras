@@ -1,7 +1,12 @@
 {
-  "build": 2865,
-  "gerado": "2026-09-05T18:47:10.871Z",
+  "build": 2866,
+  "gerado": "2026-09-05T19:04:42.147Z",
   "commits": [
+    {
+      "hash": "913e778ca1",
+      "data": "05/09/2026",
+      "titulo": "PCP › Produção: sai o painel \"Carga da produção\""
+    },
     {
       "hash": "409deb916c",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "efee8fc628",
       "data": "05/09/2026",
       "titulo": "Cronograma: folha à parte, com o que vai ao cliente editável"
-    },
-    {
-      "hash": "9db2876640",
-      "data": "05/09/2026",
-      "titulo": "Cronograma: sem datas por padrão e uma linha de compra por material sob medida"
     }
   ]
 }
