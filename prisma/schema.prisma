@@ -3084,6 +3084,12 @@ model PecaConjunto {
   corteIniciadoEm        DateTime? // real início do corte
   corteConcluidoEm       DateTime? // real fim do corte
   // Campos de produção (populados pelo Syneco)
+  /// ⚠⚠ SÓ O CORTE ESCREVE ISTO. Significa "quanto o CORTE cortou", NUNCA "quanto desse conjunto
+  /// já saiu". Escrito por app/api/producao/importar-syneco-corte e lib/reconciliar-syneco-corte;
+  /// nada alimenta este campo para montagem, solda, acabamento, jato ou pintura — nesses setores
+  /// ele devolve 0 para sempre, e zero parece um dado em vez de uma ausência.
+  /// Para "quanto saiu no setor X" use lib/produzido-setor.js (lê o MesOrdem do Syneco).
+  /// Medido em 05/09/2026: Solda 12.872 produzidas no Syneco × 30 aqui; Montagem 12.355 × 30.
   qteProduzida           Int                     @default(0)
   pesoProduzido          Float                   @default(0)
   dataProducao           DateTime? // data fim da produção (Syneco)

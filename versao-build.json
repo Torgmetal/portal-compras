@@ -1,7 +1,12 @@
 {
-  "build": 2876,
-  "gerado": "2026-09-05T22:34:17.091Z",
+  "build": 2877,
+  "gerado": "2026-09-05T22:39:32.188Z",
   "commits": [
+    {
+      "hash": "2538e59b",
+      "data": "05/09/2026",
+      "titulo": "Gantt do PCP: o \"feito\" passa a vir do Syneco por setor, não do qteProduzida"
+    },
     {
       "hash": "5e6d02df",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "9e25ad21",
       "data": "05/09/2026",
       "titulo": "Burn-down, onda mecânica: 81 avisos, três deles bugs de verdade"
-    },
-    {
-      "hash": "4a8575e9",
-      "data": "05/09/2026",
-      "titulo": "Base de testes: vitest, mock do Prisma e o snapshot que trava o calcularLqc"
     }
   ]
 }
