@@ -19,6 +19,9 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { log } from "@/lib/log";
+
+const registro = log("api/cotacao/[id]/solicitar-desconto");
 
 export const runtime = "nodejs";
 
@@ -78,7 +81,7 @@ export async function POST(req, { params }) {
   try {
     revalidatePath(`/fornecedores/c/${cot.token}`);
   } catch (e) {
-    console.error("solicitar-desconto: falha ao revalidar path do fornecedor:", e);
+    registro.erro("solicitar-desconto: falha ao revalidar path do fornecedor:", e);
   }
 
   return NextResponse.json({ ok: true, itens: cot._count.itens, token: cot.token });

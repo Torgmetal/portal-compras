@@ -9,6 +9,9 @@ import { previsaoEntregaDDMMYYYY } from "@/lib/prazo-entrega";
 import { TEXTO_CERTIFICADO_QUALIDADE } from "@/lib/certificado-qualidade";
 import { reavaliarStatusRM } from "@/lib/rm-status";
 import { itensDoPedido, divergenciaProposta } from "@/lib/pedido-itens";
+import { log } from "@/lib/log";
+
+const registro = log("api/rm/[id]/gerar-pedidos");
 
 // RMs Consumíveis (INTERNA) não têm obra própria → vinculam ao projeto geral.
 const PROJETO_CONSUMIVEL = "OP 000 - GERAL TORG";
@@ -51,12 +54,12 @@ export async function POST(req, { params }) {
   let nCodProjOP = null;
   if (rm.op?.numero) {
     try { nCodProjOP = await resolverCodProjetoPorOp(rm.op.numero); }
-    catch (e) { console.error("[rm gerar-pedidos] falha ao resolver projeto:", e?.message); }
+    catch (e) { registro.erro("[rm gerar-pedidos] falha ao resolver projeto:", e?.message); }
   }
   // RM Consumível (INTERNA) sem projeto de OP → vincula ao "OP 000 - GERAL TORG".
   if (!nCodProjOP && rm.tipoRM === "INTERNA") {
     try { nCodProjOP = await resolverCodProjetoPorNome(PROJETO_CONSUMIVEL); }
-    catch (e) { console.error("[rm gerar-pedidos] falha ao resolver projeto GERAL TORG:", e?.message); }
+    catch (e) { registro.erro("[rm gerar-pedidos] falha ao resolver projeto GERAL TORG:", e?.message); }
   }
 
   const itemPorId = new Map();
@@ -279,7 +282,7 @@ export async function POST(req, { params }) {
           }
         }
       } catch (e) {
-        console.error("[rm gerar-pedidos anexar] erro:", e?.message);
+        registro.erro("[rm gerar-pedidos anexar] erro:", e?.message);
         resAnexos = { anexados: 0, erros: [{ error: e?.message }] };
       }
     }

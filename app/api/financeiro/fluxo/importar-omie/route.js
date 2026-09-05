@@ -3,6 +3,9 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { importarFluxoExtrato } from "@/lib/omie-extrato";
+import { log } from "@/lib/log";
+
+const registro = log("api/financeiro/fluxo/importar-omie");
 
 // Importa o extrato de conta corrente do Omie (realizado + previsto, com
 // transferências marcadas) para o FluxoCaixa, reconciliando o período.
@@ -38,10 +41,10 @@ export async function POST(req) {
           diff: { periodo: body, criados: r.criados, apagados: r.apagados, totais: r.totais },
         },
       });
-    } catch (e) { console.error("AuditLog importar-omie:", e?.message); }
+    } catch (e) { registro.erro("AuditLog importar-omie:", e?.message); }
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
-    console.error("[importar-omie] erro:", e?.message);
+    registro.erro("[importar-omie] erro:", e?.message);
     return NextResponse.json({ error: e?.message || "Erro ao importar" }, { status: 500 });
   }
 }

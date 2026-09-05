@@ -10,6 +10,9 @@ import {
   dispensadoDocumentos,
 } from "@/lib/regras-documentos";
 import { documentosDeProntuarioSeguro, mesclarDocs } from "@/lib/prontuario-certificados";
+import { log } from "@/lib/log";
+
+const registro = log("api/rh/documentos/compliance");
 
 export const maxDuration = 60;
 
@@ -205,7 +208,7 @@ export async function GET() {
       funcionarios: porFuncionario,
     });
   } catch (e) {
-    console.error("Erro compliance:", e);
+    registro.erro("Erro compliance:", e);
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ success: false, error: e.message }, { status });
   }

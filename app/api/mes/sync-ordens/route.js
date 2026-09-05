@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma, prismaDirect, waitMesTables } from "@/lib/prisma";
 import { mapaObraParaOP, opIdDaLinha } from "@/lib/syneco-obra";
+import { log } from "@/lib/log";
+
+const registro = log("api/mes/sync-ordens");
 
 // Recebe ordens planejadas do SKA dataset 150 (snapshot planejado vs produzido).
 // Upsert EM MASSA via INSERT ... ON CONFLICT (1 SQL por lote) — rápido.
@@ -95,7 +98,7 @@ export async function POST(req) {
       },
     });
   } catch (e) {
-    console.error("[sync-ordens] falha ao criar MesSyncLog (não-fatal):", e?.message);
+    registro.erro("[sync-ordens] falha ao criar MesSyncLog (não-fatal):", e?.message);
   }
   const syncLogId = syncLog?.id || null;
 
@@ -209,7 +212,7 @@ export async function POST(req) {
       await prismaDirect.mesSyncLog.update({
         where: { id: syncLogId },
         data: { sucesso: true, atualizados: processados, duracaoMs: body.duracaoMs ?? (Date.now() - inicio) },
-      }).catch(e => console.error("[sync-ordens] falha ao atualizar MesSyncLog (não-fatal):", e?.message));
+      }).catch(e => registro.erro("[sync-ordens] falha ao atualizar MesSyncLog (não-fatal):", e?.message));
     }
     return NextResponse.json({ ok: true, processados, syncId: syncLogId });
   } catch (e) {

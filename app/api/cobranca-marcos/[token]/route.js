@@ -8,6 +8,9 @@ import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/html";
 import { getEmailsSetor } from "@/lib/comunicacao-setor";
+import { log } from "@/lib/log";
+
+const registro = log("api/cobranca-marcos/[token]");
 
 export const runtime = "nodejs";
 
@@ -133,7 +136,7 @@ export async function POST(req, { params }) {
         </div>`;
       await sendEmail({ to, subject: `📨 Cobrança respondida — ${DEPT_LABEL[cob.departamento] || cob.departamento} (${respondidoPor})`, html });
     }
-  } catch (e) { console.error("[cobranca-marcos] aviso ao planejamento falhou:", e?.message); }
+  } catch (e) { registro.erro("[cobranca-marcos] aviso ao planejamento falhou:", e?.message); }
 
   return NextResponse.json({ success: true });
 }

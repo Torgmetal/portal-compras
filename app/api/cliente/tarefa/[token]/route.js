@@ -7,6 +7,9 @@ import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/html";
 import { getEmailsSetor, SETOR_LABEL } from "@/lib/comunicacao-setor";
+import { log } from "@/lib/log";
+
+const registro = log("api/cliente/tarefa/[token]");
 
 export const runtime = "nodejs";
 
@@ -114,7 +117,7 @@ export async function POST(req, { params }) {
         </div>`;
       await sendEmail({ to, subject: `📨 Cliente respondeu: ${tarefa.titulo}${tarefa.opNumero ? ` (OP-${String(tarefa.opNumero).padStart(3, "0")})` : ""}`, html });
     }
-  } catch (e) { console.error("[cliente-tarefa] aviso ao planejamento falhou:", e?.message); }
+  } catch (e) { registro.erro("[cliente-tarefa] aviso ao planejamento falhou:", e?.message); }
 
   return NextResponse.json({ success: true });
 }

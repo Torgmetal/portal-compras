@@ -6,6 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { parseFormularioLE } from "@/lib/parse-le-form21";
 import * as XLSX from "xlsx";
+import { log } from "@/lib/log";
+
+const registro = log("api/producao/pecas/importar-le");
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // LE grande faz upsert peca a peca; 60s estourava (timeout -> HTML/504)
@@ -62,7 +65,7 @@ export async function POST(req) {
       }
     }
   } catch (e) {
-    console.error("[importar-le] findUnique OP erro:", e?.message);
+    registro.erro("[importar-le] findUnique OP erro:", e?.message);
   }
 
   // Diff da revisão (o que mudou vs a LE anterior): snapshot marcas+peso ANTES do

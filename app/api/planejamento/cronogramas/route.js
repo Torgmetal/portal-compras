@@ -4,6 +4,9 @@ import { requireRole } from "@/lib/session";
 import { getAccessToken, listFolderChildren, downloadFileByPath } from "@/lib/sharepoint";
 import { parseMpp, extrairOpNumero } from "@/lib/mpp-parser";
 import { sincronizarCronogramaSyneco, avancosDasTarefas } from "@/lib/cronograma-syneco";
+import { log } from "@/lib/log";
+
+const registro = log("api/planejamento/cronogramas");
 
 export const maxDuration = 60;
 
@@ -138,7 +141,7 @@ export async function GET(req) {
           // ⚠ Syneco fora do ar não pode derrubar a listagem — mas o catch mudo escondeu por
           // semanas que as duas funções nem estavam importadas: o ReferenceError caía aqui e a
           // lista saía sem avanço nenhum, como se a fábrica não tivesse produzido.
-          console.error("[cronogramas] avanço do Syneco falhou:", e?.message);
+          registro.erro("[cronogramas] avanço do Syneco falhou:", e?.message);
           return [c.id, null];
         }
       })

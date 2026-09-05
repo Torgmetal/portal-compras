@@ -8,6 +8,9 @@ import { requireRole } from "@/lib/session";
 import { z } from "zod";
 import { isoWeekString, parseSemana, semanaInicio, semanaFim } from "@/lib/semana";
 import { diaSyneco } from "@/lib/syneco-dia";
+import { log } from "@/lib/log";
+
+const registroLog = log("api/producao/importar-syneco-corte");
 
 const schema = z.object({
   opNumero: z.string().min(1, "Informe o número da OP"),
@@ -294,7 +297,7 @@ export async function POST(req) {
       totais,
     });
   } catch (e) {
-    console.error("[importar-syneco-corte] erro:", e?.message);
+    registroLog.erro("[importar-syneco-corte] erro:", e?.message);
     return NextResponse.json({ error: e?.message || "Erro interno" }, { status: 500 });
   }
 }

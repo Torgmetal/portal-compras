@@ -6,6 +6,9 @@ import { getToolsParaUser } from "@/lib/assistente/tools";
 import { executarTool } from "@/lib/assistente/executar-tools";
 import { buildSystemPrompt } from "@/lib/assistente/system-prompt";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
+import { log } from "@/lib/log";
+
+const registro = log("api/assistente/chat");
 
 // Tempo máximo para o loop de tool use (Vercel limit)
 export const maxDuration = 60;
@@ -133,7 +136,7 @@ export async function POST(req) {
         messages,
       });
     } catch (e) {
-      console.error("[assistente] erro Anthropic:", e?.status, e?.message);
+      registro.erro("[assistente] erro Anthropic:", e?.status, e?.message);
       respostaFinal = "Tive um problema técnico ao falar com a IA. Tente de novo em instantes. 🙏";
       break;
     }

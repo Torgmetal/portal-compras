@@ -6,6 +6,9 @@ import { prisma, prismaDirect } from "@/lib/prisma";
 import { sincronizarProdutos } from "@/lib/omie-estoque";
 import { registrarExecucao } from "@/lib/cron-monitor";
 import { aquecerBanco } from "@/lib/db-retry";
+import { log } from "@/lib/log";
+
+const registro = log("api/cron/estoque-produtos");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -28,7 +31,7 @@ export async function GET(req) {
     await registrarExecucao("estoque-produtos", { ok: true, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
-    console.error("[cron estoque-produtos] erro:", e?.message);
+    registro.erro("[cron estoque-produtos] erro:", e?.message);
     await registrarExecucao("estoque-produtos", { ok: false, mensagem: e?.message, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ ok: false, error: e?.message }, { status: 500 });
   }

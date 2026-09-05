@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
+import { log } from "@/lib/log";
+
+const registro = log("api/omie/categorias");
 
 const OMIE_CATEG_URL = "https://app.omie.com.br/api/v1/geral/categorias/";
 
@@ -142,7 +145,7 @@ export async function GET() {
 
     return NextResponse.json({ categorias, _meta: { count: categorias.length } });
   } catch (err) {
-    console.error("categorias error:", err);
+    registro.erro("categorias error:", err);
     return NextResponse.json({ error: err?.message || "Falha ao listar categorias" }, { status: 500 });
   }
 }

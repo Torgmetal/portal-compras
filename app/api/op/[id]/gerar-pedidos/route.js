@@ -11,6 +11,9 @@ import { TEXTO_CERTIFICADO_QUALIDADE } from "@/lib/certificado-qualidade";
 import { fdPorCategoriaDaOP, rmEhFD, itemEhFD } from "@/lib/faturamento-direto";
 import { reavaliarStatusRM } from "@/lib/rm-status";
 import { itensDoPedido, divergenciaProposta } from "@/lib/pedido-itens";
+import { log } from "@/lib/log";
+
+const registro = log("api/op/[id]/gerar-pedidos");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -99,7 +102,7 @@ export async function POST(req, { params }) {
   // se não houver projeto cadastrado, o pedido sai sem projeto (não quebra).
   let nCodProjOP = null;
   try { nCodProjOP = await resolverCodProjetoPorOp(op.numero); }
-  catch (e) { console.error("[gerar-pedidos] falha ao resolver projeto:", e?.message); }
+  catch (e) { registro.erro("[gerar-pedidos] falha ao resolver projeto:", e?.message); }
 
   // Agrupa: { [cotacaoId × isFD]: { cotacao, isFD, linhas[], rmIdsEnvolvidas } }
   const grupos = new Map();
@@ -354,11 +357,11 @@ export async function POST(req, { params }) {
                   anexos: resAnexos,
                 },
               },
-            }).catch((e) => console.error("[anexos] falha atualizando resposta:", e?.message));
+            }).catch((e) => registro.erro("[anexos] falha atualizando resposta:", e?.message));
           }
         }
       } catch (e) {
-        console.error("[gerar-pedidos anexar] erro:", e?.message);
+        registro.erro("[gerar-pedidos anexar] erro:", e?.message);
         resAnexos = { anexados: 0, erros: [{ error: e?.message }] };
       }
     }

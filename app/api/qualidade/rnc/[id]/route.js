@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { log } from "@/lib/log";
+
+const registroLog = log("api/qualidade/rnc/[id]");
 
 export const runtime = "nodejs";
 
@@ -98,7 +101,7 @@ export async function PATCH(req, { params }) {
       // deixou de ser retrabalho (virou refugo, concessão…): o apontamento sai do indicador
       await prisma.apontamentoRetrabalho.delete({ where: { id: jaTem.id } });
     }
-  } catch (e) { console.error("[rnc] apontamento de retrabalho:", e?.message); }
+  } catch (e) { registroLog.erro("[rnc] apontamento de retrabalho:", e?.message); }
 
   // ⚠ ARQUIVA AO ENCERRAR. O que se guarda é o documento fechado — a RNC muda enquanto está aberta
   // (disposição, 5 porquês, plano), e arquivar a cada salvamento encheria a pasta de rascunho. Se o
@@ -112,8 +115,8 @@ export async function PATCH(req, { params }) {
         { pasta: pastaDe("RNC", { opNumero: rnc.opNumero, ano: rnc.ano }), nomeArquivo: doc.filename, bytes: doc.bytes },
         (dados) => prisma.naoConformidade.update({ where: { id: rnc.id }, data: dados }),
       );
-      if (!r.ok) console.error("[rnc] arquivamento:", r.erro);
-    } catch (e) { console.error("[rnc] arquivamento:", e?.message); }
+      if (!r.ok) registroLog.erro("[rnc] arquivamento:", r.erro);
+    } catch (e) { registroLog.erro("[rnc] arquivamento:", e?.message); }
   }
 
   return NextResponse.json({ success: true });

@@ -11,6 +11,9 @@ import {
   Wrench, Bolt, Paintbrush, Landmark, CalendarDays, Truck, HardHat, Factory,
   Send, Package, ChevronUp, XCircle,
 } from "lucide-react";
+import { log } from "@/lib/log";
+
+const registro = log("EstudoDetalheClient");
 
 // Lazy-load abas pesadas — reduz bundle inicial em ~60%
 const TabLoader = () => (
@@ -287,7 +290,7 @@ function SecaoDocumentos({ estudoId, documentos: docsProp, onUpdate, sharepointU
       });
       return json.data;
     } catch (err) {
-      console.warn(`Conversao DWG falhou para ${docNome}:`, err);
+      registro.aviso(`Conversao DWG falhou para ${docNome}:`, err);
       setErroUpload((prev) => {
         const msg = `Conversao ${docNome}: ${err.message}`;
         return prev ? `${prev} | ${msg}` : msg;
@@ -386,7 +389,7 @@ function SecaoDocumentos({ estudoId, documentos: docsProp, onUpdate, sharepointU
           dwgsParaConverter.push({ id: regJson.data.id, nome: file.name });
         }
       } catch (err) {
-        console.warn(`Upload falhou para ${file.name}:`, err);
+        registro.aviso(`Upload falhou para ${file.name}:`, err);
         setErroUpload((prev) => {
           const msg = `${file.name}: ${err.message}`;
           return prev ? `${prev} | ${msg}` : msg;

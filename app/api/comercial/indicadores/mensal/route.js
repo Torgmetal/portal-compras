@@ -7,6 +7,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { log } from "@/lib/log";
+
+const registro = log("api/comercial/indicadores/mensal");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -88,7 +91,7 @@ export async function GET(req) {
 
     return NextResponse.json({ success: true, ano, prazoAlvo: PRAZO_ALVO_DIAS, meses, acumulado });
   } catch (e) {
-    console.error("indicadores comercial mensal:", e?.message || e);
+    registro.erro("indicadores comercial mensal:", e?.message || e);
     return NextResponse.json({ success: false, error: "Falha ao calcular a evolução mensal do comercial." }, { status: 500 });
   }
 }

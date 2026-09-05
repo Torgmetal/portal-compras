@@ -4,6 +4,9 @@ import { requireRole } from "@/lib/session";
 import Anthropic from "@anthropic-ai/sdk";
 import { matchItensComOmie } from "@/lib/match-omie";
 import { assertBlobUrlSegura } from "@/lib/blob-url";
+import { log } from "@/lib/log";
+
+const registro = log("api/comercial/estudo/[id]/analisar");
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -211,7 +214,7 @@ export async function POST(req, { params }) {
           text: `[Documento: ${doc.nome} | Categoria: ${doc.categoria || "geral"}]`,
         });
       } catch (err) {
-        console.error(`Falha ao processar ${doc.nome}:`, err.message);
+        registro.erro(`Falha ao processar ${doc.nome}:`, err.message);
       }
     }
 
@@ -282,7 +285,7 @@ export async function POST(req, { params }) {
     try {
       itens = await matchItensComOmie(itensBrutos);
     } catch (err) {
-      console.error("Erro no match Omie (continuando sem vinculacao):", err.message);
+      registro.erro("Erro no match Omie (continuando sem vinculacao):", err.message);
       itens = itensBrutos.map((i) => ({ ...i, codigoOmie: null, descricaoOmie: null, custoUnitario: null }));
     }
 
@@ -321,7 +324,7 @@ export async function POST(req, { params }) {
       },
     });
   } catch (e) {
-    console.error("Erro na analise IA:", e);
+    registro.erro("Erro na analise IA:", e);
     // Se for erro de tamanho, dar mensagem amigavel
     if (e.message?.includes("maximum size") || e.message?.includes("request_too_large")) {
       return NextResponse.json(

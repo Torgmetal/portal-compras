@@ -11,6 +11,9 @@ import { requireRole } from "@/lib/session";
 import { montarEmailVencidos } from "@/lib/qualidade-alerta-email";
 import { registrarExecucao } from "@/lib/cron-monitor";
 import { aquecerBanco } from "@/lib/db-retry";
+import { log } from "@/lib/log";
+
+const registro = log("api/cron/qualidade-vencidos");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -48,7 +51,7 @@ export async function GET(req) {
 
   const to = admin ? [admin.email].filter(Boolean) : await destinatarios();
   if (!to.length) {
-    if (!admin) console.warn("[cron qualidade-vencidos] nenhum destinatário cadastrado — pulando");
+    if (!admin) registro.aviso("[cron qualidade-vencidos] nenhum destinatário cadastrado — pulando");
     return NextResponse.json({ ok: !admin, skipped: true, motivo: admin ? "seu usuário não tem e-mail cadastrado" : "sem destinatários (cadastre em /compras/notificacoes — evento QUALIDADE_VENCIDOS — ou env QUALIDADE_ALERTA_EMAILS)" });
   }
 

@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { FileText, BarChart3, Truck, ClipboardList } from "lucide-react";
 import RMsTabelaSeletor from "../RMsTabelaSeletor";
+import { log } from "@/lib/log";
+
+const registro = log("compras/consumiveis");
 
 const STATUS_LABELS = {
   ABERTA:        { label: "Aberta",         className: "bg-torg-blue-50 text-torg-blue" },
@@ -117,7 +120,7 @@ export default async function PainelConsumiveis({ searchParams }) {
       }
     }
   } catch (e) {
-    console.error("[/compras/consumiveis] Falha agregando cotacoes:", e?.message);
+    registro.erro("[/compras/consumiveis] Falha agregando cotacoes:", e?.message);
     for (const rm of rms) {
       rm.recebidas = 0; rm.pendentes = 0; rm.atrasadas = 0;
     }

@@ -17,6 +17,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { whereSetorSyneco } from "@/lib/syneco-dia";
+import { log } from "@/lib/log";
+
+const registro = log("api/producao/indicadores/mensal");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -89,7 +92,7 @@ export async function GET(req) {
 
     return NextResponse.json({ success: true, ano, metaDiaKg: META_DIA, setor: SETOR_PRODUCAO, meses, acumulado });
   } catch (e) {
-    console.error("indicadores produção mensal:", e?.message || e);
+    registro.erro("indicadores produção mensal:", e?.message || e);
     return NextResponse.json({ success: false, error: "Falha ao calcular a evolução mensal da produção." }, { status: 500 });
   }
 }

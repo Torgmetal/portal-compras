@@ -17,6 +17,9 @@ import { prisma } from "@/lib/prisma";
 import { secoesDoPortal, portalExpirado } from "@/lib/portal-cliente";
 import { isBlobUrlSegura } from "@/lib/blob-url";
 import { dispArquivo } from "@/lib/arquivo-http";
+import { log } from "@/lib/log";
+
+const registro = log("api/portal/[token]/databook");
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -61,7 +64,7 @@ export async function GET(req, { params }) {
   // ⚠ PROXY, não redirect: a URL do Blob é pública para quem a tem. Devolvê-la ao navegador daria
   // ao cliente um endereço permanente, fora do portal, que sobrevive a despublicar a obra.
   if (!isBlobUrlSegura(arq.url)) {
-    console.error("[portal/databook] URL fora do Blob:", arq.url);
+    registro.erro("[portal/databook] URL fora do Blob:", arq.url);
     return new NextResponse("Não foi possível abrir este volume agora. Fale com a Qualidade da Torg.", { status: 502 });
   }
 
@@ -70,11 +73,11 @@ export async function GET(req, { params }) {
     res = await fetch(arq.url);
   } catch (e) {
     // ⚠ o motivo fica no log, não na tela de quem comprou a obra — ver o mesmo cuidado em /doc.
-    console.error("[portal/databook] falha ao buscar volume:", e);
+    registro.erro("[portal/databook] falha ao buscar volume:", e);
     return new NextResponse("Não foi possível abrir este volume agora. Fale com a Qualidade da Torg.", { status: 502 });
   }
   if (!res.ok || !res.body) {
-    console.error("[portal/databook] Blob respondeu", res.status);
+    registro.erro("[portal/databook] Blob respondeu", res.status);
     return new NextResponse("Não foi possível abrir este volume agora. Fale com a Qualidade da Torg.", { status: 502 });
   }
 

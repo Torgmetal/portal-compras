@@ -4,6 +4,9 @@ import { pesoRealPecas } from "@/lib/peso-op";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 import { rollupPercentualDepartamentos } from "@/lib/cronograma-recalcular";
+import { log } from "@/lib/log";
+
+const registro = log("api/planejamento/cronogramas/[id]/importar-peso");
 
 /**
  * GET /api/planejamento/cronogramas/[id]/importar-peso
@@ -213,7 +216,7 @@ export async function POST(req, { params }) {
     try {
       await rollupPercentualDepartamentos(id, null); // null = todos os departamentos
     } catch (e) {
-      console.error("Erro no rollup apos importar peso:", e.message);
+      registro.erro("Erro no rollup apos importar peso:", e.message);
     }
   }
 

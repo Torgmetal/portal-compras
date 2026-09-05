@@ -1,7 +1,12 @@
 {
-  "build": 2841,
-  "gerado": "2026-09-05T15:03:33.635Z",
+  "build": 2842,
+  "gerado": "2026-09-05T15:03:40.585Z",
   "commits": [
+    {
+      "hash": "727aea6d53",
+      "data": "05/09/2026",
+      "titulo": "Quebra o CronogramasClient (4056 linhas) em módulos por responsabilidade"
+    },
     {
       "hash": "01c7e33bdb",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "9b47417952",
       "data": "04/09/2026",
       "titulo": "Cronograma: ajuste à mão também conta como atualização"
-    },
-    {
-      "hash": "d08ce53de1",
-      "data": "04/09/2026",
-      "titulo": "Portal: avisar quem publica quando o cronograma está parado ou sem medição"
     }
   ]
 }

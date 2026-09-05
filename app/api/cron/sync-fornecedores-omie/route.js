@@ -6,6 +6,9 @@ import { prisma, prismaDirect } from "@/lib/prisma";
 import { registrarExecucao } from "@/lib/cron-monitor";
 import { aquecerBanco } from "@/lib/db-retry";
 import { sincronizarFornecedoresOmie } from "@/lib/omie-fornecedores";
+import { log } from "@/lib/log";
+
+const registro = log("api/cron/sync-fornecedores-omie");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -22,7 +25,7 @@ export async function GET(req) {
     await registrarExecucao("sync-fornecedores-omie", { ok: true, duracaoMs: Date.now() - t0, mensagem: `total ${r.total} · novos ${r.novos} · vinc ${r.vinculados} · semEmail ${r.semEmail} · remov ${r.removidos}` });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
-    console.error("[cron sync-fornecedores-omie] erro:", e?.message);
+    registro.erro("[cron sync-fornecedores-omie] erro:", e?.message);
     await registrarExecucao("sync-fornecedores-omie", { ok: false, mensagem: e?.message, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ ok: false, error: e?.message }, { status: 500 });
   }

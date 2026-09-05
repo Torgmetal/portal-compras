@@ -7,6 +7,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { whereSetorSyneco } from "@/lib/syneco-dia";
+import { log } from "@/lib/log";
+
+const registro = log("api/pcp/dashboard-prioridades");
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -140,7 +143,7 @@ export async function GET() {
 
     return NextResponse.json({ obras, geradoEm: new Date().toISOString() });
   } catch (e) {
-    console.error("[dashboard-prioridades] erro:", e?.message);
+    registro.erro("[dashboard-prioridades] erro:", e?.message);
     return NextResponse.json({ error: e?.message || "Erro interno" }, { status: 500 });
   }
 }

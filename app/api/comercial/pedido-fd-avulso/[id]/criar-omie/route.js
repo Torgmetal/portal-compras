@@ -8,6 +8,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { criarPedidoOmie, anexarAoPedidoOmie } from "@/lib/omie-pedido-compra";
+import { log } from "@/lib/log";
+
+const registroLog = log("api/comercial/pedido-fd-avulso/[id]/criar-omie");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -114,7 +117,7 @@ export async function POST(req, { params }) {
         appSecret: process.env.OMIE_APP_SECRET,
       });
     } catch (e) {
-      console.warn("[fd-avulso anexo Omie]", e?.message);
+      registroLog.aviso("[fd-avulso anexo Omie]", e?.message);
     }
   }
 

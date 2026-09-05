@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { classificarMaquina } from "@/lib/maquina-corte";
+import { log } from "@/lib/log";
+
+const registro = log("api/producao/pecas/reclassificar-maquinas");
 
 export async function POST(req) {
   let user;
@@ -69,7 +72,7 @@ export async function POST(req) {
 
     return NextResponse.json({ ok: true, analisadas: pecas.length + avulsas.length, atualizados });
   } catch (e) {
-    console.error("[reclassificar-maquinas] erro:", e?.message);
+    registro.erro("[reclassificar-maquinas] erro:", e?.message);
     return NextResponse.json({ error: e?.message || "Erro interno" }, { status: 500 });
   }
 }

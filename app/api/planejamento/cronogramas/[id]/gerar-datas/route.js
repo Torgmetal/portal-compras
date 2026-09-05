@@ -4,6 +4,9 @@ import { requireRole } from "@/lib/session";
 import { z } from "zod";
 import { gerarDatasCronograma, rollupPercentualDepartamentos } from "@/lib/cronograma-recalcular";
 import { semearDatasSetor } from "@/lib/prioridades-setor";
+import { log } from "@/lib/log";
+
+const registro = log("api/planejamento/cronogramas/[id]/gerar-datas");
 
 export const runtime = "nodejs";
 export const maxDuration = 20;
@@ -174,7 +177,7 @@ export async function POST(req, { params }) {
       tarefas: frescas,
     });
   } catch (e) {
-    console.error("[gerar-datas] falhou ao semear datas por setor:", e);
+    registro.erro("[gerar-datas] falhou ao semear datas por setor:", e);
     datasSetor = { erro: e?.message || "falha ao semear as datas por setor" };
   }
 

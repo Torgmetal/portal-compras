@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import Anthropic from "@anthropic-ai/sdk";
 import { assertBlobUrlSegura } from "@/lib/blob-url";
+import { log } from "@/lib/log";
+
+const registro = log("api/comercial/estudo/[id]/analisar-acessorios");
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -175,7 +178,7 @@ export async function POST(req, { params }) {
         }
         content.push({ type: "text", text: `Documento: "${doc.nome}" (${doc.tipo})` });
       } catch (err) {
-        console.warn(`Erro ao baixar doc ${doc.nome}:`, err.message);
+        registro.aviso(`Erro ao baixar doc ${doc.nome}:`, err.message);
       }
     }
 
@@ -229,7 +232,7 @@ export async function POST(req, { params }) {
       },
     });
   } catch (e) {
-    console.error("Erro ao analisar acessorios:", e);
+    registro.erro("Erro ao analisar acessorios:", e);
     if (e.issues) {
       return NextResponse.json({ success: false, error: e.issues[0]?.message }, { status: 400 });
     }

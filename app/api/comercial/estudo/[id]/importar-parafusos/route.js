@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import * as XLSX from "xlsx";
+import { log } from "@/lib/log";
+
+const registro = log("api/comercial/estudo/[id]/importar-parafusos");
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -138,7 +141,7 @@ export async function POST(req, { params }) {
 
     return NextResponse.json({ success: true, data: todos, importados: itensParaCriar.length }, { status: 201 });
   } catch (e) {
-    console.error("Erro ao importar parafusos:", e);
+    registro.erro("Erro ao importar parafusos:", e);
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ success: false, error: e.message }, { status });
   }

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { log } from "@/lib/log";
+
+const registro = log("api/expedicao/confronto");
 
 export const maxDuration = 60;
 
@@ -236,7 +239,7 @@ export async function GET(req) {
     })),
   });
   } catch (e) {
-    console.error("Erro em /api/expedicao/confronto:", e);
+    registro.erro("Erro em /api/expedicao/confronto:", e);
     return NextResponse.json({ success: false, error: e.message || "Erro interno" }, { status: 500 });
   }
 }

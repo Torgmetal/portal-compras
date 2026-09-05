@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prismaDirect, waitMesTables } from "@/lib/prisma";
+import { log } from "@/lib/log";
+
+const registro = log("api/mes/sync-status");
 
 // Recebe do agente a lista de setores INATIVOS-SEM-PRODUCAO do Syneco
 // (Production.IsEnabled=0 e PartCount=0) — etapas feitas FORA da fabrica.
@@ -72,7 +75,7 @@ export async function POST(req) {
 
     return NextResponse.json({ ok: true, inativos: inseridos });
   } catch (e) {
-    console.error("[mes/sync-status] erro:", e?.message);
+    registro.erro("[mes/sync-status] erro:", e?.message);
     return NextResponse.json({ error: "Erro interno: " + e?.message }, { status: 500 });
   }
 }

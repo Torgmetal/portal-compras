@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { log } from "@/lib/log";
+
+const registro = log("api/financeiro/fluxo");
 
 const schema = z.object({
   data: z.string(),
@@ -56,7 +59,7 @@ export async function POST(req) {
       },
     });
   } catch (e) {
-    console.error("AuditLog error:", e);
+    registro.erro("AuditLog error:", e);
   }
 
   return NextResponse.json({ id: created.id });

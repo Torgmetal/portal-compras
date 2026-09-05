@@ -4,6 +4,9 @@
 import { NextResponse } from "next/server";
 import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
+import { log } from "@/lib/log";
+
+const registro = log("api/cotacao/anexar/[token]/[anexoId]");
 
 export async function DELETE(req, { params }) {
   const cotacao = await prisma.cotacao.findUnique({
@@ -23,7 +26,7 @@ export async function DELETE(req, { params }) {
   try {
     if (process.env.BLOB_READ_WRITE_TOKEN) await del(anexo.blobUrl);
   } catch (e) {
-    console.error("[fornecedor anexo delete] falha blob:", e?.message);
+    registro.erro("[fornecedor anexo delete] falha blob:", e?.message);
   }
 
   await prisma.anexo.delete({ where: { id: anexo.id } });

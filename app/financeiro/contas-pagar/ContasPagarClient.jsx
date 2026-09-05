@@ -4,6 +4,9 @@ import {
   ArrowDownCircle, RefreshCw, Loader2, AlertCircle, Search, Clock,
   CalendarDays, ChevronDown, ChevronRight, Tag, Building2, ExternalLink, Check, FileSpreadsheet,
 } from "lucide-react";
+import { log } from "@/lib/log";
+
+const registro = log("ContasPagarClient");
 
 // Módulo Compras do Omie (tenant Torg). O Omie não expõe API/URL estável para
 // abrir um pedido/NF específico (ObterImpressaoPedCompra não existe e a chave
@@ -192,7 +195,7 @@ export default function ContasPagarClient() {
 
       await downloadWorkbook(workbook, `Contas_a_Pagar_${new Date().toISOString().slice(0, 10)}.xlsx`);
     } catch (e) {
-      console.error("Erro ao exportar:", e);
+      registro.erro("Erro ao exportar:", e);
       setErro("Erro ao gerar planilha: " + e.message);
     } finally {
       setExportando(false);

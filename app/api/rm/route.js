@@ -6,6 +6,9 @@ import { requireUser } from "@/lib/session";
 import { notificarEvento } from "@/lib/email";
 import { proximoNumeroInterno, proximoNumeroAluguel, proximoNumeroMontagem } from "@/lib/rm-numero";
 import { escapeHtml } from "@/lib/html";
+import { log } from "@/lib/log";
+
+const registro = log("api/rm");
 
 const itemSchema = z.object({
   opItemId: z.string().nullable().optional(),
@@ -231,7 +234,7 @@ export async function POST(req) {
       });
     }
   } catch (e) {
-    console.error("[rm create reservas] erro:", e?.message);
+    registro.erro("[rm create reservas] erro:", e?.message);
     // Nao bloqueia criacao da RM — reservas podem ser sincronizadas depois
   }
 
@@ -291,7 +294,7 @@ export async function POST(req) {
     text: `Nova RM ${rm.numero} criada por ${user.name || user.email}.\n` +
           `${opVinculada ? `OP: ${opVinculada.numero} — ${opVinculada.cliente}\n` : ""}` +
           `Descrição: ${body.descricao}\nItens: ${body.itens.length}\n\nAcesse: ${linkRM}`,
-  }).catch((e) => console.error("[notificar RM_CRIADA] erro:", e?.message));
+  }).catch((e) => registro.erro("[notificar RM_CRIADA] erro:", e?.message));
 
   revalidatePath("/rm");
   revalidatePath("/compras");

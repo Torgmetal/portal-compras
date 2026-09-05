@@ -5,6 +5,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { log } from "@/lib/log";
+
+const registroLog = log("api/producao/controle/[id]");
 
 export const runtime = "nodejs";
 
@@ -51,7 +54,7 @@ export async function PATCH(req, { params }) {
       },
     });
   } catch (e) {
-    console.error("AuditLog error:", e);
+    registroLog.erro("AuditLog error:", e);
   }
 
   return NextResponse.json({ ok: true, registro });
@@ -79,7 +82,7 @@ export async function DELETE(req, { params }) {
       },
     });
   } catch (e) {
-    console.error("AuditLog error:", e);
+    registroLog.erro("AuditLog error:", e);
   }
 
   return NextResponse.json({ ok: true });

@@ -6,6 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 import { calcularProntidao, CONJUNTO_MONTAVEL } from "@/lib/prontidao-conjunto";
+import { log } from "@/lib/log";
+
+const registro = log("api/producao/pecas/liberar-montagem");
 
 const schema = z.object({
   ids: z.array(z.string()).min(1, "Selecione ao menos um conjunto"),
@@ -165,7 +168,7 @@ export async function POST(req) {
       liberadosIds: idsPermitidos,
     });
   } catch (e) {
-    console.error("[liberar-montagem] erro:", e?.message);
+    registro.erro("[liberar-montagem] erro:", e?.message);
     return NextResponse.json({ error: e?.message || "Erro interno" }, { status: 500 });
   }
 }

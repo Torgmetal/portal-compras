@@ -7,6 +7,9 @@ import { requireRole } from "@/lib/session";
 import { parseLPC } from "@/lib/parse-lpc";
 import { classificarMaquina } from "@/lib/maquina-corte";
 import { chaveDaPeca } from "@/lib/liberacao-pecas";
+import { log } from "@/lib/log";
+
+const registro = log("api/producao/pecas/importar-lpc");
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // LPC grande faz upsert peça a peça; 60s estourava (timeout → HTML → "token JSON")
@@ -368,7 +371,7 @@ export async function POST(req) {
     } catch (e) {
       // ⚠ não aborta a importação: a lista já foi gravada, e falhar aqui só deixaria o remapeamento
       // para a próxima. Mas registra, porque silêncio foi exatamente o que criou este problema.
-      console.error("[importar-lpc] remapeamento das liberações falhou:", e?.message);
+      registro.erro("[importar-lpc] remapeamento das liberações falhou:", e?.message);
       remap.erro = e?.message || "falhou";
     }
   }
@@ -404,7 +407,7 @@ export async function POST(req) {
         }
       }
     } catch (e) {
-      console.error("[importar-lpc] recasamento por marca falhou:", e?.message);
+      registro.erro("[importar-lpc] recasamento por marca falhou:", e?.message);
       remap.erroMarca = e?.message || "falhou";
     }
   }
@@ -435,7 +438,7 @@ export async function POST(req) {
       },
     });
   } catch (auditErr) {
-    console.error("[importar-lpc] falha no audit log:", auditErr?.message);
+    registro.erro("[importar-lpc] falha no audit log:", auditErr?.message);
   }
 
   return NextResponse.json({
@@ -459,7 +462,7 @@ export async function POST(req) {
   });
 
   } catch (e) {
-    console.error("[importar-lpc] erro inesperado:", e?.message, e?.stack);
+    registro.erro("[importar-lpc] erro inesperado:", e?.message, e?.stack);
     return NextResponse.json(
       { error: e?.message || "Erro interno ao importar LPC" },
       { status: 500 }

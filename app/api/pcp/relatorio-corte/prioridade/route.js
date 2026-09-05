@@ -12,6 +12,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { log } from "@/lib/log";
+
+const registro = log("api/pcp/relatorio-corte/prioridade");
 
 export const runtime = "nodejs";
 
@@ -162,7 +165,7 @@ export async function POST(req) {
 
     return NextResponse.json({ error: "Ação inválida" }, { status: 400 });
   } catch (e) {
-    console.error("[relatorio-corte/prioridade] erro:", e?.message);
+    registro.erro("[relatorio-corte/prioridade] erro:", e?.message);
     return NextResponse.json({ error: e?.message || "Erro interno" }, { status: 500 });
   }
 }

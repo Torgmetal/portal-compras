@@ -7,6 +7,9 @@ import {
   listAllFilesRecursive,
   downloadFileById,
 } from "@/lib/sharepoint";
+import { log } from "@/lib/log";
+
+const registro = log("api/comercial/estudo/[id]/importar-sharepoint");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -96,7 +99,7 @@ export async function GET(req, { params }) {
       },
     });
   } catch (e) {
-    console.error("Erro ao listar SharePoint:", e);
+    registro.erro("Erro ao listar SharePoint:", e);
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ success: false, error: e.message }, { status });
   }
@@ -242,7 +245,7 @@ export async function POST(req, { params }) {
       },
     });
   } catch (e) {
-    console.error("Erro ao importar SharePoint:", e);
+    registro.erro("Erro ao importar SharePoint:", e);
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ success: false, error: e.message }, { status });
   }

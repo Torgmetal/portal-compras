@@ -10,6 +10,9 @@ import { gerarAuditoriaInternaPDF } from "@/lib/auditoria-interna-pdf";
 import { numRAI } from "@/lib/auditoria-interna";
 import { z } from "zod";
 import { arquivarERegistrar, pastaDe } from "@/lib/arquivar-form";
+import { log } from "@/lib/log";
+
+const registro = log("api/qualidade/auditorias-internas/[id]/divulgar");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -80,7 +83,7 @@ export async function POST(req, { params }) {
     { pasta: pastaDe("AUDITORIA_INTERNA", { ano: new Date(a.dataAuditoria || agora).getUTCFullYear() }), nomeArquivo: pdf.filename, bytes: pdf.bytes },
     (dados) => prisma.auditoriaInterna.update({ where: { id: a.id }, data: dados }),
   );
-  if (!arq.ok) console.error("[auditoria-interna] arquivamento:", arq.erro);
+  if (!arq.ok) registro.erro("[auditoria-interna] arquivamento:", arq.erro);
 
   await prisma.auditLog.create({ data: { userId: user.id, action: "DIVULGAR_AUDITORIA_INTERNA", entity: "AuditoriaInterna", entityId: a.id, diff: { enviados: ok, total: emails.length, arquivado: arq.ok } } }).catch(() => {});
 

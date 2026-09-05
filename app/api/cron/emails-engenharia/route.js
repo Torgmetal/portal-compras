@@ -8,6 +8,9 @@ import { casarEmailsPendentes } from "@/lib/match-email-op";
 import { classificarMarcosIA } from "@/lib/classificar-email-ia";
 import { registrarExecucao } from "@/lib/cron-monitor";
 import { aquecerBanco } from "@/lib/db-retry";
+import { log } from "@/lib/log";
+
+const registro = log("api/cron/emails-engenharia");
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // 1ª carga puxa histórico em blocos; dá folga
@@ -26,7 +29,7 @@ export async function GET(req) {
     await registrarExecucao("emails-engenharia", { ok: true, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ ok: true, ...r, match, ia });
   } catch (e) {
-    console.error("[cron emails-engenharia] erro:", e?.message);
+    registro.erro("[cron emails-engenharia] erro:", e?.message);
     await registrarExecucao("emails-engenharia", { ok: false, mensagem: e?.message, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ ok: false, error: e?.message }, { status: 500 });
   }

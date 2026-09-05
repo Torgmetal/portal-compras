@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { matchItensComOmie } from "@/lib/match-omie";
+import { log } from "@/lib/log";
+
+const registro = log("api/comercial/estudo/[id]/rematch");
 
 // POST /api/comercial/estudo/[id]/rematch
 // Re-vincula itens existentes com o cadastro Omie (atualiza codigoOmie, descricaoOmie, custoUnitario)
@@ -88,7 +91,7 @@ export async function POST(req, { params }) {
       },
     });
   } catch (e) {
-    console.error("Erro no rematch Omie:", e);
+    registro.erro("Erro no rematch Omie:", e);
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ success: false, error: e.message }, { status });
   }

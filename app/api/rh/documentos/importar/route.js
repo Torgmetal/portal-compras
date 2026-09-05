@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import * as XLSX from "xlsx";
+import { log } from "@/lib/log";
+
+const registroLog = log("api/rh/documentos/importar");
 
 export const maxDuration = 60;
 
@@ -201,7 +204,7 @@ export async function POST(req) {
 
     return NextResponse.json({ success: true, total: rows.length, criados, erros, detalhes: resultados });
   } catch (e) {
-    console.error("Erro importar documentos:", e);
+    registroLog.erro("Erro importar documentos:", e);
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ success: false, error: e.message }, { status });
   }

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
+import { log } from "@/lib/log";
+
+const registro = log("api/omie/preco-medio");
 
 const URL_RESUMO = "https://app.omie.com.br/api/v1/estoque/resumo/";
 const URL_ESTOQUE = "https://app.omie.com.br/api/v1/estoque/consulta/";
@@ -89,7 +92,7 @@ export async function GET(req) {
       codigo,
     });
   } catch (err) {
-    console.error("preco-medio error:", err);
+    registro.erro("preco-medio error:", err);
     return NextResponse.json({ error: err?.message || "Falha ao consultar preco", cmc: null });
   }
 }

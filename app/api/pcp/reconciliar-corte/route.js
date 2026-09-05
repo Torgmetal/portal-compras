@@ -6,6 +6,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { reconciliarSynecoCorte } from "@/lib/reconciliar-syneco-corte";
+import { log } from "@/lib/log";
+
+const registro = log("api/pcp/reconciliar-corte");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -34,7 +37,7 @@ export async function POST(req) {
       .catch(() => {});
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
-    console.error("[reconciliar-corte] erro:", e?.message);
+    registro.erro("[reconciliar-corte] erro:", e?.message);
     return NextResponse.json({ ok: false, error: e?.message || "Erro ao reconciliar" }, { status: 500 });
   }
 }

@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { log } from "@/lib/log";
+
+const registro = log("api/comercial/estudo/[id]/cronograma");
 
 // ── GET — listar itens do cronograma ──
 export async function GET(req, { params }) {
@@ -97,7 +100,7 @@ export async function POST(req, { params }) {
         },
       });
     } catch (e) {
-      console.error("AuditLog error:", e);
+      registro.erro("AuditLog error:", e);
     }
 
     return NextResponse.json({ success: true, data: itens });
@@ -154,7 +157,7 @@ export async function PATCH(req, { params }) {
         },
       });
     } catch (e) {
-      console.error("AuditLog error:", e);
+      registro.erro("AuditLog error:", e);
     }
 
     return NextResponse.json({ success: true, data: itens });
@@ -200,7 +203,7 @@ export async function DELETE(req, { params }) {
         },
       });
     } catch (e) {
-      console.error("AuditLog error:", e);
+      registro.erro("AuditLog error:", e);
     }
 
     const itens = await prisma.cronogramaItem.findMany({

@@ -14,6 +14,9 @@ import { FLUXO_SETORES, datasSetorDoCronograma } from "@/lib/prioridades-setor";
 import { portaoDoDesenho } from "@/lib/pasta-engenharia";
 import { analisarMaterial, statusMaterialPlanejamento } from "@/lib/material-liberacao";
 import { chavesDasPecas } from "@/lib/liberacao-pecas";
+import { log } from "@/lib/log";
+
+const registroLog = log("api/planejamento/liberacao");
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -267,7 +270,7 @@ export async function POST(req) {
     try {
       await prisma.liberacaoProducao.update({ where: { id: lib.id }, data: { pecaMarcas: chavesDasPecas(alvo) } });
     } catch (e) {
-      console.error("[liberacao] não consegui gravar pecaMarcas:", e?.message);
+      registroLog.erro("[liberacao] não consegui gravar pecaMarcas:", e?.message);
     }
   }
 

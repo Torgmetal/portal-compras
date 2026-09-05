@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { syncEntregas } from "@/lib/omie-recebimento";
 import { registrarExecucao } from "@/lib/cron-monitor";
 import { aquecerBanco } from "@/lib/db-retry";
+import { log } from "@/lib/log";
+
+const registro = log("api/cron/sync-entregas");
 
 export const maxDuration = 300; // a varredura de NFs + consulta por pedido no Omie passava de 60s (504)
 
@@ -50,7 +53,7 @@ export async function GET(req) {
       erros: resultado.erros,
     });
   } catch (e) {
-    console.error("[cron/sync-entregas] Erro:", e.message);
+    registro.erro("[cron/sync-entregas] Erro:", e.message);
     await registrarExecucao("sync-entregas", { ok: false, mensagem: e.message, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
   }

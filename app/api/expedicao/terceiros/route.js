@@ -8,6 +8,9 @@ import { requireRole } from "@/lib/session";
 import { gerarRomaneioTerceiroForm22 } from "@/lib/romaneio-terceiro-form22";
 import { computarMateriaisEnvio } from "@/lib/materiais-terceiro";
 import { uploadFileToFolder, pastaRomaneiosTerceiro } from "@/lib/sharepoint";
+import { log } from "@/lib/log";
+
+const registro = log("api/expedicao/terceiros");
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -159,7 +162,7 @@ export async function POST(req) {
       if (upM?.webUrl) { await prisma.romaneioTerceiro.update({ where: { id: criado.id }, data: { arquivoMaterialUrl: upM.webUrl } }); criado.arquivoMaterialUrl = upM.webUrl; }
     }
   } catch (e) {
-    console.error("[terceiros] SharePoint upload:", e?.message);
+    registro.erro("[terceiros] SharePoint upload:", e?.message);
     await prisma.auditLog.create({ data: { userId: user.id, action: "ROMANEIO_TERCEIRO_SHAREPOINT_ERRO", entity: "RomaneioTerceiro", entityId: criado.id, diff: { erro: String(e?.message || e).slice(0, 300), pasta } } }).catch(() => {});
   }
 

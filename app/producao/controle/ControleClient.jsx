@@ -8,6 +8,9 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { fmtOP } from "@/lib/utils";
+import { log } from "@/lib/log";
+
+const registroLog = log("ControleClient");
 
 const SETORES = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDICAO"];
 const SETOR_LABELS = {
@@ -98,7 +101,7 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
       const data = await res.json();
       setRegistros(data.registros || []);
     } catch (e) {
-      console.error("Erro ao carregar:", e);
+      registroLog.erro("Erro ao carregar:", e);
     } finally {
       setLoading(false);
     }
@@ -367,7 +370,7 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
       // Recarrega a lista de peças disponíveis
       await recarregarPecas();
     } catch (e) {
-      console.error("Erro na importação:", e);
+      registroLog.erro("Erro na importação:", e);
       alert("Erro: " + (e?.message || "Falha inesperada"));
     } finally {
       setImportando(false);

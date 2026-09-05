@@ -112,12 +112,17 @@ export default defineConfig([
       // Regra com violação nasce em "warn" com a contagem como linha de base;
       // quando a contagem chegar a zero, ela volta para "error".
       "quality/max-lines": ["warn", { max: 350 }], // baseline: 175 arquivos
+      // Zerada em 05/09/2026: os 205 pontos migraram pra lib/log.js. Voltou
+      // pra "error" — é o estado final da regra.
       "quality/no-direct-console": [
-        "warn", // baseline: 212 ocorrências
-        { logger: "um adaptador de log do projeto" },
+        "error",
+        { logger: 'log("modulo") de @/lib/log' },
       ],
+      // Zerada em 05/09/2026 (a consulta do PainelServicosRM virou
+      // lib/rms-servico.js). Nasceu como error de novo — é o estado final da
+      // regra: componente client não fala com o banco.
       "quality/no-direct-data-access": [
-        "warn", // baseline: 39 imports
+        "error",
         {
           modules: ["@/lib/prisma", "@/lib/prisma.js", "./prisma", "./prisma.js"],
           bindings: ["prisma", "prismaDirect"],
@@ -129,17 +134,33 @@ export default defineConfig([
     },
   },
   {
-    // As rotas de API SÃO a camada de dados — é lá que o Prisma deve ser
-    // usado. Este bloco vem DEPOIS do que liga a regra: no flat config, para
-    // um arquivo que casa com os dois, vale o último.
-    files: ["app/api/**/*.js"],
+    // Onde o Prisma DEVE ser usado. Este bloco vem DEPOIS do que liga a regra:
+    // no flat config, para um arquivo que casa com os dois, vale o último.
+    //
+    // - `app/api/**` são as rotas: é a camada de dados por definição.
+    // - `page.js` / `layout.js` são Server Components do App Router. Consultar
+    //   o banco ali é o padrão oficial do Next 14, não uma quebra de camada —
+    //   `app/comercial/page.js` faz exatamente isso. Não dá pra distinguir por
+    //   glob um server de um client component, mas um `page.js` com
+    //   "use client" nem conseguiria importar o Prisma: quebraria no build.
+    //
+    // A fronteira que sobra é a que importa: componente client
+    // (`*Client.jsx`, `components/**`) não fala com o banco — fala com a API.
+    files: [
+      "app/api/**/*.js",
+      "app/**/page.js",
+      "app/**/layout.js",
+      "app/**/opengraph-image.js",
+    ],
     rules: {
       "quality/no-direct-data-access": "off",
     },
   },
   {
-    // O próprio módulo do Prisma e o adaptador de log. Mesmo motivo de ordem.
-    files: ["lib/prisma.js"],
+    // O adaptador de log (é ele quem chama o console) e o módulo do Prisma,
+    // que precisa gritar antes do resto da infra estar de pé. Mesmo motivo de
+    // ordem: vem depois do bloco que liga a regra.
+    files: ["lib/log.js", "lib/prisma.js"],
     rules: {
       "quality/no-direct-console": "off",
     },

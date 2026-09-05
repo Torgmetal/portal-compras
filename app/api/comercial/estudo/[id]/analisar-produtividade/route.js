@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import Anthropic from "@anthropic-ai/sdk";
 import { assertBlobUrlSegura } from "@/lib/blob-url";
+import { log } from "@/lib/log";
+
+const registro = log("api/comercial/estudo/[id]/analisar-produtividade");
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -187,7 +190,7 @@ export async function POST(req, { params }) {
           }
           content.push({ type: "text", text: `[Documento: ${doc.nome}]` });
         } catch (err) {
-          console.error(`Falha ao processar ${doc.nome}:`, err.message);
+          registro.erro(`Falha ao processar ${doc.nome}:`, err.message);
         }
       }
     }
@@ -295,7 +298,7 @@ export async function POST(req, { params }) {
       },
     });
   } catch (e) {
-    console.error("Erro na analise produtividade IA:", e);
+    registro.erro("Erro na analise produtividade IA:", e);
     if (e.message?.includes("maximum size") || e.message?.includes("request_too_large")) {
       return NextResponse.json(
         { success: false, error: "Documento muito grande. Tente um arquivo menor ou com menos paginas." },

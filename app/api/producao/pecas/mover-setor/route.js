@@ -5,6 +5,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { log } from "@/lib/log";
+
+const registro = log("api/producao/pecas/mover-setor");
 
 const PIPELINE = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
 
@@ -82,7 +85,7 @@ export async function POST(req) {
       para,
     });
   } catch (e) {
-    console.error("[mover-setor] erro:", e?.message);
+    registro.erro("[mover-setor] erro:", e?.message);
     return NextResponse.json({ error: e?.message || "Erro interno" }, { status: 500 });
   }
 }

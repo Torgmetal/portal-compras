@@ -3,6 +3,9 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { syncExpedicaoProducao } from "@/lib/expedicao";
+import { log } from "@/lib/log";
+
+const registro = log("api/producao/romaneio/[id]");
 
 const schema = z.object({
   numero: z.string().optional(),
@@ -104,7 +107,7 @@ export async function PATCH(req, { params }) {
       // Ja sincronizou acima no bloco opAnterior
     }
   } catch (err) {
-    console.error("syncExpedicaoProducao erro:", err.message);
+    registro.erro("syncExpedicaoProducao erro:", err.message);
   }
 
   return NextResponse.json({ success: true, ok: true });
@@ -144,7 +147,7 @@ export async function DELETE(_req, { params }) {
     try {
       await syncExpedicaoProducao(romaneio.opId, romaneio.data);
     } catch (err) {
-      console.error("syncExpedicaoProducao erro:", err.message);
+      registro.erro("syncExpedicaoProducao erro:", err.message);
     }
   }
 

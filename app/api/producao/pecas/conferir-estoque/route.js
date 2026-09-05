@@ -6,6 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 import { parsePerfil, calcularResumoBarras } from "@/lib/maquina-corte";
+import { log } from "@/lib/log";
+
+const registro = log("api/producao/pecas/conferir-estoque");
 
 const schema = z.object({
   opNumero: z.string().min(1, "opNumero obrigatório"),
@@ -285,7 +288,7 @@ export async function POST(request) {
       pecasAtualizadas: updates.length,
     });
   } catch (e) {
-    console.error("Erro conferir estoque:", e);
+    registro.erro("Erro conferir estoque:", e);
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ success: false, error: e.message }, { status });
   }

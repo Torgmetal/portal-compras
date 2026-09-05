@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma, waitMesTables } from "@/lib/prisma";
 import { mapaObraParaOP, opIdDaLinha } from "@/lib/syneco-obra";
+import { log } from "@/lib/log";
+
+const registro = log("api/mes/sync");
 
 // Endpoint de recebimento de dados do MES SKA/Syneco.
 // Chamado pelo agente local (scripts/mes-sync-agent.js) via HTTPS a cada hora.
@@ -172,7 +175,7 @@ export async function POST(req) {
 
     return NextResponse.json({ ok: true, criados, atualizados, syncId: syncLog.id });
   } catch (e) {
-    console.error("[mes/sync] erro:", e?.message);
+    registro.erro("[mes/sync] erro:", e?.message);
     await prisma.mesSyncLog.update({
       where: { id: syncLog.id },
       data: { sucesso: false, erro: e?.message || "erro desconhecido", duracaoMs: Date.now() - inicio },

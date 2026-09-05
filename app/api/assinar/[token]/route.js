@@ -13,6 +13,9 @@ import { sendEmail } from "@/lib/email";
 import { cabecalhoEmail } from "@/lib/email-layout";
 import { baseUrlDe } from "@/lib/databook-assinaturas";
 import { ehTipoDePlano, docDoTipo, tudoAprovado, arquivarPlano, DOCS } from "@/lib/planos-aceite";
+import { log } from "@/lib/log";
+
+const registro = log("api/assinar/[token]");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -137,7 +140,7 @@ export async function POST(req, { params }) {
           await prisma.planoPintura.update({ where: { id: plp.id }, data: { revisao: novaRev } });
         }
       }
-    } catch (e) { console.error("[assinar] subir revisão:", e?.message); }
+    } catch (e) { registro.erro("[assinar] subir revisão:", e?.message); }
 
     // avisa quem mandou (e quem já tinha assinado) que o documento voltou
     try {
@@ -165,7 +168,7 @@ export async function POST(req, { params }) {
         </div>`;
         await sendEmail({ to: d.email, subject: `Revisão pedida — ${a.envio.titulo}`, html }).catch(() => null);
       }
-    } catch (e) { console.error("[assinar] aviso de revisão:", e?.message); }
+    } catch (e) { registro.erro("[assinar] aviso de revisão:", e?.message); }
 
     return NextResponse.json({ ok: true, revisaoPedida: true, novaRevisao: novaRev });
   }
@@ -226,7 +229,7 @@ export async function POST(req, { params }) {
       // ninguém mais na fila: a etapa fechou
       await prisma.envioAssinatura.update({ where: { id: a.envioId }, data: { status: "CONCLUIDO" } }).catch(() => {});
     }
-  } catch (e) { console.error("[assinar] convite do próximo:", e?.message); }
+  } catch (e) { registro.erro("[assinar] convite do próximo:", e?.message); }
 
   // ⚠⚠ APROVOU TUDO → ARQUIVA. Vitor (26/08/2026): "você deve salvar na pasta da qualidade do
   // SharePoint e anexar ao Data Book depois de todos terem aprovado". O gatilho é a última

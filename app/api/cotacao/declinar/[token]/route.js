@@ -8,6 +8,9 @@ import { prisma } from "@/lib/prisma";
 import { notificarEvento } from "@/lib/email";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 import { escapeHtml, limparTextoCurto } from "@/lib/html";
+import { log } from "@/lib/log";
+
+const registro = log("api/cotacao/declinar/[token]");
 
 const postLimiter = createRateLimiter({ name: "cotacao-declinar-post", maxRequests: 10, windowMs: 60000 });
 
@@ -94,7 +97,7 @@ export async function POST(req, { params }) {
         text: `${cotacao.fornecedorNome} declinou a cotação da ${rotuloRMs}.${motivo ? " Motivo: " + motivo : ""}`,
       });
     } catch (e) {
-      console.warn("[declinar] notificação falhou:", e?.message);
+      registro.aviso("[declinar] notificação falhou:", e?.message);
     }
   })();
 

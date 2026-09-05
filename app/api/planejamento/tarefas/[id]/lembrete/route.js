@@ -6,6 +6,9 @@ import { escapeHtml } from "@/lib/html";
 import { criarCompromissosDaTarefa } from "@/lib/compromissos";
 import { getContatosTarefas, SETOR_AREA_TAREFA } from "@/lib/contatos-tarefas";
 import { gerarTokenForte } from "@/lib/token";
+import { log } from "@/lib/log";
+
+const registro = log("api/planejamento/tarefas/[id]/lembrete");
 
 // Mapeamento setor da tarefa → modulo do sistema (para buscar usuarios)
 const SETOR_MODULO = {
@@ -208,7 +211,7 @@ export async function POST(req, { params }) {
       },
     });
   } catch (e) {
-    console.error("[audit] falha ao registrar lembrete:", e?.message);
+    registro.erro("[audit] falha ao registrar lembrete:", e?.message);
   }
 
   // Cria/reforça compromissos na agenda dos envolvidos (best-effort)

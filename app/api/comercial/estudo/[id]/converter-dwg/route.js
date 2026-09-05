@@ -9,6 +9,9 @@ import { requireRole } from "@/lib/session";
 import { convertDwgToPdf } from "@/lib/dwg-converter";
 import { put } from "@vercel/blob";
 import { assertBlobUrlSegura } from "@/lib/blob-url";
+import { log } from "@/lib/log";
+
+const registro = log("api/comercial/estudo/[id]/converter-dwg");
 
 export const runtime = "nodejs";
 export const maxDuration = 120; // DWG grande pode demorar
@@ -147,7 +150,7 @@ export async function POST(req, { params }) {
       jaExistia: false,
     });
   } catch (e) {
-    console.error("Erro ao converter DWG:", e);
+    registro.erro("Erro ao converter DWG:", e);
 
     // Erros especificos do CloudConvert
     if (e.message?.includes("CloudConvert")) {

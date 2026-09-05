@@ -8,6 +8,9 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
+import { log } from "@/lib/log";
+
+const registro = log("api/esqueci-senha");
 
 // Gera código numérico de 6 dígitos (não começa com 0)
 function gerarCodigo() {
@@ -166,7 +169,7 @@ async function enviarCodigo(req) {
 
   // Se o envio falhou, invalida o token e avisa o usuário
   if (!resultado.ok) {
-    console.error("[esqueci-senha] falha no envio do email para", body.email, ":", resultado.error);
+    registro.erro("[esqueci-senha] falha no envio do email para", body.email, ":", resultado.error);
     // Invalida o token para não deixar código perdido no banco
     await prisma.passwordResetToken.updateMany({
       where: { userId: user.id, used: false },

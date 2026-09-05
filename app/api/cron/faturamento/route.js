@@ -6,6 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { atualizarCacheFaturamento } from "@/lib/faturamento-cache";
 import { registrarExecucao } from "@/lib/cron-monitor";
 import { aquecerBanco } from "@/lib/db-retry";
+import { log } from "@/lib/log";
+
+const registro = log("api/cron/faturamento");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -24,7 +27,7 @@ export async function GET(req) {
     await registrarExecucao("faturamento", { ok: true, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ ok: true, totalObras: data.totalObras, atualizadoEm: data.atualizadoEm });
   } catch (e) {
-    console.error("[cron faturamento] erro:", e?.message);
+    registro.erro("[cron faturamento] erro:", e?.message);
     await registrarExecucao("faturamento", { ok: false, mensagem: e?.message, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ ok: false, error: e?.message }, { status: 500 });
   }

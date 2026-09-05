@@ -4,6 +4,9 @@ import { requireRole } from "@/lib/session";
 import { z } from "zod";
 import { recalcularCronograma, rollupPercentualDepartamentos, calcularDefasagem, addWorkdays, addCalendarDays } from "@/lib/cronograma-recalcular";
 import { registrarArea } from "@/lib/cronograma-areas";
+import { log } from "@/lib/log";
+
+const registro = log("api/planejamento/cronogramas/tarefas/[id]");
 
 const patchSchema = z.object({
   nome: z.string().min(1).max(200).optional(),
@@ -319,7 +322,7 @@ export async function PATCH(req, { params }) {
       await recalcularCronograma(tarefa.cronograma.id, user.id);
     } catch (e) {
       // Recalculo nao-fatal: a tarefa ja foi salva
-      console.error("Erro no recalculo automatico:", e.message);
+      registro.erro("Erro no recalculo automatico:", e.message);
     }
   }
 
@@ -335,7 +338,7 @@ export async function PATCH(req, { params }) {
     try {
       await rollupPercentualDepartamentos(tarefa.cronograma.id, null);
     } catch (e) {
-      console.error("Erro no rollup de departamentos:", e.message);
+      registro.erro("Erro no rollup de departamentos:", e.message);
     }
   }
 

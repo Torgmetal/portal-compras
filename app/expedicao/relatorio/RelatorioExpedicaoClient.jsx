@@ -6,6 +6,9 @@ import {
   ChevronUp, X, BarChart3, FileText, GitCompareArrows, ArrowRightLeft,
   Upload,
 } from "lucide-react";
+import { log } from "@/lib/log";
+
+const registro = log("RelatorioExpedicaoClient");
 
 function fmtKg(v) {
   if (v == null) return "—";
@@ -143,7 +146,7 @@ export default function RelatorioExpedicaoClient() {
         if (opImportada) setOpSel(opImportada.id);
       }
     } catch (err) {
-      console.error("[importar-le] erro:", err);
+      registro.erro("[importar-le] erro:", err);
       const msg = err instanceof Error ? err.message
         : typeof err === "string" ? err
         : JSON.stringify(err) || "Erro desconhecido ao importar LE";
@@ -454,7 +457,7 @@ export default function RelatorioExpedicaoClient() {
       const fileName = `Relatorio_Expedicao_OP-${data.op.numero}_${new Date().toISOString().slice(0, 10)}.xlsx`;
       await downloadWorkbook(workbook, fileName);
     } catch (e) {
-      console.error("Erro ao exportar:", e);
+      registro.erro("Erro ao exportar:", e);
       alert("Erro ao gerar planilha: " + e.message);
     } finally {
       setExportando(false);

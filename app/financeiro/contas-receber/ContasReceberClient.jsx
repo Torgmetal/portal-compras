@@ -4,6 +4,9 @@ import {
   ArrowUpCircle, RefreshCw, Loader2, AlertCircle, Search,
   CalendarDays, ChevronDown, ChevronRight, Tag, Building2, ExternalLink, Check, ArrowDownUp, FileSpreadsheet,
 } from "lucide-react";
+import { log } from "@/lib/log";
+
+const registro = log("ContasReceberClient");
 
 // Módulo do Omie (tenant Torg). O Omie não expõe API/URL estável para abrir uma
 // NF/pedido específico, então o clique copia o número (ou a chave NFe) e abre o
@@ -205,7 +208,7 @@ export default function ContasReceberClient() {
 
       await downloadWorkbook(workbook, `Contas_a_Receber_${new Date().toISOString().slice(0, 10)}.xlsx`);
     } catch (e) {
-      console.error("Erro ao exportar:", e);
+      registro.erro("Erro ao exportar:", e);
       setErro("Erro ao gerar planilha: " + e.message);
     } finally {
       setExportando(false);

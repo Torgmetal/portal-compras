@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { criarPedidoOmie } from "@/lib/omie-pedido-compra";
 import { requireRole } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { log } from "@/lib/log";
+
+const registro = log("api/omie/pedido-compra");
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -37,12 +40,12 @@ export async function POST(request) {
         },
       });
     } catch (auditErr) {
-      console.error("[omie pedido-compra] falha ao gravar AuditLog:", auditErr?.message);
+      registro.erro("[omie pedido-compra] falha ao gravar AuditLog:", auditErr?.message);
     }
 
     return NextResponse.json(result);
   } catch (err) {
-    console.error("omie pedido-compra error:", err);
+    registro.erro("omie pedido-compra error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

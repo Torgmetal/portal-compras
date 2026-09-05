@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { log } from "@/lib/log";
+
+const registro = log("api/qualidade/planos-acao/[id]");
 
 export const runtime = "nodejs";
 
@@ -82,8 +85,8 @@ export async function PATCH(req, { params }) {
         { pasta: pastaDe("PLANO_ACAO", { ano: plano.ano }), nomeArquivo: doc.filename, bytes: doc.bytes },
         (dados) => prisma.planoAcao.update({ where: { id: plano.id }, data: dados }),
       );
-      if (!r.ok) console.error("[plano-acao] arquivamento:", r.erro);
-    } catch (e) { console.error("[plano-acao] arquivamento:", e?.message); }
+      if (!r.ok) registro.erro("[plano-acao] arquivamento:", r.erro);
+    } catch (e) { registro.erro("[plano-acao] arquivamento:", e?.message); }
   }
 
   return NextResponse.json({ success: true });

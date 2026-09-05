@@ -5,6 +5,9 @@ import { requireRole } from "@/lib/session";
 import { syncContratacaoLote } from "@/lib/sharepoint-rh";
 import * as XLSX from "xlsx";
 import { numeroBR } from "@/lib/numero-br";
+import { log } from "@/lib/log";
+
+const registro = log("api/rh/funcionarios/importar");
 
 export const maxDuration = 60;
 
@@ -287,7 +290,7 @@ export async function POST(req) {
       detalhes: resultados,
     });
   } catch (e) {
-    console.error("Erro importar funcionarios:", e);
+    registro.erro("Erro importar funcionarios:", e);
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ success: false, error: e.message }, { status });
   }

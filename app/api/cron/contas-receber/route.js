@@ -5,6 +5,9 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { temCronSecret } from "@/lib/cron-auth";
 import { sincronizarContasReceber } from "@/lib/omie-contas-receber";
+import { log } from "@/lib/log";
+
+const registro = log("api/cron/contas-receber");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -22,7 +25,7 @@ export async function GET(req) {
     const r = await sincronizarContasReceber({ orcamentoMs: 40000 });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
-    console.error("[cron contas-receber] erro:", e?.message);
+    registro.erro("[cron contas-receber] erro:", e?.message);
     return NextResponse.json({ ok: false, error: e?.message }, { status: 500 });
   }
 }

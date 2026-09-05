@@ -10,6 +10,9 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { resolverFornecedorPorCnpj } from "@/lib/omie-pedido-compra";
+import { log } from "@/lib/log";
+
+const registro = log("api/cotacao/[id]/lancar-manual");
 
 const itemSchema = z.object({
   rmItemId: z.string(),
@@ -81,7 +84,7 @@ export async function POST(req, { params }) {
       );
       if (r.codigo) nCodOmieResolvido = String(r.codigo);
     } catch (e) {
-      console.error("lancar-manual: falha ao resolver fornecedor Omie por CNPJ:", e);
+      registro.erro("lancar-manual: falha ao resolver fornecedor Omie por CNPJ:", e);
     }
   }
 

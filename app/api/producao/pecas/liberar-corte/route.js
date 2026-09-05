@@ -5,6 +5,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { log } from "@/lib/log";
+
+const registro = log("api/producao/pecas/liberar-corte");
 
 // Liberação em lote pode ter milhares de peças — dá folga além dos 10s padrão.
 export const maxDuration = 60;
@@ -98,7 +101,7 @@ export async function POST(req) {
       acao: reverter ? "REVERTIDO" : "LIBERADO",
     });
   } catch (e) {
-    console.error("[liberar-corte] erro:", e?.message);
+    registro.erro("[liberar-corte] erro:", e?.message);
     return NextResponse.json({ error: e?.message || "Erro interno" }, { status: 500 });
   }
 }

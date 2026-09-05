@@ -15,6 +15,9 @@ import { gerarAtaOPPDF } from "@/lib/ata-op-pdf";
 import { put } from "@vercel/blob";
 import { z } from "zod";
 import { fmtOP } from "@/lib/utils";
+import { log } from "@/lib/log";
+
+const registro = log("api/comercial/op/[id]/atas/[ataId]/enviar");
 
 export const runtime = "nodejs";
 const ROLES = ["ADMIN", "COMERCIAL", "PLANEJAMENTO", "PCP"];
@@ -150,7 +153,7 @@ export async function POST(req, { params }) {
     const blob = await put(`atas-op/${ata.id}/${Date.now()}-${out.filename}`, buf, { access: "public", contentType: "application/pdf" });
     pdfUrl = blob.url;
   } catch (e) {
-    console.error("[ata-op enviar] falha ao gerar/guardar o PDF:", e?.message);
+    registro.erro("[ata-op enviar] falha ao gerar/guardar o PDF:", e?.message);
   }
 
   let ok = 0;

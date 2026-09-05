@@ -10,6 +10,9 @@ import { prisma } from "@/lib/prisma";
 import { secoesDoPortal, portalExpirado } from "@/lib/portal-cliente";
 import { FERRAMENTAS, executarFerramenta, promptDoCliente } from "@/lib/portal-assistente";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
+import { log } from "@/lib/log";
+
+const registro = log("api/portal/[token]/chat");
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -69,7 +72,7 @@ export async function POST(req, { params }) {
     try {
       r = await anthropic.messages.create({ model: MODELO, max_tokens: 2048, system, tools: FERRAMENTAS, messages });
     } catch (e) {
-      console.error("[portal-chat] Anthropic:", e?.status, e?.message);
+      registro.erro("[portal-chat] Anthropic:", e?.status, e?.message);
       resposta = "Tive um problema técnico agora. Tente de novo em instantes. 🙏";
       break;
     }

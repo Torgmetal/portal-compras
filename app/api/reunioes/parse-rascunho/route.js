@@ -3,6 +3,9 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { extrairAtividadesAta } from "@/lib/extrair-atividades-ata";
+import { log } from "@/lib/log";
+
+const registro = log("api/reunioes/parse-rascunho");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -24,7 +27,7 @@ export async function POST(req) {
     const { atividades } = await extrairAtividadesAta({ rascunho, envolvidos, hoje });
     return NextResponse.json({ success: true, atividades });
   } catch (e) {
-    console.error("parse-rascunho ata:", e?.message || e);
+    registro.erro("parse-rascunho ata:", e?.message || e);
     return NextResponse.json({ error: "Não foi possível organizar o rascunho agora. Tente novamente." }, { status: 500 });
   }
 }

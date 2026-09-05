@@ -5,6 +5,9 @@ import { sendEmail } from "@/lib/email";
 import { getCcDirecao } from "@/lib/contatos-tarefas";
 import { gerarTokenForte } from "@/lib/token";
 import { dataBR } from "@/lib/data-br";
+import { log } from "@/lib/log";
+
+const registroLog = log("api/planejamento/cronogramas/[id]/notificar-atrasos");
 
 // Mapeamento departamento do cronograma → modulo(s) do sistema
 const DEPT_TO_MODULOS = {
@@ -74,7 +77,7 @@ export async function GET(req, { params }) {
     // CC padrão: a direção, marcada mas desmarcável (Vitor 19/08).
     return NextResponse.json({ success: true, sugeridos, ccPadrao: await getCcDirecao() });
   } catch (e) {
-    console.error("[notificar-atrasos GET] erro:", e?.message);
+    registroLog.erro("[notificar-atrasos GET] erro:", e?.message);
     return NextResponse.json(
       { success: false, error: e?.message || "Erro interno" },
       { status: 500 }
@@ -303,7 +306,7 @@ export async function POST(req, { params }) {
   return NextResponse.json({ success: true, resultados });
 
   } catch (e) {
-    console.error("[notificar-atrasos] erro inesperado:", e?.message);
+    registroLog.erro("[notificar-atrasos] erro inesperado:", e?.message);
     return NextResponse.json(
       { success: false, error: e?.message || "Erro interno ao notificar" },
       { status: 500 }

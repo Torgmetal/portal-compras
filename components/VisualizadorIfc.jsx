@@ -21,6 +21,9 @@
 // build). O portal do cliente não pode depender de CDN nem de conta de terceiro.
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Maximize2, Minimize2, Loader2 } from "lucide-react";
+import { log } from "@/lib/log";
+
+const registro = log("VisualizadorIfc");
 
 // ⚠⚠ O NAVEGADOR PRECISA RESPIRAR. Vitor (03/09/2026): "a página para carregar o modelo IFC trava
 // algumas vezes e tenho que colocar em aguardar, pois aparece que a página está sem resposta".
@@ -199,7 +202,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         }
       }
     } catch (e) {
-      console.error("[ifc] falha ao ler o modelo:", e?.message);
+      registro.erro("[ifc] falha ao ler o modelo:", e?.message);
     }
     return { marcaDe, asmDe, tipoDe, nivelDe, parafusoDe, pesoDoAsm, total };
   };
@@ -710,7 +713,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
           if (el) el.innerHTML = "";
         };
       } catch (e) {
-        console.error("[ifc]", e);
+        registro.erro("[ifc]", e);
         if (vivo) setEstado({ fase: "erro", erro: e?.message || "Falha ao abrir o modelo." });
       }
     })();

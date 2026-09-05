@@ -1,10 +1,13 @@
 "use client";
 import { useEffect } from "react";
+import { log } from "@/lib/log";
+
+const registro = log("error");
 
 // Error boundary de segmento: substitui o "Application error" cru por uma tela amigável,
 // com a mensagem técnica (útil pra suporte) e botões de recuperar/recarregar.
 export default function Error({ error, reset }) {
-  useEffect(() => { console.error("[app/error]", error); }, [error]);
+  useEffect(() => { registro.erro("[app/error]", error); }, [error]);
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "#f5f7fa", fontFamily: "system-ui, sans-serif" }}>
       <div style={{ maxWidth: 460, width: "100%", background: "#fff", borderRadius: 16, boxShadow: "0 10px 40px rgba(0,0,0,.08)", padding: 28, textAlign: "center" }}>

@@ -5,6 +5,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { log } from "@/lib/log";
+
+const registro = log("api/pcp/relatorio-corte/ocultar");
 
 export const runtime = "nodejs";
 
@@ -58,7 +61,7 @@ export async function POST(req) {
 
     return NextResponse.json({ ok: true, obra, setor, oculto: ocultar });
   } catch (e) {
-    console.error("[relatorio-corte/ocultar] erro:", e?.message);
+    registro.erro("[relatorio-corte/ocultar] erro:", e?.message);
     return NextResponse.json({ error: e?.message || "Erro interno" }, { status: 500 });
   }
 }

@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { downloadFileByPath, getAccessToken } from "@/lib/sharepoint";
 import * as XLSX from "xlsx";
+import { log } from "@/lib/log";
+
+const registro = log("api/estoque/fisico");
 
 export const maxDuration = 60;
 
@@ -260,7 +263,7 @@ export async function POST() {
       sheets: sheetsImportadas,
     });
   } catch (e) {
-    console.error("Erro sync estoque fisico:", e);
+    registro.erro("Erro sync estoque fisico:", e);
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ success: false, error: e.message }, { status });
   }

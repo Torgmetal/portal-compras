@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { FileText } from "lucide-react";
 import RMsTabelaSeletor from "./RMsTabelaSeletor";
+import { log } from "@/lib/log";
+
+const registro = log("compras");
 
 // Sempre busca dados frescos do banco (sem cache de Server Component)
 
@@ -122,7 +125,7 @@ export default async function PainelCompras({ searchParams }) {
       }
     }
   } catch (e) {
-    console.error("[/compras] Falha agregando cotacoes:", e?.message);
+    registro.erro("[/compras] Falha agregando cotacoes:", e?.message);
     for (const rm of rms) {
       rm.recebidas = 0; rm.pendentes = 0; rm.atrasadas = 0;
     }

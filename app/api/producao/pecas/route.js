@@ -4,6 +4,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { log } from "@/lib/log";
+
+const registro = log("api/producao/pecas");
 
 export const runtime = "nodejs";
 
@@ -151,12 +154,12 @@ export async function DELETE(req) {
         },
       });
     } catch (auditErr) {
-      console.error("[pecas DELETE] falha no audit log:", auditErr?.message);
+      registro.erro("[pecas DELETE] falha no audit log:", auditErr?.message);
     }
 
     return NextResponse.json({ ok: true, removidas: deleted.count, lotesAfetados, ...(porIds ? { ids: idsParaDeletar.length } : { ops: opsParaDeletar }) });
   } catch (e) {
-    console.error("[pecas DELETE] erro:", e?.message);
+    registro.erro("[pecas DELETE] erro:", e?.message);
     return NextResponse.json({ error: e?.message || "Erro ao excluir" }, { status: 500 });
   }
 }

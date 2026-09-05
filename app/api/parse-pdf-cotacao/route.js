@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { parseCotacaoText } from "@/lib/pdf-parser-server";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
+import { log } from "@/lib/log";
+
+const registro = log("api/parse-pdf-cotacao");
 
 // Roda em Node — unpdf precisa de APIs Node mas funciona em serverless
 export const runtime = "nodejs";
@@ -71,7 +74,7 @@ export async function POST(request) {
       },
     });
   } catch (err) {
-    console.error("parse-pdf-cotacao failed:", err);
+    registro.erro("parse-pdf-cotacao failed:", err);
     return NextResponse.json(
       { error: err?.message || "Falha ao processar PDF" },
       { status: 500 }

@@ -7,6 +7,9 @@ import { abasDaOP } from "@/lib/op-abas";
 import { ArrowLeft, Clock } from "lucide-react";
 import OPDetailClient from "./OPDetailClient";
 import PedidosOmieSection from "@/components/PedidosOmieSection";
+import { log } from "@/lib/log";
+
+const registro = log("comercial/[id]");
 
 // Sempre busca dados frescos do banco
 
@@ -336,7 +339,7 @@ export async function carregarDetalheOP(id, user) {
       totalConsumido: Array.from(porItem.values()).reduce((s, i) => s + i.consumido, 0),
     };
   } catch (e) {
-    console.error("[comercial/[id]] materiais estoque:", e?.message);
+    registro.erro("[comercial/[id]] materiais estoque:", e?.message);
     opData.materiaisEstoque = { itens: [], valorConsumido: 0, totalReservado: 0, totalConsumido: 0 };
   }
   opData.kpisFinanceiros = {

@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import Anthropic from "@anthropic-ai/sdk";
 import { assertBlobUrlSegura } from "@/lib/blob-url";
+import { log } from "@/lib/log";
+
+const registro = log("api/comercial/estudo/[id]/analisar-parafusos");
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -149,7 +152,7 @@ Analise os documentos e extraia ou ESTIME todos os parafusos, porcas, arruelas, 
         }
         content.push({ type: "text", text: `Documento: "${doc.nome}" (${doc.tipo})` });
       } catch (err) {
-        console.warn(`Erro ao baixar doc ${doc.nome}:`, err.message);
+        registro.aviso(`Erro ao baixar doc ${doc.nome}:`, err.message);
       }
     }
 
@@ -196,7 +199,7 @@ Analise os documentos e extraia ou ESTIME todos os parafusos, porcas, arruelas, 
       },
     });
   } catch (e) {
-    console.error("Erro ao analisar parafusos:", e);
+    registro.erro("Erro ao analisar parafusos:", e);
     if (e.issues) {
       return NextResponse.json({ success: false, error: e.issues[0]?.message }, { status: 400 });
     }

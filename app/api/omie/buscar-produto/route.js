@@ -13,6 +13,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { log } from "@/lib/log";
+
+const registro = log("api/omie/buscar-produto");
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -131,7 +134,7 @@ export async function GET(req) {
       });
     }
   } catch (e) {
-    console.warn("[buscar-produto] local falhou:", e?.message);
+    registro.aviso("[buscar-produto] local falhou:", e?.message);
   }
 
   // 2) Fallback AO VIVO — item recém-cadastrado ainda não sincronizado
@@ -158,7 +161,7 @@ export async function GET(req) {
       });
     }
   } catch (e) {
-    console.warn("[buscar-produto] posestoque falhou:", e?.message);
+    registro.aviso("[buscar-produto] posestoque falhou:", e?.message);
   }
 
   // 3) Por CÓDIGO via ConsultarProduto — acha qualquer produto pelo código exato,
@@ -184,7 +187,7 @@ export async function GET(req) {
           origem: "omie-consultaproduto",
         });
       }
-    } catch (e) { console.warn("[buscar-produto] ConsultarProduto falhou:", e?.message); }
+    } catch (e) { registro.aviso("[buscar-produto] ConsultarProduto falhou:", e?.message); }
   }
 
   return NextResponse.json({ itens: [], origem: "vazio" });

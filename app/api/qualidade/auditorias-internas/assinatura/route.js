@@ -11,6 +11,9 @@ import { sendEmail } from "@/lib/email";
 import { cabecalhoEmail } from "@/lib/email-layout";
 import { baseUrlDe } from "@/lib/databook-assinaturas";
 import { arquivarForm, pastaDe } from "@/lib/arquivar-form";
+import { log } from "@/lib/log";
+
+const registro = log("api/qualidade/auditorias-internas/assinatura");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -71,7 +74,7 @@ export async function POST(req) {
     nomeArquivo: `Cronograma de Auditoria Interna ${ano} ${fmtRev(revisao)}.pdf`,
     bytes: pdfBytes,
   });
-  if (!arq.ok) console.error("[cronograma-auditoria] arquivamento:", arq.erro);
+  if (!arq.ok) registro.erro("[cronograma-auditoria] arquivamento:", arq.erro);
   const base = baseUrlDe(req);
   let enviados = 0;
 

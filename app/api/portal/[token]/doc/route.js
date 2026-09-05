@@ -11,6 +11,9 @@ import { baixarDocumento, resolverDriveServidor } from "@/lib/databook-arquivo";
 import { secoesDoPortal, portalExpirado } from "@/lib/portal-cliente";
 import { registrarAcesso } from "@/lib/portal-acesso";
 import { dispArquivo } from "@/lib/arquivo-http";
+import { log } from "@/lib/log";
+
+const registroLog = log("api/portal/[token]/doc");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -65,7 +68,7 @@ export async function GET(req, { params }) {
     // document (line:582 col:436): No PDF header found" e "Falha ao baixar item 012SCVJY…: HTTP
     // 404" — id interno do SharePoint e stack de parser, em inglês, na tela de quem comprou a
     // obra. O motivo continua existindo no log do servidor, que é onde ele serve.
-    console.error("[portal/doc] falha ao servir documento:", e);
+    registroLog.erro("[portal/doc] falha ao servir documento:", e);
     return new NextResponse("Não foi possível abrir este documento agora. Fale com a Qualidade da Torg.", { status: 502 });
   }
 }

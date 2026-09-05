@@ -4,6 +4,9 @@ import {
   Factory, Search, Filter, ChevronDown, Package, ArrowDownToLine,
   CheckCircle2, Clock, AlertTriangle, BarChart3, X, Download,
 } from "lucide-react";
+import { log } from "@/lib/log";
+
+const registro = log("ControleOPClient");
 
 const SETOR_CORES = {
   Corte: { bg: "bg-blue-50", text: "text-blue-700", bar: "bg-blue-500", border: "border-blue-200" },
@@ -287,7 +290,7 @@ export default function ControleOPClient() {
       const fileName = `Controle_Producao_${data.obra}_${new Date().toISOString().slice(0, 10)}.xlsx`;
       await downloadWorkbook(workbook, fileName);
     } catch (e) {
-      console.error("Erro ao exportar:", e);
+      registro.erro("Erro ao exportar:", e);
       alert("Erro ao gerar planilha: " + e.message);
     } finally {
       setExportando(false);

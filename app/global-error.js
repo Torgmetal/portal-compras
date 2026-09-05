@@ -1,10 +1,13 @@
 "use client";
 import { useEffect } from "react";
+import { log } from "@/lib/log";
+
+const registro = log("global-error");
 
 // Último recurso: erro no PRÓPRIO layout raiz (fora do alcance do app/error.js).
 // Precisa renderizar o próprio <html>/<body>. Mostra a mensagem real + recarregar.
 export default function GlobalError({ error, reset }) {
-  useEffect(() => { console.error("[global-error]", error); }, [error]);
+  useEffect(() => { registro.erro("[global-error]", error); }, [error]);
   return (
     <html lang="pt-BR">
       <body style={{ margin: 0 }}>

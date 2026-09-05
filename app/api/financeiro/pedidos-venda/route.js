@@ -6,6 +6,9 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { prismaDirect } from "@/lib/prisma";
 import { lerCacheFaturamento, atualizarCacheFaturamento } from "@/lib/faturamento-cache";
+import { log } from "@/lib/log";
+
+const registro = log("api/financeiro/pedidos-venda");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -113,7 +116,7 @@ export async function GET(req) {
         }
       }
     } catch (e) {
-      console.error("[pedidos-venda] falha ao anexar NF:", e?.message);
+      registro.erro("[pedidos-venda] falha ao anexar NF:", e?.message);
     }
 
     return NextResponse.json({ ok: true, ...data });

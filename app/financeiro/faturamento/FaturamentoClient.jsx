@@ -1,6 +1,9 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
 import { FileText, RefreshCw, Clock, Search, Loader2, AlertCircle, ArrowUp, ArrowDown, ChevronsUpDown, Landmark, AlertTriangle, FileSpreadsheet } from "lucide-react";
+import { log } from "@/lib/log";
+
+const registro = log("FaturamentoClient");
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -152,7 +155,7 @@ export default function FaturamentoClient() {
 
       await downloadWorkbook(workbook, `Faturamento_por_obra_${new Date().toISOString().slice(0, 10)}.xlsx`);
     } catch (e) {
-      console.error("Erro ao exportar:", e);
+      registro.erro("Erro ao exportar:", e);
       setErro("Erro ao gerar planilha: " + e.message);
     } finally {
       setExportando(false);

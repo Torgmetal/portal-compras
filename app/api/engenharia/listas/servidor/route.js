@@ -7,6 +7,9 @@ import { z } from "zod";
 import { requireRole } from "@/lib/session";
 import { salvarListaNoServidor } from "@/lib/sharepoint-lista";
 import { prisma } from "@/lib/prisma";
+import { log } from "@/lib/log";
+
+const registro = log("api/engenharia/listas/servidor");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -54,10 +57,10 @@ export async function POST(req) {
             contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           });
           formatada = a.ok ? a.path : null;
-          if (!a.ok) console.error("[listas] formatada:", a.erro);
+          if (!a.ok) registro.erro("[listas] formatada:", a.erro);
         }
       }
-    } catch (e) { console.error("[listas] formatada:", e?.message); }
+    } catch (e) { registro.erro("[listas] formatada:", e?.message); }
 
     return NextResponse.json({ ok: true, ...r, formatada });
   } catch (e) {

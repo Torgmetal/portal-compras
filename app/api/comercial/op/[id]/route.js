@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { normalizarEscopo } from "@/lib/qualidade-escopo";
 import { requireRole } from "@/lib/session";
 import { dataBR } from "@/lib/data-br";
+import { log } from "@/lib/log";
+
+const registro = log("api/comercial/op/[id]");
 
 // Aceita 2 modos:
 // 1. Status change: { acao: "finalizar" | "reabrir" | "cancelar" }
@@ -75,7 +78,7 @@ export async function PATCH(req, { params }) {
       await prisma.estoqueReserva.updateMany({
         where: { opId: op.id, status: "ATIVA" },
         data: { status: "CANCELADA", cancelMotivo: motivo },
-      }).catch((e) => console.error("[op finalizar - cancelar reservas]", e?.message));
+      }).catch((e) => registro.erro("[op finalizar - cancelar reservas]", e?.message));
     }
 
     await prisma.auditLog.create({

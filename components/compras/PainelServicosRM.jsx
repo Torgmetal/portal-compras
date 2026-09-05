@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { buscarRMsDeServico } from "@/lib/rms-servico";
 import { Forklift, Hammer, FileText, ClipboardList, Truck, DollarSign } from "lucide-react";
 
 // Painel de RMs de SERVIÇOS — usado pelas páginas /compras/aluguel e
@@ -34,31 +34,7 @@ export default async function PainelServicosRM({ tipo, verArquivadas }) {
   const ehAluguel = tipo === "ALUGUEL";
   const base = ehAluguel ? "/compras/aluguel" : "/compras/montagem";
 
-  const where = {
-    tipoRM: tipo,
-    ...(verArquivadas
-      ? { status: { in: ["PEDIDO_GERADO", "CANCELADA"] } }
-      : { status: { in: ["ABERTA", "EM_COTACAO", "COTADA"] } }),
-  };
-
-  const [rms, totais] = await Promise.all([
-    prisma.rM.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      include: {
-        op: { select: { id: true, numero: true, cliente: true } },
-        createdBy: { select: { name: true } },
-        itens: {
-          orderBy: { ordem: "asc" },
-          select: { id: true, descricao: true, status: true, qtd: true, valorDiaria: true, qtdDias: true, valorTotal: true },
-        },
-      },
-    }),
-    prisma.rM.groupBy({ by: ["status"], where: { tipoRM: tipo }, _count: { _all: true } }),
-  ]);
-
-  const statusCount = totais.reduce((acc, t) => { acc[t.status] = t._count._all; return acc; }, {});
+  const { rms, statusCount } = await buscarRMsDeServico(tipo, verArquivadas);
   const valorAtivo = rms.reduce((s, rm) => s + valorRM(rm), 0);
 
   const cards = [

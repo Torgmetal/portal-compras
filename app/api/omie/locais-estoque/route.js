@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
+import { log } from "@/lib/log";
+
+const registro = log("api/omie/locais-estoque");
 
 const OMIE_LOCAL_URL = "https://app.omie.com.br/api/v1/estoque/local/";
 
@@ -52,7 +55,7 @@ export async function GET() {
 
     return NextResponse.json({ locais: lista, _meta: { count: lista.length } });
   } catch (err) {
-    console.error("locais-estoque error:", err);
+    registro.erro("locais-estoque error:", err);
     return NextResponse.json({ error: err?.message || "Falha ao listar locais" }, { status: 500 });
   }
 }

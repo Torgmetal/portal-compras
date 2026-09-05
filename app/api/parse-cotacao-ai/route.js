@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
+import { log } from "@/lib/log";
+
+const registro = log("api/parse-cotacao-ai");
 
 // Roda em Node — SDK Anthropic precisa
 export const runtime = "nodejs";
@@ -334,7 +337,7 @@ export async function POST(request) {
       },
     });
   } catch (err) {
-    console.error("parse-cotacao-ai error:", err);
+    registro.erro("parse-cotacao-ai error:", err);
     return NextResponse.json(
       {
         error: err?.message || "Falha ao processar com IA",

@@ -3,6 +3,9 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { syncExpedicaoProducao } from "@/lib/expedicao";
+import { log } from "@/lib/log";
+
+const registro = log("api/producao/romaneio");
 
 const schema = z.object({
   numero: z.string().min(1),
@@ -116,7 +119,7 @@ export async function POST(req) {
     try {
       await syncExpedicaoProducao(created.opId, new Date(body.data));
     } catch (err) {
-      console.error("syncExpedicaoProducao erro:", err.message);
+      registro.erro("syncExpedicaoProducao erro:", err.message);
     }
   }
 

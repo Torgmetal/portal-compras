@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { log } from "@/lib/log";
+
+const registro = log("api/rm/[id]");
 
 const patchSchema = z.discriminatedUnion("acao", [
   z.object({ acao: z.literal("desvincular") }),
@@ -188,7 +191,7 @@ export async function DELETE(req, { params }) {
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error("Erro ao excluir RM:", e);
+    registro.erro("Erro ao excluir RM:", e);
     return NextResponse.json(
       {
         error: `Falha ao excluir RM ${rm.numero}: ${e.message || "erro desconhecido"}`,

@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { log } from "@/lib/log";
+
+const registroLog = log("api/rm/[id]/anexos/[anexoId]");
 
 export async function DELETE(req, { params }) {
   let user;
@@ -23,7 +26,7 @@ export async function DELETE(req, { params }) {
       await del(anexo.blobUrl);
     }
   } catch (e) {
-    console.error("[anexo delete] falha removendo do blob:", e?.message);
+    registroLog.erro("[anexo delete] falha removendo do blob:", e?.message);
   }
 
   await prisma.anexo.delete({ where: { id: anexo.id } });

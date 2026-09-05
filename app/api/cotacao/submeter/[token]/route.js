@@ -6,6 +6,9 @@ import { resolverFornecedorPorCnpj } from "@/lib/omie-pedido-compra";
 import { notificarEvento } from "@/lib/email";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 import { escapeHtml, limparTextoCurto } from "@/lib/html";
+import { log } from "@/lib/log";
+
+const registro = log("api/cotacao/submeter/[token]");
 
 const postLimiter = createRateLimiter({ name: "cotacao-submeter-post", maxRequests: 10, windowMs: 60000 });
 
@@ -211,7 +214,7 @@ export async function POST(req, { params }) {
     for (const opId of opIds) revalidatePath(`/compras/painel-ops/${opId}`);
     revalidatePath("/compras");
   } catch (e) {
-    console.warn("[submeter] revalidatePath falhou:", e?.message);
+    registro.aviso("[submeter] revalidatePath falhou:", e?.message);
   }
 
   // Notifica os inscritos no evento COTACAO_RESPONDIDA. Best-effort, nao bloqueia.
@@ -273,7 +276,7 @@ export async function POST(req, { params }) {
               `Total: ${totalFmt}\nItens: ${itensValidos.length}\n${eRevisao ? `Revisao: #${cotacao.numeroRevisao + 1}\n` : ""}\nAcesse: ${linkRM}`,
       });
     } catch (e) {
-      console.error("[notificar COTACAO_RESPONDIDA] erro:", e?.message);
+      registro.erro("[notificar COTACAO_RESPONDIDA] erro:", e?.message);
     }
   })();
 

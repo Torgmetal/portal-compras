@@ -6,6 +6,9 @@ import { requireRole } from "@/lib/session";
 import { z } from "zod";
 import { diaSyneco } from "@/lib/syneco-dia";
 import { metasCorteDoCronograma, normOpPmp } from "@/lib/pmp-cronograma";
+import { log } from "@/lib/log";
+
+const registro = log("api/pcp/pmp");
 
 // Normaliza código de obra pra casar Syneco × portal: "T60B"→"60B", "085"→"85"
 const normObra = (s) => String(s || "").toUpperCase().trim().replace(/^T/, "").replace(/^0+/, "") || "0";
@@ -107,7 +110,7 @@ export async function GET(req) {
     ];
     semLista = Object.keys(cron.semLista);
     datasSetorCronograma = cron.datasSetor;
-  } catch (e) { console.error("[pmp] cronograma:", e?.message); }
+  } catch (e) { registro.erro("[pmp] cronograma:", e?.message); }
 
   return NextResponse.json({
     semana: { inicio: seg.toISOString().split("T")[0], fim: dom.toISOString().split("T")[0] },

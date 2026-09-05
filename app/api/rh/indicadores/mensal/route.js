@@ -6,6 +6,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { log } from "@/lib/log";
+
+const registroLog = log("api/rh/indicadores/mensal");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -102,7 +105,7 @@ export async function GET(req) {
 
     return NextResponse.json({ success: true, ano, headcountMedio: Math.round(headcountMedio), meses, acumulado });
   } catch (e) {
-    console.error("indicadores RH mensal:", e?.message || e);
+    registroLog.erro("indicadores RH mensal:", e?.message || e);
     return NextResponse.json({ success: false, error: "Falha ao calcular a evolução mensal do RH." }, { status: 500 });
   }
 }

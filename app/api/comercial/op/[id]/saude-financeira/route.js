@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { temAcessoDiretoria } from "@/lib/diretoria";
 import { saudeFinanceiraOP } from "@/lib/saude-financeira-op";
+import { log } from "@/lib/log";
+
+const registro = log("api/comercial/op/[id]/saude-financeira");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -30,7 +33,7 @@ export async function GET(_req, { params }) {
   try {
     return NextResponse.json(await saudeFinanceiraOP(params.id));
   } catch (e) {
-    console.error("[saude-financeira]", e?.message);
+    registro.erro("[saude-financeira]", e?.message);
     return NextResponse.json({ error: "Falha ao montar a saúde financeira." }, { status: 500 });
   }
 }

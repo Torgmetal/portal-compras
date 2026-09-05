@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { log } from "@/lib/log";
+
+const registro = log("api/financeiro/fluxo/[id]");
 
 const schema = z.object({
   data: z.string().optional(),
@@ -46,7 +49,7 @@ export async function PATCH(req, { params }) {
       },
     });
   } catch (e) {
-    console.error("AuditLog error:", e);
+    registro.erro("AuditLog error:", e);
   }
 
   return NextResponse.json({ ok: true });
@@ -73,7 +76,7 @@ export async function DELETE(_req, { params }) {
       },
     });
   } catch (e) {
-    console.error("AuditLog error:", e);
+    registro.erro("AuditLog error:", e);
   }
 
   return NextResponse.json({ ok: true });

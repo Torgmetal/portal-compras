@@ -10,6 +10,9 @@ import { gerarListaAssinaturaPDF } from "@/lib/lista-assinatura-pdf";
 import { arquivarForm } from "@/lib/arquivar-form";
 import { dispArquivo } from "@/lib/arquivo-http";
 import { dataBR, hojeBRT } from "@/lib/data-br";
+import { log } from "@/lib/log";
+
+const registroLog = log("api/rh/mural/[id]/lista-assinatura");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -62,7 +65,7 @@ export async function GET(_req, { params }) {
   // lista assinada volta depois, ao lado do modelo que saiu.
   const pasta = `/RH/Workspace/Campanhas/${hojeBRT()} - ${slugPasta(aviso.titulo)}`;
   const arq = await arquivarForm({ pasta, nomeArquivo: doc.filename, bytes: doc.bytes });
-  if (!arq.ok) console.error("[lista-assinatura] arquivamento:", arq.erro);
+  if (!arq.ok) registroLog.erro("[lista-assinatura] arquivamento:", arq.erro);
 
   await prisma.auditLog.create({
     data: {

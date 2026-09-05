@@ -10,6 +10,9 @@ import { indicadoresQualidadeIso } from "@/lib/indicadores-qualidade-iso";
 import { indicadoresComercialIso } from "@/lib/indicadores-comercial-iso";
 import { indicadoresRhIso } from "@/lib/indicadores-rh-iso";
 import { indicadoresEngenhariaIso } from "@/lib/indicadores-engenharia-iso";
+import { log } from "@/lib/log";
+
+const registroLog = log("api/qualidade/indicadores");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -48,7 +51,7 @@ export async function GET(req) {
   try {
     const { indicadores: cInds } = await indicadoresComercialIso(ano);
     for (const ci of cInds) { series[ci.id] = ci.serie; acumulados[ci.id] = ci.acumulado; }
-  } catch (e) { console.error("[qualidade] comercial:", e?.message); }
+  } catch (e) { registroLog.erro("[qualidade] comercial:", e?.message); }
 
   // ── Engenharia: prazo do projeto, retrabalho e erros de projeto — via lib, a MESMA do painel
   // /engenharia/indicadores. Duas contas do mesmo indicador divergem na primeira mudança de regra.
@@ -91,7 +94,7 @@ export async function GET(req) {
       const { absenteismoDoAno, serieAbsenteismo } = await import("@/lib/absenteismo-planilha");
       const d = await absenteismoDoAno(ano);
       if (d.achou && d.meses.length) serie = serieAbsenteismo(d);
-    } catch (e) { console.error("[indicadores] absenteísmo pela planilha:", e?.message); }
+    } catch (e) { registroLog.erro("[indicadores] absenteísmo pela planilha:", e?.message); }
 
     if (!serie) {
       const af = await prisma.afastamento.findMany({ where: { dataInicio: { gte: yIni, lt: yFim } }, select: { dataInicio: true, diasAfastado: true } });

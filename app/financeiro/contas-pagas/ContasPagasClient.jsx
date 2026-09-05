@@ -4,6 +4,9 @@ import {
   CheckCircle2, Loader2, AlertCircle, Search, CalendarDays,
   Building2, Tag, FileSpreadsheet, RefreshCw, ChevronDown, ChevronRight,
 } from "lucide-react";
+import { log } from "@/lib/log";
+
+const registro = log("ContasPagasClient");
 
 const fmtMoeda = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -142,7 +145,7 @@ export default function ContasPagasClient() {
 
       await downloadWorkbook(workbook, `Contas_Pagas_${de}_a_${ate}.xlsx`);
     } catch (e) {
-      console.error("Erro ao exportar:", e);
+      registro.erro("Erro ao exportar:", e);
       alert("Falha ao gerar o relatório: " + e.message);
     } finally {
       setExportando(false);

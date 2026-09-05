@@ -10,6 +10,9 @@ import { prisma, prismaDirect } from "@/lib/prisma";
 import { registrarExecucao } from "@/lib/cron-monitor";
 import { aquecerBanco } from "@/lib/db-retry";
 import { reconciliarCmr } from "@/lib/cmr-reconciliar";
+import { log } from "@/lib/log";
+
+const registro = log("api/cron/cmr-reconciliar");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -27,7 +30,7 @@ export async function GET(req) {
     await registrarExecucao("cmr-reconciliar", { ok: true, duracaoMs: Date.now() - t0, mensagem: `Excel→portal ${r.importados} novo(s) · ${r.completados} completado(s) · portal→Excel ${r.enviados}` });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
-    console.error("[cron cmr-reconciliar] erro:", e?.message);
+    registro.erro("[cron cmr-reconciliar] erro:", e?.message);
     await registrarExecucao("cmr-reconciliar", { ok: false, mensagem: e?.message, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ ok: false, error: e?.message }, { status: 500 });
   }

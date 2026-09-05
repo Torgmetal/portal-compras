@@ -6,6 +6,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { whereSetorSyneco } from "@/lib/syneco-dia";
+import { log } from "@/lib/log";
+
+const registro = log("api/producao/indicadores");
 
 export const runtime = "nodejs";
 
@@ -83,7 +86,7 @@ export async function GET(req) {
       metaPreparacao: { metaKg: metaCorte, realizadoKg: kgCorte, metaDiaKg: META_CORTE_DIA, kgDia: du > 0 ? kgCorte / du : 0, diasUteis: du, pct: metaPct },
     });
   } catch (e) {
-    console.error("indicadores produção:", e?.message || e);
+    registro.erro("indicadores produção:", e?.message || e);
     return NextResponse.json({ success: false, error: "Falha ao calcular indicadores de produção." }, { status: 500 });
   }
 }
