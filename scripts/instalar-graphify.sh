@@ -20,8 +20,29 @@ BIN="$HOME/.local/bin"
 info() { printf '  %s\n' "$*"; }
 erro() { printf '\n✗ %s\n' "$*" >&2; exit 1; }
 
-command -v python3 >/dev/null || erro "python3 não encontrado. Instale o Python 3.10+ e rode de novo."
+# O graphifyy exige 3.10+. Conferir a versão ANTES de criar o venv evita o pior dos erros: o venv
+# nasce, o pip recusa o pacote e a mensagem que sobra é "pip install graphifyy falhou", que não diz
+# nada sobre versão de Python.
+MINIMO="3.10"
+serve() { "$1" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; }
+versao() { "$1" --version 2>&1 | awk '{print $2}'; }
+
+command -v python3 >/dev/null || erro "python3 não encontrado. Instale o Python $MINIMO+ e rode de novo."
 info "python3: $(python3 --version)"
+serve python3 || erro "o graphifyy exige Python $MINIMO+ e o python3 daqui é $(versao python3).
+    macOS:  brew install python
+    Ubuntu: sudo apt install python3.12 python3.12-venv
+  Depois abra um terminal NOVO (para o PATH pegar o Python novo) e rode isto de novo."
+
+# ⚠⚠ VENV VELHO NÃO SE REAPROVEITA. Caso real (Vitor, 05/09/2026): a primeira execução foi com o
+# Python 3.9.6 do sistema e criou o venv; depois de instalar o Python novo pelo Homebrew, o script
+# encontrou o venv, reaproveitou e chamou o pip DELE — o do 3.9. O pacote foi recusado e o erro que
+# apareceu foi "pip install graphifyy falhou", falando do Python antigo, que nem estava mais no
+# PATH. Conferir só se o venv EXISTE não basta: tem que conferir se ele ainda serve.
+if [ -x "$VENV/bin/python3" ] && ! serve "$VENV/bin/python3"; then
+  info "o venv é do Python $(versao "$VENV/bin/python3") — refazendo com o $(versao python3)"
+  rm -rf "$VENV"
+fi
 
 if [ ! -x "$VENV/bin/python3" ]; then
   mkdir -p "$RAIZ"
