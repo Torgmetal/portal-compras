@@ -50,26 +50,54 @@ export default function PerfisSemMaterial() {
   // peças — a cortada antes da entrega — recebe SEM_R: preenche o que ficou sem R e não encosta no
   // que o CMR da própria OP já respondeu. Na OP-106 é a diferença entre resolver 1 peça e apagar o
   // rastreio bom das outras 3 do mesmo perfil. (Vitor, 28/08/2026: "sem você quebrar outras coisas".)
-  const apontar = async (perfil, r, escopo) => {
-    setSalvando(`${perfil}|${r}`);
+  const motivoDe = (escopo) => (escopo === "SEM_R"
+    ? "peça cortada antes da entrega — origem do estoque apontada na conferência de rastreabilidade"
+    : "material de estoque — origem apontada na conferência de rastreabilidade");
+  const escopoDe = (g) => (g.motivo === "SEM_MATERIAL" ? "TODAS" : "SEM_R");
+
+  const gravar = async (trocas, chave, aviso) => {
+    setSalvando(chave);
     try {
       const res = await fetch("/api/pcp/separacao", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          opId: data.op.id,
-          trocas: [{
-            perfil, rUsado: r, escopo,
-            motivo: escopo === "SEM_R"
-              ? "peça cortada antes da entrega — origem do estoque apontada na conferência de rastreabilidade"
-              : "material de estoque — origem apontada na conferência de rastreabilidade",
-          }],
-        }),
+        body: JSON.stringify({ opId: data.op.id, trocas }),
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "Erro");
-      showToast("Origem registrada — o data book passa a trazer o certificado.", "success");
+      showToast(aviso, "success");
       buscar();
     } catch (e) { showToast(e.message, "error"); } finally { setSalvando(null); }
+  };
+
+  const apontar = (perfil, r, escopo) =>
+    gravar([{ perfil, rUsado: r, escopo, motivo: motivoDe(escopo) }], `${perfil}|${r}`,
+      "Origem registrada — o data book passa a trazer o certificado.");
+
+  // ── UM R, TODOS OS PERFIS DAQUELE MATERIAL ──────────────────────────────────────────────────
+  //
+  // Vitor (05/09/2026), fechando a OP-085: "possa ser que eu comprei material em nome de outro
+  // cliente e o recebimento não fica sabendo, ou seja precisa pegar dentro da planilha um R para
+  // casar para todos esses itens".
+  //
+  // A declaração é gravada POR PERFIL (é o que o motor de rastreio respeita), mas o fardo é do
+  // MATERIAL: a mesma chapa de 6,35 aparece na lista como CH6.40X102, CH6.40X73, CH6.40X64… — oito
+  // perfis, oito confirmações idênticas do mesmo lote. Na 085 são 38 perfis para ~13 materiais.
+  // Aqui o clique continua sendo uma decisão de gente ("este fardo é este"), só que ela vale para
+  // todos os perfis que saem daquele material de uma vez.
+  const perfisDoMaterial = (material) =>
+    (data?.perfis || []).filter((g) => !g.jaApontado && g.candidatos.some((c) => c.material === material));
+
+  const apontarMaterial = (material, r) => {
+    const alvos = perfisDoMaterial(material);
+    if (!confirm(
+      `Registrar o R ${r} como origem de ${alvos.length} perfis desta OP?\n\n` +
+      `Material: ${material}\n\n` + alvos.map((g) => `· ${g.perfil} (${g.marcas} marca${g.marcas === 1 ? "" : "s"})`).join("\n")
+    )) return;
+    return gravar(
+      alvos.map((g) => ({ perfil: g.perfil, rUsado: r, escopo: escopoDe(g), motivo: motivoDe(escopoDe(g)) })),
+      `lote|${material}|${r}`,
+      `${alvos.length} perfis apontados no R ${r}.`,
+    );
   };
 
   const t = data?.totais;
@@ -157,10 +185,17 @@ export default function PerfisSemMaterial() {
                           </span>
                           <span className="text-torg-gray shrink-0">{fmtN(c.pesoKg)} kg</span>
                           {!c.temArquivo && <span className="text-torg-orange-700 shrink-0">sem PDF</span>}
-                          <button onClick={() => apontar(g.perfil, c.r, g.motivo === "SEM_MATERIAL" ? "TODAS" : "SEM_R")} disabled={!!salvando}
+                          <button onClick={() => apontar(g.perfil, c.r, escopoDe(g))} disabled={!!salvando}
                             className="ml-auto shrink-0 text-[10px] font-semibold text-torg-blue hover:underline disabled:opacity-50">
                             {salvando === `${g.perfil}|${c.r}` ? "gravando…" : g.jaApontado === c.r ? "apontado" : "veio deste"}
                           </button>
+                          {perfisDoMaterial(c.material).length > 1 && (
+                            <button onClick={() => apontarMaterial(c.material, c.r)} disabled={!!salvando}
+                              title={`Registra este R como origem de todos os perfis desta OP que saem de "${c.material}"`}
+                              className="shrink-0 text-[10px] font-semibold text-torg-gray hover:text-torg-blue hover:underline disabled:opacity-50">
+                              {salvando === `lote|${c.material}|${c.r}` ? "gravando…" : `e nos outros ${perfisDoMaterial(c.material).length - 1}`}
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
