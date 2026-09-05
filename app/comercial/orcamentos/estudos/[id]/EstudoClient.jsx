@@ -223,6 +223,17 @@ function ImportarLqc({ id, onPronto, showToast }) {
   );
 }
 
+// Uma parcela da composição do preço da área: valor cheio e o R$/kg, que é como o Comercial confere.
+function Comp({ r, v, kg, nota, forte }) {
+  return (
+    <div title={nota || undefined}>
+      <p className={`text-[10px] uppercase tracking-wide ${forte ? "text-torg-dark font-semibold" : "text-torg-gray"}`}>{r}</p>
+      <p className={`${forte ? "font-bold text-torg-dark" : "text-torg-dark"}`}>{fmtR$(v)}</p>
+      <p className="text-[10px] text-torg-gray">{fmtR$(kg > 0 ? v / kg : 0)}/kg</p>
+    </div>
+  );
+}
+
 function Kpi({ r, v, cor }) {
   return (
     <div className="bg-white p-3 min-w-0">
@@ -2250,6 +2261,12 @@ const Linha = ({ r, v, forte }) => (
  * é o que garante que nada se perdeu nem foi contado duas vezes no caminho.
  */
 function PlanilhaComercial({ res, e }) {
+  // ⚠ Matheus (Comercial, 05/09/2026): "na aba de resumo quando mostra os valores seria importante
+  // ter um botão pra ver 'composição do preço', eu uso isso pra verificar se os valores estão
+  // coerentes". O R$/kg da área é um número só, e um número só não se confere: ou se acredita, ou
+  // se refaz a conta na planilha à parte. Aberto, cada área mostra o caminho inteiro — material,
+  // terceiros, industrialização, custo/kg, BDI e preço/kg — que é como ele já confere na LQC.
+  const [comp, setComp] = useState(false);
   const t = res.totais || {};
   const dentro = (res.porArea || []).filter((a) => a.ativo);
   const fora = (res.porArea || []).filter((a) => !a.ativo);
@@ -2276,10 +2293,16 @@ function PlanilhaComercial({ res, e }) {
           <p className="text-[12px] font-bold text-torg-dark">
             Fornecimento de estruturas metálicas{e.obra ? ` — ${e.obra}` : ""}
           </p>
-          <p className="text-[11px] text-torg-gray">
-            {dentro.length} {dentro.length === 1 ? "área" : "áreas"} no escopo
-            {fora.length > 0 && <> · {fora.length} fora</>}
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-[11px] text-torg-gray">
+              {dentro.length} {dentro.length === 1 ? "área" : "áreas"} no escopo
+              {fora.length > 0 && <> · {fora.length} fora</>}
+            </p>
+            <button onClick={() => setComp((v) => !v)}
+              className={`text-[11px] font-semibold rounded-lg px-2.5 py-1 border transition-colors ${comp ? "bg-torg-blue text-white border-transparent" : "text-torg-blue border-torg-blue-200 hover:bg-torg-blue-50"}`}>
+              Composição do preço
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-[12px]" style={{ minWidth: 700 }}>
@@ -2300,6 +2323,21 @@ function PlanilhaComercial({ res, e }) {
                   <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{Number(a.pesoKg).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(a.precoPorKg)}</td>
                   <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(a.preco)}</td>
+                </tr>
+              ))}
+              {comp && dentro.map((a) => (
+                <tr key={`c-${a.area}`} className="bg-torg-blue-50/30">
+                  <td className="px-4 py-2 text-[11px] text-torg-gray align-top">↳</td>
+                  <td className="px-2 py-2 text-[11px]" colSpan={5}>
+                    <p className="font-semibold text-torg-dark mb-1">{a.area} · como se chega em {fmtR$(a.precoPorKg)}/kg</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-1 tabular-nums">
+                      <Comp r="Material" v={a.material} kg={a.pesoKg} nota="aço, tinta da cor e o rateio por peso do que não tem área (fixador, aço por perfil)" />
+                      <Comp r="Terceiros" v={a.terceiros} kg={a.pesoKg} nota="serviço da área + rateio de terceiro geral, ensaio e frete diluído" />
+                      <Comp r="Industrialização" v={a.industrializacao} kg={a.pesoKg} nota="fabricação e pintura da classe da área" />
+                      <Comp r="Custo" v={a.custo} kg={a.pesoKg} forte />
+                      <Comp r={`Preço (BDI ${res.bdiPct || 0}%)`} v={a.preco} kg={a.pesoKg} forte />
+                    </div>
+                  </td>
                 </tr>
               ))}
               {!dentro.length && <tr><td colSpan={6} className="px-4 py-6 text-center text-torg-gray">Nenhuma área no escopo.</td></tr>}
