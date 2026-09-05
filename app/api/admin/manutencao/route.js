@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminDoPortal } from "@/lib/session";
 import { conferirBanco } from "@/lib/banco-esperado";
 import { conferirEtapaPortalXSyneco } from "@/lib/conferencias";
+import { perfisSemMaterialDaOp } from "@/lib/rastreio-sem-material";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -130,6 +131,51 @@ const TAREFAS = [
       return `${r.count} peça(s) com baixa e ${l.count} lote(s) de corte fechado(s)`;
     },
   },
+  {
+    // ⚠⚠ ISTO GRAVA UMA DECLARAÇÃO DE RASTREABILIDADE, e por isso o botão está aqui e não num
+    // script meu: quem clica assina. O registro guarda quem declarou e quando, e o motivo diz em
+    // letras que a escolha do fardo foi automática — para o Almoxarifado poder conferir e trocar.
+    //
+    // Vitor (05/09/2026), fechando o data book da OP-085: "possa ser que eu comprei material em
+    // nome de outro cliente e o recebimento não fica sabendo, ou seja precisa pegar dentro da
+    // planilha um R para casar para todos esses itens". São 39 perfis para 11 materiais.
+    id: "origem-r-085",
+    titulo: "OP-085 — amarrar a origem do aço lançado em outra obra",
+    porque:
+      "39 perfis da 085 não têm entrada no CMR da própria obra porque o material foi comprado em nome de outro cliente. Enquanto ninguém declara de onde veio, a peça sai sem R no data book. A escolha do fardo é automática (chegou antes do corte, com certificado, preferindo lote sem obra) e fica registrada como automática — confira com o Almoxarifado e troque na tela Qualidade › Perfis sem material se algum estiver errado.",
+    async checar() {
+      const r = await perfisSemMaterialDaOp("085");
+      if (!r) return { falta: false, detalhe: "OP-085 não encontrada" };
+      const grupos = agruparPorMaterial(r.perfis);
+      const perfis = grupos.reduce((n, g) => n + g.perfis.length, 0);
+      const semCandidato = r.perfis.filter((g) => !g.jaApontado && !g.candidatos.length).length;
+      const extra = semCandidato ? ` · ${semCandidato} perfil(s) sem candidato em obra nenhuma (não dá para amarrar)` : "";
+      return {
+        falta: grupos.length > 0,
+        detalhe: grupos.length
+          ? `${perfis} perfil(s) em ${grupos.length} material(is): ${grupos.slice(0, 4).map((g) => `${g.material.slice(0, 34)} → R ${g.r}`).join(" · ")}${grupos.length > 4 ? "…" : ""}${extra}`
+          : `nada a amarrar${extra}`,
+      };
+    },
+    async aplicar(user) {
+      const r = await perfisSemMaterialDaOp("085");
+      const grupos = agruparPorMaterial(r?.perfis || []);
+      const op = await prisma.oP.findFirst({ where: { numero: "085" }, select: { id: true } });
+      let n = 0;
+      for (const g of grupos) {
+        for (const p of g.perfis) {
+          const motivo = `origem escolhida automaticamente na Manutenção (lote disponível antes do corte, com certificado, preferindo lote sem obra) — R ${g.r}${g.op ? ` da OP-${g.op}` : " sem obra"}; conferir com o Almoxarifado`;
+          await prisma.trocaRastreabilidade.upsert({
+            where: { opNumero_perfil: { opNumero: "085", perfil: p.perfil } },
+            create: { opId: op?.id || null, opNumero: "085", perfil: p.perfil, rUsado: g.r, escopo: p.escopo, motivo, trocadoPorId: user?.id || null, trocadoPorNome: user?.name || null },
+            update: { rUsado: g.r, escopo: p.escopo, motivo, trocadoPorId: user?.id || null, trocadoPorNome: user?.name || null },
+          });
+          n++;
+        }
+      }
+      return `${n} perfil(s) amarrado(s) em ${grupos.length} material(is). Agora abra o data book da 085 e clique em "Trazer certificados de material (aço) desta OP" na §04 — é o clique que traz os certificados desses R para dentro do livro.`;
+    },
+  },
 ];
 
 const opDaObra = (numero) => prisma.oP.findFirst({ where: { numero }, select: { id: true } });
@@ -147,6 +193,48 @@ const alvoLotesCorte = (opId) => ({
   status: { in: ["LIBERADA", "EM_PRODUCAO"] },
   setores: { array_contains: ["CORTE"] },
 });
+
+// ── ESCOLHA DO FARDO ─────────────────────────────────────────────────────────────────────────
+//
+// A regra, na ordem, é a mesma que a tela de Perfil sem material já usa para ordenar os candidatos:
+//   1. o lote tem de ter chegado ANTES do corte — peça não sai de aço que ainda não estava aqui;
+//   2. com certificado digitalizado — R sem PDF não fecha data book, só troca um buraco por outro;
+//   3. lote SEM obra na coluna do CMR antes de lote de outra obra — estoque puro é o candidato
+//      menos comprometido;
+//   4. entre os que sobram, o mais recente: é o que estava na prateleira quando se cortou.
+// ⚠ `teto` = o corte mais recente da OP. Perfil que nunca foi apontado no corte não tem data
+// própria, e sem teto o critério "mais recente" escolhia um fardo que chegou depois da obra inteira
+// (na 085 ia pegar uma chapa de 3,00 recebida em 02/09/2026 para uma peça de 2025).
+function melhorCandidato(cands, teto) {
+  const plausiveis = cands.filter((c) => c.antesDoCorte !== false && !(teto && c.recebidoEm && new Date(c.recebidoEm) > teto));
+  const pool = plausiveis.length ? plausiveis : cands.filter((c) => c.antesDoCorte !== false);
+  if (!pool.length) return null;
+  return [...pool].sort((a, b) =>
+    (b.temArquivo === true) - (a.temArquivo === true) ||
+    (!b.op) - (!a.op) ||
+    new Date(b.recebidoEm || 0) - new Date(a.recebidoEm || 0)
+  )[0] || null;
+}
+
+// Um R por MATERIAL, não por perfil: a mesma chapa de 6,35 aparece na lista como CH6.40X102,
+// CH6.40X73, CH6.40X64… e o fardo é o mesmo. Devolve [{ material, r, perfis:[{perfil, escopo}] }].
+function agruparPorMaterial(perfis) {
+  const datas = perfis.map((g) => (g.cortadoEm ? new Date(g.cortadoEm) : null)).filter(Boolean);
+  const teto = datas.length ? new Date(Math.max(...datas)) : null;
+  const porMaterial = new Map();
+  for (const g of perfis) {
+    if (g.jaApontado || !g.candidatos.length) continue;
+    const c = melhorCandidato(g.candidatos, teto);
+    if (!c) continue;
+    const chave = c.material || `R${c.r}`;
+    const grupo = porMaterial.get(chave) || { material: chave, r: c.r, op: c.op, recebidoEm: c.recebidoEm, temArquivo: c.temArquivo, perfis: [] };
+    // ⚠ TODAS quando o perfil não tem material nenhum na OP; SEM_R quando ele TEM (a peça é a que
+    // foi cortada antes da entrega) — senão a declaração atropelaria rastreio bom das irmãs.
+    grupo.perfis.push({ perfil: g.perfil, marcas: g.marcas, escopo: g.motivo === "SEM_MATERIAL" ? "TODAS" : "SEM_R" });
+    porMaterial.set(chave, grupo);
+  }
+  return [...porMaterial.values()].sort((a, b) => b.perfis.length - a.perfis.length);
+}
 
 const ALVO_MONTAGEM = {
   tipoPeca: "CONJUNTO",
@@ -210,7 +298,7 @@ export async function POST(req) {
     try {
       const { falta } = await t.checar();
       if (!falta) { feitos.push({ id: t.id, titulo: t.titulo, ok: true, resultado: "já estava em dia" }); continue; }
-      const resultado = await t.aplicar();
+      const resultado = await t.aplicar(user);
       feitos.push({ id: t.id, titulo: t.titulo, ok: true, resultado });
     } catch (e) {
       // ⚠ uma tarefa que falha não impede as outras: são independentes, e parar tudo por causa de
