@@ -67,6 +67,30 @@ const TAREFAS = [
     },
   },
   {
+    // ⚠ o cron novo (5h50 e 13h50) faz isso sozinho daqui pra frente; esta tarefa existe para o
+    // acúmulo — e para quem não quer esperar o próximo horário.
+    id: "casar-certificados",
+    titulo: "Certificados com PDF na pasta e sem vínculo",
+    porque:
+      "Vitor (05/09/2026): \"por que não está dando para baixar os certificados? o Eduardo disse que anexou na pasta\". Estava anexado; faltava casar o PDF com o R. Sem o vínculo, o cliente vê a linha da rastreabilidade sem download e o data book monta sem o certificado.",
+    async checar() {
+      const { mapearCertificados } = await import("@/lib/match-certificados");
+      const { DO_CMR } = await import("@/lib/cmr-origens");
+      const mapa = await mapearCertificados();
+      const docs = await prisma.documentoQualidade.findMany({
+        where: { ativo: true, ...DO_CMR, importRef: { not: null }, sharepointItemId: null },
+        select: { importRef: true },
+      });
+      const n = docs.filter((d) => mapa.porIndice.has(d.importRef)).length;
+      return { falta: n > 0, detalhe: n ? `${n} certificado(s) esperando o vínculo (${mapa.totalPdfs} PDFs na pasta)` : "todos os PDFs da pasta já estão vinculados" };
+    },
+    async aplicar() {
+      const { casarCertificados } = await import("@/lib/match-certificados");
+      const r = await casarCertificados();
+      return `${r.casados} certificado(s) vinculado(s)`;
+    },
+  },
+  {
     id: "baixa-preparacao-113",
     titulo: "Baixa da preparação da OP-113",
     porque:
