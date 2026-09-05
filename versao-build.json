@@ -1,7 +1,12 @@
 {
-  "build": 2789,
-  "gerado": "2026-09-05T13:26:14.765Z",
+  "build": 2790,
+  "gerado": "2026-09-05T13:26:28.410Z",
   "commits": [
+    {
+      "hash": "2e29deebe4",
+      "data": "05/09/2026",
+      "titulo": "Quebra o RMComprasClient (4231 linhas) em módulos por responsabilidade"
+    },
     {
       "hash": "7c86c84048",
       "data": "04/09/2026",
@@ -146,11 +151,6 @@
       "hash": "6fba7e8ee0",
       "data": "04/09/2026",
       "titulo": "Portal do colaborador: fim do loop de redirect que dava tela branca ao logar"
-    },
-    {
-      "hash": "b755ff6dca",
-      "data": "04/09/2026",
-      "titulo": "Portal do cliente: a rastreabilidade fecha a corrente RM -> pedido -> NF -> R"
     }
   ]
 }
