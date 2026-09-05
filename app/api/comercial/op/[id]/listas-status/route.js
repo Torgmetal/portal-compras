@@ -63,13 +63,20 @@ export async function GET(req, { params }) {
     const cron = await prisma.cronograma.findFirst({
       where: { ativo: true, opId: op.id },
       orderBy: { ultimoSync: "desc" },
-      select: { ultimoSync: true, tarefas: { select: { nome: true, departamento: true, isSummary: true } } },
+      select: { ultimoSync: true, tarefas: { select: { nome: true, departamento: true, isSummary: true, updatedAt: true } } },
     });
     if (cron) {
       const fab = (cron.tarefas || []).filter((t) => !t.isSummary && t.departamento === "FABRICACAO");
+      // ⚠ ajuste à mão TAMBÉM é atualização: `ultimoSync` só marca a importação do arquivo, e quem
+      // corrige o avanço na tela não mexe nele. Sem isto, obra acertada hoje continuaria acusada de
+      // estar parada há 96 dias — e o aviso viraria ruído que se aprende a ignorar.
+      const atualizadoEm = (cron.tarefas || []).reduce(
+        (max, t) => (t.updatedAt && t.updatedAt > max ? t.updatedAt : max),
+        cron.ultimoSync,
+      );
       cronograma = {
-        atualizadoEm: cron.ultimoSync,
-        dias: Math.round((Date.now() - new Date(cron.ultimoSync)) / 86400000),
+        atualizadoEm,
+        dias: Math.round((Date.now() - new Date(atualizadoEm)) / 86400000),
         fabricacao: fab.length,
         medidas: fab.filter((t) => faseDaTarefa(t.nome)).length,
       };

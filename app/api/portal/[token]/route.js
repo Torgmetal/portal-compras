@@ -129,7 +129,7 @@ export async function GET(req, { params }) {
         where: { cronogramaId: cron.id },
         select: {
           id: true, nome: true, area: true, departamento: true, isSummary: true,
-          dataInicioPrevista: true, dataFimPrevista: true,
+          dataInicioPrevista: true, dataFimPrevista: true, updatedAt: true,
           percentualPrevisto: true, percentualRealizado: true,
         },
         orderBy: [{ dataInicioPrevista: "asc" }],
@@ -170,7 +170,15 @@ export async function GET(req, { params }) {
       dados.cronograma = {
         titulo: cron.titulo,
         inicio: fmt(cron.dataInicio), fim: fmt(cron.dataFim),
-        atualizadoEm: fmt(cron.ultimoSync),
+        // ⚠⚠ ATUALIZADO = A MAIS RECENTE ENTRE A IMPORTAÇÃO E A EDIÇÃO À MÃO. `ultimoSync` é o
+        // carimbo do arquivo do SharePoint; quem corrige o avanço na tela do Planejamento não mexe
+        // nele. Sem isto, obra ajustada à mão hoje continuaria anunciando ao cliente a data da
+        // última importação — na OP-085, 31/05, três meses atrás (Vitor, 05/09/2026: "vamos fazer
+        // um ajuste à mão dela").
+        atualizadoEm: fmt(tarefasCru.reduce(
+          (max, t) => (t.updatedAt && t.updatedAt > max ? t.updatedAt : max),
+          cron.ultimoSync,
+        )),
         areas: areasCron,
         tarefas: tarefas
           .filter((t) => !t.isSummary && t.dataInicioPrevista && t.dataFimPrevista)
