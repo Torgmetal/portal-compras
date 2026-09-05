@@ -81,8 +81,13 @@ const CSS = `
   .gpcp .cg .f{position:absolute;left:0;top:0;bottom:0;background:rgba(15,157,88,.22)}
   .gpcp .cg span{position:absolute;right:4px;top:2px;font-size:9.5px;font-weight:700;color:#5b6a7d;
            font-variant-numeric:tabular-nums;letter-spacing:-.2px}
+  /* ⚠⚠ VERMELHO É SÓ DE ATRASO. Vitor (05/09/2026): "vamos deixar o vermelho apenas para atraso".
+     Sobrecarga vira HACHURA âmbar: continua gritando "não cabe" sem disputar significado com o atraso.
+     Tirar a cor sem pôr outra deixaria a bancada estourada com a mesma cara da bancada folgada. */
   .gpcp .cg.q2 .f{background:rgba(217,135,0,.32)} .gpcp .cg.q2 span{color:#8a5600}
-  .gpcp .cg.q3 .f{background:rgba(198,40,40,.30)} .gpcp .cg.q3 span{color:#a01c1c}
+  .gpcp .cg.q3 .f{background:repeating-linear-gradient(135deg,rgba(217,135,0,.42),rgba(217,135,0,.42) 4px,
+            rgba(217,135,0,.14) 4px,rgba(217,135,0,.14) 8px)}
+  .gpcp .cg.q3 span{color:#7a4a00}
   .gpcp .linha.pousio .rotulo{background:repeating-linear-gradient(135deg,#fff,#fff 7px,#f6f8fb 7px,#f6f8fb 14px)}
 
   .gpcp .cabdia{position:sticky;top:0;z-index:6;background:#fbfcfe;border-bottom:2px solid var(--linha);
@@ -110,25 +115,48 @@ const CSS = `
                  padding:5px 8px;white-space:nowrap}
   .gpcp .caret{font-size:9px;color:var(--tinta-2);width:9px}
 
+  /* ⚠⚠ A BARRA NÃO VEM PREENCHIDA. Vitor (05/09/2026): "não queria que a barra já viesse preenchida,
+     queria um tom de azul no caso da 112 que ainda não iniciou opaco e conforme o apontamento do Syneco
+     fosse preenchendo, igual é um gantt de cronograma". Então contorno + fundo esmaecido na cor da OP =
+     PROGRAMADO, e a faixa sólida embaixo = APONTADO. O rótulo fica na cor da OP sobre fundo claro, e é
+     por isso que ele não some conforme o preenchimento cresce - texto branco sobre barra meio cheia
+     seria ilegível justamente no meio do avanço. */
   .gpcp .barra-op{position:absolute;height:23px;border-radius:5px;display:flex;align-items:center;gap:6px;
-            padding:0 7px;cursor:grab;pointer-events:auto;color:#fff;overflow:hidden;user-select:none;
-            box-shadow:0 1px 2px rgba(13,31,60,.22);border-left:3px solid rgba(0,0,0,.28);touch-action:none}
+            padding:0 7px;cursor:grab;pointer-events:auto;overflow:hidden;user-select:none;
+            background:var(--ct);color:var(--c);border:1.5px solid var(--c);
+            box-shadow:0 1px 2px rgba(13,31,60,.14);touch-action:none}
+  .gpcp .barra-op .prog{position:absolute;left:0;bottom:0;height:6px;background:var(--c);opacity:.9;
+            border-radius:0 3px 3px 0;pointer-events:none}
   .gpcp .barra-op:active{cursor:grabbing}
   .gpcp .barra-op.arrastando{opacity:.35}
   .gpcp .barra-op.foco{outline:2px solid var(--navy);outline-offset:1px}
   .gpcp .barra-op b{font-size:11.5px;font-weight:800;white-space:nowrap}
   .gpcp .barra-op span{font-size:10.5px;opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
                  font-variant-numeric:tabular-nums}
-  .gpcp .barra-op .selo{margin-left:auto;font-size:9.5px;background:rgba(0,0,0,.26);border-radius:3px;
-                  padding:1px 4px;font-weight:700;white-space:nowrap}
+  .gpcp .barra-op .selo{margin-left:auto;font-size:9.5px;background:rgba(255,255,255,.82);border-radius:3px;
+                  padding:1px 4px;font-weight:700;white-space:nowrap;border:1px solid var(--ct)}
   .gpcp .barra-op.mexida{outline:2px solid var(--laranja);outline-offset:-2px}
   .gpcp .fantasma{position:fixed;z-index:99;pointer-events:none;opacity:.92;
             box-shadow:0 8px 20px rgba(13,31,60,.35)}
-  .gpcp .corta{position:absolute;top:0;bottom:0;width:9px;background:rgba(0,0,0,.22);
+  .gpcp .corta{position:absolute;top:0;bottom:0;width:9px;background:var(--c);
          display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff}
   .gpcp .corta.e{left:0;border-radius:5px 0 0 5px} .gpcp .corta.d{right:0;border-radius:0 5px 5px 0}
   .gpcp .semgrd{position:absolute;right:3px;top:3px;width:7px;height:7px;border-radius:50%;
           background:#ffd27a;box-shadow:0 0 0 1.5px rgba(0,0,0,.25)}
+
+  /* ── atraso ─────────────────────────────────────────────────────────────────
+     A faixa vermelha cobre o PEDAÇO da barra cujo dia já passou e ainda tem peça pendente: é o
+     trabalho que devia estar pronto. A sombra tracejada é para onde a OP seguinte CAI se ninguém
+     recuperar - previsão, não gravação: só vira programação quando o PCP aplicar e salvar. */
+  .gpcp .barra-op .atrasado{position:absolute;left:0;top:0;bottom:0;pointer-events:none;
+            background:repeating-linear-gradient(135deg,rgba(198,40,40,.34),rgba(198,40,40,.34) 5px,
+                       rgba(198,40,40,.10) 5px,rgba(198,40,40,.10) 10px);
+            border-right:2px solid #c62828}
+  .gpcp .barra-op.atrasada{border-color:#c62828}
+  .gpcp .barra-op .selo.atr{background:#c62828;color:#fff;border-color:#c62828}
+  .gpcp .sombra{position:absolute;height:23px;border-radius:5px;pointer-events:none;display:flex;
+          align-items:center;padding:0 7px;border:1.5px dashed var(--c);background:var(--ct);opacity:.7}
+  .gpcp .sombra b{font-size:10.5px;font-weight:800;color:var(--c);white-space:nowrap}
 
   .gpcp /* ── alterações ────────────────────────────────────────────────── */
   .pend{flex:0 0 auto;margin-top:10px;background:var(--papel);border:1px solid var(--linha);
@@ -244,11 +272,14 @@ const MARKUP = `<div class="wrap">
     <div class="sep"></div>
     <button class="btn" id="gp-recarregar">Atualizar</button>
     <button class="btn" id="gp-cheio">Tela cheia</button>
+    <button class="btn" id="gp-empurrar" hidden></button>
     <span class="leg">
-      <span>Ocupação:</span>
-      <span><i style="background:rgba(15,157,88,.45)"></i>até 100%</span>
-      <span><i style="background:rgba(217,135,0,.55)"></i>100–130%</span>
-      <span><i style="background:rgba(198,40,40,.5)"></i>+130%</span>
+      <span>Bancada:</span>
+      <span><i style="background:rgba(15,157,88,.45)"></i>cabe</span>
+      <span><i style="background:rgba(217,135,0,.55)"></i>apertado</span>
+      <span><i style="background:repeating-linear-gradient(135deg,rgba(217,135,0,.5),rgba(217,135,0,.5) 3px,rgba(217,135,0,.14) 3px,rgba(217,135,0,.14) 6px)"></i>não cabe</span>
+      <span class="sep"></span>
+      <span><i style="background:repeating-linear-gradient(135deg,rgba(198,40,40,.45),rgba(198,40,40,.45) 3px,rgba(198,40,40,.12) 3px,rgba(198,40,40,.12) 6px)"></i>atraso</span>
     </span>
   </div>
 
@@ -317,6 +348,10 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   const OPS = [...new Set(LOTES.map(l=>l.op))].sort();
   const COR_OP = new Map(OPS.map((op,i)=>[op, PALETA[i%PALETA.length]]));
   const corDaOp = (op)=>COR_OP.get(op) || "#5b6a7d";
+  /* o mesmo tom da OP, esmaecido: é o fundo de "programado e ainda não apontado" */
+  const tintaOp = (op)=>{ const h = corDaOp(op).replace("#","");
+    const n = parseInt(h.length===3 ? h.split("").map(c=>c+c).join("") : h, 16);
+    return "rgba("+((n>>16)&255)+","+((n>>8)&255)+","+(n&255)+",.13)"; };
 
   /* ── calendário ─────────────────────────────────────────────────────────────── */
   const d0 = (s)=>new Date(s+"T00:00:00Z");
@@ -486,6 +521,44 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   }
   const ocup = (setor, recurso, dia, ign)=>{ const cap = capDe(setor,recurso); return cap ? carga(setor,recurso,dia,ign)/cap : 0; };
   const classeOc = (o)=> o<=0 ? "" : o<=1 ? "q1" : o<=1.3 ? "q2" : "q3";
+  /* ⚠ "532%" não diz nada sobre UM dia. Vitor (05/09/2026): "não entendi essa lógica". Acima da
+     capacidade a leitura vira múltiplo - "5,3×" = cinco dias e meio de bancada empilhados num dia só. */
+  const rotuloOc = (o)=> o<=1 ? Math.round(o*100)+"%"
+                              : (Math.round(o*10)/10).toLocaleString("pt-BR")+"×";
+
+  /* ── atraso e o empurrão que ele causa ──────────────────────────────────────
+     ⚠ ATRASO É FATO, NÃO PALPITE: dia já passou E ainda tem peça sem apontamento no Syneco. O custo
+     que sobrou consome a bancada a partir de hoje, e é isso que empurra quem vinha atrás. O empurrão
+     é sempre em dias ÚTEIS inteiros, porque bancada-dia é a unidade em que a fábrica programa. */
+  const fracaoFeita = (l)=> l.pecas>0 ? Math.min(1, l.feitas/l.pecas) : 0;
+  const loteAtrasado = (l)=> l.dia < HOJE && l.pecas > l.feitas;
+  function empurraoDoRecurso(setor, rec){
+    const cap = capDe(setor, rec); if(!cap) return 0;
+    let pend = 0;
+    for(const l of lotes){
+      if(l.setor!==setor || l.recurso!==rec || !loteAtrasado(l)) continue;
+      pend += custoLote(l) * (1 - fracaoFeita(l));
+    }
+    return pend > 0 ? Math.ceil(pend/cap) : 0;
+  }
+
+  /* onde cada OP do recurso cai se o atraso não for recuperado (previsão, nada gravado) */
+  function sombrasDoEmpurrao(runs, emp, inicio, larg){
+    if(!emp) return "";
+    let h = "";
+    for(const r of runs){
+      if(DIAS[r.ini] < HOJE) continue;
+      const ni = r.ini+emp, nf = r.fim+emp;
+      if(nf<inicio || ni>=inicio+larg) continue;
+      const a = Math.max(ni,inicio), b = Math.min(nf, inicio+larg-1);
+      const x = (a-inicio)*COL+3, w = (b-a+1)*COL-7;
+      h += '<div class="sombra" style="left:'+x+'px;width:'+w+'px;top:'+(r.faixa*30+5)+'px;'
+        +  '--c:'+corDaOp(r.op)+';--ct:'+tintaOp(r.op)+'" title="OP-'+r.op+' cai aqui se o atraso '
+        +  'não for recuperado ('+emp+' dia útil'+(emp>1?'s':'')+' de empurrão)">'
+        +  (w>=90?'<b>OP-'+r.op+' →</b>':'')+'</div>';
+    }
+    return h;
+  }
 
   /* ── desenho da grade ───────────────────────────────────────────────────────── */
   const grade = $("grade");
@@ -526,6 +599,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
           faixas[f]=r.fim; r.faixa=f;
         }
         const naJanela = meus.filter(r=>r.fim>=inicio && r.ini<inicio+larg).length;
+        const emp = empurraoDoRecurso(setor, rec.k);
         const alt = naJanela ? Math.max(1,faixas.length)*30 + 8 + 16 : 38;
         html += '<div class="linha'+(rec.k?"":" pousio")+'" data-setor="'+setor+'" data-rec="'+(rec.k||"")+'" '
              +  'data-row="'+setor+'|'+(rec.k||"")+'" style="min-height:'+alt+'px">';
@@ -539,27 +613,49 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
           const a = Math.max(r.ini,inicio), b = Math.min(r.fim, inicio+larg-1);
           const x = (a-inicio)*COL+3, w = (b-a+1)*COL-7;
           const cabe = w >= 200, dias = r.dias, pend = r.pecas-r.feitas;
+          const fr = r.pecas>0 ? Math.min(1, r.feitas/r.pecas) : 0;
+          /* a parte da barra que já venceu e não foi apontada */
+          const atrasados = r.lotes.filter(loteAtrasado);
+          const atrasoAte = atrasados.length ? Math.max(...atrasados.map(l=>IDX.get(l.dia))) : -1;
+          const larguraAtraso = atrasoAte>=0 ? ((Math.min(atrasoAte,b)-a+1)/(b-a+1))*100 : 0;
+          /* ⚠ sábado e domingo passaram a ter coluna (71cef05a), então `DIAS` já não é só dia útil:
+             o atraso desconta o fim de semana. Sem isso o que venceu na sexta apareceria como 3 dias
+             de atraso na segunda, e a fábrica não trabalhou nesses dois. */
+          const diasAtraso = atrasoAte>=0
+            ? DIAS.slice(Math.min(...atrasados.map(l=>IDX.get(l.dia))))
+                  .filter(d=>d<HOJE && !fdsISO(d)).length : 0;
           const foco = painel && painel.setor===r.setor && painel.recurso===r.recurso && painel.op===r.op && painel.ini===r.ini;
           const dica = "OP-"+r.op+(r.obra?" — "+r.obra:"")+"\n"+rec.nome+" · "
             + (dias>1 ? dbr(DIAS[r.ini])+" a "+dbr(DIAS[r.fim])+" ("+dias+" dias)" : dbr(DIAS[r.ini]))
             + "\n"+r.pecas+" peças · "+nkg(r.kg)+" kg"
+            + "\nSyneco apontou "+r.feitas+" de "+r.pecas+" ("+Math.round(fr*100)+"%)"
+            + (diasAtraso>0 ? "\n⚠ atrasada "+diasAtraso+" dia(s) úteis — "+pend+" peça(s) pendentes" : "")
             + (r.semGrd ? "\n"+r.semGrd+" projeto(s) ainda sem GRD impressa" : "\nprojetos todos impressos")
             + "\n\nclique para ver os projetos · arraste para remanejar";
-          html += '<div class="barra-op'+(r.mexida?" mexida":"")+(foco?" foco":"")+'" data-run="'+r.id+'" '
-               +  'title="'+dica.replace(/"/g,"&quot;")+'" style="left:'+x+'px;width:'+w+'px;top:'+(r.faixa*30+5)+'px;background:'+corDaOp(r.op)+'">'
+          html += '<div class="barra-op'+(r.mexida?" mexida":"")+(foco?" foco":"")+(diasAtraso>0?" atrasada":"")+'" data-run="'+r.id+'" '
+               +  'title="'+dica.replace(/"/g,"&quot;")+'" style="left:'+x+'px;width:'+w+'px;top:'+(r.faixa*30+5)+'px;'
+               +  '--c:'+corDaOp(r.op)+';--ct:'+tintaOp(r.op)+'">'
+               +  (fr>0?'<div class="prog" style="width:'+(fr*100).toFixed(1)+'%"></div>':"")
+               +  (larguraAtraso>0?'<div class="atrasado" style="width:'+larguraAtraso.toFixed(1)+'%"></div>':"")
                +  '<b>OP-'+r.op+'</b><span>'+(cabe ? r.pecas+' pç · '+nkg(r.kg)+' kg' : r.pecas+' pç')+'</span>'
+               +  (cabe && diasAtraso>0?'<span class="selo atr">atrasada '+diasAtraso+' d</span>':"")
                +  (cabe && r.adiado>0?'<span class="selo">adiada '+r.adiado+'×</span>':"")
-               +  (cabe && r.feitas>0?'<span class="selo">'+pend+' a fazer</span>':"")
+               +  (cabe && r.feitas>0?'<span class="selo">'+Math.round(fr*100)+'% · '+pend+' a fazer</span>':"")
                +  (r.semGrd?'<div class="semgrd" title="'+r.semGrd+' sem GRD"></div>':"")
                +  (r.ini<inicio?'<div class="corta e">◀</div>':"")+(r.fim>inicio+larg-1?'<div class="corta d">▶</div>':"")
                +  '</div>';
         }
+        /* ⚠ SOMBRA = PREVISÃO, NÃO PROGRAMAÇÃO. Onde a OP cai se o atraso não for recuperado. Nada
+           disso está no banco: vira alteração pendente só quando o PCP aplicar, e programação só
+           depois do "Salvar". Desenhar direto no lugar novo faria a tela mentir sobre o que está
+           gravado - foi exatamente essa confusão que escondeu 87 conjuntos da Larissa em 04/09. */
+        html += sombrasDoEmpurrao(meus, emp, inicio, larg);
         html += '</div>'+(naJanela?'<div class="cargas">':'<div class="cargas" hidden>');
         for(const s of janela){
           const o = ocup(setor, rec.k, s);
           html += '<div class="cg '+classeOc(o)+(fdsISO(s)?" fds":"")+'">'
                +  (o>0 ? '<div class="f" style="width:'+Math.min(100,o*100)+'%"></div>' : "")
-               +  (o>=0.005 ? '<span>'+Math.round(o*100)+'%</span>' : "")+'</div>';
+               +  (o>=0.005 ? '<span>'+rotuloOc(o)+'</span>' : "")+'</div>';
         }
         html += '</div></div></div>';
       }
@@ -693,14 +789,16 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     alteracoes.splice(i,1);
     redesenhar();
   }
-  function redesenhar(){ $("recarregar").onclick = ()=>recarregar();
+  /* ⚠ estes dois handlers moravam DENTRO de `redesenhar`, que não roda no init: "Atualizar" e "Tela
+     cheia" ficavam mortos até o usuário navegar o período ou arrastar alguma barra. */
+  $("recarregar").onclick = ()=>recarregar();
   $("cheio").onclick = ()=>{
     const c = raiz.classList.toggle("cheio");
     $("cheio").textContent = c ? "Sair da tela cheia" : "Tela cheia";
     desenhar();
   };
 
-  desenhar(); pintarAlteracoes(); if(painel) pintarPainel(); }
+  function redesenhar(){ desenhar(); pintarAlteracoes(); pintarEmpurrao(); if(painel) pintarPainel(); }
 
   function pintarAlteracoes(){
     const ul = $("listaAlt");
@@ -734,7 +832,9 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     $("pSub").innerHTML =
       nomeRec(r.setor, r.recurso)+" · " + (dias>1 ? dbr(DIAS[r.ini])+" a "+dbr(DIAS[r.fim])+" ("+dias+" dias)" : dbr(DIAS[r.ini]))
       + " · " + r.pecas.toLocaleString("pt-BR")+" peças · "+nkg(r.kg)+" kg"
-      + (r.setor==="CORTE" ? "" : " · "+n1(r.custo)+" dias-bancada");
+      + (r.setor==="CORTE" ? "" : " · "+n1(r.custo)+" dias-bancada")
+      + " · <b>"+r.feitas.toLocaleString("pt-BR")+" de "+r.pecas.toLocaleString("pt-BR")+" feitas</b>"
+      + " ("+Math.round((r.pecas>0?r.feitas/r.pecas:0)*100)+"%)";
     for(const b of raiz.querySelectorAll(".abas button")) b.classList.toggle("on", b.dataset.aba===abaP);
     if(abaP==="projetos") pintarProjetos(r); else pintarQuebra(r);
   }
@@ -752,12 +852,19 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     const temPerfil = itens.some(i=>i.pf);
     h += '<table class="marcas"><thead><tr><th style="width:26px"></th><th>Marca</th>'
       + (temPerfil?'<th>Perfil</th>':'')
-      + '<th class="num">Qte</th><th class="num">kg</th><th>GRD</th></tr></thead><tbody>';
+      + '<th class="num">Qte</th><th class="num" title="peças com apontamento no Syneco">Feito</th>'
+      + '<th class="num">kg</th><th>GRD</th></tr></thead><tbody>';
     for(const i of corte){
       const s = selMarcas.has(i.m);
       h += '<tr class="'+(s?"sel":"")+'"><td><input type="checkbox" class="ck" data-m="'+i.m+'"'+(s?" checked":"")+'></td>'
         + '<td><b>'+i.m+'</b></td>'+(temPerfil?'<td style="color:#5b6a7d">'+(i.pf||"—")+'</td>':'')
-        + '<td class="num">'+i.q+'</td><td class="num">'+nkg(i.kg)+'</td>'
+        + '<td class="num">'+i.q+'</td>'
+        /* ⚠ o `f` é o apontamento do Syneco por marca — o MESMO número que preenche a barra do
+           Gantt. Se a coluna e a barra discordassem, uma das duas estaria mentindo. */
+        + '<td class="num">'+(i.f
+            ? (i.f>=i.q ? '<b style="color:#136c35">'+i.f+'</b>' : i.f)
+            : '<span style="color:#aab4c0">—</span>')+'</td>'
+        + '<td class="num">'+nkg(i.kg)+'</td>'
         + '<td>'+(i.g
             ? '<span class="pilha ok" title="impressa por '+(i.g.por||"—")+(i.g.n>1?" · "+i.g.n+" cópias":"")+'">✓ '+dbr(i.g.em)+(i.g.n>1?" ·"+i.g.n+"×":"")+'</span>'
             : '<span class="pilha nao">não impressa</span>')+'</td></tr>';
@@ -834,7 +941,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
       let o = 0;
       for(const i of diasDaQuebra(r.ini, quebraDias)) o = Math.max(o, ocup(r.setor, x.k, DIAS[i], meus));
       h += '<button class="chip'+(quebraBancadas.has(x.k)?" on":"")+'" data-b="'+x.k+'">'+x.nome
-        + ' <small class="'+classeOc(o)+'">'+(o>0?Math.round(o*100)+"%":"livre")+'</small></button>';
+        + ' <small class="'+classeOc(o)+'">'+(o>0?rotuloOc(o):"livre")+'</small></button>';
     }
     h += '</div><div class="dica" style="padding:8px 0 0;background:none">'
       + (cortePorMaquina
@@ -869,7 +976,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
         h += '<tr><td class="b">'+nomeRec(r.setor,s.recurso)+'</td><td>'+dbr(s.dia)+'</td>'
           + '<td style="text-align:right">'+s.itens.reduce((a,i)=>a+i.q,0)+'</td>'
           + '<td style="text-align:right">'+nkg(s.itens.reduce((a,i)=>a+i.kg,0))+'</td>'
-          + '<td style="text-align:right" class="oc '+classeOc(o)+'">'+Math.round(o*100)+'%</td></tr>';
+          + '<td style="text-align:right" class="oc '+classeOc(o)+'">'+rotuloOc(o)+'</td></tr>';
       }
       h += '</tbody></table>';
       const pior = piorDe(plano);
@@ -1000,6 +1107,65 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   for(const b of raiz.querySelectorAll(".abas button")) b.onclick = ()=>{ abaP=b.dataset.aba; pintarPainel(); };
   const aoTeclar = (e)=>{ if(e.key==="Escape" && painel) fecharPainel(); };
   window.addEventListener("keydown", aoTeclar);
+
+  /* ── o atraso e o empurrão que ele causa ────────────────────────────────────
+     ⚠ UM LUGAR SÓ PARA A DECISÃO. Vitor (05/09/2026): "são decisões que o PCP vai analisar e irá
+     decidir o que será feito, o problema é como isso iria funcionar na tela dela para não ficar um
+     monte de botão e confuso para todos". Então nenhum botão novo nas barras: conviver com o atraso
+     já tem gesto (arrastar), e o atalho de fazer isso de uma vez mora na barra de ferramentas, que
+     já existe - aparece quando há atraso e some quando não há.
+     ⚠ POR QUE NÃO NA FAIXA DE VENCIDO: ela foi removida de propósito em f1315a74, junto com o CSS
+     `.aviso`. Ressuscitar a faixa só para pendurar um botão desfaria essa limpeza por baixo.
+     ⚠ O EMPURRÃO NÃO GRAVA. Entra como alteração PENDENTE, igual a um arraste; quem grava continua
+     sendo o "Salvar programação". Foi a escolha do Vitor em vez de o portal reescrever datas
+     sozinho - programação invisível foi o que escondeu 87 conjuntos da Larissa em 04/09.
+     ⚠ lê `lotes` (estado vivo), não `LOTES`: depois de um arraste o atraso muda, e um botão
+     congelado no carregamento mandaria empurrar o que já foi resolvido. */
+  function recursosComEmpurrao(){
+    const vistos = new Map();
+    for(const l of lotes){
+      const k = l.setor+"|"+(l.recurso||"—");
+      if(vistos.has(k)) continue;
+      const d = empurraoDoRecurso(l.setor, l.recurso);
+      if(d>0) vistos.set(k, { setor:l.setor, recurso:l.recurso, dias:d });
+    }
+    return [...vistos.values()];
+  }
+  function aplicarEmpurrao(){
+    const porRec = new Map(recursosComEmpurrao().map(r=>[r.setor+"|"+(r.recurso||"—"), r.dias]));
+    if(!porRec.size) return;
+    /* ⚠ do dia mais longe para o mais perto: mover primeiro quem está atrás faria o lote pousar em
+       cima de outro que ainda não saiu do lugar, e `mesclar` juntaria os dois. */
+    const alvos = montarRuns()
+      .filter(r=>DIAS[r.ini] >= HOJE && porRec.get(r.setor+"|"+(r.recurso||"—")))
+      .sort((a,b)=>b.ini-a.ini);
+    for(const r of alvos){
+      const d = porRec.get(r.setor+"|"+(r.recurso||"—"));
+      const antes = r.lotes.map(l=>({...l, itens:l.itens}));
+      /* mesma regra do arraste: cair no sábado escorrega para a segunda, e quem JÁ estava no fim de
+         semana continua lá - o empurrão não é lugar de desfazer uma decisão de alguém. */
+      const novos = r.lotes.map(l=>{
+        const cru = Math.max(0, Math.min(DIAS.length-1, IDX.get(l.dia)+d));
+        return novoLote({ ...l, itens:l.itens, dia: DIAS[fdsISO(l.dia) ? cru : encostaNoUtil(cru)] });
+      });
+      registrar({ setor:r.setor, op:r.op, pecas:r.pecas, kg:r.kg,
+        rotulo: '<b>'+nomeRec(r.setor,r.recurso)+'</b> · <b>'+dbr(DIAS[r.ini])+'</b><span class="seta">→</span>'
+              + '<b>'+dbr(DIAS[Math.min(DIAS.length-1, r.ini+d)])+'</b> · atraso',
+        antes, novos });
+    }
+    redesenhar();
+  }
+  function pintarEmpurrao(){
+    const b = $("empurrar"); if(!b) return;
+    const recs = recursosComEmpurrao();
+    if(!recs.length){ b.hidden = true; return; }
+    b.hidden = false;
+    b.textContent = "Empurrar o que vem depois (+"+Math.max(...recs.map(r=>r.dias))+" d)";
+    b.title = "o atraso consome " + recs.map(r=>nomeRec(r.setor,r.recurso)+": +"+r.dias+"d").join(" · ")
+            + "\nentra como alteração pendente — só o Salvar grava";
+  }
+  $("empurrar").onclick = aplicarEmpurrao;
+  pintarEmpurrao();
 
   desenhar(); pintarAlteracoes();
 

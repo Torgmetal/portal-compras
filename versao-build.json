@@ -1,156 +1,156 @@
 {
-  "build": 2873,
-  "gerado": "2026-09-05T20:07:40.234Z",
+  "build": 2875,
+  "gerado": "2026-09-05T20:11:00.172Z",
   "commits": [
     {
-      "hash": "14fa30bc7e",
+      "hash": "02fd4772",
+      "data": "05/09/2026",
+      "titulo": "Gantt do PCP: a barra enche pelo apontamento, e vermelho passa a ser só atraso"
+    },
+    {
+      "hash": "036d37fc",
+      "data": "05/09/2026",
+      "titulo": "Gantt do PCP: sai o menu do botão direito"
+    },
+    {
+      "hash": "14fa30bc",
       "data": "05/09/2026",
       "titulo": "Gantt do PCP: a barra se divide no fim de semana, em vez de atravessá-lo"
     },
     {
-      "hash": "9ec0631c48",
+      "hash": "9ec0631c",
       "data": "05/09/2026",
       "titulo": "Gantt do PCP: fim de semana vira escolha no botão direito"
     },
     {
-      "hash": "72ef4c1339",
+      "hash": "72ef4c13",
       "data": "05/09/2026",
       "titulo": "Gantt do PCP: saem as pontas arrastáveis"
     },
     {
-      "hash": "f1315a74d0",
+      "hash": "f1315a74",
       "data": "05/09/2026",
       "titulo": "Gantt do PCP: pontas arrastáveis, fim de semana só quando você escolhe"
     },
     {
-      "hash": "6df7bcda55",
+      "hash": "6df7bcda",
       "data": "05/09/2026",
       "titulo": "PCP: o erro da listagem passa a dizer o que aconteceu"
     },
     {
-      "hash": "71cef05ab1",
+      "hash": "71cef05a",
       "data": "05/09/2026",
       "titulo": "Gantt do PCP: sábado e domingo ganham coluna"
     },
     {
-      "hash": "94df944fdd",
+      "hash": "94df944f",
       "data": "05/09/2026",
       "titulo": "graphify: venv de Python velho é refeito, não reaproveitado"
     },
     {
-      "hash": "913e778ca1",
+      "hash": "913e778c",
       "data": "05/09/2026",
       "titulo": "PCP › Produção: sai o painel \"Carga da produção\""
     },
     {
-      "hash": "409deb916c",
+      "hash": "409deb91",
       "data": "05/09/2026",
       "titulo": "Diz ao time o que fazer na primeira vez que abrir o repo"
     },
     {
-      "hash": "f695ab7b03",
+      "hash": "f695ab7b",
       "data": "05/09/2026",
       "titulo": "PCP: quadro de programação arrastável acima do painel"
     },
     {
-      "hash": "f4967559f6",
+      "hash": "f4967559",
       "data": "05/09/2026",
       "titulo": "Snapshot do LQC: entram a montagem em campo e a margem do item comercial"
     },
     {
-      "hash": "a4d2f36ab5",
+      "hash": "a4d2f36a",
       "data": "05/09/2026",
       "titulo": "Duas sujeiras que o meu removedor de código morto deixou nas integrações"
     },
     {
-      "hash": "926b69291f",
+      "hash": "926b6929",
       "data": "05/09/2026",
       "titulo": "As ferramentas do split entram no repositório"
     },
     {
-      "hash": "82ba50d17e",
+      "hash": "82ba50d1",
       "data": "05/09/2026",
       "titulo": "Quebra o EstudoClient (4984 linhas) em módulos por responsabilidade"
     },
     {
-      "hash": "7aeae94bea",
+      "hash": "7aeae94b",
       "data": "05/09/2026",
       "titulo": "Reancora o snapshot do LQC: o peso sem classe agora aparece no frete"
     },
     {
-      "hash": "702e604f3b",
+      "hash": "702e604f",
       "data": "05/09/2026",
       "titulo": "Montagem: a aba passa a trazer a referência medida da casa"
     },
     {
-      "hash": "0c525498fd",
+      "hash": "0c525498",
       "data": "05/09/2026",
       "titulo": "Estudo: montagem em campo, e margem própria para o item comercial"
     },
     {
-      "hash": "6ee939a8d9",
+      "hash": "6ee939a8",
       "data": "05/09/2026",
       "titulo": "Importar LQC: ler os três blocos da planilha comercial e os itens comerciais"
     },
     {
-      "hash": "338800bae4",
+      "hash": "338800ba",
       "data": "05/09/2026",
       "titulo": "Auditoria: peso sem classe some do frete, e BDI de 400% sem aviso"
     },
     {
-      "hash": "1ab0ba1139",
+      "hash": "1ab0ba11",
       "data": "05/09/2026",
       "titulo": "graphify: um comando que se conserta sozinho, no lugar de quatro que quebravam"
     },
     {
-      "hash": "b47656d18b",
+      "hash": "b47656d1",
       "data": "05/09/2026",
       "titulo": "Reancora o snapshot do LQC nas regras novas do Vitor"
     },
     {
-      "hash": "011a69e709",
+      "hash": "011a69e7",
       "data": "05/09/2026",
       "titulo": "Skills e plugins passam a viver no projeto, não no perfil"
     },
     {
-      "hash": "5d957687ad",
+      "hash": "5d957687",
       "data": "05/09/2026",
       "titulo": "Quebra a pior função do repositório: PATCH de tarefa, complexidade 140 -> 31"
     },
     {
-      "hash": "84dc5cfcf1",
+      "hash": "84dc5cfc",
       "data": "05/09/2026",
       "titulo": "Burn-down: no-unused-vars de 427 para 5, por AST e não por regex"
     },
     {
-      "hash": "3c326640c6",
+      "hash": "3c326640",
       "data": "05/09/2026",
       "titulo": "Zera o prefer-const: separa as declarações mistas"
     },
     {
-      "hash": "9e25ad2122",
+      "hash": "9e25ad21",
       "data": "05/09/2026",
       "titulo": "Burn-down, onda mecânica: 81 avisos, três deles bugs de verdade"
     },
     {
-      "hash": "4a8575e9f6",
+      "hash": "4a8575e9",
       "data": "05/09/2026",
       "titulo": "Base de testes: vitest, mock do Prisma e o snapshot que trava o calcularLqc"
     },
     {
-      "hash": "116615e9c4",
+      "hash": "116615e9",
       "data": "05/09/2026",
       "titulo": "Adaptador de log e fronteira de dados: duas regras voltam para \"error\""
-    },
-    {
-      "hash": "2cb5bebd19",
-      "data": "05/09/2026",
-      "titulo": "Quebra o CronogramasClient (4056 linhas) em módulos por responsabilidade"
-    },
-    {
-      "hash": "57e89a85eb",
-      "data": "05/09/2026",
-      "titulo": "Instala os quality gates de ESLint (teto de 350 linhas)"
     }
   ]
 }
