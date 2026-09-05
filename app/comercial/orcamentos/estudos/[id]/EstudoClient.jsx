@@ -1056,10 +1056,16 @@ function CartaoLinha({ l, i, set, del, dup, porArea, cores, doEsquema, onImporta
 
         <Bloco titulo="De que é feito" nota={`opcional — só para quem orça por categoria de perfil · perda de tinta ${perdaDaEstrutura(l.estrutura)}%`}>
           <Campo r="Classificação" ajuda={classe ? `${classe.faixa} · fabricação ${fmtR$(classe.fabricacao)}/kg` : "faixa de peso por metro do perfil"}>
+            {/* ⚠⚠ CLASSE QUE VEIO DA PLANILHA E NÃO EXISTE AQUI FICAVA INVISÍVEL. Auditoria de
+                05/09/2026: a LQC-186 tem 7 linhas como "ESPECIAL"; o `select` não achava a opção,
+                mostrava em branco, e a pessoa via um campo vazio que na verdade tinha valor — 38 t
+                fora do frete e da cadência sem nada na tela. Agora o valor estranho aparece,
+                marcado, até alguém escolher a classe certa. */}
             <select value={l.classificacao || ""} onChange={(ev) => set(i, "classificacao", ev.target.value)}
-              className="border border-gray-200 rounded px-2 py-1 text-[12px] bg-white w-full">
+              className={`border rounded px-2 py-1 text-[12px] bg-white w-full ${l.classificacao && !classe ? "border-torg-orange-400 text-torg-orange-700" : "border-gray-200"}`}>
               <option value="">—</option>
               {CLASSES.map((x) => <option key={x.key} value={x.nome.toUpperCase()}>{x.nome} · {x.faixa}</option>)}
+              {l.classificacao && !classe && <option value={l.classificacao}>{l.classificacao} — não reconhecida, escolha uma classe</option>}
             </select>
           </Campo>
           <Campo r="Perfil predominante" ajuda={perfil ? `matéria-prima ${fmtR$(perfil.preco)}/kg` : "define o preço do aço desta linha"}>
@@ -2609,6 +2615,17 @@ function Bdi({ c, res, setComp }) {
             </label>
           ))}
         </div>
+        {/* ⚠⚠ BDI DE 400% NÃO É ERRO DE FÓRMULA, É LEITURA ERRADA DA ALAVANCA. Auditoria de
+            05/09/2026: a LQC-268 saiu com BDI 400% porque margem 50 + impostos 27 + factoring 3
+            somam 80% no denominador. "Margem" aqui é sobre a VENDA — 50% quintuplica o preço.
+            Quem digitou provavelmente queria 50% sobre o custo, que é 33% sobre a venda. */}
+        {res.bdiAlerta && (
+          <p className={`mt-4 text-[11px] rounded-lg px-3 py-2 border ${res.bdiAlerta.nivel === "erro" ? "text-red-700 bg-red-50 border-red-200" : "text-torg-dark bg-[#FFF7ED] border-[#F4801F]/30"}`}>
+            <strong>BDI de {res.bdiPct}%</strong> — {res.bdiAlerta.texto} (somam {res.bdiAlerta.den}%).
+            {" "}Margem de 50% sobre o custo equivale a 33% sobre a venda.
+          </p>
+        )}
+
         <dl className="mt-5 space-y-1 text-[13px] max-w-md">
           <Linha r="Custo faturado pela Torg" v={fmtR$(res.custoTorg)} />
           <Linha r="Custo em faturamento direto" v={fmtR$(res.custoDireto)} />
@@ -4591,6 +4608,14 @@ function CargasPorClasse({ c, res, setComp }) {
           limite de peso. Média da casa, editável por obra.
         </p>
       </div>
+      {cargas.pesoSemClasse > 0 && (
+        <p className="text-[11px] text-torg-dark bg-[#FFF7ED] border-b border-[#F4801F]/30 px-4 py-2">
+          <strong>{Math.round(cargas.pesoSemClasse).toLocaleString("pt-BR")} kg</strong> estão sem classe reconhecida
+          {cargas.rotulosSemClasse?.length ? <> (aparecem como <strong>{cargas.rotulosSemClasse.join(", ")}</strong>)</> : null}.
+          Entram na conta pela capacidade do Médio para o frete não sair por baixo, mas a fabricação, a pintura e a
+          cadência dessas linhas só ficam certas com a classe escolhida no quantitativo.
+        </p>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-[12px]" style={{ minWidth: 620 }}>
           <thead className="text-[10px] uppercase text-torg-gray">
@@ -4600,7 +4625,7 @@ function CargasPorClasse({ c, res, setComp }) {
           </thead>
           <tbody className="divide-y divide-gray-50">
             {cargas.linhas.map((l) => (
-              <tr key={l.key}>
+              <tr key={l.key} className={l.semClasse ? "bg-[#FFF7ED]" : ""}>
                 <td className="px-4 py-1.5">{l.nome} <span className="text-torg-gray">· {l.faixa}</span></td>
                 <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtKg(l.pesoKg)}</td>
                 <td className="px-2 py-1.5 text-right">
