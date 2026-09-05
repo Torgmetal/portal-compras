@@ -1,7 +1,12 @@
 {
-  "build": 2846,
-  "gerado": "2026-09-05T15:04:00.374Z",
+  "build": 2847,
+  "gerado": "2026-09-05T15:04:00.504Z",
   "commits": [
+    {
+      "hash": "65f66ebca6",
+      "data": "05/09/2026",
+      "titulo": "Burn-down: no-unused-vars de 427 para 5, por AST e não por regex"
+    },
     {
       "hash": "7895d2fd78",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "81c2b22403",
       "data": "04/09/2026",
       "titulo": "Casar certificados: ler a árvore inteira, não a pasta do ano corrente"
-    },
-    {
-      "hash": "53f7b27b27",
-      "data": "04/09/2026",
-      "titulo": "Rastreabilidade: U dobrado se compra como chapa"
     }
   ]
 }

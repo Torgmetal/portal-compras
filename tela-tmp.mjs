@@ -1,0 +1,14 @@
+import { createRequire } from "node:module";
+const { chromium } = createRequire(import.meta.url)("playwright");
+const [,, url, saida] = process.argv;
+const nav = await chromium.launch();
+const ctx = await nav.newContext({ viewport: { width: 1440, height: 900 } });
+const pg = await ctx.newPage();
+const erros = [];
+pg.on("console", (m) => { if (m.type() === "error") erros.push("console: " + m.text().slice(0, 160)); });
+pg.on("pageerror", (e) => erros.push("pageerror: " + String(e).slice(0, 200)));
+const r = await pg.goto(url, { waitUntil: "networkidle", timeout: 90000 });
+await pg.screenshot({ path: saida, fullPage: false });
+console.log("HTTP", r.status(), "| título:", await pg.title());
+console.log(erros.length ? "ERROS:\n" + erros.join("\n") : "sem erro de console/página");
+await nav.close();
