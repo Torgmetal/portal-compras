@@ -2,12 +2,12 @@
 // Reativa um usuário previamente desativado.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireAdminDoPortal } from "@/lib/session";
 
 export async function POST(_req, { params }) {
   let adminUser;
   try {
-    adminUser = await requireRole(["ADMIN"]);
+    adminUser = await requireAdminDoPortal();
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ success: false, error: e.message }, { status });

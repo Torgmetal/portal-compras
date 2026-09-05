@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireAdminDoPortal } from "@/lib/session";
 import { SETORES_COMUNICACAO, normalizarContatos, getMatrizCompleta, SETOR_LABEL } from "@/lib/comunicacao-setor";
 
 export const runtime = "nodejs";
@@ -26,14 +26,14 @@ const schema = z.object({
 });
 
 export async function GET() {
-  try { await requireRole(["ADMIN"]); }
+  try { await requireAdminDoPortal(); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
   return NextResponse.json({ matriz: await getMatrizCompleta(), setores: SETORES_COMUNICACAO, labels: SETOR_LABEL });
 }
 
 export async function PUT(req) {
   let user;
-  try { user = await requireRole(["ADMIN"]); }
+  try { user = await requireAdminDoPortal(); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const body = await req.json().catch(() => null);

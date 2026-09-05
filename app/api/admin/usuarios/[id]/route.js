@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireAdminDoPortal } from "@/lib/session";
 import { MODULOS_VALIDOS } from "@/lib/modulos";
 
 // ⚠ CLIENTE é acesso de fora: sem módulo nenhum, serve para ASSINAR documento logado (o portal da
@@ -51,7 +51,7 @@ const semUrlDaAssinatura = (u) => {
 
 export async function GET(_req, { params }) {
   try {
-    await requireRole(["ADMIN"]);
+    await requireAdminDoPortal();
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ success: false, error: e.message }, { status });
@@ -74,7 +74,7 @@ export async function GET(_req, { params }) {
 export async function PUT(req, { params }) {
   let adminUser;
   try {
-    adminUser = await requireRole(["ADMIN"]);
+    adminUser = await requireAdminDoPortal();
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ success: false, error: e.message }, { status });

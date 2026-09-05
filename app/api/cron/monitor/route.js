@@ -1,5 +1,6 @@
 // Cron Vercel — MONITOR dos crons. Lê os heartbeats e, se algum cron não roda
-// há tempo demais ou falhou, manda 1 e-mail de alerta pros ADMINs. Roda 1x/dia
+// há tempo demais ou falhou, manda 1 e-mail de alerta para quem administra o
+// portal (lib/admin-portal, não todo ADMIN) + CRON_ALERTA_EMAILS. Roda 1x/dia
 // (vercel.json). É o guarda-corpo contra cron morrer em silêncio.
 import { NextResponse } from "next/server";
 import { temCronSecret } from "@/lib/cron-auth";
@@ -8,6 +9,7 @@ import { sendEmail } from "@/lib/email";
 import { checarSaudeCrons, registrarExecucao } from "@/lib/cron-monitor";
 import { conferirOQueOClienteVe } from "@/lib/conferencia-cliente";
 import { aquecerBanco } from "@/lib/db-retry";
+import { ADMINS_DO_PORTAL } from "@/lib/admin-portal";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // a conferência do cliente simula a conciliação do CMR e lê o Syneco de cada portal publicado
@@ -32,14 +34,13 @@ export async function GET(req) {
   let alertaEnviado = false;
 
   if (problemas.length || achados.length) {
-    // Destinatários: ADMINs ativos + env CRON_ALERTA_EMAILS (dedup)
+    // ⚠⚠ NÃO É PARA TODO ADMIN. Vitor (05/09/2026): "sobre o aviso dos cron deixe limitado a mim e
+    // ao Matheus Martha, os demais não deveriam receber". Cron atrasado e divergência no portal do
+    // cliente são assunto de quem mexe no portal — para o resto da diretoria é ruído diário, e
+    // ruído diário é o que faz a pessoa criar regra de arquivar. Os cinco ADMINs continuam com
+    // acesso total ao portal; muda só quem recebe o alerta. Ver lib/admin-portal.js.
     const env = (process.env.CRON_ALERTA_EMAILS || "").split(",").map((s) => s.trim()).filter(Boolean);
-    let admins = [];
-    try {
-      const us = await prisma.user.findMany({ where: { tipo: "ADMIN", ativo: true }, select: { email: true } });
-      admins = us.map((u) => u.email).filter(Boolean);
-    } catch { /* não-fatal */ }
-    const to = [...new Set([...admins, ...env])];
+    const to = [...new Set([...ADMINS_DO_PORTAL, ...env])];
 
     if (to.length) {
       const linhas = problemas

@@ -2,7 +2,7 @@
 // das integrações externas (config + último estado no banco). Só ADMIN.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAcesso } from "@/lib/session";
+import { requireAdminDoPortal } from "@/lib/session";
 import { CRONS_ESPERADOS } from "@/lib/cron-monitor";
 
 export const runtime = "nodejs";
@@ -17,7 +17,7 @@ function situacaoCron(c, hb) {
 
 export async function GET() {
   try {
-    await requireAcesso({ tipos: ["ADMIN"] });
+    await requireAdminDoPortal();
   } catch (e) {
     return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }

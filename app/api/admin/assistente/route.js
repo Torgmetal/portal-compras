@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireAdminDoPortal } from "@/lib/session";
 import { z } from "zod";
 
 // GET /api/admin/assistente — lê a config atual (cria default se não existe)
 export async function GET() {
   try {
-    await requireRole(["ADMIN"]);
+    await requireAdminDoPortal();
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }
@@ -28,7 +28,7 @@ const schema = z.object({
 // PATCH /api/admin/assistente — atualiza a config
 export async function PATCH(req) {
   try {
-    await requireRole(["ADMIN"]);
+    await requireAdminDoPortal();
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }

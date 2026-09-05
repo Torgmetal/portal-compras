@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireAdminDoPortal } from "@/lib/session";
 import { gerarSenhaTemporaria } from "@/lib/gerar-senha";
 import { MODULOS_VALIDOS } from "@/lib/modulos";
 
@@ -39,7 +39,7 @@ const selectUsuario = {
 
 export async function GET(req) {
   try {
-    await requireRole(["ADMIN"]);
+    await requireAdminDoPortal();
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ success: false, error: e.message }, { status });
@@ -75,7 +75,7 @@ export async function GET(req) {
 export async function POST(req) {
   let adminUser;
   try {
-    adminUser = await requireRole(["ADMIN"]);
+    adminUser = await requireAdminDoPortal();
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ success: false, error: e.message }, { status });

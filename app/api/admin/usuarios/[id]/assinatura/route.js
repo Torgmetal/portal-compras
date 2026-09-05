@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireAdminDoPortal } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -17,7 +17,7 @@ const TIPOS = new Set(["image/png", "image/jpeg"]);
 
 export async function POST(req, { params }) {
   let admin;
-  try { admin = await requireRole(["ADMIN"]); }
+  try { admin = await requireAdminDoPortal(); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
   if (!process.env.BLOB_READ_WRITE_TOKEN) return NextResponse.json({ error: "Storage de arquivos não configurado" }, { status: 500 });
 
@@ -44,7 +44,7 @@ export async function POST(req, { params }) {
 
 export async function DELETE(_req, { params }) {
   let admin;
-  try { admin = await requireRole(["ADMIN"]); }
+  try { admin = await requireAdminDoPortal(); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
   // ⚠ o arquivo no Blob NÃO é apagado: documento já assinado guarda a URL que usou, e apagar aqui
   // esvaziaria a assinatura de um relatório que já saiu. Sai só do cadastro.

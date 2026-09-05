@@ -4,13 +4,13 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireAdminDoPortal } from "@/lib/session";
 import { gerarSenhaTemporaria } from "@/lib/gerar-senha";
 
 export async function POST(_req, { params }) {
   let adminUser;
   try {
-    adminUser = await requireRole(["ADMIN"]);
+    adminUser = await requireAdminDoPortal();
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ success: false, error: e.message }, { status });

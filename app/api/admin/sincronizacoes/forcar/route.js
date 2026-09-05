@@ -4,7 +4,7 @@
 // O client dispara sem bloquear a UI e acompanha pelo heartbeat.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAcesso } from "@/lib/session";
+import { requireAdminDoPortal } from "@/lib/session";
 import { CRONS_ESPERADOS } from "@/lib/cron-monitor";
 import { z } from "zod";
 
@@ -16,7 +16,7 @@ const schema = z.object({ job: z.string().min(1) });
 export async function POST(req) {
   let user;
   try {
-    user = await requireAcesso({ tipos: ["ADMIN"] });
+    user = await requireAdminDoPortal();
   } catch (e) {
     return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }

@@ -9,7 +9,7 @@
 // Nada de DROP, nada de DELETE — se um dia for preciso, não é por aqui.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAcesso } from "@/lib/session";
+import { requireAdminDoPortal } from "@/lib/session";
 import { conferirBanco } from "@/lib/banco-esperado";
 import { conferirEtapaPortalXSyneco } from "@/lib/conferencias";
 
@@ -155,7 +155,7 @@ const ALVO_MONTAGEM = {
 };
 
 export async function GET(req) {
-  try { await requireAcesso({ tipos: ["ADMIN"] }); }
+  try { await requireAdminDoPortal(); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   // ⚠ as CONFERÊNCIAS vêm num pedido à parte: elas varrem obra por obra contra o Syneco e levam
@@ -198,7 +198,7 @@ export async function GET(req) {
 
 export async function POST(req) {
   let user;
-  try { user = await requireAcesso({ tipos: ["ADMIN"] }); }
+  try { user = await requireAdminDoPortal(); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const body = await req.json().catch(() => ({}));

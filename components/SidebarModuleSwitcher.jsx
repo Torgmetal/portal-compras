@@ -28,6 +28,7 @@ import TorgLogo from "@/components/TorgLogo";
 import ToggleSidebar from "@/components/ToggleSidebar";
 import { emSetembroAmarelo, LACO } from "@/lib/campanha";
 import { usarPrevia } from "@/lib/campanha-previa";
+import { ehAdminDoPortal } from "@/lib/admin-portal";
 
 /* ─── Módulos do portal ─────────────────────────────────────────── */
 
@@ -172,8 +173,10 @@ const MODULOS = [
     desc: "Usuários e configurações",
     icon: Settings,
     cor: "bg-purple-100 text-purple-700",
-    modulos: [], // apenas ADMIN (array vazio = nenhum módulo de usuário acessa)
-    apenasAdmin: true,
+    modulos: [], // ninguém entra por módulo
+    // ⚠ allowlist própria, igual à Diretoria — nem ADMIN burla. Vitor (05/09/2026): Caio, Guilherme
+    // e Fabrine seguem com acesso full ao portal, sem o painel de administração. Ver lib/admin-portal.
+    apenasAdminPortal: true,
   },
 ];
 
@@ -220,7 +223,7 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
   const modulosVisiveis = MODULOS.filter((m) => {
     if (!session?.user) return false;
     if (m.apenasDiretoria) return !!session.user.diretoria; // allowlist própria — nem ADMIN burla
-    if (m.apenasAdmin) return isAdmin;
+    if (m.apenasAdminPortal) return ehAdminDoPortal(session.user.email);
     if (m.modulos === null) return true; // liberado pra todos os logados
     if (isAdmin) return true;
     return m.modulos.some(mod => userModulos.includes(mod));

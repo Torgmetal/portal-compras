@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireAdminDoPortal } from "@/lib/session";
 
 const MODULOS_VALIDOS = ["PRODUCAO", "COMERCIAL", "FINANCEIRO", "EXPEDICAO", "COMPRAS"];
 const TIPOS_VALIDOS = ["PESO_KG", "FATURAMENTO_BRL", "QTD_PEDIDOS", "PECAS_QTD", "VALOR_BRL"];
@@ -12,7 +12,7 @@ const TIPOS_VALIDOS = ["PESO_KG", "FATURAMENTO_BRL", "QTD_PEDIDOS", "PECAS_QTD",
 
 export async function GET(req) {
   try {
-    await requireRole(["ADMIN"]);
+    await requireAdminDoPortal();
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ success: false, error: e.message }, { status });
@@ -67,7 +67,7 @@ const schemaPost = z.object({
 export async function POST(req) {
   let user;
   try {
-    user = await requireRole(["ADMIN"]);
+    user = await requireAdminDoPortal();
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ success: false, error: e.message }, { status });

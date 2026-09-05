@@ -7,7 +7,7 @@
 // chave mora, com sessão de ADMIN e registro no AuditLog.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireAdminDoPortal } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { htmlAvisoSeguranca, ASSUNTO_AVISO, AVISO_PADRAO } from "@/lib/aviso-seguranca-email";
 import { z } from "zod";
@@ -32,7 +32,7 @@ async function destinatarios() {
 }
 
 export async function GET() {
-  try { await requireRole(["ADMIN"]); }
+  try { await requireAdminDoPortal(); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const pessoas = await destinatarios();
@@ -59,7 +59,7 @@ const schemaConteudo = z.object({
 
 export async function POST(req) {
   let admin;
-  try { admin = await requireRole(["ADMIN"]); }
+  try { admin = await requireAdminDoPortal(); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const corpo = await req.json().catch(() => ({}));
