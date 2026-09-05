@@ -1,7 +1,12 @@
 {
-  "build": 2877,
-  "gerado": "2026-09-05T22:39:32.188Z",
+  "build": 2878,
+  "gerado": "2026-09-05T23:10:53.143Z",
   "commits": [
+    {
+      "hash": "8e7046b3",
+      "data": "05/09/2026",
+      "titulo": "Auditoria do qteProduzida: o erro era só do Gantt, mas o campo continua uma armadilha"
+    },
     {
       "hash": "2538e59b",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "3c326640",
       "data": "05/09/2026",
       "titulo": "Zera o prefer-const: separa as declarações mistas"
-    },
-    {
-      "hash": "9e25ad21",
-      "data": "05/09/2026",
-      "titulo": "Burn-down, onda mecânica: 81 avisos, três deles bugs de verdade"
     }
   ]
 }
