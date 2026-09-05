@@ -1,7 +1,12 @@
 {
-  "build": 2859,
-  "gerado": "2026-09-05T18:24:29.176Z",
+  "build": 2860,
+  "gerado": "2026-09-05T18:24:35.964Z",
   "commits": [
+    {
+      "hash": "82ba50d17e",
+      "data": "05/09/2026",
+      "titulo": "Quebra o EstudoClient (4984 linhas) em módulos por responsabilidade"
+    },
     {
       "hash": "7aeae94bea",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "f4d84f9a30",
       "data": "05/09/2026",
       "titulo": "Ritmo e prazos: alinhar as caixas pelo rótulo, não pelo rodapé"
-    },
-    {
-      "hash": "1d54cda77f",
-      "data": "05/09/2026",
-      "titulo": "Estudo: cronograma prévio para compor a proposta"
     }
   ]
 }

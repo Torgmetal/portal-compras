@@ -1,0 +1,103 @@
+{
+  "_lib/formatos.js": [
+    "fmtR$",
+    "fmtMi",
+    "fmtKg",
+    "num"
+  ],
+  "_componentes/campos.jsx": [
+    "Inp",
+    "Sel",
+    "Bloco",
+    "Campo",
+    "Linha",
+    "Kpi",
+    "Quadro",
+    "Comp"
+  ],
+  "_componentes/CronogramaPrevio.jsx": [
+    "CronogramaPrevio"
+  ],
+  "_componentes/CadenciaPorClasse.jsx": [
+    "CadenciaPorClasse"
+  ],
+  "_componentes/ImportarLqc.jsx": [
+    "ImportarLqc"
+  ],
+  "_componentes/Resumos.jsx": [
+    "Resumos"
+  ],
+  "_componentes/CartaoLinha.jsx": [
+    "CartaoLinha"
+  ],
+  "_componentes/Material.jsx": [
+    "Material"
+  ],
+  "_componentes/EspecificacaoComercial.jsx": [
+    "COM_COR",
+    "EspecificacaoComercial"
+  ],
+  "_componentes/CotacaoTinta.jsx": [
+    "CotacaoTinta"
+  ],
+  "_componentes/ListaMaterialAco.jsx": [
+    "ListaMaterialAco"
+  ],
+  "_componentes/BotaoCotarFamilia.jsx": [
+    "BotaoCotarFamilia"
+  ],
+  "_componentes/Fabricacao.jsx": [
+    "Fabricacao"
+  ],
+  "_componentes/Terceiros.jsx": [
+    "Terceiros"
+  ],
+  "_componentes/Pintura.jsx": [
+    "Pintura"
+  ],
+  "_componentes/Ensaios.jsx": [
+    "Ensaios"
+  ],
+  "_componentes/Bdi.jsx": [
+    "Bdi"
+  ],
+  "_componentes/PlanilhaComercial.jsx": [
+    "PlanilhaComercial"
+  ],
+  "_componentes/Cenario.jsx": [
+    "Cenario"
+  ],
+  "_componentes/FabricaPorHora.jsx": [
+    "FabricaPorHora"
+  ],
+  "_componentes/Cadencia.jsx": [
+    "Cadencia"
+  ],
+  "_componentes/PrazoDoLucro.jsx": [
+    "PrazoDoLucro"
+  ],
+  "_componentes/FluxoDoDinheiro.jsx": [
+    "FluxoDoDinheiro"
+  ],
+  "_componentes/Frete.jsx": [
+    "Frete"
+  ],
+  "_componentes/CustoDaFabrica.jsx": [
+    "CustoDaFabrica"
+  ],
+  "_componentes/ConsultaQualp.jsx": [
+    "ConsultaQualp"
+  ],
+  "_componentes/CargasPorClasse.jsx": [
+    "CargasPorClasse"
+  ],
+  "_componentes/Pagamento.jsx": [
+    "Pagamento"
+  ],
+  "_componentes/FazerOuTerceirizar.jsx": [
+    "FazerOuTerceirizar"
+  ],
+  "_componentes/MontagemCampo.jsx": [
+    "MontagemCampo"
+  ]
+}
