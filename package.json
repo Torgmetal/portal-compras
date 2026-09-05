@@ -11,7 +11,10 @@
     "versao": "node scripts/gerar-versao.js",
     "checar": "npx --yes eslint@9 --no-config-lookup -c eslint.undef.config.mjs app lib components",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cobertura": "vitest run --coverage"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"

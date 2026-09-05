@@ -1,7 +1,12 @@
 {
-  "build": 2842,
-  "gerado": "2026-09-05T15:03:40.585Z",
+  "build": 2843,
+  "gerado": "2026-09-05T15:03:40.861Z",
   "commits": [
+    {
+      "hash": "7599eeffd7",
+      "data": "05/09/2026",
+      "titulo": "Adaptador de log e fronteira de dados: duas regras voltam para \"error\""
+    },
     {
       "hash": "727aea6d53",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5f60a15ae2",
       "data": "04/09/2026",
       "titulo": "Rastreabilidade: reconhecer o ferro chato (FC) e a chapa lançada como \"PERFIL DB FQ\""
-    },
-    {
-      "hash": "9b47417952",
-      "data": "04/09/2026",
-      "titulo": "Cronograma: ajuste à mão também conta como atualização"
     }
   ]
 }
