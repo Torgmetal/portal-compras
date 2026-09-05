@@ -211,11 +211,19 @@ function CronogramaPrevio({ c, res, e, setComp }) {
 
   const set = (k, v) => setComp({ cronograma: { ...cfg, [k]: v } });
   // referência = o que a casa mediu; se ainda não mediu, o padrão conservador da lib
+  // ⚠ o MEDIDO entra só onde ele descreve o mesmo fato. O ritmo de engenharia do histórico inclui
+  // espera de documentação e o tempo até a lista ser importada — não é prazo a vender; e a cadência
+  // por obra do histórico é obra dividindo a fábrica. Nos dois casos o padrão é a META da casa, e o
+  // medido fica escrito ao lado para comparação. (Vitor, 05/09/2026.)
   const ref = {
-    engenhariaKgDiaUtil: medido?.engenhariaKgDiaUtil || PADRAO_CRONOGRAMA.engenhariaKgDiaUtil,
+    engenhariaKgDiaUtil: PADRAO_CRONOGRAMA.engenhariaKgDiaUtil,
+    engDiasBase: PADRAO_CRONOGRAMA.engDiasBase,
+    engDiasMax: PADRAO_CRONOGRAMA.engDiasMax,
+    liberacaoFabricaPct: PADRAO_CRONOGRAMA.liberacaoFabricaPct,
     comprasDias: medido?.comprasDias || PADRAO_CRONOGRAMA.comprasDias,
-    producaoKgDiaUtil: medido?.producaoKgDiaUtil || PADRAO_CRONOGRAMA.producaoKgDiaUtil,
     comprasInicioPct: PADRAO_CRONOGRAMA.comprasInicioPct,
+    producaoTonMes: PADRAO_CRONOGRAMA.producaoTonMes,
+    ocupacaoPct: PADRAO_CRONOGRAMA.ocupacaoPct,
     diasCarregamento: PADRAO_CRONOGRAMA.diasCarregamento,
   };
   const vale = (k) => (cfg[k] === "" || cfg[k] == null ? ref[k] : num(cfg[k]));
@@ -244,18 +252,21 @@ function CronogramaPrevio({ c, res, e, setComp }) {
           <p className="text-[12px] font-bold text-torg-dark">Ritmo e prazos</p>
           {medido && (
             <p className="text-[11px] text-torg-gray">
-              Medido nas obras da casa: engenharia <b>{medido.engenhariaKgDiaUtil?.toLocaleString("pt-BR")} kg/dia</b> ({medido.amostras.engenharia} obras) ·
+              Histórico da casa, para comparar: engenharia <b>{medido.engenhariaKgDiaUtil?.toLocaleString("pt-BR")} kg/dia</b> ({medido.amostras.engenharia} obras, inclui espera de documentação) ·
               compras <b>{medido.comprasDias} dias</b> ({medido.amostras.compras}) ·
-              fabricação <b>{medido.producaoKgDiaUtil?.toLocaleString("pt-BR")} kg/dia</b> ({medido.amostras.producao})
+              fabricação <b>{Math.round((medido.producaoKgDiaUtil || 0) * 22 / 1000)} t/mês por obra</b> ({medido.amostras.producao}, obra dividindo a fábrica)
             </p>
           )}
         </div>
         <div className="grid sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-3">
           {[
             ["engenhariaKgDiaUtil", "Engenharia", "kg por dia útil"],
+            ["engDiasMax", "Teto da engenharia", "dias úteis, mesmo em obra grande"],
+            ["liberacaoFabricaPct", "Libera a fábrica em", "% da engenharia"],
             ["comprasDias", "Compras", "dias até o aço chegar"],
             ["comprasInicioPct", "Compra começa em", "% da engenharia"],
-            ["producaoKgDiaUtil", "Fabricação", "kg por dia útil"],
+            ["producaoTonMes", "Fábrica", "toneladas por mês (meta)"],
+            ["ocupacaoPct", "Fatia desta obra", "% da fábrica dedicada"],
             ["diasCarregamento", "Carregamento", "dias após a última peça"],
           ].map(([k, rot, ajuda]) => (
             <label key={k} className="flex flex-col text-[11px] text-torg-dark">
@@ -322,7 +333,7 @@ function CronogramaPrevio({ c, res, e, setComp }) {
             <div className="px-4 py-3 border-b border-gray-100">
               <p className="text-[12px] font-bold text-torg-dark">
                 Entregas — {cargas} {cargas === 1 ? "carga" : "cargas"}
-                {cron.resumo.intervaloEntregasCorridos > 0 && <span className="text-torg-gray font-normal"> · uma a cada {cron.resumo.intervaloEntregasCorridos} dias</span>}
+                {cargas > 1 && <span className="text-torg-gray font-normal"> · {cron.resumo.ritmoEntregas}</span>}
               </p>
               <p className="text-[11px] text-torg-gray mt-0.5">
                 As cargas saem da aba de Frete, por classe de estrutura, e acompanham a fabricação.
