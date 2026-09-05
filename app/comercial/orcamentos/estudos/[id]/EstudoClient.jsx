@@ -2256,6 +2256,19 @@ function PlanilhaComercial({ res, e }) {
   const pesoDentro = dentro.reduce((a, x) => a + x.pesoKg, 0);
   const precoDentro = dentro.reduce((a, x) => a + x.preco, 0);
 
+  // ⚠⚠ O TOTAL GERAL É A SOMA DO QUE ESTÁ NA TELA. Matheus (Comercial, 05/09/2026): "a soma dos
+  // valores não está batendo". A causa principal era o rateio (corrigida em lib/lqc), mas o total
+  // vinha de `res.preco` — o preço do estudo — enquanto as linhas são valores arredondados ao
+  // centavo. Qualquer diferença, mesmo de R$ 1, faz quem confere com a calculadora perder a
+  // confiança na planilha inteira. Aqui o total é a conta das linhas, pelos mesmos números
+  // impressos: se não fechar, é porque uma linha está faltando — e aí o erro aparece, que é o certo.
+  const c2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+  const bdiFator = 1 + (res.bdiPct || 0) / 100;
+  const linhaComerciais = t.comerciais > 0 ? c2(t.comerciais * bdiFator) : 0;
+  const linhaPreMont = res.preMont?.apresentacao === "separado" && res.preMont?.total > 0 ? c2(res.preMont.total * bdiFator) : 0;
+  const linhaFrete = res.frete?.apresentacao === "separado" && res.frete?.total > 0 ? c2(res.frete.total * bdiFator) : 0;
+  const totalGeral = c2(dentro.reduce((a, x) => a + c2(x.preco), 0) + linhaComerciais + linhaPreMont + linhaFrete);
+
   return (
     <div className="space-y-4 max-w-5xl">
       <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
@@ -2300,7 +2313,7 @@ function PlanilhaComercial({ res, e }) {
                 <tr>
                   <td className="px-4 py-1.5">2</td>
                   <td className="px-2 py-1.5" colSpan={4}>Fornecimento de itens comerciais</td>
-                  <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(t.comerciais * (1 + (res.bdiPct || 0) / 100))}</td>
+                  <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(linhaComerciais)}</td>
                 </tr>
               )}
               {/* ⚠ pré-montagem separada também vira linha, pelo mesmo motivo do frete: o cliente
@@ -2314,8 +2327,8 @@ function PlanilhaComercial({ res, e }) {
                       ? <span className="text-torg-gray"> — {res.preMont.areas.join(", ")}</span>
                       : <span className="text-torg-gray"> — {res.preMont.pctDaObra}% da obra</span>}
                   </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{fmtR$(res.preMont.porKg)}/kg</td>
-                  <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(res.preMont.total * (1 + (res.bdiPct || 0) / 100))}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{fmtR$(pesoDentro > 0 ? linhaPreMont / pesoDentro : 0)}/kg</td>
+                  <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(linhaPreMont)}</td>
                 </tr>
               )}
               {/* ⚠ frete separado é LINHA PRÓPRIA — foi para isso que o cliente pediu a separação. */}
@@ -2327,13 +2340,16 @@ function PlanilhaComercial({ res, e }) {
                     {res.frete.destino ? <span className="text-torg-gray"> — {res.frete.destino}</span> : null}
                     {res.frete.modo === "viagem" ? <span className="text-torg-gray"> · {res.frete.viagens} viagens</span> : null}
                   </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{fmtR$(res.frete.porKg)}/kg</td>
-                  <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(res.frete.total * (1 + (res.bdiPct || 0) / 100))}</td>
+                  {/* ⚠ R$/kg COM BDI, igual ao valor da linha. Mostrava o custo (R$ 2,86) ao lado
+                      do preço (R$ 39.491,20): 2,86 × 9.787 kg não dá 39.491, e quem confere na
+                      calculadora acha que a planilha está errada. */}
+                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{fmtR$(pesoDentro > 0 ? linhaFrete / pesoDentro : 0)}/kg</td>
+                  <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(linhaFrete)}</td>
                 </tr>
               )}
               <tr className="bg-torg-blue-50/50 font-bold text-torg-dark">
                 <td className="px-4 py-2" colSpan={5}>Total geral</td>
-                <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">{fmtR$(res.preco)}</td>
+                <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">{fmtR$(totalGeral)}</td>
               </tr>
             </tbody>
           </table>
