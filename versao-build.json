@@ -1,7 +1,12 @@
 {
-  "build": 2875,
-  "gerado": "2026-09-05T22:21:16.561Z",
+  "build": 2876,
+  "gerado": "2026-09-05T22:34:17.091Z",
   "commits": [
+    {
+      "hash": "5e6d02df",
+      "data": "05/09/2026",
+      "titulo": "Gantt do PCP: a lista de projetos ganha linha de total, grudada no rodapé"
+    },
     {
       "hash": "1a72b0f6",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "4a8575e9",
       "data": "05/09/2026",
       "titulo": "Base de testes: vitest, mock do Prisma e o snapshot que trava o calcularLqc"
-    },
-    {
-      "hash": "116615e9",
-      "data": "05/09/2026",
-      "titulo": "Adaptador de log e fronteira de dados: duas regras voltam para \"error\""
     }
   ]
 }
