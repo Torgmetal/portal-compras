@@ -15,6 +15,8 @@ import { prisma } from "@/lib/prisma";
 import { secoesDoPortal, mensagemPadrao, CAPA_PADRAO, TIPOS_ENGENHARIA, agruparEngenharia, portalExpirado } from "@/lib/portal-cliente";
 import { pecasDaLista, sincronizarRevisao, revisaoParaOCliente } from "@/lib/portal-listas";
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
+import { pecasTekla, pesoRealPecas } from "@/lib/peso-op";
+import { etapaDasMarcas } from "@/lib/portal-obra-consulta";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -125,7 +127,7 @@ export async function GET(req, { params }) {
       const tarefas = await prisma.cronogramaTarefa.findMany({
         where: { cronogramaId: cron.id },
         select: {
-          nome: true, area: true, departamento: true,
+          nome: true, area: true, departamento: true, isSummary: true,
           dataInicioPrevista: true, dataFimPrevista: true,
           percentualPrevisto: true, percentualRealizado: true,
         },
@@ -137,6 +139,7 @@ export async function GET(req, { params }) {
       // não a tarefa de quem executa. O avanço da frente é a média ponderada pelas tarefas.
       const porSetor = new Map();
       for (const t of tarefas) {
+        if (t.isSummary) continue; // linha de resumo do cronograma conta duas vezes o mesmo trabalho
         const chave = t.departamento || t.area || "Obra";
         const g = porSetor.get(chave) || { nome: String(chave).replace(/_/g, " "), tarefas: 0, soma: 0, inicio: null, fim: null };
         g.tarefas++;
@@ -145,9 +148,26 @@ export async function GET(req, { params }) {
         if (t.dataFimPrevista && (!g.fim || t.dataFimPrevista > g.fim)) g.fim = t.dataFimPrevista;
         porSetor.set(chave, g);
       }
+      // ⚠⚠ A LINHA DO TEMPO, e não quatro barras. Vitor (05/09/2026): "o cronograma que apresentamos
+      // lá é muito simples, como podemos fazer para termos um cronograma mais elaborado e mais real
+      // para que o cliente consiga acessar?". As frentes agregadas continuam (é o resumo), mas agora
+      // vão junto as TAREFAS, com a área da obra a que pertencem — é o que permite desenhar quando
+      // cada coisa acontece, em vez de só dizer que existe.
+      const areasCron = Array.isArray(cron.areas) ? cron.areas.map((a2) => a2?.nome).filter(Boolean) : [];
       dados.cronograma = {
         titulo: cron.titulo,
         inicio: fmt(cron.dataInicio), fim: fmt(cron.dataFim),
+        atualizadoEm: fmt(cron.ultimoSync),
+        areas: areasCron,
+        tarefas: tarefas
+          .filter((t) => !t.isSummary && t.dataInicioPrevista && t.dataFimPrevista)
+          .map((t) => ({
+            nome: t.nome,
+            setor: t.departamento || null,
+            area: t.area || null,
+            inicio: fmt(t.dataInicioPrevista), fim: fmt(t.dataFimPrevista),
+            feito: Math.round(Number(t.percentualRealizado) || 0),
+          })),
         frentes: [...porSetor.values()]
           .sort((a2, b2) => (a2.inicio && b2.inicio ? a2.inicio - b2.inicio : 0))
           .map((g) => ({
@@ -156,6 +176,75 @@ export async function GET(req, { params }) {
             percentual: Math.round(g.soma / Math.max(1, g.tarefas)),
           })),
       };
+
+      // ── ONDE A OBRA ESTÁ, MEDIDO ────────────────────────────────────────────────────────────
+      //
+      // ⚠⚠ Não é percentual digitado: é a distribuição das peças pelas etapas, do apontamento da
+      // fábrica (`etapaDasMarcas`, a MESMA leitura do modelo 3D — duas fontes dariam duas respostas
+      // para a mesma obra). Cada peça está em UMA etapa, a mais avançada dela, então a soma fecha
+      // 100% e nada é contado duas vezes.
+      //
+      // ⚠ Por que não "kg apontado por setor sobre o peso da obra": o `pesoProduzido` do Syneco
+      // acumula reapontamento — na OP-106 o Jato soma 10.620 kg numa obra de 10.145 kg, e a barra
+      // passaria de 100%. Distribuição não tem esse defeito.
+      if (op?.id) {
+        try {
+          const todas = await prisma.pecaConjunto.findMany({
+            where: { opId: op.id },
+            select: { fonte: true, tipoPeca: true, pesoTotalKg: true, marca: true },
+            take: 8000,
+          });
+          const base = pecasTekla(todas);           // conjuntos + avulsas da LPC, sem croqui
+          const kgTotal = base.reduce((acc, x) => acc + (Number(x.pesoTotalKg) || 0), 0);
+          if (base.length && kgTotal > 0) {
+            const mapa = await etapaDasMarcas(op.id, [...new Set(todas.map((x) => x.marca).filter(Boolean))]);
+            const dist = new Map();
+            let semN = 0, semKg = 0;
+            for (const x of base) {
+              const e = mapa.get(x.marca);
+              const kg = Number(x.pesoTotalKg) || 0;
+              if (!e) { semN++; semKg += kg; continue; }
+              // ⚠ "Corte" e "Preparação" são a mesma etapa para quem olha de fora
+              const k = e === "Corte" ? "Preparação" : e;
+              const g = dist.get(k) || { n: 0, kg: 0 };
+              g.n++; g.kg += kg; dist.set(k, g);
+            }
+            const ORDEM = ["Preparação", "Montagem", "Solda", "Acabamento", "Jato", "Pintura"];
+            dados.cronograma.onde = {
+              pecas: base.length, kg: Math.round(kgTotal),
+              etapas: ORDEM.filter((k) => dist.has(k)).map((k) => ({
+                nome: k, pecas: dist.get(k).n, kg: Math.round(dist.get(k).kg),
+                pct: Math.round((dist.get(k).kg / kgTotal) * 100),
+              })),
+              naoIniciada: { pecas: semN, kg: Math.round(semKg), pct: Math.round((semKg / kgTotal) * 100) },
+            };
+          }
+
+          // ── EMBARQUES ─────────────────────────────────────────────────────────────────────────
+          // ⚠ romaneio EMITIDO é o que saiu; o resto é PROGRAMADO. Chamar tudo de "embarcado" seria
+          // prometer ao cliente uma carga que ainda está no pátio.
+          const romaneios = await prisma.romaneioPrevio.findMany({
+            where: { opId: op.id, status: { not: "CANCELADO" } },
+            select: { numero: true, dataPrevista: true, pesoKg: true, emitidoEm: true, aprovadoEm: true },
+            orderBy: [{ dataPrevista: "asc" }, { numero: "asc" }],
+            take: 60,
+          });
+          if (romaneios.length) {
+            const pesoLista = Math.round(pesoRealPecas(todas));
+            dados.cronograma.embarques = {
+              pesoLista,
+              lista: romaneios.map((r) => ({
+                numero: r.numero,
+                data: fmt(r.dataPrevista),
+                peso: Math.round(Number(r.pesoKg) || 0),
+                situacao: r.emitidoEm ? "EMBARCADO" : r.aprovadoEm ? "LIBERADO" : "PROGRAMADO",
+              })),
+              embarcado: Math.round(romaneios.filter((r) => r.emitidoEm).reduce((acc, r) => acc + (Number(r.pesoKg) || 0), 0)),
+              programado: Math.round(romaneios.reduce((acc, r) => acc + (Number(r.pesoKg) || 0), 0)),
+            };
+          }
+        } catch { /* o cronograma vale sozinho: medição indisponível não derruba a seção */ }
+      }
     }
   }
 

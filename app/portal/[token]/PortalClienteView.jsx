@@ -355,27 +355,7 @@ export default function PortalClienteView({ token }) {
           </Bloco>
         )}
 
-        {mostrar("CRONOGRAMA") && (
-          <Bloco icone={CalendarRange} titulo="Cronograma da obra"
-            sub={`${fmtD(dados.cronograma.inicio)} a ${fmtD(dados.cronograma.fim)}`}>
-            <div className="space-y-3">
-              {dados.cronograma.frentes.map((f, i) => (
-                <div key={i}>
-                  <div className="flex items-baseline justify-between gap-3 mb-1">
-                    <span className="text-[14px] font-semibold capitalize">{f.nome.toLowerCase()}</span>
-                    <span className="text-[12px] text-gray-500 tabular-nums shrink-0">
-                      {fmtD(f.inicio)} — {fmtD(f.fim)} · <strong className="text-[#0D1F3C]">{f.percentual}%</strong>
-                    </span>
-                  </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#006EAB] rounded-full transition-all"
-                      style={{ width: `${Math.min(100, f.percentual)}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Bloco>
-        )}
+        {mostrar("CRONOGRAMA") && <Cronograma d={dados.cronograma} />}
         {mostrar("CERTIFICADOS") && (
           <Certificados token={token} lista={dados.certificados} />
         )}
@@ -1115,6 +1095,220 @@ function BlocoLista({ icone, titulo, fonte, d, token }) {
         rodape={d.total > 200 ? `A tela mostra as primeiras 200 marcas — a planilha traz as ${d.total}.` : null}
       />
     </Bloco>
+  );
+}
+
+// ─── CRONOGRAMA DA OBRA ───────────────────────────────────────────────────────────────────────
+//
+// ⚠⚠ ERAM QUATRO BARRAS. Vitor (05/09/2026): "o cronograma que apresentamos lá é muito simples,
+// como podemos fazer para termos um cronograma mais elaborado e mais real para que o cliente
+// consiga acessar?". A tela dizia que a Fabricação existe e está em 41% — não dizia QUANDO cada
+// coisa acontece, onde a obra está hoje, nem de onde vinha o número.
+//
+// Agora são três leituras, e cada uma diz a sua origem:
+//   1. a LINHA DO TEMPO, do cronograma do Planejamento (informado);
+//   2. ONDE A OBRA ESTÁ, do apontamento da fábrica (medido);
+//   3. os EMBARQUES, dos romaneios — separando o que saiu do que está programado.
+const COR_SETOR = { COMERCIAL: "#8494A8", ENGENHARIA: "#4A9DD9", FABRICACAO: "#006EAB", EXPEDICAO: "#0E7A55" };
+const NOME_SETOR = { COMERCIAL: "Comercial", ENGENHARIA: "Engenharia", FABRICACAO: "Fabricação", EXPEDICAO: "Expedição" };
+const MES_CURTO = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+function Cronograma({ d }) {
+  const tarefas = (d.tarefas || []).filter((t) => t.inicio && t.fim);
+  const hoje = new Date(); hoje.setHours(12, 0, 0, 0);
+
+  // ⚠ a régua vai do começo da primeira tarefa ao fim da última, e sempre inclui HOJE: cronograma
+  // que termina antes de hoje deixaria a linha de "agora" fora da tela, que é o oposto do que ela
+  // serve para mostrar.
+  const datas = tarefas.flatMap((t) => [new Date(`${t.inicio}T12:00:00`), new Date(`${t.fim}T12:00:00`)]);
+  const t0 = new Date(Math.min(...datas, hoje));
+  const t1 = new Date(Math.max(...datas, hoje));
+  t0.setDate(1);
+  const vao = Math.max(1, t1 - t0);
+  const pos = (dt) => ((dt - t0) / vao) * 100;
+  const posStr = (s) => pos(new Date(`${s}T12:00:00`));
+
+  const meses = [];
+  for (const m = new Date(t0); m <= t1; m.setMonth(m.getMonth() + 1)) {
+    meses.push(`${MES_CURTO[m.getMonth()]}${m.getMonth() === 0 || meses.length === 0 ? `/${String(m.getFullYear()).slice(2)}` : ""}`);
+  }
+
+  // agrupa por ÁREA da obra (a divisão que o cliente reconhece); sem área, um grupo só
+  const grupos = [];
+  for (const t of tarefas) {
+    const chave = t.area || "Obra";
+    let g = grupos.find((x) => x.chave === chave);
+    if (!g) { g = { chave, itens: [] }; grupos.push(g); }
+    g.itens.push(t);
+  }
+  for (const g of grupos) {
+    g.itens.sort((a, b) => (a.inicio < b.inicio ? -1 : 1));
+    g.feito = Math.round(g.itens.reduce((s, t) => s + (t.feito || 0), 0) / Math.max(1, g.itens.length));
+  }
+
+  const onde = d.onde;
+  const emb = d.embarques;
+  const proxima = tarefas
+    .filter((t) => t.setor === "EXPEDICAO" && new Date(`${t.fim}T12:00:00`) >= hoje)
+    .sort((a, b) => (a.fim < b.fim ? -1 : 1))[0];
+
+  return (
+    <Bloco icone={CalendarRange} titulo="Cronograma da obra"
+      sub={`${fmtD(d.inicio)} a ${fmtD(d.fim)}${d.atualizadoEm ? ` · atualizado em ${fmtD(d.atualizadoEm)}` : ""}`}>
+
+      {/* os três números que respondem à pergunta antes de o cliente procurar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden mb-5">
+        <Tile rot="Onde a obra está"
+          val={onde?.etapas?.length ? `${onde.etapas[onde.etapas.length - 1].pct}%` : "—"}
+          pe={onde?.etapas?.length ? `em ${onde.etapas[onde.etapas.length - 1].nome.toLowerCase()}` : "sem apontamento na fábrica"} />
+        <Tile rot="Próxima entrega prevista"
+          val={proxima ? fmtD(proxima.fim).slice(0, 5) : "—"}
+          pe={proxima ? (proxima.area || "expedição") : "sem expedição programada"} />
+        <Tile rot={emb?.embarcado ? "Já embarcado" : "Cargas programadas"}
+          val={emb ? fmtKg(emb.embarcado || emb.programado) : "—"}
+          pe={emb?.pesoLista ? `${Math.round(((emb.embarcado || emb.programado) / emb.pesoLista) * 100)}% da lista de expedição` : "sem carga registrada"} />
+      </div>
+
+      {/* ── linha do tempo ── */}
+      {tarefas.length > 0 && (
+        <div className="overflow-x-auto -mx-1 px-1">
+          <div className="min-w-[720px]">
+            <div className="flex border-b border-gray-200 pl-[190px]">
+              {meses.map((m, i) => (
+                <div key={i} className="flex-1 border-l border-gray-200 pl-1.5 pb-1 text-[11px] font-semibold text-gray-500">{m}</div>
+              ))}
+            </div>
+            {grupos.map((g) => (
+              <div key={g.chave} className="mt-3.5">
+                <div className="flex items-center gap-2 mb-1 text-[12.5px] font-bold">
+                  <span className="flex-1 truncate">{g.chave}</span>
+                  <span className="text-[11.5px] font-semibold text-gray-500 tabular-nums">{g.feito}% concluído</span>
+                </div>
+                {g.itens.map((t, i) => {
+                  const e = posStr(t.inicio);
+                  const larg = Math.max(posStr(t.fim) - e, 0.8);
+                  return (
+                    <div key={i} className="flex items-center h-[26px]">
+                      <div className="w-[190px] shrink-0 pr-3 text-[12px] truncate">
+                        <span className="text-[10.5px] font-semibold uppercase tracking-wide text-gray-400 mr-1.5">
+                          {(NOME_SETOR[t.setor] || "").slice(0, 4)}
+                        </span>
+                        {t.nome}
+                      </div>
+                      <div className="relative flex-1 h-full">
+                        <div className="absolute inset-0 flex">
+                          {meses.map((_, k) => <div key={k} className="flex-1 border-l border-gray-100" />)}
+                        </div>
+                        <div className="absolute top-[5px] h-[15px] rounded bg-gray-100 ring-1 ring-inset ring-black/5"
+                          style={{ left: `${e}%`, width: `${larg}%` }}>
+                          <div className="h-full rounded" style={{ width: `${t.feito}%`, background: COR_SETOR[t.setor] || "#8494A8" }} />
+                          <span className="absolute left-[calc(100%+7px)] top-1/2 -translate-y-1/2 text-[10.5px] font-semibold text-gray-500 tabular-nums whitespace-nowrap">
+                            {fmtD(t.inicio).slice(0, 5)}–{fmtD(t.fim).slice(0, 5)}{t.feito ? ` · ${t.feito}%` : ""}
+                          </span>
+                        </div>
+                        {/* ⚠ a linha de HOJE em cada trilha: uma só, no topo, some ao rolar */}
+                        <div className="absolute top-0 bottom-0 w-[2px] bg-[#F4801F] z-10" style={{ left: `${pos(hoje)}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-4 text-[11.5px] text-gray-500 pl-[190px]">
+              {Object.entries(NOME_SETOR).map(([k, nome]) => (
+                <span key={k} className="inline-flex items-center gap-1.5">
+                  <i className="w-2.5 h-2.5 rounded-sm" style={{ background: COR_SETOR[k] }} /> {nome}
+                </span>
+              ))}
+              <span className="inline-flex items-center gap-1.5"><i className="w-[2px] h-3 bg-[#F4801F]" /> hoje</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── onde a obra está, medido na fábrica ── */}
+      {onde?.etapas?.length > 0 && (
+        <div className="mt-6 pt-5 border-t border-gray-200">
+          <div className="flex items-baseline justify-between gap-3 flex-wrap mb-3">
+            <h4 className="text-[14px] font-bold">Onde a obra está</h4>
+            <span className="text-[11.5px] text-gray-500">
+              {onde.pecas} peças · {fmtKg(onde.kg)} de estrutura
+            </span>
+          </div>
+          <div className="space-y-2">
+            {onde.etapas.map((e) => (
+              <div key={e.nome} className="grid grid-cols-[110px_1fr_120px] sm:grid-cols-[130px_1fr_150px] gap-3 items-center">
+                <span className="text-[13px] font-semibold truncate">{e.nome}</span>
+                <span className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <span className="block h-full rounded-full bg-[#006EAB]" style={{ width: `${e.pct}%` }} />
+                </span>
+                <span className="text-[12px] text-gray-500 text-right tabular-nums">
+                  <strong className="text-[#0D1F3C] text-[13px]">{e.pct}%</strong> · {e.pecas} peças
+                </span>
+              </div>
+            ))}
+            {onde.naoIniciada?.pecas > 0 && (
+              <div className="grid grid-cols-[110px_1fr_120px] sm:grid-cols-[130px_1fr_150px] gap-3 items-center">
+                <span className="text-[13px] text-gray-500 truncate">não iniciada</span>
+                <span className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <span className="block h-full rounded-full bg-gray-300" style={{ width: `${onde.naoIniciada.pct}%` }} />
+                </span>
+                <span className="text-[12px] text-gray-500 text-right tabular-nums">
+                  {onde.naoIniciada.pct}% · {onde.naoIniciada.pecas} peças
+                </span>
+              </div>
+            )}
+          </div>
+          {/* ⚠ DIZER A ORIGEM é o que impede o medido de se confundir com o informado — e é o que
+              mantém o cronograma honesto quando alguém esquece de atualizar a planilha. */}
+          <p className="mt-3 text-[11.5px] text-gray-500 leading-relaxed">
+            <span className="inline-block text-[10px] font-bold uppercase tracking-wide text-[#0E7A55] bg-[#E9F6F0] border border-[#BFE5D5] rounded-full px-2 py-0.5 mr-1.5">medido</span>
+            cada peça entra na etapa mais avançada em que a fábrica apontou produção. As barras da
+            linha do tempo, acima, vêm do cronograma do planejamento.
+          </p>
+        </div>
+      )}
+
+      {/* ── embarques ── */}
+      {emb?.lista?.length > 0 && (
+        <div className="mt-6 pt-5 border-t border-gray-200">
+          <div className="flex items-baseline justify-between gap-3 flex-wrap mb-3">
+            <h4 className="text-[14px] font-bold">Embarques</h4>
+            <span className="text-[11.5px] text-gray-500">lista de expedição: {fmtKg(emb.pesoLista)}</span>
+          </div>
+          <Tabela
+            larguraMin={420}
+            cols={["Carga", "Data prevista", "Situação", "Peso"]}
+            linhas={emb.lista.map((r) => [
+              <span key="n" className="font-semibold">Romaneio {r.numero}</span>,
+              fmtD(r.data),
+              <span key="s" className={`text-[11px] font-semibold rounded-full px-2 py-0.5 border ${
+                r.situacao === "EMBARCADO" ? "bg-[#E9F6F0] text-[#0E7A55] border-[#BFE5D5]"
+                  : r.situacao === "LIBERADO" ? "bg-[#EEF5FB] text-[#006EAB] border-[#CBE0F0]"
+                  : "bg-[#FFF6EE] text-[#B45309] border-[#F6D8B6]"}`}>
+                {r.situacao === "EMBARCADO" ? "embarcado" : r.situacao === "LIBERADO" ? "liberado" : "programado"}
+              </span>,
+              <span key="p" className="tabular-nums">{fmtKg(r.peso)}</span>,
+            ])}
+          />
+          <p className="mt-3 text-[12px] text-gray-500">
+            {emb.embarcado > 0 && <>Embarcado: <strong className="text-[#0D1F3C] tabular-nums">{fmtKg(emb.embarcado)}</strong> · </>}
+            Programado: <strong className="text-[#0D1F3C] tabular-nums">{fmtKg(emb.programado)}</strong>
+            {emb.pesoLista > 0 && <> · faltam {fmtKg(Math.max(0, emb.pesoLista - emb.programado))} da lista</>}
+          </p>
+        </div>
+      )}
+    </Bloco>
+  );
+}
+
+function Tile({ rot, val, pe }) {
+  return (
+    <div className="bg-white px-4 py-3.5">
+      <p className="text-[10.5px] font-semibold uppercase tracking-wide text-gray-400">{rot}</p>
+      <p className="text-[26px] font-bold leading-tight mt-0.5 tabular-nums">{val}</p>
+      <p className="text-[12px] text-gray-500">{pe}</p>
+    </div>
   );
 }
 
