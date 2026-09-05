@@ -1,7 +1,12 @@
 {
-  "build": 2862,
-  "gerado": "2026-09-05T18:25:31.378Z",
+  "build": 2863,
+  "gerado": "2026-09-05T18:33:34.037Z",
   "commits": [
+    {
+      "hash": "f4967559f6",
+      "data": "05/09/2026",
+      "titulo": "Snapshot do LQC: entram a montagem em campo e a margem do item comercial"
+    },
     {
       "hash": "a4d2f36ab5",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "47bc680477",
       "data": "05/09/2026",
       "titulo": "Cronograma: engenharia com teto e liberação parcial para a fábrica"
-    },
-    {
-      "hash": "cc9fa8820c",
-      "data": "05/09/2026",
-      "titulo": "Cronograma vira seção da proposta, no estilo do documento"
     }
   ]
 }

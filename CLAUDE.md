@@ -167,11 +167,32 @@ anotada abaixo.
 | `caveman` (skill) | `.claude/skills/caveman/` | `/caveman` |
 | `graphify` (skill) | `.claude/skills/graphify/` | `/graphify` |
 
-**superpowers** entra via `enabledPlugins` + `extraKnownMarketplaces` no
-`.claude/settings.json`. Na primeira vez que você abrir o repo, o Claude Code
-baixa o marketplace `anthropics/claude-plugins-official` sozinho. São skills de
-*processo* — brainstorming, TDD, depuração sistemática, revisão — que decidem
-**quando** parar para perguntar e verificar, antes de sair codando.
+### Primeira vez neste repo — o que fazer
+
+```bash
+git pull origin main
+```
+
+E só. Não existe comando de instalar skill. O que acontece:
+
+1. **Abra o projeto no Claude Code.** Na primeira vez ele mostra um diálogo de
+   confiança perguntando se você aceita as configurações deste repositório
+   (`.claude/settings.json`). **Aceite** — é esse aceite que liga o plugin. Sem
+   ele o `superpowers` fica inerte e as skills locais não carregam.
+2. **Se a sessão já estava aberta durante o `git pull`, reinicie.** O
+   `settings.json` é lido na abertura da sessão, não a cada mensagem.
+3. Confira com `/caveman` e `/graphify` — se aparecerem na lista, está tudo no
+   lugar. Para o `superpowers`, o sinal é o Claude parar para planejar antes de
+   codar, sem você pedir.
+
+**superpowers** entra via `enabledPlugins` + `extraKnownMarketplaces`. Ao aceitar
+a confiança, o Claude Code baixa o marketplace `anthropics/claude-plugins-official`
+sozinho — não tem download manual. São skills de *processo* (brainstorming, TDD,
+depuração sistemática, revisão) que decidem **quando** parar para perguntar e
+verificar, antes de sair codando.
+
+**caveman** e **graphify** são skills de projeto: vêm no `git pull` e funcionam
+direto. O `graphify` tem uma ressalva de CLI, logo abaixo.
 
 ### O CLI do graphify
 

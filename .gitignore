@@ -35,3 +35,6 @@ chaves
 
 # motor do visualizador de IFC — copiado de node_modules no build (scripts/copiar-wasm.mjs)
 public/wasm/
+
+# worktrees do Claude Code são locais de cada máquina
+.claude/worktrees/
