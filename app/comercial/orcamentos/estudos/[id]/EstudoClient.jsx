@@ -4154,7 +4154,14 @@ function Pagamento({ c, res, setComp }) {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {parcelas.map((p, i) => (
-                <tr key={i}>
+                // ⚠⚠ TODA CÉLULA ANCORA NO TOPO. Vitor (05/09/2026): "precisamos ajustar o
+                // alinhamento dessa parte". A célula do prazo é a mais alta da linha (caixa + os
+                // atalhos de 7 a 90) e a do "quando" tem a frase embaixo do seletor; com o
+                // `vertical-align: middle` que a tabela usa por padrão, cada uma centralizava na
+                // altura da linha e a primeira linha de controles saía em quatro alturas
+                // diferentes — nome, %, seletor e prazo, cada um num degrau. Ancorando no topo,
+                // todos começam na mesma linha e o que cresce cresce para baixo.
+                <tr key={i} className="align-top">
                   <td className="px-4 py-1.5"><Inp value={p.nome ?? ""} onChange={(e) => set(i, "nome", e.target.value)} className="w-44" /></td>
                   <td className="px-2 py-1.5 text-right"><Inp value={p.pct ?? ""} onChange={(e) => set(i, "pct", e.target.value)} className="w-16 text-right" /></td>
                   <td className="px-2 py-1.5">
@@ -4174,27 +4181,33 @@ function Pagamento({ c, res, setComp }) {
                   {/* ⚠ os prazos da casa a um clique: digitar 3 quando se quis 30 some no fluxo
                       de caixa sem deixar rastro. Valor fora da lista continua aceito. */}
                   <td className="px-2 py-1.5">
-                    <div className="flex flex-col items-end gap-1">
-                      <div className="flex items-center gap-1.5">
-                        <Inp value={p.dias ?? ""} list={`prazos-${i}`} onChange={(e) => set(i, "dias", e.target.value)} className="w-16 text-right" />
-                        <span className="text-[10px] text-torg-gray">dias</span>
+                    {/* ⚠ A CAIXA E A RÉGUA DE ATALHOS TÊM DE FECHAR NA MESMA BORDA. O sufixo
+                        "dias" ficava depois da caixa e a empurrava para a esquerda, deixando os
+                        dois blocos desencontrados. Agora os dois moram num contêiner `w-fit`: a
+                        largura é a da régua e a caixa acompanha, com qualquer quantidade de
+                        atalhos. O cabeçalho da coluna já diz "Prazo (dias)", e a frase sob o
+                        seletor repete o prazo por extenso. */}
+                    <div className="flex flex-col items-end">
+                      <div className="w-fit">
+                        <Inp value={p.dias ?? ""} list={`prazos-${i}`} onChange={(e) => set(i, "dias", e.target.value)} className="w-full text-right" />
                         <datalist id={`prazos-${i}`}>
                           {PRAZOS_PAGAMENTO.map((d) => <option key={d} value={d} />)}
                         </datalist>
-                      </div>
-                      <div className="flex flex-wrap justify-end gap-1">
-                        {PRAZOS_PAGAMENTO.map((d) => (
-                          <button key={d} onClick={() => set(i, "dias", d)}
-                            className={`text-[10px] rounded px-1.5 py-0.5 border ${num(p.dias) === d ? "border-torg-blue text-torg-blue bg-torg-blue-50 font-semibold" : "border-gray-200 text-torg-gray hover:border-torg-blue/40"}`}>
-                            {d}
-                          </button>
-                        ))}
+                        <div className="flex gap-1 mt-1">
+                          {PRAZOS_PAGAMENTO.map((d) => (
+                            <button key={d} onClick={() => set(i, "dias", d)}
+                              className={`flex-1 text-[10px] rounded px-1.5 py-0.5 border ${num(p.dias) === d ? "border-torg-blue text-torg-blue bg-torg-blue-50 font-semibold" : "border-gray-200 text-torg-gray hover:border-torg-blue/40"}`}>
+                              {d}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(preco * (num(p.pct) / 100))}</td>
+                  {/* pt-[5px] põe o texto na mesma altura do texto DENTRO das caixas (py-1 + borda) */}
+                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold"><span className="inline-block pt-[5px]">{fmtR$(preco * (num(p.pct) / 100))}</span></td>
                   <td className="px-2 py-1.5">
-                    <button onClick={() => salvar(parcelas.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-600"><Trash2 size={13} /></button>
+                    <button onClick={() => salvar(parcelas.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-600 block pt-[5px]"><Trash2 size={13} /></button>
                   </td>
                 </tr>
               ))}
