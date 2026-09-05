@@ -103,6 +103,10 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
   const [modalVerba, setModalVerba] = useState(null); // { tipo: "op"|"aditivo", itemId, atual }
   const [modalEditarItem, setModalEditarItem] = useState(null); // { tipo: 'op'|'aditivo', item }
   const [modalAddItens, setModalAddItens] = useState(false);
+  // ⚠ Vitor (05/09/2026): "estou fazendo como aditivo, mas aí não tem botão para adicionar mais
+  // itens como tintas etc". O aditivo nascia fechado — a saída era criar um Aditivo 2 só para caber
+  // uma linha, sujando o contrato. Guarda o aditivo alvo; o modal é o mesmo da OP base.
+  const [modalAddAditivo, setModalAddAditivo] = useState(null); // { id, numero }
   const [modalReceita, setModalReceita] = useState(null); // null | 'nova' | { ...receita }
   const [modalCliente, setModalCliente] = useState(false);
   const [modalEditarOP, setModalEditarOP] = useState(false);
@@ -785,9 +789,20 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                       </p>
                     )}
                   </div>
-                  <p className="text-xs text-torg-gray">
-                    {ad.createdBy?.name} • {fmtData(ad.createdAt)}
-                  </p>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <p className="text-xs text-torg-gray">
+                      {ad.createdBy?.name} • {fmtData(ad.createdAt)}
+                    </p>
+                    {podeAlterarVerbaDireto && !encerradaOuCancelada && (
+                      <button
+                        onClick={() => setModalAddAditivo({ id: ad.id, numero: ad.numero })}
+                        className="px-3 py-1.5 bg-white border border-torg-orange-200 text-torg-orange-700 text-xs font-medium rounded-lg hover:bg-torg-orange-50 inline-flex items-center gap-1"
+                        title={`Acrescentar linhas de verba ao Aditivo ${ad.numero} (tinta, terceiro, aluguel…)`}
+                      >
+                        <Plus size={14} /> Adicionar itens
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
               <ItensTabela
@@ -1087,6 +1102,14 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
           opId={op.id}
           onClose={() => setModalAddItens(false)}
           onSaved={() => { setModalAddItens(false); router.refresh(); }}
+        />
+      )}
+      {modalAddAditivo && (
+        <ModalAdicionarItens
+          opId={op.id}
+          aditivo={modalAddAditivo}
+          onClose={() => setModalAddAditivo(null)}
+          onSaved={() => { setModalAddAditivo(null); router.refresh(); }}
         />
       )}
       {modalReceita && (
@@ -3145,7 +3168,7 @@ function ModalEditarItem({ tipo, item, onClose, onSaved }) {
 
 // Modal de adicionar itens NOVOS a uma OP existente (ADMIN-only).
 // Mesma UX do ModalAditivo mas vai pra OP base, sem criar aditivo.
-function ModalAdicionarItens({ opId, onClose, onSaved }) {
+function ModalAdicionarItens({ opId, aditivo = null, onClose, onSaved }) {
   const [itens, setItens] = useState([novoItem()]);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -3162,7 +3185,7 @@ function ModalAdicionarItens({ opId, onClose, onSaved }) {
     if (validos.length === 0) return setErro("Adicione pelo menos um item.");
     setSalvando(true);
     try {
-      const res = await fetch(`/api/comercial/op/${opId}/itens`, {
+      const res = await fetch(aditivo ? `/api/comercial/aditivo/${aditivo.id}/itens` : `/api/comercial/op/${opId}/itens`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3194,7 +3217,7 @@ function ModalAdicionarItens({ opId, onClose, onSaved }) {
   };
 
   return (
-    <Modal titulo="Adicionar itens à OP base" onClose={onClose}>
+    <Modal titulo={aditivo ? `Adicionar itens ao Aditivo ${aditivo.numero}` : "Adicionar itens à OP base"} onClose={onClose}>
       <div className="px-6 py-5 space-y-4">
         {erro && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
@@ -3203,8 +3226,9 @@ function ModalAdicionarItens({ opId, onClose, onSaved }) {
         )}
 
         <div className="bg-torg-orange-50/40 border border-torg-orange-100 rounded px-3 py-2 text-xs text-torg-dark">
-          ⚠️ Edição direta de ADMIN — adiciona itens à OP base sem criar aditivo.
-          Use só pra completar OPs que esqueceram itens. Tudo registrado em audit log.
+          {aditivo
+            ? <>As linhas entram no <strong>Aditivo {aditivo.numero}</strong> e somam à verba dele — é o mesmo contrato, não um aditivo novo. Tudo registrado em audit log.</>
+            : <>⚠️ Edição direta de ADMIN — adiciona itens à OP base sem criar aditivo. Use só pra completar OPs que esqueceram itens. Tudo registrado em audit log.</>}
         </div>
 
         <div>
