@@ -1,7 +1,12 @@
 {
-  "build": 2860,
-  "gerado": "2026-09-05T18:24:35.964Z",
+  "build": 2861,
+  "gerado": "2026-09-05T18:24:41.016Z",
   "commits": [
+    {
+      "hash": "926b69291f",
+      "data": "05/09/2026",
+      "titulo": "As ferramentas do split entram no repositório"
+    },
     {
       "hash": "82ba50d17e",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "cbd985244c",
       "data": "05/09/2026",
       "titulo": "Cronograma prévio em PDF — a folha que acompanha a proposta"
-    },
-    {
-      "hash": "f4d84f9a30",
-      "data": "05/09/2026",
-      "titulo": "Ritmo e prazos: alinhar as caixas pelo rótulo, não pelo rodapé"
     }
   ]
 }
