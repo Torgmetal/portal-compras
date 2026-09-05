@@ -782,7 +782,7 @@ function ModalVincularRM({ pedido, rmsAtivas = [], onClose, onSaved }) {
 // Quando o usuario seleciona uma sugestao, dispara onSelecionarItem(produto)
 // com { codigo, descricao, unidade }. Pra texto livre (sem seleção), dispara
 // onChangeTexto(txt) — assim o sistema cria com codigo=null (produto generico).
-function AutocompleteProdutoOmie({ valor, codigoAtual, onSelecionarItem, onChangeTexto }) {
+function AutocompleteProdutoOmie({ valor, codigoAtual: _codigoAtual, onSelecionarItem, onChangeTexto }) {
   const [busca, setBusca] = useState(valor || "");
   const [sugestoes, setSugestoes] = useState([]);
   const [aberto, setAberto] = useState(false);
@@ -810,7 +810,7 @@ function AutocompleteProdutoOmie({ valor, codigoAtual, onSelecionarItem, onChang
         const data = await res.json();
         setSugestoes(data.itens || []);
         setOrigem(data.origem);
-      } catch (e) {
+      } catch {
         setSugestoes([]);
       } finally {
         setCarregando(false);

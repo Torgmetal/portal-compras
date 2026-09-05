@@ -144,7 +144,7 @@ export function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) 
   const temPeso = tarefas.some((t) => t.qtdePlanejada > 0);
 
   // Conta tarefas com antecessoras
-  const temAntecessoras = tarefas.some((t) => t.antecessoraIds?.length > 0);
+  tarefas.some((t) => t.antecessoraIds?.length > 0);
 
   return (
     <div className="divide-y divide-gray-50">

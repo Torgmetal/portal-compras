@@ -9,9 +9,8 @@ export const maxDuration = 60;
 
 // POST — sincroniza dados da medicao com o Omie (re-busca via API).
 export async function POST(_req, { params }) {
-  let user;
   try {
-    user = await requireRole(["ADMIN", "COMERCIAL"]);
+    await requireRole(["ADMIN", "COMERCIAL"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }

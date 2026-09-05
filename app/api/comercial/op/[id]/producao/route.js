@@ -4,11 +4,10 @@
 // Obra — o status armazenado da peça não serve (só avança até CORTE).
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole, requireUser } from "@/lib/session";
+import { requireUser } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-const ROLES = ["ADMIN", "COMERCIAL", "PLANEJAMENTO", "PCP", "ENGENHARIA", "PRODUCAO"];
 
 const SYN_SETOR = { Corte: "CORTE", Montagem: "MONTAGEM", Solda: "SOLDA", Acabamento: "ACABAMENTO", Jato: "JATO", Pintura: "PINTURA" };
 const ORDEM = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];

@@ -2,9 +2,8 @@
 import { useState } from "react";
 import { Loader2, FileText, CheckCircle2, Check, Edit2, Edit3, RotateCcw, Package } from "lucide-react";
 import { ModalEditarPedido, ModalReceberPedido } from "./ModaisPedido";
-import { Modal } from "./Modal";
 
-export function PedidosGerados({ pedidos, rmId, onRevertido, isAdmin, userRole }) {
+export function PedidosGerados({ pedidos, rmId: _rmId, onRevertido, isAdmin, userRole }) {
   const [revertendo, setRevertendo] = useState(null);
   const [confirmando, setConfirmando] = useState(null);
   const [toast, setToast] = useState(null);

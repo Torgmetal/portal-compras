@@ -2,8 +2,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ClipboardList, Loader2, FileDown, Send, Trash2, Plus, X, CheckCircle2, AlertCircle, Check, ImagePlus, Paperclip, Lock, Unlock, CircleDot } from "lucide-react";
-import { numRAI, SETORES_AUDITORIA, TIPO_CONSTATACAO, TIPOS, STATUS_AI, statusAiLabel, acoesPendentes, podeFinalizar } from "@/lib/auditoria-interna";
+import { ArrowLeft, ClipboardList, Loader2, FileDown, Send, Trash2, Plus, X, CheckCircle2, AlertCircle, ImagePlus, Paperclip, Lock, Unlock, CircleDot } from "lucide-react";
+import { numRAI, SETORES_AUDITORIA, TIPO_CONSTATACAO, TIPOS, STATUS_AI, statusAiLabel } from "@/lib/auditoria-interna";
 
 const dISO = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");

@@ -7,7 +7,7 @@ import { GanttChart, CheckCircle2, Lock, AlertTriangle, Link2 } from "lucide-rea
 const DEPT_LABEL = { COMERCIAL: "Comercial", ENGENHARIA: "Engenharia", SUPRIMENTOS: "Suprimentos", FABRICACAO: "Fabricação", EXPEDICAO: "Expedição", MONTAGEM: "Montagem" };
 const DEPT_ORDER = ["COMERCIAL", "ENGENHARIA", "SUPRIMENTOS", "FABRICACAO", "EXPEDICAO", "MONTAGEM"];
 
-export default function GanttInline({ tarefas, detail }) {
+export default function GanttInline({ tarefas, detail: _detail }) {
   // Ordena por DEPT_ORDER (Comercial primeiro) e dentro do dept por uidMpp
   const allTasks = tarefas
     .filter((t) => t.outlineLevel > 0 && t.departamento && !t.isSummary)

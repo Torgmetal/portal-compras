@@ -14,13 +14,9 @@
 // própria GRD emitida, que já grava quem imprimiu, quando e quantas vezes. Por isso o botão diz
 // "Imprimir e liberar" — o ato é um só, e chamar de duas coisas faria alguém procurar um segundo
 // botão que não existe.
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
-import {
-  Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, Printer, Search,
-  Factory, Monitor, CalendarClock, Clock, Package, CheckCircle2, FileText, FileSpreadsheet, Send, Flag, X, Users,
-  BellRing,
-} from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, Printer, Factory, Monitor, CalendarClock, Clock, Package, CheckCircle2, FileText, FileSpreadsheet, Flag, X, Users, BellRing } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import CompraChip, { ModalRastreabilidade } from "@/components/CompraChip";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
@@ -65,7 +61,7 @@ const FLUXO = [
   ["ACABAMENTO", "Acabamento"], ["JATO", "Jato"], ["PINTURA", "Pintura"], ["EXPEDICAO", "Expedição"],
 ];
 const SETOR_LABEL = Object.fromEntries(FLUXO);
-const ORDEM_SETOR = Object.fromEntries(FLUXO.map(([k], i) => [k, i]));
+Object.fromEntries(FLUXO.map(([k], i) => [k, i]));
 
 // ⚠ "Não iniciadas" é a UNIÃO das duas primeiras — é a pergunta que o Vitor faz ("o que não
 // iniciou"), e as parcelas continuam separadas porque a ação é diferente: uma se cobra do

@@ -5,10 +5,7 @@ import {
   AlertTriangle, Clock, Download,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
-import {
-  criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
-  adicionarLinhaTotais, downloadWorkbook, CORES,
-} from "@/lib/excel-relatorio";
+import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } from "@/lib/excel-relatorio";
 
 const AREAS = [
   { id: "PENDENTE", label: "Estoque", rects: [{ x: 30, y: 15, w: 810, h: 80 }], stroke: "#64748b", fill: "#f1f5f9", statusKey: "PENDENTE" },
@@ -27,7 +24,6 @@ const fmtPeso = (kg) => {
   return `${Math.round(kg).toLocaleString("pt-BR")} kg`;
 };
 
-const fmtData = (d) => d ? new Date(d).toLocaleDateString("pt-BR") : "—";
 
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 

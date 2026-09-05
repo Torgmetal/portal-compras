@@ -1,9 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import {
-  Briefcase, PlusCircle, Loader2, AlertCircle, X, Users, ChevronDown,
-  Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Pencil,
-} from "lucide-react";
+import { Briefcase, PlusCircle, Loader2, AlertCircle, X, ChevronDown, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Pencil } from "lucide-react";
 
 const NIVEIS = [
   { value: "OPERACIONAL", label: "Operacional", cor: "bg-gray-100 text-gray-700" },
@@ -12,7 +9,7 @@ const NIVEIS = [
   { value: "GERENCIA", label: "Gerência", cor: "bg-amber-100 text-amber-800" },
   { value: "DIRETORIA", label: "Diretoria", cor: "bg-rose-100 text-rose-800" },
 ];
-const nivelMap = Object.fromEntries(NIVEIS.map((n) => [n.value, n]));
+Object.fromEntries(NIVEIS.map((n) => [n.value, n]));
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";

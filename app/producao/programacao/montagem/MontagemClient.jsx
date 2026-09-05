@@ -1,17 +1,9 @@
 "use client";
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Wrench, ChevronDown, ChevronUp, Filter, Search, CheckCircle2, Download,
-  Loader2, AlertCircle, ArrowRight, X, Package, Undo2, Printer, Flag,
-  Clock, CalendarClock, Layers,
-} from "lucide-react";
-import KpiSetor, { CabecalhoSetor } from "@/components/KpiSetor";
-import {
-  criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
-  adicionarLinhaTotais, adicionarLegenda,
-  downloadWorkbook, CORES,
-} from "@/lib/excel-relatorio";
+import { Wrench, ChevronDown, ChevronUp, Filter, Search, CheckCircle2, Download, Loader2, AlertCircle, ArrowRight, Package, Undo2, Printer, Flag, Clock, CalendarClock, Layers } from "lucide-react";
+import KpiSetor from "@/components/KpiSetor";
+import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLegenda, downloadWorkbook, CORES } from "@/lib/excel-relatorio";
 import { fmtOP } from "@/lib/utils";
 import BotaoRelatorioDia from "@/components/BotaoRelatorioDia";
 import { calcularProntidao } from "@/lib/prontidao-conjunto";
@@ -63,8 +55,8 @@ const cmpNatural = (a, b) => String(a ?? "").localeCompare(String(b ?? ""), unde
 // ⚠ a prontidão vive em lib/prontidao-conjunto.js — a tela de programação da montagem usa a
 // MESMA conta, e duas cópias dela divergiriam sem ninguém ver.
 
-export default function MontagemClient({ conjuntosIniciais, userRole, apontamentos = {} }) {
-  const router = useRouter();
+export default function MontagemClient({ conjuntosIniciais, userRole: _userRole, apontamentos = {} }) {
+  useRouter();
   const [conjuntos, setConjuntos] = useState(conjuntosIniciais);
   const [filtroOp, setFiltroOp] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("CORTE");

@@ -18,7 +18,7 @@ const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const fmtTam = (b) => (b == null ? "" : b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 const ehPlanilha = (n) => /\.(xls[xmb]?|csv)$/i.test(n);
 
-export default function OrcamentoComercial({ valor, onChange, onPreencher, opId = null, onSalvar = null }) {
+export default function OrcamentoComercial({ valor, onChange, onPreencher, _opId = null, onSalvar = null }) {
   const [path, setPath] = useState("");
   const [dados, setDados] = useState(null);
   const [carregando, setCarregando] = useState(false);

@@ -115,7 +115,7 @@ export async function POST(req) {
           },
         },
       });
-    } catch (_) {}
+    } catch {}
 
     return NextResponse.json({ success: true, data: acidente }, { status: 201 });
   } catch (e) {

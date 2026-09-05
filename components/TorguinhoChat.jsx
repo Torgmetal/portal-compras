@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { X, Send, Loader2, MessageCircle, ChevronDown, Paperclip, Download, FileSpreadsheet, FileText, Image as ImageIcon } from "lucide-react";
+import { X, Send, Loader2, ChevronDown, Paperclip, Download, FileSpreadsheet, FileText, Image as ImageIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { fraseDoDia } from "@/lib/torguinho-frases";
@@ -176,7 +176,7 @@ export default function TorguinhoChat() {
   if (pathname?.startsWith("/colaborador") || pathname?.startsWith("/meu-rh")) return null;
   if (status !== "authenticated" || !config || !config.ativo || !temAcesso) return null;
 
-  const nome = user?.name?.split(" ")[0] || "colega";
+  user?.name?.split(" ")[0] || "colega";
 
   // Upload de um anexo → backend processa (texto/tabela/imagem) e devolve o payload.
   async function onAnexar(e) {

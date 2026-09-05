@@ -4,10 +4,7 @@ import { AlertTriangle, Check, ClipboardList } from "lucide-react";
 import { escopoDoTipo, amostragemDoTipo } from "@/lib/pit-escopo";
 import PlpPainel from "./PlpPainel";
 import { tipoDoProduto, camposDoRelatorioPintura } from "@/lib/plp";
-import {
-  GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, METODOS_APLICACAO, TEMPO, CAMPOS_DEMAO,
-  RUGOSIDADE_MIN, RUGOSIDADE_MAX, mediaRugosidade, mediaEspessura, condicoesPermitemPintar,
-} from "@/lib/pintura-campos";
+import { GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, TEMPO, CAMPOS_DEMAO, RUGOSIDADE_MIN, RUGOSIDADE_MAX, mediaRugosidade, mediaEspessura, condicoesPermitemPintar } from "@/lib/pintura-campos";
 
 /**
  * O PREENCHIMENTO DA INSPEÇÃO DE PINTURA.
@@ -404,7 +401,7 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
  * ⚠ Separado em componente porque é o bloco que MUDA a decisão: o resto da tela registra, este
  * julga. Ele diz, com a regra na mão, se a aplicação era permitida — e nomeia o impedimento.
  */
-function CondicoesAmbientais({ res, travado, setResultado, Campo }) {
+function CondicoesAmbientais({ res, travado: _travado, setResultado: _setResultado, Campo }) {
   const r = condicoesPermitemPintar({
     tAmbiente: res.prepTAmb, tSuperficie: res.prepTSup,
     pontoOrvalho: res.prepOrvalho, umidade: res.prepUmidade, tempo: res.tempo,

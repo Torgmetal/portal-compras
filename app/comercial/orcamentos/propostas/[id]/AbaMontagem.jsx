@@ -29,7 +29,7 @@ const SECOES = [
   },
 ];
 
-const SECAO_MAP = Object.fromEntries(SECOES.map((s) => [s.id, s]));
+Object.fromEntries(SECOES.map((s) => [s.id, s]));
 
 function fmtMoeda(v) {
   if (!v && v !== 0) return "—";

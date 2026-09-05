@@ -44,7 +44,7 @@ function NivelPicker({ value, onChange, size = 26 }) {
 }
 
 export default function CargoMatrizClient({ cargoId }) {
-  const router = useRouter();
+  useRouter();
   const [d, setD] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");

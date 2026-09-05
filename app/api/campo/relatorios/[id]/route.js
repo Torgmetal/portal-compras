@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { PERFIS_CAMPO, TIPO_LABEL } from "@/lib/qualidade-campo";
-import { RESULTADOS, proximaRevisao, linhasReprovadas, rotuloRevisao } from "@/lib/revisao-inspecao";
+import { RESULTADOS, proximaRevisao, rotuloRevisao } from "@/lib/revisao-inspecao";
 import { numeroBR } from "@/lib/numero-br";
 
 export const runtime = "nodejs";

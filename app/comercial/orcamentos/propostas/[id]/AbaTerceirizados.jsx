@@ -1,9 +1,6 @@
 "use client";
 import { useState, useMemo } from "react";
-import {
-  Plus, Trash2, Loader2, Save, Factory, X,
-  ChevronDown, ChevronUp, Search,
-} from "lucide-react";
+import { Plus, Trash2, Loader2, Save, Factory, X, ChevronDown, ChevronUp } from "lucide-react";
 
 const SERVICOS = [
   { id: "DOBRA", label: "Dobra", cor: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200" },
@@ -16,7 +13,7 @@ const SERVICOS = [
   { id: "OUTROS", label: "Outros Serviços", cor: "text-gray-600", bg: "bg-gray-50", border: "border-gray-200" },
 ];
 
-const SERVICO_MAP = Object.fromEntries(SERVICOS.map((s) => [s.id, s]));
+Object.fromEntries(SERVICOS.map((s) => [s.id, s]));
 
 const UNIDADES = ["VB", "KG", "M2", "M", "UN", "CJ", "PC", "HR"];
 
@@ -49,7 +46,7 @@ export default function AbaTerceirizados({ estudo, estudoId }) {
   }, [itens]);
 
   // Serviços que têm itens (para mostrar na lista) + os fixos
-  const servicosComItens = useMemo(() => {
+  useMemo(() => {
     const comItens = new Set(itens.map((it) => it.servico));
     return SERVICOS.filter((s) => comItens.has(s.id));
   }, [itens]);
@@ -270,7 +267,7 @@ function LinhaItem({ item, onUpdate, onDelete, salvando, excluindo }) {
   const [pesoKg, setPesoKg] = useState(item.pesoKg);
   const [custoUnit, setCustoUnit] = useState(item.custoUnitario);
   const [fornecedor, setFornecedor] = useState(item.fornecedor || "");
-  const [obs, setObs] = useState(item.observacao || "");
+  const [obs, _setObs] = useState(item.observacao || "");
 
   const total = qtd * custoUnit;
 

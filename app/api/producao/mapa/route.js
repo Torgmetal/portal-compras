@@ -108,7 +108,7 @@ export async function GET(req) {
     if (setor === "CORTE") {
       pecas = pecas
         .filter((p) => !croquiConsumido((p.croquiConjuntos || []).map((x) => x.conjunto)))
-        .map(({ croquiConjuntos, ...p }) => p);
+        .map(({ croquiConjuntos: _croquiConjuntos, ...p }) => p);
     }
   }
 

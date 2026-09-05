@@ -22,7 +22,6 @@ const DESTINOS = [
   { key: "PRIORIDADE", label: "Prioridade", icon: Star, cor: "bg-amber-500 hover:bg-amber-600", desc: "libera p/ desenho e corte" },
   { key: "TERCEIRO", label: "Terceiro", icon: Truck, cor: "bg-indigo-600 hover:bg-indigo-700", desc: "terceiriza (vai p/ /pcp/terceirizados)" },
 ];
-const VOLTA = ["MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDICAO"];
 const ROTULO = { ABERTO: "Em aberto", PRIORIDADE: "Prioridade", TERCEIRO: "Terceiro", REVISAO: "Revisão", AGUARDANDO_MATERIAL: "Aguard. material", CANCELADA: "Cancelada" };
 const SETOR_LABEL = { CORTE: "Preparação", MONTAGEM: "Montagem", SOLDA: "Solda", ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura", EXPEDICAO: "Expedição" };
 const LIMITE = 400;
@@ -75,7 +74,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const [erro, setErro] = useState("");
   const [sel, setSel] = useState(() => new Set());
   const [enviando, setEnviando] = useState(false);
-  const [terceiroVolta, setTerceiroVolta] = useState("MONTAGEM");
+  const [_terceiroVolta, _setTerceiroVolta] = useState("MONTAGEM");
   const [aba, setAba] = useState(setor ? abaInicial : "despacho"); // "despacho"(Liberar) | "prontas"
   const [filtro, setFiltro] = useState("");
   // Filtros de bloco (Vitor 18/08: "um seletor de com material e sem material" — a seleção em

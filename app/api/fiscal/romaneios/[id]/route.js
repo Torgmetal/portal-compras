@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { criarPedidoRemessa, resolverClienteOmie, conferirRemessaOmie, concluirRemessaOmie, statusNfDaRemessa } from "@/lib/omie-remessa-industrializacao";
+import { criarPedidoRemessa, conferirRemessaOmie, concluirRemessaOmie, statusNfDaRemessa } from "@/lib/omie-remessa-industrializacao";
 
 export const runtime = "nodejs";
 export const maxDuration = 120; // emitir espera a autorização do SEFAZ

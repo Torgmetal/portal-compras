@@ -2,12 +2,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
-import {
-  Zap, ChevronDown, ChevronUp, Filter, Search, CheckCircle2, Download, Upload,
-  Package, Loader2, AlertCircle, RefreshCw, Undo2, FileSpreadsheet, ClipboardList,
-  ArrowRight, X, Trash2, Factory, PackageSearch, AlertTriangle, XCircle, Layers,
-  Cloud, FileDown, FolderSearch, Folder, ArrowLeft,
-} from "lucide-react";
+import { Zap, ChevronDown, ChevronUp, Filter, Search, CheckCircle2, Download, Upload, Package, Loader2, AlertCircle, RefreshCw, Undo2, FileSpreadsheet, ClipboardList, ArrowRight, X, Trash2, Factory, PackageSearch, AlertTriangle, XCircle, Cloud, FileDown, FolderSearch, Folder, ArrowLeft } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import {
   criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
@@ -16,10 +11,7 @@ import {
 } from "@/lib/excel-relatorio";
 import { fmtOP } from "@/lib/utils";
 import BotaoRelatorioDia from "@/components/BotaoRelatorioDia";
-import {
-  MAQUINA_LABEL, MAQUINA_COR, MAQUINAS, PERDA_MAQUINA,
-  calcularResumoBarras, parsePerfil, gerarProgramaCorte, classificarMaquina,
-} from "@/lib/maquina-corte";
+import { MAQUINA_LABEL, MAQUINA_COR, MAQUINAS, calcularResumoBarras, classificarMaquina } from "@/lib/maquina-corte";
 
 const STATUS_PIPELINE = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
 const STATUS_LABEL = {
@@ -79,8 +71,8 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   const [liberando, setLiberando] = useState(false);
   const [revertendo, setRevertendo] = useState(false);
   const [marcandoConjunto, setMarcandoConjunto] = useState(false);
-  const [expandido, setExpandido] = useState(new Set([...Object.keys(MAQUINAS), "CORTE_MANUAL"]));
-  const [reclassificando, setReclassificando] = useState(false);
+  const [_expandido, _setExpandido] = useState(new Set([...Object.keys(MAQUINAS), "CORTE_MANUAL"]));
+  const [_reclassificando, _setReclassificando] = useState(false);
 
   // Modais de importacao
   const [modalImport, setModalImport] = useState(false);
@@ -93,7 +85,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   const [importandoSyneco, setImportandoSyneco] = useState(false);
   const [resultadoSyneco, setResultadoSyneco] = useState(null);
   const [synecoOpSelecionada, setSynecoOpSelecionada] = useState("");
-  const [conferindoEstoque, setConferindoEstoque] = useState(false);
+  const [_conferindoEstoque, _setConferindoEstoque] = useState(false);
   const [resultadoEstoque, setResultadoEstoque] = useState(null);
 
   const isAdmin = userRole === "ADMIN";
@@ -183,7 +175,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   };
 
   // Agrupar por maquina
-  const porMaquina = useMemo(() => {
+  useMemo(() => {
     const map = {};
     for (const maq of [...Object.keys(MAQUINAS), "CORTE_MANUAL"]) map[maq] = [];
     map["SEM_MAQUINA"] = [];
@@ -223,13 +215,6 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   const totalLiberadas = useMemo(() => pecas.filter((p) => p.status === "CORTE").length, [pecas]);
 
   // Toggle expand
-  const toggleExpandido = (maq) => {
-    setExpandido((prev) => {
-      const next = new Set(prev);
-      if (next.has(maq)) next.delete(maq); else next.add(maq);
-      return next;
-    });
-  };
 
   // Selecao
   const toggleSelecionado = (id) => {
@@ -238,26 +223,6 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
-  };
-  const selecionarTodosMaquina = (maq) => {
-    const ids = porMaquina[maq]?.map((p) => p.id) || [];
-    setSelecionados((prev) => {
-      const next = new Set(prev);
-      const todosJaSelecionados = ids.every((id) => next.has(id));
-      if (todosJaSelecionados) {
-        ids.forEach((id) => next.delete(id));
-      } else {
-        ids.forEach((id) => next.add(id));
-      }
-      return next;
-    });
-  };
-  const selecionarTodos = () => {
-    if (selecionados.size === pecasFiltradas.length) {
-      setSelecionados(new Set());
-    } else {
-      setSelecionados(new Set(pecasFiltradas.map((p) => p.id)));
-    }
   };
 
   // Enviar para as máquinas (= liberar p/ corte): grava máquina + status CORTE.
@@ -324,42 +289,6 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   }
 
   // Liberar todas as pendentes de uma maquina especifica
-  async function liberarMaquina(maq) {
-    const pecasMaq = porMaquina[maq]?.filter((p) => p.status === "PENDENTE") || [];
-    if (pecasMaq.length === 0) return;
-    const idsSet = new Set(pecasMaq.map((p) => p.id));
-    // Temporariamente setar selecionados e chamar liberarSelecionados
-    setSelecionados(idsSet);
-    // Executar inline pra evitar timing issue com setState
-    setLiberando(true);
-    try {
-      const maquinasMap = {};
-      for (const p of pecasMaq) {
-        let m = p.maquina;
-        if (!m && p.descricao) m = classificarMaquina(p.descricao, p.pesoUnitKg, p.comprimentoMm);
-        if (m) maquinasMap[p.id] = m;
-      }
-      const res = await fetch("/api/producao/pecas/liberar-corte", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: [...idsSet], maquinas: maquinasMap }),
-      });
-      let data;
-      try { data = await res.json(); } catch { throw new Error(`Erro ${res.status}`); }
-      if (!res.ok) throw new Error(data.error || "Erro");
-      setPecas((prev) =>
-        prev.map((p) => {
-          if (!idsSet.has(p.id) || p.status !== "PENDENTE") return p;
-          return { ...p, status: "CORTE", maquina: maquinasMap[p.id] || p.maquina };
-        })
-      );
-      setSelecionados(new Set());
-    } catch (e) {
-      alert("Erro ao liberar: " + e.message);
-    } finally {
-      setLiberando(false);
-    }
-  }
 
   // Liberar TODAS as pendentes visíveis
   async function liberarTodas() {
@@ -446,23 +375,6 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   }
 
   // Reclassificar
-  async function reclassificarMaquinas() {
-    setReclassificando(true);
-    try {
-      const res = await fetch("/api/producao/pecas/reclassificar-maquinas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: filtroOp || null }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
-      router.refresh();
-    } catch (e) {
-      alert("Erro ao reclassificar: " + e.message);
-    } finally {
-      setReclassificando(false);
-    }
-  }
 
   // Atualizar maquina individual
   async function atualizarMaquina(id, novaMaquina) {
@@ -557,45 +469,8 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
     }
   }
 
-  function abrirModalSyneco() {
-    setSynecoOpSelecionada(filtroOp || "");
-    setResultadoSyneco(null);
-    setModalSyneco(true);
-  }
 
   // Conferir estoque para OP selecionada
-  async function conferirEstoque() {
-    const opNum = filtroOp;
-    if (!opNum) { alert("Selecione uma OP para conferir o estoque."); return; }
-    setConferindoEstoque(true);
-    setResultadoEstoque(null);
-    try {
-      const res = await fetch("/api/producao/pecas/conferir-estoque", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: opNum }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Erro ${res.status}`);
-      setResultadoEstoque(data);
-      // Atualizar statusEstoque local nas peças
-      const statusMap = {};
-      for (const c of data.conferencia) {
-        statusMap[c.perfil] = c.status;
-      }
-      setPecas((prev) =>
-        prev.map((p) => {
-          if (p.opNumero !== opNum) return p;
-          const st = statusMap[p.descricao || ""];
-          return st ? { ...p, statusEstoque: st } : p;
-        })
-      );
-    } catch (e) {
-      alert("Erro ao conferir estoque: " + e.message);
-    } finally {
-      setConferindoEstoque(false);
-    }
-  }
 
   // Prepara pecas com auto-classificação para peças sem maquina
   function prepararPecas(baseCustom) {
@@ -700,117 +575,6 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   }
 
   // --- BOTAO 2: Programa de Corte ---
-  function exportarProgramaCorte() {
-    const pecasComMaq = prepararPecas();
-    if (pecasComMaq.length === 0) {
-      alert("Nenhuma peça com perfil reconhecido para gerar programa de corte.");
-      return;
-    }
-
-    const programa = gerarProgramaCorte(pecasComMaq);
-    const wb = XLSX.utils.book_new();
-    const opLabel = filtroOp ? `OP ${filtroOp}` : "Todas OPs";
-    const agora = `${new Date().toLocaleDateString("pt-BR")} ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
-
-    // Uma aba por maquina
-    for (const [maq, dados] of Object.entries(programa)) {
-      const rows = [];
-
-      // Header
-      rows.push([`PROGRAMA DE CORTE — ${dados.label.toUpperCase()}`]);
-      rows.push([`${opLabel} — Gerado em ${agora}`]);
-      if (dados.perda) {
-        const perdas = [];
-        if (dados.perda.alinhamento) perdas.push(`${dados.perda.alinhamento}mm alinhamento`);
-        if (dados.perda.zonamorta) perdas.push(`${dados.perda.zonamorta}mm zona morta (mín. cortável)`);
-        if (dados.perda.retalhoMinimo) perdas.push(`${dados.perda.retalhoMinimo}mm retalho mín. (peças < ${dados.perda.limiarSemRetalho}mm)`);
-        if (perdas.length > 0) rows.push([`Perdas da máquina: ${perdas.join(" + ")}`]);
-      }
-      rows.push([]);
-
-      // Chapas (se houver)
-      if (dados.chapas && dados.chapas.length > 0) {
-        rows.push(["CHAPAS"]);
-        rows.push(["OP", "Marca", "Descrição", "Qte", "Peso unit. (kg)", "Peso total (kg)"]);
-        for (const ch of dados.chapas) {
-          rows.push([ch.opNumero, ch.marca, ch.descricao, ch.qte || 1, ch.pesoUnitKg || 0, ch.pesoTotalKg || 0]);
-        }
-        const pesoChapas = dados.chapas.reduce((s, c) => s + (c.pesoTotalKg || 0), 0);
-        rows.push(["", "", "TOTAL CHAPAS", dados.chapas.reduce((s, c) => s + (c.qte || 1), 0), "", pesoChapas.toFixed(1)]);
-        rows.push([]);
-      }
-
-      // Perfis com barras
-      const perfis = Object.entries(dados.perfis).sort((a, b) => a[0].localeCompare(b[0]));
-      for (const [desc, grupo] of perfis) {
-        const compBarraM = (grupo.comprimentoBarraMm / 1000).toFixed(1);
-        const compUtilM = grupo.barraUtilMm ? (grupo.barraUtilMm / 1000).toFixed(2) : compBarraM;
-        const perdaInfo = grupo.perdaMm > 0 ? ` (Útil: ${compUtilM}m | Perda: ${grupo.perdaMm}mm)` : "";
-        rows.push([`${desc} — Barra ${compBarraM}m${perdaInfo} — ${grupo.totalBarras} barra${grupo.totalBarras > 1 ? "s" : ""} — Aproveitamento ${grupo.aproveitamentoMedio.toFixed(0)}%`]);
-        rows.push(["Barra", "OP", "Marca", "Comprimento (mm)", "Peso (kg)", "Útil (mm)", "Usado (mm)", "Sobra (mm)", "Aprov. %"]);
-
-        for (const barra of grupo.barras) {
-          let primeiro = true;
-          for (const peca of barra.pecas) {
-            rows.push([
-              primeiro ? `Barra ${barra.numero}` : "",
-              peca.opNumero || "",
-              peca.marca,
-              peca.comprimentoMm,
-              peca.pesoUnitKg || "",
-              primeiro ? barra.barraUtilMm : "",
-              primeiro ? barra.usadoMm : "",
-              primeiro ? barra.sobraMm : "",
-              primeiro ? `${barra.aproveitamento.toFixed(0)}%` : "",
-            ]);
-            primeiro = false;
-          }
-        }
-
-        // Subtotal do perfil
-        const totalUsado = grupo.barras.reduce((s, b) => s + b.usadoMm, 0);
-        const totalUtil = grupo.totalBarras * (grupo.barraUtilMm || grupo.comprimentoBarraMm);
-        rows.push([
-          `TOTAL ${desc}`,
-          "",
-          `${grupo.totalPecas} peças`,
-          `${(totalUsado / 1000).toFixed(1)}m usado`,
-          "",
-          totalUtil,
-          totalUsado,
-          totalUtil - totalUsado,
-          `${grupo.aproveitamentoMedio.toFixed(0)}%`,
-        ]);
-        rows.push([]);
-      }
-
-      // Resumo geral da maquina
-      const totalBarrasMaq = perfis.reduce((s, [, g]) => s + g.totalBarras, 0);
-      const totalPecasMaq = perfis.reduce((s, [, g]) => s + g.totalPecas, 0);
-      const mediaAprov = perfis.length > 0 ? perfis.reduce((s, [, g]) => s + g.aproveitamentoMedio, 0) / perfis.length : 0;
-      rows.push([]);
-      rows.push([`RESUMO ${dados.label.toUpperCase()}: ${totalPecasMaq} peças em ${totalBarrasMaq} barras — Aproveitamento médio: ${mediaAprov.toFixed(0)}%`]);
-
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      ws["!cols"] = [
-        { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 18 },
-        { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
-      ];
-
-      const sheetName = (dados.label || maq).substring(0, 31);
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    }
-
-    if (wb.SheetNames.length === 0) {
-      alert("Nenhuma peça com perfil válido para gerar programa.");
-      return;
-    }
-
-    const fileName = filtroOp
-      ? `Programa_Corte_OP${filtroOp}_${new Date().toISOString().slice(0, 10)}.xlsx`
-      : `Programa_Corte_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    XLSX.writeFile(wb, fileName);
-  }
 
   // Exportar relatorio no padrao ISO
   async function exportarRelatorio() {
@@ -1965,7 +1729,7 @@ function ModalExcluirLote({ pecas, opsComPecas, onClose, onExcluido }) {
   );
 }
 
-function ModalImportarLE({ ops, onClose, onImportado }) {
+function ModalImportarLE({ ops: _ops, onClose, onImportado }) {
   const fileRef = useRef(null);
   const [arquivoNome, setArquivoNome] = useState("");
   const [parsing, setParsing] = useState(false);

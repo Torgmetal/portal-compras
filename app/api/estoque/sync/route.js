@@ -9,9 +9,8 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req) {
-  let user;
   try {
-    user = await requireRole(["ADMIN", "COMPRAS"]);
+    await requireRole(["ADMIN", "COMPRAS"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao." }, { status: 403 });
   }

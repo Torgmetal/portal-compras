@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { fmtOP } from "@/lib/utils";
-import { ArrowLeft, ClipboardList } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 import RMHeaderActions from "@/components/RMHeaderActions";
 

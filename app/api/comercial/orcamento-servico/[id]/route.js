@@ -48,8 +48,7 @@ export async function GET(_req, { params }) {
 }
 
 export async function PATCH(req, { params }) {
-  let user;
-  try { user = await requireRole(["ADMIN", "COMERCIAL"]); }
+  try { await requireRole(["ADMIN", "COMERCIAL"]); }
   catch (e) { return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   let body;

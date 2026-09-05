@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { fmtOP } from "@/lib/utils";
 import { ArrowLeft, FileText } from "lucide-react";
-import { labelCategoria } from "@/lib/op-categorias";
 import MapaCotacaoClient from "./MapaCotacaoClient";
 import OPAcoesClient from "./OPAcoesClient";
 import BotaoResumoFD from "./BotaoResumoFD";

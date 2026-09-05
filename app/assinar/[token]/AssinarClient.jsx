@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { FileText, CheckCircle2, Loader2, Lock, PenLine, ShieldCheck, Download, RotateCcw, Clock } from "lucide-react";
+import { CheckCircle2, Loader2, Lock, PenLine, ShieldCheck, Download, RotateCcw, Clock } from "lucide-react";
 
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 

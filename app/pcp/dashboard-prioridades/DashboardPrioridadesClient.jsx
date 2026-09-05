@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import DespachoPanel from "./DespachoPanel";
-import { Loader2, AlertCircle, RefreshCw, Maximize2, Minimize2, Trophy, CalendarClock, Package, Target, CheckCircle2, Inbox } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Maximize2, Minimize2, Trophy, CalendarClock, Target, CheckCircle2, Inbox } from "lucide-react";
 
 const AUTO_REFRESH_MS = 60_000;
 

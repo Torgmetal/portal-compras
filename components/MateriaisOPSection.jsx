@@ -2,8 +2,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Loader2, Package, AlertCircle, CheckCircle2, Truck, Clock, Archive, XCircle, ShoppingCart, Filter, ChevronDown, ChevronUp, Download, ArrowUpDown } from "lucide-react";
 
-const fmtMoeda = (v) =>
-  Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const fmtNum = (v) => Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;

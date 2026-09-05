@@ -7,15 +7,7 @@ import { log } from "@/lib/log";
 
 const registro = log("compras/consumiveis");
 
-const STATUS_LABELS = {
-  ABERTA:        { label: "Aberta",         className: "bg-torg-blue-50 text-torg-blue" },
-  EM_COTACAO:    { label: "Em cotacao",     className: "bg-torg-orange-50 text-torg-orange-700" },
-  COTADA:        { label: "Cotada",         className: "bg-torg-blue-100 text-torg-blue-800" },
-  PEDIDO_GERADO: { label: "Pedido gerado",  className: "bg-torg-dark text-white" },
-  CANCELADA:     { label: "Cancelada",      className: "bg-gray-100 text-gray-500" },
-};
 
-const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "--");
 
 export default async function PainelConsumiveis({ searchParams }) {
   const user = await requireRole(["ADMIN", "COMPRAS"]);

@@ -1,10 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import {
-  Loader2, ArrowLeft, Camera, FileText, Check, Send, AlertCircle,
-  ChevronRight, ExternalLink, Plus, X, ShieldCheck, Ruler, Trash2, Link2,
-} from "lucide-react";
+import { Loader2, FileText, Check, Send, AlertCircle, ChevronRight, ExternalLink, Plus, X, ShieldCheck, Trash2, Link2 } from "lucide-react";
 import { TIPO_LABEL, TIPOS_RELATORIO, usaCotas, pendenciasParaAssinatura } from "@/lib/qualidade-campo";
 
 /**
@@ -66,7 +63,7 @@ export default function InspecoesClient({ podeFechar = true }) {
     g.fotos.push(f);
     grupos.set(chave, g);
   }
-  const lista = [...grupos.values()].sort((a, b) => a.opNumero.localeCompare(b.opNumero));
+  [...grupos.values()].sort((a, b) => a.opNumero.localeCompare(b.opNumero));
 
   // ── o que a lista mostra ──────────────────────────────────────────────────────────────────
   // ⚠ APROVADO É CONCLUÍDO, e nada mais. Reprovado e "exame complementar" continuam na fila: os
@@ -81,31 +78,7 @@ export default function InspecoesClient({ podeFechar = true }) {
     .filter((r) => !opFiltro || r.opNumero === opFiltro)
     .filter((r) => (aba === "APROVADOS" ? ehConcluido(r) : !ehConcluido(r)));
 
-  async function excluirGrupo(g) {
-    if (!confirm(`Excluir ${g.fotos.length} registro(s) de OP-${g.opNumero} · ${TIPO_LABEL[g.tipo] || g.tipo}?\n\nAs fotos saem do portal. Isso não afeta relatórios já montados.`)) return;
-    try {
-      const r = await fetch("/api/qualidade/inspecoes", {
-        method: "DELETE", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: g.opNumero, tipo: g.tipo }),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro");
-      carregar();
-    } catch (e) { alert(e.message); }
-  }
 
-  async function excluirFoto(f) {
-    if (!confirm("Excluir esta foto?")) return;
-    try {
-      const r = await fetch("/api/qualidade/inspecoes", {
-        method: "DELETE", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: [f.id] }),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro");
-      carregar();
-    } catch (e) { alert(e.message); }
-  }
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto">

@@ -117,8 +117,7 @@ export async function GET(req) {
 // classificar elas continuariam para sempre fora das molduras. Serve também para quem anexou no
 // bloco errado — sem isso a saída seria apagar a evidência e fotografar de novo.
 export async function PATCH(req) {
-  let user;
-  try { user = await requireRole(PERFIS_CAMPO); }
+  try { await requireRole(PERFIS_CAMPO); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   let corpo;

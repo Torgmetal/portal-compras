@@ -8,7 +8,7 @@ import {
   Sparkles, Plus, Mail, Eye, Image as ImageIcon, ClipboardCheck, BookOpen,
   ScrollText, FileDown, ImagePlus, Stamp, Users, ChevronDown,
 } from "lucide-react";
-import { SECOES_AUDITORIA, ordenarSecoes, REQUISITOS_GQFQ003, STATUS_REQUISITO, requisitosDaSecao } from "@/lib/auditoria-secoes";
+import { SECOES_AUDITORIA, ordenarSecoes, REQUISITOS_GQFQ003, requisitosDaSecao } from "@/lib/auditoria-secoes";
 import { numRAE } from "@/lib/auditoria-externa";
 import { TIPOS, tipoLabel } from "@/lib/auditoria-interna";
 import { COLUNAS_5W2H, STATUS_ITEM, STATUS_ITEM_OPCOES, situacaoItem, situacaoItemLabel } from "@/lib/plano-acao";
@@ -184,7 +184,7 @@ export default function AuditoriaDetalheClient({ id }) {
   const reqNA = REQUISITOS_GQFQ003.filter((r) => checklist[r.id] === "NA").length;
   const reqAtend = REQUISITOS_GQFQ003.filter((r) => checklist[r.id] === "ATENDIDO").length;
   const reqBase = REQUISITOS_GQFQ003.length - reqNA;
-  const reqPct = reqBase > 0 ? Math.round((reqAtend / reqBase) * 100) : 0;
+  reqBase > 0 ? Math.round((reqAtend / reqBase) * 100) : 0;
   const reqGrupos = [];
   for (const r of REQUISITOS_GQFQ003) {
     const g = reqGrupos.find((x) => x[0] === r.secao);

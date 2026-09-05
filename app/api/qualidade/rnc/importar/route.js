@@ -11,7 +11,6 @@ import { numRNC } from "@/lib/nao-conformidade";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "");
 const D = (s) => { if (!s) return null; const d = new Date(s); return isNaN(d) ? null : d; };
 
 export async function POST(req) {

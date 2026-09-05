@@ -8,7 +8,7 @@ import { Loader2, AlertCircle, X, FileText, Upload } from "lucide-react";
 // Permite upload de novos arquivos e remocao dos existentes.
 // Os arquivos sao enviados aos fornecedores junto com a cotacao.
 export function AnexosSection({ rmId, anexos: anexosIniciais, editavel }) {
-  const router = useRouter();
+  useRouter();
   const [anexos, setAnexos] = useState(anexosIniciais || []);
   const [uploading, setUploading] = useState(0);
   const [erro, setErro] = useState("");

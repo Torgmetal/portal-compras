@@ -346,7 +346,7 @@ async function calcularSavings() {
 }
 
 // ─── OTIF ────────────────────────────────────────────────────
-async function calcularOTIF(dataInicio, dataFim) {
+async function calcularOTIF(_dataInicio, _dataFim) {
   // Busca pedidos entregues no período
   const pedidos = await prisma.pedidoOmie.findMany({
     where: {

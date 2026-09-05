@@ -3,10 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useStore } from "@/lib/store";
 import { fmtOP } from "@/lib/utils";
 import { numeroBR } from "@/lib/numero-br";
-import {
-  Factory, Loader2, AlertCircle, X, FileText, Search,
-  PackageOpen, ReceiptText, MinusCircle, Undo2, Truck, FilePlus2, Eye, Boxes, Package, Check, Pencil, RefreshCw,
-} from "lucide-react";
+import { Factory, Loader2, AlertCircle, X, Search, PackageOpen, ReceiptText, MinusCircle, Undo2, Truck, FilePlus2, Eye, Boxes, Package, Check, Pencil, RefreshCw } from "lucide-react";
 
 const fmtR$ = (n) => (n == null ? "—" : Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
 

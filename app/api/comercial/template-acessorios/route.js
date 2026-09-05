@@ -100,7 +100,7 @@ export async function GET() {
     let currentRow = 10;
 
     // Lista completa de nomes de produtos para validacao (dropdown)
-    const todosNomes = CATALOGO_ACESSORIOS.map((p) => p.nome);
+    CATALOGO_ACESSORIOS.map((p) => p.nome);
 
     for (const secao of SECOES) {
       // Header da secao

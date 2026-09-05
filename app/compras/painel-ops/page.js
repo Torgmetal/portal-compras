@@ -85,8 +85,7 @@ export default async function PainelOPs() {
   // trabalho de Compras, e ela só empurrava para baixo o que precisa de atenção.
   const opsFiltradas = opsAtivasParaKpis;
 
-  const totalAtivas = opsAtivasParaKpis.length;
-  const totalFinalizadas = opsComStats.length - totalAtivas;
+  opsAtivasParaKpis.length;
 
   return (
     <div className="space-y-5 max-w-7xl">

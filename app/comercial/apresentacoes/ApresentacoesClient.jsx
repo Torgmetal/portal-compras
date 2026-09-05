@@ -1,10 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { upload } from "@vercel/blob/client";
-import {
-  Loader2, Plus, Trash2, Upload, Link2, Send, Eye, EyeOff, Image as ImageIcon,
-  FileText, Check, ExternalLink, Library, Presentation, X,
-} from "lucide-react";
+import { Loader2, Plus, Trash2, Upload, Link2, Send, Eye, EyeOff, Image as ImageIcon, FileText, ExternalLink, Library, Presentation } from "lucide-react";
 
 const TIPOS = [{ v: "CADASTRAL", l: "Cadastral" }, { v: "PORTFOLIO", l: "Portfólio" }, { v: "OUTRO", l: "Outro" }];
 const chipStatus = (s) => s === "PUBLICADO" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-100 text-gray-500 border-gray-200";

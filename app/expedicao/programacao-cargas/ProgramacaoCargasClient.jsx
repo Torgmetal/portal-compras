@@ -6,7 +6,7 @@ import {
   CheckCircle2, Clock, AlertTriangle, Search,
   Weight, Ban, Eye,
 } from "lucide-react";
-import { fmtOP, fmtKg, fmtPesoCompacto, fmtData, fmtPct } from "@/lib/utils";
+import { fmtOP, fmtPesoCompacto, fmtPct } from "@/lib/utils";
 
 const STATUS_COR = {
   PLANEJADO: { bg: "bg-blue-100", text: "text-blue-700", label: "Planejado" },

@@ -9,20 +9,8 @@ const registro = log("compras");
 
 // Sempre busca dados frescos do banco (sem cache de Server Component)
 
-const STATUS_LABELS = {
-  ABERTA:        { label: "Aberta",         className: "bg-torg-blue-50 text-torg-blue" },
-  EM_COTACAO:    { label: "Em cotação",     className: "bg-torg-orange-50 text-torg-orange-700" },
-  COTADA:        { label: "Cotada",         className: "bg-torg-blue-100 text-torg-blue-800" },
-  PEDIDO_GERADO: { label: "Pedido gerado",  className: "bg-torg-dark text-white" },
-  CANCELADA:     { label: "Cancelada",      className: "bg-gray-100 text-gray-500" },
-};
 
-const TIPO_RM_LABELS = {
-  ENGENHARIA: "Engenharia",
-  INTERNA:    "Interna",
-};
 
-const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
 export default async function PainelCompras({ searchParams }) {
   const user = await requireRole(["ADMIN", "COMPRAS"]);

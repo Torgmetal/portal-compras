@@ -134,7 +134,7 @@ export async function POST(req) {
           },
         },
       });
-    } catch (_) {}
+    } catch {}
 
     return NextResponse.json({ success: true, data: treinamento }, { status: 201 });
   } catch (e) {

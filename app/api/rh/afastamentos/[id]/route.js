@@ -97,7 +97,7 @@ export async function PATCH(req, { params }) {
           diff: { antes: { status: atual.status }, depois: updateData },
         },
       });
-    } catch (_) {}
+    } catch {}
 
     return NextResponse.json({ success: true, data: afastamento });
   } catch (e) {
@@ -143,7 +143,7 @@ export async function DELETE(req, { params }) {
           },
         },
       });
-    } catch (_) {}
+    } catch {}
 
     return NextResponse.json({ success: true });
   } catch (e) {

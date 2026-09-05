@@ -117,7 +117,7 @@ export async function POST(req) {
           },
         },
       });
-    } catch (_) {}
+    } catch {}
 
     return NextResponse.json({ success: true, data: afastamento }, { status: 201 });
   } catch (e) {

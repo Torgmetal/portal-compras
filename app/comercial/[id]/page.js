@@ -159,7 +159,7 @@ export async function carregarDetalheOP(id, user) {
   }));
   // Separa entre normais (via cotacao) e FD avulsos (manuais)
   const pedidosFdAvulsos = pedidos.filter((p) => p.criadoManualmente);
-  const pedidosViaCotacao = pedidos.filter((p) => !p.criadoManualmente);
+  pedidos.filter((p) => !p.criadoManualmente);
 
   // KPIs de verba: estimada (base + aditivos) vs ja em pedidos (Omie status=CRIADO)
   const verbaBase = op.itens.reduce((s, i) => s + (i.valorVerba || 0), 0);

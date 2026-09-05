@@ -2,12 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import {
-  Loader2, AlertCircle, RefreshCw, Calendar, ChevronDown,
-  Users, TrendingDown, Clock, Shield, BookOpen, DollarSign,
-  Activity, Heart, AlertTriangle, Briefcase, UserPlus, UserMinus,
-  Target, Award, HardHat, Gauge,
-} from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Calendar, ChevronDown, Users, TrendingDown, Clock, Shield, BookOpen, DollarSign, Activity, Heart, AlertTriangle, Briefcase, UserPlus, UserMinus, Target, Gauge } from "lucide-react";
 
 // ─── HELPERS ─────────────────────────────────────────────────
 const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -189,17 +184,6 @@ function CardResumo({ icon: Icon, label, valor, sub, cor, meta }) {
   );
 }
 
-function MiniCard({ label, valor, cor }) {
-  return (
-    <div className="bg-white rounded-lg border border-gray-100 p-3 flex items-center gap-2.5">
-      <div className={`${cor} w-2 h-10 rounded-full flex-shrink-0`} />
-      <div className="min-w-0">
-        <p className="text-[10px] text-torg-gray uppercase tracking-wide truncate">{label}</p>
-        <p className="text-lg font-extrabold text-torg-dark tabular-nums truncate">{valor}</p>
-      </div>
-    </div>
-  );
-}
 
 function PercentageBar({ label, valor, pct, cor }) {
   return (

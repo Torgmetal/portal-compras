@@ -48,8 +48,7 @@ export async function GET(_req, { params }) {
 }
 
 export async function PATCH(req, { params }) {
-  let user;
-  try { user = await requireRole(MODS_RELATORIOS); }
+  try { await requireRole(MODS_RELATORIOS); }
   catch (e) { return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   let body;

@@ -1,10 +1,9 @@
 "use client";
 import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
-import { Loader2, AlertCircle, Send, AlertTriangle, Truck, RotateCcw, CheckCircle2, Upload, FileText, X, Sparkles, CalendarDays, PackageX, TrendingDown } from "lucide-react";
+import { Loader2, AlertCircle, Send, AlertTriangle, RotateCcw, CheckCircle2, Upload, FileText, Sparkles, PackageX, TrendingDown } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 import { numeroBR } from "@/lib/numero-br";
 
@@ -260,7 +259,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
         : resIA.status === 429 ? "Muitas leituras seguidas — aguarde um minuto e tente de novo."
         : resIA.status === 413 ? "PDF grande demais para a leitura automática."
         : `Leitura automática indisponível (${resIA.status}).`;
-    } catch (e) {
+    } catch {
       motivoIA = "Não consegui falar com a leitura automática — tentando o modo simples.";
     }
 

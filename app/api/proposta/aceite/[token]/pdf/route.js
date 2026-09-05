@@ -14,7 +14,7 @@ export async function GET(_req, { params }) {
 
   let out;
   try { out = await gerarPropostaPDF(o); }
-  catch (e) { return NextResponse.json({ success: false, error: "Falha ao gerar o PDF" }, { status: 500 }); }
+  catch { return NextResponse.json({ success: false, error: "Falha ao gerar o PDF" }, { status: 500 }); }
 
   return new Response(Buffer.from(out.bytes), {
     status: 200,

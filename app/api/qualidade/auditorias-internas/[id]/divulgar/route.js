@@ -43,7 +43,7 @@ export async function POST(req, { params }) {
   try { pdf = await gerarAuditoriaInternaPDF(a); }
   catch (e) { return NextResponse.json({ error: "Falha ao gerar o PDF: " + (e?.message || "erro") }, { status: 500 }); }
 
-  const cab = `${numRAI(a.numero)} · ${a.setor}`;
+  `${numRAI(a.numero)} · ${a.setor}`;
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
       ${cabecalhoEmail(`Relatório de Auditoria Interna — ${escapeHtml(numRAI(a.numero))}`, "Torg Metal · Qualidade")}

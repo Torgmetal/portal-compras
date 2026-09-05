@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { downloadFileByPath, getAccessToken } from "@/lib/sharepoint";
+import { downloadFileByPath } from "@/lib/sharepoint";
 import * as XLSX from "xlsx";
 import { log } from "@/lib/log";
 

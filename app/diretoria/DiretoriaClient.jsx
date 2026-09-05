@@ -1,16 +1,10 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import Link from "next/link";
-import {
-  Lock, Loader2, AlertCircle, UserPlus, X, ShieldCheck, ArrowLeft,
-  TrendingUp, TrendingDown, Wallet, Banknote, Truck, RefreshCw,
-  AlertTriangle, Flame, Search, ArrowDownRight, ArrowUpRight,
-  CalendarClock, Zap, Clock, Pencil, CheckCircle2, ExternalLink, ChevronDown, Download, Target,
-} from "lucide-react";
+import { Lock, Loader2, AlertCircle, UserPlus, X, ShieldCheck, ArrowLeft, TrendingUp, TrendingDown, Wallet, Banknote, Truck, RefreshCw, AlertTriangle, Search, CalendarClock, Zap, Clock, Pencil, CheckCircle2, ExternalLink, ChevronDown, Download, Target } from "lucide-react";
 import CustoHoraClient from "@/components/CustoHoraClient";
 import FluxoProducao from "./FluxoProducao";
 import ResumoMensalDiretoria from "@/components/ResumoMensalDiretoria";
-import { numeroBR } from "@/lib/numero-br";
 import { fmtOP } from "@/lib/utils";
 
 const fmtR$ = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
@@ -34,7 +28,7 @@ const ABAS_BASE = [
 ];
 const ABAS_FIN = ["resumo", "cortar"]; // dependem do fetch /financeiro
 
-export default function DiretoriaClient({ isDono, userNome }) {
+export default function DiretoriaClient({ isDono, userNome: _userNome }) {
   const [aba, setAba] = useState("resumo");
   const abas = isDono ? [...ABAS_BASE, { id: "acesso", label: "Acesso" }] : ABAS_BASE;
 
@@ -375,131 +369,6 @@ function TarefasDiretoria() {
   );
 }
 
-function Ruptura({ fin, onRefresh }) {
-  const { ruptura, previsao } = fin;
-  return (
-    <div className="space-y-6">
-      {/* Leitura crítica */}
-      <section>
-        <h2 className="text-sm font-bold text-torg-dark uppercase tracking-wide mb-3 flex items-center gap-2">
-          <Flame size={16} className="text-red-600" /> Leitura crítica
-        </h2>
-        {ruptura.flags.length === 0 ? (
-          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg px-4 py-3 text-sm">
-            Nenhum ponto de ruptura relevante detectado no momento.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {ruptura.flags.map((f, i) => (
-              <div key={i} className={`flex items-start gap-3 rounded-lg px-4 py-3 text-sm border ${
-                f.sev === "alta" ? "bg-red-50 border-red-200 text-red-800" : "bg-amber-50 border-amber-200 text-amber-800"
-              }`}>
-                {f.sev === "alta" ? <Flame size={18} className="mt-0.5 shrink-0" /> : <AlertTriangle size={18} className="mt-0.5 shrink-0" />}
-                <span>{f.texto}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Gap de caixa por janela */}
-      <section className="bg-white rounded-xl border border-gray-100 shadow-sm">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-torg-dark">Gap de caixa por janela</h2>
-          <p className="text-[11px] text-torg-gray mt-0.5">Acumulado a pagar × a receber até cada prazo (inclui vencidos). O a receber considera só títulos já faturados — a carteira a faturar está no Resumo.</p>
-        </div>
-        <div className="p-5 grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {ruptura.janelas.map((j) => {
-            const neg = j.gap < 0;
-            return (
-              <div key={j.dias} className={`rounded-xl border p-4 ${neg ? "border-red-200 bg-red-50/50" : "border-emerald-200 bg-emerald-50/40"}`}>
-                <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Próximos {j.dias} dias</p>
-                <p className={`text-xl font-extrabold tabular-nums mt-1 leading-tight ${neg ? "text-red-700" : "text-emerald-700"}`}>
-                  {neg ? "−" : "+"}{fmtR$(Math.abs(j.gap))}
-                </p>
-                <div className="mt-2 space-y-0.5 text-[11px] text-torg-gray">
-                  <p className="flex items-center justify-between"><span className="inline-flex items-center gap-1"><ArrowUpRight size={11} className="text-emerald-600" />receber</span><span className="tabular-nums">{fmtR$(j.receber)}</span></p>
-                  <p className="flex items-center justify-between"><span className="inline-flex items-center gap-1"><ArrowDownRight size={11} className="text-rose-600" />pagar</span><span className="tabular-nums">{fmtR$(j.pagar)}</span></p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        {(ruptura.cobertura != null || previsao?.aFaturar > 0) && (
-          <div className="px-5 pb-5 space-y-1.5">
-            {ruptura.cobertura != null && (
-              <div className="flex items-center gap-3 text-sm">
-                <span className="text-torg-gray">Cobertura (a receber faturado ÷ a pagar em aberto):</span>
-                <span className={`font-bold tabular-nums ${ruptura.cobertura < 30 ? "text-red-700" : ruptura.cobertura < 100 ? "text-amber-700" : "text-emerald-700"}`}>{ruptura.cobertura}%</span>
-              </div>
-            )}
-            {previsao?.aFaturar > 0 && (
-              <p className="text-[11px] text-torg-gray">
-                Fora do gap: <span className="font-semibold text-emerald-700">{fmtR$(previsao.aFaturar)}</span> a faturar da carteira ativa (sem data definida) — entra no caixa conforme as medições/entregas avançam. Detalhe na aba <span className="font-medium text-torg-dark">A receber</span>.
-              </p>
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* Fluxo de caixa diário */}
-      <FluxoDiario fluxo={ruptura.fluxoDiario} fluxoNaturezas={ruptura.fluxoNaturezas} fluxoVencido={ruptura.fluxoVencido}
-        saldoInicial={ruptura.saldoInicial} saldoAtualizadoEm={ruptura.saldoAtualizadoEm} onRefresh={onRefresh} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Concentração de credores */}
-        <section className="bg-white rounded-xl border border-gray-100 shadow-sm">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h2 className="font-semibold text-torg-dark">Concentração — maiores credores</h2>
-            <p className="text-[11px] text-torg-gray mt-0.5">Quem mais pesa no a pagar em aberto.</p>
-          </div>
-          <div className="p-5 space-y-2.5">
-            {ruptura.topCredores.length === 0 ? <p className="text-sm text-torg-gray text-center py-3">Sem dados.</p> : ruptura.topCredores.map((c, i) => (
-              <div key={i}>
-                <div className="flex items-center justify-between text-sm gap-3">
-                  <span className="text-torg-dark truncate flex-1" title={c.nome}>{c.nome}</span>
-                  <span className="tabular-nums font-medium text-torg-dark whitespace-nowrap">{fmtR$(c.valor)}</span>
-                  <span className="text-[11px] text-torg-gray tabular-nums w-9 text-right">{c.pct}%</span>
-                </div>
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1">
-                  <div className="h-full rounded-full bg-rose-400" style={{ width: `${Math.min(100, c.pct)}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Maiores títulos a pagar (30d) */}
-        <section className="bg-white rounded-xl border border-gray-100 shadow-sm">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h2 className="font-semibold text-torg-dark">Maiores títulos a vencer (≤30 dias)</h2>
-            <p className="text-[11px] text-torg-gray mt-0.5">Compromissos de maior valor no curto prazo. Inclui vencidos.</p>
-          </div>
-          <div className="p-5 overflow-x-auto">
-            {ruptura.topTitulosPagar.length === 0 ? <p className="text-sm text-torg-gray text-center py-3">Sem dados.</p> : (
-              <table className="w-full text-sm">
-                <tbody className="divide-y divide-gray-50">
-                  {ruptura.topTitulosPagar.map((t, i) => (
-                    <tr key={i}>
-                      <td className="py-1.5 pr-2">
-                        <p className="text-torg-dark truncate max-w-[180px]" title={t.nome}>{t.nome}</p>
-                        <p className="text-[11px] text-torg-gray">{t.doc || "—"}</p>
-                      </td>
-                      <td className="py-1.5 text-center whitespace-nowrap">
-                        <span className={`text-[11px] tabular-nums ${t.vencido ? "text-red-600 font-semibold" : "text-torg-gray"}`}>{fmtDia(t.venc)}{t.vencido ? " ⚠" : ""}</span>
-                      </td>
-                      <td className="py-1.5 text-right tabular-nums font-medium text-torg-dark whitespace-nowrap">{fmtR$(t.valor)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-}
 
 /* ─────────────────────── RESUMO ─────────────────────── */
 function Resumo({ fin }) {
@@ -1170,147 +1039,6 @@ function DrillLancamentos({ state, label, de, ate, onMes, onData, labelData = "E
 }
 
 /* ─────────────────────── fluxo de caixa diário (ruptura) ─────────────────────── */
-function FluxoDiario({ fluxo, fluxoNaturezas, fluxoVencido, saldoInicial, saldoAtualizadoEm, onRefresh }) {
-  const [editandoSaldo, setEditandoSaldo] = useState(false);
-  const [saldoInput, setSaldoInput] = useState(String(saldoInicial ?? 0));
-  const [salvandoSaldo, setSalvandoSaldo] = useState(false);
-  const [incluirFin, setIncluirFin] = useState(true);
-  const [incluirInv, setIncluirInv] = useState(true);
-
-  async function salvarSaldo() {
-    const v = numeroBR(saldoInput, NaN);
-    if (!Number.isFinite(v)) { alert("Valor inválido"); return; }
-    setSalvandoSaldo(true);
-    try {
-      const r = await fetch("/api/diretoria/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ saldoCaixa: v }) });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro ao salvar");
-      setEditandoSaldo(false);
-      onRefresh?.();
-    } catch (e) { alert(e.message); } finally { setSalvandoSaldo(false); }
-  }
-
-  const hojeK = new Date().toISOString().slice(0, 10);
-  const nat = fluxoNaturezas || { operacional: 0, financeiro: 0, investimento: 0 };
-
-  // Recalcula o saldo projetado conforme os toggles de natureza
-  const { rows, pior, piorDiaCalc } = useMemo(() => {
-    let acc = saldoInicial || 0, p = saldoInicial || 0, pd = null;
-    const rows = (fluxo || []).map((e) => {
-      const pagar = e.pagarOper + (incluirFin ? e.pagarFin : 0) + (incluirInv ? e.pagarInv : 0);
-      const liquido = e.receberFat + e.receberPrev - pagar;
-      acc += liquido;
-      if (acc < p) { p = acc; pd = e.dia; }
-      return { dia: e.dia, pagar, receberFat: e.receberFat, receberPrev: e.receberPrev, liquido, saldo: acc };
-    });
-    return { rows, pior: p, piorDiaCalc: pd };
-  }, [fluxo, incluirFin, incluirInv, saldoInicial]);
-
-  // Vencidos em aberto (fora da projeção diária), respeitando os toggles
-  const v = fluxoVencido || { pagarOper: 0, pagarFin: 0, pagarInv: 0, receberFat: 0, receberPrev: 0 };
-  const vencPagar = v.pagarOper + (incluirFin ? v.pagarFin : 0) + (incluirInv ? v.pagarInv : 0);
-  const vencReceber = (v.receberFat || 0) + (v.receberPrev || 0);
-  const temVencido = vencPagar > 0.5 || vencReceber > 0.5;
-
-  const saldoBox = (
-    <div className="flex items-center gap-2 text-sm">
-      <span className="text-torg-gray">Saldo em caixa hoje:</span>
-      {editandoSaldo ? (
-        <>
-          <input value={saldoInput} onChange={(e) => setSaldoInput(e.target.value)} autoFocus
-            className="w-32 px-2 py-1 text-sm border border-gray-200 rounded outline-none focus:border-torg-blue tabular-nums" placeholder="-90000" />
-          <button onClick={salvarSaldo} disabled={salvandoSaldo} className="text-[11px] text-white bg-torg-blue px-2 py-1 rounded disabled:opacity-50">salvar</button>
-          <button onClick={() => { setEditandoSaldo(false); setSaldoInput(String(saldoInicial ?? 0)); }} className="text-[11px] text-torg-gray hover:underline">cancelar</button>
-        </>
-      ) : (
-        <>
-          <span className={`font-bold tabular-nums ${(saldoInicial || 0) < 0 ? "text-red-700" : "text-torg-dark"}`}>{fmtR$(saldoInicial)}</span>
-          <button onClick={() => { setSaldoInput(String(saldoInicial ?? 0)); setEditandoSaldo(true); }} title="Editar saldo" className="text-torg-gray hover:text-torg-blue"><Pencil size={12} /></button>
-        </>
-      )}
-    </div>
-  );
-
-  const chips = (
-    <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-[11px] text-torg-gray">No fluxo:</span>
-      <span className="text-[11px] px-2 py-1 rounded bg-gray-100 text-torg-dark">Operacional {fmtR$(nat.operacional)}</span>
-      <button onClick={() => setIncluirFin((v) => !v)} title="Incluir/excluir do fluxo"
-        className={`text-[11px] px-2 py-1 rounded border transition-colors ${incluirFin ? "bg-rose-50 border-rose-200 text-rose-700" : "bg-white border-gray-200 text-torg-gray line-through"}`}>
-        {incluirFin ? "✓" : "✕"} Dívida/financ. {fmtR$(nat.financeiro)}
-      </button>
-      <button onClick={() => setIncluirInv((v) => !v)} title="Incluir/excluir do fluxo"
-        className={`text-[11px] px-2 py-1 rounded border transition-colors ${incluirInv ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-white border-gray-200 text-torg-gray line-through"}`}>
-        {incluirInv ? "✓" : "✕"} Investimento {fmtR$(nat.investimento)}
-      </button>
-    </div>
-  );
-
-  if (!fluxo?.length) return (
-    <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-2">
-      <h2 className="font-semibold text-torg-dark">Fluxo de caixa diário · próximos 60 dias</h2>
-      {saldoBox}
-      <p className="text-sm text-torg-gray">Sem movimentos nos próximos 60 dias.</p>
-    </section>
-  );
-  return (
-    <section className="bg-white rounded-xl border border-gray-100 shadow-sm">
-      <div className="px-5 py-4 border-b border-gray-100 space-y-2.5">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <h2 className="font-semibold text-torg-dark">Fluxo de caixa diário · próximos 60 dias</h2>
-            <p className="text-[11px] text-torg-gray mt-0.5">A pagar (saída) × recebimentos faturados e previsões (entrada), por dia. O <b>saldo projetado</b> parte do caixa de hoje. Tire a dívida/investimento abaixo pra ver o aperto só do operacional. <b>Vencidos ficam em aberto</b>, fora desta projeção.</p>
-          </div>
-          {pior < 0 && (
-            <div className="text-right shrink-0">
-              <p className="text-[11px] text-torg-gray">Pior saldo projetado</p>
-              <p className="text-lg font-extrabold text-red-700 tabular-nums leading-none">{fmtR$(pior)}</p>
-              <p className="text-[10px] text-torg-gray">{piorDiaCalc ? `por volta de ${fmtDia(piorDiaCalc)}` : ""}</p>
-            </div>
-          )}
-        </div>
-        {saldoBox}
-        {chips}
-      </div>
-      {temVencido && (
-        <div className="px-5 py-3 border-b border-gray-100 bg-amber-50/50 flex items-center justify-between gap-3 flex-wrap text-sm">
-          <span className="text-amber-800 font-medium inline-flex items-center gap-1.5"><AlertTriangle size={15} /> Vencido em aberto <span className="text-[11px] font-normal text-amber-700/80">(já passou do vencimento — fora da projeção diária)</span></span>
-          <div className="flex items-center gap-4 text-[12px] tabular-nums">
-            <span className="text-torg-gray">a pagar <b className="text-rose-700">{fmtR$(vencPagar)}</b></span>
-            <span className="text-torg-gray">a receber <b className="text-emerald-700">{fmtR$(vencReceber)}</b></span>
-            <span className="text-torg-gray">líquido <b className={vencReceber - vencPagar < 0 ? "text-red-700" : "text-emerald-700"}>{fmtR$(vencReceber - vencPagar)}</b></span>
-          </div>
-        </div>
-      )}
-      <div className="max-h-96 overflow-y-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50/80 text-left text-[11px] uppercase tracking-wide text-torg-gray sticky top-0">
-            <tr>
-              <th className="px-4 py-2">Dia</th>
-              <th className="px-4 py-2 text-right">A pagar</th>
-              <th className="px-4 py-2 text-right">Receb. faturado</th>
-              <th className="px-4 py-2 text-right">Receb. previsto</th>
-              <th className="px-4 py-2 text-right">Líquido</th>
-              <th className="px-4 py-2 text-right">Saldo projetado</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {rows.map((f) => (
-              <tr key={f.dia} className="hover:bg-gray-50/50">
-                <td className="px-4 py-1.5 whitespace-nowrap text-torg-dark">{fmtDia(f.dia)}{f.dia === hojeK ? <span className="text-[10px] text-torg-gray"> (hoje)</span> : null}</td>
-                <td className="px-4 py-1.5 text-right tabular-nums text-rose-600">{f.pagar > 0 ? fmtR$(f.pagar) : "—"}</td>
-                <td className="px-4 py-1.5 text-right tabular-nums text-emerald-700">{f.receberFat > 0 ? fmtR$(f.receberFat) : "—"}</td>
-                <td className="px-4 py-1.5 text-right tabular-nums text-torg-blue">{f.receberPrev > 0 ? fmtR$(f.receberPrev) : "—"}</td>
-                <td className={`px-4 py-1.5 text-right tabular-nums font-medium ${f.liquido < 0 ? "text-red-600" : "text-emerald-700"}`}>{fmtR$(f.liquido)}</td>
-                <td className={`px-4 py-1.5 text-right tabular-nums font-semibold ${f.saldo < 0 ? "text-red-700 bg-red-50/50" : "text-torg-dark"}`}>{fmtR$(f.saldo)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
 
 /* ─────────────────────── previsão de faturamento (linha do tempo) ─────────────────────── */
 const MESES_ABREV = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -1705,19 +1433,6 @@ function PrevisaoReceita({ previsao }) {
   );
 }
 
-function ReceberProjetado({ faturadoAberto, previsao }) {
-  const total = (faturadoAberto || 0) + (previsao?.aFaturar || 0);
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <KpiGrande titulo="Faturado em aberto" valor={faturadoAberto} icon={Banknote} cor="emerald" sub="títulos já emitidos, aguardando recebimento" />
-        <KpiGrande titulo="A faturar (carteira ativa)" valor={previsao?.aFaturar} icon={Truck} cor="blue" sub={`líquido de impostos · ${previsao?.qtdObras || 0} obras`} />
-        <KpiGrande titulo="A receber potencial" valor={total} icon={TrendingUp} cor="blue" sub="faturado + projetado" />
-      </div>
-      {previsao && <PrevisaoReceita previsao={previsao} />}
-    </div>
-  );
-}
 
 /* ─────────────────────── componentes compartilhados ─────────────────────── */
 const CORES_KPI = {

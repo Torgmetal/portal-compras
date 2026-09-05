@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Factory, Loader2, RefreshCw, AlertCircle, Target, Package, Info } from "lucide-react";
+import { Factory, Loader2, RefreshCw, Target, Package, Info } from "lucide-react";
 
 const PERIODOS = [
   { id: "mes", label: "Mês atual" },

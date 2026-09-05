@@ -1,9 +1,6 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
-import {
-  ArrowDownCircle, RefreshCw, Loader2, AlertCircle, Search, Clock,
-  CalendarDays, ChevronDown, ChevronRight, Tag, Building2, ExternalLink, Check, FileSpreadsheet,
-} from "lucide-react";
+import { ArrowDownCircle, RefreshCw, Loader2, AlertCircle, Search, CalendarDays, ChevronDown, ChevronRight, Tag, Building2, ExternalLink, Check, FileSpreadsheet } from "lucide-react";
 import { log } from "@/lib/log";
 
 const registro = log("ContasPagarClient");

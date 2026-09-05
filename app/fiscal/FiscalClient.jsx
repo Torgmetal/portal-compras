@@ -2,14 +2,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { fmtOP } from "@/lib/utils";
 import { numeroBR } from "@/lib/numero-br";
-import {
-  ReceiptText, FileSpreadsheet, Loader2, CheckCircle2, Clock, Truck, Weight,
-  X, Pencil, ExternalLink, AlertTriangle, Search, FilePlus2, RefreshCw, Check,
-} from "lucide-react";
+import { ReceiptText, FileSpreadsheet, Loader2, CheckCircle2, Clock, Truck, Weight, X, Pencil, ExternalLink, AlertTriangle, Search, RefreshCw, Check } from "lucide-react";
 
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
-const fmtDataHora = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
 const rotuloRomaneio = (r) => `R${r.numero}${r.revisao > 0 ? ` · rev ${String(r.revisao).padStart(2, "0")}` : ""}`;
 
 const TIPO_NF = [

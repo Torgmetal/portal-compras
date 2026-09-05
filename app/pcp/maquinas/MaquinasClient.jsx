@@ -1,9 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import {
-  Loader2, AlertCircle, RefreshCw, Cpu, Weight,
-  Search, Package, Users,
-} from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Cpu, Search, Package, Users } from "lucide-react";
 import { FLUXO_VISUAL, corSetor, normSetor } from "@/lib/setores";
 
 const fmtKg = (v) =>

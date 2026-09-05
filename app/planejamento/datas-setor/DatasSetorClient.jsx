@@ -34,7 +34,7 @@ export default function DatasSetorClient() {
   const op = ops.find((o) => o.opNumero === opSel) || null;
 
   // ⚠ o dia de hoje em ISO, para dizer qual marco já venceu
-  const hojeISO = new Date().toISOString().slice(0, 10);
+  new Date().toISOString().slice(0, 10);
 
   return (
     <div className="max-w-6xl">

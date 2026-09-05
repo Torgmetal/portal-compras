@@ -112,7 +112,7 @@ export default function AbaProdutividade({ estudo, estudoId, onEstudoUpdate }) {
 
   // Upload
   const [arquivos, setArquivos] = useState([]);
-  const [uploading, setUploading] = useState(false);
+  const [_uploading, _setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
   const [salvando, setSalvando] = useState(false);

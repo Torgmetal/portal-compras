@@ -19,7 +19,7 @@
 //
 // ⚠ SEM REDE EXTERNA: o .wasm é servido de /wasm do próprio portal (copiado de node_modules no
 // build). O portal do cliente não pode depender de CDN nem de conta de terceiro.
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Maximize2, Minimize2, Loader2 } from "lucide-react";
 import { log } from "@/lib/log";
 

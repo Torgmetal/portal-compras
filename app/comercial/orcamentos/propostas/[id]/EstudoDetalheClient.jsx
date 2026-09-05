@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
@@ -74,12 +74,6 @@ const TIPO_MATERIAL_LABELS = {
   OUTRO: "Outro",
 };
 
-const CATEGORIAS_DOC = [
-  { value: "projeto", label: "Projeto / Desenho" },
-  { value: "email", label: "E-mail" },
-  { value: "cotacao", label: "Cotacao" },
-  { value: "documento", label: "Documento" },
-];
 
 function fmtMoeda(v) {
   if (!v && v !== 0) return "—";
@@ -2663,17 +2657,6 @@ function CotacoesMateriaisSection({ cotacoes, onExcluir, onStatus }) {
 
 // ── Aba Placeholder ────────────────────────────────────────
 
-function AbaEmConstrucao({ titulo, descricao, icon: Icon }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20">
-      <div className="w-16 h-16 bg-torg-blue/5 rounded-2xl flex items-center justify-center mb-4">
-        <Icon size={28} className="text-torg-blue" />
-      </div>
-      <h3 className="text-lg font-bold text-torg-dark mb-1">{titulo}</h3>
-      <p className="text-sm text-torg-gray max-w-md text-center">{descricao}</p>
-    </div>
-  );
-}
 
 // ── Pagina principal ───────────────────────────────────────
 

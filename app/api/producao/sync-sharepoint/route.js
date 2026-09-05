@@ -8,7 +8,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { temCronSecret } from "@/lib/cron-auth";
-import { downloadPlanilhaProducao, getMesNomePt } from "@/lib/sharepoint";
+import { downloadPlanilhaProducao } from "@/lib/sharepoint";
 import { parseEapProducao } from "@/lib/parse-pcp-eap";
 import { isoWeekString, semanaInicio, semanaFim, parseSemana } from "@/lib/semana";
 import { registrarExecucao } from "@/lib/cron-monitor";

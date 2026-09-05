@@ -1,10 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import {
-  Target, Save, Loader2, AlertCircle, ChevronLeft, ChevronRight,
-  ChevronDown, ChevronUp, CheckCircle2, Factory, TrendingUp,
-  DollarSign, Package, Truck, ShoppingCart, Lock,
-} from "lucide-react";
+import { Target, Save, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CheckCircle2, Factory, TrendingUp, DollarSign, Truck, ShoppingCart, Lock } from "lucide-react";
 
 // ─── Configuração dos módulos ───────────────────────────────
 
@@ -48,7 +44,7 @@ function fmtValor(v, unidade = "t") {
 export default function MetasClient() {
   const [moduloId, setModuloId] = useState("PRODUCAO");
   const [ano, setAno] = useState(new Date().getFullYear());
-  const [tipoIdx, setTipoIdx] = useState(0);
+  const [tipoIdx, _setTipoIdx] = useState(0);
 
   // grid[setor][mes] = { valorMensal, semana1..5 } — valores já em unidade de display (ton)
   const [grid, setGrid] = useState({});

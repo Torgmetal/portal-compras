@@ -2,11 +2,7 @@
 import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
-import {
-  Upload, Loader2, AlertCircle, X, CheckCircle2, Search, Download,
-  Package, FileSpreadsheet, ChevronDown, ChevronUp, Filter, Plus, Trash2,
-  Zap, RefreshCw, Factory,
-} from "lucide-react";
+import { Upload, Loader2, AlertCircle, X, CheckCircle2, Search, Download, Package, FileSpreadsheet, Filter, Trash2, Zap, RefreshCw, Factory } from "lucide-react";
 import {
   criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
   adicionarLinhaTotais, downloadWorkbook, CORES,
@@ -14,7 +10,7 @@ import {
 import { ordenarACNoFim } from "@/lib/marca-ac";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import { fmtOP } from "@/lib/utils";
-import { MAQUINA_LABEL, MAQUINA_COR, MAQUINAS, calcularResumoBarras, parsePerfil } from "@/lib/maquina-corte";
+import { MAQUINA_LABEL, MAQUINA_COR, MAQUINAS, calcularResumoBarras } from "@/lib/maquina-corte";
 
 const STATUS_PIPELINE = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
 const STATUS_LABEL = {
@@ -1180,7 +1176,7 @@ function ModalExcluirLote({ pecas, opsComPecas, onClose, onExcluido }) {
   );
 }
 
-function ModalImportarLE({ ops, onClose, onImportado }) {
+function ModalImportarLE({ ops: _ops, onClose, onImportado }) {
   const fileRef = useRef(null);
   const [arquivoNome, setArquivoNome] = useState("");
   const [parsing, setParsing] = useState(false);

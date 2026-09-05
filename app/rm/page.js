@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { fmtOP } from "@/lib/utils";
-import { PlusCircle, ClipboardList, AlertTriangle } from "lucide-react";
+import { PlusCircle, ClipboardList } from "lucide-react";
 import RMRowActions from "@/components/RMRowActions";
 
 // Sempre busca dados frescos do banco

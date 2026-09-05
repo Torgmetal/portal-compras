@@ -6,7 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/html";
-import { getEmailsSetor, SETOR_LABEL } from "@/lib/comunicacao-setor";
+import { getEmailsSetor } from "@/lib/comunicacao-setor";
 import { log } from "@/lib/log";
 
 const registro = log("api/cliente/tarefa/[token]");

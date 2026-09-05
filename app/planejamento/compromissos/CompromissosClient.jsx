@@ -1,10 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { fmtOP } from "@/lib/utils";
-import {
-  Loader2, AlertCircle, RefreshCw, CheckCircle2, Circle, Calendar,
-  ClipboardCheck, Filter, Clock,
-} from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, CheckCircle2, Circle, Calendar, ClipboardCheck, Filter } from "lucide-react";
 
 const SETOR_LABEL = {
   PRODUCAO: "Produção", PINTURA: "Pintura", PCP: "PCP",
@@ -19,10 +16,6 @@ const PRIORIDADE_COR = {
   BAIXA: "bg-gray-50 text-gray-500 border-gray-200",
 };
 
-const fmtData = (d) => {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
-};
 
 const fmtDataCompleta = (d) => {
   if (!d) return "—";
@@ -85,7 +78,7 @@ export default function CompromissosClient() {
   }
 
   const pendentes = compromissos.filter((c) => !c.concluido).length;
-  const concluidos = compromissos.filter((c) => c.concluido).length;
+  compromissos.filter((c) => c.concluido).length;
   const grupos = agruparPorData(compromissos);
 
   return (

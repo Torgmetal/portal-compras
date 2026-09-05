@@ -1,9 +1,6 @@
 "use client";
-import { useState, useCallback, useRef, useEffect } from "react";
-import {
-  Save, Loader2, Info, Calculator, Percent, FileText, Plus, Trash2, X,
-  TrendingUp, Shield, AlertTriangle, Banknote, Users, Receipt,
-} from "lucide-react";
+import { useState } from "react";
+import { Save, Loader2, Info, Calculator, Percent, Plus, Trash2, TrendingUp, Shield, AlertTriangle, Banknote, Users, Receipt } from "lucide-react";
 
 function fmtNum(v, dec = 2) {
   if (!v && v !== 0) return "—";

@@ -421,7 +421,7 @@ function Confronto({ c }) {
  * "Tinta estourou 155%" e não tem como conferir de onde veio.
  */
 async function exportarExcel(data, opNumero) {
-  const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook, CORES } =
+  const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook, CORES: _CORES } =
     await import("@/lib/excel-relatorio");
   const { familias, totais, receita, estudo, margem, alertas, confrontos, expedicao, op } = data;
   const D = (n) => (n == null ? "—" : Number(n));

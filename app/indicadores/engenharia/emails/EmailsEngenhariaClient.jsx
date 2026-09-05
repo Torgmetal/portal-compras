@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useStore } from "@/lib/store";
-import { Mail, Loader2, AlertCircle, RefreshCw, Search, Paperclip, FileBox, Inbox, Send, ArrowDownLeft, ArrowUpRight, Sparkles } from "lucide-react";
+import { Mail, Loader2, AlertCircle, RefreshCw, Search, Paperclip, FileBox, Inbox, ArrowDownLeft, ArrowUpRight, Sparkles } from "lucide-react";
 
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
 const caixaCurta = (c) => String(c || "").split("@")[0];

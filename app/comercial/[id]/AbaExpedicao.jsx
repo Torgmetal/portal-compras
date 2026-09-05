@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, Fragment } from "react";
 import * as XLSX from "xlsx";
-import { Truck, Plus, Pencil, Trash2, ChevronUp, ChevronDown, ChevronRight, Loader2, X, Upload, Download, AlertCircle, CheckCircle2, FileSpreadsheet } from "lucide-react";
+import { Truck, Plus, Pencil, Trash2, ChevronDown, ChevronRight, Loader2, X, Upload, Download, AlertCircle, CheckCircle2, FileSpreadsheet } from "lucide-react";
 import { numeroBR } from "@/lib/numero-br";
 
 const fmtKg = (n) => (n == null ? null : `${Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`);
@@ -99,15 +99,6 @@ export default function AbaExpedicao({ opId, proposta = null, podeEditarLotes = 
     if (!confirm(`Excluir o lote "${l.nome}"?`)) return;
     const r = await fetch(`/api/comercial/op/${opId}/lotes-expedicao/${l.id}`, { method: "DELETE" });
     const j = await r.json(); if (j.success) carregar(); else alert(j.error);
-  }
-  async function mover(idx, dir) {
-    const j = idx + dir;
-    if (j < 0 || j >= lotes.length) return;
-    const novo = [...lotes];
-    [novo[idx], novo[j]] = [novo[j], novo[idx]];
-    setLotes(novo);
-    await fetch(`/api/comercial/op/${opId}/lotes-expedicao/reordenar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ordem: novo.map((l) => l.id) }) }).catch(() => {});
-    carregar();
   }
   // Expande o lote e busca as marcas (PecaLote ou, se vazio, as do romaneio prévio).
   async function verMarcas(l) {

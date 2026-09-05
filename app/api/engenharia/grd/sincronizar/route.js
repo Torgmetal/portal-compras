@@ -61,7 +61,6 @@ export async function POST(req) {
       `<td style="padding:4px 8px;border-bottom:1px solid #eef2f6">${g.opNumero ? escapeHtml(fmtOP(g.opNumero)) : "—"}</td>` +
       `<td style="padding:4px 8px;border-bottom:1px solid #eef2f6">${escapeHtml(g.referencia || "—")}</td>` +
       `<td style="padding:4px 8px;border-bottom:1px solid #eef2f6;text-align:right">${g.qtdDocs} doc.</td></tr>`;
-    const novas = [];
     const revs = aAvisar;
     const base = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace.torg.com.br";
     const html = `<div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;color:#0D1F3C">

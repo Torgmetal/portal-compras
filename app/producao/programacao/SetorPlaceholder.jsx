@@ -15,7 +15,7 @@ import {
  * Já inclui botões de Importar Planilha e Exportar Relatório funcionais.
  * @param {{ setor: string, icon: import("lucide-react").LucideIcon, cor: string }} props
  */
-export default function SetorPlaceholder({ setor, icon: Icon, cor = "torg-blue" }) {
+export default function SetorPlaceholder({ setor, icon: Icon, _cor = "torg-blue" }) {
   const [importando, setImportando] = useState(false);
   const [dadosImportados, setDadosImportados] = useState(null);
   const [exportando, setExportando] = useState(false);

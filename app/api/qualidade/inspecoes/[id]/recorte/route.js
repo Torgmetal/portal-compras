@@ -36,7 +36,7 @@ export async function POST(req, { params }) {
 
   const novo = desenhos.map((d, idx) => {
     if (idx !== i) return d;
-    if (!valido) { const { recorte, ...resto } = d; return resto; }
+    if (!valido) { const { recorte: _recorte, ...resto } = d; return resto; }
     return { ...d, recorte: { left: r.left, right: r.right, bottom: r.bottom, top: r.top } };
   });
 

@@ -7,7 +7,7 @@ import { z } from "zod";
 
 export async function GET(req) {
   try {
-    const session = await requireRole(["ADMIN", "COMERCIAL"]);
+    await requireRole(["ADMIN", "COMERCIAL"]);
     const { searchParams } = new URL(req.url);
 
     const status = searchParams.get("status");

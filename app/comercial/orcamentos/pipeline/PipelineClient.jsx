@@ -289,7 +289,6 @@ export default function PipelineClient() {
         <div className="space-y-3">
           {porEtapa.map((etapa, i) => {
             const pct = totalGeral > 0 ? (etapa.valor / totalGeral) * 100 : 0;
-            const Icon = etapa.icon;
             return (
               <div key={etapa.key}>
                 <div className="flex items-center justify-between mb-1.5">

@@ -4,7 +4,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { z } from "zod";
 import { log } from "@/lib/log";
 
 const registroLog = log("api/producao/controle/[id]");

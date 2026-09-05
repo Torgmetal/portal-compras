@@ -118,7 +118,7 @@ export function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDi
       setEditing(false);
       setJustificativa("");
       onRefresh();
-    } catch (e) {
+    } catch {
       alert("Erro de conexão ao salvar.");
     } finally {
       setSaving(false);

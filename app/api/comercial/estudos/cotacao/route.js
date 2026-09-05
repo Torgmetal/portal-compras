@@ -15,7 +15,6 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarTokenForte } from "@/lib/token";
 import { sendEmail } from "@/lib/email";
-import { cabecalhoEmail } from "@/lib/email-layout";
 import { emailCotacaoTinta } from "@/lib/cotacao-tinta-email";
 import { emailCotacaoAco } from "@/lib/cotacao-aco-email";
 import { FAMILIAS_COTACAO, fornecedorAtende } from "@/lib/cotacao-familias";

@@ -33,7 +33,7 @@ function homePorRole(role) {
 
 function LoginForm() {
   const mostrarLaco = emSetembroAmarelo() || usarPrevia();
-  const router = useRouter();
+  useRouter();
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl");
 

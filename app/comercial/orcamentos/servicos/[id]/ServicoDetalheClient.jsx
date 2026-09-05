@@ -31,7 +31,7 @@ export default function ServicoDetalheClient({ id }) {
   const [email, setEmail] = useState("");
   const [telefone, setTelefone] = useState("");
   const [endereco, setEndereco] = useState("");
-  const [diasPagamento, setDiasPagamento] = useState("");
+  const [_diasPagamento, setDiasPagamento] = useState("");
   const [pagamentoPrazo, setPagamentoPrazo] = useState("");
   const [incl, setIncl] = useState([]);
   const [excl, setExcl] = useState([]);

@@ -11,7 +11,6 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { corSetor } from "@/lib/setores";
 import { fmtKg } from "@/lib/utils";
 
 const fmtDataHora = (d) => {
@@ -74,7 +73,7 @@ export default function SetorPageClient({ setor, titulo, iconName, corHex }) {
 
   if (!data) return null;
 
-  const { kgHoje, kgDiario, produzindoAgora, operadores, maquinas, pecasNoSetor, apontamentos } = data;
+  const { kgHoje, kgDiario, produzindoAgora, operadores, maquinas: _maquinas, pecasNoSetor, apontamentos } = data;
   const emProducaoAgora = data.emProducaoAgora || [];
   const produzidoHoje = data.produzidoHoje || [];
 

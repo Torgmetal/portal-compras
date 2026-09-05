@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireRole } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { isoWeekString, semanaInicio, semanaFim, parseSemana } from "@/lib/semana";
+import { isoWeekString } from "@/lib/semana";
 import { numeroBR } from "@/lib/numero-br";
 
 export const runtime = "nodejs";

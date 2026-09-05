@@ -5,7 +5,6 @@ import { farol, FAROL_COR, metaTexto } from "@/lib/indicadores-iso";
 import PlanoAcaoIndicador from "./PlanoAcaoIndicador";
 
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-const MES3 = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const fmtVal = (v, unidade) => v == null ? "—" : `${String(Math.round(v * 10) / 10).replace(".", ",")}${unidade === "%" ? "%" : ""}`;
 
 function Spark({ serie, meta, mesFim }) {

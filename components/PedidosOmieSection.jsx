@@ -1,6 +1,5 @@
 "use client";
-import { useState } from "react";
-import { Truck, ExternalLink, AlertCircle, FileText, Loader2 } from "lucide-react";
+import { Truck, ExternalLink, AlertCircle, FileText } from "lucide-react";
 import { omiePedidoCompraUrl } from "@/lib/omie-urls";
 
 const fmtMoeda = (v) =>

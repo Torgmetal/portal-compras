@@ -1,9 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import {
-  Truck, MapPin, Loader2, CheckCircle2, AlertCircle, Send, Paperclip,
-} from "lucide-react";
+import { Truck, Loader2, CheckCircle2, AlertCircle, Send } from "lucide-react";
 
 function fmtNum(v, dec = 0) {
   if (!v && v !== 0) return "—";

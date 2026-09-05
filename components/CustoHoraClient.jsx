@@ -35,7 +35,7 @@ export default function CustoHoraClient() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
   const [fator, setFator] = useState(1.8);
-  const [custoTotal, setCustoTotal] = useState("");
+  const [_custoTotal, setCustoTotal] = useState("");
   const [criterio, setCriterio] = useState("MOD");
   const [margem, setMargem] = useState(30);
   const [impostosVenda, setImpostosVenda] = useState(15);

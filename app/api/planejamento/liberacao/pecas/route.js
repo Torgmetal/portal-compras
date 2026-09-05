@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { portaoDoDesenho, temDesenhoNaPasta, temMaquinaNaPasta } from "@/lib/pasta-engenharia";
-import { analisarMaterial, statusMaterialPlanejamento } from "@/lib/material-liberacao";
+import { analisarMaterial } from "@/lib/material-liberacao";
 import { requireRole } from "@/lib/session";
 import { pecaCortada, poolDaPeca, POOLS } from "@/lib/liberacao-producao";
 import { DO_CMR, ORDEM_FIFO_CMR } from "@/lib/cmr-origens";

@@ -171,7 +171,7 @@ function NovoFreteModal({ onClose, onSalvar, obraDefault }) {
 }
 
 // ── Modal para solicitar cotacao de frete ──
-function SolicitarCotacaoModal({ onClose, onEnviar, estudoId }) {
+function SolicitarCotacaoModal({ onClose, onEnviar, estudoId: _estudoId }) {
   const [busca, setBusca] = useState("");
   const [fornecedores, setFornecedores] = useState([]);
   const [carregando, setCarregando] = useState(false);
@@ -344,7 +344,7 @@ export default function AbaFretes({ estudo, estudoId }) {
   const [editValores, setEditValores] = useState({});
   const [toast, setToast] = useState(null);
   const [uploadingId, setUploadingId] = useState(null);
-  const fileRef = useRef(null);
+  useRef(null);
   const [cotacaoEditId, setCotacaoEditId] = useState(null);
   const [cotacaoEditValor, setCotacaoEditValor] = useState("");
   const [cotacaoEditPrazo, setCotacaoEditPrazo] = useState("");
@@ -499,7 +499,7 @@ export default function AbaFretes({ estudo, estudoId }) {
   const totalViagens = itens.reduce((s, i) => s + (i.quantidadeViagens || 0), 0);
 
   // Cotacao selecionada (menor valor)
-  const cotacaoSelecionada = cotacoes.find((c) => c.status === "SELECIONADA");
+  cotacoes.find((c) => c.status === "SELECIONADA");
 
   return (
     <div className="space-y-6">

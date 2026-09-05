@@ -1,11 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import {
-  Briefcase, Search, PlusCircle, Loader2, AlertCircle, X,
-  ChevronDown, Clock, CheckCircle2, XCircle, Users, AlertTriangle,
-  ArrowRight, Calendar, Filter, Mail, Send, Image as ImageIcon,
-  Download, Palette, CheckCircle, Copy, Pencil,
-} from "lucide-react";
+import { Briefcase, Search, PlusCircle, Loader2, AlertCircle, X, ChevronDown, Clock, CheckCircle2, Users, Calendar, Mail, Send, Image as ImageIcon, Download, Palette, CheckCircle, Copy, Pencil } from "lucide-react";
 
 const STATUS_LABELS = {
   SOLICITADA: { label: "Solicitada", cor: "bg-blue-100 text-blue-800" },
@@ -46,8 +41,8 @@ export default function VagasClient() {
   const [form, setForm] = useState({});
   const [editandoId, setEditandoId] = useState(null); // null = criando; id = editando vaga existente
   // Modal status
-  const [modalStatus, setModalStatus] = useState(null);
-  const [atualizando, setAtualizando] = useState(false);
+  const [_modalStatus, setModalStatus] = useState(null);
+  const [_atualizando, setAtualizando] = useState(false);
   // E-mails de aprovação + arte de divulgação
   const [aviso, setAviso] = useState("");
   const [notificando, setNotificando] = useState("");
@@ -518,7 +513,6 @@ const FUNDOS_RH = [
   { nome: "Soldador (2)", src: "/rh/banco/soldador-2.jpg" },
   { nome: "Auxiliar (2)", src: "/rh/banco/auxiliar-2.jpg" },
 ];
-const TIPO_ARTE = { CLT: "CLT", PJ: "PJ", ESTAGIO: "Estágio", TEMPORARIO: "Temporário" };
 
 function slugArte(s) {
   return (String(s || "vaga").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")

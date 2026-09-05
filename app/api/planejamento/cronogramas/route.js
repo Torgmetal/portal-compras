@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { getAccessToken, listFolderChildren, downloadFileByPath } from "@/lib/sharepoint";
+import { listFolderChildren, downloadFileByPath } from "@/lib/sharepoint";
 import { parseMpp, extrairOpNumero } from "@/lib/mpp-parser";
 import { sincronizarCronogramaSyneco, avancosDasTarefas } from "@/lib/cronograma-syneco";
 import { log } from "@/lib/log";
@@ -183,14 +183,14 @@ export async function GET(req) {
       }));
 
     const atrasados = realTasks.filter((t) => t.dataFimPrevista && t.dataFimPrevista < now && pctDe(t) < 100).length;
-    const { tarefas, ...rest } = c;
+    const { tarefas: _tarefas, ...rest } = c;
     return { ...rest, deptSummary, atrasados };
   });
 
   return NextResponse.json(result);
 }
 
-export async function POST(req) {
+export async function POST(_req) {
   let user;
   try {
     user = await requireRole(["ADMIN", "PRODUCAO", "PLANEJAMENTO"]);

@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { Loader2, X, Plus } from "lucide-react";
 import { CATEGORIAS_FORNECEDOR_BUILTIN, chipCategoriaFornecedor, labelCategoriaFornecedor } from "@/lib/fornecedor-categorias";
-import { Modal } from "./Modal";
 
 // FornecedoresPicker — bloco que combina:
 // 1) Lista de fornecedores cadastrados (Vendor List) com checkbox + filtro

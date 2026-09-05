@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  Factory, Search, Filter, ChevronDown, Package, ArrowDownToLine,
-  CheckCircle2, Clock, AlertTriangle, BarChart3, X, Download,
+  Factory, Search, Package,
+  CheckCircle2, Clock, BarChart3, X, Download,
 } from "lucide-react";
 import { log } from "@/lib/log";
 
@@ -143,7 +143,7 @@ export default function ControleOPClient() {
     try {
       const {
         criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
-        adicionarLinhaTotais, adicionarRodapeISO, adicionarLegenda, downloadWorkbook, CORES,
+        adicionarLinhaTotais, adicionarRodapeISO, adicionarLegenda, downloadWorkbook,
       } = await import("@/lib/excel-relatorio");
 
       const setores = data.setoresOrdem || [];
@@ -177,7 +177,7 @@ export default function ControleOPClient() {
 
       // Largura das colunas — compacta para caber em paisagem A4
       const colWidths = [3, 14, 12, 6];
-      for (const s of setores) {
+      for (const _s of setores) {
         colWidths.push(5.5, 5.5, 7, 7, 7); // Q.Pl | Q.Pr | Plan | Prod | Saldo
       }
       colWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });

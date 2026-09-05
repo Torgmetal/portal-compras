@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, AlertCircle, FileText, Eye, Download, ShieldCheck, BadgeCheck, Layers, Users, BookOpen, Factory, Building2, Cog, ChevronDown } from "lucide-react";
-import { ordenarSecoes, SECOES_AUDITORIA, requisitosDaSecao } from "@/lib/auditoria-secoes";
 import PlantaFabril from "@/components/PlantaFabril";
 import MaquinasEquipamentos from "@/components/MaquinasEquipamentos";
 
@@ -23,13 +22,6 @@ function DocCard({ d, base, i = 0, destaque }) {
   );
 }
 
-function Chip({ icon: Icon, label }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 rounded-full px-3 py-1.5 text-[13px] text-white">
-      <Icon size={14} className="text-torg-orange" /> {label}
-    </span>
-  );
-}
 
 const fmtTam = (b) => {
   if (!b) return "";

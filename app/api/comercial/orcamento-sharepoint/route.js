@@ -27,18 +27,8 @@ const GRAPH = "https://graph.microsoft.com/v1.0";
 // Aqui é relativo à raiz do drive (SHAREPOINT_DRIVE_ID já aponta pra SERVIDOR).
 const RAIZ = process.env.SHAREPOINT_ORCAMENTOS_BASE || "/Comercial/1. Orçamento";
 // Solicitados vem primeiro: OP nova costuma nascer de orçamento recém-aprovado.
-const FASES = ["1. Solicitados", "2. Concluidos", "1.Solicitados", "2.Concluídos"];
 
-const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-async function filhos(token, driveId, caminho, select = "id,name,folder,file,size,lastModifiedDateTime") {
-  const r = await fetch(`${GRAPH}/drives/${driveId}/root:${encodeURI(caminho)}:/children?$select=${select}&$top=400`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!r.ok) return [];
-  const { value = [] } = await r.json();
-  return value;
-}
 
 export async function GET(req) {
   try { await requireRole(ROLES); }

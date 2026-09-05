@@ -1,9 +1,6 @@
 "use client";
 import { useMemo } from "react";
-import {
-  Scale, Wrench, Truck, Landmark, Package, TrendingUp,
-  AlertCircle, CheckCircle2, Clock,
-} from "lucide-react";
+import { Scale, Wrench, Truck, Package, TrendingUp, AlertCircle, CheckCircle2 } from "lucide-react";
 
 function fmtNum(v, dec = 2) {
   if (!v && v !== 0) return "—";
@@ -23,13 +20,6 @@ const FAMILIA_MAP = {
   BARRA_QUADRADA: "ESPECIAIS", BARRA_ROSCADA: "ESPECIAIS", TELA: "ESPECIAIS",
   GRADE_PISO: "ESPECIAIS", DEGRAU: "ESPECIAIS", OUTRO: "ESPECIAIS",
 };
-const FAMILIA_LABELS = {
-  LAMINADOS: "Laminados (Perfis W/HP)",
-  DOBRADOS: "Dobrados (Perfis U/UE)",
-  CHAPAS: "Chapas",
-  ESPECIAIS: "Especiais (Tubos, Barras, L...)",
-};
-const FAMILIA_ORDEM = ["LAMINADOS", "DOBRADOS", "CHAPAS", "ESPECIAIS"];
 
 export default function AbaResumo({ estudo }) {
   const calc = useMemo(() => {

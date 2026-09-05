@@ -1,13 +1,11 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Medir from "./Medir";
 import RNCs from "./RNCs";
 import NovoRelatorio from "./NovoRelatorio";
 import { signOut } from "next-auth/react";
-import { Loader2, QrCode, Search, X, Check, ChevronLeft, HardHat, LogOut, AlertCircle, Tag, Ruler, KeyRound } from "lucide-react";
-import { marcaDoQR, marcaCasaOP } from "@/lib/qualidade-campo";
+import { Loader2, Check, ChevronLeft, HardHat, LogOut, AlertCircle, Ruler, KeyRound } from "lucide-react";
 import { instrumentosDoTipo, FONTE_POR_TIPO } from "@/lib/instrumentos-por-relatorio";
-import LeitorQR from "./LeitorQR";
 
 /**
  * PORTAL QUALIDADE FÁBRICA — a tela do celular.
@@ -170,59 +168,6 @@ function EscolherOP({ onEscolher, nome }) {
 /**
  * A peça da vez. Fica fixa no topo até trocarem — é ela que as próximas fotos recebem.
  */
-function PecaAtual({ peca, opNumero, opId, onDefinir }) {
-  const [lendo, setLendo] = useState(false);
-  const [buscando, setBuscando] = useState(false);
-
-  const aoLerQR = useCallback((texto) => {
-    setLendo(false);
-    const marca = marcaDoQR(texto);
-    if (!marca) { onDefinir(peca, "Não entendi esse código. Tente de novo ou busque a marca."); return; }
-    // ⚠ AVISA, não bloqueia: sub-obra usa prefixo próprio (T67B, T67CT) e obra antiga foge do
-    // padrão. Travar aqui faria o inspetor não registrar uma foto legítima no meio do galpão.
-    const av = marcaCasaOP(marca, opNumero) ? "" : `A peça ${marca} parece ser de outra OP. Confira antes de fotografar.`;
-    onDefinir({ marca, origem: "QR" }, av);
-  }, [onDefinir, peca, opNumero]);
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-3">
-      <div className="flex items-center gap-2 min-w-0">
-        <Tag size={16} className="text-torg-blue shrink-0" />
-        {peca ? (
-          <div className="min-w-0 flex-1">
-            <p className="font-bold text-torg-dark text-base leading-tight truncate">{peca.marca}</p>
-            <p className="text-[11px] text-torg-gray leading-tight">
-              {peca.origem === "QR" ? "lida no QR do desenho" : peca.origem === "BUSCA" ? "escolhida na lista" : "digitada"}
-            </p>
-          </div>
-        ) : (
-          <p className="flex-1 text-sm text-torg-gray">Nenhuma peça selecionada — a foto entra como registro geral.</p>
-        )}
-        {peca && <button onClick={() => onDefinir(null, "")} className="text-torg-gray p-1"><X size={16} /></button>}
-      </div>
-
-      <div className="flex gap-2 mt-3">
-        <button onClick={() => setLendo(true)}
-          className="flex-1 bg-torg-blue/10 text-torg-blue rounded-xl py-3 text-sm font-semibold inline-flex items-center justify-center gap-1.5">
-          <QrCode size={16} /> Ler QR
-        </button>
-        <button onClick={() => setBuscando(true)}
-          className="flex-1 border border-gray-200 text-torg-dark rounded-xl py-3 text-sm font-semibold inline-flex items-center justify-center gap-1.5">
-          <Search size={16} /> Buscar
-        </button>
-      </div>
-
-      {lendo && <LeitorQR onLer={aoLerQR} onFechar={() => setLendo(false)} />}
-      {buscando && (
-        <BuscarPeca
-          opId={opId}
-          onFechar={() => setBuscando(false)}
-          onEscolher={(marca, origem) => { setBuscando(false); onDefinir({ marca, origem }, ""); }}
-        />
-      )}
-    </div>
-  );
-}
 
 /**
  * OS INSTRUMENTOS DA VEZ.
@@ -341,65 +286,3 @@ function Equipamentos({ escolhidos, onMudar, tipo = null }) {
   );
 }
 
-function BuscarPeca({ opId, onEscolher, onFechar }) {
-  const [q, setQ] = useState("");
-  const [todas, setTodas] = useState(false);
-  const [lista, setLista] = useState([]);
-  const [carregando, setCarregando] = useState(false);
-
-  useEffect(() => {
-    let vivo = true;
-    setCarregando(true);
-    // espera o dedo parar antes de consultar — sem isso é uma consulta por letra digitada
-    const t = setTimeout(() => {
-      fetch(`/api/campo/pecas?opId=${opId}&q=${encodeURIComponent(q)}${todas ? "&todas=1" : ""}`)
-        .then((r) => r.json())
-        .then((j) => { if (vivo) setLista(j.pecas || []); })
-        .catch(() => {})
-        .finally(() => vivo && setCarregando(false));
-    }, 250);
-    return () => { vivo = false; clearTimeout(t); };
-  }, [opId, q, todas]);
-
-  return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col">
-      <header className="bg-torg-dark text-white px-4 py-3 flex items-center gap-3">
-        <button onClick={onFechar} className="p-1 -ml-1"><ChevronLeft size={22} /></button>
-        <p className="font-semibold flex-1">Buscar peça</p>
-      </header>
-      <div className="p-4 border-b border-gray-100">
-        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="marca da peça…"
-          autoCapitalize="characters" autoCorrect="off" spellCheck={false}
-          className="w-full text-base border border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none" />
-        <label className="flex items-center gap-2 mt-2 text-[12px] text-torg-gray">
-          {/* conjunto é o padrão: foto de inspeção quase sempre é do conjunto montado, e a OP tem
-              três vezes mais croqui que conjunto — misturar faz rolar lista atrás do que se quer */}
-          <input type="checkbox" checked={todas} onChange={(e) => setTodas(e.target.checked)} />
-          incluir croquis e peças avulsas
-        </label>
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        {carregando && <p className="p-4 text-sm text-torg-gray inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> buscando…</p>}
-        {!carregando && lista.map((p) => (
-          <button key={p.marca} onClick={() => onEscolher(p.marca, "BUSCA")}
-            className="w-full text-left px-4 py-3 border-b border-gray-50 active:bg-gray-50">
-            <p className="font-semibold text-torg-dark">{p.marca}</p>
-            <p className="text-[12px] text-torg-gray truncate">{[p.descricao, p.perfil].filter(Boolean).join(" · ") || "—"}</p>
-          </button>
-        ))}
-        {!carregando && !lista.length && (
-          <div className="p-4">
-            <p className="text-sm text-torg-gray mb-3">Nada encontrado com esse nome.</p>
-            {q.trim().length >= 2 && (
-              // saída pra registro que não é peça da lista: região, eixo, vista geral
-              <button onClick={() => onEscolher(q.trim().toUpperCase(), "LIVRE")}
-                className="w-full border border-torg-blue text-torg-blue rounded-xl py-3 text-sm font-semibold inline-flex items-center justify-center gap-1.5">
-                <Check size={15} /> Usar &quot;{q.trim().toUpperCase()}&quot; assim mesmo
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}

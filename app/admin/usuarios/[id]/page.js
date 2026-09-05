@@ -24,7 +24,7 @@ import { MODULOS_OPCOES } from "@/lib/modulos";
 
 
 export default function PageEditarUsuario() {
-  const router = useRouter();
+  useRouter();
   const { id } = useParams();
   const { data: session } = useSession();
   const { showToast } = useStore();

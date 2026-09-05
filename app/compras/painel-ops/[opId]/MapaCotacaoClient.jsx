@@ -777,7 +777,6 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
               const totalProposta = f.totalProposta;
               const temProposta = totalProposta != null && totalProposta > 0;
               const diff = temProposta ? Math.abs(totalCalculado - totalProposta) : 0;
-              const mostrarAvisoDivergencia = !temProposta || diff > 0.05;
               return (
               <details key={f.cotacaoId} className="bg-white rounded-lg border border-torg-orange-100 p-4 group">
                 <summary className="cursor-pointer list-none flex items-center justify-between">
@@ -1068,7 +1067,7 @@ function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalG
     }
   };
 
-  const algumOk = Object.values(statusPorCotacao).some((s) => s === "ok");
+  Object.values(statusPorCotacao).some((s) => s === "ok");
   const pendentes = fornecedoresVencedores.filter((f) => statusPorCotacao[f.cotacaoId] !== "ok");
   const todosOk = fornecedoresVencedores.length > 0 && pendentes.length === 0;
   const gerandoAlgum = Object.values(statusPorCotacao).some((s) => s === "loading");

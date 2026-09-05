@@ -9,7 +9,7 @@ const TABS = [
   { id: "omie", label: "Catálogo Omie", icon: Package, desc: "Produtos sincronizados do ERP" },
 ];
 
-export default function EstoquePageWrapper({ itensIniciais, configInicial, isAdmin }) {
+export default function EstoquePageWrapper({ itensIniciais, configInicial, isAdmin: _isAdmin }) {
   const [aba, setAba] = useState("fisico");
 
   return (

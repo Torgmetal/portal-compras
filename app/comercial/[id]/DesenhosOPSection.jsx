@@ -168,7 +168,7 @@ export default function DesenhosOPSection({ opId, opNumero, obra, cliente, refCl
         </div>
       ) : (
         <div className="space-y-2">
-          {grupos.map((g, gi) => {
+          {grupos.map((g, _gi) => {
             const idLote = g.lote?.id || "__sem__";
             const aberto = !fechados[idLote];
             const idxLote = g.lote ? grupos.filter((x) => x.lote).findIndex((x) => x.lote.id === g.lote.id) : -1;

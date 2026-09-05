@@ -535,7 +535,7 @@ export async function GET(req) {
     // `entradas` (todas as linhas do CMR daquele material) sai fora da listagem — era repetida em
     // cada peça e sozinha respondia pela maior parte do payload. O detalhe vem do modal.
     const matFull = p.perfil ? matPorPerfil.get(String(p.perfil).trim().toUpperCase()) || null : null;
-    const mat = matFull ? (({ entradas, ...resto }) => resto)(matFull) : null;
+    const mat = matFull ? (({ entradas: _entradas, ...resto }) => resto)(matFull) : null;
     // trava: quantos conjuntos esperam ESTE croqui pra poder montar
     const tr = travaPorCroqui.get(p.marca);
     return { ...p, material: mat, programacao: programacaoDe(p.marca, p.qte), expedida,

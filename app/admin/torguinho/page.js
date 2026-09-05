@@ -34,7 +34,7 @@ const MODELOS = [
 ];
 
 export default function TorguinhoConfigPage() {
-  const [config,    setConfig]    = useState(null);
+  const [_config,    setConfig]    = useState(null);
   const [loading,   setLoading]   = useState(true);
   const [salvando,  setSalvando]  = useState(false);
   const [feedback,  setFeedback]  = useState(null); // { tipo: "ok"|"erro", msg }

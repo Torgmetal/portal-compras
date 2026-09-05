@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { upload } from "@vercel/blob/client";
-import { Ruler, Plus, Loader2, X, AlertCircle, CheckCircle2, XCircle, Clock, Search, FileText, Image as ImageIcon, Paperclip, Upload } from "lucide-react";
+import { Ruler, Plus, Loader2, X, AlertCircle, CheckCircle2, Search, FileText, Image as ImageIcon, Paperclip, Upload } from "lucide-react";
 import { numRAC, CONCLUSAO, conclusaoLabel } from "@/lib/calibracao";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");

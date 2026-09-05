@@ -89,7 +89,7 @@ export function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSel
         const res = await fetch("/api/fornecedores");
         const data = await res.json();
         setFornecedoresCadastrados(data.fornecedores || []);
-      } catch (_) { /* silently */ }
+      } catch { /* silently */ }
       finally { setCarregandoForn(false); }
     })();
   }, []);

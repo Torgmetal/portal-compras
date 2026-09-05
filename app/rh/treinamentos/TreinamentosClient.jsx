@@ -1,9 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import {
-  GraduationCap, Search, PlusCircle, Loader2, AlertCircle, X,
-  ChevronDown, Shield, FileDown, Send, PenLine, CheckCircle2, Clock, Trash2, Plus,
-} from "lucide-react";
+import { GraduationCap, Search, PlusCircle, Loader2, AlertCircle, X, ChevronDown, FileDown, Send, PenLine, CheckCircle2, Clock, Trash2, Plus } from "lucide-react";
 
 const TIPOS = [
   { value: "NR_OBRIGATORIO", label: "NR Obrigatório", cor: "bg-red-100 text-red-800" },

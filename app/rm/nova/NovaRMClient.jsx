@@ -4,19 +4,8 @@ import { upload as blobUpload } from "@vercel/blob/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
-import {
-  ArrowLeft, Loader2, AlertCircle, AlertTriangle, CheckCircle2,
-  Trash2, Upload, FileSpreadsheet, X, RailSymbol, Building2, Plus, Search, Package,
-  Forklift, Hammer,
-} from "lucide-react";
-import {
-  labelCategoria,
-  categoriasUnicasOP,
-  CATEGORIAS_MATERIAL,
-  CATEGORIAS_SERVICOS_TERCEIRIZADOS,
-  CATEGORIAS_ALUGUEL,
-  CATEGORIA_OUTRO,
-} from "@/lib/op-categorias";
+import { ArrowLeft, Loader2, AlertCircle, CheckCircle2, Trash2, Upload, FileSpreadsheet, X, RailSymbol, Building2, Plus, Search, Package, Forklift, Hammer } from "lucide-react";
+import { categoriasUnicasOP, CATEGORIAS_MATERIAL, CATEGORIAS_SERVICOS_TERCEIRIZADOS, CATEGORIAS_ALUGUEL, CATEGORIA_OUTRO } from "@/lib/op-categorias";
 import { parseTekla } from "@/lib/parse-tekla";
 
 const fmtMoeda = (v) =>
@@ -1157,7 +1146,7 @@ function BuscaProdutoOmie({ onAdd }) {
 
 // Chip de categoria — mostra label + badge "no escopo" quando aplicavel.
 // Selecao destaca em azul; nao-selecionadas mostram label normal.
-function CategoriaChip({ codigo, label, selecionada, noEscopo, onClick }) {
+function CategoriaChip({ codigo: _codigo, label, selecionada, noEscopo, onClick }) {
   return (
     <button
       type="button"

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { AlertCircle, CheckCircle, Mail } from "lucide-react";
 import { Modal } from "./Modal";
 
-export function ModalLinksEnvio({ rm, links, onClose }) {
+export function ModalLinksEnvio({ rm: _rm, links, onClose }) {
   // links agora é { cotacoes: [...], emails: [...], estoque: {abatidos, excluidos} | null }
   const cotacoes = links?.cotacoes || links || [];
   const emailResults = links?.emails || [];
@@ -34,7 +34,7 @@ export function ModalLinksEnvio({ rm, links, onClose }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro");
       setReenvioStatus((prev) => ({ ...prev, [cot.id]: "ok" }));
-    } catch (e) {
+    } catch {
       setReenvioStatus((prev) => ({ ...prev, [cot.id]: "erro" }));
     }
   };

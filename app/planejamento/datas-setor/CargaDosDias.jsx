@@ -28,7 +28,7 @@ const SETORES = [
 ];
 const fmtN = (n) => new Intl.NumberFormat("pt-BR").format(Math.round(Number(n) || 0));
 const fmtKg = (n) => `${fmtN(n)} kg`;
-const fmtD = (iso) => { try { const [a, m, d] = iso.split("-"); return `${d}/${m}`; } catch { return iso; } };
+const fmtD = (iso) => { try { const [_a, m, d] = iso.split("-"); return `${d}/${m}`; } catch { return iso; } };
 
 export default function CargaDosDias({ opId, recarga }) {
   const [setor, setSetor] = useState("PREPARACAO");

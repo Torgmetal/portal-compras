@@ -1,19 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import {
-  Network,
-  Building2,
-  Users,
-  ChevronDown,
-  ChevronRight,
-  Crown,
-  User,
-  AlertCircle,
-  RefreshCw,
-  Loader2,
-  FileDown,
-  Briefcase,
-} from "lucide-react";
+import { Network, Building2, Users, ChevronDown, ChevronRight, Crown, AlertCircle, RefreshCw, Loader2, FileDown, Briefcase } from "lucide-react";
 
 const STATUS_CORES = {
   ATIVO: "bg-green-400",

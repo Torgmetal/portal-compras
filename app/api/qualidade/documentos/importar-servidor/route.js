@@ -115,7 +115,7 @@ export async function POST(req) {
   }
   const { pasta } = body;
   const map = mapaDe(pasta);
-  const dId = (() => { try { return driveId(); } catch (e) { return null; } })();
+  const dId = (() => { try { return driveId(); } catch { return null; } })();
   if (!dId) return NextResponse.json({ success: false, error: "SHAREPOINT_DRIVE_ID não configurado" }, { status: 500 });
 
   let arquivos;

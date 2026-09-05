@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/session";
 
 // GET — Lista pedidos de compra com status de entrega.
 // Retorna dados agrupados por PedidoOmie (não por item individual).
-export async function GET(req) {
+export async function GET(_req) {
   try {
     await requireRole(["ADMIN", "COMPRAS"]);
 

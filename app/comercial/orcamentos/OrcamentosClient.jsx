@@ -1,12 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  FileSpreadsheet, PlusCircle, Search, X, ChevronDown,
-  Pencil, Trash2, Eye, Loader2, AlertCircle, Filter, FileDown, FileText,
-  TrendingUp, Clock, XCircle, FileCheck2, DollarSign,
-  Calendar, BarChart3, RefreshCw, ArrowRight, FileSpreadsheet as IconLqc,
-} from "lucide-react";
+import { FileSpreadsheet, PlusCircle, Search, X, ChevronDown, Pencil, Trash2, Eye, Loader2, AlertCircle, Filter, FileDown, FileText, TrendingUp, XCircle, FileCheck2, DollarSign, Calendar, BarChart3, RefreshCw, ArrowRight, FileSpreadsheet as IconLqc } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { fmtOP, fmtMoedaCompacta, fmtMoedaInteira } from "@/lib/utils";
 import { conversaoComercial, META_CONVERSAO } from "@/lib/conversao-comercial";

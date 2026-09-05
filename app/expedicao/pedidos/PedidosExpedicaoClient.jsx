@@ -2,10 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
-import {
-  Loader2, AlertCircle, RefreshCw, Truck, MapPin, Package, ChevronRight,
-  CheckCircle2, FileText, Plus, X, ArrowLeft, Weight, Clock, AlertTriangle, Printer,
-} from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Truck, MapPin, Package, ChevronRight, CheckCircle2, FileText, X, ArrowLeft, Weight, Clock, AlertTriangle, Printer } from "lucide-react";
 
 const fmtKg = (v) => (!v ? "0 kg" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`);
 const fmtData = (d) =>

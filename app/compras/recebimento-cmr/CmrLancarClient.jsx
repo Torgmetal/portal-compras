@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useStore } from "@/lib/store";
-import { Loader2, Plus, ClipboardPaste, Save, Trash2, Search, Check, X, PackagePlus, Filter, ChevronDown, ArrowUp, ArrowDown, FileDown, RefreshCw, AlertCircle } from "lucide-react";
+import { Loader2, Plus, ClipboardPaste, Save, Trash2, Search, Check, X, PackagePlus, Filter, ArrowUp, ArrowDown, FileDown, RefreshCw, AlertCircle } from "lucide-react";
 
 const anoAtual = new Date().getFullYear();
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -177,7 +177,7 @@ export default function CmrLancarClient() {
     } catch (e) { showToast(e.message, "erro"); } finally { setExcluindo(false); }
   }
 
-  const itens = dados?.itens || [];
+  dados?.itens || [];
 
   // Reconcilia com a planilha do SharePoint (puxa rastreio digitado direto no Excel e
   // reenvia o que faltar lá). Chave = índice R.

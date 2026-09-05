@@ -98,7 +98,7 @@ export async function PATCH(req, { params }) {
   let edit;
   try {
     edit = patchEditSchema.parse(body);
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: "Dados invalidos" }, { status: 400 });
   }
 

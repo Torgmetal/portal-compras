@@ -2,11 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { upload } from "@vercel/blob/client";
 import Link from "next/link";
-import {
-  Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X,
-  FileText, CheckCircle2, Lock, BookCheck, FileDown, Upload, Send, Copy, Users,
-  FolderOpen, RotateCcw, History, Download, Eye, ListChecks,
-} from "lucide-react";
+import { Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X, FileText, CheckCircle2, Lock, BookCheck, FileDown, Upload, Send, Users, FolderOpen, RotateCcw, History, Download, Eye, ListChecks } from "lucide-react";
 import NavegadorServidor from "./NavegadorServidor";
 import Volumes from "./Volumes";
 import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, gruposDaSecao, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO } from "@/lib/databook-secoes";
@@ -33,10 +29,10 @@ export default function DataBookDetalheClient({ id, userId }) {
   const [revisoes, setRevisoes] = useState(null);
   const [verHistorico, setVerHistorico] = useState(false);
   const [rastr, setRastr] = useState(null);
-  const [aprovando, setAprovando] = useState(false);
-  const [emailCliente, setEmailCliente] = useState("");
-  const [enviandoCliente, setEnviandoCliente] = useState(false);
-  const [linkCliente, setLinkCliente] = useState("");
+  const [_aprovando, _setAprovando] = useState(false);
+  const [_emailCliente, _setEmailCliente] = useState("");
+  const [_enviandoCliente, _setEnviandoCliente] = useState(false);
+  const [_linkCliente, _setLinkCliente] = useState("");
 
   const carregar = useCallback(async () => {
     setErro("");
@@ -310,36 +306,7 @@ export default function DataBookDetalheClient({ id, userId }) {
     }
   }
 
-  async function aprovar(remover) {
-    setAprovando(true);
-    try {
-      const res = await fetch(`/api/qualidade/data-books/${id}/aprovar`, { method: remover ? "DELETE" : "POST", headers: { "Content-Type": "application/json" }, body: remover ? undefined : JSON.stringify({}) });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || "Erro");
-      await carregar();
-    } catch (e) {
-      alert(e.message);
-    } finally {
-      setAprovando(false);
-    }
-  }
 
-  async function enviarCliente() {
-    if (!/^\S+@\S+\.\S+$/.test(emailCliente.trim())) { alert("Informe um e-mail válido do cliente."); return; }
-    setEnviandoCliente(true);
-    try {
-      const res = await fetch(`/api/qualidade/data-books/${id}/enviar-cliente`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: emailCliente.trim() }) });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || "Erro");
-      setLinkCliente(json.link || "");
-      if (!json.enviado) alert("Link gerado, mas o e-mail não pôde ser enviado agora. Copie o link e envie manualmente ao cliente.");
-      await carregar();
-    } catch (e) {
-      alert(e.message);
-    } finally {
-      setEnviandoCliente(false);
-    }
-  }
 
   if (loading) return <div className="flex flex-col items-center justify-center py-24 text-torg-gray"><Loader2 size={26} className="animate-spin mb-3" /><p className="text-sm">Carregando data book…</p></div>;
   if (erro) return <div className="flex flex-col items-center justify-center py-20 text-center"><AlertCircle size={26} className="text-red-500 mb-3" /><p className="text-sm text-torg-dark mb-3">{erro}</p><button onClick={carregar} className="text-xs text-torg-blue hover:underline">Tentar novamente</button></div>;
@@ -353,7 +320,7 @@ export default function DataBookDetalheClient({ id, userId }) {
   // "fechado" = já é documento, não rascunho. Emitido, enviado ao cliente ou aceito.
   const fechado = !!data.emitidoEm || ["EMITIDO", "ENVIADO_CLIENTE", "ACEITO"].includes(data.status);
   const aprov = data.aprovacoes || [];
-  const jaAprovei = aprov.some((a) => a.userId === userId);
+  aprov.some((a) => a.userId === userId);
   // quantos anexos o livro carrega — é o que decide se ainda cabe em arquivo único
   const totalAnexos = (data.secoes || []).reduce((acc, s2) => acc + (s2.documentos?.length || 0), 0);
 

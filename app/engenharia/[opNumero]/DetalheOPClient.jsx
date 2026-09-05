@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Loader2, AlertCircle, ArrowLeft, Ruler, Package, AlertTriangle } from "lucide-react";
+import { Loader2, AlertCircle, ArrowLeft, Ruler, AlertTriangle } from "lucide-react";
 
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR")} kg`;
 const fmtNum = (v) => Number(v || 0).toLocaleString("pt-BR");

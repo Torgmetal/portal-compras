@@ -156,7 +156,7 @@ export async function GET(req, { params }) {
       .slice(0, 25);
   }
 
-  const { kickoff, orcamentos, ...opData } = op;
+  const { kickoff, orcamentos: _orcamentos, ...opData } = op;
   return NextResponse.json({
     op: opData,
     kickoff,

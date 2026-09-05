@@ -1,12 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo, useRef } from "react";
-import {
-  Users, Search, PlusCircle, Loader2, AlertCircle, X,
-  ChevronDown, Edit, UserX, UserCheck, Download, Upload,
-  FileSpreadsheet, CheckCircle2, XCircle, UserMinus, MoreVertical,
-  ArrowUpDown, ArrowRightLeft, DollarSign, Pencil, ArrowUp, ArrowDown, KeyRound,
-  Lock, Unlock,
-} from "lucide-react";
+import { Users, Search, PlusCircle, Loader2, AlertCircle, X, ChevronDown, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, UserMinus, MoreVertical, ArrowUpDown, ArrowRightLeft, DollarSign, Pencil, ArrowUp, ArrowDown, KeyRound, Lock, Unlock } from "lucide-react";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -25,13 +19,6 @@ const CONTRATO_LABELS = {
   JOVEM_APRENDIZ: "Jovem Aprendiz", TEMPORARIO: "Temporário",
 };
 
-const NIVEIS = [
-  { value: "OPERACIONAL", label: "Operacional" },
-  { value: "TECNICO", label: "Técnico" },
-  { value: "SUPERVISAO", label: "Supervisão" },
-  { value: "GERENCIA", label: "Gerência" },
-  { value: "DIRETORIA", label: "Diretoria" },
-];
 
 export default function FuncionariosClient() {
   const [funcionarios, setFuncionarios] = useState([]);

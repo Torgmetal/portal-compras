@@ -1,10 +1,6 @@
 "use client";
 import { useState, useMemo } from "react";
-import {
-  Filter, Search, CheckCircle2, Download, Loader2,
-  ArrowRight, X, Package, Undo2, AlertTriangle,
-  Flame, Sparkles, Wind, Paintbrush, Truck,
-} from "lucide-react";
+import { Filter, Search, Download, Loader2, ArrowRight, Package, Undo2, AlertTriangle, Flame, Sparkles, Wind, Paintbrush, Truck } from "lucide-react";
 
 const ICON_MAP = {
   SOLDA: Flame,
@@ -57,7 +53,7 @@ const fmtKg = (v) => {
  */
 export default function SetorClient({
   pecasIniciais, setorAtual, setorAnterior, setorProximo,
-  titulo, iconColor = "text-torg-blue", codigoDoc = "REL-PRD-005",
+  titulo: _titulo, iconColor = "text-torg-blue", codigoDoc = "REL-PRD-005",
   // apontamento do Syneco: { [marca]: { produzido, planejado, dataFim } }
   apontamentos = {},
   apontamentosProximo = {},

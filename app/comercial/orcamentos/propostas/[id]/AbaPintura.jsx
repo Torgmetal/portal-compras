@@ -1,10 +1,6 @@
 "use client";
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import {
-  Plus, Trash2, Loader2, X, Sparkles, Upload, Edit3, Check,
-  Paintbrush, ChevronDown, Pencil, Calculator, DollarSign, Percent,
-  ChevronRight, Ruler, Droplets, Package, Search, Beaker,
-} from "lucide-react";
+import { Plus, Trash2, Loader2, X, Edit3, Check, Paintbrush, ChevronDown, Calculator, DollarSign, ChevronRight, Ruler, Droplets, Package, Search, Beaker } from "lucide-react";
 import { calcularAreasTodosItens, TIPO_MATERIAL_LABEL } from "@/lib/perfil-perimetro";
 import { calcularQuantidadeTinta, RESINAS, METODOS_APLICACAO, ETAPAS, VOLUME_GALAO } from "@/lib/tinta-catalogo";
 import { numeroBR } from "@/lib/numero-br";

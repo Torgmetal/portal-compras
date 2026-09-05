@@ -1,11 +1,6 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
-import {
-  Truck, Plus, Calendar, Package, Wrench, CheckCircle2, Clock,
-  AlertTriangle, ChevronDown, ChevronRight, Loader2, X, Search,
-  ClipboardList, CircleDot, AlertCircle, ShieldAlert, Ban,
-  Pencil, Save, History,
-} from "lucide-react";
+import { Truck, Plus, Calendar, Package, Wrench, CheckCircle2, Clock, AlertTriangle, ChevronDown, ChevronRight, Loader2, X, Search, ClipboardList, AlertCircle, ShieldAlert, Ban, Pencil, Save, History } from "lucide-react";
 import { validarProntidaoExpedicao } from "@/lib/expedicao";
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");

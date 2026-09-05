@@ -1,13 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { fmtOP } from "@/lib/utils";
-import {
-  Loader2, AlertCircle, RefreshCw, Trophy, TrendingUp, TrendingDown,
-  Package, Truck, Star, ChevronDown, ChevronUp, Info, Target, Clock,
-  AlertTriangle, ShoppingCart, ArrowRight, BarChart3, Users, Factory,
-} from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Trophy, TrendingUp, Package, Truck, ChevronDown, ChevronUp, Info, Target, Clock, AlertTriangle, ShoppingCart, ArrowRight, BarChart3, Users, Factory } from "lucide-react";
 
 // ─── HELPERS ─────────────────────────────────────────────────
 const fmtMoeda = (v) =>

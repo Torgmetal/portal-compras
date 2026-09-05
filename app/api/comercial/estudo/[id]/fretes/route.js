@@ -3,9 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 
-const TIPOS_VEICULO = [
-  "TRUCK", "CARRETA", "BITREM", "RODOTREM", "MUNCK", "PRANCHA", "OUTRO",
-];
 
 // ── GET ── Lista fretes do estudo
 export async function GET(req, { params }) {

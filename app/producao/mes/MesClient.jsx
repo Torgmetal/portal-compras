@@ -1235,7 +1235,7 @@ function CardNaoIniciada({ obra, opInfo }) {
 export default function MesClient({
   grupos: gruposIniciais,
   opMap:     opMapInicial,
-  totaisMap: totaisMapInicial,
+  totaisMap: _totaisMapInicial,
   statusMapInicial,
   naoInicidasIniciais,
   setoresDisponiveis: setoresIniciais,
@@ -1408,10 +1408,10 @@ export default function MesClient({
 
       {/* Banner: histórico limitado */}
       {ultimoSync && (() => {
-        const primeiroSync = new Date(totalGeralBanco > 0
+        new Date(totalGeralBanco > 0
           ? "2026-05-27" // data aproximada do primeiro sync — poderia ser dinâmica
           : new Date().toISOString());
-        const diasDesde = Math.round((Date.now() - new Date(ultimoSync.criadoEm).getTime()) / 86400000);
+        Math.round((Date.now() - new Date(ultimoSync.criadoEm).getTime()) / 86400000);
         // Mostra aviso se existir sync recente mas os dados começam depois de jan/2026
         return null; // removido do render, instrução fica no painel de diagnóstico
       })()}

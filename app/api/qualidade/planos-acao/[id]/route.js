@@ -38,8 +38,7 @@ const schema = z.object({
 });
 
 export async function PATCH(req, { params }) {
-  let user;
-  try { user = await requireRole(["ADMIN", "QUALIDADE"]); }
+  try { await requireRole(["ADMIN", "QUALIDADE"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const atual = await prisma.planoAcao.findUnique({ where: { id: params.id }, select: { id: true, itens: true } });

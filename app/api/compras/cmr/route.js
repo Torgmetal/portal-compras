@@ -32,7 +32,7 @@ export async function GET(req) {
     { numeroCorrida: { contains: q, mode: "insensitive" } },
   ];
 
-  const [rows, total, anosRaw] = await Promise.all([
+  const [rows, _total, anosRaw] = await Promise.all([
     prisma.documentoQualidade.findMany({
       where, orderBy: { importRef: "desc" }, take: 6000,
       select: {

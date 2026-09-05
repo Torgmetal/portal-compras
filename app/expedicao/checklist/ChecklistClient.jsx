@@ -2,11 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
-import {
-  ClipboardCheck, Loader2, AlertCircle, Search, ChevronDown, ChevronRight,
-  Package, Truck, CheckCircle2, Clock, AlertTriangle, ArrowLeft, Box,
-  FileText, Weight, Wrench, CircleDot, Ban, ShieldAlert,
-} from "lucide-react";
+import { ClipboardCheck, Loader2, AlertCircle, Search, ChevronDown, ChevronRight, Package, CheckCircle2, Clock, AlertTriangle, ArrowLeft, Box, FileText, Wrench, CircleDot, Ban, ShieldAlert } from "lucide-react";
 import PlanejamentoCargaSection from "./PlanejamentoCargaSection";
 import { validarProntidaoExpedicao } from "@/lib/expedicao";
 

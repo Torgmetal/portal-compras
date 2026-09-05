@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma, prismaDirect, waitMesTables } from "@/lib/prisma";
+import { prismaDirect, waitMesTables } from "@/lib/prisma";
 import { mapaObraParaOP, opIdDaLinha } from "@/lib/syneco-obra";
 import { log } from "@/lib/log";
 
@@ -58,10 +58,6 @@ function parseData(s) {
 }
 
 // Escaping seguro para SQL
-const q   = (s) => s == null ? "NULL" : `'${String(s).replace(/'/g, "''")}'`;
-const ts  = (d) => d ? `'${d.toISOString()}'::timestamp` : "NULL";
-const n   = (v) => Number.isFinite(v) ? String(v) : "0";
-const ni  = (v) => (v == null || !Number.isFinite(v)) ? "NULL" : String(Math.trunc(v));
 
 export async function POST(req) {
   await waitMesTables();

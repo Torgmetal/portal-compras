@@ -1,9 +1,6 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
-import {
-  Warehouse, Search, Truck, Loader2, AlertCircle,
-  ChevronDown, ChevronRight, X, Layers, Weight,
-} from "lucide-react";
+import { Warehouse, Search, Truck, Loader2, AlertCircle, ChevronDown, ChevronRight, X } from "lucide-react";
 
 const fmtPeso = (kg) => {
   if (!kg && kg !== 0) return "—";
@@ -226,7 +223,7 @@ export default function EstoqueFisicoClient() {
 
           {/* Resumo por perfil (chips clicáveis) */}
           <div className="flex flex-wrap gap-2">
-            {perfisDisponiveis.map(({ perfil, label, peso, qtd, itens }) => (
+            {perfisDisponiveis.map(({ perfil, label: _label, peso, qtd: _qtd, itens }) => (
               <button
                 key={perfil}
                 onClick={() => setFiltroPerfil(filtroPerfil === perfil ? "" : perfil)}
@@ -302,7 +299,7 @@ export default function EstoqueFisicoClient() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {filtrados.map((m, idx) => {
+                  {filtrados.map((m, _idx) => {
                     const key = `${m.perfil}|${m.bitola}|${m.aco}`;
                     const isOpen = expandidos.has(key);
                     return (

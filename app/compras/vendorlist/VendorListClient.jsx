@@ -1,6 +1,6 @@
 "use client";
 import { useState, useMemo } from "react";
-import { Building2, Plus, Search, Edit2, Trash2, Mail, Phone, MapPin, AlertCircle, Loader2, X, Filter, Tag, Settings, RefreshCw } from "lucide-react";
+import { Building2, Plus, Search, Edit2, Trash2, Mail, Phone, MapPin, AlertCircle, Loader2, X, Filter, Tag, RefreshCw } from "lucide-react";
 import {
   CATEGORIAS_FORNECEDOR_BUILTIN,
   CORES_DISPONIVEIS,

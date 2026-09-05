@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { fmtOP } from "@/lib/utils";
 import Link from "next/link";
-import { Loader2, AlertCircle, Package, Clock, AlertTriangle, CheckCircle2, CalendarDays, Truck, RefreshCw, ChevronDown, ChevronRight, ExternalLink, FileText, MapPin, Wrench, Mail, Send, X, CalendarClock, History, Trash2, ArrowUpDown, PackageCheck } from "lucide-react";
+import { Loader2, AlertCircle, Package, Clock, AlertTriangle, CheckCircle2, CalendarDays, Truck, RefreshCw, ChevronDown, ChevronRight, ExternalLink, Wrench, Mail, Send, X, CalendarClock, History, Trash2, ArrowUpDown, PackageCheck } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 
 const fmtMoeda = (v) =>
@@ -594,7 +594,7 @@ function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, regist
   );
 }
 
-function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir, onAjustarOmie, ajustandoOmie }) {
+function TabelaRow({ pedido: p, cfg, dias: _dias, diasLabel, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir, onAjustarOmie, ajustandoOmie }) {
   const diasColor = p.statusEntrega === "ATRASADO" ? "text-red-600 font-semibold"
     : p.statusEntrega === "PROXIMO" ? "text-amber-600 font-medium"
     : "text-torg-gray";

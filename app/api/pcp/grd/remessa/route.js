@@ -89,11 +89,6 @@ export async function POST(req) {
     },
   });
 
-  const snapshot = {
-    numero, ano, opNumero: b.opNumero, obra: op?.obra || null, cliente: op?.cliente || null,
-    setor: remessa.setor, itens, emitidoEm: remessa.emitidoEm, emitidoPorNome: remessa.emitidoPorNome,
-  };
-
   // ─── O RECEBIMENTO É O PRÓPRIO ENVIO ────────────────────────────────────────────────────────
   // Vitor (31/08/2026): "preenche o recebimento da GRD só pelo fato de enviar o e-mail, não precisa
   // ter link para confirmar; só preciso deixar isso como se alguém tivesse recebido por conta da

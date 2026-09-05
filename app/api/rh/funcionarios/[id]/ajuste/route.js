@@ -130,7 +130,7 @@ export async function POST(req, { params }) {
           },
         },
       });
-    } catch (_) {}
+    } catch {}
 
     // Sincronizar com planilha SharePoint (fire-and-forget)
     syncAjuste(funcionario, antes, depois, data.motivo).catch(() => {});

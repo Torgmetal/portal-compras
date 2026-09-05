@@ -1,11 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import {
-  Clock, AlertTriangle, CheckCircle2, CalendarClock, Loader2,
-  AlertCircle, FileSpreadsheet, ChevronDown, Search, X, Filter,
-  Eye, Pencil, TrendingUp, XCircle, FileCheck2, Timer,
-} from "lucide-react";
+import { Clock, AlertTriangle, CheckCircle2, CalendarClock, Loader2, AlertCircle, FileSpreadsheet, ChevronDown, Search, X, Filter, TrendingUp, XCircle, FileCheck2, Timer } from "lucide-react";
 import { useStore } from "@/lib/store";
 import OrcamentosTabs from "@/components/OrcamentosTabs";
 
@@ -41,7 +37,7 @@ function urgenciaPrazo(dias) {
 }
 
 export default function AcompanhamentoClient() {
-  const { showToast } = useStore();
+  const { showToast: _showToast } = useStore();
   const [orcamentos, setOrcamentos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState(null);

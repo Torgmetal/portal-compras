@@ -1,10 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import {
-  DollarSign, Plus, Loader2, AlertCircle, X,
-  TrendingUp, TrendingDown, Pencil, Trash2, Activity, Download,
-} from "lucide-react";
+import { Plus, Loader2, AlertCircle, X, TrendingUp, TrendingDown, Pencil, Trash2, Activity, Download } from "lucide-react";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -162,7 +159,7 @@ export default function FinanceiroClient({ ops, fluxos, romaneios, semanas, sema
     return `/api/financeiro/fluxo/exportar?${p.toString()}`;
   }, [fDe, fAte, bancoFiltro, catFiltro, fornFiltro, tipoFiltro, sitFiltro]);
 
-  const maxKg = Math.max(...receitaPorSemana.map((s) => s.kg), 1);
+  Math.max(...receitaPorSemana.map((s) => s.kg), 1);
   const maxValor = Math.max(...receitaPorSemana.map((s) => s.valor), 1);
 
   return (

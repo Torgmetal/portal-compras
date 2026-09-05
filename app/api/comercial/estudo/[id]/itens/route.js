@@ -77,7 +77,7 @@ export async function POST(req, { params }) {
     }
 
     const criados = await prisma.pesoProjetoItem.createMany({
-      data: parsed.map(({ matchScore, ...p }) => ({
+      data: parsed.map(({ matchScore: _matchScore, ...p }) => ({
         estudoId: id,
         ...p,
         tipoMaterial: p.tipoMaterial || "OUTRO",
@@ -149,7 +149,7 @@ const updateItemSchema = z.object({
 
 export async function PATCH(req, { params }) {
   try {
-    const user = await requireRole(["ADMIN", "COMERCIAL"]);
+    await requireRole(["ADMIN", "COMERCIAL"]);
     const { id } = await params;
     const body = await req.json();
     const data = updateItemSchema.parse(body);

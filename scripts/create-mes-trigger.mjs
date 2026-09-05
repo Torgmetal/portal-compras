@@ -30,7 +30,7 @@ try {
       if (!process.env[key]) process.env[key] = val;
     }
   }
-} catch (_) {}
+} catch {}
 
 const { Client } = require("pg");
 

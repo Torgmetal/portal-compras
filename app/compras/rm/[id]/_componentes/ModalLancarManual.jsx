@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, AlertCircle, X, Edit3, Upload } from "lucide-react";
+import { Loader2, AlertCircle, X, Edit3 } from "lucide-react";
 import { numeroBR } from "@/lib/numero-br";
 import { PropostaUploadIA } from "./PropostaUploadIA";
 import { TabelaLinhasProposta } from "./TabelaLinhasProposta";

@@ -638,7 +638,7 @@ function ModalEnviarConsolidada({ rms, onClose, onSent, categoriasFornecedor = C
         const res = await fetch("/api/fornecedores");
         const data = await res.json();
         setFornecedoresCadastrados(data.fornecedores || []);
-      } catch (_) { /* silently */ }
+      } catch { /* silently */ }
       finally { setCarregandoForn(false); }
     })();
   }, []);
@@ -922,7 +922,7 @@ function KpiCard({ label, subtitle, value, color, icon: Icon, active, onClick, h
 }
 
 // Visualizacao Kanban — 4 colunas por categoria de acao.
-function KanbanView({ rms, isAdmin }) {
+function KanbanView({ rms, isAdmin: _isAdmin }) {
   const colunas = [
     { cat: "ABERTA",     titulo: "Abertas",            subtitle: "Aguardando envio",       color: "blue" },
     { cat: "EM_COTACAO", titulo: "Em cotação",         subtitle: "Aguardando proposta",    color: "orange" },

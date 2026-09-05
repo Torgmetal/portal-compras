@@ -30,7 +30,7 @@ const DEPT_LABEL = {
 
 // GET /api/planejamento/cronogramas/[id]/notificar-atrasos?departamento=X
 // Retorna emails sugeridos por departamento (auto-mapeados pelos modulos)
-export async function GET(req, { params }) {
+export async function GET(req, { params: _params }) {
   try {
     await requireRole(["ADMIN", "PLANEJAMENTO", "PRODUCAO", "COMERCIAL"]);
   } catch (e) {

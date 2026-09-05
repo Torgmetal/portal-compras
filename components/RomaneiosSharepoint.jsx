@@ -1,10 +1,6 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
-import {
-  Loader2, AlertCircle, RefreshCw, ChevronDown, ChevronRight,
-  FileText, Package, Truck, Search, ExternalLink, Download,
-  Weight, Hash, Box,
-} from "lucide-react";
+import { useState, useCallback } from "react";
+import { Loader2, AlertCircle, RefreshCw, ChevronDown, ChevronRight, FileText, Package, Truck, Search, Download, Weight, Hash, Box } from "lucide-react";
 
 const fmtKg = (v) =>
   v != null ? `${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} kg` : "—";

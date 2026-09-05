@@ -12,9 +12,8 @@ function status(e) {
 }
 
 export async function GET() {
-  let dono;
   try {
-    dono = await requireDonoDiretoria();
+    await requireDonoDiretoria();
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: status(e) });
   }

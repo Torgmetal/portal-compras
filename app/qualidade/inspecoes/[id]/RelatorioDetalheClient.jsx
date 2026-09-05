@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, FileText, Lock, FolderOpen, Crop } from "lucide-react";
+import { Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, Lock, FolderOpen, Crop } from "lucide-react";
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
 import MarcadorCotas from "./MarcadorCotas";
 import RecorteDesenho from "./RecorteDesenho";

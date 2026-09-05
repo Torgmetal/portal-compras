@@ -1,9 +1,7 @@
 // Aba "Materiais por OP" — visao consolidada de TODOS os materiais solicitados
 // por OP, com status derivado de cada item (comprado, aguardando, estoque, etc).
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { fmtOP } from "@/lib/utils";
 import { Boxes } from "lucide-react";
 import MateriaisOPPageClient from "./MateriaisOPPageClient";
 

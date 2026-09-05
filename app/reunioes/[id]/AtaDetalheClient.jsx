@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, NotebookPen, Loader2, Send, Trash2, Plus, X, CheckCircle2, Clock, AlertCircle, Users, Link2, Copy, Check, History, Pencil, Paperclip, Sparkles, FolderKanban, FileDown } from "lucide-react";
+import { ArrowLeft, NotebookPen, Loader2, Send, Trash2, Plus, X, CheckCircle2, Clock, AlertCircle, Users, Link2, Check, History, Pencil, Paperclip, FolderKanban, FileDown } from "lucide-react";
 import AtaAtividadesEditor, { agruparSecoes, achatarSecoes } from "@/components/AtaAtividadesEditor";
 import { situacaoAtividade, situacaoLabel, respondida, ehConcluida } from "@/lib/ata-status";
 

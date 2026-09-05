@@ -310,7 +310,7 @@ export async function POST(request) {
     try {
       const jsonStr = extractJsonFromResponse(rawText);
       parsed = JSON.parse(jsonStr);
-    } catch (e) {
+    } catch {
       return NextResponse.json(
         {
           error: "IA devolveu resposta não-JSON. Provável ruído na extração.",

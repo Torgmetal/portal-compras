@@ -3,12 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
-import {
-  Loader2, AlertCircle, RefreshCw, BarChart3, DollarSign, TrendingUp,
-  FileCheck2, XCircle, ChevronDown, ChevronUp, Calendar, Clock, Target,
-  Percent, PieChart, Activity, Users, AlertTriangle,
-  ArrowUpRight, ArrowDownRight, Timer, Zap, ExternalLink,
-} from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, DollarSign, TrendingUp, FileCheck2, XCircle, ChevronDown, ChevronUp, Calendar, Target, Users, AlertTriangle, Zap, ExternalLink } from "lucide-react";
 
 // ─── HELPERS ─────────────────────────────────────────────────
 const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -30,8 +25,6 @@ const fmtMoedaCurto = (v) => {
   if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(0)}k`;
   return `R$ ${v.toFixed(0)}`;
 };
-const fmtPct = (v) => (v != null ? `${v.toFixed(1)}%` : "—");
-const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "--");
 
 // ─── HOOK DE DADOS ───────────────────────────────────────────
 function useIndicadoresComercial() {

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Loader2, AlertTriangle, FileText, Camera, X } from "lucide-react";
+import { Loader2, AlertTriangle, FileText } from "lucide-react";
 
 /**
  * AS NÃO CONFORMIDADES, NA MÃO DO INSPETOR.

@@ -98,7 +98,6 @@ export async function POST(req, { params }) {
       if (rmItem.status === "PEDIDO_GERADO" || rmItem.status === "CANCELADO" || rmItem.status === "ATENDIDO_ESTOQUE") continue;
 
       // RMs internas sem OP não têm opItem/aditivoItem, então FD = false
-      const isFD = false;
       const codigoOmieItem = rmItem.codigoOmieEstoque || null;
       const chave = `${cot.id}|NORMAL`;
 

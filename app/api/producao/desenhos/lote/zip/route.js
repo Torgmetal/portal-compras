@@ -53,8 +53,7 @@ function destino(formato) {
 const limpo = (s) => String(s).replace(/[^\w. \-()+]/g, "_");
 
 export async function POST(req) {
-  let user;
-  try { user = await requireRole(ROLES); }
+  try { await requireRole(ROLES); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   let body;

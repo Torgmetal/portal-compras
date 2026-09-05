@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { isoWeekString, parseSemana, semanaInicio, semanaFim, fmtSemana } from "@/lib/semana";
+import { isoWeekString } from "@/lib/semana";
 import { ExternalLink, FileText, Package } from "lucide-react";
 import RomaneiosSharepoint from "@/components/RomaneiosSharepoint";
 import { fmtOP } from "@/lib/utils";

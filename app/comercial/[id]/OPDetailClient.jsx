@@ -2,7 +2,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Calendar, Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X, CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory, ShoppingCart, GanttChart, FileSpreadsheet, Building2, ShieldCheck, Globe } from "lucide-react";
+import { Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X, CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory, ShoppingCart, GanttChart, FileSpreadsheet, Building2, ShieldCheck, Globe } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
 import SaudeFinanceiraOP from "./SaudeFinanceiraOP";
@@ -22,7 +22,7 @@ import AbaTerceiros from "./AbaTerceiros";
 import EmailsObraCard from "./EmailsObraCard";
 import MargemTransformacaoOP from "./MargemTransformacaoOP";
 import PrevisaoObra from "./PrevisaoObra";
-import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
+import { labelCategoria, agruparPorGrupo } from "@/lib/op-categorias";
 import { ESTOQUE_MATERIAL_OPCOES, TIPO_DATABOOK_OPCOES, ESTOQUE_MATERIAL_LABEL, TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 import EscopoQualidade from "../EscopoQualidade";
 import { resumoEscopo } from "@/lib/qualidade-escopo";
@@ -79,7 +79,7 @@ const VISTAS = [
   { key: "financeiro", label: "Financeiro", icon: DollarSign },
 ];
 
-export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba = false, podeVerFinanceiro = false, isDiretoria = false, proposta = null, comprasSlot = null, pecas = [], abas = null }) {
+export default function OPDetailClient({ op, userRole, userId: _userId, podeAlterarVerba = false, podeVerFinanceiro = false, isDiretoria = false, proposta = null, comprasSlot = null, pecas = [], abas = null }) {
   const router = useRouter();
   const isMaster = userRole === "ADMIN";
   // As abas vêm do servidor, por módulo (lib/op-abas.js). Blindagem dupla: Resumo e Financeiro
@@ -225,7 +225,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
     }
   }
 
-  const verbaTotal = useMemo(() => {
+  useMemo(() => {
     const base = op.itens.reduce((s, i) => s + i.valorVerba, 0);
     const aditivos = op.aditivos.reduce(
       (s, a) => s + a.itens.reduce((ss, i) => ss + i.valorVerba, 0),
@@ -1149,7 +1149,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
 }
 
 // Card 'Medicoes' — lista pedidos de venda do Omie vinculados a OP
-function MedicoesCard({ medicoes, resumo, receitaBruta, valorTotalContrato = 0, contratoExplicito = false, encerrada, syncId, onAdicionar, onSync, onRemover }) {
+function MedicoesCard({ medicoes, resumo, receitaBruta, valorTotalContrato = 0, _contratoExplicito = false, encerrada, syncId, onAdicionar, onSync, onRemover }) {
   const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
   // Base do calculo de %:
@@ -2698,7 +2698,7 @@ function ItensTabela({ itens, onSolicitarVerba, onEditar, onToggleFD, isMaster, 
   );
 }
 
-function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isMaster, podeAlterarVerbaDireto = false, aluguel }) {
+function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isMaster: _isMaster, podeAlterarVerbaDireto = false, aluguel: _aluguel }) {
   return (
     <div>
       <p className="px-6 pt-4 text-xs font-semibold text-torg-gray uppercase tracking-wide">{titulo}</p>

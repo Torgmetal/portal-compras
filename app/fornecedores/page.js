@@ -1,5 +1,5 @@
 import MarketingShell from "@/components/MarketingShell";
-import { Truck, Mail, FileText } from "lucide-react";
+import { Truck, Mail } from "lucide-react";
 
 export const metadata = {
   robots: { index: false, follow: false },

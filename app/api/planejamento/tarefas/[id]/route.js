@@ -30,7 +30,7 @@ export async function PATCH(req, { params }) {
   let body;
   try {
     body = schemaUpdate.parse(await req.json());
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
   }
 

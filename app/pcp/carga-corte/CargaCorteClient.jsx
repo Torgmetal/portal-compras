@@ -5,7 +5,6 @@ import { MAQUINA_COR } from "@/lib/maquina-corte";
 
 const fmtKg = (v) => `${Math.round(Number(v) || 0).toLocaleString("pt-BR")} kg`;
 const fmtData = (iso) => (iso ? new Date(iso + "T12:00:00Z").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—");
-const hojeIso = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 
 export default function CargaCorteClient() {
   const [dados, setDados] = useState(null);

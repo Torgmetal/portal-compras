@@ -56,7 +56,7 @@ export async function POST(req, { params }) {
       usados.add(`${nome}.pdf`);
       zip.file(`${nome}.pdf`, buf);
       dentro++;
-    } catch (e) {
+    } catch {
       falhas.push(d.nome);
     }
   }

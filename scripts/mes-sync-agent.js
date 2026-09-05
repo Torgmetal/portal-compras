@@ -97,7 +97,7 @@ const LOG_FILE       = process.env.LOG_FILE || path.join(__dirname, "mes-sync.lo
 function log(msg) {
   const linha = `[${new Date().toISOString()}] ${msg}`;
   console.log(linha);
-  try { fs.appendFileSync(LOG_FILE, linha + "\n"); } catch (_) {}
+  try { fs.appendFileSync(LOG_FILE, linha + "\n"); } catch {}
 }
 
 const p = (n) => String(n).padStart(2, "0");

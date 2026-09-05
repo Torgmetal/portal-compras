@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { NotebookPen, Plus, Loader2, AlertCircle, X, Trash2, Users, CheckCircle2, Clock, Sparkles, RotateCcw } from "lucide-react";
+import { NotebookPen, Plus, Loader2, AlertCircle, X, Trash2, CheckCircle2, RotateCcw } from "lucide-react";
 import AtaAtividadesEditor, { novaSecaoVazia, achatarSecoes, agruparSecoes } from "@/components/AtaAtividadesEditor";
 
 const SETORES = ["COMERCIAL", "ENGENHARIA", "COMPRAS", "PRODUCAO", "PCP", "PLANEJAMENTO", "EXPEDICAO", "QUALIDADE", "ALMOXARIFADO", "FINANCEIRO", "RH", "DIRETORIA"];
@@ -9,9 +9,6 @@ const SETOR_LABEL = { COMERCIAL: "Comercial", ENGENHARIA: "Engenharia", COMPRAS:
 const STATUS = { RASCUNHO: { l: "Rascunho", c: "bg-gray-100 text-gray-700" }, ENVIADA: { l: "Enviada", c: "bg-blue-100 text-blue-700" }, CONCLUIDA: { l: "Concluída", c: "bg-emerald-100 text-emerald-700" } };
 const numAta = (n) => `ATA-${String(n).padStart(3, "0")}`;
 const rev = (n) => `R${String(n).padStart(2, "0")}`;
-const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
-const opNum = (a) => { const n = parseInt(String(a?.op || "").replace(/\D/g, ""), 10); return Number.isFinite(n) ? n : Infinity; };
-const ordenarPorOp = (list) => (list || []).slice().sort((a, b) => opNum(a) - opNum(b)); // ordem numérica de OP; sem OP por último
 
 export default function ReunioesClient() {
   const router = useRouter();

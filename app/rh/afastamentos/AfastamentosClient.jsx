@@ -1,10 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import {
-  ShieldAlert, Search, PlusCircle, Loader2, AlertCircle, X,
-  ChevronDown, CheckCircle2, Clock, UserX, Activity, HeartPulse,
-  Ban,
-} from "lucide-react";
+import { ShieldAlert, Search, PlusCircle, Loader2, AlertCircle, X, ChevronDown, CheckCircle2, Clock, Activity, HeartPulse, Ban } from "lucide-react";
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 

@@ -2,15 +2,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { fmtOP } from "@/lib/utils";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
-import {
-  Loader2, AlertCircle, RefreshCw, Plus, X, Trash2, Filter,
-  CheckCircle2, Clock, Circle, ListTodo, Bell, Send,
-  GanttChart, AlertTriangle, Mail, User, Building2, CalendarClock, LayoutGrid, List,
-  MessageSquarePlus, ChevronDown, ChevronRight, Pencil, Download, Lock,
-} from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Plus, X, Trash2, Filter, CheckCircle2, Clock, Circle, ListTodo, Bell, Send, GanttChart, AlertTriangle, Mail, Building2, CalendarClock, LayoutGrid, List, MessageSquarePlus } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import AtividadesCronograma from "./AtividadesCronograma";
-import { DEPT_LABEL, DEPT_COR } from "@/lib/cronograma-departamentos";
+import { DEPT_LABEL } from "@/lib/cronograma-departamentos";
 
 const SETORES = [
   "PRODUCAO", "PINTURA", "PCP", "EXPEDICAO", "COMERCIAL",

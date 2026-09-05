@@ -8,7 +8,7 @@ export const maxDuration = 120; // re-checa só os pendentes (~39) → cabe folg
 // POST — Sincroniza status de entrega com o Omie (manual via botão).
 // Só os pedidos SEM entrega (os que podem mudar): rápido e corrige na hora os já
 // recebidos/encerrados no Omie que apareciam como "atrasado".
-export async function POST(req) {
+export async function POST(_req) {
   try {
     const user = await requireRole(["ADMIN", "COMPRAS"]);
 

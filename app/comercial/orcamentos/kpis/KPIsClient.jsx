@@ -2,12 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import {
-  Loader2, AlertCircle, BarChart3, DollarSign, TrendingUp,
-  FileCheck2, XCircle, ChevronDown, ChevronUp, Calendar, Clock, Target,
-  Percent, PieChart, Activity, Users, AlertTriangle,
-  ArrowUpRight, ArrowDownRight, Timer, Zap, ExternalLink,
-} from "lucide-react";
+import { Loader2, AlertCircle, BarChart3, DollarSign, TrendingUp, FileCheck2, XCircle, ChevronDown, ChevronUp, Calendar, Target, Users, AlertTriangle, Zap, ExternalLink } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import OrcamentosTabs from "@/components/OrcamentosTabs";
 

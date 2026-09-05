@@ -2,10 +2,7 @@
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Package, Search, RefreshCw, Loader2, AlertCircle, ExternalLink,
-  Microscope, ChevronDown, X, Warehouse,
-} from "lucide-react";
+import { Package, Search, RefreshCw, Loader2, AlertCircle, Microscope, ChevronDown, X, Warehouse } from "lucide-react";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";

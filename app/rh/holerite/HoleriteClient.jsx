@@ -69,7 +69,7 @@ async function lerResposta(r) {
 export default function HoleriteClient() {
   const { showToast } = useStore();
   const [competencia, setCompetencia] = useState(mesAtual());
-  const [competencias, setCompetencias] = useState([]);
+  const [_competencias, setCompetencias] = useState([]);
   const [holerites, setHolerites] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");

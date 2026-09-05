@@ -14,8 +14,8 @@ const OPCOES_RESPOSTA = [
   { valor: "INDISPONIVEL", label: "Indisponível", cor: "border-red-400 bg-red-50 text-red-700", icon: XCircle },
 ];
 
-export default function ConsultaEstoqueResponder({ consulta, userName }) {
-  const router = useRouter();
+export default function ConsultaEstoqueResponder({ consulta, userName: _userName }) {
+  useRouter();
   const jaRespondida = consulta.status === "RESPONDIDA";
 
   const [respostas, setRespostas] = useState(() =>

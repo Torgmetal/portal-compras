@@ -1,14 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import {
-  FileText, PlusCircle, Loader2, AlertCircle, X, Search,
-  ChevronDown, ShieldAlert, ShieldCheck, Clock, Building2,
-  Users, AlertTriangle, CalendarClock, Download, Upload,
-  FileSpreadsheet, CheckCircle2, XCircle, ClipboardCheck,
-  ChevronRight, UserX, CircleAlert, BadgeCheck, Factory,
-  Paperclip, Eye, Send, UploadCloud, Cloud, Pencil, Trash2,
-  MinusCircle, Undo2,
-} from "lucide-react";
+import { FileText, PlusCircle, Loader2, AlertCircle, X, Search, ChevronDown, ShieldAlert, ShieldCheck, Clock, Building2, Users, AlertTriangle, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, ClipboardCheck, ChevronRight, BadgeCheck, Factory, Paperclip, Eye, Send, UploadCloud, Cloud, Pencil, Trash2, MinusCircle, Undo2 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import { upload } from "@vercel/blob/client";
 
@@ -1084,7 +1076,7 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
         <div className="space-y-2">
           {funcionarios.map((f) => {
             const aberto = expandido[f.funcionario.id];
-            const pendentes = f.itens.filter((i) => i.status !== "OK");
+            f.itens.filter((i) => i.status !== "OK");
             return (
               <div key={f.funcionario.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 <button onClick={() => toggleExpandido(f.funcionario.id)}

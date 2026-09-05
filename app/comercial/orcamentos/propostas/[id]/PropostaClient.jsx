@@ -1,14 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  Loader2, AlertCircle, FileText, Plus, Trash2, Check, ChevronRight,
-  Download, Files, Ruler, ListChecks, Coins, Send,
-} from "lucide-react";
+import { Loader2, AlertCircle, FileText, Plus, Trash2, Check, Download, Files, Ruler, ListChecks, Coins, Send } from "lucide-react";
 import { useStore } from "@/lib/store";
-import {
-  ELEMENTOS, ELEMENTO_POR_ID, ESCOPO_ITENS, MODALIDADES, CATEGORIAS,
-  BLOCOS, blocosAplicaveis, fraseDoEscopo, blocosDoEscopo, numeroDaProposta,
-} from "@/lib/proposta-estrutura";
+import { ELEMENTOS, ELEMENTO_POR_ID, ESCOPO_ITENS, MODALIDADES, CATEGORIAS, blocosAplicaveis, fraseDoEscopo, blocosDoEscopo, numeroDaProposta } from "@/lib/proposta-estrutura";
 
 // ─── ELABORAÇÃO DA PROPOSTA, PASSO A PASSO ────────────────────────────────────
 // Vitor (30/08/2026): "precisamos fazer aquele passo a passo que estamos fazendo na LQC para

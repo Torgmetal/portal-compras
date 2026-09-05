@@ -7,7 +7,7 @@ import { HistoricoTab } from "./HistoricoTab";
 import { ProducaoTab } from "./ProducaoTab";
 import { SuprimentosTab } from "./SuprimentosTab";
 
-export function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogramaId, onDeleted, onEncerrado, opStatus, readOnly }) {
+export function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogramaId, onDeleted, onEncerrado, opStatus: _opStatus, readOnly }) {
   const [tab, setTab] = useState("cronograma");
   const [settingBase, setSettingBase] = useState(false);
   const [enviandoTarefas, setEnviandoTarefas] = useState(false);
@@ -118,7 +118,6 @@ export function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cr
     }
   };
 
-  const opFinalizada = opStatus === "ENCERRADA" || opStatus === "CANCELADA";
 
   const tabs = [
     { key: "cronograma", label: "Cronograma", icon: GanttChart },

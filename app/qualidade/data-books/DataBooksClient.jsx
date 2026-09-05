@@ -3,9 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fmtOP } from "@/lib/utils";
-import {
-  Loader2, AlertCircle, Plus, BookCheck, ChevronRight, X, Check, Weight, Search, Archive, FolderOpen, CheckCircle2,
-} from "lucide-react";
+import { Loader2, AlertCircle, Plus, BookCheck, ChevronRight, X, Weight, Search, Archive, FolderOpen, CheckCircle2 } from "lucide-react";
 
 // ⚠ CONCLUÍDO = EMITIDO. Vitor (28/08/2026): "os data books que já foram concluídos criar uma aba
 // para que eles fiquem registrados nessa aba". Depois de emitido o dossiê está fechado — o que vem

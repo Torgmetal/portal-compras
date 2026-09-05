@@ -1,11 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
-import {
-  FileBarChart2, Search, Package, Truck, Weight, DollarSign,
-  Clock, CheckCircle2, AlertTriangle, Download, ChevronDown,
-  ChevronUp, X, BarChart3, FileText, GitCompareArrows, ArrowRightLeft,
-  Upload,
-} from "lucide-react";
+import { FileBarChart2, Search, Package, Truck, Weight, DollarSign, Clock, CheckCircle2, AlertTriangle, Download, ChevronDown, ChevronUp, X, FileText, GitCompareArrows, ArrowRightLeft, Upload } from "lucide-react";
 import { log } from "@/lib/log";
 
 const registro = log("RelatorioExpedicaoClient");
@@ -1136,7 +1131,7 @@ export default function RelatorioExpedicaoClient() {
   );
 }
 
-function KpiCard({ label, value, icon, sub, destaque, barra }) {
+function KpiCard({ label, value, icon, sub, destaque, barra: _barra }) {
   const corBorda = destaque === "green" ? "border-green-100" : destaque === "amber" ? "border-amber-100" : "border-gray-100";
   return (
     <div className={`bg-white rounded-xl border ${corBorda} shadow-sm p-4`}>

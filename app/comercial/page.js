@@ -24,8 +24,6 @@ function calcStatus(op) {
   return "ABERTA";
 }
 
-const fmtMoeda = (v) =>
-  v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
 export default async function ComercialHome({ searchParams }) {

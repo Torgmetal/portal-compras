@@ -279,7 +279,7 @@ function AnaliseResultado({ a }) {
   );
 }
 
-function Anexo({ label, campo, url, nome, img, accept, enviando, onPick, onRemove }) {
+function Anexo({ label, campo: _campo, url, nome, img, accept, enviando, onPick, onRemove }) {
   return (
     <div>
       <label className="block text-xs font-medium text-torg-dark mb-1">{label}</label>

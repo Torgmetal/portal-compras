@@ -1,11 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import {
-  Plus, Trash2, Loader2, X, Sparkles, Upload, Edit3, Check,
-  Send, Search, ChevronDown, ChevronUp, Clock, CheckCircle2,
-  XCircle, ExternalLink, Package, FileSpreadsheet, CheckSquare, Square,
-  Download,
-} from "lucide-react";
+import { Plus, Trash2, Loader2, X, Sparkles, Upload, Edit3, Check, Send, Search, ChevronDown, ChevronUp, Clock, CheckCircle2, XCircle, Package, FileSpreadsheet, CheckSquare, Square, Download } from "lucide-react";
 
 const CATEGORIAS = [
   { value: "TELHA", label: "Telha" },
@@ -981,7 +976,7 @@ export default function AbaAcessorios({ estudo, estudoId }) {
     }
   };
 
-  const handleConfirmarImport = async (itensSelecionados) => {
+  const handleConfirmarImport = async (_itensSelecionados) => {
     setConfirmandoImport(true);
     try {
       // Reenviar o arquivo original com preview=false, junto com indices selecionados
@@ -1131,7 +1126,6 @@ export default function AbaAcessorios({ estudo, estudoId }) {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {itens.map((item, idx) => {
-                const subtotal = (item.custoUnitario || 0) * (item.quantidade || 0);
                 return (
                 <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                   {editandoId === item.id ? (
