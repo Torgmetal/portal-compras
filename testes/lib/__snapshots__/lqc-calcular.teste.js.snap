@@ -58,6 +58,12 @@ exports[`calcularLqc — bordas que não podem virar NaN > estudo vazio devolve 
     "rotulosSemClasse": [],
     "totalCargas": 0,
   },
+  "comerciais": {
+    "margem": 0,
+    "margemPct": 15,
+    "precoComMargem": 0,
+    "total": 0,
+  },
   "creditoIcms": {
     "aliquotaPct": 12,
     "linhas": [
@@ -718,6 +724,16 @@ exports[`calcularLqc — bordas que não podem virar NaN > estudo vazio devolve 
     },
   ],
   "itensComerciais": [],
+  "montagem": {
+    "ativo": false,
+    "despesas": 0,
+    "despesasPct": 90,
+    "equipamentos": 0,
+    "linhas": [],
+    "mdo": 0,
+    "porKg": 0,
+    "total": 0,
+  },
   "pesoPorClasse": {},
   "pesoPorPerfil": {},
   "pesoTotal": 0,
@@ -765,6 +781,7 @@ exports[`calcularLqc — bordas que não podem virar NaN > estudo vazio devolve 
       "pisCofins": 0,
       "subtotal": 0,
     },
+    "montagem": 0,
   },
   "totalImpostos": 0,
 }
@@ -805,6 +822,12 @@ exports[`calcularLqc — snapshot do estudo de referência > o resultado inteiro
       "MEDIO",
     ],
     "totalCargas": 2,
+  },
+  "comerciais": {
+    "margem": 0,
+    "margemPct": 15,
+    "precoComMargem": 0,
+    "total": 0,
   },
   "creditoIcms": {
     "aliquotaPct": 12,
@@ -1532,6 +1555,16 @@ exports[`calcularLqc — snapshot do estudo de referência > o resultado inteiro
     },
   ],
   "itensComerciais": [],
+  "montagem": {
+    "ativo": false,
+    "despesas": 0,
+    "despesasPct": 90,
+    "equipamentos": 0,
+    "linhas": [],
+    "mdo": 0,
+    "porKg": 0,
+    "total": 0,
+  },
   "pesoPorClasse": {
     "LEVE": 1000,
     "MEDIO": 5000,
@@ -1652,6 +1685,7 @@ exports[`calcularLqc — snapshot do estudo de referência > o resultado inteiro
       "pisCofins": 0,
       "subtotal": 0,
     },
+    "montagem": 0,
   },
   "totalImpostos": 1274.35,
 }

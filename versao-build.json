@@ -1,7 +1,12 @@
 {
-  "build": 2861,
-  "gerado": "2026-09-05T18:24:41.016Z",
+  "build": 2862,
+  "gerado": "2026-09-05T18:25:31.378Z",
   "commits": [
+    {
+      "hash": "a4d2f36ab5",
+      "data": "05/09/2026",
+      "titulo": "Duas sujeiras que o meu removedor de código morto deixou nas integrações"
+    },
     {
       "hash": "926b69291f",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "cc9fa8820c",
       "data": "05/09/2026",
       "titulo": "Cronograma vira seção da proposta, no estilo do documento"
-    },
-    {
-      "hash": "cbd985244c",
-      "data": "05/09/2026",
-      "titulo": "Cronograma prévio em PDF — a folha que acompanha a proposta"
     }
   ]
 }
