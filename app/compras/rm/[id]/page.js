@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { ArrowLeft } from "lucide-react";
-import { labelCategoria } from "@/lib/op-categorias";
 import { calcularVerbaOP } from "@/lib/verba-op";
 import RMComprasClient from "./RMComprasClient";
 import ConsultaEstoqueSection from "@/components/compras/ConsultaEstoqueSection";

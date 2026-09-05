@@ -1,7 +1,12 @@
 {
-  "build": 2788,
-  "gerado": "2026-09-04T21:44:21.697Z",
+  "build": 2789,
+  "gerado": "2026-09-05T13:26:14.765Z",
   "commits": [
+    {
+      "hash": "7c86c84048",
+      "data": "04/09/2026",
+      "titulo": "Tela de versão é só do ADMIN"
+    },
     {
       "hash": "3ad77d4c22",
       "data": "04/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b755ff6dca",
       "data": "04/09/2026",
       "titulo": "Portal do cliente: a rastreabilidade fecha a corrente RM -> pedido -> NF -> R"
-    },
-    {
-      "hash": "49ee57abc3",
-      "data": "04/09/2026",
-      "titulo": "Portal do cliente: a rastreabilidade passa a mostrar a NF de compra e o kg comprado"
     }
   ]
 }
