@@ -720,6 +720,18 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
   const secaoDeCertificado = gruposDaSecao(secao.numero).length > 0;
   // Documentos que a API apontou como sendo de OUTRA seção (ex.: tinta na seção 04 de matéria-prima).
   const foraDoGrupo = secao.documentos.filter((d) => d.secaoCerta);
+  // ⚠⚠ Vitor (05/09/2026): "telha, cumeeira e silicone não possuem certificado, e não devem ser
+  // listados no data book". Não é "seção errada" — é item que não entra no livro. O portal parou de
+  // trazer, mas o que já está vinculado continua aqui até alguém tirar: sumir sozinho com vínculo
+  // que outra pessoa fez é o tipo de silêncio que faz o livro mentir.
+  const naoEntram = secao.documentos.filter((d) => d.foraDoLivro);
+  async function removerNaoEntram() {
+    if (!confirm(
+      `Remover ${naoEntram.length} item(ns) desta seção?\n\nCobertura e vedação não têm certificado de matéria-prima e não entram no data book:\n` +
+      naoEntram.slice(0, 8).map((d) => `· ${d.nome}`).join("\n") + (naoEntram.length > 8 ? `\n· … e mais ${naoEntram.length - 8}` : "")
+    )) return;
+    for (const d of naoEntram) await onDesvincular(d.id);
+  }
   // Move os certificados que estão na seção errada pra seção certa deste mesmo data book.
   async function moverForaDoGrupo() {
     const destinos = [...new Set(foraDoGrupo.map((d) => d.secaoCerta))].sort();
@@ -807,6 +819,12 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
                     <FileText size={13} className="text-torg-blue shrink-0" />
                     {(d.importRef || d.indiceR) && <span className="font-mono text-[11px] font-semibold text-torg-blue shrink-0 whitespace-nowrap" title="Rastreabilidade (Índice R)">R {d.importRef || d.indiceR}</span>}
                     <span className="text-torg-dark truncate" title={d.nome}>{d.nome}</span>
+                    {d.foraDoLivro && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-torg-gray border border-gray-200 font-medium shrink-0 whitespace-nowrap"
+                        title="Cobertura/vedação: não tem certificado de matéria-prima e não entra no data book">
+                        não entra no livro
+                      </span>
+                    )}
                     {d.secaoCerta && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-medium shrink-0 whitespace-nowrap"
                         title={`Este certificado é de outro grupo — o lugar dele é a seção ${d.secaoCerta}`}>
@@ -845,6 +863,19 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
               {/* Vitor (20/08): "você está trazendo certificados de tinta na aba de certificados de
                   materiais". O portal não erra mais ao vincular, mas o que já está gravado continua
                   ali — então aponta e deixa mover, em vez de sumir com o vínculo sem avisar. */}
+              {naoEntram.length > 0 && (
+                <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5">
+                  <span className="text-[11px] text-torg-gray">
+                    {naoEntram.length === 1 ? "1 item é" : `${naoEntram.length} itens são`} de cobertura/vedação — sem certificado de matéria-prima, não entram no data book.
+                  </span>
+                  {!fechado && (
+                    <button onClick={removerNaoEntram} disabled={acaoLoading}
+                      className="text-[11px] font-medium text-torg-dark border border-gray-300 hover:bg-gray-100 rounded-lg px-2 py-0.5 shrink-0 disabled:opacity-50">
+                      Remover da seção
+                    </button>
+                  )}
+                </div>
+              )}
               {foraDoGrupo.length > 0 && (
                 <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5">
                   <span className="text-[11px] text-amber-800">

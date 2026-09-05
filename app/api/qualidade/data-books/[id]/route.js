@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { calcStatusValidade, diasAlertaCategoria, usaMesInteiro } from "@/lib/qualidade-status";
-import { secaoUsaModulo1 , secaoCertaDoDoc } from "@/lib/databook-secoes";
+import { secaoUsaModulo1 , secaoCertaDoDoc, foraDoLivro } from "@/lib/databook-secoes";
 import { fichasPorR, comFicha } from "@/lib/databook-ficha-r";
 
 export const runtime = "nodejs";
@@ -64,7 +64,8 @@ async function montarDetalhe(id) {
   const secoes = book.secoes.map((s) => {
     const docs = s.documentos.map((ld) => docsById.get(ld.documentoId)).filter(Boolean).map(resolverDoc)
       // aponta (sem mexer) o documento que está na seção errada — ver secaoCertaDoDoc
-      .map((d) => ({ ...d, secaoCerta: secaoCertaDoDoc(d, s.numero) }));
+      // `foraDoLivro`: cobertura/vedação não pertence a seção nenhuma — a tela oferece REMOVER
+      .map((d) => ({ ...d, secaoCerta: secaoCertaDoDoc(d, s.numero), foraDoLivro: foraDoLivro(d) }));
     const temVencido = docs.some((d) => d.status === "VENCIDO");
     const usaM1 = secaoUsaModulo1(s.fonte);
     return {
