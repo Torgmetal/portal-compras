@@ -124,6 +124,18 @@ const CSS = `
   .gpcp .barra-op.mexida{outline:2px solid var(--laranja);outline-offset:-2px}
   .gpcp .fantasma{position:fixed;z-index:99;pointer-events:none;opacity:.92;
             box-shadow:0 8px 20px rgba(13,31,60,.35)}
+  /* menu do botão direito no bloco */
+  .gpcp .menu{position:fixed;z-index:60;background:#fff;border:1px solid var(--linha);border-radius:9px;
+         box-shadow:0 10px 34px rgba(13,31,60,.20);padding:5px;min-width:262px;font-size:12.5px}
+  .gpcp .menu .cab{padding:6px 9px 7px;border-bottom:1px solid var(--linha);margin-bottom:4px;
+         font-size:11px;color:var(--tinta-2)}
+  .gpcp .menu .cab b{color:var(--tinta);font-size:12.5px}
+  .gpcp .menu button{display:flex;align-items:flex-start;gap:8px;width:100%;text-align:left;border:0;
+         background:none;padding:7px 9px;border-radius:6px;cursor:pointer;color:var(--tinta);font:inherit}
+  .gpcp .menu button:hover:not(:disabled){background:#eef4fb}
+  .gpcp .menu button:disabled{color:#a9b6c6;cursor:default}
+  .gpcp .menu button .mk{flex:0 0 14px;font-weight:800;color:var(--azul)}
+  .gpcp .menu button small{display:block;color:var(--tinta-2);font-size:11px;line-height:1.45;margin-top:1px}
   .gpcp .corta{position:absolute;top:0;bottom:0;width:9px;background:rgba(0,0,0,.22);
          display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff}
   .gpcp .corta.e{left:0;border-radius:5px 0 0 5px} .gpcp .corta.d{right:0;border-radius:0 5px 5px 0}
@@ -148,13 +160,6 @@ const CSS = `
   .gpcp .li-x{margin-left:auto;border:0;background:none;color:var(--tinta-2);cursor:pointer;font-size:14px;padding:0 4px}
   .gpcp .li-x:hover{color:var(--ruim)}
 
-  .gpcp .nota{flex:0 0 auto;margin:8px 2px 0;font-size:11.5px;color:var(--tinta-2);line-height:1.6}
-  .gpcp .nota b{color:var(--tinta)}
-  .gpcp .nota summary{cursor:pointer;font-weight:700;color:var(--azul);font-size:12px;list-style:none;padding:2px 0}
-  .gpcp .nota summary::-webkit-details-marker{display:none}
-  .gpcp .nota summary::before{content:"▸ ";font-size:10px}
-  .gpcp .nota[open] summary::before{content:"▾ "}
-  .gpcp .nota .txt{padding-top:6px}
 
   .gpcp /* ── painel lateral ────────────────────────────────────────────── */
   .painel{position:fixed;top:0;right:0;bottom:0;width:min(540px,96vw);background:var(--papel);
@@ -260,6 +265,7 @@ const MARKUP = `<div class="wrap">
   </div>
 
   <div id="gp-aviso"></div>
+  <div class="menu" id="gp-menu" hidden></div>
   <div class="quadro"><div class="rolagem" id="gp-grade"></div></div>
 
   <div class="pend">
@@ -274,7 +280,6 @@ const MARKUP = `<div class="wrap">
     <div class="vazio" id="gp-semAlt">Nenhuma programação alterada ainda.</div>
   </div>
 
-  <details class="nota"><summary>Como ler este quadro</summary><div class="txt" id="gp-rodape"></div></details>
 </div>
 
 <aside class="painel" id="gp-painel" hidden>
@@ -468,6 +473,8 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
       // semana cobre 4 colunas e trabalha 2 dias. Contar coluna diria "4 dias" e
       // ainda entraria como padrão na quebra.
       r.dias = new Set(r.lotes.map(l=>l.dia)).size;
+      r.usaFds = r.lotes.some(l=>l.usaFds);
+      r.noFds = r.lotes.filter(l=>fdsISO(l.dia));
       r.pecas = r.lotes.reduce((s,l)=>s+l.pecas,0);
       r.kg = r.lotes.reduce((s,l)=>s+l.kg,0);
       r.feitas = r.lotes.reduce((s,l)=>s+l.feitas,0);
@@ -574,7 +581,13 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     }
     grade.innerHTML = html;
     $("periodo").textContent = dbr(janela[0])+" a "+dbr(janela[larg-1])+" · "+d0(janela[0]).getUTCFullYear();
-    for(const el of grade.querySelectorAll(".barra-op")) el.addEventListener("pointerdown", pegar);
+    for(const el of grade.querySelectorAll(".barra-op")){
+      el.addEventListener("pointerdown", pegar);
+      el.addEventListener("contextmenu", (ev)=>{
+        const r = montarRuns().find(x=>x.id===el.dataset.run); if(!r) return;
+        abrirMenu(ev, r);
+      });
+    }
   }
 
   /* ── arraste ────────────────────────────────────────────────────────────────── */
@@ -636,13 +649,70 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     // barra, que é deliberada. A prévia já mostra onde vai cair, então não há surpresa
     // depois de soltar.
     const jBruto = Math.max(0, cels.indexOf(cel) - arr.offCols);
-    const j = Math.max(0, encostaNoUtil(inicio + jBruto) - inicio);
+    const j = arr.r.usaFds ? jBruto : Math.max(0, encostaNoUtil(inicio + jBruto) - inicio);
     for(let k=0;k<dur;k++){ const c = cels[j+k]; if(c) c.classList.add(permitido?"alvo":"proibido"); }
     if(!permitido || !cels[j]) return;
     arr.alvo = { setor, recurso:rec, iAlvo: inicio + j };
     const rc = cels[j].getBoundingClientRect();
     arr.g.style.left = (rc.left+3)+"px"; arr.g.style.top = (rc.top+5)+"px"; arr.g.style.width = (dur*COL-7)+"px";
   }
+  /* ── menu do botão direito ──────────────────────────────────────────────────── */
+  // ⚠⚠ POR QUE UM MENU, E NÃO UM PUXADOR NA BARRA.
+  //
+  // Havia pontas arrastáveis; o Matheus mandou tirar porque "vai dar margem para
+  // aumentarem o prazo de produção" — e estava certo: esticar virava o gesto mais fácil
+  // da tela, a um arrastar de distância e sem ninguém decidir nada. Só que sem NENHUM
+  // caminho, sábado e domingo viravam coluna decorativa, e o pedido original era
+  // justamente "caso for precisar trabalhar ser possível".
+  //
+  // O menu resolve os dois: continua possível, mas deixou de ser fácil. Botão direito,
+  // ler a linha, escolher. Não dá para acontecer sem querer.
+  //
+  // A marca `usaFds` vive no LOTE e vale só para esta sessão do navegador: é intenção de
+  // quem está programando, não dado — não vai para o banco no "Salvar".
+  const menu = $("menu");
+  function fecharMenu(){ menu.hidden = true; menu.innerHTML = ""; }
+  function abrirMenu(e, r){
+    e.preventDefault();
+    const noFds = r.noFds.length;
+    menu.innerHTML =
+        '<div class="cab"><b>OP-'+r.op+'</b> · '+nomeRec(r.setor, r.recurso)+' · '
+      + r.dias+' dia'+(r.dias>1?"s":"")+' · '+r.pecas.toLocaleString("pt-BR")+' peças</div>'
+      + '<button data-ac="fds"><span class="mk">'+(r.usaFds ? "☐" : "☑")+'</span><span>Pular o fim de semana'
+      + '<small>'+(r.usaFds
+          ? "Agora este bloco PODE cair no sábado e no domingo ao ser movido. Clique para voltar a pular."
+          : "Ao mover, o bloco escorrega para o dia útil. Clique para liberar o fim de semana só para ele.")
+      + '</small></span></button>'
+      + '<button data-ac="tirar"'+(noFds?"":" disabled")+'><span class="mk">→</span><span>Tirar do fim de semana'
+      + '<small>'+(noFds
+          ? noFds+' dia(s) deste bloco caem no sábado ou domingo. Passa cada um para o dia útil seguinte.'
+          : "Nenhum dia deste bloco está no fim de semana.")
+      + '</small></span></button>';
+    menu.hidden = false;
+    const b = menu.getBoundingClientRect();
+    menu.style.left = Math.min(e.clientX, window.innerWidth  - b.width  - 8)+"px";
+    menu.style.top  = Math.min(e.clientY, window.innerHeight - b.height - 8)+"px";
+    menu.querySelector('[data-ac="fds"]').onclick = ()=>{
+      const liberar = !r.usaFds;
+      for(const l of lotes) if(r.lotes.some(x=>x.uid===l.uid)) l.usaFds = liberar;
+      fecharMenu(); redesenhar();
+    };
+    const bt = menu.querySelector('[data-ac="tirar"]');
+    if(noFds) bt.onclick = ()=>{
+      const antes = r.lotes.map(l=>({...l, itens:l.itens}));
+      const novos = r.lotes.map(l=>novoLote({ ...l, itens:l.itens,
+        dia: fdsISO(l.dia) ? DIAS[encostaNoUtil(IDX.get(l.dia))] : l.dia }));
+      registrar({
+        setor:r.setor, op:r.op, pecas:r.pecas, kg:r.kg, antes, novos,
+        rotulo: '<b>'+nomeRec(r.setor, r.recurso)+'</b> · tirada do fim de semana'
+              + ' <span class="de-para">('+r.noFds.map(l=>dbr(l.dia)).join(", ")+')</span>',
+      });
+      fecharMenu(); redesenhar();
+    };
+  }
+  window.addEventListener("click", fecharMenu);
+  window.addEventListener("scroll", fecharMenu, true);
+
   function soltar(){
     window.removeEventListener("pointermove", mover);
     if(!arr) return;
@@ -655,12 +725,13 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     const delta = a.iAlvo - r.ini;
     if(delta===0 && a.recurso===r.recurso){ desenhar(); return; }
     const antes = r.lotes.map(l=>({...l, itens:l.itens}));
-    // Cair num sábado escorrega para a segunda. A guarda do `fdsISO(l.dia)` cobre o lote
-    // que JÁ esteja num fim de semana — hoje só se veio assim do banco, programado por
-    // fora desta tela: mover o bloco não é lugar de desfazer isso em silêncio.
+    // Cair num sábado escorrega para a segunda — a não ser que este bloco tenha sido
+    // liberado no menu do botão direito (`usaFds`), ou que o lote JÁ esteja num fim de
+    // semana (veio assim do banco, programado por fora desta tela): mover o bloco não é
+    // lugar de desfazer, em silêncio, uma decisão que alguém tomou.
     const novos = r.lotes.map(l=>{
       const cru = Math.max(0, Math.min(DIAS.length-1, IDX.get(l.dia)+delta));
-      const destino = fdsISO(l.dia) ? cru : encostaNoUtil(cru);
+      const destino = (l.usaFds || fdsISO(l.dia)) ? cru : encostaNoUtil(cru);
       return novoLote({ ...l, itens:l.itens, recurso: a.recurso, dia: DIAS[destino] });
     });
     registrar({
@@ -1008,15 +1079,6 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   for(const b of raiz.querySelectorAll(".abas button")) b.onclick = ()=>{ abaP=b.dataset.aba; pintarPainel(); };
   const aoTeclar = (e)=>{ if(e.key==="Escape" && painel) fecharPainel(); };
   window.addEventListener("keydown", aoTeclar);
-
-  $("rodape").innerHTML =
-    '<b>O que está aqui:</b> '+LOTES.length+' programações reais ('+SETORES.map(s=>LOTES.filter(l=>l.setor===s).length+" "+s.toLowerCase()).join(" · ")
-    + '), com '+LOTES.reduce((s,l)=>s+l.itens.length,0).toLocaleString("pt-BR")+' marcas. Dias seguidos da mesma OP no mesmo recurso viram uma barra só.<br>'
-    + '<b>Arrastar</b> move o bloco inteiro e preserva a distribuição por dia. <b>Clicar</b> abre os projetos daquela programação '
-    + '(com quem já tem GRD impressa) e a divisão em bancadas.<br>'
-    + '<b>A ocupação</b> vem das réguas do portal: corte pela capacidade medida de cada máquina (p75 do Syneco), montagem pelo maior '
-    + 'custo entre peças/faixa e 7 t por bancada-dia, solda por peças/faixa. Âmbar acima de 100%, vermelho acima de 130%.<br>'
-    + '<b>O que ainda não faz:</b> não grava, não estica a barra pelas pontas e não deixa arrastar de um setor para outro.';
 
   desenhar(); pintarAlteracoes();
 
