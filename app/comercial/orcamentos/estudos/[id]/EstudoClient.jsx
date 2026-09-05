@@ -4,7 +4,7 @@ import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload, Send } from "luci
 import { useStore } from "@/lib/store";
 import { FAMILIAS_COTACAO, FAMILIA_DO_ITEM } from "@/lib/cotacao-familias";
 import { montarCronogramaPrevio, textoDaProposta, comprasEspeciais, PADRAO_CRONOGRAMA } from "@/lib/cronograma-previo";
-import { cadenciaPorClasse, decisaoTerceirizar, margemPorMesDeFabrica, PRECO_TERCEIRO_CLASSE } from "@/lib/lqc";
+import { cadenciaPorClasse, decisaoTerceirizar, margemPorMesDeFabrica, PRECO_TERCEIRO_CLASSE, MONTAGEM_PADRAO, MARGEM_COMERCIAIS_PADRAO } from "@/lib/lqc";
 import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAPACIDADE_CARGA, EVENTOS_PAGAMENTO, PAGAMENTO_PADRAO, PRAZOS_PAGAMENTO, conferirPagamento, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa, resultadoDoCenario, sensibilidade, ALAVANCAS_SENSIVEIS, equilibrioConvergido, impostosDoCenario } from "@/lib/lqc";
 import { capacidadePorHora } from "@/lib/fabrica-horas";
 
@@ -44,6 +44,7 @@ const ABAS = [
   { k: "FABRICACAO", r: "Fabricação", ajuda: "fábrica e pré-montagem" },
   { k: "TERCEIROS", r: "Terceiros", ajuda: "o que vem de fora" },
   { k: "FRETE", r: "Frete", ajuda: "transporte até a obra" },
+  { k: "MONTAGEM", r: "Montagem", ajuda: "montagem em campo, canteiro e equipamentos" },
   { k: "ENSAIOS", r: "Qualidade", ajuda: "ensaios, inspetores e data book" },
   { k: "PAGAMENTO", r: "Forma de pagamento", ajuda: "quando o dinheiro entra" },
   { k: "BDI", r: "Impostos e BDI" },
@@ -176,6 +177,7 @@ export default function EstudoClient({ id }) {
       {aba === "FABRICACAO" && <Fabricacao c={c} res={res} setComp={setComp} custoFabrica={d.custoFabrica} />}
       {aba === "TERCEIROS" && <Terceiros c={c} res={res} setComp={setComp} />}
       {aba === "FRETE" && <Frete c={c} res={res} setComp={setComp} />}
+      {aba === "MONTAGEM" && <MontagemCampo c={c} res={res} setComp={setComp} />}
       {aba === "ENSAIOS" && <Ensaios c={c} res={res} setComp={setComp} />}
       {aba === "PAGAMENTO" && <Pagamento c={c} res={res} setComp={setComp} />}
       {aba === "BDI" && <Bdi c={c} res={res} setComp={setComp} />}
@@ -643,6 +645,106 @@ function CadenciaPorClasse({ cadencia, res }) {
           {d.obraKgMes < cadencia ? " menos" : " mais"} que a régua de {cadencia.toLocaleString("pt-BR")}.
           É esse número que o prazo deveria usar.
         </p>
+      )}
+    </div>
+  );
+}
+
+
+/**
+ * MONTAGEM EM CAMPO — o bloco 3 da planilha comercial.
+ *
+ * Vitor (05/09/2026): "sim, precisamos criar ela agora, faltava apenas ela bem dizer".
+ *
+ * ⚠ Era o maior buraco de escopo do estudo: na LQC-253 a montagem é 31% da obra (R$ 5,28 mi de
+ * R$ 16,96 mi) e o portal não tinha onde pôr. Obra com montagem só podia ser orçada na planilha.
+ */
+function MontagemCampo({ c, res, setComp }) {
+  const cfg = c.montagem || {};
+  const set = (k, v) => setComp({ montagem: { ...cfg, [k]: v } });
+  const setItem = (k, v) => setComp({ montagem: { ...cfg, porItem: { ...(cfg.porItem || {}), [k]: v } } });
+  const m = res.montagem || { linhas: [], mdo: 0, despesas: 0, equipamentos: 0, total: 0, porKg: 0 };
+  const comerciais = (res.itensComerciais || []).filter((i) => i.qtd > 0);
+  const ativo = cfg.ativo === true || num(cfg.estruturaRsKg) > 0 || num(cfg.equipamentosVb) > 0;
+
+  return (
+    <div className="space-y-4 max-w-5xl">
+      <p className="text-[12px] text-torg-gray">
+        A montagem se cobra <strong className="text-torg-dark">por item, na unidade dele</strong> — a estrutura por
+        quilo, mas telha e steel deck por m², calha e rufo por metro. É como a planilha faz, e é como o cliente compara.
+        O canteiro entra em separado: na LQC-253 as despesas de campo custam <strong className="text-torg-dark">mais</strong> que
+        a mão de obra de montagem da estrutura.
+      </p>
+
+      <div className="bg-white border border-gray-100 rounded-xl p-4">
+        <label className="flex items-center gap-2 text-[12px] text-torg-dark mb-3">
+          <input type="checkbox" checked={ativo} onChange={(e) => set("ativo", e.target.checked)} />
+          <strong>Esta obra tem montagem em campo</strong>
+          <span className="text-torg-gray">— desmarcado, o bloco não entra no custo nem na proposta</span>
+        </label>
+        {ativo && (
+          <div className="grid sm:grid-cols-3 gap-x-4 gap-y-3">
+            {[["estruturaRsKg", "Estrutura", "R$ por kg montado"],
+              ["despesasPct", "Despesas e canteiro", `% sobre a mão de obra — padrão ${MONTAGEM_PADRAO.despesasPct}`],
+              ["equipamentosVb", "Equipamentos", "verba — guindaste, plataforma"]].map(([k, rot, ajuda]) => (
+              <label key={k} className="flex flex-col text-[11px] text-torg-dark">
+                <span className="min-h-[2.75em] leading-snug">{rot}</span>
+                <Inp value={cfg[k] ?? ""} placeholder={k === "despesasPct" ? String(MONTAGEM_PADRAO.despesasPct) : ""}
+                  onChange={(e) => set(k, e.target.value)} className="block mt-1 w-full text-right" />
+                <span className="block text-[10px] text-torg-gray mt-0.5">{ajuda}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {ativo && (
+        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <p className="text-[12px] font-bold text-torg-dark">Montagem dos itens comerciais</p>
+            <p className="text-[11px] text-torg-gray mt-0.5">
+              A quantidade vem da aba Material; aqui entra só o preço de montar cada um.
+              {!comerciais.length && " Esta obra não tem item comercial lançado."}
+            </p>
+          </div>
+          {comerciais.length > 0 && (
+            <table className="w-full text-[12px]">
+              <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
+                <tr><th className="text-left px-4 py-1.5">Item</th><th className="text-right px-2 py-1.5">Quantidade</th>
+                  <th className="text-right px-2 py-1.5">R$ por unidade</th><th className="text-right px-4 py-1.5">Subtotal</th></tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {comerciais.map((i) => {
+                  const l = m.linhas.find((x) => x.key === i.key);
+                  return (
+                    <tr key={i.key}>
+                      <td className="px-4 py-1.5">{i.rotulo}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{Number(i.qtd).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} {i.un}</td>
+                      <td className="px-2 py-1.5 text-right"><Inp value={cfg.porItem?.[i.key] ?? ""} onChange={(e) => setItem(i.key, e.target.value)} className="w-24 text-right" /></td>
+                      <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(l?.subtotal || 0)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {ativo && (
+        <div className="bg-white border border-gray-100 rounded-xl p-4">
+          <p className="text-[12px] font-bold text-torg-dark mb-3">O que a montagem custa</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Kpi r="Mão de obra" v={fmtR$(m.mdo)} />
+            <Kpi r={`Despesas e canteiro (${m.despesasPct}%)`} v={fmtR$(m.despesas)} />
+            <Kpi r="Equipamentos" v={fmtR$(m.equipamentos)} />
+            <Kpi r="Total" v={fmtR$(m.total)} cor="text-torg-orange-700" />
+          </div>
+          <p className="text-[11px] text-torg-gray mt-3">
+            Equivale a <strong className="text-torg-dark">{fmtR$(m.porKg)}/kg</strong> de estrutura.
+            A montagem entra no custo do lado da Torg — se o cliente monta por conta, desmarque o bloco em vez de zerar os valores.
+          </p>
+        </div>
       )}
     </div>
   );
@@ -1172,7 +1274,20 @@ function Material({ c, res, setComp, estudoId }) {
           e chumbador ficam lado a lado e o botão de cotar vira uma armadilha: um clique distraído
           manda telha para quem vende parafuso. Separado, o grupo E o botão são a mesma coisa. */}
       <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-        <p className="text-[12px] font-bold text-torg-dark px-4 py-2 bg-gray-50">Itens comerciais</p>
+        <div className="px-4 py-2 bg-gray-50 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[12px] font-bold text-torg-dark">Itens comerciais</p>
+          {/* ⚠⚠ NEM ZERO NEM O BDI CHEIO. Vitor (05/09/2026): "o ideal seria ter um ganho, pois a
+              compra se torna uma responsabilidade grande para nós — pode haver aumento de preço da
+              data orçada para a data concluída… porém, se a margem for grande demais, pode se
+              tornar um problema para vender". Telha com 60% de margem o cliente cota direto na
+              fábrica; com zero, a Torg banca sozinha a variação de preço até a compra. */}
+          <label className="text-[11px] text-torg-dark inline-flex items-center gap-2">
+            Margem sobre estes itens
+            <Inp value={c.margemComerciaisPct ?? ""} placeholder={String(MARGEM_COMERCIAIS_PADRAO)}
+              onChange={(e) => setComp({ margemComerciaisPct: e.target.value })} className="w-16 text-right" />
+            <span className="text-torg-gray">% — cobre a variação de preço até a compra; não leva o BDI da estrutura</span>
+          </label>
+        </div>
         <table className="w-full text-[12px]">
           <thead className="text-[10px] uppercase text-torg-gray">
             <tr><th className="text-left px-4 py-1.5">Item</th><th className="text-left px-2 py-1.5">Un.</th>
@@ -2785,10 +2900,14 @@ function PlanilhaComercial({ res, e }) {
   // impressos: se não fechar, é porque uma linha está faltando — e aí o erro aparece, que é o certo.
   const c2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
   const bdiFator = 1 + (res.bdiPct || 0) / 100;
-  const linhaComerciais = t.comerciais > 0 ? c2(t.comerciais * bdiFator) : 0;
+  // ⚠ item comercial não leva o BDI da estrutura: leva a margem própria dele (ver lib/lqc)
+  const linhaComerciais = res.comerciais?.precoComMargem > 0 ? c2(res.comerciais.precoComMargem) : 0;
   const linhaPreMont = res.preMont?.apresentacao === "separado" && res.preMont?.total > 0 ? c2(res.preMont.total * bdiFator) : 0;
   const linhaFrete = res.frete?.apresentacao === "separado" && res.frete?.total > 0 ? c2(res.frete.total * bdiFator) : 0;
-  const totalGeral = c2(dentro.reduce((a, x) => a + c2(x.preco), 0) + linhaComerciais + linhaPreMont + linhaFrete);
+  // ⚠ MONTAGEM É ITEM PRÓPRIO NA PROPOSTA, sempre. É assim na planilha (bloco 3) e é assim que o
+  // cliente negocia: ele pode tirar a montagem do escopo sem mexer no fornecimento.
+  const linhaMontagem = res.montagem?.total > 0 ? c2(res.montagem.total * bdiFator) : 0;
+  const totalGeral = c2(dentro.reduce((a, x) => a + c2(x.preco), 0) + linhaComerciais + linhaPreMont + linhaFrete + linhaMontagem);
 
   return (
     <div className="space-y-4 max-w-5xl">
@@ -2887,6 +3006,17 @@ function PlanilhaComercial({ res, e }) {
                       calculadora acha que a planilha está errada. */}
                   <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{fmtR$(pesoDentro > 0 ? linhaFrete / pesoDentro : 0)}/kg</td>
                   <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(linhaFrete)}</td>
+                </tr>
+              )}
+              {linhaMontagem > 0 && (
+                <tr>
+                  <td className="px-4 py-1.5">{2 + (t.comerciais > 0 ? 1 : 0) + (res.preMont?.apresentacao === "separado" && res.preMont?.total > 0 ? 1 : 0) + (linhaFrete > 0 ? 1 : 0)}</td>
+                  <td className="px-2 py-1.5" colSpan={3}>
+                    Montagem em campo
+                    <span className="text-torg-gray"> — mão de obra, canteiro e equipamentos</span>
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{fmtR$(pesoDentro > 0 ? linhaMontagem / pesoDentro : 0)}/kg</td>
+                  <td className="px-4 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold">{fmtR$(linhaMontagem)}</td>
                 </tr>
               )}
               <tr className="bg-torg-blue-50/50 font-bold text-torg-dark">

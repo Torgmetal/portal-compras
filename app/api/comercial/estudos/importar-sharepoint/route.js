@@ -119,6 +119,9 @@ async function processar(ano, aplicar, user) {
         ...(lido.itensComerciais && Object.keys(lido.itensComerciais).length
           ? { itensComerciais: lido.itensComerciais }
           : {}),
+        // ⚠ e a MONTAGEM EM CAMPO, lida pelo CUSTO (colunas MONTAGEM e DESPESAS E CANTEIRO) — a
+        // coluna "Unit. R$" da planilha já tem BDI dentro, e importá-la como custo dobraria o preço.
+        ...(lido.montagem ? { montagem: lido.montagem } : {}),
       };
       const resultado = calcularLqc(composicao);
       const dados = {
