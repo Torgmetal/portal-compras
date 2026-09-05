@@ -1,7 +1,12 @@
 {
-  "build": 2872,
-  "gerado": "2026-09-05T19:56:08.011Z",
+  "build": 2873,
+  "gerado": "2026-09-05T20:07:40.234Z",
   "commits": [
+    {
+      "hash": "14fa30bc7e",
+      "data": "05/09/2026",
+      "titulo": "Gantt do PCP: a barra se divide no fim de semana, em vez de atravessá-lo"
+    },
     {
       "hash": "9ec0631c48",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "57e89a85eb",
       "data": "05/09/2026",
       "titulo": "Instala os quality gates de ESLint (teto de 350 linhas)"
-    },
-    {
-      "hash": "3a925085c8",
-      "data": "05/09/2026",
-      "titulo": "Quebra o RMComprasClient (4231 linhas) em módulos por responsabilidade"
     }
   ]
 }

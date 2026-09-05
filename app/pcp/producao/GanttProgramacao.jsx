@@ -124,18 +124,6 @@ const CSS = `
   .gpcp .barra-op.mexida{outline:2px solid var(--laranja);outline-offset:-2px}
   .gpcp .fantasma{position:fixed;z-index:99;pointer-events:none;opacity:.92;
             box-shadow:0 8px 20px rgba(13,31,60,.35)}
-  /* menu do botão direito no bloco */
-  .gpcp .menu{position:fixed;z-index:60;background:#fff;border:1px solid var(--linha);border-radius:9px;
-         box-shadow:0 10px 34px rgba(13,31,60,.20);padding:5px;min-width:262px;font-size:12.5px}
-  .gpcp .menu .cab{padding:6px 9px 7px;border-bottom:1px solid var(--linha);margin-bottom:4px;
-         font-size:11px;color:var(--tinta-2)}
-  .gpcp .menu .cab b{color:var(--tinta);font-size:12.5px}
-  .gpcp .menu button{display:flex;align-items:flex-start;gap:8px;width:100%;text-align:left;border:0;
-         background:none;padding:7px 9px;border-radius:6px;cursor:pointer;color:var(--tinta);font:inherit}
-  .gpcp .menu button:hover:not(:disabled){background:#eef4fb}
-  .gpcp .menu button:disabled{color:#a9b6c6;cursor:default}
-  .gpcp .menu button .mk{flex:0 0 14px;font-weight:800;color:var(--azul)}
-  .gpcp .menu button small{display:block;color:var(--tinta-2);font-size:11px;line-height:1.45;margin-top:1px}
   .gpcp .corta{position:absolute;top:0;bottom:0;width:9px;background:rgba(0,0,0,.22);
          display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff}
   .gpcp .corta.e{left:0;border-radius:5px 0 0 5px} .gpcp .corta.d{right:0;border-radius:0 5px 5px 0}
@@ -265,7 +253,6 @@ const MARKUP = `<div class="wrap">
   </div>
 
   <div id="gp-aviso"></div>
-  <div class="menu" id="gp-menu" hidden></div>
   <div class="quadro"><div class="rolagem" id="gp-grade"></div></div>
 
   <div class="pend">
@@ -354,14 +341,21 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
 
   // A coluna de dia útil a partir de i (o próprio i, se já for útil).
   //
-  // ⚠ HOJE NADA NA TELA PROGRAMA UM FIM DE SEMANA. Sábado e domingo aparecem para dar o
-  // ritmo do calendário e para conferir data, mas não recebem trabalho: houve pontas
-  // arrastáveis que faziam isso e o Matheus (05/09/2026) mandou tirar — "vai dar margem
-  // para aumentarem o prazo de produção". Um jeito de programar o fim de semana é
-  // decisão de quem cuida do PCP, não um efeito colateral de arrastar barra.
+  // ⚠⚠ NADA NESTA TELA PROGRAMA UM FIM DE SEMANA — e isso é decisão, não limitação.
   //
-  // O caminho de volta, se um dia precisar: o painel "quebrar" (diasDaQuebra) já sabe
-  // seguir em dias corridos; falta só quem escolha isso de propósito.
+  // Sábado e domingo têm coluna para dar o ritmo do calendário e para conferir data, mas
+  // não recebem trabalho. Duas tentativas de permitir isso foram construídas e retiradas
+  // pelo Matheus (05/09/2026), cada uma pelo seu motivo:
+  //
+  //   pontas arrastáveis  "vai dar margem para aumentarem o prazo de produção"
+  //   menu no botão direito  "vai ficar confuso"
+  //
+  // Antes de reconstruir uma terceira, vale ler esses dois motivos: o problema nunca foi
+  // técnico. Programar fim de semana precisa ser decisão de quem cuida do PCP, num lugar
+  // onde isso seja pesado e visível — não um gesto a mais nesta grade.
+  //
+  // O que já existe pronto, se um dia for preciso: `diasDaQuebra` sabe seguir em dias
+  // corridos quando o bloco começa num fim de semana.
   function encostaNoUtil(i){
     let k = Math.max(0, Math.min(DIAS.length-1, i));
     while(k < DIAS.length-1 && fdsISO(DIAS[k])) k++;
@@ -437,12 +431,6 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   };
 
   /* ── runs (dias seguidos da mesma OP no mesmo recurso = 1 barra) ────────────── */
-  // true quando tudo o que existe entre duas colunas é sábado/domingo.
-  function soPulaFds(a, b){
-    if(b <= a+1) return false;
-    for(let i=a+1; i<b; i++) if(!fdsISO(DIAS[i])) return false;
-    return true;
-  }
   function montarRuns(){
     const grupos = new Map();
     for(const l of lotes){
@@ -457,23 +445,12 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
       let atual=null;
       for(const l of arr){
         const i = IDX.get(l.dia); if(i==null) continue;
-        // ⚠⚠ A BARRA SÓ ATRAVESSA O FIM DE SEMANA QUANDO O FIM DE SEMANA ESTÁ LIBERADO.
-        //
-        // Matheus (05/09/2026): "marquei pular fim de semana mas a barra continuou
-        // passando sábado e domingo; o certo é que a barra se divida em duas caso estiver
-        // programado para sex, seg, ter".
-        //
-        // Eu tinha feito a ponte de propósito, para uma OP de sexta-a-segunda não virar
-        // dois blocos de arrastar. Era o raciocínio errado: uma barra desenhada por cima
-        // do sábado PARECE trabalho no sábado, e num quadro de produção o desenho é a
-        // informação. Ler certo vale mais que arrastar em um gesto só.
-        //
-        // Então a ponte passa a ser o que a opção do bloco diz:
-        //   pular marcado (padrão) -> não atravessa: sex vira uma barra, seg-ter vira outra
-        //   fim de semana liberado -> atravessa, porque ali a corrida é contínua mesmo
-        const emenda = atual && (i === atual.fim+1
-          || (atual.lotes.some(x=>x.usaFds) && soPulaFds(atual.fim, i)));
-        if(emenda){ atual.fim=i; atual.lotes.push(l); }
+        // ⚠ A BARRA NUNCA ATRAVESSA O FIM DE SEMANA. Matheus (05/09/2026): "o certo é que
+        // a barra se divida em duas caso estiver programado para sex, seg, ter". Houve uma
+        // versão que costurava o vão para não perder o bloco único de arrastar; era o
+        // raciocínio errado — uma barra por cima do sábado PARECE trabalho no sábado, e num
+        // quadro de produção o desenho é a informação.
+        if(atual && i === atual.fim+1){ atual.fim=i; atual.lotes.push(l); }
         else { atual={ setor:l.setor, recurso:l.recurso, op:l.op, obra:l.obra, ini:i, fim:i, lotes:[l] }; runs.push(atual); }
       }
     }
@@ -483,8 +460,6 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
       // semana cobre 4 colunas e trabalha 2 dias. Contar coluna diria "4 dias" e
       // ainda entraria como padrão na quebra.
       r.dias = new Set(r.lotes.map(l=>l.dia)).size;
-      r.usaFds = r.lotes.some(l=>l.usaFds);
-      r.noFds = r.lotes.filter(l=>fdsISO(l.dia));
       r.pecas = r.lotes.reduce((s,l)=>s+l.pecas,0);
       r.kg = r.lotes.reduce((s,l)=>s+l.kg,0);
       r.feitas = r.lotes.reduce((s,l)=>s+l.feitas,0);
@@ -591,13 +566,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     }
     grade.innerHTML = html;
     $("periodo").textContent = dbr(janela[0])+" a "+dbr(janela[larg-1])+" · "+d0(janela[0]).getUTCFullYear();
-    for(const el of grade.querySelectorAll(".barra-op")){
-      el.addEventListener("pointerdown", pegar);
-      el.addEventListener("contextmenu", (ev)=>{
-        const r = montarRuns().find(x=>x.id===el.dataset.run); if(!r) return;
-        abrirMenu(ev, r);
-      });
-    }
+    for(const el of grade.querySelectorAll(".barra-op")) el.addEventListener("pointerdown", pegar);
   }
 
   /* ── arraste ────────────────────────────────────────────────────────────────── */
@@ -659,70 +628,13 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     // barra, que é deliberada. A prévia já mostra onde vai cair, então não há surpresa
     // depois de soltar.
     const jBruto = Math.max(0, cels.indexOf(cel) - arr.offCols);
-    const j = arr.r.usaFds ? jBruto : Math.max(0, encostaNoUtil(inicio + jBruto) - inicio);
+    const j = Math.max(0, encostaNoUtil(inicio + jBruto) - inicio);
     for(let k=0;k<dur;k++){ const c = cels[j+k]; if(c) c.classList.add(permitido?"alvo":"proibido"); }
     if(!permitido || !cels[j]) return;
     arr.alvo = { setor, recurso:rec, iAlvo: inicio + j };
     const rc = cels[j].getBoundingClientRect();
     arr.g.style.left = (rc.left+3)+"px"; arr.g.style.top = (rc.top+5)+"px"; arr.g.style.width = (dur*COL-7)+"px";
   }
-  /* ── menu do botão direito ──────────────────────────────────────────────────── */
-  // ⚠⚠ POR QUE UM MENU, E NÃO UM PUXADOR NA BARRA.
-  //
-  // Havia pontas arrastáveis; o Matheus mandou tirar porque "vai dar margem para
-  // aumentarem o prazo de produção" — e estava certo: esticar virava o gesto mais fácil
-  // da tela, a um arrastar de distância e sem ninguém decidir nada. Só que sem NENHUM
-  // caminho, sábado e domingo viravam coluna decorativa, e o pedido original era
-  // justamente "caso for precisar trabalhar ser possível".
-  //
-  // O menu resolve os dois: continua possível, mas deixou de ser fácil. Botão direito,
-  // ler a linha, escolher. Não dá para acontecer sem querer.
-  //
-  // A marca `usaFds` vive no LOTE e vale só para esta sessão do navegador: é intenção de
-  // quem está programando, não dado — não vai para o banco no "Salvar".
-  const menu = $("menu");
-  function fecharMenu(){ menu.hidden = true; menu.innerHTML = ""; }
-  function abrirMenu(e, r){
-    e.preventDefault();
-    const noFds = r.noFds.length;
-    menu.innerHTML =
-        '<div class="cab"><b>OP-'+r.op+'</b> · '+nomeRec(r.setor, r.recurso)+' · '
-      + r.dias+' dia'+(r.dias>1?"s":"")+' · '+r.pecas.toLocaleString("pt-BR")+' peças</div>'
-      + '<button data-ac="fds"><span class="mk">'+(r.usaFds ? "☐" : "☑")+'</span><span>Pular o fim de semana'
-      + '<small>'+(r.usaFds
-          ? "Liberado: este bloco pode cair no sábado e no domingo, e a barra atravessa o fim de semana. Clique para voltar a pular."
-          : "Ao mover, o bloco escorrega para o dia útil, e a barra se divide no fim de semana em vez de atravessá-lo. Clique para liberar o fim de semana só para ele.")
-      + '</small></span></button>'
-      + '<button data-ac="tirar"'+(noFds?"":" disabled")+'><span class="mk">→</span><span>Tirar do fim de semana'
-      + '<small>'+(noFds
-          ? noFds+' dia(s) deste bloco caem no sábado ou domingo. Passa cada um para o dia útil seguinte.'
-          : "Nenhum dia deste bloco está no fim de semana.")
-      + '</small></span></button>';
-    menu.hidden = false;
-    const b = menu.getBoundingClientRect();
-    menu.style.left = Math.min(e.clientX, window.innerWidth  - b.width  - 8)+"px";
-    menu.style.top  = Math.min(e.clientY, window.innerHeight - b.height - 8)+"px";
-    menu.querySelector('[data-ac="fds"]').onclick = ()=>{
-      const liberar = !r.usaFds;
-      for(const l of lotes) if(r.lotes.some(x=>x.uid===l.uid)) l.usaFds = liberar;
-      fecharMenu(); redesenhar();
-    };
-    const bt = menu.querySelector('[data-ac="tirar"]');
-    if(noFds) bt.onclick = ()=>{
-      const antes = r.lotes.map(l=>({...l, itens:l.itens}));
-      const novos = r.lotes.map(l=>novoLote({ ...l, itens:l.itens,
-        dia: fdsISO(l.dia) ? DIAS[encostaNoUtil(IDX.get(l.dia))] : l.dia }));
-      registrar({
-        setor:r.setor, op:r.op, pecas:r.pecas, kg:r.kg, antes, novos,
-        rotulo: '<b>'+nomeRec(r.setor, r.recurso)+'</b> · tirada do fim de semana'
-              + ' <span class="de-para">('+r.noFds.map(l=>dbr(l.dia)).join(", ")+')</span>',
-      });
-      fecharMenu(); redesenhar();
-    };
-  }
-  window.addEventListener("click", fecharMenu);
-  window.addEventListener("scroll", fecharMenu, true);
-
   function soltar(){
     window.removeEventListener("pointermove", mover);
     if(!arr) return;
@@ -735,13 +647,12 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     const delta = a.iAlvo - r.ini;
     if(delta===0 && a.recurso===r.recurso){ desenhar(); return; }
     const antes = r.lotes.map(l=>({...l, itens:l.itens}));
-    // Cair num sábado escorrega para a segunda — a não ser que este bloco tenha sido
-    // liberado no menu do botão direito (`usaFds`), ou que o lote JÁ esteja num fim de
-    // semana (veio assim do banco, programado por fora desta tela): mover o bloco não é
-    // lugar de desfazer, em silêncio, uma decisão que alguém tomou.
+    // Cair num sábado escorrega para a segunda. A guarda do `fdsISO(l.dia)` cobre o lote
+    // que JÁ esteja num fim de semana — só se veio assim do banco, programado por fora
+    // desta tela: mover o bloco não é lugar de desfazer isso em silêncio.
     const novos = r.lotes.map(l=>{
       const cru = Math.max(0, Math.min(DIAS.length-1, IDX.get(l.dia)+delta));
-      const destino = (l.usaFds || fdsISO(l.dia)) ? cru : encostaNoUtil(cru);
+      const destino = fdsISO(l.dia) ? cru : encostaNoUtil(cru);
       return novoLote({ ...l, itens:l.itens, recurso: a.recurso, dia: DIAS[destino] });
     });
     registrar({
