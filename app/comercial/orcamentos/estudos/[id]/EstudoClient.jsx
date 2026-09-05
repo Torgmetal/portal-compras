@@ -4,7 +4,7 @@ import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload, Send } from "luci
 import { useStore } from "@/lib/store";
 import { FAMILIAS_COTACAO, FAMILIA_DO_ITEM } from "@/lib/cotacao-familias";
 import { montarCronogramaPrevio, textoDaProposta, comprasEspeciais, PADRAO_CRONOGRAMA } from "@/lib/cronograma-previo";
-import { cadenciaPorClasse, decisaoTerceirizar } from "@/lib/lqc";
+import { cadenciaPorClasse, decisaoTerceirizar, PRECO_TERCEIRO_CLASSE } from "@/lib/lqc";
 import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAPACIDADE_CARGA, EVENTOS_PAGAMENTO, PAGAMENTO_PADRAO, PRAZOS_PAGAMENTO, conferirPagamento, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa, resultadoDoCenario, sensibilidade, ALAVANCAS_SENSIVEIS, equilibrioConvergido, impostosDoCenario } from "@/lib/lqc";
 import { capacidadePorHora } from "@/lib/fabrica-horas";
 
@@ -466,15 +466,22 @@ function FazerOuTerceirizar({ cadencia, res, cfg, mexer, fabrica, analise }) {
   // parecida, é isso que o mês liberado vale.
   const margemSugerida = base?.meses > 0 ? Math.round((base.resultado || 0) / base.meses) : 0;
   const margemPorMes = num(cfg.margemPorMesFabrica) || margemSugerida;
+  // preço por classe: o digitado manda; sem digitar, vale a tabela da casa
+  const precoPorClasse = Object.fromEntries(
+    Object.keys(PRECO_TERCEIRO_CLASSE).map((k) => [k, num(cfg.terceiroPorClasse?.[k])]),
+  );
+  const setPreco = (k, v) => mexer((a) => ({
+    cenario: { ...(a.cenario || {}), terceiroPorClasse: { ...((a.cenario || {}).terceiroPorClasse || {}), [k]: v } },
+  }));
   const d = decisaoTerceirizar({
     cadencia: cad,
     custoOperacionalMes: fabrica?.custoOperacionalMes || 0,
-    precoTerceiroKg: num(cfg.terceiroKg),
+    precoPorClasse,
     freteKg: num(cfg.terceiroFreteKg),
     retrabalhoPct: num(cfg.terceiroRetrabalhoPct),
     margemPorMes,
   });
-  const temPreco = num(cfg.terceiroKg) > 0;
+  const temPreco = d.linhas.length > 0;
   const ganham = d.linhas.filter((l) => l.difKg < 0);
 
   return (
@@ -485,9 +492,8 @@ function FazerOuTerceirizar({ cadencia, res, cfg, mexer, fabrica, analise }) {
         não o que a tabela cobra. Extra leve ocupa mais fábrica por quilo, e é por isso que ela costuma ser a primeira a sair.
         Terceirizar também <strong className="text-torg-dark">devolve meses de fábrica</strong>: eles só valem alguma coisa se houver obra para ocupá-los.
       </p>
-      <div className="grid sm:grid-cols-4 gap-x-4 gap-y-3 mt-3">
-        {[["terceiroKg", "Terceiro", "R$/kg da nota dele"],
-          ["terceiroFreteKg", "Frete ida e volta", "R$/kg"],
+      <div className="grid sm:grid-cols-3 gap-x-4 gap-y-3 mt-3">
+        {[["terceiroFreteKg", "Frete ida e volta", "R$/kg, se não estiver no preço"],
           ["terceiroRetrabalhoPct", "Perda e retrabalho", "% sobre o terceiro"],
           ["margemPorMesFabrica", "Um mês de fábrica rende", `R$/mês — sugerido ${fmtR$(margemSugerida)}`]].map(([k, rot, ajuda]) => (
           <label key={k} className="flex flex-col text-[11px] text-torg-dark">
@@ -500,14 +506,15 @@ function FazerOuTerceirizar({ cadencia, res, cfg, mexer, fabrica, analise }) {
       </div>
 
       {!temPreco ? (
-        <p className="text-[11px] text-torg-gray mt-3">Informe o R$/kg do terceiro para comparar.</p>
+        <p className="text-[11px] text-torg-gray mt-3">O quantitativo desta obra ainda não tem classe lançada — sem ela não dá para comparar por tipo de estrutura.</p>
       ) : (
         <>
           <div className="overflow-x-auto mt-3">
             <table className="w-full text-[12px]" style={{ minWidth: 640 }}>
               <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
                 <tr><th className="text-left px-3 py-1.5">Classe</th><th className="text-right px-2 py-1.5">Peso</th>
-                  <th className="text-right px-2 py-1.5">Dentro</th><th className="text-right px-2 py-1.5">Terceirizado</th>
+                  <th className="text-right px-2 py-1.5">Dentro</th><th className="text-right px-2 py-1.5">Terceiro R$/kg</th>
+                  <th className="text-right px-2 py-1.5">Posto aqui</th>
                   <th className="text-right px-2 py-1.5">Diferença</th><th className="text-right px-2 py-1.5">Libera</th>
                   <th className="text-right px-3 py-1.5">A fábrica liberada rende</th></tr>
               </thead>
@@ -517,6 +524,11 @@ function FazerOuTerceirizar({ cadencia, res, cfg, mexer, fabrica, analise }) {
                     <td className="px-3 py-1.5 font-semibold text-torg-dark">{l.nome}</td>
                     <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{Math.round(l.pesoKg).toLocaleString("pt-BR")} kg</td>
                     <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(l.dentroKg)}/kg</td>
+                    <td className="px-2 py-1.5 text-right">
+                      <Inp value={cfg.terceiroPorClasse?.[l.key] ?? ""} placeholder={String(PRECO_TERCEIRO_CLASSE[l.key] ?? "").replace(".", ",")}
+                        onChange={(ev) => setPreco(l.key, ev.target.value)} className="w-20 text-right" />
+                      {!l.cotado && <span className="block text-[9px] text-torg-orange-700 mt-0.5">herdado do médio</span>}
+                    </td>
                     <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(l.foraKg)}/kg</td>
                     <td className={`px-2 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold ${l.diferenca <= 0 ? "text-green-700" : "text-red-600"}`}>
                       {l.diferenca <= 0 ? "−" : "+"} {fmtR$(Math.abs(l.diferenca))}
