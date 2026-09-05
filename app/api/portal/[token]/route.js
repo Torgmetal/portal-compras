@@ -210,12 +210,23 @@ export async function GET(req, { params }) {
               g.n++; g.kg += kg; dist.set(k, g);
             }
             const ORDEM = ["Preparação", "Montagem", "Solda", "Acabamento", "Jato", "Pintura"];
+            // ⚠⚠ O ACUMULADO É O QUE A LINHA DO TEMPO PRECISA. Vitor (05/09/2026): "a preparação está
+            // sem dar avanço". A tarefa "Preparação" do cronograma mostrava 0% porque ninguém digitou
+            // o percentual — enquanto a fábrica cortava. A distribuição sozinha não serve para a
+            // barra: a peça que já está na pintura saiu do balde da preparação, mas ela PASSOU por
+            // lá. Acumulado = quanto do peso já passou daquela etapa em diante.
+            const cumulativo = {};
+            for (let i = 0; i < ORDEM.length; i++) {
+              const kg = ORDEM.slice(i).reduce((acc, k) => acc + (dist.get(k)?.kg || 0), 0);
+              cumulativo[ORDEM[i]] = Math.round((kg / kgTotal) * 100);
+            }
             dados.cronograma.onde = {
               pecas: base.length, kg: Math.round(kgTotal),
               etapas: ORDEM.filter((k) => dist.has(k)).map((k) => ({
                 nome: k, pecas: dist.get(k).n, kg: Math.round(dist.get(k).kg),
                 pct: Math.round((dist.get(k).kg / kgTotal) * 100),
               })),
+              cumulativo,
               naoIniciada: { pecas: semN, kg: Math.round(semKg), pct: Math.round((semKg / kgTotal) * 100) },
             };
           }

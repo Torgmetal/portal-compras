@@ -1115,6 +1115,29 @@ const MES_CURTO = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set"
 
 function Cronograma({ d }) {
   const tarefas = (d.tarefas || []).filter((t) => t.inicio && t.fim);
+
+  // ⚠⚠ FABRICAÇÃO ANDA PELO QUE A FÁBRICA APONTOU. Vitor (05/09/2026): "a preparação está sem dar
+  // avanço" — e não estava mesmo: o percentual da tarefa é digitado pelo Planejamento, e ninguém
+  // tinha digitado, enquanto a fábrica cortava. Quando a tarefa é uma ETAPA conhecida (preparação,
+  // montagem, solda, acabamento, jato, pintura), o avanço vem do acumulado medido; nas outras
+  // (engenharia, comercial, expedição) continua valendo o informado, que ali é a única fonte.
+  const ETAPA_DA_TAREFA = (nome) => {
+    const n = String(nome || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (/prepara|corte/.test(n)) return "Preparação";
+    if (/montagem/.test(n)) return "Montagem";
+    if (/solda/.test(n)) return "Solda";
+    if (/acabamento/.test(n)) return "Acabamento";
+    if (/jato|granalha/.test(n)) return "Jato";
+    if (/pintura/.test(n)) return "Pintura";
+    return null;
+  };
+  const cum = d.onde?.cumulativo || null;
+  const medidoDe = (t) => {
+    if (!cum || t.setor !== "FABRICACAO") return null;
+    const e = ETAPA_DA_TAREFA(t.nome);
+    return e && cum[e] != null ? cum[e] : null;
+  };
+  const avanco = (t) => { const m = medidoDe(t); return m == null ? (t.feito || 0) : m; };
   const hoje = new Date(); hoje.setHours(12, 0, 0, 0);
 
   // ⚠ a régua vai do começo da primeira tarefa ao fim da última, e sempre inclui HOJE: cronograma
@@ -1141,9 +1164,15 @@ function Cronograma({ d }) {
     if (!g) { g = { chave, itens: [] }; grupos.push(g); }
     g.itens.push(t);
   }
+  // ⚠⚠ A ORDEM É A DA ROTA, não a da data. Vitor (05/09/2026): "a preparação está no meio dos
+  // eventos da engenharia". Ordenar só por data intercala setores — a Preparação começa no mesmo dia
+  // em que a Engenharia ainda detalha, e o cliente lê a lista como se a obra pulasse de um lado para
+  // o outro. Dentro do setor, aí sim, manda a data.
+  const ORDEM_SETOR = ["COMERCIAL", "ENGENHARIA", "FABRICACAO", "EXPEDICAO"];
+  const iSetor = (t) => { const i = ORDEM_SETOR.indexOf(t.setor); return i < 0 ? 99 : i; };
   for (const g of grupos) {
-    g.itens.sort((a, b) => (a.inicio < b.inicio ? -1 : 1));
-    g.feito = Math.round(g.itens.reduce((s, t) => s + (t.feito || 0), 0) / Math.max(1, g.itens.length));
+    g.itens.sort((a, b) => iSetor(a) - iSetor(b) || (a.inicio < b.inicio ? -1 : 1));
+    g.feito = Math.round(g.itens.reduce((s, t) => s + (avanco(t) || 0), 0) / Math.max(1, g.itens.length));
   }
 
   const onde = d.onde;
@@ -1201,9 +1230,12 @@ function Cronograma({ d }) {
                         </div>
                         <div className="absolute top-[5px] h-[15px] rounded bg-gray-100 ring-1 ring-inset ring-black/5"
                           style={{ left: `${e}%`, width: `${larg}%` }}>
-                          <div className="h-full rounded" style={{ width: `${t.feito}%`, background: COR_SETOR[t.setor] || "#8494A8" }} />
+                          <div className="h-full rounded" style={{ width: `${avanco(t)}%`, background: COR_SETOR[t.setor] || "#8494A8" }} />
                           <span className="absolute left-[calc(100%+7px)] top-1/2 -translate-y-1/2 text-[10.5px] font-semibold text-gray-500 tabular-nums whitespace-nowrap">
-                            {fmtD(t.inicio).slice(0, 5)}–{fmtD(t.fim).slice(0, 5)}{t.feito ? ` · ${t.feito}%` : ""}
+                            {fmtD(t.inicio).slice(0, 5)}–{fmtD(t.fim).slice(0, 5)}
+                            {avanco(t) ? ` · ${avanco(t)}%` : ""}
+                            {/* ⚠ o ponto verde diz que aquele número veio da fábrica, não da planilha */}
+                            {medidoDe(t) != null && <i className="inline-block w-1.5 h-1.5 rounded-full bg-[#0E7A55] ml-1 align-middle" title="medido na fábrica" />}
                           </span>
                         </div>
                         {/* ⚠ a linha de HOJE em cada trilha: uma só, no topo, some ao rolar */}
@@ -1221,6 +1253,7 @@ function Cronograma({ d }) {
                 </span>
               ))}
               <span className="inline-flex items-center gap-1.5"><i className="w-[2px] h-3 bg-[#F4801F]" /> hoje</span>
+              <span className="inline-flex items-center gap-1.5"><i className="w-1.5 h-1.5 rounded-full bg-[#0E7A55]" /> avanço medido na fábrica</span>
             </div>
           </div>
         </div>
