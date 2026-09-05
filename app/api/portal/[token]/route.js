@@ -17,6 +17,7 @@ import { pecasDaLista, sincronizarRevisao, revisaoParaOCliente } from "@/lib/por
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
 import { pecasTekla, pesoRealPecas } from "@/lib/peso-op";
 import { etapaDasMarcas } from "@/lib/portal-obra-consulta";
+import { aplicarAvancoSyneco } from "@/lib/cronograma-syneco";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -124,16 +125,28 @@ export async function GET(req, { params }) {
       select: { id: true, titulo: true, dataInicio: true, dataFim: true, areas: true, ultimoSync: true },
     });
     if (cron) {
-      const tarefas = await prisma.cronogramaTarefa.findMany({
+      const tarefasCru = await prisma.cronogramaTarefa.findMany({
         where: { cronogramaId: cron.id },
         select: {
-          nome: true, area: true, departamento: true, isSummary: true,
+          id: true, nome: true, area: true, departamento: true, isSummary: true,
           dataInicioPrevista: true, dataFimPrevista: true,
           percentualPrevisto: true, percentualRealizado: true,
         },
         orderBy: [{ dataInicioPrevista: "asc" }],
         take: 600,
       });
+      // ⚠⚠ O AVANÇO É O MESMO DA TELA DO PLANEJAMENTO. Vitor (05/09/2026): "esse avanço tem que ser
+      // igual ao cronograma do planejamento, tem que tomar esse cuidado" — e estava divergindo.
+      //
+      // O `percentualRealizado` GRAVADO fica defasado nas linhas de fabricação: quem manda nelas é o
+      // Syneco, e a tela interna aplica `aplicarAvancoSyneco` na leitura (o PDF, o XML e o e-mail ao
+      // cliente fazem o mesmo). O portal lia o valor armazenado — 0% onde a tela do Planejamento já
+      // mostrava o avanço real.
+      //
+      // ⚠ Eu tinha "consertado" isso calculando um avanço próprio a partir do apontamento. Era a
+      // segunda leitura da mesma pergunta — exatamente o defeito que a gente acabou de tirar do
+      // modelo 3D. Agora é a MESMA função: o que o Planejamento vê é o que o cliente vê.
+      const tarefas = await aplicarAvancoSyneco(prisma, op?.id || null, portal.opNumero, tarefasCru);
       // ⚠ AGRUPADO POR SETOR, não a lista crua. O cronograma interno tem centenas de linhas de
       // detalhe: o cliente quer saber como andam as FRENTES (corte, solda, pintura, expedição),
       // não a tarefa de quem executa. O avanço da frente é a média ponderada pelas tarefas.
@@ -161,13 +174,19 @@ export async function GET(req, { params }) {
         areas: areasCron,
         tarefas: tarefas
           .filter((t) => !t.isSummary && t.dataInicioPrevista && t.dataFimPrevista)
-          .map((t) => ({
-            nome: t.nome,
-            setor: t.departamento || null,
-            area: t.area || null,
-            inicio: fmt(t.dataInicioPrevista), fim: fmt(t.dataFimPrevista),
-            feito: Math.round(Number(t.percentualRealizado) || 0),
-          })),
+          .map((t) => {
+            const gravado = tarefasCru.find((c) => c.id === t.id);
+            return {
+              nome: t.nome,
+              setor: t.departamento || null,
+              area: t.area || null,
+              inicio: fmt(t.dataInicioPrevista), fim: fmt(t.dataFimPrevista),
+              feito: Math.round(Number(t.percentualRealizado) || 0),
+              // ⚠ a linha cujo avanço veio do Syneco ganha o selo "medido" na tela — o cliente
+              // distingue o que a fábrica apontou do que o Planejamento digitou.
+              medido: !!gravado && Number(gravado.percentualRealizado) !== Number(t.percentualRealizado),
+            };
+          }),
         frentes: [...porSetor.values()]
           .sort((a2, b2) => (a2.inicio && b2.inicio ? a2.inicio - b2.inicio : 0))
           .map((g) => ({
@@ -210,23 +229,12 @@ export async function GET(req, { params }) {
               g.n++; g.kg += kg; dist.set(k, g);
             }
             const ORDEM = ["Preparação", "Montagem", "Solda", "Acabamento", "Jato", "Pintura"];
-            // ⚠⚠ O ACUMULADO É O QUE A LINHA DO TEMPO PRECISA. Vitor (05/09/2026): "a preparação está
-            // sem dar avanço". A tarefa "Preparação" do cronograma mostrava 0% porque ninguém digitou
-            // o percentual — enquanto a fábrica cortava. A distribuição sozinha não serve para a
-            // barra: a peça que já está na pintura saiu do balde da preparação, mas ela PASSOU por
-            // lá. Acumulado = quanto do peso já passou daquela etapa em diante.
-            const cumulativo = {};
-            for (let i = 0; i < ORDEM.length; i++) {
-              const kg = ORDEM.slice(i).reduce((acc, k) => acc + (dist.get(k)?.kg || 0), 0);
-              cumulativo[ORDEM[i]] = Math.round((kg / kgTotal) * 100);
-            }
             dados.cronograma.onde = {
               pecas: base.length, kg: Math.round(kgTotal),
               etapas: ORDEM.filter((k) => dist.has(k)).map((k) => ({
                 nome: k, pecas: dist.get(k).n, kg: Math.round(dist.get(k).kg),
                 pct: Math.round((dist.get(k).kg / kgTotal) * 100),
               })),
-              cumulativo,
               naoIniciada: { pecas: semN, kg: Math.round(semKg), pct: Math.round((semKg / kgTotal) * 100) },
             };
           }

@@ -1116,28 +1116,12 @@ const MES_CURTO = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set"
 function Cronograma({ d }) {
   const tarefas = (d.tarefas || []).filter((t) => t.inicio && t.fim);
 
-  // ⚠⚠ FABRICAÇÃO ANDA PELO QUE A FÁBRICA APONTOU. Vitor (05/09/2026): "a preparação está sem dar
-  // avanço" — e não estava mesmo: o percentual da tarefa é digitado pelo Planejamento, e ninguém
-  // tinha digitado, enquanto a fábrica cortava. Quando a tarefa é uma ETAPA conhecida (preparação,
-  // montagem, solda, acabamento, jato, pintura), o avanço vem do acumulado medido; nas outras
-  // (engenharia, comercial, expedição) continua valendo o informado, que ali é a única fonte.
-  const ETAPA_DA_TAREFA = (nome) => {
-    const n = String(nome || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    if (/prepara|corte/.test(n)) return "Preparação";
-    if (/montagem/.test(n)) return "Montagem";
-    if (/solda/.test(n)) return "Solda";
-    if (/acabamento/.test(n)) return "Acabamento";
-    if (/jato|granalha/.test(n)) return "Jato";
-    if (/pintura/.test(n)) return "Pintura";
-    return null;
-  };
-  const cum = d.onde?.cumulativo || null;
-  const medidoDe = (t) => {
-    if (!cum || t.setor !== "FABRICACAO") return null;
-    const e = ETAPA_DA_TAREFA(t.nome);
-    return e && cum[e] != null ? cum[e] : null;
-  };
-  const avanco = (t) => { const m = medidoDe(t); return m == null ? (t.feito || 0) : m; };
+  // ⚠⚠ O AVANÇO VEM PRONTO, E É O MESMO DO PLANEJAMENTO. Vitor (05/09/2026): "esse avanço tem que
+  // ser igual ao cronograma do planejamento, tem que tomar esse cuidado". A API aplica
+  // `aplicarAvancoSyneco` — a MESMA função da tela interna, do PDF e do e-mail —, então a linha de
+  // fabricação já chega com o número do chão de fábrica. Calcular aqui um percentual próprio seria
+  // criar a segunda leitura da mesma pergunta, que é como as telas passam a discordar.
+  const avanco = (t) => t.feito || 0;
   const hoje = new Date(); hoje.setHours(12, 0, 0, 0);
 
   // ⚠ a régua vai do começo da primeira tarefa ao fim da última, e sempre inclui HOJE: cronograma
@@ -1235,7 +1219,7 @@ function Cronograma({ d }) {
                             {fmtD(t.inicio).slice(0, 5)}–{fmtD(t.fim).slice(0, 5)}
                             {avanco(t) ? ` · ${avanco(t)}%` : ""}
                             {/* ⚠ o ponto verde diz que aquele número veio da fábrica, não da planilha */}
-                            {medidoDe(t) != null && <i className="inline-block w-1.5 h-1.5 rounded-full bg-[#0E7A55] ml-1 align-middle" title="medido na fábrica" />}
+                            {t.medido && <i className="inline-block w-1.5 h-1.5 rounded-full bg-[#0E7A55] ml-1 align-middle" title="medido na fábrica" />}
                           </span>
                         </div>
                         {/* ⚠ a linha de HOJE em cada trilha: uma só, no topo, some ao rolar */}
