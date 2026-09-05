@@ -1,7 +1,17 @@
 {
-  "build": 2866,
-  "gerado": "2026-09-05T19:04:42.147Z",
+  "build": 2868,
+  "gerado": "2026-09-05T19:14:14.506Z",
   "commits": [
+    {
+      "hash": "71cef05ab1",
+      "data": "05/09/2026",
+      "titulo": "Gantt do PCP: sábado e domingo ganham coluna"
+    },
+    {
+      "hash": "94df944fdd",
+      "data": "05/09/2026",
+      "titulo": "graphify: venv de Python velho é refeito, não reaproveitado"
+    },
     {
       "hash": "913e778ca1",
       "data": "05/09/2026",
@@ -141,16 +151,6 @@
       "hash": "408af6fac0",
       "data": "05/09/2026",
       "titulo": "Cenário: cadência por tipo de estrutura e rateio da casa pelo consumo real"
-    },
-    {
-      "hash": "2429d9e64e",
-      "data": "05/09/2026",
-      "titulo": "Estudo: aba Qualidade, com os inspetores por dia, kg ou verba"
-    },
-    {
-      "hash": "efee8fc628",
-      "data": "05/09/2026",
-      "titulo": "Cronograma: folha à parte, com o que vai ao cliente editável"
     }
   ]
 }

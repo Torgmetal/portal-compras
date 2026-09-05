@@ -136,6 +136,36 @@ const ALERTA = {
   NADA_LANCADO: { txt: "nada programado", cls: "bg-slate-100 text-slate-600 border-slate-200", dica: "Nenhuma peça desta OP tem ordem no Syneco — o programador ainda não programou nada." },
 };
 
+// ⚠⚠ LER A RESPOSTA ANTES DE CONFERIR O `ok` É O QUE ESCONDE O ERRO DE VERDADE.
+//
+// Matheus (05/09/2026), na listagem abaixo do Gantt: "Unexpected end of JSON input". O padrão
+// antigo era
+//
+//     const j = await r.json();
+//     if (!r.ok) throw new Error(j.error || "Erro ao carregar");
+//
+// e a segunda linha nunca rodava quando a resposta de erro não era JSON válido — que é justamente
+// o caso de timeout de função, crash no meio da resposta ou corpo vazio. O `r.json()` estourava
+// primeiro, e o que chegava na tela era a mensagem do parser: nem o status HTTP, nem a causa.
+//
+// Aqui o corpo é lido como TEXTO e só depois interpretado, então dá para dizer o que aconteceu:
+// qual endpoint, qual status, e o começo do que veio. Erro que não se explica volta como chamado.
+async function lerJson(r, oQue) {
+  const bruto = await r.text().catch(() => "");
+  if (!bruto.trim()) {
+    throw new Error(`${oQue}: o servidor respondeu ${r.status} sem nenhum conteúdo. `
+      + "Costuma ser a função tendo estourado o tempo ou o banco fora do ar — tente de novo em alguns instantes.");
+  }
+  let j;
+  try { j = JSON.parse(bruto); }
+  catch {
+    throw new Error(`${oQue}: o servidor respondeu ${r.status} com algo que não é JSON — `
+      + `"${bruto.slice(0, 120).replace(/\s+/g, " ").trim()}"`);
+  }
+  if (!r.ok) throw new Error(j.error || `${oQue}: erro ${r.status}`);
+  return j;
+}
+
 export default function ProducaoClient() {
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -186,8 +216,7 @@ export default function ProducaoClient() {
       // seria não mostrar nenhuma obra por hora para não ficar confuso". `todas` é a saída de
       // emergência, não o normal.
       const r = await fetch(`/api/pcp/producao${verTodas ? "?todas=1" : ""}`, { cache: "no-store" });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro ao carregar");
+      const j = await lerJson(r, "Lista de OPs do PCP");
       setDados(j);
     } catch (e) { setErro(e.message); } finally { setLoading(false); }
   }, [verTodas]);
@@ -199,8 +228,7 @@ export default function ProducaoClient() {
       const qs = new URLSearchParams({ opId });
       if (setor) qs.set("setor", setor);
       const r = await fetch(`/api/pcp/despacho?${qs}`, { cache: "no-store" });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro ao abrir a OP");
+      const j = await lerJson(r, "Peças da OP");
       setDetalhe(j);
     } catch (e) { setDetalhe(null); setAviso({ ok: false, texto: e.message }); }
     finally { setCarregandoDet(false); }
@@ -271,8 +299,7 @@ export default function ProducaoClient() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ opNumero: detalhe.opNumero, marcas: marcasSel, setor: setorAba || null, acao: "IMPRIMIR" }),
       });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro ao emitir o lote");
+      const j = await lerJson(r, "Emissão do lote de desenhos");
 
       // ⚠⚠ ZERO EMITIDAS NÃO É SUCESSO — e a mensagem dizia que era.
       // Estava `j.emitidas || marcasSel.length`: com emitidas = 0 (nenhuma marca tem desenho na
@@ -332,8 +359,7 @@ export default function ProducaoClient() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ baixaSetor: setorAba, baixas: baixaveis.map((p) => ({ id: p.id, qtd: p.qte || 1 })) }),
       });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro ao dar baixa");
+      const j = await lerJson(r, "Baixa de peças");
       setAviso({ ok: true, texto: `Baixa em ${j.atualizados} peça(s) na ${nome}.` + (jaNoSyneco.length ? ` ${jaNoSyneco.length} ignorada(s) por já estarem no Syneco.` : "") });
       setSel(new Set());
       await carregarDetalhe(aberta, setorAba);
@@ -394,8 +420,7 @@ export default function ProducaoClient() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids, bancadaPorId, diaPorId }),
       });
-      const jl = await rl.json();
-      if (!rl.ok) throw new Error(jl.error || "Erro ao liberar");
+      const jl = await lerJson(rl, "Liberação para montagem");
       if (jl.bloqueados?.length) {
         erros.push(...jl.bloqueados.map((b) => `${b.marca} não desceu — ${b.cortados}/${b.total} croquis cortados`));
       }
@@ -406,8 +431,7 @@ export default function ProducaoClient() {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ opNumero: detalhe.opNumero, marcas, setor: "MONTAGEM", acao: "IMPRIMIR", bancadaPorMarca }),
         });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || "Erro ao emitir os desenhos");
+        const j = await lerJson(r, "Emissão dos desenhos da montagem");
         await baixarZipLote(j, detalhe.opNumero, "montagem");
       }
       setSel(new Set());
