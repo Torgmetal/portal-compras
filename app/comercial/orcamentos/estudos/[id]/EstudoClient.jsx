@@ -4,7 +4,7 @@ import { Loader2, FileSpreadsheet, Plus, Trash2, Save, Upload, Send } from "luci
 import { useStore } from "@/lib/store";
 import { FAMILIAS_COTACAO, FAMILIA_DO_ITEM } from "@/lib/cotacao-familias";
 import { montarCronogramaPrevio, textoDaProposta, comprasEspeciais, PADRAO_CRONOGRAMA } from "@/lib/cronograma-previo";
-import { cadenciaPorClasse } from "@/lib/lqc";
+import { cadenciaPorClasse, decisaoTerceirizar } from "@/lib/lqc";
 import { CLASSES, PERFIS, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, ITENS_COMERCIAIS, TERCEIROS_SUGESTOES, BASES_TERCEIRO, MODOS_FRETE, APRESENTACAO_FRETE, CAPACIDADE_CARGA, EVENTOS_PAGAMENTO, PAGAMENTO_PADRAO, PRAZOS_PAGAMENTO, conferirPagamento, CAMADAS_TINTA, BDI_CAMPOS, LINHAS_FATURAMENTO, CFOPS, ENSAIOS, BASES_ENSAIO, cargaDoCfop, perdaDaEstrutura, precoPreMontagem, coefSugerido, rendimentoTinta, custoCamada, numeroBr, CENARIOS, analiseDeCenarios, prazoDeFabricacao, fluxoDeCaixa, resultadoDoCenario, sensibilidade, ALAVANCAS_SENSIVEIS, equilibrioConvergido, impostosDoCenario } from "@/lib/lqc";
 import { capacidadePorHora } from "@/lib/fabrica-horas";
 
@@ -450,6 +450,101 @@ function CronogramaPrevio({ c, res, e, setComp }) {
   );
 }
 
+
+/**
+ * FAZER AQUI OU TERCEIRIZAR — a decisão que o Comercial precisa tomar antes de fechar o preço.
+ *
+ * ⚠ O comparativo NÃO é contra a tabela de industrialização (que é o que a casa decidiu cobrar), e
+ * sim contra o custo REAL de fazer dentro: custo mensal da casa ÷ cadência daquela classe. É o que
+ * revela por que extra leve, que roda a 143 t/mês, sai quase o dobro por quilo da pesada.
+ */
+function FazerOuTerceirizar({ cadencia, res, cfg, mexer, fabrica, analise }) {
+  const set = (k, v) => mexer((a) => ({ cenario: { ...(a.cenario || {}), [k]: v } }));
+  const cad = cadenciaPorClasse(cadencia, res.pesoPorClasse || {});
+  const base = (analise?.cenarios || []).find((x) => x.key === "base") || (analise?.cenarios || [])[1];
+  // quanto um mês de fábrica rende, medido NESTA obra — é a régua honesta: se a próxima obra for
+  // parecida, é isso que o mês liberado vale.
+  const margemSugerida = base?.meses > 0 ? Math.round((base.resultado || 0) / base.meses) : 0;
+  const margemPorMes = num(cfg.margemPorMesFabrica) || margemSugerida;
+  const d = decisaoTerceirizar({
+    cadencia: cad,
+    custoOperacionalMes: fabrica?.custoOperacionalMes || 0,
+    precoTerceiroKg: num(cfg.terceiroKg),
+    freteKg: num(cfg.terceiroFreteKg),
+    retrabalhoPct: num(cfg.terceiroRetrabalhoPct),
+    margemPorMes,
+  });
+  const temPreco = num(cfg.terceiroKg) > 0;
+  const ganham = d.linhas.filter((l) => l.difKg < 0);
+
+  return (
+    <div className="px-4 py-3 border-t border-gray-100 bg-white">
+      <p className="text-[12px] font-bold text-torg-dark">Fazer aqui ou terceirizar</p>
+      <p className="text-[11px] text-torg-gray mt-0.5">
+        O custo de fazer dentro é o <strong className="text-torg-dark">custo da casa dividido pela cadência da classe</strong> —
+        não o que a tabela cobra. Extra leve ocupa mais fábrica por quilo, e é por isso que ela costuma ser a primeira a sair.
+        Terceirizar também <strong className="text-torg-dark">devolve meses de fábrica</strong>: eles só valem alguma coisa se houver obra para ocupá-los.
+      </p>
+      <div className="grid sm:grid-cols-4 gap-x-4 gap-y-3 mt-3">
+        {[["terceiroKg", "Terceiro", "R$/kg da nota dele"],
+          ["terceiroFreteKg", "Frete ida e volta", "R$/kg"],
+          ["terceiroRetrabalhoPct", "Perda e retrabalho", "% sobre o terceiro"],
+          ["margemPorMesFabrica", "Um mês de fábrica rende", `R$/mês — sugerido ${fmtR$(margemSugerida)}`]].map(([k, rot, ajuda]) => (
+          <label key={k} className="flex flex-col text-[11px] text-torg-dark">
+            <span className="min-h-[2.75em] leading-snug">{rot}</span>
+            <Inp value={cfg[k] ?? ""} placeholder={k === "margemPorMesFabrica" ? String(margemSugerida) : ""}
+              onChange={(ev) => set(k, ev.target.value)} className="block mt-1 w-full text-right" />
+            <span className="block text-[10px] text-torg-gray mt-0.5">{ajuda}</span>
+          </label>
+        ))}
+      </div>
+
+      {!temPreco ? (
+        <p className="text-[11px] text-torg-gray mt-3">Informe o R$/kg do terceiro para comparar.</p>
+      ) : (
+        <>
+          <div className="overflow-x-auto mt-3">
+            <table className="w-full text-[12px]" style={{ minWidth: 640 }}>
+              <thead className="bg-gray-50 text-[10px] uppercase text-torg-gray">
+                <tr><th className="text-left px-3 py-1.5">Classe</th><th className="text-right px-2 py-1.5">Peso</th>
+                  <th className="text-right px-2 py-1.5">Dentro</th><th className="text-right px-2 py-1.5">Terceirizado</th>
+                  <th className="text-right px-2 py-1.5">Diferença</th><th className="text-right px-2 py-1.5">Libera</th>
+                  <th className="text-right px-3 py-1.5">A fábrica liberada rende</th></tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {d.linhas.map((l) => (
+                  <tr key={l.key} className={l.difKg < 0 ? "bg-green-50/50" : ""}>
+                    <td className="px-3 py-1.5 font-semibold text-torg-dark">{l.nome}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{Math.round(l.pesoKg).toLocaleString("pt-BR")} kg</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(l.dentroKg)}/kg</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtR$(l.foraKg)}/kg</td>
+                    <td className={`px-2 py-1.5 text-right tabular-nums whitespace-nowrap font-semibold ${l.diferenca <= 0 ? "text-green-700" : "text-red-600"}`}>
+                      {l.diferenca <= 0 ? "−" : "+"} {fmtR$(Math.abs(l.diferenca))}
+                    </td>
+                    <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{l.mesesLiberados.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} mês</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap text-torg-gray">{fmtR$(l.ganhoCapacidade)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[11px] text-torg-dark bg-torg-blue-50/50 border border-torg-blue-200 rounded-lg px-3 py-2 mt-3">
+            {ganham.length > 0
+              ? <>Terceirizar <strong>{ganham.map((l) => l.nome.toLowerCase()).join(" e ")}</strong> já sai mais barato que fazer aqui —{" "}
+                  <strong>{fmtR$(Math.abs(ganham.reduce((a, l) => a + l.diferenca, 0)))}</strong> de economia — e ainda devolve{" "}
+                  <strong>{ganham.reduce((a, l) => a + l.mesesLiberados, 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} mês</strong> de fábrica.</>
+              : <>Nenhuma classe fica mais barata fora. Terceirizar a obra inteira custaria <strong>{fmtR$(d.total.diferenca)}</strong> a mais
+                  e devolveria <strong>{d.total.mesesLiberados.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} meses</strong> de
+                  fábrica — que valem <strong>{fmtR$(d.total.ganhoCapacidade)}</strong> se houver carteira para ocupá-los.</>}
+          </p>
+          <p className="text-[10px] text-torg-gray mt-1.5">
+            ⚠ O terceiro entra no preço pela aba Terceiros — este quadro é a decisão, não o lançamento.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
 
 /** A cadência traduzida por tipo de estrutura, e o que o MIX desta obra faz com ela. */
 function CadenciaPorClasse({ cadencia, res }) {
@@ -3099,7 +3194,7 @@ function Cenario({ e, res, mexer, fabrica }) {
       {temFabrica && (
         <>
           <FabricaPorHora fabrica={fabrica} cfg={cfg} mexer={mexer} cadencia={cadencia} />
-          <Cadencia fabrica={fabrica} cfg={cfg} mexer={mexer} res={res} cadencia={cadencia} />
+          <Cadencia fabrica={fabrica} cfg={cfg} mexer={mexer} res={res} cadencia={cadencia} analise={analise} />
           <PrazoDoLucro res={res} analise={analise} fabrica={fabrica} cadencia={cadencia} />
           <FluxoDoDinheiro res={res} base={analise.find((x) => x.key === "base")} fabrica={fabrica} cfg={cfg} mexer={mexer} c={comp} />
         </>
@@ -3255,7 +3350,7 @@ function FabricaPorHora({ fabrica, cfg, mexer, cadencia }) {
  * O que dá para medir com honestidade são três leituras do próprio apontamento, e o efeito de
  * cada uma no custo — que é onde a pergunta realmente importa.
  */
-function Cadencia({ fabrica, cfg, mexer, res, cadencia }) {
+function Cadencia({ fabrica, cfg, mexer, res, cadencia, analise }) {
   const L = fabrica.leituras || {};
   const custoMes = fabrica.custoOperacionalMes || 0;
   const set = (v) => mexer((a) => ({ cenario: { ...(a.cenario || {}), cadenciaKgMes: v } }));
@@ -3316,6 +3411,12 @@ function Cadencia({ fabrica, cfg, mexer, res, cadencia }) {
           estrutura". A proporção sai da própria tabela de classes — a coluna de fabricação (R$/kg)
           É o índice de dificuldade. Ver `cadenciaPorClasse` em lib/lqc. */}
       <CadenciaPorClasse cadencia={cadencia} res={res} />
+      {/* ⚠⚠ EXTRA LEVE É A PRIMEIRA CANDIDATA A SAIR. Vitor (05/09/2026): "em obras onde temos
+          muita estrutura extra leve precisamos que tenha a opção de terceirizar… porém o custo se
+          torna maior… como poderíamos projetar isso e tomar uma decisão já no comercial?".
+          A conta está em `decisaoTerceirizar` (lib/lqc): custo real dentro = casa ÷ cadência da
+          classe, e o ganho não é só dinheiro — é fábrica liberada. */}
+      <FazerOuTerceirizar cadencia={cadencia} res={res} cfg={cfg} mexer={mexer} fabrica={fabrica} analise={analise} />
 
       <div className="overflow-x-auto">
         <table className="w-full text-[12px]" style={{ minWidth: 560 }}>
