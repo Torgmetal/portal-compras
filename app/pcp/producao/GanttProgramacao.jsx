@@ -457,13 +457,23 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
       let atual=null;
       for(const l of arr){
         const i = IDX.get(l.dia); if(i==null) continue;
-        // ⚠ O VÃO DO FIM DE SEMANA NÃO PARTE A BARRA. Depois que sábado e domingo
-        // ganharam coluna, sexta e segunda deixaram de ser vizinhas — e uma OP de
-        // sexta-a-segunda viraria DUAS barras, ou seja, dois blocos para arrastar no
-        // lugar de um. Se o buraco entre um lote e o outro é só fim de semana, é a
-        // mesma corrida: a barra segue inteira por cima, e o sombreado das colunas é
-        // que diz que ali não se trabalha.
-        if(atual && (i === atual.fim+1 || soPulaFds(atual.fim, i))){ atual.fim=i; atual.lotes.push(l); }
+        // ⚠⚠ A BARRA SÓ ATRAVESSA O FIM DE SEMANA QUANDO O FIM DE SEMANA ESTÁ LIBERADO.
+        //
+        // Matheus (05/09/2026): "marquei pular fim de semana mas a barra continuou
+        // passando sábado e domingo; o certo é que a barra se divida em duas caso estiver
+        // programado para sex, seg, ter".
+        //
+        // Eu tinha feito a ponte de propósito, para uma OP de sexta-a-segunda não virar
+        // dois blocos de arrastar. Era o raciocínio errado: uma barra desenhada por cima
+        // do sábado PARECE trabalho no sábado, e num quadro de produção o desenho é a
+        // informação. Ler certo vale mais que arrastar em um gesto só.
+        //
+        // Então a ponte passa a ser o que a opção do bloco diz:
+        //   pular marcado (padrão) -> não atravessa: sex vira uma barra, seg-ter vira outra
+        //   fim de semana liberado -> atravessa, porque ali a corrida é contínua mesmo
+        const emenda = atual && (i === atual.fim+1
+          || (atual.lotes.some(x=>x.usaFds) && soPulaFds(atual.fim, i)));
+        if(emenda){ atual.fim=i; atual.lotes.push(l); }
         else { atual={ setor:l.setor, recurso:l.recurso, op:l.op, obra:l.obra, ini:i, fim:i, lotes:[l] }; runs.push(atual); }
       }
     }
@@ -680,8 +690,8 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
       + r.dias+' dia'+(r.dias>1?"s":"")+' · '+r.pecas.toLocaleString("pt-BR")+' peças</div>'
       + '<button data-ac="fds"><span class="mk">'+(r.usaFds ? "☐" : "☑")+'</span><span>Pular o fim de semana'
       + '<small>'+(r.usaFds
-          ? "Agora este bloco PODE cair no sábado e no domingo ao ser movido. Clique para voltar a pular."
-          : "Ao mover, o bloco escorrega para o dia útil. Clique para liberar o fim de semana só para ele.")
+          ? "Liberado: este bloco pode cair no sábado e no domingo, e a barra atravessa o fim de semana. Clique para voltar a pular."
+          : "Ao mover, o bloco escorrega para o dia útil, e a barra se divide no fim de semana em vez de atravessá-lo. Clique para liberar o fim de semana só para ele.")
       + '</small></span></button>'
       + '<button data-ac="tirar"'+(noFds?"":" disabled")+'><span class="mk">→</span><span>Tirar do fim de semana'
       + '<small>'+(noFds

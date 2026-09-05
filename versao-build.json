@@ -1,7 +1,12 @@
 {
-  "build": 2871,
-  "gerado": "2026-09-05T19:46:30.003Z",
+  "build": 2872,
+  "gerado": "2026-09-05T19:56:08.011Z",
   "commits": [
+    {
+      "hash": "9ec0631c48",
+      "data": "05/09/2026",
+      "titulo": "Gantt do PCP: fim de semana vira escolha no botão direito"
+    },
     {
       "hash": "72ef4c1339",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "3a925085c8",
       "data": "05/09/2026",
       "titulo": "Quebra o RMComprasClient (4231 linhas) em módulos por responsabilidade"
-    },
-    {
-      "hash": "909d91eec1",
-      "data": "05/09/2026",
-      "titulo": "Terceirização com a fábrica cheia: decidir por margem por mês, não por R$/kg"
     }
   ]
 }
