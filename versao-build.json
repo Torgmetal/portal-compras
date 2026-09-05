@@ -1,7 +1,17 @@
 {
-  "build": 2863,
-  "gerado": "2026-09-05T18:33:34.037Z",
+  "build": 2865,
+  "gerado": "2026-09-05T18:47:10.871Z",
   "commits": [
+    {
+      "hash": "409deb916c",
+      "data": "05/09/2026",
+      "titulo": "Diz ao time o que fazer na primeira vez que abrir o repo"
+    },
+    {
+      "hash": "f695ab7b03",
+      "data": "05/09/2026",
+      "titulo": "PCP: quadro de programação arrastável acima do painel"
+    },
     {
       "hash": "f4967559f6",
       "data": "05/09/2026",
@@ -141,16 +151,6 @@
       "hash": "9db2876640",
       "data": "05/09/2026",
       "titulo": "Cronograma: sem datas por padrão e uma linha de compra por material sob medida"
-    },
-    {
-      "hash": "4cb4eef620",
-      "data": "05/09/2026",
-      "titulo": "Cronograma: cadência pela meta da fábrica (250 t/mês) e fatia da obra"
-    },
-    {
-      "hash": "47bc680477",
-      "data": "05/09/2026",
-      "titulo": "Cronograma: engenharia com teto e liberação parcial para a fábrica"
     }
   ]
 }

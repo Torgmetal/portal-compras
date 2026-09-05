@@ -21,7 +21,6 @@ import { fmtOP } from "@/lib/utils";
 import CompraChip, { ModalRastreabilidade } from "@/components/CompraChip";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 import SeparacaoModal from "@/components/SeparacaoModal";
-import CargaProducao from "./CargaProducao";
 import GanttProgramacao from "./GanttProgramacao";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 // ⚠ o download do ZIP vem da lib (era a TERCEIRA cópia da mesma função neste repositório); ela
@@ -512,11 +511,6 @@ export default function ProducaoClient() {
           um gantt que seja visualmente fácil de ver". É o quadro de QUANDO — dia, bancada e o que
           não cabe —, e é dele que se decide o que abrir na lista abaixo. */}
       <GanttProgramacao />
-
-      {/* ⚠ ANTES DA LISTA. Vitor (03/09/2026): "no painel do PCP você consegue criar o kanban para
-          termos ideia da carga da produção?". É o retrato de onde o trabalho está acumulado — a
-          pergunta que se faz ao abrir a tela, antes de escolher a obra. */}
-      <CargaProducao />
 
       {loading ? (
         <div className="flex items-center justify-center py-20 gap-3 text-torg-gray"><Loader2 size={22} className="animate-spin" /> Carregando…</div>
