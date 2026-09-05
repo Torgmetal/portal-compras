@@ -127,17 +127,6 @@ const CSS = `
   .gpcp .corta{position:absolute;top:0;bottom:0;width:9px;background:rgba(0,0,0,.22);
          display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff}
   .gpcp .corta.e{left:0;border-radius:5px 0 0 5px} .gpcp .corta.d{right:0;border-radius:0 5px 5px 0}
-  /* ⚠ AS PONTAS ESTICAM A BARRA. Matheus (05/09/2026): "deixe as pontas das barras quando
-     colocar mouse em cima uma seta para arrastar os dias, assim consigo puxar para sábado se
-     eu quiser e tirar de segunda". Só aparecem no hover para não competir com o arraste do
-     bloco inteiro, que é o gesto de todo dia. */
-  .gpcp .barra-op .pux{position:absolute;top:0;bottom:0;width:11px;cursor:ew-resize;opacity:0;
-         display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1;
-         color:#fff;background:rgba(0,0,0,.30);transition:opacity .12s;pointer-events:auto;z-index:2}
-  .gpcp .barra-op .pux.e{left:0;border-radius:5px 0 0 5px}
-  .gpcp .barra-op .pux.d{right:0;border-radius:0 5px 5px 0}
-  .gpcp .barra-op:hover .pux{opacity:1}
-  .gpcp .barra-op.esticando{outline:2px dashed var(--laranja);outline-offset:-2px}
   .gpcp .semgrd{position:absolute;right:3px;top:3px;width:7px;height:7px;border-radius:50%;
           background:#ffd27a;box-shadow:0 0 0 1.5px rgba(0,0,0,.25)}
 
@@ -358,9 +347,16 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   const DIAS=[]; for(const d=new Date(dIni); d<=dFim; d.setUTCDate(d.getUTCDate()+1)) DIAS.push(isoD(d));
   const IDX = new Map(DIAS.map((s,i)=>[s,i]));
 
-  // A coluna de dia útil a partir de i (o próprio i, se já for útil). Sábado e domingo
-  // são visíveis e recebem barra, mas só quando alguém os escolhe de propósito puxando
-  // a ponta — mover o bloco inteiro nunca joga trabalho no fim de semana sozinho.
+  // A coluna de dia útil a partir de i (o próprio i, se já for útil).
+  //
+  // ⚠ HOJE NADA NA TELA PROGRAMA UM FIM DE SEMANA. Sábado e domingo aparecem para dar o
+  // ritmo do calendário e para conferir data, mas não recebem trabalho: houve pontas
+  // arrastáveis que faziam isso e o Matheus (05/09/2026) mandou tirar — "vai dar margem
+  // para aumentarem o prazo de produção". Um jeito de programar o fim de semana é
+  // decisão de quem cuida do PCP, não um efeito colateral de arrastar barra.
+  //
+  // O caminho de volta, se um dia precisar: o painel "quebrar" (diasDaQuebra) já sabe
+  // seguir em dias corridos; falta só quem escolha isso de propósito.
   function encostaNoUtil(i){
     let k = Math.max(0, Math.min(DIAS.length-1, i));
     while(k < DIAS.length-1 && fdsISO(DIAS[k])) k++;
@@ -563,8 +559,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
                +  (cabe && r.adiado>0?'<span class="selo">adiada '+r.adiado+'×</span>':"")
                +  (cabe && r.feitas>0?'<span class="selo">'+pend+' a fazer</span>':"")
                +  (r.semGrd?'<div class="semgrd" title="'+r.semGrd+' sem GRD"></div>':"")
-               +  (r.ini<inicio?'<div class="corta e">◀</div>':'<div class="pux e" data-pux="e" title="Arraste para começar antes ou depois">‹</div>')
-               +  (r.fim>inicio+larg-1?'<div class="corta d">▶</div>':'<div class="pux d" data-pux="d" title="Arraste para terminar antes ou depois">›</div>')
+               +  (r.ini<inicio?'<div class="corta e">◀</div>':"")+(r.fim>inicio+larg-1?'<div class="corta d">▶</div>':"")
                +  '</div>';
         }
         html += '</div>'+(naJanela?'<div class="cargas">':'<div class="cargas" hidden>');
@@ -585,9 +580,10 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   /* ── arraste ────────────────────────────────────────────────────────────────── */
   let arr = null;
   const BORDA = 46, PASSO = 16;
-  // ⚠ RECEBE O ESTADO, não fecha sobre `arr`. Enquanto só o bloco inteiro era arrastável,
-  // `arr` era o único estado possível; com o esticar pela ponta existe um segundo (`est`) e
-  // a versão antiga escrevia em `arr` null — "Cannot set properties of null".
+  // Recebe o estado por parâmetro em vez de fechar sobre `arr`. A versão que fechava
+  // sobre `arr` estourou "Cannot set properties of null" assim que existiu um segundo
+  // gesto de arraste na tela; hoje só existe um de novo, mas depender de uma variável
+  // global é a armadilha que já pegou uma vez.
   function autoRolar(e, st){
     if(!st) return;
     const rol = raiz.querySelector(".rolagem"), r = rol.getBoundingClientRect();
@@ -606,8 +602,6 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     if(e.button!==0) return;
     const el = e.currentTarget;
     const r = montarRuns().find(x=>x.id===el.dataset.run); if(!r) return;
-    const pux = e.target.closest && e.target.closest("[data-pux]");
-    if(pux){ e.stopPropagation(); esticar(e, r, el, pux.dataset.pux); return; }
     const cx = el.getBoundingClientRect();
     arr = { el, r, x0:e.clientX, y0:e.clientY, dx:e.clientX-cx.left, dy:e.clientY-cx.top, alvo:null, moveu:false,
             offCols: Math.max(0, Math.floor((e.clientX-cx.left)/COL)) };
@@ -649,93 +643,6 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     const rc = cels[j].getBoundingClientRect();
     arr.g.style.left = (rc.left+3)+"px"; arr.g.style.top = (rc.top+5)+"px"; arr.g.style.width = (dur*COL-7)+"px";
   }
-  /* ── esticar pela ponta ─────────────────────────────────────────────────────── */
-  // ⚠⚠ QUAIS DIAS DO INTERVALO RECEBEM TRABALHO — a regra inteira em uma frase:
-  //
-  //   os dias ÚTEIS do intervalo, mais o sábado ou domingo em que a PONTA parou.
-  //
-  // Puxar de sexta para o sábado programa o sábado, que é o pedido. Puxar de sexta até
-  // a segunda NÃO programa o sábado e o domingo do caminho: passar por cima deles indo
-  // para a segunda não é querer trabalhar no fim de semana. Fim de semana entra quando
-  // é ele que você encostou.
-  function diasDoIntervalo(a, b){
-    const ini = Math.min(a,b), fim = Math.max(a,b);
-    const cols = [];
-    for(let i=ini;i<=fim;i++) if(!fdsISO(DIAS[i]) || i===a || i===b) cols.push(i);
-    return cols.length ? cols : [ini];
-  }
-
-  // Reparte os itens do run entre os dias escolhidos. Usa a capacidade da bancada quando
-  // ela existe (o mesmo critério do "quebrar"); sem bancada definida, divide pelo custo,
-  // que é o melhor que dá para fazer sem saber a capacidade de nada.
-  function repartirPorDias(r, cols){
-    const meus = new Set(r.lotes.map(l=>l.uid));
-    const cap = capDe(r.setor, r.recurso);
-    const slots = cols.map(i=>({ dia: DIAS[i], cap: cap||1,
-      base: cap ? carga(r.setor, r.recurso, DIAS[i], meus) : 0, carga:0, itens:[] }));
-    for(const it of [...r.itens].sort((a,b)=>custoItem(b,r.setor)-custoItem(a,r.setor))){
-      let alvo = slots[0], livre = -Infinity;
-      for(const sl of slots){ const l = sl.cap - sl.base - sl.carga; if(l > livre + 1e-9){ livre = l; alvo = sl; } }
-      alvo.itens.push(it); alvo.carga += custoItem(it, r.setor);
-    }
-    return slots.filter(sl=>sl.itens.length);
-  }
-
-  let est = null;
-  function esticar(e, r, el, lado){
-    const lin = el.closest(".linha[data-row]"); if(!lin) return;
-    est = { r, el, lado, lin, ini:r.ini, fim:r.fim, moveu:false, x0:e.clientX };
-    el.classList.add("esticando");
-    window.addEventListener("pointermove", moverPonta);
-    window.addEventListener("pointerup", soltarPonta, { once:true });
-    e.preventDefault();
-  }
-  function moverPonta(e){
-    if(!est) return;
-    if(!est.moveu && Math.abs(e.clientX-est.x0) < 4) return;
-    est.moveu = true;
-    autoRolar(e, est);
-    const cels = [...est.lin.querySelectorAll(".cel")];
-    let idx = cels.findIndex(c=>{ const b=c.getBoundingClientRect(); return e.clientX>=b.left && e.clientX<b.right; });
-    if(idx<0) idx = e.clientX < cels[0].getBoundingClientRect().left ? 0 : cels.length-1;
-    const col = inicio + idx;
-    // uma ponta nunca atravessa a outra: o bloco tem no mínimo um dia
-    if(est.lado==="e") est.ini = Math.min(col, est.r.fim); else est.fim = Math.max(col, est.r.ini);
-    limparAlvos();
-    const cols = diasDoIntervalo(est.ini, est.fim);
-    for(const i of cols){ const c = cels[i-inicio]; if(c) c.classList.add("alvo"); }
-    const a = Math.max(est.ini, inicio), b = Math.min(est.fim, inicio+cels.length-1);
-    if(cels[a-inicio]){
-      est.el.style.left = ((a-inicio)*COL+3)+"px";
-      est.el.style.width = ((b-a+1)*COL-7)+"px";
-    }
-  }
-  function soltarPonta(){
-    window.removeEventListener("pointermove", moverPonta);
-    if(!est) return;
-    if(est.raf) cancelAnimationFrame(est.raf);
-    const { r, el, moveu, ini, fim } = est; est = null;
-    el.classList.remove("esticando"); limparAlvos();
-    if(!moveu || (ini===r.ini && fim===r.fim)){ desenhar(); return; }
-    const cols = diasDoIntervalo(ini, fim);
-    const slots = repartirPorDias(r, cols);
-    if(!slots.length){ desenhar(); return; }
-    const antes = r.lotes.map(l=>({...l, itens:l.itens}));
-    const novos = slots.map(sl=>novoLote({
-      setor:r.setor, recurso:r.recurso, dia:sl.dia, op:r.op, obra:r.obra,
-      recursoOrig: antes[0].recursoOrig, diaOrig: antes[0].diaOrig, adiado: r.adiado,
-      itens: sl.itens, pecas:0, kg:0, custo:0, feitas:0,
-    }));
-    const fds = cols.filter(i=>fdsISO(DIAS[i]));
-    registrar({
-      setor:r.setor, op:r.op, pecas:r.pecas, kg:r.kg, antes, novos,
-      rotulo: '<b>'+nomeRec(r.setor, r.recurso)+'</b> · esticada para <b>'+cols.length+' dia'+(cols.length>1?"s":"")+'</b>'
-            + ' <span class="de-para">('+dbr(DIAS[cols[0]])+' a '+dbr(DIAS[cols[cols.length-1]])+')</span>'
-            + (fds.length ? ' <b>· inclui '+fds.map(i=>dbr(DIAS[i])).join(" e ")+'</b>' : ''),
-    });
-    redesenhar();
-  }
-
   function soltar(){
     window.removeEventListener("pointermove", mover);
     if(!arr) return;
@@ -748,10 +655,9 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     const delta = a.iAlvo - r.ini;
     if(delta===0 && a.recurso===r.recurso){ desenhar(); return; }
     const antes = r.lotes.map(l=>({...l, itens:l.itens}));
-    // Quem estava em dia útil continua em dia útil: se o deslocamento cru cair num
-    // sábado, escorrega para a segunda. Quem VOCÊ colocou no fim de semana de propósito
-    // (puxando a ponta) anda em dias corridos e continua lá — mover o bloco não desfaz
-    // uma decisão que alguém tomou.
+    // Cair num sábado escorrega para a segunda. A guarda do `fdsISO(l.dia)` cobre o lote
+    // que JÁ esteja num fim de semana — hoje só se veio assim do banco, programado por
+    // fora desta tela: mover o bloco não é lugar de desfazer isso em silêncio.
     const novos = r.lotes.map(l=>{
       const cru = Math.max(0, Math.min(DIAS.length-1, IDX.get(l.dia)+delta));
       const destino = fdsISO(l.dia) ? cru : encostaNoUtil(cru);

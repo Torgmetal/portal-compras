@@ -1,7 +1,12 @@
 {
-  "build": 2869,
-  "gerado": "2026-09-05T19:26:22.005Z",
+  "build": 2870,
+  "gerado": "2026-09-05T19:39:07.418Z",
   "commits": [
+    {
+      "hash": "f1315a74d0",
+      "data": "05/09/2026",
+      "titulo": "Gantt do PCP: pontas arrastáveis, fim de semana só quando você escolhe"
+    },
     {
       "hash": "6df7bcda55",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "74364752e7",
       "data": "05/09/2026",
       "titulo": "Terceirização: preço do externo tabelado por classe"
-    },
-    {
-      "hash": "3e5e68233c",
-      "data": "05/09/2026",
-      "titulo": "Cenário: fazer aqui ou terceirizar, decidido por classe"
     }
   ]
 }
