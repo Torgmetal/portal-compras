@@ -128,6 +128,16 @@ export default function QualidadeClient({ escopo = "empresa", isAdmin = false })
                 className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
                 <FileSpreadsheet size={15} /> Importar (CMR)
               </button>
+              {/* ⚠⚠ O BOTÃO TINHA SUMIDO. Vitor (05/09/2026): "por que não está dando para baixar os
+                  certificados? o Eduardo disse que anexou na pasta". Estava anexado — e o modal de
+                  casar existia, completo, mas NADA chamava `setCasar(true)`: perdeu-se num refactor
+                  da barra. Ou seja, não era desleixo de quem opera; a tela não tinha o botão, e 162
+                  certificados com PDF na pasta ficaram sem vínculo (o cliente via a rastreabilidade
+                  sem download e o data book montava sem o certificado). */}
+              <button onClick={() => setCasar(true)} title="Vincula os PDFs da pasta de certificados digitalizados aos R do CMR"
+                className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
+                <Paperclip size={15} /> Casar PDFs
+              </button>
             </>
           )}
           {!material && (
