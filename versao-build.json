@@ -1,9 +1,19 @@
 {
-  "build": 2854,
-  "gerado": "2026-09-05T15:26:15.636Z",
+  "build": 2856,
+  "gerado": "2026-09-05T16:52:29.750Z",
   "commits": [
     {
-      "hash": "35e3368ae4",
+      "hash": "6ee939a8d9",
+      "data": "05/09/2026",
+      "titulo": "Importar LQC: ler os três blocos da planilha comercial e os itens comerciais"
+    },
+    {
+      "hash": "338800bae4",
+      "data": "05/09/2026",
+      "titulo": "Auditoria: peso sem classe some do frete, e BDI de 400% sem aviso"
+    },
+    {
+      "hash": "1ab0ba1139",
       "data": "05/09/2026",
       "titulo": "graphify: um comando que se conserta sozinho, no lugar de quatro que quebravam"
     },
@@ -141,16 +151,6 @@
       "hash": "3024cc2874",
       "data": "05/09/2026",
       "titulo": "Resumo do estudo: botão \"Composição do preço\""
-    },
-    {
-      "hash": "7ada8e3e16",
-      "data": "05/09/2026",
-      "titulo": "Aditivo: acrescentar linhas de verba a um aditivo já criado"
-    },
-    {
-      "hash": "81d8a82d53",
-      "data": "05/09/2026",
-      "titulo": "Planilha comercial: o aço precificado por perfil não tinha dono"
     }
   ]
 }

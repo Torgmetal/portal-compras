@@ -47,12 +47,15 @@ exports[`analiseDeCenarios e resultadoDoCenario — congelados > a análise dos 
 exports[`calcularLqc — bordas que não podem virar NaN > estudo vazio devolve zeros, nunca NaN 1`] = `
 {
   "areaM2": 0,
+  "bdiAlerta": null,
   "bdiCampos": {},
   "bdiPct": 0,
   "bdiValor": 0,
   "cargas": {
     "linhas": [],
+    "pesoSemClasse": 0,
     "pesoTotal": 0,
+    "rotulosSemClasse": [],
     "totalCargas": 0,
   },
   "creditoIcms": {
@@ -770,6 +773,7 @@ exports[`calcularLqc — bordas que não podem virar NaN > estudo vazio devolve 
 exports[`calcularLqc — snapshot do estudo de referência > o resultado inteiro está congelado 1`] = `
 {
   "areaM2": 193,
+  "bdiAlerta": null,
   "bdiCampos": {},
   "bdiPct": 0,
   "bdiValor": 0,
@@ -784,9 +788,23 @@ exports[`calcularLqc — snapshot do estudo de referência > o resultado inteiro
         "pesoKg": 1000,
         "ultimaCargaKg": 1000,
       },
+      {
+        "capacidadeKg": 12000,
+        "cargas": 1,
+        "faixa": "MEDIO",
+        "key": "SEM_CLASSE",
+        "nome": "Sem classificação",
+        "pesoKg": 5000,
+        "semClasse": true,
+        "ultimaCargaKg": 5000,
+      },
     ],
-    "pesoTotal": 1000,
-    "totalCargas": 1,
+    "pesoSemClasse": 5000,
+    "pesoTotal": 6000,
+    "rotulosSemClasse": [
+      "MEDIO",
+    ],
+    "totalCargas": 2,
   },
   "creditoIcms": {
     "aliquotaPct": 12,
