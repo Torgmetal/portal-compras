@@ -1,7 +1,12 @@
 {
-  "build": 2844,
-  "gerado": "2026-09-05T15:03:41.113Z",
+  "build": 2845,
+  "gerado": "2026-09-05T15:03:41.264Z",
   "commits": [
+    {
+      "hash": "318952f444",
+      "data": "05/09/2026",
+      "titulo": "Burn-down, onda mecânica: 81 avisos, três deles bugs de verdade"
+    },
     {
       "hash": "6248e7d95f",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b7e1d51531",
       "data": "04/09/2026",
       "titulo": "Rastreabilidade: barra redonda de 1\" não pode casar com a de 1/2\""
-    },
-    {
-      "hash": "686b61a557",
-      "data": "04/09/2026",
-      "titulo": "Data book: .dwg não é anexo do livro, e imagem vira página em vez de erro"
     }
   ]
 }

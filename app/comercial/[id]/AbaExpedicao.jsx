@@ -33,7 +33,11 @@ function parseData(v) {
   if (v instanceof Date && !isNaN(v)) return v.toISOString().slice(0, 10);
   const s = String(v).trim();
   const m = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
-  if (m) { let [, d, mo, y] = m; if (y.length === 2) y = "20" + y; return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`; }
+  if (m) {
+    const [, d, mo, ano] = m;
+    const y = ano.length === 2 ? "20" + ano : ano;
+    return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
   const iso = s.match(/^\d{4}-\d{2}-\d{2}/);
   return iso ? iso[0] : null;
 }

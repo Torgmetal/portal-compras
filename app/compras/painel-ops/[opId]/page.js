@@ -222,7 +222,8 @@ export default async function PainelOPDetalhe({ params }) {
   // ⚠ E o que ainda NEM foi cotado entra como contagem, não como valor: sem cotação não existe preço,
   // e inventar uma estimativa aqui seria colocar um número onde não há informação.
   const FINAL_ITEM = ["PEDIDO_GERADO", "CANCELADO", "ATENDIDO_ESTOQUE"];
-  let comprometidoCotacao = 0, itensSemCotacao = 0, rmsComPendencia = new Set();
+  let comprometidoCotacao = 0, itensSemCotacao = 0;
+  const rmsComPendencia = new Set();
   for (const rm of op.rms || []) {
     for (const it of rm.itens || []) {
       if (FINAL_ITEM.includes(it.status)) continue;
