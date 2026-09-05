@@ -121,7 +121,7 @@ export async function GET(req, { params }) {
     const cron = await prisma.cronograma.findFirst({
       where: { ativo: true, ...(op?.id ? { opId: op.id } : { opNumero: portal.opNumero }) },
       orderBy: { ultimoSync: "desc" },
-      select: { id: true, titulo: true, dataInicio: true, dataFim: true, areas: true },
+      select: { id: true, titulo: true, dataInicio: true, dataFim: true, areas: true, ultimoSync: true },
     });
     if (cron) {
       const tarefas = await prisma.cronogramaTarefa.findMany({
