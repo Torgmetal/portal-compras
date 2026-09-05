@@ -6,6 +6,30 @@ trigger: /graphify
 
 # /graphify
 
+## ANTES DE QUALQUER COISA: o CLI existe nesta máquina?
+
+O `graphify` é um CLI Python de ~200 MB (numpy, networkx, as gramáticas do
+tree-sitter). Ele NÃO viaja no repositório — cada máquina instala a sua. A skill
+está aqui, mas sem o CLI nenhum comando abaixo funciona.
+
+Rode esta verificação **primeiro**, sempre:
+
+```bash
+command -v graphify >/dev/null 2>&1 || "$HOME/.local/bin/graphify" --help >/dev/null 2>&1 \
+  || bash scripts/instalar-graphify.sh
+```
+
+O instalador é idempotente: se já estiver tudo certo, ele confirma e sai; se
+faltar alguma coisa, ele conserta. Resolve sozinho os dois tropeços conhecidos —
+o PEP 668 ("externally managed environment") do Ubuntu 24.04+ e do Python do
+Homebrew, e a ausência do `ensurepip` no Debian/Ubuntu. O venv fica em
+`~/.local/share/graphify/.venv`, **fora** de qualquer repositório.
+
+Se depois disso o `graphify` ainda não for encontrado pelo nome, chame pelo
+caminho inteiro: `~/.local/bin/graphify`. É só o `~/.local/bin` faltando no PATH.
+
+---
+
 Turn any folder of files into a navigable knowledge graph with community detection, an honest audit trail, and three outputs: interactive HTML, GraphRAG-ready JSON, and a plain-language GRAPH_REPORT.md.
 
 ## Usage

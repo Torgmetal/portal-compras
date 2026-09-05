@@ -173,18 +173,35 @@ baixa o marketplace `anthropics/claude-plugins-official` sozinho. São skills de
 *processo* — brainstorming, TDD, depuração sistemática, revisão — que decidem
 **quando** parar para perguntar e verificar, antes de sair codando.
 
-⚠ **`graphify` precisa de um CLI Python que NÃO está no repo** (são ~200 MB).
-A skill em si funciona; o comando não. Para instalar:
+### O CLI do graphify
+
+O `graphify` depende de um CLI Python de ~200 MB (numpy, networkx e as gramáticas
+do tree-sitter). Não cabe no repositório — cada máquina instala a sua. Um comando:
 
 ```bash
-python3 -m venv --without-pip ~/.claude/skills/graphify/.venv
-curl -sS https://bootstrap.pypa.io/get-pip.py | ~/.claude/skills/graphify/.venv/bin/python3 -
-~/.claude/skills/graphify/.venv/bin/pip install graphifyy
-ln -sf ~/.claude/skills/graphify/.venv/bin/graphify ~/.local/bin/graphify
+bash scripts/instalar-graphify.sh
 ```
 
-O venv existe porque o Python do Ubuntu 24.04+ é *externally managed* (PEP 668)
-e recusa `pip install` direto. Em outra distro, `pip install graphifyy` basta.
+Idempotente: rode quantas vezes quiser. E você normalmente **não precisa rodar** —
+a skill verifica o CLI antes de qualquer comando e chama o instalador sozinha se
+faltar.
+
+O que o script resolve por você:
+
+- **PEP 668** — o Python do Ubuntu 24.04+ e o do Homebrew são *externally managed*
+  e recusam `pip install` direto. Daí o venv, em `~/.local/share/graphify/.venv`,
+  **fora** de qualquer repositório (198 MB dentro do projeto seriam um acidente
+  esperando o `git add -A`).
+- **`ensurepip` ausente** — Debian/Ubuntu tiram o módulo do pacote base, então
+  `python3 -m venv` falha na metade. O script detecta e traz o pip pelo get-pip.
+- **Verificação de verdade** — carrega numpy, networkx e tree-sitter e roda o
+  comando. "O pip não deu erro" já enganou antes.
+- Publica uma cópia de si mesmo em `~/.local/bin/instalar-graphify`, para
+  consertar o CLI de fora deste repositório.
+
+Se o `graphify` não for achado pelo nome depois disso, é só o `~/.local/bin`
+faltando no PATH — chame por `~/.local/bin/graphify` ou acrescente ao seu
+`~/.bashrc`/`~/.zshrc`.
 
 ⚠ **`npx skills add <repo>` instala no diretório do projeto por padrão, e traz o
 pacote INTEIRO do repositório** — o caveman, por exemplo, são 20 skills, não uma.

@@ -1,56 +1,81 @@
 {
-  "build": 2849,
-  "gerado": "2026-09-05T15:05:27.458Z",
+  "build": 2854,
+  "gerado": "2026-09-05T15:26:15.636Z",
   "commits": [
     {
-      "hash": "12f22bed62",
+      "hash": "35e3368ae4",
+      "data": "05/09/2026",
+      "titulo": "graphify: um comando que se conserta sozinho, no lugar de quatro que quebravam"
+    },
+    {
+      "hash": "b47656d18b",
+      "data": "05/09/2026",
+      "titulo": "Reancora o snapshot do LQC nas regras novas do Vitor"
+    },
+    {
+      "hash": "011a69e709",
       "data": "05/09/2026",
       "titulo": "Skills e plugins passam a viver no projeto, não no perfil"
     },
     {
-      "hash": "a5b930cf07",
+      "hash": "5d957687ad",
       "data": "05/09/2026",
       "titulo": "Quebra a pior função do repositório: PATCH de tarefa, complexidade 140 -> 31"
     },
     {
-      "hash": "65f66ebca6",
+      "hash": "84dc5cfcf1",
       "data": "05/09/2026",
       "titulo": "Burn-down: no-unused-vars de 427 para 5, por AST e não por regex"
     },
     {
-      "hash": "7895d2fd78",
+      "hash": "3c326640c6",
       "data": "05/09/2026",
       "titulo": "Zera o prefer-const: separa as declarações mistas"
     },
     {
-      "hash": "318952f444",
+      "hash": "9e25ad2122",
       "data": "05/09/2026",
       "titulo": "Burn-down, onda mecânica: 81 avisos, três deles bugs de verdade"
     },
     {
-      "hash": "6248e7d95f",
+      "hash": "4a8575e9f6",
       "data": "05/09/2026",
       "titulo": "Base de testes: vitest, mock do Prisma e o snapshot que trava o calcularLqc"
     },
     {
-      "hash": "7599eeffd7",
+      "hash": "116615e9c4",
       "data": "05/09/2026",
       "titulo": "Adaptador de log e fronteira de dados: duas regras voltam para \"error\""
     },
     {
-      "hash": "727aea6d53",
+      "hash": "2cb5bebd19",
       "data": "05/09/2026",
       "titulo": "Quebra o CronogramasClient (4056 linhas) em módulos por responsabilidade"
     },
     {
-      "hash": "01c7e33bdb",
+      "hash": "57e89a85eb",
       "data": "05/09/2026",
       "titulo": "Instala os quality gates de ESLint (teto de 350 linhas)"
     },
     {
-      "hash": "9c2a2fdbec",
+      "hash": "3a925085c8",
       "data": "05/09/2026",
       "titulo": "Quebra o RMComprasClient (4231 linhas) em módulos por responsabilidade"
+    },
+    {
+      "hash": "909d91eec1",
+      "data": "05/09/2026",
+      "titulo": "Terceirização com a fábrica cheia: decidir por margem por mês, não por R$/kg"
+    },
+    {
+      "hash": "74364752e7",
+      "data": "05/09/2026",
+      "titulo": "Terceirização: preço do externo tabelado por classe"
+    },
+    {
+      "hash": "3e5e68233c",
+      "data": "05/09/2026",
+      "titulo": "Cenário: fazer aqui ou terceirizar, decidido por classe"
     },
     {
       "hash": "408af6fac0",
@@ -126,31 +151,6 @@
       "hash": "81d8a82d53",
       "data": "05/09/2026",
       "titulo": "Planilha comercial: o aço precificado por perfil não tinha dono"
-    },
-    {
-      "hash": "fe8051232e",
-      "data": "05/09/2026",
-      "titulo": "Manutenção: amarrar num clique a origem do aço da OP-085"
-    },
-    {
-      "hash": "9fc27ff1ad",
-      "data": "05/09/2026",
-      "titulo": "Perfil sem material: a mesma chapa escrita de outro jeito também é candidata"
-    },
-    {
-      "hash": "5de7eeeab7",
-      "data": "05/09/2026",
-      "titulo": "Data book: o certificado do R declarado também entra na seção"
-    },
-    {
-      "hash": "330657ccbf",
-      "data": "05/09/2026",
-      "titulo": "Perfil sem material: um R para todos os perfis do mesmo material"
-    },
-    {
-      "hash": "12fce9de93",
-      "data": "05/09/2026",
-      "titulo": "Painel de administração e alerta dos crons: só quem administra o portal"
     }
   ]
 }
