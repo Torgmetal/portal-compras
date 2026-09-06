@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { Loader2, Globe, Send, Save, ExternalLink, Copy, Check, Eye, Upload, X, ImagePlus, FolderOpen, Plus, Trash2, Images } from "lucide-react";
+import { ehVideo } from "@/lib/midia";
 import SeletorFotos from "@/components/SeletorFotos";
 import { MODELOS_EMAIL, MODELO_EMAIL } from "@/lib/portal-email-modelos";
 import { upload } from "@vercel/blob/client";
@@ -85,7 +86,8 @@ export default function AbaPortalCliente({ opId, opNumero }) {
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
   const [salvando, setSalvando] = useState(false);
-  const [banco, setBanco] = useState(false);   // o banco de fotos aberto
+  const [banco, setBanco] = useState(false);
+  const [bancoCapa, setBancoCapa] = useState(false);   // o banco de fotos aberto
   // ⚠⚠ O MODELO É DO ENVIO, NÃO DA OBRA. Vitor (03/09/2026): "será apenas para esse envio ok, para
   // os próximos volta ao normal". Por isso ele mora no estado da TELA e volta ao padrão a cada vez
   // que ela abre — nada é gravado. Anúncio de novidade repetido em todo reenvio vira ruído.
@@ -163,7 +165,12 @@ export default function AbaPortalCliente({ opId, opNumero }) {
             body: JSON.stringify({ fotos: novas, opId, origem: "PORTAL" }),
           }).catch(() => {});
         } else {
-          set(alvo, await subir(arqs[0]));
+          const url = await subir(arqs[0]);
+          set(alvo, url);
+          if (alvo === "capaUrl") {
+            const r = await fetch("/api/fotos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, legenda: arqs[0].name, opId, origem: "PORTAL" }) });
+            if (!r.ok) throw new Error("Capa carregada, mas não foi possível registrá-la no banco de imagens.");
+          }
         }
         setAviso("Imagem carregada — salve para gravar.");
       } catch (e) { setErro(e.message || "Falha ao subir a imagem."); }
@@ -293,6 +300,8 @@ export default function AbaPortalCliente({ opId, opNumero }) {
           })}
         </div>
         <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <button onClick={() => setBancoCapa(true)} disabled={salvando} className="text-xs font-semibold text-torg-blue border rounded-lg px-3 py-2 mr-2">Escolher do banco</button>
+          <SeletorFotos aberto={bancoCapa} multiplo={false} opId={opId} onFechar={() => setBancoCapa(false)} onEscolher={(imagens) => { if (imagens[0]) set("capaUrl", imagens[0].url); }} />
           <button onClick={() => escolherArquivo("capaUrl")} disabled={salvando}
             className="text-[11px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-2.5 py-1 hover:bg-torg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">
             <Upload size={12} /> subir outra capa
@@ -349,7 +358,7 @@ export default function AbaPortalCliente({ opId, opNumero }) {
         <p className="text-[11px] text-torg-gray mb-3">
           A obra em imagens — fabricação, pintura, expedição. A legenda é o que dá sentido à foto.
         </p>
-        <SeletorFotos aberto={banco} opId={opId} onFechar={() => setBanco(false)}
+        <SeletorFotos aberto={banco} permitirVideos maximo={Math.max(0, 24 - (f.fotos || []).length)} opId={opId} onFechar={() => setBanco(false)}
           jaUsadas={(f.fotos || []).map((x) => x.url)}
           onEscolher={(novas) => {
             setF((p) => ({ ...p, fotos: [...(p.fotos || []), ...novas].slice(0, 24) }));
@@ -363,7 +372,7 @@ export default function AbaPortalCliente({ opId, opNumero }) {
             {f.fotos.map((foto, i) => (
               <div key={i} className="border border-gray-100 rounded-lg overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={foto.url} alt="" className="w-full h-24 object-cover" />
+                {ehVideo(foto) ? <video src={foto.url} controls preload="none" className="w-full h-32 object-cover" /> : <img src={foto.url} alt="" className="w-full h-24 object-cover" />}
                 <div className="p-1.5 flex items-center gap-1">
                   <input value={foto.legenda || ""} placeholder="legenda"
                     onChange={(e) => set("fotos", f.fotos.map((x, j) => (j === i ? { ...x, legenda: e.target.value } : x)))}

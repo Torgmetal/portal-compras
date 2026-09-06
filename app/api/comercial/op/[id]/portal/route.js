@@ -65,7 +65,7 @@ export async function PUT(req, { params }) {
       secoes: normalizarSecoes(b.secoes),
       ...(b.mostrarPeso === undefined ? {} : { mostrarPeso: b.mostrarPeso === true }),
       fotos: Array.isArray(b.fotos)
-        ? b.fotos.slice(0, 24).map((f) => ({ url: String(f?.url || "").slice(0, 600), legenda: txt(f?.legenda, 140) }))
+        ? b.fotos.slice(0, 24).map((f) => ({ url: String(f?.url || "").slice(0, 600), legenda: txt(f?.legenda, 140), miniatura: /^https:\/\//.test(f?.miniatura || "") ? txt(f.miniatura, 600) : null }))
             .filter((f) => f.url)
         : undefined,
     },

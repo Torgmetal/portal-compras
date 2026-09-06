@@ -1,5 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import SeletorFotos from "@/components/SeletorFotos";
+import { ehVideo } from "@/lib/midia";
 import { upload } from "@vercel/blob/client";
 import { Loader2, Plus, Trash2, Upload, Link2, Send, Eye, EyeOff, Image as ImageIcon, FileText, ExternalLink, Library, Presentation } from "lucide-react";
 
@@ -15,11 +17,16 @@ async function uploadArquivo(file) {
     access: "public",
     handleUploadUrl: "/api/comercial/apresentacoes/upload-token",
   });
+  if (/^image\//.test(file.type || "")) {
+    const r = await fetch("/api/fotos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: blob.url, legenda: file.name, origem: "AVULSA" }) });
+    if (!r.ok) throw new Error("Imagem enviada, mas não foi possível registrá-la no banco.");
+  }
   return { url: blob.url, nomeArquivo: file.name, tamanho: file.size, tipo: file.type || "application/octet-stream" };
 }
 
 export default function ApresentacoesClient() {
   const [aba, setAba] = useState("apresentacoes");
+  const [verBanco, setVerBanco] = useState(false);
   const [msg, setMsg] = useState(null); // { ok, txt }
   const toast = (ok, txt) => { setMsg({ ok, txt }); setTimeout(() => setMsg(null), 3500); };
 
@@ -38,6 +45,8 @@ export default function ApresentacoesClient() {
         ))}
       </div>
 
+      <button onClick={() => setVerBanco(true)} className="mb-4 text-sm font-semibold text-torg-blue border rounded-lg px-3 py-2">Consultar banco de imagens e vídeos</button>
+      <SeletorFotos aberto={verBanco} permitirVideos onFechar={() => setVerBanco(false)} />
       {aba === "apresentacoes" ? <Apresentacoes toast={toast} /> : <Biblioteca toast={toast} />}
 
       {msg && (
@@ -126,6 +135,7 @@ function Apresentacoes({ toast }) {
 
 /* ─── Editor de uma apresentação ─────────────────────────────── */
 function Editor({ id, toast, onChange }) {
+  const [banco, setBanco] = useState(null);
   const [d, setD] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [subindo, setSubindo] = useState("");
@@ -146,8 +156,18 @@ function Editor({ id, toast, onChange }) {
       const j = await r.json();
       if (!j.success) throw new Error(j.error);
       if (aviso) toast(true, aviso);
-      carregar(); onChange();
-    } catch (e) { toast(false, e.message); } finally { setSalvando(false); }
+      carregar(); onChange(); return true;
+    } catch (e) { toast(false, e.message); return false; } finally { setSalvando(false); }
+  }
+
+  async function escolherMidias(midias) {
+    if (banco === "capa") { if (!await patch({ capaUrl: midias[0].url })) throw new Error("Falha ao salvar capa."); return; }
+    for (const m of midias) {
+      if (a.documentos.some((d) => d.arquivoUrl === m.url)) continue;
+      const r = await fetch(`/api/comercial/apresentacoes/${id}/docs`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: m.legenda || "Imagem da Torg", tipo: "PORTFOLIO", arquivoUrl: m.url, arquivoTipo: ehVideo(m) ? "video/mp4" : "image/webp", arquivoTamanho: m.tamanho || null }) });
+      if (!r.ok) { carregar(); throw new Error("Não foi possível adicionar a mídia."); }
+    }
+    carregar(); onChange(); toast(true, "Mídias adicionadas à apresentação");
   }
 
   async function subirCapa(file) {
@@ -199,6 +219,8 @@ function Editor({ id, toast, onChange }) {
             <div className="w-24 h-14 rounded-lg bg-gray-100 border border-gray-200 overflow-hidden grid place-items-center flex-none">
               {a.capaUrl ? <img src={a.capaUrl} alt="capa" className="w-full h-full object-cover" /> : <ImageIcon size={18} className="text-gray-300" />}
             </div>
+            <button onClick={() => setBanco("capa")} className="text-xs text-torg-blue border rounded-lg px-3 py-2">Do banco</button>
+            <SeletorFotos aberto={banco !== null} multiplo={banco !== "capa"} permitirVideos={banco !== "capa"} jaUsadas={banco === "capa" ? [] : a.documentos.map((d) => d.arquivoUrl)} onFechar={() => setBanco(null)} onEscolher={escolherMidias} />
             <label className="text-sm font-semibold text-torg-blue border border-torg-blue/30 hover:bg-torg-blue-50 rounded-lg px-3 py-1.5 cursor-pointer inline-flex items-center gap-2">
               {subindo === "capa" ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Trocar
               <input type="file" accept="image/*" className="hidden" onChange={(e) => subirCapa(e.target.files?.[0])} />
@@ -226,6 +248,7 @@ function Editor({ id, toast, onChange }) {
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <p className="text-[11px] font-semibold text-torg-gray uppercase">Extras deste cliente</p>
+            <button onClick={() => setBanco("extras")} className="text-xs text-torg-blue font-semibold">Fotos e vídeos do banco</button>
             <label className="text-xs font-semibold text-torg-blue cursor-pointer inline-flex items-center gap-1">{subindo === "extra" ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Adicionar<input type="file" className="hidden" onChange={(e) => subirExtra(e.target.files?.[0])} /></label>
           </div>
           {a.documentos.length === 0 ? <p className="text-xs text-torg-gray">Sem extras.</p> : a.documentos.map((doc) => (

@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Loader2, FileText, Download, Image as ImageIcon, Briefcase, FileCheck2 } from "lucide-react";
+import GaleriaMidias from "@/components/GaleriaMidias";
+import { ehVideo } from "@/lib/midia";
 import TorgLogo from "@/components/TorgLogo";
 
 const GRUPOS = [
@@ -40,7 +42,8 @@ export default function ApresentacaoClient({ token }) {
   }
 
   const { apresentacao: ap, docs } = dados;
-  const porGrupo = GRUPOS.map((g) => ({ ...g, itens: docs.filter((d) => d.tipo === g.tipo) })).filter((g) => g.itens.length > 0);
+  const midias = docs.filter((d) => d.tipo !== "CADASTRAL" && (ehVideo(d) || /^image\//.test(d.arquivoTipo || "") || /\.(png|jpe?g|webp)(?:[?#]|$)/i.test(d.url))).map((d) => ({ ...d, legenda: d.nome }));
+  const porGrupo = GRUPOS.map((g) => ({ ...g, itens: docs.filter((d) => d.tipo === g.tipo && !midias.some((m) => m.url === d.url)) })).filter((g) => g.itens.length > 0);
 
   return (
     <div className="min-h-screen bg-[#F3F6F9]">
@@ -65,7 +68,8 @@ export default function ApresentacaoClient({ token }) {
 
       {/* Documentos */}
       <main className="max-w-3xl mx-auto px-6 py-10">
-        {porGrupo.length === 0 ? (
+        {midias.length > 0 && <section className="mb-8"><h2 className="text-sm font-bold text-[#00263F] mb-4">A Torg em imagens</h2><GaleriaMidias itens={midias} /></section>}
+        {porGrupo.length === 0 && midias.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-[#5C7285] text-sm">Nenhum documento disponível ainda.</div>
         ) : porGrupo.map((g) => {
           const Icon = g.icon;

@@ -38,3 +38,6 @@ public/wasm/
 
 # worktrees do Claude Code são locais de cada máquina
 .claude/worktrees/
+
+# Acervo local: matrizes, ensaios e arquivos tratados ficam fora do Git
+/output/banco-midias/

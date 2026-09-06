@@ -1,7 +1,12 @@
 {
-  "build": 2889,
-  "gerado": "2026-09-06T03:12:34.787Z",
+  "build": 2890,
+  "gerado": "2026-09-06T03:41:55.911Z",
   "commits": [
+    {
+      "hash": "1509157a",
+      "data": "06/09/2026",
+      "titulo": "Melhora layout do modelo 3D no portal do cliente"
+    },
     {
       "hash": "6b376996",
       "data": "06/09/2026",
@@ -146,11 +151,6 @@
       "hash": "926b6929",
       "data": "05/09/2026",
       "titulo": "As ferramentas do split entram no repositório"
-    },
-    {
-      "hash": "82ba50d1",
-      "data": "05/09/2026",
-      "titulo": "Quebra o EstudoClient (4984 linhas) em módulos por responsabilidade"
     }
   ]
 }

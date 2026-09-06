@@ -8,6 +8,7 @@
 // Fosse o contrário, ligar o banco publicaria no portal toda foto que alguém subisse num relatório.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import acervo from "@/lib/acervo-torg.json";
 import { getSession } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -42,7 +43,7 @@ export async function GET(req) {
     id: f.id, url: f.url, legenda: f.legenda || "", origem: f.origem,
     op: f.op?.numero || f.opNumero || null, criadoEm: f.criadoEm,
   });
-  return NextResponse.json({ daObra: daObra.map(item), outras: outras.map(item) });
+  return NextResponse.json({ daObra: daObra.map(item), outras: outras.map(item), acervo });
 }
 
 export async function POST(req) {
