@@ -88,8 +88,10 @@ export const CSS = `
 
   .gpcp .setor{display:flex;background:#eef2f7;border-bottom:1px solid var(--linha);border-top:1px solid var(--linha);
          position:sticky;top:64px;z-index:5}
-  .gpcp .setor .rotulo{background:#eef2f7;flex-direction:row;align-items:center;gap:8px;cursor:pointer;
-                 border-right:2px solid var(--linha)}
+  /* justify-content:flex-start anula o center do .rotulo base: com flex-direction:row ele passa a
+     centralizar na horizontal e cada setor fica deslocado pela largura do proprio nome (escadinha). */
+  .gpcp .setor .rotulo{background:#eef2f7;flex-direction:row;align-items:center;justify-content:flex-start;
+                 gap:8px;cursor:pointer;border-right:2px solid var(--linha)}
   .gpcp .setor b{font-size:11.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--navy)}
   .gpcp .setor .resumo{background:#eef2f7;font-size:10.5px;color:var(--tinta-2);font-weight:600;
                  padding:5px 8px;white-space:nowrap}

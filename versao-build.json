@@ -1,7 +1,12 @@
 {
-  "build": 2895,
-  "gerado": "2026-09-06T15:27:26.723Z",
+  "build": 2896,
+  "gerado": "2026-09-06T15:38:47.099Z",
   "commits": [
+    {
+      "hash": "39316fcb",
+      "data": "06/09/2026",
+      "titulo": "Fila do PCP: peça pintada sai de todas as filas"
+    },
     {
       "hash": "8928f17b",
       "data": "06/09/2026",
@@ -146,11 +151,6 @@
       "hash": "94df944f",
       "data": "05/09/2026",
       "titulo": "graphify: venv de Python velho é refeito, não reaproveitado"
-    },
-    {
-      "hash": "913e778c",
-      "data": "05/09/2026",
-      "titulo": "PCP › Produção: sai o painel \"Carga da produção\""
     }
   ]
 }
