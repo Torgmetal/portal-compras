@@ -1,39 +1,13 @@
 "use client";
 import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Loader2, AlertCircle } from "lucide-react";
-import TorgLogo from "@/components/TorgLogo";
-import { emSetembroAmarelo, LACO } from "@/lib/campanha";
-import { usarPrevia } from "@/lib/campanha-previa";
-
-function homePorRole(role) {
-  switch (role) {
-    case "ADMIN":
-    case "COMERCIAL":
-      return "/comercial";
-    case "COMPRAS":
-      return "/compras";
-    case "ENGENHARIA":
-      return "/engenharia";
-    case "ALMOXARIFADO":
-      return "/rm";
-    case "PRODUCAO":
-      return "/producao";
-    case "FINANCEIRO":
-      return "/financeiro";
-    case "EXPEDICAO":
-      return "/expedicao";
-    default:
-      return "/";
-  }
-}
+import { Loader2, AlertCircle, ArrowRight } from "lucide-react";
+import WorkspaceAcesso from "@/components/WorkspaceAcesso";
+import { destinoLogin } from "@/lib/destino-login";
 
 function LoginForm() {
-  const mostrarLaco = emSetembroAmarelo() || usarPrevia();
-  useRouter();
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl");
 
@@ -58,31 +32,11 @@ function LoginForm() {
         setCarregando(false);
         return;
       }
-      // Lê a sessão pra descobrir o tipo/role e redirecionar pro portal certo.
-      // Funcionário (autoatendimento) sempre vai pro /meu-rh — nunca pro portal
-      // interno, mesmo que tenha vindo com callbackUrl de uma página interna.
-      let destino = callbackUrl;
-      try {
-        const s = await fetch("/api/auth/session").then((r) => r.json());
-        if (s?.user?.tipo === "FUNCIONARIO") destino = "/colaborador";
-        // ⚠⚠ INSPETOR DE CAMPO VAI PARA O PORTAL DELE, mesmo entrando por esta tela.
-        // Quem tem SÓ `QUALIDADE_CAMPO` não tem módulo interno nenhum: caía no destino padrão "/" e
-        // batia numa página sem permissão logo depois de acertar a senha. É o acesso do inspetor —
-        // inclusive o de fora —, e o lugar dele é /campo.
-        // ⚠ ...MAS NÃO POR CIMA DE ONDE ELE QUIS IR. O inspetor agora também preenche o relatório
-        // no computador (/qualidade/inspecoes): quem clicou nesse link e fez login era jogado para
-        // /campo assim mesmo, e nunca chegava na tela — foi o "ainda não" de 04/09/2026.
-        else if (s?.user?.tipo !== "ADMIN" && (s?.user?.modulos || []).length === 1 && (s.user.modulos[0]?.modulo ?? s.user.modulos[0]) === "QUALIDADE_CAMPO") {
-          const pedido = String(callbackUrl || "");
-          destino = pedido.startsWith("/qualidade/inspecoes") || pedido.startsWith("/campo") ? pedido : "/campo";
-        }
-        else if (!destino) destino = homePorRole(s?.user?.role);
-      } catch {
-        if (!destino) destino = "/";
-      }
-      // Hard redirect — garante que o cookie de sessão esteja disponível
-      // e evita problemas de soft navigation do App Router
-      window.location.href = destino;
+      const resposta = await fetch("/api/auth/session");
+      if (!resposta.ok) throw new Error("Sessão indisponível");
+      const sessao = await resposta.json();
+      if (!sessao?.user) throw new Error("Sessão indisponível");
+      window.location.href = destinoLogin(sessao.user, callbackUrl, window.location.origin);
     } catch {
       setErro("Erro de conexão. Tente novamente.");
       setCarregando(false);
@@ -90,56 +44,24 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-white">
-      {/* Imagem hero */}
-      <div className="relative lg:w-1/2 h-48 lg:h-auto lg:min-h-screen overflow-hidden">
-        <Image
-          src="/obras/ponte-sunset.jpg"
-          alt="Torg Metal"
-          fill
-          priority
-          className="object-cover"
-          sizes="(max-width: 1024px) 100vw, 50vw"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t lg:bg-gradient-to-r from-torg-dark/85 via-torg-dark/40 to-torg-dark/10" />
-        <div className="relative z-10 h-full flex flex-col justify-between p-8">
-          <Link href="/" className="bg-white/95 backdrop-blur rounded-xl px-4 py-2 shadow-lg w-fit">
-            <TorgLogo size="sm" />
-          </Link>
-          <div className="text-white max-w-md hidden lg:block">
-            <p className="text-torg-orange font-semibold tracking-widest text-xs uppercase mb-3">
-              Acesso interno
-            </p>
-            <h1 className="text-3xl xl:text-4xl font-extrabold tracking-tight leading-tight flex items-center gap-3">
-              Workspace Torg
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {mostrarLaco ? <img src={LACO} alt="Setembro Amarelo" title="Setembro Amarelo — a Torg Metal apoia a valorização da vida" className="h-9 w-9 shrink-0" /> : null}
-            </h1>
-            <p className="text-white/80 text-sm mt-3">
-              Portais de Comercial, Compras e Requisições integrados.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Form */}
-      <div className="lg:w-1/2 flex items-center justify-center p-8 lg:p-12">
-        <form onSubmit={submit} className="w-full max-w-md bg-white rounded-2xl border border-torg-blue-100 shadow-sm p-7 space-y-5">
+    <WorkspaceAcesso>
+        <form onSubmit={submit} className="w-full max-w-[380px] bg-white rounded-2xl border border-slate-200 shadow-sm p-7 space-y-5">
           <div>
-            <h2 className="text-2xl font-extrabold text-torg-dark tracking-tight">Entrar</h2>
-            <p className="text-sm text-torg-gray mt-1">Acesso interno — use seu e-mail e senha.</p>
+            <h1 className="text-2xl font-extrabold text-torg-dark tracking-tight">Entre no Workspace</h1>
+            <p className="text-sm text-torg-gray mt-1">Use seu e-mail e senha para acessar.</p>
           </div>
 
           {erro && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
+            <div role="alert" className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
               <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
               <span>{erro}</span>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">E-mail</label>
+            <label htmlFor="email" className="block text-sm font-medium text-torg-dark mb-1">E-mail</label>
             <input
+              id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -147,19 +69,20 @@ function LoginForm() {
               autoFocus
               autoComplete="email"
               placeholder="seu@email.com"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base focus:ring-2 focus:ring-torg-blue focus:border-transparent"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">Senha</label>
+            <label htmlFor="senha" className="block text-sm font-medium text-torg-dark mb-1">Senha</label>
             <input
+              id="senha"
               type="password"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
               required
               autoComplete="current-password"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base focus:ring-2 focus:ring-torg-blue focus:border-transparent"
             />
           </div>
 
@@ -170,6 +93,7 @@ function LoginForm() {
           >
             {carregando && <Loader2 size={16} className="animate-spin" />}
             {carregando ? "Entrando..." : "Entrar"}
+            {!carregando && <ArrowRight size={16} aria-hidden="true" />}
           </button>
 
           <div className="pt-3 border-t border-gray-100 space-y-2 text-center">
@@ -190,8 +114,7 @@ function LoginForm() {
             </p>
           </div>
         </form>
-      </div>
-    </div>
+    </WorkspaceAcesso>
   );
 }
 
