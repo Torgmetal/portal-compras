@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import TorgLogo from "@/components/TorgLogo";
-import { ClipboardList, ShoppingCart, Truck, FolderKanban, ArrowRight, Activity, DollarSign, FileText, Users, Gauge, CalendarClock, BarChart3, ShieldCheck } from "lucide-react";
+import { ClipboardList, ShoppingCart, Truck, FolderKanban, ArrowRight, Factory, DollarSign, Handshake, Users, Cog, CalendarClock, TrendingUp, ShieldCheck } from "lucide-react";
 
 const FOOTER_LOGO_W = 180;
 const FOOTER_LOGO_H = Math.round((FOOTER_LOGO_W * 1080) / 1920);
@@ -10,86 +10,74 @@ const portais = [
   {
     href: "/comercial",
     label: "Comercial",
-    desc: "Cadastro de Ordens de Produção, revisões, aditivos e prazos.",
+    desc: "Ordens de produção, revisões, aditivos e prazos.",
     Icon: FolderKanban,
-    bg: "bg-torg-blue",
   },
   {
     href: "/rm",
     label: "Requisições (RM)",
-    desc: "Equipe interna lança requisições de material e consumíveis.",
+    desc: "Requisições de materiais e consumíveis.",
     Icon: ClipboardList,
-    bg: "bg-torg-blue-700",
   },
   {
     href: "/compras",
     label: "Compras",
-    desc: "Gestão de RMs, cotações, mapa comparativo e pedidos no Omie.",
+    desc: "RMs, cotações, comparativos e pedidos.",
     Icon: ShoppingCart,
-    bg: "bg-torg-dark",
   },
   {
     href: "/producao",
     label: "Produção",
-    desc: "PCP, pesos previstos × realizados por semana.",
-    Icon: Activity,
-    bg: "bg-torg-orange-700",
+    desc: "Controle da fabricação e resultados por semana.",
+    Icon: Factory,
   },
   {
     href: "/pcp",
     label: "PCP",
-    desc: "Dashboard de setores, peças por status, máquinas e progresso por OP.",
-    Icon: Gauge,
-    bg: "bg-emerald-600",
+    desc: "Setores, máquinas e progresso por OP.",
+    Icon: Cog,
   },
   {
     href: "/expedicao",
     label: "Expedição",
-    desc: "Checklist, romaneios, programação de cargas e peso expedido por OP.",
-    Icon: FileText,
-    bg: "bg-torg-orange",
+    desc: "Romaneios, cargas e peso expedido por OP.",
+    Icon: Truck,
   },
   {
     href: "/planejamento",
     label: "Planejamento",
-    desc: "Cronogramas de obra, programação de corte e expedição semanal.",
+    desc: "Cronogramas e programação semanal.",
     Icon: CalendarClock,
-    bg: "bg-violet-600",
   },
   {
     href: "/indicadores",
     label: "Indicadores",
-    desc: "KPIs de compras, comercial e RH — visão gerencial consolidada.",
-    Icon: BarChart3,
-    bg: "bg-cyan-700",
+    desc: "KPIs e visão gerencial consolidada.",
+    Icon: TrendingUp,
   },
   {
     href: "/financeiro",
     label: "Financeiro",
-    desc: "Fluxo de caixa, receita gerada por produção e validação.",
+    desc: "Fluxo de caixa, receitas e validação.",
     Icon: DollarSign,
-    bg: "bg-torg-blue-700",
   },
   {
     href: "/rh",
     label: "Recursos Humanos",
-    desc: "Gestão de pessoas, ponto, férias, benefícios e competências.",
+    desc: "Pessoas, ponto, férias e benefícios.",
     Icon: Users,
-    bg: "bg-rose-600",
   },
   {
     href: "/qualidade",
     label: "Qualidade",
-    desc: "Controle de documentos (norma + validade) e data books por OP.",
+    desc: "Documentos e data books por OP.",
     Icon: ShieldCheck,
-    bg: "bg-torg-blue",
   },
   {
     href: "/fornecedores",
     label: "Fornecedores",
-    desc: "Envio de propostas e cotações via link único.",
-    Icon: Truck,
-    bg: "bg-torg-dark",
+    desc: "Envio de propostas e cotações.",
+    Icon: Handshake,
   },
 ];
 
@@ -152,20 +140,21 @@ export default function Landing() {
             O Workspace reúne os portais internos da Torg Metal — cada perfil acessa o seu.
           </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {portais.map(({ href, label, desc, Icon, bg }) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {portais.map(({ href, label, desc, Icon }) => (
             <Link
               key={href}
               href={href}
-              className="group bg-white rounded-2xl border border-torg-blue-100 p-7 hover:shadow-xl transition-shadow"
+              className="group relative flex flex-col items-start bg-white rounded-[13px] border border-slate-200 p-5 hover:border-torg-blue hover:shadow-[0_4px_16px_rgba(0,110,171,0.07)] focus-visible:border-torg-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-torg-blue transition-[border-color,box-shadow] motion-reduce:transition-none"
             >
-              <div className={`w-14 h-14 rounded-xl ${bg} flex items-center justify-center mb-5 group-hover:scale-105 transition-transform`}>
-                <Icon size={26} className="text-white" />
+              <span aria-hidden="true" className="absolute top-6 right-5 h-[3px] w-4 rounded-full bg-torg-orange opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity motion-reduce:transition-none" />
+              <div className="w-12 h-12 rounded-xl bg-torg-blue-50/60 text-torg-blue flex items-center justify-center mb-4">
+                <Icon size={25} strokeWidth={1.65} aria-hidden="true" />
               </div>
-              <h3 className="text-xl font-bold text-torg-dark mb-2">{label}</h3>
-              <p className="text-sm text-torg-gray leading-relaxed mb-5">{desc}</p>
-              <span className="text-sm font-semibold text-torg-blue inline-flex items-center gap-1 group-hover:gap-2 transition-all">
-                Entrar <ArrowRight size={14} />
+              <h3 className="text-base font-semibold text-torg-dark mb-2">{label}</h3>
+              <p className="text-sm text-torg-gray leading-relaxed mb-4 flex-1">{desc}</p>
+              <span className="text-sm font-semibold text-torg-blue inline-flex items-center gap-1.5">
+                Entrar <ArrowRight size={14} strokeWidth={1.7} aria-hidden="true" />
               </span>
             </Link>
           ))}

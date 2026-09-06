@@ -1,7 +1,12 @@
 {
-  "build": 2896,
-  "gerado": "2026-09-06T15:38:47.099Z",
+  "build": 2897,
+  "gerado": "2026-09-06T15:51:34.802Z",
   "commits": [
+    {
+      "hash": "81028b4a",
+      "data": "06/09/2026",
+      "titulo": "Gantt do PCP: nomes dos setores alinhados à esquerda"
+    },
     {
       "hash": "39316fcb",
       "data": "06/09/2026",
@@ -146,11 +151,6 @@
       "hash": "71cef05a",
       "data": "05/09/2026",
       "titulo": "Gantt do PCP: sábado e domingo ganham coluna"
-    },
-    {
-      "hash": "94df944f",
-      "data": "05/09/2026",
-      "titulo": "graphify: venv de Python velho é refeito, não reaproveitado"
     }
   ]
 }
