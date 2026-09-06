@@ -22,6 +22,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Maximize2, Minimize2, Loader2 } from "lucide-react";
 import { log } from "@/lib/log";
+import { acabamentoIfc, configurarLuzesIfc, pixelRatioIfc, reservarContornoIfc } from "@/lib/ifc-visual";
+import { suavizarNormaisIfc } from "@/lib/ifc-normais";
 
 const registro = log("VisualizadorIfc");
 
@@ -59,9 +61,10 @@ const COR_TIPO = {
  * @param {Set<string>} [ocultos]          itens que somem da cena (o "ocultar" da tela)
  * @param {boolean} [esconderResto]        em vez de apagar o que está fora do filtro, some com ele
  * @param {Record<string,string>} [cores]  marca → cor hex ("#0E7A5F"), para pintar por andamento
+ * @param {"atual"|"refinado"|"nitido"} [perfilVisual] padrão nítido; demais perfis para comparação
  * @param {string|null} [selecionada]      chave destacada de fora (a lista, por exemplo)
  */
-export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis, ocultos, esconderResto, cores, selecionada, altura = 520, modo = "modelo" }) {
+export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis, ocultos, esconderResto, cores, selecionada, altura = 520, modo = "modelo", perfilVisual = "nitido" }) {
   const box = useRef(null);
   const ref = useRef({});             // guarda three/api entre renders sem provocar re-render
   const [estado, setEstado] = useState({ fase: "carregando", pct: 0 });
@@ -251,6 +254,12 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         const THREE = await import("three");
         const WebIFC = await import("web-ifc");
         if (!vivo) return;
+        // Comparação local nas duas abas; em produção vale o perfil do componente.
+        const perfilLocal = process.env.NODE_ENV === "development"
+          ? new URLSearchParams(window.location.search).get("ifcVisual") : null;
+        const perfil = perfilLocal || perfilVisual;
+        const refinado = perfil === "refinado";
+        const nitido = perfil === "nitido";
 
         setEstado({ fase: "baixando", pct: 0 });
         const res = await fetch(url, { cache: "force-cache" });
@@ -288,7 +297,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         // linear e tudo sai lavado — o azul da viga vira azul-claro, o marrom do piso vira bege. Era
         // parte do que fazia a imagem parecer "menos limpa" que a do Trimble.
         rend.outputColorSpace = THREE.SRGBColorSpace;
-        rend.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+        rend.setPixelRatio(pixelRatioIfc(el.clientWidth || 800, el.clientHeight || 560, window.devicePixelRatio, refinado));
         el.innerHTML = "";
         el.appendChild(rend.domElement);
         rend.setSize(el.clientWidth || 800, el.clientHeight || (typeof altura === "number" ? altura : 560));
@@ -297,10 +306,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         // perfil, alma e enrijecedor ficam do mesmo tom e a peça vira um borrão. A hemisférica dá
         // céu claro e chão escuro — é ela que faz a face de cima ler diferente da de baixo —, e as
         // duas direcionais cruzadas revelam a face que ficaria preta.
-        cena.add(new THREE.HemisphereLight(0xffffff, 0xb8c4cf, 0.95));
-        const sol = new THREE.DirectionalLight(0xffffff, 0.75); sol.position.set(1, 2, 1.4); cena.add(sol);
-        const sol2 = new THREE.DirectionalLight(0xffffff, 0.35); sol2.position.set(-1.2, 0.6, -1); cena.add(sol2);
-        const sol3 = new THREE.DirectionalLight(0xffffff, 0.2); sol3.position.set(0, -1, 0.4); cena.add(sol3);
+        configurarLuzesIfc(THREE, cena, refinado, nitido);
 
         // ── malha: uma por MARCA, para pintar e destacar por conjunto ──
         setEstado({ fase: "montando", pct: 0 });
@@ -320,6 +326,8 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         // real de quem está olhando a ligação.
         const porChave = new Map();    // chave → { marca, hex, tipo, parafuso, gs, ids, cotas }
         let n = 0;
+        const normaisSuaves = new Map();
+        let verticesSuavizados = 0;
         // ⚠⚠ "SEM COR" SE MEDE PELA VARIEDADE, NÃO PELO VALOR. Primeiro tentei olhar se a cor vinha
         // zerada e não funcionou: quando o IFC não tem estilo nenhum, o motor devolve UMA cor padrão
         // para tudo — cor existe, só que é sempre a mesma. Um modelo de verdade tem dezenas (o da
@@ -375,7 +383,17 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
             }
             const bg = new THREE.BufferGeometry();
             bg.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-            bg.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+            // Suavização em coordenadas locais, antes de transformar ou juntar peças.
+            // Cache por geometria; exclui fixadores e limita a 200 mil vértices únicos.
+            if (nitido && !parafuso && !normaisSuaves.has(geoId)) {
+              const quantidade = pos.length / 3;
+              const cabe = quantidade <= 60_000 && verticesSuavizados + quantidade <= 200_000;
+              normaisSuaves.set(geoId, cabe ? suavizarNormaisIfc(pos, nor) : null);
+              if (cabe) verticesSuavizados += quantidade;
+            }
+            // applyMatrix4 transforma também as normais: cada instância precisa de sua cópia.
+            const suaves = nitido && !parafuso ? normaisSuaves.get(geoId) : null;
+            bg.setAttribute("normal", new THREE.BufferAttribute(suaves ? suaves.slice() : nor, 3));
             bg.setIndex(new THREE.BufferAttribute(new Uint32Array(ix), 1));
             bg.applyMatrix4(new THREE.Matrix4().fromArray(m));
             // ⚠⚠ A COTA TAMBÉM SAI DA GEOMETRIA. O "Bottom elevation" só existe no export do Tekla
@@ -406,6 +424,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
 
         // ⚠ junta as geometrias de cada marca numa malha só: 1.500 objetos separados derrubam o
         // quadro por causa das chamadas de desenho; por marca dá algumas centenas.
+        normaisSuaves.clear();
         const { mergeGeometries } = await import("three/examples/jsm/utils/BufferGeometryUtils.js");
         const malhas = new Map();     // chave → mesh
         const arestasCruas = [];
@@ -422,6 +441,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         // número que manda no custo.
         const TETO_ARESTAS = 6000;
         const comArestas = n <= TETO_ARESTAS;
+        let triangulosContornados = 0;
         // ⚠ a junção é a segunda parte cara: mesclar geometrias e extrair as arestas de 3.000 grupos
         // leva segundos. Mesmo respiro, mesma barra andando.
         let feitos = 0;
@@ -444,7 +464,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
           // converte sozinho (ColorManagement ligado por padrão). Um `convertSRGBToLinear()` aqui
           // converte DUAS vezes: medido — o piso marrom da OP-089 virou vermelho-escuro e a obra
           // inteira ficou pesada. O que faltava era só declarar o espaço de saída do renderizador.
-          const mat = new THREE.MeshPhongMaterial({ color: cor, shininess: 14, specular: 0x1e2833, side: THREE.DoubleSide, flatShading: false });
+          const mat = new THREE.MeshPhongMaterial({ color: cor, ...acabamentoIfc(refinado), side: THREE.DoubleSide, flatShading: false });
           const m = new THREE.Mesh(junta, mat);
           // ⚠⚠ PARAFUSO NÃO HERDA A MARCA DO CONJUNTO. Ele está dentro do assembly, então o mapa de
           // marcas responde "V0" para ele também — e aí a lista mostrava marca no lugar da bitola, o
@@ -475,7 +495,10 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
           // ⚠ COLETA AGORA, DESENHA NUMA MALHA SÓ DEPOIS. Uma LineSegments por conjunto seriam ~600
           // chamadas de desenho a mais — junto com as 600 dos sólidos, é isso que faz o giro
           // engasgar. Aresta não precisa de identidade própria: ela não é clicável nem pintada.
-          if (comArestas) {
+          const triangulos = (junta.index?.count || junta.attributes.position.count) / 3;
+          const contornar = nitido ? reservarContornoIfc(parafuso, triangulos, triangulosContornados) : comArestas;
+          if (contornar) {
+            if (nitido) triangulosContornados += triangulos;
             try { arestasCruas.push(new THREE.EdgesGeometry(junta, 25)); }
             catch { /* peça sem geometria de aresta: segue sem contorno */ }
           }
@@ -617,6 +640,8 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         let forcar = true;
         const medir = () => {
           const w = el.clientWidth || 800, h = el.clientHeight || (typeof altura === "number" ? altura : 560);
+          const proporcao = pixelRatioIfc(w, h, window.devicePixelRatio, refinado);
+          if (rend.getPixelRatio() !== proporcao) rend.setPixelRatio(proporcao);
           // ⚠ sem atualizar o CSS do canvas (3º argumento), o buffer fica 800×520 e o elemento
           // continua nos 300×150 padrão do <canvas> — a obra aparece espremida num canto.
           rend.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix();
@@ -718,7 +743,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
       }
     })();
     return () => { vivo = false; limpar(); };
-  }, [url]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [url, perfilVisual]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ⚠⚠ COR, DESTAQUE E FILTRO NUM EFEITO SÓ. São três coisas que mexem na mesma propriedade do
   // material; separadas em efeitos diferentes, a ordem em que o React os roda decide quem ganha —

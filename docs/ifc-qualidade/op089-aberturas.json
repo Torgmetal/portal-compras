@@ -1,0 +1,30 @@
+{
+  "ativo": false,
+  "fila": [],
+  "resultados": [
+    {
+      "perfil": "atual",
+      "tempoMs": 3276
+    },
+    {
+      "perfil": "nitido",
+      "tempoMs": 3425
+    },
+    {
+      "perfil": "atual",
+      "tempoMs": 3202
+    },
+    {
+      "perfil": "nitido",
+      "tempoMs": 3521
+    },
+    {
+      "perfil": "atual",
+      "tempoMs": 3224
+    },
+    {
+      "perfil": "nitido",
+      "tempoMs": 3548
+    }
+  ]
+}

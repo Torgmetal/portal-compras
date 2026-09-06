@@ -1,0 +1,12 @@
+{
+  "quadros": 121,
+  "desenhosPorQuadro": 852,
+  "triangulosPorQuadro": 714237,
+  "intervaloMedianoMs": 16.700000002980232,
+  "intervaloP95Ms": 17.899999991059303,
+  "buffer": [
+    1000,
+    640
+  ],
+  "dpr": 1
+}

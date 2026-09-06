@@ -1,7 +1,12 @@
 {
-  "build": 2881,
-  "gerado": "2026-09-06T00:51:14.950Z",
+  "build": 2882,
+  "gerado": "2026-09-06T01:00:09.325Z",
   "commits": [
+    {
+      "hash": "2ae37ed7",
+      "data": "05/09/2026",
+      "titulo": "O R sai da GRD e vira portão: a trava de material ganha porta na hora de imprimir"
+    },
     {
       "hash": "002a1bed",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b47656d1",
       "data": "05/09/2026",
       "titulo": "Reancora o snapshot do LQC nas regras novas do Vitor"
-    },
-    {
-      "hash": "011a69e7",
-      "data": "05/09/2026",
-      "titulo": "Skills e plugins passam a viver no projeto, não no perfil"
     }
   ]
 }

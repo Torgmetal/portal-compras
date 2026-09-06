@@ -1,0 +1,26 @@
+{
+  "atual": {
+    "quadros": 121,
+    "desenhosPorQuadro": 851,
+    "triangulosPorQuadro": 714237,
+    "intervaloMedianoMs": 16.600000008940697,
+    "intervaloP95Ms": 17.700000002980232,
+    "buffer": [
+      1000,
+      640
+    ],
+    "dpr": 1
+  },
+  "nitido": {
+    "quadros": 121,
+    "desenhosPorQuadro": 852,
+    "triangulosPorQuadro": 714237,
+    "intervaloMedianoMs": 16.69999998807907,
+    "intervaloP95Ms": 18,
+    "buffer": [
+      1000,
+      640
+    ],
+    "dpr": 1
+  }
+}
