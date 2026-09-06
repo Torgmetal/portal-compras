@@ -137,13 +137,19 @@ export const CSS = `
      A faixa vermelha cobre o PEDAÇO da barra cujo dia já passou e ainda tem peça pendente: é o
      trabalho que devia estar pronto. A sombra tracejada é para onde a OP seguinte CAI se ninguém
      recuperar - previsão, não gravação: só vira programação quando o PCP aplicar e salvar. */
-  /* ⚠ hachura LEVE de propósito: ela marca o trecho vencido, não compete com a leitura. Quem grita
-     o atraso é a borda vermelha da barra e o selo — não a textura atrás do nome da OP. */
-  .gpcp .barra-op .atrasado{position:absolute;left:0;top:0;bottom:0;pointer-events:none;z-index:1;
-            background:repeating-linear-gradient(135deg,rgba(198,40,40,.16),rgba(198,40,40,.16) 5px,
-                       rgba(198,40,40,.04) 5px,rgba(198,40,40,.04) 10px);
-            border-right:2px solid #c62828}
-  .gpcp .barra-op.atrasada{border-color:#c62828}
+  /* ⚠⚠ NADA DE TEXTURA ATRÁS DO TEXTO. Vitor (06/09/2026): "os atrasados estão ruins ainda" — e
+     estava certo: hachura diagonal por trás de letra é ilegível em qualquer opacidade, e numa barra
+     100% vencida ela cobria o rótulo inteiro. Eu tinha escrito no comentário anterior que quem
+     grita o atraso é a borda e o selo, e mesmo assim mantive a textura.
+     Agora o atraso é uma FAIXA SÓLIDA NO TOPO, espelhando a de apontamento no rodapé:
+       topo vermelho   = o pedaço que já venceu
+       rodapé na cor   = o pedaço que o Syneco já apontou
+     Duas faixas finas nas bordas, o meio livre para o texto. A largura continua dizendo QUANTO
+     venceu, que é a informação que a hachura carregava. */
+  .gpcp .barra-op .atrasado{position:absolute;left:0;top:0;height:4px;pointer-events:none;z-index:1;
+            background:#c62828;border-radius:0 0 2px 0}
+  /* a borda inteira em vermelho é o que identifica a barra atrasada de longe */
+  .gpcp .barra-op.atrasada{border-color:#c62828;box-shadow:0 1px 2px rgba(198,40,40,.28)}
   .gpcp .barra-op .selo.atr{background:#c62828;color:#fff;border-color:#c62828}
   .gpcp .sombra{position:absolute;height:23px;border-radius:5px;pointer-events:none;display:flex;
           align-items:center;padding:0 7px;border:1.5px dashed var(--c);background:var(--ct);opacity:.7}

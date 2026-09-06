@@ -32,7 +32,7 @@ export const MARKUP = `<div class="wrap">
       <span><i style="background:rgba(217,135,0,.55)"></i>apertado</span>
       <span><i style="background:repeating-linear-gradient(135deg,rgba(217,135,0,.5),rgba(217,135,0,.5) 3px,rgba(217,135,0,.14) 3px,rgba(217,135,0,.14) 6px)"></i>não cabe</span>
       <span class="sep"></span>
-      <span><i style="background:repeating-linear-gradient(135deg,rgba(198,40,40,.45),rgba(198,40,40,.45) 3px,rgba(198,40,40,.12) 3px,rgba(198,40,40,.12) 6px)"></i>atraso</span>
+      <span><i style="background:#c62828"></i>atraso</span>
     </span>
   </div>
 

@@ -1,7 +1,12 @@
 {
-  "build": 2887,
-  "gerado": "2026-09-06T03:05:59.166Z",
+  "build": 2888,
+  "gerado": "2026-09-06T03:10:48.203Z",
   "commits": [
+    {
+      "hash": "b6658fd2",
+      "data": "06/09/2026",
+      "titulo": "Gantt: o rótulo da barra volta a ser legível por cima das camadas"
+    },
     {
       "hash": "e7ef7d90",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7aeae94b",
       "data": "05/09/2026",
       "titulo": "Reancora o snapshot do LQC: o peso sem classe agora aparece no frete"
-    },
-    {
-      "hash": "702e604f",
-      "data": "05/09/2026",
-      "titulo": "Montagem: a aba passa a trazer a referência medida da casa"
     }
   ]
 }
