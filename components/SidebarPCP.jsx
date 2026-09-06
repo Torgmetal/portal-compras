@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Package, ListOrdered, FileText, Truck, FolderKanban, Printer, Factory, Gauge, Flame, Wrench,
+  Sparkles, Paintbrush,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -37,6 +38,12 @@ const menu = [
   // mesma coisa. "Fila de" fazia a solda parecer outra categoria de tela, e o menu já mistura duas
   // formas (por setor e por obra) sem dizer qual é qual.
   { href: "/pcp/fila-solda",   label: "Solda",            icon: Flame },
+  // ⚠ ACABAMENTO E JATO, na ordem do fluxo e com a mesma regra de nome que a solda: "Acabamento",
+  // não "Fila do Acabamento". Vitor (01/09/2026): as esteiras são a mesma coisa e precisam ler como
+  // a mesma coisa. Apontam para a FILA DE ENTRADA — /pcp/acabamento e /pcp/jato continuam no ar
+  // como a Programação do setor (quem já está lá dentro), fora do menu, como antes.
+  { href: "/pcp/fila-acabamento", label: "Acabamento",    icon: Paintbrush },
+  { href: "/pcp/fila-jato",    label: "Jato",             icon: Sparkles },
   // ⚠ o indicador ISO do setor mora no menu do setor, como nos outros — quem responde por ele é
   // quem opera, não a Qualidade.
   { href: "/pcp/indicadores",  label: "Indicadores",      icon: Gauge },

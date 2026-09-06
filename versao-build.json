@@ -1,7 +1,12 @@
 {
-  "build": 2892,
-  "gerado": "2026-09-06T15:06:00.178Z",
+  "build": 2893,
+  "gerado": "2026-09-06T15:23:50.474Z",
   "commits": [
+    {
+      "hash": "5e320ba3",
+      "data": "06/09/2026",
+      "titulo": "Gantt: acabamento e jato entram no quadro, com bancada única e bancada dupla"
+    },
     {
       "hash": "4409e9f6",
       "data": "06/09/2026",
@@ -146,11 +151,6 @@
       "hash": "f695ab7b",
       "data": "05/09/2026",
       "titulo": "PCP: quadro de programação arrastável acima do painel"
-    },
-    {
-      "hash": "f4967559",
-      "data": "05/09/2026",
-      "titulo": "Snapshot do LQC: entram a montagem em campo e a margem do item comercial"
     }
   ]
 }
