@@ -1,7 +1,12 @@
 {
-  "build": 2882,
-  "gerado": "2026-09-06T01:00:09.325Z",
+  "build": 2883,
+  "gerado": "2026-09-06T01:51:14.733Z",
   "commits": [
+    {
+      "hash": "816dd5b0",
+      "data": "05/09/2026",
+      "titulo": "Melhora cores, curvas e contornos do visualizador IFC nos portais"
+    },
     {
       "hash": "2ae37ed7",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "1ab0ba11",
       "data": "05/09/2026",
       "titulo": "graphify: um comando que se conserta sozinho, no lugar de quatro que quebravam"
-    },
-    {
-      "hash": "b47656d1",
-      "data": "05/09/2026",
-      "titulo": "Reancora o snapshot do LQC nas regras novas do Vitor"
     }
   ]
 }
