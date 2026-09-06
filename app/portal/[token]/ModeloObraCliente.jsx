@@ -30,6 +30,7 @@ export default function ModeloObraCliente({ token }) {
   const [modelo, setModelo] = useState(null);
   const [erro, setErro] = useState("");
   const [sel, setSel] = useState(null);
+  const [detalhesAbertos, setDetalhesAbertos] = useState(true);
   // ⚠ a RM abre por cima do painel, não troca a tela: o cliente estava olhando a peça e quer
   // conferir de onde ela veio — tirá-lo da peça para responder isso seria perder o lugar.
   const [rm, setRm] = useState(null);        // { numero, ...dados } | { numero, carregando } | { numero, erro }
@@ -231,6 +232,7 @@ export default function ModeloObraCliente({ token }) {
 
   const abrir = useCallback((item) => {
     setSel(item || null);
+    setDetalhesAbertos(true);
     const m = item?.marca;
     if (!m) return setPeca(null);
     setBuscando(true); setPeca(null);
@@ -278,13 +280,12 @@ export default function ModeloObraCliente({ token }) {
 
   return (
     <div className="space-y-3">
-      {modelo?.comparacao && <button onClick={() => setComparando(true)} className="text-[13px] font-semibold text-torg-blue border border-gray-200 rounded-lg px-3 py-2">Comparar com revisão anterior</button>}
       {/* ⚠⚠ A BARRA ENTRA NA TELA CHEIA. Vitor (03/09/2026): "dê a opção para apertar no menu de
           níveis e tipos dentro da tela cheia também". O `data-tela-cheia` é o que o botão procura
           para saber o que levar junto — estava só no quadro do 3D, então o seletor de modelo e o
           botão de filtros ficavam de fora justamente onde mais se precisa deles. */}
       <div data-tela-cheia className="flex flex-col gap-3 bg-white">
-      <div className="flex items-center gap-2 flex-wrap px-0 pt-0">
+      <div className="flex items-center gap-2 flex-wrap rounded-xl border border-gray-200 bg-slate-50/70 p-3">
       {lista.modelos.length > 1 && (
         <select value={modelo?.rel || ""} onChange={(e) => { setModelo(lista.modelos.find((m) => m.rel === e.target.value)); setSel(null); setPeca(null); }}
           className="text-[13px] border border-gray-200 rounded-lg px-3 py-2 max-w-full outline-none focus:border-[#006EAB]">
@@ -304,12 +305,12 @@ export default function ModeloObraCliente({ token }) {
           </button>
         )}
         {indice && (
-          <div className="relative">
-            <button onClick={() => setPainelEtapa((v) => !v)}
+          <div className="relative order-first">
+            <button aria-expanded={painelEtapa} onClick={() => setPainelEtapa((v) => !v)}
               className={`text-[12.5px] font-semibold px-3 py-2 rounded-lg border inline-flex items-center gap-2 ${
-                fSetores.size ? "bg-[#006EAB] text-white border-[#006EAB]" : "border-gray-200 text-gray-600 hover:border-[#006EAB] hover:text-[#006EAB]"}`}>
+                "bg-[#006EAB] text-white border-[#006EAB] hover:bg-[#00598b]"}`}>
               <Factory size={13} />
-              {fSetores.size ? rotuloEtapa([...fSetores][0]) : "Etapa de fabricação"}
+              Status da fabricação{fSetores.size > 0 ? ` · ${rotuloEtapa([...fSetores][0])}` : ""}
             </button>
             {painelEtapa && (
               <div className="absolute left-0 top-full mt-1 z-30 w-[250px] bg-white border border-gray-200 rounded-xl shadow-lg p-2">
@@ -351,7 +352,22 @@ export default function ModeloObraCliente({ token }) {
             <Eye size={12} /> mostrar {ocultos.size} oculta(s)
           </button>
         )}
+        {modelo?.comparacao && <button onClick={() => setComparando(true)} className="text-[12.5px] font-semibold text-[#006EAB] border border-gray-200 bg-white rounded-lg px-3 py-2">Comparar com revisão anterior</button>}
+        {sel && <button onClick={() => setDetalhesAbertos((v) => !v)} aria-expanded={detalhesAbertos} className="ml-auto text-[12px] font-semibold text-[#006EAB] px-3 py-2">{detalhesAbertos ? "Ocultar detalhes" : "Mostrar detalhes"}</button>}
       </div>
+      {(fSetores.size > 0 || fNiveis.size > 0 || fTipos.size > 0 || ocultos.size > 0 || esconderResto) && (
+        <div className="flex flex-wrap items-center gap-2 text-[11px]" aria-label="Filtros ativos">
+          <span className="text-gray-500">Nesta vista:</span>
+          {[
+            ...[...fSetores].map((v) => ({ chave: `etapa-${v}`, rotulo: rotuloEtapa(v), valor: v, definir: setFSetores })),
+            ...[...fNiveis].map((v) => ({ chave: `nivel-${v}`, rotulo: niveisNaTela.find((n) => n.chave === v)?.rotulo || v, valor: v, definir: setFNiveis })),
+            ...[...fTipos].map((v) => ({ chave: `tipo-${v}`, rotulo: v, valor: v, definir: setFTipos })),
+          ].map((f) => <button key={f.chave} aria-label={`Remover filtro ${f.rotulo}`} onClick={() => f.definir((atual) => { const proximo = new Set(atual); proximo.delete(f.valor); return proximo; })} className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 text-[#006EAB] px-3 py-1.5">{f.rotulo}<X size={12} /></button>)}
+          {ocultos.size > 0 && <span className="text-gray-500">{ocultos.size} peça(s) oculta(s)</span>}
+          {esconderResto && <span className="text-gray-500">Somente peças encontradas</span>}
+          <button onClick={() => { setFSetores(new Set()); setFNiveis(new Set()); setFTipos(new Set()); setOcultos(new Set()); setEsconderResto(false); setBusca(""); }} className="ml-auto font-semibold text-[#006EAB] px-2 py-1.5 hover:underline">Limpar filtros e exibir todas</button>
+        </div>
+      )}
 
       {/* ⚠ o modelo é a peça central da seção: altura generosa, painel ao lado só quando há peça
           escolhida — coluna vazia num portal de cliente parece defeito. */}
@@ -364,7 +380,7 @@ export default function ModeloObraCliente({ token }) {
           quadro da cena. */}
       <div className="flex flex-col lg:flex-row gap-0 border border-gray-200 rounded-xl overflow-hidden bg-white flex-1 min-h-0">
         {painel && indice && (
-          <aside data-painel-3d className="w-full lg:w-[260px] shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200 overflow-y-auto" style={{ maxHeight: 560 }}>
+          <aside data-painel-3d className="w-full lg:w-[260px] shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200 overflow-y-auto" style={{ maxHeight: "clamp(440px, 68vh, 760px)" }}>
             <div className="p-3.5 space-y-3.5">
               <div className="flex items-center justify-between">
                 <h4 className="text-[12px] font-bold text-[#0D1F3C] uppercase tracking-wide">Filtrar a vista</h4>
@@ -449,7 +465,7 @@ export default function ModeloObraCliente({ token }) {
             COLUNA — e aí `flex-1` passa a valer no eixo vertical, com base 0: a altura de 560
             morria e o canvas nascia com 300 px de altura desenhando nada. Em coluna ele é um bloco
             de altura própria; em linha, o item que estica. */}
-        <div data-cena-3d className="w-full lg:flex-1 min-w-0 relative" style={{ height: 560 }}>
+        <div data-cena-3d className="w-full lg:flex-1 min-w-0 relative" style={{ height: "clamp(440px, 68vh, 760px)" }}>
           {url && (
             <VisualizadorIfc key={url} url={url} onSelecionar={abrir} onIndice={receberIndice}
               visiveis={visiveis} ocultos={ocultos} esconderResto={esconderResto}
@@ -513,8 +529,8 @@ export default function ModeloObraCliente({ token }) {
           </div>
         )}
 
-        {sel && (
-          <aside data-painel-3d className="w-full lg:w-[330px] shrink-0 border-t lg:border-t-0 lg:border-l border-gray-200 overflow-y-auto" style={{ maxHeight: 560 }}>
+        {sel && detalhesAbertos && (
+          <aside data-painel-3d className="w-full lg:w-[330px] shrink-0 border-t lg:border-t-0 lg:border-l border-gray-200 overflow-y-auto" style={{ maxHeight: "clamp(440px, 68vh, 760px)" }}>
             <div className="p-4 space-y-3">
               <button onClick={() => setOcultos((v) => new Set(v).add(sel.id))}
                 className="text-[11.5px] text-gray-500 hover:text-[#0D1F3C] inline-flex items-center gap-1.5 border border-gray-200 rounded-md px-2 py-1">

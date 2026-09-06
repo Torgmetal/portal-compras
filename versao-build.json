@@ -1,7 +1,12 @@
 {
-  "build": 2888,
-  "gerado": "2026-09-06T03:10:48.203Z",
+  "build": 2889,
+  "gerado": "2026-09-06T03:12:34.787Z",
   "commits": [
+    {
+      "hash": "6b376996",
+      "data": "06/09/2026",
+      "titulo": "Gantt: o atraso sai de trás do texto e vira faixa no topo da barra"
+    },
     {
       "hash": "b6658fd2",
       "data": "06/09/2026",
@@ -146,11 +151,6 @@
       "hash": "82ba50d1",
       "data": "05/09/2026",
       "titulo": "Quebra o EstudoClient (4984 linhas) em módulos por responsabilidade"
-    },
-    {
-      "hash": "7aeae94b",
-      "data": "05/09/2026",
-      "titulo": "Reancora o snapshot do LQC: o peso sem classe agora aparece no frete"
     }
   ]
 }

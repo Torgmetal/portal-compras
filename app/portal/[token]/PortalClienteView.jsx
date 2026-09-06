@@ -159,7 +159,7 @@ export default function PortalClienteView({ token }) {
             <div className="absolute inset-0 bg-gradient-to-t from-[#0D1F3C] via-[#0D1F3C]/90 to-[#0D1F3C]/55" />
           </>
         )}
-        <div className="relative max-w-5xl mx-auto px-6 sm:px-8 pt-14 pb-16">
+        <div className={`relative mx-auto px-6 sm:px-8 ${abaAtiva === "MODELO" ? "max-w-[1600px] py-6" : "max-w-5xl pt-14 pb-16"}`}>
           {/* ── AS DUAS MARCAS, LADO A LADO ───────────────────────────────────────────────
               Vitor (22/08/2026): "quero que tenha o logo da Torg e logo do cliente".
 
@@ -177,7 +177,7 @@ export default function PortalClienteView({ token }) {
           {/* ⚠ o selo do Setembro Amarelo entra NESTA linha, não numa própria: Vitor pediu
               "posicionado correto, igual ao nosso logo" — mesma altura das marcas, encostado à
               direita. Linha separada faria ele flutuar acima do logo e desalinhar o cabeçalho. */}
-          <div className="flex items-center gap-6 mb-10">
+          <div className={`flex items-center gap-6 ${abaAtiva === "MODELO" ? "mb-4" : "mb-10"}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/torg-logo-white.png" alt="Torg Metal" className="h-14 sm:h-[72px] w-auto drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
               onError={(e) => { e.currentTarget.style.display = "none"; }} />
@@ -197,7 +197,7 @@ export default function PortalClienteView({ token }) {
           <p className="text-[11px] tracking-[0.22em] font-semibold text-[#9fc0dd] uppercase">
             Portal da obra
           </p>
-          <h1 className="text-3xl sm:text-5xl font-extrabold mt-2 leading-[1.08]">
+          <h1 className={`font-extrabold mt-2 leading-[1.08] ${abaAtiva === "MODELO" ? "text-2xl sm:text-3xl" : "text-3xl sm:text-5xl"}`}>
             {op.obra || `OP-${String(op.numero).padStart(3, "0")}`}
           </h1>
           <p className="text-[15px] sm:text-lg text-[#cfe0ef] mt-3">
@@ -207,7 +207,7 @@ export default function PortalClienteView({ token }) {
 
           <div className="h-[3px] w-24 bg-[#F4801F] rounded-full mt-7" />
 
-          {numeros.length > 0 && (
+          {abaAtiva !== "MODELO" && numeros.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-5 mt-9">
               {numeros.map((n, i) => (
                 <div key={i}>
@@ -222,7 +222,7 @@ export default function PortalClienteView({ token }) {
 
       {/* ── A MENSAGEM ───────────────────────────────────────────────────── */}
       {/* ⚠ vem ANTES dos dados, e não como rodapé: é o que dá sentido ao resto. */}
-      <section className="max-w-3xl mx-auto px-6 sm:px-8 -mt-8 relative">
+      {abaAtiva !== "MODELO" && <section className="max-w-3xl mx-auto px-6 sm:px-8 -mt-8 relative">
         <div className="bg-white rounded-2xl shadow-[0_2px_24px_rgba(13,31,60,0.08)] border border-gray-100 p-7 sm:p-9">
           <div className="flex items-center gap-2 text-[#006EAB] mb-4">
             <ShieldCheck size={17} />
@@ -238,7 +238,7 @@ export default function PortalClienteView({ token }) {
             </p>
           )}
         </div>
-      </section>
+      </section>}
 
       {/* ── O QUE MUDOU NAS LISTAS ────────────────────────────────────────
           Vitor (22/08/2026): "deixar com um alerta quando ele entrar para saber o que mudou".
@@ -255,7 +255,7 @@ export default function PortalClienteView({ token }) {
       {/* ── as áreas da obra ── */}
       {abas.length > 1 && (
         <nav className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-gray-100">
-          <div className="max-w-5xl mx-auto px-6 sm:px-8 flex gap-1 overflow-x-auto">
+          <div className={`mx-auto px-6 sm:px-8 flex gap-1 overflow-x-auto ${abaAtiva === "MODELO" ? "max-w-[1600px]" : "max-w-5xl"}`}>
             {/* ⚠ SEM CONTADOR. Ele contava SEÇÕES, não documentos — dava "1" em quase toda aba, o
                 que não informa nada e ainda sugere que a obra tem um documento só. Um número que
                 não ajuda a decidir onde clicar é ruído na primeira coisa que o cliente vê. */}
@@ -273,7 +273,7 @@ export default function PortalClienteView({ token }) {
         </nav>
       )}
 
-      <div className="max-w-5xl mx-auto px-6 sm:px-8 py-14 space-y-12">
+      <div className={`mx-auto px-4 sm:px-8 ${abaAtiva === "MODELO" ? "max-w-[1600px] py-6 space-y-6" : "max-w-5xl py-14 space-y-12"}`}>
         {/* ⚠ o resumo da área abre a aba: o cliente que clicou em "Qualidade" tem de saber o que
             esperar antes de rolar. */}
         {abaAtiva === "CONTATO" && <MatrizComunicacao />}
