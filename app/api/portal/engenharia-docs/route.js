@@ -13,6 +13,7 @@
 //
 // ⚠ NADA É PUBLICADO SOZINHO — a pasta tem revisão obsoleta e arquivo de trabalho. Escolher
 // continua obrigatório; o que a tela faz é baratear o esforço.
+import { comparacaoIfcSchema } from "@/lib/ifc-comparacao-publicacao";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -230,6 +231,42 @@ export async function POST(req) {
       ...(area === "ENGENHARIA" ? { tipo } : {}),
     }));
 
+  // O arquivo anterior é uma referência privada até a autorização explícita.
+  // Metadados e pertença à OP são conferidos no Graph; não confiar em nome/pasta do cliente.
+  const comComparacao = docs.filter((d) => d?.comparacaoIfc != null);
+  if (comComparacao.length) {
+    if (area !== "ENGENHARIA" || tipo !== "MODELO_3D") return NextResponse.json({ error: "Comparação disponível apenas para modelos IFC." }, { status: 400 });
+    if (comComparacao.length > 20) return NextResponse.json({ error: "Publique até 20 comparações por vez." }, { status: 400 });
+    try {
+      const base = await acharPastaOp(opNumero);
+      if (!base) throw new Error("Pasta da OP não encontrada.");
+      const auth = { Authorization: `Bearer ${await getAccessToken()}` };
+      const lerArquivo = async (id) => {
+        const r = await fetch(`${GRAPH}/drives/${process.env.SHAREPOINT_DRIVE_ID}/items/${encodeURIComponent(id)}?$select=id,name,size,file,parentReference,lastModifiedDateTime,eTag`, { headers: auth, cache: "no-store" });
+        if (!r.ok) throw new Error("Não consegui validar o IFC no servidor.");
+        const a = await r.json();
+        const pasta = decodeURIComponent(String(a.parentReference?.path || "").split("root:")[1] || "").replace(/^\/+/, "");
+        const raiz = base.replace(/^\/+|\/+$/g, "");
+        if (!a.file || !/\.ifc$/i.test(a.name) || !(pasta === raiz || pasta.startsWith(`${raiz}/`))) throw new Error("Escolha um IFC pertencente à pasta desta OP.");
+        if (!a.size || a.size > 60 * 1024 * 1024) throw new Error("Cada IFC da comparação deve ter até 60 MB.");
+        return { id: String(a.id), nome: a.name, tamanho: a.size, em: a.lastModifiedDateTime, etag: a.eTag || null, pasta: pasta.slice(raiz.length + 1) };
+      };
+      for (const doc of comComparacao) {
+        const parsed = comparacaoIfcSchema.safeParse(doc.comparacaoIfc);
+        if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+        const c = parsed.data, destino = limpo.find((d) => d.id === String(doc.id));
+        if (!destino || !/\.ifc$/i.test(destino.nome)) throw new Error("Selecione um IFC atual válido.");
+        if (c.anterior?.id === destino.id) throw new Error("Os IFCs anterior e atual devem ser arquivos diferentes.");
+        if (c.anterior) {
+          const atualIfc = await lerArquivo(destino.id);
+          const anterior = await lerArquivo(c.anterior.id);
+          Object.assign(destino, { nome: atualIfc.nome, tamanho: atualIfc.tamanho, em: atualIfc.em, etag: atualIfc.etag });
+          destino.comparacaoIfc = { publicar: c.publicar, anterior };
+        }
+      }
+    } catch (e) { return NextResponse.json({ error: e.message || "Não consegui validar a comparação." }, { status: 400 }); }
+  }
+
   // ⚠⚠ LPC/LE CRUA NÃO SE PUBLICA COM O PESO FECHADO. Vitor (26/08/2026): "as planilhas que estamos
   // conseguindo baixar não estão na formatação da Torg (…) a LPC precisa estar na aba da
   // Engenharia, a que está lá foi a que anexei da pasta e ela não está no nosso template, tanto que
@@ -293,7 +330,7 @@ export async function POST(req) {
   });
   await prisma.auditLog.create({
     data: { userId: user?.id || null, action: "PORTAL_DOCS_AREA", entity: "PortalCliente", entityId: opNumero,
-      diff: { op: opNumero, area, tipo: tipo || null, documentos: limpo.length, nomes: limpo.slice(0, 20).map((d) => d.nomeExibicao || d.nome) } },
+      diff: { op: opNumero, area, tipo: tipo || null, documentos: limpo.length, comparacoes: limpo.filter((d) => d.comparacaoIfc).map((d) => ({ atual: d.id, anterior: d.comparacaoIfc.anterior.id, publicar: d.comparacaoIfc.publicar })), nomes: limpo.slice(0, 20).map((d) => d.nomeExibicao || d.nome) } },
   }).catch(() => {});
 
   return NextResponse.json({ ok: true, area, tipo: tipo || null, escolhidos: limpo.length, total: (mapa[area] || []).length, aviso: avisoLista || undefined });

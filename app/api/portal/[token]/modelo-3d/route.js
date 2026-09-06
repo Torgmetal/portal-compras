@@ -11,6 +11,7 @@
 // ninguém os marcou — e é a mesma marcação que publica o download, então a decisão é uma só.
 //
 // ⚠ E só com a seção MODELO_3D ligada no portal da obra: publicar o modelo é decisão por obra.
+import { comparacaoIfcPublicada } from "@/lib/ifc-comparacao-publicacao";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAccessToken } from "@/lib/sharepoint";
@@ -50,6 +51,7 @@ export async function GET(req, { params }) {
     .filter((d) => d?.id && /\.ifc$/i.test(String(d?.nome || "")) && tipoDoDocEng(d) === "MODELO_3D");
 
   const modelos = escolhidos.map((d) => ({
+    ...(comparacaoIfcPublicada(d) ? { comparacao: { anteriorNome: d.comparacaoIfc.anterior.nome, anteriorEm: d.comparacaoIfc.anterior.em || null } } : {}),
     nome: d.nomeExibicao || d.nome,
     rel: String(d.id),
     kb: Number(d.tamanho) ? Math.round(Number(d.tamanho) / 1024) : null,
@@ -66,22 +68,39 @@ export async function GET(req, { params }) {
   }
 
   // ⚠ o id tem de estar na lista que acabamos de montar: o caminho nunca vem do navegador.
-  const escolhido = modelos.find((m) => m.rel === rel);
+  let escolhido = modelos.find((m) => m.rel === rel);
+  let arquivoId = rel;
+  let fonte = escolhidos.find((d) => String(d.id) === rel);
+  const comparando = new URL(req.url).searchParams.has("comparacao") || new URL(req.url).searchParams.get("revisao") === "anterior";
+  if (comparando && !comparacaoIfcPublicada(fonte)) return NextResponse.json({ error: "Comparação não publicada." }, { status: 404 });
+  if (new URL(req.url).searchParams.get("revisao") === "anterior") {
+    const c = comparacaoIfcPublicada(escolhidos.find((d) => String(d.id) === rel));
+    if (!c) return NextResponse.json({ error: "Comparação não publicada." }, { status: 404 });
+    arquivoId = c.anterior.id;
+    fonte = c.anterior;
+    escolhido = { nome: c.anterior.nome, grande: Number(c.anterior.tamanho) > TETO_MB * 1024 * 1024 };
+  }
   if (!escolhido) return NextResponse.json({ error: "Modelo não encontrado." }, { status: 404 });
   if (escolhido.grande) return NextResponse.json({ error: "Modelo grande demais para abrir no navegador." }, { status: 413 });
 
   try {
     const auth = { Authorization: `Bearer ${await getAccessToken()}` };
-    const r = await fetch(`https://graph.microsoft.com/v1.0/drives/${process.env.SHAREPOINT_DRIVE_ID}/items/${encodeURIComponent(rel)}/content`,
+    if (comparando && fonte?.etag) {
+      const meta = await fetch(`https://graph.microsoft.com/v1.0/drives/${process.env.SHAREPOINT_DRIVE_ID}/items/${encodeURIComponent(arquivoId)}?$select=eTag`, { headers: auth, cache: "no-store" });
+      if (!meta.ok || (await meta.json()).eTag !== fonte.etag) return NextResponse.json({ error: "Um IFC mudou desde a publicação. A Engenharia precisa republicar a comparação." }, { status: 409 });
+    }
+    const r = await fetch(`https://graph.microsoft.com/v1.0/drives/${process.env.SHAREPOINT_DRIVE_ID}/items/${encodeURIComponent(arquivoId)}/content`,
       { headers: auth, redirect: "follow", cache: "no-store" });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    if (Number(r.headers.get("content-length")) > TETO_MB * 1024 * 1024) return NextResponse.json({ error: "Modelo grande demais." }, { status: 413 });
     const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > TETO_MB * 1024 * 1024) return NextResponse.json({ error: "Modelo grande demais." }, { status: 413 });
     return new Response(buf, {
       status: 200,
       headers: {
         "Content-Type": "application/octet-stream",
         "Content-Length": String(buf.length),
-        "Cache-Control": "private, max-age=3600",
+        "Cache-Control": comparando ? "private, no-store" : "private, max-age=3600",
         "Content-Disposition": `inline; filename="${encodeURIComponent(escolhido.nome)}"`,
       },
     });

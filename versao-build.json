@@ -1,7 +1,12 @@
 {
-  "build": 2885,
-  "gerado": "2026-09-06T02:03:54.315Z",
+  "build": 2886,
+  "gerado": "2026-09-06T02:06:05.861Z",
   "commits": [
+    {
+      "hash": "f2fba741",
+      "data": "05/09/2026",
+      "titulo": "Corte: chapa sem largura continua sendo chapa"
+    },
     {
       "hash": "27939c72",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "0c525498",
       "data": "05/09/2026",
       "titulo": "Estudo: montagem em campo, e margem própria para o item comercial"
-    },
-    {
-      "hash": "6ee939a8",
-      "data": "05/09/2026",
-      "titulo": "Importar LQC: ler os três blocos da planilha comercial e os itens comerciais"
     }
   ]
 }

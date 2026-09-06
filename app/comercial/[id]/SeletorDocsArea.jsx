@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Loader2, FolderOpen, Folder, FolderPlus, Check, AlertCircle, RefreshCw, ChevronRight, FileText, CornerLeftUp, Pencil, X, Lock, Trash2 } from "lucide-react";
 
 const kb = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round((n || 0) / 1024))} KB`);
@@ -32,6 +32,13 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea, tipo, nomeTi
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
 
+  const [alvoRevisao, setAlvoRevisao] = useState(null);
+  const iniciou = useRef(false);
+  const alterarComparacao = (id, dados) => setSel((m) => {
+    const n = new Map(m), doc = n.get(String(id));
+    if (doc) n.set(String(id), { ...doc, comparacaoIfc: { publicar: false, anterior: null, ...doc.comparacaoIfc, ...dados } });
+    return n;
+  });
   const rotulo = nomeTipo || nomeArea;
 
   const carregar = useCallback(async (p) => {
@@ -47,13 +54,13 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea, tipo, nomeTi
       setCaminho(j.caminho ?? "");
       // ⚠ a seleção do TIPO inteiro, não só o que está nesta pasta: navegar não pode desmarcar o
       // que foi escolhido noutra pasta.
-      setSel(new Map((j.selecionados || []).map((x) => [String(x.id), x])));
+      if (!iniciou.current) { setSel(new Map((j.selecionados || []).map((x) => [String(x.id), x]))); iniciou.current = true; }
       setFora(j.foraDoPadrao || []);
       if (j.error) setErro(j.error);
       setAviso(j.aviso || "");
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
   }, [opNumero, area, tipo]);
-  useEffect(() => { carregar(null); }, [carregar]);
+  useEffect(() => { iniciou.current = false; setAlvoRevisao(null); carregar(null); }, [carregar]);
 
   // ⚠ a pasta é EXPANDIDA aqui: o portal continua publicando uma LISTA de arquivos escolhidos, e é
   // isso que impede revisão nova de entrar sozinha depois. A pasta é o atalho, não a regra.
@@ -71,7 +78,7 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea, tipo, nomeTi
       setSel((m) => {
         const n = new Map(m);
         for (const a of arqs) {
-          n.set(String(a.id), { id: a.id, nome: a.nome, nomeExibicao: n.get(String(a.id))?.nomeExibicao || null, pasta: a.pasta || cam, tamanho: a.tamanho, em: a.em });
+          n.set(String(a.id), { ...n.get(String(a.id)), id: a.id, nome: a.nome, nomeExibicao: n.get(String(a.id))?.nomeExibicao || null, pasta: a.pasta || cam, tamanho: a.tamanho, em: a.em });
         }
         return n;
       });
@@ -81,7 +88,7 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea, tipo, nomeTi
 
   const marcar = (a, ligar) => setSel((m) => {
     const n = new Map(m);
-    if (ligar) n.set(String(a.id), { id: a.id, nome: a.nome, nomeExibicao: n.get(String(a.id))?.nomeExibicao || null, pasta: a.pasta ?? (caminho || ""), tamanho: a.tamanho, em: a.em });
+    if (ligar) n.set(String(a.id), { ...n.get(String(a.id)), id: a.id, nome: a.nome, nomeExibicao: n.get(String(a.id))?.nomeExibicao || null, pasta: a.pasta ?? (caminho || ""), tamanho: a.tamanho, em: a.em });
     else n.delete(String(a.id));
     return n;
   });
@@ -98,7 +105,7 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea, tipo, nomeTi
     try {
       const r = await fetch("/api/portal/engenharia-docs", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero, area, tipo: tipo || undefined, docs: [...sel.values()], limparForaDoPadrao: limparFora }),
+        body: JSON.stringify({ opNumero, area, tipo: tipo || undefined, docs: [...sel.values()].map((doc) => ({ ...doc, ...(doc.comparacaoIfc ? { comparacaoIfc: { publicar: doc.comparacaoIfc.publicar === true, anterior: doc.comparacaoIfc.anterior ? { id: String(doc.comparacaoIfc.anterior.id) } : null } } : {}) })), limparForaDoPadrao: limparFora }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao salvar");
@@ -148,6 +155,17 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea, tipo, nomeTi
         </div>
       )}
 
+      {tipo === "MODELO_3D" && [...sel.values()].filter((a) => /\.ifc$/i.test(a.nome)).map((a) => (
+        <div key={`revisao-${a.id}`} className="border-t border-gray-100 pt-2 text-[12px] space-y-2">
+          <p className="font-semibold">Comparação · {a.nomeExibicao || a.nome}</p>
+          <p>IFC anterior: {a.comparacaoIfc?.anterior?.nome || "não selecionado"}</p>
+          <button type="button" onClick={() => setAlvoRevisao(String(a.id))} className="text-torg-blue hover:underline">Selecionar IFC anterior no servidor</button>
+          {a.comparacaoIfc?.anterior && <button type="button" onClick={() => alterarComparacao(a.id, { anterior: null, publicar: false })} className="ml-3 text-torg-orange">Remover anterior</button>}
+          <label className="flex gap-2 items-center"><input type="checkbox" disabled={!a.comparacaoIfc?.anterior} checked={a.comparacaoIfc?.publicar === true} onChange={(e) => alterarComparacao(a.id, { publicar: e.target.checked })} />Mostrar comparação ao cliente</label>
+          <p className="text-torg-gray">Só ficará disponível após marcar esta opção e publicar a seleção. Escolha arquivos do mesmo trecho da obra.</p>
+        </div>
+      ))}
+      {alvoRevisao && <div className="text-[12px] bg-blue-50 p-2">Navegue até o IFC anterior e clique em “Usar como anterior”. Ele será vinculado somente à comparação. <button type="button" className="underline" onClick={() => setAlvoRevisao(null)}>Cancelar</button></div>}
       {/* ── trilha ── */}
       <div className="flex items-center gap-1 text-[12px] flex-wrap">
         <button onClick={() => carregar("")} className={`hover:underline ${trilha.length ? "text-torg-blue" : "font-semibold text-torg-dark"}`}>{tipo ? rotulo : "OP"}</button>
@@ -241,6 +259,7 @@ export default function SeletorDocsArea({ opNumero, area, nomeArea, tipo, nomeTi
                 )}
                 <span className="text-[10px] text-torg-gray-light shrink-0">{kb(a.tamanho)}</span>
               </label>
+              {alvoRevisao && /\.ifc$/i.test(a.nome) && String(a.id) !== alvoRevisao && <button type="button" className="text-[12px] text-torg-blue ml-6 underline" onClick={() => { alterarComparacao(alvoRevisao, { anterior: { ...a }, publicar: false }); setAlvoRevisao(null); }}>Usar como anterior</button>}
               {/* ── o nome que o cliente vê ── */}
               {on && (
                 editando === String(a.id) ? (

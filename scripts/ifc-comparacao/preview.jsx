@@ -1,0 +1,5 @@
+import React, {useState} from 'react';
+import {createRoot} from 'react-dom/client';
+import ComparadorIfc from '../../components/ComparadorIfc';
+import SeletorDocsArea from '../../app/comercial/[id]/SeletorDocsArea';
+function App(){const [caso,setCaso]=useState('mudanca');return <main><h1>Comparação IFC · validação local</h1><nav><button onClick={()=>setCaso('mudanca')}>Arquivos com diferenças conhecidas</button><button onClick={()=>setCaso('igual')}>Mesmo IFC</button><button onClick={()=>setCaso('op89')}>Mesmo IFC real OP89</button><button onClick={()=>setCaso('seletor')}>Publicação (dados de teste)</button></nav>{caso==='seletor'?<SeletorDocsArea opNumero="TESTE" area="ENGENHARIA" tipo="MODELO_3D" nomeTipo="Modelo 3D"/>:<ComparadorIfc key={caso} anteriorUrl={caso==='op89'?'/op89.ifc':'/anterior.ifc'} atualUrl={caso==='op89'?'/op89.ifc':caso==='igual'?'/anterior.ifc':'/atual.ifc'} anteriorNome={caso==='op89'?'OP89 · arquivo real':'Revisão A de teste'} atualNome={caso==='op89'?'OP89 · mesmo arquivo':caso==='igual'?'Revisão A de teste':'Revisão B de teste'} onFechar={()=>setCaso('seletor')}/>}</main>};createRoot(document.getElementById('root')).render(<App/>);

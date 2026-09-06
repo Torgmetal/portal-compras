@@ -15,6 +15,8 @@
 // "pendente" ou "não conferido" — é a mesma regra dos documentos ao cliente.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Box, SlidersHorizontal, Search, EyeOff, Eye, FileSpreadsheet, X, Factory } from "lucide-react";
+import dynamic from "next/dynamic";
+const ComparadorIfc = dynamic(() => import("@/components/ComparadorIfc"), { ssr: false, loading: () => <p>Preparando comparação…</p> });
 import VisualizadorIfc from "@/components/VisualizadorIfc";
 
 const SEM = "sem informação";
@@ -23,6 +25,7 @@ const fmtKg = (v) => (v == null ? null : `${Math.round(v).toLocaleString("pt-BR"
 const fmtData = (d) => { try { return new Date(d).toLocaleDateString("pt-BR"); } catch { return ""; } };
 
 export default function ModeloObraCliente({ token }) {
+  const [comparando, setComparando] = useState(false);
   const [lista, setLista] = useState(null);
   const [modelo, setModelo] = useState(null);
   const [erro, setErro] = useState("");
@@ -268,8 +271,14 @@ export default function ModeloObraCliente({ token }) {
   }
   if (!lista.modelos?.length) return <p className="text-[13px] text-gray-500">O modelo desta obra não está disponível aqui.</p>;
 
+  if (comparando && modelo?.comparacao && url) return <ComparadorIfc
+    key={url} atualUrl={`${url}&comparacao=1`} anteriorUrl={`${url}&revisao=anterior`}
+    atualNome={modelo.nome} anteriorNome={modelo.comparacao.anteriorNome}
+    onFechar={() => setComparando(false)} />;
+
   return (
     <div className="space-y-3">
+      {modelo?.comparacao && <button onClick={() => setComparando(true)} className="text-[13px] font-semibold text-torg-blue border border-gray-200 rounded-lg px-3 py-2">Comparar com revisão anterior</button>}
       {/* ⚠⚠ A BARRA ENTRA NA TELA CHEIA. Vitor (03/09/2026): "dê a opção para apertar no menu de
           níveis e tipos dentro da tela cheia também". O `data-tela-cheia` é o que o botão procura
           para saber o que levar junto — estava só no quadro do 3D, então o seletor de modelo e o
