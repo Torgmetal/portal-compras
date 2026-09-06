@@ -1,20 +1,21 @@
 {
-<<<<<<< HEAD
-  "build": 2897,
-<<<<<<< HEAD
-  "gerado": "2026-09-06T15:51:34.802Z",
-=======
-  "gerado": "2026-09-06T16:05:10.471Z",
->>>>>>> 720225a6 (Encerra as 11 OPs que produziram e pararam, e diz por que 8 ficaram de fora)
-=======
-  "build": 2898,
-  "gerado": "2026-09-06T16:05:26.903Z",
->>>>>>> 6f1f7870 (PCP: a fila da pintura, e o teto que cortava as filas em silêncio)
+  "build": 2900,
+  "gerado": "2026-09-06T16:15:55.119Z",
   "commits": [
     {
-      "hash": "720225a6",
+      "hash": "1fe51bc4",
+      "data": "06/09/2026",
+      "titulo": "PCP: a fila da pintura, e o teto que cortava as filas em silêncio"
+    },
+    {
+      "hash": "6aa8dc8a",
       "data": "06/09/2026",
       "titulo": "Encerra as 11 OPs que produziram e pararam, e diz por que 8 ficaram de fora"
+    },
+    {
+      "hash": "cbe674e6",
+      "data": "06/09/2026",
+      "titulo": "refactor: moderniza ícones de acesso aos portais"
     },
     {
       "hash": "81028b4a",
@@ -150,16 +151,6 @@
       "hash": "72ef4c13",
       "data": "05/09/2026",
       "titulo": "Gantt do PCP: saem as pontas arrastáveis"
-    },
-    {
-      "hash": "f1315a74",
-      "data": "05/09/2026",
-      "titulo": "Gantt do PCP: pontas arrastáveis, fim de semana só quando você escolhe"
-    },
-    {
-      "hash": "6df7bcda",
-      "data": "05/09/2026",
-      "titulo": "PCP: o erro da listagem passa a dizer o que aconteceu"
     }
   ]
 }
