@@ -1,6 +1,10 @@
 {
   "build": 2897,
+<<<<<<< HEAD
   "gerado": "2026-09-06T15:51:34.802Z",
+=======
+  "gerado": "2026-09-06T16:05:10.471Z",
+>>>>>>> 720225a6 (Encerra as 11 OPs que produziram e pararam, e diz por que 8 ficaram de fora)
   "commits": [
     {
       "hash": "81028b4a",
