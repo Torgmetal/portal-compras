@@ -1,7 +1,12 @@
 {
-  "build": 2879,
-  "gerado": "2026-09-06T00:13:30.821Z",
+  "build": 2880,
+  "gerado": "2026-09-06T00:14:14.852Z",
   "commits": [
+    {
+      "hash": "b7329f80",
+      "data": "05/09/2026",
+      "titulo": "Regularização de GRD: o corte entra junto, e ele é o da preparação"
+    },
     {
       "hash": "64056fae",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5d957687",
       "data": "05/09/2026",
       "titulo": "Quebra a pior função do repositório: PATCH de tarefa, complexidade 140 -> 31"
-    },
-    {
-      "hash": "84dc5cfc",
-      "data": "05/09/2026",
-      "titulo": "Burn-down: no-unused-vars de 427 para 5, por AST e não por regex"
     }
   ]
 }

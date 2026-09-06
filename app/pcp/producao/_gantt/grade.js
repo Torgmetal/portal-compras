@@ -1,0 +1,141 @@
+// ─── O DESENHO DA GRADE ────────────────────────────────────────────────────────────────────────
+//
+// ⚠ HTML EM STRING, DE PROPÓSITO. São centenas de barras posicionadas em pixel, redesenhadas a cada
+// pointermove do arraste. Reconstruir isto com estado do React re-renderizaria a grade inteira a
+// cada movimento — ver o cabeçalho de GanttProgramacao.jsx.
+//
+// ⚠ A BARRA NÃO VEM PREENCHIDA: contorno + fundo esmaecido = PROGRAMADO; a faixa sólida embaixo é o
+// que o Syneco já apontou. Vermelho é só ATRASO — sobrecarga é hachura âmbar na régua de baixo.
+//
+// ⚠ A SOMBRA TRACEJADA É PREVISÃO, NÃO PROGRAMAÇÃO: onde a OP cai se o atraso não for recuperado.
+// Nada disso está no banco. Desenhar direto no lugar novo faria a tela mentir sobre o que está
+// gravado — foi essa confusão que escondeu 87 conjuntos da Larissa em 04/09/2026.
+//
+// ⚠ O estado (inicio, painel, setoresOn) entra por GETTER: `desenhar` é chamado de dezenas de
+// lugares e sempre tem de ler o valor de agora, não o da montagem.
+
+export function criarGrade(dep){
+
+  function sombrasDoEmpurrao(runs, emp, inicio, larg){
+    if(!emp) return "";
+    let h = "";
+    for(const r of runs){
+      if(dep.DIAS[r.ini] < dep.HOJE) continue;
+      const ni = r.ini+emp, nf = r.fim+emp;
+      if(nf<inicio || ni>=inicio+larg) continue;
+      const a = Math.max(ni,inicio), b = Math.min(nf, inicio+larg-1);
+      const x = (a-inicio)*dep.COL+3, w = (b-a+1)*dep.COL-7;
+      h += '<div class="sombra" style="left:'+x+'px;width:'+w+'px;top:'+(r.faixa*30+5)+'px;'
+        +  '--c:'+dep.corDaOp(r.op)+';--ct:'+dep.tintaOp(r.op)+'" title="OP-'+r.op+' cai aqui se o atraso '
+        +  'não for recuperado ('+emp+' dia útil'+(emp>1?'s':'')+' de empurrão)">'
+        +  (w>=90?'<b>OP-'+r.op+' →</b>':'')+'</div>';
+    }
+    return h;
+  }
+
+  /* ── desenho da dep.grade ───────────────────────────────────────────────────────── */
+  function desenhar(){
+    const runs = dep.montarRuns();
+    const janela = dep.DIAS.slice(dep.getInicio(), dep.getInicio()+dep.JANELA);
+    const larg = janela.length;
+    let html = '<div class="linha cabdia"><div class="rotulo">Setor / recurso</div><div class="trilho" style="width:'+(larg*dep.COL)+'px"><div class="celulas">';
+    for(const s of janela){
+      const d=dep.d0(s);
+      html += '<div class="dia'+(s===dep.HOJE?" hoje":"")+(dep.fdsISO(s)?" fds":"")+'"><div class="dsem">'+dep.DSEM[d.getUTCDay()]+'</div>'
+           +  '<div class="dnum">'+String(d.getUTCDate()).padStart(2,"0")+'</div>'
+           +  '<div class="dmes">'+dep.MES[d.getUTCMonth()]+'</div></div>';
+    }
+    html += '</div></div></div>';
+
+    for(const setor of dep.SETORES){
+      if(!dep.getSetoresOn().has(setor)) continue;
+      const doSetor = runs.filter(r=>r.setor===setor);
+      const pc = doSetor.reduce((s,r)=>s+r.pecas,0), kg = doSetor.reduce((s,r)=>s+r.kg,0);
+      const temNaJanela = doSetor.some(r=>r.fim>=dep.getInicio() && r.ini<dep.getInicio()+larg);
+      const e = dep.estado.get(setor);
+      const aberto = e ? e==="a" : temNaJanela;
+      const resumo = doSetor.length
+        ? doSetor.length+' programações · '+pc.toLocaleString("pt-BR")+' peças · '+dep.nkg(kg)+' kg'
+          + (temNaJanela ? "" : ' — <b>nada nesta janela</b>')
+        : 'sem programação';
+      html += '<div class="setor" data-toggle="'+setor+'"><div class="rotulo"><span class="caret">'+(aberto?"▼":"►")+'</span>'
+           +  '<b>'+setor+'</b></div><div class="resumo">'+resumo+'</div></div>';
+      if(!aberto) continue;
+
+      for(const rec of dep.RECURSOS[setor]){
+        const meus = doSetor.filter(r=>r.recurso===rec.k).sort((a,b)=>a.ini-b.ini||b.fim-a.fim);
+        const faixas=[];
+        for(const r of meus){
+          let f = faixas.findIndex(x=>x < r.ini);
+          if(f<0){ f=faixas.length; faixas.push(-1); }
+          faixas[f]=r.fim; r.faixa=f;
+        }
+        const naJanela = meus.filter(r=>r.fim>=dep.getInicio() && r.ini<dep.getInicio()+larg).length;
+        const emp = dep.empurraoDoRecurso(setor, rec.k);
+        const alt = naJanela ? Math.max(1,faixas.length)*30 + 8 + 16 : 38;
+        html += '<div class="linha'+(rec.k?"":" pousio")+'" data-setor="'+setor+'" data-rec="'+(rec.k||"")+'" '
+             +  'data-row="'+setor+'|'+(rec.k||"")+'" style="min-height:'+alt+'px">';
+        html += '<div class="rotulo"><b>'+rec.nome+'</b>'
+             +  (rec.obs?'<small>'+rec.obs+'</small>':(rec.cap>1?'<small>meta '+dep.nkg(rec.cap)+' kg/dia</small>':'<small>1 bancada-dia</small>'))+'</div>';
+        html += '<div class="trilho" style="width:'+(larg*dep.COL)+'px"><div class="celulas">';
+        for(const s of janela) html += '<div class="cel'+(dep.fdsISO(s)?" fds":"")+'" data-dia="'+s+'"></div>';
+        html += '</div><div class="barras">';
+        for(const r of meus){
+          if(r.fim<dep.getInicio() || r.ini>=dep.getInicio()+larg) continue;
+          const a = Math.max(r.ini,dep.getInicio()), b = Math.min(r.fim, dep.getInicio()+larg-1);
+          const x = (a-dep.getInicio())*dep.COL+3, w = (b-a+1)*dep.COL-7;
+          const cabe = w >= 200, dias = r.dias, pend = r.pecas-r.feitas;
+          const fr = r.pecas>0 ? Math.min(1, r.feitas/r.pecas) : 0;
+          /* a parte da barra que já venceu e não foi apontada */
+          const atrasados = r.lotes.filter(dep.loteAtrasado);
+          const atrasoAte = atrasados.length ? Math.max(...atrasados.map(l=>dep.IDX.get(l.dia))) : -1;
+          const larguraAtraso = atrasoAte>=0 ? ((Math.min(atrasoAte,b)-a+1)/(b-a+1))*100 : 0;
+          /* ⚠ sábado e domingo passaram a ter coluna (71cef05a), então `dep.DIAS` já não é só dia útil:
+             o atraso desconta o fim de semana. Sem isso o que venceu na sexta apareceria como 3 dias
+             de atraso na segunda, e a fábrica não trabalhou nesses dois. */
+          const diasAtraso = atrasoAte>=0
+            ? dep.DIAS.slice(Math.min(...atrasados.map(l=>dep.IDX.get(l.dia))))
+                  .filter(d=>d<dep.HOJE && !dep.fdsISO(d)).length : 0;
+          const foco = dep.getPainel() && dep.getPainel().setor===r.setor && dep.getPainel().recurso===r.recurso && dep.getPainel().op===r.op && dep.getPainel().ini===r.ini;
+          const dica = "OP-"+r.op+(r.obra?" — "+r.obra:"")+"\n"+rec.nome+" · "
+            + (dias>1 ? dep.dbr(dep.DIAS[r.ini])+" a "+dep.dbr(dep.DIAS[r.fim])+" ("+dias+" dias)" : dep.dbr(dep.DIAS[r.ini]))
+            + "\n"+r.pecas+" peças · "+dep.nkg(r.kg)+" kg"
+            + "\nSyneco apontou "+r.feitas+" de "+r.pecas+" ("+Math.round(fr*100)+"%)"
+            + (diasAtraso>0 ? "\n⚠ atrasada "+diasAtraso+" dia(s) úteis — "+pend+" peça(s) pendentes" : "")
+            + (r.semGrd ? "\n"+r.semGrd+" projeto(s) ainda sem GRD impressa" : "\nprojetos todos impressos")
+            + "\n\nclique para ver os projetos · arraste para remanejar";
+          html += '<div class="barra-op'+(r.mexida?" mexida":"")+(foco?" foco":"")+(diasAtraso>0?" atrasada":"")+'" data-run="'+r.id+'" '
+               +  'title="'+dica.replace(/"/g,"&quot;")+'" style="left:'+x+'px;width:'+w+'px;top:'+(r.faixa*30+5)+'px;'
+               +  '--c:'+dep.corDaOp(r.op)+';--ct:'+dep.tintaOp(r.op)+'">'
+               +  (fr>0?'<div class="prog" style="width:'+(fr*100).toFixed(1)+'%"></div>':"")
+               +  (larguraAtraso>0?'<div class="atrasado" style="width:'+larguraAtraso.toFixed(1)+'%"></div>':"")
+               +  '<b>OP-'+r.op+'</b><span>'+(cabe ? r.pecas+' pç · '+dep.nkg(r.kg)+' kg' : r.pecas+' pç')+'</span>'
+               +  (cabe && diasAtraso>0?'<span class="selo atr">atrasada '+diasAtraso+' d</span>':"")
+               +  (cabe && r.adiado>0?'<span class="selo">adiada '+r.adiado+'×</span>':"")
+               +  (cabe && r.feitas>0?'<span class="selo">'+Math.round(fr*100)+'% · '+pend+' a fazer</span>':"")
+               +  (r.semGrd?'<div class="semgrd" title="'+r.semGrd+' sem GRD"></div>':"")
+               +  (r.ini<dep.getInicio()?'<div class="corta e">◀</div>':"")+(r.fim>dep.getInicio()+larg-1?'<div class="corta d">▶</div>':"")
+               +  '</div>';
+        }
+        /* ⚠ SOMBRA = PREVISÃO, NÃO PROGRAMAÇÃO. Onde a OP cai se o atraso não for recuperado. Nada
+           disso está no banco: vira alteração pendente só quando o PCP aplicar, e programação só
+           depois do "Salvar". Desenhar direto no lugar novo faria a tela mentir sobre o que está
+           gravado - foi exatamente essa confusão que escondeu 87 conjuntos da Larissa em 04/09. */
+        html += sombrasDoEmpurrao(meus, emp, dep.getInicio(), larg);
+        html += '</div>'+(naJanela?'<div class="cargas">':'<div class="cargas" hidden>');
+        for(const s of janela){
+          const o = dep.ocup(setor, rec.k, s);
+          html += '<div class="cg '+dep.classeOc(o)+(dep.fdsISO(s)?" fds":"")+'">'
+               +  (o>0 ? '<div class="f" style="width:'+Math.min(100,o*100)+'%"></div>' : "")
+               +  (o>=0.005 ? '<span>'+dep.rotuloOc(o)+'</span>' : "")+'</div>';
+        }
+        html += '</div></div></div>';
+      }
+    }
+    dep.grade.innerHTML = html;
+    dep.$("periodo").textContent = dep.dbr(janela[0])+" a "+dep.dbr(janela[larg-1])+" · "+dep.d0(janela[0]).getUTCFullYear();
+    for(const el of dep.grade.querySelectorAll(".barra-op")) el.addEventListener("pointerdown", dep.pegar());
+  }
+
+  return { desenhar };
+}
