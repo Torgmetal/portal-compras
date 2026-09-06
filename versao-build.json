@@ -1,7 +1,12 @@
 {
-  "build": 2890,
-  "gerado": "2026-09-06T03:41:55.911Z",
+  "build": 2891,
+  "gerado": "2026-09-06T03:42:09.781Z",
   "commits": [
+    {
+      "hash": "06bfdf5f",
+      "data": "06/09/2026",
+      "titulo": "Integra acervo tratado de fotos e vídeos aos portais"
+    },
     {
       "hash": "1509157a",
       "data": "06/09/2026",
@@ -146,11 +151,6 @@
       "hash": "a4d2f36a",
       "data": "05/09/2026",
       "titulo": "Duas sujeiras que o meu removedor de código morto deixou nas integrações"
-    },
-    {
-      "hash": "926b6929",
-      "data": "05/09/2026",
-      "titulo": "As ferramentas do split entram no repositório"
     }
   ]
 }
