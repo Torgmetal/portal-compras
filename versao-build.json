@@ -1,7 +1,12 @@
 {
-  "build": 2878,
-  "gerado": "2026-09-05T23:10:53.143Z",
+  "build": 2879,
+  "gerado": "2026-09-06T00:13:30.821Z",
   "commits": [
+    {
+      "hash": "64056fae",
+      "data": "05/09/2026",
+      "titulo": "Regulariza a GRD de montagem dos conjuntos que a fábrica montou fora do portal"
+    },
     {
       "hash": "8e7046b3",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "84dc5cfc",
       "data": "05/09/2026",
       "titulo": "Burn-down: no-unused-vars de 427 para 5, por AST e não por regex"
-    },
-    {
-      "hash": "3c326640",
-      "data": "05/09/2026",
-      "titulo": "Zera o prefer-const: separa as declarações mistas"
     }
   ]
 }

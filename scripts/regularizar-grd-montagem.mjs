@@ -18,8 +18,16 @@
  * montagem daquele conjunto de fato começou. Está preenchida em 100% dos casos (conferido em
  * 05/09/2026). O `MesApontamento` não serve: ele não guarda a marca, só `descricaoItem`.
  *
- * ⚠ SÓ MONTAGEM. A solda trabalha sobre o mesmo conjunto e o mesmo desenho que a montagem baixou —
- * decisão do Vitor em 05/09/2026. Por isso o portal nunca teve GRD de SOLDA, e isso não é furo.
+ * ⚠ DOIS SETORES, E SÓ DOIS:
+ *   MONTAGEM — o desenho do conjunto. A SOLDA trabalha sobre o mesmo conjunto e o mesmo desenho,
+ *              então não tem GRD própria (Vitor, 05/09/2026). Zero GRDs de SOLDA não é furo.
+ *   CORTE    — o croqui. Serve também à PREPARAÇÃO: "as GRDs servem para a Preparação também"
+ *              (Vitor, 05/09/2026). É a MESMA GRD, não uma segunda.
+ *
+ * ⚠ POR QUE A DATA DO CORTE SAI DE `setor='Corte'` E NÃO DE `'Preparação'`: nas obras vivas o Syneco
+ * aponta tudo em Corte — ele separa as operações 10 e 20, mas a fábrica lança na 10. Das 1.295
+ * ordens de Preparação com produção, 1.285 são ÓRFÃS (sem opId), de obras T08..T65 que nunca
+ * chegaram a existir como OP no portal. Procurar a data em "Preparação" acharia quase nada.
  *
  * ⚠ SÓ OBRA VIVA (ABERTA · EM_EXECUCAO · ATRASADA). Obra encerrada pode ter Data Book fechado, e
  * criar GRD depois disso mexe em documento já entregue.
@@ -39,12 +47,23 @@ const AUTOR = "Vitor Costa · regularização";
 const ARQUIVO = "(regularização — desenho não emitido pelo portal)";
 const VIVAS = ["ABERTA", "EM_EXECUCAO", "ATRASADA"];
 
+// setor do portal → { setor no Syneco, valores de GrdLiberacao.setor que JÁ contam como cobertura }
+const SETORES = {
+  MONTAGEM: { syneco: "Montagem", cobre: ["MONTAGEM"] },
+  CORTE:    { syneco: "Corte",    cobre: ["CORTE", "PREPARACAO"] },
+};
+
 // Vitor (05/09/2026): "a OP 84 e 67 não precisa de GRD".
 const FORA = ["067", "084"];
 
 const args = process.argv.slice(2);
 const aplicar = args.includes("--aplicar");
 // aceita lista: --op 097,103,089
+const setorArg = (() => { const i = args.indexOf("--setor");
+  return (i >= 0 ? String(args[i + 1] || "") : "MONTAGEM").toUpperCase(); })();
+if (!SETORES[setorArg]) { console.error(`--setor inválido. Use: ${Object.keys(SETORES).join(" | ")}`); process.exit(1); }
+const { syneco: SETOR_SYNECO, cobre: COBRE } = SETORES[setorArg];
+
 const soOp = (() => { const i = args.indexOf("--op");
   return i >= 0 ? String(args[i + 1] || "").split(",").map((x) => x.trim()).filter(Boolean) : null; })();
 
@@ -55,13 +74,13 @@ const linhas = await prisma.$queryRawUnsafe(`
   LEFT JOIN "GrdLiberacao" g
     ON g."opNumero" = o.numero
    AND UPPER(TRIM(g.marca)) = UPPER(TRIM(m.item))
-   AND UPPER(g.setor) = 'MONTAGEM'
-  WHERE m."produzidoUn" > 0 AND m.setor = 'Montagem'
+   AND UPPER(g.setor) = ANY($3::text[])
+  WHERE m."produzidoUn" > 0 AND m.setor = $4
     AND o.status::text = ANY($1::text[])
     AND NOT (o.numero = ANY($2::text[]))
     AND g.id IS NULL
     AND m."dataInicio" IS NOT NULL
-  ORDER BY o.numero, m.item`, VIVAS, FORA);
+  ORDER BY o.numero, m.item`, VIVAS, FORA, COBRE, SETOR_SYNECO);
 
 const alvo = soOp ? linhas.filter((l) => soOp.includes(l.op)) : linhas;
 
@@ -75,11 +94,11 @@ for (const l of alvo) {
 }
 
 const d = (x) => new Date(x).toISOString().slice(0, 10);
-console.log(`\n${aplicar ? "APLICANDO" : "DRY-RUN (nada será gravado)"}${soOp ? ` — só ${soOp.map((o) => "OP-" + o).join(", ")}` : ""}\n`);
-console.log("OP     obra                 marcas   montagem de … até");
+console.log(`\n${aplicar ? "APLICANDO" : "DRY-RUN (nada será gravado)"} — setor ${setorArg}${soOp ? ` — só ${soOp.map((o) => "OP-" + o).join(", ")}` : ""}\n`);
+console.log(`OP     obra                 marcas   ${SETOR_SYNECO.toLowerCase()} de … até`);
 for (const [op, a] of [...porOp].sort((x, y) => y[1].n - x[1].n))
   console.log(`  ${op.padEnd(5)} ${String(a.obra || "").padEnd(20).slice(0, 20)} ${String(a.n).padEnd(8)} ${d(a.de)} … ${d(a.ate)}`);
-console.log(`\nTOTAL: ${alvo.length} GRD(s) de montagem a criar, em ${porOp.size} OP(s).`);
+console.log(`\nTOTAL: ${alvo.length} GRD(s) de ${setorArg} a criar, em ${porOp.size} OP(s).`);
 
 if (!aplicar) {
   console.log("\nNada foi gravado. Para valer: acrescente --aplicar.");
@@ -95,7 +114,7 @@ for (let i = 0; i < alvo.length; i += LOTE) {
   await prisma.grdLiberacao.createMany({
     data: bloco.map((l) => ({
       opId: l.opId, opNumero: l.op, marca: l.marca,
-      arquivo: ARQUIVO, setor: "MONTAGEM",
+      arquivo: ARQUIVO, setor: setorArg,
       liberadoPorNome: AUTOR,
       createdAt: l.quando,          // ⚠ a data VERDADEIRA do início da montagem
       ultimaImpressaoEm: null,      // nada foi impresso: não existe "última impressão"
@@ -111,12 +130,12 @@ console.log("");
 // ⚠ bookkeeping não-fatal: uma falha de log nunca deve derrubar o que já foi gravado.
 await prisma.auditLog.create({
   data: {
-    action: "GRD_REGULARIZAR_MONTAGEM", entity: "GrdLiberacao", entityId: `${feitas} GRD(s)`,
+    action: `GRD_REGULARIZAR_${setorArg}`, entity: "GrdLiberacao", entityId: `${feitas} GRD(s)`,
     diff: { porOp: Object.fromEntries([...porOp].map(([op, a]) => [op, a.n])), autor: AUTOR,
-            criterio: "MesOrdem.produzidoUn>0 em Montagem, sem GRD de MONTAGEM, OP viva",
+            criterio: `MesOrdem.produzidoUn>0 em ${SETOR_SYNECO}, sem GRD de ${COBRE.join("/")}, OP viva`,
             foraDoAlcance: FORA },
   },
 }).catch((e) => console.log("  (aviso: AuditLog falhou —", e.message, ")"));
 
-console.log(`\n✓ ${feitas} GRD(s) criada(s). Reversível por (liberadoPorNome="${AUTOR}", setor="MONTAGEM").`);
+console.log(`\n✓ ${feitas} GRD(s) criada(s). Reversível por (liberadoPorNome="${AUTOR}", setor="${setorArg}").`);
 await prisma.$disconnect();
