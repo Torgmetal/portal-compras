@@ -59,8 +59,13 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   let painel = null, abaP = "projetos";
   const estado = new Map();
 
-  const custoLote = (l)=> l.setor==="CORTE" ? l.kg : l.custo * (regua==="meta" ? FATOR_META[l.setor] : 1);
-  const custoItem = (it, setor)=> setor==="CORTE" ? it.kg : it.c * (regua==="meta" ? FATOR_META[setor] : 1);
+  // ⚠ TRÊS SETORES SE MEDEM EM KG, três em bancada-dia. Corte, acabamento e jato têm capacidade do
+  // RECURSO em kg/dia (a máquina, ou a bancada única do setor), então o custo do lote é o próprio
+  // peso. Montagem e solda medem PEÇA POR FAIXA DE PESO, e o custo vem das libs de capacidade —
+  // misturar as duas réguas foi o que fez a montagem parecer folgada com 24 t de peça graúda.
+  const POR_KG = new Set(["CORTE","ACABAMENTO","JATO"]);
+  const custoLote = (l)=> POR_KG.has(l.setor) ? l.kg : l.custo * (regua==="meta" ? FATOR_META[l.setor] : 1);
+  const custoItem = (it, setor)=> POR_KG.has(setor) ? it.kg : it.c * (regua==="meta" ? FATOR_META[setor] : 1);
 
   // ⚠ `custoLote` entra como FUNÇÃO porque fecha sobre a régua (normal × meta), que o usuário troca
   // no botão. Passar o valor congelaria o custo na montagem do quadro.

@@ -3081,6 +3081,25 @@ model PecaConjunto {
   // ⚠ @db.Date: é o DIA do trabalho, não um instante. Timestamp aqui volta um dia ao converter
   // para BRT — a armadilha já anotada em lib/data-br.js.
   soldaDiaProgramado     DateTime? @db.Date
+  // ─── ACABAMENTO · JATO · PINTURA ────────────────────────────────────────────
+  // ⚠ Vitor (06/09/2026) pediu a representação desses setores no Gantt, e ele lê exatamente estes
+  // campos: sem dia, a peça não existe no quadro. Antes daqui a obra sumia do Gantt depois da solda.
+  //
+  // ⚠ BANCADA ÚNICA, NÃO "SEM BANCADA". Vitor: "teria que ficar primeiramente em uma fila sem
+  // bancada, depois selecionar a bancada única do acabamento e jato". Com uma bancada nomeada, os
+  // dois setores ficam estruturalmente iguais a montagem e solda — mesma fila de entrada, mesma
+  // faixa, mesmo arraste — e o quadro não ganha conceito novo.
+  //   acabamento: 1 bancada · jato: 2 (turbina e manual) · pintura: a definir
+  //
+  // ⚠ `pinturaDiaProgramado` nasce SEM USO. Vitor ainda vai passar a regra da pintura; a coluna
+  // entra junto porque é aditiva e nula, e uma segunda migração no banco de produção por causa de
+  // um campo custaria mais do que deixá-la esperando.
+  acabamentoDiaProgramado DateTime? @db.Date
+  acabamentoBancada       String?
+  jatoDiaProgramado       DateTime? @db.Date
+  jatoBancada             String?
+  pinturaDiaProgramado    DateTime? @db.Date
+  pinturaBancada          String?
   corteIniciadoEm        DateTime? // real início do corte
   corteConcluidoEm       DateTime? // real fim do corte
   // Campos de produção (populados pelo Syneco)

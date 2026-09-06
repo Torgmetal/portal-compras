@@ -1,3 +1,5 @@
+import { META_KG_DIA_ACABAMENTO, META_KG_DIA_JATO } from "@/lib/capacidade-acabamento";
+
 // ─── RECURSOS, SETORES E CORES ─────────────────────────────────────────────────────────────────
 //
 // ⚠ AS CAPACIDADES SÃO MEDIDAS, NÃO ESCOLHIDAS. Os kg/dia do corte saem do p75 dos apontamentos do
@@ -18,10 +20,25 @@ export const RECURSOS = {
     ...["MONTAGEM 1","MONTAGEM 2","MONTAGEM 3","MONTAGEM 4","MONTAGEM 5"].map(n=>({k:n,nome:n,cap:1}))],
   SOLDA: [{ k:null, nome:"sem bancada", obs:"atribuir bancada" },
     ...["SOLDA 1","SOLDA 2","SOLDA 4","SOLDA 5","SOLDA 6","SOLDA 7"].map(n=>({k:n,nome:n,cap:1}))],
+  // ⚠⚠ ACABAMENTO TEM UMA BANCADA SÓ, e é isso que o faz caber no quadro sem conceito novo. Vitor
+  // (06/09/2026): "não temos bancadas (…) selecionar a bancada única do acabamento". Escolher a
+  // bancada vira um clique; a decisão que sobra é QUAL OP e QUAL DIA — que é o arraste que já
+  // existe. A capacidade é em kg/dia, como o corte, não em bancada-dia: aqui não há régua de peças
+  // por faixa de peso, o setor é um só.
+  ACABAMENTO: [{ k:null, nome:"sem bancada", obs:"atribuir" },
+    { k:"ACABAMENTO", nome:"Acabamento", cap: META_KG_DIA_ACABAMENTO }],
+  // ⚠⚠ O JATO TEM DUAS. Vitor (06/09/2026): "temos dois jatos, o turbina e o manual". Elas dividem
+  // a meta do setor; a repartição entre as duas é do PCP com o líder, como no corte.
+  JATO: [{ k:null, nome:"sem bancada", obs:"atribuir jato" },
+    { k:"JATO_TURBINA", nome:"Jato Turbina", cap: Math.round(META_KG_DIA_JATO / 2) },
+    { k:"JATO_MANUAL", nome:"Jato Manual", cap: Math.round(META_KG_DIA_JATO / 2) }],
 };
-export const SETORES = ["CORTE","MONTAGEM","SOLDA"];
-export const COR_SETOR = { CORTE:"#8e5cd9", MONTAGEM:"#006EAB", SOLDA:"#c2410c" };
-export const FATOR_META = { MONTAGEM:0.47, SOLDA:0.58, CORTE:1 };
+export const SETORES = ["CORTE","MONTAGEM","SOLDA","ACABAMENTO","JATO"];
+export const COR_SETOR = { CORTE:"#8e5cd9", MONTAGEM:"#006EAB", SOLDA:"#c2410c",
+                           ACABAMENTO:"#0f766e", JATO:"#3730a3" };
+// ⚠ acabamento e jato já são medidos contra a META (cap em kg/dia da meta), então o fator é 1:
+// não existe "ritmo normal" separado para eles como há na montagem e na solda.
+export const FATOR_META = { MONTAGEM:0.47, SOLDA:0.58, CORTE:1, ACABAMENTO:1, JATO:1 };
 
 export const capDe = (setor, rec)=> (RECURSOS[setor].find(r=>r.k===rec)||{}).cap || 0;
 export const nomeRec = (setor, rec)=> (RECURSOS[setor].find(r=>r.k===rec)||{}).nome || "sem recurso";

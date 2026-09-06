@@ -1,7 +1,12 @@
 {
-  "build": 2891,
-  "gerado": "2026-09-06T03:42:09.781Z",
+  "build": 2892,
+  "gerado": "2026-09-06T15:06:00.178Z",
   "commits": [
+    {
+      "hash": "4409e9f6",
+      "data": "06/09/2026",
+      "titulo": "Metas: 280 t/mês de entrega, 230 na montagem e na solda, e a preparação sobe junto"
+    },
     {
       "hash": "06bfdf5f",
       "data": "06/09/2026",
@@ -146,11 +151,6 @@
       "hash": "f4967559",
       "data": "05/09/2026",
       "titulo": "Snapshot do LQC: entram a montagem em campo e a margem do item comercial"
-    },
-    {
-      "hash": "a4d2f36a",
-      "data": "05/09/2026",
-      "titulo": "Duas sujeiras que o meu removedor de código morto deixou nas integrações"
     }
   ]
 }
