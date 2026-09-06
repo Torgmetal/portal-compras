@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Package, ListOrdered, FileText, Truck, FolderKanban, Printer, Factory, Gauge, Flame, Wrench,
-  Sparkles, Paintbrush,
+  Sparkles, Paintbrush, Brush,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -44,6 +44,9 @@ const menu = [
   // como a Programação do setor (quem já está lá dentro), fora do menu, como antes.
   { href: "/pcp/fila-acabamento", label: "Acabamento",    icon: Paintbrush },
   { href: "/pcp/fila-jato",    label: "Jato",             icon: Sparkles },
+  // ⚠ PINTURA É A ÚLTIMA FILA. Depois dela a peça sai do PCP inteiro (Vitor, 06/09/2026: "após
+  // passar pela pintura essas peças não devem nem aparecer em fila alguma mais").
+  { href: "/pcp/fila-pintura", label: "Pintura",          icon: Brush },
   // ⚠ o indicador ISO do setor mora no menu do setor, como nos outros — quem responde por ele é
   // quem opera, não a Qualidade.
   { href: "/pcp/indicadores",  label: "Indicadores",      icon: Gauge },

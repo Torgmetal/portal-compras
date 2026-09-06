@@ -1,4 +1,4 @@
-// GET  /api/pcp/fila-setor?setor=ACABAMENTO|JATO → a fila de entrada do setor
+// GET  /api/pcp/fila-setor?setor=ACABAMENTO|JATO|PINTURA → a fila de entrada do setor
 // POST /api/pcp/fila-setor { setor, ids[], bancada|null, dia? } → manda para a bancada
 //
 // ⚠⚠ ISTO É INTENÇÃO, NÃO ORDEM — a mesma regra que o Vitor definiu para a solda em 01/09/2026:
@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const ROLES = ["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"];
-const SETORES = ["ACABAMENTO", "JATO"];
+const SETORES = ["ACABAMENTO", "JATO", "PINTURA"];
 
 export async function GET(req) {
   try { await requireRole(ROLES); }
@@ -35,7 +35,7 @@ export async function GET(req) {
 }
 
 const schema = z.object({
-  setor: z.enum(["ACABAMENTO", "JATO"]),
+  setor: z.enum(["ACABAMENTO", "JATO", "PINTURA"]),
   ids: z.array(z.string()).min(1, "Selecione ao menos uma peça"),
   bancada: z.string().trim().max(40).nullable(),
   dia: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida").nullable().optional(),

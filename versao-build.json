@@ -1,11 +1,21 @@
 {
+<<<<<<< HEAD
   "build": 2897,
 <<<<<<< HEAD
   "gerado": "2026-09-06T15:51:34.802Z",
 =======
   "gerado": "2026-09-06T16:05:10.471Z",
 >>>>>>> 720225a6 (Encerra as 11 OPs que produziram e pararam, e diz por que 8 ficaram de fora)
+=======
+  "build": 2898,
+  "gerado": "2026-09-06T16:05:26.903Z",
+>>>>>>> 6f1f7870 (PCP: a fila da pintura, e o teto que cortava as filas em silêncio)
   "commits": [
+    {
+      "hash": "720225a6",
+      "data": "06/09/2026",
+      "titulo": "Encerra as 11 OPs que produziram e pararam, e diz por que 8 ficaram de fora"
+    },
     {
       "hash": "81028b4a",
       "data": "06/09/2026",
@@ -150,11 +160,6 @@
       "hash": "6df7bcda",
       "data": "05/09/2026",
       "titulo": "PCP: o erro da listagem passa a dizer o que aconteceu"
-    },
-    {
-      "hash": "71cef05a",
-      "data": "05/09/2026",
-      "titulo": "Gantt do PCP: sábado e domingo ganham coluna"
     }
   ]
 }

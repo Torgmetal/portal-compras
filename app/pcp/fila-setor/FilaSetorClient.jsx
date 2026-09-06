@@ -1,5 +1,5 @@
 "use client";
-// ─── A FILA DE ENTRADA DO ACABAMENTO E DO JATO ─────────
+// ─── A FILA DE ENTRADA DO ACABAMENTO, DO JATO E DA PINTURA ─────────
 //
 // ⚠⚠ A ENTRADA É AUTOMÁTICA. Vitor (06/09/2026): "o que for ficando pronto da solda já deve
 // aparecer para a fila do acabamento e o que for ficando pronto do acabamento aparecer na fila do
@@ -12,7 +12,7 @@
 // ⚠ MANDAR PARA A BANCADA É INTENÇÃO, não ordem — mesma regra da solda (Vitor, 01/09). O portal
 // anota a decisão do PCP; o que aconteceu de fato volta pelo Syneco.
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, AlertCircle, ArrowRight, Undo2, Flame, Sparkles } from "lucide-react";
+import { Loader2, AlertCircle, ArrowRight, Undo2, Flame, Sparkles, Paintbrush } from "lucide-react";
 import { useStore } from "@/lib/store";
 
 const nkg = (n) => `${Math.round(Number(n) || 0).toLocaleString("pt-BR")} kg`;
@@ -70,7 +70,12 @@ export default function FilaSetorClient({ setor }) {
   }
 
   const nomeBancada = (k) => dados?.bancadas?.find((b) => b.k === k)?.nome || k;
-  const Icone = setor === "JATO" ? Sparkles : Flame;
+  const Icone = setor === "PINTURA" ? Paintbrush : setor === "JATO" ? Sparkles : Flame;
+
+  // ⚠ NA PINTURA NÃO SE DIZ "BANCADA". Vitor (06/09/2026) chama os postos de GALPÃO ("o galpão 1
+  // que fica na Torg (…) e o Galpão 2 que seria um galpão apoio"). A tela usa a palavra da fábrica.
+  const POSTO = setor === "PINTURA" ? "galpão" : "bancada";
+  const Posto = POSTO[0].toUpperCase() + POSTO.slice(1);
 
   if (carregando && !dados) {
     return (
@@ -93,7 +98,7 @@ export default function FilaSetorClient({ setor }) {
         <Icone size={28} className="mx-auto text-gray-300" />
         <p className="mt-3 text-sm font-semibold text-torg-dark">A fila está vazia</p>
         <p className="mt-1 text-xs text-torg-gray">
-          Nada terminou {dados?.anterior === "SOLDA" ? "a solda" : "o acabamento"} e está esperando aqui.
+          Nada terminou {dados?.anterior === "SOLDA" ? "a solda" : dados?.anterior === "JATO" ? "o jato" : "o acabamento"} e está esperando aqui.
         </p>
       </div>
     );
@@ -118,10 +123,24 @@ export default function FilaSetorClient({ setor }) {
           <p className="text-[11px] text-torg-gray">dias na meta ({nkg(dados.capacidadeKgDia)}/dia)</p>
         </div>
         <p className="text-[11px] text-torg-gray max-w-sm ml-auto leading-relaxed">
-          Entra sozinho o que termina {dados.anterior === "SOLDA" ? "a solda" : "o acabamento"} —
+          Entra sozinho o que termina{" "}
+          {dados.anterior === "SOLDA" ? "a solda" : dados.anterior === "JATO" ? "o jato" : "o acabamento"} —
           não há liberação a fazer.
         </p>
       </div>
+
+      {/* ⚠ A fila só pode ser lida como completa se a consulta não bateu no teto. Ver LIMITE_PECAS
+          em lib/fila-setor.js: o teto antigo (8.000) ficava abaixo do total real e cortava peça sem
+          avisar ninguém. Se isto aparecer, o número na tela está MENOR que a realidade. */}
+      {dados.truncado && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+          <AlertCircle size={16} className="shrink-0 mt-0.5" />
+          <span>
+            <b>Fila incompleta.</b> A consulta atingiu o limite de peças e parte da fila ficou de
+            fora — os números abaixo estão menores que a realidade. Avise o time do portal.
+          </span>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-4 py-2.5 border-b border-gray-100">
@@ -136,7 +155,7 @@ export default function FilaSetorClient({ setor }) {
                 <th className="text-right px-4 py-2 font-bold">Peças</th>
                 <th className="text-right px-4 py-2 font-bold">kg</th>
                 <th className="text-right px-4 py-2 font-bold">Dias</th>
-                <th className="text-right px-4 py-2 font-bold">Sem bancada</th>
+                <th className="text-right px-4 py-2 font-bold">Sem {POSTO}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -165,7 +184,7 @@ export default function FilaSetorClient({ setor }) {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap items-center gap-3">
             <h2 className="text-[13px] font-bold text-torg-dark">
-              OP-{opSel} · {pendentes.length} sem bancada
+              OP-{opSel} · {pendentes.length} sem {POSTO}
               {naBancada.length ? <span className="text-torg-gray font-normal"> · {naBancada.length} já posicionadas</span> : null}
             </h2>
             <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -182,7 +201,7 @@ export default function FilaSetorClient({ setor }) {
                 disabled={!pendentes.length || !!enviando}
                 className="text-xs font-semibold bg-torg-blue text-white rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-40">
                 {enviando === "enviar" ? <Loader2 size={12} className="animate-spin" /> : <ArrowRight size={12} />}
-                Mandar {pendentes.length} para {dados.bancadas.length > 1 ? nomeBancada(bancada) : "a bancada"}
+                Mandar {pendentes.length} para {dados.bancadas.length > 1 ? nomeBancada(bancada) : `a ${POSTO}`}
               </button>
               {naBancada.length > 0 && (
                 <button
@@ -203,7 +222,7 @@ export default function FilaSetorClient({ setor }) {
                   <th className="text-left px-4 py-2 font-bold">Descrição</th>
                   <th className="text-right px-4 py-2 font-bold">Qte</th>
                   <th className="text-right px-4 py-2 font-bold">kg</th>
-                  <th className="text-left px-4 py-2 font-bold">Bancada</th>
+                  <th className="text-left px-4 py-2 font-bold">{Posto}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
