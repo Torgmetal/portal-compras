@@ -1,7 +1,12 @@
 {
-  "build": 2894,
-  "gerado": "2026-09-06T15:26:08.221Z",
+  "build": 2895,
+  "gerado": "2026-09-06T15:27:26.723Z",
   "commits": [
+    {
+      "hash": "8928f17b",
+      "data": "06/09/2026",
+      "titulo": "refactor: alinha menu de módulos à identidade Torg"
+    },
     {
       "hash": "eb69a9dd",
       "data": "06/09/2026",
@@ -146,11 +151,6 @@
       "hash": "913e778c",
       "data": "05/09/2026",
       "titulo": "PCP › Produção: sai o painel \"Carga da produção\""
-    },
-    {
-      "hash": "409deb91",
-      "data": "05/09/2026",
-      "titulo": "Diz ao time o que fazer na primeira vez que abrir o repo"
     }
   ]
 }
