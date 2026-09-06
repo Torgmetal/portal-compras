@@ -1,7 +1,12 @@
 {
-  "build": 2884,
-  "gerado": "2026-09-06T01:55:31.196Z",
+  "build": 2885,
+  "gerado": "2026-09-06T02:03:54.315Z",
   "commits": [
+    {
+      "hash": "27939c72",
+      "data": "05/09/2026",
+      "titulo": "Corte: HP, Z, UE, WT e barra ganham máquina, e 94 t saem do limbo"
+    },
     {
       "hash": "bb160694",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "6ee939a8",
       "data": "05/09/2026",
       "titulo": "Importar LQC: ler os três blocos da planilha comercial e os itens comerciais"
-    },
-    {
-      "hash": "338800ba",
-      "data": "05/09/2026",
-      "titulo": "Auditoria: peso sem classe some do frete, e BDI de 400% sem aviso"
     }
   ]
 }
