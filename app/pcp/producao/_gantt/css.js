@@ -226,6 +226,21 @@ export const CSS = `
   .gpcp dialog .pe{padding:12px 18px;border-top:1px solid var(--linha);display:flex;justify-content:flex-end;gap:8px}
   .gpcp dialog p{margin:0 0 10px;font-size:12px;color:var(--tinta-2);line-height:1.6}
 
+  /* ── a trava do material, antes de imprimir ─────────────────────────────────
+     ⚠ O R É POR PERFIL, não por marca (TrocaRastreabilidade é único em opNumero+perfil). Uma
+     confirmação solta TODAS as marcas daquele perfil — e a tela diz isso, senão a pessoa confirma
+     dez vezes o mesmo aço. */
+  .gpcp .trava{width:100%;border-collapse:collapse;font-size:12px}
+  .gpcp .trava th{text-align:left;padding:6px 8px;font-size:9.5px;text-transform:uppercase;
+            letter-spacing:.06em;color:var(--tinta-2);border-bottom:1px solid var(--linha)}
+  .gpcp .trava td{padding:8px;border-bottom:1px solid #f2f5f9;vertical-align:middle}
+  .gpcp .trava tr.ok td{background:rgba(19,108,53,.07)}
+  .gpcp .trava tr.travada td{background:rgba(198,40,40,.06)}
+  .gpcp .trava .rin{width:92px;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:600;
+            padding:4px 7px;border-radius:6px;border:1px solid var(--linha);background:#fbfcfe}
+  .gpcp .trava .org{font-size:10px;color:var(--tinta-2);margin-top:2px}
+  .gpcp .trava .mot{font-size:10.5px;color:#a01c1c;line-height:1.45}
+
   .gpcp, .gpcp *{box-sizing:border-box}
   .gpcp.cheio{position:fixed;inset:0;z-index:60;background:var(--fundo);padding:10px 14px;--alt:100%}
   .gpcp .carregando{display:flex;align-items:center;justify-content:center;gap:10px;height:200px;color:var(--tinta-2)}

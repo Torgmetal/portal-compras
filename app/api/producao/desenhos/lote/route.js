@@ -1,5 +1,6 @@
 // EMITIR EM LOTE os desenhos carimbados de várias marcas de uma vez.
-// POST { opNumero, marcas[], setor?, acao: "EMITIR"|"IMPRIMIR" }
+// POST { opNumero, marcas[], setor?, acao: "EMITIR"|"IMPRIMIR"|"CONFERIR" }
+//   CONFERIR não emite: devolve o que a trava de material prende, com o R sugerido de cada um.
 // Devolve um arquivo POR FORMATO (A1/A2/A3/A4) — cada um vai numa bandeja diferente da
 // impressora, então PDF único misturado não serve. (Vitor 19/08.)
 import { NextResponse } from "next/server";
@@ -18,7 +19,7 @@ const schema = z.object({
   opNumero: z.string().min(1),
   marcas: z.array(z.string()).min(1),
   setor: z.string().nullable().optional(),
-  acao: z.enum(["EMITIR", "IMPRIMIR"]).default("EMITIR"),
+  acao: z.enum(["EMITIR", "IMPRIMIR", "CONFERIR"]).default("EMITIR"),
   // ⚠ marca → bancada de montagem. Faz o lote agrupar (e nomear) por bancada e devolver a `pasta`
   // que o ZIP usa, para o encarregado receber um maço por bancada. Ausente = comportamento antigo.
   bancadaPorMarca: z.record(z.string(), z.string().max(60)).nullable().optional(),

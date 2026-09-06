@@ -1,7 +1,12 @@
 {
-  "build": 2880,
-  "gerado": "2026-09-06T00:14:14.852Z",
+  "build": 2881,
+  "gerado": "2026-09-06T00:51:14.950Z",
   "commits": [
+    {
+      "hash": "002a1bed",
+      "data": "05/09/2026",
+      "titulo": "Quebra o GanttProgramacao (1.265 linhas) em módulos por responsabilidade"
+    },
     {
       "hash": "b7329f80",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "011a69e7",
       "data": "05/09/2026",
       "titulo": "Skills e plugins passam a viver no projeto, não no perfil"
-    },
-    {
-      "hash": "5d957687",
-      "data": "05/09/2026",
-      "titulo": "Quebra a pior função do repositório: PATCH de tarefa, complexidade 140 -> 31"
     }
   ]
 }

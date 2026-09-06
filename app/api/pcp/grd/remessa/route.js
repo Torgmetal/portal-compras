@@ -76,8 +76,8 @@ export async function POST(req) {
 
   const itens = novas.map((l) => ({
     id: l.id, marca: l.marca, arquivo: l.arquivo, formato: l.formato,
-    // ⚠ o R impresso é o SNAPSHOT da emissão do desenho, não o CMR de hoje: é o que estava no papel.
-    r: l.rastreio?.texto || l.rastreio?.resumo || null,
+    // ⚠ o R NÃO vai na remessa: a GRD é registro de documento liberado, não de rastreabilidade.
+    // Vitor (05/09/2026). O R vive no CMR e na §02 do Data Book.
     impressoes: l.impressoes || 1,
   }));
 

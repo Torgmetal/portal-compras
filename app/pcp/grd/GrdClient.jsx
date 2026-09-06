@@ -107,7 +107,7 @@ export default function GrdClient() {
     const hoje = new Date().toISOString().split("T")[0];
     const det = aberta ? detalhe[aberta] : null;
     if (det) {
-      const headers = ["Marca", "Arquivo", "Formato", "Setor", "Rastreabilidade carimbada", "Impressões", "1ª impressão", "Última impressão", "Liberado por", "No Data Book"];
+      const headers = ["Marca", "Arquivo", "Formato", "Setor", "Impressões", "1ª impressão", "Última impressão", "Liberado por", "No Data Book"];
       const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
         titulo: `GRD — liberação de desenhos · OP-${det.op.numero}`,
         subtitulo: `${det.op.obra || ""}${det.op.cliente ? ` · ${det.op.cliente}` : ""} · ${det.linhas.length} liberação(ões)`,
@@ -120,7 +120,7 @@ export default function GrdClient() {
       const first = row;
       for (const l of det.linhas) {
         adicionarLinhaTabela(ws, row, [
-          l.marca, l.arquivo, l.formato || "", l.setor || "", l.resumoR?.texto || "—",
+          l.marca, l.arquivo, l.formato || "", l.setor || "",
           l.impressoes || 1, fmtDH(l.createdAt), fmtDH(l.ultimaImpressaoEm || l.createdAt),
           l.liberadoPorNome || "—", l.documentoId ? "sim" : "não",
         ], { alinhamento: { 2: "center", 3: "center", 5: "center", 6: "center", 7: "center", 9: "center" } });
@@ -263,7 +263,7 @@ export default function GrdClient() {
       )}
 
       <p className="text-[11px] text-torg-gray mt-3">
-        A coluna <b>Rastreabilidade carimbada</b> é o <b>snapshot</b> gravado no momento da emissão — é o R que foi impresso no papel. Se o CMR mudar depois, o que o setor recebeu continua registrado aqui.
+        A GRD registra o <b>documento liberado</b> — quem imprimiu, quando e quantas cópias. A <b>rastreabilidade</b> do material não mora aqui: ela é do CMR e da §02 do Data Book. Se o CMR mudar depois, o que o setor recebeu continua registrado aqui.
         Clique na <b>marca</b> pra abrir o desenho (croqui ou conjunto) e ver do que se trata.
       </p>
 
@@ -287,7 +287,7 @@ function Detalhe({ det, abrirPdf, onVerDesenho }) {
   const [q, setQ] = useState("");
   const linhas = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return t ? det.linhas.filter((l) => `${l.marca} ${l.arquivo} ${l.setor || ""} ${l.resumoR?.texto || ""}`.toLowerCase().includes(t)) : det.linhas;
+    return t ? det.linhas.filter((l) => `${l.marca} ${l.arquivo} ${l.setor || ""}`.toLowerCase().includes(t)) : det.linhas;
   }, [det.linhas, q]);
   const verDesenho = (l) => onVerDesenho({ opNumero: det.op.numero, opId: det.op.id || null, marca: l.marca, setor: l.setor || null });
   const guias = det.guias || [];
@@ -363,7 +363,6 @@ function Detalhe({ det, abrirPdf, onVerDesenho }) {
                 <th className="text-left px-2.5 py-1.5">Arquivo</th>
                 <th className="text-left px-2.5 py-1.5">Formato</th>
                 <th className="text-left px-2.5 py-1.5">Setor</th>
-                <th className="text-left px-2.5 py-1.5">Rastreabilidade carimbada</th>
                 <th className="text-right px-2.5 py-1.5">Impressões</th>
                 <th className="text-left px-2.5 py-1.5">1ª</th>
                 <th className="text-left px-2.5 py-1.5">Última</th>
@@ -384,11 +383,6 @@ function Detalhe({ det, abrirPdf, onVerDesenho }) {
                   <td className="px-2.5 py-1.5 truncate max-w-[240px]" title={l.arquivo}>{l.arquivo}</td>
                   <td className="px-2.5 py-1.5 whitespace-nowrap">{l.formato || "—"}</td>
                   <td className="px-2.5 py-1.5 whitespace-nowrap">{l.setor || "—"}</td>
-                  <td className="px-2.5 py-1.5 whitespace-nowrap font-mono">
-                    {l.resumoR?.rs?.length
-                      ? <span className="text-emerald-800">{l.resumoR.texto}</span>
-                      : <span className="text-amber-700 font-sans inline-flex items-center gap-1"><AlertTriangle size={10} /> sem R no papel</span>}
-                  </td>
                   {/* ⚠ o contador vira a LISTA das cópias na dica: "3" não prova nada; "3 cópias,
                       estas horas, por estas pessoas" é o que uma GRD tem de responder. */}
                   <td className="px-2.5 py-1.5 text-right tabular-nums font-semibold"

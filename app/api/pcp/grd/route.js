@@ -14,20 +14,16 @@ export const dynamic = "force-dynamic";
 
 const ROLES = ["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO", "QUALIDADE", "COMERCIAL"];
 
-// O R que estava carimbado: a GRD guarda o array do rastreioDoConjunto (1 linha = peça;
-// N = croquis do conjunto). Resume pra caber numa coluna.
-function resumoRastreio(rastreio) {
-  const itens = Array.isArray(rastreio) ? rastreio : [];
-  if (!itens.length) return { rs: [], comR: 0, total: 0, texto: "—" };
-  const rs = [...new Set(itens.flatMap((i) => (i.usadas || []).map((u) => u.rastreio)).filter(Boolean))];
-  const comR = itens.filter((i) => i.situacao === "R_DEFINIDO").length;
-  const texto = !rs.length
-    ? "sem R no papel"
-    : itens.length === 1
-      ? `R ${rs[0]}`
-      : `${comR}/${itens.length} com R · ${rs.slice(0, 3).map((r) => `R ${r}`).join(" · ")}${rs.length > 3 ? " …" : ""}`;
-  return { rs, comR, total: itens.length, texto };
-}
+// ⚠ O R SAIU DA GRD. Vitor (05/09/2026): "vamos tirar o R da GRD, vai fazer mais sentido".
+//
+// A GRD é registro de DOCUMENTO LIBERADO — quem imprimiu, quando, qual revisão, quantas cópias
+// (ISO 9001 §7.5.2). Rastreabilidade de material é outra pergunta, com outro registro: o CMR e a
+// §02 do Data Book. Misturar as duas criava um campo que ficava em branco nas liberações sem
+// emissão de papel — e campo em branco num formulário é não conformidade, para uma informação que
+// a GRD nunca teve a obrigação de carregar.
+//
+// O snapshot continua GRAVADO na coluna `rastreio` (é a única prova do que saiu carimbado naquele
+// papel específico, e o `conferir-r.js` depende dele) — só não é mais devolvido nem exibido.
 
 export async function GET(req) {
   try { await requireRole(ROLES); }
@@ -75,7 +71,7 @@ export async function GET(req) {
       op: op ? { id: op.id, numero: op.numero, obra: op.obra, cliente: op.cliente } : { numero: num },
       // ⚠ o histórico vai do mais RECENTE para o mais antigo: quem abre a GRD quer a última cópia
       linhas: linhas.map((l) => ({
-        ...l, resumoR: resumoRastreio(l.rastreio), rastreio: undefined,
+        ...l, rastreio: undefined,
         copias: (Array.isArray(l.historico) ? l.historico : []).slice().reverse(),
         historico: undefined,
       })),

@@ -82,12 +82,131 @@ export function criarPainelProjetos(dep){
   }
 
   const SETOR_GRD = { CORTE:"CORTE", MONTAGEM:"MONTAGEM", SOLDA:"SOLDA" };
+  /* ── A TRAVA DO MATERIAL, ANTES DE IMPRIMIR ─────────────────────────────────
+     ⚠ Vitor (05/09/2026): "não podemos permitir liberar desenhos sem a definição do R da peça, pois
+     a rastreabilidade é o nosso maior ponto forte" — e, sobre o atrito: "um aviso deve aparecer na
+     tela e informar na hora o R para não perder tempo e já tirar isso da frente".
+
+     A trava já existia em lib/desenhos-lote.js desde 26/08 e fazia a metade certa: prendia a peça
+     sem material. A metade que faltava era a porta — as presas sumiam do lote e voltavam como uma
+     lista de nomes, e quem estava emitindo ia caçar o R noutra tela.
+
+     ⚠ O R É POR PERFIL. `TrocaRastreabilidade` é única em (opNumero, perfil), então confirmar um R
+     solta TODAS as marcas daquele perfil de uma vez. A tela agrupa assim de propósito: uma linha
+     por perfil, não por marca — senão a pessoa confirmaria o mesmo aço dez vezes.
+
+     ⚠ SEM_MATERIAL NÃO SE RESOLVE AQUI, e isso é o ponto. Confirmar um R é dizer QUAL aço foi
+     usado; não é atalho para liberar o que não tem aço nenhum. */
+  async function conferirMaterial(r, marcas){
+    const res = await fetch("/api/producao/desenhos/lote", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ opNumero:r.op, marcas, setor: SETOR_GRD[r.setor], acao:"CONFERIR" }),
+    });
+    const j = await res.json();
+    if(!res.ok) throw new Error(j.error || "Erro ao conferir o material");
+    return j;
+  }
+
+  /** uma linha por PERFIL, com as marcas que ele prende */
+  function agruparPorPerfil(semMaterial){
+    const m = new Map();
+    for(const x of semMaterial || []){
+      const k = String(x.perfil || "—");
+      const a = m.get(k) || { perfil:k, marcas:[], resolvivel:!!x.resolvivel, rSugerido:x.rSugerido || "",
+                              ops:x.opsDoMaterial || [], desc:x.descricaoCmr || "", motivo:x.motivo,
+                              faltaRotulo:x.faltaRotulo };
+      a.marcas.push(x.marca);
+      m.set(k, a);
+    }
+    return [...m.values()].sort((a,b)=> (b.resolvivel?1:0)-(a.resolvivel?1:0) || a.perfil.localeCompare(b.perfil));
+  }
+
+  function abrirTravaMaterial(r, tipo, conf){
+    const grupos = agruparPorPerfil(conf.semMaterial);
+    const podem = new Set(conf.prontas || []);
+    const dlg = document.createElement("dialog");
+    const resolviveis = grupos.filter(g=>g.resolvivel);
+    const travadas = grupos.filter(g=>!g.resolvivel);
+
+    const pintar = ()=>{
+      const nPresas = grupos.filter(g=>g.resolvivel).reduce((s,g)=>s+g.marcas.length,0);
+      dlg.innerHTML =
+        '<h3>Material — '+(nPresas ? nPresas+' marca(s) esperando o R' : 'tudo conferido')+'</h3>'
+        + '<div class="corpo">'
+        + (resolviveis.length
+            ? '<p>Estas peças usam <b>material de estoque</b>, comprado sob outra OP. O portal sugere o R do CMR — '
+              + 'confirme e elas entram no lote. <b>O R vale para o perfil inteiro</b>, então uma confirmação solta todas as marcas dele.</p>'
+              + '<table class="trava"><thead><tr><th>Perfil</th><th>Marcas</th><th>R usado</th><th></th></tr></thead><tbody>'
+              + resolviveis.map((g,i)=>
+                  '<tr class="'+(g.feito?"ok":"")+'"><td><b>'+g.perfil+'</b>'
+                  + (g.desc?'<div class="org">'+g.desc+'</div>':'')+'</td>'
+                  + '<td>'+g.marcas.length+' <span class="org">'+g.marcas.slice(0,3).join(", ")
+                  + (g.marcas.length>3?" …":"")+'</span></td>'
+                  + '<td><input class="rin" data-i="'+i+'" value="'+(g.rUsado||g.rSugerido||"")+'" '
+                  + (g.feito?'disabled ':'')+'>'
+                  + (g.ops.length?'<div class="org">sugerido do CMR · OP-'+g.ops[0]+'</div>':'')+'</td>'
+                  + '<td>'+(g.feito
+                      ? '<span class="pilha ok">✓ confirmado</span>'
+                      : '<button class="btn mini" data-conf="'+i+'">Confirmar</button>')+'</td></tr>').join("")
+              + '</tbody></table>'
+            : '')
+        + (travadas.length
+            ? '<p style="margin-top:14px"><b>Sem material — ficam de fora.</b> Não dá para liberar daqui; '
+              + 'confirmar um R diz qual aço foi usado, não cria aço que não chegou.</p>'
+              + '<table class="trava"><tbody>'
+              + travadas.map(g=>'<tr class="travada"><td><b>'+g.perfil+'</b></td><td>'+g.marcas.length+' marca(s) '
+                  + '<span class="org">'+g.marcas.slice(0,3).join(", ")+(g.marcas.length>3?" …":"")+'</span></td>'
+                  + '<td colspan="2"><span class="mot">'+(g.faltaRotulo||g.motivo||"sem entrada no CMR")+'</span></td></tr>').join("")
+              + '</tbody></table>'
+            : '')
+        + '</div>'
+        + '<div class="pe"><button class="btn" data-x="1">Cancelar</button>'
+        + '<button class="btn pri" data-ir="1"'+(podem.size?'':' disabled')+'>Imprimir '+podem.size+' liberada(s)</button></div>';
+
+      dlg.querySelector('[data-x]').onclick = ()=>dlg.close();
+      dlg.querySelector('[data-ir]').onclick = ()=>{ dlg.close(); emitirLote(r, [...podem], tipo); };
+      for(const b of dlg.querySelectorAll("[data-conf]")) b.onclick = async ()=>{
+        const g = resolviveis[+b.dataset.conf];
+        const inp = dlg.querySelector('.rin[data-i="'+b.dataset.conf+'"]');
+        const rUsado = String(inp?.value || "").trim();
+        if(!rUsado){ dep.avisar(false, "Informe o R usado neste perfil."); return; }
+        b.disabled = true; b.textContent = "…";
+        try{
+          const res = await fetch("/api/pcp/liberacao-material", {
+            method:"POST", headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({ opNumero:r.op, perfil:g.perfil, rUsado }),
+          });
+          const j = await res.json();
+          if(!res.ok) throw new Error(j.error || "Não foi possível gravar o R");
+          g.feito = true; g.rUsado = rUsado;
+          for(const m of g.marcas) podem.add(m);   // o perfil inteiro entra no lote
+          pintar();
+        }catch(e){ dep.avisar(false, e.message); b.disabled = false; b.textContent = "Confirmar"; }
+      };
+    };
+
+    pintar();
+    dep.raiz.appendChild(dlg);
+    dlg.addEventListener("close", ()=>dlg.remove());
+    dlg.showModal();
+  }
+
   async function imprimir(r, marcas, tipo){
     if(!marcas.length) return;
     if(marcas.length > dep.MAX_LOTE){
       dep.avisar(false, "A rota aceita no máximo "+dep.MAX_LOTE+" marcas por vez (são "+marcas.length+"). Use a seleção para dividir em blocos.");
       return;
     }
+    // conferência primeiro: se algo estiver preso, a pessoa resolve na hora em vez de descobrir depois
+    try{
+      const conf = await conferirMaterial(r, marcas);
+      if(conf?.semMaterial?.length){ abrirTravaMaterial(r, tipo, conf); return; }
+    }catch(e){ dep.avisar(false, e.message); return; }
+    await emitirLote(r, marcas, tipo);
+  }
+
+  async function emitirLote(r, marcas, tipo){
+    if(!marcas.length) return;
     if(!confirm("Imprimir "+marcas.length+" desenho(s) da OP-"+r.op+" ("+tipo+")?\n\nCada um sai carimbado com a rastreabilidade e a GRD fica registrada. Pode levar alguns minutos.")) return;
     const foot = dep.$("pFoot"); foot.querySelectorAll("button").forEach(b=>b.disabled=true);
     try{
