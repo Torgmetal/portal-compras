@@ -1,7 +1,12 @@
 {
-  "build": 2886,
-  "gerado": "2026-09-06T02:06:05.861Z",
+  "build": 2887,
+  "gerado": "2026-09-06T03:05:59.166Z",
   "commits": [
+    {
+      "hash": "e7ef7d90",
+      "data": "05/09/2026",
+      "titulo": "Permite publicar comparação de revisões IFC por modelo no portal do cliente"
+    },
     {
       "hash": "f2fba741",
       "data": "05/09/2026",
@@ -146,11 +151,6 @@
       "hash": "702e604f",
       "data": "05/09/2026",
       "titulo": "Montagem: a aba passa a trazer a referência medida da casa"
-    },
-    {
-      "hash": "0c525498",
-      "data": "05/09/2026",
-      "titulo": "Estudo: montagem em campo, e margem própria para o item comercial"
     }
   ]
 }

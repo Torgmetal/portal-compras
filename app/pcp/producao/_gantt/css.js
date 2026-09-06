@@ -105,15 +105,24 @@ export const CSS = `
             padding:0 7px;cursor:grab;pointer-events:auto;overflow:hidden;user-select:none;
             background:var(--ct);color:var(--c);border:1.5px solid var(--c);
             box-shadow:0 1px 2px rgba(13,31,60,.14);touch-action:none}
-  .gpcp .barra-op .prog{position:absolute;left:0;bottom:0;height:6px;background:var(--c);opacity:.9;
-            border-radius:0 3px 3px 0;pointer-events:none}
+  /* faixa fina no rodapé: mostra o avanço sem disputar a linha do texto */
+  .gpcp .barra-op .prog{position:absolute;left:0;bottom:0;height:4px;background:var(--c);opacity:.95;
+            border-radius:0 2px 2px 0;pointer-events:none;z-index:1}
   .gpcp .barra-op:active{cursor:grabbing}
   .gpcp .barra-op.arrastando{opacity:.35}
   .gpcp .barra-op.foco{outline:2px solid var(--navy);outline-offset:1px}
-  .gpcp .barra-op b{font-size:11.5px;font-weight:800;white-space:nowrap}
+  /* ⚠⚠ O TEXTO PRECISA DE 'position:relative'. '.prog' e '.atrasado' são absolutos, e elemento
+     POSICIONADO pinta por cima de estático mesmo vindo antes no HTML — a faixa de apontamento e a
+     hachura de atraso estavam cobrindo o rótulo. Vitor (06/09/2026): "está um pouco ruim para
+     visualizar as escritas dentro das barras". */
+  .gpcp .barra-op b,
+  .gpcp .barra-op span{position:relative; z-index:2}
+  .gpcp .barra-op b{font-size:11.5px;font-weight:800;white-space:nowrap;
+            text-shadow:0 1px 0 var(--ct), 0 0 3px var(--ct)}
   .gpcp .barra-op span{font-size:10.5px;opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
                  font-variant-numeric:tabular-nums}
-  .gpcp .barra-op .selo{margin-left:auto;font-size:9.5px;background:rgba(255,255,255,.82);border-radius:3px;
+  .gpcp .barra-op .selo{position:relative;z-index:2;margin-left:auto;font-size:9.5px;
+                  background:rgba(255,255,255,.92);border-radius:3px;
                   padding:1px 4px;font-weight:700;white-space:nowrap;border:1px solid var(--ct)}
   .gpcp .barra-op.mexida{outline:2px solid var(--laranja);outline-offset:-2px}
   .gpcp .fantasma{position:fixed;z-index:99;pointer-events:none;opacity:.92;
@@ -128,15 +137,18 @@ export const CSS = `
      A faixa vermelha cobre o PEDAÇO da barra cujo dia já passou e ainda tem peça pendente: é o
      trabalho que devia estar pronto. A sombra tracejada é para onde a OP seguinte CAI se ninguém
      recuperar - previsão, não gravação: só vira programação quando o PCP aplicar e salvar. */
-  .gpcp .barra-op .atrasado{position:absolute;left:0;top:0;bottom:0;pointer-events:none;
-            background:repeating-linear-gradient(135deg,rgba(198,40,40,.34),rgba(198,40,40,.34) 5px,
-                       rgba(198,40,40,.10) 5px,rgba(198,40,40,.10) 10px);
+  /* ⚠ hachura LEVE de propósito: ela marca o trecho vencido, não compete com a leitura. Quem grita
+     o atraso é a borda vermelha da barra e o selo — não a textura atrás do nome da OP. */
+  .gpcp .barra-op .atrasado{position:absolute;left:0;top:0;bottom:0;pointer-events:none;z-index:1;
+            background:repeating-linear-gradient(135deg,rgba(198,40,40,.16),rgba(198,40,40,.16) 5px,
+                       rgba(198,40,40,.04) 5px,rgba(198,40,40,.04) 10px);
             border-right:2px solid #c62828}
   .gpcp .barra-op.atrasada{border-color:#c62828}
   .gpcp .barra-op .selo.atr{background:#c62828;color:#fff;border-color:#c62828}
   .gpcp .sombra{position:absolute;height:23px;border-radius:5px;pointer-events:none;display:flex;
           align-items:center;padding:0 7px;border:1.5px dashed var(--c);background:var(--ct);opacity:.7}
-  .gpcp .sombra b{font-size:10.5px;font-weight:800;color:var(--c);white-space:nowrap}
+  .gpcp .sombra b{position:relative;z-index:2;font-size:10.5px;font-weight:800;color:var(--c);
+            white-space:nowrap}
 
   .gpcp /* ── alterações ────────────────────────────────────────────────── */
   .pend{flex:0 0 auto;margin-top:10px;background:var(--papel);border:1px solid var(--linha);
