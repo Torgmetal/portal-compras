@@ -13,6 +13,7 @@ import {
   Truck,
   Settings,
   ChevronDown,
+  ChevronRight,
   LayoutGrid,
   Users,
   Activity,
@@ -36,9 +37,8 @@ const MODULOS = [
   {
     href: "/comercial",
     label: "OPs",
-    desc: "Ordens de Produção — acompanhamento por obra",
+    desc: "Ordens de produção",
     icon: FolderKanban,
-    cor: "bg-blue-100 text-blue-700",
     // Aberto a TODOS os setores (Vitor, 24/07): cada um vê as abas do seu
     // escopo; o financeiro é blindado. Antes era só ["COMERCIAL"].
     modulos: null,
@@ -46,9 +46,8 @@ const MODULOS = [
   {
     href: "/engenharia",
     label: "Engenharia",
-    desc: "Detalhamento, marcas e reconciliação de peso",
+    desc: "Detalhamento e marcas",
     icon: PencilRuler,
-    cor: "bg-sky-100 text-sky-700",
     modulos: ["ENGENHARIA"],
   },
   {
@@ -56,7 +55,6 @@ const MODULOS = [
     label: "Compras",
     desc: "RMs, cotações e pedidos",
     icon: ShoppingCart,
-    cor: "bg-orange-100 text-orange-700",
     modulos: ["COMPRAS"],
   },
   {
@@ -64,7 +62,6 @@ const MODULOS = [
     label: "Requisições",
     desc: "Criar e acompanhar RMs",
     icon: RailSymbol,
-    cor: "bg-cyan-100 text-cyan-700",
     modulos: ["REQUISICOES", "ENGENHARIA", "ALMOXARIFADO", "COMPRAS"],
   },
   {
@@ -72,7 +69,6 @@ const MODULOS = [
     label: "Produção",
     desc: "Controle e romaneios",
     icon: Factory,
-    cor: "bg-green-100 text-green-700",
     modulos: ["PRODUCAO", "ALMOXARIFADO"],
   },
   {
@@ -80,7 +76,6 @@ const MODULOS = [
     label: "Financeiro",
     desc: "Fluxo de caixa e KPIs",
     icon: DollarSign,
-    cor: "bg-pink-100 text-pink-700",
     modulos: ["FINANCEIRO"],
   },
   {
@@ -88,23 +83,20 @@ const MODULOS = [
     label: "Expedição",
     desc: "Romaneios de saída",
     icon: Truck,
-    cor: "bg-teal-100 text-teal-700",
     modulos: ["EXPEDICAO"],
   },
   {
     href: "/fiscal",
     label: "Fiscal",
-    desc: "Romaneios emitidos aguardando NF",
+    desc: "Romaneios aguardando NF",
     icon: ReceiptText,
-    cor: "bg-violet-100 text-violet-700",
     modulos: ["FISCAL", "FINANCEIRO"],
   },
   {
     href: "/qualidade",
     label: "Qualidade",
-    desc: "Documentos e data books (NBR 16775)",
+    desc: "Documentos e data books",
     icon: ShieldCheck,
-    cor: "bg-torg-blue-100 text-torg-blue",
     // ⚠ o inspetor de campo entra para preencher o relatório no computador (Vitor, 04/09/2026) —
     // e lá dentro a Sidebar da Qualidade mostra só Inspeções, que é o que o middleware libera.
     modulos: ["QUALIDADE", "QUALIDADE_CAMPO"],
@@ -112,49 +104,43 @@ const MODULOS = [
   {
     href: "/relatorios",
     label: "Relatórios",
-    desc: "Relatórios de status com fotos (padrão Torg)",
+    desc: "Status e fotos da obra",
     icon: FileBarChart2,
-    cor: "bg-teal-100 text-teal-700",
     modulos: ["COMERCIAL", "PRODUCAO", "ENGENHARIA", "PCP", "QUALIDADE"],
   },
   {
     href: "/indicadores",
     label: "Indicadores",
-    desc: "Scorecard, Savings, OTIF e Produção",
+    desc: "Desempenho e resultados",
     icon: Activity,
-    cor: "bg-indigo-100 text-indigo-700",
     modulos: ["COMPRAS", "COMERCIAL", "RH", "PRODUCAO", "PCP", "PLANEJAMENTO", "EXPEDICAO", "QUALIDADE"],
   },
   {
     href: "/rh",
     label: "RH",
-    desc: "Funcionários e gestão de pessoas",
+    desc: "Gestão de pessoas",
     icon: Users,
-    cor: "bg-rose-100 text-rose-700",
     modulos: ["RH"],
   },
   {
     href: "/planejamento",
     label: "Planejamento",
-    desc: "Cronogramas e programação semanal",
+    desc: "Cronogramas e programação",
     icon: ClipboardList,
-    cor: "bg-amber-100 text-amber-700",
     modulos: ["PLANEJAMENTO", "PRODUCAO"],
   },
   {
     href: "/pcp",
     label: "PCP",
-    desc: "Máquinas, setores e aproveitamento",
+    desc: "Máquinas e aproveitamento",
     icon: Cog,
-    cor: "bg-emerald-100 text-emerald-700",
     modulos: ["PCP", "PLANEJAMENTO", "PRODUCAO"],
   },
   {
     href: "/reunioes",
     label: "Reuniões",
-    desc: "Atas de reunião semanal (ISO)",
+    desc: "Atas de reunião semanal",
     icon: NotebookPen,
-    cor: "bg-torg-blue-50 text-torg-blue",
     // Liberado pra todos os logados: os envolvidos precisam voltar na ata pra
     // responder as atividades. Criar/editar/enviar continua só ADMIN/PLANEJAMENTO.
     modulos: null,
@@ -162,9 +148,8 @@ const MODULOS = [
   {
     href: "/diretoria",
     label: "Diretoria",
-    desc: "Área restrita — acesso liberado pelo Vitor",
+    desc: "Acesso restrito",
     icon: Lock,
-    cor: "bg-slate-200 text-slate-700",
     apenasDiretoria: true, // visível só p/ quem está na allowlist (nem ADMIN burla)
   },
   {
@@ -172,7 +157,6 @@ const MODULOS = [
     label: "Administração",
     desc: "Usuários e configurações",
     icon: Settings,
-    cor: "bg-purple-100 text-purple-700",
     modulos: [], // ninguém entra por módulo
     // ⚠ allowlist própria, igual à Diretoria — nem ADMIN burla. Vitor (05/09/2026): Caio, Guilherme
     // e Fabrine seguem com acesso full ao portal, sem o painel de administração. Ver lib/admin-portal.
@@ -229,7 +213,7 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
     return m.modulos.some(mod => userModulos.includes(mod));
   }).map((m) => (
     soCampoQualidade && m.href === "/qualidade"
-      ? { ...m, href: "/qualidade/inspecoes", desc: "Preencher relatórios de inspeção" }
+      ? { ...m, href: "/qualidade/inspecoes", desc: "Relatórios de inspeção" }
       : m
   ));
 
@@ -246,6 +230,7 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
           temMultiplos ? "cursor-pointer" : "cursor-default"
         }`}
         title={temMultiplos ? "Trocar de módulo" : undefined}
+        aria-expanded={temMultiplos ? aberto : undefined}
       >
         <TorgLogo size="sm" />
         {/* ⚠ O LAÇO AO LADO DA MARCA, o mês inteiro. Vitor pediu no login e a recomendação foi
@@ -275,10 +260,10 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
 
       {/* Dropdown de módulos */}
       {aberto && (
-        <div className="absolute left-3 right-3 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-lg z-50 py-2 animate-in fade-in slide-in-from-top-1 duration-150 max-h-[75vh] overflow-y-auto">
-          <div className="px-3 py-1.5 mb-1">
-            <p className="text-[10px] text-torg-gray uppercase tracking-wider font-semibold flex items-center gap-1.5">
-              <LayoutGrid size={11} />
+        <div className="absolute left-3 top-full mt-1 w-[308px] max-w-[calc(100vw-24px)] bg-white rounded-[14px] border border-slate-200 shadow-[0_8px_24px_rgba(0,41,69,0.08)] z-50 p-2 animate-in fade-in slide-in-from-top-1 duration-150 max-h-[min(75vh,calc(100dvh-120px))] overflow-y-auto overscroll-contain">
+          <div className="px-3 pt-2 pb-3">
+            <p className="text-[10px] text-torg-gray uppercase tracking-[0.12em] font-semibold flex items-center gap-2">
+              <LayoutGrid size={13} strokeWidth={1.7} />
               Módulos disponíveis
             </p>
           </div>
@@ -290,25 +275,29 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
                 key={m.href}
                 href={m.href}
                 onClick={() => setAberto(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 mx-1 rounded-lg text-sm transition-colors ${
+                aria-current={ativo ? "page" : undefined}
+                className={`relative flex items-center gap-3 min-h-[62px] px-3 py-2.5 rounded-[9px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-torg-blue ${
                   ativo
-                    ? "bg-torg-blue-50 text-torg-blue font-semibold"
-                    : "text-torg-dark hover:bg-gray-50"
+                    ? "bg-torg-blue-50 text-torg-blue-600"
+                    : "text-torg-dark hover:bg-slate-50"
                 }`}
               >
                 <span
-                  className={`flex items-center justify-center w-8 h-8 rounded-lg ${m.cor}`}
+                  className={`flex shrink-0 items-center justify-center w-9 h-9 rounded-lg text-torg-blue ${ativo ? "bg-white" : "bg-torg-blue-50/60"}`}
                 >
-                  <Icon size={16} />
+                  <Icon size={20} strokeWidth={1.7} />
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm leading-tight">{m.label}</p>
-                  <p className="text-[11px] text-torg-gray leading-tight truncate">
+                  <p className="font-semibold text-sm leading-tight">{m.label}</p>
+                  <p className="mt-0.5 text-[12px] text-torg-gray leading-snug">
                     {m.desc}
                   </p>
                 </div>
                 {ativo && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-torg-blue flex-shrink-0" />
+                  <>
+                    <span aria-hidden="true" className="absolute left-0 top-3.5 bottom-3.5 w-[3px] rounded-full bg-torg-orange" />
+                    <ChevronRight aria-hidden="true" size={15} className="shrink-0 text-torg-blue" />
+                  </>
                 )}
               </Link>
             );

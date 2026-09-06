@@ -1,7 +1,12 @@
 {
-  "build": 2893,
-  "gerado": "2026-09-06T15:23:50.474Z",
+  "build": 2894,
+  "gerado": "2026-09-06T15:26:08.221Z",
   "commits": [
+    {
+      "hash": "eb69a9dd",
+      "data": "06/09/2026",
+      "titulo": "PCP: a fila do acabamento e a do jato, alimentadas pela cascata dos setores"
+    },
     {
       "hash": "5e320ba3",
       "data": "06/09/2026",
@@ -146,11 +151,6 @@
       "hash": "409deb91",
       "data": "05/09/2026",
       "titulo": "Diz ao time o que fazer na primeira vez que abrir o repo"
-    },
-    {
-      "hash": "f695ab7b",
-      "data": "05/09/2026",
-      "titulo": "PCP: quadro de programação arrastável acima do painel"
     }
   ]
 }
