@@ -1,7 +1,12 @@
 {
-  "build": 2901,
-  "gerado": "2026-09-06T16:25:16.597Z",
+  "build": 2902,
+  "gerado": "2026-09-06T16:26:37.872Z",
   "commits": [
+    {
+      "hash": "754fb799",
+      "data": "06/09/2026",
+      "titulo": "feat: unifica login e seleção de módulos por acesso"
+    },
     {
       "hash": "f4558b36",
       "data": "06/09/2026",
@@ -146,11 +151,6 @@
       "hash": "14fa30bc",
       "data": "05/09/2026",
       "titulo": "Gantt do PCP: a barra se divide no fim de semana, em vez de atravessá-lo"
-    },
-    {
-      "hash": "9ec0631c",
-      "data": "05/09/2026",
-      "titulo": "Gantt do PCP: fim de semana vira escolha no botão direito"
     }
   ]
 }

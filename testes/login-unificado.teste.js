@@ -32,13 +32,13 @@ describe("módulos exibidos após login e no menu", () => {
   });
 });
 describe("destino após autenticação", () => {
-  it("abre a seleção por padrão", () => expect(destinoLogin(user)).toBe("/modulos"));
+  it("abre OPs por padrão", () => expect(destinoLogin(user)).toBe("/comercial"));
   it.each(["/compras/pedidos?id=12#itens", origin+"/compras/pedidos?id=12#itens"])("preserva link interno %s", callback => {
     expect(destinoLogin(user, callback, origin)).toBe("/compras/pedidos?id=12#itens");
   });
-  it.each(["https://outro.example/compras", "//outro.example", "/\\outro.example", "javascript:alert(1)", "/", "/entrar?callbackUrl=/", "/api/auth/signout"])("recusa callback inseguro ou circular %s", callback => {
+  it.each(["https://outro.example/compras", "//outro.example", "/\\outro.example", "javascript:alert(1)", "/", "/entrar?callbackUrl=/", "/modulos", "/api/auth/signout"])("recusa callback inseguro ou circular %s", callback => {
     expect(callbackInterno(callback, origin)).toBeNull();
-    expect(destinoLogin(user, callback, origin)).toBe("/modulos");
+    expect(destinoLogin(user, callback, origin)).toBe("/comercial");
   });
   it("preserva a área de colaboradores e clientes", () => {
     expect(destinoLogin({tipo:"FUNCIONARIO"}, "/compras", origin)).toBe("/colaborador");
