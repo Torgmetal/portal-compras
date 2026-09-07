@@ -1,4 +1,5 @@
 "use client";
+import { tarefaAtrasada, diasDeAtraso, diaPrevisto, diaDeHoje } from "@/lib/cronograma-atraso";
 import { useState } from "react";
 import { Send, Weight, X } from "lucide-react";
 import { fmtKg } from "../_lib/formatos";
@@ -45,19 +46,18 @@ export function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDi
   const exigeJustificativa = cronogramaValidado && datasMudaram;
 
   const t = tarefa;
-  const atrasada = t.dataFimPrevista && new Date(t.dataFimPrevista) < now && t.percentualRealizado < 100;
+  const hoje = diaDeHoje(now);
+  const atrasada = tarefaAtrasada(t, hoje);
   const concluida = t.percentualRealizado >= 100;
   const indent = Math.max(0, t.outlineLevel - 2);
 
   // Atraso REAL vs fim previsto (a data base do cronograma NÃO muda):
   // concluída → término real (ou data executada) vs previsto; em andamento → hoje vs previsto.
-  const fimPrev = t.dataFimPrevista ? new Date(t.dataFimPrevista) : null;
-  const fimEfetivo = t.dataFimReal
-    ? new Date(t.dataFimReal)
-    : (concluida ? (t.dataRealizacao ? new Date(t.dataRealizacao) : null) : now);
-  const atrasoDias = fimPrev && fimEfetivo && fimEfetivo > fimPrev
-    ? Math.ceil((fimEfetivo - fimPrev) / 86400000)
-    : 0;
+  const diaPrev = diaPrevisto(t.dataFimPrevista);
+  const diaEfetivo = t.dataFimReal
+    ? diaPrevisto(t.dataFimReal)
+    : (concluida ? diaPrevisto(t.dataRealizacao) : hoje);
+  const atrasoDias = diasDeAtraso(diaPrev, diaEfetivo);
 
   // Verifica se esta tarefa esta bloqueada (tem antecessora nao concluida)
   const antecessorasIncompletas = (t.antecessoraIds || []).filter((aid) => {

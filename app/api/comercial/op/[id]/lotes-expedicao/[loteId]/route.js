@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { renomearArea } from "@/lib/cronograma-areas";
+import { normArea } from "@/lib/cronograma-area-cor";
 
 export const runtime = "nodejs";
 const ROLES = ["ADMIN", "COMERCIAL", "PLANEJAMENTO", "PCP"];
@@ -24,7 +26,7 @@ const schema = z.object({
 
 export async function PATCH(req, { params }) {
   try { await requireRole(ROLES); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
-  const lote = await prisma.loteExpedicao.findFirst({ where: { id: params.loteId, opId: params.id }, select: { id: true } });
+  const lote = await prisma.loteExpedicao.findFirst({ where: { id: params.loteId, opId: params.id }, select: { id: true, nome: true } });
   if (!lote) return NextResponse.json({ error: "Lote não encontrado" }, { status: 404 });
   let body;
   try { body = schema.parse(await req.json()); } catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
@@ -42,6 +44,30 @@ export async function PATCH(req, { params }) {
   }
 
   const atualizado = await prisma.loteExpedicao.update({ where: { id: lote.id }, data });
+
+  /* ⚠⚠ RENOMEAR A FASE TEM DE CHEGAR NO CRONOGRAMA. As fases (lotes de entrega) viram as ÁREAS do
+     cronograma — Vitor: "precisamos ter isso ligado". Só que renomear aqui não mexia lá, e as duas
+     pontas se separavam por uma letra: a OP-105 ficou com o lote "Quadros Vasadores" e a área
+     "Quadro Vasadores", e a área órfã parou de receber datas e avanço (aparecendo como atraso que
+     não existe). O vínculo é o NOME, então ele tem de andar junto.
+     ⚠ Só propaga se existir área com o nome ANTIGO. Se alguém já renomeou a área dentro do
+     cronograma de propósito, ela não casa mais com o lote — e aí mandar renomear criaria uma área
+     nova, duplicando. Nesse caso não se toca em nada. */
+  const nomeAntigo = lote.nome;
+  if (data.nome && normArea(data.nome) !== normArea(nomeAntigo)) {
+    const cronos = await prisma.cronograma.findMany({ where: { opId: params.id }, select: { id: true, areas: true } });
+    for (const c of cronos) {
+      const areas = Array.isArray(c.areas) ? c.areas : [];
+      if (!areas.some((a) => normArea(a?.nome) === normArea(nomeAntigo))) continue;
+      await renomearArea(prisma, c.id, nomeAntigo, data.nome);
+    }
+  }
+
+  await prisma.auditLog.create({
+    data: { action: "LOTE_ATUALIZAR", entity: "LoteExpedicao", entityId: lote.id,
+            diff: { antes: { nome: nomeAntigo }, depois: data } },
+  }).catch(() => {});
+
   return NextResponse.json({ success: true, lote: atualizado });
 }
 

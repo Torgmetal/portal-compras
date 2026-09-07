@@ -1,4 +1,5 @@
 "use client";
+import { tarefaAtrasada, diaDeHoje } from "@/lib/cronograma-atraso";
 import { useState } from "react";
 import { AlertCircle, ArrowUpDown, CheckCircle2, ChevronDown, ChevronRight, Factory, Loader2, Mail, X } from "lucide-react";
 import { TarefaRow } from "./TarefaRow";
@@ -33,7 +34,7 @@ export function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId
   const [savingTask, setSavingTask] = useState(false);
   const Icon = DEPT_ICONS[dept] || Factory;
   const colors = DEPT_COLORS[dept] || "text-gray-600 bg-gray-50 border-gray-200";
-  const atrasadas = tasks.filter((t) => !t.isSummary && t.dataFimPrevista && new Date(t.dataFimPrevista) < now && t.percentualRealizado < 100);
+  const atrasadas = tasks.filter((t) => !t.isSummary && tarefaAtrasada(t, diaDeHoje(now)));
 
   // Agrupamento por Área dentro do setor (Setor → Área → Tarefa). Sem nenhuma
   // área definida, a lista sai plana (idêntico ao comportamento anterior).

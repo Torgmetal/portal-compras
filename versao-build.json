@@ -1,7 +1,12 @@
 {
-  "build": 2944,
-  "gerado": "2026-09-07T20:11:57.417Z",
+  "build": 2945,
+  "gerado": "2026-09-07T20:44:31.055Z",
   "commits": [
+    {
+      "hash": "72a0eb16",
+      "data": "07/09/2026",
+      "titulo": "Cronograma da OP-105: cada fase ganha preparação, montagem, solda e pintura"
+    },
     {
       "hash": "09f0aee6",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "576c078d",
       "data": "07/09/2026",
       "titulo": "Gantt do PCP: montagem e solda também listam a fila na faixa sem posto"
-    },
-    {
-      "hash": "b010a9b0",
-      "data": "07/09/2026",
-      "titulo": "Gantt do PCP: a fila do acabamento, jato e pintura aparece na faixa sem posto"
     }
   ]
 }
