@@ -1,7 +1,12 @@
 {
-  "build": 2934,
-  "gerado": "2026-09-07T18:39:03.212Z",
+  "build": 2935,
+  "gerado": "2026-09-07T18:41:38.494Z",
   "commits": [
+    {
+      "hash": "05479d3e",
+      "data": "07/09/2026",
+      "titulo": "Relatório de produção: avanço real por setor e Excel geral das OPs abertas"
+    },
     {
       "hash": "06ed7e2e",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "13555116",
       "data": "07/09/2026",
       "titulo": "Aplica painel visual do PCP com dados operacionais existentes"
-    },
-    {
-      "hash": "884a51c3",
-      "data": "07/09/2026",
-      "titulo": "Gantt do PCP: a pintura entra no quadro, e os botões de setor param de mentir"
     }
   ]
 }
