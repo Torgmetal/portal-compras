@@ -4,11 +4,13 @@
 //   - setor: CORTE (padrão) | MONTAGEM | SOLDA | ACABAMENTO | JATO | PINTURA
 //   - sem obra → resumo das obras com apontamento no setor
 //   - com obra → detalhe por peça
-// Obras marcadas como CONCLUÍDAS (baixa manual de ADM) são forçadas a 100% só na
-// visão (não altera o Syneco/mesOrdem). Casamento: obra exata ou obra-pai + marca.
+// Baixas administrativas não substituem apontamentos. OPs encerradas ou com todas
+// as etapas da LPC concluídas ficam fora da listagem e das exportações.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { carregarResumoProducao } from "@/lib/relatorio-producao-data";
+import { numeroOpRelatorio } from "@/lib/relatorio-producao-resumo";
 import { whereSetorSyneco } from "@/lib/syneco-dia";
 
 export const runtime = "nodejs";
@@ -26,19 +28,18 @@ function estadoDe(prog, prod) {
   return "PENDENTE";
 }
 
-const FIELDS = { obra: true, op: true, descItem: true, planejadoUn: true, produzidoUn: true, saldoUn: true, pesoProduzido: true, dataInicio: true, dataFim: true, maquina: true, operador: true };
-const mapItem = (r, verbo, concluidas) => {
-  const concl = concluidas.has(r.obra);
+const FIELDS = { obra: true, op: true, item: true, descItem: true, planejadoUn: true, produzidoUn: true, saldoUn: true, pesoProduzido: true, dataInicio: true, dataFim: true, maquina: true, operador: true };
+const mapItem = (r, verbo) => {
   const planj = r.planejadoUn || 0;
-  const prod = concl && planj > 0 ? planj : (r.produzidoUn || 0); // baixa manual → 100%
+  const prod = Math.max(0, r.produzidoUn || 0);
   const estado = estadoDe(planj, prod);
   return {
     obra: limpo(r.obra),
-    peca: limpo(r.op),
+    peca: limpo(r.item || r.op),
     descricao: limpo(r.descItem),
     programado: planj,
     cortado: prod, // produzido no setor (nome mantido p/ o client)
-    saldo: concl ? Math.max(0, planj - prod) : (r.saldoUn || 0),
+    saldo: Math.max(0, planj - prod),
     estado,
     situacao: estado === "FEITO" ? verbo : LABEL_ESTADO[estado],
     data: r.dataFim,
@@ -63,7 +64,9 @@ export async function GET(req) {
   const ate = url.searchParams.get("ate");
   const todas = url.searchParams.get("todas"); // extrai TODAS as peças de todas as OPs (flat)
 
-  const base = whereSetorSyneco(setor);
+  const {finalizadas,finalizadasIds} = await carregarResumoProducao();
+  const ativa = nome => !finalizadas.has(numeroOpRelatorio(nome));
+  const base = {...whereSetorSyneco(setor),AND:[{OR:[{opId:null},{opId:{notIn:finalizadasIds}}]}]};
   if (de || ate) {
     base.dataFim = {};
     // Datas do Syneco são UTC-naïve → janela em 00:00Z/23:59Z (explícito p/ não
@@ -79,10 +82,11 @@ export async function GET(req) {
   // TODAS as peças de todas as OPs, em uma lista só (para extração geral)
   if (todas) {
     const rows = await prisma.mesOrdem.findMany({
-      where: base, select: FIELDS, take: 20000,
+      where: base, select: FIELDS, take: 20001,
       orderBy: [{ obra: "asc" }, { dataFim: "desc" }],
     });
-    return NextResponse.json({ todas: true, setor, total: rows.length, itens: rows.map((r) => mapItem(r, verbo, concluidas)) });
+    if(rows.length>20000)return NextResponse.json({error:"O relatório excede 20.000 ordens. Selecione um período menor para exportar todas as linhas sem truncamento."},{status:400});
+    return NextResponse.json({ todas: true, setor, total: rows.filter(r=>ativa(r.obra)).length, itens: rows.filter(r=>ativa(r.obra)).map((r) => mapItem(r, verbo)) });
   }
 
   // Resumo por OP/frente — TODAS as obras que têm apontamento no setor
@@ -98,12 +102,12 @@ export async function GET(req) {
     ]);
     const ocultas = new Set(ocultasRows.map((o) => o.obra));
     const prioMap = new Map(prioridadesRows.map((p) => [p.obra, p]));
-    const obras = grupos.filter((g) => g.obra).map((g) => {
+    const obras = grupos.filter((g) => g.obra && ativa(g.obra)).map((g) => {
       const concl = concluidas.has(g.obra);
       const prog = g._sum.planejadoUn || 0;
-      const cort = concl && prog > 0 ? prog : (g._sum.produzidoUn || 0); // baixa manual → 100%
+      const cort = Math.max(0, g._sum.produzidoUn || 0);
       const prio = prioMap.get(g.obra);
-      return { obra: g.obra, pecas: g._count._all, programadoUn: Math.round(prog), cortadoUn: Math.round(cort), pesoCortado: Math.round(g._sum.pesoProduzido || 0), pct: prog > 0 ? Math.round((cort / prog) * 100) : 0, ultima: g._max.dataFim, oculto: ocultas.has(g.obra), concluida: concl, prioridade: prio ? prio.ordem : null, dataEstimada: prio ? prio.dataEstimada : null, obraInteira: prio ? prio.obraInteira : true, pecasPrioridade: prio ? prio.pecas : [] };
+      return { obra: g.obra, pecas: g._count._all, programadoUn: Math.round(prog), cortadoUn: Math.round(cort), pesoCortado: Math.round(g._sum.pesoProduzido || 0), pct: prog > 0 ? Math.min(100, Math.round((cort / prog) * 100)) : 0, ultima: g._max.dataFim, oculto: ocultas.has(g.obra), concluida: concl, prioridade: prio ? prio.ordem : null, dataEstimada: prio ? prio.dataEstimada : null, obraInteira: prio ? prio.obraInteira : true, pecasPrioridade: prio ? prio.pecas : [] };
     });
     // Ordem numérica da obra, da maior para a menor (T95, T90, T88… ; "1000" no topo).
     const numObra = (s) => { const m = String(s || "").match(/\d+/); return m ? parseInt(m[0], 10) : -1; };
@@ -121,7 +125,7 @@ export async function GET(req) {
     const da = a.dataFim ? +new Date(a.dataFim) : -1, db = b.dataFim ? +new Date(b.dataFim) : -1;
     return db - da || String(a.op).localeCompare(String(b.op));
   });
-  const itens = rows.map((r) => mapItem(r, verbo, concluidas));
+  const itens = rows.filter(r=>ativa(r.obra)).map((r) => mapItem(r, verbo));
   const prioridade = await prisma.producaoPrioridade.findUnique({
     where: { obra_setor: { obra, setor } },
     select: { ordem: true, dataEstimada: true, obraInteira: true, pecas: true },

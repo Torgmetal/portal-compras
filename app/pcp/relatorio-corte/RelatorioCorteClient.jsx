@@ -1,17 +1,17 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import Link from "next/link";
-import { Factory, Download, Loader2, AlertCircle, RefreshCw, ChevronLeft, Inbox, EyeOff, Eye, CheckCircle2, RotateCcw, Star, ArrowUp, ArrowDown, X, Plus, Tv } from "lucide-react";
+import { Factory, Download, Loader2, AlertCircle, RefreshCw, ChevronLeft, Inbox, Star, ArrowUp, ArrowDown, X, Plus } from "lucide-react";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, adicionarLegenda, downloadWorkbook, CORES } from "@/lib/excel-relatorio";
+import ResumoProducao from "./ResumoProducao";
 import { useStore } from "@/lib/store";
 
 // dataEstimada (noon UTC) → valor "YYYY-MM-DD" pro <input type=date>
 const dataInputVal = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR")} kg`;
-const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—");
+const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const fmtDataHora = (d) =>
-  d ? new Date(d).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  d ? new Date(d).toLocaleString("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 
 // Cor da situação por ESTADO (independe do setor — o rótulo é o verbo do setor).
 const EST_COR = {
@@ -31,8 +31,9 @@ const SETOR_INFO = {
 };
 const SETORES = Object.keys(SETOR_INFO);
 
-export default function RelatorioCorteClient({ isAdmin = false }) {
+export default function RelatorioCorteClient() {
   const { showToast } = useStore();
+  const [visaoGeral,setVisaoGeral]=useState(true);
   const [setor, setSetor] = useState("CORTE");
   const [obras, setObras] = useState([]);
   const [obra, setObra] = useState("");
@@ -44,13 +45,11 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
   const [fMaquina, setFMaquina] = useState("");
   const [fEstado, setFEstado] = useState("");
   const [exportandoTodas, setExportandoTodas] = useState(false);
-  const [reconciliando, setReconciliando] = useState(false);
-  const [reconMsg, setReconMsg] = useState("");
-  const [mostrarOcultas, setMostrarOcultas] = useState(false);
-
+  const pedidoAtual=useRef(0);
   const info = SETOR_INFO[setor];
 
   const carregar = useCallback(async () => {
+    const pedido=++pedidoAtual.current;
     setLoading(true); setErro("");
     try {
       const p = new URLSearchParams({ setor });
@@ -60,86 +59,30 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
       const res = await fetch(`/api/pcp/relatorio-corte?${p}`);
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "Erro ao carregar");
+      if(pedido!==pedidoAtual.current)return;
       if (obra) { setDetalhe(j); } else { setObras(j.obras || []); setDetalhe(null); }
     } catch (e) {
-      setErro(e.message);
+      if(pedido===pedidoAtual.current)setErro(e.message);
     } finally {
-      setLoading(false);
+      if(pedido===pedidoAtual.current)setLoading(false);
     }
   }, [setor, obra, de, ate]);
 
-  useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => { if(!visaoGeral)carregar(); }, [carregar,visaoGeral]);
 
   function mudarSetor(s) {
+    setVisaoGeral(false);
     if (s === setor) return;
     setSetor(s); setObra(""); setDetalhe(null);
-    setFMaquina(""); setFEstado(""); setMostrarOcultas(false); setReconMsg("");
+    setFMaquina(""); setFEstado("");
   }
-
-  // Reconciliação da baixa do CORTE (Syneco → peças) — manual + auto ao abrir.
-  // Só faz sentido no corte (montagem+ avança por liberação manual).
-  const carregarRef = useRef(carregar);
-  useEffect(() => { carregarRef.current = carregar; }, [carregar]);
-  const reconciliar = useCallback(async (auto = false) => {
-    if (!auto) { setReconciliando(true); setReconMsg(""); }
-    try {
-      const r = await fetch(`/api/pcp/reconciliar-corte${auto ? "?auto=1" : ""}`, { method: "POST" });
-      const j = await r.json();
-      if (!r.ok || !j.ok) { if (!auto) setReconMsg(j.error || "Erro ao reconciliar"); return; }
-      if (j.skipped) return;
-      if (!auto) setReconMsg(`Baixa em dia — ${j.atualizadas} peça(s) atualizada(s)${j.promovidas ? `, ${j.promovidas} promovida(s) p/ CORTE` : ""}.`);
-      if (j.atualizadas > 0) carregarRef.current?.();
-    } catch (e) { if (!auto) setReconMsg(e.message); }
-    finally { if (!auto) setReconciliando(false); }
-  }, []);
-  useEffect(() => { if (setor === "CORTE") reconciliar(true); }, [reconciliar, setor]); // rede de segurança ao abrir
 
   // Filtros do detalhe (cliente): máquina + estado
   const itensDet = detalhe?.itens || [];
   const maquinas = [...new Set(itensDet.map((i) => i.maquina).filter((m) => m && m !== "—"))].sort();
   const itensFiltrados = itensDet.filter((i) => (!fMaquina || i.maquina === fMaquina) && (!fEstado || i.estado === fEstado));
 
-  // Resumo: obras visíveis × ocultas (por setor). ADM pode ocultar OPs já
-  // finalizadas no setor (só some da visão — nada é apagado).
-  const obrasOcultas = obras.filter((o) => o.oculto);
-  const obrasVisiveis = obras.filter((o) => !o.oculto);
-  const listaExibida = isAdmin && mostrarOcultas ? obras : obrasVisiveis;
-
-  async function toggleOcultar(obraAlvo, ocultar) {
-    setObras((prev) => prev.map((o) => (o.obra === obraAlvo ? { ...o, oculto: ocultar } : o)));
-    try {
-      const r = await fetch("/api/pcp/relatorio-corte/ocultar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ obra: obraAlvo, setor, ocultar }),
-      });
-      const j = await r.json();
-      if (!r.ok || !j.ok) throw new Error(j.error || "Erro ao ocultar");
-    } catch (e) {
-      setObras((prev) => prev.map((o) => (o.obra === obraAlvo ? { ...o, oculto: !ocultar } : o)));
-      setErro(e.message);
-    }
-  }
-
-  // Baixa manual: marca a OP como 100% concluída no relatório (não toca no Syneco).
-  async function toggleConcluir(obraAlvo, concluir) {
-    setObras((prev) => prev.map((o) => (o.obra === obraAlvo
-      ? { ...o, concluida: concluir, ...(concluir && o.programadoUn > 0 ? { cortadoUn: o.programadoUn, pct: 100 } : {}) }
-      : o)));
-    try {
-      const r = await fetch("/api/pcp/relatorio-corte/concluir", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ obra: obraAlvo, setor, concluir }),
-      });
-      const j = await r.json();
-      if (!r.ok || !j.ok) throw new Error(j.error || "Erro ao dar baixa");
-      carregar(); // recarrega p/ refletir números exatos (e o detalhe, se aberto)
-    } catch (e) {
-      setErro(e.message);
-      carregar();
-    }
-  }
+  const listaExibida = obras;
 
   // ─── Prioridades (PCP) ───────────────────────────────────────────
   // A rota devolve a lista de prioridades do setor; mesclamos direto no estado
@@ -239,7 +182,7 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
       adicionarLegenda(ws, row, [{ cor: CORES.LIGHT_GREEN, label: `Verde = ${info.verbo.toLowerCase()}` }, { cor: CORES.LIGHT_ORANGE, label: "Laranja = parcial" }, { cor: "FFFFFF", label: "Branco = pendente" }], headers.length);
       await downloadWorkbook(workbook, `Torg_${info.nome}_${detalhe.obra}_${hoje}.xlsx`);
     } else {
-      const headers = ["Obra", "Pecas", "Programado (un)", `${info.acao} (un)`, `% ${info.acao.toLowerCase()}`, `Peso ${info.acao.toLowerCase()} (kg)`, info.ultima];
+      const headers = ["Obra", "Pecas", "Programado (un)", `${info.acao} (un)`, "% do programado", `Peso ${info.acao.toLowerCase()} (kg)`, info.ultima];
       const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
         titulo: `Relatorio de ${info.nome} — Resumo por obra`,
         subtitulo: `Obras com apontamento de ${info.nome.toLowerCase()} no Syneco${periodo}`,
@@ -267,73 +210,41 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="flex items-start justify-between mb-4 gap-3">
+      <div className="flex flex-wrap items-start justify-between mb-4 gap-3">
         <div>
           <h1 className="text-xl font-bold text-torg-dark flex items-center gap-2"><Factory size={20} className="text-torg-blue" /> Relatório de Produção</h1>
           <p className="text-xs text-torg-gray mt-0.5">Peças <strong>programadas</strong> e <strong>produzidas</strong> por obra/setor — situação, data/hora, máquina e operador (Syneco).</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Link href="/pcp/dashboard-prioridades" target="_blank"
-            title="Abrir o painel de prioridades para TV"
-            className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
-            <Tv size={15} /> Dashboard TV
-          </Link>
-          {setor === "CORTE" && (
-            <button onClick={() => reconciliar(false)} disabled={reconciliando}
-              title="Aplica a baixa do corte do Syneco em todas as OPs agora"
-              className="text-sm font-semibold text-torg-gray border border-gray-300 hover:bg-gray-50 px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50">
-              {reconciliando ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />} Reconciliar corte
-            </button>
-          )}
-          {isAdmin && !detalhe && obrasOcultas.length > 0 && (
-            <button onClick={() => setMostrarOcultas((v) => !v)}
-              title="Mostrar/esconder as obras ocultadas deste setor"
-              className="text-sm font-semibold text-torg-gray border border-gray-300 hover:bg-gray-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
-              {mostrarOcultas ? <Eye size={15} /> : <EyeOff size={15} />} {mostrarOcultas ? "Esconder ocultas" : `Ocultas (${obrasOcultas.length})`}
-            </button>
-          )}
+        {!visaoGeral&&<div className="flex flex-wrap items-center gap-2">
           {!detalhe && (
             <button onClick={exportarTodas} disabled={exportandoTodas}
               className="text-sm font-semibold text-white bg-torg-blue hover:bg-torg-dark px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50">
               {exportandoTodas ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} Todas as peças (Excel)
             </button>
           )}
-          {isAdmin && detalhe && (detalhe.concluida ? (
-            <button onClick={() => toggleConcluir(detalhe.obra, false)}
-              title="Reabrir — volta a usar o apontamento do Syneco"
-              className="text-sm font-semibold text-amber-700 border border-amber-300 hover:bg-amber-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
-              <RotateCcw size={15} /> Reabrir baixa
-            </button>
-          ) : (
-            <button onClick={() => toggleConcluir(detalhe.obra, true)}
-              title="Marca esta OP como 100% concluída no relatório (não altera o Syneco)"
-              className="text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-2 rounded-lg inline-flex items-center gap-2">
-              <CheckCircle2 size={15} /> Dar baixa (100%)
-            </button>
-          ))}
           <button onClick={exportarExcel} disabled={loading || vazio}
             className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50">
             <Download size={15} /> Exportar {detalhe ? "OP" : "resumo"}
           </button>
-        </div>
+        </div>}
       </div>
 
       {/* Abas por setor */}
       <div className="flex items-center gap-1 mb-4 border-b border-gray-200 overflow-x-auto">
+        <button onClick={()=>setVisaoGeral(true)} className={`px-3 py-2 text-sm font-semibold whitespace-nowrap border-b-2 ${visaoGeral?"border-torg-blue text-torg-blue":"border-transparent text-torg-gray"}`}>Visão geral</button>
         {SETORES.map((s) => (
           <button key={s} onClick={() => mudarSetor(s)}
-            className={`px-3 py-2 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition-colors ${setor === s ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
+            className={`px-3 py-2 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition-colors ${!visaoGeral && setor === s ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
             {SETOR_INFO[s].nome}
           </button>
         ))}
       </div>
 
-      {reconMsg && <div className="mb-3 text-[13px] bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-3 py-2 flex items-center gap-2">{reconMsg}<button onClick={() => setReconMsg("")} className="ml-auto text-emerald-700 hover:text-emerald-900 font-bold">✕</button></div>}
-
+      {visaoGeral?<ResumoProducao/>:<>
       <div className="flex items-center gap-3 flex-wrap mb-4 bg-white border border-gray-100 rounded-xl shadow-sm p-3">
         <select value={obra} onChange={(e) => setObra(e.target.value)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
           <option value="">Todas as obras (resumo)</option>
-          {listaExibida.map((o) => <option key={o.obra} value={o.obra}>{o.obra}{o.oculto ? " (oculta)" : ""}</option>)}
+          {listaExibida.map((o) => <option key={o.obra} value={o.obra}>{o.obra}</option>)}
         </select>
         <label className="text-xs text-torg-gray flex items-center gap-1">De <input type="date" value={de} onChange={(e) => setDe(e.target.value)} className="px-2 py-1 border border-gray-300 rounded-lg text-sm" /></label>
         <label className="text-xs text-torg-gray flex items-center gap-1">Até <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} className="px-2 py-1 border border-gray-300 rounded-lg text-sm" /></label>
@@ -354,7 +265,7 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
         )}
         {obra && <button onClick={() => { setObra(""); setFMaquina(""); setFEstado(""); }} className="text-xs text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 ml-auto"><ChevronLeft size={13} /> voltar ao resumo</button>}
       </div>
-      {(de || ate) && <p className="text-[11px] text-torg-gray -mt-2 mb-3">Filtro de período mostra só o que foi <strong>{info.acao.toLowerCase()}</strong> no intervalo (pendentes aparecem sem filtro de data).</p>}
+      {(de || ate) && <p className="text-[11px] text-torg-gray -mt-2 mb-3">O período seleciona ordens pela data do último apontamento; as quantidades são acumuladas dessas ordens, não a produção diária. O status geral da LPC permanece acumulado.</p>}
 
       {loading ? (
         <div className="text-center py-16 text-torg-gray"><Loader2 size={22} className="animate-spin mx-auto mb-2" /> Carregando…</div>
@@ -365,11 +276,6 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
         <div className="text-center py-16 text-torg-gray"><Inbox size={28} className="mx-auto mb-2 opacity-50" /><p className="text-sm">Nenhum apontamento de {info.nome.toLowerCase()}{(de || ate) ? " no período." : "."}</p></div>
       ) : detalhe ? (
         <>
-          {detalhe.concluida && (
-            <div className="mb-3 text-[13px] bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg px-3 py-2">
-              ✓ OP marcada como <strong>concluída (baixa manual)</strong> — apontamento forçado a 100% no relatório. O Syneco não é alterado.
-            </div>
-          )}
           <PrioridadeDetalheBar
             prioridade={detalhe.prioridade}
             setorNome={info.nome}
@@ -425,18 +331,16 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
               <th className="px-3 py-2 font-medium text-right">Peças</th>
               <th className="px-3 py-2 font-medium text-right">Programado</th>
               <th className="px-3 py-2 font-medium text-right">{info.acao}</th>
-              <th className="px-3 py-2 font-medium text-right">% {info.acao.toLowerCase()}</th>
+              <th className="px-3 py-2 font-medium text-right">% do programado</th>
               <th className="px-3 py-2 font-medium text-right">Peso {info.acao.toLowerCase()}</th>
               <th className="px-3 py-2 font-medium">{info.ultima}</th>
               <th className="px-3 py-2 font-medium text-right">Ações</th>
             </tr></thead>
             <tbody className="divide-y divide-gray-50">
               {listaExibida.map((o) => (
-                <tr key={o.obra} className={`hover:bg-gray-50/50 ${o.oculto ? "opacity-50" : ""}`}>
+                <tr key={o.obra} className="hover:bg-gray-50/50">
                   <td className="px-3 py-2 font-mono font-semibold text-torg-dark whitespace-nowrap">
                     {o.obra}
-                    {o.concluida && <span className="ml-2 align-middle text-[10px] font-sans font-medium text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full">✓ baixa manual</span>}
-                    {o.oculto && <span className="ml-2 align-middle text-[10px] font-sans font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">oculta</span>}
                   </td>
                   <td className="px-3 py-2">
                     {o.prioridade ? (
@@ -469,20 +373,6 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
                   <td className="px-3 py-2 whitespace-nowrap text-torg-gray">{fmtData(o.ultima)}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     <button onClick={() => setObra(o.obra)} className="text-[12px] text-torg-blue hover:text-torg-dark font-medium">ver peças →</button>
-                    {isAdmin && (o.concluida ? (
-                      <button onClick={() => toggleConcluir(o.obra, false)} title="Reabrir — volta a usar o apontamento do Syneco"
-                        className="ml-3 text-[12px] text-amber-700 hover:text-amber-900 font-medium inline-flex items-center gap-1"><RotateCcw size={13} /> reabrir</button>
-                    ) : (
-                      <button onClick={() => toggleConcluir(o.obra, true)} title="Dar baixa — marca a OP como 100% concluída no relatório (não altera o Syneco)"
-                        className="ml-3 text-[12px] text-emerald-700 hover:text-emerald-900 font-medium inline-flex items-center gap-1"><CheckCircle2 size={13} /> baixa 100%</button>
-                    ))}
-                    {isAdmin && (o.oculto ? (
-                      <button onClick={() => toggleOcultar(o.obra, false)} title="Restaurar no relatório"
-                        className="ml-3 text-[12px] text-emerald-700 hover:text-emerald-900 font-medium inline-flex items-center gap-1"><Eye size={13} /> restaurar</button>
-                    ) : (
-                      <button onClick={() => toggleOcultar(o.obra, true)} title="Ocultar do relatório (ex.: OP finalizada neste setor)"
-                        className="ml-3 text-[12px] text-torg-gray hover:text-red-600 font-medium inline-flex items-center gap-1"><EyeOff size={13} /> ocultar</button>
-                    ))}
                   </td>
                 </tr>
               ))}
@@ -490,6 +380,7 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
           </table>
         </div>
       )}
+      </>}
     </div>
   );
 }

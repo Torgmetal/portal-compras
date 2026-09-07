@@ -1,0 +1,11 @@
+import {vi,it,expect,beforeEach} from 'vitest';
+import {mockPrisma as db} from '@/testes/apoio/prisma';
+vi.mock('server-only',()=>({}));vi.mock('@/lib/prisma',()=>({prisma:db}));vi.mock('@/lib/session',()=>({requireRole:vi.fn()}));
+vi.mock('@/lib/relatorio-producao-data',()=>({carregarResumoProducao:vi.fn()}));
+import {requireRole} from '@/lib/session';
+import {carregarResumoProducao} from '@/lib/relatorio-producao-data';
+import {GET} from '@/app/api/pcp/relatorio-corte/route';
+beforeEach(()=>{vi.clearAllMocks();requireRole.mockResolvedValue({});carregarResumoProducao.mockResolvedValue({finalizadas:new Set(['78']),finalizadasIds:['old']});db.relatorioObraConcluida.findMany.mockResolvedValue([{obra:'T97'}]);db.relatorioCorteObraOculta.findMany.mockResolvedValue([]);db.producaoPrioridade.findMany.mockResolvedValue([]);db.producaoPrioridade.findUnique.mockResolvedValue(null)});
+it('não transforma baixa administrativa em 100% e retira OP finalizada',async()=>{db.mesOrdem.groupBy.mockResolvedValue(['T97','T78A'].map(obra=>({obra,_sum:{planejadoUn:10,produzidoUn:3,pesoProduzido:30},_count:{_all:1},_max:{dataFim:null}})));const j=await(await GET(new Request('http://local/api?setor=SOLDA'))).json();expect(j.obras).toHaveLength(1);expect(j.obras[0]).toMatchObject({obra:'T97',cortadoUn:3,pct:30});});
+it('preserva marca e apontamento real no detalhe',async()=>{db.mesOrdem.findMany.mockResolvedValue([{obra:'T97',op:'ordem-99',item:'M1',planejadoUn:10,produzidoUn:3,saldoUn:0}]);const j=await(await GET(new Request('http://local/api?obra=T97'))).json();expect(j.itens[0]).toMatchObject({peca:'M1',programado:10,cortado:3,saldo:7});});
+it('verifica autenticação antes de carregar dados',async()=>{requireRole.mockRejectedValue(Error('Unauthorized'));expect((await GET(new Request('http://local/api'))).status).toBe(401);expect(carregarResumoProducao).not.toHaveBeenCalled()});

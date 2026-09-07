@@ -1,7 +1,12 @@
 {
-  "build": 2933,
-  "gerado": "2026-09-07T18:35:28.017Z",
+  "build": 2934,
+  "gerado": "2026-09-07T18:39:03.212Z",
   "commits": [
+    {
+      "hash": "06ed7e2e",
+      "data": "07/09/2026",
+      "titulo": "Jato e pintura: a fila passa a mostrar o m² das peças"
+    },
     {
       "hash": "993b060f",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "884a51c3",
       "data": "07/09/2026",
       "titulo": "Gantt do PCP: a pintura entra no quadro, e os botões de setor param de mentir"
-    },
-    {
-      "hash": "9b6262be",
-      "data": "07/09/2026",
-      "titulo": "Refina identidade visual dos e-mails e campanha no cabeçalho"
     }
   ]
 }
