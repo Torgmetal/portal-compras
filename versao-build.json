@@ -1,7 +1,12 @@
 {
-  "build": 2905,
-  "gerado": "2026-09-07T13:57:44.561Z",
+  "build": 2906,
+  "gerado": "2026-09-07T14:05:12.131Z",
   "commits": [
+    {
+      "hash": "13555116",
+      "data": "07/09/2026",
+      "titulo": "Aplica painel visual do PCP com dados operacionais existentes"
+    },
     {
       "hash": "884a51c3",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "2538e59b",
       "data": "05/09/2026",
       "titulo": "Gantt do PCP: o \"feito\" passa a vir do Syneco por setor, não do qteProduzida"
-    },
-    {
-      "hash": "5e6d02df",
-      "data": "05/09/2026",
-      "titulo": "Gantt do PCP: a lista de projetos ganha linha de total, grudada no rodapé"
     }
   ]
 }

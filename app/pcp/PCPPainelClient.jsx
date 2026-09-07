@@ -8,7 +8,7 @@ import { MAQUINA_LABEL } from '@/lib/maquina-corte';
 import s from './painel.module.css';
 
 const n = v => v == null ? '—' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
-const t = v => v == null ? '—' : `${n(v / 1000)} t`;
+const t = v => v == null ? '—' : `${n(v / 1000)} Ton`;
 const date = v => v ? new Date(v.length === 10 ? `${v}T12:00:00` : v).toLocaleDateString('pt-BR') : 'Sem data';
 const alertas = { SEM_LISTA: 'Lista de peças pendente', PRODUZINDO_SEM_LISTA: 'Produção sem lista completa', SEM_DETALHE_CORTE: 'Detalhamento de corte pendente', SEM_CRONOGRAMA: 'Cronograma pendente', NADA_LANCADO: 'Aguardando lançamento' };
 function Section({ number, title, children, id, aside }) {
