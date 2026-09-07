@@ -1,7 +1,12 @@
 {
-  "build": 2935,
-  "gerado": "2026-09-07T18:41:38.494Z",
+  "build": 2936,
+  "gerado": "2026-09-07T18:59:04.713Z",
   "commits": [
+    {
+      "hash": "33386ba4",
+      "data": "07/09/2026",
+      "titulo": "Folha do pintor: três linhas por demão, e mais nenhuma"
+    },
     {
       "hash": "05479d3e",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "eb4e1014",
       "data": "07/09/2026",
       "titulo": "Exibe toneladas como Ton no painel PCP"
-    },
-    {
-      "hash": "13555116",
-      "data": "07/09/2026",
-      "titulo": "Aplica painel visual do PCP com dados operacionais existentes"
     }
   ]
 }
