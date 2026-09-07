@@ -1,7 +1,12 @@
 {
-  "build": 2948,
-  "gerado": "2026-09-07T22:54:32.477Z",
+  "build": 2949,
+  "gerado": "2026-09-07T23:05:10.789Z",
   "commits": [
+    {
+      "hash": "952480c5",
+      "data": "07/09/2026",
+      "titulo": "Cronograma: a solda não espera a montagem fechar"
+    },
     {
       "hash": "b10927e9",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "3f2f0c2f",
       "data": "07/09/2026",
       "titulo": "Baixa do corte que a OP-067 fez à mão, antes do Syneco"
-    },
-    {
-      "hash": "6930a704",
-      "data": "07/09/2026",
-      "titulo": "Montagem: setor posterior prova a montagem · GRD só até a montagem"
     }
   ]
 }
