@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/session";
 import { produzidoPorMarca } from "@/lib/conjuntos-setor";
 import MontagemClient from "@/app/producao/programacao/montagem/MontagemClient";
 import { CONJUNTO_MONTAVEL } from "@/lib/prontidao-conjunto";
+import { OP_VIVA } from "@/lib/op-viva";
 
 export const metadata = { title: "Workspace Torg — PCP · Montagem" };
 export const dynamic = "force-dynamic";
@@ -14,7 +15,11 @@ export default async function PcpMontagem() {
 
   // Conjuntos com seus croquis (relações) — mesma consulta da tela da Produção
   const conjuntos = await prisma.pecaConjunto.findMany({
-    where: { ...CONJUNTO_MONTAVEL },
+    // ⚠⚠ OP_VIVA. Vitor (07/09/2026): "as que já finalizaram tire da frente". Sem este filtro a
+    // tela mostrava 3.397 conjuntos, dos quais 1.281 (38%) eram de obra ENCERRADA — a OP-078 com
+    // 585 conjuntos e 131 t e a OP-064 com 468 e 72 t lideravam, as duas confirmadas como 100%
+    // acabadas. Quem abria a montagem para escolher o que atacar garimpava entre obra morta.
+    where: { ...CONJUNTO_MONTAVEL, ...OP_VIVA },
     orderBy: [{ opNumero: "asc" }, { marca: "asc" }],
     include: {
       op: { select: { id: true, numero: true, cliente: true, obra: true } },

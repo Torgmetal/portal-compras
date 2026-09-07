@@ -1,7 +1,12 @@
 {
-  "build": 2916,
-  "gerado": "2026-09-07T15:38:05.522Z",
+  "build": 2917,
+  "gerado": "2026-09-07T15:49:44.444Z",
   "commits": [
+    {
+      "hash": "0fe87959",
+      "data": "07/09/2026",
+      "titulo": "Reverte montagem e solda da fila do quadro: só acabamento, jato e pintura"
+    },
     {
       "hash": "576c078d",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b6658fd2",
       "data": "06/09/2026",
       "titulo": "Gantt: o rótulo da barra volta a ser legível por cima das camadas"
-    },
-    {
-      "hash": "e7ef7d90",
-      "data": "05/09/2026",
-      "titulo": "Permite publicar comparação de revisões IFC por modelo no portal do cliente"
     }
   ]
 }
