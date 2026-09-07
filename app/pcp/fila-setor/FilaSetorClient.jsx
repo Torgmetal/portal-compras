@@ -53,7 +53,17 @@ export default function FilaSetorClient({ setor }) {
     try {
       const r = await fetch("/api/pcp/fila-setor", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ setor, ids, bancada: paraBancada, dia: paraBancada ? dia : null }),
+        body: JSON.stringify({ setor, ids, bancada: paraBancada, dia: paraBancada ? dia : null,
+          // ⚠ só quando foi preenchida: o AuditLog guarda o que destravou a liberação
+          ...(paraBancada && calc ? { especificacao: {
+            demaos: Math.max(1, Number(spec.demaos) || 1),
+            ...(spec.produto ? { produto: spec.produto } : {}),
+            ...(spec.cor ? { cor: spec.cor } : {}),
+            espessuraSeca: Number(String(spec.espessuraSeca).replace(",", ".")),
+            solidosVol: Number(String(spec.solidosVol).replace(",", ".")),
+            ...(String(spec.diluicaoPct).trim() !== "" ? { diluicaoPct: Number(String(spec.diluicaoPct).replace(",", ".")) } : {}),
+            ...(spec.secagem ? { secagem: spec.secagem } : {}),
+          } } : {}) }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Não foi possível gravar");
@@ -76,6 +86,40 @@ export default function FilaSetorClient({ setor }) {
   // que fica na Torg (…) e o Galpão 2 que seria um galpão apoio"). A tela usa a palavra da fábrica.
   const POSTO = setor === "PINTURA" ? "galpão" : "bancada";
   const Posto = POSTO[0].toUpperCase() + POSTO.slice(1);
+
+  /* ── A ESPECIFICAÇÃO INFORMADA NA HORA ────────────────────────────────────────
+     ⚠⚠ Vitor (07/09/2026): "para essas obras que não temos as especificações do PLP teria uma
+     maneira de, quando formos selecionar essas peças para pintura, deixar informar essas partes e
+     já fazer o cálculo?". E, sobre gravar: "não grava não, é apenas para conseguir liberar para
+     pintura e não ficar amarrado; esse PLP deve vir preenchido desde o início da OP".
+     Então isto NÃO vira registro da obra: vai junto da liberação, para o AuditLog, e acaba ali. */
+  const pinturaDaOp = (dados?.pintura || []).find((x) => x.opNumero === opSel) || null;
+  const faltaSpec = !!(pinturaDaOp?.falta?.length);
+  const [spec, setSpec] = useState({ demaos: "1", produto: "", cor: "", espessuraSeca: "", solidosVol: "", diluicaoPct: "", secagem: "" });
+  const [abrirSpec, setAbrirSpec] = useState(false);
+  useEffect(() => { setAbrirSpec(false); }, [opSel]);
+
+  const num = (v) => { const x = Number(String(v).replace(",", ".")); return Number.isFinite(x) && x > 0 ? x : null; };
+  /* ⚠ MESMA FÓRMULA DA QUALIDADE, e a mesma do editor do PLP: rendimento = SV × 10 ÷ espessura, e a
+     camada úmida = seca × (100 + %diluição) ÷ SV. 15% de perda é o padrão do estudo de pintura.
+     ⚠ Diluição VAZIA não é zero: sem ela a úmida não sai, e chutar daria um número que o pintor
+     mede o pente contra. */
+  const calc = useMemo(() => {
+    const sv = num(spec.solidosVol), esp = num(spec.espessuraSeca);
+    const dem = Math.max(1, Number(spec.demaos) || 1);
+    const m2 = pinturaDaOp?.m2 || 0;
+    const dil = String(spec.diluicaoPct).trim() === "" ? null : Number(String(spec.diluicaoPct).replace(",", "."));
+    if (!sv || !esp || !m2) return null;
+    const rend = (sv * 10) / esp * 0.85;
+    const litros = (m2 / rend) * dem;
+    return {
+      m2Aplicar: Math.round(m2 * dem * 100) / 100,
+      litros: Math.round(litros * 100) / 100,
+      galoes: Math.ceil(litros / 18),
+      diluente: dil == null ? null : Math.round(litros * (dil / 100) * 100) / 100,
+      umida: dil == null ? null : Math.round((esp * (100 + dil)) / sv),
+    };
+  }, [spec, pinturaDaOp]);
 
   if (carregando && !dados) {
     return (
@@ -188,6 +232,12 @@ export default function FilaSetorClient({ setor }) {
               {naBancada.length ? <span className="text-torg-gray font-normal"> · {naBancada.length} já posicionadas</span> : null}
             </h2>
             <div className="ml-auto flex flex-wrap items-center gap-2">
+              {faltaSpec && (
+                <button onClick={() => setAbrirSpec((v) => !v)}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100">
+                  {abrirSpec ? "Fechar" : `Informar a especificação (falta ${pinturaDaOp.falta.join(", ")})`}
+                </button>
+              )}
               {dados.bancadas.length > 1 && (
                 <select value={bancada || ""} onChange={(e) => setBancada(e.target.value)}
                         className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-torg-dark">
@@ -214,6 +264,48 @@ export default function FilaSetorClient({ setor }) {
               )}
             </div>
           </div>
+          {/* ⚠ NÃO GRAVA NO PLP. O que sai daqui viaja com a liberação e fica no AuditLog — o
+              PlanoPintura continua sendo documento da Qualidade e tem de vir preenchido da
+              engenharia. Isto existe só para a obra antiga não travar a fila. */}
+          {abrirSpec && faltaSpec && (
+            <div className="px-4 py-3 border-b border-gray-100 bg-amber-50/40">
+              <p className="text-[11px] text-amber-900 mb-2">
+                A OP-{opSel} está sem <b>{pinturaDaOp.falta.join(" e ")}</b>. Informe abaixo para liberar e ver a
+                quantidade — <b>isto não altera o PLP da obra</b>, fica registrado só nesta liberação.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                {[["demaos", "Demãos", "1"], ["produto", "Produto", "ex.: Industhane"], ["cor", "Cor", "ex.: Cinza N5"],
+                  ["espessuraSeca", "Esp. seca µm", "100"], ["solidosVol", "Sólidos vol. %", "64"],
+                  ["diluicaoPct", "Diluição %", "10"], ["secagem", "Secagem", "8 horas"]].map(([k, rot, ph]) => (
+                  <label key={k} className="block">
+                    <span className="text-[10px] text-torg-gray block mb-0.5">{rot}</span>
+                    <input value={spec[k]} onChange={(e) => setSpec((x) => ({ ...x, [k]: e.target.value }))}
+                      placeholder={ph}
+                      className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-torg-dark" />
+                  </label>
+                ))}
+              </div>
+              {calc ? (
+                <div className="mt-2.5 flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-torg-dark">
+                  <span><b>{calc.m2Aplicar.toLocaleString("pt-BR")}</b> m² a aplicar</span>
+                  <span><b>{calc.litros.toLocaleString("pt-BR")}</b> L de tinta</span>
+                  <span><b>{calc.galoes}</b> galões</span>
+                  <span>{calc.diluente != null
+                    ? <><b>{calc.diluente.toLocaleString("pt-BR")}</b> L de diluente</>
+                    : <span className="text-amber-800">diluente: informe a diluição</span>}</span>
+                  {/* ⚠ a úmida é o que o pintor mede na hora — a seca só depois de curar. */}
+                  <span className={calc.umida ? "font-bold text-emerald-700" : "text-amber-800"}>
+                    {calc.umida ? `${calc.umida} µm úmidos (o pente deve marcar isto)` : "úmida: informe a diluição"}
+                  </span>
+                </div>
+              ) : (
+                <p className="mt-2.5 text-[11px] text-torg-gray">
+                  Preencha <b>espessura seca</b> e <b>sólidos por volume</b> para o portal calcular.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="overflow-x-auto max-h-[420px]">
             <table className="w-full text-sm">
               <thead className="bg-gray-50/60 sticky top-0">

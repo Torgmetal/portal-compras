@@ -1,4 +1,6 @@
 // GET  /api/pcp/fila-setor?setor=ACABAMENTO|JATO|PINTURA → a fila de entrada do setor
+// ⚠ o POST aceita `especificacao` na pintura: dado informado na hora para destravar obra sem PLP,
+//   guardado só no AuditLog. Ver a nota no schema.
 // POST /api/pcp/fila-setor { setor, ids[], bancada|null, dia? } → manda para a bancada
 //
 // ⚠⚠ ISTO É INTENÇÃO, NÃO ORDEM — a mesma regra que o Vitor definiu para a solda em 01/09/2026:
@@ -39,6 +41,23 @@ const schema = z.object({
   ids: z.array(z.string()).min(1, "Selecione ao menos uma peça"),
   bancada: z.string().trim().max(40).nullable(),
   dia: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida").nullable().optional(),
+  // ⚠⚠ ESPECIFICAÇÃO INFORMADA NA HORA — NÃO VIRA REGISTRO DA OBRA. Vitor (07/09/2026): "não grava
+  // não, é apenas para conseguir liberar para pintura e não ficar amarrado; esse PLP deve vir
+  // preenchido desde o início da OP".
+  //
+  // Obra antiga entra na fila da pintura sem PLP (4 das 5 hoje) e a liberação travava por falta de
+  // um dado que a engenharia é que deveria ter posto lá. Isto destrava — e MORRE AQUI: vai só para
+  // o AuditLog da liberação, para existir a resposta a "quem mandou pintar sem plano, e com base em
+  // quê". Nada é escrito no PlanoPintura; o documento continua sendo da Qualidade.
+  especificacao: z.object({
+    demaos: z.number().int().min(1).max(9).optional(),
+    produto: z.string().trim().max(160).optional(),
+    cor: z.string().trim().max(80).optional(),
+    espessuraSeca: z.number().min(1).max(2000).optional(),
+    solidosVol: z.number().min(1).max(100).optional(),
+    diluicaoPct: z.number().min(0).max(100).optional(),
+    secagem: z.string().trim().max(80).optional(),
+  }).nullable().optional(),
 });
 
 export async function POST(req) {
@@ -71,7 +90,10 @@ export async function POST(req) {
     data: {
       userId: user.id, action: `FILA_${body.setor}_BANCADA`, entity: "PecaConjunto",
       entityId: `${r.count} peça(s)`,
-      diff: { setor: body.setor, bancada: body.bancada, dia: body.dia ?? null, pecas: r.count },
+      diff: { setor: body.setor, bancada: body.bancada, dia: body.dia ?? null, pecas: r.count,
+              // ⚠ o que foi informado na hora, quando a obra não tinha PLP. É o ÚNICO lugar onde
+              // isso fica — de propósito.
+              ...(body.especificacao ? { especificacaoInformada: body.especificacao } : {}) },
     },
   }).catch(() => {});
 

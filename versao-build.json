@@ -1,7 +1,12 @@
 {
-  "build": 2927,
-  "gerado": "2026-09-07T18:03:54.111Z",
+  "build": 2928,
+  "gerado": "2026-09-07T18:05:53.593Z",
   "commits": [
+    {
+      "hash": "44c045dd",
+      "data": "07/09/2026",
+      "titulo": "Remove cartões de resumo da tela de terceiros"
+    },
     {
       "hash": "4458ece1",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "6aa8dc8a",
       "data": "06/09/2026",
       "titulo": "Encerra as 11 OPs que produziram e pararam, e diz por que 8 ficaram de fora"
-    },
-    {
-      "hash": "cbe674e6",
-      "data": "06/09/2026",
-      "titulo": "refactor: moderniza ícones de acesso aos portais"
     }
   ]
 }
