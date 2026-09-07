@@ -97,19 +97,14 @@ export const CSS = `
                  padding:5px 8px;white-space:nowrap}
   .gpcp .caret{font-size:9px;color:var(--tinta-2);width:9px}
 
-  /* ⚠⚠ A BARRA NÃO VEM PREENCHIDA. Vitor (05/09/2026): "não queria que a barra já viesse preenchida,
-     queria um tom de azul no caso da 112 que ainda não iniciou opaco e conforme o apontamento do Syneco
-     fosse preenchendo, igual é um gantt de cronograma". Então contorno + fundo esmaecido na cor da OP =
-     PROGRAMADO, e a faixa sólida embaixo = APONTADO. O rótulo fica na cor da OP sobre fundo claro, e é
-     por isso que ele não some conforme o preenchimento cresce - texto branco sobre barra meio cheia
-     seria ilegível justamente no meio do avanço. */
+  /* Avanço apontado preenche toda a altura, na cor da OP em tom suave.
+     Texto escuro e posicionado acima mantém a leitura de 0 a 100%. */
   .gpcp .barra-op{position:absolute;height:23px;border-radius:5px;display:flex;align-items:center;gap:6px;
             padding:0 7px;cursor:grab;pointer-events:auto;overflow:hidden;user-select:none;
-            background:var(--ct);color:var(--c);border:1.5px solid var(--c);
+            background:#f6f8fa;color:#122b40;border:1.5px solid var(--c);
             box-shadow:0 1px 2px rgba(13,31,60,.14);touch-action:none}
-  /* faixa fina no rodapé: mostra o avanço sem disputar a linha do texto */
-  .gpcp .barra-op .prog{position:absolute;left:0;bottom:0;height:4px;background:var(--c);opacity:.95;
-            border-radius:0 2px 2px 0;pointer-events:none;z-index:1}
+  .gpcp .barra-op .prog{position:absolute;left:0;top:0;bottom:0;height:100%;background:var(--c);opacity:.26;
+            border-radius:0;pointer-events:none;z-index:1}
   .gpcp .barra-op:active{cursor:grabbing}
   .gpcp .barra-op.arrastando{opacity:.35}
   .gpcp .barra-op.foco{outline:2px solid var(--navy);outline-offset:1px}
@@ -120,12 +115,12 @@ export const CSS = `
   .gpcp .barra-op b,
   .gpcp .barra-op span{position:relative; z-index:2}
   .gpcp .barra-op b{font-size:11.5px;font-weight:800;white-space:nowrap;
-            text-shadow:0 1px 0 var(--ct), 0 0 3px var(--ct)}
-  .gpcp .barra-op span{font-size:10.5px;opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+            color:#122b40;text-shadow:none;flex-shrink:0}
+  .gpcp .barra-op span{font-size:10.5px;opacity:1;color:#263f52;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
                  font-variant-numeric:tabular-nums}
   .gpcp .barra-op .selo{position:relative;z-index:2;margin-left:auto;font-size:9.5px;
-                  background:rgba(255,255,255,.92);border-radius:3px;
-                  padding:1px 4px;font-weight:700;white-space:nowrap;border:1px solid var(--ct)}
+                  background:rgba(255,255,255,.87);color:#18354b;flex-shrink:0;border-radius:3px;
+                  padding:1px 4px;font-weight:700;white-space:nowrap;border:1px solid transparent}
   .gpcp .barra-op.mexida{outline:2px solid var(--laranja);outline-offset:-2px}
   .gpcp .fantasma{position:fixed;z-index:99;pointer-events:none;opacity:.92;
             box-shadow:0 8px 20px rgba(13,31,60,.35)}
@@ -143,10 +138,10 @@ export const CSS = `
      estava certo: hachura diagonal por trás de letra é ilegível em qualquer opacidade, e numa barra
      100% vencida ela cobria o rótulo inteiro. Eu tinha escrito no comentário anterior que quem
      grita o atraso é a borda e o selo, e mesmo assim mantive a textura.
-     Agora o atraso é uma FAIXA SÓLIDA NO TOPO, espelhando a de apontamento no rodapé:
+     O atraso mantém uma faixa sólida no topo:
        topo vermelho   = o pedaço que já venceu
-       rodapé na cor   = o pedaço que o Syneco já apontou
-     Duas faixas finas nas bordas, o meio livre para o texto. A largura continua dizendo QUANTO
+       fundo na cor   = o pedaço que o Syneco já apontou
+     A largura da faixa de atraso continua dizendo QUANTO
      venceu, que é a informação que a hachura carregava. */
   .gpcp .barra-op .atrasado{position:absolute;left:0;top:0;height:4px;pointer-events:none;z-index:1;
             background:#c62828;border-radius:0 0 2px 0}

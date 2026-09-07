@@ -1,7 +1,12 @@
 {
-  "build": 2911,
-  "gerado": "2026-09-07T14:55:47.079Z",
+  "build": 2912,
+  "gerado": "2026-09-07T15:04:08.640Z",
   "commits": [
+    {
+      "hash": "322833d5",
+      "data": "07/09/2026",
+      "titulo": "Expedido no mês: soma o romaneio de pasta com o do portal"
+    },
     {
       "hash": "8e5c66a9",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "816dd5b0",
       "data": "05/09/2026",
       "titulo": "Melhora cores, curvas e contornos do visualizador IFC nos portais"
-    },
-    {
-      "hash": "2ae37ed7",
-      "data": "05/09/2026",
-      "titulo": "O R sai da GRD e vira portão: a trava de material ganha porta na hora de imprimir"
     }
   ]
 }
