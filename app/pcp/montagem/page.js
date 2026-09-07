@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { produzidoPorMarca } from "@/lib/conjuntos-setor";
+import { lerProduzidoPorSetor } from "@/lib/produzido-setor";
 import MontagemClient from "@/app/producao/programacao/montagem/MontagemClient";
 import { CONJUNTO_MONTAVEL } from "@/lib/prontidao-conjunto";
 import { OP_VIVA } from "@/lib/op-viva";
@@ -49,9 +50,22 @@ export default async function PcpMontagem() {
   // "Feito" na montagem = produzido no Syneco (setor Montagem) por marca de conjunto.
   const apontamentos = await produzidoPorMarca("Montagem", conjuntos.map((c) => c.marca));
 
+  // ⚠⚠ SETOR POSTERIOR PROVA A MONTAGEM. Vitor (07/09/2026): "de todas essas marcas que você está
+  // dizendo que estão em aberto na montagem, tem alguma delas apontada em outro setor?". Tinha —
+  // 139 conjuntos (5.740 kg, 137 deles da OP-067) apontados em solda, acabamento, jato ou pintura.
+  // Se a peça foi SOLDADA, ela foi montada: o que faltou foi apontar a montagem, não montar. Sem
+  // este corte a tela cobra trabalho que a fábrica já fez.
+  const adiante = await lerProduzidoPorSetor(
+    conjuntos.map((c) => ({ opId: c.opId, marca: c.marca })),
+    ["SOLDA", "ACABAMENTO", "JATO", "PINTURA"],
+  );
+  const emAberto = conjuntos.filter(
+    (c) => !["SOLDA", "ACABAMENTO", "JATO", "PINTURA"].some((s) => adiante({ opId: c.opId, marca: c.marca }, s) > 0),
+  );
+
   return (
     <MontagemClient
-      conjuntosIniciais={JSON.parse(JSON.stringify(conjuntos))}
+      conjuntosIniciais={JSON.parse(JSON.stringify(emAberto))}
       apontamentos={apontamentos}
       userRole={user.role}
     />

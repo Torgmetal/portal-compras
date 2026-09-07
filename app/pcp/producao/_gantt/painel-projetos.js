@@ -16,19 +16,22 @@ export function criarPainelProjetos(dep){
 
   function pintarProjetos(r){
     const itens = [...r.itens].sort((a,b)=> (a.g?1:0)-(b.g?1:0) || String(a.m).localeCompare(String(b.m)));
-    const mostra = soFalta ? itens.filter(i=>!i.g) : itens;
+    const mostra = (soFalta && temGrd(r.setor)) ? itens.filter(i=>!i.g) : itens;
     const teto = 300, corte = mostra.slice(0, teto);
-    const semG = itens.filter(i=>!i.g).length;
+    const grd = temGrd(r.setor);
+    const semG = grd ? itens.filter(i=>!i.g).length : 0;
     let h = '<div class="ptool">'
-      + '<b style="color:#8a5600">'+semG+' marca(s) sem GRD</b> · <b style="color:#136c35">'+(itens.length-semG)+' já impressa(s)</b>'
-      + '<label><input type="checkbox" id="gp-fSemGrd"'+(soFalta?" checked":"")+'> só os não impressos</label>'
-      + '<button class="btn mini" id="gp-selTodos">Selecionar '+(soFalta?"os listados":"todos")+'</button>'
+      + (grd
+          ? '<b style="color:#8a5600">'+semG+' marca(s) sem GRD</b> · <b style="color:#136c35">'+(itens.length-semG)+' já impressa(s)</b>'
+            + '<label><input type="checkbox" id="gp-fSemGrd"'+(soFalta?" checked":"")+'> só os não impressos</label>'
+          : '')
+      + '<button class="btn mini" id="gp-selTodos">Selecionar '+(soFalta&&grd?"os listados":"todos")+'</button>'
       + '<button class="btn mini" id="gp-selNenhum">Limpar</button></div>';
     const temPerfil = itens.some(i=>i.pf);
     h += '<table class="marcas"><thead><tr><th style="width:26px"></th><th>Marca</th>'
       + (temPerfil?'<th>Perfil</th>':'')
       + '<th class="num">Qte</th><th class="num" title="peças com apontamento no Syneco">Feito</th>'
-      + '<th class="num">kg</th><th>GRD</th></tr></thead><tbody>';
+      + '<th class="num">kg</th>'+(grd?'<th>GRD</th>':'')+'</tr></thead><tbody>';
     for(const i of corte){
       const s = sel.has(i.m);
       h += '<tr class="'+(s?"sel":"")+'"><td><input type="checkbox" class="ck" data-m="'+i.m+'"'+(s?" checked":"")+'></td>'
@@ -40,9 +43,11 @@ export function criarPainelProjetos(dep){
             ? (i.f>=i.q ? '<b style="color:#136c35">'+i.f+'</b>' : i.f)
             : '<span style="color:#aab4c0">—</span>')+'</td>'
         + '<td class="num">'+dep.nkg(i.kg)+'</td>'
-        + '<td>'+(i.g
-            ? '<span class="pilha ok" title="impressa por '+(i.g.por||"—")+(i.g.n>1?" · "+i.g.n+" cópias":"")+'">✓ '+dep.dbr(i.g.em)+(i.g.n>1?" ·"+i.g.n+"×":"")+'</span>'
-            : '<span class="pilha nao">não impressa</span>')+'</td></tr>';
+        + (grd
+            ? '<td>'+(i.g
+                ? '<span class="pilha ok" title="impressa por '+(i.g.por||"—")+(i.g.n>1?" · "+i.g.n+" cópias":"")+'">✓ '+dep.dbr(i.g.em)+(i.g.n>1?" ·"+i.g.n+"×":"")+'</span>'
+                : '<span class="pilha nao">não impressa</span>')+'</td>'
+            : '')+'</tr>';
     }
     h += '</tbody>';
     /* soma a lista MOSTRADA (o filtro "só os não impressos" muda o conjunto), não apenas as 300 que
@@ -57,20 +62,27 @@ export function criarPainelProjetos(dep){
       + '<td class="num"><b>'+somaQ.toLocaleString("pt-BR")+'</b></td>'
       + '<td class="num"><b'+(somaF?' style="color:#136c35"':'')+'>'+somaF.toLocaleString("pt-BR")+'</b>'
       + ' <span style="color:#5b6a7d">('+Math.round(somaQ?somaF/somaQ*100:0)+'%)</span></td>'
-      + '<td class="num"><b>'+dep.nkg(somaKg)+'</b></td><td></td></tr></tfoot></table>';
+      + '<td class="num"><b>'+dep.nkg(somaKg)+'</b></td>'+(grd?'<td></td>':'')+'</tr></tfoot></table>';
     if(mostra.length > teto) h += '<div class="dica">Mostrando '+teto+' de '+mostra.length+' marcas. Os botões abaixo agem sobre a lista inteira.</div>';
-    h += '<div class="dica"><b>GRD = impressão.</b> No portal não existe estado "liberado" separado: a GRD nasce quando o '
+    if(grd) h += '<div class="dica"><b>GRD = impressão.</b> No portal não existe estado "liberado" separado: a GRD nasce quando o '
       + 'desenho é impresso, e reimprimir a mesma marca soma uma cópia no registro em vez de criar outra GRD. '
       + 'O ponto amarelo na barra do Gantt marca a programação que ainda tem projeto sem imprimir.</div>';
     dep.$("pCorpo").innerHTML = h;
 
     const alvo = soFalta ? mostra : itens;
-    dep.$("pFoot").innerHTML =
-        '<div class="info">'+(sel.size ? sel.size+" marca(s) selecionada(s)" : "Nada selecionado — os botões usam a lista acima")+'</div>'
-      + '<button class="btn pri" id="gp-impFalta"'+(semG?"":" disabled")+'>Imprimir as '+semG+' sem GRD</button>'
-      + '<button class="btn" id="gp-impSel"'+(sel.size?"":" disabled")+'>Reimprimir selecionados</button>';
+    /* ⚠ sem GRD o rodapé não tem o que oferecer: os dois botões imprimem maço de desenho, e da
+       solda em diante não há maço. Some inteiro em vez de ficar desabilitado — botão morto na tela
+       é convite para alguém perguntar por que não funciona. */
+    dep.$("pFoot").innerHTML = grd
+      ? '<div class="info">'+(sel.size ? sel.size+" marca(s) selecionada(s)" : "Nada selecionado — os botões usam a lista acima")+'</div>'
+        + '<button class="btn pri" id="gp-impFalta"'+(semG?"":" disabled")+'>Imprimir as '+semG+' sem GRD</button>'
+        + '<button class="btn" id="gp-impSel"'+(sel.size?"":" disabled")+'>Reimprimir selecionados</button>'
+      : '<div class="info">'+(sel.size ? sel.size+" marca(s) selecionada(s)" : "Sem GRD neste setor — o desenho desce até a montagem")+'</div>';
 
-    dep.$("fSemGrd").onchange = (e)=>{ soFalta = e.target.checked; dep.pintarPainel(); };
+    /* ⚠ o filtro só existe quando há GRD; sem a guarda, `$("fSemGrd")` volta null e o painel
+       inteiro morre no `.onchange`. */
+    const fg = dep.$("fSemGrd");
+    if(fg) fg.onchange = (e)=>{ soFalta = e.target.checked; dep.pintarPainel(); };
     dep.$("selTodos").onclick = ()=>{ for(const i of alvo) sel.add(i.m); dep.pintarPainel(); };
     dep.$("selNenhum").onclick = ()=>{ sel.clear(); dep.pintarPainel(); };
     for(const c of dep.raiz.querySelectorAll("#gp-pCorpo .ck"))
@@ -81,7 +93,13 @@ export function criarPainelProjetos(dep){
     if(is) is.onclick = ()=>imprimir(r, [...sel], "reimpressão");
   }
 
-  const SETOR_GRD = { CORTE:"CORTE", MONTAGEM:"MONTAGEM", SOLDA:"SOLDA" };
+  /* ⚠⚠ GRD SÓ ATÉ A MONTAGEM. Vitor (07/09/2026): "da solda para frente não temos mais GRDs,
+     precisa tirar essa marcação no resumo das peças". O desenho desce para cortar e para montar;
+     da solda em diante a peça já está na mão de quem executa e não há maço para imprimir.
+     Este mapa manda em tudo: quem não está aqui não mostra coluna GRD, nem contador de "sem GRD",
+     nem botão de imprimir. */
+  const SETOR_GRD = { CORTE:"CORTE", MONTAGEM:"MONTAGEM" };
+  const temGrd = (setor)=> !!SETOR_GRD[setor];
   /* ── A TRAVA DO MATERIAL, ANTES DE IMPRIMIR ─────────────────────────────────
      ⚠ Vitor (05/09/2026): "não podemos permitir liberar desenhos sem a definição do R da peça, pois
      a rastreabilidade é o nosso maior ponto forte" — e, sobre o atrito: "um aviso deve aparecer na
