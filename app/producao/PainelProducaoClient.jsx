@@ -1,6 +1,5 @@
 "use client";
 import { useState, useMemo, useTransition } from "react";
-import * as XLSX from "xlsx";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -33,7 +32,7 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
   const [isPending, startTransition] = useTransition();
 
   // Exporta a lista de furos para Excel (operadores usam para corrigir no Syneco)
-  const exportarFuros = () => {
+  const exportarFuros = async () => {
     const header = ["Marca", "OP", "Etapa apontada", "Qtd", "Etapa anterior", "Qtd anterior", "Diferença"];
     const linhas = furos.map((f) => [
       f.marca,
@@ -44,12 +43,11 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
       f.valorUp ?? "",
       f.diff ?? "",
     ]);
-    const ws = XLSX.utils.aoa_to_sheet([header, ...linhas]);
-    ws["!cols"] = [{ wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 8 }, { wch: 16 }, { wch: 12 }, { wch: 10 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Furos");
+    const {criarExcelTabular}=await import('@/lib/excel-tabular');
+    const {downloadWorkbook}=await import('@/lib/excel-relatorio');
+    const wb=await criarExcelTabular({titulo:'Conferência de apontamentos — Produção',abas:[{nome:'Furos',headers:header,linhas,larguras:[18,12,22,12,22,16,14]}]});
     const hojeStr = new Date().toLocaleDateString("pt-BR").replace(/\//g, "-");
-    XLSX.writeFile(wb, `furos-apontamento-${hojeStr}.xlsx`);
+    await downloadWorkbook(wb, `furos-apontamento-${hojeStr}.xlsx`);
   };
 
   // Total apontado hoje (usado no rótulo da seção de apontamento por setor)
@@ -279,4 +277,3 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
     </div>
   );
 }
-

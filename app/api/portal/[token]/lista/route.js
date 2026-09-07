@@ -1,3 +1,4 @@
+import {bufferWorkbookTorg} from "@/lib/excel-refinamento";
 // A LPC e a LE que o CLIENTE baixa, e o "já vi essa revisão".
 //
 // Vitor (22/08/2026): "a LE e LPC deve ter permissão para o cliente baixar e nos casos de uma
@@ -90,7 +91,7 @@ export async function GET(req, { params }) {
     "TOTAL", "", "", totalItens, ...(comPeso ? [totalKg] : []),
   ]);
 
-  const buf = await workbook.xlsx.writeBuffer();
+  const buf = await bufferWorkbookTorg(workbook);
   const bonito = `${chave} OP-${op.numero}${op.obra ? ` ${op.obra}` : ""} ${revisao}`
     .replace(/[\\/:*?"<>|]/g, "-").replace(/\s+/g, " ").trim().slice(0, 110);
   // ⚠ `filename=` só aceita ASCII com segurança, e o rótulo de revisão de obra com mais de uma

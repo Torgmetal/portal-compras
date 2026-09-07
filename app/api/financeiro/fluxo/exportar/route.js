@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import ExcelJS from "exceljs";
+import {criarExcelTabular} from "@/lib/excel-tabular";
+import {bufferWorkbookTorg} from "@/lib/excel-relatorio";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { dispArquivo } from "@/lib/arquivo-http";
@@ -29,6 +30,8 @@ export async function GET(req) {
   const tipo       = searchParams.get("tipo")       || null;   // ENTRADA | SAIDA
   const situacao   = searchParams.get("situacao")   || null;   // real | prev
 
+  if(Number.isNaN(de.getTime())||Number.isNaN(ate.getTime())||de>ate)return NextResponse.json({error:"Informe um período válido para exportar."},{status:400});
+
   const where = { data: { gte: de, lte: ate } };
   if (banco)      where.contaCorrente = banco;
   if (categoria)  where.categoria = categoria;
@@ -43,53 +46,15 @@ export async function GET(req) {
     include: { op: { select: { numero: true, cliente: true } } },
   });
 
-  const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Fluxo de Caixa");
-  ws.columns = [
-    { header: "Data",        key: "data",   width: 12 },
-    { header: "Tipo",        key: "tipo",   width: 10 },
-    { header: "Situação",    key: "sit",    width: 12 },
-    { header: "Banco",       key: "banco",  width: 22 },
-    { header: "Categoria",   key: "cat",    width: 28 },
-    { header: "Fornecedor/Cliente", key: "forn", width: 34 },
-    { header: "Descrição",   key: "desc",   width: 44 },
-    { header: "OP",          key: "op",     width: 10 },
-    { header: "Valor (R$)",  key: "valor",  width: 16 },
-  ];
-  ws.getRow(1).font = { bold: true };
-  ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF006EAB" } };
-  ws.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
-
-  let entradas = 0, saidas = 0;
-  for (const f of linhas) {
-    const sinal = f.tipo === "ENTRADA" ? 1 : -1;
-    if (f.tipo === "ENTRADA") entradas += f.valor; else saidas += f.valor;
-    const row = ws.addRow({
-      data: fmtDataBR(f.data),
-      tipo: f.tipo === "ENTRADA" ? "Entrada" : "Saída",
-      sit: f.realizado ? "Realizado" : "Previsto",
-      banco: f.contaCorrente || "",
-      cat: (f.transferencia ? "[Transf.] " : "") + (f.categoria || ""),
-      forn: f.contraparte || "",
-      desc: f.descricao || "",
-      op: f.op?.numero || "",
-      valor: sinal * (f.valor || 0),
-    });
-    row.getCell("valor").numFmt = "#,##0.00";
-  }
-
-  // Linha de totais
-  ws.addRow({});
-  const tot = ws.addRow({ desc: "TOTAIS", op: "", valor: entradas - saidas });
-  tot.font = { bold: true };
-  tot.getCell("valor").numFmt = "#,##0.00";
-  ws.addRow({ desc: "Entradas", valor: entradas }).getCell("valor").numFmt = "#,##0.00";
-  ws.addRow({ desc: "Saídas",   valor: -saidas   }).getCell("valor").numFmt = "#,##0.00";
-
-  ws.autoFilter = { from: "A1", to: "I1" };
-  ws.views = [{ state: "frozen", ySplit: 1 }];
-
-  const buf = await wb.xlsx.writeBuffer();
+  const entradas=linhas.filter(f=>f.tipo==="ENTRADA").reduce((n,f)=>n+(f.valor||0),0);
+  const saidas=linhas.filter(f=>f.tipo!=="ENTRADA").reduce((n,f)=>n+(f.valor||0),0);
+  const wb=await criarExcelTabular({titulo:"Fluxo de caixa",subtitulo:[`${fmtDataBR(de)} a ${fmtDataBR(ate)}`,banco,categoria,fornecedor,tipo,situacao].filter(Boolean).join(" · "),codigoDoc:"REL-FIN-001",abas:[
+    {nome:"Fluxo de Caixa",headers:["Data","Tipo","Situação","Banco","Categoria","Fornecedor/Cliente","Descrição","OP","Valor (R$)"],
+      linhas:linhas.map(f=>[f.data?new Date(f.data):null,f.tipo==="ENTRADA"?"Entrada":"Saída",f.realizado?"Realizado":"Previsto",f.contaCorrente||"",(f.transferencia?"[Transf.] ":"")+(f.categoria||""),f.contraparte||"",f.descricao||"",f.op?.numero||"",(f.tipo==="ENTRADA"?1:-1)*(f.valor||0)]),
+      totais:["TOTAL","","","","","","","",entradas-saidas],larguras:[16,14,16,24,30,36,48,12,20],formatos:{1:"dd/mm/yyyy",9:'"R$" #,##0.00'}},
+    {nome:"Resumo",headers:["Movimento","Valor (R$)"],linhas:[["Entradas",entradas],["Saídas",-saidas],["Saldo do período",entradas-saidas]],larguras:[38,28],formatos:{2:'"R$" #,##0.00'}}
+  ]});
+  const buf=await bufferWorkbookTorg(wb);
   const nome = `fluxo-caixa_${searchParams.get("de") || ""}_${searchParams.get("ate") || ""}.xlsx`.replace(/__+/g, "_");
   return new NextResponse(buf, {
     status: 200,

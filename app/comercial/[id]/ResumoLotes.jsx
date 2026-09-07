@@ -51,7 +51,7 @@ async function parseLista(file) {
   }
   return { cols, pecas };
 }
-function baixarModelo() {
+async function baixarModelo() {
   const ws = XLSX.utils.aoa_to_sheet([
     ["Lote", "Marca", "Descrição", "Qtd", "Peso unit. (kg)", "Peso total (kg)"],
     ["Lote 1 — Pilares", "P1", "W 310x38,7", 4, 250, 1000],
@@ -61,7 +61,9 @@ function baixarModelo() {
   ws["!cols"] = [{ wch: 22 }, { wch: 12 }, { wch: 24 }, { wch: 8 }, { wch: 16 }, { wch: 16 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Lista Tekla");
-  XLSX.writeFile(wb, "modelo-lista-tekla-lotes.xlsx");
+  const {refinarModeloImportacao}=await import("@/lib/excel-tabular");
+  const {downloadWorkbook}=await import("@/lib/excel-relatorio");
+  await downloadWorkbook(await refinarModeloImportacao(wb,{titulo:"Modelo de lotes de entrega"}),"modelo-lista-tekla-lotes.xlsx");
 }
 
 export default function ResumoLotes({ opId, lotes = [], onChange }) {

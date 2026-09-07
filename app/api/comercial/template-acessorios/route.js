@@ -1,3 +1,4 @@
+import {refinarFormularioExcel,registrarTabelaExcel,listaValidacaoExcel,bufferWorkbookTorg} from "@/lib/excel-refinamento";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { CATALOGO_ACESSORIOS, CATEGORIAS_CATALOGO } from "@/lib/catalogo-acessorios";
@@ -48,8 +49,8 @@ export async function GET() {
     });
 
     ws.columns = [
-      { key: "item", width: 6 },
-      { key: "produto", width: 48 },
+      { key: "item", width: 16 },
+      { key: "produto", width: 38 },
       { key: "area", width: 14 },
       { key: "peso_m2", width: 14 },
       { key: "peso_total", width: 14 },
@@ -125,6 +126,7 @@ export async function GET() {
         cell.border = THIN_BORDER;
       });
       headerRow.height = 28;
+      const tabelaSecao=registrarTabelaExcel(ws,currentRow,colHeaders);
       currentRow++;
 
       // Produtos desta categoria para dropdown
@@ -138,6 +140,7 @@ export async function GET() {
       for (let i = 0; i < secao.linhas; i++) {
         const r = currentRow;
         const row = ws.getRow(r);
+        tabelaSecao.rows.add(r);
 
         // Coluna A: numero do item
         row.getCell(1).value = i + 1;
@@ -151,7 +154,7 @@ export async function GET() {
           prodCell.dataValidation = {
             type: "list",
             allowBlank: true,
-            formulae: [`"${produtosCat.join(",")}"`],
+            formulae: [listaValidacaoExcel(wb,`TORG_Produtos_${secao.num}`,produtosCat)],
             showErrorMessage: true,
             errorTitle: "Produto invalido",
             error: "Selecione um produto da lista ou deixe em branco",
@@ -263,7 +266,7 @@ export async function GET() {
     totalRow.height = 26;
 
     // Proteger a aba (permite editar apenas colunas B, C, F)
-    ws.protect("torg2024", {
+    await ws.protect("torg2024", {
       selectLockedCells: true,
       selectUnlockedCells: true,
       formatCells: false,
@@ -326,6 +329,7 @@ export async function GET() {
       cell.alignment = { horizontal: "center" };
     });
     dbHeaderRow.height = 22;
+    const tabelaBanco=registrarTabelaExcel(wsDB,3,dbHeaders);
 
     // Dados agrupados por categoria
     let dbRow = 4;
@@ -333,6 +337,7 @@ export async function GET() {
     for (const prod of CATALOGO_ACESSORIOS) {
       const catLabel = CATEGORIAS_CATALOGO.find((c) => c.value === prod.categoria)?.label || prod.categoria;
       const row = wsDB.getRow(dbRow);
+      tabelaBanco.rows.add(dbRow);
 
       if (prod.categoria !== lastCat) {
         row.getCell(1).value = catLabel.toUpperCase();
@@ -360,10 +365,11 @@ export async function GET() {
     }
 
     // Proteger aba de banco de dados
-    wsDB.protect("torg2024", { selectLockedCells: true, selectUnlockedCells: true });
+    await wsDB.protect("torg2024", { selectLockedCells: true, selectUnlockedCells: true });
 
     // Gerar buffer
-    const buffer = await wb.xlsx.writeBuffer();
+    refinarFormularioExcel(wb);
+    const buffer = await bufferWorkbookTorg(wb);
 
     return new NextResponse(buffer, {
       status: 200,
