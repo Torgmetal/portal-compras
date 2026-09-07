@@ -1,7 +1,12 @@
 {
-  "build": 2915,
-  "gerado": "2026-09-07T15:35:19.838Z",
+  "build": 2916,
+  "gerado": "2026-09-07T15:38:05.522Z",
   "commits": [
+    {
+      "hash": "576c078d",
+      "data": "07/09/2026",
+      "titulo": "Gantt do PCP: montagem e solda também listam a fila na faixa sem posto"
+    },
     {
       "hash": "b010a9b0",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e7ef7d90",
       "data": "05/09/2026",
       "titulo": "Permite publicar comparação de revisões IFC por modelo no portal do cliente"
-    },
-    {
-      "hash": "f2fba741",
-      "data": "05/09/2026",
-      "titulo": "Corte: chapa sem largura continua sendo chapa"
     }
   ]
 }
