@@ -7,10 +7,11 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 
 export const runtime = "nodejs";
-const ROLES = ["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "ALMOXARIFADO"];
+const ROLES = ["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "ALMOXARIFADO", "PCP", "PLANEJAMENTO", "COMPRAS"];
 
 const itemSchema = z.object({
   marca: z.string().min(1),
+  destino: z.enum(["MONTAGEM","SOLDA","ACABAMENTO","JATO","PINTURA","EXPEDICAO"]).optional().nullable(),
   descricao: z.string().optional().nullable(),
   qte: z.number().nullable().optional(),
   pesoUn: z.number().nullable().optional(),
@@ -61,6 +62,9 @@ export async function PATCH(req, { params }) {
   let body;
   try { body = schema.parse(await req.json()); } catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
+  const assinatura = itens => JSON.stringify(itens.map(i=>[String(i.marca).trim().toUpperCase(),i.qte,Number(i.pesoTotal)||0]).sort((a,b)=>a[0].localeCompare(b[0])));
+  if (body.itens && Array.isArray(atual.retornos) && atual.retornos.length && assinatura(body.itens)!==assinatura(atual.itens)) return NextResponse.json({error:"Não altere as peças de uma remessa com recebimentos. Desfaça os retornos antes de corrigir a carga."},{status:409});
+  if ((atual.retornos||[]).length && ((body.opRefId!==undefined && body.opRefId!==atual.opRefId)||(body.opRefNumero!==undefined && body.opRefNumero!==atual.opRefNumero))) return NextResponse.json({error:"Não altere a OP de uma remessa com retornos."},{status:409});
   const data = {};
   for (const k of ["fornecedorId", "opRefId"]) if (body[k] !== undefined) data[k] = body[k] || null;
   for (const k of ["terceiroNome", "servico", "opRefNumero", "transportadora", "motorista", "placaVeiculo", "placaCarreta", "contatoTransporte", "observacao"])
@@ -72,7 +76,7 @@ export async function PATCH(req, { params }) {
     const porMarca = new Map();
     for (const it of body.itens) {
       const k = it.marca.trim().toUpperCase();
-      if (k && !porMarca.has(k)) porMarca.set(k, { marca: it.marca.trim(), descricao: it.descricao?.trim() || null, qte: it.qte ?? null, pesoUn: it.pesoUn ?? null, pesoTotal: pesoDoItem(it) });
+      if (k && !porMarca.has(k)) porMarca.set(k, { marca: it.marca.trim(), destino: it.destino || null, descricao: it.descricao?.trim() || null, qte: it.qte ?? null, pesoUn: it.pesoUn ?? null, pesoTotal: pesoDoItem(it) });
     }
     const itens = [...porMarca.values()];
     if (!itens.length) return NextResponse.json({ error: "A carga precisa ter ao menos uma peça." }, { status: 400 });

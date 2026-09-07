@@ -1,0 +1,10 @@
+import {vi,it,expect,beforeEach} from 'vitest';
+import {mockPrisma as db} from '@/testes/apoio/prisma';
+vi.mock('server-only',()=>({}));vi.mock('@/lib/prisma',()=>({prisma:db}));
+import {programarRetornos} from '@/lib/terceiros-programacao';
+const blocos=[{setor:'SOLDA',ids:['retorno:r1:ret1:0'],recurso:'SOLDA 1',dia:'2026-09-09'}];
+beforeEach(()=>{vi.clearAllMocks();db.romaneioTerceiro.findUnique.mockResolvedValue({id:'r1',status:'PARCIAL',updatedAt:new Date(),retornos:[{id:'ret1',itens:[{destino:'SOLDA',qte:3}]}]});db.romaneioTerceiro.updateMany.mockResolvedValue({count:1})});
+it('programa apenas a quantidade do lote recebido, sem mexer na peça inteira',async()=>{await expect(programarRetornos(blocos,{id:'u1'})).resolves.toMatchObject({total:1});const data=db.romaneioTerceiro.updateMany.mock.calls[0][0].data;expect(data.retornos[0].itens[0]).toMatchObject({qte:3,programacao:{recurso:'SOLDA 1',dia:'2026-09-09'}});expect(db.pecaConjunto.updateMany).not.toHaveBeenCalled()});
+it('recusa setor diferente e bancada inválida',async()=>{await expect(programarRetornos([{...blocos[0],setor:'MONTAGEM'}],{id:'u1'})).rejects.toThrow();await expect(programarRetornos([{...blocos[0],recurso:'NAO EXISTE'}],{id:'u1'})).rejects.toThrow()});
+it('recusa previsão de terceiro ainda não recebida',async()=>{await expect(programarRetornos([{...blocos[0],ids:['previsao:r1:0']}],{id:'u1'})).rejects.toThrow()});
+it('conflito não sobrescreve retorno simultâneo',async()=>{db.romaneioTerceiro.updateMany.mockResolvedValue({count:0});await expect(programarRetornos(blocos,{id:'u1'})).rejects.toThrow('Recarregue')});

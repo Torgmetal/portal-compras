@@ -1,6 +1,7 @@
 // Romaneios Terceirizados — controle À PARTE (sem vínculo com o romaneio da obra).
 // GET  — lista os romaneios + o próximo número sugerido (série própria RT-##).
 // POST — cria um romaneio de envio a terceiro (material que sai pra trabalhar fora).
+import { opTerceiro } from "@/lib/terceiros-retorno";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -15,18 +16,20 @@ const registro = log("api/expedicao/terceiros");
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 // PCP/PLANEJAMENTO incluídos: o romaneio pode ser criado pelo painel de Liberar (despacho).
-const ROLES = ["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "ALMOXARIFADO", "PCP", "PLANEJAMENTO"];
+const ROLES = ["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "ALMOXARIFADO", "PCP", "PLANEJAMENTO", "COMPRAS"];
 // Pasta À PARTE dos romaneios de obra (que ficam em cada OP/4. Expedição/4.2 Romaneios).
 const PASTA_ROMANEIOS_TERCEIROS = "/Ordem de Servico/01. OP/Romaneios terceiros";
 
 const itemSchema = z.object({
   marca: z.string().min(1),
+  destino: z.enum(["MONTAGEM","SOLDA","ACABAMENTO","JATO","PINTURA","EXPEDICAO"]).optional().nullable(),
   descricao: z.string().optional().nullable(),
   qte: z.number().nullable().optional(),
   pesoUn: z.number().nullable().optional(),
   pesoTotal: z.number().nullable().optional(),
 });
 const schema = z.object({
+  destinoRetorno: z.enum(["MONTAGEM","SOLDA","ACABAMENTO","JATO","PINTURA","EXPEDICAO"]).optional().nullable(),
   fornecedorId: z.string().nullable().optional(),
   terceiroNome: z.string().min(1, "Informe o terceiro."),
   servico: z.string().max(200).nullable().optional(),
@@ -85,13 +88,19 @@ export async function POST(req) {
     return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 });
   }
 
+  if(body.opRefNumero || body.opRefId){
+    const n=opTerceiro(body.opRefNumero);
+    const op=body.opRefId?await prisma.oP.findUnique({where:{id:body.opRefId},select:{id:true,numero:true}}):await prisma.oP.findFirst({where:{numero:{in:[n,n.padStart(3,"0"),String(body.opRefNumero).trim()]}},select:{id:true,numero:true}});
+    if(!op || (body.opRefNumero && opTerceiro(op.numero)!==n))return NextResponse.json({error:"Confira a OP selecionada e o número da obra."},{status:400});
+    body.opRefId=op.id;body.opRefNumero=op.numero;
+  }
   // dedupe por marca; normaliza peso
   const porMarca = new Map();
   for (const it of body.itens) {
     const k = it.marca.trim().toUpperCase();
     if (k && !porMarca.has(k)) {
       porMarca.set(k, {
-        marca: it.marca.trim(), descricao: it.descricao?.trim() || null,
+        marca: it.marca.trim(), destino: it.destino || body.destinoRetorno || null, descricao: it.descricao?.trim() || null,
         qte: it.qte ?? null, pesoUn: it.pesoUn ?? null, pesoTotal: pesoDoItem(it),
       });
     }

@@ -1,4 +1,6 @@
 "use client";
+import ModalRetorno from "@/components/terceiros/ReceberTerceiro";
+import { DESTINOS_TERCEIRO } from "@/lib/terceiros-retorno";
 import { useState, useMemo, useEffect, useCallback, Fragment } from "react";
 import { useStore } from "@/lib/store";
 import { fmtOP } from "@/lib/utils";
@@ -21,11 +23,11 @@ const STATUS = {
   CANCELADO: { label: "Cancelado", cls: "bg-gray-100 text-gray-500 border-gray-200" },
 };
 
-export default function TerceirizadosClient({ ops }) {
+export default function TerceirizadosClient({ ops, focoRetorno = false }) {
   const { showToast } = useStore();
   const [romaneios, setRomaneios] = useState(null);
   const [erro, setErro] = useState("");
-  const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [filtroStatus, setFiltroStatus] = useState(focoRetorno ? "abertos" : "todos");
   const [busca, setBusca] = useState("");
   const [expandido, setExpandido] = useState({});
   const [modal, setModal] = useState(null);   // { rom } editar | {} novo
@@ -53,7 +55,8 @@ export default function TerceirizadosClient({ ops }) {
 
   const filtrados = useMemo(() => {
     let lista = romaneios || [];
-    if (filtroStatus !== "todos") lista = lista.filter((r) => r.status === filtroStatus);
+    if (filtroStatus === "abertos") lista = lista.filter(r=>["ENVIADO","PARCIAL"].includes(r.status));
+    else if (filtroStatus !== "todos") lista = lista.filter((r) => r.status === filtroStatus);
     const q = busca.trim().toLowerCase();
     if (q) lista = lista.filter((r) =>
       r.terceiroNome?.toLowerCase().includes(q) ||
@@ -81,7 +84,7 @@ export default function TerceirizadosClient({ ops }) {
             <Factory size={28} className="text-torg-orange" /> Romaneios Terceirizados
           </h2>
           <p className="text-sm text-torg-gray mt-1">
-            Material enviado a terceiros pra trabalhar (galvanização, usinagem, pintura…) — controle de envio e retorno. À parte do romaneio da obra.
+            Controle por remessa: confira o saldo que está no terceiro e registre retornos parciais ou totais.
           </p>
         </div>
         <button onClick={() => setModal({})}
@@ -101,7 +104,7 @@ export default function TerceirizadosClient({ ops }) {
       {/* Filtros */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-1 flex-wrap">
-          {[["todos", "Todos"], ["ENVIADO", "No terceiro"], ["PARCIAL", "Parcial"], ["RETORNADO", "Retornados"]].map(([v, l]) => (
+          {[["abertos", "Com saldo pendente"], ["todos", "Todos"], ["ENVIADO", "No terceiro"], ["PARCIAL", "Parcial"], ["RETORNADO", "Retornados"]].map(([v, l]) => (
             <button key={v} onClick={() => setFiltroStatus(v)}
               className={`text-xs px-3 py-1.5 rounded-lg font-medium border ${filtroStatus === v ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue"}`}>
               {l}
@@ -182,7 +185,7 @@ export default function TerceirizadosClient({ ops }) {
                             {r.status !== "RETORNADO" && r.status !== "CANCELADO" && (
                               <button onClick={() => setRetorno(r)} title="Registrar retorno"
                                 className="text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1 rounded-lg inline-flex items-center gap-1">
-                                <Undo2 size={12} /> Retorno
+                                <Undo2 size={12} /> Registrar retorno
                               </button>
                             )}
                             <a href={`/api/expedicao/terceiros/${r.id}/romaneio`} title="Romaneio de peças (Excel)" className="text-torg-gray hover:text-torg-blue p-1"><FileSpreadsheet size={15} /></a>
@@ -190,7 +193,7 @@ export default function TerceirizadosClient({ ops }) {
                               <a href={`/api/expedicao/terceiros/${r.id}/material`} title="Romaneio de material — enviado ao fornecedor (Excel)" className="text-indigo-600 hover:text-indigo-800 p-1"><FileSpreadsheet size={15} /></a>
                             )}
                             <button onClick={() => setModal({ rom: r })} title="Editar" className="text-torg-gray hover:text-torg-blue p-1"><Pencil size={14} /></button>
-                            <button onClick={() => excluir(r)} title="Excluir" className="text-torg-gray hover:text-red-600 p-1"><Trash2 size={14} /></button>
+                            {!focoRetorno && <button onClick={() => excluir(r)} title="Excluir" className="text-torg-gray hover:text-red-600 p-1"><Trash2 size={14} /></button>}
                           </div>
                         </td>
                       </tr>
@@ -306,6 +309,7 @@ function DetalheRomaneio({ r, onDesfazRetorno, showToast }) {
                   <span className="font-medium text-torg-dark">{fmtD(ret.data)}</span>
                   <span className="text-torg-gray"> · {fmtKg(ret.pesoKg)} · {(ret.itens || []).length} marca(s)</span>
                   {ret.porNome && <span className="text-torg-gray"> · {ret.porNome}</span>}
+                  {ret.itens?.map((item,index)=><span key={index} className="block text-torg-gray">{item.marca} · {item.qte ?? "—"} pç · {item.destino || "Destino não informado"}</span>)}
                   {ret.observacao && <span className="block text-torg-gray italic">{ret.observacao}</span>}
                 </div>
                 <button onClick={() => desfazer(ret)} title="Desfazer" className="text-gray-300 hover:text-red-600 shrink-0"><RotateCcw size={13} /></button>
@@ -323,6 +327,7 @@ function DetalheRomaneio({ r, onDesfazRetorno, showToast }) {
 function ModalRomaneio({ ops, rom, onClose, onSalvo }) {
   const edit = !!rom;
   const [f, setF] = useState({
+    destinoRetorno: rom?.itens?.[0]?.destino || "",
     fornecedorId: rom?.fornecedorId || null,
     terceiroNome: rom?.terceiroNome || "",
     servico: rom?.servico || "",
@@ -339,7 +344,7 @@ function ModalRomaneio({ ops, rom, onClose, onSalvo }) {
   });
   const [itens, setItens] = useState(
     Array.isArray(rom?.itens) && rom.itens.length
-      ? rom.itens.map((it) => ({ marca: it.marca || "", descricao: it.descricao || "", qte: it.qte ?? "", pesoTotal: it.pesoTotal ?? "" }))
+      ? rom.itens.map((it) => ({ destino: it.destino || "", marca: it.marca || "", descricao: it.descricao || "", qte: it.qte ?? "", pesoTotal: it.pesoTotal ?? "" }))
       : [{ marca: "", descricao: "", qte: "", pesoTotal: "" }]
   );
   const [salvando, setSalvando] = useState(false);
@@ -379,10 +384,12 @@ function ModalRomaneio({ ops, rom, onClose, onSalvo }) {
     if (!f.terceiroNome.trim()) return setErro("Informe o terceiro.");
     const itensLimpos = itens
       .filter((it) => it.marca.trim())
-      .map((it) => ({ marca: it.marca.trim(), descricao: it.descricao.trim() || null, qte: num(it.qte), pesoTotal: num(it.pesoTotal) }));
+      .map((it) => ({ destino: f.destinoRetorno || it.destino || null, marca: it.marca.trim(), descricao: it.descricao.trim() || null, qte: num(it.qte), pesoTotal: num(it.pesoTotal) }));
+    if (!f.destinoRetorno) return setErro("Informe o setor previsto de retorno.");
     if (!itensLimpos.length) return setErro("Adicione ao menos uma peça (marca).");
     setSalvando(true);
     const payload = {
+      destinoRetorno: f.destinoRetorno || undefined,
       fornecedorId: f.fornecedorId || null,
       terceiroNome: f.terceiroNome.trim(),
       servico: f.servico.trim() || null,
@@ -459,7 +466,7 @@ function ModalRomaneio({ ops, rom, onClose, onSalvo }) {
               <input type="date" value={f.dataEnvio} onChange={(e) => setF((v) => ({ ...v, dataEnvio: e.target.value }))} className={inp} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-torg-dark mb-1">Previsão de retorno</label>
+              <label className="block text-xs font-medium text-torg-dark mb-1">Setor previsto de retorno</label><select className={inp} value={f.destinoRetorno} onChange={e=>setF(v=>({...v,destinoRetorno:e.target.value}))}><option value="">Escolher setor</option>{DESTINOS_TERCEIRO.map(d=><option key={d}>{d}</option>)}</select><label className="block text-xs font-medium text-torg-dark mb-1">Previsão de retorno</label>
               <input type="date" value={f.dataPrevRetorno} onChange={(e) => setF((v) => ({ ...v, dataPrevRetorno: e.target.value }))} className={inp} />
             </div>
           </div>
@@ -516,96 +523,6 @@ function ModalRomaneio({ ops, rom, onClose, onSalvo }) {
           <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">Cancelar</button>
           <button onClick={salvar} disabled={salvando} className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-dark text-sm font-medium flex items-center gap-2 disabled:opacity-50">
             {salvando && <Loader2 size={14} className="animate-spin" />} {edit ? "Salvar" : "Criar romaneio"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── modal registrar retorno (parcial, por peça) ───────────────────────────────
-function ModalRetorno({ rom, onClose, onSalvo }) {
-  const itens = Array.isArray(rom.itens) ? rom.itens : [];
-  const [sel, setSel] = useState(() => itens.map((it) => ({ marca: it.marca, qte: it.qte ?? "", pesoTotal: it.pesoTotal ?? "", on: false })));
-  const [data, setData] = useState(hojeISO());
-  const [obs, setObs] = useState("");
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState("");
-  const num = (v) => (v === "" || v == null ? null : numeroBR(v, NaN));
-  const set = (i, k, v) => setSel((arr) => arr.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
-
-  const escolhidos = sel.filter((s) => s.on);
-  const pesoRetorno = escolhidos.reduce((s, x) => s + (num(x.pesoTotal) || 0), 0);
-
-  function marcarTodos(on) { setSel((arr) => arr.map((x) => ({ ...x, on }))); }
-
-  async function salvar() {
-    setErro("");
-    if (!escolhidos.length) return setErro("Selecione ao menos uma peça que voltou.");
-    setSalvando(true);
-    try {
-      const res = await fetch(`/api/expedicao/terceiros/${rom.id}/retorno`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data, observacao: obs.trim() || null, itens: escolhidos.map((x) => ({ marca: x.marca, qte: num(x.qte), pesoTotal: num(x.pesoTotal) })) }),
-      });
-      const j = await res.json();
-      if (!j.success) throw new Error(j.error || "Erro");
-      onSalvo(j.romaneio);
-    } catch (e) { setErro(e.message); setSalvando(false); }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl my-8">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><Undo2 size={16} className="text-emerald-600" /> Registrar retorno — RT-{String(rom.numero).padStart(3, "0")}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
-        </div>
-        <div className="px-5 py-4 space-y-4">
-          {erro && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2"><AlertCircle size={14} className="mt-0.5" /><span>{erro}</span></div>}
-          <p className="text-xs text-torg-gray">Marque as peças que voltaram do terceiro. Dá pra ajustar qtd/peso (retorno parcial). Enviado: <strong>{fmtKg(rom.pesoEnviadoKg)}</strong> · já retornado: <strong>{fmtKg(rom.pesoRetornadoKg)}</strong>.</p>
-          <div className="flex items-center gap-3 text-xs">
-            <button onClick={() => marcarTodos(true)} className="text-torg-blue hover:underline">Marcar todos</button>
-            <button onClick={() => marcarTodos(false)} className="text-torg-gray hover:underline">Limpar</button>
-          </div>
-          <div className="border border-gray-100 rounded-lg overflow-hidden max-h-72 overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-[11px] text-torg-gray uppercase sticky top-0"><tr>
-                <th className="w-8 px-2 py-1.5"></th>
-                <th className="text-left px-2 py-1.5 font-medium">Marca</th>
-                <th className="text-right px-2 py-1.5 font-medium w-24">Qtd</th>
-                <th className="text-right px-2 py-1.5 font-medium w-28">Peso (kg)</th>
-              </tr></thead>
-              <tbody className="divide-y divide-gray-50">
-                {sel.map((s, i) => (
-                  <tr key={i} className={s.on ? "bg-emerald-50/40" : ""}>
-                    <td className="px-2 py-1 text-center"><input type="checkbox" checked={s.on} onChange={(e) => set(i, "on", e.target.checked)} /></td>
-                    <td className="px-2 py-1 font-mono text-torg-dark">{s.marca}</td>
-                    <td className="px-1 py-1"><input value={s.qte} onChange={(e) => set(i, "qte", e.target.value)} disabled={!s.on} inputMode="numeric" className="w-full text-sm border border-gray-200 rounded px-2 py-1 text-right disabled:bg-gray-50" /></td>
-                    <td className="px-1 py-1"><input value={s.pesoTotal} onChange={(e) => set(i, "pesoTotal", e.target.value)} disabled={!s.on} inputMode="decimal" className="w-full text-sm border border-gray-200 rounded px-2 py-1 text-right disabled:bg-gray-50" /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-torg-dark mb-1">Data do retorno</label>
-              <input type="date" value={data} onChange={(e) => setData(e.target.value)} className={inp} />
-            </div>
-            <div className="flex items-end">
-              <p className="text-sm text-torg-gray">Peso deste retorno: <strong className="text-emerald-700">{fmtKg(pesoRetorno)}</strong></p>
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-torg-dark mb-1">Observação</label>
-            <input value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Opcional" className={inp} />
-          </div>
-        </div>
-        <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 rounded-b-xl">
-          <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">Cancelar</button>
-          <button onClick={salvar} disabled={salvando} className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50">
-            {salvando && <Loader2 size={14} className="animate-spin" />} Registrar retorno
           </button>
         </div>
       </div>

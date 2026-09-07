@@ -18,7 +18,7 @@ export function criarLotes(dep){
     const por = new Map();
     const fora = [];
     for(const l of dep.getLotes()){
-      const k = l.setor+"|"+(l.recurso||"—")+"|"+l.op+"|"+l.dia;
+      const k = l.setor+"|"+(l.recurso||"—")+"|"+l.op+"|"+l.dia+"|"+((l.terceiroPrevisto||l.terceiroRecebido)?l.id:"");
       const a = por.get(k);
       if(!a){ por.set(k,l); fora.push(l); continue; }
       a.itens = a.itens.concat(l.itens);
@@ -40,7 +40,7 @@ export function criarLotes(dep){
     const grupos = new Map();
     for(const l of dep.getLotes()){
       if(!dep.getSetoresOn().has(l.setor)) continue;
-      const k = l.setor+"|"+(l.recurso||"—")+"|"+l.op;
+      const k = l.setor+"|"+(l.recurso||"—")+"|"+l.op+"|"+((l.terceiroPrevisto||l.terceiroRecebido)?l.id:"");
       if(!grupos.has(k)) grupos.set(k,[]);
       grupos.get(k).push(l);
     }
@@ -56,11 +56,11 @@ export function criarLotes(dep){
         // raciocínio errado — uma barra por cima do sábado PARECE trabalho no sábado, e num
         // quadro de produção o desenho é a informação.
         if(atual && i === atual.fim+1){ atual.fim=i; atual.lotes.push(l); }
-        else { atual={ setor:l.setor, recurso:l.recurso, op:l.op, obra:l.obra, ini:i, fim:i, lotes:[l] }; runs.push(atual); }
+        else { atual={ setor:l.setor, recurso:l.recurso, op:l.op, obra:l.obra, terceiroPrevisto:l.terceiroPrevisto, terceiroRecebido:l.terceiroRecebido, ini:i, fim:i, lotes:[l] }; runs.push(atual); }
       }
     }
     for(const r of runs){
-      r.id = r.setor+"|"+(r.recurso||"—")+"|"+r.op+"|"+r.ini;
+      r.id = r.setor+"|"+(r.recurso||"—")+"|"+r.op+"|"+r.ini+((r.terceiroPrevisto||r.terceiroRecebido)?"|"+r.lotes[0].id:"");
       // dias TRABALHADOS, não colunas ocupadas: uma barra que atravessa o fim de
       // semana cobre 4 colunas e trabalha 2 dias. Contar coluna diria "4 dias" e
       // ainda entraria como padrão na quebra.
@@ -70,7 +70,7 @@ export function criarLotes(dep){
       r.feitas = r.lotes.reduce((s,l)=>s+l.feitas,0);
       r.custo = r.lotes.reduce((s,l)=>s+dep.custoLote(l),0);
       r.itens = r.lotes.flatMap(l=>l.itens);
-      r.semGrd = r.itens.filter(i=>!i.g).length;
+      r.semGrd = (r.terceiroPrevisto||r.terceiroRecebido)?0:r.itens.filter(i=>!i.g).length;
       r.mexida = r.lotes.some(l=>l.recurso!==l.recursoOrig || l.dia!==l.diaOrig);
       r.adiado = Math.max(0, ...r.lotes.map(l=>l.adiado||0));
     }
@@ -83,6 +83,7 @@ export function criarLotes(dep){
   function carga(setor, recurso, dia, ignorarUids){
     let c = 0;
     for(const l of dep.getLotes()){
+      if(l.terceiroPrevisto) continue;
       if(l.setor!==setor || l.recurso!==recurso || l.dia!==dia) continue;
       if(ignorarUids && ignorarUids.has(l.uid)) continue;
       c += dep.custoLote(l);

@@ -2,6 +2,7 @@
 // Recebimento do serviço terceirizado: libera a peça pro destino (Montagem/Pintura/
 // Expedição) — o Compras (ou PCP) confirma quando o terceiro entrega. Reverter desfaz.
 // Body: { ids } | { ids, reverter: true }
+import {marcaTerceiro,opTerceiro} from "@/lib/terceiros-retorno";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -28,6 +29,9 @@ export async function POST(req) {
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
   const { ids, reverter } = body;
+  const alvos=await prisma.pecaConjunto.findMany({where:{id:{in:ids}},select:{opNumero:true,marca:true}});
+  const remessas=await prisma.romaneioTerceiro.findMany({where:{status:{not:"CANCELADO"}},select:{opRefNumero:true,itens:true}});
+  if(alvos.some(p=>remessas.some(r=>opTerceiro(r.opRefNumero)===opTerceiro(p.opNumero)&&(r.itens||[]).some(i=>marcaTerceiro(i.marca)===marcaTerceiro(p.marca))))) return NextResponse.json({error:"Receba estas marcas pelo romaneio na aba Envios e retornos, para preservar o saldo parcial."},{status:409});
   let atualizados = 0;
 
   if (reverter) {

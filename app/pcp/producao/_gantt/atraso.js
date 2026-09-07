@@ -26,6 +26,7 @@ export function criarAtraso(dep){
     const cap = dep.capDe(setor, rec); if(!cap) return 0;
     let pend = 0;
     for(const l of dep.getLotes()){
+      if(l.terceiroPrevisto) continue;
       if(l.setor!==setor || l.recurso!==rec || !loteAtrasado(l)) continue;
       pend += dep.custoLote(l) * (1 - fracaoFeita(l));
     }
@@ -61,7 +62,7 @@ export function criarAtraso(dep){
     /* ⚠ do dia mais longe para o mais perto: mover primeiro quem está atrás faria o lote pousar em
        cima de outro que ainda não saiu do lugar, e `mesclar` juntaria os dois. */
     const alvos = dep.montarRuns()
-      .filter(r=>dep.DIAS[r.ini] >= dep.HOJE && porRec.get(r.setor+"|"+(r.recurso||"—")))
+      .filter(r=>!r.terceiroPrevisto && dep.DIAS[r.ini] >= dep.HOJE && porRec.get(r.setor+"|"+(r.recurso||"—")))
       .sort((a,b)=>b.ini-a.ini);
     for(const r of alvos){
       const d = porRec.get(r.setor+"|"+(r.recurso||"—"));

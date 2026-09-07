@@ -4,6 +4,7 @@
 //  - recebidas:  já liberadas pro destino (terceirizado + recebidoEm)
 //  - markaveis:  peças da OP informada ainda não avançadas (PENDENTE/CORTE) p/ marcar
 //  - ops:        OPs que têm peças marcáveis (para o seletor)
+import {marcaTerceiro,opTerceiro} from "@/lib/terceiros-retorno";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -28,9 +29,12 @@ export async function GET(req) {
     op ? prisma.pecaConjunto.findMany({ where: { opNumero: op, status: { in: ["PENDENTE", "CORTE"] } }, select: SEL, orderBy: { marca: "asc" } }) : Promise.resolve([]),
   ]);
 
+  const remessas=await prisma.romaneioTerceiro.findMany({where:{status:{not:"CANCELADO"}},select:{opRefNumero:true,itens:true}});
+  const vinculadas=new Set(remessas.flatMap(r=>(r.itens||[]).map(i=>opTerceiro(r.opRefNumero)+"|"+marcaTerceiro(i.marca))));
+  const semRomaneio=p=>!vinculadas.has(opTerceiro(p.opNumero)+"|"+marcaTerceiro(p.marca));
   return NextResponse.json({
-    aguardando,
-    recebidas,
+    aguardando:aguardando.filter(semRomaneio),
+    recebidas:recebidas.filter(semRomaneio),
     markaveis,
     ops: opsRaw.map((o) => o.opNumero).filter(Boolean),
   });

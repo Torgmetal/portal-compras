@@ -9,6 +9,7 @@
 // ⚠ A DE MONTAGEM NÃO PODIA SER REUTILIZADA: /api/producao/pecas/liberar-montagem carrega a trava de
 // prontidão (todos os croquis cortados), que é o portão para o conjunto DESCER pela primeira vez.
 // Remanejar o que já está programado não pode passar por esse portão de novo — a peça já desceu.
+import { programarRetornos } from "@/lib/terceiros-programacao";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -45,7 +46,12 @@ export async function POST(req) {
   try { body = schema.parse(await req.json()); }
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
-  const r = await aplicarRemanejo(body.blocos, user);
+  const temRetorno = body.blocos.some(b=>b.ids.some(id=>id.startsWith("retorno:")));
+  const temPeca = body.blocos.some(b=>b.ids.some(id=>!id.startsWith("retorno:")));
+  if(temRetorno&&temPeca)return NextResponse.json({error:"Salve os retornos de terceiros separadamente das outras programações."},{status:400});
+  let r;
+  try {r = temRetorno ? await programarRetornos(body.blocos,user) : await aplicarRemanejo(body.blocos, user);}
+  catch(e){return NextResponse.json({error:e.message},{status:400});}
 
   await prisma.auditLog.create({
     data: {

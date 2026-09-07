@@ -105,6 +105,7 @@ export const CSS = `
             box-shadow:0 1px 2px rgba(13,31,60,.14);touch-action:none}
   .gpcp .barra-op .prog{position:absolute;left:0;top:0;bottom:0;height:100%;background:var(--c);opacity:.26;
             border-radius:0;pointer-events:none;z-index:1}
+  .gpcp .barra-op.terceiro-previsto{border-style:dashed;background:#fff5e8;cursor:pointer}
   .gpcp .barra-op:active{cursor:grabbing}
   .gpcp .barra-op.arrastando{opacity:.35}
   .gpcp .barra-op.foco{outline:2px solid var(--navy);outline-offset:1px}

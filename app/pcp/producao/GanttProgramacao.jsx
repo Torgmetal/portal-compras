@@ -64,7 +64,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   // peso. Montagem e solda medem PEÇA POR FAIXA DE PESO, e o custo vem das libs de capacidade —
   // misturar as duas réguas foi o que fez a montagem parecer folgada com 24 t de peça graúda.
   const POR_KG = new Set(["CORTE","ACABAMENTO","JATO","PINTURA"]);
-  const custoLote = (l)=> POR_KG.has(l.setor) ? l.kg : l.custo * (regua==="meta" ? FATOR_META[l.setor] : 1);
+  const custoLote = (l)=> l.terceiroPrevisto ? 0 : POR_KG.has(l.setor) ? l.kg * (l.terceiroRecebido ? Math.max(0,l.pecas-l.feitas)/Math.max(1,l.pecas) : 1) : l.custo * (regua==="meta" ? FATOR_META[l.setor] : 1);
   const custoItem = (it, setor)=> POR_KG.has(setor) ? it.kg : it.c * (regua==="meta" ? FATOR_META[setor] : 1);
 
   // ⚠ `custoLote` entra como FUNÇÃO porque fecha sobre a régua (normal × meta), que o usuário troca
@@ -150,6 +150,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
 
   /* ── painel: projetos + quebra ──────────────────────────────────────────────── */
   function abrirPainel(r){
+    if(r.terceiroPrevisto||r.terceiroRecebido){avisar(true,"Retorno de terceiro: arraste os lotes recebidos para programar. Consulte marcas e histórico na aba Terceiros.");return;}
     painel = { setor:r.setor, recurso:r.recurso, op:r.op, ini:r.ini };
     abaP = "projetos"; projetos.reiniciar();
     quebra.reiniciar(r);

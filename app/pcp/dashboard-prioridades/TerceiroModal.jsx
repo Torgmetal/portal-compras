@@ -44,7 +44,7 @@ export default function TerceiroModal({ obra, opId, setor, pecas, onClose, onDon
         body: JSON.stringify({
           fornecedorId: forn.id, terceiroNome: forn.nomeFantasia || forn.razaoSocial, servico: servico.trim() || null,
           opRefId: opId || null, opRefNumero: String(obra), itens, dataEnvio: new Date().toISOString(),
-          dataPrevRetorno: dataRetorno || null,
+          dataPrevRetorno: dataRetorno || null, destinoRetorno: volta,
           observacao: `Enviado da etapa ${SETOR_LABEL[setor] || setor || "—"} · retorna para ${SETOR_LABEL[volta] || volta}`,
           pecaIds: pecas.map((p) => p.id), setorEnvio: setor || null, chapaModo, // p/ o 2º romaneio de material (Corte/Montagem)
         }),

@@ -37,6 +37,7 @@ export function criarArraste(dep){
     if(e.button!==0) return;
     const el = e.currentTarget;
     const r = dep.montarRuns().find(x=>x.id===el.dataset.run); if(!r) return;
+    if(r.terceiroPrevisto){window.location.href="/pcp/terceirizados";return;}
     const cx = el.getBoundingClientRect();
     arr = { el, r, x0:e.clientX, y0:e.clientY, dx:e.clientX-cx.left, dy:e.clientY-cx.top, alvo:null, moveu:false,
             offCols: Math.max(0, Math.floor((e.clientX-cx.left)/dep.COL)) };

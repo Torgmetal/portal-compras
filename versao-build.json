@@ -1,7 +1,12 @@
 {
-  "build": 2919,
-  "gerado": "2026-09-07T16:13:03.287Z",
+  "build": 2920,
+  "gerado": "2026-09-07T16:45:39.312Z",
   "commits": [
+    {
+      "hash": "3f2f0c2f",
+      "data": "07/09/2026",
+      "titulo": "Baixa do corte que a OP-067 fez à mão, antes do Syneco"
+    },
     {
       "hash": "6930a704",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "06bfdf5f",
       "data": "06/09/2026",
       "titulo": "Integra acervo tratado de fotos e vídeos aos portais"
-    },
-    {
-      "hash": "1509157a",
-      "data": "06/09/2026",
-      "titulo": "Melhora layout do modelo 3D no portal do cliente"
     }
   ]
 }
