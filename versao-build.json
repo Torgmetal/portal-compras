@@ -1,7 +1,12 @@
 {
-  "build": 2908,
-  "gerado": "2026-09-07T14:11:16.926Z",
+  "build": 2909,
+  "gerado": "2026-09-07T14:21:35.299Z",
   "commits": [
+    {
+      "hash": "c8b7f25e",
+      "data": "07/09/2026",
+      "titulo": "Gantt do PCP: o quadro para de somar a LE e a obra encerrada"
+    },
     {
       "hash": "74590f7e",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b7329f80",
       "data": "05/09/2026",
       "titulo": "Regularização de GRD: o corte entra junto, e ele é o da preparação"
-    },
-    {
-      "hash": "64056fae",
-      "data": "05/09/2026",
-      "titulo": "Regulariza a GRD de montagem dos conjuntos que a fábrica montou fora do portal"
     }
   ]
 }
