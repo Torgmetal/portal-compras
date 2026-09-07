@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { upload as blobUpload } from "@vercel/blob/client";
-import { FileText, PenTool, Upload, Eye, Download, Trash2, ChevronUp, ChevronDown, ChevronRight, Loader2, X, ExternalLink, AlertCircle, Plus, FileSpreadsheet, MapPin, CalendarDays } from "lucide-react";
+import { FileText, PenTool, Upload, Eye, Download, Trash2, ChevronUp, ChevronDown, ChevronRight, Loader2, X, ExternalLink, AlertCircle, Plus, FileSpreadsheet, MapPin, CalendarDays, Pencil } from "lucide-react";
 
 const fmtTam = (n) => (n == null ? "" : n < 1024 * 1024 ? `${Math.round(n / 1024)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : null);
@@ -192,10 +192,18 @@ export default function DesenhosOPSection({ opId, opNumero, obra, cliente, refCl
                     </div>
                   </div>
                   {g.lote && (
-                    <div className="flex flex-col shrink-0">
-                      <button onClick={() => moverLoteOrdem(idxLote, -1)} disabled={idxLote === 0} className="text-gray-300 hover:text-torg-blue disabled:opacity-30 leading-none" title="Subir prioridade"><ChevronUp size={13} /></button>
-                      <button onClick={() => moverLoteOrdem(idxLote, 1)} disabled={idxLote === nComLote - 1} className="text-gray-300 hover:text-torg-blue disabled:opacity-30 leading-none" title="Descer prioridade"><ChevronDown size={13} /></button>
-                    </div>
+                    <>
+                      {/* ⚠ editar fica ANTES das setas e separado delas: renomear e mudar prioridade
+                          são decisões diferentes, e o clique errado aqui reordena a fabricação. */}
+                      <button onClick={() => setNovoLoteAlvo({ tipo: "editar", lote: g.lote })}
+                        className="text-torg-gray hover:text-torg-blue shrink-0" title="Editar nome, local e data">
+                        <Pencil size={13} />
+                      </button>
+                      <div className="flex flex-col shrink-0">
+                        <button onClick={() => moverLoteOrdem(idxLote, -1)} disabled={idxLote === 0} className="text-gray-300 hover:text-torg-blue disabled:opacity-30 leading-none" title="Subir prioridade"><ChevronUp size={13} /></button>
+                        <button onClick={() => moverLoteOrdem(idxLote, 1)} disabled={idxLote === nComLote - 1} className="text-gray-300 hover:text-torg-blue disabled:opacity-30 leading-none" title="Descer prioridade"><ChevronDown size={13} /></button>
+                      </div>
+                    </>
                   )}
                 </div>
                 {/* desenhos do lote */}
@@ -226,8 +234,10 @@ export default function DesenhosOPSection({ opId, opNumero, obra, cliente, refCl
         </div>
       )}
 
-      {novoLoteAlvo && <NovoLoteModal opId={opId} onClose={() => setNovoLoteAlvo(null)} onCriado={(lote) => {
-        setLotes((ls) => (ls.some((x) => x.id === lote.id) ? ls : [...ls, lote]));
+      {novoLoteAlvo && <NovoLoteModal opId={opId} lote={novoLoteAlvo.lote || null} onClose={() => setNovoLoteAlvo(null)} onCriado={(lote) => {
+        // ⚠ edição SUBSTITUI, criação ACRESCENTA — sem isso, renomear duplicava o lote na lista até
+        // o recarregamento chegar, e por um instante a tela mostrava a fase duas vezes.
+        setLotes((ls) => (ls.some((x) => x.id === lote.id) ? ls.map((x) => (x.id === lote.id ? lote : x)) : [...ls, lote]));
         carregarLotes();
         if (novoLoteAlvo.tipo === "destino") setLoteDestino(lote.id);
         setNovoLoteAlvo(null);
@@ -236,8 +246,17 @@ export default function DesenhosOPSection({ opId, opNumero, obra, cliente, refCl
   );
 }
 
-function NovoLoteModal({ opId, onClose, onCriado }) {
-  const [f, setF] = useState({ nome: "", local: "", dataPrevista: "" });
+function NovoLoteModal({ opId, onClose, onCriado, lote = null }) {
+  /* ⚠⚠ O MESMO MODAL CRIA E EDITA. Vitor (07/09/2026): "preciso que me dê permissão para editar as
+     fases na aba projetos da OP, para colocar nomenclaturas reais". A rota PATCH já aceitava nome,
+     local e data desde que o lote existe — faltava só a tela oferecer. Reaproveitar o formulário
+     evita dois lugares onde o mesmo campo é validado de jeito diferente. */
+  const editando = !!lote;
+  const [f, setF] = useState({
+    nome: lote?.nome || "",
+    local: lote?.local || "",
+    dataPrevista: lote?.dataPrevista ? String(lote.dataPrevista).slice(0, 10) : "",
+  });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const inp = "w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-torg-blue outline-none";
@@ -246,7 +265,10 @@ function NovoLoteModal({ opId, onClose, onCriado }) {
     if (!f.nome.trim()) return setErro("Informe o nome do lote.");
     setErro(""); setSalvando(true);
     try {
-      const r = await fetch(`/api/comercial/op/${opId}/lotes-expedicao`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: f.nome.trim(), local: f.local.trim() || null, dataPrevista: f.dataPrevista || null }) });
+      const corpo = JSON.stringify({ nome: f.nome.trim(), local: f.local.trim() || null, dataPrevista: f.dataPrevista || null });
+      const r = editando
+        ? await fetch(`/api/comercial/op/${opId}/lotes-expedicao/${lote.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: corpo })
+        : await fetch(`/api/comercial/op/${opId}/lotes-expedicao`, { method: "POST", headers: { "Content-Type": "application/json" }, body: corpo });
       const j = await r.json(); if (!j.success) throw new Error(j.error);
       onCriado(j.lote);
     } catch (e) { setErro(e.message); setSalvando(false); }
@@ -256,7 +278,7 @@ function NovoLoteModal({ opId, onClose, onCriado }) {
     <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-sm my-10">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-torg-dark">Novo lote de entrega</h3>
+          <h3 className="text-sm font-semibold text-torg-dark">{editando ? "Editar lote de entrega" : "Novo lote de entrega"}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="px-5 py-4 space-y-3">

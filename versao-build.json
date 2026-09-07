@@ -1,7 +1,12 @@
 {
-  "build": 2941,
-  "gerado": "2026-09-07T19:51:48.074Z",
+  "build": 2942,
+  "gerado": "2026-09-07T19:59:09.588Z",
   "commits": [
+    {
+      "hash": "bb358b87",
+      "data": "07/09/2026",
+      "titulo": "Portal do cliente: o pacote leva o nome da pasta anexada, não o do desenho"
+    },
     {
       "hash": "e4aa4ed4",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "95655e4d",
       "data": "07/09/2026",
       "titulo": "Preenche toda a altura das barras de avanço do PCP"
-    },
-    {
-      "hash": "322833d5",
-      "data": "07/09/2026",
-      "titulo": "Expedido no mês: soma o romaneio de pasta com o do portal"
     }
   ]
 }
