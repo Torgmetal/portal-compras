@@ -1,5 +1,5 @@
 import { requireRole } from "@/lib/session";
-import PCPDashboardClient from "./PCPDashboardClient";
+import PCPPainelClient from "./PCPPainelClient";
 
 export const metadata = {
   title: "Workspace Torg — PCP Dashboard",
@@ -7,5 +7,5 @@ export const metadata = {
 
 export default async function PCPDashboard() {
   const user = await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]);
-  return <PCPDashboardClient isAdmin={user.tipo === "ADMIN"} />;
+  return <PCPPainelClient isAdmin={user.tipo === "ADMIN"} />;
 }
