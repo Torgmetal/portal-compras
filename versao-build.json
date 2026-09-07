@@ -1,7 +1,12 @@
 {
-  "build": 2926,
-  "gerado": "2026-09-07T17:56:08.487Z",
+  "build": 2927,
+  "gerado": "2026-09-07T18:03:54.111Z",
   "commits": [
+    {
+      "hash": "4458ece1",
+      "data": "07/09/2026",
+      "titulo": "Substitui cartões de setor do PCP por seletor compacto"
+    },
     {
       "hash": "669e2361",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "cbe674e6",
       "data": "06/09/2026",
       "titulo": "refactor: moderniza ícones de acesso aos portais"
-    },
-    {
-      "hash": "81028b4a",
-      "data": "06/09/2026",
-      "titulo": "Gantt do PCP: nomes dos setores alinhados à esquerda"
     }
   ]
 }

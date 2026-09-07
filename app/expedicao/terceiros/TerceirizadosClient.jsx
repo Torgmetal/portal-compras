@@ -7,7 +7,7 @@ import { fmtOP } from "@/lib/utils";
 import { numeroBR } from "@/lib/numero-br";
 import {
   Factory, Plus, Search, Loader2, AlertCircle, X, Pencil, Trash2,
-  Truck, PackageCheck, PackageOpen, Clock, ChevronDown, ChevronRight,
+  Truck, ChevronDown, ChevronRight,
   FileSpreadsheet, Undo2, RotateCcw,
 } from "lucide-react";
 
@@ -43,16 +43,6 @@ export default function TerceirizadosClient({ ops, focoRetorno = false }) {
   useEffect(() => { carregar(); }, [carregar]);
 
   const hoje = hojeISO();
-  const kpis = useMemo(() => {
-    const lista = romaneios || [];
-    const fora = lista.filter((r) => r.status === "ENVIADO" || r.status === "PARCIAL");
-    const pesoPendente = fora.reduce((s, r) => s + Math.max(0, (r.pesoEnviadoKg || 0) - (r.pesoRetornadoKg || 0)), 0);
-    const atrasados = fora.filter((r) => retornoEmAtraso(r, hoje)).length;
-    const mesAtual = new Date().toISOString().slice(0, 7);
-    const retornadosMes = lista.filter((r) => r.status === "RETORNADO" && String(r.updatedAt).slice(0, 7) === mesAtual).length;
-    return { fora: fora.length, pesoPendente, atrasados, retornadosMes };
-  }, [romaneios, hoje]);
-
   const filtrados = useMemo(() => {
     let lista = romaneios || [];
     if (filtroStatus === "abertos") lista = lista.filter(r=>["ENVIADO","PARCIAL"].includes(r.status));
@@ -91,14 +81,6 @@ export default function TerceirizadosClient({ ops, focoRetorno = false }) {
           className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2">
           <Plus size={16} /> Novo romaneio terceirizado
         </button>
-      </div>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Kpi label="No terceiro" value={String(kpis.fora)} sub={`${fmtKg(kpis.pesoPendente)} pendente`} color="bg-torg-blue" Icon={PackageOpen} />
-        <Kpi label="Peso pendente" value={fmtKg(kpis.pesoPendente)} sub="a retornar" color="bg-torg-orange" Icon={Truck} />
-        <Kpi label="Atrasados" value={String(kpis.atrasados)} sub="retorno vencido" color={kpis.atrasados ? "bg-red-600" : "bg-torg-gray"} Icon={Clock} />
-        <Kpi label="Retornados (mês)" value={String(kpis.retornadosMes)} sub="concluídos" color="bg-emerald-600" Icon={PackageCheck} />
       </div>
 
       {/* Filtros */}
@@ -215,19 +197,6 @@ export default function TerceirizadosClient({ ops, focoRetorno = false }) {
 
       {modal && <ModalRomaneio ops={ops} rom={modal.rom} onClose={() => setModal(null)} onSalvo={(rom, novo) => { setModal(null); if (novo) carregar(); else aplicar(rom); showToast(novo ? "Romaneio criado" : "Romaneio atualizado", "success"); }} />}
       {retorno && <ModalRetorno rom={retorno} onClose={() => setRetorno(null)} onSalvo={(rom) => { setRetorno(null); aplicar(rom); showToast("Retorno registrado", "success"); }} />}
-    </div>
-  );
-}
-
-function Kpi({ label, value, sub, color, Icon }) {
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-3">
-      <div className={`${color} p-2.5 rounded-lg`}><Icon size={20} className="text-white" /></div>
-      <div className="min-w-0">
-        <p className="text-xs text-torg-gray truncate">{label}</p>
-        <p className="text-xl font-extrabold text-torg-dark tabular-nums truncate">{value}</p>
-        {sub && <p className="text-[10px] text-torg-gray truncate">{sub}</p>}
-      </div>
     </div>
   );
 }
