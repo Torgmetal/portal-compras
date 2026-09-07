@@ -1,7 +1,12 @@
 {
-  "build": 2912,
-  "gerado": "2026-09-07T15:04:08.640Z",
+  "build": 2913,
+  "gerado": "2026-09-07T15:06:29.623Z",
   "commits": [
+    {
+      "hash": "95655e4d",
+      "data": "07/09/2026",
+      "titulo": "Preenche toda a altura das barras de avanço do PCP"
+    },
     {
       "hash": "322833d5",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "bb160694",
       "data": "05/09/2026",
       "titulo": "Corte: o parser passa a reconhecer tubo, e tubo até 100mm vai na cantoneira"
-    },
-    {
-      "hash": "816dd5b0",
-      "data": "05/09/2026",
-      "titulo": "Melhora cores, curvas e contornos do visualizador IFC nos portais"
     }
   ]
 }
