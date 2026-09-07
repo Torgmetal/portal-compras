@@ -73,11 +73,16 @@ export function criarPainelProjetos(dep){
     /* ⚠ sem GRD o rodapé não tem o que oferecer: os dois botões imprimem maço de desenho, e da
        solda em diante não há maço. Some inteiro em vez de ficar desabilitado — botão morto na tela
        é convite para alguém perguntar por que não funciona. */
+    /* ⚠⚠ O CADERNO DE PINTURA SAI DA BARRA. Vitor (07/09/2026): "todas as folhas sairão da OP
+       selecionada na barra do Gantt de cada OP" — três folhas (quantidade · qual tinta usar · para
+       o pintor), sempre da OP do lote clicado, nunca de um consolidado. */
+    const btnPint = r.setor === "PINTURA"
+      ? '<button class="btn" id="gp-xlsPint">Caderno de pintura (Excel)</button>' : "";
     dep.$("pFoot").innerHTML = grd
       ? '<div class="info">'+(sel.size ? sel.size+" marca(s) selecionada(s)" : "Nada selecionado — os botões usam a lista acima")+'</div>'
         + '<button class="btn pri" id="gp-impFalta"'+(semG?"":" disabled")+'>Imprimir as '+semG+' sem GRD</button>'
-        + '<button class="btn" id="gp-impSel"'+(sel.size?"":" disabled")+'>Reimprimir selecionados</button>'
-      : '<div class="info">'+(sel.size ? sel.size+" marca(s) selecionada(s)" : "Sem GRD neste setor — o desenho desce até a montagem")+'</div>';
+        + '<button class="btn" id="gp-impSel"'+(sel.size?"":" disabled")+'>Reimprimir selecionados</button>' + btnPint
+      : '<div class="info">'+(sel.size ? sel.size+" marca(s) selecionada(s)" : "Sem GRD neste setor — o desenho desce até a montagem")+'</div>' + btnPint;
 
     /* ⚠ o filtro só existe quando há GRD; sem a guarda, `$("fSemGrd")` volta null e o painel
        inteiro morre no `.onchange`. */
@@ -87,6 +92,15 @@ export function criarPainelProjetos(dep){
     dep.$("selNenhum").onclick = ()=>{ sel.clear(); dep.pintarPainel(); };
     for(const c of dep.raiz.querySelectorAll("#gp-pCorpo .ck"))
       c.onchange = ()=>{ if(c.checked) sel.add(c.dataset.m); else sel.delete(c.dataset.m); dep.pintarPainel(); };
+    const bp = dep.$("xlsPint");
+    if(bp) bp.onclick = async ()=>{
+      bp.disabled = true; const antes = bp.textContent; bp.textContent = "Gerando…";
+      /* ⚠ manda os IDS do lote, não a OP inteira: a barra representa o que vai ser pintado agora, e
+         a folha tem de dimensionar a tinta desse lote — não da obra toda. */
+      try{ await dep.baixarPintura(r.op, r.itens.map(i=>i.id).filter(Boolean)); }
+      catch(e){ dep.avisar(e?.message || "Falha ao gerar o caderno de pintura", "erro"); }
+      finally{ bp.disabled = false; bp.textContent = antes; }
+    };
     const im = dep.$("impFalta");
     if(im) im.onclick = ()=>imprimir(r, itens.filter(i=>!i.g).map(i=>i.m), "primeira impressão");
     const is = dep.$("impSel");

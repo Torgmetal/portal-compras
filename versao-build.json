@@ -1,7 +1,12 @@
 {
-  "build": 2929,
-  "gerado": "2026-09-07T18:12:13.432Z",
+  "build": 2930,
+  "gerado": "2026-09-07T18:18:00.934Z",
   "commits": [
+    {
+      "hash": "eaa4393c",
+      "data": "07/09/2026",
+      "titulo": "Pintura: a espessura de cálculo passa a ser a máxima"
+    },
     {
       "hash": "2705eea7",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "f4558b36",
       "data": "06/09/2026",
       "titulo": "Conserta o versao-build.json quebrado por marcador de conflito"
-    },
-    {
-      "hash": "1fe51bc4",
-      "data": "06/09/2026",
-      "titulo": "PCP: a fila da pintura, e o teto que cortava as filas em silêncio"
     }
   ]
 }

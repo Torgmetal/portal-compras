@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
 import { baixarZipLote } from "@/lib/desenhos-zip-cliente";
+import { baixarCadernoPintura } from "@/lib/pintura-excel-cliente";
 import { CSS } from "./_gantt/css";
 import { MARKUP } from "./_gantt/markup";
 import { RECURSOS, SETORES, COR_SETOR, FATOR_META, capDe, nomeRec, criarCores } from "./_gantt/recursos";
@@ -40,7 +41,7 @@ import { criarLotes } from "./_gantt/lotes";
 
 function iniciar(raiz, LOTES, HOJE, ajuda) {
   const $ = (id) => raiz.querySelector("#gp-" + id);
-  const { avisar, recarregar, baixarZip } = ajuda;
+  const { avisar, recarregar, baixarZip, baixarPintura } = ajuda;
 
   // JANELA 14 = duas semanas CHEIAS agora que sábado e domingo têm coluna. Com 13 a
   // grade cortava no meio de uma semana e o olho perdia o ritmo de sete.
@@ -169,7 +170,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     ocup, carga, custoItem, classeOc, rotuloOc, novoLote, registrar, redesenhar, pintarPainel,
     esconderPainel });
   const projetos = criarPainelProjetos({ $, raiz, nkg, dbr, MAX_LOTE, avisar, recarregar, baixarZip,
-    pintarPainel });
+    baixarPintura, pintarPainel });
   const arraste = criarArraste({ raiz, grade, COL, DIAS, IDX, encostaNoUtil, fdsISO, montarRuns,
     novoLote, registrar, nomeRec, dbr, abrirPainel, desenhar, redesenhar,
     getInicio: ()=>inicio, getPainel: ()=>painel, setPainel: (v)=>{ painel = v; } });
@@ -294,7 +295,7 @@ export default function GanttProgramacao() {
       d.appendChild(x); el.appendChild(d);
     };
     const limpar = iniciar(raiz, dados.lotes, dados.hoje, {
-      avisar, recarregar: buscar, baixarZip: baixarZipLote,
+      avisar, recarregar: buscar, baixarZip: baixarZipLote, baixarPintura: baixarCadernoPintura,
     });
     return () => { if (typeof limpar === "function") limpar(); raiz.innerHTML = ""; };
   }, [dados, buscar]);
