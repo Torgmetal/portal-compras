@@ -1,7 +1,12 @@
 {
-  "build": 2937,
-  "gerado": "2026-09-07T19:09:54.529Z",
+  "build": 2938,
+  "gerado": "2026-09-07T19:11:11.302Z",
   "commits": [
+    {
+      "hash": "74be32dc",
+      "data": "07/09/2026",
+      "titulo": "Produção: planilha por OP com composição LPC e sete abas por setor"
+    },
     {
       "hash": "4d410ce3",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c8b7f25e",
       "data": "07/09/2026",
       "titulo": "Gantt do PCP: o quadro para de somar a LE e a obra encerrada"
-    },
-    {
-      "hash": "74590f7e",
-      "data": "07/09/2026",
-      "titulo": "Dimensional: a tolerância sugerida passa a sair do PO-04, pela peça"
     }
   ]
 }

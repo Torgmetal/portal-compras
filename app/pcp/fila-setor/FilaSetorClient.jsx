@@ -120,7 +120,9 @@ export default function FilaSetorClient({ setor }) {
     return {
       m2Aplicar: Math.round(m2 * dem * 100) / 100,
       litros: Math.round(litros * 100) / 100,
-      galoes: Math.ceil(litros / 18),
+      // ⚠ 3,6 L é o galão de tinta no Brasil — a mesma constante que lib/tinta-catalogo usa. Eu
+      // tinha cravado 18 aqui, que é o BALDE: dava cinco vezes menos galões.
+      galoes: Math.ceil(litros / 3.6),
       diluente: dil == null ? null : Math.round(litros * (dil / 100) * 100) / 100,
       umida: dil == null ? null : Math.round((esp * (100 + dil)) / sv),
     };
@@ -312,7 +314,7 @@ export default function FilaSetorClient({ setor }) {
                 <div className="mt-2.5 flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-torg-dark">
                   <span><b>{calc.m2Aplicar.toLocaleString("pt-BR")}</b> m² a aplicar</span>
                   <span><b>{calc.litros.toLocaleString("pt-BR")}</b> L de tinta</span>
-                  <span><b>{calc.galoes}</b> galões</span>
+                  <span><b>{calc.galoes}</b> galões de 3,6 L</span>
                   <span>{calc.diluente != null
                     ? <><b>{calc.diluente.toLocaleString("pt-BR")}</b> L de diluente</>
                     : <span className="text-amber-800">diluente: informe a diluição</span>}</span>
