@@ -1,7 +1,12 @@
 {
-  "build": 2913,
-  "gerado": "2026-09-07T15:06:29.623Z",
+  "build": 2914,
+  "gerado": "2026-09-07T15:30:39.802Z",
   "commits": [
+    {
+      "hash": "b87e00f4",
+      "data": "07/09/2026",
+      "titulo": "Importa os 11 romaneios de pasta que faltavam no portal"
+    },
     {
       "hash": "95655e4d",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "27939c72",
       "data": "05/09/2026",
       "titulo": "Corte: HP, Z, UE, WT e barra ganham máquina, e 94 t saem do limbo"
-    },
-    {
-      "hash": "bb160694",
-      "data": "05/09/2026",
-      "titulo": "Corte: o parser passa a reconhecer tubo, e tubo até 100mm vai na cantoneira"
     }
   ]
 }
