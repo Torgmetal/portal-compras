@@ -1,7 +1,12 @@
 {
-  "build": 2910,
-  "gerado": "2026-09-07T14:26:32.167Z",
+  "build": 2911,
+  "gerado": "2026-09-07T14:55:47.079Z",
   "commits": [
+    {
+      "hash": "8e5c66a9",
+      "data": "07/09/2026",
+      "titulo": "Painel do PCP: expedido no mês, e reabre as 5 OPs que não tinham acabado"
+    },
     {
       "hash": "ba095fcc",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "2ae37ed7",
       "data": "05/09/2026",
       "titulo": "O R sai da GRD e vira portão: a trava de material ganha porta na hora de imprimir"
-    },
-    {
-      "hash": "002a1bed",
-      "data": "05/09/2026",
-      "titulo": "Quebra o GanttProgramacao (1.265 linhas) em módulos por responsabilidade"
     }
   ]
 }

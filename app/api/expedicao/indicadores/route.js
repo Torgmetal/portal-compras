@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { expedidoNoMes } from "@/lib/expedido-mes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,6 +49,11 @@ export async function GET() {
     }),
   ]);
 
+  // ⚠ `mes` continua sendo SÓ O PORTAL, de propósito: a aba Romaneios da Expedição fala do fluxo
+  // dela (pendentes e atrasados também são do portal), e mudar o sentido de `mes` faria aquela tela
+  // somar peras com maçãs. Quem quer o embarque de verdade usa `expedido`, abaixo.
+  const expedido = await expedidoNoMes();
+
   return NextResponse.json({
     success: true,
     indicadores: {
@@ -55,6 +61,8 @@ export async function GET() {
       atrasados: { qtd: atrasados },
       semana: { qtd: semana._count._all, pesoKg: semana._sum.pesoKg || 0 },
       mes: { qtd: mes._count._all, pesoKg: mes._sum.pesoKg || 0 },
+      // o que saiu da fábrica no mês: romaneio de pasta (FORM 22) + romaneio do portal
+      expedido,
     },
   });
 }

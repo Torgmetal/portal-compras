@@ -40,6 +40,11 @@ export default function PCPPainelClient({ isAdmin }) {
   const r = resumoPainel(fontes.producao, fontes.corte);
   const maxKg = Math.max(1, ...r.etapas.map(e => e.kg || 0));
   const corte = fontes.corte;
+  // ⚠ O MÊS CORRENTE NASCE SUBESTIMADO enquanto ninguém importa os romaneios de pasta do mês — a
+  // importação é manual de propósito (FORM 22 emitido não é FORM 22 embarcado). Sem dizer isso na
+  // tela, "9 t no mês" lê como fábrica parada em vez de importação atrasada.
+  const exp = fontes.exped?.indicadores?.expedido || null;
+  const pastaAtrasada = exp && exp.porFonte.pasta.romaneios === 0 && exp.porFonte.portal.romaneios >= 0;
   if (detalhe) return <><button className={s.back} onClick={() => { setDetalhe(false); carregar(); }}><ChevronLeft size={16}/> Voltar à visão geral</button><PCPDashboardClient isAdmin={isAdmin}/></>;
   return <div className={s.root} aria-busy={loading}>
     <header className={s.top}><div><p className={s.eyebrow}>PCP / VISÃO OPERACIONAL</p><h1>Painel da produção</h1><p>Do corte à pintura. Prioridades, pendências e próximas liberações.</p></div>
@@ -52,13 +57,16 @@ export default function PCPPainelClient({ isAdmin }) {
       <article><small>Material indisponível no corte</small><strong>{t(r.indisponivelKg)}</strong><p>Peso das peças pendentes de material</p></article>
       {/* ⚠ "expedido" aqui é ROMANEIO EMITIDO no mês, não nota fiscal — é a régua que a Expedição
           já usa. O rodapé diz isso na cara para ninguém comparar com faturamento. */}
-      <article><small>Expedido no mês</small><strong>{t(fontes.exped?.indicadores?.mes?.pesoKg)}</strong>
-        <p>{fontes.exped?.indicadores?.mes ? `${n(fontes.exped.indicadores.mes.qtd)} romaneio(s) emitido(s)` : 'Indicador indisponível'}</p></article>
+      <article><small>Expedido no mês</small><strong>{t(fontes.exped?.indicadores?.expedido?.kg)}</strong>
+        <p>{exp
+          ? `${n(exp.romaneios)} romaneio(s) · ${n(exp.porFonte.pasta.romaneios)} de pasta, ${n(exp.porFonte.portal.romaneios)} do portal`
+          : 'Indicador indisponível'}</p></article>
       <article><small>Aguardando embarque</small><strong>{t(fontes.exped?.indicadores?.pendentes?.pesoKg)}</strong>
         <p>{fontes.exped?.indicadores?.atrasados?.qtd > 0
           ? `${n(fontes.exped.indicadores.atrasados.qtd)} com data prevista vencida`
           : 'Romaneios montados e ainda não emitidos'}</p></article>
     </div>
+    {pastaAtrasada && <p className={s.legend}>O expedido do mês conta o romaneio do portal e o FORM 22 das pastas da OP. Ainda não há romaneio de pasta importado neste mês{exp.ultimoDePasta ? ` (o último no portal é de ${date(exp.ultimoDePasta)})` : ''} — o número está menor que o embarque real até que a importação seja feita.</p>}
     <Section number="01" title="Fluxo da fábrica" id="fluxo-pcp" aside={<small>Saldo das obras liberadas</small>}>
       <div className={s.flows}>{r.etapas.map((e, i) => <Link href={e.href} key={e.key} className={e.kg > 0 && e.kg === maxKg ? s.hot : ''}><div className={s.flowTop}><b>{e.label}</b><span>0{i+1}</span></div><small>A concluir na etapa</small><strong>{t(e.kg)}</strong><div className={s.track}><i style={{width: `${(e.kg || 0) / maxKg * 100}%`}}/></div><p>Consultar fila <ArrowUpRight size={13}/></p></Link>)}</div>
       <p className={s.legend}>O saldo inclui peças que ainda dependem de etapas anteriores. Consulte cada fila para ver o que já pode avançar. Os pesos das etapas não devem ser somados.</p>
