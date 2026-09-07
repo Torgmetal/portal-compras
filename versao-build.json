@@ -1,7 +1,12 @@
 {
-  "build": 2928,
-  "gerado": "2026-09-07T18:05:53.593Z",
+  "build": 2929,
+  "gerado": "2026-09-07T18:12:13.432Z",
   "commits": [
+    {
+      "hash": "2705eea7",
+      "data": "07/09/2026",
+      "titulo": "Fila da pintura: informar a especificação na hora, sem tocar no PLP"
+    },
     {
       "hash": "44c045dd",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "1fe51bc4",
       "data": "06/09/2026",
       "titulo": "PCP: a fila da pintura, e o teto que cortava as filas em silêncio"
-    },
-    {
-      "hash": "6aa8dc8a",
-      "data": "06/09/2026",
-      "titulo": "Encerra as 11 OPs que produziram e pararam, e diz por que 8 ficaram de fora"
     }
   ]
 }

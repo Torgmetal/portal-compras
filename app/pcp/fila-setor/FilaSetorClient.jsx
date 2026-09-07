@@ -275,7 +275,7 @@ export default function FilaSetorClient({ setor }) {
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                 {[["demaos", "Demãos", "1"], ["produto", "Produto", "ex.: Industhane"], ["cor", "Cor", "ex.: Cinza N5"],
-                  ["espessuraSeca", "Esp. seca µm", "100"], ["solidosVol", "Sólidos vol. %", "64"],
+                  ["espessuraSeca", "Esp. seca máx. µm", "100"], ["solidosVol", "Sólidos vol. %", "64"],
                   ["diluicaoPct", "Diluição %", "10"], ["secagem", "Secagem", "8 horas"]].map(([k, rot, ph]) => (
                   <label key={k} className="block">
                     <span className="text-[10px] text-torg-gray block mb-0.5">{rot}</span>
