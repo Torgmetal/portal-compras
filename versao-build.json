@@ -1,7 +1,12 @@
 {
-  "build": 2942,
-  "gerado": "2026-09-07T19:59:09.588Z",
+  "build": 2943,
+  "gerado": "2026-09-07T20:04:49.089Z",
   "commits": [
+    {
+      "hash": "7c6d2c8d",
+      "data": "07/09/2026",
+      "titulo": "Engenharia › Projetos: dá para editar o nome, o local e a data da fase"
+    },
     {
       "hash": "bb358b87",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b87e00f4",
       "data": "07/09/2026",
       "titulo": "Importa os 11 romaneios de pasta que faltavam no portal"
-    },
-    {
-      "hash": "95655e4d",
-      "data": "07/09/2026",
-      "titulo": "Preenche toda a altura das barras de avanço do PCP"
     }
   ]
 }

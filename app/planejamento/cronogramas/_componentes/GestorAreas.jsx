@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { PALETA_AREAS, corDaArea } from "@/lib/cronograma-area-cor";
-import { ChevronDown, ChevronRight, Layers, Loader2, Pencil, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Layers, Loader2, Pencil, Plus, Download } from "lucide-react";
 
 // Painel "Áreas da obra" — define/renomeia/recolore as áreas do cronograma.
 // Corrige cor repetida: auto-cadastra (cores distintas) as áreas em uso ainda não fixadas.
@@ -25,15 +25,18 @@ export function GestorAreas({ cronogramaId, areas, tarefas, onRefresh, readOnly 
   const naoFixadas = [...usadas.values()].filter((n) => !regKeys.has(n.toLowerCase()));
   const lista = [...registradas.map((a) => a.nome), ...naoFixadas];
 
-  const chamar = async (body) => {
+  // ⚠ `devolver` existe para o "trazer fases" poder dizer O QUE trouxe; as outras ações não precisam.
+  const chamar = async (body, devolver = false) => {
     setSalvando(true);
     try {
       const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/areas`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
-      if (!res.ok) { const e = await res.json().catch(() => ({})); alert(`Erro: ${e.error || "falha"}`); return; }
+      if (!res.ok) { const e = await res.json().catch(() => ({})); alert(`Erro: ${e.error || "falha"}`); return null; }
+      const j = devolver ? await res.json().catch(() => null) : null;
       onRefresh();
-    } catch { alert("Erro de conexão."); } finally { setSalvando(false); }
+      return j;
+    } catch { alert("Erro de conexão."); return null; } finally { setSalvando(false); }
   };
 
   // Uma vez por montagem: fixa cores distintas nas áreas em uso ainda não cadastradas.
@@ -53,6 +56,20 @@ export function GestorAreas({ cronogramaId, areas, tarefas, onRefresh, readOnly 
     const para = window.prompt(`Renomear área "${de}" para:`, de);
     if (para == null || !para.trim() || para.trim() === de) return;
     chamar({ acao: "renomear", de, para: para.trim() });
+  };
+
+  /* ⚠⚠ A LIGAÇÃO COM AS FASES DA OP. Vitor (07/09/2026): "quando criamos essas fases são as que
+     vamos usar no cronograma, correto?" — não eram, e ele pediu "precisamos ter isso ligado". As
+     fases são os lotes de entrega da aba Engenharia da OP; aqui elas viram áreas, na ordem da
+     prioridade de fabricação.
+     ⚠ POR BOTÃO, NÃO AUTOMÁTICO: sincronia a cada carregamento desfaria a renomeação feita aqui na
+     primeira vez que a tela abrisse — e o cronograma vai ao cliente. Quem renomeia aqui está
+     corrigindo de propósito, e o portal não pode brigar com isso. */
+  const importarFases = async () => {
+    const r = await chamar({ acao: "importarFases" }, true);
+    if (!r) return;
+    if (r.adicionadas?.length) alert(`${r.adicionadas.length} fase(s) trazida(s): ${r.adicionadas.join(", ")}`);
+    else alert(r.jaExistiam?.length ? "As fases da OP já estão todas aqui." : "Esta OP ainda não tem fases cadastradas na aba Engenharia.");
   };
 
   if (!lista.length && readOnly) return null;
@@ -89,7 +106,13 @@ export function GestorAreas({ cronogramaId, areas, tarefas, onRefresh, readOnly 
             );
           })}
           {!readOnly && (
-            <button onClick={adicionar} className="text-[11px] text-torg-blue hover:text-torg-blue-700 font-medium flex items-center gap-1 pt-1"><Plus size={12} /> adicionar área</button>
+            <div className="flex items-center gap-3 pt-1 flex-wrap">
+              <button onClick={adicionar} className="text-[11px] text-torg-blue hover:text-torg-blue-700 font-medium flex items-center gap-1"><Plus size={12} /> adicionar área</button>
+              <button onClick={importarFases} className="text-[11px] text-torg-blue hover:text-torg-blue-700 font-medium flex items-center gap-1"
+                title="Traz as fases da aba Engenharia da OP (lotes de entrega) como áreas, na ordem da prioridade">
+                <Download size={12} /> trazer as fases da OP
+              </button>
+            </div>
           )}
         </div>
       )}

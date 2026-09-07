@@ -1,16 +1,18 @@
 // POST /api/planejamento/cronogramas/[id]/areas — gerencia as Áreas do cronograma.
 //  { acao: "renomear", de, para } → renomeia a área MANTENDO a cor + atualiza as tarefas
 //  { acao: "definir", nomes: [...] } → (re)define a lista de áreas (cores por ordem)
+//  { acao: "importarFases" } → traz as FASES da OP (lotes de entrega) como áreas — ver a nota em
+//    lib/cronograma-areas.js; não duplica, não sobrescreve e não roda sozinho
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { renomearArea, definirAreas, recolorArea, sincronizarAreas } from "@/lib/cronograma-areas";
+import { renomearArea, definirAreas, recolorArea, sincronizarAreas, importarFasesDaOP } from "@/lib/cronograma-areas";
 
 export const runtime = "nodejs";
 
 const schema = z.object({
-  acao: z.enum(["renomear", "definir", "recolor", "sincronizar"]),
+  acao: z.enum(["renomear", "definir", "recolor", "sincronizar", "importarFases"]),
   de: z.string().max(120).optional(),
   para: z.string().max(120).optional(),
   nomes: z.array(z.string().max(120)).optional(),
@@ -39,6 +41,11 @@ export async function POST(req, { params }) {
     if (!body.nome?.trim() || body.cor == null) return NextResponse.json({ success: false, error: "Informe 'nome' e 'cor'." }, { status: 400 });
     const areas = await recolorArea(prisma, id, body.nome, body.cor);
     return NextResponse.json({ success: true, areas });
+  }
+  if (body.acao === "importarFases") {
+    const r = await importarFasesDaOP(prisma, id);
+    if (r.semOp) return NextResponse.json({ success: false, error: "Este cronograma não está ligado a uma OP." }, { status: 400 });
+    return NextResponse.json({ success: true, ...r });
   }
   if (body.acao === "sincronizar") {
     const r = await sincronizarAreas(prisma, id);
