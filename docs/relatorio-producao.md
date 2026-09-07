@@ -11,3 +11,15 @@ OPs ENCERRADAS/CANCELADAS e OPs com todas as etapas aplicáveis de fabricação 
 O Excel contém Status por OP, Detalhe dos setores e Critérios. Percentuais são células numéricas, com formato percentual. A exportação antiga de todas as ordens avisa se o recorte exceder 20.000 registros em vez de truncar silenciosamente.
 
 A página do relatório deixou de efetuar reconciliação por POST ao abrir. As APIs operacionais continuam disponíveis aos fluxos que as utilizam; a consulta do relatório é somente leitura.
+
+## Planilha de uma OP
+
+Em Visão geral, **Planilha da OP**, abaixo do número, consulta `GET /api/pcp/relatorio-producao?opId=...`. Gera sete abas: Preparação, Montagem, Solda, Acabamento, Jato, Pintura e Expedição. A extração independe do filtro de datas das ordens e representa o acumulado atual. Não altera apontamentos ou baixa peças.
+
+Preparação reconstrói a composição da LPC importada: conjunto em destaque e seus croquis abaixo, com material, descrição, comprimento, quantidades, peso, área e observação. `ConjuntoCroqui.qtdNoConjunto` já representa o total da linha da LPC (não se multiplica pela quantidade do conjunto). A aba acrescenta o preparado do vínculo e da marca na OP, saldo, percentual e último apontamento. Pesos dos croquis já estão incluídos nos conjuntos; não somar os dois níveis.
+
+Croqui compartilhado parcialmente preparado não tem distribuição por conjunto no MES. Nesse caso, o acumulado por marca é informado e a quantidade atribuída ao vínculo fica vazia, com aviso explícito. Quando a marca inteira está preparada, todos os vínculos podem ser confirmados. Não há rateio fictício ou repetição da produção como se pertencesse a cada conjunto.
+
+Montagem a Pintura têm uma linha por conjunto/avulsa, sem croquis. Etapas fora da rota aparecem como Não se aplica. A extração reconhece pertencimento `naLPC` além da origem de importação, preservando marcas compartilhadas com a LE.
+
+Expedição usa a LE importada, sem substituí-la pela LPC. Quantidades de romaneios do portal emitidos e não cancelados, ou de itens de romaneios vinculados à marca, comprovam o embarque. Baixas administrativas aparecem em coluna separada. Sinalizações de arquivo sem quantidade, duplicidade de marca entre frentes ou presença nas duas fontes de romaneio são marcadas para conferência, sem quantidade inventada. A ausência de LE é indicada na própria aba.

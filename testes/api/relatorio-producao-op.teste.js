@@ -1,0 +1,11 @@
+import {beforeEach,it,expect,vi} from 'vitest';
+const mocks=vi.hoisted(()=>({role:vi.fn(),geral:vi.fn(),op:vi.fn()}));
+vi.mock('@/lib/session',()=>({requireRole:mocks.role}));
+vi.mock('@/lib/relatorio-producao-data',()=>({carregarResumoProducao:mocks.geral}));
+vi.mock('@/lib/relatorio-producao-op-data',()=>({carregarProducaoOp:mocks.op}));
+import {GET} from '@/app/api/pcp/relatorio-producao/route';
+beforeEach(()=>vi.resetAllMocks());
+const req=id=>new Request('http://localhost/api/pcp/relatorio-producao'+(id?'?opId='+id:''));
+it('exige permissão antes de consultar uma obra',async()=>{mocks.role.mockRejectedValue(new Error('Unauthorized'));expect((await GET(req('op1'))).status).toBe(401);expect(mocks.op).not.toHaveBeenCalled();});
+it('exporta somente a OP solicitada e mantém o relatório geral separado',async()=>{mocks.op.mockResolvedValue({op:{id:'op1'},setores:{}});const r=await GET(req('op1'));expect(r.status).toBe(200);expect(mocks.op).toHaveBeenCalledWith('op1');expect(mocks.geral).not.toHaveBeenCalled();});
+it('retorna 404 para OP inexistente e 500 para falha de leitura',async()=>{mocks.op.mockResolvedValue(null);expect((await GET(req('inexistente'))).status).toBe(404);mocks.op.mockRejectedValue(new Error('erro interno'));expect((await GET(req('op1'))).status).toBe(500);});

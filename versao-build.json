@@ -1,7 +1,12 @@
 {
-  "build": 2936,
-  "gerado": "2026-09-07T18:59:04.713Z",
+  "build": 2937,
+  "gerado": "2026-09-07T19:09:54.529Z",
   "commits": [
+    {
+      "hash": "4d410ce3",
+      "data": "07/09/2026",
+      "titulo": "Pintura: a cor de cada peça sai do tipo da estrutura no PLP"
+    },
     {
       "hash": "33386ba4",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "74590f7e",
       "data": "07/09/2026",
       "titulo": "Dimensional: a tolerância sugerida passa a sair do PO-04, pela peça"
-    },
-    {
-      "hash": "eb4e1014",
-      "data": "07/09/2026",
-      "titulo": "Exibe toneladas como Ton no painel PCP"
     }
   ]
 }
