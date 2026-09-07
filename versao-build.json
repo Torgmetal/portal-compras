@@ -1,7 +1,12 @@
 {
-  "build": 2950,
-  "gerado": "2026-09-07T23:45:40.953Z",
+  "build": 2951,
+  "gerado": "2026-09-07T23:49:20.180Z",
   "commits": [
+    {
+      "hash": "e0fe3b8d",
+      "data": "07/09/2026",
+      "titulo": "CMR: a obra digitada à mão passa a ser conferida contra o pedido"
+    },
     {
       "hash": "67396b91",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e87e043c",
       "data": "07/09/2026",
       "titulo": "Inclui previsão de retorno à Expedição no Gantt"
-    },
-    {
-      "hash": "13b24f91",
-      "data": "07/09/2026",
-      "titulo": "Integra retornos parciais de terceiros com importação e previsão no Gantt"
     }
   ]
 }
