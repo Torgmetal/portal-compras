@@ -1,7 +1,12 @@
 {
-  "build": 2943,
-  "gerado": "2026-09-07T20:04:49.089Z",
+  "build": 2944,
+  "gerado": "2026-09-07T20:11:57.417Z",
   "commits": [
+    {
+      "hash": "09f0aee6",
+      "data": "07/09/2026",
+      "titulo": "Cronograma: as fases da OP viram as áreas, por um botão"
+    },
     {
       "hash": "7c6d2c8d",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b010a9b0",
       "data": "07/09/2026",
       "titulo": "Gantt do PCP: a fila do acabamento, jato e pintura aparece na faixa sem posto"
-    },
-    {
-      "hash": "b87e00f4",
-      "data": "07/09/2026",
-      "titulo": "Importa os 11 romaneios de pasta que faltavam no portal"
     }
   ]
 }
