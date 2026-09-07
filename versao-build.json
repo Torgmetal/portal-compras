@@ -1,7 +1,12 @@
 {
-  "build": 2914,
-  "gerado": "2026-09-07T15:30:39.802Z",
+  "build": 2915,
+  "gerado": "2026-09-07T15:35:19.838Z",
   "commits": [
+    {
+      "hash": "b010a9b0",
+      "data": "07/09/2026",
+      "titulo": "Gantt do PCP: a fila do acabamento, jato e pintura aparece na faixa sem posto"
+    },
     {
       "hash": "b87e00f4",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "f2fba741",
       "data": "05/09/2026",
       "titulo": "Corte: chapa sem largura continua sendo chapa"
-    },
-    {
-      "hash": "27939c72",
-      "data": "05/09/2026",
-      "titulo": "Corte: HP, Z, UE, WT e barra ganham máquina, e 94 t saem do limbo"
     }
   ]
 }
