@@ -1,7 +1,12 @@
 {
-  "build": 2939,
-  "gerado": "2026-09-07T19:16:13.130Z",
+  "build": 2940,
+  "gerado": "2026-09-07T19:27:24.464Z",
   "commits": [
+    {
+      "hash": "73a8e0e0",
+      "data": "07/09/2026",
+      "titulo": "Caderno de pintura: a planilha vira a calculadora, com as células a preencher em amarelo"
+    },
     {
       "hash": "ab5b8c2d",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "8e5c66a9",
       "data": "07/09/2026",
       "titulo": "Painel do PCP: expedido no mês, e reabre as 5 OPs que não tinham acabado"
-    },
-    {
-      "hash": "ba095fcc",
-      "data": "07/09/2026",
-      "titulo": "Prioridades: sai o fallback para a LE, e sai a obra encerrada"
     }
   ]
 }
