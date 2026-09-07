@@ -1,7 +1,12 @@
 {
-  "build": 2924,
-  "gerado": "2026-09-07T17:38:47.936Z",
+  "build": 2925,
+  "gerado": "2026-09-07T17:39:47.362Z",
   "commits": [
+    {
+      "hash": "5acfa4ac",
+      "data": "07/09/2026",
+      "titulo": "Recebimento: a validade do lote passa a ser pedida quando o material é tinta"
+    },
     {
       "hash": "228bb38b",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "39316fcb",
       "data": "06/09/2026",
       "titulo": "Fila do PCP: peça pintada sai de todas as filas"
-    },
-    {
-      "hash": "8928f17b",
-      "data": "06/09/2026",
-      "titulo": "refactor: alinha menu de módulos à identidade Torg"
     }
   ]
 }
