@@ -1,7 +1,12 @@
 {
-  "build": 2925,
-  "gerado": "2026-09-07T17:39:47.362Z",
+  "build": 2926,
+  "gerado": "2026-09-07T17:56:08.487Z",
   "commits": [
+    {
+      "hash": "669e2361",
+      "data": "07/09/2026",
+      "titulo": "Simplifica retorno de terceiros com destino geral e exceções por marca"
+    },
     {
       "hash": "5acfa4ac",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "81028b4a",
       "data": "06/09/2026",
       "titulo": "Gantt do PCP: nomes dos setores alinhados à esquerda"
-    },
-    {
-      "hash": "39316fcb",
-      "data": "06/09/2026",
-      "titulo": "Fila do PCP: peça pintada sai de todas as filas"
     }
   ]
 }

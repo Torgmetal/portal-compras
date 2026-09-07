@@ -629,56 +629,15 @@ export default function ProducaoClient() {
 
                 {open && (
                   <div className="border-t border-gray-100">
-                    {/* abas de setor da OP */}
-                    {/* ⚠ GRADE, NÃO flex-wrap. Vitor (01/09/2026): "melhore o visual desses
-                        botões". Com largura livre, cada aba media o tamanho do seu próprio texto e
-                        a segunda fila não batia com a primeira — sete cartões de sete larguras.
-                        Colunas iguais alinham as duas filas e dão ao número um espaço fixo. */}
-                    <div className="grid gap-1.5 px-3 pt-2.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(158px, 1fr))" }}>
-                      {/* ⚠⚠ O kg DA ABA É O QUE FALTA PASSAR NAQUELE SETOR — e não se somam.
-                          Vitor (24/08/2026): "o que significam esses números". A mesma peça conta em
-                          TODOS os setores por onde ainda vai passar, então somar as abas dá muito
-                          mais que o peso da obra. Croqui só existe na Preparação; conjunto vai de
-                          Montagem a Expedição; avulsa é cortada e pula Montagem/Solda. */}
-                      {/* ⚠⚠ A UNIDADE MUDA COM O SETOR. Vitor (01/09/2026): "vamos ter que prever
-                          em peças, pois isso não vai fechar". O corte se mede em kg — é a meta dele.
-                          Da montagem em diante, em PEÇA: as mesmas bancadas mantiveram 35→36 peças
-                          por dia enquanto o kg/dia caía de 4.312 para 1.425, porque a peça ficou
-                          três vezes mais leve. Sete abas em kg faziam a montagem parecer parada.
-                          ⚠ ZERO E "AINDA NÃO CHEGOU A VEZ" NÃO SÃO A MESMA COISA: setor sem fila
-                          mostra "—", não 0 kg. */}
-                      {o.setores.map((s) => {
-                        const emKg = s.setor === "CORTE";
-                        // ⚠ o vazio se mede NA UNIDADE DA ABA: a montagem aparecia "0" com
-                        // 15.064 kg ao lado porque o teste olhava só o kg. Se o que se conta ali é
-                        // marca, é a marca que decide se a fila está vazia.
-                        const vazio = emKg ? (s.pendenteKg || 0) <= 0 : (s.pendenteItens || 0) <= 0;
-                        const sel = setorAba === s.setor;
-                        return (
-                          <button key={s.setor} onClick={() => trocarSetor(o, s.setor)}
-                            title={`${s.label}: falta passar ${fmtKg(s.pendenteKg)} de ${fmtKg(s.totalKg)} (${s.pct}% pronto)${emKg ? "" : ` · ${fmtN(s.pendenteItens)} marca(s), ${fmtN(s.pendenteUn)} peça(s)`}.${s.atrasoDias > 0 ? ` Atrasado ${s.atrasoDias} dia(s).` : s.entrega ? ` Até ${fmtD(s.entrega)}.` : ""} A mesma peça conta em cada setor por onde ainda vai passar — não some as abas.`}
-                            className={`text-left px-3 py-2 rounded-lg border transition-colors ${
-                              sel ? "bg-torg-blue text-white border-torg-blue"
-                              /* ⚠ o atraso POR SETOR diz QUAL setor está segurando a obra — o
-                                 atraso da OP inteira não diz. */
-                              : s.atrasoDias > 0 ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                              : vazio ? "border-gray-100 text-torg-gray-light"
-                              : "border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
-                            <span className="block text-[10px] font-bold uppercase tracking-wider opacity-90 truncate">{s.label}</span>
-                            {/* ⚠⚠ A UNIDADE FICA COLADA NO NÚMERO. Antes "187" ficava numa linha e a
-                                de baixo abria com um "marcas" órfão — o número sem unidade e a
-                                unidade sem número. Agora "187 marcas", e embaixo só o detalhe. */}
-                            <span className="block text-[15px] font-extrabold tabular-nums leading-none mt-0.5">
-                              {vazio ? "—" : emKg ? fmtKg(s.pendenteKg) : (
-                                <>{fmtN(s.pendenteItens)}<span className="text-[10px] font-semibold ml-1 opacity-75">marcas</span></>
-                              )}
-                            </span>
-                            <span className={`block text-[10px] mt-1 truncate ${sel ? "opacity-80" : "opacity-70"}`}>
-                              {vazio ? "nada na fila" : emKg ? `${fmtN(s.pendenteItens)} peças` : `${fmtN(s.pendenteUn)} un · ${fmtKg(s.pendenteKg)}`}
-                            </span>
-                          </button>
-                        );
-                      })}
+                    <div className="px-3 pt-2.5 pb-1">
+                      <label className="inline-flex items-center gap-2 text-xs text-torg-gray">
+                        Setor
+                        <select aria-label={`Setor da ${fmtOP(o.opNumero)}`} value={setorAba}
+                          onChange={(e) => trocarSetor(o, e.target.value)}
+                          className="border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white text-torg-dark focus:border-torg-blue">
+                          {o.setores.map((s) => <option key={s.setor} value={s.setor}>{s.label}</option>)}
+                        </select>
+                      </label>
                     </div>
 
                     {carregandoDet ? (
