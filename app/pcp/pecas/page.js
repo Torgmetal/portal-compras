@@ -5,5 +5,5 @@ export const metadata = {
 };
 
 export default function PCPPecasPage() {
-  redirect("/producao/programacao/corte");
+  redirect("/pcp/producao");
 }

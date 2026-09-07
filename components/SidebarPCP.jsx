@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Package, ListOrdered, FileText, Truck, FolderKanban, Printer, Factory, Gauge, Flame, Wrench,
+  LayoutDashboard, ListOrdered, FileText, Truck, FolderKanban, Printer, Factory, Gauge, Flame, Wrench,
   Sparkles, Paintbrush, Brush,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
@@ -19,7 +19,6 @@ const menu = [
   // aqui: lista de OPs, peças, o que o programador lançou e o botão de imprimir/liberar em lote.
   { href: "/pcp/producao",     label: "Produção",         icon: Factory },
   { href: "/pcp/relatorio-corte", label: "Relatório de Produção", icon: FileText },
-  { href: "/pcp/pecas-corte",  label: "Programação",      icon: Package },
   { href: "/pcp/terceirizados", label: "Terceiros",       icon: Truck },
   // Controle de liberação de desenhos: quem levou qual desenho, quando e com qual R carimbado.
   { href: "/pcp/grd",          label: "GRD",              icon: Printer },

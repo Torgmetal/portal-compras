@@ -163,9 +163,6 @@ export default function PCPDashboardClient({ isAdmin = false }) {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Link href="/pcp/pecas-corte" className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50">
-            Liberar peças
-          </Link>
           <Link href="/pcp/fila-corte" className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50 inline-flex items-center gap-1">
             <ListOrdered size={13} /> Fila de Corte
           </Link>
@@ -240,7 +237,7 @@ export default function PCPDashboardClient({ isAdmin = false }) {
         <p className="text-xs font-bold text-torg-dark uppercase tracking-wide mb-3">Fluxo do corte</p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <EtapaFunil
-            titulo="Aguardando liberação" icon={Boxes} href="/pcp/pecas-corte"
+            titulo="Aguardando liberação" icon={Boxes} href="/pcp/producao"
             pecas={carteira.pendente.pecas} kg={carteira.pendente.kg}
             extra={
               carteira.pendente.porEstoque.length > 0 && (
@@ -324,8 +321,8 @@ export default function PCPDashboardClient({ isAdmin = false }) {
           <div className="px-5 py-2.5 border-t border-amber-100 bg-amber-50/60 flex items-center gap-2 text-xs text-amber-800">
             <AlertTriangle size={13} className="shrink-0" />
             <span>
-              <strong>{semMaquina.pecas} peça(s) · {fmtKg(semMaquina.kg)}</strong> na fila <strong>sem máquina definida</strong> — atribua um laser na tela{" "}
-              <Link href="/pcp/pecas-corte" className="underline hover:text-amber-900">Peças / Corte</Link> pra entrar na carga, ou marque como <strong>conjunto</strong> (não corta, vai pra montagem).
+              <strong>{semMaquina.pecas} peça(s) · {fmtKg(semMaquina.kg)}</strong> na fila <strong>sem máquina definida</strong> — confira as peças na tela de{" "}
+              <Link href="/pcp/producao" className="underline hover:text-amber-900">Produção</Link> para revisar as pendências.
             </span>
           </div>
         )}

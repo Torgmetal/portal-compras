@@ -1,7 +1,12 @@
 {
-  "build": 2930,
-  "gerado": "2026-09-07T18:18:00.934Z",
+  "build": 2931,
+  "gerado": "2026-09-07T18:21:12.067Z",
   "commits": [
+    {
+      "hash": "02b8bc5e",
+      "data": "07/09/2026",
+      "titulo": "Gantt: a barra da pintura gera o caderno de três folhas da OP"
+    },
     {
       "hash": "eaa4393c",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "754fb799",
       "data": "06/09/2026",
       "titulo": "feat: unifica login e seleção de módulos por acesso"
-    },
-    {
-      "hash": "f4558b36",
-      "data": "06/09/2026",
-      "titulo": "Conserta o versao-build.json quebrado por marcador de conflito"
     }
   ]
 }
