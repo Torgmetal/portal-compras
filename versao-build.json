@@ -1,7 +1,12 @@
 {
-  "build": 2902,
-  "gerado": "2026-09-06T16:26:37.872Z",
+  "build": 2903,
+  "gerado": "2026-09-07T13:11:57.783Z",
   "commits": [
+    {
+      "hash": "112fe9c6",
+      "data": "06/09/2026",
+      "titulo": "fix: abre OPs diretamente após o login"
+    },
     {
       "hash": "754fb799",
       "data": "06/09/2026",
@@ -146,11 +151,6 @@
       "hash": "036d37fc",
       "data": "05/09/2026",
       "titulo": "Gantt do PCP: sai o menu do botão direito"
-    },
-    {
-      "hash": "14fa30bc",
-      "data": "05/09/2026",
-      "titulo": "Gantt do PCP: a barra se divide no fim de semana, em vez de atravessá-lo"
     }
   ]
 }
