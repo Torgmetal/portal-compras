@@ -1,7 +1,12 @@
 {
-  "build": 2931,
-  "gerado": "2026-09-07T18:21:12.067Z",
+  "build": 2932,
+  "gerado": "2026-09-07T18:33:06.425Z",
   "commits": [
+    {
+      "hash": "82951f32",
+      "data": "07/09/2026",
+      "titulo": "Inativa Programação no PCP e redireciona acessos antigos para Produção"
+    },
     {
       "hash": "02b8bc5e",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "112fe9c6",
       "data": "06/09/2026",
       "titulo": "fix: abre OPs diretamente após o login"
-    },
-    {
-      "hash": "754fb799",
-      "data": "06/09/2026",
-      "titulo": "feat: unifica login e seleção de módulos por acesso"
     }
   ]
 }
