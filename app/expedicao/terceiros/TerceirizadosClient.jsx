@@ -1,6 +1,6 @@
 "use client";
 import ModalRetorno from "@/components/terceiros/ReceberTerceiro";
-import { DESTINOS_TERCEIRO } from "@/lib/terceiros-retorno";
+import { DESTINOS_TERCEIRO, retornoEmAtraso } from "@/lib/terceiros-retorno";
 import { useState, useMemo, useEffect, useCallback, Fragment } from "react";
 import { useStore } from "@/lib/store";
 import { fmtOP } from "@/lib/utils";
@@ -47,7 +47,7 @@ export default function TerceirizadosClient({ ops, focoRetorno = false }) {
     const lista = romaneios || [];
     const fora = lista.filter((r) => r.status === "ENVIADO" || r.status === "PARCIAL");
     const pesoPendente = fora.reduce((s, r) => s + Math.max(0, (r.pesoEnviadoKg || 0) - (r.pesoRetornadoKg || 0)), 0);
-    const atrasados = fora.filter((r) => r.dataPrevRetorno && String(r.dataPrevRetorno).slice(0, 10) < hoje).length;
+    const atrasados = fora.filter((r) => retornoEmAtraso(r, hoje)).length;
     const mesAtual = new Date().toISOString().slice(0, 7);
     const retornadosMes = lista.filter((r) => r.status === "RETORNADO" && String(r.updatedAt).slice(0, 7) === mesAtual).length;
     return { fora: fora.length, pesoPendente, atrasados, retornadosMes };
@@ -154,7 +154,7 @@ export default function TerceirizadosClient({ ops, focoRetorno = false }) {
                 {filtrados.map((r) => {
                   const aberto = !!expandido[r.id];
                   const pend = Math.max(0, (r.pesoEnviadoKg || 0) - (r.pesoRetornadoKg || 0));
-                  const atrasado = (r.status === "ENVIADO" || r.status === "PARCIAL") && r.dataPrevRetorno && String(r.dataPrevRetorno).slice(0, 10) < hoje;
+                  const atrasado = (r.status === "ENVIADO" || r.status === "PARCIAL") && retornoEmAtraso(r, hoje);
                   const st = STATUS[r.status] || STATUS.ENVIADO;
                   return (
                     <Fragment key={r.id}>
@@ -179,7 +179,7 @@ export default function TerceirizadosClient({ ops, focoRetorno = false }) {
                         <td className={`px-3 py-2 text-xs whitespace-nowrap ${atrasado ? "text-red-600 font-semibold" : "text-torg-gray"}`}>
                           {fmtD(r.dataPrevRetorno)}{atrasado && " ⚠"}
                         </td>
-                        <td className="px-3 py-2"><span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border whitespace-nowrap ${st.cls}`}>{st.label}</span></td>
+                        <td className="px-3 py-2"><span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border whitespace-nowrap ${atrasado ? "bg-red-50 text-red-700 border-red-200" : st.cls}`}>{st.label}{atrasado && " · Atrasado"}</span></td>
                         <td className="px-3 py-2">
                           <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                             {r.status !== "RETORNADO" && r.status !== "CANCELADO" && (
@@ -307,7 +307,7 @@ function DetalheRomaneio({ r, onDesfazRetorno, showToast }) {
               <li key={ret.id} className="border border-gray-100 rounded bg-white px-2.5 py-1.5 text-[12px] flex items-start justify-between gap-2">
                 <div>
                   <span className="font-medium text-torg-dark">{fmtD(ret.data)}</span>
-                  <span className="text-torg-gray"> · {fmtKg(ret.pesoKg)} · {(ret.itens || []).length} marca(s)</span>
+                  <span className="text-torg-gray"> · {fmtKg(ret.pesoKg)} · {new Set((ret.itens || []).map(i=>i.marca)).size} marca(s)</span>
                   {ret.porNome && <span className="text-torg-gray"> · {ret.porNome}</span>}
                   {ret.itens?.map((item,index)=><span key={index} className="block text-torg-gray">{item.marca} · {item.qte ?? "—"} pç · {item.destino || "Destino não informado"}</span>)}
                   {ret.observacao && <span className="block text-torg-gray italic">{ret.observacao}</span>}

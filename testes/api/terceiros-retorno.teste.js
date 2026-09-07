@@ -17,3 +17,15 @@ describe('baixa de terceiros',()=>{
  it('bloqueia documento duplicado mesmo com chave nova',async()=>{const hash='a'.repeat(64);db.romaneioTerceiro.findUnique.mockResolvedValue({...rom,retornos:[{documentoHash:hash}]});expect((await call({...body,documentoHash:hash})).status).toBe(400)});
  it('conflito de versão não retorna sucesso',async()=>{db.romaneioTerceiro.updateMany.mockResolvedValue({count:0});expect((await call(body)).status).toBe(400);expect(db.auditLog.create).not.toHaveBeenCalled()});
 });
+
+it('salva destinos distintos para a mesma marca e mantém prazo original',async()=>{
+ const itens=[{marca:'M1',qte:3,destino:'SOLDA'},{marca:'M1',qte:2,destino:'PINTURA'}];
+ expect((await call({...body,itens})).status).toBe(200);
+ const data=db.romaneioTerceiro.updateMany.mock.calls[0][0].data;
+ expect(data).toMatchObject({status:'PARCIAL',pesoRetornadoKg:50,retornos:[{itens:[{qte:3,destino:'SOLDA',producaoInicio:0},{qte:2,destino:'PINTURA',producaoInicio:0}]}]});
+ expect(data).not.toHaveProperty('dataPrevRetorno');
+});
+it('recusa excesso agregado entre setores antes de gravar',async()=>{
+ expect((await call({...body,itens:[{marca:'M1',qte:6,destino:'SOLDA'},{marca:'M1',qte:5,destino:'PINTURA'}]})).status).toBe(400);
+ expect(db.romaneioTerceiro.updateMany).not.toHaveBeenCalled();
+});

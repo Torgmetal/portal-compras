@@ -1,7 +1,12 @@
 {
-  "build": 2921,
-  "gerado": "2026-09-07T16:49:59.729Z",
+  "build": 2922,
+  "gerado": "2026-09-07T17:11:27.402Z",
   "commits": [
+    {
+      "hash": "e87e043c",
+      "data": "07/09/2026",
+      "titulo": "Inclui previsão de retorno à Expedição no Gantt"
+    },
     {
       "hash": "13b24f91",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5e320ba3",
       "data": "06/09/2026",
       "titulo": "Gantt: acabamento e jato entram no quadro, com bancada única e bancada dupla"
-    },
-    {
-      "hash": "4409e9f6",
-      "data": "06/09/2026",
-      "titulo": "Metas: 280 t/mês de entrega, 230 na montagem e na solda, e a preparação sobe junto"
     }
   ]
 }

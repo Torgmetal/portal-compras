@@ -21,3 +21,8 @@ A produção posterior ao registro é medida pelo Syneco, com início reservado 
 ## Verificação
 
 Testes em `testes/lib/terceiros-*.teste.js` e `testes/api/terceiros-*.teste.js` usam Prisma simulado. A validação no navegador usa APIs interceptadas; nenhuma remessa de produção foi recebida como teste. A leitura de PDF usa a integração Anthropic existente e precisa da chave configurada; indisponibilidade não provoca baixa nem inventa linhas.
+
+### Divisão de uma marca entre setores no retorno
+No recebimento, informe a quantidade que chegou e marque **Dividir entre setores** quando necessário. Cada destino recebe uma quantidade; a soma precisa ser exatamente a quantidade recebida. O servidor também verifica a soma por marca contra o saldo da remessa e recusa setores repetidos para a mesma marca. Cada distribuição mantém seu destino e lote de programação independente.
+
+O retorno parcial não altera a data prevista original. Enquanto houver saldo após essa data, a lista mostra **Retorno parcial · Atrasado**, e a previsão do saldo permanece no Gantt até completar o retorno.
