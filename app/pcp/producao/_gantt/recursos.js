@@ -1,4 +1,5 @@
 import { META_KG_DIA_ACABAMENTO, META_KG_DIA_JATO } from "@/lib/capacidade-acabamento";
+import { META_KG_DIA_PINTURA } from "@/lib/capacidade-pintura";
 
 // ─── RECURSOS, SETORES E CORES ─────────────────────────────────────────────────────────────────
 //
@@ -32,13 +33,23 @@ export const RECURSOS = {
   JATO: [{ k:null, nome:"sem bancada", obs:"atribuir jato" },
     { k:"JATO_TURBINA", nome:"Jato Turbina", cap: Math.round(META_KG_DIA_JATO / 2) },
     { k:"JATO_MANUAL", nome:"Jato Manual", cap: Math.round(META_KG_DIA_JATO / 2) }],
+  // ⚠⚠ NA PINTURA O POSTO É O GALPÃO. Vitor (06/09/2026): "temos galpões separados, hoje tem o
+  // galpão 1 que fica na Torg onde pintamos quase todas as estruturas, e o Galpão 2 que seria um
+  // galpão apoio que pintamos peças leves, como chapas, travamentos, coisa que daria para virar na
+  // mão, até guarda-corpo". O terceiro barracão está em negociação e NÃO entra até fechar.
+  //
+  // ⚠ A CAPACIDADE ESTÁ DIVIDIDA AO MEIO como no jato, e isso é um chute honesto: ninguém mediu
+  // quanto cada galpão pinta por dia. Quando esse número existir, é aqui que se acerta.
+  PINTURA: [{ k:null, nome:"sem galpão", obs:"atribuir galpão" },
+    { k:"GALPAO_1", nome:"Galpão 1", cap: Math.round(META_KG_DIA_PINTURA / 2) },
+    { k:"GALPAO_2", nome:"Galpão 2", cap: Math.round(META_KG_DIA_PINTURA / 2) }],
 };
-export const SETORES = ["CORTE","MONTAGEM","SOLDA","ACABAMENTO","JATO"];
+export const SETORES = ["CORTE","MONTAGEM","SOLDA","ACABAMENTO","JATO","PINTURA"];
 export const COR_SETOR = { CORTE:"#8e5cd9", MONTAGEM:"#006EAB", SOLDA:"#c2410c",
-                           ACABAMENTO:"#0f766e", JATO:"#3730a3" };
+                           ACABAMENTO:"#0f766e", JATO:"#3730a3", PINTURA:"#9d174d" };
 // ⚠ acabamento e jato já são medidos contra a META (cap em kg/dia da meta), então o fator é 1:
 // não existe "ritmo normal" separado para eles como há na montagem e na solda.
-export const FATOR_META = { MONTAGEM:0.47, SOLDA:0.58, CORTE:1, ACABAMENTO:1, JATO:1 };
+export const FATOR_META = { MONTAGEM:0.47, SOLDA:0.58, CORTE:1, ACABAMENTO:1, JATO:1, PINTURA:1 };
 
 export const capDe = (setor, rec)=> (RECURSOS[setor].find(r=>r.k===rec)||{}).cap || 0;
 export const nomeRec = (setor, rec)=> (RECURSOS[setor].find(r=>r.k===rec)||{}).nome || "sem recurso";
