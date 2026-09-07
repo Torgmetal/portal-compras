@@ -11,6 +11,7 @@ import { conciliarRecebimentoCmr } from "@/lib/recebimento-cmr";
 import { aplicarAvancoSuprimentos } from "@/lib/cronograma-suprimentos";
 import { DO_CMR } from "@/lib/cmr-origens";
 import { registrarExecucao } from "@/lib/cron-monitor";
+import { obrasDivergentesDoPedido, frasesDivergencia } from "@/lib/cmr-obra-divergente";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // planilha de ~17MB: download + parse passam de 60s
@@ -57,7 +58,15 @@ async function sincronizar(userId) {
     const res = await prismaDirect.documentoQualidade.createMany({ data: data.slice(i, i + 200) });
     criados += res.count;
   }
-  return { arquivo: name, modificadoEm, linhasPlanilha: parsed.linhas.length, novas: novas.length, criados };
+  /* ⚠⚠ A OBRA DA PLANILHA CONTRA A OBRA DO PEDIDO. Vitor pegou à mão que a OP-105 tinha tinta da
+     Induscolor que era da OP-064 (pedido 1871) — obra digitada errada no Almoxarifado, aceita
+     calada pelo portal. Conferir na ENTRADA é o único momento em que ainda dá para corrigir a
+     planilha antes de o número circular no PCP, no Data Book e na compra de tinta.
+     ⚠ Avisa e segue: importação não é o lugar de arbitrar qual das duas obras é a certa, e barrar
+     a linha esconderia o material inteiro em vez do erro de digitação. */
+  const divergencias = await obrasDivergentesDoPedido(prisma, novas);
+  return { arquivo: name, modificadoEm, linhasPlanilha: parsed.linhas.length, novas: novas.length, criados,
+           obraDivergente: divergencias.length, divergencias: frasesDivergencia(divergencias) };
 }
 
 // Botão "Atualizar agora"

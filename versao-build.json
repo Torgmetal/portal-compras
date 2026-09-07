@@ -1,7 +1,12 @@
 {
-  "build": 2949,
-  "gerado": "2026-09-07T23:05:10.789Z",
+  "build": 2950,
+  "gerado": "2026-09-07T23:45:40.953Z",
   "commits": [
+    {
+      "hash": "67396b91",
+      "data": "07/09/2026",
+      "titulo": "XML do MS Project: o arquivo abria um cronograma diferente da tela"
+    },
     {
       "hash": "952480c5",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "13b24f91",
       "data": "07/09/2026",
       "titulo": "Integra retornos parciais de terceiros com importação e previsão no Gantt"
-    },
-    {
-      "hash": "3f2f0c2f",
-      "data": "07/09/2026",
-      "titulo": "Baixa do corte que a OP-067 fez à mão, antes do Syneco"
     }
   ]
 }
