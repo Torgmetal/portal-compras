@@ -1,7 +1,12 @@
 {
-  "build": 2906,
-  "gerado": "2026-09-07T14:05:12.131Z",
+  "build": 2907,
+  "gerado": "2026-09-07T14:07:29.471Z",
   "commits": [
+    {
+      "hash": "eb4e1014",
+      "data": "07/09/2026",
+      "titulo": "Exibe toneladas como Ton no painel PCP"
+    },
     {
       "hash": "13555116",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "8e7046b3",
       "data": "05/09/2026",
       "titulo": "Auditoria do qteProduzida: o erro era só do Gantt, mas o campo continua uma armadilha"
-    },
-    {
-      "hash": "2538e59b",
-      "data": "05/09/2026",
-      "titulo": "Gantt do PCP: o \"feito\" passa a vir do Syneco por setor, não do qteProduzida"
     }
   ]
 }

@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X, Eraser, ZoomIn, ZoomOut, Ruler, ArrowLeftRight, Minus, Plus } from "lucide-react";
 import { layoutCotas, setaEm, PADDING } from "@/lib/cota-marcacao";
+import { faixaCorte } from "@/lib/tolerancia-po04";
 
 /**
  * MARCAR AS COTAS NO DESENHO.
@@ -31,7 +32,7 @@ const LETRAS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 // "(A.L.)" noutro. Apagar só o primeiro deixava parênteses soltos boiando no desenho.
 const RX_MARCA = /^([A-Z]?\d*[A-Z]+\d*-P\d+|\(\s*A\.?\s*L\.?\s*\)|TÍP\.?|TIP\.?)/i;
 
-export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocultos = [], onOcultos, linhasOcultas = [], onLinhas }) {
+export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocultos = [], onOcultos, linhasOcultas = [], onLinhas }, comprimentoMm) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [pendente, setPendente] = useState(null); // primeiro ponto já clicado
@@ -49,7 +50,24 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
   const [sobreCota, setSobreCota] = useState(false);
   // ⚠ a tolerância SE LEMBRA entre as cotas: digitar "3" a cada uma é trabalho à toa. Vive aqui, e
   // não dentro do formulário, justamente para sobreviver ao fecha-e-abre de cada cota.
-  const [tol, setTol] = useState("3");
+  //
+  // ⚠⚠ O VALOR INICIAL VEM DO PO-04 §5.2, que escala pelo comprimento da peça. Vitor (07/09/2026):
+  // "fui informado que peças maiores têm uma tolerância maior". Tinham razão, e a tela oferecia
+  // ± 3 mm fixo para qualquer peça — correto só de 400 a 2.000 mm. Sem comprimento na LPC (23% das
+  // peças) cai no ±3 de antes, e o rótulo diz que ali ninguém sugeriu nada.
+  //
+  // ⚠ SUGERE, NÃO DECIDE: o campo continua editável e o procedimento manda o desenho vir primeiro
+  // ("estas tabelas somente deverão ser utilizadas para tolerâncias não especificadas nos desenhos
+  // de fabricação"). Quem medir contra cota do desenho digita o que o desenho diz.
+  const sugestao = useMemo(() => faixaCorte(comprimentoMm), [comprimentoMm]);
+  const [tol, setTol] = useState(() => String(sugestao?.tol ?? 3));
+  // troca de marca no seletor → outra peça, outro comprimento, outra faixa
+  const marcaDaSugestao = useRef(marca);
+  useEffect(() => {
+    if (marcaDaSugestao.current === marca) return;
+    marcaDaSugestao.current = marca;
+    setTol(String(sugestao?.tol ?? 3));
+  }, [marca, sugestao]);
   // ⚠ BORRACHA. Vitor (21/08/2026): "está muito confuso para ver os números, é possível permitir
   // remover algumas cotas, meio que apagando isso do desenho?". O que ele apaga aqui some TAMBÉM do
   // PDF — é coberto de branco sobre a vista embutida, do mesmo jeito que as tabelas já eram.
@@ -725,7 +743,7 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
           letra={LETRAS[cotas.length] || "?"}
           valores={candidatos(rascunho)}
           semDesenho={rascunho.ax == null}
-          tol={tol} onTol={setTol}
+          tol={tol} onTol={setTol} sugestao={sugestao}
           onConfirmar={confirmar}
           onCancelar={() => setRascunho(null)}
         />
@@ -779,7 +797,7 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
  * ⚠ O campo de digitar continua, para o desenho que não declara o número. Não dá para depender só
  * da leitura: nem toda cota está escrita na folha.
  */
-function BarraCota({ letra, valores, semDesenho, tol, onTol, onConfirmar, onCancelar }) {
+function BarraCota({ letra, valores, semDesenho, tol, onTol, sugestao, onConfirmar, onCancelar }) {
   const [outro, setOutro] = useState("");
   return (
     <div className="mt-2 p-2.5 bg-torg-blue-50 border border-torg-blue-200 rounded-lg">
@@ -805,10 +823,20 @@ function BarraCota({ letra, valores, semDesenho, tol, onTol, onConfirmar, onCanc
 
         <span className="flex-1" />
 
+        {/* ⚠ o rótulo diz DE ONDE veio o número. Sugestão sem origem é valor mágico, e valor mágico
+            ninguém confere — ainda mais num relatório que vai assinado ao cliente. */}
         <label className="inline-flex items-center gap-1">
           <span className="text-[10px] text-torg-gray">Tol. ±</span>
           <input type="number" value={tol} onChange={(e) => onTol(e.target.value)}
             className="w-14 border border-gray-200 rounded px-1.5 py-1 text-[12px] font-mono" />
+          <span className="text-[10px] text-torg-gray whitespace-nowrap"
+            title={sugestao
+              ? `${sugestao.origem} — corte e dobramento, faixa ${sugestao.faixa}. O desenho tem precedência: se ele especificar tolerância, use a dele.`
+              : "A peça não tem comprimento na lista, então não dá para dizer a faixa do PO-04 — preencha conforme o desenho."}>
+            {sugestao
+              ? `${sugestao.origem} · ${sugestao.faixa} → ±${sugestao.tol}`
+              : "sem comprimento na lista — preencha pelo desenho"}
+          </span>
         </label>
       </div>
 

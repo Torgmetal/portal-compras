@@ -198,10 +198,14 @@ export default function RelatorioDetalheClient({ id }) {
               onCancelar={() => setAjustandoRecorte(false)}
             />
           )}
+          {/* ⚠ `comprimentoMm` é o comprimento da marca, congelado no relatório quando ele foi
+              criado. Alimenta a sugestão de tolerância do PO-04 §5.2 na barra de cota — sem ele a
+              barra oferecia ± 3 mm para peça de qualquer tamanho. */}
           {desenhos.length > 0 && !ajustandoRecorte && (
           <MarcadorCotas
             relatorioId={id}
             marca={marcaAtual}
+            comprimentoMm={res.comprPeca?.[String(marcaAtual).toUpperCase()] ?? null}
             cotas={cotas}
             onChange={(novas) => setDados((d) => ({
               ...d,

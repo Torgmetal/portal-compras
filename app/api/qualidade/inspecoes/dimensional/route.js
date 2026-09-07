@@ -102,12 +102,16 @@ export async function POST(req) {
   //
   // ⚠ Gravado na CRIAÇÃO, não lido na hora de gerar o PDF: a lista da Engenharia é reimportada a
   // cada revisão, e o relatório deve continuar dizendo o que a peça era quando foi inspecionada.
-  const tiposPeca = {}, qtdPeca = {};
+  // ⚠ `comprPeca` alimenta a SUGESTÃO de tolerância na tela de cotas (PO-04 §5.2, que escala pelo
+  // comprimento). Sem ele a tela oferecia ±3 fixo para peça de qualquer tamanho — ver
+  // lib/tolerancia-po04.js. Fica no mesmo lugar de tiposPeca/qtdPeca: são todos "o que a LPC sabe
+  // desta marca", congelado no relatório para ele não mudar de valor quando a lista for revisada.
+  const tiposPeca = {}, qtdPeca = {}, comprPeca = {};
   if (op?.id) {
     try {
       const pecas = await prisma.pecaConjunto.findMany({
         where: { opId: op.id, marca: { in: marcas } },
-        select: { marca: true, descricao: true, qte: true },
+        select: { marca: true, descricao: true, qte: true, comprimentoMm: true },
       });
       for (const pc of pecas) {
         const k = String(pc.marca).toUpperCase();
@@ -116,6 +120,11 @@ export async function POST(req) {
         // ⚠ SOMA as ocorrências: a mesma marca aparece uma vez por conjunto na lista, e a
         // quantidade do relatório é quantas peças daquela marca a OP tem.
         qtdPeca[k] = (qtdPeca[k] || 0) + (pc.qte || 0);
+        // ⚠ o MAIOR entre as ocorrências, não a soma nem a primeira: a mesma marca pode aparecer em
+        // conjuntos diferentes, e a faixa do PO-04 tem de refletir a peça real. Somar comprimento
+        // daria uma peça imaginária de dez metros; pegar a primeira daria a menor por acaso da
+        // ordem. O maior erra para o lado seguro — tolerância maior nunca reprova peça boa.
+        if (pc.comprimentoMm) comprPeca[k] = Math.max(comprPeca[k] || 0, pc.comprimentoMm);
       }
     } catch { /* sem tipo, o cabeçalho mostra a marca — como antes */ }
   }
@@ -182,7 +191,7 @@ export async function POST(req) {
               escolhido: true,
             })).filter((d) => d.marca && d.caminho)
           : [],
-        resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia, tiposPeca, qtdPeca,
+        resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia, tiposPeca, qtdPeca, comprPeca,
           procedimento: proc?.nome || null, procedimentoId: proc?.id || null,
           // o critério do ensaio visual de solda é fixado pelo PO-06, item 9.4
           criterio: tipo === "VISUAL_SOLDA" ? CRITERIO_PADRAO : null,
