@@ -54,15 +54,54 @@ function ordemDeProjeto(a, b) {
     || ext(a?.nome).localeCompare(ext(b?.nome));
 }
 
+/**
+ * O nome que o cliente vê em cada pacote de documentos.
+ *
+ * ⚠⚠ NÃO É O ÚLTIMO SEGMENTO DO CAMINHO. Vitor (07/09/2026): "na importação não está respeitando os
+ * nomes das pastas, ele puxa o nome do desenho". Estava mesmo — a regra antiga pegava o último
+ * pedaço, e na OP-105 os desenhos ficam cada um na SUA subpasta, nomeada com o número do desenho:
+ *
+ *   …/Fabricação/Conjuntos de Fabricação/Logarinas TC - 4708 (B)/TC 4708 - OC228630/DESENHOS TMSA/70408127
+ *                                        └── o que ele anexou ──┘                              └ virava o título
+ *
+ * Pegar o PRIMEIRO segmento também não serve: seria "Conjuntos de Fabricação" para os 42 arquivos,
+ * um pacote só.
+ *
+ * ⚠ A REGRA É O PRIMEIRO SEGMENTO ABAIXO DO PREFIXO COMUM a todos os documentos daquele tipo — que é
+ * exatamente a pasta que a pessoa escolheu ao anexar. Na OP-105 dá os quatro nomes certos: "Apoio e
+ * Longarina TC - 4701 (C)", "Logarinas TC - 4708 (B)", "Quadro Vasadores TC- 4708 (B)" e "Treliças
+ * TC 4706 - 4707 (A)". E não precisa de campo novo nem de reimportar o que já está publicado.
+ *
+ * ⚠ Arquivo que fica NO prefixo comum (sem segmento abaixo) herda o nome do próprio prefixo — é o
+ * caso de quem anexou uma pasta só, sem subpastas.
+ */
+function nomeDoPacote(docs) {
+  const partes = docs
+    .map((d) => String(d.pasta || "").replace(/\/+$/, "").split("/").filter(Boolean))
+    .filter((a) => a.length);
+  if (!partes.length) return () => "";
+  let prefixo = 0;
+  // enquanto TODOS tiverem o mesmo segmento nesta posição, ele ainda é prefixo comum
+  while (partes.every((a) => a.length > prefixo + 1 && a[prefixo] === partes[0][prefixo])) prefixo++;
+  return (d) => {
+    const a = String(d.pasta || "").replace(/\/+$/, "").split("/").filter(Boolean);
+    if (!a.length) return "";
+    return a[prefixo] || a[a.length - 1] || "";
+  };
+}
+
 function subpastasDe(docs, item) {
+  const nomeDe = nomeDoPacote(docs);
   const porPasta = new Map();
   for (const d of docs) {
-    const cheio = String(d.pasta || "").replace(/\/+$/, "");
-    const nome = cheio ? cheio.split("/").filter(Boolean).pop() : "";
-    const chave = nome || "";
+    const chave = nomeDe(d) || "";
     (porPasta.get(chave) || porPasta.set(chave, []).get(chave)).push(d);
   }
-  if (porPasta.size < 2) return null;
+  // ⚠ UMA PASTA COM NOME JÁ VIRA PACOTE. Vitor (03/09/2026) descreveu assim: "teria uma pasta dentro
+  // da aba da engenharia com o nome dela e dentro dela os projetos". A regra antiga exigia DUAS e,
+  // com uma só, o cliente recebia os desenhos soltos e sem o nome da pasta. Só some quando não há
+  // pasta nenhuma — aí são arquivos avulsos mesmo.
+  if (!porPasta.size || (porPasta.size === 1 && !porPasta.keys().next().value)) return null;
   return [...porPasta.entries()]
     .sort((a, b) => (a[0] ? 0 : 1) - (b[0] ? 0 : 1) || String(a[0]).localeCompare(String(b[0]), "pt-BR", { numeric: true }))
     .map(([nome, ds]) => ({
