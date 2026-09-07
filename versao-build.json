@@ -1,7 +1,12 @@
 {
-  "build": 2932,
-  "gerado": "2026-09-07T18:33:06.425Z",
+  "build": 2933,
+  "gerado": "2026-09-07T18:35:28.017Z",
   "commits": [
+    {
+      "hash": "993b060f",
+      "data": "07/09/2026",
+      "titulo": "Excel: o cabeçalho Torg passa a valer para qualquer folha, não só a primeira"
+    },
     {
       "hash": "82951f32",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "9b6262be",
       "data": "07/09/2026",
       "titulo": "Refina identidade visual dos e-mails e campanha no cabeçalho"
-    },
-    {
-      "hash": "112fe9c6",
-      "data": "06/09/2026",
-      "titulo": "fix: abre OPs diretamente após o login"
     }
   ]
 }

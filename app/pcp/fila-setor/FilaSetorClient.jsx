@@ -84,6 +84,11 @@ export default function FilaSetorClient({ setor }) {
 
   // ⚠ NA PINTURA NÃO SE DIZ "BANCADA". Vitor (06/09/2026) chama os postos de GALPÃO ("o galpão 1
   // que fica na Torg (…) e o Galpão 2 que seria um galpão apoio"). A tela usa a palavra da fábrica.
+  /* ⚠⚠ JATO E PINTURA SE MEDEM EM SUPERFÍCIE. Vitor (07/09/2026): "no jato será necessário ter a
+     m² das peças". Na fila de hoje a relação vai de 5 a 46 m² por tonelada conforme a peça — uma
+     tonelada de chapa fina jateia quase dez vezes mais que uma de perfil pesado.
+     O ACABAMENTO fica de fora: rebarba e esmerilho seguem o peso, não a área. */
+  const PORM2 = setor === "JATO" || setor === "PINTURA";
   const POSTO = setor === "PINTURA" ? "galpão" : "bancada";
   const Posto = POSTO[0].toUpperCase() + POSTO.slice(1);
 
@@ -162,6 +167,17 @@ export default function FilaSetorClient({ setor }) {
           <p className="text-2xl font-extrabold text-torg-dark tabular-nums leading-none">{nkg(dados.total.kg)}</p>
           <p className="text-[11px] text-torg-gray">na fila</p>
         </div>
+        {PORM2 && (
+          <div>
+            <p className="text-2xl font-extrabold text-torg-dark tabular-nums leading-none">
+              {dados.total.m2?.toLocaleString("pt-BR", { maximumFractionDigits: 0 }) ?? "—"}
+            </p>
+            <p className="text-[11px] text-torg-gray">
+              m² de superfície
+              {dados.total.semArea ? <span className="text-torg-orange"> · {dados.total.semArea} sem área</span> : null}
+            </p>
+          </div>
+        )}
         <div>
           <p className="text-2xl font-extrabold text-torg-orange tabular-nums leading-none">{n1(dados.total.dias)}</p>
           <p className="text-[11px] text-torg-gray">dias na meta ({nkg(dados.capacidadeKgDia)}/dia)</p>
@@ -199,6 +215,7 @@ export default function FilaSetorClient({ setor }) {
                 <th className="text-right px-4 py-2 font-bold">Peças</th>
                 <th className="text-right px-4 py-2 font-bold">kg</th>
                 <th className="text-right px-4 py-2 font-bold">Dias</th>
+                {PORM2 && <th className="text-right px-4 py-2 font-bold">m²</th>}
                 <th className="text-right px-4 py-2 font-bold">Sem {POSTO}</th>
               </tr>
             </thead>
@@ -212,6 +229,12 @@ export default function FilaSetorClient({ setor }) {
                   <td className="px-4 py-2 text-right tabular-nums">{o.pecas}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{nkg(o.kg)}</td>
                   <td className="px-4 py-2 text-right tabular-nums font-semibold">{n1(o.dias)}</td>
+                  {PORM2 && (
+                    <td className="px-4 py-2 text-right tabular-nums">
+                      {o.m2 ? o.m2.toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : "—"}
+                      {o.semArea ? <span className="text-torg-orange text-[10px]"> ({o.semArea} s/área)</span> : null}
+                    </td>
+                  )}
                   <td className="px-4 py-2 text-right tabular-nums">
                     {o.semBancada
                       ? <span className="text-torg-orange font-semibold">{o.semBancada}</span>
@@ -314,6 +337,7 @@ export default function FilaSetorClient({ setor }) {
                   <th className="text-left px-4 py-2 font-bold">Descrição</th>
                   <th className="text-right px-4 py-2 font-bold">Qte</th>
                   <th className="text-right px-4 py-2 font-bold">kg</th>
+                  {PORM2 && <th className="text-right px-4 py-2 font-bold">m²</th>}
                   <th className="text-left px-4 py-2 font-bold">{Posto}</th>
                 </tr>
               </thead>
@@ -324,6 +348,15 @@ export default function FilaSetorClient({ setor }) {
                     <td className="px-4 py-1.5 text-torg-gray truncate max-w-[320px]">{f.descricao || f.perfil || "—"}</td>
                     <td className="px-4 py-1.5 text-right tabular-nums">{f.qte}</td>
                     <td className="px-4 py-1.5 text-right tabular-nums">{f.kg.toLocaleString("pt-BR")}</td>
+                    {PORM2 && (
+                      /* ⚠ "sem área" não é zero: a peça existe e vai ser jateada, só não veio com
+                         área na LPC. Mostrar 0 faria o total parecer completo. */
+                      <td className="px-4 py-1.5 text-right tabular-nums">
+                        {f.m2 == null
+                          ? <span className="text-torg-orange text-[11px]">sem área</span>
+                          : f.m2.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                      </td>
+                    )}
                     <td className="px-4 py-1.5">
                       {f.bancada
                         ? <span className="text-[11px] font-semibold text-emerald-700">
