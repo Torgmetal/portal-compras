@@ -1,7 +1,12 @@
 {
-  "build": 2923,
-  "gerado": "2026-09-07T17:22:42.930Z",
+  "build": 2924,
+  "gerado": "2026-09-07T17:38:47.936Z",
   "commits": [
+    {
+      "hash": "228bb38b",
+      "data": "07/09/2026",
+      "titulo": "PLP: o sólidos por volume passa a viajar com a demão, e a tinta vira litro"
+    },
     {
       "hash": "a9e836f1",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "8928f17b",
       "data": "06/09/2026",
       "titulo": "refactor: alinha menu de módulos à identidade Torg"
-    },
-    {
-      "hash": "eb69a9dd",
-      "data": "06/09/2026",
-      "titulo": "PCP: a fila do acabamento e a do jato, alimentadas pela cascata dos setores"
     }
   ]
 }

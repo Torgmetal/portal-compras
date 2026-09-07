@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useStore } from "@/lib/store";
 import { Loader2, Plus, ClipboardPaste, Save, Trash2, Search, Check, X, PackagePlus, Filter, ArrowUp, ArrowDown, FileDown, RefreshCw, AlertCircle } from "lucide-react";
+import { ehMaterialDeTinta, avisosDeTinta } from "@/lib/material-tinta";
 
 const anoAtual = new Date().getFullYear();
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -16,7 +17,7 @@ function parseObs(observacao) {
 const inp = "w-full text-sm border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-torg-blue outline-none";
 const lbl = "block text-[11px] font-medium text-torg-gray uppercase tracking-wide mb-1";
 
-const VAZIO = { rc: "R", descricao: "", especificacao: "", certificado: "", loteCorrida: "", pedidoCompra: "", dataRecebimento: "", nf: "", fornecedor: "", obra: "", qtd: "", pesoLitro: "", observacao: "" };
+const VAZIO = { rc: "R", descricao: "", especificacao: "", certificado: "", loteCorrida: "", pedidoCompra: "", dataRecebimento: "", nf: "", fornecedor: "", obra: "", qtd: "", pesoLitro: "", validade: "", observacao: "" };
 // Ordem das colunas ao COLAR do Excel (igual à planilha CMR; o índice R é automático).
 const COLS_MASSA = ["rc", "_indice", "descricao", "certificado", "loteCorrida", "especificacao", "pedidoCompra", "dataRecebimento", "nf", "fornecedor", "obra", "qtd", "pesoLitro", "observacao"];
 
@@ -125,8 +126,19 @@ export default function CmrLancarClient() {
     setForm((s) => ({ ...s, descricao: it.descricao, qtd: it.qtd ? String(it.qtd) : s.qtd }));
   }
 
+  // ⚠ lê a descrição ao vivo: o campo tem de aparecer enquanto a pessoa digita, não depois de salvar
+  const ehTintaAqui = ehMaterialDeTinta(form.descricao);
+
   async function salvarForm() {
     if (!form.descricao.trim()) { showToast("Informe a descrição do material", "erro"); return; }
+    /* ⚠ AVISA, NÃO BLOQUEIA. O recebimento é lançado com a nota na mão e às vezes a validade não
+       está legível na embalagem; travar faria o Almoxarifado inventar uma data, que é pior do que
+       não ter. Fica um "—" honesto e o FEFO sabe que aquele lote não tem validade conhecida. */
+    const faltando = avisosDeTinta(form);
+    if (faltando.length && !confirm(
+      `Este material é tinta e ficou sem ${faltando.join(" e ")}.\n\n` +
+      "Sem validade o lote não entra na ordem de consumo por vencimento (FEFO).\n\nLançar assim mesmo?"
+    )) return;
     setSalvando(true);
     try {
       const r = await fetch("/api/compras/cmr", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ano, lancamentos: [form] }) });
@@ -294,6 +306,17 @@ export default function CmrLancarClient() {
             <div><span className={lbl}>Obra (OP)</span><input value={form.obra} onChange={(e) => setF("obra", e.target.value)} placeholder="ex.: OP 067" className={inp} /></div>
             <div><span className={lbl}>Qtd peças</span><input value={form.qtd} onChange={(e) => setF("qtd", e.target.value)} inputMode="numeric" className={inp} /></div>
             <div><span className={lbl}>Peso / litro</span><input value={form.pesoLitro} onChange={(e) => setF("pesoLitro", e.target.value)} inputMode="decimal" className={inp} /></div>
+            {/* ⚠⚠ O CAMPO APARECE SOZINHO QUANDO É TINTA. Vitor (07/09/2026): "quando identificar
+                que é recebimento de tinta isso deve ser solicitado para o preenchimento na tela de
+                recebimento". Sem validade não existe FEFO, e um campo permanente na tela seria mais
+                um que ninguém preenche — ele só aparece quando importa, e aí pede atenção. */}
+            {ehTintaAqui && (
+              <div>
+                <span className={lbl}>Validade do lote <span className="text-torg-orange">· tinta</span></span>
+                <input type="date" value={form.validade} onChange={(e) => setF("validade", e.target.value)}
+                  className={`${inp} ${form.validade ? "" : "border-torg-orange bg-orange-50"}`} />
+              </div>
+            )}
             <div className="col-span-2 sm:col-span-4"><span className={lbl}>Observação</span><input value={form.observacao} onChange={(e) => setF("observacao", e.target.value)} className={inp} /></div>
           </div>
           <div className="flex justify-end gap-2">

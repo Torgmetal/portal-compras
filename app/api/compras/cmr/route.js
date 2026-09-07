@@ -62,6 +62,8 @@ const lancSchema = z.object({
   loteCorrida: z.string().max(120).nullable().optional(),
   pedidoCompra: z.string().max(60).nullable().optional(),
   dataRecebimento: z.union([z.string(), z.number()]).nullable().optional(),
+  // validade do lote — pedida quando o material é tinta (ver lib/material-tinta.js)
+  validade: z.union([z.string(), z.number()]).nullable().optional(),
   nf: z.string().max(60).nullable().optional(),
   fornecedor: z.string().max(120).nullable().optional(),
   obra: z.string().max(60).nullable().optional(),
@@ -98,7 +100,8 @@ export async function POST(req) {
       linhasSP.push({
         rc: l.rc, indiceR, descricao: l.descricao, certificado: l.certificado, loteCorrida: l.loteCorrida,
         especificacao: l.especificacao, pedidoCompra: l.pedidoCompra, dataRecebimento: l.dataRecebimento,
-        nf: l.nf, fornecedor: l.fornecedor, obra: l.obra, qtd: l.qtd, pesoLitro: l.pesoLitro, observacao: l.observacao,
+        nf: l.nf, fornecedor: l.fornecedor, obra: l.obra, qtd: l.qtd, pesoLitro: l.pesoLitro,
+        validade: l.validade, observacao: l.observacao,
       });
     } catch (e) { return NextResponse.json({ error: `Falha ao gravar (${indiceR}): ${e.message}`, criados: criados.length }, { status: 500 }); }
   }
