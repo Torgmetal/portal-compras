@@ -1,7 +1,12 @@
 {
-  "build": 2947,
-  "gerado": "2026-09-07T22:46:59.904Z",
+  "build": 2948,
+  "gerado": "2026-09-07T22:54:32.477Z",
   "commits": [
+    {
+      "hash": "b10927e9",
+      "data": "07/09/2026",
+      "titulo": "Cronograma: as fases correm em ordem, uma depois da outra"
+    },
     {
       "hash": "2773d0cc",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "6930a704",
       "data": "07/09/2026",
       "titulo": "Montagem: setor posterior prova a montagem · GRD só até a montagem"
-    },
-    {
-      "hash": "809105c2",
-      "data": "07/09/2026",
-      "titulo": "Montagem: a fila entra na faixa sem bancada, e a obra encerrada sai da tela"
     }
   ]
 }
