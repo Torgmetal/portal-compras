@@ -21,7 +21,11 @@ export default function PCPPainelClient({ isAdmin }) {
   const [detalhe, setDetalhe] = useState(false);
   const carregar = useCallback(async (signal) => {
     setLoading(true);
-    const entries = [['producao', '/api/pcp/producao', 'Programação'], ['corte', '/api/pcp/painel-corte', 'Corte']];
+    // ⚠ A EXPEDIÇÃO VEM DO ENDPOINT DA PRÓPRIA EXPEDIÇÃO, de propósito. Vitor (07/09/2026) pediu
+    // "quanto foi expedido no mês"; a conta já existia em /api/expedicao/indicadores (romaneio com
+    // `emitidoEm` no mês). Refazer a conta aqui criaria a mesma grandeza com dois números em duas
+    // telas — que é exatamente o problema que este portal já teve várias vezes.
+    const entries = [['producao', '/api/pcp/producao', 'Programação'], ['corte', '/api/pcp/painel-corte', 'Corte'], ['exped', '/api/expedicao/indicadores', 'Expedição']];
     const resultados = await Promise.allSettled(entries.map(async ([, url]) => {
       const res = await fetch(url, { cache: 'no-store', signal });
       if (!res.ok) throw new Error('Falha ao consultar');
@@ -46,6 +50,14 @@ export default function PCPPainelClient({ isAdmin }) {
       <article><small>Obras com prazo vencido</small><strong className={r.atrasadas > 0 ? s.red : ''}>{n(r.atrasadas)}</strong><p>Entre as obras liberadas ao PCP</p></article>
       <article><small>Maior carga no corte</small><strong>{r.maiorCarga ? n(r.maiorCarga.diasCarga) : '—'} <em>{r.maiorCarga ? 'dias' : ''}</em></strong><p>{r.maiorCarga ? MAQUINA_LABEL[r.maiorCarga.maquina] || r.maiorCarga.maquina : 'Sem capacidade disponível para estimar'}</p></article>
       <article><small>Material indisponível no corte</small><strong>{t(r.indisponivelKg)}</strong><p>Peso das peças pendentes de material</p></article>
+      {/* ⚠ "expedido" aqui é ROMANEIO EMITIDO no mês, não nota fiscal — é a régua que a Expedição
+          já usa. O rodapé diz isso na cara para ninguém comparar com faturamento. */}
+      <article><small>Expedido no mês</small><strong>{t(fontes.exped?.indicadores?.mes?.pesoKg)}</strong>
+        <p>{fontes.exped?.indicadores?.mes ? `${n(fontes.exped.indicadores.mes.qtd)} romaneio(s) emitido(s)` : 'Indicador indisponível'}</p></article>
+      <article><small>Aguardando embarque</small><strong>{t(fontes.exped?.indicadores?.pendentes?.pesoKg)}</strong>
+        <p>{fontes.exped?.indicadores?.atrasados?.qtd > 0
+          ? `${n(fontes.exped.indicadores.atrasados.qtd)} com data prevista vencida`
+          : 'Romaneios montados e ainda não emitidos'}</p></article>
     </div>
     <Section number="01" title="Fluxo da fábrica" id="fluxo-pcp" aside={<small>Saldo das obras liberadas</small>}>
       <div className={s.flows}>{r.etapas.map((e, i) => <Link href={e.href} key={e.key} className={e.kg > 0 && e.kg === maxKg ? s.hot : ''}><div className={s.flowTop}><b>{e.label}</b><span>0{i+1}</span></div><small>A concluir na etapa</small><strong>{t(e.kg)}</strong><div className={s.track}><i style={{width: `${(e.kg || 0) / maxKg * 100}%`}}/></div><p>Consultar fila <ArrowUpRight size={13}/></p></Link>)}</div>

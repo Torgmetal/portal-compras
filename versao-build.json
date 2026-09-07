@@ -1,7 +1,12 @@
 {
-  "build": 2909,
-  "gerado": "2026-09-07T14:21:35.299Z",
+  "build": 2910,
+  "gerado": "2026-09-07T14:26:32.167Z",
   "commits": [
+    {
+      "hash": "ba095fcc",
+      "data": "07/09/2026",
+      "titulo": "Prioridades: sai o fallback para a LE, e sai a obra encerrada"
+    },
     {
       "hash": "c8b7f25e",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "002a1bed",
       "data": "05/09/2026",
       "titulo": "Quebra o GanttProgramacao (1.265 linhas) em módulos por responsabilidade"
-    },
-    {
-      "hash": "b7329f80",
-      "data": "05/09/2026",
-      "titulo": "Regularização de GRD: o corte entra junto, e ele é o da preparação"
     }
   ]
 }

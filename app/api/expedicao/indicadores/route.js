@@ -6,7 +6,10 @@ import { requireRole } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const ROLES = ["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL"];
+// ⚠ PCP e PLANEJAMENTO entram aqui em 07/09/2026 porque o painel do PCP passou a mostrar o
+// "expedido no mês" desta mesma fonte. Sem eles o card dava 403 justamente para quem abre /pcp
+// (que aceita ADMIN, PCP, PLANEJAMENTO e PRODUCAO). É leitura de indicador, não mutação.
+const ROLES = ["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "PCP", "PLANEJAMENTO"];
 
 // Início da semana (segunda) e do mês, ancorados no fuso de São Paulo.
 function limites() {
