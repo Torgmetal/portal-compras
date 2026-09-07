@@ -92,6 +92,7 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
         demaos: ((p.demaos || []).length ? p.demaos : VAZIAS).map((x, i) => ({
           ordem: x.ordem || i + 1, nome: so(x.nome) || `${i + 1}ª demão`, produto: so(x.produto),
           fabricante: so(x.fabricante), cor: so(x.cor), espessuraMin: so(x.espessuraMin), espessuraMax: so(x.espessuraMax),
+          solidosVol: so(x.solidosVol),
         })),
         itens: (p.itens || []).map((x) => ({
           item: so(x.item), sistema: so(x.sistema), cor: so(x.cor), obs: so(x.obs),
@@ -205,6 +206,16 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           potLife: t.potLife || dm.potLife || "",
           secagem: [t.secagemToque && `${t.secagemToque} ao toque`, t.secagemManuseio && `${t.secagemManuseio} ao manuseio`]
             .filter(Boolean).join(" · ") || dm.secagem,
+          // ⚠⚠ O SÓLIDOS POR VOLUME VIAJA COM A DEMÃO, e não só com a tinta. Vitor (07/09/2026):
+          // "assim como a secagem temos os sólidos por volume também, não teria como já deixar isso
+          // alinhado?". Ele já estava aqui — `umidaDe()` usa `t.solidosVol` para calcular a camada
+          // úmida — mas morria no cálculo: nunca era gravado no plano. Sem ele no PLP não há como
+          // dizer quantos litros a obra consome, que é a pergunta que a fábrica faz.
+          //
+          // ⚠ FICA NO PLANO, NÃO NO CATÁLOGO, pelo mesmo motivo da secagem: o plano é o documento
+          // da obra e tem de continuar respondendo sozinho anos depois, mesmo que o boletim do
+          // fabricante mude ou a tinta saia de linha.
+          solidosVol: t.solidosVol != null ? String(t.solidosVol) : (dm.solidosVol || ""),
           // ⚠ o boletim dá uma FAIXA recomendada; o plano especifica UM valor. Sugere a mínima —
           // é a que o medidor tem de encontrar — e só quando o campo está vazio.
           espessuraMin: dm.espessuraMin || (t.secaMin != null ? String(t.secaMin) : ""),
@@ -508,7 +519,7 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           ))}
         </div>
         {f.demaos.length < 6 && (
-          <button onClick={() => setF((x) => ({ ...x, demaos: [...x.demaos, { ordem: x.demaos.length + 1, nome: "", produto: "", fabricante: "", cor: "", espessuraMin: "", espessuraMax: "", lote: "", diluicao: "", camadaUmida: "", secagem: "", produtoId: "", diluicaoPct: "", componentes: "", potLife: "", umidas: [] }] }))}
+          <button onClick={() => setF((x) => ({ ...x, demaos: [...x.demaos, { ordem: x.demaos.length + 1, nome: "", produto: "", fabricante: "", cor: "", espessuraMin: "", espessuraMax: "", lote: "", diluicao: "", camadaUmida: "", secagem: "", solidosVol: "", produtoId: "", diluicaoPct: "", componentes: "", potLife: "", umidas: [] }] }))}
             className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={11} /> demão</button>
         )}
       </Secao>
@@ -551,6 +562,10 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
                   <Texto valor={dm.camadaUmida} onChange={(v) => setDemao(i, "camadaUmida", v)} ph="úmida µm" />
                 )}
                 <Texto valor={dm.secagem} onChange={(v) => setDemao(i, "secagem", v)} ph="tempo de secagem" />
+                {/* ⚠ editável de propósito: nem toda tinta do PLP está no catálogo de boletins (das
+                    que as obras usam hoje, só a Hardtop Flexi está). Quem preenche lê o SV da ficha
+                    técnica e digita — é o mesmo gesto da secagem. */}
+                <Texto valor={dm.solidosVol} onChange={(v) => setDemao(i, "solidosVol", v)} ph="sólidos vol. %" />
                 {/* ⚠ componentes e pot life ocupam a linha inteira: é o que a fábrica lê para
                     misturar, e cortar num campo de 6 rem não ajuda ninguém. */}
                 <div className="sm:col-span-5 grid sm:grid-cols-[9rem_1fr_10rem] gap-1.5 items-center">
@@ -565,8 +580,8 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
           {/* o que o boletim respondeu, para quem preenche saber de onde veio o número */}
           {f.demaos.some((dm) => dm.produtoId) && (
             <p className="text-[10px] text-torg-gray-light">
-              Diluente, camada úmida e secagem vêm do boletim técnico do fabricante — dá para
-              corrigir aqui se a obra usar outra condição.
+              Diluente, camada úmida, secagem e sólidos por volume vêm do boletim técnico do
+              fabricante — dá para corrigir aqui se a obra usar outra condição.
             </p>
           )}
         </div>

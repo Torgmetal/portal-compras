@@ -1,7 +1,12 @@
 {
-  "build": 2922,
-  "gerado": "2026-09-07T17:11:27.402Z",
+  "build": 2923,
+  "gerado": "2026-09-07T17:22:42.930Z",
   "commits": [
+    {
+      "hash": "a9e836f1",
+      "data": "07/09/2026",
+      "titulo": "Permite distribuir retorno de terceiros entre setores e destaca saldo atrasado"
+    },
     {
       "hash": "e87e043c",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "eb69a9dd",
       "data": "06/09/2026",
       "titulo": "PCP: a fila do acabamento e a do jato, alimentadas pela cascata dos setores"
-    },
-    {
-      "hash": "5e320ba3",
-      "data": "06/09/2026",
-      "titulo": "Gantt: acabamento e jato entram no quadro, com bancada única e bancada dupla"
     }
   ]
 }
