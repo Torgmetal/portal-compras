@@ -9,6 +9,7 @@ import { META_KG_DIA_PINTURA } from "@/lib/capacidade-pintura";
 // que o portal promete — não é ajuste de tela.
 
 export const RECURSOS = {
+  EXPEDICAO: [{k:null,nome:"sem bancada",obs:"retorno previsto à Expedição"}],
   CORTE: [
     { k:null, nome:"sem máquina", obs:"atribuir laser" },
     { k:"LASER_PERFIL", nome:"Laser Perfil", cap:2843 },
@@ -44,8 +45,8 @@ export const RECURSOS = {
     { k:"GALPAO_1", nome:"Galpão 1", cap: Math.round(META_KG_DIA_PINTURA / 2) },
     { k:"GALPAO_2", nome:"Galpão 2", cap: Math.round(META_KG_DIA_PINTURA / 2) }],
 };
-export const SETORES = ["CORTE","MONTAGEM","SOLDA","ACABAMENTO","JATO","PINTURA"];
-export const COR_SETOR = { CORTE:"#8e5cd9", MONTAGEM:"#006EAB", SOLDA:"#c2410c",
+export const SETORES = ["CORTE","MONTAGEM","SOLDA","ACABAMENTO","JATO","PINTURA","EXPEDICAO"];
+export const COR_SETOR = { EXPEDICAO:"#166b59", CORTE:"#8e5cd9", MONTAGEM:"#006EAB", SOLDA:"#c2410c",
                            ACABAMENTO:"#0f766e", JATO:"#3730a3", PINTURA:"#9d174d" };
 // ⚠ acabamento e jato já são medidos contra a META (cap em kg/dia da meta), então o fator é 1:
 // não existe "ritmo normal" separado para eles como há na montagem e na solda.

@@ -23,6 +23,7 @@ export const MARKUP = `<div class="wrap">
     <button class="btn on" data-setor="ACABAMENTO">Acabamento</button>
     <button class="btn on" data-setor="JATO">Jato</button>
     <button class="btn on" data-setor="PINTURA">Pintura</button>
+    <button class="btn on" data-setor="EXPEDICAO">Retorno à Expedição</button>
     <div class="sep"></div>
     <button class="btn on" id="gp-regua">Ritmo normal</button>
     <div class="sep"></div>

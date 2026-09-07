@@ -10,7 +10,7 @@ A aba PCP > Terceiros abre os romaneios com saldo. O recebimento é compartilhad
 
 ## Gantt
 
-A previsão é tracejada, na data prevista e sem bancada do setor industrial escolhido. Não consome capacidade nem pode ser arrastada. Clicar abre Terceiros. O saldo diminui nos recebimentos. Expedição não é setor industrial do Gantt: seu retorno permanece no romaneio/histórico, sem marcar material como expedido ao cliente.
+A previsão é tracejada, na data prevista e sem bancada do setor industrial escolhido. Não consome capacidade nem pode ser arrastada. Clicar abre Terceiros. O saldo diminui nos recebimentos. Retornos previstos à Expedição têm uma faixa própria, sem capacidade industrial; ao receber, saem da previsão e permanecem no histórico, sem marcar material como expedido ao cliente.
 
 Lotes recebidos nos setores industriais aparecem com quantidade e destino próprios, e podem ser arrastados para recurso e dia. A programação fica no item do retorno, preservando as quantidades parciais e o histórico. Não se altera a quantidade total da LPC para acomodar um recebimento parcial.
 
