@@ -188,6 +188,21 @@ export default defineConfig([
     },
   },
   {
+    // ⚠ ESTE ARQUIVO NÃO RODA NO NODE. `scripts/ifc-qualidade/medir.js` é injetado DENTRO da
+    // página pelo navegador headless — ele mexe em `WebGL2RenderingContext.prototype` para contar
+    // chamadas de desenho. Lintado como Node, os globais do navegador viram `no-undef` e o gate
+    // passa a acusar erro em código correto, que é a maneira mais rápida de um time aprender a
+    // ignorar o gate.
+    files: ["scripts/ifc-qualidade/**/*.js"],
+    languageOptions: {
+      globals: {
+        WebGL2RenderingContext: "readonly", WebGLRenderingContext: "readonly",
+        devicePixelRatio: "readonly", window: "readonly", document: "readonly",
+        performance: "readonly", requestAnimationFrame: "readonly",
+      },
+    },
+  },
+  {
     files: ["eslint-rules/**/*.cjs"],
     languageOptions: {
       sourceType: "commonjs",
