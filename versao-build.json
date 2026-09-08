@@ -1,7 +1,12 @@
 {
-  "build": 2981,
-  "gerado": "2026-09-08T14:34:58.539Z",
+  "build": 2982,
+  "gerado": "2026-09-08T14:38:19.871Z",
   "commits": [
+    {
+      "hash": "9f55a687",
+      "data": "08/09/2026",
+      "titulo": "Terceiros: importar lista de material enviado com conferência por OP"
+    },
     {
       "hash": "3bb3d249",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "16780d69",
       "data": "07/09/2026",
       "titulo": "feat(planejamento): escolher tipo de email e conferir cronograma antes do envio"
-    },
-    {
-      "hash": "5c53ca25",
-      "data": "07/09/2026",
-      "titulo": "CMR: divergir de pedido não é errar — a trava pergunta, não acusa"
     }
   ]
 }
