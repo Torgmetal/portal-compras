@@ -199,16 +199,29 @@ export const CSS = `
   .gpcp .pcorpo{flex:1 1 auto;overflow:auto;padding:0}
   .gpcp .ptool{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--linha);
          background:#fbfcfe;flex-wrap:wrap;font-size:11.5px;color:var(--tinta-2)}
-  .gpcp .pfiltros{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 14px;background:#f6f9fc;border-bottom:1px solid var(--linha)}
-  .gpcp .pfiltros label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:var(--tinta-2);min-width:0}
-  .gpcp .pfiltros label:first-child{grid-column:1/-1}
-  .gpcp .pfiltros input,.gpcp .pfiltros select{width:100%;min-width:0;padding:7px 8px;border:1px solid var(--linha);border-radius:6px;background:white;color:var(--navy);font:inherit}
-  .gpcp .pfiltros button{justify-self:start}
+  .gpcp .filtro-resumo{justify-content:space-between;background:#f6f9fc}
+  .gpcp dialog.filtro-excel{position:fixed;margin:0;padding:14px;width:310px;max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);border:1px solid #ccd9e4;border-radius:10px;box-shadow:0 12px 40px #0e233340;color:var(--navy);font-size:12px;background:white;overflow:auto}
+  .gpcp dialog.filtro-excel::backdrop{background:#09243c12}
+  .gpcp .filtro-excel header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .gpcp .filtro-excel header button{border:0;background:none;font-size:22px;color:#5b6a7d;cursor:pointer}
+  .gpcp .filtro-excel input[type=search]{width:100%;padding:8px 10px;border:1px solid #ccd9e4;border-radius:5px;margin-bottom:10px;font:inherit}
+  .gpcp .filtro-excel label{display:flex;gap:8px;align-items:center;padding:7px 4px;cursor:pointer;text-align:left}
+  .gpcp .filtro-excel input[type=checkbox]{accent-color:#006eab;flex-shrink:0}
+  .gpcp .filtro-excel .todos{border-bottom:1px solid #e5edf3;font-weight:600}
+  .gpcp .filtro-excel .valores{max-height:min(240px,35dvh);overflow:auto;min-height:45px}
+  .gpcp .filtro-excel .valores span{overflow-wrap:anywhere}
+  .gpcp .filtro-excel .valores label:hover{background:#eef6fb}
+  .gpcp .filtro-excel .contagem{padding:9px 0;color:#5b6a7d;font-size:11px}
+  .gpcp .filtro-excel footer{display:flex;justify-content:flex-end;gap:6px;padding-top:10px;border-top:1px solid #e5edf3}
+  .gpcp .filtro-coluna.ativo{color:#006eab;background:#e4f2fa;border-radius:4px}
   .gpcp .ptool label{display:flex;align-items:center;gap:5px;cursor:pointer}
   .gpcp table.marcas{width:100%;border-collapse:collapse;font-size:11.5px}
   .gpcp table.marcas th{position:sticky;top:0;background:#fbfcfe;text-align:left;padding:6px 8px;
                   font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--tinta-2);
                   border-bottom:1px solid var(--linha);z-index:1}
+  .gpcp .filtro-coluna{display:inline-flex;align-items:center;gap:5px;border:0;background:none;padding:2px 0;color:inherit;font:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer}
+  .gpcp .filtro-coluna span{color:#006eab;font-size:13px}
+  .gpcp .filtro-coluna:focus-visible{outline:2px solid #006eab;outline-offset:3px}
   .gpcp table.marcas td{padding:5px 8px;border-bottom:1px solid #f2f5f9;vertical-align:middle}
   .gpcp table.marcas td.num{text-align:right;font-variant-numeric:tabular-nums}
   .gpcp table.marcas tr.sel{background:#eef6fb}

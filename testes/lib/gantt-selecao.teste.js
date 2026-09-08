@@ -26,3 +26,9 @@ it('desconta a carga das peças que permanecem na bancada ao dividir uma seleç�
  expect(plano.slots.find(s=>s.recurso==='B1').base).toBe(8);
  expect(plano.slots.find(s=>s.recurso==='B2').itens.map(i=>i.id)).toEqual(['sel']);
 });
+it('combina listas de valores por coluna e distingue filtro vazio de todos',()=>{
+ expect(filtrarProjetos(itens,{colunas:{pf:['CH4.75','U200'],mt:['A36','A572']}})).toEqual(itens.slice(0,2));
+ expect(filtrarProjetos(itens,{colunas:{pf:[]}})).toEqual([]);
+ expect(filtrarProjetos(itens,{colunas:{pf:null,mt:['__SEM__']}})).toEqual([itens[2]]);
+ expect(filtrarProjetos(itens,{colunas:{m:['P1','P3'],pf:['CH4.75']}})).toEqual([itens[0],itens[2]]);
+});

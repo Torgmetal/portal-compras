@@ -1,3 +1,4 @@
+import { abrirFiltroColuna } from "./filtro-coluna";
 import { filtrarProjetos, escapar } from "./selecao-projetos";
 // ─── ABA "PROJETOS PROGRAMADOS" ────────────────────────────────────────────────────────────────
 //
@@ -11,22 +12,20 @@ import { filtrarProjetos, escapar } from "./selecao-projetos";
 // ⚠ O estado da aba (seleção e filtro) mora aqui; `abrirPainel` zera por `reiniciar()`.
 
 export function criarPainelProjetos(dep){
-  let sel = new Set(), soFalta = false, busca = "", perfil = "", material = "";
+  let sel = new Set(), soFalta = false, colunas = {};
 
-  function reiniciar(){ sel = new Set(); soFalta = false; busca = ""; perfil = ""; material = ""; }
+  function reiniciar(){ sel = new Set(); soFalta = false; colunas = {}; }
 
   function pintarProjetos(r){
     const itens = [...r.itens].sort((a,b)=> (a.g?1:0)-(b.g?1:0) || String(a.m).localeCompare(String(b.m)));
-    const mostra = filtrarProjetos(itens, { busca, perfil, material, soFalta: soFalta && temGrd(r.setor) });
+    const mostra = filtrarProjetos(itens, { colunas, soFalta: soFalta && temGrd(r.setor) });
     const teto = 300, corte = mostra.slice(0, teto);
     const grd = temGrd(r.setor);
     const semG = grd ? mostra.filter(i=>!i.g).length : 0;
-    const opcoes = (campo, valor) => '<option value="">Todos</option>' + [...new Set(itens.map(i=>i[campo] || '__SEM__'))].sort().map(v=>'<option value="'+escapar(v)+'"'+(v===valor?' selected':'')+'>'+escapar(v==='__SEM__'?'Não informado':v)+'</option>').join('');
-    let h = '<div class="pfiltros">'
-      + '<label>Buscar marca ou perfil<input id="gp-fBusca" type="search" value="'+escapar(busca)+'" placeholder="Ex.: CH4.75, T97A..."></label>'
-      + '<label>Perfil<select id="gp-fPerfil">'+opcoes('pf',perfil)+'</select></label>'
-      + '<label>Material / aço<select id="gp-fMaterial">'+opcoes('mt',material)+'</select></label>'
-      + '<button class="btn mini" id="gp-fLimpar">Limpar filtros</button></div><div class="ptool">'
+    const ativos = Object.values(colunas).filter(v=>v!=null).length;
+    let h = '<div class="ptool filtro-resumo"><span>'+mostra.length+' de '+itens.length+' marcas'
+      + (ativos?' · '+ativos+' filtro(s) ativo(s)':' · Filtre pelas setas das colunas')+'</span>'
+      + (ativos||soFalta?'<button class="btn mini" id="gp-fLimpar">Limpar filtros</button>':'')+'</div><div class="ptool">'
       + (grd
           ? '<b style="color:#8a5600">'+semG+' marca(s) sem GRD</b> · <b style="color:#136c35">'+(mostra.length-semG)+' já impressa(s)</b>'
             + '<label><input type="checkbox" id="gp-fSemGrd"'+(soFalta?" checked":"")+'> só os não impressos</label>'
@@ -34,14 +33,16 @@ export function criarPainelProjetos(dep){
       + '<button class="btn mini" id="gp-selTodos">Selecionar os filtrados</button>'
       + '<button class="btn mini" id="gp-selNenhum">Limpar</button></div>';
     const temPerfil = itens.some(i=>i.pf);
-    h += '<table class="marcas"><thead><tr><th style="width:26px"></th><th>Marca</th>'
-      + (temPerfil?'<th>Perfil</th>':'')
+    const cabecalho = (campo, rotulo) => '<th><button class="filtro-coluna'+(colunas[campo]!=null?' ativo':'')+'" data-filtro="'+campo+'" aria-haspopup="dialog" title="Filtrar '+rotulo+'" aria-label="Filtrar '+rotulo+'">'+rotulo+' <span aria-hidden="true">'+(colunas[campo]!=null?'●':'▾')+'</span></button></th>';
+    h += '<table class="marcas"><thead><tr><th style="width:26px"></th>'+cabecalho('m','Marca')
+      + (temPerfil?cabecalho('pf','Perfil'):'')+cabecalho('mt','Material / aço')
       + '<th class="num">Qte</th><th class="num" title="peças com apontamento no Syneco">Feito</th>'
       + '<th class="num">kg</th>'+(grd?'<th>GRD</th>':'')+'</tr></thead><tbody>';
     for(const i of corte){
       const s = sel.has(i.id);
       h += '<tr class="'+(s?"sel":"")+'"><td><input type="checkbox" class="ck" data-m="'+escapar(i.id)+'"'+(s?" checked":"")+'></td>'
         + '<td><b>'+escapar(i.m)+'</b></td>'+(temPerfil?'<td style="color:#5b6a7d">'+escapar(i.pf||"—")+'</td>':'')
+        + '<td>'+escapar(i.mt||'—')+'</td>'
         + '<td class="num">'+i.q+'</td>'
         /* ⚠ o `f` é o apontamento do Syneco por marca — o MESMO número que preenche a barra do
            Gantt. Se a coluna e a barra discordassem, uma das duas estaria mentindo. */
@@ -64,7 +65,7 @@ export function criarPainelProjetos(dep){
     h += '<tfoot><tr><td></td>'
       + '<td><b>Total</b> <span style="color:#5b6a7d">· '+mostra.length+' marca'+(mostra.length===1?'':'s')
       + (soFalta?', só as não impressas':'')+'</span></td>'
-      + (temPerfil?'<td></td>':'')
+      + (temPerfil?'<td></td>':'')+'<td></td>'
       + '<td class="num"><b>'+somaQ.toLocaleString("pt-BR")+'</b></td>'
       + '<td class="num"><b'+(somaF?' style="color:#136c35"':'')+'>'+somaF.toLocaleString("pt-BR")+'</b>'
       + ' <span style="color:#5b6a7d">('+Math.round(somaQ?somaF/somaQ*100:0)+'%)</span></td>'
@@ -105,10 +106,17 @@ export function criarPainelProjetos(dep){
        inteiro morre no `.onchange`. */
     const fg = dep.$("fSemGrd");
     if(fg) fg.onchange = (e)=>{ soFalta = e.target.checked; sel.clear(); dep.pintarPainel(); };
-    dep.$("fPerfil").onchange = e=>{ perfil=e.target.value; sel.clear(); dep.pintarPainel(); };
-    dep.$("fMaterial").onchange = e=>{ material=e.target.value; sel.clear(); dep.pintarPainel(); };
-    dep.$("fBusca").oninput = e=>{ const pos=e.target.selectionStart; busca=e.target.value; sel.clear(); dep.pintarPainel(); const input=dep.$("fBusca"); input.focus(); input.setSelectionRange(pos,pos); };
-    dep.$("fLimpar").onclick=()=>{ busca=""; perfil=""; material=""; soFalta=false; sel.clear(); dep.pintarPainel(); };
+    for(const botao of dep.raiz.querySelectorAll('[data-filtro]')) botao.onclick=()=>{
+      const campo=botao.dataset.filtro;
+      const outros={...colunas}; delete outros[campo];
+      const disponiveis=filtrarProjetos(itens,{colunas:outros,soFalta:soFalta&&grd});
+      abrirFiltroColuna({raiz:dep.raiz,botao,campo,itens:disponiveis,valores:colunas[campo],aplicar:valores=>{
+        colunas[campo]=valores; sel.clear(); dep.pintarPainel();
+        dep.raiz.querySelector('[data-filtro="'+campo+'"]')?.focus();
+      }});
+    };
+    const limpar=dep.$("fLimpar");
+    if(limpar) limpar.onclick=()=>{ colunas={}; soFalta=false; sel.clear(); dep.pintarPainel(); };
     dep.$("distribuir").onclick=()=>dep.abrirQuebra();
     dep.$("selTodos").onclick = ()=>{ for(const i of alvo) sel.add(i.id); dep.pintarPainel(); };
     dep.$("selNenhum").onclick = ()=>{ sel.clear(); dep.pintarPainel(); };
@@ -323,7 +331,7 @@ export function criarPainelProjetos(dep){
 
   function idsParaDividir(r) {
     if(sel.size) return new Set(sel);
-    return new Set(filtrarProjetos(r.itens,{busca,perfil,material,soFalta:soFalta&&temGrd(r.setor)}).map(i=>i.id));
+    return new Set(filtrarProjetos(r.itens,{colunas,soFalta:soFalta&&temGrd(r.setor)}).map(i=>i.id));
   }
   return { reiniciar, pintarProjetos, idsParaDividir };
 }
