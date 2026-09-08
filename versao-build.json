@@ -1,7 +1,12 @@
 {
-  "build": 2966,
-  "gerado": "2026-09-08T12:11:14.952Z",
+  "build": 2967,
+  "gerado": "2026-09-08T12:24:33.895Z",
   "commits": [
+    {
+      "hash": "5e8749a1",
+      "data": "08/09/2026",
+      "titulo": "versao-build"
+    },
     {
       "hash": "0b4ebf32",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "74be32dc",
       "data": "07/09/2026",
       "titulo": "Produção: planilha por OP com composição LPC e sete abas por setor"
-    },
-    {
-      "hash": "4d410ce3",
-      "data": "07/09/2026",
-      "titulo": "Pintura: a cor de cada peça sai do tipo da estrutura no PLP"
     }
   ]
 }

@@ -82,7 +82,12 @@ export function criarPainelProjetos(dep){
        Syneco: será exportada uma planilha para poder dar baixa no Syneco das marcas selecionadas".
        O portal não baixa nada: quem lança é a pessoa, no Syneco, e o número volta pelo sync. Assim
        o quadro, o cronograma e o portal do cliente continuam falando o mesmo número. */
-    const btnBaixa = '<button class="btn" id="gp-xlsBaixa"'+(sel.size?"":" disabled")+'>Baixa Syneco</button>';
+    /* ⚠ USA A SELEÇÃO, OU A LISTA INTEIRA — como o botão de imprimir ao lado. Eu tinha deixado o
+       botão DESABILITADO sem seleção e o Vitor não conseguiu baixar: o próprio rodapé promete "os
+       botões usam a lista acima", e um botão morto ali só levanta a pergunta de por que não
+       funciona. Gerar planilha não escreve nada, então agir sobre a lista toda é seguro. */
+    const alvoBaixa = sel.size ? itens.filter(i=>sel.has(i.m)) : mostra;
+    const btnBaixa = '<button class="btn" id="gp-xlsBaixa"'+(alvoBaixa.length?"":" disabled")+'>Baixa Syneco ('+alvoBaixa.length+')</button>';
     dep.$("pFoot").innerHTML = grd
       ? '<div class="info">'+(sel.size ? sel.size+" marca(s) selecionada(s)" : "Nada selecionado — os botões usam a lista acima")+'</div>'
         + '<button class="btn pri" id="gp-impFalta"'+(semG?"":" disabled")+'>Imprimir as '+semG+' sem GRD</button>'
@@ -110,7 +115,7 @@ export function criarPainelProjetos(dep){
     if(bb) bb.onclick = async ()=>{
       bb.disabled = true; const antes = bb.textContent; bb.textContent = "Gerando…";
       // ⚠ manda as MARCAS selecionadas, resolvidas para os ids das peças do lote clicado
-      try{ await dep.baixarBaixaSyneco(r.op, r.setor, r.itens.filter(i=>sel.has(i.m)).map(i=>i.id).filter(Boolean)); }
+      try{ await dep.baixarBaixaSyneco(r.op, r.setor, alvoBaixa.map(i=>i.id).filter(Boolean)); }
       catch(e){ dep.avisar(e?.message || "Falha ao gerar a planilha de baixa", "erro"); }
       finally{ bb.disabled = false; bb.textContent = antes; }
     };

@@ -75,7 +75,13 @@ export function criarGrade(dep){
         const alt = naJanela ? Math.max(1,faixas.length)*30 + 8 + 16 : 38;
         html += '<div class="linha'+(rec.k?"":" pousio")+'" data-setor="'+setor+'" data-rec="'+(rec.k||"")+'" '
              +  'data-row="'+setor+'|'+(rec.k||"")+'" style="min-height:'+alt+'px">';
+        /* ⚠⚠ A LISTA DO POSTO SAI DAQUI. Vitor (08/09/2026): "na frente do nome do montador, uma
+           opção para imprimir a lista completa do que está no nome dele, por dia ou semana".
+           Vale para qualquer posto COM chave — o laser e o galpão têm a mesma pergunta. A linha
+           "sem bancada" não tem: ali ninguém é dono de nada, é fila esperando decisão. */
         html += '<div class="rotulo"><b>'+rec.nome+'</b>'
+             +  (rec.k?'<span class="lista"><button class="mini" data-lista="dia" data-setor="'+setor+'" data-rec="'+rec.k+'" data-nome="'+rec.nome+'" title="lista de hoje">dia</button>'
+                      +'<button class="mini" data-lista="semana" data-setor="'+setor+'" data-rec="'+rec.k+'" data-nome="'+rec.nome+'" title="lista da semana">semana</button></span>':'')
              +  (rec.obs?'<small>'+rec.obs+'</small>':(rec.cap>1?'<small>meta '+dep.nkg(rec.cap)+' kg/dia</small>':'<small>1 bancada-dia</small>'))+'</div>';
         html += '<div class="trilho" style="width:'+(larg*dep.COL)+'px"><div class="celulas">';
         for(const s of janela) html += '<div class="cel'+(dep.fdsISO(s)?" fds":"")+'" data-dia="'+s+'"></div>';
@@ -135,6 +141,26 @@ export function criarGrade(dep){
     dep.grade.innerHTML = html;
     dep.$("periodo").textContent = dep.dbr(janela[0])+" a "+dep.dbr(janela[larg-1])+" · "+dep.d0(janela[0]).getUTCFullYear();
     for(const el of dep.grade.querySelectorAll(".barra-op")) el.addEventListener("pointerdown", dep.pegar());
+
+    /* ⚠ a lista do posto: "dia" é hoje, "semana" é a semana de hoje (segunda a domingo). Ancorar na
+       janela visível seria mais esperto e menos previsível — quem clica quer o que o montador tem
+       para hoje, não o que aparece na tela depois de rolar. */
+    for(const b of dep.grade.querySelectorAll("[data-lista]")) b.onclick = async (ev)=>{
+      ev.stopPropagation();
+      const per = b.dataset.lista, hoje = dep.HOJE || new Date().toISOString().slice(0,10);
+      let de = hoje, ate = hoje;
+      if(per === "semana"){
+        const d = new Date(hoje+"T12:00:00Z"), w = d.getUTCDay();       // 0=dom
+        const seg = new Date(d); seg.setUTCDate(d.getUTCDate() - ((w+6)%7));
+        const dom = new Date(seg); dom.setUTCDate(seg.getUTCDate()+6);
+        de = seg.toISOString().slice(0,10); ate = dom.toISOString().slice(0,10);
+      }
+      const antes = b.textContent; b.disabled = true; b.textContent = "…";
+      try{ await dep.baixarListaPosto({ setor:b.dataset.setor, recurso:b.dataset.rec,
+        nomePosto:b.dataset.nome, de, ate, periodo:per }); }
+      catch(e){ dep.avisar(e?.message || "Falha ao gerar a lista", "erro"); }
+      finally{ b.disabled = false; b.textContent = antes; }
+    };
   }
 
   return { desenhar };
