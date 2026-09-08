@@ -1,7 +1,12 @@
 {
-  "build": 2988,
-  "gerado": "2026-09-08T14:49:48.765Z",
+  "build": 2989,
+  "gerado": "2026-09-08T14:50:02.515Z",
   "commits": [
+    {
+      "hash": "7c381275c4",
+      "data": "08/09/2026",
+      "titulo": "CLAUDE.md: como o versao-build.json derruba o build, e o hook novo"
+    },
     {
       "hash": "e659fa3162",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "656206a303",
       "data": "08/09/2026",
       "titulo": "feat(excel): publicar refinamento das planilhas e preservar estruturas externas"
-    },
-    {
-      "hash": "d2442aff37",
-      "data": "08/09/2026",
-      "titulo": "versao-build 2958"
     }
   ]
 }

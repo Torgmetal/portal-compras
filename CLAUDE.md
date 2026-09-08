@@ -61,13 +61,11 @@ Three env vars that differ between Vercel and local:
 ### Número de build (versão exibida no portal)
 
 O rodapé da barra lateral mostra `v<VERSAO_ATUAL> · build <N>`, onde `N` é a contagem de commits.
-Instale o hook uma vez por clone:
+Instale os hooks uma vez por clone — são **dois**, e o mesmo comando liga os dois:
 
 ```bash
 git config core.hooksPath .githooks
 ```
-
-Instale o hook uma vez por clone — são **dois**, o mesmo comando liga os dois.
 
 O hook `.githooks/pre-commit` roda `scripts/gerar-versao.js`, que grava `versao-build.json` e o
 inclui no próprio commit. `next.config.js` lê esse arquivo e expõe `NEXT_PUBLIC_BUILD_NUMERO`.
