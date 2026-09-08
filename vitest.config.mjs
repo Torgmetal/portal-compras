@@ -24,6 +24,10 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: { "@": fileURLToPath(new URL("./", import.meta.url)) },
+    alias: {
+      "@": fileURLToPath(new URL("./", import.meta.url)),
+      // ver testes/apoio/server-only.js
+      "server-only": fileURLToPath(new URL("./testes/apoio/server-only.js", import.meta.url)),
+    },
   },
 });

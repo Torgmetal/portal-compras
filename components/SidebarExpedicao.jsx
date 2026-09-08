@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, PackageCheck, Factory, ClipboardList } from "lucide-react";
+import { FileText, PackageCheck, Factory, ClipboardList, Tag } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -11,6 +11,8 @@ const menu = [
   // O que a OBRA ainda deve, direcionado ou não — a pergunta de quem embarca. (Vitor 19/08.)
   { href: "/expedicao/listas", label: "Listas de Expedição", icon: ClipboardList },
   { href: "/expedicao/terceiros", label: "Terceirizados", icon: Factory },
+  // Substitui o BarTender: a etiqueta de 100×50 sai do próprio portal, sem planilha no meio.
+  { href: "/expedicao/etiquetas", label: "Etiquetas de Carregamento", icon: Tag },
 ];
 
 export default function SidebarExpedicao() {

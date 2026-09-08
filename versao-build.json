@@ -1,156 +1,156 @@
 {
-  "build": 2972,
-  "gerado": "2026-09-08T13:30:03.051Z",
+  "build": 2973,
+  "gerado": "2026-09-08T13:35:16.496Z",
   "commits": [
     {
-      "hash": "b4168342",
+      "hash": "2289730d11",
+      "data": "08/09/2026",
+      "titulo": "PCP: a baixa do portal passa a contar no quadro — e a OP-067 sai da preparação"
+    },
+    {
+      "hash": "b4168342d1",
       "data": "08/09/2026",
       "titulo": "Gantt: os botões da lista do posto ganham estilo — saíam como \"diasemana\""
     },
     {
-      "hash": "64611b15",
+      "hash": "64611b155e",
       "data": "08/09/2026",
       "titulo": "Corte: cada família vira sua barra na raia sem máquina"
     },
     {
-      "hash": "e3635863",
+      "hash": "e363586345",
       "data": "08/09/2026",
       "titulo": "Corte: separa por perfil de verdade — a lista não escreve \"chapa\", escreve CH9.50"
     },
     {
-      "hash": "72b19237",
+      "hash": "72b192379f",
       "data": "08/09/2026",
       "titulo": "PCP: o aviso da liberação sai quando tudo tem dia, e o resto vai ao histórico"
     },
     {
-      "hash": "5f94b44d",
+      "hash": "5f94b44d5d",
       "data": "08/09/2026",
       "titulo": "Gantt: a lista de trabalho de cada posto, por dia ou semana"
     },
     {
-      "hash": "5e8749a1",
+      "hash": "5e8749a1c4",
       "data": "08/09/2026",
       "titulo": "versao-build"
     },
     {
-      "hash": "0b4ebf32",
+      "hash": "0b4ebf3202",
       "data": "08/09/2026",
       "titulo": "Gantt: botão Baixa Syneco, saldo sem agrupar e bancada com nome de gente"
     },
     {
-      "hash": "226519b3",
+      "hash": "226519b3a9",
       "data": "08/09/2026",
       "titulo": "Planejamento libera peças sem data e informa OP e setor no PCP"
     },
     {
-      "hash": "d2539b11",
+      "hash": "d2539b1172",
       "data": "08/09/2026",
       "titulo": "Gantt: a fila sem máquina também fica em hoje; a data de entrada vira idade"
     },
     {
-      "hash": "73026e7e",
+      "hash": "73026e7e4f",
       "data": "08/09/2026",
       "titulo": "Gantt: o saldo do que não saiu vem para hoje, na mesma bancada"
     },
     {
-      "hash": "1fe8c5aa",
+      "hash": "1fe8c5aaad",
       "data": "08/09/2026",
       "titulo": "versao-build"
     },
     {
-      "hash": "d38adc78",
+      "hash": "d38adc78b8",
       "data": "08/09/2026",
       "titulo": "Gantt: o corte sem dia aparece em \"sem máquina\", no dia da importação"
     },
     {
-      "hash": "656206a3",
+      "hash": "656206a303",
       "data": "08/09/2026",
       "titulo": "feat(excel): publicar refinamento das planilhas e preservar estruturas externas"
     },
     {
-      "hash": "d2442aff",
+      "hash": "d2442aff37",
       "data": "08/09/2026",
       "titulo": "versao-build 2958"
     },
     {
-      "hash": "ef0726b7",
+      "hash": "ef0726b701",
       "data": "08/09/2026",
       "titulo": "Cronograma novo nasce sobreposto, não em fila"
     },
     {
-      "hash": "4275d072",
+      "hash": "4275d07223",
       "data": "07/09/2026",
       "titulo": "fix(planejamento): melhorar leitura das linhas do cronograma"
     },
     {
-      "hash": "46297351",
+      "hash": "4629735170",
       "data": "07/09/2026",
       "titulo": "refactor(planejamento): organizar controles e acoes do cronograma"
     },
     {
-      "hash": "58bc140e",
+      "hash": "58bc140e5c",
       "data": "07/09/2026",
       "titulo": "fix(ui): retirar prefixo T da exibicao das OPs"
     },
     {
-      "hash": "a03adf7c",
+      "hash": "a03adf7c6a",
       "data": "07/09/2026",
       "titulo": "refactor(planejamento): simplificar lista e criacao de cronogramas"
     },
     {
-      "hash": "16780d69",
+      "hash": "16780d6927",
       "data": "07/09/2026",
       "titulo": "feat(planejamento): escolher tipo de email e conferir cronograma antes do envio"
     },
     {
-      "hash": "5c53ca25",
+      "hash": "5c53ca256a",
       "data": "07/09/2026",
       "titulo": "CMR: divergir de pedido não é errar — a trava pergunta, não acusa"
     },
     {
-      "hash": "e0fe3b8d",
+      "hash": "e0fe3b8d6d",
       "data": "07/09/2026",
       "titulo": "CMR: a obra digitada à mão passa a ser conferida contra o pedido"
     },
     {
-      "hash": "67396b91",
+      "hash": "67396b9153",
       "data": "07/09/2026",
       "titulo": "XML do MS Project: o arquivo abria um cronograma diferente da tela"
     },
     {
-      "hash": "952480c5",
+      "hash": "952480c5d8",
       "data": "07/09/2026",
       "titulo": "Cronograma: a solda não espera a montagem fechar"
     },
     {
-      "hash": "b10927e9",
+      "hash": "b10927e944",
       "data": "07/09/2026",
       "titulo": "Cronograma: as fases correm em ordem, uma depois da outra"
     },
     {
-      "hash": "2773d0cc",
+      "hash": "2773d0ccaa",
       "data": "07/09/2026",
       "titulo": "Cronograma: o \"T\" do código da frente é opcional"
     },
     {
-      "hash": "5b996f16",
+      "hash": "5b996f1649",
       "data": "07/09/2026",
       "titulo": "Cronograma: atraso é o que passou do dia, não o que vence hoje"
     },
     {
-      "hash": "72a0eb16",
+      "hash": "72a0eb16ff",
       "data": "07/09/2026",
       "titulo": "Cronograma da OP-105: cada fase ganha preparação, montagem, solda e pintura"
     },
     {
-      "hash": "09f0aee6",
+      "hash": "09f0aee69a",
       "data": "07/09/2026",
       "titulo": "Cronograma: as fases da OP viram as áreas, por um botão"
-    },
-    {
-      "hash": "7c6d2c8d",
-      "data": "07/09/2026",
-      "titulo": "Engenharia › Projetos: dá para editar o nome, o local e a data da fase"
     }
   ]
 }

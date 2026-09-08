@@ -13,9 +13,22 @@ npx prisma migrate dev --name <name>  # create a migration
 npx prisma db seed   # seed initial admin user
 npx prisma studio    # open Prisma database UI
 npx vercel env pull .env  # pull env vars from Vercel
+
+npm test             # vitest — 128 testes, NENHUM toca o banco
+npm run checar       # varre no-undef/no-unused-vars em app, lib e components
+npx eslint .         # quality gates completos (teto de 350 linhas, complexidade…)
 ```
 
-No test suite is configured.
+## Testes
+
+`npm test`. **Nenhum teste toca o banco** — o `testes/apoio/setup.js` aponta a `DATABASE_URL`
+para lugar nenhum de propósito, e o Prisma é mockado em `testes/apoio/prisma.js`. Um teste que
+abre conexão com o Neon é um teste que escreve em **produção** (ver o aviso de arquitetura abaixo).
+
+Os testes do `calcularLqc` são de **caracterização**: congelam o que a função devolve hoje, não o
+que ela deveria devolver. Se um número mudar numa refatoração que deveria preservar comportamento,
+o errado é a refatoração. Se mudar de propósito, atualize com `npx vitest -u` **e diga no commit
+qual regra mudou e por quê**.
 
 ## Workflow padrão de desenvolvimento
 
@@ -228,6 +241,35 @@ faltando no PATH — chame por `~/.local/bin/graphify` ou acrescente ao seu
 pacote INTEIRO do repositório** — o caveman, por exemplo, são 20 skills, não uma.
 Se for adicionar outra, use `--skill <nome>` para escolher, e revise o
 `git status` antes de commitar.
+
+## Etiquetas de carregamento (Expedição)
+
+Substitui o **BarTender**. `Expedição › Etiquetas de Carregamento` → escolher a OP,
+marcar as peças, gerar. Sai uma etiqueta **por peça** (numerada `001/N`), não por marca.
+
+| | |
+|---|---|
+| Impressora | **Argox OS-214 plus series PPLA**, USB, 203 dpi |
+| Etiqueta | **100 × 50 mm**, BOPP permanente laranja, transferência térmica |
+| Engine | `pdf-lib` (o mesmo dos outros 35 PDFs) + `qrcode` |
+| Código | `lib/etiqueta-carregamento-pdf.js`, `app/api/expedicao/etiquetas/` |
+
+**Ao imprimir**: escolher a Argox, escala em **100%** (nunca "ajustar à página") e margens
+**nenhuma**. A página do PDF já tem o tamanho exato do rolo — qualquer ajuste do navegador
+faz a etiqueta sair torta. O aviso está na própria tela.
+
+⚠ **A impressora só imprime PRETO** — o laranja é o material do rolo. Por isso o logo da
+etiqueta é o `public/torg-logo-etiqueta.png` (chapado e horizontal), e não o `torg-logo.png`
+do portal, que é vertical e tem gradiente azul. Ele foi gerado a partir do
+`public/torg-logo.svg` recortado em duas partes e recolorido.
+
+⚠ **Não existe importação de planilha, de propósito.** Marca, descrição, quantidade e peso
+vivem em `PecaConjunto`; a planilha só existia porque o BarTender não enxerga o banco.
+Tirar esse pulo tira junto a chance de imprimir com dado velho.
+
+> **Se a qualidade de impressão decepcionar**, o caminho de upgrade é gerar **PPLA cru** em vez
+> de PDF — o layout e os dados se aproveitam, troca só o renderizador. Isso exige um agente
+> local no PC da expedição para mandar os bytes à USB, que é a razão de não ter começado por aí.
 
 ## Padrões de qualidade
 

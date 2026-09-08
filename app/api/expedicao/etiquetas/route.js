@@ -1,0 +1,126 @@
+// Etiquetas de carregamento — as que hoje saem do BarTender.
+//
+// GET  ?opId=xxx   → as marcas daquela OP, para a tela montar a seleção
+// POST { opId, marcas[] } → o PDF, uma página de 100×50 mm por PEÇA
+//
+// ⚠ NÃO EXISTE IMPORTAÇÃO DE PLANILHA AQUI, E ISSO É DE PROPÓSITO. O fluxo do BarTender era
+// exportar planilha → importar no BarTender → imprimir. Marca, descrição, quantidade e peso já
+// vivem em `PecaConjunto`; a planilha só existia porque o BarTender não enxerga o banco. Tirar
+// esse pulo tira junto a chance de imprimir com dado velho, que é o defeito que planilha
+// intermediária sempre tem.
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { requireRole } from "@/lib/session";
+import { gerarEtiquetasCarregamentoPDF } from "@/lib/etiqueta-carregamento-pdf";
+import { log } from "@/lib/log";
+import { fmtOP } from "@/lib/utils";
+
+const registro = log("api/expedicao/etiquetas");
+const PERFIS = ["ADMIN", "EXPEDICAO", "PRODUCAO", "PCP", "PLANEJAMENTO"];
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+// Um lote grande de etiquetas é muita geração de QR: sai do teto padrão de 10 s da Vercel.
+export const maxDuration = 60;
+
+const erroDeAcesso = (e) =>
+  NextResponse.json({ success: false, error: e.message },
+    { status: e.message === "Unauthorized" ? 401 : 403 });
+
+async function carregar(opId) {
+  const op = await prisma.oP.findUnique({
+    where: { id: opId },
+    select: { id: true, numero: true, cliente: true, obra: true },
+  });
+  if (!op) return null;
+  const pecas = await prisma.pecaConjunto.findMany({
+    where: { opId },
+    select: { id: true, marca: true, descricao: true, qte: true, pesoUnitKg: true, status: true },
+    orderBy: [{ marca: "asc" }],
+  });
+  return { op, pecas };
+}
+
+export async function GET(req) {
+  try { await requireRole(PERFIS); } catch (e) { return erroDeAcesso(e); }
+
+  const opId = new URL(req.url).searchParams.get("opId");
+
+  // Sem opId, a tela está abrindo: devolve as OPs que TÊM peça cadastrada. OP sem peça não
+  // rende etiqueta nenhuma e só faria a lista crescer.
+  if (!opId) {
+    const comPecas = await prisma.pecaConjunto.groupBy({ by: ["opId"], _count: { _all: true } });
+    const ids = comPecas.map((c) => c.opId).filter(Boolean);
+    const ops = await prisma.oP.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, numero: true, cliente: true, obra: true },
+      orderBy: { numero: "desc" },
+    });
+    const quantas = new Map(comPecas.map((c) => [c.opId, c._count._all]));
+    return NextResponse.json({
+      success: true,
+      ops: ops.map((o) => ({ ...o, marcas: quantas.get(o.id) || 0 })),
+    });
+  }
+
+  const dados = await carregar(opId);
+  if (!dados) return NextResponse.json({ success: false, error: "OP não encontrada" }, { status: 404 });
+  return NextResponse.json({ success: true, ...dados });
+}
+
+const erro400 = (msg) => NextResponse.json({ success: false, error: msg }, { status: 400 });
+
+/**
+ * O que vai ser impresso, ou a mensagem de por que não vai.
+ *
+ * ⚠ A QUANTIDADE VEM DO BANCO, NÃO DO NAVEGADOR. A tela manda quais marcas; quantas etiquetas cada
+ * uma rende é decisão do dado. Aceitar um número vindo da tela seria deixar a etiqueta dizer
+ * "003/5" para uma marca que tem 2 peças.
+ */
+async function selecionar(corpo) {
+  const opId = corpo?.opId;
+  const marcas = Array.isArray(corpo?.marcas) ? corpo.marcas : [];
+  if (!opId || !marcas.length) return { recusa: erro400("Escolha a OP e ao menos uma marca.") };
+
+  const dados = await carregar(opId);
+  if (!dados) return { recusa: NextResponse.json({ success: false, error: "OP não encontrada" }, { status: 404 }) };
+
+  const escolhidas = new Set(marcas.map(String));
+  const pecas = dados.pecas.filter((p) => escolhidas.has(p.marca));
+  if (!pecas.length) return { recusa: erro400("Nenhuma das marcas enviadas existe nesta OP.") };
+  return { op: dados.op, pecas };
+}
+
+export async function POST(req) {
+  try { await requireRole(PERFIS); } catch (e) { return erroDeAcesso(e); }
+
+  let corpo;
+  try { corpo = await req.json(); } catch { corpo = null; }
+  const { recusa, op, pecas } = await selecionar(corpo);
+  if (recusa) return recusa;
+
+  const dados = { op };
+  const total = pecas.reduce((s, p) => s + Math.max(1, p.qte || 1), 0);
+  try {
+    const pdf = await gerarEtiquetasCarregamentoPDF({
+      cliente: dados.op.cliente,
+      obra: dados.op.obra,
+      // ⚠ O NÚMERO SAI PELO `fmtOP`, sem o "OP-" — a célula da etiqueta já diz "O.P.:".
+      // Reusar o formatador da casa traz de graça o padding de três dígitos e a sub-obra
+      // ("036-01"), que já foram motivo de a mesma OP aparecer com dois nomes no portal.
+      opNumero: fmtOP(dados.op.numero).replace(/^OP-/, ""),
+      pecas,
+    });
+    registro.info(`OP ${dados.op.numero}: ${pecas.length} marca(s), ${total} etiqueta(s)`);
+    return new NextResponse(Buffer.from(pdf), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="etiquetas-OP-${dados.op.numero}.pdf"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (e) {
+    registro.erro("falha ao gerar:", e?.message);
+    return NextResponse.json({ success: false, error: "Não consegui gerar as etiquetas: " + e.message }, { status: 500 });
+  }
+}
