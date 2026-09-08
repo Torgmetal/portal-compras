@@ -280,39 +280,39 @@ etiqueta é o `public/torg-logo-etiqueta.png` (chapado e horizontal), e não o `
 do portal, que é vertical e tem gradiente azul. Ele foi gerado a partir do
 `public/torg-logo.svg` recortado em duas partes e recolorido.
 
-⚠⚠ **A lista mostra só os itens da LISTA DE EXPEDIÇÃO, não a obra inteira.** Matheus (08/09/2026):
-"não pode aparecer as posições, somente os produtos finais igual sai na Lista de Expedição".
-`PecaConjunto` guarda o conjunto que sobe no caminhão E as posições que o compõem — na OP-97 são
-1.236 linhas para 537 itens expedíveis; o resto são croquis ("T97A-P30"), peça de fábrica que vai
-soldada dentro de outra. O filtro é o **pertencimento à LE**, nunca `tipoPeca !== "CROQUI"`: a LE
-tem os parafusos (`T97-AC8`, tipo nulo) e eles se expedem.
+⚠⚠ **QUEM DEFINE A LISTA É A LISTA DE EXPEDIÇÃO — não `PecaConjunto`.** Matheus (08/09/2026):
+"não pode aparecer as posições, somente os produtos finais igual sai na Lista de Expedição" e
+depois "acredito que só deve considerar a L.E e não incluir LPC junto para não duplicar". Toda a
+regra mora em `lib/itens-expedicao.js` (`itensExpediveisDaOP`), usada tanto pelas etiquetas quanto
+pela Conferência de Peça. Em duas etapas:
 
-⚠⚠ **A MESMA MARCA TEM ATÉ TRÊS LINHAS NA MESMA OBRA, e não é dado sujo:** o schema é
-`@@unique([opNumero, marca])` e a mesma OP tem várias chaves de `opNumero` conforme quem importou —
-a OP-89 tem `"89"`, `"089"`, `"T89A"` e `"T89C"`, dando **809 linhas para 284 marcas**.
-`itensExpediveisDaOP` **escolhe uma, não soma** (somar triplicaria o previsto), e a que vence é a
-`fonte: "LE_IMPORT"` — a do LPC traz o PERFIL na descrição (`L1.1/2''X1/8''`) e a da LE traz o NOME
-da peça (`CONTRAVENTAMENTO`), que é o texto que sai impresso na etiqueta.
-Cada peça devolve também `ids` (todas as cópias): quem casa registro por id — a auditoria de
-impressão — tem de olhar as três, senão perde histórico gravado contra a cópia que não venceu.
+1. **A Lista de Expedição (`ListaExpedicao`, a planilha importada) diz QUAIS marcas existem e
+   QUANTAS peças cada uma tem.** Ela é o documento — manda na quantidade e na descrição.
+2. **`PecaConjunto` só COMPLETA** o que a L.E. não trouxer (peso, id) para as marcas carimbadas
+   `naLE`, e cobre obras cuja planilha nunca foi importada. **Uma linha de LPC nunca entra na lista
+   por si** — é ela que trazia as posições de fábrica e, antes desta regra, a duplicação.
 
-⚠⚠ **A QUANTIDADE VEM DA PLANILHA (`ListaExpedicao`) QUANDO ELA EXISTE.** Não é preferência de
-fonte, é dado corrompido: na OP-89 as linhas importadas sob a chave `"89"` estão **deslocadas em uma
-posição** em relação às sob `"089"` (T89-AC13 tem 20 numa e 55 na outra; T89-AC14, 55 e 3). São 17
-marcas, e as duas linhas são `LE_IMPORT` — nenhuma regra de "escolher a linha" resolve. A planilha
-é a L.E. em si, então é ela que decide. Conferido: OP-97, 60, 85 e 121 batem exatamente com a
-planilha; a 89 bate somando as 4 marcas que só existem no cadastro (8705 + 204 = 8909).
+Motivo do redesenho: `PecaConjunto` guarda a obra INTEIRA — o conjunto que sobe no caminhão e as
+posições que o compõem — vinda de importadores diferentes sob **chaves de `opNumero` diferentes**
+para a mesma OP (a OP-89 tem `"89"`, `"089"`, `"T89A"`, `"T89C"`, por causa do
+`@@unique([opNumero, marca])`). Usá-la como ponto de partida gerava, ao mesmo tempo: posições na
+lista (croquis como `T97A-P30`), a mesma marca até três vezes (809 linhas para 284 marcas na
+OP-89), o PERFIL no lugar do nome da peça (`L1.1/2''X1/8''` em vez de `CONTRAVENTAMENTO`), e 484
+marcas da OP-67 **invisíveis em toda tela** por não terem nenhuma linha em `PecaConjunto`.
 
-⚠⚠ **`"TOTAL.:"` é uma marca no banco, em 4 obras (060, 067, 085, 089)** — o importador da L.E.
-engoliu o rodapé da planilha. A da OP-89 tem `qte` **8705**, e dava para mandar imprimir 8.705
-etiquetas de uma peça que não existe. `lib/itens-expedicao.js` filtra na leitura (`ehLinhaDeTotal`),
-o que trata as duas telas de uma vez — **consertar o importador e limpar as 4 linhas continua
-pendente**.
+Conferido linha a linha contra a planilha: OP-97, 60, 67, 85 e 121 batem **exatamente** (marcas e
+peças); a OP-89 soma as poucas marcas que só existem no cadastro (planilha 8705 + 204 = 8909).
 
-⚠ **Duas fontes da mesma LE, e nenhuma cobre tudo.** `naLE` na peça vem do importador da Produção;
-a tabela `ListaExpedicao` vem da planilha do SharePoint pela Expedição. Onde os dois rodaram eles
-concordam; a OP-118 só tem `naLE` e a OP-101 só tem `ListaExpedicao`. A tela usa a **união** —
-olhar uma fonte só faz obra inteira sumir do seletor.
+⚠ **`"TOTAL.:"` é uma marca no banco**, em 4 obras (060, 067, 085, 089) — o importador da L.E.
+engoliu o rodapé da planilha; a da OP-89 tinha `qte` 8705. `ehLinhaDeTotal` filtra na leitura.
+Consertar o importador e limpar as linhas continua pendente.
+
+⚠ **O histórico de impressão é gravado pela MARCA (`entity: "EtiquetaCarregamento"`,
+`entityId: "<opNumero>|<MARCA>"`), não pelo id de `PecaConjunto`.** O id não sobrevive à
+reimportação da lista — mesma lição já gravada no schema em `LiberacaoProducao.pecaMarcas` — e
+agora existe item legítimo sem NENHUMA linha no cadastro. Registros antigos (`entity:
+"PecaConjunto"`) continuam lidos junto, senão a coluna diria "nunca impressa" para etiqueta que
+já saiu.
 
 ⚠ **A contagem sai sem zero à esquerda** ("3/3", "300/300"). O "001/1" da etiqueta antiga era
 limitação do BarTender, que importava a planilha com o campo de largura fixa — aqui o número vem
@@ -322,8 +322,8 @@ O cabeçalho da lista tem os **funis tipo Excel** do `components/FiltroColuna` (
 Etiqueta). Peças e Peso ficam sem funil de propósito — número contínuo vira menu de 200 valores.
 
 **Quais já foram impressas** aparece numa coluna da própria lista, com data e "×N" na reimpressão.
-O histórico mora no `AuditLog` (`action: "IMPRIMIR_ETIQUETA_CARREGAMENTO"`, `entity: "PecaConjunto"`),
-não numa coluna de `PecaConjunto`: é a pergunta que a tabela de auditoria já existe para responder,
+O histórico mora no `AuditLog` (`action: "IMPRIMIR_ETIQUETA_CARREGAMENTO"`, ver acima), não numa
+coluna de `PecaConjunto`: é a pergunta que a tabela de auditoria já existe para responder,
 o registro é obrigatório de qualquer jeito, e assim ficam TODAS as impressões, não só a última.
 O carimbo é gravado **depois** de o PDF existir — e uma falha ao gravar não segura o PDF.
 

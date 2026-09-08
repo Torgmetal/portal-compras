@@ -113,10 +113,10 @@ describe("GET — o saldo que a tela mostra", () => {
   it("traz previsto, conferido e saldo de cada marca da L.E.", async () => {
     jaConferido([["T97A140", 1]]);
     const j = await (await GET(new Request("http://localhost/x"), { params })).json();
-    // a ordem é a do banco (orderBy marca) — aqui, a do mock
+    // ⚠ a lista sai ordenada por marca (localeCompare numérico), não na ordem do banco
     expect(j.marcas).toEqual([
-      expect.objectContaining({ marca: "T97A140", previsto: 2, conferido: 1, saldo: 1, completa: false }),
       expect.objectContaining({ marca: "T97-AC8", previsto: 40, conferido: 0, saldo: 40, completa: false }),
+      expect.objectContaining({ marca: "T97A140", previsto: 2, conferido: 1, saldo: 1, completa: false }),
     ]);
     expect(j.progresso).toMatchObject({ previsto: 42, conferido: 1 });
   });

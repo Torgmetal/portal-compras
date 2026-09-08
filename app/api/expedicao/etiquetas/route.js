@@ -3,11 +3,10 @@
 // GET  ?opId=xxx   → as marcas daquela OP, para a tela montar a seleção
 // POST { opId, marcas[] } → o PDF, uma página de 100×50 mm por PEÇA
 //
-// ⚠ NÃO EXISTE IMPORTAÇÃO DE PLANILHA AQUI, E ISSO É DE PROPÓSITO. O fluxo do BarTender era
-// exportar planilha → importar no BarTender → imprimir. Marca, descrição, quantidade e peso já
-// vivem em `PecaConjunto`; a planilha só existia porque o BarTender não enxerga o banco. Tirar
-// esse pulo tira junto a chance de imprimir com dado velho, que é o defeito que planilha
-// intermediária sempre tem.
+// ⚠ NÃO EXISTE UPLOAD DE PLANILHA AQUI, E ISSO É DE PROPÓSITO. O fluxo do BarTender era exportar
+// planilha → importar no BarTender → imprimir. A Lista de Expedição já está no portal (ver
+// `lib/itens-expedicao.js`); a planilha intermediária só existia porque o BarTender não enxerga o
+// banco. Tirar esse pulo tira junto a chance de imprimir com dado velho.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -30,36 +29,48 @@ const erroDeAcesso = (e) =>
 const ACAO = "IMPRIMIR_ETIQUETA_CARREGAMENTO";
 
 /**
+ * A CHAVE DO HISTÓRICO É A MARCA, NÃO O ID DA PEÇA.
+ *
+ * ⚠⚠ O id da linha de `PecaConjunto` não sobrevive à reimportação da lista — é a mesma lição já
+ * gravada no schema, em `LiberacaoProducao.pecaMarcas`: "o id da peça não sobrevive à
+ * reimportação/exclusão da lista; a marca sim". E desde que a lista passou a ser definida pela
+ * Lista de Expedição, existe item legítimo SEM nenhuma linha no cadastro (a OP-67 tem 1.519), que
+ * por id não teria onde ser registrado.
+ *
+ * ⚠ Registros ANTIGOS foram gravados por id (`entity: "PecaConjunto"`). São lidos também, senão a
+ * coluna diria "nunca impressa" para etiqueta que saiu — ver `historicoDaMarca`.
+ */
+const ENTIDADE = "EtiquetaCarregamento";
+const chaveHistorico = (opNumero, marca) => `${opNumero}|${String(marca).trim().toUpperCase()}`;
+
+/**
  * Quando cada marca saiu impressa, e quantas vezes.
  *
- * ⚠ O HISTÓRICO MORA NO `AuditLog`, NÃO NUMA COLUNA NOVA DA PEÇA. Duas razões, nessa ordem:
- * "quem imprimiu e quando" é exatamente o que a tabela de auditoria existe para responder — e o
- * CLAUDE.md manda registrar toda mutação nela de qualquer jeito, então a coluna seria a segunda
- * cópia do mesmo fato. E `PecaConjunto` tem 12 mil linhas em produção; guardar a REIMPRESSÃO ali
- * daria só a última, enquanto aqui ficam todas.
+ * ⚠ O HISTÓRICO MORA NO `AuditLog`, NÃO NUMA COLUNA NOVA. "Quem imprimiu e quando" é exatamente o
+ * que a tabela de auditoria existe para responder — e o CLAUDE.md manda registrar toda mutação nela
+ * de qualquer jeito, então a coluna seria a segunda cópia do mesmo fato. Uma coluna também daria só
+ * a ÚLTIMA impressão; aqui ficam todas.
  */
-async function impressoes(pecaIds) {
-  if (!pecaIds.length) return new Map();
+async function impressoes(chaves, idsLegados) {
+  const onde = [];
+  if (chaves.length) onde.push({ entity: ENTIDADE, entityId: { in: chaves } });
+  if (idsLegados.length) onde.push({ entity: "PecaConjunto", entityId: { in: idsLegados } });
+  if (!onde.length) return new Map();
+
   const por = await prisma.auditLog.groupBy({
     by: ["entityId"],
-    where: { entity: "PecaConjunto", action: ACAO, entityId: { in: pecaIds } },
+    where: { action: ACAO, OR: onde },
     _max: { createdAt: true },
     _count: { _all: true },
   });
   return new Map(por.map((r) => [r.entityId, { em: r._max.createdAt, vezes: r._count._all }]));
 }
 
-/**
- * O histórico de uma marca, somando TODAS as linhas dela.
- *
- * ⚠ A mesma marca tem até três linhas de `PecaConjunto` na mesma obra (ver `linhaQueVale` em
- * `lib/itens-expedicao.js`). A impressão foi gravada contra a linha que estava na tela naquele dia
- * — olhar só a linha escolhida hoje faria a coluna dizer "nunca impressa" para etiqueta que saiu.
- */
-function historicoDaPeca(hist, ids) {
+/** O histórico de uma marca: a chave nova mais todos os ids antigos daquela marca. */
+function historicoDaMarca(hist, chave, ids) {
   let em = null, vezes = 0;
-  for (const id of ids) {
-    const h = hist.get(id);
+  for (const k of [chave, ...ids]) {
+    const h = hist.get(k);
     if (!h) continue;
     vezes += h.vezes;
     if (!em || (h.em && h.em > em)) em = h.em;
@@ -68,17 +79,18 @@ function historicoDaPeca(hist, ids) {
 }
 
 async function carregar(opId) {
-  // ⚠ SÓ O QUE ESTÁ NA LE — a regra e o porquê moram em `lib/itens-expedicao.js`, que é a mesma
-  // fonte usada pela Conferência de Peça. Etiquetar posição é colar adesivo em peça que vai ser
-  // soldada dentro de outra.
-  const dados = await itensExpediveisDaOP(prisma, opId, { campos: { pesoUnitKg: true, status: true } });
+  // ⚠ QUEM DEFINE A LISTA É A LISTA DE EXPEDIÇÃO — a regra e o porquê moram em
+  // `lib/itens-expedicao.js`, a mesma fonte usada pela Conferência de Peça.
+  const dados = await itensExpediveisDaOP(prisma, opId);
   if (!dados) return null;
-  const hist = await impressoes(dados.pecas.flatMap((p) => p.ids));
+
+  const chaves = dados.pecas.map((p) => chaveHistorico(dados.op.numero, p.marca));
+  const hist = await impressoes(chaves, dados.pecas.flatMap((p) => p.ids));
   return {
     op: dados.op,
-    pecas: dados.pecas.map(({ ids, ...p }) => {
-      const h = historicoDaPeca(hist, ids);
-      return { ...p, impressaEm: h.em, impressoes: h.vezes };
+    pecas: dados.pecas.map(({ ids, id: _id, naPlanilha: _naPlanilha, ...p }, i) => {
+      const h = historicoDaMarca(hist, chaves[i], ids);
+      return { ...p, id: chaves[i], impressaEm: h.em, impressoes: h.vezes };
     }),
   };
 }
@@ -134,8 +146,8 @@ async function registrarImpressao(user, op, pecas) {
       data: pecas.map((p) => ({
         userId: user?.id || null,
         action: ACAO,
-        entity: "PecaConjunto",
-        entityId: p.id,
+        entity: ENTIDADE,
+        entityId: chaveHistorico(op.numero, p.marca),
         diff: { op: op.numero, marca: p.marca, etiquetas: Math.max(1, p.qte || 1), por: user?.name || null },
       })),
     });

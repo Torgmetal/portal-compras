@@ -38,7 +38,7 @@ beforeEach(() => {
 
 describe("a lista de marcas é a Lista de Expedição", () => {
   it("as posições de fábrica ficam de fora", async () => {
-    expect(await marcas(await get("?opId=op1"))).toEqual(["T97A140", "T97-AC8"]);
+    expect(await marcas(await get("?opId=op1"))).toEqual(["T97-AC8", "T97A140"]);
   });
 
   // ⚠ Filtrar por tipoPeca deixaria o parafuso de fora — e ele sobe no caminhão.
@@ -50,9 +50,10 @@ describe("a lista de marcas é a Lista de Expedição", () => {
     mockPrisma.listaExpedicao.findMany.mockResolvedValue([
       { marcasJson: [{ marca: "T97A180", descricao: "VIGA", qte: 2 }] },
     ]);
-    expect(await marcas(await get("?opId=op1"))).toEqual(["T97A140", "T97-AC8", "T97A180"]);
+    expect(await marcas(await get("?opId=op1"))).toEqual(["T97-AC8", "T97A140", "T97A180"]);
   });
 
+  // ⚠ a comparação é por chave normalizada; a GRAFIA exibida vem do cadastro, que é a registrada.
   it("compara a marca sem se importar com espaço nem caixa", async () => {
     mockPrisma.listaExpedicao.findMany.mockResolvedValue([{ marcasJson: [{ marca: " t97a180 " }] }]);
     expect(await marcas(await get("?opId=op1"))).toContain("T97A180");
@@ -62,7 +63,7 @@ describe("a lista de marcas é a Lista de Expedição", () => {
     mockPrisma.listaExpedicao.findMany.mockResolvedValue([
       { marcasJson: null }, { marcasJson: [] }, { marcasJson: [{ semMarca: 1 }] },
     ]);
-    expect(await marcas(await get("?opId=op1"))).toEqual(["T97A140", "T97-AC8"]);
+    expect(await marcas(await get("?opId=op1"))).toEqual(["T97-AC8", "T97A140"]);
   });
 
   // ⚠ "097" e "97" são a mesma obra em tabelas diferentes.
@@ -112,7 +113,6 @@ describe("a mesma marca em várias chaves de OP vira UMA linha", () => {
     mockPrisma.pecaConjunto.findMany.mockResolvedValue(TRES);
     const j = await (await get("?opId=op1")).json();
     expect(j.pecas[0].descricao).toBe("CONTRAVENTAMENTO");
-    expect(j.pecas[0].id).toBe("b");
   });
 
   it("sem linha da L.E., fica a que existir", async () => {
@@ -192,7 +192,7 @@ describe("a quantidade vem da planilha da L.E. quando ela existe", () => {
       [{ id: "c", marca: "T89C98", descricao: "L1.1/2''X1/8''", qte: 7, naLE: true, fonte: "LE_IMPORT" }]);
     mockPrisma.listaExpedicao.findMany.mockResolvedValue([{ marcasJson: [{ marca: "OUTRA", qte: 1 }] }]);
     const j = await (await get("?opId=op1")).json();
-    expect(j.pecas[0]).toMatchObject({ marca: "T89C98", qte: 7 });
+    expect(j.pecas.find((p) => p.marca === "T89C98")).toMatchObject({ qte: 7 });
   });
 
   it("planilha com qte zerada ou ausente não zera a peça", async () => {

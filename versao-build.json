@@ -1,7 +1,12 @@
 {
-  "build": 3017,
-  "gerado": "2026-09-08T20:57:03.062Z",
+  "build": 3018,
+  "gerado": "2026-09-08T21:10:08.025Z",
   "commits": [
+    {
+      "hash": "f5c40fac74",
+      "data": "08/09/2026",
+      "titulo": "Expedição: uma linha por marca, e a quantidade vem da L.E."
+    },
     {
       "hash": "d5dd37a0eb",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7c381275c4",
       "data": "08/09/2026",
       "titulo": "CLAUDE.md: como o versao-build.json derruba o build, e o hook novo"
-    },
-    {
-      "hash": "e659fa3162",
-      "data": "08/09/2026",
-      "titulo": "Hook de pre-push: barra marcador de conflito e JSON quebrado"
     }
   ]
 }
