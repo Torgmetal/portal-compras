@@ -11,7 +11,7 @@
 //
 // ⚠⚠ A PRONTIDÃO NÃO TRAVA NADA. Vitor (01/09/2026, corrigindo a primeira versão): "para a
 // liberação da montagem no planejamento não precisa estar com os croquis prontos para ele liberar,
-// apenas colocar para poder lançar para o PCP". Eu tinha feito o contrário — só deixava programar
+// apenas colocar para poder lançar para o PCP". Eu tinha feito o contrário — só deixava liberar
 // conjunto com TODOS os croquis cortados —, e isso invertia quem decide: o planejamento marca a
 // data olhando o cronograma, e o corte corre atrás. A prontidão fica na tela como INFORMAÇÃO, para
 // ele saber o que está pedindo; ordena a lista, mas não impede seleção nenhuma.
@@ -33,7 +33,7 @@ const fmtDiaLongo = (iso) => {
   return `${semana} ${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" })}`;
 };
 
-export default function MontagemConjuntos({ opId, marcoMontagem }) {
+export default function MontagemConjuntos({ opId }) {
   const [conjuntos, setConjuntos] = useState(null);
   const [montados, setMontados] = useState({});
   const [motivos, setMotivos] = useState({});
@@ -51,7 +51,7 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
   // dia caiu aquela marca" —, e uma busca só serviria mal às duas.
   const [buscaProg, setBuscaProg] = useState("");
   // ⚠ o dia sugerido é o MARCO do cronograma, não hoje: é ele que o planejamento veio olhar.
-  const [dia, setDia] = useState(marcoMontagem || isoHoje());
+
   const [agindo, setAgindo] = useState(false);
 
   const carregar = useCallback(async () => {
@@ -68,7 +68,7 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
   }, [opId]);
   useEffect(() => { carregar(); }, [carregar]);
-  useEffect(() => { if (marcoMontagem) setDia(marcoMontagem); }, [marcoMontagem]);
+
 
   const lista = useMemo(() => (conjuntos || []).map((c) => {
     const q = Number(c.qte) || 1;
@@ -79,7 +79,7 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
   // ⚠ ORDENA pela prontidão (mais cortado primeiro), mas TODOS entram na mesma lista e todos podem
   // ser selecionados — a ordem ajuda a escolher, não decide por ninguém.
   const aProgramar = useMemo(() => lista
-    .filter((c) => !c.montagemDiaProgramado && !c.montado)
+    .filter((c) => !c.liberadaParaPcp && !(c.liberadaParaPcp || c.montagemDiaProgramado) && !c.montado)
     .sort((a, b) => (b.prontidao?.pct || 0) - (a.prontidao?.pct || 0)
       || String(a.marca).localeCompare(String(b.marca), "pt-BR", { numeric: true })),
     [lista]);
@@ -111,7 +111,7 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
     const hojeIso = isoHoje();
     const termos = semAcento(buscaProg).split(/\s+/).filter(Boolean);
     const m = new Map();
-    for (const c of lista.filter((c) => c.montagemDiaProgramado && !c.montado)) {
+    for (const c of lista.filter((c) => (c.liberadaParaPcp || c.montagemDiaProgramado) && !c.montado)) {
       const k = isoDe(c.montagemDiaProgramado);
       if (!m.has(k)) m.set(k, []);
       m.get(k).push(c);
@@ -130,7 +130,7 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
   }, [lista, buscaProg]);
   const progFiltrando = buscaProg.trim().length > 0;
   const progTotal = useMemo(
-    () => lista.filter((c) => c.montagemDiaProgramado && !c.montado).length,
+    () => lista.filter((c) => (c.liberadaParaPcp || c.montagemDiaProgramado) && !c.montado).length,
     [lista],
   );
 
@@ -253,7 +253,7 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
 
       <div className="flex items-center gap-3 flex-wrap text-[12px] text-torg-gray">
         <span><b className="text-emerald-700">{prontos.length}</b> prontos · {fmtKg(somaKg(prontos))}</span>
-        <span><b className="text-torg-dark">{grupos.reduce((s, g) => s + g.lista.length, 0)}</b> programados</span>
+        <span><b className="text-torg-dark">{grupos.reduce((s, g) => s + g.lista.length, 0)}</b> liberados ao PCP</span>
         <span><b className="text-torg-dark">{montadosN}</b> já montados</span>
         {aProgramar.length > prontos.length && (
           <span>{aProgramar.length - prontos.length} ainda com croqui na máquina</span>
@@ -263,22 +263,12 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
       {sel.size > 0 && (
         <div className="bg-torg-blue-50/60 border border-torg-blue-100 rounded-lg px-3 py-2 flex items-center gap-2 flex-wrap">
           <span className="text-[12px] font-semibold text-torg-dark">{sel.size} conjunto(s) · {fmtKg(somaKg(selecao))}</span>
-          <label className="text-[12px] text-torg-gray ml-1">Início da montagem</label>
-          <input type="date" value={dia} onChange={(e) => setDia(e.target.value)}
-            className="px-2 py-1 text-[12px] border border-gray-200 rounded-lg" />
-          <button onClick={() => agir({ acao: "programar", ids: [...sel], dia }, "programado(s)")}
-            disabled={agindo || !dia}
+          <button onClick={() => agir({ acao: "liberar", opId, ids: [...sel] }, "liberado(s) para o PCP, sem data")}
+            disabled={agindo}
             className="px-3 py-1.5 bg-torg-blue text-white text-[12px] font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-1 disabled:opacity-50">
-            {agindo ? <Loader2 size={12} className="animate-spin" /> : <CalendarClock size={12} />} Programar
+            {agindo ? <Loader2 size={12} className="animate-spin" /> : <ArrowRight size={12} />} Liberar para o PCP
           </button>
-          <button onClick={() => agir({ acao: "adiar", ids: [...sel] }, "levado(s) para o próximo dia útil")} disabled={agindo}
-            className="px-2.5 py-1.5 border border-red-200 text-red-700 text-[12px] rounded-lg hover:bg-red-50 disabled:opacity-50">
-            Adiar 1 dia
-          </button>
-          <button onClick={() => agir({ acao: "desprogramar", ids: [...sel] }, "tirado(s) do plano")} disabled={agindo}
-            className="px-2.5 py-1.5 border border-gray-200 text-torg-gray text-[12px] rounded-lg hover:bg-gray-50 disabled:opacity-50">
-            Desprogramar
-          </button>
+          <span className="text-xs text-torg-gray">Datas e bancadas são definidas no PCP.</span>
           <button onClick={() => setSel(new Set())} className="ml-auto p-1 text-torg-gray hover:bg-white rounded"><X size={13} /></button>
         </div>
       )}
@@ -403,11 +393,11 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
                 Todos os conjuntos desta obra já estão programados ou montados.
               </p>
             )}
-            {/* ⚠ "a busca não achou" ≠ "não tem nada a programar": sem separar, quem procurou
+            {/* ⚠ "a busca não achou" ≠ "não tem nada a liberar": sem separar, quem procurou
                 errado concluiria que a obra acabou. */}
             {aProgramar.length > 0 && visiveis.length === 0 && (
               <p className="text-[11px] text-torg-gray italic py-4 text-center">
-                Nenhum conjunto com <b className="not-italic font-mono">{busca.trim()}</b> entre os {aProgramar.length} a programar.{" "}
+                Nenhum conjunto com <b className="not-italic font-mono">{busca.trim()}</b> entre os {aProgramar.length} a liberar.{" "}
                 <button onClick={() => setBusca("")} className="underline not-italic">limpar a busca</button>
               </p>
             )}
@@ -423,7 +413,7 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
             <div className="w-full flex flex-col gap-2">
               <div className="flex items-baseline gap-1.5 flex-wrap">
                 <CalendarClock size={11} className="shrink-0 self-center" />
-                <span className="font-bold uppercase tracking-wide">programado</span>
+                <span className="font-bold uppercase tracking-wide">liberados ao PCP</span>
                 <span className="font-semibold tabular-nums">{grupos.reduce((s, g) => s + g.lista.length, 0)} conj</span>
                 {progFiltrando && (
                   <span className="font-normal tabular-nums text-torg-gray-light">de {progTotal}</span>
@@ -454,7 +444,7 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
                 <button onClick={() => setBuscaProg("")} className="underline not-italic">limpar a busca</button>
               </p>
             ) : (
-              <p className="text-[11px] text-torg-gray italic py-6 text-center">Nada programado — selecione conjuntos ao lado e marque o dia.</p>
+              <p className="text-[11px] text-torg-gray italic py-6 text-center">Nenhum conjunto liberado — selecione ao lado e envie ao PCP.</p>
             ))}
             {grupos.map((g) => (
               <div key={g.iso} className="space-y-1.5 pb-1">
@@ -463,21 +453,12 @@ export default function MontagemConjuntos({ opId, marcoMontagem }) {
                     : g.hoje ? "bg-amber-50 border-amber-200 text-amber-800"
                     : "bg-white border-gray-100 text-torg-gray"}`}>
                   <CalendarClock size={11} />
-                  <span className="font-bold uppercase tracking-wide">{fmtDiaLongo(g.iso)}</span>
+                  <span className="font-bold uppercase tracking-wide">{g.iso ? fmtDiaLongo(g.iso) : "Liberados · data a definir no PCP"}</span>
                   <span className="font-semibold">
                     {g.lista.length}{progFiltrando && g.todos.length !== g.lista.length ? ` de ${g.todos.length}` : ""} conj · {fmtKg(g.kg)}
                   </span>
                   {g.hoje && <span className="font-semibold">· hoje</span>}
-                  {g.atrasado && (
-                    <button onClick={() => agir({ acao: "adiar", ids: g.todos.map((c) => c.id) }, "levado(s) para o próximo dia útil")}
-                      disabled={agindo}
-                      title={progFiltrando && g.todos.length !== g.lista.length
-                        ? `Leva os ${g.todos.length} do dia, não só os ${g.lista.length} da busca`
-                        : "Leva o dia inteiro para o próximo dia útil"}
-                      className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-50">
-                      <ArrowRight size={10} /> levar p/ o próximo dia
-                    </button>
-                  )}
+
                 </div>
                 {g.lista.map((c) => <Card key={c.id} c={c} sel={sel} onToggle={toggle} alerta={g.atrasado} />)}
               </div>

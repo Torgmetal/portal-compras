@@ -1,7 +1,12 @@
 {
-  "build": 2963,
-  "gerado": "2026-09-08T11:56:16.439Z",
+  "build": 2964,
+  "gerado": "2026-09-08T12:05:19.373Z",
   "commits": [
+    {
+      "hash": "d2539b11",
+      "data": "08/09/2026",
+      "titulo": "Gantt: a fila sem máquina também fica em hoje; a data de entrada vira idade"
+    },
     {
       "hash": "73026e7e",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "05479d3e",
       "data": "07/09/2026",
       "titulo": "Relatório de produção: avanço real por setor e Excel geral das OPs abertas"
-    },
-    {
-      "hash": "06ed7e2e",
-      "data": "07/09/2026",
-      "titulo": "Jato e pintura: a fila passa a mostrar o m² das peças"
     }
   ]
 }

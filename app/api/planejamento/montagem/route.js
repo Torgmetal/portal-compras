@@ -14,6 +14,8 @@ import { proximoDiaUtil, isoDia } from "@/lib/programacao-dia";
 import { calcularProntidao, CONJUNTO_MONTAVEL } from "@/lib/prontidao-conjunto";
 import { produzidoPorMarca } from "@/lib/conjuntos-setor";
 
+import {liberarMontagemSemData,conjuntosLiberadosMontagem} from '@/lib/planejamento-liberacao-montagem';
+
 const ROLES = ["ADMIN", "PLANEJAMENTO", "PCP"];
 
 // GET ?opId=… → os conjuntos daquela obra, com a prontidão de cada um
@@ -72,18 +74,21 @@ export async function GET(req) {
       : "peça avulsa — não passa pela montagem";
   }
 
+  const libs=await prisma.liberacaoProducao.findMany({where:{opId,status:{in:['LIBERADA','EM_PRODUCAO']},setores:{array_contains:['MONTAGEM']}},select:{frente:true,pecaIds:true,pecaMarcas:true}});
+  const liberadas=conjuntosLiberadosMontagem(libs,conjuntos);
   return NextResponse.json({
     // ⚠ NÃO devolve se o PCP já imprimiu. Chegou a devolver (`liberado`, por GRD) para uma faixa
     // "esperando descer" nesta tela; Vitor (01/09/2026): "vamos tirar o do planejamento, é melhor".
     // O sinal ficou só no painel do PCP, onde é "liberado para montagem" — lá quem lê AGE. Sem
     // consumidor, a consulta da GRD era um roundtrip por carregamento servindo campo que ninguém lê.
-    conjuntos: conjuntos.map((c) => ({ ...c, prontidao: calcularProntidao(c), conjuntoCroquis: undefined })),
+    conjuntos: conjuntos.map((c) => ({ ...c, liberadaParaPcp:liberadas.has(c.id), prontidao: calcularProntidao(c), conjuntoCroquis: undefined })),
     montados,
     motivos,
   });
 }
 
 const schema = z.discriminatedUnion("acao", [
+  z.object({acao:z.literal("liberar"),opId:z.string().min(1),ids:z.array(z.string().min(1)).min(1).max(2000)}),
   z.object({
     acao: z.literal("programar"),
     ids: z.array(z.string()).min(1, "Selecione ao menos um conjunto"),
@@ -103,6 +108,10 @@ export async function POST(req) {
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
   const agora = new Date();
+  if(body.acao==='liberar'){
+    try{return NextResponse.json(await liberarMontagemSemData(prisma,{...body,user,agora}));}
+    catch{return NextResponse.json({error:'Não foi possível liberar os conjuntos. Tente novamente.'},{status:500});}
+  }
   const avisos = [];
   let atualizados = 0;
   // ⚠ a rota devolve QUAIS conjuntos mudaram, não só quantos: a tela precisa saber exatamente o

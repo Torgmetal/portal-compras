@@ -22,6 +22,7 @@ import CompraChip, { ModalRastreabilidade } from "@/components/CompraChip";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 import SeparacaoModal from "@/components/SeparacaoModal";
 import GanttProgramacao from "./GanttProgramacao";
+import UltimasLiberacoes from "../UltimasLiberacoes";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 // ⚠ o download do ZIP vem da lib (era a TERCEIRA cópia da mesma função neste repositório); ela
 // suporta a pasta por bancada, que a cópia local não tinha.
@@ -234,11 +235,11 @@ export default function ProducaoClient() {
     finally { setCarregandoDet(false); }
   }, []);
 
-  function abrir(op) {
-    if (aberta === op.opId) { setAberta(null); setDetalhe(null); return; }
+  function abrir(op, setorSolicitado) {
+    if (aberta === op.opId && !setorSolicitado) { setAberta(null); setDetalhe(null); return; }
     // ⚠ abre no setor que o filtro já escolheu; sem filtro, no primeiro que tem fila — é onde a
     // obra está parada, e é a pergunta que o PCP faz ao clicar.
-    const setor = op.setores.find((s) => s.pendenteKg > 0)?.setor || op.setores[0]?.setor || "";
+    const setor = setorSolicitado || op.setores.find((s) => s.pendenteKg > 0)?.setor || op.setores[0]?.setor || "";
     setAberta(op.opId); setSetorAba(setor); setDetalhe(null); setFiltroPecas(""); limparColunas(); setColAberta(null);
     carregarDetalhe(op.opId, setor);
   }
@@ -253,7 +254,7 @@ export default function ProducaoClient() {
   // sem fila nem alerta continua fora da lista. Tirar o controle e ligar tudo de volta encheria a
   // tela com o que ele acabou de mandar limpar.
   const ops = useMemo(
-    () => (dados?.ops || []).filter((o) => o.kg.pendente > 0 || o.alertas.length > 0),
+    () => (dados?.ops || []).filter((o) => o.kg.pendente > 0 || o.alertas.length > 0 || o.liberacoes?.some(l=>['LIBERADA','EM_PRODUCAO'].includes(l.status))),
     [dados]
   );
 
@@ -534,6 +535,10 @@ export default function ProducaoClient() {
       {/* ⚠ NO TOPO DE TUDO. Vitor (05/09/2026): "na PÁGINA do PCP, quero que crie acima desse painel
           um gantt que seja visualmente fácil de ver". É o quadro de QUANDO — dia, bancada e o que
           não cabe —, e é dele que se decide o que abrir na lista abaixo. */}
+      <UltimasLiberacoes ops={dados?.ops || []} onAbrir={(opId,setor)=>{
+        const op=dados?.ops?.find(o=>o.opId===opId);if(op)abrir(op,setor);
+        requestAnimationFrame(()=>document.getElementById('pcp-op-'+opId)?.scrollIntoView({behavior:'smooth',block:'start'}));
+      }}/>
       <GanttProgramacao />
 
       {loading ? (
@@ -565,7 +570,7 @@ export default function ProducaoClient() {
           {ops.map((o) => {
             const open = aberta === o.opId;
             return (
-              <div key={o.opId} className={`bg-white rounded-xl border shadow-[0_1px_3px_rgba(0,41,69,0.06)] overflow-hidden ${open ? "border-torg-blue-200" : "border-gray-100"}`}>
+              <div id={"pcp-op-"+o.opId} key={o.opId} className={`bg-white rounded-xl border shadow-[0_1px_3px_rgba(0,41,69,0.06)] overflow-hidden ${open ? "border-torg-blue-200" : "border-gray-100"}`}>
                 {/* ⚠ DIV, NÃO BUTTON. A linha carrega o CompraChip, que é um botão com modal
                     próprio — botão dentro de botão é HTML inválido e o React avisa em cada
                     render. O chevron é o botão de verdade (é por ele que o teclado abre a OP);

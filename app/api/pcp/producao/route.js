@@ -145,6 +145,7 @@ export async function GET(req) {
       dataProgramada: l.dataProgramada ? l.dataProgramada.toISOString().slice(0, 10) : null,
       pecas: Array.isArray(l.pecaIds) ? l.pecaIds.length : null,
       totalKg: l.totalKg || null,
+      totalPecas: l.totalPecas ?? null,
       desvioDias: l.desvioDias, desvioMotivo: l.desvioMotivo,
     });
     porOpLib.set(l.opId, g);

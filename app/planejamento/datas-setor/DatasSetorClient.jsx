@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { CalendarClock, Loader2, AlertCircle, RefreshCw, Send, Wrench } from "lucide-react";
 import LiberarFrentes from "./LiberarFrentes";
-import CargaDosDias from "./CargaDosDias";
+
 import MontagemConjuntos from "./MontagemConjuntos";
 
 
@@ -11,16 +11,11 @@ export default function DatasSetorClient() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [opSel, setOpSel] = useState("");
-  // ⚠ duas abas na MESMA obra: liberar o corte para o PCP e marcar o dia da montagem. Vitor
-  // (01/09/2026): "não era isso, queria dentro da aba de datas por setor" — a primeira versão
-  // ficou numa tela própria e obrigava a escolher a obra de novo, longe do marco que a justifica.
+  // Preparação e montagem compartilham a seleção da OP; datas ficam no PCP.
   const [aba, setAba] = useState("PCP");
-  // ⚠ o painel de carga tem de recarregar depois de cada liberação: o dia que acabou de ser
-  // preenchido precisa aparecer cheio, senão alguém o programa duas vezes.
-  const [recarga, setRecarga] = useState(0);
 
   const carregar = useCallback(async () => {
-    setLoading(true); setErro(""); setRecarga((n) => n + 1);
+    setLoading(true); setErro("");
     try {
       const res = await fetch("/api/planejamento/datas-setor", { cache: "no-store" });
       const j = await res.json();
@@ -33,8 +28,6 @@ export default function DatasSetorClient() {
   const ops = dados?.ops || [];
   const op = ops.find((o) => o.opNumero === opSel) || null;
 
-  // ⚠ o dia de hoje em ISO, para dizer qual marco já venceu
-  new Date().toISOString().slice(0, 10);
 
   return (
     <div className="max-w-6xl">
@@ -43,7 +36,7 @@ export default function DatasSetorClient() {
           <div className="bg-torg-blue-50 p-2.5 rounded-xl"><CalendarClock size={24} className="text-torg-blue" /></div>
           <div>
             <h1 className="text-2xl font-bold text-torg-dark">Programação PCP</h1>
-            <p className="text-sm text-torg-gray">Escolha a obra e libere o que desce para o PCP — o corte por frente e o dia de cada conjunto na montagem</p>
+            <p className="text-sm text-torg-gray">Escolha a OP, as peças e o setor. O PCP define as datas e as bancadas.</p>
           </div>
         </div>
         <button onClick={carregar} className="p-2.5 rounded-xl bg-white border border-torg-blue-100 hover:border-torg-blue-300 text-torg-dark"><RefreshCw size={18} className={loading ? "animate-spin" : ""} /></button>
@@ -55,11 +48,7 @@ export default function DatasSetorClient() {
         <div className="flex flex-col items-center justify-center py-24 text-center"><AlertCircle size={40} className="text-red-500 mb-3" /><p className="text-red-600 mb-3">{erro}</p><button onClick={carregar} className="text-sm bg-white border border-torg-blue-100 px-4 py-2 rounded-lg inline-flex items-center gap-2"><RefreshCw size={14} /> Tentar de novo</button></div>
       ) : (
         <div className="space-y-6">
-          {/* ⚠⚠ FIXO ACIMA DO SELETOR. Vitor (03/09/2026): "deixe isso travado logo acima do seletor
-              de OP, não para aparecer quando clicarmos na OP". A carga do dia é da FÁBRICA — quem
-              chega para programar precisa ver o que já desceu ANTES de escolher a obra, senão
-              escolhe a obra e o dia por instinto e confere depois. */}
-          <CargaDosDias opId={op?.opId || null} recarga={recarga} />
+
 
           {/* Seletor + formulário */}
           <div className="bg-white rounded-xl border border-torg-blue-100 p-5">
@@ -74,17 +63,9 @@ export default function DatasSetorClient() {
             </div>
 
             {!op ? (
-              <p className="text-sm text-torg-gray py-6 text-center">Escolha uma OP acima (ou clique numa linha da tabela) para ver os marcos e liberar para o PCP.</p>
+              <p className="text-sm text-torg-gray py-6 text-center">Escolha uma OP acima para selecionar as peças e liberar para o PCP.</p>
             ) : (
               <>
-                {/* ⚠ A GRADE DOS SETE MARCOS SAIU (Vitor, 01/09/2026: "pode tirar essa parte
-                    tbm"). Ela repetia, em sete cartões, o que a "Visão geral das obras" logo
-                    abaixo já mostra em tabela — e empurrava para baixo o que a pessoa vem fazer
-                    aqui, que é liberar. O DADO continua: o marco do cronograma segue alimentando a
-                    data sugerida da montagem (`datasSetorCrono.MONTAGEM`) e o desvio da liberação.
-
-                    ⚠ A data digitada à mão também continua no banco e mandando na TV de
-                    Prioridades — ela não dependia desta tela para existir. */}
 
                 {/* ── liberar para o PCP, por frente ── */}
                 {/* ⚠ a data acima é MARCO, não gatilho: quem libera é alguém, aqui, e o desvio
@@ -110,22 +91,17 @@ export default function DatasSetorClient() {
                   {aba === "PCP" ? (
                     <>
                       <p className="text-[12px] text-torg-gray mb-3">
-                        As datas acima são o <b>marco</b> de início. Liberar é decisão — pode ser antes ou
-                        depois, e o desvio fica registrado.
+                        Selecione as peças de preparação para liberar ao PCP, sem informar data.
                       </p>
                       <LiberarFrentes opId={op.opId} opNumero={op.opNumero} onMudou={carregar} />
                     </>
                   ) : (
                     <>
                       <p className="text-[12px] text-torg-gray mb-3">
-                        O dia em que cada <b>conjunto</b> entra na montagem. Entram no plano os que têm
-                        <b> todas as sub peças cortadas</b>; o resto fica separado, para você ver e decidir.
+                        Libere os <b>conjuntos</b> para o PCP. A prontidão dos croquis é informativa; as datas serão definidas no painel do PCP.
                       </p>
-                      {/* ⚠ o marco do cronograma vira a data sugerida — é ele que o planejamento
-                          veio olhar; abrir o campo em "hoje" convidaria a ignorar o combinado. */}
                       <MontagemConjuntos
                         opId={op.opId}
-                        marcoMontagem={op.datasSetorCrono?.MONTAGEM || op.datasSetor?.MONTAGEM || ""}
                       />
                     </>
                   )}

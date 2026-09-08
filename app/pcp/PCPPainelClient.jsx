@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight, RefreshCw, CalendarRange, ChevronLeft } from 'lucide-react';
+import UltimasLiberacoes from './UltimasLiberacoes';
 import PCPDashboardClient from './PCPDashboardClient';
 import { resumoPainel } from '@/lib/pcp-painel-resumo';
 import { MAQUINA_LABEL } from '@/lib/maquina-corte';
@@ -51,6 +52,7 @@ export default function PCPPainelClient({ isAdmin }) {
       <div className={s.actions}><button disabled={loading} onClick={() => carregar()}><RefreshCw size={15}/>{loading ? 'Atualizando…' : 'Atualizar'}</button><Link className={s.primary} href="/pcp/producao"><CalendarRange size={16}/> Programação</Link></div></header>
     <nav className={s.tabs} aria-label="Seções do painel"><a href="#visao-pcp">Visão geral</a><a href="#fluxo-pcp">Fluxo da fábrica</a><a href="#prioridades-pcp">Prioridades</a><button onClick={() => setDetalhe(true)}>Detalhamento do corte</button></nav>
     {erros.length > 0 && <p role="alert" className={s.warning}>Não foi possível carregar: {erros.join(', ')}. Os indicadores dessa fonte estão indisponíveis. Tente atualizar.</p>}
+    <UltimasLiberacoes ops={fontes.producao?.ops || []}/>
     <div className={s.metrics} id="visao-pcp">
       <article><small>Obras com prazo vencido</small><strong className={r.atrasadas > 0 ? s.red : ''}>{n(r.atrasadas)}</strong><p>Entre as obras liberadas ao PCP</p></article>
       <article><small>Maior carga no corte</small><strong>{r.maiorCarga ? n(r.maiorCarga.diasCarga) : '—'} <em>{r.maiorCarga ? 'dias' : ''}</em></strong><p>{r.maiorCarga ? MAQUINA_LABEL[r.maiorCarga.maquina] || r.maiorCarga.maquina : 'Sem capacidade disponível para estimar'}</p></article>
@@ -85,7 +87,7 @@ export default function PCPPainelClient({ isAdmin }) {
     </div>
     <Section number="04" title="Programação liberada" aside={<Link href="/pcp/producao">Abrir programação e Gantt ↗</Link>}>
       {!r.programacoes ? <p className={s.empty}>{loading ? 'Carregando programação…' : 'Programação indisponível.'}</p> : !r.programacoes.length ? <p className={s.empty}>Nenhuma liberação do Planejamento para o PCP.</p> : <div className={s.scroll}><table><thead><tr><th>DIA PROGRAMADO</th><th>OBRA / FRENTE</th><th>PRIORIDADE</th><th>PESO LIBERADO</th></tr></thead><tbody>{r.programacoes.slice(0,8).map((l,i) => <tr key={l.id || i}><td><span className={s.day}>{date(l.dataProgramada)}</span></td><td><b>OP {l.opNumero}</b><small>{l.frente || l.obra || 'Frente não informada'}</small></td><td>{l.prioridade || '—'}</td><td>{t(l.totalKg)}</td></tr>)}</tbody></table>{r.programacoes.length > 8 && <p className={s.legend}>Mostrando 8 de {r.programacoes.length} liberações. A lista completa está na programação.</p>}</div>}
-      <p className={s.legend}>As datas representam a programação do Planejamento. A execução é confirmada pelos apontamentos da fábrica.</p>
+      <p className={s.legend}>As peças são liberadas pelo Planejamento; as datas são definidas no PCP. A execução é confirmada pelos apontamentos da fábrica.</p>
     </Section>
     <footer className={s.footer}><span>PCP · Planejamento e controle da produção</span><span>Última conciliação do corte: {corte?.ultimaBaixa?.em ? new Date(corte.ultimaBaixa.em).toLocaleString('pt-BR') : 'não disponível'}</span></footer>
   </div>;

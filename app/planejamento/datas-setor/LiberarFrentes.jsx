@@ -16,7 +16,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Loader2, AlertCircle, Send, Check, X, CalendarClock, Wand2, Star, RefreshCw, Minus, FileWarning, Timer, FileDown, CalendarRange, FolderTree, PackageSearch } from "lucide-react";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
-import { estimarPrazo, somarDiasUteis, proximoDiaUtil, classeDaPeca, kgPorMetro } from "@/lib/prazo-preparacao";
+import { estimarPrazo, classeDaPeca, kgPorMetro } from "@/lib/prazo-preparacao";
 
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -107,14 +107,6 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   const [marcando, setMarcando] = useState(false);
   const [conferindo, setConferindo] = useState(false);
   const [baixando, setBaixando] = useState(false);
-  // ⚠⚠ O DIA NASCE PREENCHIDO. Vitor liberou 19 peças (8.422 kg) e a pasta não saiu: o campo estava
-  // vazio, e sem dia não há pasta para criar. O campo ser opcional fazia o caminho normal — marcar e
-  // apertar o botão — cair no caminho que NÃO monta a pasta, em silêncio.
-  const [dia, setDia] = useState(() => proximoDiaUtil().toISOString().slice(0, 10));
-  const [programandoSemana, setProgramandoSemana] = useState(false);
-  const [plano, setPlano] = useState(null);
-  const [nDias, setNDias] = useState(5);
-  const [pastas, setPastas] = useState(null);
   // ⚠⚠ DECLARAR O FARDO DO ESTOQUE. Vitor (02/09/2026), na linha da T113A-P64 com "✕ não comprado":
   // "onde eu informo o R aqui?" — e não havia onde. "então deixa onde aparece material não comprado
   // você já coloca material a ser usado de estoque": a PORTA é a própria célula.
@@ -219,20 +211,6 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   }, [setores, lib]);
   const desvio = marco ? Math.round((new Date().setUTCHours(12, 0, 0, 0) - new Date(`${marco}T12:00:00Z`)) / 86400000) : null;
 
-  // ⚠ MARCO VENCIDO NÃO VIRA PROMESSA. Vitor (26/08/2026): "se a data já estiver como atrasa sem
-  // problema preencha com a data nova". Repetir uma data que já passou seria fingir que dá; o que
-  // vale é quando dá se começar agora.
-  const marcoPrazo = useMemo(() => {
-    if (!prazo.diasCheios) return null;
-    const atrasado = desvio != null && desvio > 0;
-    const partida = atrasado || !marco ? proximoDiaUtil() : new Date(`${marco}T12:00:00Z`);
-    return {
-      marco, atrasado,
-      inicio: partida.toISOString().slice(0, 10),
-      fim: somarDiasUteis(partida, prazo.diasCheios - 1).toISOString().slice(0, 10),
-    };
-  }, [marco, desvio, prazo.diasCheios]);
-
   async function preencherDia() {
     const { sugerirDoDia } = await import("@/lib/liberacao-sugestao");
     // ⚠ a sugestão do dia respeita o portão: sugerir peça que o POST vai barrar é fazer a pessoa
@@ -294,7 +272,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         { t: "kg/m", w: 8, dir: "right", v: (p) => Number(kgPorMetro(p).toFixed(1)) },
         { t: "Máquina", w: 10, v: (p) => (p.pool === "CHAPAS" ? "chapa" : "perfil") },
         { t: "Situação", w: 16, v: (p) => (p.cortada ? "já cortada"
-            : p.programadaEm ? (p.programadaEm === "sem data" ? "programada" : `programada ${fmtD(p.programadaEm)}`) : "a fazer") },
+            : p.programadaEm ? (p.programadaEm === "sem data" ? "liberada ao PCP" : `programada ${fmtD(p.programadaEm)}`) : "a fazer") },
         { t: "Prioridade", w: 11, v: (p) => (p.prioridade != null ? "sim" : "") },
         // ⚠ a coluna "Selecionada" só faz sentido na lista inteira — na planilha da seleção ela
         // seria uma coluna inteira de "sim".
@@ -307,7 +285,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         subtitulo: [
           daSelecao ? `Seleção: ${fmtN(somaSel.n)} peça(s)` : "Lista completa",
           f.ativos ? `Filtro: ${f.rotulosAtivos.join(", ")}` : soAFazer ? "Só as a fazer" : "Todas",
-          dia ? `Dia ${fmtD(dia)}` : "",
+          "Datas definidas pelo PCP",
           prazo.diasCheios ? `Previsão ${fmtN(prazo.diasCheios)} dia(s) na meta de ${fmtN(Number(metaKg) || 0)} kg/dia` : "",
         ].filter(Boolean).join(" · "),
         kpis: [`${fmtN(prazo.un)} peça(s)`, fmtKg(prazo.kg), `${fmtN(prazo.diasCheios)} dia(s)`],
@@ -325,86 +303,6 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
       await downloadWorkbook(workbook, `Lista de preparacao - OP-${opNumero}${daSelecao ? " - selecao" : ""}.xlsx`);
     } catch (e) { setErro(`Não consegui gerar a planilha: ${e?.message || e}`); }
     finally { setBaixando(false); }
-  }
-
-  // ⚠⚠ PROGRAMAR VÁRIOS DIAS DE UMA VEZ. Vitor (26/08/2026): "já deixar permitido para eu fazer
-  // isso já vários dias para já deixar pronto essa programação".
-  //
-  // ⚠ MONTA ANTES, GRAVA DEPOIS. Chamar o "preencher o dia" em laço não funcionaria: cada gravação
-  // recarrega a lista e o estado do React só chega no render seguinte — o dia 2 escolheria as
-  // mesmas peças do dia 1. Aqui o pool é uma cópia local e cada dia sai dele.
-  //
-  // ⚠ E MOSTRA O PLANO ANTES DE GRAVAR: são N liberações de uma vez, cada uma vira trabalho no
-  // chão de fábrica. Gravar sete dias sem o Planejamento ver o que saiu seria escolher por ele.
-  async function montarPlano() {
-    const { sugerirDoDia } = await import("@/lib/liberacao-sugestao");
-    let pool = selecionaveis.slice();
-    const partida = dia ? new Date(`${dia}T12:00:00Z`) : proximoDiaUtil();
-    const dias = [];
-    for (let i = 0; i < Math.max(1, Number(nDias) || 1) && pool.length; i++) {
-      const sug = sugerirDoDia(pool, { metaKg: Number(metaKg) || 12000, pools: d.pools });
-      if (!sug.ids?.length) break;
-      const ids = new Set(sug.ids);
-      const pecas = pool.filter((p) => ids.has(p.id));
-      dias.push({
-        data: (i === 0 ? partida : somarDiasUteis(partida, i)).toISOString().slice(0, 10),
-        pecas,
-        kg: pecas.reduce((a, x) => a + (x.pesoTotalKg || 0), 0),
-        un: pecas.reduce((a, x) => a + (x.qte || 1), 0),
-      });
-      pool = pool.filter((p) => !ids.has(p.id));
-    }
-    setPlano({ dias, sobra: pool.length, sobraKg: pool.reduce((a, x) => a + (x.pesoTotalKg || 0), 0) });
-    setSel(new Set()); setSugestao(null);
-  }
-
-  async function gravarPlano() {
-    if (!plano?.dias?.length || !setores.length) return;
-    setProgramandoSemana(true); setErro(""); setPastas(null);
-    try {
-      const criadas = [];
-      for (const dd of plano.dias) {
-        const frentes = [...new Set(dd.pecas.map((p) => p.frente))];
-        const r = await fetch("/api/planejamento/liberacao", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            opId, frente: frentes.length === 1 ? frentes[0] : `${frentes.length} frentes`,
-            setores, prioridade, dataMarco: marco, desvioMotivo: motivo, dataProgramada: dd.data,
-            pecaIds: dd.pecas.map((p) => p.id), metaKg: Number(metaKg) || null,
-            totalKg: Math.round(dd.kg), totalPecas: dd.un,
-          }),
-        });
-        const j = await r.json();
-        // ⚠ para no primeiro erro e diz em qual dia parou — seguir gravaria um calendário com buraco
-        if (!r.ok) throw new Error(`${new Date(`${dd.data}T12:00:00Z`).toLocaleDateString("pt-BR")}: ${j.error || "erro ao programar"}`);
-        criadas.push(j.liberacao?.id);
-      }
-      await montarPastas(criadas);
-      setPlano(null); setMotivo("");
-      await carregar(); onMudou?.();
-    } catch (e) { setErro(e.message); await carregar(); }
-    finally { setProgramandoSemana(false); }
-  }
-
-  // ⚠ A PASTA DO DIA NO SHAREPOINT. Vitor (26/08/2026): "crie dentro dessas pastas outras pastas
-  // com as datas que foram liberadas (…) e separe em outras pastas cada tipo de perfil".
-  //
-  // ⚠ DEPOIS DA GRAVAÇÃO E FORA DELA. A liberação é a verdade do portal e não depende de pasta
-  // nenhuma; se o SharePoint estiver fora do ar, o dia continua programado e isto se repete depois.
-  // Por isso o erro daqui é AVISO, não falha da liberação.
-  async function montarPastas(ids) {
-    const feitas = [];
-    for (const id of ids.filter(Boolean)) {
-      try {
-        const r = await fetch("/api/planejamento/liberacao/pastas", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ liberacaoId: id }),
-        });
-        const j = await r.json();
-        feitas.push(r.ok ? { ok: true, ...j } : { ok: false, erro: j.error || "falhou" });
-      } catch (e) { feitas.push({ ok: false, erro: e.message }); }
-    }
-    setPastas(feitas);
   }
 
   async function conferirPasta() {
@@ -425,14 +323,14 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
     // a frente da liberação: se a seleção é de uma frente só, usa ela; senão, marca como mista
     const frentes = [...new Set(selecionadas.map((p) => p.frente))];
     const frente = frentes.length === 1 ? frentes[0] : `${frentes.length} frentes`;
-    setSalvando(true); setErro(""); setPastas(null);
+    setSalvando(true); setErro("");
     let ok = false;
     try {
       const r = await fetch("/api/planejamento/liberacao", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           opId, frente, setores, prioridade, dataMarco: marco, desvioMotivo: motivo,
-          dataProgramada: dia || null,
+          dataProgramada: null,
           // ⚠ MANDA O QUE A TELA MOSTRA. `sel` guarda tudo que já foi marcado, inclusive o que
           // saiu de vista quando o filtro mudou — e os totais ao lado do botão saem de
           // `selecionadas`. Mandar `sel` liberava mais peças do que o número no botão dizia.
@@ -443,13 +341,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao liberar");
       ok = true;
-      if (dia && j.liberacao?.id) await montarPastas([j.liberacao.id]);
-      // ⚠ liberar sem dia é permitido (nem toda liberação é de um dia), mas não pode ser mudo: sem
-      // data não existe pasta em 2.5.2.4, e quem espera os NC1/IGS lá vai achar que falhou.
-      else if (!dia) setPastas([{ ok: false, erro: "liberação sem dia — a pasta com os arquivos de máquina não foi criada. Informe o dia e libere de novo, ou peça para eu montar a pasta desta liberação." }]);
       setSel(new Set()); setSugestao(null); setMotivo("");
-      // ⚠ o próximo dia já vem preenchido: quem programa a semana não deveria digitar data sete vezes
-      if (dia) setDia(somarDiasUteis(new Date(`${dia}T12:00:00Z`), 1).toISOString().slice(0, 10));
       await carregar(); onMudou?.();
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
     return ok;
@@ -586,13 +478,6 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
             <span className="text-[12px] text-torg-gray">
               {selecionadas.length ? "para a seleção" : "para a lista inteira"} · {fmtN(prazo.un)} peça(s) · {fmtKg(prazo.kg)} · meta {fmtN(Number(metaKg) || 0)} kg/dia
             </span>
-            {marcoPrazo && (
-              <span className="text-[12px] text-torg-gray ml-auto">
-                {marcoPrazo.atrasado
-                  ? <>marco de {fmtD(marcoPrazo.marco)} já passou — começando hoje, termina <b className="text-torg-dark">{fmtD(marcoPrazo.fim)}</b></>
-                  : <>começando {fmtD(marcoPrazo.inicio)}, termina <b className="text-torg-dark">{fmtD(marcoPrazo.fim)}</b></>}
-              </span>
-            )}
           </div>
 
           {/* ⚠ o prazo da lista INTEIRA conta o que ainda não pode descer — é o tempo que o setor
@@ -667,35 +552,18 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         )}
 
         <span className="text-torg-gray-light">·</span>
-        <span className="text-[12px] text-torg-gray">meta do dia</span>
+        <span className="text-[12px] text-torg-gray">Referência de capacidade</span>
         <input type="number" value={metaKg} onChange={(e) => setMetaKg(e.target.value)} min={500} step={500}
           className="w-24 text-[13px] border border-gray-200 rounded-lg px-2 py-1 text-right tabular-nums focus:border-torg-blue outline-none" />
         <span className="text-[12px] text-torg-gray">kg</span>
 
         <span className="text-torg-gray-light">·</span>
-        <span className="text-[12px] text-torg-gray">dia</span>
-        <input type="date" value={dia} onChange={(e) => { setDia(e.target.value); setPlano(null); }}
-          title="O dia em que este lote deve ser cortado. Em branco, a liberação vai sem data."
-          className="text-[13px] border border-gray-200 rounded-lg px-2 py-1 tabular-nums focus:border-torg-blue outline-none" />
-
         <button onClick={preencherDia} disabled={!selecionaveis.length}
           title="Escolhe as peças até a meta, respeitando o limite de kg E de peças de cada laser"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-torg-blue text-white hover:opacity-90 disabled:opacity-40">
-          <Wand2 size={14} /> Preencher o dia
+          <Wand2 size={14} /> Sugerir seleção
         </button>
 
-        {/* ⚠ a programação de vários dias fica ao lado do dia 1 de propósito: é a mesma decisão,
-            só que repetida — e quem monta a semana não deveria procurar isso em outro canto. */}
-        <span className="text-torg-gray-light">·</span>
-        <input type="number" value={nDias} min={1} max={20} onChange={(e) => { setNDias(e.target.value); setPlano(null); }}
-          className="w-14 text-[13px] border border-gray-200 rounded-lg px-2 py-1 text-right tabular-nums focus:border-torg-blue outline-none" />
-        <button onClick={montarPlano} disabled={!selecionaveis.length}
-          title="Monta um lote por dia útil, na meta, até acabar a lista — e mostra antes de gravar"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-torg-blue text-torg-blue bg-white hover:bg-torg-blue-50 disabled:opacity-40">
-          <CalendarRange size={14} /> Montar {Math.max(1, Number(nDias) || 1)} dia(s)
-        </button>
-
-        <span className="text-torg-gray-light">·</span>
         <div className="flex items-center gap-2">
           {f.ativos > 0 && <button onClick={f.limpar} className="text-[11px] text-torg-orange hover:underline">limpar filtro</button>}
           <button onClick={exportar} disabled={baixando || !escopo.length}
@@ -817,14 +685,14 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
             <button onClick={liberar} disabled={salvando || !setores.length || (desvio > 0 && !motivo.trim())}
               className="px-3.5 py-1.5 bg-torg-blue text-white text-[13px] font-semibold rounded-lg disabled:opacity-40 inline-flex items-center gap-1.5">
               {salvando ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-              Liberar {fmtN(somaSel.n)} peça(s){dia ? ` para ${fmtD(dia)}` : ""}
+              Liberar {fmtN(somaSel.n)} peça(s) para o PCP
             </button>
             {!setores.length && <span className="text-[11px] text-red-600">escolha ao menos um setor</span>}
             {/* o mesmo aviso ao lado do botão: quem olha para o botão desabilitado não olha para cima */}
             {desvio > 0 && !motivo.trim() && (
               <span className="text-[11px] text-red-600 font-semibold">escreva o motivo do atraso acima para liberar</span>
             )}
-            {!dia && <span className="text-[11px] text-amber-700">sem dia informado — não vai gerar a pasta de NC1/IGS</span>}
+            <span className="text-[11px] text-torg-gray">Datas e bancadas serão definidas no PCP. Os arquivos de máquina continuam disponíveis na Engenharia.</span>
             <span className="text-[11px] text-torg-gray-light">o PCP gera a separação, imprime os projetos e libera para os setores</span>
           </div>
         </div>
@@ -944,7 +812,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                         ? <span className="text-[11px] text-emerald-700">já cortada</span>
                         : p.programadaEm
                         ? <span className="text-[11px] text-torg-blue font-semibold whitespace-nowrap" title="já programada — sai da escolha do próximo dia">
-                            {p.programadaEm === "sem data" ? "programada" : fmtD(p.programadaEm)}
+                            {p.programadaEm === "sem data" ? "liberada ao PCP" : fmtD(p.programadaEm)}
                           </span>
                         : <span className="text-[11px] text-torg-gray">a fazer</span>}
                     </td>
@@ -986,74 +854,6 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
           </p>
         )}
       </div>
-
-      {pastas?.length > 0 && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5 text-[12px] text-emerald-900 space-y-1.5">
-          <div className="flex items-start gap-2">
-            <FolderTree size={15} className="mt-0.5 shrink-0" />
-            <div className="flex-1">
-              <b>Pasta do dia montada em 2.5.2.4</b> — o dia fica dentro da pasta do tipo:
-              <b> NC1/{"{dia}"}</b> para as chapas e <b>IGS/{"{dia}"}</b> para os perfis, separados por
-              tipo de perfil.
-            </div>
-            <button onClick={() => setPastas(null)} className="text-[11px] hover:underline">fechar</button>
-          </div>
-          {pastas.map((x, i) => (
-            <p key={i} className={x.ok ? "" : "text-red-700"}>
-              {x.ok
-                ? <>· <b>{fmtD(x.dia)}</b> — {fmtN(x.arquivos)} arquivo(s) em {fmtN(x.grupos.length)} pasta(s) de perfil
-                    {x.pastasDia?.length ? <span className="text-emerald-700"> ({x.pastasDia.join(" · ")})</span> : null}
-                    {x.semArquivoTotal > 0 && <span className="text-amber-800"> · {fmtN(x.semArquivoTotal)} marca(s) sem arquivo de máquina: {x.semArquivo.slice(0, 6).map((m) => m.marca).join(", ")}{x.semArquivoTotal > 6 ? "…" : ""}</span>}</>
-                : <>· não consegui montar a pasta: {x.erro} — a liberação está gravada, dá para repetir depois.</>}
-            </p>
-          ))}
-        </div>
-      )}
-
-      {/* ── a programação montada, antes de gravar ── */}
-      {plano && (
-        <div className="bg-white border-2 border-torg-blue rounded-xl p-4 space-y-3">
-          <div className="flex flex-wrap items-baseline gap-3">
-            <p className="text-sm font-bold text-torg-dark inline-flex items-center gap-2">
-              <CalendarRange size={16} className="text-torg-blue" /> Programação de {fmtN(plano.dias.length)} dia(s)
-            </p>
-            <span className="text-[12px] text-torg-gray">
-              {fmtN(plano.dias.reduce((a, x) => a + x.un, 0))} peça(s) · {fmtKg(plano.dias.reduce((a, x) => a + x.kg, 0))}
-            </span>
-            <button onClick={() => setPlano(null)} className="text-[11px] text-torg-gray hover:underline ml-auto">descartar</button>
-          </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            {plano.dias.map((dd) => (
-              <span key={dd.data} className="text-[11px] px-2 py-1 rounded-lg border border-torg-blue-100 bg-torg-blue-50 text-torg-dark whitespace-nowrap">
-                <b>{fmtD(dd.data)}</b> · {fmtN(dd.un)} pç · {fmtKg(dd.kg)}
-              </span>
-            ))}
-          </div>
-
-          {/* ⚠ o que SOBRA é a informação que decide se a semana fecha a obra ou não */}
-          {plano.sobra > 0 && (
-            <p className="text-[12px] text-amber-800">
-              {plano.motivo === "dias"
-                ? <>Ficaram <b>{fmtN(plano.sobra)} linha(s) · {fmtKg(plano.sobraKg)}</b> fora: os {fmtN(plano.dias.length)} dia(s)
-                    pedidos não dão conta da lista. Peça mais dias para programar o resto.</>
-                : <>Ficaram <b>{fmtN(plano.sobra)} linha(s) · {fmtKg(plano.sobraKg)}</b> fora e <b>não entram em dia nenhum</b>:
-                    cada uma sozinha passa do teto de um dia ({fmtN(Number(metaKg) || 0)} kg, no laser dela). Aumente a
-                    meta do dia para elas caberem.</>}
-            </p>
-          )}
-
-          {!setores.length && (
-            <p className="text-[12px] text-red-600">Escolha abaixo os setores que descem antes de gravar.</p>
-          )}
-
-          <button onClick={gravarPlano} disabled={programandoSemana || !setores.length || (desvio > 0 && !motivo.trim())}
-            className="px-4 py-2 bg-torg-blue text-white text-sm font-semibold rounded-lg disabled:opacity-40 inline-flex items-center gap-2">
-            {programandoSemana ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-            Gravar a programação ({fmtN(plano.dias.length)} liberação(ões))
-          </button>
-        </div>
-      )}
 
       {/* ⚠⚠ O QUE A CÉLULA ABRE. Por PERFIL, com os fardos que existem no CMR — R, obra de origem,
           data, peso e corrida. O Planejamento não precisa decorar número de R nem saber o que tem
