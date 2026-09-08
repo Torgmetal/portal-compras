@@ -1,10 +1,9 @@
 "use client";
 import { useState } from "react";
 import { fmtOP } from "@/lib/utils";
-import { Archive, ArchiveRestore, ChevronDown, ChevronRight, Factory, Loader2 } from "lucide-react";
+import { Archive, ArchiveRestore, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { CronogramaExpandido } from "./CronogramaExpandido";
 import { fmtData } from "../_lib/formatos";
-import { DEPT_COLORS, DEPT_ICONS, DEPT_LABEL } from "../_lib/rotulos";
 
 export function HistoricoEncerrados({ encerrados, loading, onReabrir, expandedId, onToggle, detail, loadingDetail, onRefreshDetail }) {
   const [reabrindo, setReabrindo] = useState(null);
@@ -61,27 +60,6 @@ export function HistoricoEncerrados({ encerrados, loading, onReabrir, expandedId
               </button>
             </div>
           </div>
-
-          {/* Department summary pills */}
-          {expandedId !== c.id && c.deptSummary?.length > 0 && (
-            <div className="px-4 pb-3 flex flex-wrap gap-1.5">
-              {c.deptSummary.map((d, i) => {
-                const Icon = DEPT_ICONS[d.departamento] || Factory;
-                return (
-                  <span
-                    key={i}
-                    className={`px-2 py-0.5 text-[10px] font-medium rounded-full border flex items-center gap-1 ${
-                      DEPT_COLORS[d.departamento] || "bg-gray-50 text-torg-gray border-gray-200"
-                    }`}
-                  >
-                    <Icon size={10} />
-                    {DEPT_LABEL[d.departamento] || d.nome}
-                    <span className="font-bold">{d.percentual}%</span>
-                  </span>
-                );
-              })}
-            </div>
-          )}
 
           {expandedId === c.id && (
             <CronogramaExpandido

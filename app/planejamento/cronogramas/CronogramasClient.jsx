@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Archive, Download, GanttChart, List, Loader2, Plus, RefreshCw } from "lucide-react";
+import { AlertCircle, Archive, GanttChart, Loader2, Plus, RefreshCw, Search, X } from "lucide-react";
 import { CronogramaCard } from "./_componentes/CronogramaCard";
 import { HistoricoEncerrados } from "./_componentes/HistoricoEncerrados";
 import { NovoCronogramaModal } from "./_componentes/NovoCronogramaModal";
@@ -11,7 +11,7 @@ export default function CronogramasClient({ soloId }) {
   const router = useRouter();
   const [cronogramas, setCronogramas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
+  const [busca, setBusca] = useState("");
   const [erro, setErro] = useState("");
   const [expandedId, setExpandedId] = useState(soloId || null);
   const [detail, setDetail] = useState(null);
@@ -50,20 +50,6 @@ export default function CronogramasClient({ soloId }) {
 
   useEffect(() => { carregar(); }, [carregar]);
   useEffect(() => { if (abaAtiva === "historico") carregarEncerrados(); }, [abaAtiva, carregarEncerrados]);
-
-  const sincronizar = async () => {
-    setSyncing(true);
-    try {
-      const res = await fetch("/api/planejamento/cronogramas", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao sincronizar");
-      await carregar();
-    } catch (e) {
-      setErro(e.message);
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   const expandir = async (id) => {
     // Em modo lista, navega pra página exclusiva da OP
@@ -138,106 +124,59 @@ export default function CronogramasClient({ soloId }) {
     );
   }
 
-  // ─── Modo Lista (todas as OPs) ─────────────
+  const normalizar = valor => String(valor || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const termos = normalizar(busca).trim().split(/\s+/).filter(Boolean);
+  const corresponde = c => termos.every(termo => normalizar(`${c.opNumero} ${c.titulo} ${c.op?.cliente || ""} ${c.op?.obra || ""}`).includes(termo));
+  const visiveis = cronogramas.filter(corresponde);
+  const historicoVisivel = encerrados.filter(corresponde);
+
   return (
     <div className="space-y-6 max-w-7xl">
-      <div className="flex items-center justify-between">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight">Cronogramas</h2>
-          <p className="text-xs text-torg-gray mt-0.5">
-            Acompanhamento de cronogramas por OP e departamento
-          </p>
+          <h2 className="text-2xl font-bold text-torg-dark tracking-tight">Cronogramas</h2>
+          <p className="text-sm text-torg-gray mt-1">Programação das obras e avanço por setor.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowNovoModal(true)}
-            className="px-4 py-2 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-1.5"
-          >
-            <Plus size={14} /> Novo Cronograma
-          </button>
-          <button
-            onClick={sincronizar}
-            disabled={syncing}
-            className="px-4 py-2 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5 disabled:opacity-50"
-          >
-            {syncing ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-            {syncing ? "Sincronizando..." : "Sincronizar SharePoint"}
-          </button>
-          <a href="/planejamento/config-expedicao" title="Itens que NÃO contam como estrutura no % de expedição (grade de piso, telha, steel deck…)"
-            className="px-3 py-2 text-torg-gray hover:text-torg-blue text-xs rounded-lg hover:bg-gray-100 font-medium flex items-center gap-1.5 border border-gray-200">
-            <List size={14} /> Itens fora da estrutura
-          </a>
-          <button onClick={carregar} className="p-2 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100">
-            <RefreshCw size={16} />
-          </button>
-        </div>
-      </div>
-
-      {erro && (
-        <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-2 rounded-lg">
-          {erro}
-        </div>
-      )}
-
-      {/* Abas Ativos / Histórico */}
-      <div className="flex items-center gap-1 border-b border-gray-200">
-        <button
-          onClick={() => setAbaAtiva("ativos")}
-          className={`px-4 py-2 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
-            abaAtiva === "ativos" ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"
-          }`}
-        >
-          <GanttChart size={13} /> Ativos ({cronogramas.length})
+        <button onClick={() => setShowNovoModal(true)} className="self-start sm:self-auto inline-flex items-center justify-center gap-2 rounded-lg bg-torg-blue px-4 py-2.5 text-sm font-semibold text-white hover:bg-torg-dark transition-colors">
+          <Plus size={16} /> Novo cronograma
         </button>
-        <button
-          onClick={() => setAbaAtiva("historico")}
-          className={`px-4 py-2 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
-            abaAtiva === "historico" ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"
-          }`}
-        >
-          <Archive size={13} /> Histórico {encerrados.length > 0 && `(${encerrados.length})`}
-        </button>
-      </div>
+      </header>
 
-      {abaAtiva === "ativos" && (
-        <>
-          {cronogramas.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
-              <GanttChart size={40} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-sm text-torg-gray mb-4">Nenhum cronograma ativo.</p>
-              <div className="flex items-center justify-center gap-3">
-                <button
-                  onClick={() => setShowNovoModal(true)}
-                  className="px-4 py-2 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium inline-flex items-center gap-1.5"
-                >
-                  <Plus size={14} /> Criar Cronograma
-                </button>
-                <button
-                  onClick={sincronizar}
-                  disabled={syncing}
-                  className="px-4 py-2 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1.5"
-                >
-                  <Download size={14} /> Importar do SharePoint
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {cronogramas.map((c) => (
-                <CronogramaCard
-                  key={c.id}
-                  cronograma={c}
-                  onToggle={() => expandir(c.id)}
-                />
-              ))}
-            </div>
-          )}
-        </>
-      )}
+      {erro && <div role="alert" className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-lg">{erro}</div>}
 
-      {abaAtiva === "historico" && (
-        <HistoricoEncerrados
-          encerrados={encerrados}
+      <section className="bg-white rounded-xl border border-gray-200/80 shadow-sm overflow-hidden" aria-label="Lista de cronogramas">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-gray-200/80 px-4 sm:px-5 py-4">
+          <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1 self-start" role="tablist" aria-label="Situação dos cronogramas">
+            {[{id:"ativos",nome:"Ativos",Icon:GanttChart,quantidade:cronogramas.length},{id:"historico",nome:"Histórico",Icon:Archive}].map(({id,nome,Icon,quantidade}) => (
+              <button key={id} role="tab" id={`aba-cronogramas-${id}`} aria-selected={abaAtiva === id} aria-controls={`painel-cronogramas-${id}`} onClick={() => setAbaAtiva(id)} className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${abaAtiva === id ? "bg-white text-torg-blue shadow-sm" : "text-torg-gray hover:text-torg-dark"}`}>
+                <Icon size={15} /> {nome}{quantidade !== undefined && <span className="text-xs tabular-nums rounded bg-slate-100 px-1.5 py-0.5">{quantidade}</span>}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 w-full lg:w-auto">
+            <div className="relative flex-1 lg:w-80">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-torg-gray" />
+              <input aria-label="Buscar por OP, obra ou cliente" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar OP, obra ou cliente" className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-9 text-sm outline-none focus:border-torg-blue focus:ring-1 focus:ring-torg-blue" />
+              {busca && <button aria-label="Limpar busca" onClick={() => setBusca("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-torg-gray hover:text-torg-blue"><X size={14}/></button>}
+            </div>
+            <button onClick={abaAtiva === "historico" ? carregarEncerrados : carregar} aria-label="Atualizar cronogramas" title="Atualizar cronogramas" className="shrink-0 rounded-lg border border-gray-200 p-2.5 text-torg-gray hover:bg-slate-50 hover:text-torg-blue"><RefreshCw size={17}/></button>
+          </div>
+        </div>
+
+        {abaAtiva === "ativos" && <div role="tabpanel" id="painel-cronogramas-ativos" aria-labelledby="aba-cronogramas-ativos">
+          {visiveis.length === 0 ? <div className="px-6 py-16 text-center">
+            <GanttChart size={32} className="mx-auto text-slate-300 mb-3" />
+            <p className="text-sm font-medium text-torg-dark">{cronogramas.length ? "Nenhum cronograma encontrado." : "Nenhum cronograma ativo."}</p>
+            <p className="mt-1 text-sm text-torg-gray">{cronogramas.length ? "Tente outro número de OP, obra ou cliente." : "Crie o primeiro cronograma para organizar as atividades da obra."}</p>
+            {cronogramas.length ? <button onClick={() => setBusca("")} className="mt-4 text-sm font-medium text-torg-blue">Limpar busca</button> : <button onClick={() => setShowNovoModal(true)} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-torg-blue px-4 py-2 text-sm font-medium text-white hover:bg-torg-dark"><Plus size={15}/> Criar cronograma</button>}
+          </div> : <div className="divide-y divide-gray-200/70">
+            {visiveis.map(c => <CronogramaCard key={c.id} cronograma={c} onToggle={() => expandir(c.id)} />)}
+          </div>}
+          {!!visiveis.length && <p className="border-t border-gray-200/70 bg-slate-50/60 px-5 py-3 text-xs text-torg-gray">{busca ? `${visiveis.length} de ${cronogramas.length} cronogramas` : `${cronogramas.length} cronograma${cronogramas.length === 1 ? "" : "s"} ativo${cronogramas.length === 1 ? "" : "s"}`} · Selecione uma obra para abrir a programação.</p>}
+        </div>}
+      {abaAtiva === "historico" && <div role="tabpanel" id="painel-cronogramas-historico" aria-labelledby="aba-cronogramas-historico" className="p-4 sm:p-5">
+        {busca && !loadingEncerrados && !historicoVisivel.length ? <div className="py-12 text-center text-sm text-torg-gray">Nenhum cronograma encontrado no histórico.<button onClick={() => setBusca("")} className="block mx-auto mt-3 text-torg-blue font-medium">Limpar busca</button></div> : <HistoricoEncerrados
+          encerrados={historicoVisivel}
           loading={loadingEncerrados}
           onReabrir={async (id) => {
             try {
@@ -258,8 +197,9 @@ export default function CronogramasClient({ soloId }) {
           detail={detail}
           loadingDetail={loadingDetail}
           onRefreshDetail={recarregarDetail}
-        />
-      )}
+        />}
+      </div>}
+      </section>
 
       {showNovoModal && (
         <NovoCronogramaModal

@@ -1,7 +1,12 @@
 {
-  "build": 2952,
-  "gerado": "2026-09-08T00:24:23.639Z",
+  "build": 2953,
+  "gerado": "2026-09-08T00:45:33.868Z",
   "commits": [
+    {
+      "hash": "16780d69",
+      "data": "07/09/2026",
+      "titulo": "feat(planejamento): escolher tipo de email e conferir cronograma antes do envio"
+    },
     {
       "hash": "5c53ca25",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "228bb38b",
       "data": "07/09/2026",
       "titulo": "PLP: o sólidos por volume passa a viajar com a demão, e a tinta vira litro"
-    },
-    {
-      "hash": "a9e836f1",
-      "data": "07/09/2026",
-      "titulo": "Permite distribuir retorno de terceiros entre setores e destaca saldo atrasado"
     }
   ]
 }
