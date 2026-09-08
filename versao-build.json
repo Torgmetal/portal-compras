@@ -1,7 +1,12 @@
 {
-  "build": 2954,
-  "gerado": "2026-09-08T00:58:22.006Z",
+  "build": 2955,
+  "gerado": "2026-09-08T01:27:02.569Z",
   "commits": [
+    {
+      "hash": "58bc140e",
+      "data": "07/09/2026",
+      "titulo": "fix(ui): retirar prefixo T da exibicao das OPs"
+    },
     {
       "hash": "a03adf7c",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "669e2361",
       "data": "07/09/2026",
       "titulo": "Simplifica retorno de terceiros com destino geral e exceções por marca"
-    },
-    {
-      "hash": "5acfa4ac",
-      "data": "07/09/2026",
-      "titulo": "Recebimento: a validade do lote passa a ser pedida quando o material é tinta"
     }
   ]
 }
