@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { gerarEtiquetasCarregamentoPDF, ajustarTexto, GRADE, MM } from "@/lib/etiqueta-carregamento-pdf";
+import { gerarEtiquetasCarregamentoPDF, ajustarTexto, numeroDaEtiqueta, GRADE, MM } from "@/lib/etiqueta-carregamento-pdf";
 
 // ⚠ POR QUE ESTE TESTE EXISTE, E NÃO UMA OLHADA NA TELA.
 //
@@ -55,6 +55,23 @@ describe("ajustarTexto — nada pode vazar a célula", () => {
     const r = ajustarTexto(texto, bold, { xIni, xFim, tamMax });
     expect(r.xFim).toBeLessThanOrEqual(xFim);
     expect(r.xFim).toBeLessThanOrEqual(GRADE.fimDir);
+  });
+});
+
+describe("numeroDaEtiqueta — o T é convenção da etiqueta, não do banco", () => {
+  it.each([
+    ["121", "T121"],
+    ["089", "T089"],
+    ["036-01", "T036-01"],
+    ["T89", "T89"],      // já veio com T: não dobra
+    ["t89", "T89"],      // minúsculo do cadastro vira maiúsculo
+  ])("%s vira %s", (entrada, esperado) => {
+    expect(numeroDaEtiqueta(entrada)).toBe(esperado);
+  });
+
+  it("vazio não vira um T sozinho", () => {
+    expect(numeroDaEtiqueta("")).toBe("—");
+    expect(numeroDaEtiqueta(null)).toBe("—");
   });
 });
 

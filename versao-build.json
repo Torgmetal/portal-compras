@@ -1,7 +1,12 @@
 {
-  "build": 2975,
-  "gerado": "2026-09-08T13:35:16.777Z",
+  "build": 2976,
+  "gerado": "2026-09-08T13:48:30.630Z",
   "commits": [
+    {
+      "hash": "c29c1ab842",
+      "data": "08/09/2026",
+      "titulo": "Etiqueta: o número da OP vai cru, não pelo fmtOP"
+    },
     {
       "hash": "61f6800de0",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "2773d0ccaa",
       "data": "07/09/2026",
       "titulo": "Cronograma: o \"T\" do código da frente é opcional"
-    },
-    {
-      "hash": "5b996f1649",
-      "data": "07/09/2026",
-      "titulo": "Cronograma: atraso é o que passou do dia, não o que vence hoje"
     }
   ]
 }
