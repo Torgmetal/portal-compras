@@ -1,7 +1,17 @@
 {
-  "build": 2991,
-  "gerado": "2026-09-08T15:16:01.944Z",
+  "build": 2993,
+  "gerado": "2026-09-08T15:16:22.146Z",
   "commits": [
+    {
+      "hash": "b175fb58ce",
+      "data": "08/09/2026",
+      "titulo": "Expedição abre no celular: barra vira gaveta abaixo de md"
+    },
+    {
+      "hash": "2681b4420b",
+      "data": "08/09/2026",
+      "titulo": "Expedição: Conferência de Peça, ligada à Lista de Expedição"
+    },
     {
       "hash": "a783c7d52a",
       "data": "08/09/2026",
@@ -141,16 +151,6 @@
       "hash": "d2539b1172",
       "data": "08/09/2026",
       "titulo": "Gantt: a fila sem máquina também fica em hoje; a data de entrada vira idade"
-    },
-    {
-      "hash": "73026e7e4f",
-      "data": "08/09/2026",
-      "titulo": "Gantt: o saldo do que não saiu vem para hoje, na mesma bancada"
-    },
-    {
-      "hash": "1fe8c5aaad",
-      "data": "08/09/2026",
-      "titulo": "versao-build"
     }
   ]
 }
