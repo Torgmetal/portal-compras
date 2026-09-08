@@ -103,7 +103,7 @@ export function criarGrade(dep){
             ? dep.DIAS.slice(Math.min(...atrasados.map(l=>dep.IDX.get(l.dia))))
                   .filter(d=>d<dep.HOJE && !dep.fdsISO(d)).length : 0;
           const foco = dep.getPainel() && dep.getPainel().setor===r.setor && dep.getPainel().recurso===r.recurso && dep.getPainel().op===r.op && dep.getPainel().ini===r.ini;
-          const dica = "OP-"+r.op+(r.obra?" — "+r.obra:"")+"\n"+rec.nome+" · "
+          const dica = "OP-"+r.op+(r.familia?" · "+r.familia:"")+(r.obra?" — "+r.obra:"")+"\n"+rec.nome+" · "
             + (dias>1 ? dep.dbr(dep.DIAS[r.ini])+" a "+dep.dbr(dep.DIAS[r.fim])+" ("+dias+" dias)" : dep.dbr(dep.DIAS[r.ini]))
             + "\n"+r.pecas+" peças · "+dep.nkg(r.kg)+" kg"
             + "\nSyneco apontou "+r.feitas+" de "+r.pecas+" ("+Math.round(fr*100)+"%)"

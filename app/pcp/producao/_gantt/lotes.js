@@ -46,7 +46,9 @@ export function criarLotes(dep){
          diferentes reaparecia hoje como UMA barra só: quatro atrasos viravam um número, e o de
          junho ficava indistinguível do de ontem. Cada saldo é um fato com a sua data. */
       const origem = l.veioDe || l.desde || "";
-      const k = l.setor+"|"+(l.recurso||"—")+"|"+l.op+"|"+origem+"|"+((l.terceiroPrevisto||l.terceiroRecebido)?l.id:"");
+      // ⚠ a FAMÍLIA também separa: ferro redondo e chapa esperando a mesma decisão não são a mesma
+      //   barra — quem arrasta precisa levar um sem o outro.
+      const k = l.setor+"|"+(l.recurso||"—")+"|"+l.op+"|"+origem+"|"+(l.familia||"")+"|"+((l.terceiroPrevisto||l.terceiroRecebido)?l.id:"");
       if(!grupos.has(k)) grupos.set(k,[]);
       grupos.get(k).push(l);
     }
@@ -55,6 +57,7 @@ export function criarLotes(dep){
       arr.sort((a,b)=>a.dia.localeCompare(b.dia));
       // a origem é a mesma do grupo inteiro (ela entra na chave) — o primeiro lote basta
       const origem = arr[0]?.veioDe || arr[0]?.desde || "";
+      const familia = arr[0]?.familia || null;
       let atual=null;
       for(const l of arr){
         const i = dep.IDX.get(l.dia); if(i==null) continue;
@@ -64,7 +67,7 @@ export function criarLotes(dep){
         // raciocínio errado — uma barra por cima do sábado PARECE trabalho no sábado, e num
         // quadro de produção o desenho é a informação.
         if(atual && i === atual.fim+1){ atual.fim=i; atual.lotes.push(l); }
-        else { atual={ setor:l.setor, recurso:l.recurso, op:l.op, obra:l.obra, origem, terceiroPrevisto:l.terceiroPrevisto, terceiroRecebido:l.terceiroRecebido, ini:i, fim:i, lotes:[l] }; runs.push(atual); }
+        else { atual={ setor:l.setor, recurso:l.recurso, op:l.op, obra:l.obra, origem, familia, terceiroPrevisto:l.terceiroPrevisto, terceiroRecebido:l.terceiroRecebido, ini:i, fim:i, lotes:[l] }; runs.push(atual); }
       }
     }
     for(const r of runs){
@@ -86,6 +89,7 @@ export function criarLotes(dep){
       r.veioDe = [...new Set(r.lotes.map(l=>l.veioDe).filter(Boolean))].sort()[0] || null;
       // ⚠ peça que nunca foi programada: a data é a da ENTRADA dela, não um prazo perdido.
       r.desde = [...new Set(r.lotes.map(l=>l.desde).filter(Boolean))].sort()[0] || null;
+      r.familia = r.lotes[0]?.familia || null;
     }
     return runs;
   }

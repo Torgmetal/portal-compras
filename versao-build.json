@@ -1,7 +1,12 @@
 {
-  "build": 2969,
-  "gerado": "2026-09-08T12:48:07.297Z",
+  "build": 2970,
+  "gerado": "2026-09-08T12:54:35.011Z",
   "commits": [
+    {
+      "hash": "e3635863",
+      "data": "08/09/2026",
+      "titulo": "Corte: separa por perfil de verdade — a lista não escreve \"chapa\", escreve CH9.50"
+    },
     {
       "hash": "72b19237",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e4aa4ed4",
       "data": "07/09/2026",
       "titulo": "Tinta: as duas embalagens lado a lado — galão de 3,6 L e balde de 18 L"
-    },
-    {
-      "hash": "73a8e0e0",
-      "data": "07/09/2026",
-      "titulo": "Caderno de pintura: a planilha vira a calculadora, com as células a preencher em amarelo"
     }
   ]
 }

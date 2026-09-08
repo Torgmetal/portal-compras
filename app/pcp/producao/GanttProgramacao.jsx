@@ -188,7 +188,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     const r = acharRun(painel);
     if(!r){ fecharPainel(); return; }
     const dias = r.dias;
-    $("pOp").textContent = "OP-"+r.op;
+    $("pOp").textContent = "OP-"+r.op+(r.familia?" · "+r.familia:"");
     $("pObra").textContent = r.obra || "";
     $("pSub").innerHTML =
       nomeRec(r.setor, r.recurso)+" · " + (dias>1 ? dbr(DIAS[r.ini])+" a "+dbr(DIAS[r.fim])+" ("+dias+" dias)" : dbr(DIAS[r.ini]))
