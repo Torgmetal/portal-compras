@@ -313,6 +313,40 @@ Tirar esse pulo tira junto a chance de imprimir com dado velho.
 > de PDF — o layout e os dados se aproveitam, troca só o renderizador. Isso exige um agente
 > local no PC da expedição para mandar os bytes à USB, que é a razão de não ter começado por aí.
 
+## Conferência de peça (Expedição)
+
+`Expedição › Conferência de Peça` → Iniciar conferência, escolher a OP, e lançar **MARCA,
+QUANTIDADE, OBSERVAÇÃO**. Feita no **celular no pátio**, antes de a peça ir para pintura e
+etiquetagem.
+
+| | |
+|---|---|
+| Regra | `lib/conferencia-peca.js` — a validação mora aqui, não na rota |
+| Fonte da L.E. | `lib/itens-expedicao.js` (a mesma das etiquetas) |
+| Tabelas | `ConferenciaPeca` + `ConferenciaPecaItem`, criadas por `scripts/ensure-mes-tables.mjs` |
+
+⚠⚠ **O teto é da OBRA, não da sessão.** Se a L.E. tem 2 peças de uma marca e a conferência de
+ontem pegou as 2, a de hoje não aceita mais nenhuma. Sessão **CANCELADA** não conta — é o desfazer
+de quem abriu por engano; se contasse, um clique errado consumiria o saldo da obra para sempre.
+
+⚠ **As duas recusas são problemas diferentes e a mensagem diz qual**: "não está na Lista de
+Expedição" é a peça errada na mão (uma posição, que vai soldada dentro do conjunto); "você já
+conferiu 2" é a peça certa contada duas vezes.
+
+⚠ **Uma sessão ABERTA por obra.** Duas pessoas em dois celulares somariam no mesmo teto sem se
+enxergar, e a segunda descobriria isso na forma de um "já conferiu tudo" que ela não entende. Quem
+chega depois entra na sessão que já existe.
+
+⚠ **A validação é no servidor.** A tela mostra o saldo e evita a maioria dos erros, mas lê um
+retrato de alguns segundos atrás. Toda gravação responde com o estado inteiro recalculado — o
+navegador nunca soma saldo sozinho.
+
+## Este módulo abre no celular (e é o único)
+
+`app/expedicao/layout.js` é `md:ml-64`, e o `SidebarExpedicao` vira gaveta abaixo de `md`. Os
+outros 15 layouts continuam `ml-64` fixo — no telefone a barra come a tela inteira. Se algum dia
+outro módulo precisar de campo, o padrão a copiar é esse par de arquivos.
+
 ## Padrões de qualidade
 
 Consolidados nas Fases 1 e 2 (gestão de usuários). Aplicar em todos os módulos novos.
