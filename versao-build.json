@@ -1,156 +1,156 @@
 {
-  "build": 3018,
-  "gerado": "2026-09-08T21:10:08.025Z",
+  "build": 3019,
+  "gerado": "2026-09-08T23:19:46.578Z",
   "commits": [
     {
-      "hash": "f5c40fac74",
+      "hash": "53a097a6",
+      "data": "08/09/2026",
+      "titulo": "Expedição: a Lista de Expedição define a lista, não completa PecaConjunto"
+    },
+    {
+      "hash": "f5c40fac",
       "data": "08/09/2026",
       "titulo": "Expedição: uma linha por marca, e a quantidade vem da L.E."
     },
     {
-      "hash": "d5dd37a0eb",
+      "hash": "d5dd37a0",
       "data": "08/09/2026",
       "titulo": "fix(planejamento): listar todos os Rs compatíveis de outras OPs"
     },
     {
-      "hash": "9115967694",
+      "hash": "91159676",
       "data": "08/09/2026",
       "titulo": "RH › Cargos: o cargo passa a ter faixa — base, médio e máximo"
     },
     {
-      "hash": "4d62c6f250",
+      "hash": "4d62c6f2",
       "data": "08/09/2026",
       "titulo": "Conferência: autocomplete só depois de digitar, e corrigir a quantidade lançada"
     },
     {
-      "hash": "61a168326b",
+      "hash": "61a16832",
       "data": "08/09/2026",
       "titulo": "Conferência: escolher a marca não preenche mais a quantidade"
     },
     {
-      "hash": "cce56011bc",
+      "hash": "cce56011",
       "data": "08/09/2026",
       "titulo": "scripts/validar-tela.mjs: validar tela logado antes do push"
     },
     {
-      "hash": "ccb48c1cce",
+      "hash": "ccb48c1c",
       "data": "08/09/2026",
       "titulo": "Torguinho sai da Conferência de Peça — cobria o campo de observação"
     },
     {
-      "hash": "b0958f2772",
+      "hash": "b0958f27",
       "data": "08/09/2026",
       "titulo": "Preparação: o croqui do conjunto que está no terceiro sai da fila de corte"
     },
     {
-      "hash": "a1d16474c4",
+      "hash": "a1d16474",
       "data": "08/09/2026",
       "titulo": "fix(pcp): exigir seleção explícita para distribuir peças"
     },
     {
-      "hash": "ef5d2bef2e",
+      "hash": "ef5d2bef",
       "data": "08/09/2026",
       "titulo": "feat(pcp): filtros por coluna com seleção múltipla"
     },
     {
-      "hash": "d594f3320c",
+      "hash": "d594f332",
       "data": "08/09/2026",
       "titulo": "feat: filtrar materiais e dividir selecao no painel PCP"
     },
     {
-      "hash": "8a3b780ba8",
+      "hash": "8a3b780b",
       "data": "08/09/2026",
       "titulo": "PCP: peça que está no terceiro sai da programação de todos os setores"
     },
     {
-      "hash": "a0b4da6c75",
+      "hash": "a0b4da6c",
       "data": "08/09/2026",
       "titulo": "Emissão em lote: parar de varrer a mesma pasta a cada bloco"
     },
     {
-      "hash": "7b7bafa06e",
+      "hash": "7b7bafa0",
       "data": "08/09/2026",
       "titulo": "Gantt: imprimir e liberar 260 marcas fatia sozinho, em vez de recusar"
     },
     {
-      "hash": "21c341d3b3",
+      "hash": "21c341d3",
       "data": "08/09/2026",
       "titulo": "Liberação: o aviso conta a lista da tela, não a OP inteira"
     },
     {
-      "hash": "a5b9730e2f",
+      "hash": "a5b9730e",
       "data": "08/09/2026",
       "titulo": "Corte: ferro chato vai para a cantoneira; e o Ø do tubo também faltava"
     },
     {
-      "hash": "da9ac7edf5",
+      "hash": "da9ac7ed",
       "data": "08/09/2026",
       "titulo": "Despacho: o lote de desenhos se fatia sozinho, em vez de recusar"
     },
     {
-      "hash": "7e24f30d6f",
+      "hash": "7e24f30d",
       "data": "08/09/2026",
       "titulo": "versao-build"
     },
     {
-      "hash": "13d7d53360",
+      "hash": "13d7d533",
       "data": "08/09/2026",
       "titulo": "Import da LPC: a reimportação para de zerar a produção da obra"
     },
     {
-      "hash": "0bd3385170",
+      "hash": "0bd33851",
       "data": "08/09/2026",
       "titulo": "Qualidade: permitir editar tolerâncias das cotas e respeitar os limites informados"
     },
     {
-      "hash": "04d92c0952",
+      "hash": "04d92c09",
       "data": "08/09/2026",
       "titulo": "PCP: peça já cortada sai do aviso — ela não precisa de dia"
     },
     {
-      "hash": "ff0119f60a",
+      "hash": "ff0119f6",
       "data": "08/09/2026",
       "titulo": "Despacho: status na língua da fábrica e GRD sem reimprimir"
     },
     {
-      "hash": "dd09dad3a9",
+      "hash": "dd09dad3",
       "data": "08/09/2026",
       "titulo": "versao-build"
     },
     {
-      "hash": "8a9940ba4a",
+      "hash": "8a9940ba",
       "data": "08/09/2026",
       "titulo": "PCP: o aviso mostra o que falta agendar, e enxerga liberação órfã"
     },
     {
-      "hash": "e03488b3be",
+      "hash": "e03488b3",
       "data": "08/09/2026",
       "titulo": "CLAUDE.md: Conferência de Peça e o único módulo que abre no celular"
     },
     {
-      "hash": "9d175ddb77",
+      "hash": "9d175ddb",
       "data": "08/09/2026",
       "titulo": "Expedição abre no celular: barra vira gaveta abaixo de md"
     },
     {
-      "hash": "2681b4420b",
+      "hash": "2681b442",
       "data": "08/09/2026",
       "titulo": "Expedição: Conferência de Peça, ligada à Lista de Expedição"
     },
     {
-      "hash": "a783c7d52a",
+      "hash": "a783c7d5",
       "data": "08/09/2026",
       "titulo": "Extrai a regra da L.E. e o lerJson para libs próprias"
     },
     {
-      "hash": "9911f139d2",
+      "hash": "9911f139",
       "data": "08/09/2026",
       "titulo": "CLAUDE.md: tira a linha duplicada de \"instale o hook\""
-    },
-    {
-      "hash": "7c381275c4",
-      "data": "08/09/2026",
-      "titulo": "CLAUDE.md: como o versao-build.json derruba o build, e o hook novo"
     }
   ]
 }
