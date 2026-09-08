@@ -13,6 +13,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { analisarMaterial, pecasLiberaveis } from "@/lib/material-liberacao";
+import { buscarFardosCompativeis } from "@/lib/fardos-compativeis";
 import { casarPerfilComOmie } from "@/lib/casar-omie";
 
 export const runtime = "nodejs";
@@ -27,7 +28,17 @@ export async function GET(req) {
   try { await requireRole(ROLES); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
-  const id = new URL(req.url).searchParams.get("id");
+  const params = new URL(req.url).searchParams;
+  if (params.has("perfil")) {
+    const perfil = (params.get("perfil") || "").trim();
+    if (!perfil || perfil.length > 120) return NextResponse.json({error: "Informe um perfil válido."}, {status: 400});
+    try {
+      return NextResponse.json({perfil, fardos: await buscarFardosCompativeis(perfil)});
+    } catch {
+      return NextResponse.json({error: "Não foi possível consultar os Rs. Tente novamente."}, {status: 500});
+    }
+  }
+  const id = params.get("id");
   if (!id) return NextResponse.json({ error: "Informe a liberação." }, { status: 400 });
 
   const lib = await prisma.liberacaoProducao.findUnique({

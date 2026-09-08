@@ -1,0 +1,25 @@
+import {beforeEach, expect, it, vi} from 'vitest';
+import {mockPrisma} from '@/testes/apoio/prisma';
+const mocks=vi.hoisted(()=>({role:vi.fn(),buscar:vi.fn()}));
+vi.mock('@/lib/prisma',()=>({prisma:mockPrisma}));
+vi.mock('@/lib/session',()=>({requireRole:mocks.role}));
+vi.mock('@/lib/fardos-compativeis',()=>({buscarFardosCompativeis:mocks.buscar}));
+vi.mock('@/lib/material-liberacao',()=>({analisarMaterial:vi.fn(),pecasLiberaveis:vi.fn()}));
+import {GET,POST} from '@/app/api/pcp/liberacao-material/route';
+const get=query=>GET(new Request('http://localhost/api/pcp/liberacao-material?'+query));
+const post=()=>POST(new Request('http://localhost/api/pcp/liberacao-material',{method:'POST',body:JSON.stringify({opNumero:'097',perfil:'CH9.50',rUsado:'260123'})}));
+beforeEach(()=>{
+  vi.resetAllMocks();mocks.role.mockResolvedValue({id:'user',name:'Planejamento'});
+  mocks.buscar.mockResolvedValue([{r:'260123',opNumero:'113'}]);
+  mockPrisma.oP.findFirst.mockResolvedValue({id:'op97',numero:'097'});
+  mockPrisma.documentoQualidade.findFirst.mockResolvedValue({id:'cmr',importRef:'260123',nome:'CHAPA A36 9.50MM',opNumero:'113'});
+  mockPrisma.trocaRastreabilidade.findMany.mockResolvedValue([]);
+  mockPrisma.trocaRastreabilidade.upsert.mockResolvedValue({id:'troca',perfil:'CH9.50',rUsado:'260123'});
+  mockPrisma.auditLog.create.mockResolvedValue({});
+});
+it('consulta candidatos sem restringir a OP',async()=>{const r=await get('perfil=CH9.50');expect(r.status).toBe(200);expect((await r.json()).fardos[0].opNumero).toBe('113');});
+it('rejeita perfil inválido',async()=>{expect((await get('perfil=')).status).toBe(400);expect(mocks.buscar).not.toHaveBeenCalled();});
+it('mantém a rota antiga por liberação',async()=>{mockPrisma.liberacaoProducao.findUnique.mockResolvedValue(null);expect((await get('id=lib1')).status).toBe(404);expect(mockPrisma.liberacaoProducao.findUnique).toHaveBeenCalled();expect(mocks.buscar).not.toHaveBeenCalled();});
+it('não expõe Rs a usuário sem permissão',async()=>{mocks.role.mockRejectedValue(new Error('Forbidden'));expect((await get('perfil=CH9.50')).status).toBe(403);expect(mocks.buscar).not.toHaveBeenCalled();});
+it('grava R compatível de outra OP e preserva auditoria',async()=>{expect((await post()).status).toBe(200);expect(mockPrisma.trocaRastreabilidade.upsert.mock.calls[0][0].create).toMatchObject({opNumero:'097',rUsado:'260123'});expect(mockPrisma.auditLog.create).toHaveBeenCalled();});
+it('recusa R de espessura incompatível sem gravar',async()=>{mockPrisma.documentoQualidade.findFirst.mockResolvedValue({importRef:'260123',nome:'CHAPA A36 16MM',opNumero:'113'});expect((await post()).status).toBe(400);expect(mockPrisma.trocaRastreabilidade.upsert).not.toHaveBeenCalled();});

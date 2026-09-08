@@ -1,7 +1,12 @@
 {
-  "build": 3015,
-  "gerado": "2026-09-08T20:21:04.629Z",
+  "build": 3016,
+  "gerado": "2026-09-08T20:51:28.885Z",
   "commits": [
+    {
+      "hash": "91159676",
+      "data": "08/09/2026",
+      "titulo": "RH › Cargos: o cargo passa a ter faixa — base, médio e máximo"
+    },
     {
       "hash": "4d62c6f2",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "4b6e842c",
       "data": "08/09/2026",
       "titulo": "versao-build.json volta a ser JSON — subiu com marcadores de conflito"
-    },
-    {
-      "hash": "aea7fcb5",
-      "data": "08/09/2026",
-      "titulo": "Etiquetas: filtros tipo Excel no cabeçalho da lista"
     }
   ]
 }
