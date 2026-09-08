@@ -1,156 +1,156 @@
 {
-  "build": 2993,
-  "gerado": "2026-09-08T15:16:22.217Z",
+  "build": 2994,
+  "gerado": "2026-09-08T15:21:44.918Z",
   "commits": [
     {
-      "hash": "9d175ddb77",
+      "hash": "e03488b3",
+      "data": "08/09/2026",
+      "titulo": "CLAUDE.md: Conferência de Peça e o único módulo que abre no celular"
+    },
+    {
+      "hash": "9d175ddb",
       "data": "08/09/2026",
       "titulo": "Expedição abre no celular: barra vira gaveta abaixo de md"
     },
     {
-      "hash": "2681b4420b",
+      "hash": "2681b442",
       "data": "08/09/2026",
       "titulo": "Expedição: Conferência de Peça, ligada à Lista de Expedição"
     },
     {
-      "hash": "a783c7d52a",
+      "hash": "a783c7d5",
       "data": "08/09/2026",
       "titulo": "Extrai a regra da L.E. e o lerJson para libs próprias"
     },
     {
-      "hash": "9911f139d2",
+      "hash": "9911f139",
       "data": "08/09/2026",
       "titulo": "CLAUDE.md: tira a linha duplicada de \"instale o hook\""
     },
     {
-      "hash": "7c381275c4",
+      "hash": "7c381275",
       "data": "08/09/2026",
       "titulo": "CLAUDE.md: como o versao-build.json derruba o build, e o hook novo"
     },
     {
-      "hash": "e659fa3162",
+      "hash": "e659fa31",
       "data": "08/09/2026",
       "titulo": "Hook de pre-push: barra marcador de conflito e JSON quebrado"
     },
     {
-      "hash": "4b6e842cd4",
+      "hash": "4b6e842c",
       "data": "08/09/2026",
       "titulo": "versao-build.json volta a ser JSON — subiu com marcadores de conflito"
     },
     {
-      "hash": "aea7fcb52e",
+      "hash": "aea7fcb5",
       "data": "08/09/2026",
       "titulo": "Etiquetas: filtros tipo Excel no cabeçalho da lista"
     },
     {
-      "hash": "ec3b85df61",
+      "hash": "ec3b85df",
       "data": "08/09/2026",
       "titulo": "Etiquetas: a lista mostra só os itens da Lista de Expedição"
     },
     {
-      "hash": "921fddbad2",
+      "hash": "921fddba",
       "data": "08/09/2026",
       "titulo": "versao-build"
     },
     {
-      "hash": "faf3663ca0",
+      "hash": "faf3663c",
       "data": "08/09/2026",
       "titulo": "Rastreio: a chapa de 5,00 é a de 4,75, e o BRØ é ferro redondo"
     },
     {
-      "hash": "9f55a68772",
+      "hash": "9f55a687",
       "data": "08/09/2026",
       "titulo": "Terceiros: importar lista de material enviado com conferência por OP"
     },
     {
-      "hash": "3bb3d24907",
+      "hash": "3bb3d249",
       "data": "08/09/2026",
       "titulo": "Etiquetas: coluna mostrando quais já foram impressas"
     },
     {
-      "hash": "b1d21d2749",
+      "hash": "b1d21d27",
       "data": "08/09/2026",
       "titulo": "Etiqueta: a contagem de peças sai sem zero à esquerda"
     },
     {
-      "hash": "2f643c34fb",
+      "hash": "2f643c34",
       "data": "08/09/2026",
       "titulo": "versao-build"
     },
     {
-      "hash": "fb2280408e",
+      "hash": "fb228040",
       "data": "08/09/2026",
       "titulo": "Gantt: só aparece o que alguém programou — o resto o portal deduzia"
     },
     {
-      "hash": "8806898812",
+      "hash": "88068988",
       "data": "08/09/2026",
       "titulo": "Etiqueta: o \"T\" na frente do número da OP, como a que está colada na peça"
     },
     {
-      "hash": "c29c1ab842",
+      "hash": "c29c1ab8",
       "data": "08/09/2026",
       "titulo": "Etiqueta: o número da OP vai cru, não pelo fmtOP"
     },
     {
-      "hash": "61f6800de0",
+      "hash": "61f6800d",
       "data": "08/09/2026",
       "titulo": "Gate volta a zero erros: o medidor do IFC é código de navegador"
     },
     {
-      "hash": "b8dda42509",
+      "hash": "b8dda425",
       "data": "08/09/2026",
       "titulo": "Expedição: etiquetas de carregamento, sem BarTender e sem planilha"
     },
     {
-      "hash": "2289730d11",
+      "hash": "2289730d",
       "data": "08/09/2026",
       "titulo": "PCP: a baixa do portal passa a contar no quadro — e a OP-067 sai da preparação"
     },
     {
-      "hash": "b4168342d1",
+      "hash": "b4168342",
       "data": "08/09/2026",
       "titulo": "Gantt: os botões da lista do posto ganham estilo — saíam como \"diasemana\""
     },
     {
-      "hash": "64611b155e",
+      "hash": "64611b15",
       "data": "08/09/2026",
       "titulo": "Corte: cada família vira sua barra na raia sem máquina"
     },
     {
-      "hash": "e363586345",
+      "hash": "e3635863",
       "data": "08/09/2026",
       "titulo": "Corte: separa por perfil de verdade — a lista não escreve \"chapa\", escreve CH9.50"
     },
     {
-      "hash": "72b192379f",
+      "hash": "72b19237",
       "data": "08/09/2026",
       "titulo": "PCP: o aviso da liberação sai quando tudo tem dia, e o resto vai ao histórico"
     },
     {
-      "hash": "5f94b44d5d",
+      "hash": "5f94b44d",
       "data": "08/09/2026",
       "titulo": "Gantt: a lista de trabalho de cada posto, por dia ou semana"
     },
     {
-      "hash": "5e8749a1c4",
+      "hash": "5e8749a1",
       "data": "08/09/2026",
       "titulo": "versao-build"
     },
     {
-      "hash": "0b4ebf3202",
+      "hash": "0b4ebf32",
       "data": "08/09/2026",
       "titulo": "Gantt: botão Baixa Syneco, saldo sem agrupar e bancada com nome de gente"
     },
     {
-      "hash": "226519b3a9",
+      "hash": "226519b3",
       "data": "08/09/2026",
       "titulo": "Planejamento libera peças sem data e informa OP e setor no PCP"
-    },
-    {
-      "hash": "d2539b1172",
-      "data": "08/09/2026",
-      "titulo": "Gantt: a fila sem máquina também fica em hoje; a data de entrada vira idade"
     }
   ]
 }
