@@ -1,7 +1,12 @@
 {
-  "build": 2996,
-  "gerado": "2026-09-08T15:27:02.411Z",
+  "build": 2997,
+  "gerado": "2026-09-08T15:38:03.292Z",
   "commits": [
+    {
+      "hash": "ff0119f6",
+      "data": "08/09/2026",
+      "titulo": "Despacho: status na língua da fábrica e GRD sem reimprimir"
+    },
     {
       "hash": "dd09dad3",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5f94b44d",
       "data": "08/09/2026",
       "titulo": "Gantt: a lista de trabalho de cada posto, por dia ou semana"
-    },
-    {
-      "hash": "5e8749a1",
-      "data": "08/09/2026",
-      "titulo": "versao-build"
     }
   ]
 }
