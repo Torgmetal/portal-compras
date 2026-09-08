@@ -32,3 +32,8 @@ it('combina listas de valores por coluna e distingue filtro vazio de todos',()=>
  expect(filtrarProjetos(itens,{colunas:{pf:null,mt:['__SEM__']}})).toEqual([itens[2]]);
  expect(filtrarProjetos(itens,{colunas:{m:['P1','P3'],pf:['CH4.75']}})).toEqual([itens[0],itens[2]]);
 });
+it('não distribui a lista quando nenhuma peça foi selecionada',async()=>{
+ const {criarPainelProjetos}=await import('@/app/pcp/producao/_gantt/painel-projetos');
+ const painel=criarPainelProjetos({});
+ expect([...painel.idsParaDividir({itens,setor:'MONTAGEM'})]).toEqual([]);
+});

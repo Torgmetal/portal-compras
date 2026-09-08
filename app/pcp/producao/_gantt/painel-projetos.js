@@ -329,9 +329,6 @@ export function criarPainelProjetos(dep){
 
   /* ── quebra da programação ──────────────────────────────────────────────────── */
 
-  function idsParaDividir(r) {
-    if(sel.size) return new Set(sel);
-    return new Set(filtrarProjetos(r.itens,{colunas,soFalta:soFalta&&temGrd(r.setor)}).map(i=>i.id));
-  }
+  function idsParaDividir() { return new Set(sel); }
   return { reiniciar, pintarProjetos, idsParaDividir };
 }

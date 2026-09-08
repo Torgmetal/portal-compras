@@ -22,7 +22,7 @@ export function criarQuebra(dep){
     .flatMap(l=>l.itens).reduce((s,i)=>s+dep.custoItem(i,r.setor),0);
 
   function pintarQuebra(r){
-    if(!r.itens.length){ dep.$("pCorpo").innerHTML='<div class="dica">Nenhum item selecionado. Volte a Projetos programados e ajuste os filtros.</div>'; dep.$("pFoot").innerHTML=''; return; }
+    if(!r.itens.length){ dep.$("pCorpo").innerHTML='<div class="dica">Nenhum item selecionado. Volte a Projetos programados e selecione as peças que deseja distribuir.</div>'; dep.$("pFoot").innerHTML=''; return; }
     const recs = dep.RECURSOS[r.setor].filter(x=>x.k);
     const cortePorMaquina = r.setor==="CORTE";   // no corte a máquina é UMA só
     if(bancadas===null) bancadas = new Set(r.recurso ? [r.recurso] : []);
