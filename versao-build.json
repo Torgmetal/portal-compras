@@ -1,7 +1,12 @@
 {
-  "build": 2956,
-  "gerado": "2026-09-08T01:39:03.386Z",
+  "build": 2957,
+  "gerado": "2026-09-08T10:24:42.349Z",
   "commits": [
+    {
+      "hash": "4275d072",
+      "data": "07/09/2026",
+      "titulo": "fix(planejamento): melhorar leitura das linhas do cronograma"
+    },
     {
       "hash": "46297351",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "44c045dd",
       "data": "07/09/2026",
       "titulo": "Remove cartões de resumo da tela de terceiros"
-    },
-    {
-      "hash": "4458ece1",
-      "data": "07/09/2026",
-      "titulo": "Substitui cartões de setor do PCP por seletor compacto"
     }
   ]
 }

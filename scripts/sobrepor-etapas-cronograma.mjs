@@ -32,6 +32,7 @@
    Uso: node scripts/sobrepor-etapas-cronograma.mjs --op 105 [--aplicar] [--autor <e-mail>]  */
 import { prisma } from "@/lib/prisma";
 import { recalcularCronograma } from "@/lib/cronograma-recalcular";
+import { SOBREPOSICAO, lagDaEtapa } from "@/lib/cronograma-sobreposicao";
 
 const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : null; };
 const OP = arg("--op");
@@ -39,8 +40,8 @@ const AUTOR = arg("--autor") || "vitor@torg.com.br";
 const aplicar = process.argv.includes("--aplicar");
 if (!OP) { console.error("uso: --op <numero> [--aplicar]"); process.exit(1); }
 
-// quanto do setor ANTERIOR está pronto quando este começa (mediana medida no Syneco)
-const SOBREPOSICAO = { "Montagem": 0.76, "Solda": 0.46, "Pintura": 0.46 };
+// ⚠ a tabela mora em lib/cronograma-sobreposicao.js — a mesma que o cronograma NOVO usa ao
+//   nascer. Duas cópias divergiriam no primeiro ajuste de medição.
 const ETAPAS = ["Preparação", "Montagem", "Solda", "Pintura"];
 const brd = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 
@@ -65,7 +66,7 @@ for (const l of lotes) {
     /* início desejado = início da antecessora + X·D. O motor faz
        início = próximo dia útil depois do fim da antecessora + lag, e fim = início + D,
        logo o lag que leva ao ponto desejado é X·D − D − 1. */
-    const lag = Math.round(SOBREPOSICAO[etapa] * D) - D - 1;
+    const lag = lagDaEtapa(etapa, D);
     if ((t.defasagemDias || 0) === lag) continue;
     mudancas.push({ id: t.id, area: l.nome, etapa, de: t.defasagemDias || 0, para: lag, base: D });
   }
