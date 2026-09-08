@@ -1,7 +1,12 @@
 {
-  "build": 3002,
-  "gerado": "2026-09-08T17:43:20.487Z",
+  "build": 3003,
+  "gerado": "2026-09-08T17:51:42.763Z",
   "commits": [
+    {
+      "hash": "a5b9730e",
+      "data": "08/09/2026",
+      "titulo": "Corte: ferro chato vai para a cantoneira; e o Ø do tubo também faltava"
+    },
     {
       "hash": "da9ac7ed",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b8dda425",
       "data": "08/09/2026",
       "titulo": "Expedição: etiquetas de carregamento, sem BarTender e sem planilha"
-    },
-    {
-      "hash": "2289730d",
-      "data": "08/09/2026",
-      "titulo": "PCP: a baixa do portal passa a contar no quadro — e a OP-067 sai da preparação"
     }
   ]
 }
