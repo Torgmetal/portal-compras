@@ -279,6 +279,9 @@ olhar uma fonte só faz obra inteira sumir do seletor.
 limitação do BarTender, que importava a planilha com o campo de largura fixa — aqui o número vem
 do banco a cada etiqueta e a largura se ajusta sozinha.
 
+O cabeçalho da lista tem os **funis tipo Excel** do `components/FiltroColuna` (Marca, Descrição e
+Etiqueta). Peças e Peso ficam sem funil de propósito — número contínuo vira menu de 200 valores.
+
 **Quais já foram impressas** aparece numa coluna da própria lista, com data e "×N" na reimpressão.
 O histórico mora no `AuditLog` (`action: "IMPRIMIR_ETIQUETA_CARREGAMENTO"`, `entity: "PecaConjunto"`),
 não numa coluna de `PecaConjunto`: é a pergunta que a tabela de auditoria já existe para responder,

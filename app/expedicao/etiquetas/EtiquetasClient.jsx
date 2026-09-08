@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, Check, Loader2, Printer, Search, Tag } from "lucide-react";
+import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 
 // ETIQUETAS DE CARREGAMENTO — a aba que substitui o BarTender.
 //
@@ -37,7 +38,7 @@ const quando = (iso) => {
 const nkg = (n) =>
   Number(n) > 0 ? Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
 
-function BarraSelecao({ busca, setBusca, visiveis, sel, totalEtiquetas, marcarVisiveis, limpar, imprimir, gerando }) {
+function BarraSelecao({ busca, setBusca, visiveis, sel, totalEtiquetas, marcarVisiveis, limpar, imprimir, gerando, filtrosAtivos }) {
   return (
     <div className="flex flex-wrap items-center gap-3 p-3 border-b border-gray-100 bg-gray-50/60">
       <div className="relative flex-1 min-w-[220px]">
@@ -49,7 +50,10 @@ function BarraSelecao({ busca, setBusca, visiveis, sel, totalEtiquetas, marcarVi
       <button onClick={marcarVisiveis} className="text-[13px] font-semibold text-torg-blue hover:underline">
         Marcar {busca ? "os filtrados" : "todas"} ({visiveis.length})
       </button>
-      <button onClick={limpar} disabled={!sel.size}
+      {/* ⚠ HABILITADO TAMBÉM COM FUNIL ATIVO E NADA MARCADO. Antes olhava só a seleção, e aí quem
+          filtrasse uma coluna encontrava um "Limpar" apagado — morto justamente na hora em que ele
+          é mais necessário, porque é o filtro que está escondendo marca da tela. */}
+      <button onClick={limpar} disabled={!sel.size && !filtrosAtivos}
         className="text-[13px] text-torg-gray hover:underline disabled:opacity-40">Limpar</button>
       <div className="ml-auto flex items-center gap-3">
         {/* Quantas ETIQUETAS, não quantas marcas: é o número que decide se o rolo aguenta. */}
@@ -86,18 +90,32 @@ function Impressa({ peca }) {
   );
 }
 
-function TabelaMarcas({ visiveis, sel, alterna, busca }) {
+// Os funis do cabeçalho. Matheus (08/09/2026): "no cabeçalho coloque os filtros igual fizemos
+// anteriormente tipo excel" — é o `components/FiltroColuna`, o mesmo das Listas de Expedição e da
+// consulta do Comercial, e não mais um filtro inventado só para esta tela.
+//
+// ⚠ Peças e Peso ficam SEM funil de propósito: são números contínuos, e uma lista de 200 valores
+// distintos não é filtro, é ruído. Para eles vale a busca por texto que já está na barra.
+export const COLUNAS_ETIQUETA = [
+  { key: "marca", label: "Marca", valor: (p) => p.marca || "—" },
+  { key: "descricao", label: "Descrição", valor: (p) => p.descricao || "—" },
+  // ⚠ O QUE FILTRA É "JÁ SAIU OU NÃO", não a data. Filtrar por "08/09 14:20" separaria duas
+  // impressões do mesmo lote; quem abre este funil quer as que faltam imprimir.
+  { key: "impressa", label: "Etiqueta", valor: (p) => (p.impressaEm ? "Já impressa" : "Não impressa") },
+];
+
+function TabelaMarcas({ visiveis, sel, alterna, busca, fp }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-[13px]" style={{ minWidth: 640 }}>
         <thead className="bg-gray-50/60 text-[11px] uppercase text-torg-gray">
           <tr>
             <th className="w-10 px-3 py-2"></th>
-            <th className="text-left px-2 py-2">Marca</th>
-            <th className="text-left px-2 py-2">Descrição</th>
+            <ThFiltro col="marca" label="Marca" className="text-left px-2 py-2" {...fp} />
+            <ThFiltro col="descricao" label="Descrição" className="text-left px-2 py-2" {...fp} />
             <th className="text-right px-2 py-2">Peças</th>
             <th className="text-right px-2 py-2">Peso unit. (kg)</th>
-            <th className="text-left px-4 py-2">Etiqueta</th>
+            <ThFiltro col="impressa" label="Etiqueta" className="text-left px-4 py-2" {...fp} />
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
@@ -116,13 +134,41 @@ function TabelaMarcas({ visiveis, sel, alterna, busca }) {
           ))}
           {!visiveis.length && (
             <tr><td colSpan={6} className="px-4 py-10 text-center text-torg-gray">
-              Nenhuma marca bate com &quot;{busca}&quot;.
+              {busca
+                ? <>Nenhuma marca bate com &quot;{busca}&quot;.</>
+                : "Nenhuma marca passa pelos filtros do cabeçalho."}
             </td></tr>
           )}
         </tbody>
       </table>
     </div>
   );
+}
+
+/**
+ * O que a tabela mostra: a busca por texto e, depois dela, os funis do cabeçalho.
+ *
+ * ⚠ A ORDEM IMPORTA. Os funis leem a lista JÁ buscada, então as opções de cada um são as do que
+ * está escrito na busca — filtrar "VIGA" e abrir o funil de Marca oferece só as vigas. Ao
+ * contrário, o funil ofereceria marcas que a tela não está mostrando.
+ */
+function useListaFiltrada(pecas, busca) {
+  const [colAberta, setColAberta] = useState(null);
+  const buscadas = useMemo(() => {
+    const q = busca.trim().toUpperCase();
+    if (!q) return pecas;
+    return pecas.filter((p) =>
+      p.marca.toUpperCase().includes(q) || String(p.descricao || "").toUpperCase().includes(q));
+  }, [pecas, busca]);
+
+  const f = useFiltroColunas(buscadas, COLUNAS_ETIQUETA);
+  return {
+    visiveis: f.filtradas,
+    limparFiltros: f.limpar,
+    filtrosAtivos: f.ativos,
+    fp: { filtros: f.filtros, setFiltros: f.setFiltros, opcoesDaColuna: f.opcoesDaColuna,
+          aberta: colAberta, setAberta: setColAberta },
+  };
 }
 
 export default function EtiquetasClient() {
@@ -158,12 +204,7 @@ export default function EtiquetasClient() {
   }, [buscarPecas]);
 
   const pecas = dados?.pecas || [];
-  const visiveis = useMemo(() => {
-    const q = busca.trim().toUpperCase();
-    if (!q) return pecas;
-    return pecas.filter((p) =>
-      p.marca.toUpperCase().includes(q) || String(p.descricao || "").toUpperCase().includes(q));
-  }, [pecas, busca]);
+  const { visiveis, fp, limparFiltros, filtrosAtivos } = useListaFiltrada(pecas, busca);
 
   // Quantas ETIQUETAS, não quantas marcas: é o número que decide se o rolo aguenta.
   const totalEtiquetas = useMemo(
@@ -176,7 +217,9 @@ export default function EtiquetasClient() {
     return n;
   });
   const marcarVisiveis = () => setSel((prev) => new Set([...prev, ...visiveis.map((p) => p.marca)]));
-  const limpar = () => setSel(new Set());
+  // "Limpar" limpa TUDO o que restringe a tela — seleção e funis. Deixar um funil ativo depois de
+  // limpar é a forma clássica de alguém jurar que a marca sumiu do portal.
+  const limpar = () => { setSel(new Set()); limparFiltros(); };
 
   const imprimir = async () => {
     if (!sel.size) return;
@@ -210,7 +253,9 @@ export default function EtiquetasClient() {
         <div>
           <h1 className="text-2xl font-bold text-torg-dark">Etiquetas de carregamento</h1>
           <p className="text-torg-gray text-sm">
-            Escolha a OP e as marcas. Sai uma etiqueta por peça, de 100×50&nbsp;mm, pronta para a Argox.
+            Escolha a obra e as marcas. Sai uma etiqueta por peça, de 100×50&nbsp;mm, pronta para a Argox.
+            <br />
+            Aparecem só os itens da <b>Lista de Expedição</b> — as posições de fábrica não levam etiqueta.
           </p>
         </div>
       </div>
@@ -233,6 +278,7 @@ export default function EtiquetasClient() {
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5">
         <label className="block text-[11px] font-bold uppercase tracking-wide text-torg-gray mb-1.5">Obra</label>
+        {/* ⚠ Matheus (08/09/2026): "somente os produtos finais igual sai na Lista de Expedição". */}
         {carregandoOps ? (
           <div className="flex items-center gap-2 text-torg-gray text-sm py-2">
             <Loader2 size={16} className="animate-spin" /> Carregando as OPs…
@@ -260,17 +306,19 @@ export default function EtiquetasClient() {
         pecas.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center text-torg-gray">
             <Tag size={30} className="mx-auto mb-3 opacity-40" />
-            Esta OP não tem peça cadastrada — não há o que etiquetar.
+            <div className="font-semibold text-torg-dark mb-1">Nada a etiquetar nesta obra</div>
+            Nenhuma marca desta OP está na Lista de Expedição — só o que se expede leva etiqueta.
+            Se a obra já tem LE, importe-a antes (Produção › Peças, ou a sincronização do SharePoint).
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
             <BarraSelecao
               busca={busca} setBusca={setBusca}
               visiveis={visiveis} sel={sel} totalEtiquetas={totalEtiquetas}
-              marcarVisiveis={marcarVisiveis} limpar={limpar}
+              marcarVisiveis={marcarVisiveis} limpar={limpar} filtrosAtivos={filtrosAtivos}
               imprimir={imprimir} gerando={gerando}
             />
-            <TabelaMarcas visiveis={visiveis} sel={sel} alterna={alterna} busca={busca} />
+            <TabelaMarcas visiveis={visiveis} sel={sel} alterna={alterna} busca={busca} fp={fp} />
           </div>
         )
       )}

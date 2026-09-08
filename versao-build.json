@@ -1,8 +1,11 @@
 {
 <<<<<<< HEAD
+<<<<<<< HEAD
   "build": 2983,
   "gerado": "2026-09-08T14:39:10.412Z",
 =======
+=======
+>>>>>>> 4a8f32eb32 (Etiquetas: filtros tipo Excel no cabeçalho da lista)
   "build": 2981,
 <<<<<<< HEAD
   "gerado": "2026-09-08T14:34:58.539Z",
@@ -22,7 +25,16 @@
       "hash": "3bb3d249",
 =======
   "gerado": "2026-09-08T14:42:09.619Z",
+=======
+  "build": 2982,
+  "gerado": "2026-09-08T14:42:23.221Z",
+>>>>>>> 0f1ba08367 (Etiquetas: filtros tipo Excel no cabeçalho da lista)
   "commits": [
+    {
+      "hash": "c1d8bd7621",
+      "data": "08/09/2026",
+      "titulo": "Etiquetas: a lista mostra só os itens da Lista de Expedição"
+    },
     {
       "hash": "3bb3d24907",
 >>>>>>> c1d8bd7621 (Etiquetas: a lista mostra só os itens da Lista de Expedição)
@@ -167,6 +179,22 @@
       "hash": "a03adf7c",
       "data": "07/09/2026",
       "titulo": "refactor(planejamento): simplificar lista e criacao de cronogramas"
+<<<<<<< HEAD
+=======
+    },
+    {
+      "hash": "16780d69",
+      "data": "07/09/2026",
+      "titulo": "feat(planejamento): escolher tipo de email e conferir cronograma antes do envio"
+<<<<<<< HEAD
+    },
+    {
+      "hash": "5c53ca25",
+      "data": "07/09/2026",
+      "titulo": "CMR: divergir de pedido não é errar — a trava pergunta, não acusa"
+=======
+>>>>>>> 0f1ba08367 (Etiquetas: filtros tipo Excel no cabeçalho da lista)
+>>>>>>> 4a8f32eb32 (Etiquetas: filtros tipo Excel no cabeçalho da lista)
     }
   ]
 }
