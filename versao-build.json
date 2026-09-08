@@ -1,7 +1,12 @@
 {
-  "build": 2982,
-  "gerado": "2026-09-08T14:38:19.871Z",
+  "build": 2983,
+  "gerado": "2026-09-08T14:39:10.412Z",
   "commits": [
+    {
+      "hash": "faf3663c",
+      "data": "08/09/2026",
+      "titulo": "Rastreio: a chapa de 5,00 é a de 4,75, e o BRØ é ferro redondo"
+    },
     {
       "hash": "9f55a687",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "a03adf7c",
       "data": "07/09/2026",
       "titulo": "refactor(planejamento): simplificar lista e criacao de cronogramas"
-    },
-    {
-      "hash": "16780d69",
-      "data": "07/09/2026",
-      "titulo": "feat(planejamento): escolher tipo de email e conferir cronograma antes do envio"
     }
   ]
 }
