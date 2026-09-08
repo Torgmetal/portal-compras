@@ -1,7 +1,12 @@
 {
-  "build": 2987,
-  "gerado": "2026-09-08T14:49:22.425Z",
+  "build": 2988,
+  "gerado": "2026-09-08T14:49:48.765Z",
   "commits": [
+    {
+      "hash": "e659fa3162",
+      "data": "08/09/2026",
+      "titulo": "Hook de pre-push: barra marcador de conflito e JSON quebrado"
+    },
     {
       "hash": "4b6e842cd4",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "d2442aff37",
       "data": "08/09/2026",
       "titulo": "versao-build 2958"
-    },
-    {
-      "hash": "ef0726b701",
-      "data": "08/09/2026",
-      "titulo": "Cronograma novo nasce sobreposto, não em fila"
     }
   ]
 }

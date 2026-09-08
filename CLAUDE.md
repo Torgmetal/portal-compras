@@ -67,8 +67,27 @@ Instale o hook uma vez por clone:
 git config core.hooksPath .githooks
 ```
 
+Instale o hook uma vez por clone — são **dois**, o mesmo comando liga os dois.
+
 O hook `.githooks/pre-commit` roda `scripts/gerar-versao.js`, que grava `versao-build.json` e o
 inclui no próprio commit. `next.config.js` lê esse arquivo e expõe `NEXT_PUBLIC_BUILD_NUMERO`.
+
+O `.githooks/pre-push` recusa o push com **marcador de conflito** em arquivo versionado ou com
+`versao-build.json` inválido.
+
+> ⚠⚠ **`versao-build.json` conflitado derruba o build da Vercel** (08/09/2026). O webpack importa
+> esse arquivo em `app/versao/page.js`: JSON com `<<<<<<< HEAD` dentro não é aviso, é build falho —
+> e **nenhum teste pega**, porque o arquivo só é lido no build.
+>
+> ⚠ **`git rebase --continue` NÃO roda o `pre-commit`.** Foi por aí que o arquivo sujo passou: um
+> laço de rebase com `node scripts/gerar-versao.js || true` engoliu a falha do gerador (que se
+> recusa, corretamente, a parsear um JSON quebrado) e commitou os marcadores. Ao resolver esse
+> arquivo num rebase, **regere e confira** em vez de dar `git add` no que o merge deixou:
+>
+> ```bash
+> git show <ultimo-commit-bom>:versao-build.json > versao-build.json
+> node scripts/gerar-versao.js && git add versao-build.json
+> ```
 
 > **Depois de um `git pull`/rebase** o número gravado fica atrás da contagem real por alguns
 > commits; o hook realinha sozinho no commit seguinte (ele usa o maior entre a contagem atual e o
