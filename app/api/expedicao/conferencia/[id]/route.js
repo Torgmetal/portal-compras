@@ -2,13 +2,14 @@
 //
 // GET                       → sessão + marcas da L.E. com previsto/conferido/saldo + lançamentos
 // POST   { marca, qte, observacao } → lança (e RECUSA o que passa da L.E.)
+// PUT    { itemId, qte, observacao } → corrige um lançamento já feito, antes de encerrar
 // DELETE ?item=xxx          → apaga um lançamento (errou a marca, digitou 10 em vez de 1)
 // PATCH  { acao }           → "finalizar" | "cancelar"
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { saldosDaOP, validarLancamento, progresso, STATUS, autorDe } from "@/lib/conferencia-peca";
+import { saldosDaOP, validarLancamento, validarEdicao, progresso, STATUS, autorDe } from "@/lib/conferencia-peca";
 import { log } from "@/lib/log";
 
 const registro = log("api/expedicao/conferencia/[id]");
@@ -101,22 +102,88 @@ export async function POST(req, { params }) {
   return NextResponse.json(await estado(sessao));
 }
 
+/** A sessão aberta desta rota, ou a resposta de recusa. Repetido em três verbos antes disto. */
+async function sessaoAberta(id) {
+  const sessao = await sessaoDe(id);
+  if (!sessao) return { recusa: erro("Conferência não encontrada", 404) };
+  if (sessao.status !== STATUS.ABERTA) return { recusa: erro("Esta conferência já foi encerrada.") };
+  return { sessao };
+}
+
+/**
+ * O lançamento, se ele for MESMO desta conferência.
+ * ⚠ Sem a checagem do dono, o id de um lançamento de OUTRA conferência seria editado ou apagado
+ * por aqui — o id sozinho não diz a quem pertence.
+ */
+async function itemDaSessao(itemId, conferenciaId) {
+  const item = await prisma.conferenciaPecaItem.findUnique({
+    where: { id: itemId },
+    select: { id: true, conferenciaId: true, marca: true, qte: true },
+  });
+  return item && item.conferenciaId === conferenciaId ? item : null;
+}
+
+const esquemaEdicao = z.object({
+  itemId: z.string().min(1, "Informe qual lançamento corrigir."),
+  qte: z.coerce.number().int("A quantidade tem que ser um número inteiro.").min(1, "A quantidade mínima é 1."),
+  observacao: z.string().max(500).optional().nullable(),
+});
+
+/** Grava a correção e o registro de auditoria. ⚠ Guarda ANTES e DEPOIS: sem os dois, a auditoria
+ *  diria que a marca tem 3 sem dizer que alguém havia lançado 10. */
+async function gravarEdicao({ user, sessao, item, dados, mexeuNaObs }) {
+  const quem = autorDe(user);
+  await prisma.conferenciaPecaItem.update({
+    where: { id: item.id },
+    data: { qte: dados.qte, ...(mexeuNaObs ? { observacao: (dados.observacao || "").trim() || null } : {}) },
+  });
+  await prisma.auditLog.create({
+    data: {
+      userId: quem.id, action: "EDITAR_LANCAMENTO_CONFERENCIA",
+      entity: "ConferenciaPeca", entityId: sessao.id,
+      diff: { op: sessao.opNumero, marca: item.marca, antes: item.qte, depois: dados.qte, por: quem.nome },
+    },
+  }).catch(() => {});
+  registro.info(`${sessao.opNumero}: ${item.marca} corrigida de ${item.qte} para ${dados.qte}`);
+}
+
+export async function PUT(req, { params }) {
+  let user;
+  try { user = await requireRole(PERFIS); } catch (e) { return erroDeAcesso(e); }
+
+  const { recusa, sessao } = await sessaoAberta(params.id);
+  if (recusa) return recusa;
+
+  let corpo;
+  try { corpo = await req.json(); } catch { corpo = null; }
+  const lido = esquemaEdicao.safeParse(corpo);
+  if (!lido.success) return erro(lido.error.issues[0]?.message);
+
+  const item = await itemDaSessao(lido.data.itemId, sessao.id);
+  if (!item) return erro("Lançamento não encontrado nesta conferência", 404);
+
+  const saldos = await saldosDaOP(prisma, sessao.opId);
+  if (!saldos) return erro("A OP desta conferência não existe mais", 404);
+
+  const v = validarEdicao(saldos, item, lido.data.qte);
+  if (!v.ok) return NextResponse.json({ success: false, error: v.erro, recusado: true }, { status: 409 });
+
+  await gravarEdicao({ user, sessao, item, dados: lido.data, mexeuNaObs: corpo?.observacao !== undefined });
+  return NextResponse.json(await estado(sessao));
+}
+
 export async function DELETE(req, { params }) {
   let user;
   try { user = await requireRole(PERFIS); } catch (e) { return erroDeAcesso(e); }
 
-  const sessao = await sessaoDe(params.id);
-  if (!sessao) return erro("Conferência não encontrada", 404);
-  if (sessao.status !== STATUS.ABERTA) return erro("Esta conferência já foi encerrada.");
+  const { recusa, sessao } = await sessaoAberta(params.id);
+  if (recusa) return recusa;
 
   const itemId = new URL(req.url).searchParams.get("item");
   if (!itemId) return erro("Informe qual lançamento apagar.");
 
-  const item = await prisma.conferenciaPecaItem.findUnique({
-    where: { id: itemId }, select: { id: true, conferenciaId: true, marca: true, qte: true },
-  });
-  // ⚠ confere o dono: sem isto, o id de um lançamento de OUTRA conferência apagaria por aqui.
-  if (!item || item.conferenciaId !== sessao.id) return erro("Lançamento não encontrado nesta conferência", 404);
+  const item = await itemDaSessao(itemId, sessao.id);
+  if (!item) return erro("Lançamento não encontrado nesta conferência", 404);
 
   const quem = autorDe(user);
   await prisma.conferenciaPecaItem.delete({ where: { id: item.id } });
@@ -140,9 +207,8 @@ export async function PATCH(req, { params }) {
   let user;
   try { user = await requireRole(PERFIS); } catch (e) { return erroDeAcesso(e); }
 
-  const sessao = await sessaoDe(params.id);
-  if (!sessao) return erro("Conferência não encontrada", 404);
-  if (sessao.status !== STATUS.ABERTA) return erro("Esta conferência já foi encerrada.");
+  const { recusa, sessao } = await sessaoAberta(params.id);
+  if (recusa) return recusa;
 
   let corpo;
   try { corpo = await req.json(); } catch { corpo = null; }

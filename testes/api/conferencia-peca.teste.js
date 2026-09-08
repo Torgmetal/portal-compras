@@ -8,7 +8,7 @@ import { mockPrisma } from "@/testes/apoio/prisma";
 const mocks = vi.hoisted(() => ({ role: vi.fn() }));
 vi.mock("@/lib/session", () => ({ requireRole: mocks.role }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma, prismaDirect: mockPrisma }));
-import { POST, DELETE, PATCH, GET } from "@/app/api/expedicao/conferencia/[id]/route";
+import { POST, PUT, DELETE, PATCH, GET } from "@/app/api/expedicao/conferencia/[id]/route";
 
 const SESSAO = { id: "c1", opId: "op1", opNumero: "097", status: "ABERTA", observacao: null,
   iniciadaEm: new Date(), iniciadaPorNome: "Zé", finalizadaEm: null, finalizadaPorNome: null };
@@ -143,6 +143,68 @@ describe("DELETE — desfazer o lançamento errado", () => {
       { id: "i9", conferenciaId: "OUTRA", marca: "X", qte: 1 });
     expect((await del("i9")).status).toBe(404);
     expect(mockPrisma.conferenciaPecaItem.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe("PUT — corrigir a quantidade já lançada", () => {
+  const put = (corpo) => PUT(new Request("http://localhost/x", { method: "PUT", body: JSON.stringify(corpo) }), { params });
+  const itemGravado = (qte) =>
+    mockPrisma.conferenciaPecaItem.findUnique.mockResolvedValue(
+      { id: "i1", conferenciaId: "c1", marca: "T97A140", qte });
+
+  it("diminuir uma marca completa passa — o próprio lançamento sai da conta", async () => {
+    itemGravado(2); jaConferido([["T97A140", 2]]);   // L.E. prevê 2, este item é as 2
+    const r = await put({ itemId: "i1", qte: 1 });
+    expect(r.status).toBe(200);
+    expect(mockPrisma.conferenciaPecaItem.update.mock.calls[0][0])
+      .toMatchObject({ where: { id: "i1" }, data: { qte: 1 } });
+  });
+
+  it("aumentar além do previsto é recusado com 409", async () => {
+    itemGravado(1); jaConferido([["T97A140", 1]]);
+    const r = await put({ itemId: "i1", qte: 5 });
+    expect(r.status).toBe(409);
+    expect((await r.json()).error).toContain("T97A140");
+    expect(mockPrisma.conferenciaPecaItem.update).not.toHaveBeenCalled();
+  });
+
+  it("registra o ANTES e o DEPOIS na auditoria", async () => {
+    itemGravado(2); jaConferido([["T97A140", 2]]);
+    await put({ itemId: "i1", qte: 1 });
+    expect(mockPrisma.auditLog.create.mock.calls[0][0].data)
+      .toMatchObject({ action: "EDITAR_LANCAMENTO_CONFERENCIA", diff: expect.objectContaining({ antes: 2, depois: 1 }) });
+  });
+
+  // ⚠ o id sozinho não diz a quem o lançamento pertence.
+  it("recusa o lançamento de outra conferência", async () => {
+    mockPrisma.conferenciaPecaItem.findUnique.mockResolvedValue(
+      { id: "i9", conferenciaId: "OUTRA", marca: "T97A140", qte: 1 });
+    expect((await put({ itemId: "i9", qte: 1 })).status).toBe(404);
+    expect(mockPrisma.conferenciaPecaItem.update).not.toHaveBeenCalled();
+  });
+
+  it("não deixa editar em conferência encerrada", async () => {
+    mockPrisma.conferenciaPeca.findUnique.mockResolvedValue({ ...SESSAO, status: "FINALIZADA" });
+    expect((await put({ itemId: "i1", qte: 1 })).status).toBe(400);
+    expect(mockPrisma.conferenciaPecaItem.update).not.toHaveBeenCalled();
+  });
+
+  it.each([[0], [1.5]])("recusa quantidade %s com 400", async (q) => {
+    itemGravado(1);
+    expect((await put({ itemId: "i1", qte: q })).status).toBe(400);
+    expect(mockPrisma.conferenciaPecaItem.update).not.toHaveBeenCalled();
+  });
+
+  // ⚠ a observação só é tocada quando vem no corpo — editar a quantidade não pode apagá-la.
+  it("não apaga a observação quando o corpo não a manda", async () => {
+    itemGravado(2); jaConferido([["T97A140", 2]]);
+    await put({ itemId: "i1", qte: 1 });
+    expect(mockPrisma.conferenciaPecaItem.update.mock.calls[0][0].data).not.toHaveProperty("observacao");
+  });
+
+  it("preserva as permissões de acesso", async () => {
+    mocks.role.mockRejectedValue(new Error("Forbidden"));
+    expect((await put({ itemId: "i1", qte: 1 })).status).toBe(403);
   });
 });
 

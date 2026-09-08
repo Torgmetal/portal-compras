@@ -145,8 +145,8 @@ export default function SessaoClient({ id }) {
             <h2 className="text-[11px] font-bold uppercase tracking-wide text-torg-gray mb-1">
               Conferido nesta sessão
             </h2>
-            <ListaLancamentos lancamentos={s.lancamentos} onApagar={s.apagar}
-              apagando={s.apagando} encerrada={s.encerrada} />
+            <ListaLancamentos lancamentos={s.lancamentos} onApagar={s.apagar} onEditar={s.editar}
+              apagando={s.apagando} salvando={s.salvando} encerrada={s.encerrada} />
           </div>
           {!s.encerrada && <Encerrar onAcao={s.encerrar} agindo={s.agindo} />}
         </>

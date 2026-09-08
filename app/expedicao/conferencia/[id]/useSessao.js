@@ -38,6 +38,18 @@ export function useSessao(id) {
     } catch (e) { setErro(e.message); return false; } finally { setSalvando(false); }
   }, [url]);
 
+  const editar = useCallback(async (itemId, qte) => {
+    setSalvando(true); setErro(""); setOk("");
+    try {
+      setDados(await lerJson(await fetch(url, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId, qte }),
+      }), "Correção"));
+      setOk("Quantidade corrigida.");
+      return true;
+    } catch (e) { setErro(e.message); return false; } finally { setSalvando(false); }
+  }, [url]);
+
   const apagar = useCallback(async (itemId) => {
     setApagando(itemId); setErro(""); setOk("");
     try {
@@ -59,7 +71,7 @@ export function useSessao(id) {
   return {
     dados, carregando, salvando, apagando, agindo, erro, ok,
     limparErro: () => setErro(""),
-    lancar, apagar, encerrar,
+    lancar, editar, apagar, encerrar,
     encerrada: !!dados && dados?.conferencia?.status !== "ABERTA",
     marcas: dados?.marcas || [],
     lancamentos: dados?.lancamentos || [],

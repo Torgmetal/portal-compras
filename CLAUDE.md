@@ -337,6 +337,18 @@ conferiu 2" é a peça certa contada duas vezes.
 enxergar, e a segunda descobriria isso na forma de um "já conferiu tudo" que ela não entende. Quem
 chega depois entra na sessão que já existe.
 
+⚠ **O autocomplete só sugere a partir de 2 letras.** A OP-97 tem 537 marcas: abrir a lista no
+clique despeja algo que ninguém lê e empurra o formulário para fora da tela do celular.
+
+⚠ **Escolher a marca NÃO preenche a quantidade** — ela fica sempre em 1. Preenchendo com o saldo, a
+tela troca *contar* por *confirmar*: um toque daria por conferidas 10 peças que ninguém olhou, com
+o número vindo da própria lista que a conferência existe para checar.
+
+⚠⚠ **Ao corrigir um lançamento (PUT), o próprio lançamento sai da conta antes de validar**
+(`validarEdicao`). Validando contra o saldo cru, `conferido` já inclui o item e QUALQUER correção
+seria recusada — inclusive as que diminuem. O bug seria pior que a ausência da funcionalidade: a
+tela deixaria consertar só o que não precisava.
+
 ⚠ **O Torguinho não aparece nesta tela.** Ele é `fixed bottom-4 right-4` e no celular fica em cima
 do campo OBSERVAÇÃO, ao lado do botão de lançar (visto na validação em 390×844). Padding não
 resolve — ele flutua sobre a viewport. Está na mesma lista de exceções de `/colaborador` e

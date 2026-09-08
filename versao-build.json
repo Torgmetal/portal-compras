@@ -1,7 +1,12 @@
 {
-  "build": 3013,
-  "gerado": "2026-09-08T19:46:02.664Z",
+  "build": 3014,
+  "gerado": "2026-09-08T20:24:29.190Z",
   "commits": [
+    {
+      "hash": "61a168326b",
+      "data": "08/09/2026",
+      "titulo": "Conferência: escolher a marca não preenche mais a quantidade"
+    },
     {
       "hash": "cce56011bc",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ec3b85df61",
       "data": "08/09/2026",
       "titulo": "Etiquetas: a lista mostra só os itens da Lista de Expedição"
-    },
-    {
-      "hash": "921fddbad2",
-      "data": "08/09/2026",
-      "titulo": "versao-build"
     }
   ]
 }

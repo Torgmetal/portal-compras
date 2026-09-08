@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validarLancamento, mensagemDeExcesso, progresso } from "@/lib/conferencia-peca";
+import { validarLancamento, validarEdicao, mensagemDeExcesso, progresso } from "@/lib/conferencia-peca";
 
 // ⚠⚠ ESTA É A RAZÃO DE A TELA EXISTIR. Matheus (08/09/2026): "precisa lincar a coluna quantidade
 // com a L.E; caso ele digitar uma peça 3 vezes mas na lista só tem 2 vai dar erro e mensagem
@@ -72,6 +72,56 @@ describe("validarLancamento — o teto é a Lista de Expedição", () => {
 
   it("aceita quantidade numérica vinda como texto do formulário", () => {
     expect(validarLancamento(LE, { marca: "T97A140", qte: "2" }).ok).toBe(true);
+  });
+});
+
+describe("validarEdicao — corrigir um lançamento que já existe", () => {
+  // ⚠⚠ O BUG QUE ESTE TESTE EXISTE PARA IMPEDIR: validando contra o saldo cru, `conferido` já
+  // inclui o próprio lançamento, e QUALQUER correção seria recusada — inclusive as que diminuem.
+  // A tela deixaria consertar só o que não precisava de conserto.
+  const cheia = saldos([marca({ marca: "T97A140", previsto: 10, conferido: 10 })]);
+  const item = { marca: "T97A140", qte: 10 };
+
+  it("diminuir passa, mesmo com a marca completa", () => {
+    expect(validarEdicao(cheia, item, 3).ok).toBe(true);
+    expect(validarEdicao(cheia, item, 1).ok).toBe(true);
+  });
+
+  it("manter o mesmo número passa", () => {
+    expect(validarEdicao(cheia, item, 10).ok).toBe(true);
+  });
+
+  it("aumentar até o previsto passa; além dele, não", () => {
+    const parcial = saldos([marca({ marca: "T97A140", previsto: 10, conferido: 4 })]);
+    const de4 = { marca: "T97A140", qte: 4 };
+    expect(validarEdicao(parcial, de4, 10).ok).toBe(true);
+    const r = validarEdicao(parcial, de4, 11);
+    expect(r.ok).toBe(false);
+    expect(r.erro).toContain("T97A140");
+  });
+
+  // ⚠ o desconto é SÓ do próprio lançamento; o que OUTROS lançaram continua ocupando o saldo.
+  it("não devolve o que outro lançamento da mesma marca já ocupou", () => {
+    // previsto 10, conferido 10 = 6 deste item + 4 de outro
+    const s = saldos([marca({ marca: "T97A140", previsto: 10, conferido: 10 })]);
+    const meu = { marca: "T97A140", qte: 6 };
+    expect(validarEdicao(s, meu, 6).ok).toBe(true);
+    expect(validarEdicao(s, meu, 7).ok).toBe(false);   // 4 do outro + 7 = 11 > 10
+  });
+
+  it("não mexe no saldo das outras marcas", () => {
+    const s = saldos([
+      marca({ marca: "A", previsto: 5, conferido: 5 }),
+      marca({ marca: "B", previsto: 5, conferido: 5 }),
+    ]);
+    expect(validarEdicao(s, { marca: "A", qte: 5 }, 5).ok).toBe(true);
+    expect(validarEdicao(s, { marca: "A", qte: 5 }, 5).item.marca).toBe("A");
+    // B continua cheia
+    expect(validarLancamento(s, { marca: "B", qte: 1 }).ok).toBe(false);
+  });
+
+  it.each([[0], [-1], [1.5]])("recusa quantidade %s", (q) => {
+    expect(validarEdicao(cheia, item, q).ok).toBe(false);
   });
 });
 

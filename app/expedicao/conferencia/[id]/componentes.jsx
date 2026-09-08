@@ -1,10 +1,18 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
-import { Check, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { Check, Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 
 // As peças da tela de conferência. Ficam num arquivo à parte porque a tela é para CELULAR: cada
 // bloco é uma tela cheia no telefone, e misturá-los num componente só deixaria de caber no teto de
 // 350 linhas antes de o formulário ficar pronto.
+
+// ⚠⚠ SÓ SUGERE DEPOIS DE DIGITAR. Matheus (08/09/2026): "não é interessante aparecer a lista
+// completa das marcas só de eu clicar dentro do campo de pesquisa MARCA; o ideal é ir aparecendo a
+// marca no autocomplete conforme eu digito, assim não fica um número enorme".
+//
+// A OP-97 tem 537 marcas: abrir no clique despeja uma lista que ninguém lê e que empurra o resto do
+// formulário para fora da tela do celular. Duas letras já cortam a lista para algo que se enxerga.
+const MIN_BUSCA = 2;
 
 /**
  * Escolher a marca sem digitar a marca inteira num teclado de celular.
@@ -19,13 +27,16 @@ export function CampoMarca({ marcas, valor, onChange, onEscolher, autoFocus }) {
   const [aberto, setAberto] = useState(false);
   const caixa = useRef(null);
 
+  const q = String(valor || "").trim().toUpperCase();
+  const buscando = q.length >= MIN_BUSCA;
+
   const sugestoes = useMemo(() => {
-    const q = String(valor || "").trim().toUpperCase();
-    const base = q ? marcas.filter((m) => m.marca.toUpperCase().includes(q)
-      || String(m.descricao || "").toUpperCase().includes(q)) : marcas;
+    if (!buscando) return [];
+    const base = marcas.filter((m) => m.marca.toUpperCase().includes(q)
+      || String(m.descricao || "").toUpperCase().includes(q));
     // Pendentes primeiro: é o que se está conferindo. As completas continuam visíveis, mas no fim.
     return [...base].sort((a, b) => Number(a.completa) - Number(b.completa)).slice(0, 30);
-  }, [marcas, valor]);
+  }, [marcas, q, buscando]);
 
   return (
     <div className="relative" ref={caixa}>
@@ -37,12 +48,14 @@ export function CampoMarca({ marcas, valor, onChange, onEscolher, autoFocus }) {
           onChange={(e) => { onChange(e.target.value.toUpperCase()); setAberto(true); }}
           onFocus={() => setAberto(true)}
           onBlur={() => setTimeout(() => setAberto(false), 150)}
-          placeholder="Digite parte da marca"
+          placeholder={`Digite ${MIN_BUSCA}+ letras da marca`}
           autoComplete="off" autoCapitalize="characters" spellCheck={false}
-          className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-3 text-base font-bold uppercase" />
+          // ⚠ `placeholder:normal-case`: o `uppercase` é para o que a pessoa DIGITA (a marca é
+          // maiúscula no cadastro) — sem isto ele grita a dica do campo junto, em caixa alta.
+          className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-3 text-base font-bold uppercase placeholder:normal-case placeholder:font-normal" />
       </div>
 
-      {aberto && (
+      {aberto && buscando && (
         <ul className="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-72 overflow-y-auto">
           {sugestoes.map((m) => (
             <li key={m.marca}>
@@ -59,7 +72,7 @@ export function CampoMarca({ marcas, valor, onChange, onEscolher, autoFocus }) {
             </li>
           ))}
           {!sugestoes.length && (
-            <li className="px-3 py-4 text-[13px] text-torg-gray">Nenhuma marca da L.E. bate com isso.</li>
+            <li className="px-3 py-4 text-[13px] text-torg-gray">Nenhuma marca da L.E. bate com &quot;{q}&quot;.</li>
           )}
         </ul>
       )}
@@ -138,34 +151,89 @@ export function FormLancamento({ marcas, onLancar, salvando, encerrada }) {
   );
 }
 
-/** Os últimos lançamentos, com o desfazer — errar a marca no pátio é rotina. */
-export function ListaLancamentos({ lancamentos, onApagar, apagando, encerrada }) {
+/**
+ * Corrigir a quantidade de um lançamento sem apagar e refazer.
+ *
+ * ⚠ Matheus (08/09/2026): "depois de conferir uma marca, ser possível editar a quantidade dela lá
+ * em CONFERIDO NESTA SESSÃO antes de encerrar a conferência". Apagar e relançar já dava o mesmo
+ * resultado, mas custa quatro toques e perde a observação — e no pátio o que se corrige é um
+ * número, não o lançamento inteiro.
+ */
+function EditorQte({ l, onSalvar, salvando, onCancelar }) {
+  const [qte, setQte] = useState(String(l.qte));
+  const salvar = () => onSalvar(Number(qte));
+  // ⚠ DUAS LINHAS, NÃO UMA. Numa só, os cinco controles (−, número, +, ✓, ✕) mais o nome não cabem
+  // em 390px e a marca quebra no meio ("T97-/AC1") — visto na validação em celular. A marca em cima,
+  // os controles embaixo em largura cheia, e os alvos de toque continuam de 40px.
+  return (
+    <li className="py-2.5">
+      <div className="flex items-baseline gap-2 mb-2">
+        <span className="font-bold text-torg-dark">{l.marca}</span>
+        <span className="text-[11px] text-torg-gray">era {l.qte}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => setQte((q) => String(Math.max(1, Number(q) - 1)))}
+          className="w-10 h-10 rounded-lg border border-gray-200 text-lg font-bold text-torg-gray shrink-0">−</button>
+        <input value={qte} autoFocus inputMode="numeric" pattern="[0-9]*"
+          onChange={(e) => setQte(e.target.value.replace(/\D/g, ""))}
+          onKeyDown={(e) => { if (e.key === "Enter") salvar(); if (e.key === "Escape") onCancelar(); }}
+          aria-label={`Quantidade de ${l.marca}`}
+          className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2 py-2 text-center text-lg font-bold" />
+        <button type="button" onClick={() => setQte((q) => String(Number(q || 0) + 1))}
+          className="w-10 h-10 rounded-lg border border-gray-200 text-lg font-bold text-torg-gray shrink-0">+</button>
+        <button onClick={salvar} disabled={!Number(qte) || salvando} aria-label="Salvar quantidade"
+          className="w-10 h-10 rounded-lg bg-torg-blue text-white flex items-center justify-center shrink-0 disabled:opacity-40">
+          {salvando ? <Loader2 size={16} className="animate-spin" /> : <Check size={18} />}
+        </button>
+        <button onClick={onCancelar} aria-label="Cancelar edição"
+          className="w-10 h-10 rounded-lg border border-gray-200 text-torg-gray flex items-center justify-center shrink-0">
+          <X size={16} />
+        </button>
+      </div>
+    </li>
+  );
+}
+
+/** Os últimos lançamentos, com corrigir e desfazer — errar no pátio é rotina. */
+export function ListaLancamentos({ lancamentos, onApagar, onEditar, apagando, salvando, encerrada }) {
+  const [editando, setEditando] = useState(null);
   if (!lancamentos.length) {
     return <p className="text-sm text-torg-gray text-center py-8">Nenhuma peça conferida ainda.</p>;
   }
   return (
     <ul className="divide-y divide-gray-50">
       {lancamentos.map((l) => (
-        <li key={l.id} className="flex items-start gap-3 py-2.5">
-          <span className="bg-torg-blue-50 text-torg-blue font-bold rounded-lg px-2.5 py-1 text-sm shrink-0 tabular-nums">
-            {l.qte}
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="font-bold text-torg-dark">{l.marca}</div>
-            {l.observacao && <div className="text-[13px] text-torg-orange">{l.observacao}</div>}
-            <div className="text-[11px] text-torg-gray">
-              {new Date(l.criadoEm).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-              {l.criadoPorNome ? ` · ${l.criadoPorNome}` : ""}
+        editando === l.id ? (
+          <EditorQte key={l.id} l={l} salvando={salvando} onCancelar={() => setEditando(null)}
+            onSalvar={async (qte) => { if (await onEditar(l.id, qte)) setEditando(null); }} />
+        ) : (
+          <li key={l.id} className="flex items-start gap-3 py-2.5">
+            <span className="bg-torg-blue-50 text-torg-blue font-bold rounded-lg px-2.5 py-1 text-sm shrink-0 tabular-nums">
+              {l.qte}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="font-bold text-torg-dark">{l.marca}</div>
+              {l.observacao && <div className="text-[13px] text-torg-orange">{l.observacao}</div>}
+              <div className="text-[11px] text-torg-gray">
+                {new Date(l.criadoEm).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                {l.criadoPorNome ? ` · ${l.criadoPorNome}` : ""}
+              </div>
             </div>
-          </div>
-          {!encerrada && (
-            <button onClick={() => onApagar(l.id)} disabled={apagando === l.id}
-              aria-label={`Apagar lançamento de ${l.marca}`}
-              className="text-torg-gray hover:text-red-600 shrink-0 p-2 disabled:opacity-40">
-              {apagando === l.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-            </button>
-          )}
-        </li>
+            {!encerrada && (
+              <>
+                <button onClick={() => setEditando(l.id)} aria-label={`Editar quantidade de ${l.marca}`}
+                  className="text-torg-gray hover:text-torg-blue shrink-0 p-2">
+                  <Pencil size={16} />
+                </button>
+                <button onClick={() => onApagar(l.id)} disabled={apagando === l.id}
+                  aria-label={`Apagar lançamento de ${l.marca}`}
+                  className="text-torg-gray hover:text-red-600 shrink-0 p-2 disabled:opacity-40">
+                  {apagando === l.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                </button>
+              </>
+            )}
+          </li>
+        )
       ))}
     </ul>
   );
