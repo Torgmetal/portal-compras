@@ -58,7 +58,9 @@ export async function POST(req) {
         nome: find("nome", "cargo", "função", "funcao"),
         nivel: find("nivel", "nível"),
         categoria: find("categoria", "area", "área"),
-        salarioBase: find("salario", "salário", "salário base"),
+        salarioBase: find("salario base", "salário base", "salario", "salário"),
+        salarioMedio: find("salario medio", "salário médio"),
+        salarioMaximo: find("salario maximo", "salário máximo"),
         cbo: find("cbo"),
       };
     };
@@ -90,11 +92,14 @@ export async function POST(req) {
 
       const nivel = NIVEL_MAP[norm(raw.nivel)] || null;
       const categoria = String(raw.categoria).trim() || null;
-      const salarioBase = numeroBR(String(raw.salarioBase).replace(/[^\d.,]/g, ""), NaN) || null;
+      const dinheiro = (v) => numeroBR(String(v).replace(/[^\d.,]/g, ""), NaN) || null;
+      const salarioBase = dinheiro(raw.salarioBase);
+      const salarioMedio = dinheiro(raw.salarioMedio);
+      const salarioMaximo = dinheiro(raw.salarioMaximo);
       const cbo = String(raw.cbo).trim() || null;
 
       try {
-        await prisma.cargo.create({ data: { nome, nivel, categoria, salarioBase, cbo } });
+        await prisma.cargo.create({ data: { nome, nivel, categoria, salarioBase, salarioMedio, salarioMaximo, cbo } });
         cache.add(norm(nome));
         criados++;
         resultados.push({ linha: lineNum, nome, ok: true });

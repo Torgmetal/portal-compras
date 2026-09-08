@@ -1159,7 +1159,12 @@ model Cargo {
   nome         String
   nivel        String?
   categoria    String?
+  // Faixa salarial do cargo (Plano de Cargos e Salários). `salarioBase` é o PISO da faixa — o nome
+  // vem de antes de a faixa existir e ficou para não quebrar import, template e telas que já o usam.
+  // Vitor (08/09/2026): "na aba de cargos deixar salário base, médio e máximo".
   salarioBase  Float?
+  salarioMedio Float?
+  salarioMaximo Float?
   cbo          String?
   ativo        Boolean            @default(true)
   // Matriz de Competências (FORM-11 / ISO 9001 §7.2)

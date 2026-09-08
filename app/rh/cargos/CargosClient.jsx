@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { faixaForaDeOrdem } from "@/lib/cargo-faixa";
 import { Briefcase, PlusCircle, Loader2, AlertCircle, X, ChevronDown, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Pencil } from "lucide-react";
 
 const NIVEIS = [
@@ -21,7 +22,7 @@ export default function CargosClient() {
   const [modal, setModal] = useState(false);
   const [editandoId, setEditandoId] = useState(null); // null = novo; id = editando
   const [salvando, setSalvando] = useState(false);
-  const [form, setForm] = useState({ nome: "", nivel: "OPERACIONAL", categoria: "", salarioBase: "", cbo: "" });
+  const [form, setForm] = useState({ nome: "", nivel: "OPERACIONAL", categoria: "", salarioBase: "", salarioMedio: "", salarioMaximo: "", cbo: "" });
   const [nota, setNota] = useState(null); // feedback pós-edição { tipo: "ok"|"warn", texto }
 
   // Import Excel
@@ -45,7 +46,7 @@ export default function CargosClient() {
   const abrirNovo = () => {
     setEditandoId(null);
     setErro("");
-    setForm({ nome: "", nivel: "OPERACIONAL", categoria: "", salarioBase: "", cbo: "" });
+    setForm({ nome: "", nivel: "OPERACIONAL", categoria: "", salarioBase: "", salarioMedio: "", salarioMaximo: "", cbo: "" });
     setModal(true);
   };
 
@@ -57,10 +58,18 @@ export default function CargosClient() {
       nivel: c.nivel || "OPERACIONAL",
       categoria: c.categoria || "",
       salarioBase: c.salarioBase ?? "",
+      salarioMedio: c.salarioMedio ?? "",
+      salarioMaximo: c.salarioMaximo ?? "",
       cbo: c.cbo || "",
     });
     setModal(true);
   };
+
+  // mesma regra do servidor (lib/cargo-faixa.js): avisa aqui, mas quem decide é a rota
+  const num = (v) => (v === "" || v == null ? null : Number(v));
+  const faixaInvalida = faixaForaDeOrdem({
+    salarioBase: num(form.salarioBase), salarioMedio: num(form.salarioMedio), salarioMaximo: num(form.salarioMaximo),
+  });
 
   const salvar = async () => {
     setSalvando(true);
@@ -70,6 +79,8 @@ export default function CargosClient() {
       const body = {
         ...form,
         salarioBase: form.salarioBase ? Number(form.salarioBase) : null,
+        salarioMedio: form.salarioMedio ? Number(form.salarioMedio) : null,
+        salarioMaximo: form.salarioMaximo ? Number(form.salarioMaximo) : null,
         categoria: form.categoria || null,
         cbo: form.cbo || null,
         nivel: form.nivel || null,
@@ -97,7 +108,7 @@ export default function CargosClient() {
         setCargos((prev) => [...prev, { ...data.data, _count: { funcionarios: 0 } }]);
       }
       fecharModal();
-      setForm({ nome: "", nivel: "OPERACIONAL", categoria: "", salarioBase: "", cbo: "" });
+      setForm({ nome: "", nivel: "OPERACIONAL", categoria: "", salarioBase: "", salarioMedio: "", salarioMaximo: "", cbo: "" });
     } catch (e) {
       setErro(e.message);
     } finally {
@@ -222,6 +233,8 @@ export default function CargosClient() {
                         <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
                         <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">CBO</th>
                         <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase">Salário base</th>
+                        <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase">Médio</th>
+                        <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase">Máximo</th>
                         <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase">Funcionários</th>
                         <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase w-16">Editar</th>
                       </tr>
@@ -232,7 +245,9 @@ export default function CargosClient() {
                           <td className="px-4 py-2.5 font-medium text-torg-dark">{c.nome}</td>
                           <td className="px-4 py-2.5 text-torg-gray text-xs">{c.categoria || "—"}</td>
                           <td className="px-4 py-2.5 font-mono text-xs text-torg-gray">{c.cbo || "—"}</td>
-                          <td className="px-4 py-2.5 text-right text-torg-dark tabular-nums">{fmtMoeda(c.salarioBase)}</td>
+                          <td className="px-4 py-2.5 text-right text-torg-gray tabular-nums">{fmtMoeda(c.salarioBase)}</td>
+                          <td className="px-4 py-2.5 text-right font-medium text-torg-dark tabular-nums">{fmtMoeda(c.salarioMedio)}</td>
+                          <td className="px-4 py-2.5 text-right text-torg-gray tabular-nums">{fmtMoeda(c.salarioMaximo)}</td>
                           <td className="px-4 py-2.5 text-right text-torg-gray">{c._count?.funcionarios || 0}</td>
                           <td className="px-4 py-2.5 text-right">
                             <button onClick={() => abrirEditar(c)} title="Editar cargo"
@@ -293,12 +308,21 @@ export default function CargosClient() {
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-torg-gray mb-1">Salário base (R$)</label>
-                  <input type="number" value={form.salarioBase} onChange={(e) => setForm({ ...form, salarioBase: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue" />
+              <div>
+                <label className="block text-xs font-medium text-torg-gray mb-1">Faixa salarial (R$)</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {[["salarioBase", "Base"], ["salarioMedio", "Médio"], ["salarioMaximo", "Máximo"]].map(([k, rotulo]) => (
+                    <div key={k}>
+                      <input type="number" min="0" step="0.01" value={form[k]} placeholder={rotulo}
+                        onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue" />
+                      <span className="block mt-1 text-[11px] text-torg-gray">{rotulo}</span>
+                    </div>
+                  ))}
                 </div>
+                {faixaInvalida && <p className="mt-2 text-xs text-rose-600">{faixaInvalida}</p>}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-torg-gray mb-1">CBO</label>
                   <input type="text" value={form.cbo} onChange={(e) => setForm({ ...form, cbo: e.target.value })}
@@ -309,7 +333,7 @@ export default function CargosClient() {
             </div>
             <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
               <button onClick={fecharModal} className="px-4 py-2 text-sm text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
-              <button onClick={salvar} disabled={salvando || !form.nome}
+              <button onClick={salvar} disabled={salvando || !form.nome || !!faixaInvalida}
                 className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2 disabled:opacity-50">
                 {salvando ? <Loader2 size={14} className="animate-spin" /> : editandoId ? <Pencil size={14} /> : <PlusCircle size={14} />}
                 {salvando ? "Salvando…" : editandoId ? "Salvar alterações" : "Criar Cargo"}

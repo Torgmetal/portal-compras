@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { faixaForaDeOrdem } from "@/lib/cargo-faixa";
 
 const cargoSchema = z.object({
   nome: z.string().min(2, "Nome obrigatório"),
   nivel: z.enum(["OPERACIONAL", "TECNICO", "SUPERVISAO", "GERENCIA", "DIRETORIA"]).optional().nullable(),
   categoria: z.string().optional().nullable(),
   salarioBase: z.number().optional().nullable(),
+  salarioMedio: z.number().optional().nullable(),
+  salarioMaximo: z.number().optional().nullable(),
   cbo: z.string().optional().nullable(),
 });
 
@@ -24,6 +27,8 @@ export async function GET() {
         nivel: true,
         categoria: true,
         salarioBase: true,
+        salarioMedio: true,
+        salarioMaximo: true,
         cbo: true,
         _count: { select: { funcionarios: { where: { ativo: true } } } },
       },
@@ -50,6 +55,8 @@ export async function POST(req) {
         { status: 400 }
       );
     }
+    const ordem = faixaForaDeOrdem(parsed.data);
+    if (ordem) return NextResponse.json({ success: false, error: ordem }, { status: 400 });
 
     const cargo = await prisma.cargo.create({ data: parsed.data });
 

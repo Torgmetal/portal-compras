@@ -6,12 +6,15 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 import { syncCargoRename } from "@/lib/sharepoint-rh";
+import { faixaForaDeOrdem } from "@/lib/cargo-faixa";
 
 const cargoSchema = z.object({
   nome: z.string().min(2, "Nome obrigatório"),
   nivel: z.enum(["OPERACIONAL", "TECNICO", "SUPERVISAO", "GERENCIA", "DIRETORIA"]).optional().nullable(),
   categoria: z.string().optional().nullable(),
   salarioBase: z.number().optional().nullable(),
+  salarioMedio: z.number().optional().nullable(),
+  salarioMaximo: z.number().optional().nullable(),
   cbo: z.string().optional().nullable(),
 });
 
@@ -30,6 +33,8 @@ export async function PATCH(req, { params }) {
       );
     }
     const data = parsed.data;
+    const ordem = faixaForaDeOrdem(data);
+    if (ordem) return NextResponse.json({ success: false, error: ordem }, { status: 400 });
 
     const atual = await prisma.cargo.findUnique({ where: { id }, select: { id: true, nome: true } });
     if (!atual) {
@@ -57,10 +62,13 @@ export async function PATCH(req, { params }) {
         nivel: data.nivel || null,
         categoria: data.categoria || null,
         salarioBase: data.salarioBase ?? null,
+        salarioMedio: data.salarioMedio ?? null,
+        salarioMaximo: data.salarioMaximo ?? null,
         cbo: data.cbo || null,
       },
       select: {
-        id: true, nome: true, nivel: true, categoria: true, salarioBase: true, cbo: true,
+        id: true, nome: true, nivel: true, categoria: true,
+        salarioBase: true, salarioMedio: true, salarioMaximo: true, cbo: true,
         _count: { select: { funcionarios: { where: { ativo: true } } } },
       },
     });
