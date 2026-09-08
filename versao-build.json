@@ -1,7 +1,12 @@
 {
-  "build": 2986,
-  "gerado": "2026-09-08T14:48:21.050Z",
+  "build": 2987,
+  "gerado": "2026-09-08T14:49:22.425Z",
   "commits": [
+    {
+      "hash": "4b6e842cd4",
+      "data": "08/09/2026",
+      "titulo": "versao-build.json volta a ser JSON — subiu com marcadores de conflito"
+    },
     {
       "hash": "aea7fcb52e",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ef0726b701",
       "data": "08/09/2026",
       "titulo": "Cronograma novo nasce sobreposto, não em fila"
-    },
-    {
-      "hash": "4275d07223",
-      "data": "07/09/2026",
-      "titulo": "fix(planejamento): melhorar leitura das linhas do cronograma"
     }
   ]
 }

@@ -1,0 +1,32 @@
+#!/bin/sh
+# ⚠⚠ ESTE HOOK NASCEU DE UM BUILD QUEBRADO EM PRODUÇÃO (08/09/2026).
+#
+# Um `versao-build.json` com `<<<<<<< HEAD` dentro foi commitado e empurrado, e a Vercel caiu:
+# o webpack importa esse arquivo, então JSON inválido não é aviso, é build falho.
+#
+# O `pre-commit` não pegaria — GIT NÃO RODA O pre-commit NUM `rebase --continue`. E teste nenhum
+# pega: `versao-build.json` só é lido no build. O único momento que sobra é o push.
+#
+# Instalação: a mesma do outro hook — `git config core.hooksPath .githooks`, uma vez por clone.
+
+falhou=0
+
+# 1) marcador de conflito em QUALQUER arquivo versionado
+sujos=$(git grep -l -I -E '^(<<<<<<< |>>>>>>> |=======$)' HEAD -- 2>/dev/null | sed 's/^HEAD://')
+if [ -n "$sujos" ]; then
+  echo "✗ marcadores de conflito ainda no commit:" >&2
+  echo "$sujos" | sed 's/^/    /' >&2
+  falhou=1
+fi
+
+# 2) o versao-build.json precisa ser JSON — é ele que derruba o build
+if ! node -e 'JSON.parse(require("fs").readFileSync("versao-build.json","utf8"))' 2>/dev/null; then
+  echo "✗ versao-build.json não é JSON válido — rode: node scripts/gerar-versao.js" >&2
+  falhou=1
+fi
+
+[ "$falhou" = 0 ] || {
+  echo "" >&2
+  echo "  push abortado. Conserte e commite antes de empurrar." >&2
+  exit 1
+}
