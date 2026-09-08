@@ -1,3 +1,4 @@
+import { filtrarProjetos, escapar } from "./selecao-projetos";
 // ─── ABA "PROJETOS PROGRAMADOS" ────────────────────────────────────────────────────────────────
 //
 // ⚠ GRD = IMPRESSÃO. No portal não existe estado "liberado" separado da impressão: a GRD nasce
@@ -10,22 +11,27 @@
 // ⚠ O estado da aba (seleção e filtro) mora aqui; `abrirPainel` zera por `reiniciar()`.
 
 export function criarPainelProjetos(dep){
-  let sel = new Set(), soFalta = false;
+  let sel = new Set(), soFalta = false, busca = "", perfil = "", material = "";
 
-  function reiniciar(){ sel = new Set(); soFalta = false; }
+  function reiniciar(){ sel = new Set(); soFalta = false; busca = ""; perfil = ""; material = ""; }
 
   function pintarProjetos(r){
     const itens = [...r.itens].sort((a,b)=> (a.g?1:0)-(b.g?1:0) || String(a.m).localeCompare(String(b.m)));
-    const mostra = (soFalta && temGrd(r.setor)) ? itens.filter(i=>!i.g) : itens;
+    const mostra = filtrarProjetos(itens, { busca, perfil, material, soFalta: soFalta && temGrd(r.setor) });
     const teto = 300, corte = mostra.slice(0, teto);
     const grd = temGrd(r.setor);
-    const semG = grd ? itens.filter(i=>!i.g).length : 0;
-    let h = '<div class="ptool">'
+    const semG = grd ? mostra.filter(i=>!i.g).length : 0;
+    const opcoes = (campo, valor) => '<option value="">Todos</option>' + [...new Set(itens.map(i=>i[campo] || '__SEM__'))].sort().map(v=>'<option value="'+escapar(v)+'"'+(v===valor?' selected':'')+'>'+escapar(v==='__SEM__'?'Não informado':v)+'</option>').join('');
+    let h = '<div class="pfiltros">'
+      + '<label>Buscar marca ou perfil<input id="gp-fBusca" type="search" value="'+escapar(busca)+'" placeholder="Ex.: CH4.75, T97A..."></label>'
+      + '<label>Perfil<select id="gp-fPerfil">'+opcoes('pf',perfil)+'</select></label>'
+      + '<label>Material / aço<select id="gp-fMaterial">'+opcoes('mt',material)+'</select></label>'
+      + '<button class="btn mini" id="gp-fLimpar">Limpar filtros</button></div><div class="ptool">'
       + (grd
-          ? '<b style="color:#8a5600">'+semG+' marca(s) sem GRD</b> · <b style="color:#136c35">'+(itens.length-semG)+' já impressa(s)</b>'
+          ? '<b style="color:#8a5600">'+semG+' marca(s) sem GRD</b> · <b style="color:#136c35">'+(mostra.length-semG)+' já impressa(s)</b>'
             + '<label><input type="checkbox" id="gp-fSemGrd"'+(soFalta?" checked":"")+'> só os não impressos</label>'
           : '')
-      + '<button class="btn mini" id="gp-selTodos">Selecionar '+(soFalta&&grd?"os listados":"todos")+'</button>'
+      + '<button class="btn mini" id="gp-selTodos">Selecionar os filtrados</button>'
       + '<button class="btn mini" id="gp-selNenhum">Limpar</button></div>';
     const temPerfil = itens.some(i=>i.pf);
     h += '<table class="marcas"><thead><tr><th style="width:26px"></th><th>Marca</th>'
@@ -33,9 +39,9 @@ export function criarPainelProjetos(dep){
       + '<th class="num">Qte</th><th class="num" title="peças com apontamento no Syneco">Feito</th>'
       + '<th class="num">kg</th>'+(grd?'<th>GRD</th>':'')+'</tr></thead><tbody>';
     for(const i of corte){
-      const s = sel.has(i.m);
-      h += '<tr class="'+(s?"sel":"")+'"><td><input type="checkbox" class="ck" data-m="'+i.m+'"'+(s?" checked":"")+'></td>'
-        + '<td><b>'+i.m+'</b></td>'+(temPerfil?'<td style="color:#5b6a7d">'+(i.pf||"—")+'</td>':'')
+      const s = sel.has(i.id);
+      h += '<tr class="'+(s?"sel":"")+'"><td><input type="checkbox" class="ck" data-m="'+escapar(i.id)+'"'+(s?" checked":"")+'></td>'
+        + '<td><b>'+escapar(i.m)+'</b></td>'+(temPerfil?'<td style="color:#5b6a7d">'+escapar(i.pf||"—")+'</td>':'')
         + '<td class="num">'+i.q+'</td>'
         /* ⚠ o `f` é o apontamento do Syneco por marca — o MESMO número que preenche a barra do
            Gantt. Se a coluna e a barra discordassem, uma das duas estaria mentindo. */
@@ -69,7 +75,7 @@ export function criarPainelProjetos(dep){
       + 'O ponto amarelo na barra do Gantt marca a programação que ainda tem projeto sem imprimir.</div>';
     dep.$("pCorpo").innerHTML = h;
 
-    const alvo = soFalta ? mostra : itens;
+    const alvo = mostra;
     /* ⚠ sem GRD o rodapé não tem o que oferecer: os dois botões imprimem maço de desenho, e da
        solda em diante não há maço. Some inteiro em vez de ficar desabilitado — botão morto na tela
        é convite para alguém perguntar por que não funciona. */
@@ -86,7 +92,7 @@ export function criarPainelProjetos(dep){
        botão DESABILITADO sem seleção e o Vitor não conseguiu baixar: o próprio rodapé promete "os
        botões usam a lista acima", e um botão morto ali só levanta a pergunta de por que não
        funciona. Gerar planilha não escreve nada, então agir sobre a lista toda é seguro. */
-    const alvoBaixa = sel.size ? itens.filter(i=>sel.has(i.m)) : mostra;
+    const alvoBaixa = sel.size ? itens.filter(i=>sel.has(i.id)) : mostra;
     const btnBaixa = '<button class="btn" id="gp-xlsBaixa"'+(alvoBaixa.length?"":" disabled")+'>Baixa Syneco ('+alvoBaixa.length+')</button>';
     dep.$("pFoot").innerHTML = grd
       ? '<div class="info">'+(sel.size ? sel.size+" marca(s) selecionada(s)" : "Nada selecionado — os botões usam a lista acima")+'</div>'
@@ -94,11 +100,17 @@ export function criarPainelProjetos(dep){
         + '<button class="btn" id="gp-impSel"'+(sel.size?"":" disabled")+'>Reimprimir selecionados</button>' + btnBaixa + btnPint
       : '<div class="info">'+(sel.size ? sel.size+" marca(s) selecionada(s)" : "Sem GRD neste setor — o desenho desce até a montagem")+'</div>' + btnPint;
 
+    dep.$("pFoot").innerHTML += '<button class="btn pri" id="gp-distribuir"'+(sel.size?'':' disabled')+'>Distribuir selecionados ('+sel.size+')</button>';
     /* ⚠ o filtro só existe quando há GRD; sem a guarda, `$("fSemGrd")` volta null e o painel
        inteiro morre no `.onchange`. */
     const fg = dep.$("fSemGrd");
-    if(fg) fg.onchange = (e)=>{ soFalta = e.target.checked; dep.pintarPainel(); };
-    dep.$("selTodos").onclick = ()=>{ for(const i of alvo) sel.add(i.m); dep.pintarPainel(); };
+    if(fg) fg.onchange = (e)=>{ soFalta = e.target.checked; sel.clear(); dep.pintarPainel(); };
+    dep.$("fPerfil").onchange = e=>{ perfil=e.target.value; sel.clear(); dep.pintarPainel(); };
+    dep.$("fMaterial").onchange = e=>{ material=e.target.value; sel.clear(); dep.pintarPainel(); };
+    dep.$("fBusca").oninput = e=>{ const pos=e.target.selectionStart; busca=e.target.value; sel.clear(); dep.pintarPainel(); const input=dep.$("fBusca"); input.focus(); input.setSelectionRange(pos,pos); };
+    dep.$("fLimpar").onclick=()=>{ busca=""; perfil=""; material=""; soFalta=false; sel.clear(); dep.pintarPainel(); };
+    dep.$("distribuir").onclick=()=>dep.abrirQuebra();
+    dep.$("selTodos").onclick = ()=>{ for(const i of alvo) sel.add(i.id); dep.pintarPainel(); };
     dep.$("selNenhum").onclick = ()=>{ sel.clear(); dep.pintarPainel(); };
     for(const c of dep.raiz.querySelectorAll("#gp-pCorpo .ck"))
       c.onchange = ()=>{ if(c.checked) sel.add(c.dataset.m); else sel.delete(c.dataset.m); dep.pintarPainel(); };
@@ -107,7 +119,7 @@ export function criarPainelProjetos(dep){
       bp.disabled = true; const antes = bp.textContent; bp.textContent = "Gerando…";
       /* ⚠ manda os IDS do lote, não a OP inteira: a barra representa o que vai ser pintado agora, e
          a folha tem de dimensionar a tinta desse lote — não da obra toda. */
-      try{ await dep.baixarPintura(r.op, r.itens.map(i=>i.id).filter(Boolean)); }
+      try{ await dep.baixarPintura(r.op, alvoBaixa.map(i=>i.id).filter(Boolean)); }
       catch(e){ dep.avisar(e?.message || "Falha ao gerar o caderno de pintura", "erro"); }
       finally{ bp.disabled = false; bp.textContent = antes; }
     };
@@ -120,9 +132,9 @@ export function criarPainelProjetos(dep){
       finally{ bb.disabled = false; bb.textContent = antes; }
     };
     const im = dep.$("impFalta");
-    if(im) im.onclick = ()=>imprimir(r, itens.filter(i=>!i.g).map(i=>i.m), "primeira impressão");
+    if(im) im.onclick = ()=>imprimir(r, mostra.filter(i=>!i.g).map(i=>i.m), "primeira impressão");
     const is = dep.$("impSel");
-    if(is) is.onclick = ()=>imprimir(r, [...sel], "reimpressão");
+    if(is) is.onclick = ()=>imprimir(r, itens.filter(i=>sel.has(i.id)).map(i=>i.m), "reimpressão");
   }
 
   /* ⚠⚠ GRD SÓ ATÉ A MONTAGEM. Vitor (07/09/2026): "da solda para frente não temos mais GRDs,
@@ -309,5 +321,9 @@ export function criarPainelProjetos(dep){
 
   /* ── quebra da programação ──────────────────────────────────────────────────── */
 
-  return { reiniciar, pintarProjetos };
+  function idsParaDividir(r) {
+    if(sel.size) return new Set(sel);
+    return new Set(filtrarProjetos(r.itens,{busca,perfil,material,soFalta:soFalta&&temGrd(r.setor)}).map(i=>i.id));
+  }
+  return { reiniciar, pintarProjetos, idsParaDividir };
 }

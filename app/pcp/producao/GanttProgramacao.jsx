@@ -9,6 +9,7 @@ import { CSS } from "./_gantt/css";
 import { MARKUP } from "./_gantt/markup";
 import { RECURSOS, SETORES, COR_SETOR, FATOR_META, capDe, nomeRec, criarCores } from "./_gantt/recursos";
 import { montarCalendario, d0, DSEM, MES, dbr, nkg, n1 } from "./_gantt/calendario";
+import { recortarProgramacao } from "./_gantt/selecao-projetos";
 import { criarQuebra } from "./_gantt/quebra";
 import { criarPainelProjetos } from "./_gantt/painel-projetos";
 import { criarArraste } from "./_gantt/arraste";
@@ -96,7 +97,13 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
 
   /* ── aplicar / desfazer ─────────────────────────────────────────────────────── */
   function registrar(alt){
-    for(const l of alt.antes){ const i = lotes.findIndex(x=>x.uid===l.uid); if(i>=0) lotes.splice(i,1); }
+    for(const l of alt.antes){
+      const i = lotes.findIndex(x=>x.uid===l.uid);
+      if(i<0) continue;
+      const ids = new Set(l.itens.map(it=>it.id));
+      const fica = alt.parcial ? lotes[i].itens.filter(it=>!ids.has(it.id)) : [];
+      if(fica.length) lotes[i] = recalc({...lotes[i], itens:fica}); else lotes.splice(i,1);
+    }
     for(const n of alt.novos) lotes.push(recalc(n));
     mesclar();
     alt.depois = alt.novos.map(n=>({ recurso:n.recurso, dia:n.dia, ids:n.itens.map(i=>i.id) }));
@@ -172,7 +179,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     ocup, carga, custoItem, classeOc, rotuloOc, novoLote, registrar, redesenhar, pintarPainel,
     esconderPainel });
   const projetos = criarPainelProjetos({ $, raiz, nkg, dbr, MAX_LOTE, avisar, recarregar, baixarZip,
-    baixarPintura, baixarBaixaSyneco, pintarPainel });
+    baixarPintura, baixarBaixaSyneco, pintarPainel, abrirQuebra: ()=>{ abaP="quebrar"; pintarPainel(); } });
   const arraste = criarArraste({ raiz, grade, COL, DIAS, IDX, encostaNoUtil, fdsISO, montarRuns,
     novoLote, registrar, nomeRec, dbr, abrirPainel, desenhar, redesenhar,
     getInicio: ()=>inicio, getPainel: ()=>painel, setPainel: (v)=>{ painel = v; } });
@@ -202,7 +209,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
       // ⚠ nunca foi programada: o que se mostra é a IDADE da espera, não um prazo perdido.
       + (r.desde ? " · <b style='color:#b45309'>esperando desde "+dbr(r.desde)+"</b>" : "");
     for(const b of raiz.querySelectorAll(".abas button")) b.classList.toggle("on", b.dataset.aba===abaP);
-    if(abaP==="projetos") projetos.pintarProjetos(r); else quebra.pintarQuebra(r);
+    if(abaP==="projetos") projetos.pintarProjetos(r); else quebra.pintarQuebra(recortarProgramacao(r, projetos.idsParaDividir(r)));
   }
 
   /* ── o que seria gravado ────────────────────────────────────────────────────── */

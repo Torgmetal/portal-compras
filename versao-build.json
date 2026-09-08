@@ -1,7 +1,12 @@
 {
-  "build": 3006,
-  "gerado": "2026-09-08T19:09:12.459Z",
+  "build": 3007,
+  "gerado": "2026-09-08T19:09:30.410Z",
   "commits": [
+    {
+      "hash": "8a3b780b",
+      "data": "08/09/2026",
+      "titulo": "PCP: peça que está no terceiro sai da programação de todos os setores"
+    },
     {
       "hash": "a0b4da6c",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "fb228040",
       "data": "08/09/2026",
       "titulo": "Gantt: só aparece o que alguém programou — o resto o portal deduzia"
-    },
-    {
-      "hash": "88068988",
-      "data": "08/09/2026",
-      "titulo": "Etiqueta: o \"T\" na frente do número da OP, como a que está colada na peça"
     }
   ]
 }

@@ -17,23 +17,28 @@ export function criarQuebra(dep){
   /** o painel abriu noutra programação: a escolha volta ao padrão daquela barra */
   function reiniciar(r){ bancadas = null; dias = r.dias; }
 
+  const cargaRestante = (r, recurso, dia, meus) => (r.restantes || [])
+    .filter(l=>meus.has(l.uid) && l.recurso===recurso && l.dia===dia)
+    .flatMap(l=>l.itens).reduce((s,i)=>s+dep.custoItem(i,r.setor),0);
+
   function pintarQuebra(r){
+    if(!r.itens.length){ dep.$("pCorpo").innerHTML='<div class="dica">Nenhum item selecionado. Volte a Projetos programados e ajuste os filtros.</div>'; dep.$("pFoot").innerHTML=''; return; }
     const recs = dep.RECURSOS[r.setor].filter(x=>x.k);
     const cortePorMaquina = r.setor==="CORTE";   // no corte a máquina é UMA só
     if(bancadas===null) bancadas = new Set(r.recurso ? [r.recurso] : []);
-    let h = '<div class="bloco"><h4>'+(cortePorMaquina?"Máquina":"Bancadas que vão receber")+'</h4><div class="chips">';
+    let h = '<div class="dica"><b>'+r.itens.length+' marca(s) · '+r.pecas+' peças selecionadas</b>. '+(r.parcial?'As demais peças permanecem na programação original.':'Divisão de todos os itens exibidos.')+'</div><div class="bloco"><h4>'+(cortePorMaquina?"Máquina":"Bancadas que vão receber")+'</h4><div class="chips">';
     const meus = new Set(r.lotes.map(l=>l.uid));
     for(const x of recs){
       let o = 0;
-      for(const i of dep.diasDaQuebra(r.ini, dias)) o = Math.max(o, dep.ocup(r.setor, x.k, dep.DIAS[i], meus));
+      for(const i of dep.diasDaQuebra(r.ini, dias)) o = Math.max(o, dep.ocup(r.setor, x.k, dep.DIAS[i], meus) + cargaRestante(r,x.k,dep.DIAS[i],meus)/dep.capDe(r.setor,x.k));
       h += '<button class="chip'+(bancadas.has(x.k)?" on":"")+'" data-b="'+x.k+'">'+x.nome
         + ' <small class="'+dep.classeOc(o)+'">'+(o>0?dep.rotuloOc(o):"livre")+'</small></button>';
     }
     h += '</div><div class="dica" style="padding:8px 0 0;background:none">'
       + (cortePorMaquina
-          ? '<b>No corte não se reparte entre máquinas:</b> a peça vai para o laser que corta o perfil dela — chapa não vai '
-            + 'para o laser de tubo. Aqui a divisão <b>espalha por mais dias</b> na mesma máquina; trocar a máquina de peças '
-            + 'específicas é na tela de atribuição.'
+          ? '<b>No corte, cada seleção vai para uma máquina.</b> Escolha a máquina compatível com o perfil — chapa não vai '
+            + 'para o laser de tubo. A divisão pode <b>espalhar por mais dias</b> na máquina escolhida; trocar a máquina de peças '
+            + 'específicas pode ser feita selecionando o perfil em Projetos programados e escolhendo a máquina aqui.'
           : 'A porcentagem é o pior dia que a bancada <b>já tem</b> no período de outras programações — a divisão desconta '
             + 'isso antes de repartir.')
       + '</div></div>';
@@ -118,7 +123,7 @@ export function criarQuebra(dep){
     for(const b of bancadas) for(const i of cols){
       const dia = dep.DIAS[i];
       const cap = dep.capDe(r.setor, b);
-      slots.push({ recurso:b, dia, cap, base: dep.carga(r.setor, b, dia, meus), carga:0, itens:[] });
+      slots.push({ recurso:b, dia, cap, base: dep.carga(r.setor, b, dia, meus) + cargaRestante(r,b,dia,meus), carga:0, itens:[] });
     }
     const ord = [...r.itens].sort((a,b)=>dep.custoItem(b,r.setor)-dep.custoItem(a,r.setor));
     for(const it of ord){
@@ -138,7 +143,7 @@ export function criarQuebra(dep){
     }));
     const nB = new Set(novos.map(n=>n.recurso)).size, nD = new Set(novos.map(n=>n.dia)).size;
     dep.registrar({
-      setor:r.setor, op:r.op, pecas:r.pecas, kg:r.kg, antes, novos,
+      setor:r.setor, op:r.op, pecas:r.pecas, kg:r.kg, antes, novos, parcial:r.parcial,
       rotulo: '<b>quebrada</b> em <b>'+nB+' '+(cortePorMaquina?"máquina":"bancada")+(nB>1?"s":"")+'</b> × <b>'+nD+' dia'+(nD>1?"s":"")+'</b>'
             + ' <span class="de-para">('+dep.dbr(novos[0].dia)+' a '+dep.dbr(novos[novos.length-1].dia)+')</span>',
     });

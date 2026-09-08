@@ -199,6 +199,11 @@ export const CSS = `
   .gpcp .pcorpo{flex:1 1 auto;overflow:auto;padding:0}
   .gpcp .ptool{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--linha);
          background:#fbfcfe;flex-wrap:wrap;font-size:11.5px;color:var(--tinta-2)}
+  .gpcp .pfiltros{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 14px;background:#f6f9fc;border-bottom:1px solid var(--linha)}
+  .gpcp .pfiltros label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:var(--tinta-2);min-width:0}
+  .gpcp .pfiltros label:first-child{grid-column:1/-1}
+  .gpcp .pfiltros input,.gpcp .pfiltros select{width:100%;min-width:0;padding:7px 8px;border:1px solid var(--linha);border-radius:6px;background:white;color:var(--navy);font:inherit}
+  .gpcp .pfiltros button{justify-self:start}
   .gpcp .ptool label{display:flex;align-items:center;gap:5px;cursor:pointer}
   .gpcp table.marcas{width:100%;border-collapse:collapse;font-size:11.5px}
   .gpcp table.marcas th{position:sticky;top:0;background:#fbfcfe;text-align:left;padding:6px 8px;
