@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { conferirPastaDaOp } from "@/lib/pasta-engenharia";
+import { esquecerDesenhosDaOp } from "@/lib/desenhos-lote";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,11 @@ export async function POST(req) {
   if (!opId) return NextResponse.json({ error: "Informe a OP." }, { status: 400 });
 
   try {
+    /* ⚠ quem clica em "conferir a pasta agora" acabou de pedir à Engenharia para salvar — o retrato
+       guardado para a emissão em lote (2 min) não pode sobreviver a isso, senão a conferência diz
+       que o desenho chegou e a impressão continua sem achar. */
+    const op = await prisma.oP.findUnique({ where: { id: opId }, select: { numero: true } });
+    if (op?.numero) esquecerDesenhosDaOp(op.numero);
     const r = await conferirPastaDaOp(prisma, opId);
     if (r.erro) return NextResponse.json({ error: r.erro }, { status: 502 });
     return NextResponse.json({

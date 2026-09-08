@@ -1,7 +1,12 @@
 {
-  "build": 3004,
-  "gerado": "2026-09-08T17:58:49.976Z",
+  "build": 3005,
+  "gerado": "2026-09-08T18:26:45.575Z",
   "commits": [
+    {
+      "hash": "7b7bafa0",
+      "data": "08/09/2026",
+      "titulo": "Gantt: imprimir e liberar 260 marcas fatia sozinho, em vez de recusar"
+    },
     {
       "hash": "21c341d3",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c29c1ab8",
       "data": "08/09/2026",
       "titulo": "Etiqueta: o número da OP vai cru, não pelo fmtOP"
-    },
-    {
-      "hash": "61f6800d",
-      "data": "08/09/2026",
-      "titulo": "Gate volta a zero erros: o medidor do IFC é código de navegador"
     }
   ]
 }
