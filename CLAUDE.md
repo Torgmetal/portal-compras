@@ -263,6 +263,18 @@ etiqueta é o `public/torg-logo-etiqueta.png` (chapado e horizontal), e não o `
 do portal, que é vertical e tem gradiente azul. Ele foi gerado a partir do
 `public/torg-logo.svg` recortado em duas partes e recolorido.
 
+⚠⚠ **A lista mostra só os itens da LISTA DE EXPEDIÇÃO, não a obra inteira.** Matheus (08/09/2026):
+"não pode aparecer as posições, somente os produtos finais igual sai na Lista de Expedição".
+`PecaConjunto` guarda o conjunto que sobe no caminhão E as posições que o compõem — na OP-97 são
+1.236 linhas para 537 itens expedíveis; o resto são croquis ("T97A-P30"), peça de fábrica que vai
+soldada dentro de outra. O filtro é o **pertencimento à LE**, nunca `tipoPeca !== "CROQUI"`: a LE
+tem os parafusos (`T97-AC8`, tipo nulo) e eles se expedem.
+
+⚠ **Duas fontes da mesma LE, e nenhuma cobre tudo.** `naLE` na peça vem do importador da Produção;
+a tabela `ListaExpedicao` vem da planilha do SharePoint pela Expedição. Onde os dois rodaram eles
+concordam; a OP-118 só tem `naLE` e a OP-101 só tem `ListaExpedicao`. A tela usa a **união** —
+olhar uma fonte só faz obra inteira sumir do seletor.
+
 ⚠ **A contagem sai sem zero à esquerda** ("3/3", "300/300"). O "001/1" da etiqueta antiga era
 limitação do BarTender, que importava a planilha com o campo de largura fixa — aqui o número vem
 do banco a cada etiqueta e a largura se ajusta sozinha.

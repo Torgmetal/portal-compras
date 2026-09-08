@@ -14,8 +14,8 @@ import { GET, POST } from "@/app/api/expedicao/etiquetas/route";
 
 const ACAO = "IMPRIMIR_ETIQUETA_CARREGAMENTO";
 const PECAS = [
-  { id: "p1", marca: "T97A140", descricao: "TRAVAMENTO", qte: 1, pesoUnitKg: 4.46, status: "PENDENTE" },
-  { id: "p2", marca: "T97A141", descricao: "TRAVAMENTO", qte: 3, pesoUnitKg: 4.46, status: "PENDENTE" },
+  { id: "p1", marca: "T97A140", descricao: "TRAVAMENTO", qte: 1, pesoUnitKg: 4.46, status: "PENDENTE", naLE: true },
+  { id: "p2", marca: "T97A141", descricao: "TRAVAMENTO", qte: 3, pesoUnitKg: 4.46, status: "PENDENTE", naLE: true },
 ];
 const get = (q = "") => GET(new Request(`http://localhost/api/expedicao/etiquetas${q}`));
 const post = (body) => POST(new Request("http://localhost/api/expedicao/etiquetas",
@@ -28,6 +28,7 @@ beforeEach(() => {
   mockPrisma.oP.findUnique.mockResolvedValue({ id: "op1", numero: "97", cliente: "MEGASTEAM", obra: "Unipar" });
   mockPrisma.pecaConjunto.findMany.mockResolvedValue(PECAS);
   mockPrisma.auditLog.groupBy.mockResolvedValue([]);
+  mockPrisma.listaExpedicao.findMany.mockResolvedValue([]);
 });
 
 describe("GET — o que já saiu impresso", () => {
