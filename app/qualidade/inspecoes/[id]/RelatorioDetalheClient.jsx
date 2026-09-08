@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, Lock, FolderOpen, Crop } from "lucide-react";
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
+import CampoTolerancia from "./CampoTolerancia";
+import {foraDaTolerancia} from "@/lib/tolerancia-inspecao";
 import MarcadorCotas from "./MarcadorCotas";
 import RecorteDesenho from "./RecorteDesenho";
 import FormEVS from "./FormEVS";
@@ -321,6 +323,7 @@ export default function RelatorioDetalheClient({ id }) {
                       <th className="pb-1 font-semibold">Peça</th>
                       <th className="pb-1 font-semibold">Descrição</th>
                       <th className="pb-1 font-semibold text-right">Projeto</th>
+                      <th className="pb-1 font-semibold text-right px-2">Tolerância (mm)</th>
                       <th className="pb-1 font-semibold text-right">Encontrado</th>
                       <th className="pb-1 font-semibold">Obs.</th>
                     </tr>
@@ -333,13 +336,14 @@ export default function RelatorioDetalheClient({ id }) {
                           <td className="py-1 font-medium text-torg-dark whitespace-nowrap">{l.marca}</td>
                           <td className="py-1 text-torg-gray">{l.descricao || "—"}</td>
                           <td className="py-1 text-right font-mono text-torg-dark">{l.projetoMm ?? "—"}</td>
+                          <td className="py-1 text-right px-2"><CampoTolerancia value={l.tolerancia} disabled={travado} label={`Tolerância da dimensão ${l.letra || i+1} (mm)`} onChange={v=>setLinha(idxReal(i),"tolerancia",v)}/></td>
                           <td className="py-1 text-right">
                             {/* 🚫 nasce vazio: Vitor pediu que a dimensão encontrada seja do elaborador */}
                             <input type="number" step="0.1" disabled={travado}
                               value={l.encontradoMm ?? ""} onChange={(e) => setLinha(idxReal(i), "encontradoMm", e.target.value === "" ? null : Number(e.target.value))}
                               className="w-20 text-right text-[12px] font-mono border border-gray-200 rounded px-1.5 py-0.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
                             {dif != null && dif !== 0 && (
-                              <span className={`ml-1 text-[10px] font-semibold ${Math.abs(dif) > 3 ? "text-red-600" : "text-amber-600"}`}>
+                              <span className={`ml-1 text-[10px] font-semibold ${foraDaTolerancia(l) === true ? "text-red-600" : foraDaTolerancia(l) === false ? "text-amber-600" : "text-torg-gray"}`}>
                                 {dif > 0 ? "+" : ""}{Math.round(dif * 10) / 10}
                               </span>
                             )}

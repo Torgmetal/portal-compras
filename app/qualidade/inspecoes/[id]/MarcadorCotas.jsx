@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X, Eraser, ZoomIn, ZoomOut, Ruler, ArrowLeftRight, Minus, Plus } from "lucide-react";
 import { layoutCotas, setaEm, PADDING } from "@/lib/cota-marcacao";
+import CampoTolerancia from "./CampoTolerancia";
 import { faixaCorte } from "@/lib/tolerancia-po04";
 
 /**
@@ -32,7 +33,7 @@ const LETRAS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 // "(A.L.)" noutro. Apagar só o primeiro deixava parênteses soltos boiando no desenho.
 const RX_MARCA = /^([A-Z]?\d*[A-Z]+\d*-P\d+|\(\s*A\.?\s*L\.?\s*\)|TÍP\.?|TIP\.?)/i;
 
-export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocultos = [], onOcultos, linhasOcultas = [], onLinhas }, comprimentoMm) {
+export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocultos = [], onOcultos, linhasOcultas = [], onLinhas, comprimentoMm } ) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [pendente, setPendente] = useState(null); // primeiro ponto já clicado
@@ -756,7 +757,8 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
               <span className="w-5 h-5 rounded-full bg-torg-orange text-white font-bold text-[10px] inline-flex items-center justify-center shrink-0">{c.letra}</span>
               <span className="text-torg-dark flex-1">{c.descricao}</span>
               <span className="font-mono text-torg-dark">{c.projetoMm ?? "—"}</span>
-              <span className="text-torg-gray w-14 text-right">{c.tolerancia || ""}</span>
+              <CampoTolerancia value={c.tolerancia} label={`Tolerância da cota ${c.letra} (mm)`} onFocus={registrar}
+                onChange={valor=>onChange(cotas.map((linha,j)=>j===i?{...linha,tolerancia:valor}:linha))}/>
               {c.ax != null && (<>
                 <span className="inline-flex items-center rounded border border-gray-200 overflow-hidden shrink-0">
                   <button onClick={() => ajustarAfastamento(i, -8)} title="Linha mais curta (mais perto da peça)"

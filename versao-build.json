@@ -1,7 +1,12 @@
 {
-  "build": 2997,
-  "gerado": "2026-09-08T15:38:03.292Z",
+  "build": 2998,
+  "gerado": "2026-09-08T15:47:46.567Z",
   "commits": [
+    {
+      "hash": "04d92c09",
+      "data": "08/09/2026",
+      "titulo": "PCP: peça já cortada sai do aviso — ela não precisa de dia"
+    },
     {
       "hash": "ff0119f6",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "72b19237",
       "data": "08/09/2026",
       "titulo": "PCP: o aviso da liberação sai quando tudo tem dia, e o resto vai ao histórico"
-    },
-    {
-      "hash": "5f94b44d",
-      "data": "08/09/2026",
-      "titulo": "Gantt: a lista de trabalho de cada posto, por dia ou semana"
     }
   ]
 }

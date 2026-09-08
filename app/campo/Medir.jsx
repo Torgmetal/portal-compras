@@ -1,4 +1,5 @@
 "use client";
+import {foraDaTolerancia} from "@/lib/tolerancia-inspecao";
 import { useEffect, useState, useRef } from "react";
 import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2, Camera, X, FileText } from "lucide-react";
 import LeitorQR from "./LeitorQR";
@@ -577,8 +578,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           if (!l.letra && !l.marca) return null;
           const marcados = String(l.descontinuidade || "").split(/[\s,;]+/).filter(Boolean);
           const dif = ehDim && l.encontradoMm != null && l.projetoMm != null ? Number(l.encontradoMm) - Number(l.projetoMm) : null;
-          const tol = numeroBR(String(l.tolerancia || "").replace(/[^\d.,]/g, ""), NaN);
-          const fora = dif != null && Number.isFinite(tol) && Math.abs(dif) > tol;
+          const fora = foraDaTolerancia(l);
           return (
             <div key={i} className={`bg-white rounded-xl p-3 border ${l.reprovouAntes ? "border-2 border-amber-400" : "border-gray-200"}`}>
               {l.reprovouAntes && (
@@ -607,7 +607,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
                       fora ? "border-red-400 bg-red-50 text-red-700" : "border-gray-200 focus:border-torg-blue"}`} />
                   {dif != null && (
                     <p className={`text-center text-[13px] mt-1 font-semibold ${fora ? "text-red-600" : "text-emerald-700"}`}>
-                      {dif > 0 ? "+" : ""}{Math.round(dif * 10) / 10} mm {fora ? "· fora da tolerância" : "· dentro"}
+                      {dif > 0 ? "+" : ""}{Math.round(dif * 10) / 10} mm {fora === true ? "· fora da tolerância" : fora === false ? "· dentro" : "· conferir tolerância"}
                     </p>
                   )}
                 </div>
