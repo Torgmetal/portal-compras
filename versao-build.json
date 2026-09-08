@@ -1,7 +1,12 @@
 {
-  "build": 3000,
-  "gerado": "2026-09-08T17:18:13.354Z",
+  "build": 3001,
+  "gerado": "2026-09-08T17:40:45.828Z",
   "commits": [
+    {
+      "hash": "7e24f30d",
+      "data": "08/09/2026",
+      "titulo": "versao-build"
+    },
     {
       "hash": "13d7d533",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b4168342",
       "data": "08/09/2026",
       "titulo": "Gantt: os botões da lista do posto ganham estilo — saíam como \"diasemana\""
-    },
-    {
-      "hash": "64611b15",
-      "data": "08/09/2026",
-      "titulo": "Corte: cada família vira sua barra na raia sem máquina"
     }
   ]
 }

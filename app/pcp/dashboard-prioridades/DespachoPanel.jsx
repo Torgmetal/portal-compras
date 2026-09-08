@@ -383,26 +383,47 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     const alvo = (data?.pecas || []).filter((p) => sel.has(p.id));
     if (!alvo.length) return alert("Selecione as peças para emitir os desenhos.");
     const marcas = [...new Set(alvo.map((p) => p.marca))];
-    if (marcas.length > 80) return alert(`Lote máximo de 80 marcas por vez (selecionadas: ${marcas.length}). Divida em blocos.`);
+    /* ⚠⚠ O LOTE SE FATIA SOZINHO. Vitor (08/09/2026): "selecionei 260 arquivos, porém deu erro
+       dizendo que o máximo era 80, mas não tem como selecionarmos de 80 em 80, e se formos fazer
+       isso um por um estamos mortos".
+
+       Ele tem razão: o teto existe por causa do servidor (baixar, carimbar e juntar dezenas de A1
+       estoura os 300 s da rota), e devolver isso como recusa transfere para a pessoa um problema
+       que é da máquina. A tela passa a repartir e enviar bloco a bloco, somando o resultado.
+
+       ⚠ UM ARQUIVO POR BLOCO, de propósito: o ZIP já vem separado por bandeja de impressora, e
+       juntar tudo num só faria a pessoa esperar os quatro blocos para começar a imprimir o
+       primeiro. Cada bloco baixa assim que fica pronto. */
+    const TETO = 80;
+    const blocos = [];
+    for (let i = 0; i < marcas.length; i += TETO) blocos.push(marcas.slice(i, i + TETO));
+    const quantos = blocos.length > 1 ? ` em ${blocos.length} blocos de até ${TETO}` : "";
     const pergunta = acao === "REGISTRAR"
-      ? `Registrar a GRD de ${marcas.length} marca(s) SEM imprimir?\n\nNenhum desenho é gerado. A data de cada uma é a do primeiro apontamento no Syneco.`
-      : `${acao === "IMPRIMIR" ? "Imprimir (GRD)" : "Emitir"} ${marcas.length} desenho(s) carimbado(s)?\n\nSai um PDF por formato. Pode levar alguns minutos.`;
+      ? `Registrar a GRD de ${marcas.length} marca(s) SEM imprimir${quantos}?\n\nNenhum desenho é gerado. A data de cada uma é a do primeiro apontamento no Syneco.`
+      : `${acao === "IMPRIMIR" ? "Imprimir (GRD)" : "Emitir"} ${marcas.length} desenho(s) carimbado(s)${quantos}?\n\nSai um PDF por formato${blocos.length > 1 ? ", um download por bloco" : ""}. Pode levar alguns minutos.`;
     if (!confirm(pergunta)) return;
-    setEnviando(true); setLote({ carregando: true });
+    setEnviando(true); setLote({ carregando: true, blocos: blocos.length, bloco: 0 });
+    const soma = { emitidas: 0, grds: 0, arquivos: [], semDesenho: [], semMaterial: [], erros: [], blocos: blocos.length };
     try {
-      const r = await fetch("/api/producao/desenhos/lote", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: data.opNumero, marcas, setor: setor || null, acao }),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro ao emitir o lote");
-      setLote(j);
-      // ⚠ REGISTRAR não gera arquivo: baixar um ZIP vazio abriria um download que não serve.
-      if (acao !== "REGISTRAR") {
-        // baixa tudo de uma vez, em pastas por impressora — abrir uma aba por arquivo era bloqueado
-        // pelo navegador e ainda deixava a pessoa imprimindo um por um. (Vitor 19/08.)
-        baixarZipLote(j, data.opNumero).catch(() => {});
+      for (let b = 0; b < blocos.length; b++) {
+        setLote({ carregando: true, blocos: blocos.length, bloco: b + 1 });
+        const r = await fetch("/api/producao/desenhos/lote", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ opNumero: data.opNumero, marcas: blocos[b], setor: setor || null, acao }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(`Bloco ${b + 1} de ${blocos.length}: ${j.error || "erro ao emitir"}`);
+        soma.emitidas += j.emitidas || 0;
+        soma.grds += j.grds || 0;
+        for (const k of ["arquivos", "semDesenho", "semMaterial", "erros"]) soma[k].push(...(j[k] || []));
+        // ⚠ REGISTRAR não gera arquivo: baixar um ZIP vazio abriria um download que não serve.
+        if (acao !== "REGISTRAR") {
+          // baixa em pastas por impressora — abrir uma aba por arquivo era bloqueado pelo navegador
+          // e ainda deixava a pessoa imprimindo um por um. (Vitor 19/08.)
+          await baixarZipLote(j, `${data.opNumero}${blocos.length > 1 ? `-bloco${b + 1}de${blocos.length}` : ""}`).catch(() => {});
+        }
       }
+      setLote(soma);
       // ⚠ a GRD registrada muda a coluna da tela: recarrega para a pessoa ver o efeito
       if (acao === "REGISTRAR") carregar();
     } catch (e) { setLote(null); alert(e.message); } finally { setEnviando(false); }
@@ -920,10 +941,15 @@ function LoteDesenhos({ lote, onClose }) {
         </div>
         <div className="px-5 py-4 overflow-y-auto">
           {lote.carregando ? (
-            <p className="text-[13px] text-torg-gray inline-flex items-center gap-2 py-6"><Loader2 size={16} className="animate-spin" /> Baixando os desenhos, carimbando e juntando… pode levar alguns minutos.</p>
+            <p className="text-[13px] text-torg-gray inline-flex items-center gap-2 py-6"><Loader2 size={16} className="animate-spin" />
+              {/* ⚠ com mais de 80 marcas o envio vai em blocos: dizer QUAL bloco é o que separa
+                  "está trabalhando" de "travou" numa espera de vários minutos. */}
+              {lote.blocos > 1
+                ? `Bloco ${lote.bloco} de ${lote.blocos} — baixando os desenhos, carimbando e juntando… cada bloco baixa sozinho quando fica pronto.`
+                : "Baixando os desenhos, carimbando e juntando… pode levar alguns minutos."}</p>
           ) : (
             <>
-              <p className="text-[13px] mb-2"><b>{fmtN(lote.emitidas)}</b> desenho(s) emitido(s){lote.grds ? ` · ${fmtN(lote.grds)} GRD registrada(s)` : ""}. Um arquivo por formato — imprima cada um no papel certo.</p>
+              <p className="text-[13px] mb-2"><b>{fmtN(lote.emitidas)}</b> desenho(s) emitido(s){lote.grds ? ` · ${fmtN(lote.grds)} GRD registrada(s)` : ""}{lote.blocos > 1 ? ` · em ${lote.blocos} blocos` : ""}. Um arquivo por formato — imprima cada um no papel certo.</p>
               <div className="flex items-center gap-2 mb-3 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
                 <div className="min-w-0 flex-1">
                   <p className="text-[12px] font-semibold text-torg-blue">O ZIP já foi baixado, com uma pasta por impressora</p>
