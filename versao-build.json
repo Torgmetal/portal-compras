@@ -1,7 +1,12 @@
 {
-  "build": 2951,
-  "gerado": "2026-09-07T23:49:20.180Z",
+  "build": 2952,
+  "gerado": "2026-09-08T00:24:23.639Z",
   "commits": [
+    {
+      "hash": "5c53ca25",
+      "data": "07/09/2026",
+      "titulo": "CMR: divergir de pedido não é errar — a trava pergunta, não acusa"
+    },
     {
       "hash": "e0fe3b8d",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "a9e836f1",
       "data": "07/09/2026",
       "titulo": "Permite distribuir retorno de terceiros entre setores e destaca saldo atrasado"
-    },
-    {
-      "hash": "e87e043c",
-      "data": "07/09/2026",
-      "titulo": "Inclui previsão de retorno à Expedição no Gantt"
     }
   ]
 }
