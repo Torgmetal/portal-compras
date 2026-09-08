@@ -1,7 +1,12 @@
 {
-  "build": 3005,
-  "gerado": "2026-09-08T18:26:45.575Z",
+  "build": 3006,
+  "gerado": "2026-09-08T19:09:12.459Z",
   "commits": [
+    {
+      "hash": "a0b4da6c",
+      "data": "08/09/2026",
+      "titulo": "Emissão em lote: parar de varrer a mesma pasta a cada bloco"
+    },
     {
       "hash": "7b7bafa0",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "88068988",
       "data": "08/09/2026",
       "titulo": "Etiqueta: o \"T\" na frente do número da OP, como a que está colada na peça"
-    },
-    {
-      "hash": "c29c1ab8",
-      "data": "08/09/2026",
-      "titulo": "Etiqueta: o número da OP vai cru, não pelo fmtOP"
     }
   ]
 }
