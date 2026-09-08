@@ -1,7 +1,12 @@
 {
-  "build": 3009,
-  "gerado": "2026-09-08T19:11:48.703Z",
+  "build": 3010,
+  "gerado": "2026-09-08T19:19:05.828Z",
   "commits": [
+    {
+      "hash": "a1d16474",
+      "data": "08/09/2026",
+      "titulo": "fix(pcp): exigir seleção explícita para distribuir peças"
+    },
     {
       "hash": "ef5d2bef",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "3bb3d249",
       "data": "08/09/2026",
       "titulo": "Etiquetas: coluna mostrando quais já foram impressas"
-    },
-    {
-      "hash": "b1d21d27",
-      "data": "08/09/2026",
-      "titulo": "Etiqueta: a contagem de peças sai sem zero à esquerda"
     }
   ]
 }
