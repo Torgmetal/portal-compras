@@ -18,7 +18,7 @@ model User {
   // de assinatura dela? mas isso seria apenas nos relatórios de inspeção". Sobe uma vez aqui e vale
   // para todo relatório que a pessoa assinar. PIT/PLP ficam de fora de propósito: a assinatura do
   // cliente nem sempre dá para capturar assim.
-  assinaturaUrl String?
+  assinaturaUrl            String?
   setor                    String?
   ativo                    Boolean               @default(true)
   createdAt                DateTime              @default(now())
@@ -73,14 +73,14 @@ model User {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  userId    String
-  expiresAt DateTime
-  used      Boolean  @default(false)
-  tentativas Int     @default(0) // nº de códigos errados tentados — trava anti-brute-force
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
+  id         String   @id @default(cuid())
+  token      String   @unique
+  userId     String
+  expiresAt  DateTime
+  used       Boolean  @default(false)
+  tentativas Int      @default(0) // nº de códigos errados tentados — trava anti-brute-force
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([expiresAt])
@@ -123,13 +123,13 @@ model OP {
   numero               String               @unique
   cliente              String
   obra                 String?
-  refCliente           String?              // código/nº de referência da obra no cliente (aparece nos relatórios enviados)
+  refCliente           String? // código/nº de referência da obra no cliente (aparece nos relatórios enviados)
   // ⚠ O PADRÃO DE PIT DA OBRA. Vitor (26/08/2026): "o PIT é aquele documento que NASCE COM A
   // PROPOSTA — vamos informar qual o padrão que vamos usar na criação da proposta e com isso você
   // já vai puxar todas as informações"; e depois: "também pode ser selecionado na aba da qualidade,
   // igual vamos fazer no PLP". Fica na OP porque é decisão DA OBRA, não de um documento: o PIT sai
   // dele, e amanhã o Data Book e o escopo de inspeção também podem sair.
-  pitPadrao            String?              // PINTURA | GALVANIZACAO | GALV_PINTURA | SNQC | BASICO
+  pitPadrao            String? // PINTURA | GALVANIZACAO | GALV_PINTURA | SNQC | BASICO
   pitRevisao           String?
   descricao            String?
   status               OPStatus             @default(ABERTA)
@@ -210,12 +210,12 @@ model OP {
   romaneiosPrevios     RomaneioPrevio[]
   pastaEngenharia      PastaEngenharia?
   liberacoesProducao   LiberacaoProducao[]
+  fotosObra            FotoObra[]
 
   @@index([numero])
   @@index([status])
   @@index([status, createdAt])
   @@index([createdById, status])
-  fotosObra            FotoObra[]
 }
 
 model ProducaoSemanal {
@@ -517,7 +517,7 @@ model KickoffAceite {
   token     String    @unique
   enviadoEm DateTime  @default(now())
   aceitoEm  DateTime?
-  aceitoIp  String?   // IP de quem confirmou — o aceite vai impresso no PDF, tem de ser provável
+  aceitoIp  String? // IP de quem confirmou — o aceite vai impresso no PDF, tem de ser provável
   cobradoEm DateTime? // última cobrança do aceite pendente (reenvio) — `enviadoEm` fica com o 1º envio
   cobrancas Int       @default(0)
   kickoff   OPKickOff @relation(fields: [kickoffId], references: [id], onDelete: Cascade)
@@ -562,26 +562,26 @@ model AtaOP {
 // costuma vir SEM peso (só prioridade/local); a Engenharia refina a lista final
 // e aí entram os pesos. status = PENDENTE | ENTREGUE (baixa por romaneio, futuro).
 model LoteExpedicao {
-  id           String    @id @default(cuid())
-  opId         String
-  ordem        Int       @default(0) // prioridade de entrega (menor = primeiro)
-  nome         String
-  local        String? // local de entrega (pode variar por lote)
-  dataPrevista DateTime?
-  pesoKg       Float? // definido depois, pela lista final da Engenharia
-  observacao   String?
+  id                String           @id @default(cuid())
+  opId              String
+  ordem             Int              @default(0) // prioridade de entrega (menor = primeiro)
+  nome              String
+  local             String? // local de entrega (pode variar por lote)
+  dataPrevista      DateTime?
+  pesoKg            Float? // definido depois, pela lista final da Engenharia
+  observacao        String?
   transportadora    String? // dados do transportador (salvos aqui pra não redigitar no romaneio)
   motorista         String?
   placaVeiculo      String? // placa do caminhão/cavalo
   placaCarreta      String? // placa da carreta (quando é carreta, tem 2 placas)
   contatoTransporte String?
-  status       String    @default("PENDENTE")
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  op           OP               @relation(fields: [opId], references: [id], onDelete: Cascade)
-  desenhos     DesenhoOP[]
-  pecas        PecaLote[]
-  romaneios    RomaneioPrevio[]
+  status            String           @default("PENDENTE")
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  op                OP               @relation(fields: [opId], references: [id], onDelete: Cascade)
+  desenhos          DesenhoOP[]
+  pecas             PecaLote[]
+  romaneios         RomaneioPrevio[]
 
   @@index([opId])
 }
@@ -608,12 +608,12 @@ model PecaLote {
 // Desenho/projeto da OP na aba Engenharia. UPLOAD (arquivo no Blob) ou SHAREPOINT
 // (referência a um item na pasta da obra, servido por proxy). DWG ou PDF.
 model DesenhoOP {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   opId      String
-  ordem     Int      @default(0)
+  ordem     Int            @default(0)
   nome      String
   ext       String? // pdf | dwg | ...
-  origem    String   @default("UPLOAD") // UPLOAD | SHAREPOINT
+  origem    String         @default("UPLOAD") // UPLOAD | SHAREPOINT
   url       String? // Blob (UPLOAD)
   driveId   String? // SHAREPOINT
   itemId    String? // SHAREPOINT
@@ -621,8 +621,8 @@ model DesenhoOP {
   area      String? // Montagem | Conjunto (SHAREPOINT)
   tamanho   Int?
   loteId    String? // lote de entrega de que este desenho faz parte
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
   op        OP             @relation(fields: [opId], references: [id], onDelete: Cascade)
   lote      LoteExpedicao? @relation(fields: [loteId], references: [id], onDelete: SetNull)
 
@@ -671,26 +671,26 @@ model Revisao {
 }
 
 model Aditivo {
-  id          String        @id @default(cuid())
-  opId        String
-  numero      Int
-  descricao   String
+  id              String        @id @default(cuid())
+  opId            String
+  numero          Int
+  descricao       String
   // Aditivo tem prazo PRÓPRIO e vínculo PRÓPRIO com o orçamento — ele nasce de outra proposta e
   // de outro estudo, e a informação precisa chegar a todos os setores.
   // Vitor (19/08): "quando criamos um aditivo precisa ser divulgado a todos os setores… teria que
   // ter a mesma coisa, importar proposta e planilha de estudo… importante ter data de início e fim".
-  dataInicio       DateTime?
-  dataFimPrevista  DateTime?
-  orcamentoPasta   String?
-  orcamentoRef     String?
-  propostas        Json?
-  estudoArquivo    Json?
-  estudoDados      Json?
-  createdById String
-  createdAt   DateTime      @default(now())
-  createdBy   User          @relation(fields: [createdById], references: [id])
-  op          OP            @relation(fields: [opId], references: [id], onDelete: Cascade)
-  itens       AditivoItem[]
+  dataInicio      DateTime?
+  dataFimPrevista DateTime?
+  orcamentoPasta  String?
+  orcamentoRef    String?
+  propostas       Json?
+  estudoArquivo   Json?
+  estudoDados     Json?
+  createdById     String
+  createdAt       DateTime      @default(now())
+  createdBy       User          @relation(fields: [createdById], references: [id])
+  op              OP            @relation(fields: [opId], references: [id], onDelete: Cascade)
+  itens           AditivoItem[]
 
   @@unique([opId, numero])
   @@index([opId])
@@ -1446,42 +1446,42 @@ model FolhaCompetencia {
 }
 
 model FolhaItem {
-  id            String           @id @default(cuid())
-  folhaId       String
-  funcionarioId String?
+  id             String           @id @default(cuid())
+  folhaId        String
+  funcionarioId  String?
   // Snapshot do cadastro no momento da competência (cadastro muda mês a mês)
-  nome          String
-  cpf           String?
-  empresa       String?
-  centroCusto   String?
-  tipoContrato  String           @default("CLT") // CLT | PJ
-  salarioBase   Float            @default(0)
+  nome           String
+  cpf            String?
+  empresa        String?
+  centroCusto    String?
+  tipoContrato   String           @default("CLT") // CLT | PJ
+  salarioBase    Float            @default(0)
   // Horas do Controle de Ponto (RH ajusta) — o portal calcula o R$ (valor-hora × %).
-  heHoras50     Float            @default(0)
-  heHoras60     Float            @default(0)
-  heHoras80     Float            @default(0)
-  heHoras100    Float            @default(0)
-  heHoras150    Float            @default(0)
-  faltasHoras   Float            @default(0)
-  atrasosHoras  Float            @default(0)
-  adNoturnoHoras Float           @default(0) // horas noturnas (Ponto) — portal calcula 20%
-  divisorHoras  Float            @default(220) // divisor do valor-hora (jornada×5; 44h→220)
+  heHoras50      Float            @default(0)
+  heHoras60      Float            @default(0)
+  heHoras80      Float            @default(0)
+  heHoras100     Float            @default(0)
+  heHoras150     Float            @default(0)
+  faltasHoras    Float            @default(0)
+  atrasosHoras   Float            @default(0)
+  adNoturnoHoras Float            @default(0) // horas noturnas (Ponto) — portal calcula 20%
+  divisorHoras   Float            @default(220) // divisor do valor-hora (jornada×5; 44h→220)
   // Digitados pelo RH (vêm do sistema de folha)
-  horasExtras   Float            @default(0) // LEGADO: HE em R$ (competências antigas)
-  adicionais    Float            @default(0)
-  descontos     Float            @default(0)
-  inss          Float            @default(0)
-  irrf          Float            @default(0)
-  liquido       Float            @default(0)
-  vr            Float            @default(0)
-  ifood         Float            @default(0)
-  kr            Float            @default(0)
-  rescisao      Float            @default(0)
-  observacao    String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  folha         FolhaCompetencia @relation(fields: [folhaId], references: [id], onDelete: Cascade)
-  funcionario   Funcionario?     @relation(fields: [funcionarioId], references: [id], onDelete: SetNull)
+  horasExtras    Float            @default(0) // LEGADO: HE em R$ (competências antigas)
+  adicionais     Float            @default(0)
+  descontos      Float            @default(0)
+  inss           Float            @default(0)
+  irrf           Float            @default(0)
+  liquido        Float            @default(0)
+  vr             Float            @default(0)
+  ifood          Float            @default(0)
+  kr             Float            @default(0)
+  rescisao       Float            @default(0)
+  observacao     String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  folha          FolhaCompetencia @relation(fields: [folhaId], references: [id], onDelete: Cascade)
+  funcionario    Funcionario?     @relation(fields: [funcionarioId], references: [id], onDelete: SetNull)
 
   @@unique([folhaId, funcionarioId])
   @@index([folhaId])
@@ -1518,7 +1518,7 @@ model PontoItem {
   diario           Json? // espelho diário do PDF Secullum: { totais{min}, dias[{data,batidas,faixas}] }
   pdfUrl           String? // Blob do PDF Secullum COMPLETO (a página do funcionário é extraída sob demanda)
   pagina           Int? // nº da página deste funcionário dentro do PDF completo (1-based)
-  origem           String          @default("MANUAL") // MANUAL | ACJEF | SECULLUM_PDF
+  origem           String           @default("MANUAL") // MANUAL | ACJEF | SECULLUM_PDF
   horasNormais     Float            @default(0)
   horasExtras50    Float            @default(0)
   horasExtras60    Float            @default(0)
@@ -1548,24 +1548,24 @@ model PontoItem {
 // Mural do portal do funcionário: comunicados/avisos que o RH publica para todos
 // (opcionalmente disparados por e-mail). Sem relações — nomes denormalizados.
 model MuralAviso {
-  id                 String    @id @default(cuid())
+  id                 String         @id @default(cuid())
   titulo             String
   corpo              String
   imagemUrl          String? // imagem opcional do comunicado (Vercel Blob público)
-  fixado             Boolean   @default(false)
+  fixado             Boolean        @default(false)
   emailEnviadoEm     DateTime?
   emailDestinatarios Int?
   criadoPorId        String?
   criadoPorNome      String?
-  ativo              Boolean   @default(true)
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  ativo              Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
   // ⚠ Comunicado em VÍDEO com ciência obrigatória no login (Setembro Amarelo, 01/09/2026).
   // `exibirLoginAte` faz o aviso sair do ar sozinho — ninguém precisa lembrar de desligar.
   videoUrl           String?
   // ⚠ quem NÃO deve receber o comunicado: e-mails de gente de fora com conta no portal
   // (inspetor terceirizado, cliente). Campanha interna não é assunto deles.
-  dispensados        Json      @default("[]")
+  dispensados        Json           @default("[]")
   exibirLoginDe      DateTime?
   exibirLoginAte     DateTime?
   ciencias           MuralCiencia[]
@@ -1592,7 +1592,7 @@ model FeedbackRH {
 // layout padrão Torg (linha do Data Book). blocos = JSON [{ id, titulo,
 // descricao, fotos: [{ url, legenda }] }]. Sem relações — vínculo à OP é só snapshot.
 model RelatorioStatus {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   numero        Int? // sequencial global (REL-001) — atribuído na criação
   opId          String?
   opNumero      String? // OP.numero é texto ("067", "T60B") — snapshot
@@ -1600,17 +1600,17 @@ model RelatorioStatus {
   obra          String?
   titulo        String
   resumo        String?
-  blocos        Json     @default("[]")
-  status        String   @default("RASCUNHO") // RASCUNHO | EMITIDO
-  token         String?  @unique // link público de aceite do cliente
+  blocos        Json      @default("[]")
+  status        String    @default("RASCUNHO") // RASCUNHO | EMITIDO
+  token         String?   @unique // link público de aceite do cliente
   aceitoEm      DateTime?
   aceitoNome    String?
   aceitoIp      String?
-  envios        Json     @default("[]") // histórico: [{ para, cc, porNome, em }]
+  envios        Json      @default("[]") // histórico: [{ para, cc, porNome, em }]
   criadoPorId   String?
   criadoPorNome String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([createdAt])
   @@index([opId])
@@ -1631,10 +1631,10 @@ model RelatorioStatus {
 // terceirizados, itens comerciais, BDI); `resultado` guarda o calculo da vez que gerou a proposta
 // — sem isso, mudar um preco no futuro reescreveria a historia do que foi cotado.
 model EstudoFabricacao {
-  id            String   @id @default(cuid())
+  id            String              @id @default(cuid())
   numero        Int? // sequencial do ano → LQC-nnn-aa
   ano           Int
-  revisao       Int      @default(0)
+  revisao       Int                 @default(0)
   cliente       String
   obra          String?
   // ⚠ É ESTE O VÍNCULO QUE FALTAVA. Vitor (29/08/2026): "a estrutura LQC na verdade é o que gera a
@@ -1642,19 +1642,19 @@ model EstudoFabricacao {
   // estava nulo nos 4 estudos; agora tem FK de verdade (ON DELETE SET NULL — apagar o orçamento
   // não pode levar junto o estudo de custo, que é trabalho de horas).
   orcamentoId   String?
-  metodo        String   @default("ESTIMATIVA") // ESTIMATIVA | PESO DE PROJETO
+  metodo        String              @default("ESTIMATIVA") // ESTIMATIVA | PESO DE PROJETO
   demaos        String? // 01 DEMAO | 02 DEMAOS | 03 DEMAOS | N/A
   preMontagem   String?
-  composicao    Json     @default("{}")
+  composicao    Json                @default("{}")
   cenario       Json? // parametros do cenario financeiro (prazos, parcelas, taxa)
   resultado     Json? // ultimo calculo congelado
-  status        String   @default("RASCUNHO")
+  status        String              @default("RASCUNHO")
   observacoes   String?
   criadoPorId   String?
   criadoPorNome String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  orcamento     Orcamento? @relation("OrcamentoEstudoLqc", fields: [orcamentoId], references: [id], onDelete: SetNull)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  orcamento     Orcamento?          @relation("OrcamentoEstudoLqc", fields: [orcamentoId], references: [id], onDelete: SetNull)
   propostas     PropostaEstrutura[]
 
   @@index([ano])
@@ -1663,42 +1663,42 @@ model EstudoFabricacao {
 }
 
 model OrcamentoServico {
-  id            String   @id @default(cuid())
-  numero        Int? // sequencial (OS-001)
-  cliente       String
-  obra          String?
-  contato       String?
-  email         String?
-  telefone      String?
-  endereco      String?
-  servicos      Json     @default("[]")
-  composicao    Json     @default("{}") // por serviço: { CORTE_FURACAO: { linhas: [...] }, ... }
-  arquivos      Json     @default("[]") // arquivos do cliente: [{ url, nome, tamanho, tipo }]
-  status        String   @default("RASCUNHO")
-  valor         Float?
-  observacoes   String?
-  diasPagamento Int? // legado — usar pagamentoPrazo (texto livre)
-  pagamentoPrazo String? // prazo de pagamento livre: "15", "28/42", "30/60"…
-  inclusos      Json? // lista custom de inclusos (null = padrão)
-  exclusos      Json? // lista custom de exclusos (null = padrão)
-  lotes         Json? // lotes de entrega: [{ id, nome, local, data, itens:[{descricao,qtd,unidade}] }]
-  revisao       Int      @default(0) // revisão atual (R00, R01…)
-  revisoes      Json     @default("[]") // histórico: [{ num, data, motivo }]
-  enviadoEm     DateTime? // 1º envio ao cliente
-  envios        Json     @default("[]") // log de envios: [{ data, para, cc, revisao, porNome }]
-  consolidadaEm DateTime? // proposta consolidada (trava edição; ganha tarja)
-  aceiteToken   String?   @unique // token do link público de aceite do cliente
+  id              String    @id @default(cuid())
+  numero          Int? // sequencial (OS-001)
+  cliente         String
+  obra            String?
+  contato         String?
+  email           String?
+  telefone        String?
+  endereco        String?
+  servicos        Json      @default("[]")
+  composicao      Json      @default("{}") // por serviço: { CORTE_FURACAO: { linhas: [...] }, ... }
+  arquivos        Json      @default("[]") // arquivos do cliente: [{ url, nome, tamanho, tipo }]
+  status          String    @default("RASCUNHO")
+  valor           Float?
+  observacoes     String?
+  diasPagamento   Int? // legado — usar pagamentoPrazo (texto livre)
+  pagamentoPrazo  String? // prazo de pagamento livre: "15", "28/42", "30/60"…
+  inclusos        Json? // lista custom de inclusos (null = padrão)
+  exclusos        Json? // lista custom de exclusos (null = padrão)
+  lotes           Json? // lotes de entrega: [{ id, nome, local, data, itens:[{descricao,qtd,unidade}] }]
+  revisao         Int       @default(0) // revisão atual (R00, R01…)
+  revisoes        Json      @default("[]") // histórico: [{ num, data, motivo }]
+  enviadoEm       DateTime? // 1º envio ao cliente
+  envios          Json      @default("[]") // log de envios: [{ data, para, cc, revisao, porNome }]
+  consolidadaEm   DateTime? // proposta consolidada (trava edição; ganha tarja)
+  aceiteToken     String?   @unique // token do link público de aceite do cliente
   aceiteEnviadoEm DateTime? // quando o link de aceite foi enviado
-  aceitoEm      DateTime? // cliente aceitou/assinou
-  aceitoNome    String? // nome de quem aceitou
-  aceitoDoc     String? // RG/CPF de quem aceitou
-  aceitoIp      String? // IP do aceite
-  opCriadaId    String? // OP gerada a partir desta proposta aceita
-  opId          String?
-  criadoPorId   String?
-  criadoPorNome String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  aceitoEm        DateTime? // cliente aceitou/assinou
+  aceitoNome      String? // nome de quem aceitou
+  aceitoDoc       String? // RG/CPF de quem aceitou
+  aceitoIp        String? // IP do aceite
+  opCriadaId      String? // OP gerada a partir desta proposta aceita
+  opId            String?
+  criadoPorId     String?
+  criadoPorNome   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([createdAt])
 }
@@ -1721,7 +1721,7 @@ model ConfigCustoHora {
   setores           Json     @default("[]")
   outrosCustos      Json     @default("[]") // overhead não-folha: [{ id, nome, valor }] (R$/mês)
   atualizadoPorNome String?
-  updatedAt         DateTime @updatedAt @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
 }
 
 // Portal da Qualidade — Módulo 1 (Controle de Documentos). Espelha o padrão dos
@@ -1784,9 +1784,9 @@ model DocumentoQualidade {
 // por cima do certificado (DocumentoQualidade categoria EQUIPAMENTOS). Guarda os
 // anexos obrigatórios (foto do equipamento + relatório) e os critérios avaliados.
 model AvaliacaoCalibracao {
-  id                  String    @id @default(cuid())
+  id                  String             @id @default(cuid())
   numero              Int // sequencial RAC-001
-  documentoId         String    @unique
+  documentoId         String             @unique
   documento           DocumentoQualidade @relation(fields: [documentoId], references: [id], onDelete: Cascade)
   // Identificação complementar do equipamento (o restante vem do documento/certificado)
   identificacao       String? // tag / patrimônio / nº de série
@@ -1798,10 +1798,10 @@ model AvaliacaoCalibracao {
   relatorioUrl        String?
   relatorioNome       String?
   // Avaliação — critérios do PO-20 (editáveis) + parecer + conclusão
-  criterios           Json      @default("[]") // [{ criterio, situacao: CONFORME|NAO_CONFORME|NA, observacao }]
+  criterios           Json               @default("[]") // [{ criterio, situacao: CONFORME|NAO_CONFORME|NA, observacao }]
   criterioAceitacao   String? // resumo do critério de aceitação (PO-20)
   parecer             String? // parecer final da avaliação
-  conclusao           String    @default("PENDENTE") // PENDENTE | APROVADO | REPROVADO
+  conclusao           String             @default("PENDENTE") // PENDENTE | APROVADO | REPROVADO
   // Análise automática do certificado (IA) — pontos convertidos em %, padrões e rastreabilidade
   erroMaxPercent      Float? // limite de erro admissível (% do valor nominal); null = usar EMP do certificado
   analise             Json? // { laboratorio, acreditacao, faixaMin/Max, unidade, empDeclarado, incertezaMax, pontos:[{nominal,erro,unidade,incerteza,erroPercent,limitePercent,conforme}], padroes:[{nome,certificado,validade,vencido}], resumo, extraidoEm }
@@ -1809,8 +1809,8 @@ model AvaliacaoCalibracao {
   avaliadorId         String?
   avaliadoEm          DateTime?
   createdById         String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   @@index([conclusao])
 }
@@ -1819,16 +1819,16 @@ model AvaliacaoCalibracao {
 // Uma por OP, com as 20 seções (template em lib/databook-secoes). Seções de
 // fonte "modulo1" puxam documentos do Controle de Documentos pelo vínculo de OP.
 model DataBookQualidade {
-  id               String               @id @default(cuid())
-  opNumero         String               @unique
-  opId             String?
-  cliente          String?
-  obra             String?
-  pesoTotalKg      Float?
-  pecas            Int?
-  tipo             String? // herda de OP.tipoDataBook: PADRAO_TORG | SNQC | RELATORIO_ACOMPANHAMENTO
-  observacao       String?
-  status           String               @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO | EM_ASSINATURA | ENVIADO_CLIENTE | ACEITO
+  id          String  @id @default(cuid())
+  opNumero    String  @unique
+  opId        String?
+  cliente     String?
+  obra        String?
+  pesoTotalKg Float?
+  pecas       Int?
+  tipo        String? // herda de OP.tipoDataBook: PADRAO_TORG | SNQC | RELATORIO_ACOMPANHAMENTO
+  observacao  String?
+  status      String  @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO | EM_ASSINATURA | ENVIADO_CLIENTE | ACEITO
 
   // ── AVALIAÇÃO DO CLIENTE, ANTES DA ASSINATURA ───────────────────────────────────────────────
   // Vitor (31/08/2026): "antes de enviar para assinatura, teria como disponibilizar no portal do
@@ -1847,28 +1847,28 @@ model DataBookQualidade {
   avaliacaoOkEm      DateTime?
   avaliacaoOkNome    String?
   avaliacaoOkIp      String?
-  avaliacaoObs       String?   // o que o cliente escreveu ao pedir ajuste
-  emitidoEm        DateTime?
+  avaliacaoObs       String? // o que o cliente escreveu ao pedir ajuste
+  emitidoEm          DateTime?
   // REVISÃO. Vitor (19/08/2026): "sempre depois de emitido você não deve permitir salvar sem gerar
   // uma revisão; e se for revisão, fazer o histórico da revisão e enviar para assinatura de todos
   // novamente". R00 é a primeira emissão; cada mudança depois vira R01, R02…
-  revisao          Int                  @default(0)
-  revisoes         DataBookRevisao[]
+  revisao            Int                  @default(0)
+  revisoes           DataBookRevisao[]
   // Envio e aceite pelo cliente (link público por token, sem login)
-  tokenCliente     String?              @unique
-  clienteEmail     String?
-  enviadoClienteEm DateTime?
-  aceiteEm         DateTime?
-  aceiteNome       String?
-  aceiteIp         String?
-  criadoPorId      String?
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
-  secoes           DataBookSecao[]
-  aprovacoes       DataBookAprovacao[]
-  assinaturas      DataBookAssinatura[]
-  arquivos         DataBookArquivo[]
-  geracoes         DataBookGeracao[]
+  tokenCliente       String?              @unique
+  clienteEmail       String?
+  enviadoClienteEm   DateTime?
+  aceiteEm           DateTime?
+  aceiteNome         String?
+  aceiteIp           String?
+  criadoPorId        String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  secoes             DataBookSecao[]
+  aprovacoes         DataBookAprovacao[]
+  assinaturas        DataBookAssinatura[]
+  arquivos           DataBookArquivo[]
+  geracoes           DataBookGeracao[]
 
   @@index([opNumero])
 }
@@ -1963,27 +1963,27 @@ model ProdutoTinta {
 }
 
 model PlanoPintura {
-  id             String   @id @default(cuid())
-  opId           String?
-  opNumero       String   @unique
-  revisao        String? // revisão do PLP do cliente/projeto, como veio
+  id                   String   @id @default(cuid())
+  opId                 String?
+  opNumero             String   @unique
+  revisao              String? // revisão do PLP do cliente/projeto, como veio
   // preparação de superfície (PO-05 item 5.4)
-  preparoMetodo  String? // Ferramentas manuais e/ou mecânicas | Jateamento abrasivo | Produtos químicos
-  grauLimpeza    String? // ST2 | ST3 | SA1 | SA2 | SA2.5 | SA3 | QUIMICO
-  abrasivo       String?
-  rugosidadeMin  Float? // µm — PO-05 usa 50 a 90 quando o PLP não diz outra coisa
-  rugosidadeMax  Float?
+  preparoMetodo        String? // Ferramentas manuais e/ou mecânicas | Jateamento abrasivo | Produtos químicos
+  grauLimpeza          String? // ST2 | ST3 | SA1 | SA2 | SA2.5 | SA3 | QUIMICO
+  abrasivo             String?
+  rugosidadeMin        Float? // µm — PO-05 usa 50 a 90 quando o PLP não diz outra coisa
+  rugosidadeMax        Float?
   // sistema de pintura
-  metodoAplicacao String?
+  metodoAplicacao      String?
   // [{ ordem, nome, produto, fabricante, cor, espessuraMin, espessuraMax }]
-  demaos         Json?
+  demaos               Json?
   // ⚠ AS CORES SÃO POR ITEM, NÃO POR DEMÃO. Vitor (22/08/2026): "temos peças que são de
   // cores diferentes, então o ideal seria criarmos a seleção e o Inspetor seleciona na
   // hora o que foi aplicado". Na PLP-T067 o mesmo sistema pinta plataformas de PRETO N1 e
   // guarda-corpo de AMARELO 5Y 8/12 — uma cor fixa no esquema estaria errada em metade
   // das peças. [{ item, sistema, cor, obs }], vindo da folha 3 do PLP.
-  itens          Json?
-  espessuraTotal Float? // µm, seca, do sistema todo
+  itens                Json?
+  espessuraTotal       Float? // µm, seca, do sistema todo
   // FL 1 da capa: o que rege a pintura desta obra (procedimento e normas)
   documentosReferencia String?
   // ⚠ ÍNDICE DE REVISÕES — parte do documento, não histórico de sistema. Vitor (27/08/2026): "no
@@ -1991,15 +1991,15 @@ model PlanoPintura {
   // elaborou, verificou e aprovou cada revisão. Sem ela, o cliente recebe uma R01 sem saber o que
   // mudou da R00 — e é a primeira pergunta que a fiscalização faz.
   // [{ revisao, data, descricao, elaborado, verificado, aprovado }]
-  revisoes       Json?
+  revisoes             Json?
   // o PLP em si (PDF do cliente/projeto), quando houver
-  arquivoUrl     String?
-  arquivoNome    String?
-  observacoes    String?
-  criadoPorId    String?
-  criadoPorNome  String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  arquivoUrl           String?
+  arquivoNome          String?
+  observacoes          String?
+  criadoPorId          String?
+  criadoPorNome        String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   @@index([opNumero])
 }
@@ -2027,30 +2027,30 @@ model DataBookArquivo {
 // guarda um CURSOR sobre o roteiro de impressão e fecha um volume por invocação; o
 // cron retoma de onde parou até acabar.
 model DataBookGeracao {
-  id           String            @id @default(cuid())
-  dataBookId   String
-  revisao      Int               @default(0)
-  status       String            @default("NA_FILA") // NA_FILA | GERANDO | CONCLUIDO | ERRO | CANCELADO
-  etapa        String?
-  cursor       Int               @default(0) // posição no roteiro de impressão
-  volumeAtual  Int               @default(0)
-  totalVolumes Int               @default(0)
-  totalItens   Int               @default(0)
-  paginas      Int               @default(0)
+  id            String            @id @default(cuid())
+  dataBookId    String
+  revisao       Int               @default(0)
+  status        String            @default("NA_FILA") // NA_FILA | GERANDO | CONCLUIDO | ERRO | CANCELADO
+  etapa         String?
+  cursor        Int               @default(0) // posição no roteiro de impressão
+  volumeAtual   Int               @default(0)
+  totalVolumes  Int               @default(0)
+  totalItens    Int               @default(0)
+  paginas       Int               @default(0)
   // ⚠ O QUE NÃO ENTROU TEM QUE APARECER. A trava antiga descartava anexo além da
   // página 200 em silêncio — o livro dizia ter 1.336 desenhos e levava 200 páginas
   // deles. Num documento controlado isso é pior que não gerar.
-  pendencias   Json?
+  pendencias    Json?
   // secaoId → { volumeIni, volumeFim, paginas }: onde os anexos de cada seção foram
   // parar. O Volume 1 (o livro) é gerado POR ÚLTIMO justamente para poder apontar isso.
-  mapa         Json?
-  erro         String?
+  mapa          Json?
+  erro          String?
   solicitadoPor String?
-  criadoEm     DateTime          @default(now())
-  iniciadoEm   DateTime?
-  concluidoEm  DateTime?
-  atualizadoEm DateTime          @updatedAt
-  dataBook     DataBookQualidade @relation(fields: [dataBookId], references: [id], onDelete: Cascade)
+  criadoEm      DateTime          @default(now())
+  iniciadoEm    DateTime?
+  concluidoEm   DateTime?
+  atualizadoEm  DateTime          @updatedAt
+  dataBook      DataBookQualidade @relation(fields: [dataBookId], references: [id], onDelete: Cascade)
 
   @@index([status, criadoEm])
   @@index([dataBookId])
@@ -2066,18 +2066,18 @@ model DataBookGeracao {
 // registrado o que mudou, quem mandou mudar e quando, e TODAS as assinaturas voltam a ser
 // colhidas — quem assinou a R00 não assinou a R01.
 model DataBookRevisao {
-  id           String            @id @default(cuid())
-  dataBookId   String
-  revisao      Int // a revisão que NASCEU aqui (1 = R01)
-  revisaoAnterior Int
-  motivo       String // obrigatório: revisão sem motivo é mudança sem rastro
-  statusAnterior String
-  emitidoEmAnterior DateTime?
-  assinaturasZeradas Int      @default(0)
-  criadoPorId  String?
-  criadoPorNome String?
-  createdAt    DateTime          @default(now())
-  dataBook     DataBookQualidade @relation(fields: [dataBookId], references: [id], onDelete: Cascade)
+  id                 String            @id @default(cuid())
+  dataBookId         String
+  revisao            Int // a revisão que NASCEU aqui (1 = R01)
+  revisaoAnterior    Int
+  motivo             String // obrigatório: revisão sem motivo é mudança sem rastro
+  statusAnterior     String
+  emitidoEmAnterior  DateTime?
+  assinaturasZeradas Int               @default(0)
+  criadoPorId        String?
+  criadoPorNome      String?
+  createdAt          DateTime          @default(now())
+  dataBook           DataBookQualidade @relation(fields: [dataBookId], references: [id], onDelete: Cascade)
 
   @@index([dataBookId])
 }
@@ -2202,8 +2202,8 @@ model AuditoriaInterna {
   createdById               String?
   createdAt                 DateTime  @default(now())
   updatedAt                 DateTime  @updatedAt
-  arquivadoEm         DateTime? // quando o PDF foi arquivado no SharePoint
-  arquivadoPath       String?   // caminho do arquivo lá — é o que torna o arquivamento verificável
+  arquivadoEm               DateTime? // quando o PDF foi arquivado no SharePoint
+  arquivadoPath             String? // caminho do arquivo lá — é o que torna o arquivamento verificável
 
   @@index([status])
   @@index([dataAuditoria])
@@ -2213,10 +2213,10 @@ model AuditoriaInterna {
 // Como/Quanto, com acompanhamento e status por ação. Pode nascer de auditoria,
 // não-conformidade, reclamação, reunião etc. (campo origem, texto livre).
 model PlanoAcao {
-  id          String   @id @default(cuid())
-  numero      Int // PA-001
-  titulo      String
-  origem      String? // de onde veio (Auditoria RAI-001, NC, reclamação…)
+  id            String    @id @default(cuid())
+  numero        Int // PA-001
+  titulo        String
+  origem        String? // de onde veio (Auditoria RAI-001, NC, reclamação…)
   // ⚠⚠ PLANO DE MÊS FORA DA META. Vitor (27/08/2026): "criar um botão para criar plano de ação para
   // os meses que estão abaixo da meta (…) não precisa salvar na aba de plano de ação da aba
   // qualidade, pode ser apenas dentro do painel indicadores de cada setor".
@@ -2227,20 +2227,20 @@ model PlanoAcao {
   //
   // ⚠ Estes NÃO entram na aba Planos de Ação da Qualidade (ela filtra `indicador: null`): lá ficam
   // os planos de auditoria e de RNC, que têm outro rito de acompanhamento.
-  indicador   String? // id do indicador ISO (ex.: "retrabalho")
-  processo    String? // PRODUCAO | ENGENHARIA | …
-  ano         Int?
-  mes         Int? // 0-11; null = plano do acumulado do ano
-  valor       Float? // o valor apurado que disparou o plano
-  metaValor   Float? // a meta vigente naquele mês
-  responsavel String? // dono do plano
-  status      String   @default("EM_ANDAMENTO") // EM_ANDAMENTO | CONCLUIDO | CANCELADO
-  itens       Json     @default("[]") // [{ oque, porque, onde, quem, quando, como, quanto, status, acompanhamento, concluidoEm }]
-  createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  arquivadoEm         DateTime? // quando o PDF foi arquivado no SharePoint
-  arquivadoPath       String?   // caminho do arquivo lá — é o que torna o arquivamento verificável
+  indicador     String? // id do indicador ISO (ex.: "retrabalho")
+  processo      String? // PRODUCAO | ENGENHARIA | …
+  ano           Int?
+  mes           Int? // 0-11; null = plano do acumulado do ano
+  valor         Float? // o valor apurado que disparou o plano
+  metaValor     Float? // a meta vigente naquele mês
+  responsavel   String? // dono do plano
+  status        String    @default("EM_ANDAMENTO") // EM_ANDAMENTO | CONCLUIDO | CANCELADO
+  itens         Json      @default("[]") // [{ oque, porque, onde, quem, quando, como, quanto, status, acompanhamento, concluidoEm }]
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  arquivadoEm   DateTime? // quando o PDF foi arquivado no SharePoint
+  arquivadoPath String? // caminho do arquivo lá — é o que torna o arquivamento verificável
 
   @@index([status])
 }
@@ -2275,12 +2275,12 @@ model ApontamentoRetrabalho {
   colaborador   String?
   abriuRnc      Boolean  @default(false)
   numeroRnc     String?
-  rncId         String? @unique
+  rncId         String?  @unique
   descricao     String?
   acao          String?
   pecas         Json? // quando escolhidas da LE: [{ marca, descricao, pesoUnitKg, qtd, pesoKg }]
   origem        String   @default("PORTAL") // PORTAL | IMPORT
-  importRef     String? @unique // chave da linha na planilha de origem (dedupe do import)
+  importRef     String?  @unique // chave da linha na planilha de origem (dedupe do import)
   criadoPorId   String?
   criadoPorNome String?
   createdAt     DateTime @default(now())
@@ -2359,26 +2359,26 @@ model NaoConformidade {
   relatorioInspecaoId String?
 
   // RNC de Cliente (RTNC)
-  anexoUrl            String? // documento da RNC do cliente
-  programa            String? // ASME…
-  jobCliente          String? // 0326
-  numeroCliente       String? // RTNC-010
-  respostaCliente     String? // texto da resposta gerada
-  respostaPdfUrl      String?
-  respostaEnviadaEm   DateTime?
-  evidencias          Json      @default("[]") // [{ tipo, descricao, url }] treinamentos/melhorias
-  createdById         String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  arquivadoEm         DateTime? // quando o PDF foi arquivado no SharePoint
-  arquivadoPath       String?   // caminho do arquivo lá — é o que torna o arquivamento verificável
+  anexoUrl          String? // documento da RNC do cliente
+  programa          String? // ASME…
+  jobCliente        String? // 0326
+  numeroCliente     String? // RTNC-010
+  respostaCliente   String? // texto da resposta gerada
+  respostaPdfUrl    String?
+  respostaEnviadaEm DateTime?
+  evidencias        Json      @default("[]") // [{ tipo, descricao, url }] treinamentos/melhorias
+  createdById       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  arquivadoEm       DateTime? // quando o PDF foi arquivado no SharePoint
+  arquivadoPath     String? // caminho do arquivo lá — é o que torna o arquivamento verificável
 
-  @@index([tipo])
-  @@index([status])
   // ⚠ ÚNICO, não só índice: duas RNCs abertas no mesmo instante liam o mesmo "último número" e
   // gravavam o mesmo. Passou a existir risco real quando a reprovação de inspeção começou a abrir
   // RNC sozinha — dois inspetores reprovando ao mesmo tempo, no chão de fábrica, é rotina.
   @@unique([ano, numero])
+  @@index([tipo])
+  @@index([status])
   @@index([ano, numero])
 }
 
@@ -2520,9 +2520,6 @@ model PortalDestinatario {
   primeiroAcessoEm DateTime?
   ultimoAcessoEm   DateTime?
   createdAt        DateTime  @default(now())
-
-  @@index([portalId])
-  @@index([opNumero])
   // ⚠⚠ SAI DA LISTA SEM SUMIR DO HISTÓRICO. Vitor (02/09/2026): "aparece o Carlos Santos, ele não
   // faz mais parte da empresa". Apagar a linha levaria junto o registro de que ele recebeu e abriu
   // o portal — e o histórico de acesso é o que responde "quem viu o quê" numa obra.
@@ -2531,6 +2528,9 @@ model PortalDestinatario {
   // `codigo` só identifica quem abriu. Um link já enviado continua funcionando — para cortar de
   // verdade é preciso trocar o token do portal, o que derruba o link de todo mundo.
   ativo            Boolean   @default(true)
+
+  @@index([portalId])
+  @@index([opNumero])
 }
 
 // Uma linha por evento — abertura e download. ⚠ O CONTADOR NÃO BASTA: "3 downloads" não diz QUAL
@@ -2966,21 +2966,21 @@ model EstoqueFisicoSync {
 }
 
 model PecaConjunto {
-  id                     String                  @id @default(cuid())
-  opId                   String?
-  opNumero               String
-  item                   Int?
-  marca                  String
-  descricao              String?
-  qte                    Int                     @default(1)
-  pesoUnitKg             Float                   @default(0)
-  pesoTotalKg            Float                   @default(0)
-  status                 String                  @default("PENDENTE")
-  fluxoEspecial          Boolean                 @default(false)
-  ultimoSetor            String?
-  dataConcluida          DateTime?
-  dataPrevista           DateTime?
-  fonte                  String?
+  id                      String                  @id @default(cuid())
+  opId                    String?
+  opNumero                String
+  item                    Int?
+  marca                   String
+  descricao               String?
+  qte                     Int                     @default(1)
+  pesoUnitKg              Float                   @default(0)
+  pesoTotalKg             Float                   @default(0)
+  status                  String                  @default("PENDENTE")
+  fluxoEspecial           Boolean                 @default(false)
+  ultimoSetor             String?
+  dataConcluida           DateTime?
+  dataPrevista            DateTime?
+  fonte                   String?
   // ⚠⚠ PERTENCIMENTO ≠ PROCEDÊNCIA. Vitor (02/09/2026): "precisamos consertar isso, não pode ser
   // feito gambiarra mais".
   //
@@ -2996,41 +2996,41 @@ model PecaConjunto {
   // ⚠ O `@@unique([opNumero, marca])` é o que torna isto inevitável: não cabem duas linhas da mesma
   // marca sob a mesma obra, então a LPC não cria a sua — ela herda a linha da LE. Com os dois
   // sinalizadores, herdar deixa de custar a lista da outra.
-  naLE                   Boolean  @default(false)
-  naLPC                  Boolean  @default(false)
-  observacao             String?
-  criadoEm               DateTime                @default(now())
-  atualizadoEm           DateTime                @updatedAt
-  precoTotal             Float                   @default(0)
-  precoUnitario          Float                   @default(0)
+  naLE                    Boolean                 @default(false)
+  naLPC                   Boolean                 @default(false)
+  observacao              String?
+  criadoEm                DateTime                @default(now())
+  atualizadoEm            DateTime                @updatedAt
+  precoTotal              Float                   @default(0)
+  precoUnitario           Float                   @default(0)
   // Campos LPC — conjunto/croqui
-  tipoPeca               String? // "CONJUNTO" | "CROQUI" | null (legado LE)
-  material               String? // "A36", "A572-GR.50"
-  perfil                 String? // "W410X46.1", "CH4.80X70"
-  comprimentoMm          Float? // comprimento em mm
-  areaPinturaM2          Float? // area de pintura m²
-  statusPrep             String? // "PENDENTE" | "PREPARADO" (so croquis)
-  maquina                String? // maquina de corte atribuida (LASER_CHAPA, LASER_PERFIL, LASER_TUBO, LASER_CANTONEIRA)
-  statusEstoque          String? // "DISPONIVEL" | "PARCIAL" | "INDISPONIVEL" | null (nao conferido)
-  prioridade             Int? // prioridade manual na Programação (vazia = sem prioridade); preservada na reimportação LPC
-  ordemCampo             Int? // ordem de envio a campo (1 = primeiro); vazio = sem prioridade
+  tipoPeca                String? // "CONJUNTO" | "CROQUI" | null (legado LE)
+  material                String? // "A36", "A572-GR.50"
+  perfil                  String? // "W410X46.1", "CH4.80X70"
+  comprimentoMm           Float? // comprimento em mm
+  areaPinturaM2           Float? // area de pintura m²
+  statusPrep              String? // "PENDENTE" | "PREPARADO" (so croquis)
+  maquina                 String? // maquina de corte atribuida (LASER_CHAPA, LASER_PERFIL, LASER_TUBO, LASER_CANTONEIRA)
+  statusEstoque           String? // "DISPONIVEL" | "PARCIAL" | "INDISPONIVEL" | null (nao conferido)
+  prioridade              Int? // prioridade manual na Programação (vazia = sem prioridade); preservada na reimportação LPC
+  ordemCampo              Int? // ordem de envio a campo (1 = primeiro); vazio = sem prioridade
   // Serviço terceirizado — peça fabricada por terceiros: NÃO passa pelo corte; fica em
   // espera (status TERCEIRIZADO) até o Compras receber, então é liberada pro destino.
-  terceirizado           Boolean                 @default(false)
-  destinoTerceirizado    String? // "MONTAGEM" | "PINTURA" | "EXPEDICAO"
+  terceirizado            Boolean                 @default(false)
+  destinoTerceirizado     String? // "MONTAGEM" | "PINTURA" | "EXPEDICAO"
   // Despacho no fluxo do PCP (TV de prioridades): rota da peça EM ABERTO. null = em aberto (não
   // despachada); PRIORIDADE (fila de desenho/corte) | TERCEIRO (vai pra /pcp/terceirizados) |
   // REVISAO (volta p/ engenharia) | AGUARDANDO_MATERIAL | CANCELADA. "Liberado p/ montagem" é
   // computado (conjunto montável = todos os croquis cortados), não fica gravado aqui.
-  destino                String? // PRIORIDADE | TERCEIRO | REVISAO | AGUARDANDO_MATERIAL | CANCELADA
-  destinoEm              DateTime?
-  destinoPor             String?
-  destinoObs             String?
+  destino                 String? // PRIORIDADE | TERCEIRO | REVISAO | AGUARDANDO_MATERIAL | CANCELADA
+  destinoEm               DateTime?
+  destinoPor              String?
+  destinoObs              String?
   // Baixa no PORTAL, por setor (não escreve no Syneco). Mapa { CORTE:{em,por}, MONTAGEM:{...} }.
   // O Excel da lista traz uma coluna "Syneco" = precisa acertar no Syneco? (baixa no portal
   // existe mas o mesOrdem ainda não registrou aquela produção).
-  baixaSetores           Json?     @default("{}")
-  terceirizadoRecebidoEm DateTime?
+  baixaSetores            Json?                   @default("{}")
+  terceirizadoRecebidoEm  DateTime?
   // Data prevista de RETORNO informada pelo terceiro (do romaneio RT). Enquanto no terceiro
   // (terceirizado=true, ainda não recebido), a peça aparece na fila do setor de RETORNO
   // (destinoTerceirizado) com essa data — e sai da fila do setor de onde saiu.
@@ -3042,45 +3042,45 @@ model PecaConjunto {
   encaminhadoPor          String?
   // Fila / kanban de corte (programação pós-liberação). As datas META não
   // mudam depois de programadas; o real vem dos botões Iniciar/Concluir.
-  corteOrdem             Int? // posição na fila (menor = corta primeiro)
-  corteDataMetaInicio    DateTime?               @db.Date
-  corteDataMetaFim       DateTime?               @db.Date
+  corteOrdem              Int? // posição na fila (menor = corta primeiro)
+  corteDataMetaInicio     DateTime?               @db.Date
+  corteDataMetaFim        DateTime?               @db.Date
   // ⚠ O DIA DA PEÇA, dentro da janela. Vitor (01/09/2026): "quando eu fizer uma programação para
   // mais de um dia precisamos ter a visão separada no pcp para ficar registrado para quais dias
   // foram programados tais peças". A janela acima é o compromisso e segue imutável; este é o dia em
   // que a peça deve ser cortada, e é ELE que se move quando alguém adia.
-  corteDiaProgramado     DateTime?               @db.Date
+  corteDiaProgramado      DateTime?               @db.Date
   // ⚠⚠ E O DIA ORIGINAL NÃO SE MOVE NUNCA. Adiar sem guardar isto apagaria o atraso: a peça
   // empurrada três vezes apareceria sempre "em dia", que é o oposto do que a tela existe para
   // mostrar. O vermelho conta daqui.
-  corteDiaOriginal       DateTime?               @db.Date
-  corteAdiado            Int                     @default(0) // quantas vezes foi empurrada
+  corteDiaOriginal        DateTime?               @db.Date
+  corteAdiado             Int                     @default(0) // quantas vezes foi empurrada
   // ── MONTAGEM ──────────────────────────────────────────────────────────────────────────────────
   // Vitor (01/09/2026): "o planejamento programa de acordo com o tempo da preparação a data que
   // deverá iniciar a montagem" — e "será por conjunto que tenha todas as sub peças prontas".
   // ⚠ Só faz sentido em tipoPeca = CONJUNTO: croqui não se monta, se corta.
-  montagemDiaProgramado  DateTime?               @db.Date
-  montagemDiaOriginal    DateTime?               @db.Date // não se move; é dele que o atraso conta
-  montagemAdiado         Int                     @default(0)
-  montagemProgramadaEm   DateTime?
-  montagemProgramadaPor  String?
+  montagemDiaProgramado   DateTime?               @db.Date
+  montagemDiaOriginal     DateTime?               @db.Date // não se move; é dele que o atraso conta
+  montagemAdiado          Int                     @default(0)
+  montagemProgramadaEm    DateTime?
+  montagemProgramadaPor   String?
   // ⚠ A BANCADA QUE VAI MONTAR. Vitor (01/09/2026): a Larissa escolhe quantas bancadas usar "junto
   // com o encarregado da fábrica" e o portal reparte. Guardado porque o maço impresso sai por
   // bancada — se a atribuição se perdesse ao fechar a tela, o papel na mão do encarregado e o
   // portal diriam coisas diferentes.
-  montagemBancada        String?
-  montagemBancadaEm      DateTime?
+  montagemBancada         String?
+  montagemBancadaEm       DateTime?
   // ── SOLDA ─────────────────────────────────────────────────────────────────────────────────────
   // ⚠⚠ A BANCADA AQUI É INTENÇÃO, NÃO ORDEM. Vitor (01/09/2026) escolheu "só registra a intenção":
   // quem manda na bancada é o líder no chão. O portal organiza a fila e anota a sugestão; o que
   // realmente aconteceu volta do Syneco (setor Solda, bancadas SOLDA 1..10). Não medir aderência
   // contra este campo — ele não é promessa de ninguém.
-  soldaBancada           String?
-  soldaBancadaEm         DateTime?
-  soldaBancadaPor        String?
+  soldaBancada            String?
+  soldaBancadaEm          DateTime?
+  soldaBancadaPor         String?
   // ⚠ @db.Date: é o DIA do trabalho, não um instante. Timestamp aqui volta um dia ao converter
   // para BRT — a armadilha já anotada em lib/data-br.js.
-  soldaDiaProgramado     DateTime? @db.Date
+  soldaDiaProgramado      DateTime?               @db.Date
   // ─── ACABAMENTO · JATO · PINTURA ────────────────────────────────────────────
   // ⚠ Vitor (06/09/2026) pediu a representação desses setores no Gantt, e ele lê exatamente estes
   // campos: sem dia, a peça não existe no quadro. Antes daqui a obra sumia do Gantt depois da solda.
@@ -3094,14 +3094,14 @@ model PecaConjunto {
   // ⚠ `pinturaDiaProgramado` nasce SEM USO. Vitor ainda vai passar a regra da pintura; a coluna
   // entra junto porque é aditiva e nula, e uma segunda migração no banco de produção por causa de
   // um campo custaria mais do que deixá-la esperando.
-  acabamentoDiaProgramado DateTime? @db.Date
+  acabamentoDiaProgramado DateTime?               @db.Date
   acabamentoBancada       String?
-  jatoDiaProgramado       DateTime? @db.Date
+  jatoDiaProgramado       DateTime?               @db.Date
   jatoBancada             String?
-  pinturaDiaProgramado    DateTime? @db.Date
+  pinturaDiaProgramado    DateTime?               @db.Date
   pinturaBancada          String?
-  corteIniciadoEm        DateTime? // real início do corte
-  corteConcluidoEm       DateTime? // real fim do corte
+  corteIniciadoEm         DateTime? // real início do corte
+  corteConcluidoEm        DateTime? // real fim do corte
   // Campos de produção (populados pelo Syneco)
   /// ⚠⚠ SÓ O CORTE ESCREVE ISTO. Significa "quanto o CORTE cortou", NUNCA "quanto desse conjunto
   /// já saiu". Escrito por app/api/producao/importar-syneco-corte e lib/reconciliar-syneco-corte;
@@ -3109,17 +3109,17 @@ model PecaConjunto {
   /// ele devolve 0 para sempre, e zero parece um dado em vez de uma ausência.
   /// Para "quanto saiu no setor X" use lib/produzido-setor.js (lê o MesOrdem do Syneco).
   /// Medido em 05/09/2026: Solda 12.872 produzidas no Syneco × 30 aqui; Montagem 12.355 × 30.
-  qteProduzida           Int                     @default(0)
-  pesoProduzido          Float                   @default(0)
-  dataProducao           DateTime? // data fim da produção (Syneco)
-  op                     OP?                     @relation(fields: [opId], references: [id])
-  planejamentos          PecaPlanejamento[]
-  planejamentoCargaItens PlanejamentoCargaItem[]
-  romaneioItens          RomaneioItem[]
+  qteProduzida            Int                     @default(0)
+  pesoProduzido           Float                   @default(0)
+  dataProducao            DateTime? // data fim da produção (Syneco)
+  op                      OP?                     @relation(fields: [opId], references: [id])
+  planejamentos           PecaPlanejamento[]
+  planejamentoCargaItens  PlanejamentoCargaItem[]
+  romaneioItens           RomaneioItem[]
   // Relacoes conjunto<->croqui (many-to-many via junction)
-  conjuntoCroquis        ConjuntoCroqui[]        @relation("ConjuntoCroquis_conjunto")
-  croquiConjuntos        ConjuntoCroqui[]        @relation("ConjuntoCroquis_croqui")
-  entregas               ConjuntoEntrega[]
+  conjuntoCroquis         ConjuntoCroqui[]        @relation("ConjuntoCroquis_conjunto")
+  croquiConjuntos         ConjuntoCroqui[]        @relation("ConjuntoCroquis_croqui")
+  entregas                ConjuntoEntrega[]
 
   @@unique([opNumero, marca])
   @@index([opId])
@@ -3211,8 +3211,8 @@ model SharepointSync {
 }
 
 model Orcamento {
-  id             String             @id @default(cuid())
-  numero         String             @unique
+  id             String              @id @default(cuid())
+  numero         String              @unique
   cliente        String
   obra           String?
   responsavel    String?
@@ -3224,21 +3224,21 @@ model Orcamento {
   dataSolicitada DateTime?
   dataEnvio      DateTime?
   dataFechamento DateTime?
-  status         StatusOrcamento    @default(ORCAMENTO)
+  status         StatusOrcamento     @default(ORCAMENTO)
   vendedor       String?
   motivoPerda    String?
   observacoes    String?
   opId           String?
   criadoPorId    String?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
   prazoEntrega   DateTime?
-  criadoPor      User?              @relation("OrcamentoCriadoPor", fields: [criadoPorId], references: [id])
-  op             OP?                @relation("OrcamentoOP", fields: [opId], references: [id])
+  criadoPor      User?               @relation("OrcamentoCriadoPor", fields: [criadoPorId], references: [id])
+  op             OP?                 @relation("OrcamentoOP", fields: [opId], references: [id])
   revisoes       OrcamentoRevisao[]
   estudos        PropostaEstudo[]
-  estudosLqc     EstudoFabricacao[] @relation("OrcamentoEstudoLqc")
-  emails         ObraEmailEvento[]  @relation("OrcamentoEmails")
+  estudosLqc     EstudoFabricacao[]  @relation("OrcamentoEstudoLqc")
+  emails         ObraEmailEvento[]   @relation("OrcamentoEmails")
   propostas      PropostaEstrutura[]
 
   @@index([status])
@@ -3267,7 +3267,7 @@ model PropostaEstrutura {
   modalidade  String  @default("PESO_UNITARIO")
   status      String  @default("RASCUNHO")
 
-  destinatario Json   @default("{}") // empresa, endereço, A/C, e-mail, fone
+  destinatario Json    @default("{}") // empresa, endereço, A/C, e-mail, fone
   referencia   String? // a obra e a cidade, como aparecem na capa
 
   escopo     Json @default("[]") // os elementos listados no escopo
@@ -3281,8 +3281,8 @@ model PropostaEstrutura {
 
   emitidoEm   DateTime?
   criadoPorId String?
-  criadoEm    DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  criadoEm    DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   orcamento Orcamento         @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
   estudo    EstudoFabricacao? @relation(fields: [estudoId], references: [id], onDelete: SetNull)
@@ -4037,19 +4037,19 @@ model CmrReferencia {
 }
 
 model Cronograma {
-  id             String               @id @default(cuid())
+  id             String    @id @default(cuid())
   opNumero       String
   opId           String?
   nomeArquivo    String
   titulo         String
-  sharepointPath String               @unique
+  sharepointPath String    @unique
   dataInicio     DateTime?
   dataFim        DateTime?
   dataBase       DateTime? // Data base (baseline) — referencia do cronograma
-  tipoDias       String               @default("DU") // DU = dias uteis, DC = dias corridos
-  areas          Json                 @default("[]") // Áreas da obra: [{nome, cor}] — cor FIXA por área (índice da paleta), estável no rename; definível na criação
-  ultimoSync     DateTime             @default(now())
-  ativo          Boolean              @default(true)
+  tipoDias       String    @default("DU") // DU = dias uteis, DC = dias corridos
+  areas          Json      @default("[]") // Áreas da obra: [{nome, cor}] — cor FIXA por área (índice da paleta), estável no rename; definível na criação
+  ultimoSync     DateTime  @default(now())
+  ativo          Boolean   @default(true)
 
   // TAREFAS LIBERADAS PROS SETORES — ato deliberado, com botão, DEPOIS que o cronograma está
   // fechado. Vitor (19/08/2026): "minha sugestão seria colocarmos um botão para enviar tarefas em
@@ -4058,13 +4058,13 @@ model Cronograma {
   // Enquanto for null, as tarefas existem no cronograma mas NÃO aparecem na Sequência dos setores.
   tarefasEnviadasEm    DateTime?
   tarefasEnviadasPorId String?
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
-  op             OP?                  @relation(fields: [opId], references: [id])
-  tarefas        CronogramaTarefa[]
-  revisoes       CronogramaRevisao[]
-  cobrancas      CronogramaCobranca[]
-  envios         CronogramaEnvio[]
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  op                   OP?                  @relation(fields: [opId], references: [id])
+  tarefas              CronogramaTarefa[]
+  revisoes             CronogramaRevisao[]
+  cobrancas            CronogramaCobranca[]
+  envios               CronogramaEnvio[]
 
   @@index([opNumero])
   @@index([ativo])
@@ -4104,7 +4104,7 @@ model CronogramaTarefa {
   // quando a estimativa foi dada — uma de 15 dias atrás não vale como previsão de hoje
   estimativaEm        DateTime?
   responsavelId       String?
-  responsavel         User?     @relation("TarefaResponsavel", fields: [responsavelId], references: [id])
+  responsavel         User?                   @relation("TarefaResponsavel", fields: [responsavelId], references: [id])
 
   // ⚠ QUANDO A ESPERA COMEÇOU. Sem isto o hold registra o motivo mas não a duração, e "quantos dias
   // o cliente segurou o projeto" vira estimativa. Gravado quando o motivo de bloqueio é preenchido.
@@ -4113,19 +4113,19 @@ model CronogramaTarefa {
   // custou 60 dias"), cobrar o lado certo, e — o que mais importa — decidir se a espera SAI da
   // aderência: espera de fora não é dívida do setor; espera de outro setor da Torg é.
   // O `motivoBloqueio` continua em texto livre, como observação.
-  esperaDe            String?
-  esperaInicio        DateTime?
-  dataLiberacao       DateTime? // Data em que a tarefa foi liberada (desbloqueio externo)
-  motivoBloqueio      String? // Ex: "Aguardando assinatura do aditivo"
-  observacao          String?
-  dataRealizacao      DateTime?
+  esperaDe       String?
+  esperaInicio   DateTime?
+  dataLiberacao  DateTime? // Data em que a tarefa foi liberada (desbloqueio externo)
+  motivoBloqueio String? // Ex: "Aguardando assinatura do aditivo"
+  observacao     String?
+  dataRealizacao DateTime?
   // Execução REAL — não altera as datas previstas/base; o atraso é derivado
-  dataInicioReal      DateTime?
-  dataFimReal         DateTime?
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
-  registros           CronogramaRegistro[]
-  cronograma          Cronograma              @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
+  dataInicioReal DateTime?
+  dataFimReal    DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  registros      CronogramaRegistro[]
+  cronograma     Cronograma           @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
 
   @@index([cronogramaId])
   @@index([departamento])
@@ -4223,22 +4223,22 @@ model CobrancaMarco {
 // atividades são atribuídas a setores, que confirmam recebimento por link e
 // preenchem informação + evidência.
 model AtaReuniao {
-  id          String            @id @default(cuid())
-  numero      Int // sequencial (ATA-001)
-  semanaIso   Int
-  ano         Int
-  titulo      String
-  dataReuniao DateTime?
-  status      String            @default("RASCUNHO") // RASCUNHO | ENVIADA | CONCLUIDA
-  revisao     Int               @default(0) // R00, R01…
-  pauta       String?
-  envolvidos  Json              @default("[]") // [{ nome, email, setor }]
-  revisoes    Json              @default("[]") // [{ n, motivo, em, por }]
-  createdById String?
-  enviadaEm   DateTime?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  atividades  AtaAtividade[]
+  id           String           @id @default(cuid())
+  numero       Int // sequencial (ATA-001)
+  semanaIso    Int
+  ano          Int
+  titulo       String
+  dataReuniao  DateTime?
+  status       String           @default("RASCUNHO") // RASCUNHO | ENVIADA | CONCLUIDA
+  revisao      Int              @default(0) // R00, R01…
+  pauta        String?
+  envolvidos   Json             @default("[]") // [{ nome, email, setor }]
+  revisoes     Json             @default("[]") // [{ n, motivo, em, por }]
+  createdById  String?
+  enviadaEm    DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  atividades   AtaAtividade[]
   confirmacoes AtaConfirmacao[]
 
   @@index([ano, semanaIso])
@@ -4246,24 +4246,24 @@ model AtaReuniao {
 }
 
 model AtaAtividade {
-  id              String     @id @default(cuid())
-  ataId           String
-  descricao       String
-  op              String? // OP relacionada (organização por OP no rascunho da IA)
-  setor           String? // setor responsável (pode ficar em branco p/ preencher depois)
-  responsavel     String?
-  prazo           DateTime?
-  origemAtaNumero Int? // arrastada de uma ata anterior (nº da ata de ORIGEM — mantém a mais antiga)
-  ehDesdobramento     Boolean @default(false) // tarefa NOVA criada ao responder (desdobramento), ≠ arrastada
+  id                  String     @id @default(cuid())
+  ataId               String
+  descricao           String
+  op                  String? // OP relacionada (organização por OP no rascunho da IA)
+  setor               String? // setor responsável (pode ficar em branco p/ preencher depois)
+  responsavel         String?
+  prazo               DateTime?
+  origemAtaNumero     Int? // arrastada de uma ata anterior (nº da ata de ORIGEM — mantém a mais antiga)
+  ehDesdobramento     Boolean    @default(false) // tarefa NOVA criada ao responder (desdobramento), ≠ arrastada
   desdobramentoDeDesc String? // descrição da tarefa de origem (rastreio do desdobramento)
-  status          String     @default("PENDENTE") // PENDENTE (=atrasada, sem resposta) | EM_ANDAMENTO | CONCLUIDA
-  resposta      String? // informação preenchida pelo setor
-  evidencia     String? // evidência (texto)
-  respondidoPor String?
-  respondidoEm  DateTime?
-  ordem         Int        @default(0)
-  createdAt     DateTime   @default(now())
-  ata           AtaReuniao @relation(fields: [ataId], references: [id], onDelete: Cascade)
+  status              String     @default("PENDENTE") // PENDENTE (=atrasada, sem resposta) | EM_ANDAMENTO | CONCLUIDA
+  resposta            String? // informação preenchida pelo setor
+  evidencia           String? // evidência (texto)
+  respondidoPor       String?
+  respondidoEm        DateTime?
+  ordem               Int        @default(0)
+  createdAt           DateTime   @default(now())
+  ata                 AtaReuniao @relation(fields: [ataId], references: [id], onDelete: Cascade)
 
   @@index([ataId])
 }
@@ -4285,44 +4285,44 @@ model AtaConfirmacao {
 }
 
 model TarefaPlanejamento {
-  id                String        @id @default(cuid())
-  titulo            String
-  descricao         String?
-  opNumero          String?
-  opId              String?
-  setor             String
-  semanaIso         Int
-  ano               Int
-  status            String        @default("PENDENTE")
-  prioridade        String        @default("MEDIA")
-  responsavel       String?
-  dataPrevista      DateTime?
-  dataConcluida     DateTime?
-  observacao        String?
+  id                   String           @id @default(cuid())
+  titulo               String
+  descricao            String?
+  opNumero             String?
+  opId                 String?
+  setor                String
+  semanaIso            Int
+  ano                  Int
+  status               String           @default("PENDENTE")
+  prioridade           String           @default("MEDIA")
+  responsavel          String?
+  dataPrevista         DateTime?
+  dataConcluida        DateTime?
+  observacao           String?
   // Tarefa de responsabilidade do CLIENTE (ele fornece/aprova). Cobrança/confirmação
   // por e-mail com resposta de 1 clique (token público, sem login).
-  doCliente         Boolean       @default(false)
-  clienteNome       String?
-  clienteEmail      String?
-  clienteToken      String?       @unique
-  clienteAvisadoEm  DateTime?
-  clienteRespostaEm DateTime?
-  clienteResposta   String?
+  doCliente            Boolean          @default(false)
+  clienteNome          String?
+  clienteEmail         String?
+  clienteToken         String?          @unique
+  clienteAvisadoEm     DateTime?
+  clienteRespostaEm    DateTime?
+  clienteResposta      String?
   // Token público (sem login) para o SETOR responder o lembrete de 1 clique
-  respostaToken     String?          @unique
+  respostaToken        String?          @unique
   // "Aguardando resposta": setado quando o lembrete (pedindo resposta) é enviado;
   // limpo/comparado quando o setor responde — pra saber o que ainda falta cobrar.
   respostaSolicitadaEm DateTime?
   respostaRecebidaEm   DateTime?
   // Checklist de sub-tarefas: [{ id, titulo, feita }]
-  subtarefas        Json             @default("[]")
-  createdById       String?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  createdBy         User?         @relation("TarefaPlanejamentoCreatedBy", fields: [createdById], references: [id])
-  op                OP?           @relation(fields: [opId], references: [id])
-  compromissos      Compromisso[]
-  respostas         TarefaResposta[]
+  subtarefas           Json             @default("[]")
+  createdById          String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  createdBy            User?            @relation("TarefaPlanejamentoCreatedBy", fields: [createdById], references: [id])
+  op                   OP?              @relation(fields: [opId], references: [id])
+  compromissos         Compromisso[]
+  respostas            TarefaResposta[]
 
   @@index([semanaIso, ano])
   @@index([setor])
@@ -4415,24 +4415,24 @@ model BaixaExpedicao {
 // Numeração sequencial ao último romaneio EMITIDO da OP. `itens` guarda as
 // marcas escolhidas (mesma chave da lista: a marca).
 model RomaneioPrevio {
-  id           String    @id @default(cuid())
-  opId         String
-  opNumero     String
-  numero       Int
-  status        String    @default("PREVISTO") // PREVISTO (em aberto) | APROVADO | CANCELADO
-  dataPrevista  DateTime?
-  local         String?
-  observacao    String?
-  itens         Json      @default("[]") // [{ frente, marca, descricao, qte, pesoTotal }]
-  pesoKg        Float     @default(0)
-  loteId        String? // lote de entrega a que esta carga pertence
-  aprovadoEm    DateTime? // aprovado = liberado para a Expedição
-  aprovadoPorId String?
-  emitidoEm     DateTime? // null = não emitido; setado ao gerar o romaneio consolidado
-  emitidoPorId  String?
-  revisao       Int       @default(0) // 0 = 1ª emissão (R00); 1+ = revisões (R01, R02…)
-  historico     Json      @default("[]") // [{ revisao, emitidoEm, mudanca, porQuem }]
-  arquivoUrl    String? // webUrl do FORM 22 no SharePoint (setado na emissão) — link no Fiscal
+  id                String         @id @default(cuid())
+  opId              String
+  opNumero          String
+  numero            Int
+  status            String         @default("PREVISTO") // PREVISTO (em aberto) | APROVADO | CANCELADO
+  dataPrevista      DateTime?
+  local             String?
+  observacao        String?
+  itens             Json           @default("[]") // [{ frente, marca, descricao, qte, pesoTotal }]
+  pesoKg            Float          @default(0)
+  loteId            String? // lote de entrega a que esta carga pertence
+  aprovadoEm        DateTime? // aprovado = liberado para a Expedição
+  aprovadoPorId     String?
+  emitidoEm         DateTime? // null = não emitido; setado ao gerar o romaneio consolidado
+  emitidoPorId      String?
+  revisao           Int            @default(0) // 0 = 1ª emissão (R00); 1+ = revisões (R01, R02…)
+  historico         Json           @default("[]") // [{ revisao, emitidoEm, mudanca, porQuem }]
+  arquivoUrl        String? // webUrl do FORM 22 no SharePoint (setado na emissão) — link no Fiscal
   // ── Fiscal (aba Fiscal) — emitido cai aqui aguardando NF; finalizado = nº + tipo ──
   nfNumero          String? // número da NF informado pelo dept fiscal
   nfTipo            String? // VENDA | SERVICO | REMESSA
@@ -4446,14 +4446,57 @@ model RomaneioPrevio {
   nfChave           String? // chave de acesso da NF-e (44 díg.)
   nfErroEmissao     String? // última msg de erro/aguardando da emissão
   nfFrete           Json? // dados do frete p/ a NF (mesma estrutura da remessa terceiro)
-  criadoPorId   String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  op            OP             @relation(fields: [opId], references: [id], onDelete: Cascade)
-  lote          LoteExpedicao? @relation(fields: [loteId], references: [id], onDelete: SetNull)
+  criadoPorId       String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  op                OP             @relation(fields: [opId], references: [id], onDelete: Cascade)
+  lote              LoteExpedicao? @relation(fields: [loteId], references: [id], onDelete: SetNull)
 
   @@unique([opId, numero])
   @@index([opId])
+}
+
+// ─── CONFERÊNCIA DE PEÇA (Expedição) ──────────────────────────────────────────
+// Matheus (08/09/2026): "clicar em iniciar conferência, seleciona a OP e vai ter 3 campos: MARCA,
+// QUANTIDADE e OBSERVAÇÃO (…) a ideia é usar essa tela em um celular em campo ou tablet para ele
+// conferir as peças antes de ir para pintura e etiquetagem".
+//
+// ⚠ Uma SESSÃO por vez que alguém confere um lote, não uma lista acumulada por obra: o lote de
+// hoje e o da semana que vem são conferências diferentes, com autor e data próprios.
+model ConferenciaPeca {
+  id                String    @id @default(cuid())
+  opId              String
+  opNumero          String
+  status            String    @default("ABERTA") // ABERTA | FINALIZADA | CANCELADA
+  observacao        String?
+  iniciadaEm        DateTime  @default(now())
+  iniciadaPorId     String?
+  iniciadaPorNome   String?
+  finalizadaEm      DateTime?
+  finalizadaPorNome String?
+  atualizadoEm      DateTime  @updatedAt
+
+  itens ConferenciaPecaItem[]
+
+  @@index([opId])
+  @@index([status])
+}
+
+// Um lançamento: "T97A140, 2 peças". Vários lançamentos da mesma marca somam — é o que permite
+// conferir aos poucos, que é como acontece no pátio.
+model ConferenciaPecaItem {
+  id            String   @id @default(cuid())
+  conferenciaId String
+  marca         String
+  qte           Int
+  observacao    String?
+  criadoEm      DateTime @default(now())
+  criadoPorNome String?
+
+  conferencia ConferenciaPeca @relation(fields: [conferenciaId], references: [id], onDelete: Cascade)
+
+  @@index([conferenciaId])
+  @@index([marca])
 }
 
 model ListaExpedicaoRevisao {
@@ -4642,12 +4685,12 @@ model SolicitacaoProducao {
 // A partir dela o motor de rastreio para de usar o FIFO naquele material e passa a usar o R
 // registrado — deixa de ser regra de consumo e vira fato.
 model TrocaRastreabilidade {
-  id         String   @id @default(cuid())
-  opId       String?
-  opNumero   String
-  perfil     String
-  rIndicado  String? // o que o FIFO tinha apontado (fica pra auditoria)
-  rUsado     String // o R do fardo efetivamente separado
+  id             String   @id @default(cuid())
+  opId           String?
+  opNumero       String
+  perfil         String
+  rIndicado      String? // o que o FIFO tinha apontado (fica pra auditoria)
+  rUsado         String // o R do fardo efetivamente separado
   // ⚠⚠ ATÉ ONDE A DECLARAÇÃO VALE. Vitor (28/08/2026), sobre a OP-106: "precisamos ver como vamos
   // resolver sem você quebrar outras coisas". São dois fatos diferentes registrados no mesmo lugar:
   //   TODAS  → "todo este perfil, nesta OP, veio deste lote" (o fardo trocado na separação; era o
@@ -4656,44 +4699,44 @@ model TrocaRastreabilidade {
   //            R que o CMR da própria OP já respondeu. É o caso da peça cortada antes da entrega:
   //            na OP-106, o perfil CH12.50X100 tem 1 peça de estoque e 3 corretamente rastreadas,
   //            e aplicar a declaração nas 4 apagaria rastreio bom.
-  escopo     String   @default("TODAS") // TODAS | SEM_R
-  motivo     String?
+  escopo         String   @default("TODAS") // TODAS | SEM_R
+  motivo         String?
   trocadoPorId   String?
   trocadoPorNome String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@unique([opNumero, perfil])
   @@index([opNumero])
 }
 
 model GrdLiberacao {
-  id              String   @id @default(cuid())
-  opId            String?
-  opNumero        String
-  marca           String
-  arquivo         String // nome do PDF no SharePoint (ex.: T89A1.pdf)
-  formato         String? // A1 | A2 | A3 | A4 | A4 (croqui)
-  setor           String? // bloco/setor de onde foi liberado (preparacao|montagem|acabamento|PCP)
-  itemId          String? // id do arquivo no drive (pra reabrir)
+  id                String    @id @default(cuid())
+  opId              String?
+  opNumero          String
+  marca             String
+  arquivo           String // nome do PDF no SharePoint (ex.: T89A1.pdf)
+  formato           String? // A1 | A2 | A3 | A4 | A4 (croqui)
+  setor             String? // bloco/setor de onde foi liberado (preparacao|montagem|acabamento|PCP)
+  itemId            String? // id do arquivo no drive (pra reabrir)
   // Emissão CARIMBADA: o PDF sai do portal com a rastreabilidade do material daquela marca,
   // quem emitiu, data e hora — e o MESMO arquivo é arquivado e amarrado ao Data Book (§02).
-  rastreio        Json? // snapshot do casamento de corrida no momento da emissão (prova)
-  impressoItemId  String? // item do PDF CARIMBADO no SharePoint (é o que a pessoa abre/imprime)
-  impressoUrl     String? // webUrl do carimbado
-  documentoId     String? // DocumentoQualidade gerado (entra na §02 do Data Book)
+  rastreio          Json? // snapshot do casamento de corrida no momento da emissão (prova)
+  impressoItemId    String? // item do PDF CARIMBADO no SharePoint (é o que a pessoa abre/imprime)
+  impressoUrl       String? // webUrl do carimbado
+  documentoId       String? // DocumentoQualidade gerado (entra na §02 do Data Book)
   // GRD só nasce quando o desenho é IMPRESSO (abrir/emitir não é GRD). Reimpressão da mesma
   // marca/arquivo/setor NÃO cria outra GRD: soma aqui, com a data da última. (Vitor 19/08.)
-  impressoes      Int      @default(1)
+  impressoes        Int       @default(1)
   ultimaImpressaoEm DateTime?
   // ⚠ CADA CÓPIA, não só quantas. Vitor (26/08/2026): "garanta que está sendo registradas copias
   // que foram impressas novamente não estou vendo esse registro dessas copias". O contador dizia o
   // total e a data da última — quem imprimiu a 2ª via, quando e com qual R não ficava em lugar
   // nenhum, e é exatamente isso que uma GRD existe para provar.
-  historico       Json? // [{ em, por, itemId, rs: [] }] — uma entrada por impressão
-  liberadoPorId   String?
-  liberadoPorNome String?
-  createdAt       DateTime @default(now())
+  historico         Json? // [{ em, por, itemId, rs: [] }] — uma entrada por impressão
+  liberadoPorId     String?
+  liberadoPorNome   String?
+  createdAt         DateTime  @default(now())
 
   @@index([opNumero, marca])
 }
@@ -5008,57 +5051,57 @@ model CronHeartbeat {
 // Série de numeração própria (RT-01, RT-02…). Referência à OP é só rastreio
 // (opRefId/opRefNumero denormalizados — NÃO liga no fluxo da OP).
 model RomaneioTerceiro {
-  id                String    @id @default(cuid())
-  numero            Int       @unique // série própria RT-##
+  id                  String    @id @default(cuid())
+  numero              Int       @unique // série própria RT-##
   // terceiro (Vendor List opcional + nome sempre gravado)
-  fornecedorId      String?
-  terceiroNome      String
-  servico           String? // ex.: galvanização, usinagem, pintura, jato
+  fornecedorId        String?
+  terceiroNome        String
+  servico             String? // ex.: galvanização, usinagem, pintura, jato
   // referência opcional à OP (só rastreio)
-  opRefId           String?
-  opRefNumero       String?
+  opRefId             String?
+  opRefNumero         String?
   // transporte
-  transportadora    String?
-  motorista         String?
-  placaVeiculo      String?
-  placaCarreta      String?
-  contatoTransporte String?
+  transportadora      String?
+  motorista           String?
+  placaVeiculo        String?
+  placaCarreta        String?
+  contatoTransporte   String?
   // peças enviadas (conjuntos/croquis): [{ marca, descricao, qte, pesoUn, pesoTotal }]
-  itens             Json      @default("[]")
-  pesoEnviadoKg     Float     @default(0)
+  itens               Json      @default("[]")
+  pesoEnviadoKg       Float     @default(0)
   // Etapa de onde a peça saiu (CORTE/MONTAGEM/SOLDA/…). Só p/ Corte/Montagem geramos o 2º
   // romaneio de MATERIAL (perfis a cortar), pra NF de retorno. Da Solda em diante, só peças.
-  setorEnvio        String?
+  setorEnvio          String?
   // material a mandar (agrupado por perfil): [{ perfil, descricao, qtd, pesoKg }]
-  materiais         Json      @default("[]")
-  arquivoMaterialUrl String?
+  materiais           Json      @default("[]")
+  arquivoMaterialUrl  String?
   // retornos parciais: [{ id, data, itens:[{marca, qte, pesoTotal}], pesoKg, observacao, porNome }]
-  retornos          Json      @default("[]")
-  pesoRetornadoKg   Float     @default(0)
-  status            String    @default("ENVIADO") // ENVIADO | PARCIAL | RETORNADO | CANCELADO
-  dataEnvio         DateTime?
-  dataPrevRetorno   DateTime?
-  observacao        String?
-  arquivoUrl        String?
+  retornos            Json      @default("[]")
+  pesoRetornadoKg     Float     @default(0)
+  status              String    @default("ENVIADO") // ENVIADO | PARCIAL | RETORNADO | CANCELADO
+  dataEnvio           DateTime?
+  dataPrevRetorno     DateTime?
+  observacao          String?
+  arquivoUrl          String?
   // ── Remessa fiscal (NF de remessa p/ industrialização — aba Remessa Terceiro do Fiscal) ──
   // A remessa é PRÉ-CRIADA junto do romaneio (remessaStatus PENDENTE) e emitida no Fiscal.
-  remessaStatus     String    @default("PENDENTE") // PENDENTE | EMITIDA | CANCELADA | DISPENSADA
-  remessaCfop       String? // 5901 (dentro do estado) / 6901 (fora) — remessa p/ industrialização
-  remessaFrete      Json? // dados do frete p/ a NF: { tpFrete, nCodTransp, transpNome, placa, uf, qtdVol, especie, pesoLiq, pesoBruto, valorFrete, valorSeguro, valorOutras }
-  remessaErroEmissao String? // última mensagem de erro da emissão (SEFAZ) — some quando autoriza
-  remessaNatureza   String? // natureza da operação (ex.: "Remessa para industrialização")
-  remessaNfNumero   String?
-  remessaNfSerie    String?
-  remessaNfChave    String? // chave de acesso (44 díg.)
-  remessaNfEmitidaEm DateTime?
-  remessaPedidoOmie String? // codigo interno do pedido de venda no Omie (Fase 2 — emissão integrada)
+  remessaStatus       String    @default("PENDENTE") // PENDENTE | EMITIDA | CANCELADA | DISPENSADA
+  remessaCfop         String? // 5901 (dentro do estado) / 6901 (fora) — remessa p/ industrialização
+  remessaFrete        Json? // dados do frete p/ a NF: { tpFrete, nCodTransp, transpNome, placa, uf, qtdVol, especie, pesoLiq, pesoBruto, valorFrete, valorSeguro, valorOutras }
+  remessaErroEmissao  String? // última mensagem de erro da emissão (SEFAZ) — some quando autoriza
+  remessaNatureza     String? // natureza da operação (ex.: "Remessa para industrialização")
+  remessaNfNumero     String?
+  remessaNfSerie      String?
+  remessaNfChave      String? // chave de acesso (44 díg.)
+  remessaNfEmitidaEm  DateTime?
+  remessaPedidoOmie   String? // codigo interno do pedido de venda no Omie (Fase 2 — emissão integrada)
   remessaPedidoNumero String? // nº do pedido de venda no Omie (humano, p/ conferir/faturar lá)
-  remessaObservacao String?
-  remessaPorNome    String?
-  criadoPorId       String?
-  criadoNome        String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  remessaObservacao   String?
+  remessaPorNome      String?
+  criadoPorId         String?
+  criadoNome          String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@index([status])
   @@index([remessaStatus])
@@ -5117,7 +5160,7 @@ model EnvioAssinatura {
   opNumero     String? // documento DE UMA OBRA (PLP, PIT): o mesmo tipo convive em várias OPs
   // EM_ANDAMENTO | CONCLUIDO | REVISAO_PEDIDA — um envio com revisão pedida sai do caminho: o
   // documento sobe de revisão e o ciclo recomeça do elaborador.
-  status       String   @default("EM_ANDAMENTO")
+  status       String                @default("EM_ANDAMENTO")
   assinaturas  AssinaturaDocumento[]
 
   @@index([tipo])
@@ -5159,30 +5202,30 @@ model PlanoResponsavel {
 }
 
 model AssinaturaDocumento {
-  id         String          @id @default(cuid())
-  envioId    String
-  nome       String
-  email      String
-  setor      String?
-  token      String          @unique
-  assinadoEm DateTime?
-  ip         String?
+  id              String          @id @default(cuid())
+  envioId         String
+  nome            String
+  email           String
+  setor           String?
+  token           String          @unique
+  assinadoEm      DateTime?
+  ip              String?
   // ⚠ A IMAGEM DA ASSINATURA usada NESTE documento — copiada do cadastro da pessoa no momento em
   // que ela assina. Fica congelada: trocar a assinatura no cadastro depois não reescreve o que já
   // foi assinado. Vazia quando quem assina não tem imagem cadastrada (o caso do inspetor do
   // cliente) — aí o campo sai com a linha para assinar à mão, como sempre foi.
-  imagemUrl  String?
+  imagemUrl       String?
   // ⚠⚠ A FILA DE ASSINATURA. Vitor (27/08/2026): "o ideal seria o elaborador assinar primeiro, o
   // verificador assina e o cliente assina por último". Antes os dois recebiam juntos e qualquer um
   // podia assinar primeiro — o verificador podia validar um documento que o elaborador ainda não
   // tinha assumido. `ordem` põe cada um na vez, e `convidadoEm` marca quando o e-mail DELE saiu:
   // quem ainda não foi convidado não recebeu nada e não tem o que assinar.
-  ordem      Int? // 1 = elabora · 2 = verifica · 3 = cliente
-  convidadoEm DateTime?
+  ordem           Int? // 1 = elabora · 2 = verifica · 3 = cliente
+  convidadoEm     DateTime?
   // Pedido de revisão: quem assina pode devolver o documento em vez de assinar.
   revisaoPedidaEm DateTime?
-  motivo     String?
-  envio      EnvioAssinatura @relation(fields: [envioId], references: [id], onDelete: Cascade)
+  motivo          String?
+  envio           EnvioAssinatura @relation(fields: [envioId], references: [id], onDelete: Cascade)
 
   @@index([envioId])
 }
@@ -5197,28 +5240,28 @@ model AssinaturaDocumento {
 // ⚠ `origemMarca` não é detalhe. QR é o desenho identificando a peça; BUSCA é uma pessoa afirmando
 // qual é. Numa auditoria isso não vale a mesma coisa, então fica registrado qual dos dois foi.
 model FotoInspecao {
-  id          String   @id @default(cuid())
-  opId        String?
-  opNumero    String // snapshot: OP.numero é texto ("067", "T60B")
-  tipo        String // DIMENSIONAL | VISUAL_SOLDA | LP | PINTURA | MONTAGEM | GERAL
-  marca       String? // peça (marca do Tekla). Nulo = foto de região/geral
-  origemMarca String? // QR | BUSCA | LIVRE
-  observacao  String? // legenda curta digitada no celular
+  id           String   @id @default(cuid())
+  opId         String?
+  opNumero     String // snapshot: OP.numero é texto ("067", "T60B")
+  tipo         String // DIMENSIONAL | VISUAL_SOLDA | LP | PINTURA | MONTAGEM | GERAL
+  marca        String? // peça (marca do Tekla). Nulo = foto de região/geral
+  origemMarca  String? // QR | BUSCA | LIVRE
+  observacao   String? // legenda curta digitada no celular
   // SNAPSHOT dos instrumentos que o inspetor marcou na hora: [{id,nome,certificado,validade}].
   // É snapshot de propósito — quando o certificado for renovado, o relatório antigo tem de
   // continuar mostrando o que estava valendo no dia da inspeção, não o de agora.
   equipamentos Json?
-  url         String // Vercel Blob (JPEG já reduzido no aparelho)
-  tamanho     Int?
-  autorId     String?
-  autorNome   String?
-  capturadaEm DateTime @default(now())
-  relatorioId String? // preenchido quando a foto entra num relatório montado no portal
+  url          String // Vercel Blob (JPEG já reduzido no aparelho)
+  tamanho      Int?
+  autorId      String?
+  autorNome    String?
+  capturadaEm  DateTime @default(now())
+  relatorioId  String? // preenchido quando a foto entra num relatório montado no portal
   // Em qual ÁREA de evidência do relatório a foto entra (lib/fotos-evidencia.js): no de pintura,
   // rugosidade / salinidade / espessura / aderência X / pull-off / outros. Nulo = foto sem área,
   // que é o caso de tudo que veio antes de 04/09/2026 e do que o celular manda solto.
-  evidencia   String?
-  createdAt   DateTime @default(now())
+  evidencia    String?
+  createdAt    DateTime @default(now())
 
   @@index([opNumero, tipo])
   @@index([relatorioId])
@@ -5237,39 +5280,39 @@ model FotoInspecao {
 // A assinatura reusa o fluxo genérico (EnvioAssinatura/AssinaturaDocumento + /assinar/[token]), o
 // mesmo do Plano de Treinamentos e do Cronograma de Auditoria.
 model RelatorioInspecao {
-  id       String @id @default(cuid())
+  id           String  @id @default(cuid())
   // sequencial POR OBRA e POR TIPO ("de acordo com cada obra, e ser sequencial")
-  numero   Int
-  codigo   String @unique // RID-067-001
-  opId     String?
-  opNumero String
-  tipo     String // DIMENSIONAL | VISUAL_SOLDA | LP | PINTURA | MONTAGEM | GERAL
-  titulo   String?
+  numero       Int
+  codigo       String  @unique // RID-067-001
+  opId         String?
+  opNumero     String
+  tipo         String // DIMENSIONAL | VISUAL_SOLDA | LP | PINTURA | MONTAGEM | GERAL
+  titulo       String?
   // observações do inspetor, escritas no computador ao fechar o relatório
-  observacoes String?
+  observacoes  String?
   // instrumentos utilizados, consolidados das fotos (e ajustáveis na montagem)
   equipamentos Json?
 
   // ── DIMENSIONAL ──────────────────────────────────────────────────────────────────────────
   // Vitor (21/08/2026): "pode ser [um por conjunto], mas no caso das peças avulsas podemos
   // agrupá-las para facilitar, pois senão iríamos gerar inúmeros relatórios".
-  escopo    String? // CONJUNTO (um desenho) | AVULSAS (várias peças num relatório só)
-  marcas    Json? // as marcas cobertas: ["T83A13"] ou ["T83A-P1","T83A-P2",…]
+  escopo      String? // CONJUNTO (um desenho) | AVULSAS (várias peças num relatório só)
+  marcas      Json? // as marcas cobertas: ["T83A13"] ou ["T83A-P1","T83A-P2",…]
   // linhas da tabela: { marca, descricao, projetoMm, tolerancia, encontradoMm, obs }
   // `projetoMm` vem da LISTA DE MATERIAIS do DESENHO (não da LPC — divergem em 1 mm);
   // `encontradoMm` nasce vazio, é o elaborador que preenche.
-  linhas    Json?
+  linhas      Json?
   // { dimensional, alinhamento, acabamento, resultado } — os quadros de aprovação do modelo
-  resultados Json?
+  resultados  Json?
   // desenhos embutidos no PDF: [{ marca, itemId, nome }] — o "CROQUI / FOTO DA PEÇA"
-  desenhos  Json?
-  status   String @default("RASCUNHO") // RASCUNHO | EMITIDO
+  desenhos    Json?
+  status      String    @default("RASCUNHO") // RASCUNHO | EMITIDO
   // ⚠ BACKUP NA PASTA DA OBRA. Vitor (22/08/2026): "salvar os relatórios em PDF na pasta
   // da qualidade de cada OP para podermos garantir o backup". O portal não é o arquivo da
   // obra: aqui o PDF é gerado sob demanda, e sem cópia no servidor não sobra papel nenhum
   // se o registro sumir. Guardado na APROVAÇÃO, em 8. Qualidade/3. Relatórios de Inspeção.
-  arquivoUrl   String?
-  arquivadoEm  DateTime?
+  arquivoUrl  String?
+  arquivadoEm DateTime?
 
   // ── REINSPEÇÃO E REVISÃO ─────────────────────────────────────────────────────────────────
   // Vitor (21/08/2026): "no caso de reprova o relatório deve ficar aberto; na reinspeção o inspetor
@@ -5284,16 +5327,16 @@ model RelatorioInspecao {
   // as rodadas anteriores, congeladas: [{ revisao, resultadoInspecao, linhas, emEm, por }]
   revisoes          Json?
 
-  emitidoEm DateTime?
-  inspetor      String? // quem executou a inspeção (nome que sai no documento)
-  criadoPorId   String?
-  criadoPorNome String?
+  emitidoEm         DateTime?
+  inspetor          String? // quem executou a inspeção (nome que sai no documento)
+  criadoPorId       String?
+  criadoPorNome     String?
   // liga ao fluxo de assinatura genérico (null enquanto não foi enviado)
   envioAssinaturaId String?
   // DocumentoQualidade gerado — é ele que aparece na seção do data book
-  documentoId String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  documentoId       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@unique([opNumero, tipo, numero])
   @@index([opNumero])
@@ -5305,7 +5348,7 @@ model RelatorioInspecao {
 // saber o start do projeto (IFC etc.), tempo de resposta e quem respondeu.
 // Doc: docs/agente-emails-engenharia.md. Fase 1 = ingestão crua (sem casar com OP).
 model ObraEmailEvento {
-  id                String    @id @default(cuid())
+  id                String     @id @default(cuid())
   opId              String? // vínculo com a OP (null enquanto não casou) — Fase 2
   // ⚠ o mesmo evento pode pertencer a um ORÇAMENTO (fase comercial, antes da OP existir) ou a uma
   // OP (fase de execução). São dois momentos da mesma obra, não dois modelos.
@@ -5315,30 +5358,30 @@ model ObraEmailEvento {
   caixa             String // mailbox de origem (qual das 6 caixas da engenharia)
   pasta             String // inbox | sentItems
   conversationId    String? // thread do Graph (amarra 1º e-mail ↔ resposta)
-  internetMessageId String    @unique // dedupe idempotente
+  internetMessageId String     @unique // dedupe idempotente
   graphId           String? // id da mensagem no Graph (referência)
   webLink           String? // link p/ abrir a mensagem no Outlook Web (Graph webLink)
   direcao           String // ENTRADA | SAIDA
   de                String?
   deNome            String?
-  para              Json      @default("[]") // [endereços]
-  cc                Json      @default("[]")
+  para              Json       @default("[]") // [endereços]
+  cc                Json       @default("[]")
   assunto           String?
   snippet           String? // bodyPreview (sem corpo inteiro)
   recebidoEm        DateTime?
   enviadoEm         DateTime?
-  temAnexo          Boolean   @default(false)
-  temAnexoIfc       Boolean   @default(false)
-  anexos            Json      @default("[]") // [{ nome, tipo, tamanho }] — metadados só
+  temAnexo          Boolean    @default(false)
+  temAnexoIfc       Boolean    @default(false)
+  anexos            Json       @default("[]") // [{ nome, tipo, tamanho }] — metadados só
   tipoGatilho       String? // marco: IFC_RECEBIDO | LIBERACAO_INICIO | PROJETO_ENVIADO | APROVADO_CLIENTE | OUTRO
   marcoFonte        String? // KEYWORD | IA — como o marco foi classificado
-  iaChecado         Boolean   @default(false) // já passou pela classificação por IA
-  primeiroContato   Boolean   @default(false) // 1º inbound do cliente na thread (Fase 2)
+  iaChecado         Boolean    @default(false) // já passou pela classificação por IA
+  primeiroContato   Boolean    @default(false) // 1º inbound do cliente na thread (Fase 2)
   matchConfianca    Float? // 0..1 (Fase 2)
   matchMetodo       String? // REGRA_OP | CODIGO_OBRA | DOMINIO | NOME_OBRA | IA | MANUAL (Fase 2)
   respondidoEm      DateTime? // 1ª resposta da eng na thread (SLA — Fase 2)
   respondidoPor     String?
-  criadoEm          DateTime  @default(now())
+  criadoEm          DateTime   @default(now())
   orcamento         Orcamento? @relation("OrcamentoEmails", fields: [orcamentoId], references: [id], onDelete: SetNull)
 
   @@index([opId])
@@ -5373,32 +5416,32 @@ model ObraEmailSync {
 // ⚠ UMA LINHA POR OP (@unique): é uma foto do estado atual, não histórico. Guardar série temporal
 // disso multiplicaria a tabela por dia sem ninguém consultar o passado.
 model PastaEngenharia {
-  id             String   @id @default(cuid())
-  opId           String   @unique
-  op             OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
+  id             String    @id @default(cuid())
+  opId           String    @unique
+  op             OP        @relation(fields: [opId], references: [id], onDelete: Cascade)
   // OK | PARCIAL | SEM_CONJUNTO | SO_MAQUINA | SEM_DESENHO | SEM_LISTA | VAZIA
   veredito       String
-  pdfs           Int      @default(0)
-  outrosPdfs     Int      @default(0)
-  nc1            Int      @default(0)
-  igs            Int      @default(0)
-  cliente        Int      @default(0)
-  marcas         Int      @default(0)
-  conjuntosTotal Int      @default(0)
-  conjuntosCom   Int      @default(0)
-  croquisTotal   Int      @default(0)
-  croquisCom     Int      @default(0)
-  foraPadrao     Int      @default(0)
+  pdfs           Int       @default(0)
+  outrosPdfs     Int       @default(0)
+  nc1            Int       @default(0)
+  igs            Int       @default(0)
+  cliente        Int       @default(0)
+  marcas         Int       @default(0)
+  conjuntosTotal Int       @default(0)
+  conjuntosCom   Int       @default(0)
+  croquisTotal   Int       @default(0)
+  croquisCom     Int       @default(0)
+  foraPadrao     Int       @default(0)
   // semDesenho[], porFormato[], clienteAmostra[] — o que a tabela do detalhe mostra
   detalhe        Json?
   erro           String?
-  checadoEm      DateTime @default(now())
+  checadoEm      DateTime  @default(now())
   // BAIXA — obra antiga que a Diretoria não quer mais acompanhar aqui. Vitor (25/08/2026): "dar
   // baixa em algumas OPs que são antigas... registrar isso e tirar elas da seleção".
   //
   // ⚠ NÃO é encerrar a OP: a obra segue viva no resto do portal. É só sumir desta lista, com quem
   // deu baixa e por quê — sem o registro, some do painel e ninguém sabe explicar por quê depois.
-  baixada        Boolean  @default(false)
+  baixada        Boolean   @default(false)
   baixadaEm      DateTime?
   baixadaPorNome String?
   baixaMotivo    String?
@@ -5505,7 +5548,7 @@ model MuralCiencia {
 // versões coexistem na pasta: guardar por número sozinho apagaria a R00 quando a R01 chegasse, e é
 // justamente o histórico de revisão que o procedimento pede.
 model GrdEngenharia {
-  id           String    @id @default(cuid())
+  id              String    @id @default(cuid())
   // ⚠⚠ O NÚMERO VEM DO NOME DO ARQUIVO, não do cabeçalho — e a diferença apareceu nos dados.
   // Sete GRDs da pasta (24, 26, 27, 28, 29, 30, 31) trazem "Nº: 23" impresso: alguém copiou o
   // arquivo da 23 e não trocou o campo. O nome do arquivo é a série real da pasta e é único; o
@@ -5513,24 +5556,24 @@ model GrdEngenharia {
   // a Engenharia corrigir, não motivo para o portal recusar o registro.
   numero          String
   numeroCabecalho String? // o Nº impresso no documento, quando difere do nome do arquivo
-  revisao      Int       @default(0)
-  arquivo      String
-  itemId       String    @unique // id do arquivo no SharePoint
-  data         DateTime?
-  de           String?
-  para         String? // o setor que recebeu (PCP, Produção…)
-  referencia   String? // cliente/obra como a Engenharia escreveu
-  opCodigo     String? // como veio na planilha: "T105B"
-  opNumero     String? // resolvido para o padrão do portal: "105"
-  opId         String?
-  pesoKg       Float?
-  area         String?
-  emitidoPor   String?
-  itens        Json      @default("[]") // [{item, documento, revisao, descricao, finalidade, situacao, copias}]
-  qtdDocs      Int       @default(0)
-  modificadoEm DateTime? // lastModifiedDateTime do arquivo, para detectar alteração
-  importadoEm  DateTime  @default(now())
-  avisadoEm    DateTime? // quando a Engenharia foi avisada desta GRD
+  revisao         Int       @default(0)
+  arquivo         String
+  itemId          String    @unique // id do arquivo no SharePoint
+  data            DateTime?
+  de              String?
+  para            String? // o setor que recebeu (PCP, Produção…)
+  referencia      String? // cliente/obra como a Engenharia escreveu
+  opCodigo        String? // como veio na planilha: "T105B"
+  opNumero        String? // resolvido para o padrão do portal: "105"
+  opId            String?
+  pesoKg          Float?
+  area            String?
+  emitidoPor      String?
+  itens           Json      @default("[]") // [{item, documento, revisao, descricao, finalidade, situacao, copias}]
+  qtdDocs         Int       @default(0)
+  modificadoEm    DateTime? // lastModifiedDateTime do arquivo, para detectar alteração
+  importadoEm     DateTime  @default(now())
+  avisadoEm       DateTime? // quando a Engenharia foi avisada desta GRD
 
   // ─── REMESSA REGISTRADA ─────────────────────────────────────────────────────────────────────
   // Vitor (31/08/2026): "vamos fazer as próximas assinadas; as antigas já foram, agora vamos fazer
@@ -5546,8 +5589,8 @@ model GrdEngenharia {
   remetidoParaNome  String?
   remetidoParaEmail String?
   remetidoEm        DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   // ⚠ SEM UNIQUE em (numero, revisao): ela recusava documento que existe de verdade — os sete
   // arquivos com o mesmo Nº no cabeçalho ficavam de fora da importação sem ninguém saber por quê.
@@ -5595,7 +5638,7 @@ model GrdRemessaPcp {
   recebidoPorEmail String?
   enviadoEm        DateTime?
 
-  createdAt      DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([numero, ano])
   @@index([opNumero])
@@ -5670,7 +5713,7 @@ model FotoObra {
   criadoEm    DateTime @default(now())
   criadoPorId String?
 
-  op          OP?      @relation(fields: [opId], references: [id], onDelete: SetNull)
+  op OP? @relation(fields: [opId], references: [id], onDelete: SetNull)
 
   @@index([opId])
   @@index([criadoEm])

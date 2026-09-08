@@ -532,6 +532,57 @@ async function main() {
   } catch (e) { console.warn("[ensure-mes-tables] RomaneioTerceiro:", e?.message); }
 
   // Verifica quais das duas tabelas existem
+  // ── Conferência de peça (Expedição) — 08/09/2026 ──────────────────────────
+  // A conferência do lote antes da pintura/etiquetagem, feita no celular em campo.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "ConferenciaPeca" (
+      "id"                TEXT         NOT NULL,
+      "opId"              TEXT         NOT NULL,
+      "opNumero"          TEXT         NOT NULL,
+      "status"            TEXT         NOT NULL DEFAULT 'ABERTA',
+      "observacao"        TEXT,
+      "iniciadaEm"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "iniciadaPorId"     TEXT,
+      "iniciadaPorNome"   TEXT,
+      "finalizadaEm"      TIMESTAMP(3),
+      "finalizadaPorNome" TEXT,
+      "atualizadoEm"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ConferenciaPeca_pkey" PRIMARY KEY ("id")
+    )`).catch((e) => console.warn("[ensure-mes-tables] ConferenciaPeca:", e.message));
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "ConferenciaPecaItem" (
+      "id"            TEXT         NOT NULL,
+      "conferenciaId" TEXT         NOT NULL,
+      "marca"         TEXT         NOT NULL,
+      "qte"           INTEGER      NOT NULL,
+      "observacao"    TEXT,
+      "criadoEm"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "criadoPorNome" TEXT,
+      CONSTRAINT "ConferenciaPecaItem_pkey" PRIMARY KEY ("id")
+    )`).catch((e) => console.warn("[ensure-mes-tables] ConferenciaPecaItem:", e.message));
+  for (const c of [
+    `CREATE INDEX IF NOT EXISTS "ConferenciaPeca_opId_idx"            ON "ConferenciaPeca"("opId")`,
+    `CREATE INDEX IF NOT EXISTS "ConferenciaPeca_status_idx"          ON "ConferenciaPeca"("status")`,
+    `CREATE INDEX IF NOT EXISTS "ConferenciaPecaItem_conferenciaId_idx" ON "ConferenciaPecaItem"("conferenciaId")`,
+    `CREATE INDEX IF NOT EXISTS "ConferenciaPecaItem_marca_idx"       ON "ConferenciaPecaItem"("marca")`,
+  ]) await prisma.$executeRawUnsafe(c).catch(() => {});
+  // ⚠ CASCADE de propósito: apagar a conferência apaga os lançamentos dela. Sem isso, cancelar
+  // uma sessão deixaria itens órfãos contando no saldo da obra — que é justamente o número que a
+  // tela usa para barrar o excesso.
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints
+                     WHERE constraint_name = 'ConferenciaPecaItem_conferenciaId_fkey') THEN
+        ALTER TABLE "ConferenciaPecaItem"
+          ADD CONSTRAINT "ConferenciaPecaItem_conferenciaId_fkey"
+          FOREIGN KEY ("conferenciaId") REFERENCES "ConferenciaPeca"("id")
+          ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END$$
+  `).catch((e) => console.warn("[ensure-mes-tables] FK ConferenciaPecaItem:", e.message));
+  console.log("[ensure-mes-tables] OK — Conferência de peça garantida.");
+
   const existentes = await prisma.$queryRawUnsafe(`
     SELECT tablename
     FROM pg_tables

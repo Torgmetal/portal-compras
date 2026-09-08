@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, PackageCheck, Factory, ClipboardList, Tag } from "lucide-react";
+import { FileText, PackageCheck, Factory, ClipboardList, Tag, ClipboardCheck } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -13,6 +13,8 @@ const menu = [
   { href: "/expedicao/terceiros", label: "Terceirizados", icon: Factory },
   // Substitui o BarTender: a etiqueta de 100×50 sai do próprio portal, sem planilha no meio.
   { href: "/expedicao/etiquetas", label: "Etiquetas de Carregamento", icon: Tag },
+  // Conferir o lote contra a L.E. antes da pintura/etiquetagem — feita no celular, no pátio.
+  { href: "/expedicao/conferencia", label: "Conferência de Peça", icon: ClipboardCheck },
 ];
 
 export default function SidebarExpedicao() {

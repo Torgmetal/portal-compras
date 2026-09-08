@@ -1,7 +1,12 @@
 {
-  "build": 2990,
-  "gerado": "2026-09-08T15:15:28.060Z",
+  "build": 2991,
+  "gerado": "2026-09-08T15:16:01.944Z",
   "commits": [
+    {
+      "hash": "a783c7d52a",
+      "data": "08/09/2026",
+      "titulo": "Extrai a regra da L.E. e o lerJson para libs próprias"
+    },
     {
       "hash": "9911f139d2",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "1fe8c5aaad",
       "data": "08/09/2026",
       "titulo": "versao-build"
-    },
-    {
-      "hash": "d38adc78b8",
-      "data": "08/09/2026",
-      "titulo": "Gantt: o corte sem dia aparece em \"sem máquina\", no dia da importação"
     }
   ]
 }
