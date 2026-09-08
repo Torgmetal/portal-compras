@@ -193,7 +193,10 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
       + " · " + r.pecas.toLocaleString("pt-BR")+" peças · "+nkg(r.kg)+" kg"
       + (r.setor==="CORTE" ? "" : " · "+n1(r.custo)+" dias-bancada")
       + " · <b>"+r.feitas.toLocaleString("pt-BR")+" de "+r.pecas.toLocaleString("pt-BR")+" feitas</b>"
-      + " ("+Math.round((r.pecas>0?r.feitas/r.pecas:0)*100)+"%)";
+      + " ("+Math.round((r.pecas>0?r.feitas/r.pecas:0)*100)+"%)"
+      // ⚠ barra trazida para hoje por não ter sido atendida no dia: dizer DE ONDE veio, senão
+      //   trazer para a frente apagaria o atraso em vez de mostrá-lo.
+      + (r.veioDe ? " · <b style='color:#b45309'>vinha de "+dbr(r.veioDe)+"</b>" : "");
     for(const b of raiz.querySelectorAll(".abas button")) b.classList.toggle("on", b.dataset.aba===abaP);
     if(abaP==="projetos") projetos.pintarProjetos(r); else quebra.pintarQuebra(r);
   }

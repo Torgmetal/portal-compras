@@ -73,6 +73,9 @@ export function criarLotes(dep){
       r.semGrd = (r.terceiroPrevisto||r.terceiroRecebido)?0:r.itens.filter(i=>!i.g).length;
       r.mexida = r.lotes.some(l=>l.recurso!==l.recursoOrig || l.dia!==l.diaOrig);
       r.adiado = Math.max(0, ...r.lotes.map(l=>l.adiado||0));
+      // ⚠ de onde a barra veio quando o dia programado venceu sem ser atendido (lib/gantt-pcp.js).
+      //   Sem isto a barra apareceria hoje como se sempre tivesse sido de hoje, e o atraso sumiria.
+      r.veioDe = [...new Set(r.lotes.map(l=>l.veioDe).filter(Boolean))].sort()[0] || null;
     }
     return runs;
   }
