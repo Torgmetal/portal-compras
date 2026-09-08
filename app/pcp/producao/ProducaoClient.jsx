@@ -289,18 +289,39 @@ export default function ProducaoClient() {
   // impressora (plotter A1/A2, comum A3/A4) porque cada formato vai numa bandeja diferente.
   async function imprimirELiberar() {
     if (!marcasSel.length) return;
-    if (marcasSel.length > MAX_LOTE) {
-      setAviso({ ok: false, texto: `Lote máximo de ${MAX_LOTE} marcas por vez (selecionadas: ${marcasSel.length}). Divida em blocos.` });
-      return;
-    }
-    if (!confirm(`Imprimir e liberar ${marcasSel.length} desenho(s) da ${fmtOP(detalhe.opNumero)}?\n\nCada um sai carimbado com a rastreabilidade e a GRD fica registrada. Pode levar alguns minutos.`)) return;
+    /* ⚠⚠ O LOTE SE FATIA SOZINHO — o teto é da máquina, não da pessoa. Vitor (08/09/2026): "ao
+       clicar em imprimir e liberar ele dá o erro das 80 peças, estamos selecionando 260 e ele fala
+       que o limite é 80"; e antes, "se formos fazer isso um por um estamos mortos".
+
+       O teto existe de verdade — baixar, carimbar e juntar dezenas de A1 estoura os 300 s da rota —
+       mas devolvê-lo como recusa passa para quem programa um problema que é do servidor.
+
+       ⚠ Um download POR BLOCO: o ZIP já vem separado por bandeja, e juntar tudo faria esperar os
+       quatro blocos para começar a imprimir o primeiro.
+       ⚠ Se um bloco falhar, PARA e diz qual — seguir deixaria metade das GRDs gravadas sem ninguém
+       saber onde parou. */
+    const blocos = [];
+    for (let i = 0; i < marcasSel.length; i += MAX_LOTE) blocos.push(marcasSel.slice(i, i + MAX_LOTE));
+    const emBlocos = blocos.length > 1 ? ` em ${blocos.length} blocos de até ${MAX_LOTE}` : "";
+    if (!confirm(`Imprimir e liberar ${marcasSel.length} desenho(s) da ${fmtOP(detalhe.opNumero)}${emBlocos}?\n\nCada um sai carimbado com a rastreabilidade e a GRD fica registrada.${blocos.length > 1 ? " Sai um download por bloco." : ""} Pode levar alguns minutos.`)) return;
     setImprimindo(true); setAviso(null);
     try {
-      const r = await fetch("/api/producao/desenhos/lote", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: detalhe.opNumero, marcas: marcasSel, setor: setorAba || null, acao: "IMPRIMIR" }),
-      });
-      const j = await lerJson(r, "Emissão do lote de desenhos");
+      const j = { emitidas: 0, semDesenho: [], arquivos: [] };
+      for (let b = 0; b < blocos.length; b++) {
+        if (blocos.length > 1) setAviso({ ok: true, texto: `Bloco ${b + 1} de ${blocos.length} — gerando os desenhos…` });
+        const r = await fetch("/api/producao/desenhos/lote", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ opNumero: detalhe.opNumero, marcas: blocos[b], setor: setorAba || null, acao: "IMPRIMIR" }),
+        });
+        const parcial = await lerJson(r, `Emissão do lote de desenhos${blocos.length > 1 ? ` (bloco ${b + 1} de ${blocos.length})` : ""}`);
+        j.emitidas += Number(parcial.emitidas) || 0;
+        j.semDesenho.push(...(parcial.semDesenho || []));
+        j.arquivos.push(...(parcial.arquivos || []));
+        if (Number(parcial.emitidas) > 0) {
+          try { await baixarZipLote(parcial, `${detalhe.opNumero}${blocos.length > 1 ? `-bloco${b + 1}de${blocos.length}` : ""}`); }
+          catch (e) { j.erroZip = e?.message || "falhou"; }
+        }
+      }
 
       // ⚠⚠ ZERO EMITIDAS NÃO É SUCESSO — e a mensagem dizia que era.
       // Estava `j.emitidas || marcasSel.length`: com emitidas = 0 (nenhuma marca tem desenho na
@@ -321,8 +342,8 @@ export default function ProducaoClient() {
 
       // ⚠ o erro do ZIP não pode mais sumir: as GRDs JÁ foram gravadas, então dizer só "liberado"
       // sem o arquivo na mão deixa a pessoa procurando um download que não aconteceu.
-      let erroZip = null;
-      try { await baixarZipLote(j, detalhe.opNumero); } catch (e) { erroZip = e?.message || "falhou"; }
+      // (o download acontece bloco a bloco, acima — aqui só se reporta o que falhou)
+      const erroZip = j.erroZip || null;
       setAviso({
         ok: !erroZip,
         texto: `${emitidas} desenho(s) liberado(s)`

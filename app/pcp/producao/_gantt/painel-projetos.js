@@ -243,10 +243,6 @@ export function criarPainelProjetos(dep){
 
   async function imprimir(r, marcas, tipo){
     if(!marcas.length) return;
-    if(marcas.length > dep.MAX_LOTE){
-      dep.avisar(false, "A rota aceita no máximo "+dep.MAX_LOTE+" marcas por vez (são "+marcas.length+"). Use a seleção para dividir em blocos.");
-      return;
-    }
     // conferência primeiro: se algo estiver preso, a pessoa resolve na hora em vez de descobrir depois
     try{
       const conf = await conferirMaterial(r, marcas);
@@ -255,32 +251,56 @@ export function criarPainelProjetos(dep){
     await emitirLote(r, marcas, tipo);
   }
 
+  /* ⚠⚠ O LOTE SE FATIA SOZINHO — o teto é da máquina, não da pessoa. Vitor (08/09/2026), na barra do
+     Gantt: "ao clicar em imprimir e liberar ele dá o erro das 80 peças, estamos selecionando 260 e
+     ele fala que o limite é 80" e, antes, "se formos fazer isso um por um estamos mortos".
+
+     O teto existe de verdade: baixar, carimbar e juntar dezenas de A1 estoura os 300 s da rota.
+     Mas recusar transfere para quem programa um problema que é do servidor — e selecionar 80 de 260
+     na mão, quatro vezes, sem errar quais já foram, é trabalho que ninguém deveria fazer.
+
+     ⚠ UM DOWNLOAD POR BLOCO, de propósito: o ZIP já vem separado por bandeja, e juntar tudo num só
+     faria esperar os quatro blocos para começar a imprimir o primeiro.
+     ⚠ Se um bloco falhar, PARA e diz qual — seguir em frente deixaria metade das GRDs registradas
+     sem ninguém saber onde parou. */
   async function emitirLote(r, marcas, tipo){
     if(!marcas.length) return;
-    if(!confirm("Imprimir "+marcas.length+" desenho(s) da OP-"+r.op+" ("+tipo+")?\n\nCada um sai carimbado com a rastreabilidade e a GRD fica registrada. Pode levar alguns minutos.")) return;
+    const TETO = dep.MAX_LOTE || 80;
+    const blocos = [];
+    for(let i=0; i<marcas.length; i+=TETO) blocos.push(marcas.slice(i, i+TETO));
+    const emBlocos = blocos.length > 1 ? " em "+blocos.length+" blocos de até "+TETO : "";
+    if(!confirm("Imprimir "+marcas.length+" desenho(s) da OP-"+r.op+" ("+tipo+")"+emBlocos+"?\n\nCada um sai carimbado com a rastreabilidade e a GRD fica registrada."
+      + (blocos.length>1 ? " Sai um download por bloco." : "") + " Pode levar alguns minutos.")) return;
     const foot = dep.$("pFoot"); foot.querySelectorAll("button").forEach(b=>b.disabled=true);
+    let emitidas = 0; const semDesenho = []; let erroZip = null;
     try{
-      const bancadaPorMarca = {};
-      if(r.setor!=="CORTE" && r.recurso) for(const m of marcas) bancadaPorMarca[m] = r.recurso;
-      const res = await fetch("/api/producao/desenhos/lote", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ opNumero:r.op, marcas, setor: SETOR_GRD[r.setor], acao:"IMPRIMIR",
-                               ...(Object.keys(bancadaPorMarca).length ? { bancadaPorMarca } : {}) }),
-      });
-      const j = await res.json();
-      if(!res.ok) throw new Error(j.error || "Erro ao emitir o lote");
-      const emitidas = Number(j.emitidas) || 0;
-      const sem = j.semDesenho?.length || 0;
-      const faltantes = sem ? " Sem desenho na pasta da OP: "+j.semDesenho.slice(0,8).join(", ")+(sem>8?" e mais "+(sem-8):"")+"." : "";
+      for(let b=0; b<blocos.length; b++){
+        if(blocos.length>1) dep.avisar(true, "Bloco "+(b+1)+" de "+blocos.length+" — gerando os desenhos…");
+        const bancadaPorMarca = {};
+        if(r.setor!=="CORTE" && r.recurso) for(const m of blocos[b]) bancadaPorMarca[m] = r.recurso;
+        const res = await fetch("/api/producao/desenhos/lote", {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({ opNumero:r.op, marcas: blocos[b], setor: SETOR_GRD[r.setor], acao:"IMPRIMIR",
+                                 ...(Object.keys(bancadaPorMarca).length ? { bancadaPorMarca } : {}) }),
+        });
+        const j = await res.json();
+        if(!res.ok) throw new Error((blocos.length>1 ? "Bloco "+(b+1)+" de "+blocos.length+": " : "")+(j.error || "Erro ao emitir o lote"));
+        emitidas += Number(j.emitidas) || 0;
+        semDesenho.push(...(j.semDesenho || []));
+        if(Number(j.emitidas) > 0){
+          try{ await dep.baixarZip(j, r.op + (blocos.length>1 ? "-bloco"+(b+1)+"de"+blocos.length : ""), r.setor.toLowerCase()); }
+          catch(e){ erroZip = e?.message || "falhou"; }
+        }
+      }
+      const sem = semDesenho.length;
+      const faltantes = sem ? " Sem desenho na pasta da OP: "+semDesenho.slice(0,8).join(", ")+(sem>8?" e mais "+(sem-8):"")+"." : "";
       if(!emitidas){
         dep.avisar(false, "Nenhum desenho foi encontrado para as "+marcas.length+" marca(s), então nada foi impresso nem liberado."+faltantes
           + " Confira se os PDFs estão em 2. Engenharia › 2.5 Projetos › 2.5.2 Fabricação, com o nome começando pela marca.");
         return;
       }
-      let erroZip = null;
-      try{ await dep.baixarZip(j, r.op, r.setor.toLowerCase()); }catch(e){ erroZip = e?.message || "falhou"; }
-      dep.avisar(!erroZip, emitidas+" desenho(s) liberado(s)"
-        + (erroZip ? ", mas o download falhou ("+erroZip+"). A GRD está registrada; abra os arquivos pela pasta da OP."
+      dep.avisar(!erroZip, emitidas+" desenho(s) liberado(s)"+(blocos.length>1 ? " em "+blocos.length+" blocos" : "")
+        + (erroZip ? ", mas um download falhou ("+erroZip+"). A GRD está registrada; abra os arquivos pela pasta da OP."
                    : " e baixado(s) em pastas por impressora.") + faltantes);
       await dep.recarregar();
     }catch(e){ dep.avisar(false, e.message); }
