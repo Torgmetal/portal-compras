@@ -118,7 +118,43 @@ export async function POST(req) {
     (await prisma.pecaConjunto.findMany({ where: { opNumero, naLPC: true }, select: { marca: true } }))
       .map((x) => x.marca),
   );
+  /* ⚠⚠ O QUE A FÁBRICA DECIDIU NÃO PODE MORRER NA REIMPORTAÇÃO. Vitor (08/09/2026): "na OP-97 já
+     descemos alguns projetos e por alguma razão quando a engenharia reimporta as listas dá esse
+     problema e começa tudo novamente".
+
+     A peça recriada nascia com `status: PENDENTE` e nada mais: sem dia programado, sem bancada, sem
+     baixa do portal. As LIBERAÇÕES já eram remapeadas (03 e 04/09) — a peça em si, não. Medido na
+     OP-097: as peças foram recriadas SEIS vezes (quatro blocos em 01/09, dois em 03/09), 571 das
+     789 GRDs têm a peça recriada depois da GRD, e a OP inteira ficou com ZERO dias de corte
+     programados.
+
+     ⚠ Fotografa por MARCA, que é o que sobrevive à reimportação — o id não. E só campos de DECISÃO
+     (dia, posto, baixa, destino) e de PRODUÇÃO; nada do que a lista nova traz (peso, perfil, qte,
+     descrição), senão a revisão da Engenharia não valeria de nada. */
+  const producaoAntes = new Map();
   if (sobrescrever) {
+    for (const x of await prisma.pecaConjunto.findMany({
+      where: { opNumero, naLPC: true },
+      select: {
+        marca: true, status: true, ultimoSetor: true, prioridade: true, ordemCampo: true,
+        statusPrep: true, statusEstoque: true, maquina: true,
+        corteOrdem: true, corteDataMetaInicio: true, corteDataMetaFim: true,
+        corteDiaProgramado: true, corteDiaOriginal: true, corteAdiado: true,
+        corteIniciadoEm: true, corteConcluidoEm: true, qteProduzida: true, pesoProduzido: true, dataProducao: true,
+        montagemDiaProgramado: true, montagemDiaOriginal: true, montagemAdiado: true,
+        montagemProgramadaEm: true, montagemProgramadaPor: true, montagemBancada: true, montagemBancadaEm: true,
+        soldaDiaProgramado: true, soldaBancada: true, soldaBancadaEm: true, soldaBancadaPor: true,
+        acabamentoDiaProgramado: true, acabamentoBancada: true,
+        jatoDiaProgramado: true, jatoBancada: true,
+        pinturaDiaProgramado: true, pinturaBancada: true,
+        baixaSetores: true, encaminhadoSetor: true, encaminhadoEm: true, encaminhadoPor: true,
+        destino: true, destinoEm: true, destinoPor: true, destinoObs: true,
+        terceirizado: true, destinoTerceirizado: true, terceirizadoRecebidoEm: true, terceiroRetornoPrevisto: true,
+      },
+    })) {
+      const { marca, ...resto } = x;
+      producaoAntes.set(marca, resto);
+    }
     const aApagar = await prisma.pecaConjunto.findMany({
       where: { opNumero, naLPC: true, naLE: false },
       select: { id: true, marca: true },
@@ -342,8 +378,25 @@ export async function POST(req) {
   // ⚠ Só mexe em liberação LIBERADA/EM_PRODUCAO: cancelada é histórico e não se reescreve.
   // ⚠ AS NOVAS DA REVISÃO — o que a lista trouxe e ainda não está na fila de ninguém. Só marca de
   // FABRICAÇÃO conta: croqui e avulsa é o que desce para o corte; conjunto entra pela montagem.
+  /* ⚠⚠ DEVOLVE A PRODUÇÃO À PEÇA RECRIADA. Sem isto o dia programado, a bancada e a baixa morriam a
+     cada revisão de lista — e a fábrica recomeçava do zero uma obra que já estava andando.
+
+     ⚠ Só para marca que EXISTIA antes: o que a revisão trouxe é novo e tem de ficar sem programação
+     mesmo, para o Planejamento ver o que falta descer (é o `novasMarcas` logo abaixo).
+     ⚠ Só campos nulos/zerados são preenchidos? NÃO — sobrescreve, porque a peça acabou de nascer em
+     branco. O que a lista nova traz (peso, perfil, qte) não está nesta lista e continua intacto. */
+  let restauradas = 0;
+  if (sobrescrever && producaoAntes.size) {
+    for (const [marca, dados] of producaoAntes) {
+      const id = pieceIds.get(marca);
+      if (!id) continue;                       // marca saiu da lista: nada a restaurar
+      try { await prisma.pecaConjunto.update({ where: { id }, data: dados }); restauradas++; }
+      catch (e) { registro.erro("[importar-lpc] restaurar produção falhou:", marca, e?.message); }
+    }
+  }
+
   const novasMarcas = [...pieceIds.keys()].filter((m) => !marcasAntes.has(m));
-  const remap = { liberacoes: 0, pecas: 0, perdidas: 0, marcasPerdidas: [],
+  const remap = { liberacoes: 0, pecas: 0, perdidas: 0, marcasPerdidas: [], restauradas,
                   novas: novasMarcas.length, amostraNovas: novasMarcas.slice(0, 50) };
   if (sobrescrever && op && marcaDoIdApagado.size) {
     try {

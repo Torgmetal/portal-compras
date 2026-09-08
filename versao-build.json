@@ -1,7 +1,12 @@
 {
-  "build": 2998,
-  "gerado": "2026-09-08T15:47:46.567Z",
+  "build": 2999,
+  "gerado": "2026-09-08T17:17:30.800Z",
   "commits": [
+    {
+      "hash": "0bd33851",
+      "data": "08/09/2026",
+      "titulo": "Qualidade: permitir editar tolerâncias das cotas e respeitar os limites informados"
+    },
     {
       "hash": "04d92c09",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e3635863",
       "data": "08/09/2026",
       "titulo": "Corte: separa por perfil de verdade — a lista não escreve \"chapa\", escreve CH9.50"
-    },
-    {
-      "hash": "72b19237",
-      "data": "08/09/2026",
-      "titulo": "PCP: o aviso da liberação sai quando tudo tem dia, e o resto vai ao histórico"
     }
   ]
 }
