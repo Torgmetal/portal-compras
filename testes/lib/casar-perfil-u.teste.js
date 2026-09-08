@@ -52,3 +52,23 @@ describe('lábio equivalente na seção 200x75 (par nomeado)', () => {
   expect(casarPerfilComOmie('UE200X75X20X3.75', so28)).toBeNull();
  });
 });
+
+describe('U dobrado que se compra como chapa', () => {
+ const chapas = [
+  { codigo: null, descricao: 'CHAPA ACO CARBONO LAMINADO A-36 ESPESSURA 3,00MM' },
+  { codigo: null, descricao: 'CHAPA ACO CARBONO LAMINADO A-36 ESPESSURA 20,00MM' },
+  { codigo: null, descricao: 'CHAPA ACO CARBONO LAMINADO A-36 ESPESSURA 9,50MM' },
+ ];
+ it('lê a espessura na QUARTA medida do enrijecido, não no lábio', () => {
+  // UE150X75X20X3,00: a chapa é a de 3,00 — nunca a de 20, que é o lábio
+  expect(casarPerfilComOmie('UE150X75X20X3.00', chapas)?.descricao)
+   .toBe('CHAPA ACO CARBONO LAMINADO A-36 ESPESSURA 3,00MM');
+ });
+ it('mantém o U simples, onde a espessura é a terceira', () => {
+  expect(casarPerfilComOmie('U200X60X9.5', chapas)?.descricao)
+   .toBe('CHAPA ACO CARBONO LAMINADO A-36 ESPESSURA 9,50MM');
+ });
+ it('não vira chapa quando existe o U comprado pronto', () => {
+  expect(casa('UE200X75X20X3.00')).toBe('PERFIL DOBRADO UDCE 200x75x25x3,00');
+ });
+});
