@@ -337,9 +337,37 @@ conferiu 2" é a peça certa contada duas vezes.
 enxergar, e a segunda descobriria isso na forma de um "já conferiu tudo" que ela não entende. Quem
 chega depois entra na sessão que já existe.
 
+⚠ **O Torguinho não aparece nesta tela.** Ele é `fixed bottom-4 right-4` e no celular fica em cima
+do campo OBSERVAÇÃO, ao lado do botão de lançar (visto na validação em 390×844). Padding não
+resolve — ele flutua sobre a viewport. Está na mesma lista de exceções de `/colaborador` e
+`/meu-rh`, em `components/TorguinhoChat.jsx`.
+
 ⚠ **A validação é no servidor.** A tela mostra o saldo e evita a maioria dos erros, mas lê um
 retrato de alguns segundos atrás. Toda gravação responde com o estado inteiro recalculado — o
 navegador nunca soma saldo sozinho.
+
+### Validar uma tela logado, antes do push
+
+O fluxo obrigatório manda validar no `npm run dev`. Para tela atrás de login isso não é um `curl`:
+o `middleware.js` devolve **307 para /entrar antes de a página compilar**, então o curl só prova
+que o middleware funciona.
+
+```bash
+npm run dev &
+node scripts/validar-tela.mjs <arquivo-de-credenciais> /expedicao/conferencia saida.png --mobile
+```
+
+Ele loga, abre a rota, tira o screenshot e **relata erro de console, exceção de página e resposta
+4xx/5xx de API** — sai com código 1 se achar algo. `--mobile` usa 390×844 (o tamanho em que a
+Conferência de Peça é usada de verdade); `--esperar=<seletor>` espera a tela carregar os dados.
+
+- ⚠ **As credenciais ficam FORA do repositório** — o script recebe o caminho do arquivo por
+  argumento (e-mail na 1ª linha, senha na 2ª). Nada de credencial no git.
+- ⚠ Ele **recusa** apontar para qualquer coisa que não seja `localhost`. É ferramenta de validação
+  local; apontar para o portal no ar transformaria um teste de tela em ação sobre dado real.
+- ⚠ **Chromium sem root no WSL**: as bibliotecas (libnspr4, libnss3, libasound) foram extraídas
+  dos `.deb` para `~/.local/share/torg-playwright/lib`, porque `playwright install-deps` exige apt
+  e senha. O script põe esse diretório no `LD_LIBRARY_PATH` sozinho.
 
 ## Este módulo abre no celular (e é o único)
 

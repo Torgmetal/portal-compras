@@ -1,7 +1,12 @@
 {
-  "build": 3011,
-  "gerado": "2026-09-08T19:25:14.592Z",
+  "build": 3012,
+  "gerado": "2026-09-08T19:25:14.782Z",
   "commits": [
+    {
+      "hash": "ccb48c1cce",
+      "data": "08/09/2026",
+      "titulo": "Torguinho sai da Conferência de Peça — cobria o campo de observação"
+    },
     {
       "hash": "b0958f2772",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "faf3663ca0",
       "data": "08/09/2026",
       "titulo": "Rastreio: a chapa de 5,00 é a de 4,75, e o BRØ é ferro redondo"
-    },
-    {
-      "hash": "9f55a68772",
-      "data": "08/09/2026",
-      "titulo": "Terceiros: importar lista de material enviado com conferência por OP"
     }
   ]
 }
