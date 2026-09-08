@@ -95,8 +95,21 @@ describe("conferência no celular", () => {
     expect(await screen.findByText("faltam 2")).toBeTruthy();
     expect(screen.getByText("completa")).toBeTruthy();
     fireEvent.click(screen.getByText("T97A140"));
-    // escolher a marca já sugere o saldo como quantidade — 2 peças faltando, 2 no campo
-    await waitFor(() => expect(screen.getByDisplayValue("2")).toBeTruthy());
+    await waitFor(() => expect(screen.getByPlaceholderText("Digite parte da marca").value).toBe("T97A140"));
+  });
+
+  // ⚠⚠ Matheus (08/09/2026): "quando eu selecionar a MARCA não deve preencher a quantidade total
+  // automática, deve vir com 1 por padrão". Preencher com o saldo transforma CONTAR em CONFIRMAR:
+  // um toque daria por conferidas 10 peças que ninguém olhou, com o número vindo da própria lista
+  // que a conferência existe para checar.
+  it("escolher a marca NÃO preenche a quantidade — fica 1", async () => {
+    vi.stubGlobal("fetch", servidor());
+    await abrir();
+    fireEvent.focus(screen.getByPlaceholderText("Digite parte da marca"));
+    fireEvent.click(await screen.findByText("T97A140"));   // faltam 2
+    await waitFor(() => expect(screen.getByPlaceholderText("Digite parte da marca").value).toBe("T97A140"));
+    expect(screen.getByDisplayValue("1")).toBeTruthy();
+    expect(screen.queryByDisplayValue("2")).toBeNull();
   });
 
   it("a aba da lista mostra a L.E. com o que falta", async () => {

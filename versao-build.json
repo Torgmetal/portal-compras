@@ -1,7 +1,12 @@
 {
-  "build": 3012,
-  "gerado": "2026-09-08T19:25:14.782Z",
+  "build": 3013,
+  "gerado": "2026-09-08T19:46:02.664Z",
   "commits": [
+    {
+      "hash": "cce56011bc",
+      "data": "08/09/2026",
+      "titulo": "scripts/validar-tela.mjs: validar tela logado antes do push"
+    },
     {
       "hash": "ccb48c1cce",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "921fddbad2",
       "data": "08/09/2026",
       "titulo": "versao-build"
-    },
-    {
-      "hash": "faf3663ca0",
-      "data": "08/09/2026",
-      "titulo": "Rastreio: a chapa de 5,00 é a de 4,75, e o BRØ é ferro redondo"
     }
   ]
 }

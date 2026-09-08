@@ -89,8 +89,13 @@ export function FormLancamento({ marcas, onLancar, salvando, encerrada }) {
 
   return (
     <form onSubmit={enviar} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
+      {/* ⚠⚠ ESCOLHER A MARCA NÃO PREENCHE A QUANTIDADE. Matheus (08/09/2026): "quando eu selecionar a
+          MARCA não deve preencher a quantidade total automática, deve vir com 1 por padrão".
+          Preenchendo com o saldo, a tela transforma CONTAR em CONFIRMAR: um toque dá por conferidas
+          10 peças que ninguém olhou, e o número que sai é o da lista — exatamente o que a
+          conferência existe para checar. O saldo continua à vista no painel abaixo. */}
       <CampoMarca marcas={marcas} valor={marca} onChange={setMarca}
-        onEscolher={(m) => { setMarca(m.marca); setQte(String(Math.max(1, m.saldo || 1))); }} autoFocus />
+        onEscolher={(m) => { setMarca(m.marca); setQte("1"); }} autoFocus />
 
       {escolhida && (
         <div className={`text-[13px] rounded-lg px-3 py-2 ${escolhida.completa
