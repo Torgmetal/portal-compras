@@ -19,7 +19,7 @@ const schema = z.object({
   opNumero: z.string().min(1),
   marcas: z.array(z.string()).min(1),
   setor: z.string().nullable().optional(),
-  acao: z.enum(["EMITIR", "IMPRIMIR", "CONFERIR"]).default("EMITIR"),
+  acao: z.enum(["EMITIR", "IMPRIMIR", "CONFERIR", "REGISTRAR"]).default("EMITIR"),
   // ⚠ marca → bancada de montagem. Faz o lote agrupar (e nomear) por bancada e devolver a `pasta`
   // que o ZIP usa, para o encarregado receber um maço por bancada. Ausente = comportamento antigo.
   bancadaPorMarca: z.record(z.string(), z.string().max(60)).nullable().optional(),
@@ -38,9 +38,9 @@ export async function POST(req) {
     const r = await emitirLoteDesenhos({ ...body, user });
     await prisma.auditLog.create({
       data: {
-        userId: user.id, action: body.acao === "IMPRIMIR" ? "GRD_IMPRIMIR_LOTE" : "EMITIR_LOTE_RASTREADO",
+        userId: user.id, action: body.acao === "IMPRIMIR" ? "GRD_IMPRIMIR_LOTE" : body.acao === "REGISTRAR" ? "GRD_REGISTRAR_SEM_IMPRIMIR" : "EMITIR_LOTE_RASTREADO",
         entity: "GrdLiberacao", entityId: r.op.numero,
-        diff: { op: r.op.numero, setor: body.setor, marcas: body.marcas.length, emitidas: r.emitidas, arquivos: r.arquivos.map((a) => `${a.formato}:${a.paginas}p`), semDesenho: r.semDesenho.length, erros: r.erros.length, grds: r.grds },
+        diff: { op: r.op.numero, setor: body.setor, marcas: body.marcas.length, emitidas: r.emitidas, arquivos: (r.arquivos || []).map((a) => `${a.formato}:${a.paginas}p`), semDesenho: (r.semDesenho || []).length, erros: (r.erros || []).length, grds: r.grds, semImpressao: body.acao === "REGISTRAR" || undefined },
       },
     }).catch(() => {});
     return NextResponse.json(r);

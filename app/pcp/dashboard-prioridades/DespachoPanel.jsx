@@ -31,11 +31,20 @@ const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit
 
 // PROGRAMAÇÃO (Syneco): o programador já lançou a peça na produção? A ordem do Syneco nasce
 // quando ele lança — peça sem ordem nenhuma ainda não foi programada. (Vitor 18/08.)
+/* ⚠⚠ AS PALAVRAS SÃO DO VITOR (08/09/2026): "nos status da programação vai ser Liberado no lugar de
+   programado, Não liberado no caso de ainda não ter enviado para bancada, e Finalizado para os que
+   estiverem prontos". Três palavras, uma linha do tempo: não liberado → liberado → finalizado.
+
+   ⚠ "INICIADA" VIRA DUAS COISAS, e por isso não é tradução direta. A ordem do Syneco "iniciada"
+   cobre tanto a peça produzindo quanto a já pronta — chamar as duas de "finalizado" diria que
+   acabou trabalho que está na bancada agora. Quem decide é a contagem: feito ≥ qtd é finalizado,
+   o resto é liberado. */
 const PROG = {
-  INICIADA: { txt: "iniciada", cls: "bg-emerald-50 text-emerald-700", dica: "A ordem deste setor já rodou no Syneco (produzindo ou finalizada)." },
-  PROGRAMADA: { txt: "programada", cls: "bg-sky-50 text-sky-700", dica: "O programador já lançou a peça na produção (ordem aberta no Syneco), ainda não iniciada." },
-  OUTRO_SETOR: { txt: "lançada", cls: "bg-slate-100 text-slate-600", dica: "O programador lançou a peça na produção, mas o Syneco não tem ordem deste setor pra ela." },
-  NAO_LANCADA: { txt: "não lançada", cls: "bg-red-50 text-red-700", dica: "O programador ainda NÃO lançou esta peça na produção (sem ordem no Syneco)." },
+  INICIADA: { txt: "liberado", cls: "bg-sky-50 text-sky-700", dica: "A ordem deste setor já rodou no Syneco — a peça está em produção." },
+  FINALIZADA: { txt: "finalizado", cls: "bg-emerald-50 text-emerald-700", dica: "Toda a quantidade desta marca já saiu neste setor." },
+  PROGRAMADA: { txt: "liberado", cls: "bg-sky-50 text-sky-700", dica: "O programador já lançou a peça na produção (ordem aberta no Syneco)." },
+  OUTRO_SETOR: { txt: "liberado", cls: "bg-slate-100 text-slate-600", dica: "O programador lançou a peça na produção, mas o Syneco não tem ordem deste setor pra ela." },
+  NAO_LANCADA: { txt: "não liberado", cls: "bg-red-50 text-red-700", dica: "Ainda não foi enviada para a bancada (sem ordem no Syneco)." },
 };
 // "Programada" pro filtro = o programador LANÇOU a peça (existe ordem no Syneco), mesmo que a
 // ordem deste setor específico não exista. A coluna mostra o detalhe.
@@ -64,7 +73,16 @@ const textoMaterial = (p) => {
   if (!p.perfil) return "";
   return p.material?.material || "sem material";
 };
-const textoProg = (p) => (p.programacao ? PROG[p.programacao.situacao]?.txt || "" : "");
+/** Terminou tudo neste setor? Mesma conta do `feitoQtd` do painel: o maior entre a baixa do portal
+ *  e o produzido no Syneco, contra a quantidade da marca. */
+const prontaNoSetor = (p) =>
+  p?.programacao?.situacao === "INICIADA"
+  && Math.max(p.baixadoQtd || 0, p.produzidoSyneco || 0) >= (p.qte || 1);
+
+const textoProg = (p) => {
+  if (!p.programacao) return "";
+  return (prontaNoSetor(p) ? PROG.FINALIZADA : PROG[p.programacao.situacao])?.txt || "";
+};
 // Corrida em branco no CMR é informação, não vazio — o Vitor quer ver pra ir conferir.
 const textoCorrida = (p) => (!p.perfil || !p.material ? "" : p.material.corrida || "sem corrida no CMR");
 
@@ -366,7 +384,10 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     if (!alvo.length) return alert("Selecione as peças para emitir os desenhos.");
     const marcas = [...new Set(alvo.map((p) => p.marca))];
     if (marcas.length > 80) return alert(`Lote máximo de 80 marcas por vez (selecionadas: ${marcas.length}). Divida em blocos.`);
-    if (!confirm(`${acao === "IMPRIMIR" ? "Imprimir (GRD)" : "Emitir"} ${marcas.length} desenho(s) carimbado(s)?\n\nSai um PDF por formato. Pode levar alguns minutos.`)) return;
+    const pergunta = acao === "REGISTRAR"
+      ? `Registrar a GRD de ${marcas.length} marca(s) SEM imprimir?\n\nNenhum desenho é gerado. A data de cada uma é a do primeiro apontamento no Syneco.`
+      : `${acao === "IMPRIMIR" ? "Imprimir (GRD)" : "Emitir"} ${marcas.length} desenho(s) carimbado(s)?\n\nSai um PDF por formato. Pode levar alguns minutos.`;
+    if (!confirm(pergunta)) return;
     setEnviando(true); setLote({ carregando: true });
     try {
       const r = await fetch("/api/producao/desenhos/lote", {
@@ -376,9 +397,14 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao emitir o lote");
       setLote(j);
-      // baixa tudo de uma vez, em pastas por impressora — abrir uma aba por arquivo era bloqueado
-      // pelo navegador e ainda deixava a pessoa imprimindo um por um. (Vitor 19/08.)
-      baixarZipLote(j, data.opNumero).catch(() => {});
+      // ⚠ REGISTRAR não gera arquivo: baixar um ZIP vazio abriria um download que não serve.
+      if (acao !== "REGISTRAR") {
+        // baixa tudo de uma vez, em pastas por impressora — abrir uma aba por arquivo era bloqueado
+        // pelo navegador e ainda deixava a pessoa imprimindo um por um. (Vitor 19/08.)
+        baixarZipLote(j, data.opNumero).catch(() => {});
+      }
+      // ⚠ a GRD registrada muda a coluna da tela: recarrega para a pessoa ver o efeito
+      if (acao === "REGISTRAR") carregar();
     } catch (e) { setLote(null); alert(e.message); } finally { setEnviando(false); }
   }
 
@@ -665,7 +691,10 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                       <td className={`${td} text-center`}>
                         {(() => {
                           const g = p.programacao;
-                          const e = PROG[g?.situacao] || PROG.NAO_LANCADA;
+                          /* ⚠ "iniciada" no Syneco cobre produzindo E pronta — quem separa as duas é a
+                             contagem da própria peça, senão a tela chamaria de finalizado o que está
+                             na bancada agora. */
+                          const e = (prontaNoSetor(p) ? PROG.FINALIZADA : PROG[g?.situacao]) || PROG.NAO_LANCADA;
                           const rota = g?.setores?.length ? `\nRota no Syneco: ${g.setores.join(" · ")}` : "";
                           const qtdRuim = g?.qtdOk === false;
                           const dica = `${e.dica}${rota}${g?.planejadoUn ? `\nPlanejado: ${fmtN(g.planejadoUn)} un` : ""}${qtdRuim ? `\n⚠ O Syneco planejou ${fmtN(g.planejadoUn)} un e a LPC pede ${fmtN(g.qtdLpc)} un.` : ""}\n\nClique para ver as ordens do Syneco.`;
@@ -760,6 +789,16 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                 <button onClick={() => emitirLote("IMPRIMIR")} disabled={!sel.size || enviando}
                   title="O mesmo, e REGISTRA A GRD de cada marca (liberação pro setor)"
                   className="text-[11px] font-semibold text-white bg-torg-blue hover:bg-torg-blue/90 rounded-lg px-2.5 py-2 inline-flex items-center gap-1 disabled:opacity-40"><Printer size={12} /> Imprimir lote (GRD)</button>
+                {/* ⚠⚠ GRD SEM IMPRIMIR. Vitor (08/09/2026), na 105 com o corte já apontando: "nesse
+                    caso específico que já temos apontamentos acontecendo, queria um botão apenas
+                    para gerar o controle de GRD correto, sem precisar imprimir novamente". O
+                    desenho já está na bancada; reimprimir só para criar a GRD produz papel para o
+                    lixo e um registro com data errada.
+                    ⚠ A data gravada é a do PRIMEIRO APONTAMENTO da marca, não a de hoje — regra da
+                    casa para GRD emitida fora do portal. E fica registrado que não houve impressão. */}
+                <button type="button" disabled={enviando || !sel.size} onClick={() => emitirLote("REGISTRAR")}
+                  title="Registra a GRD das marcas selecionadas SEM gerar desenho — para peça que já está apontando. A data é a do primeiro apontamento."
+                  className="text-[11px] font-semibold text-torg-blue border border-torg-blue/40 hover:bg-torg-blue/5 rounded-lg px-2.5 py-2 inline-flex items-center gap-1 disabled:opacity-40">Só registrar GRD</button>
               </span>
               <span className="w-px h-6 bg-gray-200 mx-1" />
               <button onClick={tirarPrioridade} disabled={!sel.size || enviando} title="Tira a marcação de prioridade das selecionadas (marcou errado)"
