@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, Check, Loader2, Printer, Search, Tag } from "lucide-react";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
+import { lerJson } from "@/lib/ler-json";
 
 // ETIQUETAS DE CARREGAMENTO — a aba que substitui o BarTender.
 //
@@ -14,17 +15,6 @@ import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 //
 // ⚠ O PDF ABRE EM ABA NOVA em vez de baixar: quem imprime etiqueta imprime de novo em seguida
 // (faltou uma, descolou, borrou), e reaproveitar a aba aberta é um clique em vez de quatro.
-
-/** Ler a resposta como TEXTO antes de interpretar — erro sem corpo JSON não pode virar mensagem de parser. */
-async function lerJson(r, oQue) {
-  const bruto = await r.text().catch(() => "");
-  if (!bruto.trim()) throw new Error(`${oQue}: o servidor respondeu ${r.status} sem conteúdo.`);
-  let j;
-  try { j = JSON.parse(bruto); }
-  catch { throw new Error(`${oQue}: resposta ${r.status} não é JSON — "${bruto.slice(0, 100)}"`); }
-  if (!r.ok) throw new Error(j.error || `${oQue}: erro ${r.status}`);
-  return j;
-}
 
 /** "05/09 14:20" — dia e hora bastam; o ano não ajuda a decidir se reimprime. */
 const quando = (iso) => {

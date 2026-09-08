@@ -1,7 +1,12 @@
 {
-  "build": 2989,
-  "gerado": "2026-09-08T14:50:02.515Z",
+  "build": 2990,
+  "gerado": "2026-09-08T15:15:28.060Z",
   "commits": [
+    {
+      "hash": "9911f139d2",
+      "data": "08/09/2026",
+      "titulo": "CLAUDE.md: tira a linha duplicada de \"instale o hook\""
+    },
     {
       "hash": "7c381275c4",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "d38adc78b8",
       "data": "08/09/2026",
       "titulo": "Gantt: o corte sem dia aparece em \"sem máquina\", no dia da importação"
-    },
-    {
-      "hash": "656206a303",
-      "data": "08/09/2026",
-      "titulo": "feat(excel): publicar refinamento das planilhas e preservar estruturas externas"
     }
   ]
 }
