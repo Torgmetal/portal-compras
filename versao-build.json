@@ -1,7 +1,12 @@
 {
-  "build": 2994,
-  "gerado": "2026-09-08T15:21:44.918Z",
+  "build": 2995,
+  "gerado": "2026-09-08T15:21:45.234Z",
   "commits": [
+    {
+      "hash": "8a9940ba",
+      "data": "08/09/2026",
+      "titulo": "PCP: o aviso mostra o que falta agendar, e enxerga liberação órfã"
+    },
     {
       "hash": "e03488b3",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "0b4ebf32",
       "data": "08/09/2026",
       "titulo": "Gantt: botão Baixa Syneco, saldo sem agrupar e bancada com nome de gente"
-    },
-    {
-      "hash": "226519b3",
-      "data": "08/09/2026",
-      "titulo": "Planejamento libera peças sem data e informa OP e setor no PCP"
     }
   ]
 }
