@@ -1,7 +1,12 @@
 {
-  "build": 2962,
-  "gerado": "2026-09-08T11:48:26.871Z",
+  "build": 2963,
+  "gerado": "2026-09-08T11:56:16.439Z",
   "commits": [
+    {
+      "hash": "73026e7e",
+      "data": "08/09/2026",
+      "titulo": "Gantt: o saldo do que não saiu vem para hoje, na mesma bancada"
+    },
     {
       "hash": "1fe8c5aa",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "06ed7e2e",
       "data": "07/09/2026",
       "titulo": "Jato e pintura: a fila passa a mostrar o m² das peças"
-    },
-    {
-      "hash": "993b060f",
-      "data": "07/09/2026",
-      "titulo": "Excel: o cabeçalho Torg passa a valer para qualquer folha, não só a primeira"
     }
   ]
 }

@@ -196,7 +196,9 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
       + " ("+Math.round((r.pecas>0?r.feitas/r.pecas:0)*100)+"%)"
       // ⚠ barra trazida para hoje por não ter sido atendida no dia: dizer DE ONDE veio, senão
       //   trazer para a frente apagaria o atraso em vez de mostrá-lo.
-      + (r.veioDe ? " · <b style='color:#b45309'>vinha de "+dbr(r.veioDe)+"</b>" : "");
+      + (r.veioDe ? " · <b style='color:#b45309'>vinha de "+dbr(r.veioDe)+"</b>" : "")
+      // ⚠ nunca foi programada: o que se mostra é a IDADE da espera, não um prazo perdido.
+      + (r.desde ? " · <b style='color:#b45309'>esperando desde "+dbr(r.desde)+"</b>" : "");
     for(const b of raiz.querySelectorAll(".abas button")) b.classList.toggle("on", b.dataset.aba===abaP);
     if(abaP==="projetos") projetos.pintarProjetos(r); else quebra.pintarQuebra(r);
   }

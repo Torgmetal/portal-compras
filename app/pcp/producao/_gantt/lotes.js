@@ -76,6 +76,8 @@ export function criarLotes(dep){
       // ⚠ de onde a barra veio quando o dia programado venceu sem ser atendido (lib/gantt-pcp.js).
       //   Sem isto a barra apareceria hoje como se sempre tivesse sido de hoje, e o atraso sumiria.
       r.veioDe = [...new Set(r.lotes.map(l=>l.veioDe).filter(Boolean))].sort()[0] || null;
+      // ⚠ peça que nunca foi programada: a data é a da ENTRADA dela, não um prazo perdido.
+      r.desde = [...new Set(r.lotes.map(l=>l.desde).filter(Boolean))].sort()[0] || null;
     }
     return runs;
   }
