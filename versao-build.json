@@ -1,7 +1,12 @@
 {
-  "build": 2955,
-  "gerado": "2026-09-08T01:27:02.569Z",
+  "build": 2956,
+  "gerado": "2026-09-08T01:39:03.386Z",
   "commits": [
+    {
+      "hash": "46297351",
+      "data": "07/09/2026",
+      "titulo": "refactor(planejamento): organizar controles e acoes do cronograma"
+    },
     {
       "hash": "58bc140e",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "4458ece1",
       "data": "07/09/2026",
       "titulo": "Substitui cartões de setor do PCP por seletor compacto"
-    },
-    {
-      "hash": "669e2361",
-      "data": "07/09/2026",
-      "titulo": "Simplifica retorno de terceiros com destino geral e exceções por marca"
     }
   ]
 }
