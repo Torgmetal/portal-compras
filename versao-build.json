@@ -1,7 +1,12 @@
 {
-  "build": 2960,
-  "gerado": "2026-09-08T11:35:16.659Z",
+  "build": 2961,
+  "gerado": "2026-09-08T11:36:04.074Z",
   "commits": [
+    {
+      "hash": "d38adc78",
+      "data": "08/09/2026",
+      "titulo": "Gantt: o corte sem dia aparece em \"sem máquina\", no dia da importação"
+    },
     {
       "hash": "656206a3",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "82951f32",
       "data": "07/09/2026",
       "titulo": "Inativa Programação no PCP e redireciona acessos antigos para Produção"
-    },
-    {
-      "hash": "02b8bc5e",
-      "data": "07/09/2026",
-      "titulo": "Gantt: a barra da pintura gera o caderno de três folhas da OP"
     }
   ]
 }
