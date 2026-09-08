@@ -78,10 +78,15 @@ export function criarPainelProjetos(dep){
        o pintor), sempre da OP do lote clicado, nunca de um consolidado. */
     const btnPint = r.setor === "PINTURA"
       ? '<button class="btn" id="gp-xlsPint">Caderno de pintura (Excel)</button>' : "";
+    /* ⚠⚠ BAIXA SYNECO — ideia do Vitor (08/09/2026): "criar um botão ao lado do reimprimir, Baixa
+       Syneco: será exportada uma planilha para poder dar baixa no Syneco das marcas selecionadas".
+       O portal não baixa nada: quem lança é a pessoa, no Syneco, e o número volta pelo sync. Assim
+       o quadro, o cronograma e o portal do cliente continuam falando o mesmo número. */
+    const btnBaixa = '<button class="btn" id="gp-xlsBaixa"'+(sel.size?"":" disabled")+'>Baixa Syneco</button>';
     dep.$("pFoot").innerHTML = grd
       ? '<div class="info">'+(sel.size ? sel.size+" marca(s) selecionada(s)" : "Nada selecionado — os botões usam a lista acima")+'</div>'
         + '<button class="btn pri" id="gp-impFalta"'+(semG?"":" disabled")+'>Imprimir as '+semG+' sem GRD</button>'
-        + '<button class="btn" id="gp-impSel"'+(sel.size?"":" disabled")+'>Reimprimir selecionados</button>' + btnPint
+        + '<button class="btn" id="gp-impSel"'+(sel.size?"":" disabled")+'>Reimprimir selecionados</button>' + btnBaixa + btnPint
       : '<div class="info">'+(sel.size ? sel.size+" marca(s) selecionada(s)" : "Sem GRD neste setor — o desenho desce até a montagem")+'</div>' + btnPint;
 
     /* ⚠ o filtro só existe quando há GRD; sem a guarda, `$("fSemGrd")` volta null e o painel
@@ -100,6 +105,14 @@ export function criarPainelProjetos(dep){
       try{ await dep.baixarPintura(r.op, r.itens.map(i=>i.id).filter(Boolean)); }
       catch(e){ dep.avisar(e?.message || "Falha ao gerar o caderno de pintura", "erro"); }
       finally{ bp.disabled = false; bp.textContent = antes; }
+    };
+    const bb = dep.$("xlsBaixa");
+    if(bb) bb.onclick = async ()=>{
+      bb.disabled = true; const antes = bb.textContent; bb.textContent = "Gerando…";
+      // ⚠ manda as MARCAS selecionadas, resolvidas para os ids das peças do lote clicado
+      try{ await dep.baixarBaixaSyneco(r.op, r.setor, r.itens.filter(i=>sel.has(i.m)).map(i=>i.id).filter(Boolean)); }
+      catch(e){ dep.avisar(e?.message || "Falha ao gerar a planilha de baixa", "erro"); }
+      finally{ bb.disabled = false; bb.textContent = antes; }
     };
     const im = dep.$("impFalta");
     if(im) im.onclick = ()=>imprimir(r, itens.filter(i=>!i.g).map(i=>i.m), "primeira impressão");

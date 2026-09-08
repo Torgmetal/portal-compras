@@ -18,8 +18,19 @@ export const RECURSOS = {
     { k:"LASER_CANTONEIRA", nome:"Laser Cantoneira", cap:1065 },
     { k:"CORTE_MANUAL", nome:"Corte Manual", cap:419 },
   ],
+  /* ⚠⚠ A BANCADA DA MONTAGEM TEM NOME DE GENTE. Vitor (08/09/2026): "nas bancadas da montagem vamos
+     colocar os nomes dos operários: Jurandir, Adenilson, Vando, Rodrigo". Quem programa fala em
+     pessoa, não em número — e o quadro é lido por quem distribui o trabalho.
+
+     ⚠ A CHAVE NÃO MUDA. "MONTAGEM 1" está gravado em `PecaConjunto.montagemBancada` (59 peças na 1,
+     55 na 2, 2 na 3 em 08/09/2026) e é o que lib/montagem-capacidade.js conhece. Trocar a chave
+     apagaria a atribuição de todas elas. Muda só o RÓTULO.
+
+     ⚠ São CINCO bancadas e vieram QUATRO nomes: a quinta segue "Montagem 5" até alguém dizer de
+     quem é. Inventar um nome ali seria pôr no quadro uma pessoa que não foi citada. */
   MONTAGEM: [{ k:null, nome:"sem bancada", obs:"atribuir bancada" },
-    ...["MONTAGEM 1","MONTAGEM 2","MONTAGEM 3","MONTAGEM 4","MONTAGEM 5"].map(n=>({k:n,nome:n,cap:1}))],
+    ...[["MONTAGEM 1","Jurandir"],["MONTAGEM 2","Adenilson"],["MONTAGEM 3","Vando"],
+        ["MONTAGEM 4","Rodrigo"],["MONTAGEM 5","Montagem 5"]].map(([k,nome])=>({k,nome,cap:1}))],
   SOLDA: [{ k:null, nome:"sem bancada", obs:"atribuir bancada" },
     ...["SOLDA 1","SOLDA 2","SOLDA 4","SOLDA 5","SOLDA 6","SOLDA 7"].map(n=>({k:n,nome:n,cap:1}))],
   // ⚠⚠ ACABAMENTO TEM UMA BANCADA SÓ, e é isso que o faz caber no quadro sem conceito novo. Vitor

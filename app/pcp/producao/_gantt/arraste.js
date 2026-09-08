@@ -106,7 +106,7 @@ export function criarArraste(dep){
       antes, novos,
     });
     if(dep.getPainel() && dep.getPainel().setor===r.setor && dep.getPainel().op===r.op && dep.getPainel().ini===r.ini)
-      dep.setPainel({ setor:r.setor, recurso:a.recurso, op:r.op, ini:r.ini+delta });
+      dep.setPainel({ setor:r.setor, recurso:a.recurso, op:r.op, ini:r.ini+delta, origem:r.origem||"" });
     dep.redesenhar();
   }
 

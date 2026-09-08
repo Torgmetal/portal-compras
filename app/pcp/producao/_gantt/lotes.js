@@ -40,13 +40,21 @@ export function criarLotes(dep){
     const grupos = new Map();
     for(const l of dep.getLotes()){
       if(!dep.getSetoresOn().has(l.setor)) continue;
-      const k = l.setor+"|"+(l.recurso||"—")+"|"+l.op+"|"+((l.terceiroPrevisto||l.terceiroRecebido)?l.id:"");
+      /* ⚠⚠ SALDO NÃO SE AGRUPA. Vitor (08/09/2026): "quando movermos uma barra de peças pendentes,
+         deixar na bancada que faltou produzir, mas não permitir agrupar — apenas deixar listado uma
+         embaixo da outra". Sem a ORIGEM na chave, tudo que a mesma OP deixou de fazer em dias
+         diferentes reaparecia hoje como UMA barra só: quatro atrasos viravam um número, e o de
+         junho ficava indistinguível do de ontem. Cada saldo é um fato com a sua data. */
+      const origem = l.veioDe || l.desde || "";
+      const k = l.setor+"|"+(l.recurso||"—")+"|"+l.op+"|"+origem+"|"+((l.terceiroPrevisto||l.terceiroRecebido)?l.id:"");
       if(!grupos.has(k)) grupos.set(k,[]);
       grupos.get(k).push(l);
     }
     const runs=[];
     for(const arr of grupos.values()){
       arr.sort((a,b)=>a.dia.localeCompare(b.dia));
+      // a origem é a mesma do grupo inteiro (ela entra na chave) — o primeiro lote basta
+      const origem = arr[0]?.veioDe || arr[0]?.desde || "";
       let atual=null;
       for(const l of arr){
         const i = dep.IDX.get(l.dia); if(i==null) continue;
@@ -56,11 +64,11 @@ export function criarLotes(dep){
         // raciocínio errado — uma barra por cima do sábado PARECE trabalho no sábado, e num
         // quadro de produção o desenho é a informação.
         if(atual && i === atual.fim+1){ atual.fim=i; atual.lotes.push(l); }
-        else { atual={ setor:l.setor, recurso:l.recurso, op:l.op, obra:l.obra, terceiroPrevisto:l.terceiroPrevisto, terceiroRecebido:l.terceiroRecebido, ini:i, fim:i, lotes:[l] }; runs.push(atual); }
+        else { atual={ setor:l.setor, recurso:l.recurso, op:l.op, obra:l.obra, origem, terceiroPrevisto:l.terceiroPrevisto, terceiroRecebido:l.terceiroRecebido, ini:i, fim:i, lotes:[l] }; runs.push(atual); }
       }
     }
     for(const r of runs){
-      r.id = r.setor+"|"+(r.recurso||"—")+"|"+r.op+"|"+r.ini+((r.terceiroPrevisto||r.terceiroRecebido)?"|"+r.lotes[0].id:"");
+      r.id = r.setor+"|"+(r.recurso||"—")+"|"+r.op+"|"+r.ini+"|"+(r.origem||"")+((r.terceiroPrevisto||r.terceiroRecebido)?"|"+r.lotes[0].id:"");
       // dias TRABALHADOS, não colunas ocupadas: uma barra que atravessa o fim de
       // semana cobre 4 colunas e trabalha 2 dias. Contar coluna diria "4 dias" e
       // ainda entraria como padrão na quebra.
@@ -81,8 +89,11 @@ export function criarLotes(dep){
     }
     return runs;
   }
+  // ⚠ a ORIGEM entra no casamento: no mesmo posto e dia agora existe mais de uma barra da mesma OP
+  //   (um saldo por data), e sem ela o painel abriria sempre a primeira.
   const acharRun = (chave)=> chave ? montarRuns().find(r=>r.setor===chave.setor && r.recurso===chave.recurso
-      && r.op===chave.op && r.ini===chave.ini) : null;
+      && r.op===chave.op && r.ini===chave.ini
+      && (chave.origem === undefined || (r.origem||"") === (chave.origem||""))) : null;
 
   /* ── carga por célula ───────────────────────────────────────────────────────── */
   function carga(setor, recurso, dia, ignorarUids){

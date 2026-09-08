@@ -1,7 +1,12 @@
 {
-  "build": 2964,
-  "gerado": "2026-09-08T12:05:19.373Z",
+  "build": 2965,
+  "gerado": "2026-09-08T12:10:29.341Z",
   "commits": [
+    {
+      "hash": "226519b3",
+      "data": "08/09/2026",
+      "titulo": "Planejamento libera peças sem data e informa OP e setor no PCP"
+    },
     {
       "hash": "d2539b11",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "33386ba4",
       "data": "07/09/2026",
       "titulo": "Folha do pintor: três linhas por demão, e mais nenhuma"
-    },
-    {
-      "hash": "05479d3e",
-      "data": "07/09/2026",
-      "titulo": "Relatório de produção: avanço real por setor e Excel geral das OPs abertas"
     }
   ]
 }
