@@ -1,7 +1,12 @@
 {
-  "build": 2953,
-  "gerado": "2026-09-08T00:45:33.868Z",
+  "build": 2954,
+  "gerado": "2026-09-08T00:58:22.006Z",
   "commits": [
+    {
+      "hash": "a03adf7c",
+      "data": "07/09/2026",
+      "titulo": "refactor(planejamento): simplificar lista e criacao de cronogramas"
+    },
     {
       "hash": "16780d69",
       "data": "07/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5acfa4ac",
       "data": "07/09/2026",
       "titulo": "Recebimento: a validade do lote passa a ser pedida quando o material é tinta"
-    },
-    {
-      "hash": "228bb38b",
-      "data": "07/09/2026",
-      "titulo": "PLP: o sólidos por volume passa a viajar com a demão, e a tinta vira litro"
     }
   ]
 }
