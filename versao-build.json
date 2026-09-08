@@ -1,7 +1,12 @@
 {
-  "build": 2999,
-  "gerado": "2026-09-08T17:17:30.800Z",
+  "build": 3000,
+  "gerado": "2026-09-08T17:18:13.354Z",
   "commits": [
+    {
+      "hash": "13d7d533",
+      "data": "08/09/2026",
+      "titulo": "Import da LPC: a reimportação para de zerar a produção da obra"
+    },
     {
       "hash": "0bd33851",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "64611b15",
       "data": "08/09/2026",
       "titulo": "Corte: cada família vira sua barra na raia sem máquina"
-    },
-    {
-      "hash": "e3635863",
-      "data": "08/09/2026",
-      "titulo": "Corte: separa por perfil de verdade — a lista não escreve \"chapa\", escreve CH9.50"
     }
   ]
 }
