@@ -263,6 +263,10 @@ etiqueta é o `public/torg-logo-etiqueta.png` (chapado e horizontal), e não o `
 do portal, que é vertical e tem gradiente azul. Ele foi gerado a partir do
 `public/torg-logo.svg` recortado em duas partes e recolorido.
 
+⚠ **A contagem sai sem zero à esquerda** ("3/3", "300/300"). O "001/1" da etiqueta antiga era
+limitação do BarTender, que importava a planilha com o campo de largura fixa — aqui o número vem
+do banco a cada etiqueta e a largura se ajusta sozinha.
+
 ⚠ **Não existe importação de planilha, de propósito.** Marca, descrição, quantidade e peso
 vivem em `PecaConjunto`; a planilha só existia porque o BarTender não enxerga o banco.
 Tirar esse pulo tira junto a chance de imprimir com dado velho.

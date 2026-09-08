@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { gerarEtiquetasCarregamentoPDF, ajustarTexto, numeroDaEtiqueta, GRADE, MM } from "@/lib/etiqueta-carregamento-pdf";
+import { gerarEtiquetasCarregamentoPDF, ajustarTexto, numeroDaEtiqueta, contagemDaEtiqueta, GRADE, MM } from "@/lib/etiqueta-carregamento-pdf";
 
 // ⚠ POR QUE ESTE TESTE EXISTE, E NÃO UMA OLHADA NA TELA.
 //
@@ -72,6 +72,24 @@ describe("numeroDaEtiqueta — o T é convenção da etiqueta, não do banco", (
   it("vazio não vira um T sozinho", () => {
     expect(numeroDaEtiqueta("")).toBe("—");
     expect(numeroDaEtiqueta(null)).toBe("—");
+  });
+});
+
+describe("contagemDaEtiqueta — sem zero à esquerda", () => {
+  // ⚠ Matheus (08/09/2026): "remova esses 0 à esquerda". O "001/1" era exigência do BarTender,
+  // que importava a planilha com o campo de largura fixa.
+  it.each([
+    [1, 1, "1/1"],
+    [3, 3, "3/3"],
+    [7, 12, "7/12"],
+    [300, 300, "300/300"],
+    [1, 1000, "1/1000"],
+  ])("%s de %s vira %s", (i, n, esperado) => {
+    expect(contagemDaEtiqueta(i, n)).toBe(esperado);
+  });
+
+  it("nenhum resultado começa com zero", () => {
+    for (let i = 1; i <= 20; i++) expect(contagemDaEtiqueta(i, 20).startsWith("0")).toBe(false);
   });
 });
 
