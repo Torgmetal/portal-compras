@@ -49,20 +49,37 @@ async function impressoes(pecaIds) {
   return new Map(por.map((r) => [r.entityId, { em: r._max.createdAt, vezes: r._count._all }]));
 }
 
+/**
+ * O histórico de uma marca, somando TODAS as linhas dela.
+ *
+ * ⚠ A mesma marca tem até três linhas de `PecaConjunto` na mesma obra (ver `linhaQueVale` em
+ * `lib/itens-expedicao.js`). A impressão foi gravada contra a linha que estava na tela naquele dia
+ * — olhar só a linha escolhida hoje faria a coluna dizer "nunca impressa" para etiqueta que saiu.
+ */
+function historicoDaPeca(hist, ids) {
+  let em = null, vezes = 0;
+  for (const id of ids) {
+    const h = hist.get(id);
+    if (!h) continue;
+    vezes += h.vezes;
+    if (!em || (h.em && h.em > em)) em = h.em;
+  }
+  return { em, vezes };
+}
+
 async function carregar(opId) {
   // ⚠ SÓ O QUE ESTÁ NA LE — a regra e o porquê moram em `lib/itens-expedicao.js`, que é a mesma
   // fonte usada pela Conferência de Peça. Etiquetar posição é colar adesivo em peça que vai ser
   // soldada dentro de outra.
   const dados = await itensExpediveisDaOP(prisma, opId, { campos: { pesoUnitKg: true, status: true } });
   if (!dados) return null;
-  const hist = await impressoes(dados.pecas.map((p) => p.id));
+  const hist = await impressoes(dados.pecas.flatMap((p) => p.ids));
   return {
     op: dados.op,
-    pecas: dados.pecas.map((p) => ({
-      ...p,
-      impressaEm: hist.get(p.id)?.em ?? null,
-      impressoes: hist.get(p.id)?.vezes ?? 0,
-    })),
+    pecas: dados.pecas.map(({ ids, ...p }) => {
+      const h = historicoDaPeca(hist, ids);
+      return { ...p, impressaEm: h.em, impressoes: h.vezes };
+    }),
   };
 }
 

@@ -84,6 +84,125 @@ describe("a lista de marcas é a Lista de Expedição", () => {
   });
 });
 
+// ⚠⚠ Matheus (08/09/2026): "verifique o porquê está repetindo a mesma marca várias vezes na lista,
+// não faz sentido isso". Não é dado sujo: o `@@unique([opNumero, marca])` deixa a MESMA peça existir
+// uma vez por chave de OP, e a mesma obra tem várias — a OP-89 tem "89", "089", "T89A" e "T89C",
+// então 809 linhas para 284 marcas.
+describe("a mesma marca em várias chaves de OP vira UMA linha", () => {
+  const TRES = [
+    { id: "a", marca: "T89A10", descricao: "L1.1/2''X1/8''", qte: 2, naLE: true, fonte: "LPC_IMPORT" },
+    { id: "b", marca: "T89A10", descricao: "CONTRAVENTAMENTO", qte: 1, naLE: true, fonte: "LE_IMPORT" },
+    { id: "c", marca: "T89A10", descricao: "CONTRAVENTAMENTO", qte: 1, naLE: true, fonte: "LE_IMPORT" },
+  ];
+
+  it("três cópias viram uma marca só", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue(TRES);
+    expect(await marcas(await get("?opId=op1"))).toEqual(["T89A10"]);
+  });
+
+  // ⚠ ESCOLHE, NÃO SOMA: são três visões da mesma peça, não três peças.
+  it("não soma as quantidades", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue(TRES);
+    const j = await (await get("?opId=op1")).json();
+    expect(j.pecas[0].qte).toBe(1);
+  });
+
+  // ⚠ quem expede lê a L.E.: é o texto que sai impresso na etiqueta colada na peça.
+  it("a linha da L.E. ganha da do LPC, inclusive na descrição", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue(TRES);
+    const j = await (await get("?opId=op1")).json();
+    expect(j.pecas[0].descricao).toBe("CONTRAVENTAMENTO");
+    expect(j.pecas[0].id).toBe("b");
+  });
+
+  it("sem linha da L.E., fica a que existir", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue([TRES[0]]);
+    const j = await (await get("?opId=op1")).json();
+    expect(j.pecas[0].descricao).toBe("L1.1/2''X1/8''");
+  });
+
+  // ⚠ a impressão foi gravada contra a linha que estava na tela naquele dia.
+  it("o histórico de impressão soma TODAS as cópias da marca", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue(TRES);
+    const antigo = new Date("2026-09-01T10:00:00Z"), novo = new Date("2026-09-08T14:00:00Z");
+    mockPrisma.auditLog.groupBy.mockResolvedValue([
+      { entityId: "a", _max: { createdAt: antigo }, _count: { _all: 1 } },
+      { entityId: "c", _max: { createdAt: novo }, _count: { _all: 2 } },
+    ]);
+    const j = await (await get("?opId=op1")).json();
+    expect(j.pecas[0].impressoes).toBe(3);
+    expect(new Date(j.pecas[0].impressaEm).toISOString()).toBe(novo.toISOString());
+  });
+
+  it("o campo `ids` não vaza para a tela", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue(TRES);
+    const j = await (await get("?opId=op1")).json();
+    expect(j.pecas[0]).not.toHaveProperty("ids");
+    expect(j.pecas[0]).not.toHaveProperty("fonte");
+  });
+});
+
+// ⚠⚠ O importador da L.E. engoliu o rodapé da planilha: existe uma marca "TOTAL.:" em 4 obras, a da
+// OP-89 com qte 8705. Dava para pedir 8.705 etiquetas de uma peça que não existe.
+describe("a linha de TOTAL da planilha não é peça", () => {
+  it.each(["TOTAL.:", "total.:", " TOTAL ", "SUBTOTAL", "SOMA"])("%s fica de fora da lista", async (m) => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue([
+      { id: "t", marca: m, descricao: null, qte: 8705, naLE: true, fonte: "LE_IMPORT" },
+      { id: "p", marca: "T89A1", descricao: "COLUNA", qte: 1, naLE: true, fonte: "LE_IMPORT" },
+    ]);
+    expect(await marcas(await get("?opId=op1"))).toEqual(["T89A1"]);
+  });
+
+  it("marca que só COMEÇA parecido continua valendo", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue([
+      { id: "x", marca: "TOTALIZADOR-1", descricao: "", qte: 1, naLE: true, fonte: "LE_IMPORT" },
+    ]);
+    // "TOTALIZADOR" não é a palavra TOTAL isolada — o \b do padrão protege isso
+    expect(await marcas(await get("?opId=op1"))).toEqual(["TOTALIZADOR-1"]);
+  });
+
+  it("some também quando vem da planilha importada", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue([]);
+    mockPrisma.listaExpedicao.findMany.mockResolvedValue([{ marcasJson: [{ marca: "TOTAL.:", qte: 8705 }] }]);
+    expect(await marcas(await get("?opId=op1"))).toEqual([]);
+  });
+});
+
+// ⚠⚠ Na OP-89 as linhas importadas sob a chave "89" estão DESLOCADAS EM UMA POSIÇÃO em relação às
+// sob "089": T89-AC13 tem 20 numa e 55 na outra, T89-AC14 tem 55 e 3. As duas são LE_IMPORT, então
+// nenhuma regra de "escolher a linha" resolve — quem decide é a planilha, que é a L.E. em si.
+describe("a quantidade vem da planilha da L.E. quando ela existe", () => {
+  const linhas = [
+    { id: "a", marca: "T89-AC13", descricao: "GRAMPO", qte: 20, naLE: true, fonte: "LE_IMPORT" },
+    { id: "b", marca: "T89-AC13", descricao: "GRAMPO", qte: 55, naLE: true, fonte: "LE_IMPORT" },
+  ];
+
+  it("a planilha corrige a quantidade da linha escolhida", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue(linhas);
+    mockPrisma.listaExpedicao.findMany.mockResolvedValue([
+      { marcasJson: [{ marca: "T89-AC13", qte: 55, descricao: "GRAMPO TIPO 2" }] },
+    ]);
+    const j = await (await get("?opId=op1")).json();
+    expect(j.pecas[0]).toMatchObject({ marca: "T89-AC13", qte: 55, descricao: "GRAMPO TIPO 2" });
+  });
+
+  // ⚠ 4 marcas reais da OP-89 existem só no PecaConjunto — restringir à planilha as perderia.
+  it("marca que não está na planilha mantém a quantidade da peça", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue(
+      [{ id: "c", marca: "T89C98", descricao: "L1.1/2''X1/8''", qte: 7, naLE: true, fonte: "LE_IMPORT" }]);
+    mockPrisma.listaExpedicao.findMany.mockResolvedValue([{ marcasJson: [{ marca: "OUTRA", qte: 1 }] }]);
+    const j = await (await get("?opId=op1")).json();
+    expect(j.pecas[0]).toMatchObject({ marca: "T89C98", qte: 7 });
+  });
+
+  it("planilha com qte zerada ou ausente não zera a peça", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue(linhas);
+    mockPrisma.listaExpedicao.findMany.mockResolvedValue([{ marcasJson: [{ marca: "T89-AC13" }] }]);
+    const j = await (await get("?opId=op1")).json();
+    expect(j.pecas[0].qte).toBe(20);
+  });
+});
+
 describe("POST — a posição não é etiquetável nem por fora da tela", () => {
   it("pedir uma marca fora da LE é recusado", async () => {
     const r = await POST(new Request("http://localhost/api/expedicao/etiquetas",
@@ -110,8 +229,12 @@ describe("a lista de obras só traz o que tem LE", () => {
     ]);
   });
 
+  // ⚠ o groupBy agora é por (opId, marca): uma linha por MARCA, não por peça — a mesma marca tem
+  // até três linhas na mesma obra (ver `linhaQueVale` em lib/itens-expedicao.js).
+  const marcasDe = (opId, n) => Array.from({ length: n }, (_, i) => ({ opId, marca: `M${i}`, _count: { _all: 1 } }));
+
   it("some a obra que não tem item expedível em fonte nenhuma", async () => {
-    mockPrisma.pecaConjunto.groupBy.mockResolvedValue([{ opId: "op2", _count: { _all: 1641 } }]);
+    mockPrisma.pecaConjunto.groupBy.mockResolvedValue(marcasDe("op2", 1641));
     mockPrisma.listaExpedicao.findMany.mockResolvedValue([
       { opId: "op1", opNumero: "097", marcas: 537 },
       { opId: null, opNumero: "101", marcas: 8 },   // LE sem vínculo de id — casa pelo número
@@ -123,7 +246,7 @@ describe("a lista de obras só traz o que tem LE", () => {
 
   // ⚠ As duas fontes são a MESMA lista por caminhos diferentes: somar contaria a obra duas vezes.
   it("obra presente nas duas fontes conta uma vez só, pelo maior", async () => {
-    mockPrisma.pecaConjunto.groupBy.mockResolvedValue([{ opId: "op1", _count: { _all: 537 } }]);
+    mockPrisma.pecaConjunto.groupBy.mockResolvedValue(marcasDe("op1", 537));
     mockPrisma.listaExpedicao.findMany.mockResolvedValue([{ opId: "op1", opNumero: "097", marcas: 530 }]);
     const j = await (await get()).json();
     expect(j.ops).toHaveLength(1);
@@ -134,6 +257,8 @@ describe("a lista de obras só traz o que tem LE", () => {
     mockPrisma.pecaConjunto.groupBy.mockResolvedValue([]);
     mockPrisma.listaExpedicao.findMany.mockResolvedValue([]);
     await get();
-    expect(mockPrisma.pecaConjunto.groupBy.mock.calls[0][0].where).toEqual({ naLE: true });
+    const chamada = mockPrisma.pecaConjunto.groupBy.mock.calls[0][0];
+    expect(chamada.where).toEqual({ naLE: true });
+    expect(chamada.by).toEqual(["opId", "marca"]);   // conta MARCAS, não linhas
   });
 });

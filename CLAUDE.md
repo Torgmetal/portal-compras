@@ -287,6 +287,28 @@ do portal, que é vertical e tem gradiente azul. Ele foi gerado a partir do
 soldada dentro de outra. O filtro é o **pertencimento à LE**, nunca `tipoPeca !== "CROQUI"`: a LE
 tem os parafusos (`T97-AC8`, tipo nulo) e eles se expedem.
 
+⚠⚠ **A MESMA MARCA TEM ATÉ TRÊS LINHAS NA MESMA OBRA, e não é dado sujo:** o schema é
+`@@unique([opNumero, marca])` e a mesma OP tem várias chaves de `opNumero` conforme quem importou —
+a OP-89 tem `"89"`, `"089"`, `"T89A"` e `"T89C"`, dando **809 linhas para 284 marcas**.
+`itensExpediveisDaOP` **escolhe uma, não soma** (somar triplicaria o previsto), e a que vence é a
+`fonte: "LE_IMPORT"` — a do LPC traz o PERFIL na descrição (`L1.1/2''X1/8''`) e a da LE traz o NOME
+da peça (`CONTRAVENTAMENTO`), que é o texto que sai impresso na etiqueta.
+Cada peça devolve também `ids` (todas as cópias): quem casa registro por id — a auditoria de
+impressão — tem de olhar as três, senão perde histórico gravado contra a cópia que não venceu.
+
+⚠⚠ **A QUANTIDADE VEM DA PLANILHA (`ListaExpedicao`) QUANDO ELA EXISTE.** Não é preferência de
+fonte, é dado corrompido: na OP-89 as linhas importadas sob a chave `"89"` estão **deslocadas em uma
+posição** em relação às sob `"089"` (T89-AC13 tem 20 numa e 55 na outra; T89-AC14, 55 e 3). São 17
+marcas, e as duas linhas são `LE_IMPORT` — nenhuma regra de "escolher a linha" resolve. A planilha
+é a L.E. em si, então é ela que decide. Conferido: OP-97, 60, 85 e 121 batem exatamente com a
+planilha; a 89 bate somando as 4 marcas que só existem no cadastro (8705 + 204 = 8909).
+
+⚠⚠ **`"TOTAL.:"` é uma marca no banco, em 4 obras (060, 067, 085, 089)** — o importador da L.E.
+engoliu o rodapé da planilha. A da OP-89 tem `qte` **8705**, e dava para mandar imprimir 8.705
+etiquetas de uma peça que não existe. `lib/itens-expedicao.js` filtra na leitura (`ehLinhaDeTotal`),
+o que trata as duas telas de uma vez — **consertar o importador e limpar as 4 linhas continua
+pendente**.
+
 ⚠ **Duas fontes da mesma LE, e nenhuma cobre tudo.** `naLE` na peça vem do importador da Produção;
 a tabela `ListaExpedicao` vem da planilha do SharePoint pela Expedição. Onde os dois rodaram eles
 concordam; a OP-118 só tem `naLE` e a OP-101 só tem `ListaExpedicao`. A tela usa a **união** —
@@ -336,6 +358,10 @@ conferiu 2" é a peça certa contada duas vezes.
 ⚠ **Uma sessão ABERTA por obra.** Duas pessoas em dois celulares somariam no mesmo teto sem se
 enxergar, e a segunda descobriria isso na forma de um "já conferiu tudo" que ela não entende. Quem
 chega depois entra na sessão que já existe.
+
+⚠ **O autocomplete ordena por exatidão**: marca exata, depois as que começam com o texto, depois as
+que só o contêm. Digitar `T89A10` põe T89A10 em primeiro sem sumir com T89A100 — filtrar as outras
+fora tiraria da tela justamente o que quem está no meio da digitação ia escolher.
 
 ⚠ **O autocomplete só sugere a partir de 2 letras.** A OP-97 tem 537 marcas: abrir a lista no
 clique despeja algo que ninguém lê e empurra o formulário para fora da tela do celular.

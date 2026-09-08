@@ -34,8 +34,25 @@ export function CampoMarca({ marcas, valor, onChange, onEscolher, autoFocus }) {
     if (!buscando) return [];
     const base = marcas.filter((m) => m.marca.toUpperCase().includes(q)
       || String(m.descricao || "").toUpperCase().includes(q));
-    // Pendentes primeiro: é o que se está conferindo. As completas continuam visíveis, mas no fim.
-    return [...base].sort((a, b) => Number(a.completa) - Number(b.completa)).slice(0, 30);
+
+    // ⚠⚠ A MARCA EXATA VEM PRIMEIRO. Matheus (08/09/2026): "quando eu digito o código completo da
+    // marca ainda sim não aparece só ela na lista, fica aparecendo todas que tem T89A...".
+    //
+    // Filtrar as outras fora seria pior: "T89A10" é prefixo legítimo de T89A100..T89A109, e quem
+    // está no meio da digitação perderia o que ainda ia escolher. Então elas continuam na lista —
+    // só deixam de estar na frente. Ordem: exata, começa com, contém; e dentro de cada nível, as
+    // pendentes antes das completas, que é o que se está conferindo.
+    const nivel = (m) => {
+      const M = m.marca.toUpperCase();
+      if (M === q) return 0;
+      if (M.startsWith(q)) return 1;
+      return 2;
+    };
+    return [...base].sort((a, b) =>
+      nivel(a) - nivel(b)
+      || Number(a.completa) - Number(b.completa)
+      || a.marca.localeCompare(b.marca, "pt-BR", { numeric: true })
+    ).slice(0, 30);
   }, [marcas, q, buscando]);
 
   return (

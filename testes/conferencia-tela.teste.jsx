@@ -14,6 +14,13 @@ const MARCAS = [
   { marca: "T97A140", descricao: "TRAVAMENTO EL.9325", previsto: 2, conferido: 0, saldo: 2, completa: false },
   { marca: "T97A180", descricao: "VIGA EL.10250", previsto: 5, conferido: 5, saldo: 0, completa: true },
 ];
+// para a ordenação: a exata, as que começam com ela, e uma que só contém
+const MARCAS_PREFIXO = [
+  { marca: "T89A100", descricao: "COLUNA", previsto: 1, conferido: 0, saldo: 1, completa: false },
+  { marca: "T89A101", descricao: "COLUNA", previsto: 1, conferido: 0, saldo: 1, completa: false },
+  { marca: "T89A10", descricao: "COLUNA", previsto: 1, conferido: 0, saldo: 1, completa: false },
+  { marca: "X-T89A10-B", descricao: "OUTRA", previsto: 1, conferido: 0, saldo: 1, completa: false },
+];
 const estado = (over = {}) => ({
   success: true,
   conferencia: { id: "c1", status: "ABERTA", opNumero: "097" },
@@ -128,6 +135,31 @@ describe("conferência no celular", () => {
     await waitFor(() => expect(campoMarca().value).toBe("T97A140"));
     expect(screen.getByDisplayValue("1")).toBeTruthy();
     expect(screen.queryByDisplayValue("2")).toBeNull();
+  });
+
+  // ⚠⚠ Matheus (08/09/2026): "quando eu digito o código completo da marca ainda sim não aparece só
+  // ela na lista, fica aparecendo todas que tem T89A...".
+  it("digitar o código completo põe a marca exata em primeiro", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true, status: 200, text: async () => JSON.stringify(estado({ marcas: MARCAS_PREFIXO })),
+    })));
+    await abrir();
+    digitar(/letras da marca/, "T89A10");
+    await waitFor(() => expect(document.querySelectorAll("ul li button").length).toBe(4));
+    const ordem = [...document.querySelectorAll("ul li button")].map((b) => b.querySelector("span").textContent);
+    expect(ordem[0]).toBe("T89A10");                    // exata
+    expect(ordem.slice(1, 3)).toEqual(["T89A100", "T89A101"]);  // começam com
+    expect(ordem[3]).toBe("X-T89A10-B");                // só contém
+  });
+
+  it("as que apenas começam com o texto continuam na lista", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true, status: 200, text: async () => JSON.stringify(estado({ marcas: MARCAS_PREFIXO })),
+    })));
+    await abrir();
+    digitar(/letras da marca/, "T89A10");
+    // ⚠ filtrar fora seria pior: quem está no meio da digitação perderia o que ia escolher
+    expect(await screen.findByText("T89A100")).toBeTruthy();
   });
 
   it("a aba da lista mostra a L.E. com o que falta", async () => {
