@@ -14,6 +14,7 @@
 // ⚠ O DETALHE NÃO VEM DAQUI. Clicar na OP abre /api/pcp/despacho?opId=&setor=, que já devolve peça
 // a peça com programação, material e baixa. Duplicar aquilo aqui daria dois lugares para consertar.
 import { NextResponse } from "next/server";
+import { estadoDasLiberacoes } from "@/lib/liberacao-estado";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import {
@@ -134,6 +135,8 @@ export async function GET(req) {
     where: { opId: { in: opIds }, status: { in: ["LIBERADA", "EM_PRODUCAO"] } },
     orderBy: { liberadoEm: "asc" },
   });
+  // ⚠ o que já foi agendado de cada liberação — é o que tira o aviso da tela (lib/liberacao-estado)
+  const estado = await estadoDasLiberacoes(libs);
   const porOpLib = new Map();
   for (const l of libs) {
     const g = porOpLib.get(l.opId) || [];
@@ -147,6 +150,7 @@ export async function GET(req) {
       totalKg: l.totalKg || null,
       totalPecas: l.totalPecas ?? null,
       desvioDias: l.desvioDias, desvioMotivo: l.desvioMotivo,
+      ...(estado.get(l.id) || {}),
     });
     porOpLib.set(l.opId, g);
   }
