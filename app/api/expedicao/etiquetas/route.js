@@ -26,6 +26,28 @@ const erroDeAcesso = (e) =>
   NextResponse.json({ success: false, error: e.message },
     { status: e.message === "Unauthorized" ? 401 : 403 });
 
+const ACAO = "IMPRIMIR_ETIQUETA_CARREGAMENTO";
+
+/**
+ * Quando cada marca saiu impressa, e quantas vezes.
+ *
+ * ⚠ O HISTÓRICO MORA NO `AuditLog`, NÃO NUMA COLUNA NOVA DA PEÇA. Duas razões, nessa ordem:
+ * "quem imprimiu e quando" é exatamente o que a tabela de auditoria existe para responder — e o
+ * CLAUDE.md manda registrar toda mutação nela de qualquer jeito, então a coluna seria a segunda
+ * cópia do mesmo fato. E `PecaConjunto` tem 12 mil linhas em produção; guardar a REIMPRESSÃO ali
+ * daria só a última, enquanto aqui ficam todas.
+ */
+async function impressoes(pecaIds) {
+  if (!pecaIds.length) return new Map();
+  const por = await prisma.auditLog.groupBy({
+    by: ["entityId"],
+    where: { entity: "PecaConjunto", action: ACAO, entityId: { in: pecaIds } },
+    _max: { createdAt: true },
+    _count: { _all: true },
+  });
+  return new Map(por.map((r) => [r.entityId, { em: r._max.createdAt, vezes: r._count._all }]));
+}
+
 async function carregar(opId) {
   const op = await prisma.oP.findUnique({
     where: { id: opId },
@@ -37,7 +59,15 @@ async function carregar(opId) {
     select: { id: true, marca: true, descricao: true, qte: true, pesoUnitKg: true, status: true },
     orderBy: [{ marca: "asc" }],
   });
-  return { op, pecas };
+  const hist = await impressoes(pecas.map((p) => p.id));
+  return {
+    op,
+    pecas: pecas.map((p) => ({
+      ...p,
+      impressaEm: hist.get(p.id)?.em ?? null,
+      impressoes: hist.get(p.id)?.vezes ?? 0,
+    })),
+  };
 }
 
 export async function GET(req) {
@@ -90,8 +120,32 @@ async function selecionar(corpo) {
   return { op: dados.op, pecas };
 }
 
+/**
+ * Uma linha de auditoria por MARCA — é a granularidade da pergunta que a tela faz ("esta marca já
+ * saiu?"). Um registro só da OP inteira não responderia nada depois da primeira impressão parcial.
+ *
+ * ⚠ Não-fatal de propósito: uma falha ao registrar não pode segurar o PDF que já foi gerado. O
+ * pior caso é a coluna dizer "—" para uma etiqueta impressa; imprimir de novo custa um adesivo.
+ */
+async function registrarImpressao(user, op, pecas) {
+  try {
+    await prisma.auditLog.createMany({
+      data: pecas.map((p) => ({
+        userId: user?.id || null,
+        action: ACAO,
+        entity: "PecaConjunto",
+        entityId: p.id,
+        diff: { op: op.numero, marca: p.marca, etiquetas: Math.max(1, p.qte || 1), por: user?.name || null },
+      })),
+    });
+  } catch (e) {
+    registro.erro("falha ao registrar a impressão:", e?.message);
+  }
+}
+
 export async function POST(req) {
-  try { await requireRole(PERFIS); } catch (e) { return erroDeAcesso(e); }
+  let user;
+  try { user = await requireRole(PERFIS); } catch (e) { return erroDeAcesso(e); }
 
   let corpo;
   try { corpo = await req.json(); } catch { corpo = null; }
@@ -118,6 +172,9 @@ export async function POST(req) {
       opNumero: dados.op.numero,
       pecas,
     });
+    // ⚠ SÓ DEPOIS DE O PDF EXISTIR. Carimbar antes marcaria como impressa uma marca cuja geração
+    // falhou — e a tela ficaria dizendo "já saiu" para uma etiqueta que ninguém viu.
+    await registrarImpressao(user, dados.op, pecas);
     registro.info(`OP ${dados.op.numero}: ${pecas.length} marca(s), ${total} etiqueta(s)`);
     return new NextResponse(Buffer.from(pdf), {
       headers: {

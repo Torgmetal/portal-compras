@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Loader2, Printer, Search, Tag } from "lucide-react";
+import { AlertCircle, Check, Loader2, Printer, Search, Tag } from "lucide-react";
 
 // ETIQUETAS DE CARREGAMENTO — a aba que substitui o BarTender.
 //
@@ -24,6 +24,15 @@ async function lerJson(r, oQue) {
   if (!r.ok) throw new Error(j.error || `${oQue}: erro ${r.status}`);
   return j;
 }
+
+/** "05/09 14:20" — dia e hora bastam; o ano não ajuda a decidir se reimprime. */
+const quando = (iso) => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(+d)
+    ? null
+    : d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+};
 
 const nkg = (n) =>
   Number(n) > 0 ? Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
@@ -58,6 +67,25 @@ function BarraSelecao({ busca, setBusca, visiveis, sel, totalEtiquetas, marcarVi
   );
 }
 
+/**
+ * Se a etiqueta desta marca já saiu, e quando.
+ *
+ * ⚠ Matheus (08/09/2026): "deixar uma coluna na lista no portal mostrando quais etiquetas já foram
+ * impressas". O "×2" não é enfeite: reimpressão é rotina (descolou, borrou), mas reimprimir SEM
+ * saber que já tinha saído é como a peça sai do pátio com dois adesivos diferentes.
+ */
+function Impressa({ peca }) {
+  const em = quando(peca.impressaEm);
+  if (!em) return <span className="text-gray-300">—</span>;
+  return (
+    <span className="inline-flex items-center gap-1 text-[12px] text-emerald-700 whitespace-nowrap">
+      <Check size={13} className="shrink-0" />
+      {em}
+      {peca.impressoes > 1 && <b className="text-torg-gray">×{peca.impressoes}</b>}
+    </span>
+  );
+}
+
 function TabelaMarcas({ visiveis, sel, alterna, busca }) {
   return (
     <div className="overflow-x-auto">
@@ -68,7 +96,8 @@ function TabelaMarcas({ visiveis, sel, alterna, busca }) {
             <th className="text-left px-2 py-2">Marca</th>
             <th className="text-left px-2 py-2">Descrição</th>
             <th className="text-right px-2 py-2">Peças</th>
-            <th className="text-right px-4 py-2">Peso unit. (kg)</th>
+            <th className="text-right px-2 py-2">Peso unit. (kg)</th>
+            <th className="text-left px-4 py-2">Etiqueta</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
@@ -81,11 +110,12 @@ function TabelaMarcas({ visiveis, sel, alterna, busca }) {
               <td className="px-2 py-2 font-bold text-torg-dark">{p.marca}</td>
               <td className="px-2 py-2 text-torg-gray">{p.descricao || "—"}</td>
               <td className="px-2 py-2 text-right tabular-nums">{Math.max(1, p.qte || 1)}</td>
-              <td className="px-4 py-2 text-right tabular-nums">{nkg(p.pesoUnitKg)}</td>
+              <td className="px-2 py-2 text-right tabular-nums">{nkg(p.pesoUnitKg)}</td>
+              <td className="px-4 py-2"><Impressa peca={p} /></td>
             </tr>
           ))}
           {!visiveis.length && (
-            <tr><td colSpan={5} className="px-4 py-10 text-center text-torg-gray">
+            <tr><td colSpan={6} className="px-4 py-10 text-center text-torg-gray">
               Nenhuma marca bate com &quot;{busca}&quot;.
             </td></tr>
           )}
@@ -115,17 +145,17 @@ export default function EtiquetasClient() {
     })();
   }, []);
 
+  const buscarPecas = useCallback(async (id) => lerJson(
+    await fetch(`/api/expedicao/etiquetas?opId=${encodeURIComponent(id)}`, { cache: "no-store" }),
+    "Peças da OP"), []);
+
   const abrirOp = useCallback(async (id) => {
     setOpId(id); setDados(null); setSel(new Set()); setBusca(""); setErro("");
     if (!id) return;
     setCarregando(true);
-    try {
-      const j = await lerJson(
-        await fetch(`/api/expedicao/etiquetas?opId=${encodeURIComponent(id)}`, { cache: "no-store" }),
-        "Peças da OP");
-      setDados(j);
-    } catch (e) { setErro(e.message); } finally { setCarregando(false); }
-  }, []);
+    try { setDados(await buscarPecas(id)); }
+    catch (e) { setErro(e.message); } finally { setCarregando(false); }
+  }, [buscarPecas]);
 
   const pecas = dados?.pecas || [];
   const visiveis = useMemo(() => {
@@ -166,6 +196,10 @@ export default function EtiquetasClient() {
       window.open(url, "_blank", "noopener");
       // Revogar na hora fecharia o PDF antes de a aba lê-lo.
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      // Recarrega só os dados — a coluna "Etiqueta" tem que refletir o que acabou de sair, e o
+      // filtro e a seleção continuam onde estavam (quem imprime costuma imprimir de novo).
+      const atualizado = await buscarPecas(opId).catch(() => null);
+      if (atualizado) setDados(atualizado);
     } catch (e) { setErro(e.message); } finally { setGerando(false); }
   };
 

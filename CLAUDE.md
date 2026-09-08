@@ -267,6 +267,12 @@ do portal, que é vertical e tem gradiente azul. Ele foi gerado a partir do
 limitação do BarTender, que importava a planilha com o campo de largura fixa — aqui o número vem
 do banco a cada etiqueta e a largura se ajusta sozinha.
 
+**Quais já foram impressas** aparece numa coluna da própria lista, com data e "×N" na reimpressão.
+O histórico mora no `AuditLog` (`action: "IMPRIMIR_ETIQUETA_CARREGAMENTO"`, `entity: "PecaConjunto"`),
+não numa coluna de `PecaConjunto`: é a pergunta que a tabela de auditoria já existe para responder,
+o registro é obrigatório de qualquer jeito, e assim ficam TODAS as impressões, não só a última.
+O carimbo é gravado **depois** de o PDF existir — e uma falha ao gravar não segura o PDF.
+
 ⚠ **Não existe importação de planilha, de propósito.** Marca, descrição, quantidade e peso
 vivem em `PecaConjunto`; a planilha só existia porque o BarTender não enxerga o banco.
 Tirar esse pulo tira junto a chance de imprimir com dado velho.

@@ -1,7 +1,12 @@
 {
-  "build": 2979,
-  "gerado": "2026-09-08T14:12:01.223Z",
+  "build": 2980,
+  "gerado": "2026-09-08T14:12:12.067Z",
   "commits": [
+    {
+      "hash": "b1d21d2749",
+      "data": "08/09/2026",
+      "titulo": "Etiqueta: a contagem de peças sai sem zero à esquerda"
+    },
     {
       "hash": "2f643c34fb",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e0fe3b8d6d",
       "data": "07/09/2026",
       "titulo": "CMR: a obra digitada à mão passa a ser conferida contra o pedido"
-    },
-    {
-      "hash": "67396b9153",
-      "data": "07/09/2026",
-      "titulo": "XML do MS Project: o arquivo abria um cronograma diferente da tela"
     }
   ]
 }
