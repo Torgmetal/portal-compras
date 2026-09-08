@@ -13,7 +13,6 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarEtiquetasCarregamentoPDF } from "@/lib/etiqueta-carregamento-pdf";
 import { log } from "@/lib/log";
-import { fmtOP } from "@/lib/utils";
 
 const registro = log("api/expedicao/etiquetas");
 const PERFIS = ["ADMIN", "EXPEDICAO", "PRODUCAO", "PCP", "PLANEJAMENTO"];
@@ -105,10 +104,18 @@ export async function POST(req) {
     const pdf = await gerarEtiquetasCarregamentoPDF({
       cliente: dados.op.cliente,
       obra: dados.op.obra,
-      // ⚠ O NÚMERO SAI PELO `fmtOP`, sem o "OP-" — a célula da etiqueta já diz "O.P.:".
-      // Reusar o formatador da casa traz de graça o padding de três dígitos e a sub-obra
-      // ("036-01"), que já foram motivo de a mesma OP aparecer com dois nomes no portal.
-      opNumero: fmtOP(dados.op.numero).replace(/^OP-/, ""),
+      // ⚠⚠ O NÚMERO VAI CRU, e isso é decisão, não descuido.
+      //
+      // Cheguei a usar o `fmtOP` da casa aqui. Está errado para ESTA tela por dois motivos que só
+      // apareceram olhando o dado: (1) o `fmtOP` REMOVE um "T" inicial — decisão do Vitor em
+      // `58bc140e5c`, certa para a exibição no portal, mas aqui apagaria justamente o "T89" que a
+      // etiqueta em uso mostra; (2) ele completa com zeros ("89" -> "089"), e a etiqueta impressa
+      // hoje diz "T89", sem zero à esquerda.
+      //
+      // Hoje nenhuma das 35 OPs tem prefixo — são todas "121", "120". Então o "T89" da etiqueta
+      // antiga foi DIGITADO na planilha do BarTender, não veio do cadastro. Mandar cru faz a
+      // etiqueta mostrar exatamente o que está na OP, seja lá qual for a convenção que ela use.
+      opNumero: dados.op.numero,
       pecas,
     });
     registro.info(`OP ${dados.op.numero}: ${pecas.length} marca(s), ${total} etiqueta(s)`);
