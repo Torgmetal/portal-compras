@@ -1,7 +1,12 @@
 {
-  "build": 3001,
-  "gerado": "2026-09-08T17:40:45.828Z",
+  "build": 3002,
+  "gerado": "2026-09-08T17:43:20.487Z",
   "commits": [
+    {
+      "hash": "da9ac7ed",
+      "data": "08/09/2026",
+      "titulo": "Despacho: o lote de desenhos se fatia sozinho, em vez de recusar"
+    },
     {
       "hash": "7e24f30d",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "2289730d",
       "data": "08/09/2026",
       "titulo": "PCP: a baixa do portal passa a contar no quadro — e a OP-067 sai da preparação"
-    },
-    {
-      "hash": "b4168342",
-      "data": "08/09/2026",
-      "titulo": "Gantt: os botões da lista do posto ganham estilo — saíam como \"diasemana\""
     }
   ]
 }
