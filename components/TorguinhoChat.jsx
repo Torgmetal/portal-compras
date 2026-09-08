@@ -174,6 +174,11 @@ export default function TorguinhoChat() {
 
   // Portal do funcionário (/colaborador, /meu-rh) não exibe o Torguinho — é ferramenta interna do time.
   if (pathname?.startsWith("/colaborador") || pathname?.startsWith("/meu-rh")) return null;
+  // ⚠ A Conferência de Peça também não. Ela é usada no celular, no pátio, com uma mão só — e o
+  // balão fica `fixed bottom-4 right-4`, exatamente por cima do campo OBSERVAÇÃO e ao lado do
+  // botão de lançar. Visto na validação da tela em 390×844 (08/09/2026). Padding não resolve:
+  // o balão flutua sobre a viewport, não sobre o conteúdo.
+  if (pathname?.startsWith("/expedicao/conferencia")) return null;
   if (status !== "authenticated" || !config || !config.ativo || !temAcesso) return null;
 
   user?.name?.split(" ")[0] || "colega";
