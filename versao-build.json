@@ -1,7 +1,12 @@
 {
-  "build": 3019,
-  "gerado": "2026-09-08T23:19:46.578Z",
+  "build": 3020,
+  "gerado": "2026-09-08T23:38:08.185Z",
   "commits": [
+    {
+      "hash": "c6e615d1",
+      "data": "08/09/2026",
+      "titulo": "Rastreio: o UE da Engenharia é o UDCE do fornecedor"
+    },
     {
       "hash": "53a097a6",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "a783c7d5",
       "data": "08/09/2026",
       "titulo": "Extrai a regra da L.E. e o lerJson para libs próprias"
-    },
-    {
-      "hash": "9911f139",
-      "data": "08/09/2026",
-      "titulo": "CLAUDE.md: tira a linha duplicada de \"instale o hook\""
     }
   ]
 }
