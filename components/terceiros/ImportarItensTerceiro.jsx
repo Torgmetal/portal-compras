@@ -1,0 +1,33 @@
+'use client';
+import {useRef,useState} from 'react';
+import {FileSpreadsheet,Upload,Loader2,X,CheckCircle2,AlertCircle} from 'lucide-react';
+import {chaveMarca} from '@/lib/terceiros-importar-itens';
+const fmt=n=>Number(n).toLocaleString('pt-BR',{maximumFractionDigits:3});
+export default function ImportarItensTerceiro({opId,itens,onAplicar}){
+ const [aberto,setAberto]=useState(false),[texto,setTexto]=useState(''),[arquivo,setArquivo]=useState(null),[resultado,setResultado]=useState(null),[erro,setErro]=useState(''),[lendo,setLendo]=useState(false),[mensagem,setMensagem]=useState('');
+ const fileRef=useRef(null);
+ const existentes=new Set(itens.filter(i=>i.marca?.trim()).map(i=>chaveMarca(i.marca)));
+ const linhas=(resultado?.linhas||[]).map(l=>existentes.has(chaveMarca(l.marca))?{...l,ok:false,erro:'Já está no formulário. Edite a linha existente para evitar duplicação.'}:l);
+ const validas=linhas.filter(l=>l.ok);
+ function limpar(){setResultado(null);setErro('');setMensagem('');}
+ async function conferir(){
+  limpar();if(!opId){setErro('Selecione a OP antes de importar.');return;}setLendo(true);
+  try{const form=new FormData();form.set('opId',opId);if(arquivo)form.set('arquivo',arquivo);else form.set('texto',texto);
+   const r=await fetch('/api/expedicao/terceiros/importar-itens',{method:'POST',body:form});const j=await r.json();if(!r.ok)throw Error(j.error||'Não foi possível ler a lista.');setResultado(j);
+  }catch(e){setErro(e.message);}finally{setLendo(false);}
+ }
+ function aplicar(){onAplicar(validas.map(l=>l.item));setMensagem(`${validas.length} marca(s) adicionada(s). Confira o formulário e clique em Salvar para registrar o envio.`);setResultado(null);setArquivo(null);setTexto('');if(fileRef.current)fileRef.current.value='';setAberto(false);}
+ function modelo(){const blob=new Blob(['\uFEFFMarca;Quantidade;Descrição;Peso total (kg)\n'],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Modelo-material-terceiros.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+ return <div className="mb-3">
+  <div className="flex flex-wrap items-center gap-2"><button type="button" onClick={()=>setAberto(!aberto)} className="inline-flex items-center gap-1.5 rounded-lg border border-torg-blue-100 px-3 py-2 text-xs font-semibold text-torg-blue hover:bg-torg-blue-50"><FileSpreadsheet size={15}/> Importar lista</button>{!opId&&<span className="text-xs text-torg-gray">Selecione a OP para conferir as marcas.</span>}</div>
+  {mensagem&&<p role="status" className="mt-2 text-xs text-emerald-700">{mensagem}</p>}
+  {aberto&&<section aria-label="Importação de material enviado" className="mt-2 rounded-lg border border-torg-blue-100 bg-torg-blue-50/30 p-3 space-y-3">
+   <div className="flex justify-between items-start gap-3"><div><h4 className="text-sm font-semibold text-torg-dark">Preencher material enviado</h4><p className="mt-1 text-xs text-torg-gray">Excel ou CSV (primeira aba), até 2.000 linhas e 4 MB. Use Marca e Quantidade; descrição e peso são opcionais.</p><p className="mt-1 text-xs text-torg-gray">Só marcas? Usaremos a quantidade cadastrada na OP. Para envio parcial, informe a quantidade a enviar.</p></div><button type="button" aria-label="Fechar importação" disabled={lendo} onClick={()=>setAberto(false)}><X size={16}/></button></div>
+   <div className="flex flex-wrap gap-2 items-center"><label className="inline-flex cursor-pointer items-center gap-2 bg-white rounded-lg border px-3 py-2 text-xs text-torg-blue"><Upload size={14}/> Escolher planilha<input ref={fileRef} type="file" aria-label="Escolher planilha" accept=".xlsx,.xls,.csv" disabled={lendo} className="sr-only" onChange={e=>{setArquivo(e.target.files?.[0]||null);setTexto('');limpar();}}/></label><button type="button" onClick={modelo} className="text-xs text-torg-blue underline">Baixar modelo</button>{arquivo&&<span className="text-xs text-torg-gray break-all">{arquivo.name}<button type="button" disabled={lendo} aria-label="Remover arquivo" onClick={()=>{setArquivo(null);if(fileRef.current)fileRef.current.value='';limpar();}} className="ml-2">×</button></span>}</div>
+   {!arquivo&&<label className="block text-xs text-torg-gray">Ou cole a lista do Excel (marca e quantidade em colunas)<textarea aria-label="Lista de marcas e quantidades" disabled={lendo} value={texto} onChange={e=>{setTexto(e.target.value);limpar();}} placeholder={'Marca\tQuantidade\nT97A4\t3\nT97A5\t2'} className="mt-1 block w-full min-h-24 rounded-lg border border-gray-200 bg-white p-2 font-mono text-xs text-torg-dark"/></label>}
+   {erro&&<p role="alert" className="text-xs text-red-700">{erro}</p>}
+   <button type="button" disabled={lendo||!opId||(!arquivo&&!texto.trim())} onClick={conferir} className="inline-flex items-center gap-2 rounded-lg bg-torg-blue text-white px-3 py-2 text-xs font-semibold disabled:opacity-50">{lendo?<Loader2 size={14} className="animate-spin"/>:<FileSpreadsheet size={14}/>} Conferir lista</button>
+   {resultado&&<div className="space-y-2"><p className="text-xs font-semibold text-torg-dark">{validas.length} marca(s) pronta(s) · {linhas.length-validas.length} pendente(s) de correção</p><div className="max-h-64 overflow-auto rounded-lg border border-gray-200 bg-white"><table className="w-full text-xs text-left"><thead className="bg-gray-50"><tr><th className="p-2">Marca</th><th className="p-2">Qtd</th><th className="p-2">Peso total (kg)</th><th className="p-2">Conferência</th></tr></thead><tbody>{linhas.map((l,i)=><tr key={i} className="border-t border-gray-100"><td className="p-2 font-mono">{l.marca||'Sem marca'}<span className="block text-[10px] text-torg-gray">Linha {l.linha}</span></td><td className="p-2">{l.ok?fmt(l.item.qte):'—'}</td><td className="p-2">{l.ok?fmt(l.item.pesoTotal):'—'}</td><td className="p-2">{l.ok?<><span className="inline-flex gap-1 text-emerald-700"><CheckCircle2 size={13}/> Encontrada na OP</span><span className="block text-torg-gray">{l.item.descricao}</span>{l.avisos.map((a,n)=><span key={n} className="block text-amber-800">{a}</span>)}</>:<span className="inline-flex gap-1 text-red-700"><AlertCircle size={13} className="shrink-0"/>{l.erro}</span>}</td></tr>)}</tbody></table></div><p className="text-xs text-torg-gray">Somente as linhas prontas serão adicionadas. Itens preenchidos no formulário serão mantidos.</p><button type="button" disabled={!validas.length||lendo} onClick={aplicar} className="rounded-lg bg-torg-blue px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Adicionar {validas.length} marca(s) ao formulário</button></div>}
+  </section>}
+ </div>;
+}

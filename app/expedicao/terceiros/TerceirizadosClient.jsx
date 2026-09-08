@@ -1,4 +1,5 @@
 "use client";
+import ImportarItensTerceiro from "@/components/terceiros/ImportarItensTerceiro";
 import ModalRetorno from "@/components/terceiros/ReceberTerceiro";
 import { DESTINOS_TERCEIRO, retornoEmAtraso } from "@/lib/terceiros-retorno";
 import { useState, useMemo, useEffect, useCallback, Fragment } from "react";
@@ -446,6 +447,7 @@ function ModalRomaneio({ ops, rom, onClose, onSalvo }) {
               <label className="text-xs font-medium text-torg-dark">Material enviado *</label>
               <span className="text-[11px] text-torg-gray">Total: <strong className="text-torg-dark">{fmtKg(pesoTotalCarga)}</strong></span>
             </div>
+            <ImportarItensTerceiro key={f.opRefId} opId={f.opRefId} itens={itens} onAplicar={novos=>setItens(atuais=>[...atuais.filter(it=>Object.values(it).some(v=>v!==''&&v!=null)),...novos])}/>
             <div className="border border-gray-100 rounded-lg overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-[11px] text-torg-gray uppercase"><tr>
