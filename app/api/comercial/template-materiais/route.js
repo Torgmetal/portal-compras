@@ -1,3 +1,4 @@
+import {refinarFormularioExcel,registrarTabelaExcel,listaValidacaoExcel,bufferWorkbookTorg} from "@/lib/excel-refinamento";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { CATALOGO_PERFIS, CATEGORIAS_PERFIL } from "@/lib/catalogo-perfis";
@@ -36,7 +37,7 @@ export async function GET() {
     });
 
     ws.columns = [
-      { key: "item", width: 6 },
+      { key: "item", width: 16 },
       { key: "material", width: 16 },
       { key: "tipo", width: 20 },
       { key: "perfil", width: 30 },
@@ -110,6 +111,7 @@ export async function GET() {
       cell.border = THIN_BORDER;
     });
     headerRow.height = 32;
+    const tabelaPrincipal=registrarTabelaExcel(ws,headerRowIdx,colHeaders);
 
     // Lista de todos os perfis para dropdown (col D)
     const todosPerfis = CATALOGO_PERFIS.map((p) => p.perfil);
@@ -125,6 +127,7 @@ export async function GET() {
 
     for (let i = 0; i < NUM_LINHAS; i++) {
       const r = firstDataRow + i;
+      tabelaPrincipal.rows.add(r);
       const row = ws.getRow(r);
 
       // Col A: numero do item
@@ -138,7 +141,7 @@ export async function GET() {
       matCell.dataValidation = {
         type: "list",
         allowBlank: true,
-        formulae: [`"${normasDropdown.join(",")}"`],
+        formulae: [listaValidacaoExcel(wb,"TORG_Normas",normasDropdown)],
         showErrorMessage: false,
       };
 
@@ -148,7 +151,7 @@ export async function GET() {
       tipoCell.dataValidation = {
         type: "list",
         allowBlank: true,
-        formulae: [`"${tiposDropdown.join(",")}"`],
+        formulae: [listaValidacaoExcel(wb,"TORG_Tipos",tiposDropdown)],
         showErrorMessage: false,
       };
 
@@ -159,7 +162,7 @@ export async function GET() {
       perfilCell.dataValidation = {
         type: "list",
         allowBlank: true,
-        formulae: [`'Banco de Dados'!$B$4:$B$${3 + todosPerfis.length}`],
+        formulae: [listaValidacaoExcel(wb,"TORG_Perfis",todosPerfis)],
         showErrorMessage: true,
         errorTitle: "Perfil invalido",
         error: "Selecione um perfil da lista ou digite manualmente",
@@ -231,7 +234,7 @@ export async function GET() {
     totalRow.height = 26;
 
     // Proteger aba (permite editar colunas B, C, D, E, F)
-    ws.protect("torg2024", {
+    await ws.protect("torg2024", {
       selectLockedCells: true,
       selectUnlockedCells: true,
       formatCells: false,
@@ -284,6 +287,7 @@ export async function GET() {
       cell.alignment = { horizontal: "center" };
     });
     dbHeaderRow.height = 22;
+    const tabelaBanco=registrarTabelaExcel(wsDB,3,dbHeaders);
 
     // Dados agrupados por categoria
     let dbRow = 4;
@@ -291,6 +295,7 @@ export async function GET() {
     for (const prod of CATALOGO_PERFIS) {
       const catLabel = CATEGORIAS_PERFIL.find((c) => c.value === prod.categoria)?.label || prod.categoria;
       const row = wsDB.getRow(dbRow);
+      tabelaBanco.rows.add(dbRow);
 
       if (prod.categoria !== lastCat) {
         row.getCell(1).value = catLabel.toUpperCase();
@@ -312,10 +317,11 @@ export async function GET() {
     }
 
     // Proteger aba de banco de dados
-    wsDB.protect("torg2024", { selectLockedCells: true, selectUnlockedCells: true });
+    await wsDB.protect("torg2024", { selectLockedCells: true, selectUnlockedCells: true });
 
     // Gerar buffer
-    const buffer = await wb.xlsx.writeBuffer();
+    refinarFormularioExcel(wb);
+    const buffer = await bufferWorkbookTorg(wb);
 
     return new NextResponse(buffer, {
       status: 200,

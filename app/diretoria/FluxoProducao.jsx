@@ -201,8 +201,9 @@ export default function FluxoProducao() {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao montar a planilha");
       if (!j.resumo?.length) throw new Error("Nenhuma obra para exportar.");
+      if(j.truncado)throw new Error("A seleção excede 20.000 peças. Selecione menos OPs para exportar a lista completa.");
 
-      const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarRodapeISO, downloadWorkbook } =
+      const { criarRelatorioTorg, adicionarFolhaTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarRodapeISO, downloadWorkbook } =
         await import("@/lib/excel-relatorio");
 
       const semDesenho = j.resumo.filter((x) => ["SO_MAQUINA", "SEM_DESENHO", "SO_ENVIO", "VAZIA"].includes(x.veredito)).length;
@@ -218,7 +219,7 @@ export default function FluxoProducao() {
         totalColunas: cab.length, nomePlanilha: "Resumo", codigoDoc: "REL-DIR-002",
       });
       ws.columns = [{ width: 10 }, { width: 20 }, { width: 26 }, { width: 24 }, { width: 15 }, { width: 19 }, { width: 17 },
-        { width: 17 }, { width: 19 }, { width: 12 }, { width: 15 }, { width: 11 }, { width: 18 }, { width: 16 }, { width: 22 }];
+        { width: 17 }, { width: 19 }, { width: 12 }, { width: 15 }, { width: 22 }, { width: 32 }];
 
       // ⚠ os helpers NÃO devolvem a próxima linha — contar aqui. Já custou uma planilha que não baixava.
       let l = linhaInicio;
@@ -238,9 +239,9 @@ export default function FluxoProducao() {
 
       // ── aba 2: a peça, não a obra ──
       const cab2 = ["OP", "Cliente", "Marca", "Tipo", "Tem NC1", "Desenho achado com outro nome"];
-      const ws2 = workbook.addWorksheet("Sem desenho");
-      ws2.columns = [{ width: 10 }, { width: 20 }, { width: 22 }, { width: 12 }, { width: 10 }, { width: 19 }, { width: 44 }];
-      let l2 = 1;
+      const {sheet:ws2,linhaInicio:inicioSemDesenho}=await adicionarFolhaTorg(workbook,{titulo:"Marcas sem desenho",nomePlanilha:"Sem desenho",totalColunas:cab2.length,codigoDoc:"REL-DIR-002"});
+      ws2.columns = [{ width: 10 }, { width: 20 }, { width: 22 }, { width: 14 }, { width: 12 }, { width: 44 }];
+      let l2 = inicioSemDesenho;
       adicionarHeaderTabela(ws2, l2, cab2); l2++;
       for (const it of j.itens) {
         adicionarLinhaTabela(ws2, l2, [
@@ -249,14 +250,12 @@ export default function FluxoProducao() {
         ]);
         l2++;
       }
-      if (!j.itens.length) { adicionarLinhaTabela(ws2, l2, ["—", "", "Nenhuma marca sem desenho.", "", "", "", ""]); }
-      ws2.views = [{ state: "frozen", ySplit: 1 }];
+      if (!j.itens.length) { adicionarLinhaTabela(ws2, l2, ["—", "", "Nenhuma marca sem desenho.", "", "", ""]); }
+      ws2.views = [{ state: "frozen", ySplit: inicioSemDesenho }];
 
       const nome = ids?.length ? `Desenhos na pasta - ${ids.length} OPs.xlsx` : "Desenhos na pasta - todas as OPs.xlsx";
       await downloadWorkbook(workbook, nome);
-      // ⚠ avisar o corte: 20.000 itens calados pareceriam a lista inteira.
-      if (j.truncado) setErro("A planilha saiu, mas a aba de peças foi cortada em 20.000 linhas. Exporte por seleção de OP para ver o resto.");
-      else if (j.naoConferidas) setErro(`Planilha gerada. ${j.naoConferidas} obra(s) ainda não foram conferidas e saíram sem números.`);
+      if (j.naoConferidas) setErro(`Planilha gerada. ${j.naoConferidas} obra(s) ainda não foram conferidas e saíram sem números.`);
     } catch (e) { setErro(`Não consegui gerar a planilha: ${e?.message || e}`); }
     finally { setBaixando(false); }
   }
@@ -268,7 +267,7 @@ export default function FluxoProducao() {
     if (!d0?.itens?.length) return;
     setExportando(true);
     try {
-      const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, downloadWorkbook } =
+      const { criarRelatorioTorg, adicionarFolhaTorg, adicionarHeaderTabela, adicionarLinhaTabela, downloadWorkbook } =
         await import("@/lib/excel-relatorio");
       const headers = ["Peça (Syneco)", "Tipo", "Situação", "Onde está", "Falta passar por", "Rota lançada", "Sem apontamento (já passou)", "Planejado", "Produzido", "Peso (kg)", "1º apontamento", "Último"];
       const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({

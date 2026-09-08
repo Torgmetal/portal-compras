@@ -82,7 +82,11 @@ export async function GET(req, { params }) {
           semPeso: portal.mostrarPeso !== true,
         });
         if (tratada) { buf = tratada; nomeSaida = String(doc.nome).replace(/\.[a-z]+$/i, "") + ".xlsx"; }
-      } catch { /* qualquer tropeço: entrega o arquivo original */ }
+        else if(portal.mostrarPeso!==true)return new NextResponse('Esta planilha precisa de uma versão revisada sem peso antes de ser disponibilizada.',{status:422});
+      } catch {
+        // Uma falha de formatação não pode contornar a restrição de peso do portal.
+        if(portal.mostrarPeso!==true)return new NextResponse('Não foi possível preparar a versão autorizada desta planilha.',{status:422});
+      }
     }
     await prisma.portalCliente.update({ where: { id: portal.id }, data: { ultimoAcessoEm: new Date() } }).catch(() => {});
     await registrarAcesso(req, {

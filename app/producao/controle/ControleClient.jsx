@@ -378,7 +378,7 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
   };
 
   // Download planilha modelo para importação
-  const downloadModelo = () => {
+  const downloadModelo = async () => {
     const wsData = [
       ["MARCA", "DESCRIÇÃO", "OP", "QTE", "PESO UNIT (KG)", "PESO TOTAL (KG)", "PREÇO UNIT (R$)", "PREÇO TOTAL (R$)"],
       ["MK-001", "Viga principal 6m", "OP-2025-001", 4, 30.125, 120.5, 350.00, 1400.00],
@@ -398,7 +398,9 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Modelo");
-    XLSX.writeFile(wb, "modelo_importacao_producao.xlsx");
+    const {refinarModeloImportacao}=await import("@/lib/excel-tabular");
+    const {downloadWorkbook}=await import("@/lib/excel-relatorio");
+    await downloadWorkbook(await refinarModeloImportacao(wb,{titulo:"Modelo de importação da produção"}),"modelo_importacao_producao.xlsx");
   };
 
   // Peças planejadas do dia/setor atual
@@ -586,7 +588,7 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
               <div className="flex items-center gap-3">
                 {apontSetor.length > 0 && (
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const dataFmt = dataSelecionada; // já é string "YYYY-MM-DD"
                       const setorLabel = SETOR_LABELS[setorSelecionado] || setorSelecionado;
 
@@ -599,12 +601,12 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
                         ["Apontamentos", apontSetor.length],
                         [],
                         ["Realizado dia (kg)", Number(setorData.totalKg.toFixed(1))],
-                        ["Realizado dia (ton)", Number((setorData.totalKg / 1000).toFixed(3))],
-                        ["Meta dia (ton)", Number((metaDiaria / 1000).toFixed(2))],
+                        ["Realizado dia (Ton)", Number((setorData.totalKg / 1000).toFixed(3))],
+                        ["Meta dia (Ton)", Number((metaDiaria / 1000).toFixed(2))],
                         ["% Meta dia", metaDiaria > 0 ? `${pctDia.toFixed(1)}%` : "—"],
                         [],
-                        ["Acumulado mês (ton)", Number((realizadoMes.kg / 1000).toFixed(1))],
-                        ["Meta mês (ton)", Number((metaMensal / 1000).toFixed(1))],
+                        ["Acumulado mês (Ton)", Number((realizadoMes.kg / 1000).toFixed(1))],
+                        ["Meta mês (Ton)", Number((metaMensal / 1000).toFixed(1))],
                         ["% Meta mês", metaMensal > 0 ? `${pctMes.toFixed(1)}%` : "—"],
                         ["Peças dia", Math.round(setorData.totalUn)],
                         ["Peças mês", Math.round(realizadoMes.un)],
@@ -614,7 +616,9 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
                       // Detalhe dos apontamentos
                       const header = ["Hora", "Obra", "Item", "Operação", "Máquina", "Operador", "Peso (kg)", "Qtd", "Status"];
                       const rows = apontSetor.map((a) => [
-                        new Date(a.dataInicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+                        // Fração do dia conserva a hora local mostrada na tela;
+                        // Date seria gravado como UTC e deslocaria o horário no Excel.
+                        a.dataInicio ? (()=>{const d=new Date(a.dataInicio);return (d.getHours()*3600+d.getMinutes()*60+d.getSeconds())/86400;})() : null,
                         a.obra || "",
                         a.descricaoItem || "",
                         a.operacao || "",
@@ -625,18 +629,13 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
                         a.status || "",
                       ]);
 
-                      const wsData = [...resumo, header, ...rows];
-                      const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-                      // Larguras de coluna
-                      ws["!cols"] = [
-                        { wch: 22 }, { wch: 12 }, { wch: 30 }, { wch: 18 },
-                        { wch: 18 }, { wch: 22 }, { wch: 12 }, { wch: 8 }, { wch: 14 },
-                      ];
-
-                      const wb = XLSX.utils.book_new();
-                      XLSX.utils.book_append_sheet(wb, ws, "Produção Dia");
-                      XLSX.writeFile(wb, `producao_${setorLabel.toLowerCase()}_${dataFmt}.xlsx`);
+                      const {criarExcelTabular}=await import("@/lib/excel-tabular");
+                      const {downloadWorkbook}=await import("@/lib/excel-relatorio");
+                      const wb=await criarExcelTabular({titulo:`Produção diária — ${setorLabel}`,subtitulo:`Data: ${fmtData(dataSelecionada)}`,abas:[
+                        {nome:"Resumo",headers:["Indicador","Valor"],linhas:resumo.filter(r=>r.length===2),larguras:[38,42]},
+                        {nome:"Apontamentos",headers:header,linhas:rows,larguras:[16,14,38,22,22,26,16,12,20],formatos:{1:"hh:mm"}}
+                      ]});
+                      await downloadWorkbook(wb,`producao_${setorLabel.toLowerCase()}_${dataFmt}.xlsx`);
                     }}
                     className="flex items-center gap-1.5 text-xs font-medium text-torg-blue hover:text-torg-dark transition-colors px-2 py-1 rounded-md hover:bg-gray-50"
                   >

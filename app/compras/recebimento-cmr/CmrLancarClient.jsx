@@ -215,19 +215,16 @@ export default function CmrLancarClient() {
     if (!visiveis.length) { showToast("Nada para exportar", "erro"); return; }
     setExportando(true);
     try {
-      const XLSX = await import("xlsx");
+      const {criarExcelTabular}=await import('@/lib/excel-tabular');
+      const {downloadWorkbook}=await import('@/lib/excel-relatorio');
       const header = COLUNAS.map((c) => c.label);
       const rows = visiveis.map((l) => COLUNAS.map((c) => {
         const v = c.get(l);
         if (v == null || v === "") return "";
         return c.num ? Number(v) : String(v);
       }));
-      const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-      ws["!cols"] = COLUNAS.map((c) => ({ wch: c.w ? Math.min(70, Math.round(c.w / 6.5)) : Math.max(11, c.label.length + 3) }));
-      ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length, c: COLUNAS.length - 1 } }) };
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, `CMR ${ano}`);
-      XLSX.writeFile(wb, `CMR-TORG-${ano}.xlsx`);
+      const wb=await criarExcelTabular({titulo:`Controle de materiais recebidos — ${ano}`,subtitulo:'Registros conforme os filtros selecionados no portal',abas:[{nome:`CMR ${ano}`,headers:header,linhas:rows,larguras:COLUNAS.map(c=>c.w?Math.min(70,Math.round(c.w/6.5)):Math.max(11,c.label.length+3))}]});
+      await downloadWorkbook(wb, `CMR-TORG-${ano}.xlsx`);
     } catch (e) { showToast("Falha ao gerar Excel: " + e.message, "erro"); } finally { setExportando(false); }
   }
 

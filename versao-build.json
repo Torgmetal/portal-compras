@@ -1,7 +1,12 @@
 {
-  "build": 2958,
-  "gerado": "2026-09-08T10:25:35.047Z",
+  "build": 2959,
+  "gerado": "2026-09-08T10:27:26.111Z",
   "commits": [
+    {
+      "hash": "d2442aff",
+      "data": "08/09/2026",
+      "titulo": "versao-build 2958"
+    },
     {
       "hash": "ef0726b7",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "eaa4393c",
       "data": "07/09/2026",
       "titulo": "Pintura: a espessura de cálculo passa a ser a máxima"
-    },
-    {
-      "hash": "2705eea7",
-      "data": "07/09/2026",
-      "titulo": "Fila da pintura: informar a especificação na hora, sem tocar no PLP"
     }
   ]
 }

@@ -421,7 +421,7 @@ function Confronto({ c }) {
  * "Tinta estourou 155%" e não tem como conferir de onde veio.
  */
 async function exportarExcel(data, opNumero) {
-  const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook, CORES: _CORES } =
+  const { criarRelatorioTorg, adicionarFolhaTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook, CORES: _CORES } =
     await import("@/lib/excel-relatorio");
   const { familias, totais, receita, estudo, margem, alertas, confrontos, expedicao, op } = data;
   const D = (n) => (n == null ? "—" : Number(n));
@@ -484,10 +484,10 @@ async function exportarExcel(data, opNumero) {
   }
 
   // ── ABA: verba por família ───────────────────────────────────────────────────────────────
-  const wsFam = wb.addWorksheet("Verba por família");
+  const {sheet:wsFam,linhaInicio:inicioFam}=await adicionarFolhaTorg(wb,{titulo:`Verba por família — OP-${opNumero}`,nomePlanilha:"Verba por família",totalColunas:6,codigoDoc:"REL-FIN-001"});
   [28, 18, 18, 18, 12, 30].forEach((w, i) => { wsFam.getColumn(i + 1).width = w; });
-  adicionarHeaderTabela(wsFam, 1, ["Família", "Estimado", "Realizado", "Saldo", "Consumo", "Situação"]);
-  let rf = 2;
+  adicionarHeaderTabela(wsFam, inicioFam, ["Família", "Estimado", "Realizado", "Saldo", "Consumo", "Situação"]);
+  let rf = inicioFam+1;
   for (const f of familias) {
     adicionarLinhaTabela(wsFam, rf, [
       f.label, D(f.estimado), D(f.realizado), f.estimado > 0 ? D(f.saldo) : "—", pctTxt(f.pct),
@@ -505,10 +505,10 @@ async function exportarExcel(data, opNumero) {
   adicionarLinhaTotais(wsFam, rf, ["TOTAL", D(totais.estimado), D(totais.realizado), D(totais.saldo), pctTxt(totais.pct), ""]);
 
   // ── ABA: itens do contrato (o lado ESTIMADO, aberto) ─────────────────────────────────────
-  const wsIt = wb.addWorksheet("Itens do contrato");
+  const {sheet:wsIt,linhaInicio:inicioIt}=await adicionarFolhaTorg(wb,{titulo:`Itens do contrato — OP-${opNumero}`,nomePlanilha:"Itens do contrato",totalColunas:5,codigoDoc:"REL-FIN-001"});
   [24, 52, 18, 16, 16].forEach((w, i) => { wsIt.getColumn(i + 1).width = w; });
-  adicionarHeaderTabela(wsIt, 1, ["Família", "Descrição", "Verba", "Origem", "Faturamento"]);
-  let ri = 2;
+  adicionarHeaderTabela(wsIt, inicioIt, ["Família", "Descrição", "Verba", "Origem", "Faturamento"]);
+  let ri = inicioIt+1;
   for (const f of familias) {
     for (const i of f.itens) {
       adicionarLinhaTabela(wsIt, ri, [f.label, i.descricao || "", D(i.valor), i.origem === "base" ? "contrato base" : i.origem, i.fd ? "direto ao cliente" : "Torg"], { alinhamento: ["left", "left", "right", "left", "left"] });
@@ -517,10 +517,10 @@ async function exportarExcel(data, opNumero) {
   }
 
   // ── ABA: pedidos (o lado REALIZADO, aberto) ──────────────────────────────────────────────
-  const wsPd = wb.addWorksheet("Pedidos");
+  const {sheet:wsPd,linhaInicio:inicioPd}=await adicionarFolhaTorg(wb,{titulo:`Pedidos — OP-${opNumero}`,nomePlanilha:"Pedidos",totalColunas:6,codigoDoc:"REL-FIN-001"});
   [24, 14, 34, 14, 18, 22].forEach((w, i) => { wsPd.getColumn(i + 1).width = w; });
-  adicionarHeaderTabela(wsPd, 1, ["Família", "Pedido", "Fornecedor", "RM", "Valor", "Como foi atribuído"]);
-  let rp = 2;
+  adicionarHeaderTabela(wsPd, inicioPd, ["Família", "Pedido", "Fornecedor", "RM", "Valor", "Como foi atribuído"]);
+  let rp = inicioPd+1;
   for (const f of familias) {
     for (const p of f.pedidos) {
       adicionarLinhaTabela(wsPd, rp, [f.label, p.pedido || "—", p.fornecedor || "—", p.rm || "—", D(p.valor), `${p.via || ""}${p.rateado ? " · rateado entre famílias" : ""}`], { alinhamento: ["left", "left", "left", "left", "right", "left"] });
@@ -534,10 +534,10 @@ async function exportarExcel(data, opNumero) {
 
   // ── ABA: orçado × real na quantidade ─────────────────────────────────────────────────────
   if (confrontos?.length) {
-    const wsQt = wb.addWorksheet("Orçado x real");
+    const {sheet:wsQt,linhaInicio:inicioQt}=await adicionarFolhaTorg(wb,{titulo:`Orçado x real — OP-${opNumero}`,nomePlanilha:"Orçado x real",totalColunas:9,codigoDoc:"REL-FIN-001"});
     [22, 8, 14, 14, 10, 16, 18, 18, 34].forEach((w, i) => { wsQt.getColumn(i + 1).width = w; });
-    adicionarHeaderTabela(wsQt, 1, ["Grandeza", "Un.", "Orçado", "Na lista", "Desvio", "Verba", "Preço orçado", "Custo na qtd real", "Observação"]);
-    let rq = 2;
+    adicionarHeaderTabela(wsQt, inicioQt, ["Grandeza", "Un.", "Orçado", "Na lista", "Desvio", "Verba", "Preço orçado", "Custo na qtd real", "Observação"]);
+    let rq = inicioQt+1;
     for (const c of confrontos) {
       if (c.semComparacao) {
         adicionarLinhaTabela(wsQt, rq, [c.rotulo, c.unidade, "—", "—", "—", "—", "—", "—", `item do contrato está em ${c.unidadeErrada} — unidade não comparável`], { alinhamento: ["left", "center", "right", "right", "right", "right", "right", "right", "left"] });
@@ -567,10 +567,10 @@ async function exportarExcel(data, opNumero) {
 
   // ── ABA: pontos pra conferir ─────────────────────────────────────────────────────────────
   if (alertas?.length) {
-    const wsAl = wb.addWorksheet("Conferir");
+    const {sheet:wsAl,linhaInicio:inicioAl}=await adicionarFolhaTorg(wb,{titulo:`Conferir — OP-${opNumero}`,nomePlanilha:"Conferir",totalColunas:2,codigoDoc:"REL-FIN-001"});
     [16, 120].forEach((w, i) => { wsAl.getColumn(i + 1).width = w; });
-    adicionarHeaderTabela(wsAl, 1, ["Nível", "O que conferir"]);
-    let ra = 2;
+    adicionarHeaderTabela(wsAl, inicioAl, ["Nível", "O que conferir"]);
+    let ra = inicioAl+1;
     for (const a of alertas) {
       adicionarLinhaTabela(wsAl, ra, [a.nivel === "alerta" ? "ALERTA" : a.nivel === "atencao" ? "Atenção" : "Informação", a.texto], {
         wrapText: true,

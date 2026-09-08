@@ -3,7 +3,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import * as XLSX from "xlsx";
+import {criarExcelTabular} from "@/lib/excel-tabular";
+import {bufferWorkbookTorg} from "@/lib/excel-relatorio";
 import { dispArquivo } from "@/lib/arquivo-http";
 
 export const runtime = "nodejs";
@@ -31,12 +32,8 @@ export async function GET(_req, { params }) {
     r2(it.adicionalNoturno), r2(it.dsr), r2(it.ajudaCusto), it.observacao || "",
   ]);
 
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([[`PONTO ${ponto.competencia}${ponto.empresa ? " — " + ponto.empresa : ""}`], head, ...linhas]);
-  ws["!cols"] = [{ wch: 16 }, { wch: 14 }, { wch: 30 }, { wch: 6 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 8 }, { wch: 14 }, { wch: 30 }];
-  XLSX.utils.book_append_sheet(wb, ws, "Ponto");
-
-  const buf = Buffer.from(XLSX.write(wb, { type: "array", bookType: "xlsx" }));
+  const wb=await criarExcelTabular({titulo:`Ponto — ${ponto.competencia}`,subtitulo:ponto.empresa||"",codigoDoc:"REL-RH-002",abas:[{nome:"Ponto",headers:head,linhas,larguras:[18,20,38,10,14,14,14,14,18,14,18,40],formatos:{5:"#,##0.00",6:"#,##0.00",7:"#,##0.00",8:"#,##0.00",9:"#,##0.00",10:"#,##0.00",11:"#,##0.00"}}]});
+  const buf=Buffer.from(await bufferWorkbookTorg(wb));
   return new NextResponse(buf, {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

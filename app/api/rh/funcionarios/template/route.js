@@ -1,3 +1,5 @@
+import {refinarModeloImportacao} from "@/lib/excel-tabular";
+import {bufferWorkbookTorg} from "@/lib/excel-relatorio";
 // GET /api/rh/funcionarios/template — gera planilha modelo para importação
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -116,7 +118,7 @@ export async function GET() {
     XLSX.utils.book_append_sheet(wb, wsRef, "Referência");
 
     // Gerar buffer
-    const out = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const out = await bufferWorkbookTorg(await refinarModeloImportacao(wb,{titulo:"Modelo de funcionarios — RH"}));
     const buf = Buffer.from(out);
 
     return new NextResponse(buf, {

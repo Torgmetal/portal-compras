@@ -64,7 +64,7 @@ async function parsePlanilha(file) {
   if (out.some((r) => r._ordem != null)) out.sort((a, b) => (a._ordem ?? 9999) - (b._ordem ?? 9999));
   return out.map(({ _ordem, ...r }) => r);
 }
-function baixarModelo() {
+async function baixarModelo() {
   const ws = XLSX.utils.aoa_to_sheet([
     ["Lote", "Local de entrega", "Prioridade", "Data prevista", "Peso (kg)", "Observação"],
     ["Lote 1 — Pilares", "Obra SP — Galpão A", 1, "", "", "Pesos a definir pela Engenharia"],
@@ -73,7 +73,9 @@ function baixarModelo() {
   ws["!cols"] = [{ wch: 22 }, { wch: 28 }, { wch: 11 }, { wch: 14 }, { wch: 11 }, { wch: 30 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Lotes de entrega");
-  XLSX.writeFile(wb, "modelo-lotes-entrega.xlsx");
+  const {refinarModeloImportacao}=await import("@/lib/excel-tabular");
+  const {downloadWorkbook}=await import("@/lib/excel-relatorio");
+  await downloadWorkbook(await refinarModeloImportacao(wb,{titulo:"Modelo de lotes de entrega"}),"modelo-lotes-entrega.xlsx");
 }
 
 // ── componente ────────────────────────────────────────────────────────────────

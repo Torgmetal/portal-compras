@@ -1,3 +1,5 @@
+import {refinarModeloImportacao} from "@/lib/excel-tabular";
+import {bufferWorkbookTorg} from "@/lib/excel-relatorio";
 // GET /api/rh/cargos/template — gera planilha modelo para importação de cargos
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
@@ -33,7 +35,7 @@ export async function GET() {
     wsInst["!cols"] = [{ wch: 14 }, { wch: 12 }, { wch: 18 }, { wch: 55 }];
     XLSX.utils.book_append_sheet(wb, wsInst, "Instruções");
 
-    const out = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const out = await bufferWorkbookTorg(await refinarModeloImportacao(wb,{titulo:"Modelo de cargos — RH"}));
     const buf = Buffer.from(out);
 
     return new NextResponse(buf, {
