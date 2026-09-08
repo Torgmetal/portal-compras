@@ -49,6 +49,13 @@ export const CSS = `
           justify-content:center;gap:1px}
   .gpcp .rotulo b{font-size:12px;font-weight:700}
   .gpcp .rotulo small{font-size:10.5px;color:var(--tinta-2)}
+  /* ⚠ os dois botões da lista do posto (dia · semana). Sem estilo eles saíam como texto colado —
+     o rótulo do Laser Perfil aparecia "diasemana" embaixo do nome, e ninguém entendia o que era. */
+  .gpcp .rotulo .lista{display:flex;gap:4px;margin:3px 0 1px}
+  .gpcp .rotulo .lista .mini{font-size:9.5px;line-height:1;padding:3px 6px;border-radius:5px;
+    border:1px solid var(--linha);background:#fff;color:var(--tinta-2);cursor:pointer}
+  .gpcp .rotulo .lista .mini:hover{background:#eef2f7;color:var(--tinta);border-color:#c7d2e0}
+  .gpcp .rotulo .lista .mini:disabled{opacity:.5;cursor:default}
   .gpcp .trilho{position:relative;flex:0 0 auto;z-index:1}
   .gpcp .celulas{display:flex;height:100%}
   .gpcp .cel{flex:0 0 var(--col);border-right:1px solid var(--linha);position:relative}
