@@ -1,7 +1,12 @@
 {
-  "build": 3023,
-  "gerado": "2026-09-09T00:09:48.163Z",
+  "build": 3024,
+  "gerado": "2026-09-09T00:20:20.903Z",
   "commits": [
+    {
+      "hash": "f0db952e",
+      "data": "08/09/2026",
+      "titulo": "feat(rh): registrar contratações parciais e manter saldo de vagas"
+    },
     {
       "hash": "61ffa732",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "8a9940ba",
       "data": "08/09/2026",
       "titulo": "PCP: o aviso mostra o que falta agendar, e enxerga liberação órfã"
-    },
-    {
-      "hash": "e03488b3",
-      "data": "08/09/2026",
-      "titulo": "CLAUDE.md: Conferência de Peça e o único módulo que abre no celular"
     }
   ]
 }

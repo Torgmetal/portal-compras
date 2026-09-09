@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { faixaForaDeOrdem } from "@/lib/cargo-faixa";
-import { Briefcase, PlusCircle, Loader2, AlertCircle, X, ChevronDown, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Pencil } from "lucide-react";
+import { Briefcase, Search, PlusCircle, Loader2, AlertCircle, X, ChevronDown, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Pencil } from "lucide-react";
 
 const NIVEIS = [
   { value: "OPERACIONAL", label: "Operacional", cor: "bg-gray-100 text-gray-700" },
@@ -10,13 +10,15 @@ const NIVEIS = [
   { value: "GERENCIA", label: "Gerência", cor: "bg-amber-100 text-amber-800" },
   { value: "DIRETORIA", label: "Diretoria", cor: "bg-rose-100 text-rose-800" },
 ];
-Object.fromEntries(NIVEIS.map((n) => [n.value, n]));
+const NIVEL_POR_VALOR = Object.fromEntries(NIVEIS.map((n) => [n.value, n]));
+const normalizarBusca = valor => String(valor || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 
 export default function CargosClient() {
   const [cargos, setCargos] = useState([]);
+  const [busca, setBusca] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
   const [modal, setModal] = useState(false);
@@ -161,9 +163,15 @@ export default function CargosClient() {
     return <div className="flex items-center justify-center py-20 text-torg-gray"><Loader2 size={20} className="animate-spin mr-2" /> Carregando cargos…</div>;
   }
 
-  // Agrupar por nível
+  const termos = normalizarBusca(busca).trim().split(/\s+/).filter(Boolean);
+  const filtrados = cargos.filter(c => {
+    const texto = normalizarBusca(`${c.nome} ${c.categoria || ""} ${c.cbo || ""} ${String(c.cbo || "").replace(/\D/g, "")} ${NIVEL_POR_VALOR[c.nivel]?.label || ""}`);
+    return termos.every(termo => texto.includes(termo));
+  });
+
+  // Filtrar antes de agrupar mantém os totais de cada nível coerentes com a busca.
   const porNivel = {};
-  for (const c of cargos) {
+  for (const c of filtrados) {
     const n = c.nivel || "SEM_NIVEL";
     if (!porNivel[n]) porNivel[n] = [];
     porNivel[n].push(c);
@@ -194,6 +202,17 @@ export default function CargosClient() {
         </div>
       </div>
 
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-torg-gray" />
+          <input type="search" aria-label="Buscar cargos" value={busca} onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar por cargo, categoria ou CBO…"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
+        </div>
+        {busca && <button type="button" onClick={() => setBusca("")} className="text-sm text-torg-blue hover:underline">Limpar busca</button>}
+        <span role="status" className="text-xs text-torg-gray">{filtrados.length} de {cargos.length} cargos</span>
+      </div>
+
       {erro && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
           <AlertCircle size={14} className="mt-0.5" /> {erro}
@@ -213,6 +232,11 @@ export default function CargosClient() {
           <Briefcase size={48} className="mx-auto text-gray-300 mb-4" />
           <p className="text-torg-gray text-lg font-medium">Nenhum cargo cadastrado</p>
           <p className="text-xs text-torg-gray mt-2">Crie os cargos da empresa para poder cadastrar funcionários.</p>
+        </div>
+      ) : filtrados.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-100 p-10 text-center">
+          <p className="font-medium text-torg-dark">Nenhum cargo encontrado</p>
+          <p className="text-sm text-torg-gray mt-1">Tente outro nome, categoria ou CBO.</p>
         </div>
       ) : (
         <div className="space-y-6">
