@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { aplicarQuantidadesVaga } from "@/lib/rh-vagas-quantidades";
 import { z } from "zod";
 
 const patchVagaSchema = z.object({
+  quantidadeContratada: z.number().int().min(1).optional(),
+  versaoEsperada: z.string().datetime().optional(),
   titulo: z.string().min(2).optional(),
   status: z.enum(["SOLICITADA", "APROVADA", "EM_RECRUTAMENTO", "PREENCHIDA", "CANCELADA"]).optional(),
   dataAprovacao: z.string().optional().nullable(),
@@ -46,7 +49,7 @@ export async function GET(req, { params }) {
 
     return NextResponse.json({ success: true, data: vaga });
   } catch (e) {
-    const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
+    const status = e.status || (e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500);
     return NextResponse.json({ success: false, error: e.message }, { status });
   }
 }
@@ -74,7 +77,7 @@ export async function PATCH(req, { params }) {
       );
     }
 
-    const data = { ...parsed.data };
+    const data = aplicarQuantidadesVaga(vaga, parsed.data);
 
     // Auto-set dataAprovacao when status changes to APROVADA
     if (data.status === "APROVADA" && vaga.status !== "APROVADA") {
@@ -94,26 +97,31 @@ export async function PATCH(req, { params }) {
     if (data.dataAprovacao) data.dataAprovacao = new Date(data.dataAprovacao);
     if (data.dataFechamento) data.dataFechamento = new Date(data.dataFechamento);
 
-    const atualizada = await prisma.vaga.update({
-      where: { id },
-      data,
-      include: {
-        setor: { select: { id: true, nome: true } },
-        cargo: { select: { id: true, nome: true } },
-      },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: user.id,
-        action: "ATUALIZAR_VAGA",
-        entity: "Vaga",
-        entityId: id,
-        diff: {
-          antes: { status: vaga.status, titulo: vaga.titulo },
-          depois: { status: atualizada.status, titulo: atualizada.titulo },
+    const atualizada = await prisma.$transaction(async (tx) => {
+      // A comparação também protege edições concorrentes e reenvios da mesma baixa.
+      const resultado = await tx.vaga.updateMany({where: {id, updatedAt: vaga.updatedAt}, data});
+      if (resultado.count !== 1) {
+        const erro = new Error("Esta vaga foi atualizada. Recarregue a lista e tente novamente.");
+        erro.status = 409; throw erro;
+      }
+      const nova = await tx.vaga.findUnique({
+        where: {id},
+        include: {setor: {select: {id: true, nome: true}}, cargo: {select: {id: true, nome: true}}},
+      });
+      await tx.auditLog.create({
+        data: {
+          userId: user.id,
+          action: parsed.data.quantidadeContratada ? "REGISTRAR_CONTRATACAO_VAGA" : "ATUALIZAR_VAGA",
+          entity: "Vaga", entityId: id,
+          diff: {
+            antes: {status: vaga.status, titulo: vaga.titulo, quantidade: vaga.quantidade, quantidadePreenchida: vaga.quantidadePreenchida},
+            depois: {status: nova.status, titulo: nova.titulo, quantidade: nova.quantidade, quantidadePreenchida: nova.quantidadePreenchida},
+            quantidadeContratada: parsed.data.quantidadeContratada || null,
+            contratadoNome: parsed.data.funcionarioContratadoNome || null,
+          },
         },
-      },
+      });
+      return nova;
     });
 
     return NextResponse.json({ success: true, data: atualizada });
@@ -124,7 +132,7 @@ export async function PATCH(req, { params }) {
         { status: 400 }
       );
     }
-    const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
+    const status = e.status || (e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500);
     return NextResponse.json({ success: false, error: e.message }, { status });
   }
 }
@@ -181,7 +189,7 @@ export async function DELETE(req, { params }) {
 
     return NextResponse.json({ success: true, data: atualizada });
   } catch (e) {
-    const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
+    const status = e.status || (e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500);
     return NextResponse.json({ success: false, error: e.message }, { status });
   }
 }

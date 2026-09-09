@@ -131,11 +131,13 @@ export async function GET(req) {
     },
   });
 
-  const vagasAbertas = await prisma.vaga.count({
+  const saldoVagas = await prisma.vaga.aggregate({
     where: {
       status: { notIn: ["PREENCHIDA", "CANCELADA"] },
     },
+    _sum: {quantidade: true, quantidadePreenchida: true},
   });
+  const vagasAbertas = (saldoVagas._sum.quantidade || 0) - (saldoVagas._sum.quantidadePreenchida || 0);
 
   const detalheVagas = vagasPreenchidas.map((v) => {
     const dataSolicitacao = v.createdAt;

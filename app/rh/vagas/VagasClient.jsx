@@ -2,6 +2,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Briefcase, Search, PlusCircle, Loader2, AlertCircle, X, ChevronDown, Clock, CheckCircle2, Users, Calendar, Mail, Send, Image as ImageIcon, Download, Palette, CheckCircle, Copy, Pencil } from "lucide-react";
 
+import { resumoVaga } from "@/lib/rh-vagas-quantidades";
+import RegistrarContratacao from "./RegistrarContratacao";
+
 const STATUS_LABELS = {
   SOLICITADA: { label: "Solicitada", cor: "bg-blue-100 text-blue-800" },
   APROVADA: { label: "Aprovada", cor: "bg-amber-100 text-amber-800" },
@@ -47,6 +50,7 @@ export default function VagasClient() {
   const [aviso, setAviso] = useState("");
   const [notificando, setNotificando] = useState("");
   const [arteVaga, setArteVaga] = useState(null);
+  const [contratando, setContratando] = useState(null);
 
   const carregar = async () => {
     setCarregando(true);
@@ -73,6 +77,7 @@ export default function VagasClient() {
 
   // Filtros
   const filtradas = vagas.filter((v) => {
+    if (!verTodas && ["PREENCHIDA", "CANCELADA"].includes(v.status)) return false;
     if (filtroStatus && v.status !== filtroStatus) return false;
     if (filtroSetor && v.setor?.id !== filtroSetor) return false;
     if (busca) {
@@ -158,10 +163,6 @@ export default function VagasClient() {
     setAtualizando(true);
     try {
       const body = { status: novoStatus };
-      if (novoStatus === "PREENCHIDA") {
-        const nome = prompt("Nome do contratado (opcional):");
-        if (nome) body.funcionarioContratadoNome = nome;
-      }
       const res = await fetch(`/api/rh/vagas/${vaga.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -202,8 +203,8 @@ export default function VagasClient() {
   };
 
   // Contadores
-  const abertas = vagas.filter((v) => !["PREENCHIDA", "CANCELADA"].includes(v.status)).length;
-  const urgentes = vagas.filter((v) => v.prioridade === "URGENTE" && !["PREENCHIDA", "CANCELADA"].includes(v.status)).length;
+  const abertas = vagas.reduce((total, v) => total + resumoVaga(v).abertas, 0);
+  const urgentes = vagas.filter(v => v.prioridade === "URGENTE").reduce((total, v) => total + resumoVaga(v).abertas, 0);
 
   if (carregando) {
     return (
@@ -292,7 +293,8 @@ export default function VagasClient() {
             const st = STATUS_LABELS[v.status] || { label: v.status, cor: "bg-gray-100 text-gray-700" };
             const pri = PRIORIDADE_LABELS[v.prioridade] || PRIORIDADE_LABELS.NORMAL;
             const dias = diasAberto(v.dataAbertura, v.dataFechamento);
-            const aberta = !["PREENCHIDA", "CANCELADA"].includes(v.status);
+            const resumo = resumoVaga(v);
+            const aberta = resumo.abertas > 0;
 
             return (
               <div key={v.id} className={`bg-white rounded-xl border shadow-sm p-5 ${
@@ -313,13 +315,19 @@ export default function VagasClient() {
                   </div>
                 </div>
 
-                <div className="mt-3 flex items-center gap-4 text-xs text-torg-gray">
-                  <span className="inline-flex items-center gap-1"><Users size={12} /> {v.quantidade} vaga{v.quantidade !== 1 ? "s" : ""}</span>
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-torg-gray">
+                  <span className="inline-flex items-center gap-1"><Users size={12} /> {resumo.total} prevista{resumo.total !== 1 ? "s" : ""}</span>
                   <span className="inline-flex items-center gap-1"><Calendar size={12} /> {fmtData(v.dataAbertura)}</span>
                   <span className="inline-flex items-center gap-1">
                     <Clock size={12} />
                     <span className={dias > 30 && aberta ? "text-red-600 font-medium" : ""}>{dias} dias</span>
                   </span>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                  <span className="text-emerald-700"><b>{resumo.preenchidas}</b> preenchida{resumo.preenchidas !== 1 ? "s" : ""}</span>
+                  <span className="text-torg-blue"><b>{resumo.abertas}</b> em aberto</span>
+                  {v.status === "CANCELADA" && resumo.restantes > 0 && <span className="text-torg-gray">{resumo.restantes} cancelada(s)</span>}
                 </div>
 
                 {v.justificativa && (
@@ -328,7 +336,7 @@ export default function VagasClient() {
 
                 {v.funcionarioContratadoNome && (
                   <p className="mt-2 text-xs text-emerald-700 flex items-center gap-1">
-                    <CheckCircle2 size={12} /> Contratado: {v.funcionarioContratadoNome}
+                    <CheckCircle2 size={12} /> Contratado(s): <span className="whitespace-pre-line">{v.funcionarioContratadoNome}</span>
                   </p>
                 )}
 
@@ -366,9 +374,9 @@ export default function VagasClient() {
                       </>
                     )}
                     {v.status === "EM_RECRUTAMENTO" && (
-                      <button onClick={() => handleStatusChange(v, "PREENCHIDA")}
+                      <button onClick={() => setContratando(v)}
                         className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition">
-                        Marcar Preenchida
+                        Registrar contratação
                       </button>
                     )}
                     {["APROVADA", "EM_RECRUTAMENTO"].includes(v.status) && (
@@ -389,6 +397,14 @@ export default function VagasClient() {
           })}
         </div>
       )}
+
+      {contratando && <RegistrarContratacao vaga={contratando} onClose={() => setContratando(null)}
+        onSaved={(atualizada, quantidade) => {
+          setVagas(prev => prev.map(v => v.id === atualizada.id ? {...v, ...atualizada} : v));
+          setContratando(null);
+          const saldo = resumoVaga(atualizada).abertas;
+          setAviso(`${quantidade} ${quantidade === 1 ? "contratação registrada" : "contratações registradas"}. ${saldo === 0 ? "Pedido totalmente preenchido." : `${saldo} ${saldo === 1 ? "vaga continua" : "vagas continuam"} em aberto neste pedido.`}`);
+        }} />}
 
       {/* Modal Nova Vaga */}
       {modalAberto && (

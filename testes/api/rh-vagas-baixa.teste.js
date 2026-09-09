@@ -1,0 +1,22 @@
+import {beforeEach,expect,it,vi} from 'vitest';
+import {mockPrisma} from '@/testes/apoio/prisma';
+const mocks=vi.hoisted(()=>({role:vi.fn()}));
+vi.mock('@/lib/prisma',()=>({prisma:mockPrisma}));
+vi.mock('@/lib/session',()=>({requireRole:mocks.role}));
+import {PATCH} from '@/app/api/rh/vagas/[id]/route';
+const vaga={id:'v1',titulo:'Auxiliar Geral',quantidade:3,quantidadePreenchida:0,status:'EM_RECRUTAMENTO',updatedAt:new Date('2026-09-08T12:00:00Z')};
+const baixa={quantidadeContratada:1,versaoEsperada:vaga.updatedAt.toISOString()};
+const patch=body=>PATCH(new Request('http://localhost/api/rh/vagas/v1',{method:'PATCH',body:JSON.stringify(body)}),{params:{id:'v1'}});
+beforeEach(()=>{
+ vi.resetAllMocks();mocks.role.mockResolvedValue({id:'rh'});
+ mockPrisma.vaga.findUnique.mockResolvedValue(vaga);
+ mockPrisma.vaga.updateMany.mockImplementation(async({data})=>{mockPrisma.vaga.findUnique.mockResolvedValue({...vaga,...data});return {count:1};});
+ mockPrisma.auditLog.create.mockResolvedValue({});
+});
+it('grava baixa parcial e retorna o saldo sem encerrar',async()=>{const res=await patch(baixa);expect(res.status).toBe(200);expect((await res.json()).data).toMatchObject({quantidade:3,quantidadePreenchida:1,status:'EM_RECRUTAMENTO',dataFechamento:null});expect(mockPrisma.auditLog.create.mock.calls[0][0].data.diff.quantidadeContratada).toBe(1);});
+it('não grava quantidade superior ao saldo',async()=>{expect((await patch({...baixa,quantidadeContratada:4})).status).toBe(400);expect(mockPrisma.vaga.updateMany).not.toHaveBeenCalled();});
+it('fecha pedido ao preencher as últimas vagas',async()=>{const res=await patch({...baixa,quantidadeContratada:3});expect((await res.json()).data).toMatchObject({status:'PREENCHIDA',quantidadePreenchida:3});});
+it('reenvio com versão antiga não registra outra contratação',async()=>{mockPrisma.vaga.findUnique.mockResolvedValue({...vaga,updatedAt:new Date('2026-09-09')});expect((await patch(baixa)).status).toBe(409);expect(mockPrisma.vaga.updateMany).not.toHaveBeenCalled();});
+it('conflito entre leitura e gravação não registra auditoria nem sucesso',async()=>{mockPrisma.vaga.updateMany.mockResolvedValue({count:0});expect((await patch(baixa)).status).toBe(409);expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();});
+it('recusa alterar total abaixo das contratações já realizadas',async()=>{mockPrisma.vaga.findUnique.mockResolvedValue({...vaga,quantidadePreenchida:2});expect((await patch({quantidade:1})).status).toBe(400);expect(mockPrisma.vaga.updateMany).not.toHaveBeenCalled();});
+it('mantém controle de acesso',async()=>{mocks.role.mockRejectedValue(new Error('Forbidden'));expect((await patch(baixa)).status).toBe(403);expect(mockPrisma.vaga.findUnique).not.toHaveBeenCalled();});

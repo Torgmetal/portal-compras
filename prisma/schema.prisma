@@ -2699,6 +2699,7 @@ model DataBookSecaoDoc {
 }
 
 model Vaga {
+  quantidadePreenchida      Int       @default(0)
   id                        String    @id @default(cuid())
   titulo                    String
   setorId                   String
