@@ -10,6 +10,7 @@ const ordem = (setor, produzidoUn) => ({ opId: "o1", item: "T67F1", setor, produ
 beforeEach(() => {
   vi.clearAllMocks();
   mockPrisma.pecaConjunto.findMany.mockResolvedValue([]);
+  mockPrisma.romaneioItem.findMany.mockResolvedValue([]);
 });
 
 describe("apontamento na frente dá baixa atrás", () => {
@@ -74,5 +75,48 @@ describe("a baixa manual do portal continua valendo", () => {
     const feito = await lerProduzidoPorSetor([P]);
     expect(feito(P, "SOLDA")).toBe(6);
     expect(feito(P, "MONTAGEM")).toBe(6);
+  });
+});
+
+/* ⚠⚠ O ROMANEIO É A ÚLTIMA ETAPA. Vitor (09/09/2026), sobre a OP-104: "deve ter algum furo de
+   apontamento, não temos mais montagem dela". Os seis guarda-corpos (9 peças) não têm apontamento
+   em setor NENHUM — a dedução pela rota não os alcançava, porque não havia nada à frente. Mas as
+   nove embarcaram no R02 em 14/08, quantidade completa. */
+describe("peça expedida dá baixa na rota inteira", () => {
+  const comRomaneio = (qtd) => {
+    mockPrisma.romaneioItem.findMany.mockResolvedValue([
+      { qtd, pecaConjunto: { opId: "o1", marca: "T67F1" } },
+    ]);
+  };
+
+  it("sem apontamento nenhum, o embarque prova montagem, solda e pintura", async () => {
+    mockPrisma.mesOrdem.findMany.mockResolvedValue([]);
+    comRomaneio(3);
+    const feito = await lerProduzidoPorSetor([P]);
+    for (const s of ["CORTE", "MONTAGEM", "SOLDA", "JATO", "PINTURA"]) expect(feito(P, s)).toBe(3);
+  });
+
+  it("vale o maior: 5 apontadas na solda com 3 embarcadas continuam 5", async () => {
+    mockPrisma.mesOrdem.findMany.mockResolvedValue([ordem("Solda", 5)]);
+    comRomaneio(3);
+    const feito = await lerProduzidoPorSetor([P]);
+    expect(feito(P, "SOLDA")).toBe(5);
+  });
+
+  it("dois romaneios da mesma marca somam — a carga pode ir partida", async () => {
+    mockPrisma.mesOrdem.findMany.mockResolvedValue([]);
+    mockPrisma.romaneioItem.findMany.mockResolvedValue([
+      { qtd: 79, pecaConjunto: { opId: "o1", marca: "T67F1" } },
+      { qtd: 5, pecaConjunto: { opId: "o1", marca: "T67F1" } },
+    ]);
+    const feito = await lerProduzidoPorSetor([P]);
+    expect(feito(P, "MONTAGEM")).toBe(84);
+  });
+
+  it("no modo cru o romaneio não é nem consultado", async () => {
+    mockPrisma.mesOrdem.findMany.mockResolvedValue([ordem("Montagem", 0)]);
+    const feito = await lerProduzidoPorSetor([P], ["MONTAGEM"], { deduzirRota: false });
+    expect(feito(P, "MONTAGEM")).toBe(0);
+    expect(mockPrisma.romaneioItem.findMany).not.toHaveBeenCalled();
   });
 });

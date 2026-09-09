@@ -1,7 +1,12 @@
 {
-  "build": 3052,
-  "gerado": "2026-09-09T22:44:47.936Z",
+  "build": 3053,
+  "gerado": "2026-09-09T22:56:26.421Z",
   "commits": [
+    {
+      "hash": "88ca2b72",
+      "data": "09/09/2026",
+      "titulo": "Gantt: da solda em diante a fila aparece sem esperar liberação"
+    },
     {
       "hash": "fd38991b",
       "data": "09/09/2026",
@@ -146,11 +151,6 @@
       "hash": "f0db952e",
       "data": "08/09/2026",
       "titulo": "feat(rh): registrar contratações parciais e manter saldo de vagas"
-    },
-    {
-      "hash": "61ffa732",
-      "data": "08/09/2026",
-      "titulo": "Liberação: conjunto não compra aço — ele herda o material dos croquis"
     }
   ]
 }

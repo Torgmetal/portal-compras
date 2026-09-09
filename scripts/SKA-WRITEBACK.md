@@ -6,7 +6,7 @@ no terminal e o painel mostra divergência entre setores (ex.: Corte=10, Montage
 
 > ⚠️ Hoje a integração é **só leitura** (`/v1/dataset`). Não existe escrita ainda. A API de
 > escrita do SKA **não é documentada publicamente** — por isso precisamos descobri-la na rede
-> da Torg. Rode tudo abaixo numa máquina que **enxerga** `192.168.0.190:1000` (a do `C:\MesSync`).
+> da Torg. Rode tudo abaixo numa máquina que **enxerga** `192.168.0.190:81` (a do `C:\MesSync`).
 
 ---
 
