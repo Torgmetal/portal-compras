@@ -16,6 +16,7 @@ import { criarArraste } from "./_gantt/arraste";
 import { criarGrade } from "./_gantt/grade";
 import { criarAtraso } from "./_gantt/atraso";
 import { criarLotes } from "./_gantt/lotes";
+import { destinosFinais } from "@/lib/gantt-destinos";
 
 // ─── O QUADRO DE PROGRAMAÇÃO DO PCP ────────────────────────────────────────────────────────────
 //
@@ -59,9 +60,9 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   let seq = 0;
   const novoLote = (o)=>({ ...o, uid:"L"+(++seq) });
   let lotes = LOTES.map(l=>novoLote({ ...l, recursoOrig:l.recurso, diaOrig:l.dia }));
-  let alteracoes = [], setoresOn = new Set(SETORES), regua = "normal", inicio = 0;
-  let painel = null, abaP = "projetos";
-  const estado = new Map();
+  let alteracoes = [], setoresOn = new Set(ajuda.vista?.setores || SETORES), regua = ajuda.vista?.regua || "normal", inicio = 0;
+  let painel = null, abaP = "projetos", salvando = false;
+  const estado = new Map(ajuda.vista?.estado || []);
 
   // ⚠ QUATRO SETORES SE MEDEM EM KG, dois em bancada-dia. Corte, acabamento, jato e pintura têm capacidade do
   // RECURSO em kg/dia (a máquina, ou a bancada única do setor), então o custo do lote é o próprio
@@ -91,12 +92,16 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     const i = DIAS.findIndex(d=>d>=HOJE);
     return Math.max(0, Math.min(DIAS.length-JANELA, (i<0?DIAS.length-JANELA:i)-2));
   }
-  inicio = janelaDeHoje();
+  inicio = ajuda.vista?.dia && IDX.has(ajuda.vista.dia) ? IDX.get(ajuda.vista.dia) : janelaDeHoje();
+  for (const b of raiz.querySelectorAll('.barra [data-setor]')) b.classList.toggle('on', setoresOn.has(b.dataset.setor));
+  $('regua').textContent = regua === 'meta' ? 'Ritmo meta' : 'Ritmo normal';
+  $('regua').classList.toggle('on', regua === 'meta');
 
 
 
   /* ── aplicar / desfazer ─────────────────────────────────────────────────────── */
   function registrar(alt){
+    if (salvando) return;
     for(const l of alt.antes){
       const i = lotes.findIndex(x=>x.uid===l.uid);
       if(i<0) continue;
@@ -112,12 +117,13 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   }
   function desfazer(i){
     const a = alteracoes[i]; if(!a) return;
-    if(alteracoes.slice(i+1).some(b=>[...b.ids].some(id=>a.ids.has(id)))){
+    if(alteracoes.slice(i+1).some(b=>b.setor===a.setor && [...b.ids].some(id=>a.ids.has(id)))){
       alert("Há uma alteração mais recente sobre as mesmas peças.\nDesfaça primeiro a de baixo.");
       return;
     }
     const restantes = [];
     for(const l of lotes){
+      if(l.setor!==a.setor){ restantes.push(l); continue; }
       const fica = l.itens.filter(x=>!a.ids.has(x.id));
       if(fica.length === l.itens.length){ restantes.push(l); continue; }
       if(fica.length){ l.itens = fica; restantes.push(recalc(l)); }
@@ -130,7 +136,13 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   }
   /* ⚠ estes dois handlers moravam DENTRO de `redesenhar`, que não roda no init: "Atualizar" e "Tela
      cheia" ficavam mortos até o usuário navegar o período ou arrastar alguma barra. */
-  $("recarregar").onclick = ()=>recarregar();
+  $("recarregar").onclick = ()=>{
+    if (alteracoes.length || salvando) {
+      avisar(false, 'Há alterações não salvas. Salve ou use Descartar tudo antes de atualizar.');
+      return;
+    }
+    recarregar();
+  };
   $("cheio").onclick = ()=>{
     const c = raiz.classList.toggle("cheio");
     $("cheio").textContent = c ? "Sair da tela cheia" : "Tela cheia";
@@ -216,21 +228,26 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
 
   /* ── o que seria gravado ────────────────────────────────────────────────────── */
   $("salvar").onclick = async ()=>{
-    if(!alteracoes.length) return;
+    if(!alteracoes.length || salvando) return;
     const blocos = [];
     for(const a of alteracoes) for(const d of a.depois) blocos.push({ setor:a.setor, ids:d.ids, recurso:d.recurso, dia:d.dia });
     const pecas = alteracoes.reduce((s,a)=>s+a.pecas,0);
     if(!confirm("Gravar "+alteracoes.length+" alteração(ões) de programação ("+pecas+" peças)?\n\nIsto muda o dia e o recurso das peças no portal.")) return;
     const b = $("salvar"); b.disabled = true; b.textContent = "Salvando…";
+    salvando = true; raiz.dataset.salvando = 'true'; raiz.inert = true;
+    ajuda.iniciarSalvamento();
     try{
-      const res = await fetch("/api/pcp/gantt", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ blocos }) });
-      const j = await res.json();
+      const res = await fetch("/api/pcp/gantt", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ blocos: destinosFinais(blocos) }) });
+      const j = await res.json().catch(()=>{ throw new Error('Não foi possível confirmar a gravação. Suas alterações continuam no quadro.'); });
       if(!res.ok) throw new Error(j.error || "Erro ao salvar");
-      avisar(true, j.total+" peça(s) reprogramada(s).");
       alteracoes = [];
-      await recarregar();
+      for (const l of lotes) { l.recursoOrig = l.recurso; l.diaOrig = l.dia; }
+      pintarAlteracoes();
+      raiz.dataset.salvando = 'false';
+      const atualizou = await recarregar();
+      avisar(true, j.total+" peça(s) reprogramada(s)." + (atualizou ? '' : ' A gravação foi confirmada; atualize o quadro quando a conexão voltar.'));
     }catch(e){ avisar(false, e.message); b.disabled=false; }
-    finally{ b.textContent = "Salvar programação"; }
+    finally{ salvando = false; raiz.dataset.salvando = 'false'; raiz.inert = false; b.textContent = "Salvar programação"; }
   };
 
   $("desfazer").onclick = ()=>desfazer(alteracoes.length-1);
@@ -261,40 +278,54 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   for(const b of raiz.querySelectorAll(".abas button")) b.onclick = ()=>{ abaP=b.dataset.aba; pintarPainel(); };
   const aoTeclar = (e)=>{ if(e.key==="Escape" && painel) fecharPainel(); };
   window.addEventListener("keydown", aoTeclar);
+  const aoSair = (e)=>{ if(alteracoes.length || salvando){ e.preventDefault(); e.returnValue = ''; } };
+  window.addEventListener('beforeunload', aoSair);
 
   $("empurrar").onclick = atraso.aplicarEmpurrao;
   atraso.pintarEmpurrao();
 
   desenhar(); pintarAlteracoes();
+  const rolagem = raiz.querySelector('.rolagem');
+  if (rolagem && ajuda.vista) { rolagem.scrollTop = ajuda.vista.topo || 0; rolagem.scrollLeft = ajuda.vista.esquerda || 0; }
 
-    return () => {
+    const limpar = () => {
       window.removeEventListener("keydown", aoTeclar);
+      window.removeEventListener('beforeunload', aoSair);
       arraste.encerrar();
     };
+    limpar.lerVista = () => ({ dia: DIAS[inicio], setores: [...setoresOn], regua, estado: [...estado],
+      topo: rolagem?.scrollTop || 0, esquerda: rolagem?.scrollLeft || 0 });
+    return limpar;
 
 }
 
 export default function GanttProgramacao({ revisao = 0 }) {
   const caixa = useRef(null);
+  const consulta = useRef(0);
+  const vista = useRef(null);
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(true);
 
   const podeAtualizar = () => {
     const raiz = caixa.current;
-    return raiz && !document.hidden && raiz.dataset.pendente !== 'true'
+    return raiz && !document.hidden && raiz.dataset.pendente !== 'true' && raiz.dataset.salvando !== 'true'
       && !raiz.querySelector('.fantasma, dialog[open]') && raiz.querySelector('#gp-painel')?.hidden !== false;
   };
   const buscar = useCallback(async (silencioso = false) => {
+    if (caixa.current?.dataset.pendente === 'true' || caixa.current?.dataset.salvando === 'true') return false;
+    const numero = ++consulta.current;
     if (!silencioso) { setCarregando(true); setErro(''); }
     try {
-      const r = await fetch("/api/pcp/gantt");
+      const r = await fetch("/api/pcp/gantt", { cache: 'no-store' });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao carregar a programação");
       // O usuário pode ter começado uma seleção ou arraste enquanto a consulta estava em voo.
-      if (!silencioso || podeAtualizar()) setDados(j);
-    } catch (e) { if (!silencioso) setErro(e.message); }
-    finally { if (!silencioso) setCarregando(false); }
+      if (numero !== consulta.current || caixa.current?.dataset.pendente === 'true' || caixa.current?.dataset.salvando === 'true') return false;
+      if (silencioso && !podeAtualizar()) return false;
+      setDados(j); setErro(''); return true;
+    } catch (e) { if (numero === consulta.current && !silencioso) setErro(e.message); return false; }
+    finally { if (!silencioso && numero === consulta.current) setCarregando(false); }
   }, []);
 
   useEffect(() => {
@@ -331,9 +362,11 @@ export default function GanttProgramacao({ revisao = 0 }) {
     };
     const limpar = iniciar(raiz, dados.lotes, dados.hoje, {
       avisar, recarregar: buscar, baixarZip: baixarZipLote, baixarPintura: baixarCadernoPintura,
+      iniciarSalvamento: () => { consulta.current++; },
+      vista: vista.current,
       baixarBaixaSyneco: baixarPlanilhaBaixaSyneco, baixarListaPosto: baixarListaDoPosto,
     });
-    return () => { if (typeof limpar === "function") limpar(); raiz.innerHTML = ""; };
+    return () => { if (typeof limpar === "function") { vista.current = limpar.lerVista(); limpar(); } raiz.innerHTML = ""; };
   }, [dados, buscar]);
 
   if (carregando && !dados) {
@@ -343,17 +376,21 @@ export default function GanttProgramacao({ revisao = 0 }) {
       </div>
     );
   }
-  if (erro) {
+  const avisoErro = erro && (
+    <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 flex items-center gap-2">
+      <AlertCircle size={16} /> {erro}
+      <button onClick={() => buscar()} className="ml-auto text-xs underline">tentar de novo</button>
+    </div>
+  );
+  if (erro && !dados) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 flex items-center gap-2">
-        <AlertCircle size={16} /> {erro}
-        <button onClick={() => buscar()} className="ml-auto text-xs underline">tentar de novo</button>
-      </div>
+      avisoErro
     );
   }
   return (
     <>
       <style>{CSS}</style>
+      {avisoErro}
       <div className="gpcp" ref={caixa} />
     </>
   );

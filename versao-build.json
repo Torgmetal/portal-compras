@@ -1,7 +1,12 @@
 {
-  "build": 3047,
-  "gerado": "2026-09-09T20:41:18.493Z",
+  "build": 3048,
+  "gerado": "2026-09-09T21:21:32.022Z",
   "commits": [
+    {
+      "hash": "03e3fc62",
+      "data": "09/09/2026",
+      "titulo": "Gantt: a raia do jato deixa de virar uma página em branco"
+    },
     {
       "hash": "9b38a021",
       "data": "09/09/2026",
@@ -146,11 +151,6 @@
       "hash": "53a097a6",
       "data": "08/09/2026",
       "titulo": "Expedição: a Lista de Expedição define a lista, não completa PecaConjunto"
-    },
-    {
-      "hash": "f5c40fac",
-      "data": "08/09/2026",
-      "titulo": "Expedição: uma linha por marca, e a quantidade vem da L.E."
     }
   ]
 }

@@ -18,7 +18,7 @@ export function criarLotes(dep){
     const por = new Map();
     const fora = [];
     for(const l of dep.getLotes()){
-      const k = l.setor+"|"+(l.recurso||"—")+"|"+l.op+"|"+l.dia+"|"+((l.terceiroPrevisto||l.terceiroRecebido)?l.id:"");
+      const k = l.setor+"|"+(l.recurso||"—")+"|"+l.op+"|"+l.dia+"|"+(l.veioDe||l.desde||"")+"|"+(l.familia||"")+"|"+((l.terceiroPrevisto||l.terceiroRecebido)?l.id:"");
       const a = por.get(k);
       if(!a){ por.set(k,l); fora.push(l); continue; }
       a.itens = a.itens.concat(l.itens);
