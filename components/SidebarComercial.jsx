@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { FolderKanban, Inbox, FileSpreadsheet, ChevronDown, Presentation, Gauge, Rocket, Building2, Wrench } from "lucide-react";
+import { FolderKanban, Inbox, FileSpreadsheet, ChevronDown, Presentation, Gauge, Rocket, Building2, Wrench, Factory } from "lucide-react";
 import { useState } from "react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -25,6 +25,10 @@ const menu = [
     sub: [
       { href: "/comercial/orcamentos/propostas", label: "Criar Proposta Estrutura", icon: Building2 },
       { href: "/comercial/orcamentos/servicos", label: "Criar Proposta Serviço", icon: Wrench },
+      /* ⚠ Não é uma visão da lista nem começa proposta — é o PARÂMETRO que as propostas herdam.
+         Vitor (09/09/2026), sobre a aba Fabricação do estudo estar confusa: custo da casa é
+         decisão da empresa e vive num lugar só, com data e período; o estudo herda. */
+      { href: "/comercial/orcamentos/custo-fabricacao", label: "Custo de Fabricação", icon: Factory },
     ],
   },
   { href: "/comercial/produtos/tintas", label: "Produtos e boletins", icon: FileSpreadsheet },
