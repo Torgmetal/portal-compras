@@ -16,10 +16,9 @@ import { ehItemComprado } from "@/lib/item-comprado";
 import { dedupLpcLe, renumerarPrioridades, ehLinhaLixo } from "@/lib/pecas-producao";
 import { materialPorPerfil, statusCompraPorOp } from "@/lib/status-compra";
 import { pecasDosLotes } from "@/lib/liberacao-pecas";
-import { croquiCortado, setorRealIndex, mapaSetorReal, FLUXO_SETORES, soloPassaNoSetor } from "@/lib/prioridades-setor";
+import { croquiCortado, pecaEhComposta, setorRealIndex, mapaSetorReal, FLUXO_SETORES, soloPassaNoSetor } from "@/lib/prioridades-setor";
 import { z } from "zod";
 import { pecasNoTerceiro } from "@/lib/fora-da-fabrica";
-import { conjuntoAguardandoCroquis } from "@/lib/gantt-prontidao";
 
 export const runtime = "nodejs";
 
@@ -81,7 +80,7 @@ export async function GET(req) {
   // A pré-programação precisa enxergar também os conjuntos ainda fora do lote liberado.
   // A entrada em bancada continua validada pelo Gantt, após o apontamento do corte.
   const preprogramar = setor === "MONTAGEM" && url.searchParams.get("preprogramar") === "1";
-  const podePreprogramar = (p) => preprogramar && p.fonte === "LPC_IMPORT" && p.tipoPeca === "CONJUNTO";
+  const podePreprogramar = (p) => preprogramar && p.fonte === "LPC_IMPORT" && pecaEhComposta(p);
   const todasRaw = await prisma.pecaConjunto.findMany({
     where: { opId },
     select: { id: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoUnitKg: true, pesoTotalKg: true, qte: true, qteProduzida: true, corteConcluidoEm: true, status: true, destino: true, destinoTerceirizado: true, terceirizado: true, terceirizadoRecebidoEm: true, encaminhadoSetor: true, prioridade: true, baixaSetores: true, montagemDiaProgramado: true, corteDiaProgramado: true, _count: { select: { conjuntoCroquis: true } } },
@@ -114,14 +113,12 @@ export async function GET(req) {
   const temLPC = todas.some((p) => p.fonte === "LPC_IMPORT");
   const temPerfil = (p) => !!(p.perfil && String(p.perfil).trim());
   const ehCroqui = (p) => p.tipoPeca === "CROQUI";
-  const ehComposta = (p) => (p._count?.conjuntoCroquis || 0) > 0;
+  const ehComposta = pecaEhComposta;
   const ehMarcaLE = (p) => temLPC && p.fonte === "LE_IMPORT" && !ehCroqui(p) && !temPerfil(p);
   const vaiPraMontagem = (p) => ehComposta(p) || ehMarcaLE(p);
   const passaNoSetor = (p, s) => {
     if (!s) return true;
     if (ehCroqui(p)) return s === "CORTE";
-    // Pré-programar o conjunto ainda sem croquis não autoriza a entrada numa bancada.
-    if (s === 'MONTAGEM' && conjuntoAguardandoCroquis(p)) return true;
     if (vaiPraMontagem(p)) return s !== "CORTE";               // Montagem→Expedição
     return soloPassaNoSetor(s); // solo/avulsa: CORTE → JATO → Pintura → Expedição
   };
@@ -542,7 +539,7 @@ export async function GET(req) {
       : null;
     // Montagem: só conjuntos COM croquis têm status pronto/pendente; sem croquis (ex.: GC) = null (sem chip).
     const info = prontoInfo ? prontoInfo.get(p.marca) : null;
-    const mont = prontoInfo ? (info || { prontoMontar: conjuntoAguardandoCroquis(p) ? false : null, faltamCroquis: [], totalCroquis: 0 }) : null;
+    const mont = prontoInfo ? (info || { prontoMontar: null, faltamCroquis: [], totalCroquis: 0 }) : null;
     // avancouAlem: a peça JÁ está num setor à frente deste (Syneco/status/terceiro/encaminhada) —
     // não pode ficar pendente aqui atrás; o painel joga pro histórico (aba Peças prontas).
     // `entradas` (todas as linhas do CMR daquele material) sai fora da listagem — era repetida em

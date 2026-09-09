@@ -16,7 +16,7 @@ export default async function PcpFilaJato() {
       <div>
         <h1 className="text-xl font-extrabold text-torg-dark">Fila do Jato</h1>
         <p className="text-xs text-torg-gray mt-0.5">
-          Entra sozinho o que termina o acabamento — escolha a obra e mande para a bancada.
+          Marcas avulsas entram após o corte; conjuntos, após o acabamento. Escolha a obra e programe a bancada.
         </p>
       </div>
       <FilaSetorClient setor="JATO" />

@@ -9,7 +9,7 @@ const bloco=(ids,recurso=null)=>({setor:'MONTAGEM',ids,recurso,dia:'2026-09-15'}
 const conjunto=(id,cortado)=>({id,marca:id,fonte:'LPC_IMPORT',tipoPeca:'CONJUNTO',status:'CORTE',montagemDiaProgramado:null,montagemDiaOriginal:null,conjuntoCroquis:[{croqui:{marca:'CR-'+id,qte:2,qteProduzida:cortado?2:0}}]});
 beforeEach(()=>{
  vi.clearAllMocks();
- mockPrisma.pecaConjunto.findMany.mockImplementation(async ({where})=>[conjunto('C01',true),conjunto('C02',false)].filter(c=>where.id.in.includes(c.id)));
+ mockPrisma.pecaConjunto.findMany.mockImplementation(async ({where})=>[conjunto('C01',true),conjunto('C02',false),conjunto('s1',true)].filter(c=>where.id.in.includes(c.id)));
  mockPrisma.pecaConjunto.updateMany.mockResolvedValue({count:1});
 });
 it('permite programar corte pendente na fila sem bancada sem liberar montagem',async()=>{
@@ -31,6 +31,11 @@ it('libera somente o conjunto apto selecionado e preserva os pendentes',async()=
 it('recusa conjunto sem croquis na bancada',async()=>{
  mockPrisma.pecaConjunto.findMany.mockResolvedValue([{...conjunto('C03',false),conjuntoCroquis:[]}]);
  await expect(aplicarRemanejo([bloco(['C03'],'B1')],usuario)).rejects.toThrow(/croqui/i);
+});
+it.each(['MONTAGEM','SOLDA'])('recusa marca sem subpeças na programação de %s mesmo sem bancada',async setor=>{
+ mockPrisma.pecaConjunto.findMany.mockResolvedValue([{...conjunto('C03',false),status:'MONTAGEM',conjuntoCroquis:[]}]);
+ await expect(aplicarRemanejo([{...bloco(['C03']),setor}],usuario)).rejects.toThrow(/marca|subpe|croqui/i);
+ expect(mockPrisma.pecaConjunto.updateMany).not.toHaveBeenCalled();
 });
 it('preserva remanejo de conjunto que já está liberado para montagem',async()=>{
  mockPrisma.pecaConjunto.findMany.mockResolvedValue([{...conjunto('C01',false),status:'MONTAGEM'}]);

@@ -14,10 +14,9 @@ beforeEach(()=>{
  mockPrisma.liberacaoProducao.findMany.mockResolvedValue([{id:'l1',pecaIds:['c1','c2'],dataProgramada:null}]);
  for(const [model,method] of [['grdLiberacao','findMany'],['mesOrdem','groupBy'],['mesOrdem','findMany'],['mesApontamento','groupBy'],['romaneioItem','findMany'],['conjuntoCroqui','findMany']])mockPrisma[model][method].mockResolvedValue([]);
 });
-it('pré-programação lista todos os conjuntos mesmo com apenas dois no lote liberado',async()=>{
+it('pré-programação lista conjuntos com corte pendente, mas exclui marcas sem subpeças',async()=>{
  const r=await GET(new Request('http://localhost/api/pcp/despacho?opId=op94&setor=MONTAGEM&preprogramar=1'));
- expect(r.status).toBe(200);const j=await r.json();expect(j.pecas.map(p=>p.id)).toEqual(['c1','c2','c3','c4']);
- expect(j.pecas.find(p=>p.id==='c4').prontoMontar).toBe(false);
+ expect(r.status).toBe(200);const j=await r.json();expect(j.pecas.map(p=>p.id)).toEqual(['c1','c2','c3']);
 });
 it('consulta normal mantém o recorte de liberação',async()=>{
  const r=await GET(new Request('http://localhost/api/pcp/despacho?opId=op94&setor=MONTAGEM'));

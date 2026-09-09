@@ -1,7 +1,12 @@
 {
-  "build": 3048,
-  "gerado": "2026-09-09T21:21:32.022Z",
+  "build": 3049,
+  "gerado": "2026-09-09T22:03:42.212Z",
   "commits": [
+    {
+      "hash": "81b92be3",
+      "data": "09/09/2026",
+      "titulo": "Corrige persistência e atualização do Gantt em todos os setores"
+    },
     {
       "hash": "03e3fc62",
       "data": "09/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c6e615d1",
       "data": "08/09/2026",
       "titulo": "Rastreio: o UE da Engenharia é o UDCE do fornecedor"
-    },
-    {
-      "hash": "53a097a6",
-      "data": "08/09/2026",
-      "titulo": "Expedição: a Lista de Expedição define a lista, não completa PecaConjunto"
     }
   ]
 }
