@@ -27,6 +27,7 @@ const menu = [
       { href: "/comercial/orcamentos/servicos", label: "Criar Proposta Serviço", icon: Wrench },
     ],
   },
+  { href: "/comercial/produtos/tintas", label: "Produtos e boletins", icon: FileSpreadsheet },
   { href: "/comercial/kickoffs", label: "Kick Offs — Aceites", icon: Rocket },
   { href: "/comercial/apresentacoes", label: "Apresentação ao Cliente", icon: Presentation },
   { href: "/comercial/aprovacoes", label: "Aprovações", icon: Inbox, masterOnly: true },

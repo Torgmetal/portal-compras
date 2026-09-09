@@ -1,201 +1,46 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { Loader2, Send } from "lucide-react";
-import { perdaDaEstrutura } from "@/lib/lqc";
-import { fmtR$, num } from "../_lib/formatos";
-
-// ─── COTAÇÃO DE TINTA COM OS FABRICANTES ──────────────────────────────────────────────────────
-// Vitor (31/08/2026): "precisamos que tenha o botão para enviar para cotação (…) mando a
-// especificação da pintura, mais a área a ser pintada e o coeficiente de perda para o fabricante e
-// com base nisso ele informa quantos galões, quantos diluentes e componentes B vai precisar vender"
-// e "traga os cadastrados no vendor list, página de compras, lista de fornecedores de tintas".
-//
-// ⚠⚠ NADA SAI PARA QUEM NÃO FOI MARCADO. Vitor: "precisa ser selecionado quais fornecedores vamos
-// enviar, não deve mandar nada para ninguém que não esteja selecionado". Por isso não existe
-// "enviar para todos" nem pré-seleção: a caixa começa vazia e o botão só liga com alguém marcado.
-//
-// ⚠ ESTA NÃO É A COTAÇÃO DO COMPRAS. Lá nasce de uma RM, com OP aberta; aqui a obra ainda não foi
-// vendida. O e-mail diz isso com todas as letras ("ainda não é um pedido de compra") — se o
-// fornecedor confundir os dois, ele reserva estoque para uma obra que talvez não exista.
-export function CotacaoTinta({ estudoId, c, res }) {
-  const [dados, setDados] = useState(null);
-  const [marcados, setMarcados] = useState(() => new Set());
-  const [enviando, setEnviando] = useState(false);
-  const [aviso, setAviso] = useState("");
-
-  const carregar = useCallback(() => {
-    if (!estudoId) return;
-    fetch(`/api/comercial/estudos/cotacao?tipo=TINTA&estudoId=${estudoId}`)
-      .then((r) => r.json()).then((j) => !j.error && setDados(j)).catch(() => {});
-  }, [estudoId]);
-  useEffect(() => { carregar(); }, [carregar]);
-
-  const camadas = (Array.isArray(c.tintas) ? c.tintas : [])
-    .filter((t) => t.produto || t.solidos || t.peliculaSeca)
-    .map((t) => ({ camada: t.camada, produto: t.produto, peliculaSeca: t.peliculaSeca, solidos: t.solidos, cor: t.cor }));
-  // ⚠ a perda que vai na consulta é a que PREDOMINA no levantamento: mandar 45% quando metade da
-  // obra é guarda-corpo faria o fabricante dimensionar tinta a menos.
-  const perdas = (Array.isArray(c.resumos) ? c.resumos : []).filter((l) => l.ativo !== false)
-    .map((l) => perdaDaEstrutura(l.estrutura));
-  const perda = perdas.length ? Math.max(...perdas) : 45;
-  const areaM2 = Math.round(num(res?.areaM2) || 0);
-  const pronto = areaM2 > 0 && camadas.length > 0;
-
-  const alterna = (id) => setMarcados((s2) => { const n = new Set(s2); n.has(id) ? n.delete(id) : n.add(id); return n; });
-
-  async function marcarVencedor(id) {
-    try {
-      const r = await fetch("/api/comercial/estudos/cotacao/vencedor", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fornecedorId: id }),
-      });
-      if (!r.ok) throw new Error((await r.json()).error || "Erro");
-      carregar();
-    } catch (e) { setAviso(e.message); }
-  }
-
-  async function enviar() {
-    if (!marcados.size) return;
-    if (!confirm(
-      `Enviar a consulta de tintas para ${marcados.size} fabricante(s)?\n\n` +
-      `Vai a área (${areaM2.toLocaleString("pt-BR")} m²), o coeficiente de perda (${perda}%) e o esquema de ` +
-      `${camadas.length} demão(ões). Não vai preço nosso nem nome de concorrente.`
-    )) return;
-    setEnviando(true); setAviso("");
-    try {
-      const r = await fetch("/api/comercial/estudos/cotacao", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          estudoId, tipo: "TINTA", fornecedorIds: [...marcados],
-          snapshot: { areaM2, perda, perdaNota: perda === 85 ? "guarda-corpo / escada marinheiro" : null,
-                      camadas, fabricante: c.pinturaFabricante || null },
-        }),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro");
-      setAviso(`Consulta enviada a ${j.enviados} de ${j.convidados} fabricante(s).`);
-      setMarcados(new Set());
-      carregar();
-    } catch (e) { setAviso("Falha: " + e.message); } finally { setEnviando(false); }
-  }
-
-  if (!dados) return null;
-
-  return (
-    <div className="bg-white border border-gray-100 rounded-xl p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-[12px] font-bold text-torg-dark">Cotação com os fabricantes de tinta</p>
-          <p className="text-[11px] text-torg-gray mt-0.5">
-            Manda área, coeficiente de perda e o esquema de pintura — o fabricante devolve galões,
-            diluente e componente B. Fase de orçamento: não é pedido de compra.
-          </p>
-        </div>
-        <button onClick={enviar} disabled={!marcados.size || enviando || !pronto}
-          title={!pronto ? "Lance a área e o esquema de pintura antes de consultar" : marcados.size ? "" : "Marque quem deve receber"}
-          className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-2 hover:bg-torg-dark disabled:opacity-40 inline-flex items-center gap-1.5">
-          {enviando ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-          Enviar para cotação{marcados.size ? ` (${marcados.size})` : ""}
-        </button>
-      </div>
-
-      {!pronto && (
-        <p className="mt-2 text-[11px] text-torg-orange-700">
-          Falta {areaM2 > 0 ? "o esquema de pintura (camadas)" : "a área a pintar"} — sem isso o fabricante não tem como dimensionar.
-        </p>
-      )}
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        {dados.fornecedores.map((f) => (
-          <label key={f.id}
-            className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[12px] cursor-pointer ${
-              marcados.has(f.id) ? "border-torg-blue bg-torg-blue-50 text-torg-dark" : "border-gray-200 text-torg-gray hover:border-torg-blue/40"}`}>
-            <input type="checkbox" checked={marcados.has(f.id)} onChange={() => alterna(f.id)}
-              className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
-            <span className="font-medium text-torg-dark">{f.nome}</span>
-            {f.praca && <span className="text-[10px] text-torg-gray">{f.praca}</span>}
-          </label>
-        ))}
-        {!dados.fornecedores.length && (
-          <p className="text-[11px] text-torg-orange-700">
-            Nenhum fornecedor com família “Tinta” e e-mail no vendor list.
-          </p>
-        )}
-      </div>
-
-      {aviso && <p className="mt-2 text-[11px] text-torg-dark">{aviso}</p>}
-
-      {/* ─── MAPA DE COTAÇÕES ───────────────────────────────────────────────────────────────────
-          Vitor (31/08/2026): "precisamos ter o mapa de cotações (…) para podermos ver quem foi o
-          vencedor".
-
-          ⚠ ORDENADO PELO MENOR TOTAL, com quem ainda não respondeu no fim: o mapa existe para
-          comparar, e quem não respondeu não é comparável — deixar no meio faria a leitura parecer
-          uma classificação quando não é.
-
-          ⚠⚠ MARCAR O VENCEDOR NÃO AVISA NINGUÉM. A obra nem foi vendida, e o fabricante saber que
-          "venceu" um orçamento cria expectativa de pedido que pode nunca vir. É decisão interna. */}
-      {dados.cotacoes.map((ct) => (
-        <div key={ct.id} className="mt-3 border-t border-gray-100 pt-3">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-torg-gray mb-1.5">
-            Mapa · consulta de {new Date(ct.enviadoEm).toLocaleDateString("pt-BR")}
-            {ct.enviadoPorNome ? ` · ${ct.enviadoPorNome}` : ""}
-            {ct.snapshot?.areaM2 ? ` · ${Number(ct.snapshot.areaM2).toLocaleString("pt-BR")} m² · perda ${ct.snapshot.perda}%` : ""}
-          </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[12px] min-w-[560px]">
-              <thead className="text-[10px] uppercase text-torg-gray">
-                <tr>
-                  <th className="text-left py-1">Fabricante</th>
-                  <th className="text-left py-1">Situação</th>
-                  <th className="text-right py-1">Galões</th>
-                  <th className="text-right py-1">Total</th>
-                  <th className="text-left py-1 pl-3">Prazo</th>
-                  <th className="py-1" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {ct.fornecedores.map((f) => {
-                  const r = f.resposta;
-                  const galoes = (r?.camadas || []).reduce((s2, c2) => s2 + (Number(c2.galoes) || 0), 0);
-                  return (
-                    <tr key={f.id} className={f.vencedor ? "bg-emerald-50/60" : undefined}>
-                      <td className="py-1.5 font-medium text-torg-dark">{f.nome}</td>
-                      <td className="py-1.5">
-                        {f.erroEnvio
-                          ? <span className="text-red-600" title={f.erroEnvio}>e-mail falhou</span>
-                          : f.respondidoEm
-                            ? <span className="text-emerald-700">respondeu {new Date(f.respondidoEm).toLocaleDateString("pt-BR")}</span>
-                            : <span className="text-torg-gray">aguardando</span>}
-                      </td>
-                      <td className="py-1.5 text-right tabular-nums">{galoes || "—"}</td>
-                      <td className="py-1.5 text-right tabular-nums font-semibold text-torg-dark">
-                        {f.valorTotal > 0 ? fmtR$(f.valorTotal) : "—"}
-                      </td>
-                      <td className="py-1.5 pl-3">{r?.prazo || "—"}</td>
-                      <td className="py-1.5 text-right">
-                        {f.valorTotal > 0 && (
-                          <button onClick={() => marcarVencedor(f.id)}
-                            className={`text-[11px] font-semibold rounded px-2 py-0.5 ${
-                              f.vencedor ? "bg-emerald-600 text-white" : "text-torg-blue border border-torg-blue-200 hover:bg-torg-blue-50"}`}>
-                            {f.vencedor ? "vencedor" : "marcar"}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          {ct.fornecedores.some((f) => f.resposta?.observacao) && (
-            <div className="mt-1.5 space-y-0.5">
-              {ct.fornecedores.filter((f) => f.resposta?.observacao).map((f) => (
-                <p key={f.id} className="text-[11px] text-torg-gray"><strong>{f.nome}:</strong> {f.resposta.observacao}</p>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
+import {useCallback,useEffect,useMemo,useState} from 'react';
+import {ArrowLeft,ArrowRight,Check,FileText,Loader2,Mail,Search,Send} from 'lucide-react';
+import {calcularLqc,calcularCamadasPintura,numeroBr,ESTRUTURA_ROTULO} from '@/lib/lqc';
+import {candidatosBoletim} from '@/lib/cotacao-tinta-snapshot';
+import {useStore} from '@/lib/store';
+import HistoricoCotacaoTinta from './HistoricoCotacaoTinta';
+import s from './CotacaoTinta.module.css';
+const formatar=v=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
+const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
+export function CotacaoTinta({estudoId,c}){
+ const {showToast}=useStore();
+ const [dados,setDados]=useState(null),[erro,setErro]=useState(''),[carregando,setCarregando]=useState(true),[aberto,setAberto]=useState(false);
+ const carregar=useCallback(async()=>{if(!estudoId){setCarregando(false);return;}setCarregando(true);setErro('');try{const r=await fetch(`/api/comercial/estudos/cotacao?tipo=TINTA&estudoId=${encodeURIComponent(estudoId)}`);const j=await r.json();if(!r.ok)throw new Error(j.error||'Falha ao carregar fornecedores.');setDados(j);}catch(e){setErro(e.message);}finally{setCarregando(false);}},[estudoId]);
+ useEffect(()=>{carregar();},[carregar]);
+ async function marcarVencedor(id){try{const r=await fetch('/api/comercial/estudos/cotacao/vencedor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fornecedorId:id})});const j=await r.json();if(!r.ok)throw new Error(j.error||'Falha ao marcar vencedor.');showToast('Vencedor registrado.','success');await carregar();}catch(e){showToast(e.message,'error');}}
+ if(carregando)return <div className={s.carregando}><Loader2 size={16} className="animate-spin"/>Carregando cotações e boletins…</div>;
+ if(erro)return <div className={s.erro}>{erro}<button className="ml-3 underline" onClick={carregar}>Tentar novamente</button></div>;
+ if(!dados)return null;
+ return <section className={s.raiz}>{aberto?<PrepararCotacao c={c} estudoId={estudoId} dados={dados} onFechar={()=>setAberto(false)} onEnviado={async j=>{showToast(`Consulta enviada a ${j.enviados} de ${j.convidados} fornecedor(es).`,j.enviados===j.convidados?'success':'error');setAberto(false);await carregar();}}/>:<div className={s.principal}><div className={s.cabecalhoCompacto}><div><h3>Cotação com fabricantes de tintas</h3><p>Confira as demãos, selecione os fornecedores e revise cada e-mail antes de enviar.</p><div className={s.links}><a href="/comercial/produtos/tintas" target="_blank" rel="noreferrer">Cadastrar produtos e boletins técnicos</a></div></div><button className={s.primario} onClick={()=>setAberto(true)}><Send size={15}/>Preparar cotação</button></div></div>}<HistoricoCotacaoTinta cotacoes={dados.cotacoes||[]} marcarVencedor={marcarVencedor}/></section>;
+}
+function PrepararCotacao({c,estudoId,dados,onFechar,onEnviado}){
+ const res=useMemo(()=>calcularLqc(c),[c]);
+ const areas=(c.resumos||[]).filter(l=>l.ativo!==false);
+ const demaos=calcularCamadasPintura(c).map((t,i)=>({...t,solidos:numeroBr(t.solidos),peliculaSeca:numeroBr(t.peliculaSeca),perda:numeroBr(t.perda??45),id:t.id||`demao-${i}`,destino:[...new Set(t.indices.map(idx=>{const l=areas[idx];return `${l.area||l.item||'Área não informada'} · ${l.estruturaNome||ESTRUTURA_ROTULO[l.estrutura]||l.estrutura||'Estrutura não informada'}`;}))].join('; ')}));
+ const [etapa,setEtapa]=useState(0),[itens,setItens]=useState(()=>demaos.map(t=>t.id)),[destinos,setDestinos]=useState([]),[busca,setBusca]=useState(''),[prazo,setPrazo]=useState(''),[assunto,setAssunto]=useState('Consulta de tintas — orçamento Torg'),[mensagem,setMensagem]=useState('Solicitamos sua proposta para o sistema de pintura informado. Confirme produto, consumo, embalagens, diluente, componente B, preço e prazo de entrega. Esta consulta é para orçamento e não representa pedido de compra.'),[escolhas,setEscolhas]=useState({}),[previa,setPrevia]=useState(null),[payloadRevisado,setPayloadRevisado]=useState(null),[emailAtivo,setEmailAtivo]=useState(''),[ocupado,setOcupado]=useState(false),[erro,setErro]=useState('');
+ const selecionadas=demaos.filter(t=>itens.includes(t.id));
+ const convidados=(dados.fornecedores||[]).filter(x=>destinos.includes(x.id));
+ const mudar=(setter,v)=>{setter(v);setPrevia(null);setPayloadRevisado(null);setErro('');};
+ const alternar=(setter,id)=>mudar(setter,a=>a.includes(id)?a.filter(x=>x!==id):[...a,id]);
+ const validas=selecionadas.length>0&&selecionadas.every(t=>t.areaM2>0&&Number(t.solidos)>0&&Number(t.solidos)<=100&&Number(t.peliculaSeca)>0&&Number(t.perda??45)>=0&&Number(t.perda??45)<100);
+ const payload={estudoId,tipo:'TINTA',fornecedorIds:destinos,escolhas,snapshot:{areaM2:res.areaM2,prazoResposta:prazo,assunto,mensagem,camadas:selecionadas.map(t=>({id:t.id,camada:t.camada,tipo:t.tipo||t.camada,areaM2:t.areaM2,peliculaSeca:Number(t.peliculaSeca),solidos:Number(t.solidos),cor:t.cor||'',perda:Number(t.perda??45),destino:typeof t.destino==='string'?t.destino:null}))}};
+ const assinatura=JSON.stringify(payload);
+ const revisaoValida=previa&&payloadRevisado&&JSON.stringify(payloadRevisado)===assinatura;
+ async function revisar(){setOcupado(true);setErro('');try{const r=await fetch('/api/comercial/estudos/cotacao',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,previa:true})});const j=await r.json();if(!r.ok)throw new Error(j.error||'Não foi possível preparar a consulta.');setPrevia(j);setPayloadRevisado(payload);setEmailAtivo(j.destinatarios?.[0]?.fornecedorId||'');setEtapa(2);}catch(e){setErro(e.message);}finally{setOcupado(false);}}
+ async function enviar(){if(!revisaoValida||ocupado)return;setOcupado(true);setErro('');try{const r=await fetch('/api/comercial/estudos/cotacao',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payloadRevisado,previa:false,confirmacao:previa.confirmacao})});const j=await r.json();if(!r.ok)throw new Error(j.error||'Não foi possível enviar a consulta.');setPrevia(null);setPayloadRevisado(null);await onEnviado(j);}catch(e){setErro(e.message);}finally{setOcupado(false);}}
+ const email=previa?.destinatarios?.find(x=>x.fornecedorId===emailAtivo)||previa?.destinatarios?.[0];
+ return <div><button className={s.voltar} disabled={ocupado} onClick={onFechar}><ArrowLeft size={15}/>Voltar à composição</button><header className={s.cabecalho}><div><span>CONSULTA COMERCIAL · TINTAS</span><h2>Preparar cotação</h2><p>Requisitos da obra e produtos de cada fabricante.</p></div><a className="text-sm text-torg-blue underline" href="/comercial/produtos/tintas" target="_blank" rel="noreferrer">Produtos e boletins</a></header><nav className={s.passos} aria-label="Etapas da cotação">{['Itens e especificações','Fornecedores e prazo','Mensagem e revisão'].map((x,i)=><button key={x} disabled={ocupado||(i===1&&!validas)||(i===2&&!revisaoValida)} aria-current={etapa===i?'step':undefined} onClick={()=>setEtapa(i)}><span>{etapa>i?<Check size={15}/>:i+1}</span><b>{x}</b>{i<2&&<ArrowRight size={14}/>}</button>)}</nav>
+ {erro&&<p role="alert" className={s.erro}>{erro}</p>}
+ <div className={s.corpo}><main className={s.principal}>
+ {etapa===0&&<><div className={s.tituloSecao}><div><h3>O que será cotado</h3><p>Envie a área, os sólidos, a película e a perda de cada demão. O produto será indicado por fabricante.</p></div><span>{selecionadas.length} demãos</span></div><div className={s.scroll}><table><thead><tr><th/><th>Demão</th><th>Cor</th><th>Área</th><th>Película</th><th>Sólidos</th><th>Perda</th></tr></thead><tbody>{demaos.map((t,i)=><tr key={t.id}><td><input type="checkbox" aria-label={`Incluir demão ${i+1}`} checked={itens.includes(t.id)} onChange={()=>alternar(setItens,t.id)}/></td><td><b>{i+1} · {t.camada||'Tipo não informado'}</b>{t.destino&&<small>{String(t.destino)}</small>}</td><td>{t.cor||'A definir'}</td><td>{formatar(t.areaM2)} m²</td><td>{formatar(t.peliculaSeca)} µm</td><td>{formatar(t.solidos)}%</td><td>{formatar(t.perda??45)}%</td></tr>)}</tbody></table></div>{!validas&&<p className={s.erro}>Selecione demãos com área, sólidos, película e perda válidos. Complete esses dados na composição antes de enviar.</p>}<div className={s.nota}>Preço não é necessário para solicitar cotação. A escolha do produto é feita por fabricante, com referência ao boletim técnico conferido.</div><div className={s.editor}><label>Assunto<input aria-label="Assunto da cotação" maxLength={200} value={assunto} onChange={e=>mudar(setAssunto,e.target.value)}/></label><label>Mensagem<textarea aria-label="Mensagem da cotação" rows={4} maxLength={4000} value={mensagem} onChange={e=>mudar(setMensagem,e.target.value)}/></label></div></>}
+ {etapa===1&&<><div className={s.tituloSecao}><div><h3>Quem vai receber</h3><p>Selecione os fornecedores. Nenhum é marcado automaticamente.</p></div></div><label className={s.busca}><Search size={16}/><input aria-label="Buscar fornecedor" placeholder="Nome, fabricante, e-mail ou cidade" value={busca} onChange={e=>setBusca(e.target.value)}/></label><div className={s.fornecedores}>{(dados.fornecedores||[]).filter(f=>norm(`${f.nome} ${f.email} ${f.praca} ${f.fabricanteTinta}`).includes(norm(busca))).map(f=><label key={f.id} className={destinos.includes(f.id)?s.marcado:''}><input type="checkbox" aria-label={f.nome} checked={destinos.includes(f.id)} onChange={()=>alternar(setDestinos,f.id)}/><div><strong>{f.nome}</strong><span>{f.email}</span><small>{f.praca} · {f.fabricanteTinta?`Fabricante: ${f.fabricanteTinta}`:'Fabricante ainda não vinculado — solicitar especificação'}</small></div></label>)}{!(dados.fornecedores||[]).length&&<p className={s.nota}>Nenhum fornecedor ativo de tintas com e-mail cadastrado.</p>}</div><div className={s.boletins}><h4>Produtos por fabricante</h4><div className={s.links}><a href="/comercial/produtos/tintas" target="_blank" rel="noreferrer"><FileText size={14} className="inline mr-1"/>Cadastrar boletins e vincular fabricantes</a></div>{convidados.map(f=><article key={f.id}><h5>{f.nome}</h5>{selecionadas.map((t,i)=>{const lista=candidatosBoletim(f,t,dados.boletins||[]);const chave=`${f.id}:${t.id}`,valor=escolhas[chave]??lista[0]?.id??'fornecedor';return <label key={t.id}>{i+1} · {t.camada} · {t.solidos}% · {t.peliculaSeca} µm<select aria-label={`Produto para ${f.nome}, demão ${i+1}`} value={valor} onChange={e=>mudar(setEscolhas,a=>({...a,[chave]:e.target.value}))}>{lista.map(b=><option key={b.id} value={b.id}>{b.produto} · {b.fabricante} · {b.boletimRevisao||b.revisao||'boletim conferido'}</option>)}<option value="fornecedor">Solicitar especificação ao fornecedor</option></select><small>{lista.length?'Sugestão pelo boletim. O fabricante deverá confirmar o sistema, a cor e a compatibilidade.':'Sem boletim correspondente desse fabricante. A consulta pedirá produto e ficha técnica com base nos requisitos.'}</small></label>})}</article>)}</div><div className={s.prazo}><label>Responder até<input type="date" aria-label="Responder até" value={prazo} onChange={e=>mudar(setPrazo,e.target.value)}/></label><p>Esse prazo será informado no e-mail da consulta.</p></div></>}
+ {etapa===2&&<><div className={s.tituloSecao}><div><h3>Confira o e-mail de cada fornecedor</h3><p>Este é o conteúdo preparado pelo servidor para o envio individual.</p></div></div>{!revisaoValida?<p className={s.erro}>Os dados mudaram desde a revisão. Prepare novamente as mensagens antes de enviar.</p>:<><div className={s.previaTitulo}><h4><Mail size={16}/>Mensagem individual</h4><select aria-label="Visualizar e-mail do fornecedor" value={emailAtivo} onChange={e=>setEmailAtivo(e.target.value)}>{previa.destinatarios.map(f=><option key={f.fornecedorId} value={f.fornecedorId}>{f.nome}</option>)}</select></div><div className="px-5 py-3 text-xs text-torg-gray">Para: {email?.email}<br/>Assunto: {email?.mensagem?.subject}</div><iframe title="Prévia do e-mail de cotação" sandbox="" srcDoc={email?.mensagem?.html||''} className={s.emailReal}/></>}</>}
+ </main><aside className={s.resumo}><h3>Resumo da consulta</h3><dl><div><dt>Demãos</dt><dd>{selecionadas.length}</dd></div><div><dt>Fornecedores</dt><dd>{destinos.length}</dd></div><div><dt>Prazo</dt><dd>{prazo?new Date(`${prazo}T12:00:00`).toLocaleDateString('pt-BR'):'Não informado'}</dd></div></dl><div className={s.selecionados}><h4>Destinatários</h4>{convidados.length?convidados.map(f=><p key={f.id}><Check size={13}/>{f.nome}</p>):<p>Nenhum selecionado</p>}</div><div className={s.privado}><Mail size={16}/><p>Uma mensagem individual. Somente produtos e boletins do fabricante correspondente.</p></div><p className={s.discreto}>Custos internos, BDI e produtos de outros fabricantes não integram a consulta.</p></aside></div>
+ <footer className={s.rodape}><div>{ocupado?<span><Loader2 size={13} className="inline animate-spin mr-2"/>Processando…</span>:<span>Fase de orçamento · não representa pedido de compra.</span>}</div><div>{etapa>0&&<button disabled={ocupado} className={s.secundario} onClick={()=>setEtapa(etapa-1)}>Voltar</button>}{etapa===0?<button className={s.primario} disabled={!validas||!assunto.trim()||!mensagem.trim()} onClick={()=>setEtapa(1)}>Escolher fornecedores<ArrowRight size={14}/></button>:etapa===1?<button className={s.primario} disabled={ocupado||!validas||!destinos.length||!prazo} onClick={revisar}>Revisar mensagens<ArrowRight size={14}/></button>:<button className={s.primario} disabled={ocupado||!revisaoValida} onClick={enviar}><Send size={14}/>Enviar cotação ({destinos.length})</button>}</div></footer></div>;
 }

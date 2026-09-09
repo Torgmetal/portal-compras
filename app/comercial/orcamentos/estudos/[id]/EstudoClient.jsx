@@ -9,6 +9,7 @@ import { Ensaios } from "./_componentes/Ensaios";
 import { Fabricacao } from "./_componentes/Fabricacao";
 import { Frete } from "./_componentes/Frete";
 import { ImportarLqc } from "./_componentes/ImportarLqc";
+import { ItensComerciais } from "./_componentes/ItensComerciais";
 import { Material } from "./_componentes/Material";
 import { MontagemCampo } from "./_componentes/MontagemCampo";
 import { Pagamento } from "./_componentes/Pagamento";
@@ -38,8 +39,9 @@ import styles from "./Lqc.module.css";
 // custo não precisa saber como a LQC guarda as coisas por dentro.
 export const ABAS = [
   { k: "RESUMOS", r: "Quantitativo", ajuda: "o que tem na obra: peso e área" },
-  { k: "MATERIAL", r: "Material", ajuda: "aço, fixadores e itens comerciais" },
-  { k: "PINTURA", r: "Pintura", ajuda: "camadas, tinta e mão de obra" },
+  { k: "MATERIAL", r: "Material", ajuda: "aço e fixadores estruturais" },
+  { k: "ITENS_COMERCIAIS", r: "Itens comerciais", ajuda: "produtos, acessórios e frete por família" },
+  { k: "PINTURA", r: "Pintura", ajuda: "demãos, tintas, diluentes e boletins" },
   { k: "FABRICACAO", r: "Fabricação", ajuda: "fábrica e pré-montagem" },
   { k: "TERCEIROS", r: "Terceiros", ajuda: "o que vem de fora" },
   { k: "FRETE", r: "Frete", ajuda: "transporte até a obra" },
@@ -173,6 +175,7 @@ export default function EstudoClient({ id }) {
 
       {aba === "RESUMOS" && <Resumos e={e} c={c} setComp={setComp} mexer={mexer} res={res} />}
       {aba === "MATERIAL" && <Material c={c} res={res} setComp={setComp} estudoId={e.id} />}
+      {aba === "ITENS_COMERCIAIS" && <ItensComerciais c={c} res={res} setComp={setComp} estudoId={e.id} />}
       {aba === "PINTURA" && <Pintura c={c} res={res} setComp={setComp} estudoId={e.id} />}
       {aba === "FABRICACAO" && <Fabricacao c={c} res={res} setComp={setComp} custoFabrica={d.custoFabrica} />}
       {aba === "TERCEIROS" && <Terceiros c={c} res={res} setComp={setComp} />}

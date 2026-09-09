@@ -23,9 +23,13 @@ import { fmtKg, num } from "../_lib/formatos";
 export function Resumos({ e, c, setComp, mexer: _mexer, res }) {
   const linhas = Array.isArray(c.resumos) ? c.resumos : [];
   const set = (i, campo, v) => setComp({ resumos: linhas.map((l, j) => (j === i ? { ...l, [campo]: v } : l)) });
-  const add = () => setComp({ resumos: [...linhas, { item: `1.${linhas.length + 1}`, metodo: e.metodo || "ESTIMATIVA", un: "unid", quantidade: 1, unidades: 1 }] });
+  const add = () => setComp({ resumos: [...linhas, { id: crypto.randomUUID(), item: `1.${linhas.length + 1}`, metodo: e.metodo || "ESTIMATIVA", un: "unid", quantidade: 1, unidades: 1 }] });
+  const escolherTipo = (i, tipo, novo) => setComp({
+    ...(novo ? { tiposEstrutura: [...(c.tiposEstrutura || []), tipo] } : {}),
+    resumos: linhas.map((l, j) => j === i ? { ...l, id:l.id || crypto.randomUUID(), estrutura:tipo.base, estruturaNome:tipo.nome, estruturaTipoId:tipo.id } : l),
+  });
   const del = (i) => setComp({ resumos: linhas.filter((_, j) => j !== i) });
-  const dup = (i) => setComp({ resumos: [...linhas.slice(0, i + 1), { ...linhas[i], item: `1.${linhas.length + 1}` }, ...linhas.slice(i + 1)] });
+  const dup = (i) => setComp({ resumos: [...linhas.slice(0, i + 1), { ...linhas[i], id: crypto.randomUUID(), item: `1.${linhas.length + 1}` }, ...linhas.slice(i + 1)] });
   // ⚠ MESMA REGRA DO MOTOR (lib/lqc.js): o peso lançado manda, a fórmula é o plano B. Sem isto a
   // linha "N áreas · X kg" desta aba podia divergir do KPI do topo, que já usava a regra certa.
   const pesoDe = (l) => (num(l.pesoTotal) > 0 ? num(l.pesoTotal) : num(l.quantidade) * num(l.unidades || 1) * num(l.pesoUnit));
@@ -131,7 +135,8 @@ export function Resumos({ e, c, setComp, mexer: _mexer, res }) {
       <div className="space-y-3">
         <input ref={arquivoRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={lerPlanilhaPeso} />
         {linhas.map((l, i) => (
-          <CartaoLinha key={i} l={l} i={i} set={set} del={del} dup={dup} porArea={porArea}
+          <CartaoLinha key={l.id || i} l={l} i={i} set={set} del={del} dup={dup} porArea={porArea}
+            tiposEstrutura={c.tiposEstrutura || []} onTipoEstrutura={escolherTipo}
             cores={coresConhecidas} doEsquema={coresDoEsquema}
             onImportarPeso={pedirPlanilha} importando={importando === i} />
         ))}

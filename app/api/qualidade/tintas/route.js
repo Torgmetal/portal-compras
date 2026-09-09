@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { extrairBoletim } from "@/lib/extrair-boletim";
+import { historicoBoletim } from "@/lib/boletim-historico";
 import { numeroBR } from "@/lib/numero-br";
 
 export const runtime = "nodejs";
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const LER = ["ADMIN", "QUALIDADE", "COMERCIAL", "PRODUCAO", "PCP"];
-const ESCREVER = ["ADMIN", "QUALIDADE"];
+const ESCREVER = ["ADMIN", "QUALIDADE", "COMERCIAL", "COMPRAS"];
 
 const num = (v) => {
   if (v === null || v === undefined || v === "") return null;
@@ -109,6 +110,9 @@ export async function POST(req) {
     }, { status: 422 });
   }
 
+  // O Comercial revisa a leitura e anexa o PDF antes de persistir; IA nunca marca conferido.
+  if (body.somenteExtrair === true) return NextResponse.json({ tintas: lista, falhas });
+
   // ⚠ MESMO PRODUTO DO MESMO FABRICANTE É UM SÓ. Reimportar o boletim ATUALIZA — é assim que a
   // revisão nova da ficha entra sem criar um segundo cadastro com dados velhos ao lado.
   const salvos = [];
@@ -116,9 +120,8 @@ export async function POST(req) {
   for (const dados of lista) {
     const jaTem = await prisma.produtoTinta.findFirst({
       where: { fabricante: { equals: dados.fabricante, mode: "insensitive" }, produto: { equals: dados.produto, mode: "insensitive" } },
-      select: { id: true },
     });
-    const comum = { ...dados, extraidoEm: new Date(), ativo: true };
+    const comum = { ...dados, extraidoEm: new Date(), ativo: true, conferidoEm: null, conferidoPorNome: null, historicoBoletins: historicoBoletim(jaTem) };
     salvos.push(jaTem
       ? await prisma.produtoTinta.update({ where: { id: jaTem.id }, data: comum })
       : await prisma.produtoTinta.create({ data: { ...comum, criadoPorId: user?.id || null, criadoPorNome: user?.name || user?.email || null } }));
@@ -128,11 +131,12 @@ export async function POST(req) {
   // ⚠⚠ AMARRA A TINTA AO DILUENTE. Se o diluente veio na mesma leva (ou já estava no catálogo), o
   // vínculo é feito aqui — é o que faz o PLP conseguir dizer QUAL diluente usar, com a ficha dele
   // por trás, em vez de repetir um nome solto digitado na tinta.
-  const diluentes = await prisma.produtoTinta.findMany({ where: { categoria: "DILUENTE", ativo: true }, select: { id: true, produto: true } });
+  const diluentes = await prisma.produtoTinta.findMany({ where: { categoria: "DILUENTE", ativo: true }, select: { id: true, produto: true, fabricante: true } });
   const soDigitos = (v) => String(v || "").replace(/\D/g, "");
   for (const t of salvos.filter((x) => x.categoria === "TINTA" && x.diluente && !x.diluenteId)) {
     const cod = soDigitos(t.diluente);
     const achado = diluentes.find((d) => {
+      if (String(d.fabricante).trim().toLowerCase() !== String(t.fabricante).trim().toLowerCase()) return false;
       const dc = soDigitos(d.produto);
       // casa pelo CÓDIGO quando há um ("Diluente 34.019" → 34019); senão pelo nome
       if (cod && dc) return cod.includes(dc) || dc.includes(cod);
@@ -185,7 +189,14 @@ export async function PUT(req) {
   };
   if (!dados.fabricante || !dados.produto) return NextResponse.json({ error: "Fabricante e produto são obrigatórios." }, { status: 400 });
 
-  const tinta = await prisma.produtoTinta.update({ where: { id }, data: dados });
+  const atual = await prisma.produtoTinta.findUnique({ where: { id } });
+  if (!atual) return NextResponse.json({ error: "Produto não encontrado." }, { status: 404 });
+  if (dados.diluenteId) {
+    const dil = await prisma.produtoTinta.findUnique({ where: { id: dados.diluenteId } });
+    if (!dil || dil.categoria !== "DILUENTE" || !dil.ativo || dil.fabricante.trim().toLowerCase() !== dados.fabricante.trim().toLowerCase())
+      return NextResponse.json({ error: "O diluente precisa pertencer ao mesmo fabricante." }, { status: 400 });
+  }
+  const tinta = await prisma.produtoTinta.update({ where: { id }, data: { ...dados, conferidoEm: null, conferidoPorNome: null, historicoBoletins: historicoBoletim(atual) } });
   await prisma.auditLog.create({
     data: { userId: user?.id || null, action: "TINTA_EDITADA", entity: "ProdutoTinta", entityId: id,
       diff: { fabricante: tinta.fabricante, produto: tinta.produto } },

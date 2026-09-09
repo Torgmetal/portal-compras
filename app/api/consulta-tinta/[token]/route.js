@@ -14,6 +14,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { snapshotPublicoTinta } from "@/lib/cotacao-tinta-snapshot";
 import { limparTextoCurto } from "@/lib/html";
 
 export const runtime = "nodejs";
@@ -28,7 +29,7 @@ async function achar(token) {
   return prisma.cotacaoEstudoFornecedor.findUnique({
     where: { token },
     select: {
-      id: true, nome: true, respondidoEm: true, resposta: true, valorTotal: true,
+      id: true, nome: true, respondidoEm: true, resposta: true, valorTotal: true, snapshot: true,
       cotacao: { select: { id: true, tipo: true, snapshot: true, enviadoEm: true, estudoId: true } },
     },
   });
@@ -51,7 +52,7 @@ export async function GET(_req, { params }) {
     enviadoEm: f.cotacao.enviadoEm,
     // ⚠ o snapshot é o que foi PERGUNTADO: se a área mudar no estudo depois, a pergunta que ele
     // respondeu continua sendo esta.
-    consulta: f.cotacao.snapshot || {},
+    consulta: f.cotacao.tipo === "TINTA" ? snapshotPublicoTinta(f) : f.snapshot || f.cotacao.snapshot || {},
     resposta: f.resposta || null,
     respondidoEm: f.respondidoEm,
   });

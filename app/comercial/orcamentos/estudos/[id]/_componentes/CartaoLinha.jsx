@@ -1,13 +1,14 @@
 "use client";
 import { useState } from "react";
 import { ChevronDown, FileSpreadsheet, Loader2, Plus, Trash2 } from "lucide-react";
-import { CLASSES, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, PERFIS, coefSugerido, perdaDaEstrutura } from "@/lib/lqc";
+import { CLASSES, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, PERFIS, coefSugerido } from "@/lib/lqc";
 import { Bloco, Campo, Inp, Sel } from "./campos";
 import { fmtKg, fmtR$, num } from "../_lib/formatos";
+import { TipoEstrutura } from "./TipoEstrutura";
 import styles from "../Lqc.module.css";
 
 /** Um elemento do quantitativo, com a consequência de cada escolha à vista. */
-export function CartaoLinha({ l, i, set, del, dup, porArea, cores, doEsquema, onImportarPeso, importando }) {
+export function CartaoLinha({ l, i, set, del, dup, porArea, cores, doEsquema, onImportarPeso, importando, tiposEstrutura, onTipoEstrutura }) {
   const [aberto, setAberto] = useState(i === 0 || !l.area);
   const dentro = l.ativo !== false;
   const custo = (porArea || []).find((x) => x.area === (l.area || l.item));
@@ -35,7 +36,7 @@ export function CartaoLinha({ l, i, set, del, dup, porArea, cores, doEsquema, on
         <span className={styles.numero}>{l.item || `1.${i + 1}`}</span>
         <span className={styles.areaIdentidade}>
           <strong>{l.area || "Nova área"}</strong>
-          <span>{[ESTRUTURA_ROTULO[l.estrutura] || l.estrutura, l.elemento].filter(Boolean).join(" · ") || "Preencha a identificação e o peso da estrutura"}</span>
+          <span>{[l.estruturaNome || ESTRUTURA_ROTULO[l.estrutura] || l.estrutura, l.elemento].filter(Boolean).join(" · ") || "Preencha a identificação e o peso da estrutura"}</span>
         </span>
         {l.cor && <span className={`text-[11px] ${corCasa === false ? "text-orange-700" : "text-torg-gray"}`}>
           {l.cor}{corCasa === false ? " · sem acabamento" : ""}
@@ -61,8 +62,7 @@ export function CartaoLinha({ l, i, set, del, dup, porArea, cores, doEsquema, on
             <Inp value={l.item || ""} onChange={(ev) => set(i, "item", ev.target.value)} className="w-full" /></Campo>
           <Campo r="Área" ajuda="galpão, prédio, trecho">
             <Inp value={l.area || ""} onChange={(ev) => set(i, "area", ev.target.value)} className="w-full" /></Campo>
-          <Campo r="Estrutura">
-            <Sel value={l.estrutura || ""} onChange={(ev) => set(i, "estrutura", ev.target.value)} opcoes={ESTRUTURAS} rotulos={ESTRUTURA_ROTULO} className="w-full" /></Campo>
+          <TipoEstrutura linha={l} tipos={tiposEstrutura} onEscolher={(tipo, novo) => onTipoEstrutura(i, tipo, novo)}/>
           <Campo r="Elemento" ajuda="tesoura, terça, pilar…">
             <Inp value={l.elemento || ""} onChange={(ev) => set(i, "elemento", ev.target.value)} className="w-full" /></Campo>
         </Bloco>
@@ -209,7 +209,7 @@ export function CartaoLinha({ l, i, set, del, dup, porArea, cores, doEsquema, on
           )}
         </Bloco>
 
-        <Bloco titulo="De que é feito" nota={`opcional — só para quem orça por categoria de perfil · perda de tinta ${perdaDaEstrutura(l.estrutura)}%`}>
+        <Bloco titulo="De que é feito" nota="opcional — para quem orça por categoria de perfil">
           <Campo r="Classificação" ajuda={classe ? `${classe.faixa} · fabricação ${fmtR$(classe.fabricacao)}/kg` : "faixa de peso por metro do perfil"}>
             {/* ⚠⚠ CLASSE QUE VEIO DA PLANILHA E NÃO EXISTE AQUI FICAVA INVISÍVEL. Auditoria de
                 05/09/2026: a LQC-186 tem 7 linhas como "ESPECIAL"; o `select` não achava a opção,

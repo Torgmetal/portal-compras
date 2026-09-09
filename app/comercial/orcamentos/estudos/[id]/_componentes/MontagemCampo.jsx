@@ -16,7 +16,7 @@ export function MontagemCampo({ c, res, setComp }) {
   const set = (k, v) => setComp({ montagem: { ...cfg, [k]: v } });
   const setItem = (k, v) => setComp({ montagem: { ...cfg, porItem: { ...(cfg.porItem || {}), [k]: v } } });
   const m = res.montagem || { linhas: [], mdo: 0, despesas: 0, equipamentos: 0, total: 0, porKg: 0 };
-  const comerciais = (res.itensComerciais || []).filter((i) => i.qtd > 0);
+  const comerciais = (res.itensComerciais || []).filter((i) => i.qtd > 0 && !["frete", "montagem", "complemento"].includes(i.tipo));
   const ativo = cfg.ativo === true || num(cfg.estruturaRsKg) > 0 || num(cfg.equipamentosVb) > 0;
 
   // ⚠⚠ CAMPO EM BRANCO EMPURRA O ORÇAMENTISTA A CHUTAR. Vitor (05/09/2026): "precisa trazer as
@@ -88,7 +88,7 @@ export function MontagemCampo({ c, res, setComp }) {
           <div className="px-4 py-3 border-b border-gray-100">
             <p className="text-[12px] font-bold text-torg-dark">Montagem dos itens comerciais</p>
             <p className="text-[11px] text-torg-gray mt-0.5">
-              A quantidade vem da aba Material; aqui entra só o preço de montar cada um.
+              A quantidade vem da aba Itens comerciais; aqui entra só o preço de montar cada um.
               {!comerciais.length && " Esta obra não tem item comercial lançado."}
             </p>
           </div>
@@ -100,14 +100,14 @@ export function MontagemCampo({ c, res, setComp }) {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {comerciais.map((i) => {
-                  const l = m.linhas.find((x) => x.key === i.key);
+                  const l = m.linhas.find((x) => x.key === (i.id || i.key));
                   return (
-                    <tr key={i.key}>
+                    <tr key={i.id || i.key}>
                       <td className="px-4 py-1.5">{i.rotulo}</td>
                       <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{Number(i.qtd).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} {i.un}</td>
                       <td className="px-2 py-1.5 text-right">
-                        <Inp value={cfg.porItem?.[i.key] ?? ""} placeholder={String(MONTAGEM_REFERENCIA.porItem[i.key]?.valor ?? "")}
-                          onChange={(e) => setItem(i.key, e.target.value)} className="w-24 text-right" />
+                        <Inp value={cfg.porItem?.[i.id || i.key] ?? cfg.porItem?.[i.key] ?? ""} placeholder={String(MONTAGEM_REFERENCIA.porItem[i.key]?.valor ?? "")}
+                          onChange={(e) => setItem(i.id || i.key, e.target.value)} className="w-24 text-right" />
                         {MONTAGEM_REFERENCIA.porItem[i.key] && (
                           <span className="block text-[9px] text-torg-gray mt-0.5">
                             casa {fmtR$(MONTAGEM_REFERENCIA.porItem[i.key].valor)}/{i.un} ({MONTAGEM_REFERENCIA.porItem[i.key].n} obras)

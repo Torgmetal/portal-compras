@@ -96,8 +96,8 @@ export default function ConsultaTintaClient({ token }) {
           ) : (
             <>
               <div><span className="block text-[11px] text-gray-500">Área total</span><strong>{Number(c.areaM2 || 0).toLocaleString("pt-BR")} m²</strong></div>
-              <div><span className="block text-[11px] text-gray-500">Coeficiente de perda</span><strong>{c.perda ?? 45}%</strong></div>
-              {c.fabricante && <div><span className="block text-[11px] text-gray-500">Especificação do cliente</span><strong>{c.fabricante}</strong></div>}
+              <div><span className="block text-[11px] text-gray-500">Perda de aplicação</span><strong>Individual por demão</strong></div>
+              {c.fabricante && <div><span className="block text-[11px] text-gray-500">Fabricante consultado</span><strong>{c.fabricante}</strong></div>}
             </>
           )}
         </div>
@@ -126,16 +126,16 @@ export default function ConsultaTintaClient({ token }) {
             <thead className="bg-gray-50 text-[10px] uppercase text-gray-500">
               <tr><th className="text-left px-4 py-1.5">Demão</th><th className="text-left px-2 py-1.5">Produto / resina</th>
                 <th className="text-right px-2 py-1.5">Película</th><th className="text-right px-2 py-1.5">Sólidos</th>
-                <th className="text-left px-4 py-1.5">Cor</th></tr>
+                <th className="text-left px-4 py-1.5">Cor / área / perda</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {c.camadas.map((x, i) => (
                 <tr key={i}>
                   <td className="px-4 py-1.5 font-semibold text-[#0D1F3C]">{x.camada}</td>
-                  <td className="px-2 py-1.5">{x.produto || "—"}</td>
+                  <td className="px-2 py-1.5">{x.produto || "Fornecedor deverá especificar"}{x.boletim?.url && /^https:\/\//.test(x.boletim.url) && <a href={x.boletim.url} target="_blank" rel="noreferrer" className="block text-xs text-blue-700 underline">{x.boletim.nome || 'Boletim'} · rev. {x.boletim.revisao}</a>}</td>
                   <td className="px-2 py-1.5 text-right">{x.peliculaSeca ?? "—"} µm</td>
                   <td className="px-2 py-1.5 text-right">{x.solidos ?? "—"}%</td>
-                  <td className="px-4 py-1.5">{x.cor || "—"}</td>
+                  <td className="px-4 py-1.5">{x.cor || "—"}<span className="block">{Number(x.areaM2 ?? c.areaM2 ?? 0).toLocaleString("pt-BR")} m² · {x.perda ?? c.perda ?? 45}% perda</span>{x.destino&&<span className="block text-xs text-gray-500">{x.destino}</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -143,6 +143,7 @@ export default function ConsultaTintaClient({ token }) {
         )}
       </div>
 
+      {!aco && <div className="mt-3 text-sm text-gray-600">{c.prazoResposta && <p>Responder até {c.prazoResposta.split('-').reverse().join('/')}.</p>}{c.mensagem && <p className="mt-2 whitespace-pre-wrap">{c.mensagem}</p>}<p className="mt-2">Confirme cor, aplicação e compatibilidade entre os produtos. Quando não houver produto sugerido, indique o produto que atende aos requisitos da demão.</p></div>}
       {pronto ? (
         <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
           <p className="text-[14px] font-semibold text-emerald-900">Proposta recebida — obrigado.</p>

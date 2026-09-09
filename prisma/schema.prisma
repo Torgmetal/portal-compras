@@ -1043,6 +1043,7 @@ model Fornecedor {
   // Opcional: fornecedores importados do Omie geralmente não têm e-mail lá; ficam
   // marcados "falta e-mail" e o time completa antes de cotar. Cadastro manual continua exigindo.
   email            String?
+  fabricanteTinta  String? // vínculo explícito para consultas de tinta; nunca inferido pelo nome
   emailsAdicionais String[]
   telefone         String?
   contato          String?
@@ -2003,6 +2004,11 @@ model ProdutoTinta {
   especificacao    String? // a descrição do tipo ("Tinta poliuretano dupla função…")
   boletimUrl       String?
   boletimNome      String?
+  boletimRevisao   String?
+  boletimData      String?
+  conferidoEm      DateTime?
+  conferidoPorNome String?
+  historicoBoletins Json? // versões anteriores completas, preservadas a cada alteração
   extraidoEm       DateTime?
   observacoes      String?
   ativo            Boolean   @default(true)
@@ -5735,6 +5741,7 @@ model CotacaoEstudoFornecedor {
   enviadoEm    DateTime?
   erroEnvio    String?
   respondidoEm DateTime?
+  snapshot     Json? // consulta isolada e congelada para este destinatário
   resposta     Json? // { galoes, diluentes, componenteB, prazo, observacao, itens[] }
   valorTotal   Float?
   vencedor     Boolean   @default(false)
