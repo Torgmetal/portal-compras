@@ -1,7 +1,12 @@
 {
-  "build": 3049,
-  "gerado": "2026-09-09T22:03:42.212Z",
+  "build": 3050,
+  "gerado": "2026-09-09T22:26:08.763Z",
   "commits": [
+    {
+      "hash": "0bfeced9",
+      "data": "09/09/2026",
+      "titulo": "Encaminha marcas avulsas do corte diretamente ao jato"
+    },
     {
       "hash": "81b92be3",
       "data": "09/09/2026",
@@ -146,11 +151,6 @@
       "hash": "144228a1",
       "data": "08/09/2026",
       "titulo": "Rastreio: o lábio 20 da lista é o 25 que a casa compra, na seção 200x75"
-    },
-    {
-      "hash": "c6e615d1",
-      "data": "08/09/2026",
-      "titulo": "Rastreio: o UE da Engenharia é o UDCE do fornecedor"
     }
   ]
 }
