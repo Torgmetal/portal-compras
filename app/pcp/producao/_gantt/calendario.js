@@ -34,23 +34,8 @@ export function montarCalendario(LOTES, HOJE){
   const DIAS=[]; for(const d=new Date(dIni); d<=dFim; d.setUTCDate(d.getUTCDate()+1)) DIAS.push(isoD(d));
   const IDX = new Map(DIAS.map((s,i)=>[s,i]));
 
-  // A coluna de dia útil a partir de i (o próprio i, se já for útil).
-  //
-  // ⚠⚠ NADA NESTA TELA PROGRAMA UM FIM DE SEMANA — e isso é decisão, não limitação.
-  //
-  // Sábado e domingo têm coluna para dar o ritmo do calendário e para conferir data, mas
-  // não recebem trabalho. Duas tentativas de permitir isso foram construídas e retiradas
-  // pelo Matheus (05/09/2026), cada uma pelo seu motivo:
-  //
-  //   pontas arrastáveis  "vai dar margem para aumentarem o prazo de produção"
-  //   menu no botão direito  "vai ficar confuso"
-  //
-  // Antes de reconstruir uma terceira, vale ler esses dois motivos: o problema nunca foi
-  // técnico. Programar fim de semana precisa ser decisão de quem cuida do PCP, num lugar
-  // onde isso seja pesado e visível — não um gesto a mais nesta grade.
-  //
-  // O que já existe pronto, se um dia for preciso: `diasDaQuebra` sabe seguir em dias
-  // corridos quando o bloco começa num fim de semana.
+  // A coluna de dia útil a partir de i (o próprio i, se já for útil), usada pelo
+  // empurrão automático de atrasos. O arraste manual respeita o dia escolhido pelo PCP.
   function encostaNoUtil(i){
     let k = Math.max(0, Math.min(DIAS.length-1, i));
     while(k < DIAS.length-1 && fdsISO(DIAS[k])) k++;

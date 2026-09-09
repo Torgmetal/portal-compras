@@ -1,7 +1,12 @@
 {
-  "build": 3054,
-  "gerado": "2026-09-09T23:38:48.734Z",
+  "build": 3055,
+  "gerado": "2026-09-09T23:58:42.387Z",
   "commits": [
+    {
+      "hash": "04eb38a6",
+      "data": "09/09/2026",
+      "titulo": "PCP: Baixa em Lote — um clique fecha um setor inteiro de uma OP"
+    },
     {
       "hash": "cfe8eadd",
       "data": "09/09/2026",
@@ -146,11 +151,6 @@
       "hash": "0daf3a61",
       "data": "08/09/2026",
       "titulo": "fix(rh): encontrar CBO com ou sem hífen no cadastro e na busca"
-    },
-    {
-      "hash": "a333438a",
-      "data": "08/09/2026",
-      "titulo": "feat(rh): buscar cargos por nome categoria e CBO"
     }
   ]
 }

@@ -1,8 +1,7 @@
 // ─── ARRASTAR A BARRA PARA REMANEJAR ───────────────────────────────────────────────────────────
 //
-// ⚠ SOLTAR NO FIM DE SEMANA ESCORREGA PARA A SEGUNDA. Mover o bloco é a operação de todo dia e não
-// pode plantar trabalho no sábado por descuido. Quem JÁ estava num fim de semana continua lá — só
-// se veio assim do banco, programado por fora desta tela; mover não desfaz decisão de ninguém.
+// O arraste manual respeita as colunas escolhidas, inclusive sábado e domingo. A prévia e a
+// gravação usam o mesmo deslocamento; a distribuição automática continua contando dias úteis.
 //
 // ⚠ O ESTADO DO GESTO É LOCAL E PASSA POR PARÂMETRO. A versão que fechava sobre uma variável de
 // módulo estourou "Cannot set properties of null" assim que existiu um segundo gesto na tela.
@@ -67,13 +66,7 @@ export function criarArraste(dep){
     const permitido = setor === arr.r.setor && !arr.bloqueado;
     const dur = arr.r.fim - arr.r.ini + 1;
     const cels = [...lin.querySelectorAll(".cel")];
-    // ⚠ SOLTAR NO FIM DE SEMANA ESCORREGA PARA A SEGUNDA. Matheus (05/09/2026): "os
-    // sábados e domingo por padrão pule eles". Mover o bloco é a operação de todo dia e
-    // não pode plantar trabalho no sábado por descuido; para isso existe a ponta da
-    // barra, que é deliberada. A prévia já mostra onde vai cair, então não há surpresa
-    // depois de soltar.
-    const jBruto = Math.max(0, cels.indexOf(cel) - arr.offCols);
-    const j = Math.max(0, dep.encostaNoUtil(dep.getInicio() + jBruto) - dep.getInicio());
+    const j = Math.max(0, cels.indexOf(cel) - arr.offCols);
     for(let k=0;k<dur;k++){ const c = cels[j+k]; if(c) c.classList.add(permitido?"alvo":"proibido"); }
     if(!permitido || !cels[j]) return;
     arr.alvo = { setor, recurso:rec, iAlvo: dep.getInicio() + j };
@@ -96,12 +89,10 @@ export function criarArraste(dep){
     const delta = a.iAlvo - r.ini;
     if(delta===0 && a.recurso===r.recurso){ dep.desenhar(); return; }
     const antes = r.lotes.map(l=>({...l, itens:l.itens}));
-    // Cair num sábado escorrega para a segunda. A guarda do `dep.fdsISO(l.dia)` cobre o lote
-    // que JÁ esteja num fim de semana — só se veio assim do banco, programado por fora
-    // desta tela: mover o bloco não é lugar de desfazer isso em silêncio.
+    // Preserva os dias mostrados na prévia, inclusive quando uma barra de vários dias
+    // passa a ocupar o fim de semana. Não deslocar esses lotes novamente ao salvar.
     const novos = r.lotes.map(l=>{
-      const cru = Math.max(0, Math.min(dep.DIAS.length-1, dep.IDX.get(l.dia)+delta));
-      const destino = dep.fdsISO(l.dia) ? cru : dep.encostaNoUtil(cru);
+      const destino = Math.max(0, Math.min(dep.DIAS.length-1, dep.IDX.get(l.dia)+delta));
       return dep.novoLote({ ...l, itens:l.itens, recurso: a.recurso, dia: dep.DIAS[destino] });
     });
     dep.registrar({

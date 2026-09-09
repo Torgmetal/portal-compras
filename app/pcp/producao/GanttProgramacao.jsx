@@ -193,7 +193,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     esconderPainel });
   const projetos = criarPainelProjetos({ $, raiz, nkg, dbr, MAX_LOTE, avisar, recarregar, baixarZip,
     baixarPintura, baixarBaixaSyneco, pintarPainel, abrirQuebra: ()=>{ abaP="quebrar"; pintarPainel(); } });
-  const arraste = criarArraste({ raiz, grade, COL, DIAS, IDX, encostaNoUtil, fdsISO, montarRuns,
+  const arraste = criarArraste({ raiz, grade, COL, DIAS, IDX, montarRuns,
     avisar,
     novoLote, registrar, nomeRec, dbr, abrirPainel, desenhar, redesenhar,
     getInicio: ()=>inicio, getPainel: ()=>painel, setPainel: (v)=>{ painel = v; } });
