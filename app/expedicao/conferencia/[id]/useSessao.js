@@ -65,7 +65,8 @@ export function useSessao(id) {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao }),
       }), "Encerrar");
       await carregar();
-    } catch (e) { setErro(e.message); } finally { setAgindo(false); }
+      return true;
+    } catch (e) { setErro(e.message); return false; } finally { setAgindo(false); }
   }, [url, carregar]);
 
   return {

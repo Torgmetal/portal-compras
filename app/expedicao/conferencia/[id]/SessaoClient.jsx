@@ -207,5 +207,12 @@ export default function SessaoClient({ id }) {
     );
   }
 
-  return ehCelular ? <ModoPatio titulo={titulo}>{conteudo}</ModoPatio> : conteudo;
+  // ⚠ Só oferece o atalho de cancelar direto na saída quando não há NADA lançado ainda — é
+  // exatamente "abri por engano". Com lançamento de verdade, cancelar continua um passo mais
+  // deliberado (Encerrar conferência → Cancelar sessão), pra não descartar trabalho num toque.
+  const semLancamentos = !!s.dados && !s.encerrada && s.lancamentos.length === 0;
+
+  return ehCelular
+    ? <ModoPatio titulo={titulo} semLancamentos={semLancamentos} onCancelar={() => s.encerrar("cancelar")}>{conteudo}</ModoPatio>
+    : conteudo;
 }

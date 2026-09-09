@@ -320,16 +320,65 @@ describe("conferência no celular", () => {
       vi.stubGlobal("fetch", servidor());
       await abrirCelular();
       fireEvent.click(screen.getByRole("button", { name: "Sair do modo pátio" }));
-      expect(await screen.findByText("Sair do modo pátio?")).toBeTruthy();
+      expect(await screen.findByText(/Nada foi conferido ainda/)).toBeTruthy();
       expect(push).not.toHaveBeenCalled();
     });
 
-    it("confirmar a saída volta pra lista de conferências", async () => {
+    // ⚠⚠ Matheus (09/09/2026): "não está funcionando o botão ENCERRAR para excluir uma
+    // conferência quando eu iniciar por engano". Achado: o ✕ só navegava (`router.push`), nunca
+    // cancelava a sessão no servidor — quem abria a OP errada e nunca lançava nada saía pelo ✕
+    // achando que tinha "excluído", e a conferência ficava ABERTA pra sempre na lista. Sem
+    // lançamento nenhum, a folha agora oferece cancelar de verdade.
+    describe("sem nenhum lançamento — oferece cancelar direto", () => {
+      it("cancelar manda o PATCH de verdade e só sai depois que ele confirma", async () => {
+        comoCelular();
+        const fetchMock = servidor();
+        vi.stubGlobal("fetch", fetchMock);
+        await abrirCelular();
+        fireEvent.click(screen.getByRole("button", { name: "Sair do modo pátio" }));
+        fireEvent.click(await screen.findByRole("button", { name: "Cancelar esta conferência" }));
+        await waitFor(() => expect(push).toHaveBeenCalledWith("/expedicao/conferencia"));
+        const patchCall = fetchMock.mock.calls.find(([, o]) => o?.method === "PATCH");
+        expect(JSON.parse(patchCall[1].body)).toEqual({ acao: "cancelar" });
+      });
+
+      it("se o cancelamento falhar no servidor, NÃO sai — a folha fecha e o erro aparece por trás", async () => {
+        comoCelular();
+        const fetchMock = vi.fn(async (url, opcoes) => {
+          if (opcoes?.method === "PATCH") return { ok: false, status: 500, text: async () => JSON.stringify({ error: "banco fora do ar" }) };
+          return { ok: true, status: 200, text: async () => JSON.stringify(estado()) };
+        });
+        vi.stubGlobal("fetch", fetchMock);
+        await abrirCelular();
+        fireEvent.click(screen.getByRole("button", { name: "Sair do modo pátio" }));
+        fireEvent.click(await screen.findByRole("button", { name: "Cancelar esta conferência" }));
+        await screen.findByText("banco fora do ar");
+        expect(push).not.toHaveBeenCalled();
+      });
+
+      it("'só sair' continua só navegando — não cancela nada", async () => {
+        comoCelular();
+        const fetchMock = servidor();
+        vi.stubGlobal("fetch", fetchMock);
+        await abrirCelular();
+        fireEvent.click(screen.getByRole("button", { name: "Sair do modo pátio" }));
+        fireEvent.click(await screen.findByRole("button", { name: /Só sair/ }));
+        expect(push).toHaveBeenCalledWith("/expedicao/conferencia");
+        expect(fetchMock.mock.calls.some(([, o]) => o?.method === "PATCH")).toBe(false);
+      });
+    });
+
+    // Com algo já lançado, cancelar continua só pelo caminho deliberado (Encerrar conferência →
+    // Cancelar sessão) — a saída rápida não pode arriscar descartar trabalho de verdade num toque.
+    it("com algo já lançado, a saída rápida NÃO oferece cancelar — só navega", async () => {
       comoCelular();
-      vi.stubGlobal("fetch", servidor());
+      const LANCADO = [{ id: "i1", marca: "T97A140", qte: 1, criadoEm: new Date().toISOString() }];
+      vi.stubGlobal("fetch", servidor({ comLancamentos: LANCADO }));
       await abrirCelular();
       fireEvent.click(screen.getByRole("button", { name: "Sair do modo pátio" }));
-      fireEvent.click(await screen.findByRole("button", { name: /^Sair$/ }));
+      expect(await screen.findByText("Sair do modo pátio?")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Cancelar esta conferência" })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: /^Sair$/ }));
       expect(push).toHaveBeenCalledWith("/expedicao/conferencia");
     });
 
@@ -339,7 +388,7 @@ describe("conferência no celular", () => {
       await abrirCelular();
       fireEvent.click(screen.getByRole("button", { name: "Sair do modo pátio" }));
       fireEvent.click(await screen.findByRole("button", { name: "Continuar" }));
-      await waitFor(() => expect(screen.queryByText("Sair do modo pátio?")).toBeNull());
+      await waitFor(() => expect(screen.queryByText(/Nada foi conferido ainda/)).toBeNull());
       expect(push).not.toHaveBeenCalled();
     });
 

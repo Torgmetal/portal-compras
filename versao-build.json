@@ -1,7 +1,12 @@
 {
-  "build": 3036,
-  "gerado": "2026-09-09T15:24:03.016Z",
+  "build": 3037,
+  "gerado": "2026-09-09T15:47:07.858Z",
   "commits": [
+    {
+      "hash": "bae39f9791",
+      "data": "09/09/2026",
+      "titulo": "Conferência de peça: Modo Pátio de verdade (tela cheia no celular)"
+    },
     {
       "hash": "f049567133",
       "data": "09/09/2026",
@@ -146,11 +151,6 @@
       "hash": "d594f3320c",
       "data": "08/09/2026",
       "titulo": "feat: filtrar materiais e dividir selecao no painel PCP"
-    },
-    {
-      "hash": "8a3b780ba8",
-      "data": "08/09/2026",
-      "titulo": "PCP: peça que está no terceiro sai da programação de todos os setores"
     }
   ]
 }

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Maximize2, Minimize2, X } from "lucide-react";
+import { AlertTriangle, LogOut, Maximize2, Minimize2, X } from "lucide-react";
 import { usarModoPatio } from "../modo-patio";
 
 const CHAVE_DICA = "torg-conferencia-dica-tela-cheia";
@@ -12,10 +12,21 @@ const CHAVE_DICA = "torg-conferencia-dica-tela-cheia";
  * ⚠⚠ SAIR EXIGE CONFIRMAÇÃO. Matheus (08/09/2026): "não ter chance do operador sair sem querer".
  * O único jeito de voltar pra lista é o botão ✕, que abre uma folha de confirmação — não um
  * `Link` normal, que sairia num toque só.
+ *
+ * ⚠⚠ "SAIR" NÃO CANCELA A SESSÃO — E ISSO CONFUNDIA QUEM ABRIU POR ENGANO. Matheus (09/09/2026):
+ * "não está funcionando o botão ENCERRAR para excluir uma conferência quando eu iniciar por
+ * engano". Achado ao investigar: o ✕ só navega de volta (a sessão continua ABERTA, do jeito
+ * certo pra quem tem lançamento de verdade pra não perder). Quem abriu a OP errada e nunca lançou
+ * nada tocava o ✕ esperando que sumisse — e a conferência ficava "em andamento" na lista, porque
+ * cancelar de verdade é outro caminho (Encerrar conferência → Cancelar sessão, mais embaixo na
+ * tela, fácil de não ver). Com `semLancamentos`, esta folha já oferece cancelar aqui — é
+ * exatamente o caso "abri por engano, nada foi conferido ainda". Com lançamento já feito, a folha
+ * continua só navegando: cancelar dado de verdade fica no caminho mais deliberado de baixo.
  */
-export default function ModoPatio({ titulo, children }) {
+export default function ModoPatio({ titulo, semLancamentos, onCancelar, children }) {
   const router = useRouter();
   const [saindo, setSaindo] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
   const [dica, setDica] = useState(false);
   const { telaCheia, suporta, standalone, alternar } = usarModoPatio();
 
@@ -34,6 +45,14 @@ export default function ModoPatio({ titulo, children }) {
   const sair = () => {
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     router.push("/expedicao/conferencia");
+  };
+
+  const cancelarESair = async () => {
+    setCancelando(true);
+    const ok = await onCancelar();
+    setCancelando(false);
+    if (ok) sair(); // erro fica visível na tela por trás (o aviso de sempre) — a folha só fecha
+    else setSaindo(false);
   };
 
   return (
@@ -71,7 +90,38 @@ export default function ModoPatio({ titulo, children }) {
         {children}
       </div>
 
-      {saindo && (
+      {saindo && semLancamentos && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-end" onClick={() => setSaindo(false)}>
+          <div className="w-full bg-white rounded-t-2xl p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-2">
+              <AlertTriangle size={18} className="text-torg-orange shrink-0 mt-0.5" />
+              <p className="text-[15px] font-semibold text-torg-dark">Nada foi conferido ainda nesta sessão.</p>
+            </div>
+            <p className="text-[13px] text-torg-gray">
+              Se abriu a obra errada por engano, cancele — senão ela fica marcada &quot;em
+              andamento&quot; pra sempre, sem ninguém mexer nela.
+            </p>
+            <div className="space-y-2 pt-1">
+              <button onClick={cancelarESair} disabled={cancelando}
+                className="w-full bg-red-600 text-white font-semibold rounded-lg py-3 text-sm disabled:opacity-40">
+                {cancelando ? "Cancelando…" : "Cancelar esta conferência"}
+              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => setSaindo(false)} disabled={cancelando}
+                  className="border border-gray-200 text-torg-gray font-semibold rounded-lg py-3 text-sm disabled:opacity-40">
+                  Continuar
+                </button>
+                <button onClick={sair} disabled={cancelando}
+                  className="border border-gray-200 text-torg-gray font-semibold rounded-lg py-3 text-sm flex items-center justify-center gap-1.5 disabled:opacity-40">
+                  <LogOut size={15} /> Só sair
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {saindo && !semLancamentos && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-end" onClick={() => setSaindo(false)}>
           <div className="w-full bg-white rounded-t-2xl p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
             <p className="text-[15px] font-semibold text-torg-dark">Sair do modo pátio?</p>
