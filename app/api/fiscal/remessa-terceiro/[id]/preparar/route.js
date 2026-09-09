@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { resolverCustoPorCodigo } from "@/lib/custo-material";
+import { configRemessa } from "@/lib/omie-remessa-industrializacao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,6 +57,10 @@ export async function GET(_req, { params }) {
     especie: "PEÇAS",
   };
 
+  // ⚠ Sugestão, não obrigação — o Fiscal pode ajustar por remessa. `configRemessa().valorKg` vem
+  // do env (OMIE_REMESSA_VALOR_KG); sem ele configurado, vem 0 e o campo chega vazio na tela.
+  const valorKgSugestao = configRemessa().valorKg || null;
+
   return NextResponse.json({
     success: true,
     numero: rom.numero,
@@ -66,5 +71,6 @@ export async function GET(_req, { params }) {
     pronto,
     frete: rom.remessaFrete || null, // frete já salvo (se regerando)
     freteSugestao,
+    valorKgSugestao,
   });
 }

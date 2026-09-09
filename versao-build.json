@@ -1,156 +1,156 @@
 {
-  "build": 3044,
-  "gerado": "2026-09-09T19:38:05.977Z",
+  "build": 3045,
+  "gerado": "2026-09-09T20:11:32.279Z",
   "commits": [
     {
-      "hash": "4c0388fa",
+      "hash": "d11b51500e",
+      "data": "09/09/2026",
+      "titulo": "PCP: peça no terceiro sai do aviso de liberações"
+    },
+    {
+      "hash": "4c0388fae4",
       "data": "09/09/2026",
       "titulo": "fix(pcp): incluir todos os conjuntos na pre-programacao sem bancada"
     },
     {
-      "hash": "caa85be6",
+      "hash": "caa85be6d9",
       "data": "09/09/2026",
       "titulo": "Solda: a bancada passa a ter nome de soldador"
     },
     {
-      "hash": "7486262c",
+      "hash": "7486262cb8",
       "data": "09/09/2026",
       "titulo": "feat(pcp): programar conjuntos pendentes no Gantt e liberar aptos parcialmente"
     },
     {
-      "hash": "fb87d86f",
+      "hash": "fb87d86f6d",
       "data": "09/09/2026",
       "titulo": "RNC: a reclamação vira apontamentos, cada um com a sua disposição"
     },
     {
-      "hash": "626a6f1b",
+      "hash": "626a6f1b6e",
       "data": "09/09/2026",
       "titulo": "feat(qualidade): anexar relatório às auditorias"
     },
     {
-      "hash": "7c3ca4d2",
+      "hash": "7c3ca4d2c3",
       "data": "09/09/2026",
       "titulo": "Comercial: página de Custo de Fabricação — só o custo, medido"
     },
     {
-      "hash": "13123e95",
+      "hash": "13123e956e",
       "data": "09/09/2026",
       "titulo": "Conferência de peça: cancelar sessão aberta por engano, direto na saída"
     },
     {
-      "hash": "bae39f97",
+      "hash": "bae39f9791",
       "data": "09/09/2026",
       "titulo": "Conferência de peça: Modo Pátio de verdade (tela cheia no celular)"
     },
     {
-      "hash": "f0495671",
+      "hash": "f049567133",
       "data": "09/09/2026",
       "titulo": "Conferência de peça: concorrência, idempotência e acesso corrigidos"
     },
     {
-      "hash": "c2b4991e",
+      "hash": "c2b4991ebb",
       "data": "09/09/2026",
       "titulo": "feat(lqc): integrar itens comerciais, pintura e boletins por fabricante"
     },
     {
-      "hash": "2ff928af",
+      "hash": "2ff928afc7",
       "data": "09/09/2026",
       "titulo": "O sino: notificações por módulo e por pessoa, em toda sidebar"
     },
     {
-      "hash": "f484941e",
+      "hash": "f484941eb5",
       "data": "09/09/2026",
       "titulo": "LQC: refina cabeçalho, totais e áreas recolhíveis"
     },
     {
-      "hash": "bf370cf6",
+      "hash": "bf370cf60b",
       "data": "08/09/2026",
       "titulo": "Gantt: obra fora do quadro sai de todas as raias, não só da bancada"
     },
     {
-      "hash": "b0f41132",
+      "hash": "b0f4113299",
       "data": "08/09/2026",
       "titulo": "Gantt: lote concluído e velho sai do quadro; o recente fica"
     },
     {
-      "hash": "dd0b0929",
+      "hash": "dd0b092956",
       "data": "08/09/2026",
       "titulo": "Gantt: a bancada só traz as obras que o PCP está tocando; o resto vai numa lista"
     },
     {
-      "hash": "a8b2e829",
+      "hash": "a8b2e8298c",
       "data": "08/09/2026",
       "titulo": "Gantt: o que já está na bancada aparece, mesmo sem ninguém ter programado"
     },
     {
-      "hash": "e087c90c",
+      "hash": "e087c90c57",
       "data": "08/09/2026",
       "titulo": "PCP: o que foi para o terceiro sai do painel, e não só do Gantt"
     },
     {
-      "hash": "3c1d70ca",
+      "hash": "3c1d70ca6f",
       "data": "08/09/2026",
       "titulo": "Gantt: botão para apagar uma programação e tirar as peças da fila"
     },
     {
-      "hash": "0daf3a61",
+      "hash": "0daf3a6108",
       "data": "08/09/2026",
       "titulo": "fix(rh): encontrar CBO com ou sem hífen no cadastro e na busca"
     },
     {
-      "hash": "a333438a",
+      "hash": "a333438af8",
       "data": "08/09/2026",
       "titulo": "feat(rh): buscar cargos por nome categoria e CBO"
     },
     {
-      "hash": "f0db952e",
+      "hash": "f0db952e62",
       "data": "08/09/2026",
       "titulo": "feat(rh): registrar contratações parciais e manter saldo de vagas"
     },
     {
-      "hash": "61ffa732",
+      "hash": "61ffa732d4",
       "data": "08/09/2026",
       "titulo": "Liberação: conjunto não compra aço — ele herda o material dos croquis"
     },
     {
-      "hash": "72e6eefb",
+      "hash": "72e6eefb03",
       "data": "08/09/2026",
       "titulo": "Rastreio: no U enrijecido a espessura da chapa é a quarta medida"
     },
     {
-      "hash": "144228a1",
+      "hash": "144228a199",
       "data": "08/09/2026",
       "titulo": "Rastreio: o lábio 20 da lista é o 25 que a casa compra, na seção 200x75"
     },
     {
-      "hash": "c6e615d1",
+      "hash": "c6e615d1ae",
       "data": "08/09/2026",
       "titulo": "Rastreio: o UE da Engenharia é o UDCE do fornecedor"
     },
     {
-      "hash": "53a097a6",
+      "hash": "53a097a6ba",
       "data": "08/09/2026",
       "titulo": "Expedição: a Lista de Expedição define a lista, não completa PecaConjunto"
     },
     {
-      "hash": "f5c40fac",
+      "hash": "f5c40fac74",
       "data": "08/09/2026",
       "titulo": "Expedição: uma linha por marca, e a quantidade vem da L.E."
     },
     {
-      "hash": "d5dd37a0",
+      "hash": "d5dd37a0eb",
       "data": "08/09/2026",
       "titulo": "fix(planejamento): listar todos os Rs compatíveis de outras OPs"
     },
     {
-      "hash": "91159676",
+      "hash": "9115967694",
       "data": "08/09/2026",
       "titulo": "RH › Cargos: o cargo passa a ter faixa — base, médio e máximo"
-    },
-    {
-      "hash": "4d62c6f2",
-      "data": "08/09/2026",
-      "titulo": "Conferência: autocomplete só depois de digitar, e corrigir a quantidade lançada"
     }
   ]
 }

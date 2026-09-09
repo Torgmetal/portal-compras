@@ -39,6 +39,9 @@ const schema = z.object({
   acao: z.enum(["gerar_pedido_omie", "conferir_omie", "emitir_omie", "atualizar_status", "registrar", "dispensar", "reabrir"]),
   // gerar_pedido_omie: materiais já resolvidos na tela de preparação (código + valor)
   materiais: z.array(materialResolvidoSchema).optional(),
+  // gerar_pedido_omie SEM materiais (romaneio só de peças/marcas): o Fiscal informa R$/kg na
+  // tela — sem isto a remessa não tem preço pra sair (ARM000001 não tem custo próprio).
+  valorKg: z.number().positive().optional(),
   frete: freteSchema,
   cfop: z.string().max(10).nullable().optional(),
   natureza: z.string().max(120).nullable().optional(),
@@ -91,9 +94,12 @@ export async function PATCH(req, { params }) {
     }
 
     const frete = body.frete || null;
+    // ⚠ Só faz sentido no caso SEM materiais (marcas/peças) — `criarPedidoRemessa` ignora
+    // `valorKg` quando `materiaisResolvidos` está presente (cada material já tem seu valorUnit).
+    const valorKg = materiaisRom.length === 0 ? body.valorKg : undefined;
     let resultado;
     try {
-      resultado = await criarPedidoRemessa(rom, { cnpj: forn.cnpj, uf: forn.uf, nCodOmie: forn.nCodOmie }, { materiaisResolvidos, frete });
+      resultado = await criarPedidoRemessa(rom, { cnpj: forn.cnpj, uf: forn.uf, nCodOmie: forn.nCodOmie }, { materiaisResolvidos, frete, valorKg });
     } catch (e) {
       return NextResponse.json({ error: `Falha ao criar pedido no Omie: ${e.message}` }, { status: 502 });
     }

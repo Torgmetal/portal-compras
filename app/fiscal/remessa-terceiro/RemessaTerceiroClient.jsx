@@ -203,6 +203,7 @@ const finp = "w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 foc
 function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
   const [dados, setDados] = useState(null);
   const [itens, setItens] = useState([]);
+  const [valorKg, setValorKg] = useState(""); // só usado quando o romaneio não tem materiais (peças)
   const [frete, setFrete] = useState({ tpFrete: "0" });
   const [aba, setAba] = useState("itens");
   const [freteVisto, setFreteVisto] = useState(false); // obriga conferir a aba Frete antes de gerar
@@ -216,6 +217,12 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
       .then((j) => {
         if (!j.success) { setErro(j.error || "Erro"); return; }
         setDados(j); setItens(j.itens || []);
+        // ⚠⚠ SEM ISTO, "GERAR" SEMPRE FALHAVA COM "defina o valor por kg" — o campo pra
+        // informar existia no backend (`lib/omie-remessa-industrializacao.js`, comentário
+        // "Fiscal pode informar na tela"), mas a tela nunca tinha o input. Matheus (09/09/2026):
+        // "esta dando erro de preço, mas não achei campo para colocar valor". Pré-preenche com o
+        // padrão da conta (`OMIE_REMESSA_VALOR_KG`), se houver — o Fiscal ajusta se for o caso.
+        setValorKg(j.valorKgSugestao ? String(j.valorKgSugestao).replace(".", ",") : "");
         const sug = j.freteSugestao || {};
         setFrete(j.frete || { tpFrete: "0", especie: sug.especie || "PEÇAS", pesoBruto: sug.pesoBruto || "", pesoLiq: sug.pesoBruto || "", qtdVol: sug.qtdVol || "" });
       })
@@ -227,7 +234,10 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
   const totalGeral = itens.reduce((s, it) => s + (Number(it.valorUnit) || 0) * (Number(it.qtd) || 0), 0);
   const pendentes = itens.filter((it) => !it.codigoOmie || !(Number(it.valorUnit) > 0));
   const temMateriais = dados?.temMateriais;
-  const itensOk = temMateriais ? (itens.length > 0 && pendentes.length === 0) : (dados?.marcasCount > 0);
+  const valorKgNum = numeroBR(valorKg, NaN);
+  const itensOk = temMateriais
+    ? (itens.length > 0 && pendentes.length === 0)
+    : (dados?.marcasCount > 0 && valorKgNum > 0);
   const podeGerar = itensOk && freteVisto; // só libera depois de conferir a aba Frete
   const num = (v) => (v === "" || v == null ? null : numeroBR(v, NaN));
 
@@ -236,6 +246,7 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
     try {
       const payload = { acao: "gerar_pedido_omie" };
       if (temMateriais) payload.materiais = itens.map((it) => ({ idx: it.idx, codigoOmie: it.codigoOmie, descricao: it.descricao || null, qtd: Number(it.qtd), valorUnit: Number(it.valorUnit) }));
+      else payload.valorKg = valorKgNum;
       payload.frete = {
         tpFrete: frete.tpFrete || "0",
         nCodTransp: frete.nCodTransp || null,
@@ -316,8 +327,24 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
               {frete.nCodTransp && <p className="text-[11px] text-emerald-700 inline-flex items-center gap-1"><Check size={12} /> Transportadora vinculada (o RNTRC/ANTT vem do cadastro dela no Omie).</p>}
             </div>
           ) : !temMateriais ? (
-            <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-4 text-sm text-torg-dark">
-              Este romaneio não tem materiais — a remessa sai como <strong>peças (ARM000001)</strong>{dados.marcasCount ? ` · ${dados.marcasCount} marca(s)` : ""}. Ao gerar, o Omie cria a remessa rascunho pra você conferir e faturar.
+            <div className="space-y-3">
+              <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-4 text-sm text-torg-dark">
+                Este romaneio não tem materiais — a remessa sai como <strong>peças (ARM000001)</strong>{dados.marcasCount ? ` · ${dados.marcasCount} marca(s)` : ""}. Ao gerar, o Omie cria a remessa rascunho pra você conferir e faturar.
+              </div>
+              <div className="max-w-[220px]">
+                <label className="block text-xs font-medium text-torg-dark mb-1">Valor por kg (R$) *</label>
+                <input value={valorKg} onChange={(e) => setValorKg(e.target.value)}
+                  inputMode="decimal" placeholder="0,00" className={finp} />
+                <p className="text-[11px] text-torg-gray mt-1">
+                  A NF sai pelo peso × este valor — não tem preço de compra pra peça pronta, então
+                  quem define é o Fiscal.
+                </p>
+              </div>
+              {!(valorKgNum > 0) && (
+                <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-100 rounded px-2.5 py-1.5 flex items-start gap-1.5">
+                  <AlertCircle size={13} className="mt-0.5 shrink-0" /> Defina o valor por kg pra liberar a geração.
+                </p>
+              )}
             </div>
           ) : (
             <>
