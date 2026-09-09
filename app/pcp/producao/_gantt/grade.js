@@ -103,19 +103,22 @@ export function criarGrade(dep){
             ? dep.DIAS.slice(Math.min(...atrasados.map(l=>dep.IDX.get(l.dia))))
                   .filter(d=>d<dep.HOJE && !dep.fdsISO(d)).length : 0;
           const foco = dep.getPainel() && dep.getPainel().setor===r.setor && dep.getPainel().recurso===r.recurso && dep.getPainel().op===r.op && dep.getPainel().ini===r.ini;
+          const bloqueados = r.setor==='MONTAGEM' && !r.terceiroRecebido ? r.itens.filter(i=>i.prontidao?.pronto!==true).length : 0;
           const dica = "OP-"+r.op+(r.familia?" · "+r.familia:"")+(r.obra?" — "+r.obra:"")+"\n"+rec.nome+" · "
             + (dias>1 ? dep.dbr(dep.DIAS[r.ini])+" a "+dep.dbr(dep.DIAS[r.fim])+" ("+dias+" dias)" : dep.dbr(dep.DIAS[r.ini]))
             + "\n"+r.pecas+" peças · "+dep.nkg(r.kg)+" kg"
             + "\nSyneco apontou "+r.feitas+" de "+r.pecas+" ("+Math.round(fr*100)+"%)"
             + (diasAtraso>0 ? "\n⚠ atrasada "+diasAtraso+" dia(s) úteis — "+pend+" peça(s) pendentes" : "")
             + (r.semGrd ? "\n"+r.semGrd+" projeto(s) ainda sem GRD impressa" : "\nprojetos todos impressos")
+            + (bloqueados ? '\n! '+bloqueados+' conjunto(s) com croqui/corte pendente. '+(r.itens.length-bloqueados)+' apto(s) para liberação parcial.' : '')
             + "\n\nclique para ver os projetos · arraste para remanejar";
-          html += '<div class="barra-op'+(r.terceiroPrevisto?" terceiro-previsto":"")+(r.mexida?" mexida":"")+(foco?" foco":"")+(diasAtraso>0?" atrasada":"")+'" data-run="'+r.id+'" '
+          html += '<div class="barra-op'+(bloqueados?' croquis-pendentes':'')+(r.terceiroPrevisto?" terceiro-previsto":"")+(r.mexida?" mexida":"")+(foco?" foco":"")+(diasAtraso>0?" atrasada":"")+'" data-run="'+r.id+'" '
                +  'title="'+dica.replace(/"/g,"&quot;")+'" style="left:'+x+'px;width:'+w+'px;top:'+(r.faixa*30+5)+'px;'
                +  '--c:'+dep.corDaOp(r.op)+';--ct:'+dep.tintaOp(r.op)+'">'
                +  (fr>0?'<div class="prog" style="width:'+(fr*100).toFixed(1)+'%"></div>':"")
                +  (larguraAtraso>0?'<div class="atrasado" style="width:'+larguraAtraso.toFixed(1)+'%"></div>':"")
-               +  '<b>OP-'+r.op+'</b><span>'+(r.terceiroPrevisto ? 'Aguardando terceiro' : r.terceiroRecebido ? 'Retorno recebido · '+r.pecas+' pç' : cabe ? r.pecas+' pç · '+dep.nkg(r.kg)+' kg' : r.pecas+' pç')+'</span>'
+               +  (bloqueados?'<b class="alerta-croqui" aria-label="Croquis pendentes">!</b>':'')
+               +  '<b>OP-'+r.op+'</b><span>'+(bloqueados ? (r.itens.length-bloqueados)+'/'+r.itens.length+' aptos' : r.terceiroPrevisto ? 'Aguardando terceiro' : r.terceiroRecebido ? 'Retorno recebido · '+r.pecas+' pç' : cabe ? r.pecas+' pç · '+dep.nkg(r.kg)+' kg' : r.pecas+' pç')+'</span>'
                +  (cabe && diasAtraso>0?'<span class="selo atr">atrasada '+diasAtraso+' d</span>':"")
                +  (cabe && r.adiado>0?'<span class="selo">adiada '+r.adiado+'×</span>':"")
                +  (cabe && r.feitas>0?'<span class="selo">'+Math.round(fr*100)+'% · '+pend+' a fazer</span>':"")

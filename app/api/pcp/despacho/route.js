@@ -19,6 +19,7 @@ import { pecasDosLotes } from "@/lib/liberacao-pecas";
 import { croquiCortado, setorRealIndex, mapaSetorReal, FLUXO_SETORES, soloPassaNoSetor } from "@/lib/prioridades-setor";
 import { z } from "zod";
 import { pecasNoTerceiro } from "@/lib/fora-da-fabrica";
+import { conjuntoAguardandoCroquis } from "@/lib/gantt-prontidao";
 
 export const runtime = "nodejs";
 
@@ -115,6 +116,8 @@ export async function GET(req) {
   const passaNoSetor = (p, s) => {
     if (!s) return true;
     if (ehCroqui(p)) return s === "CORTE";
+    // Pré-programar o conjunto ainda sem croquis não autoriza a entrada numa bancada.
+    if (s === 'MONTAGEM' && conjuntoAguardandoCroquis(p)) return true;
     if (vaiPraMontagem(p)) return s !== "CORTE";               // Montagem→Expedição
     return soloPassaNoSetor(s); // solo/avulsa: CORTE → JATO → Pintura → Expedição
   };
@@ -535,7 +538,7 @@ export async function GET(req) {
       : null;
     // Montagem: só conjuntos COM croquis têm status pronto/pendente; sem croquis (ex.: GC) = null (sem chip).
     const info = prontoInfo ? prontoInfo.get(p.marca) : null;
-    const mont = prontoInfo ? (info || { prontoMontar: null, faltamCroquis: [], totalCroquis: 0 }) : null;
+    const mont = prontoInfo ? (info || { prontoMontar: conjuntoAguardandoCroquis(p) ? false : null, faltamCroquis: [], totalCroquis: 0 }) : null;
     // avancouAlem: a peça JÁ está num setor à frente deste (Syneco/status/terceiro/encaminhada) —
     // não pode ficar pendente aqui atrás; o painel joga pro histórico (aba Peças prontas).
     // `entradas` (todas as linhas do CMR daquele material) sai fora da listagem — era repetida em

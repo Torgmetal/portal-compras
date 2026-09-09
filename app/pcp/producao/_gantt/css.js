@@ -298,4 +298,13 @@ export const CSS = `
   .gpcp .avisoTela.ruim{background:#fef2f2;border-color:#f6cccc;color:#a01c1c}
   .gpcp .avisoTela button{margin-left:auto;background:none;border:0;text-decoration:underline;
                           cursor:pointer;color:inherit;font-size:11px}
+  .gpcp .barra-op.croquis-pendentes{--c:#ffe4e8!important;--ct:#9f1239!important;
+    border-color:#e88a9d;animation:gp-croquis-pendentes 2.8s ease-in-out infinite}
+  .gpcp .alerta-croqui{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
+    width:16px;height:16px;border:1px solid currentColor;border-radius:50%}
+  .gpcp .prontidao-pendente{color:#b42336}
+  .gpcp .prontidao-ok{color:#136c35}
+  .gpcp .prontidao-aviso{background:#fff1f2;border:1px solid #fecdd3;color:#9f1239}
+  @keyframes gp-croquis-pendentes{0%,100%{background:#fff1f2}50%{background:#fecdd3}}
+  @media(prefers-reduced-motion:reduce){.gpcp .barra-op.croquis-pendentes{animation:none}}
 `;

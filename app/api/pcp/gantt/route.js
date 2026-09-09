@@ -17,6 +17,7 @@ import { requireRole } from "@/lib/session";
 import { lotesProgramados, aplicarRemanejo, SETORES_GANTT } from "@/lib/gantt-pcp";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const ROLES = ["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"];
 

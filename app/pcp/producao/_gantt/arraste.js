@@ -63,7 +63,8 @@ export function criarArraste(dep){
     const cel = sob && sob.closest(".cel"), lin = sob && sob.closest(".linha[data-row]");
     if(!cel || !lin) return;
     const setor = lin.dataset.setor, rec = lin.dataset.rec || null;
-    const permitido = setor === arr.r.setor;
+    arr.bloqueado = setor===arr.r.setor && setor==='MONTAGEM' && !!rec && !arr.r.terceiroRecebido && arr.r.itens.some(i=>i.prontidao?.pronto!==true);
+    const permitido = setor === arr.r.setor && !arr.bloqueado;
     const dur = arr.r.fim - arr.r.ini + 1;
     const cels = [...lin.querySelectorAll(".cel")];
     // ⚠ SOLTAR NO FIM DE SEMANA ESCORREGA PARA A SEGUNDA. Matheus (05/09/2026): "os
@@ -85,9 +86,13 @@ export function criarArraste(dep){
     if(arr.raf) cancelAnimationFrame(arr.raf);
     arr.g.remove(); arr.el.classList.remove("arrastando"); limparAlvos();
     document.body.style.userSelect = "";
-    const a = arr.alvo, r = arr.r, moveu = arr.moveu; arr = null;
+    const a = arr.alvo, r = arr.r, moveu = arr.moveu, bloqueado = arr.bloqueado; arr = null;
     if(!moveu){ dep.abrirPainel(r); return; }
-    if(!a){ dep.desenhar(); return; }
+    if(!a){
+      if(bloqueado){dep.avisar(false,'Há conjuntos com croqui/corte pendente. Selecione os aptos para liberar parcialmente.');dep.abrirPainel(r);}
+      else dep.desenhar();
+      return;
+    }
     const delta = a.iAlvo - r.ini;
     if(delta===0 && a.recurso===r.recurso){ dep.desenhar(); return; }
     const antes = r.lotes.map(l=>({...l, itens:l.itens}));

@@ -1,7 +1,12 @@
 {
-  "build": 3040,
-  "gerado": "2026-09-09T18:02:19.387Z",
+  "build": 3041,
+  "gerado": "2026-09-09T18:35:44.152Z",
   "commits": [
+    {
+      "hash": "fb87d86f",
+      "data": "09/09/2026",
+      "titulo": "RNC: a reclamação vira apontamentos, cada um com a sua disposição"
+    },
     {
       "hash": "626a6f1b",
       "data": "09/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ccb48c1c",
       "data": "08/09/2026",
       "titulo": "Torguinho sai da Conferência de Peça — cobria o campo de observação"
-    },
-    {
-      "hash": "b0958f27",
-      "data": "08/09/2026",
-      "titulo": "Preparação: o croqui do conjunto que está no terceiro sai da fila de corte"
     }
   ]
 }

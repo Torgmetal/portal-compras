@@ -22,6 +22,7 @@ import CompraChip, { ModalRastreabilidade } from "@/components/CompraChip";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 import SeparacaoModal from "@/components/SeparacaoModal";
 import GanttProgramacao from "./GanttProgramacao";
+import ProgramarFilaMontagem from "./ProgramarFilaMontagem";
 import UltimasLiberacoes from "../UltimasLiberacoes";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 // ⚠ o download do ZIP vem da lib (era a TERCEIRA cópia da mesma função neste repositório); ela
@@ -168,6 +169,7 @@ async function lerJson(r, oQue) {
 }
 
 export default function ProducaoClient() {
+  const [revisaoGantt, setRevisaoGantt] = useState(0);
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
   const [verTodas, setVerTodas] = useState(false);
@@ -560,7 +562,7 @@ export default function ProducaoClient() {
         const op=dados?.ops?.find(o=>o.opId===opId);if(op)abrir(op,setor);
         requestAnimationFrame(()=>document.getElementById('pcp-op-'+opId)?.scrollIntoView({behavior:'smooth',block:'start'}));
       }}/>
-      <GanttProgramacao />
+      <GanttProgramacao revisao={revisaoGantt} />
 
       {loading ? (
         <div className="flex items-center justify-center py-20 gap-3 text-torg-gray"><Loader2 size={22} className="animate-spin" /> Carregando…</div>
@@ -816,6 +818,11 @@ export default function ProducaoClient() {
                           );
                         })()}
                         {setorAba === "MONTAGEM" && sel.size > 0 && (
+                          <ProgramarFilaMontagem ids={[...sel]} ocupado={imprimindo} onProgramado={() => {
+                            setSel(new Set()); setRevisaoGantt(v=>v+1); carregarDetalhe(aberta, setorAba);
+                          }} />
+                        )}
+                        {setorAba === "MONTAGEM" && sel.size > 0 && (
                           <div className="px-3 pb-3">
                             <PainelBancadas
                               conjuntos={pecas.filter((p) => sel.has(p.id)).map((p) => ({ ...p, opNumero: detalhe.opNumero }))}
@@ -959,8 +966,7 @@ export default function ProducaoClient() {
                                               p.prontoMontar
                                                 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                                 : "bg-amber-50 text-amber-700 border-amber-200"}`}>
-                                            {p.totalCroquis - (p.faltamCroquis?.length || 0)}/{p.totalCroquis}
-                                            {p.prontoMontar ? " pronto" : ` · faltam ${p.faltamCroquis?.length || 0}`}
+                                            {p.totalCroquis ? `${p.totalCroquis - (p.faltamCroquis?.length || 0)}/${p.totalCroquis}${p.prontoMontar ? ' pronto' : ` · faltam ${p.faltamCroquis?.length || 0}`}` : '! Sem croquis'}
                                           </span>
                                         ) : <span className="text-torg-gray-light">—</span>}
                                       </td>
@@ -1038,4 +1044,3 @@ export default function ProducaoClient() {
     </div>
   );
 }
-

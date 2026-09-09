@@ -1,5 +1,6 @@
 import { abrirFiltroColuna } from "./filtro-coluna";
 import { filtrarProjetos, escapar } from "./selecao-projetos";
+import { itemAptoMontagem } from "@/lib/gantt-prontidao";
 // ─── ABA "PROJETOS PROGRAMADOS" ────────────────────────────────────────────────────────────────
 //
 // ⚠ GRD = IMPRESSÃO. No portal não existe estado "liberado" separado da impressão: a GRD nasce
@@ -21,9 +22,12 @@ export function criarPainelProjetos(dep){
     const mostra = filtrarProjetos(itens, { colunas, soFalta: soFalta && temGrd(r.setor) });
     const teto = 300, corte = mostra.slice(0, teto);
     const grd = temGrd(r.setor);
+    const montagem = r.setor === 'MONTAGEM' && !r.terceiroRecebido;
+    const aptos = mostra.filter(itemAptoMontagem);
     const semG = grd ? mostra.filter(i=>!i.g).length : 0;
     const ativos = Object.values(colunas).filter(v=>v!=null).length;
-    let h = '<div class="ptool filtro-resumo"><span>'+mostra.length+' de '+itens.length+' marcas'
+    let h = (montagem ? '<div class="dica prontidao-aviso">'+(aptos.length<mostra.length?'! ':'')+aptos.length+' de '+mostra.length+' conjuntos aptos. Os pendentes ficam programados sem bancada até todos os croquis serem cortados.</div>' : '')
+      + '<div class="ptool filtro-resumo"><span>'+mostra.length+' de '+itens.length+' marcas'
       + (ativos?' · '+ativos+' filtro(s) ativo(s)':' · Filtre pelas setas das colunas')+'</span>'
       + (ativos||soFalta?'<button class="btn mini" id="gp-fLimpar">Limpar filtros</button>':'')+'</div><div class="ptool">'
       + (grd
@@ -31,13 +35,14 @@ export function criarPainelProjetos(dep){
             + '<label><input type="checkbox" id="gp-fSemGrd"'+(soFalta?" checked":"")+'> só os não impressos</label>'
           : '')
       + '<button class="btn mini" id="gp-selTodos">Selecionar os filtrados</button>'
+      + (montagem?'<button class="btn mini" id="gp-selAptos"'+(aptos.length?'':' disabled')+'>Selecionar aptos ('+aptos.length+')</button>':'')
       + '<button class="btn mini" id="gp-selNenhum">Limpar</button></div>';
     const temPerfil = itens.some(i=>i.pf);
     const cabecalho = (campo, rotulo) => '<th><button class="filtro-coluna'+(colunas[campo]!=null?' ativo':'')+'" data-filtro="'+campo+'" aria-haspopup="dialog" title="Filtrar '+rotulo+'" aria-label="Filtrar '+rotulo+'">'+rotulo+' <span aria-hidden="true">'+(colunas[campo]!=null?'●':'▾')+'</span></button></th>';
     h += '<table class="marcas"><thead><tr><th style="width:26px"></th>'+cabecalho('m','Marca')
       + (temPerfil?cabecalho('pf','Perfil'):'')+cabecalho('mt','Material / aço')
       + '<th class="num">Qte</th><th class="num" title="peças com apontamento no Syneco">Feito</th>'
-      + '<th class="num">kg</th>'+(grd?'<th>GRD</th>':'')+'</tr></thead><tbody>';
+      + '<th class="num">kg</th>'+(montagem?'<th>Croquis / liberação</th>':'')+(grd?'<th>GRD</th>':'')+'</tr></thead><tbody>';
     for(const i of corte){
       const s = sel.has(i.id);
       h += '<tr class="'+(s?"sel":"")+'"><td><input type="checkbox" class="ck" data-m="'+escapar(i.id)+'"'+(s?" checked":"")+'></td>'
@@ -50,6 +55,7 @@ export function criarPainelProjetos(dep){
             ? (i.f>=i.q ? '<b style="color:#136c35">'+i.f+'</b>' : i.f)
             : '<span style="color:#aab4c0">—</span>')+'</td>'
         + '<td class="num">'+dep.nkg(i.kg)+'</td>'
+        + (montagem?'<td class="'+(itemAptoMontagem(i)?'prontidao-ok':'prontidao-pendente')+'">'+(itemAptoMontagem(i)?'✓ ':'! ')+escapar(i.prontidao?.motivo||'Atualize a programação')+'</td>':'')
         + (grd
             ? '<td>'+(i.g
                 ? '<span class="pilha ok" title="impressa por '+(i.g.por||"—")+(i.g.n>1?" · "+i.g.n+" cópias":"")+'">✓ '+dep.dbr(i.g.em)+(i.g.n>1?" ·"+i.g.n+"×":"")+'</span>'
@@ -69,7 +75,7 @@ export function criarPainelProjetos(dep){
       + '<td class="num"><b>'+somaQ.toLocaleString("pt-BR")+'</b></td>'
       + '<td class="num"><b'+(somaF?' style="color:#136c35"':'')+'>'+somaF.toLocaleString("pt-BR")+'</b>'
       + ' <span style="color:#5b6a7d">('+Math.round(somaQ?somaF/somaQ*100:0)+'%)</span></td>'
-      + '<td class="num"><b>'+dep.nkg(somaKg)+'</b></td>'+(grd?'<td></td>':'')+'</tr></tfoot></table>';
+      + '<td class="num"><b>'+dep.nkg(somaKg)+'</b></td>'+(montagem?'<td></td>':'')+(grd?'<td></td>':'')+'</tr></tfoot></table>';
     if(mostra.length > teto) h += '<div class="dica">Mostrando '+teto+' de '+mostra.length+' marcas. Os botões abaixo agem sobre a lista inteira.</div>';
     if(grd) h += '<div class="dica"><b>GRD = impressão.</b> No portal não existe estado "liberado" separado: a GRD nasce quando o '
       + 'desenho é impresso, e reimprimir a mesma marca soma uma cópia no registro em vez de criar outra GRD. '
@@ -101,7 +107,9 @@ export function criarPainelProjetos(dep){
         + '<button class="btn" id="gp-impSel"'+(sel.size?"":" disabled")+'>Reimprimir selecionados</button>' + btnBaixa + btnPint
       : '<div class="info">'+(sel.size ? sel.size+" marca(s) selecionada(s)" : "Sem GRD neste setor — o desenho desce até a montagem")+'</div>' + btnPint;
 
-    dep.$("pFoot").innerHTML += '<button class="btn pri" id="gp-distribuir"'+(sel.size?'':' disabled')+'>Distribuir selecionados ('+sel.size+')</button>';
+    const selecionadosAptos = idsParaDividir(r).size;
+    dep.$("pFoot").innerHTML += '<button class="btn pri" id="gp-distribuir"'+(selecionadosAptos?'':' disabled')+'>'+(montagem?'Liberar aptos selecionados':'Distribuir selecionados')+' ('+selecionadosAptos+')</button>';
+    if(montagem && selecionadosAptos<sel.size) dep.$('pFoot').innerHTML += '<span class="info prontidao-pendente">'+(sel.size-selecionadosAptos)+' pendente(s) da seleção permanecerão na fila.</span>';
     /* ⚠ APAGAR usa a SELEÇÃO, ou a lista inteira — como imprimir e Baixa Syneco. Botão morto sem
        seleção só levanta a pergunta de por que não funciona (foi o que aconteceu com a Baixa). */
     const alvoApagar = sel.size ? itens.filter(i=>sel.has(i.id)) : mostra;
@@ -125,6 +133,7 @@ export function criarPainelProjetos(dep){
     dep.$("apagar").onclick=()=>confirmarApagar(r, alvoApagar);
     dep.$("selTodos").onclick = ()=>{ for(const i of alvo) sel.add(i.id); dep.pintarPainel(); };
     dep.$("selNenhum").onclick = ()=>{ sel.clear(); dep.pintarPainel(); };
+    if(montagem) dep.$('selAptos').onclick=()=>{sel=new Set(aptos.map(i=>i.id));dep.pintarPainel();};
     for(const c of dep.raiz.querySelectorAll("#gp-pCorpo .ck"))
       c.onchange = ()=>{ if(c.checked) sel.add(c.dataset.m); else sel.delete(c.dataset.m); dep.pintarPainel(); };
     const bp = dep.$("xlsPint");
@@ -334,7 +343,7 @@ export function criarPainelProjetos(dep){
 
   /* ── quebra da programação ──────────────────────────────────────────────────── */
 
-  function idsParaDividir() { return new Set(sel); }
+  function idsParaDividir(r) { return r?.setor === 'MONTAGEM' && !r.terceiroRecebido ? new Set(r.itens.filter(i=>sel.has(i.id)&&itemAptoMontagem(i)).map(i=>i.id)) : new Set(sel); }
 
   /* ─── APAGAR A PROGRAMAÇÃO ────────────────────────────────────────────────────────────────────
      Vitor (08/09/2026): "precisa ter um botão para podermos deletar uma programação, e com isso

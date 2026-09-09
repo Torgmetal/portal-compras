@@ -146,6 +146,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   function redesenhar(){ desenhar(); pintarAlteracoes(); atraso.pintarEmpurrao(); if(painel) pintarPainel(); }
 
   function pintarAlteracoes(){
+    raiz.dataset.pendente = alteracoes.length ? 'true' : 'false';
     const ul = $("listaAlt");
     $("nAlt").textContent = alteracoes.length;
     $("semAlt").style.display = alteracoes.length ? "none" : "";
@@ -181,6 +182,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   const projetos = criarPainelProjetos({ $, raiz, nkg, dbr, MAX_LOTE, avisar, recarregar, baixarZip,
     baixarPintura, baixarBaixaSyneco, pintarPainel, abrirQuebra: ()=>{ abaP="quebrar"; pintarPainel(); } });
   const arraste = criarArraste({ raiz, grade, COL, DIAS, IDX, encostaNoUtil, fdsISO, montarRuns,
+    avisar,
     novoLote, registrar, nomeRec, dbr, abrirPainel, desenhar, redesenhar,
     getInicio: ()=>inicio, getPainel: ()=>painel, setPainel: (v)=>{ painel = v; } });
   const atraso = criarAtraso({ $, capDe, custoLote, HOJE, DIAS, IDX, montarRuns, novoLote, registrar,
@@ -272,24 +274,43 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
 
 }
 
-export default function GanttProgramacao() {
+export default function GanttProgramacao({ revisao = 0 }) {
   const caixa = useRef(null);
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(true);
 
-  const buscar = useCallback(async () => {
-    setCarregando(true); setErro("");
+  const podeAtualizar = () => {
+    const raiz = caixa.current;
+    return raiz && !document.hidden && raiz.dataset.pendente !== 'true'
+      && !raiz.querySelector('.fantasma, dialog[open]') && raiz.querySelector('#gp-painel')?.hidden !== false;
+  };
+  const buscar = useCallback(async (silencioso = false) => {
+    if (!silencioso) { setCarregando(true); setErro(''); }
     try {
       const r = await fetch("/api/pcp/gantt");
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao carregar a programação");
-      setDados(j);
-    } catch (e) { setErro(e.message); }
-    finally { setCarregando(false); }
+      // O usuário pode ter começado uma seleção ou arraste enquanto a consulta estava em voo.
+      if (!silencioso || podeAtualizar()) setDados(j);
+    } catch (e) { if (!silencioso) setErro(e.message); }
+    finally { if (!silencioso) setCarregando(false); }
   }, []);
 
-  useEffect(() => { buscar(); }, [buscar]);
+  useEffect(() => {
+    // Não apagar remanejos que ainda estão sendo preparados ao adicionar uma nova fila.
+    if (caixa.current?.dataset.pendente === 'true') return;
+    buscar(revisao > 0);
+  }, [buscar, revisao]);
+
+  useEffect(() => {
+    const atualizarProntidao = () => {
+      if (podeAtualizar()) buscar(true);
+    };
+    const timer = setInterval(atualizarProntidao, 60000);
+    window.addEventListener('focus', atualizarProntidao);
+    return () => { clearInterval(timer); window.removeEventListener('focus', atualizarProntidao); };
+  }, [buscar]);
 
   // ⚠ o quadro é remontado do zero a cada carga: é o que garante que "Salvar" e "Imprimir" mostrem
   // o estado que está no banco, sem sobrar alteração pendente de uma sessão que já foi gravada.
@@ -326,7 +347,7 @@ export default function GanttProgramacao() {
     return (
       <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 flex items-center gap-2">
         <AlertCircle size={16} /> {erro}
-        <button onClick={buscar} className="ml-auto text-xs underline">tentar de novo</button>
+        <button onClick={() => buscar()} className="ml-auto text-xs underline">tentar de novo</button>
       </div>
     );
   }
