@@ -3,6 +3,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
+import { criarNotificacao } from "@/lib/notificacoes";
+import { log } from "@/lib/log";
+
+const registro = log("api/rm/[id]/consulta-estoque/responder");
 
 const respostaItemSchema = z.object({
   consultaItemId: z.string(),
@@ -112,6 +116,17 @@ export async function POST(req, { params }) {
     resumo.PARCIAL && `${resumo.PARCIAL} parcial`,
     resumo.INDISPONIVEL && `${resumo.INDISPONIVEL} indisponível`,
   ].filter(Boolean).join(", ");
+
+  // ⚠ "DESTINADA A ELE", não ao módulo: só quem abriu ESTA consulta precisa saber que ela
+  // voltou — não o Compras inteiro.
+  criarNotificacao({
+    tipo: "CONSULTA_ESTOQUE",
+    titulo: `Estoque respondido — RM ${consulta.rm.numero}`,
+    mensagem: `${user.name} respondeu à consulta de estoque da RM ${consulta.rm.numero}: ${resumoText}.`,
+    link: `/compras/rm/${consulta.rm.id}`,
+    origemUserId: user.id,
+    destinatarios: [consulta.createdBy.id],
+  }).catch((e) => registro.erro("[notif CONSULTA_ESTOQUE respondida] erro:", e?.message));
 
   // Email para quem criou — busca itens com rmItem para montar tabela
   if (consulta.createdBy.email) {

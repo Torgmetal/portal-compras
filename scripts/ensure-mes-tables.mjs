@@ -583,6 +583,53 @@ async function main() {
   `).catch((e) => console.warn("[ensure-mes-tables] FK ConferenciaPecaItem:", e.message));
   console.log("[ensure-mes-tables] OK — Conferência de peça garantida.");
 
+  // ── O sino de notificações — 09/09/2026 ────────────────────────────────────
+  // Uma linha por (notificação, destinatário): é o que permite uma notificação de
+  // MÓDULO (várias pessoas) ter leitura independente por pessoa, em vez do
+  // booleano único que a Notificacao original tinha (e que morreu porque uma
+  // leitura marcava "lida" para todo mundo — ver a nota no schema).
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "NotificacaoDestinatario" (
+      "id"            TEXT         NOT NULL,
+      "notificacaoId" TEXT         NOT NULL,
+      "userId"        TEXT         NOT NULL,
+      "lida"          BOOLEAN      NOT NULL DEFAULT false,
+      "lidaEm"        TIMESTAMP(3),
+      "criadoEm"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "NotificacaoDestinatario_pkey" PRIMARY KEY ("id")
+    )`).catch((e) => console.warn("[ensure-mes-tables] NotificacaoDestinatario:", e.message));
+  for (const c of [
+    `CREATE UNIQUE INDEX IF NOT EXISTS "NotificacaoDestinatario_notificacaoId_userId_key" ON "NotificacaoDestinatario"("notificacaoId", "userId")`,
+    `CREATE INDEX IF NOT EXISTS "NotificacaoDestinatario_userId_lida_idx" ON "NotificacaoDestinatario"("userId", "lida")`,
+  ]) await prisma.$executeRawUnsafe(c).catch(() => {});
+  // ⚠ CASCADE nos dois lados: apagar a notificação apaga as cópias por destinatário; apagar o
+  // usuário (não deveria acontecer — desativa, não apaga — mas se acontecer) não deixa órfão.
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints
+                     WHERE constraint_name = 'NotificacaoDestinatario_notificacaoId_fkey') THEN
+        ALTER TABLE "NotificacaoDestinatario"
+          ADD CONSTRAINT "NotificacaoDestinatario_notificacaoId_fkey"
+          FOREIGN KEY ("notificacaoId") REFERENCES "Notificacao"("id")
+          ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END$$
+  `).catch((e) => console.warn("[ensure-mes-tables] FK notificacaoId:", e.message));
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints
+                     WHERE constraint_name = 'NotificacaoDestinatario_userId_fkey') THEN
+        ALTER TABLE "NotificacaoDestinatario"
+          ADD CONSTRAINT "NotificacaoDestinatario_userId_fkey"
+          FOREIGN KEY ("userId") REFERENCES "User"("id")
+          ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END$$
+  `).catch((e) => console.warn("[ensure-mes-tables] FK userId:", e.message));
+  console.log("[ensure-mes-tables] OK — NotificacaoDestinatario garantida.");
+
   const existentes = await prisma.$queryRawUnsafe(`
     SELECT tablename
     FROM pg_tables

@@ -3,6 +3,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
+import { criarNotificacao } from "@/lib/notificacoes";
+import { log } from "@/lib/log";
+
+const registro = log("api/rm/[id]/consulta-estoque");
 
 const postSchema = z.object({
   mensagem: z.string().max(500).optional(),
@@ -111,8 +115,16 @@ export async function POST(req, { params }) {
       },
     });
 
-    // Notificação in-app
+    // Sino — mesma audiência do email abaixo (Produção + Engenharia respondem estoque).
     const opLabel = rm.op ? `OP ${rm.op.numero}` : "Sem OP";
+    criarNotificacao({
+      tipo: "CONSULTA_ESTOQUE",
+      titulo: `Consulta de estoque — RM ${rm.numero}`,
+      mensagem: `${user.name} solicitou verificação de estoque para RM ${rm.numero} (${opLabel}). ${rm.itens.length} iten${rm.itens.length === 1 ? "" : "s"} para avaliar.`,
+      link: `/producao/consulta-estoque/${consulta.id}`,
+      origemUserId: user.id,
+      modulos: ["PRODUCAO", "ENGENHARIA"],
+    }).catch((e) => registro.erro("[notif CONSULTA_ESTOQUE] erro:", e?.message));
 
     // Email: usa o email informado manualmente, ou busca usuários de Produção
     let emails = [];

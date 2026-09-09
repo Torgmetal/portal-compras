@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { notificarEvento } from "@/lib/email";
+import { criarNotificacao } from "@/lib/notificacoes";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 import { escapeHtml, limparTextoCurto } from "@/lib/html";
 import { log } from "@/lib/log";
@@ -15,6 +16,22 @@ const registro = log("api/cotacao/declinar/[token]");
 const postLimiter = createRateLimiter({ name: "cotacao-declinar-post", maxRequests: 10, windowMs: 60000 });
 
 const schema = z.object({ motivo: z.string().max(500).optional().nullable() });
+
+/** As RMs por trás dos itens de uma cotação — junta os ids em um único texto/link. */
+function resumoDasRMs(cotItens) {
+  const rmsMap = new Map();
+  const opIds = new Set();
+  for (const ci of cotItens) {
+    const rm = ci.rmItem?.rm;
+    if (!rm) continue;
+    rmsMap.set(rm.id, rm.numero);
+    if (rm.opId) opIds.add(rm.opId);
+  }
+  const rmsNumeros = Array.from(rmsMap.values()).sort();
+  const rotuloRMs = rmsNumeros.length === 1 ? `RM ${rmsNumeros[0]}` : `RMs ${rmsNumeros.join(", ")}`;
+  const linkInterno = rmsMap.size === 1 ? `/compras/rm/${[...rmsMap.keys()][0]}` : "/compras";
+  return { rmsMap, opIds, rmsNumeros, rotuloRMs, linkInterno };
+}
 
 export async function POST(req, { params }) {
   const rl = postLimiter(req);
@@ -71,18 +88,20 @@ export async function POST(req, { params }) {
         where: { cotacaoId: cotacao.id },
         select: { rmItem: { select: { rm: { select: { id: true, numero: true, opId: true } } } } },
       });
-      const rmsMap = new Map();
-      const opIds = new Set();
-      for (const ci of cotItens) {
-        const rm = ci.rmItem?.rm;
-        if (rm) { rmsMap.set(rm.id, rm.numero); if (rm.opId) opIds.add(rm.opId); }
-      }
-      const rmsNumeros = Array.from(rmsMap.values()).sort();
-      const rotuloRMs = rmsNumeros.length === 1 ? `RM ${rmsNumeros[0]}` : `RMs ${rmsNumeros.join(", ")}`;
+      const { rmsMap, opIds, rmsNumeros, rotuloRMs, linkInterno } = resumoDasRMs(cotItens);
 
       for (const rmId of rmsMap.keys()) revalidatePath(`/compras/rm/${rmId}`);
       for (const opId of opIds) revalidatePath(`/compras/painel-ops/${opId}`);
       revalidatePath("/compras");
+
+      criarNotificacao({
+        tipo: "COTACAO_RESPONDIDA",
+        titulo: `Cotação declinada — ${cotacao.fornecedorNome}`,
+        mensagem: `${cotacao.fornecedorNome} declinou a cotação da ${rotuloRMs}${motivo ? ` — "${motivo}"` : ""}. Considere outro fornecedor.`,
+        link: linkInterno,
+        dados: { cotacaoId: cotacao.id, fornecedor: cotacao.fornecedorNome, rmsNumeros, motivo, declinada: true },
+        modulos: ["COMPRAS"],
+      }).catch((e) => registro.erro("[notif COTACAO_RESPONDIDA] erro:", e?.message));
 
       await notificarEvento({
         evento: "COTACAO_RESPONDIDA",

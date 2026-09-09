@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { notificarEvento } from "@/lib/email";
+import { criarNotificacao } from "@/lib/notificacoes";
 import { proximoNumeroInterno, proximoNumeroAluguel, proximoNumeroMontagem } from "@/lib/rm-numero";
 import { escapeHtml } from "@/lib/html";
 import { log } from "@/lib/log";
@@ -262,6 +263,17 @@ export async function POST(req) {
     : null;
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace.torg.com.br";
   const linkRM = `${baseUrl}/compras/rm/${rm.id}`;
+
+  // Sino — o email acima é o "Compras fica sabendo" externo; isto é o "Compras vê no portal".
+  criarNotificacao({
+    tipo: "RM_CRIADA",
+    titulo: `Nova RM ${rm.numero}`,
+    mensagem: `${user.name || user.email} criou a RM ${rm.numero}${opVinculada ? ` para OP ${opVinculada.numero} (${opVinculada.cliente})` : ""} com ${body.itens.length} item(s).`,
+    link: `/compras/rm/${rm.id}`,
+    dados: { rmId: rm.id, rmNumero: rm.numero, opNumero: opVinculada?.numero || null },
+    origemUserId: user.id,
+    modulos: ["COMPRAS"],
+  }).catch((e) => registro.erro("[notif RM_CRIADA] erro:", e?.message));
 
   notificarEvento({
     evento: "RM_CRIADA",

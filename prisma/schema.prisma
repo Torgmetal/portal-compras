@@ -9,8 +9,8 @@ datasource db {
 }
 
 model User {
-  id                       String                @id @default(cuid())
-  email                    String                @unique
+  id                       String                    @id @default(cuid())
+  email                    String                    @unique
   name                     String
   password                 String
   // ⚠ A ASSINATURA DA PESSOA, em imagem. Vitor (28/08/2026): "para as assinaturas dos relatórios de
@@ -20,56 +20,57 @@ model User {
   // cliente nem sempre dá para capturar assim.
   assinaturaUrl            String?
   setor                    String?
-  ativo                    Boolean               @default(true)
-  createdAt                DateTime              @default(now())
-  updatedAt                DateTime              @updatedAt
-  podeAlterarVerba         Boolean               @default(false)
+  ativo                    Boolean                   @default(true)
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  podeAlterarVerba         Boolean                   @default(false)
   tipo                     TipoUsuario
   // Troca de senha: força a definição de nova senha só no 1º acesso do
   // funcionário (senha provisória). Depois que ele troca, não volta a exigir
   // (sem expiração periódica). senhaAlteradaEm fica como registro da última troca.
-  deveTrocarSenha          Boolean               @default(false)
+  deveTrocarSenha          Boolean                   @default(false)
   senhaAlteradaEm          DateTime?
   // ⚠ Trava de força bruta POR CONTA (não por IP): a fábrica inteira sai pelo mesmo IP público, e
   // um limitador por IP derrubaria o escritório junto com o atacante. Ver lib/login-tentativas.js.
-  tentativasFalhas         Int                   @default(0)
+  tentativasFalhas         Int                       @default(0)
   bloqueadoAte             DateTime?
   // Self-service: quando tipo=FUNCIONARIO, vincula 1:1 ao registro de RH
-  funcionarioId            String?               @unique
-  funcionario              Funcionario?          @relation("UsuarioFuncionario", fields: [funcionarioId], references: [id])
-  lotesHoleriteCriados     LoteHolerite[]        @relation("LoteHoleriteCriadoPor")
-  folhasCriadas            FolhaCompetencia[]    @relation("FolhaCriadaPor")
-  pontosCriados            PontoCompetencia[]    @relation("PontoCriadaPor")
+  funcionarioId            String?                   @unique
+  funcionario              Funcionario?              @relation("UsuarioFuncionario", fields: [funcionarioId], references: [id])
+  lotesHoleriteCriados     LoteHolerite[]            @relation("LoteHoleriteCriadoPor")
+  folhasCriadas            FolhaCompetencia[]        @relation("FolhaCriadaPor")
+  pontosCriados            PontoCompetencia[]        @relation("PontoCriadaPor")
   aditivos                 Aditivo[]
-  ajustesPrazoCriados      AjustePrazo[]         @relation("AjustePrazoCreatedBy")
+  ajustesPrazoCriados      AjustePrazo[]             @relation("AjustePrazoCreatedBy")
   auditLogs                AuditLog[]
-  consultasEstoqueCriadas  ConsultaEstoque[]     @relation("ConsultaEstoqueCreatedBy")
-  consultaItensRespondidos ConsultaEstoqueItem[] @relation("ConsultaItemRespondidoPor")
-  tarefasCronograma        CronogramaTarefa[]    @relation("TarefaResponsavel")
-  cronogramaRegistros      CronogramaRegistro[]  @relation("CronogramaRegistroCreatedBy")
-  cronogramaRevisoes       CronogramaRevisao[]   @relation("CronogramaRevisaoCreatedBy")
-  cronogramaCobrancas      CronogramaCobranca[]  @relation("CobrancaCreatedBy")
-  cronogramaEnvios         CronogramaEnvio[]     @relation("CronogramaEnvioCreatedBy")
-  necessidadesSemanais     NecessidadeSemanal[]  @relation("NecessidadeSemanalCreatedBy")
+  consultasEstoqueCriadas  ConsultaEstoque[]         @relation("ConsultaEstoqueCreatedBy")
+  consultaItensRespondidos ConsultaEstoqueItem[]     @relation("ConsultaItemRespondidoPor")
+  tarefasCronograma        CronogramaTarefa[]        @relation("TarefaResponsavel")
+  cronogramaRegistros      CronogramaRegistro[]      @relation("CronogramaRegistroCreatedBy")
+  cronogramaRevisoes       CronogramaRevisao[]       @relation("CronogramaRevisaoCreatedBy")
+  cronogramaCobrancas      CronogramaCobranca[]      @relation("CobrancaCreatedBy")
+  cronogramaEnvios         CronogramaEnvio[]         @relation("CronogramaEnvioCreatedBy")
+  necessidadesSemanais     NecessidadeSemanal[]      @relation("NecessidadeSemanalCreatedBy")
   notificacoes             Notificacao[]
-  opsCriadas               OP[]                  @relation("OPCreatedBy")
-  orcamentosCriados        Orcamento[]           @relation("OrcamentoCriadoPor")
+  notificacoesRecebidas    NotificacaoDestinatario[]
+  opsCriadas               OP[]                      @relation("OPCreatedBy")
+  orcamentosCriados        Orcamento[]               @relation("OrcamentoCriadoPor")
   passwordResetTokens      PasswordResetToken[]
   prazoHistoricos          PrazoHistorico[]
-  producaoDiarias          ProducaoDiaria[]      @relation("ProducaoDiariaCreatedBy")
-  estudosCriados           PropostaEstudo[]      @relation("EstudoCriadoPor")
-  rmsCriadas               RM[]                  @relation("RMCreatedBy")
+  producaoDiarias          ProducaoDiaria[]          @relation("ProducaoDiariaCreatedBy")
+  estudosCriados           PropostaEstudo[]          @relation("EstudoCriadoPor")
+  rmsCriadas               RM[]                      @relation("RMCreatedBy")
   recebimentos             Recebimento[]
-  pedidosRecebidos         PedidoOmie[]          @relation("PedidoRecebidoPor")
-  revisoesCriadas          Revisao[]             @relation("RevisaoCreatedBy")
+  pedidosRecebidos         PedidoOmie[]              @relation("PedidoRecebidoPor")
+  revisoesCriadas          Revisao[]                 @relation("RevisaoCreatedBy")
   sharepointSyncs          SharepointSync[]
-  solicitacoesCriadas      SolicitacaoVerba[]    @relation("SolicitacaoCreatedBy")
-  solicitacoesDecididas    SolicitacaoVerba[]    @relation("SolicitacaoDecididoBy")
-  tarefasPlanejamento      TarefaPlanejamento[]  @relation("TarefaPlanejamentoCreatedBy")
-  compromissos             Compromisso[]         @relation("CompromissoUser")
-  compromissosCriados      Compromisso[]         @relation("CompromissoCriadoPor")
+  solicitacoesCriadas      SolicitacaoVerba[]        @relation("SolicitacaoCreatedBy")
+  solicitacoesDecididas    SolicitacaoVerba[]        @relation("SolicitacaoDecididoBy")
+  tarefasPlanejamento      TarefaPlanejamento[]      @relation("TarefaPlanejamentoCreatedBy")
+  compromissos             Compromisso[]             @relation("CompromissoUser")
+  compromissosCriados      Compromisso[]             @relation("CompromissoCriadoPor")
   modulos                  UserModulo[]
-  pmpMetas                 PmpMeta[]             @relation("PmpMetaCriador")
+  pmpMetas                 PmpMeta[]                 @relation("PmpMetaCriador")
 }
 
 model PasswordResetToken {
@@ -1095,22 +1096,61 @@ model CategoriaFornecedor {
   updatedAt DateTime @updatedAt
 }
 
+// ─── O SINO ────────────────────────────────────────────────────────────────
+// Matheus (09/09/2026): "Crie um sino ao lado do menu perto do nome do usuário
+// (…) ele vai receber as notificações de informações que forem importantes
+// para ele do módulo dele ou forem destinadas a ele".
+//
+// ⚠⚠ ESTE MODEL JÁ EXISTIU EM PRODUÇÃO, MORREU E VOLTOU. Vitor (30/08/2026), ao
+// remover: "prisma.notificacao só aparecia no create — nenhuma tela, API ou
+// cron lia de volta (…) Se um dia o sino voltar, o histórico está lá e os
+// writes voltam pelo git". As 541 linhas antigas (`lida`/`lidaEm` no singular)
+// ficam intocadas — são o registro de quando NINGUÉM lia. A causa não foi o
+// dado, foi a falta de um lugar visível para ler: a tela ficava enterrada em
+// `/compras/notificacoes`, um link que ninguém clicava. O sino no rodapé de
+// toda sidebar é a correção disso — mora em todo módulo, não em um só.
+//
+// ⚠ `lida`/`lidaEm` AQUI EM CIMA SÃO LEGADO, NÃO A FONTE DA VERDADE NOVA. Um
+// único booleano por notificação fazia sentido quando ninguém lia mesmo — mas
+// não serve para "destinada a ele OU ao módulo dele": uma notificação de
+// módulo é vista por VÁRIAS pessoas, e a primeira a ler não pode apagar o
+// "não lido" das outras. Por isso o estado de leitura mora em
+// `NotificacaoDestinatario`, uma linha por (notificação, pessoa).
 model Notificacao {
-  id           String          @id @default(cuid())
-  tipo         NotificacaoTipo
-  titulo       String
-  mensagem     String
-  link         String?
-  dados        Json?
-  origemUserId String?
-  lida         Boolean         @default(false)
-  lidaEm       DateTime?
-  createdAt    DateTime        @default(now())
-  origemUser   User?           @relation(fields: [origemUserId], references: [id])
+  id            String                    @id @default(cuid())
+  tipo          NotificacaoTipo
+  titulo        String
+  mensagem      String
+  link          String?
+  dados         Json?
+  origemUserId  String?
+  lida          Boolean                   @default(false)
+  lidaEm        DateTime?
+  createdAt     DateTime                  @default(now())
+  origemUser    User?                     @relation(fields: [origemUserId], references: [id])
+  destinatarios NotificacaoDestinatario[]
 
   @@index([lida])
   @@index([createdAt])
   @@index([tipo])
+}
+
+// Uma linha por (notificação, destinatário) — o "fan-out" que uma notificação de módulo precisa.
+// Nasce toda de uma vez, na criação da `Notificacao` (ver `lib/notificacoes.js`): quem é o
+// destinatário já fica decidido ali, resolvendo módulo → usuários ativos naquele momento. Não
+// recalcula depois — quem entrou no módulo hoje não vê notificação de ontem que não era dele.
+model NotificacaoDestinatario {
+  id            String      @id @default(cuid())
+  notificacaoId String
+  userId        String
+  lida          Boolean     @default(false)
+  lidaEm        DateTime?
+  criadoEm      DateTime    @default(now())
+  notificacao   Notificacao @relation(fields: [notificacaoId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificacaoId, userId])
+  @@index([userId, lida])
 }
 
 model ConsultaEstoque {
@@ -1162,27 +1202,27 @@ model Setor {
 }
 
 model Cargo {
-  id           String             @id @default(cuid())
-  nome         String
-  nivel        String?
-  categoria    String?
+  id            String             @id @default(cuid())
+  nome          String
+  nivel         String?
+  categoria     String?
   // Faixa salarial do cargo (Plano de Cargos e Salários). `salarioBase` é o PISO da faixa — o nome
   // vem de antes de a faixa existir e ficou para não quebrar import, template e telas que já o usam.
   // Vitor (08/09/2026): "na aba de cargos deixar salário base, médio e máximo".
-  salarioBase  Float?
-  salarioMedio Float?
+  salarioBase   Float?
+  salarioMedio  Float?
   salarioMaximo Float?
-  cbo          String?
-  ativo        Boolean            @default(true)
+  cbo           String?
+  ativo         Boolean            @default(true)
   // Matriz de Competências (FORM-11 / ISO 9001 §7.2)
-  descricao    String? // descrição da função
-  area         String? // área / setor da função
-  matriz       Json? // metadados FORM-11: { revisao, revisadaEm, escolaridadeObrigatoria, escolaridadeDesejavel, experienciaAdmissao, experienciaPromocao, qualificacoes:[{grupo,item,evidencia}], emitidoPor, aprovadoPor }
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  competencias CargoCompetencia[]
-  funcionarios Funcionario[]
-  vagas        Vaga[]
+  descricao     String? // descrição da função
+  area          String? // área / setor da função
+  matriz        Json? // metadados FORM-11: { revisao, revisadaEm, escolaridadeObrigatoria, escolaridadeDesejavel, experienciaAdmissao, experienciaPromocao, qualificacoes:[{grupo,item,evidencia}], emitidoPor, aprovadoPor }
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  competencias  CargoCompetencia[]
+  funcionarios  Funcionario[]
+  vagas         Vaga[]
 
   @@index([nivel])
   @@index([categoria])

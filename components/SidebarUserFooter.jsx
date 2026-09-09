@@ -3,6 +3,7 @@ import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { LogOut, Settings, KeyRound } from "lucide-react";
 import { VERSAO_LABEL, BUILD_HASH, BUILD_DATE } from "@/lib/versao";
+import NotificationBell from "@/components/NotificationBell";
 
 export default function SidebarUserFooter() {
   const { data: session } = useSession();
@@ -11,15 +12,21 @@ export default function SidebarUserFooter() {
 
   return (
     <div className="px-5 py-4 border-t border-torg-blue-100 text-xs">
+      {/* ⚠ Matheus (09/09/2026): "Crie um sino ao lado do menu perto do nome do usuário (…)
+          deixe um pouco menor o nome do usuário, setor, email etc." O sino fica na mesma
+          linha do nome — é o lugar de "quem sou eu e o que é meu" na sidebar inteira. */}
       {session?.user && (
-        <div className="mb-3">
-          <p className="text-torg-dark font-medium truncate">
-            {session.user.name}
-          </p>
-          <p className="text-torg-gray truncate">{session.user.email}</p>
-          <p className="text-[10px] text-torg-gray uppercase tracking-wide mt-0.5">
-            {tipo === "ADMIN" ? "Administrador" : (session.user.modulos?.[0] ?? tipo)}
-          </p>
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[11.5px] text-torg-dark font-semibold truncate">
+              {session.user.name}
+            </p>
+            <p className="text-[10.5px] text-torg-gray truncate">{session.user.email}</p>
+            <p className="text-[9px] text-torg-gray uppercase tracking-wide mt-0.5">
+              {tipo === "ADMIN" ? "Administrador" : (session.user.modulos?.[0] ?? tipo)}
+            </p>
+          </div>
+          <NotificationBell />
         </div>
       )}
       <div className="flex items-center gap-1">
