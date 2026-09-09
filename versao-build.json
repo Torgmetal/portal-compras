@@ -1,7 +1,12 @@
 {
-  "build": 3029,
-  "gerado": "2026-09-09T00:57:58.998Z",
+  "build": 3030,
+  "gerado": "2026-09-09T01:01:02.748Z",
   "commits": [
+    {
+      "hash": "dd0b0929",
+      "data": "08/09/2026",
+      "titulo": "Gantt: a bancada só traz as obras que o PCP está tocando; o resto vai numa lista"
+    },
     {
       "hash": "a8b2e829",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7e24f30d",
       "data": "08/09/2026",
       "titulo": "versao-build"
-    },
-    {
-      "hash": "13d7d533",
-      "data": "08/09/2026",
-      "titulo": "Import da LPC: a reimportação para de zerar a produção da obra"
     }
   ]
 }
