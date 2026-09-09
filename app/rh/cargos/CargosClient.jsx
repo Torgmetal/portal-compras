@@ -11,7 +11,7 @@ const NIVEIS = [
   { value: "DIRETORIA", label: "Diretoria", cor: "bg-rose-100 text-rose-800" },
 ];
 const NIVEL_POR_VALOR = Object.fromEntries(NIVEIS.map((n) => [n.value, n]));
-const normalizarBusca = valor => String(valor || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const normalizarBusca = valor => String(valor || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/(\d)[-–—](?=\d)/g, "$1").toLowerCase();
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";

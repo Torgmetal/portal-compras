@@ -3,7 +3,7 @@ import React from 'react';
 import {beforeEach,afterEach,expect,it,vi} from 'vitest';
 import {render,screen,fireEvent,cleanup} from '@testing-library/react';
 import Cargos from '@/app/rh/cargos/CargosClient';
-const cargos=[{id:'1',nome:'Acabador Júnior',categoria:'Produção',cbo:'7251-20',nivel:'OPERACIONAL'}, {id:'2',nome:'Almoxarife Pleno',categoria:'Logística',cbo:'4141-05',nivel:'OPERACIONAL'}, {id:'3',nome:'Engenheiro Sênior',categoria:'Engenharia',nivel:'TECNICO'}];
+const cargos=[{id:'1',nome:'Acabador Júnior',categoria:'Produção',cbo:'7251-20',nivel:'OPERACIONAL'}, {id:'2',nome:'Almoxarife Pleno',categoria:'Logística',cbo:'414105',nivel:'OPERACIONAL'}, {id:'3',nome:'Engenheiro Sênior',categoria:'Engenharia',nivel:'TECNICO'}];
 beforeEach(()=>{globalThis.React=React;vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({success:true,data:cargos})}));});
 afterEach(()=>{cleanup();vi.unstubAllGlobals();});
 it('busca pelo nome sem depender de acentos e mantém edição do resultado',async()=>{

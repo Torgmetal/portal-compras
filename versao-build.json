@@ -1,7 +1,12 @@
 {
-  "build": 3024,
-  "gerado": "2026-09-09T00:20:20.903Z",
+  "build": 3025,
+  "gerado": "2026-09-09T00:22:51.626Z",
   "commits": [
+    {
+      "hash": "a333438a",
+      "data": "08/09/2026",
+      "titulo": "feat(rh): buscar cargos por nome categoria e CBO"
+    },
     {
       "hash": "f0db952e",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "dd09dad3",
       "data": "08/09/2026",
       "titulo": "versao-build"
-    },
-    {
-      "hash": "8a9940ba",
-      "data": "08/09/2026",
-      "titulo": "PCP: o aviso mostra o que falta agendar, e enxerga liberação órfã"
     }
   ]
 }
