@@ -16,7 +16,7 @@ import { fmtOP } from "@/lib/utils";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import PainelSolda from "./PainelSolda";
 import { gerarFolhaSolda } from "@/lib/folha-solda";
-import { BANCADAS, RITMO_META, ocupacaoDasBancadas } from "@/lib/solda-capacidade";
+import { BANCADAS, RITMO_META, ocupacaoDasBancadas, nomeDaBancada } from "@/lib/solda-capacidade";
 
 const fmtKg = (v) => `${(Number(v) || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 const fmtData = (v) => (v ? new Date(v).toLocaleDateString("pt-BR") : "—");
@@ -34,7 +34,7 @@ const COLUNAS = [
   { key: "marca", label: "Marca", valor: (c) => c.marca || "—" },
   { key: "descricao", label: "Descrição", valor: (c) => c.descricao || "—" },
   { key: "op", label: "OP", valor: (c) => fmtOP(c.opNumero) || "—" },
-  { key: "bancada", label: "Bancada", valor: (c) => c.soldaBancada || "sem bancada" },
+  { key: "bancada", label: "Bancada", valor: (c) => nomeDaBancada(c.soldaBancada) },
   { key: "dia", label: "Dia", valor: (c) => (c._dia ? fmtDiaLongo(c._dia) : "sem data") },
   { key: "situacao", label: "Situação", valor: (c) => (c.emSolda ? "soldando" : c.soldaBancada ? "programado" : "a programar") },
 ];
@@ -231,7 +231,7 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
       if (!r.ok) throw new Error(j.error || "Erro ao gravar a bancada");
       const set = new Set(ids);
       setConjuntos((prev) => prev.map((c) => (set.has(c.id) ? { ...c, soldaBancada: bancada, soldaBancadaEm: new Date().toISOString() } : c)));
-      setOkMsg(bancada ? `${j.atualizados} conjunto(s) sugerido(s) para ${bancada}.` : `${j.atualizados} conjunto(s) sem bancada.`);
+      setOkMsg(bancada ? `${j.atualizados} conjunto(s) sugerido(s) para ${nomeDaBancada(bancada)}.` : `${j.atualizados} conjunto(s) sem bancada.`);
       setSel(new Set());
     } catch (e) { setErro(e.message); } finally { setAgindo(false); }
   }
@@ -390,7 +390,7 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
                   ativo ? "border-torg-blue bg-torg-blue text-white"
                     : o ? "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
                     : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}>
-                <span className="block text-[11px] font-bold uppercase tracking-wide truncate">{b}</span>
+                <span className="block text-[11px] font-bold uppercase tracking-wide truncate" title={b}>{nomeDaBancada(b)}</span>
                 <span className={`block text-[10px] truncate ${ativo ? "opacity-90" : "opacity-80"}`}>
                   {o ? `${o.conj} conj · até ${fmtDiaLongo(o.livreEm)}` : "livre"}
                 </span>
@@ -432,7 +432,7 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
           className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white">
           <option value="">Todas as bancadas</option>
           <option value="__sem">Sem bancada sugerida</option>
-          {bancadas.map((b) => <option key={b} value={b}>{b}</option>)}
+          {bancadas.map((b) => <option key={b} value={b}>{nomeDaBancada(b)}</option>)}
         </select>
         <div className="relative">
           <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-torg-gray" />
@@ -496,7 +496,7 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
               const t = travada(b);
               return (
                 <option key={b} value={b} disabled={!!t}>
-                  {b}{t ? ` — ocupada até ${fmtDiaLongo(t.livreEm)}` : ocupadasHoje[b] ? ` (${ocupadasHoje[b].conj} conj)` : " (livre)"}
+                  {nomeDaBancada(b)}{t ? ` — ocupada até ${fmtDiaLongo(t.livreEm)}` : ocupadasHoje[b] ? ` (${ocupadasHoje[b].conj} conj)` : " (livre)"}
                 </option>
               );
             })}
@@ -586,7 +586,7 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
                   <td className="px-2 py-1.5 text-right tabular-nums text-torg-gray whitespace-nowrap">{fmtKg(c.pesoPendenteKg ?? c.pesoTotalKg)}</td>
                   <td className="px-2 py-1.5 truncate">
                     {c.soldaBancada
-                      ? <span className="font-semibold text-torg-dark">{c.soldaBancada}</span>
+                      ? <span className="font-semibold text-torg-dark" title={c.soldaBancada}>{nomeDaBancada(c.soldaBancada)}</span>
                       : <span className="text-torg-gray-light">—</span>}
                   </td>
                   <td className={`px-2 py-1.5 whitespace-nowrap tabular-nums ${c._atrasado ? "text-red-700 font-semibold" : c._dia === hojeIso ? "text-amber-800 font-semibold" : "text-torg-gray"}`}>

@@ -1,7 +1,12 @@
 {
-  "build": 3041,
-  "gerado": "2026-09-09T18:35:44.152Z",
+  "build": 3042,
+  "gerado": "2026-09-09T18:42:50.124Z",
   "commits": [
+    {
+      "hash": "7486262c",
+      "data": "09/09/2026",
+      "titulo": "feat(pcp): programar conjuntos pendentes no Gantt e liberar aptos parcialmente"
+    },
     {
       "hash": "fb87d86f",
       "data": "09/09/2026",
@@ -146,11 +151,6 @@
       "hash": "cce56011",
       "data": "08/09/2026",
       "titulo": "scripts/validar-tela.mjs: validar tela logado antes do push"
-    },
-    {
-      "hash": "ccb48c1c",
-      "data": "08/09/2026",
-      "titulo": "Torguinho sai da Conferência de Peça — cobria o campo de observação"
     }
   ]
 }

@@ -1,4 +1,5 @@
 import { META_KG_DIA_ACABAMENTO, META_KG_DIA_JATO } from "@/lib/capacidade-acabamento";
+import { BANCADAS as BANCADAS_SOLDA, nomeDaBancada } from "@/lib/solda-capacidade";
 import { META_KG_DIA_PINTURA } from "@/lib/capacidade-pintura";
 
 // ─── RECURSOS, SETORES E CORES ─────────────────────────────────────────────────────────────────
@@ -31,8 +32,13 @@ export const RECURSOS = {
   MONTAGEM: [{ k:null, nome:"sem bancada", obs:"atribuir bancada" },
     ...[["MONTAGEM 1","Jurandir"],["MONTAGEM 2","Adenilson"],["MONTAGEM 3","Vando"],
         ["MONTAGEM 4","Rodrigo"],["MONTAGEM 5","Montagem 5"]].map(([k,nome])=>({k,nome,cap:1}))],
+  /* ⚠⚠ A BANCADA DA SOLDA TAMBÉM TEM NOME DE GENTE. Vitor (09/09/2026): "nas bancadas da solda
+     coloque o nome dos operadores no lugar de solda 1, 2, 3". A chave continua "SOLDA n" — é o que
+     o Syneco aponta e o que está gravado em `PecaConjunto.soldaBancada`; muda só o rótulo.
+     ⚠ A lista e o mapa nome↔bancada moram em lib/solda-capacidade.js, junto da capacidade: duas
+     cópias divergiriam no primeiro soldador que trocasse de bancada. */
   SOLDA: [{ k:null, nome:"sem bancada", obs:"atribuir bancada" },
-    ...["SOLDA 1","SOLDA 2","SOLDA 4","SOLDA 5","SOLDA 6","SOLDA 7"].map(n=>({k:n,nome:n,cap:1}))],
+    ...BANCADAS_SOLDA.map(n=>({k:n,nome:nomeDaBancada(n),cap:1}))],
   // ⚠⚠ ACABAMENTO TEM UMA BANCADA SÓ, e é isso que o faz caber no quadro sem conceito novo. Vitor
   // (06/09/2026): "não temos bancadas (…) selecionar a bancada única do acabamento". Escolher a
   // bancada vira um clique; a decisão que sobra é QUAL OP e QUAL DIA — que é o arraste que já

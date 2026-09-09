@@ -8,7 +8,7 @@
 // dia de trabalho e outra com uma semana.
 import { useState, useMemo } from "react";
 import { Flame, Loader2, Download, ArrowRight } from "lucide-react";
-import { BANCADAS, RITMO_CONSERVADOR, RITMO_META, RITMO_COMPLEXAS, repartirPorBancada, distribuirEmDias, ocupacaoDasBancadas } from "@/lib/solda-capacidade";
+import { BANCADAS, RITMO_CONSERVADOR, RITMO_META, RITMO_COMPLEXAS, repartirPorBancada, distribuirEmDias, ocupacaoDasBancadas, nomeDaBancada } from "@/lib/solda-capacidade";
 import { gerarFolhaSolda } from "@/lib/folha-solda";
 
 const fmtKg = (v) => `${Math.round(Number(v) || 0).toLocaleString("pt-BR")} kg`;
@@ -40,7 +40,7 @@ const CURVAS = [
 ];
 
 export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, ocupado }) {
-  const [n, setN] = useState(6);
+  const [n, setN] = useState(BANCADAS.length);
   const [inicio, setInicio] = useState(isoHoje());
   const [curvaK, setCurvaK] = useState("META");
   // ⚠⚠ ESCOLHER A BANCADA DE NOVO. Vitor (03/09/2026): "está um pouco confuso a seleção de bancada
@@ -139,7 +139,9 @@ export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, o
         <div>
           <p className="text-[11px] font-semibold text-torg-gray mb-1">quantas bancadas vão soldar</p>
           <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
-            {[1, 2, 3, 4, 5, 6].map((x) => (
+            {/* ⚠ a lista de números segue as bancadas vivas (7 desde 09/09/2026, com a SOLDA 9) —
+                fixar [1..6] deixaria a sétima inalcançável pelo atalho. */}
+            {BANCADAS.map((_, i) => i + 1).map((x) => (
               <button key={x} onClick={() => setN(x)}
                 className={`px-3 py-1.5 text-sm font-semibold ${x === n ? "bg-torg-blue text-white" : "bg-white text-torg-gray hover:bg-gray-50"}`}>{x}</button>
             ))}
@@ -166,7 +168,7 @@ export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, o
                     on ? "bg-torg-blue text-white border-torg-blue"
                        : livre ? "bg-white text-torg-gray border-gray-200 hover:border-torg-blue-300"
                                : "bg-gray-50 text-torg-gray-light border-gray-200"}`}>
-                  {b}{!livre && <span className="ml-1 text-[10px] font-normal">até {fmtDia(ocup.livreEm).slice(-5)}</span>}
+                  {nomeDaBancada(b)}{!livre && <span className="ml-1 text-[10px] font-normal">até {fmtDia(ocup.livreEm).slice(-5)}</span>}
                 </button>
               );
             })}
@@ -193,7 +195,7 @@ export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, o
           {ocupadas.length > 0 && (
             <div>
               <b>Ocupadas nesta data:</b>{" "}
-              {ocupadas.map((b) => `${b} até ${fmtDia(ocupacao[b].livreEm)} (${ocupacao[b].conj} conj)`).join(" · ")}
+              {ocupadas.map((b) => `${nomeDaBancada(b)} até ${fmtDia(ocupacao[b].livreEm)} (${ocupacao[b].conj} conj)`).join(" · ")}
             </div>
           )}
           {nomes.length < n && (
