@@ -30,6 +30,12 @@ export const CSS = `
   .gpcp .btn[disabled]{opacity:.4;cursor:default}
   .gpcp .btn.pri{background:var(--azul);border-color:var(--azul);color:#fff}
   .gpcp .btn.pri:hover:not([disabled]){background:#005b8e}
+  /* ⚠ APAGAR PROGRAMAÇÃO é destrutivo e fica ao lado de botões que não são — a cor é o que separa
+     "distribuir" de "sair da fila" num rodapé onde os dois ficam a um clique de distância. */
+  .gpcp .btn.perigo{border-color:#dc2626;color:#b91c1c}
+  .gpcp .btn.perigo:hover:not([disabled]){background:#fee2e2}
+  .gpcp dialog .pe .btn.perigo{background:#dc2626;border-color:#dc2626;color:#fff}
+  .gpcp dialog .pe .btn.perigo:hover:not([disabled]){background:#b91c1c}
   .gpcp .btn.on{background:var(--navy);border-color:var(--navy);color:#fff}
   .gpcp .btn.mini{padding:3px 8px;font-size:11px}
   .gpcp .periodo{font-weight:700;font-size:13px;min-width:180px;text-align:center}

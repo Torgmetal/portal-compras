@@ -102,6 +102,10 @@ export function criarPainelProjetos(dep){
       : '<div class="info">'+(sel.size ? sel.size+" marca(s) selecionada(s)" : "Sem GRD neste setor — o desenho desce até a montagem")+'</div>' + btnPint;
 
     dep.$("pFoot").innerHTML += '<button class="btn pri" id="gp-distribuir"'+(sel.size?'':' disabled')+'>Distribuir selecionados ('+sel.size+')</button>';
+    /* ⚠ APAGAR usa a SELEÇÃO, ou a lista inteira — como imprimir e Baixa Syneco. Botão morto sem
+       seleção só levanta a pergunta de por que não funciona (foi o que aconteceu com a Baixa). */
+    const alvoApagar = sel.size ? itens.filter(i=>sel.has(i.id)) : mostra;
+    dep.$("pFoot").innerHTML += '<button class="btn perigo" id="gp-apagar"'+(alvoApagar.length?'':' disabled')+'>Apagar a programação ('+alvoApagar.length+')</button>';
     /* ⚠ o filtro só existe quando há GRD; sem a guarda, `$("fSemGrd")` volta null e o painel
        inteiro morre no `.onchange`. */
     const fg = dep.$("fSemGrd");
@@ -118,6 +122,7 @@ export function criarPainelProjetos(dep){
     const limpar=dep.$("fLimpar");
     if(limpar) limpar.onclick=()=>{ colunas={}; soFalta=false; sel.clear(); dep.pintarPainel(); };
     dep.$("distribuir").onclick=()=>dep.abrirQuebra();
+    dep.$("apagar").onclick=()=>confirmarApagar(r, alvoApagar);
     dep.$("selTodos").onclick = ()=>{ for(const i of alvo) sel.add(i.id); dep.pintarPainel(); };
     dep.$("selNenhum").onclick = ()=>{ sel.clear(); dep.pintarPainel(); };
     for(const c of dep.raiz.querySelectorAll("#gp-pCorpo .ck"))
@@ -330,5 +335,91 @@ export function criarPainelProjetos(dep){
   /* ── quebra da programação ──────────────────────────────────────────────────── */
 
   function idsParaDividir() { return new Set(sel); }
+
+  /* ─── APAGAR A PROGRAMAÇÃO ────────────────────────────────────────────────────────────────────
+     Vitor (08/09/2026): "precisa ter um botão para podermos deletar uma programação, e com isso
+     sair da fila; o planejamento terá que reprogramar novas peças, pois pode ter sido revisão,
+     lançamento duplo e etc".
+
+     ⚠ TRÊS GRUPOS, TRATADOS DIFERENTE — decisão dele no mesmo dia:
+       • sem apontamento → apaga direto;
+       • COM apontamento → vem desmarcada, uma a uma. Programação de trabalho que já aconteceu não
+         some sem alguém olhar;
+       • com GRD impressa → apaga, mas avisa que o papel pode estar no chão de fábrica. A GRD em si
+         NÃO se apaga: é registro de auditoria do que foi impresso [[torg_grd_desenhos]].
+
+     ⚠ E NÃO MEXE NO SYNECO. Se a ordem já foi lançada no MES, ela continua aberta lá — o aviso está
+     no diálogo porque quem apaga aqui precisa saber que falta o outro lado. */
+  function confirmarApagar(r, alvo){
+    const comApont = alvo.filter(i=>i.f>0);
+    const semApont = alvo.filter(i=>!(i.f>0));
+    const comGrd = alvo.filter(i=>i.g);
+    const marcados = new Set();                       // as com apontamento entram desmarcadas
+    const dlg = document.createElement("dialog");
+
+    const pintar = ()=>{
+      const total = semApont.length + marcados.size;
+      dlg.innerHTML =
+        '<h3>Apagar a programação — '+r.setor.toLowerCase()+' · '+(r.recurso||"sem recurso")+' · '+dep.dbr(r.dia)+'</h3>'
+        + '<div class="corpo">'
+        + '<p>As peças saem do quadro <b>e da fila</b> — não voltam para a faixa "sem bancada". Quem decide se elas '
+          + 'voltam é o Planejamento, liberando de novo.</p>'
+        + (semApont.length
+            ? '<p><b>'+semApont.length+' marca(s) sem apontamento</b> — serão apagadas.</p>' : '')
+        + (comApont.length
+            ? '<p style="margin-top:12px"><b>'+comApont.length+' marca(s) já têm apontamento no Syneco.</b> '
+              + 'Marque as que devem sair mesmo assim:</p>'
+              + '<table class="trava"><tbody>'
+              + comApont.map((i,n)=>'<tr class="'+(marcados.has(i.id)?"":"travada")+'">'
+                  + '<td style="width:26px"><input type="checkbox" data-ap="'+n+'"'+(marcados.has(i.id)?" checked":"")+'></td>'
+                  + '<td><b>'+escapar(i.m)+'</b></td>'
+                  + '<td><span class="org">'+i.f+' de '+i.q+' já feitas</span></td></tr>').join("")
+              + '</tbody></table>' : '')
+        + (comGrd.length
+            ? '<p style="margin-top:12px"><b>⚠ '+comGrd.length+' marca(s) já tiveram o desenho impresso</b> — '
+              + 'recolha o papel do chão de fábrica. A GRD continua no histórico, como registro do que foi emitido.</p>' : '')
+        + '<p style="margin-top:12px"><b>A ordem no Syneco continua aberta.</b> Se for revisão ou lançamento duplo, '
+          + 'alguém precisa cancelar lá também — o portal não mexe no MES.</p>'
+        + '<p style="margin-top:12px">Motivo:<br><select id="gp-motivo" style="margin-top:4px;padding:6px;width:100%">'
+          + ['revisão do projeto','lançamento duplo','programado na máquina errada','outro']
+              .map(m=>'<option>'+m+'</option>').join("")
+          + '</select></p>'
+        + '</div>'
+        + '<div class="pe"><button class="btn" data-x="1">Cancelar</button>'
+        + '<button class="btn perigo" data-ok="1"'+(total?'':' disabled')+'>Apagar '+total+' marca(s)</button></div>';
+
+      dlg.querySelector('[data-x]').onclick = ()=>dlg.close();
+      for(const c of dlg.querySelectorAll("[data-ap]")) c.onchange = ()=>{
+        const i = comApont[+c.dataset.ap];
+        if(c.checked) marcados.add(i.id); else marcados.delete(i.id);
+        pintar();
+      };
+      dlg.querySelector('[data-ok]').onclick = async (ev)=>{
+        const b = ev.currentTarget;
+        const escolhidas = [...semApont, ...comApont.filter(i=>marcados.has(i.id))];
+        const motivo = dlg.querySelector("#gp-motivo")?.value || "outro";
+        b.disabled = true; b.textContent = "Apagando…";
+        try{
+          const res = await fetch("/api/pcp/gantt/apagar", {
+            method:"POST", headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({ motivo, blocos:[{ setor:r.setor, recurso:r.recurso||null, dia:r.dia||null,
+              ids: escolhidas.map(i=>i.id), marcas: escolhidas.map(i=>i.m) }] }),
+          });
+          const j = await res.json();
+          if(!res.ok) throw new Error(j.error || "Não foi possível apagar");
+          dlg.close();
+          dep.avisar(true, j.total+" peça(s) fora da programação e da fila."
+            + (comGrd.length ? " Recolha o desenho de "+comGrd.length+" marca(s) no chão de fábrica." : ""));
+          dep.recarregar();
+        }catch(e){ dep.avisar(false, e.message); b.disabled = false; b.textContent = "Apagar"; }
+      };
+    };
+
+    pintar();
+    dep.raiz.appendChild(dlg);
+    dlg.addEventListener("close", ()=>dlg.remove());
+    dlg.showModal();
+  }
+
   return { reiniciar, pintarProjetos, idsParaDividir };
 }
