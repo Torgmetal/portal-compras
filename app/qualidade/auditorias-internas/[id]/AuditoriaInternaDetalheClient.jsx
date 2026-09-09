@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import RelatorioAnexo from "./RelatorioAnexo";
 import { ArrowLeft, ClipboardList, Loader2, FileDown, Send, Trash2, Plus, X, CheckCircle2, AlertCircle, ImagePlus, Paperclip, Lock, Unlock, CircleDot } from "lucide-react";
 import { numRAI, SETORES_AUDITORIA, TIPO_CONSTATACAO, TIPOS, STATUS_AI, statusAiLabel } from "@/lib/auditoria-interna";
 
@@ -306,6 +307,8 @@ export default function AuditoriaInternaDetalheClient({ id }) {
       </Secao>
 
       {/* Encerramento — só após emitido; fica em aberto enquanto houver ação pendente */}
+      <RelatorioAnexo auditoriaId={id} anexo={a?.relatorioAnexo} bloqueado={salvando} onSalvo={(j) => setA((atual) => ({ ...atual, relatorioAnexo: j.relatorioAnexo, status: j.status }))} />
+
       {(emitido || finalizado) && (
         <div className={`rounded-xl border p-4 ${finalizado || podeFin ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
           {finalizado ? (

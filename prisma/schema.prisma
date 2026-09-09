@@ -2254,6 +2254,7 @@ model AuditoriaInterna {
   acoes                     Json      @default("[]") // [{ oque, responsavel, prazo, resposta, evidencias:[{url,legenda}], concluida, respondidoEm }]
   fotos                     Json      @default("[]") // registro fotográfico [{ url, legenda }]
   conclusao                 String?
+  relatorioAnexo            Json? // { url, nome, tamanho, tipo, anexadoEm }
   divulgadoEm               DateTime?
   finalizadoEm              DateTime? // encerrado após todas as ações do plano concluídas
   divulgadoPara             Json      @default("[]") // histórico [{ email, em }]
