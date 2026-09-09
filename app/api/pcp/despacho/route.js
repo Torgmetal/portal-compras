@@ -18,6 +18,7 @@ import { materialPorPerfil, statusCompraPorOp } from "@/lib/status-compra";
 import { pecasDosLotes } from "@/lib/liberacao-pecas";
 import { croquiCortado, setorRealIndex, mapaSetorReal, FLUXO_SETORES, soloPassaNoSetor } from "@/lib/prioridades-setor";
 import { z } from "zod";
+import { pecasNoTerceiro } from "@/lib/fora-da-fabrica";
 
 export const runtime = "nodejs";
 
@@ -88,7 +89,12 @@ export async function GET(req) {
   const ehLixo = ehLinhaLixo; // helper compartilhado (lib/pecas-producao) — mesma regra na TV
   // dedupLpcLe: a mesma marca pode ter linha na LPC e na LE — no fluxo de produção vale a da
   // LPC (senão a peça aparece 2× e é despachada/encaminhada em dobro — caso da OP-67).
-  const todas = dedupLpcLe(todasRaw.filter((p) => !ehLixo(p) && !ehItemComprado(p)));
+  /* ⚠⚠ E O QUE FOI PARA O TERCEIRO TAMBÉM SAI. Vitor (08/09/2026): "a 97B foi enviada para
+     terceiros, porém ela ainda aparece no painel do PCP, precisa tirar ela da frente". A marcação
+     na peça alcança só o conjunto; o romaneio alcança os croquis dele — que na OP-097 eram 262 e
+     seguiam nas listas. Ver lib/fora-da-fabrica.js. */
+  const noTerceiro = await pecasNoTerceiro();
+  const todas = dedupLpcLe(todasRaw.filter((p) => !ehLixo(p) && !ehItemComprado(p) && !noTerceiro.has(p.id)));
   // ROTA da peça pelos setores (regra de domínio do Vitor):
   //   • CROQUI (sub-peça "P")            → só CORTE.
   //   • CONJUNTO COMPOSTO (tem croquis)  → Montagem→Expedição (o corte é dos croquis dele).
