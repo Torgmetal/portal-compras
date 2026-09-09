@@ -1,7 +1,12 @@
 {
-  "build": 3045,
-  "gerado": "2026-09-09T20:11:32.279Z",
+  "build": 3046,
+  "gerado": "2026-09-09T20:34:15.099Z",
   "commits": [
+    {
+      "hash": "3ec99dcb54",
+      "data": "09/09/2026",
+      "titulo": "Remessa Terceiro: campo pra informar o valor por kg (faltava na tela)"
+    },
     {
       "hash": "d11b51500e",
       "data": "09/09/2026",
@@ -146,11 +151,6 @@
       "hash": "d5dd37a0eb",
       "data": "08/09/2026",
       "titulo": "fix(planejamento): listar todos os Rs compatíveis de outras OPs"
-    },
-    {
-      "hash": "9115967694",
-      "data": "08/09/2026",
-      "titulo": "RH › Cargos: o cargo passa a ter faixa — base, médio e máximo"
     }
   ]
 }
