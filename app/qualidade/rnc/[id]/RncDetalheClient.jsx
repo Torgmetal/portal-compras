@@ -3,10 +3,12 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Trash2, CheckCircle2, AlertCircle, ListChecks, FileDown, Plus, Upload, X, FileText, Sparkles } from "lucide-react";
-import { numRNC, TIPOS_RNC, ORIGEM_NC, DISPOSICAO_NC, NECESSITA_ACAO, STATUS_RNC, statusRncLabel } from "@/lib/nao-conformidade";
+import { numRNC, TIPOS_RNC, ORIGEM_NC, NECESSITA_ACAO, STATUS_RNC, statusRncLabel } from "@/lib/nao-conformidade";
 import { SETORES_AUDITORIA } from "@/lib/auditoria-interna";
 import { SETORES_RETRABALHO } from "@/lib/retrabalho";
 import SeletorPecasLE from "./SeletorPecasLE";
+import Apontamentos from "./Apontamentos";
+import { apontamentosDaRnc, procedenciaDaRnc, contagemProcedencia } from "@/lib/rnc-apontamentos";
 
 const dISO = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 
@@ -21,7 +23,6 @@ export default function RncDetalheClient({ id }) {
   const [subindoRe, setSubindoRe] = useState(false);
   const [extraindo, setExtraindo] = useState(false);
   const [criandoPlano, setCriandoPlano] = useState(false);
-  const [puxandoPeso, setPuxandoPeso] = useState(false);
   const [msg, setMsg] = useState("");
 
   const carregar = useCallback(() => {
@@ -61,6 +62,7 @@ export default function RncDetalheClient({ id }) {
         prazoResposta: d.prazoResposta || null, realizadoEm: d.realizadoEm || null, acompanhadoPor: d.acompanhadoPor,
         acompanhamento: d.acompanhamento, avaliacaoEficacia: d.avaliacaoEficacia, encerradaPor: d.encerradaPor,
         pertinente: !!d.pertinente, recorrente: !!d.recorrente,
+        apontamentos: apontamentosDaRnc(d),
         numeroCliente: d.numeroCliente, programa: d.programa, jobCliente: d.jobCliente,
         respostaCliente: d.respostaCliente, anexos: d.anexos || [],
         reinspecaoPor: d.reinspecaoPor, reinspecaoEm: d.reinspecaoEm || null, reinspecaoFotos: d.reinspecaoFotos || [],
@@ -71,18 +73,6 @@ export default function RncDetalheClient({ id }) {
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao salvar");
       flash("RNC salva."); carregar();
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
-  }
-
-  // Tenta preencher o peso de retrabalho a partir das marcas da RNC (cadastro de peças).
-  async function puxarPeso() {
-    setPuxandoPeso(true); setErro("");
-    try {
-      const r = await fetch(`/api/qualidade/rnc/${id}/peso-marca`);
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Erro ao buscar peso");
-      if (j.pesoKg != null) { set("pesoRetrabalhoKg", j.pesoKg); flash(j.aviso || `Peso sugerido: ${j.pesoKg} kg (${j.encontradas.length} marca(s)).`); }
-      else flash(j.aviso || "Nenhuma marca localizada no cadastro — informe o peso manualmente.");
-    } catch (e) { setErro(e.message); } finally { setPuxandoPeso(false); }
   }
 
   async function excluir() {
@@ -178,7 +168,13 @@ export default function RncDetalheClient({ id }) {
   if (erro && !d) return <div className="py-20 text-center text-red-600 text-sm">{erro} · <Link href="/qualidade/rnc" className="text-torg-blue underline">voltar</Link></div>;
 
   const cliente = d.tipo === "CLIENTE";
-  const improcedente = cliente && d.pertinente === false; // improcedente ⇒ só justificativa
+  /* ⚠ A PROCEDÊNCIA AGORA É AGREGADA. Ela sai dos apontamentos, não de um botão da RNC — e pode
+     ser PARCIAL, que é o estado da RNC-012/26. "Improcedente" só quando NENHUM apontamento procede;
+     basta um procedente para a RNC ter tratamento, causa raiz e plano. */
+  const apts = Array.isArray(d.apontamentos) ? d.apontamentos : [];
+  const procedencia = cliente ? procedenciaDaRnc(apts) : "PROCEDENTE";
+  const nProc = contagemProcedencia(apts);
+  const improcedente = procedencia === "IMPROCEDENTE";
   const mostrarAnalise = !improcedente;                   // tratamento, causa raiz, plano, acompanhamento
   const aceita = cliente ? ".pdf,image/png,image/jpeg,image/webp" : "image/png,image/jpeg,image/webp,.pdf,.doc,.docx,.xls,.xlsx";
   const anexoIA = cliente ? ((d.anexos || []).find((x) => x.tipo === "application/pdf") || (d.anexos || []).find((x) => String(x.tipo || "").startsWith("image/"))) : null;
@@ -200,29 +196,14 @@ export default function RncDetalheClient({ id }) {
           <span className="font-mono font-bold text-torg-blue text-lg">{numRNC(d.numero, d.ano)}</span>
           <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-torg-blue-50 text-torg-blue">{TIPOS_RNC[d.tipo]?.label || "RNC"}</span>
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_RNC[d.status]?.cor}`}>{statusRncLabel(d.status)}</span>
-          {improcedente && <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600">improcedente</span>}
+          {cliente && procedencia !== "PROCEDENTE" && (
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${procedencia === "PARCIAL" ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-600"}`}>
+              {procedencia === "PARCIAL" ? `parcialmente procedente (${nProc.sim} de ${nProc.total})` : "improcedente"}
+            </span>
+          )}
         </div>
         <h1 className="text-xl font-extrabold text-torg-dark tracking-tight">Relatório de Não Conformidade</h1>
       </div>
-
-      {/* Procedência (só RNC de cliente) */}
-      {cliente && (
-        <Secao titulo="Procedência">
-          <p className="text-[12px] text-torg-gray -mt-1">Avalie se o apontamento do cliente procede. <b>Improcedente</b> pede só a justificativa; <b>procedente</b> segue para causa raiz e plano de ação.</p>
-          <div className="grid grid-cols-2 gap-2 max-w-md">
-            {[{ v: true, l: "Procedente", dsc: "Cabe análise e plano de ação" }, { v: false, l: "Improcedente", dsc: "Só justificativa ao cliente" }].map((o) => {
-              const on = !!d.pertinente === o.v;
-              return (
-                <button key={String(o.v)} type="button" onClick={() => set("pertinente", o.v)}
-                  className={`text-left rounded-lg border px-3 py-2.5 transition-colors ${on ? "border-torg-blue bg-torg-blue-50/50 ring-1 ring-torg-blue" : "border-gray-200 hover:border-gray-300"}`}>
-                  <div className={`text-sm font-semibold ${on ? "text-torg-blue" : "text-torg-dark"}`}>{o.l}</div>
-                  <p className="text-[11px] text-torg-gray mt-0.5">{o.dsc}</p>
-                </button>
-              );
-            })}
-          </div>
-        </Secao>
-      )}
 
       {/* Identificação */}
       <Secao titulo="Identificação">
@@ -244,14 +225,20 @@ export default function RncDetalheClient({ id }) {
               <SeletorPecasLE
                 rncId={d.id}
                 pecas={d.pecas}
-                onChange={(pecas) => setD((x) => ({
-                  ...x, pecas,
-                  // o peso do retrabalho passa a ser a SOMA das peças — nada de digitar por fora
-                  pesoRetrabalhoKg: pecas.length
+                onChange={(pecas) => setD((x) => {
+                  // ⚠ o peso somado das peças cai no PRIMEIRO apontamento, não mais num campo da
+                  //   RNC: o peso do retrabalho agora é a soma dos apontamentos (ver Apontamentos).
+                  //   Com um apontamento só — toda RNC até aqui — o resultado é o de sempre.
+                  const kg = pecas.length
                     ? Math.round(pecas.reduce((t, p2) => t + (Number(p2.pesoKg) || (Number(p2.qtd) || 0) * (Number(p2.pesoUnitKg) || 0)), 0) * 100) / 100
-                    : x.pesoRetrabalhoKg,
-                  desenhoProjetoMarca: pecas.length ? pecas.map((p2) => p2.marca).join(" / ") : x.desenhoProjetoMarca,
-                }))}
+                    : null;
+                  const aps = Array.isArray(x.apontamentos) ? x.apontamentos : [];
+                  return {
+                    ...x, pecas,
+                    apontamentos: kg != null && aps.length ? aps.map((ap, i) => (i === 0 ? { ...ap, pesoKg: kg } : ap)) : aps,
+                    desenhoProjetoMarca: pecas.length ? pecas.map((p2) => p2.marca).join(" / ") : x.desenhoProjetoMarca,
+                  };
+                })}
                 textoLivre={d.desenhoProjetoMarca}
                 onTextoLivre={(v) => set("desenhoProjetoMarca", v)}
               />
@@ -264,23 +251,10 @@ export default function RncDetalheClient({ id }) {
               {d.processoArea && !SETORES_AUDITORIA.includes(d.processoArea) && <option value={d.processoArea}>{d.processoArea}</option>}
             </select>
           </Campo>
-          {/* ⚠ QUEM GEROU, não quem vai refazer: é por este campo que o peso entra no indicador de
-              cada setor. Sem ele, o portal deduz do "Processo / Área" — o que funciona para o
-              histórico, mas erra quando a área da ocorrência não é a que causou. */}
-          <Campo label="Setor que gerou o retrabalho">
-            <select value={d.setorRetrabalho || ""} onChange={(e) => set("setorRetrabalho", e.target.value)} className="inp">
-              <option value="">— deduzir do processo / área —</option>
-              <optgroup label="Setores da Torg">
-                {SETORES_RETRABALHO.filter((st) => !st.externo).map((st) => <option key={st.id} value={st.id}>{st.nome}</option>)}
-              </optgroup>
-              {/* ⚠ material fora de especificação ou serviço de terceiro refeito: as horas são
-                  nossas, a causa não. Sem esta opção, quem preenche escolhe o setor que REFEZ e o
-                  índice dele sobe por culpa alheia. */}
-              <optgroup label="Externo">
-                {SETORES_RETRABALHO.filter((st) => st.externo).map((st) => <option key={st.id} value={st.id}>{st.nome}</option>)}
-              </optgroup>
-            </select>
-          </Campo>
+          {/* ⚠ O SETOR QUE GEROU O RETRABALHO SAIU DAQUI. Ele era um campo da RNC inteira e passou
+              a ser de CADA APONTAMENTO (ver Apontamentos): a RNC-012/26 tem três, e podem ter donos
+              diferentes — um campo só mandaria o peso dos três para o setor de um. O campo da RNC
+              continua no banco como resumo, escrito pela rota a partir do apontamento que mais pesa. */}
           <Campo label="Origem da não conformidade">
             <select value={d.origem || ""} onChange={(e) => set("origem", e.target.value)} className="inp"><option value="">—</option>{Object.entries(ORIGEM_NC).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
           </Campo>
@@ -325,42 +299,24 @@ export default function RncDetalheClient({ id }) {
         )}
       </Secao>
 
-      {/* ⚠⚠ TAMBÉM NA PROCEDENTE. Vitor (02/09/2026): "não está saindo a justificativa da
-          improcedência OU PROCEDÊNCIA". Não saía da procedente porque não havia onde escrever —
-          o campo só aparecia quando a RNC era recusada.
-          Mas aceitar o apontamento também é uma decisão que precisa de motivo: é o que o cliente
-          lê para saber que analisamos, e é o que o auditor lê daqui a um ano para entender por que
-          esta virou não conformidade. O texto é o mesmo campo; o que muda é o que ele defende. */}
-      {cliente && (
-        <Secao titulo={improcedente ? "Justificativa da improcedência" : "Justificativa da procedência"}>
-          <Campo label={improcedente ? "Por que a RNC é improcedente (resposta ao cliente)" : "Por que o apontamento procede (resposta ao cliente)"}>
-            <textarea value={d.respostaCliente || ""} onChange={(e) => set("respostaCliente", e.target.value)} rows={5} className="inp"
-              placeholder={improcedente
-                ? "Explique tecnicamente por que o apontamento do cliente não procede — este texto é a resposta ao cliente."
-                : "Explique o que foi apurado e por que o apontamento procede — este texto é a resposta ao cliente."} />
-          </Campo>
-        </Secao>
-      )}
+      {/* ⚠⚠ APONTAMENTOS — SUBSTITUI "PROCEDÊNCIA" E "JUSTIFICATIVA DA PROCEDÊNCIA/IMPROCEDÊNCIA".
+          Vitor (09/09/2026): "temos o caso da RNC 12 que temos 3 apontamentos onde 2 é procedente e
+          um não é e não conseguimos fazer isso de uma forma separada"; e depois, sobre o nome:
+          "onde está escrito justificativa de procedência ou improcedência vamos usar o termo
+          DISPOSIÇÃO para cada apontamento (…) e deve ter esse campo para ser preenchido".
+          A procedência deixou de ser um par de botões da RNC inteira — ela é de cada apontamento, e
+          a da RNC é o agregado (PROCEDENTE / PARCIAL / IMPROCEDENTE) mostrado no cabeçalho. */}
+      <Apontamentos lista={apts} cliente={cliente} onChange={(v) => set("apontamentos", v)} />
 
       {mostrarAnalise && (
         <>
           {/* Tratamento */}
           <Secao titulo="Tratamento">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Campo label="Disposição"><select value={d.disposicao || ""} onChange={(e) => set("disposicao", e.target.value)} className="inp"><option value="">—</option>{Object.entries(DISPOSICAO_NC).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Campo>
-              <Campo label="Necessita de ação"><select value={d.necessitaAcao || ""} onChange={(e) => set("necessitaAcao", e.target.value)} className="inp"><option value="">—</option>{Object.entries(NECESSITA_ACAO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Campo>
-            </div>
-            {d.disposicao === "RETRABALHAR" && (
-              <Campo label="Peso de retrabalho (kg)">
-                <div className="flex items-center gap-2">
-                  <input type="number" step="0.01" min="0" value={d.pesoRetrabalhoKg ?? ""} onChange={(e) => set("pesoRetrabalhoKg", e.target.value)} placeholder="0" className="inp flex-1" />
-                  <button type="button" onClick={puxarPeso} disabled={puxandoPeso} className="whitespace-nowrap px-3 py-2 text-sm rounded-lg border border-torg-blue-200 text-torg-blue hover:bg-torg-blue-50 disabled:opacity-50">
-                    {puxandoPeso ? "Buscando…" : "Puxar da marca"}
-                  </button>
-                </div>
-                <p className="text-xs text-torg-dark/50 mt-1">Base do indicador de Retrabalho da Produção. Tenta puxar do cadastro pela marca; ajuste se necessário.</p>
-              </Campo>
-            )}
+            {/* ⚠⚠ A DISPOSIÇÃO E O PESO SAÍRAM DAQUI — cada apontamento tem os seus, no bloco
+                Apontamentos. Manter uma segunda cópia deles nesta seção deixaria a tela editar
+                num lugar o que a rota recalcula do outro, e o valor digitado sumiria ao salvar.
+                A ação corretiva/preventiva continua sendo da RNC: o plano é um só. */}
+            <Campo label="Necessita de ação"><select value={d.necessitaAcao || ""} onChange={(e) => set("necessitaAcao", e.target.value)} className="inp"><option value="">—</option>{Object.entries(NECESSITA_ACAO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Campo>
             {d.necessitaAcao === "NAO_NECESSARIO" && <Campo label="Motivo de não necessitar de ação"><input value={d.motivoNaoAcao || ""} onChange={(e) => set("motivoNaoAcao", e.target.value)} className="inp" /></Campo>}
             <Campo label="Abrangência"><input value={d.abrangencia || ""} onChange={(e) => set("abrangencia", e.target.value)} className="inp" /></Campo>
           </Secao>

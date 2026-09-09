@@ -2395,6 +2395,17 @@ model NaoConformidade {
   // nada — quem audita precisa ver ANTES e DEPOIS, e saber qual é qual.
   reinspecaoFotos     Json      @default("[]") // [{ url, legenda }]
   abrangencia         String?
+  // ⚠⚠ OS APONTAMENTOS DA RNC — uma reclamação pode trazer vários, e eles não precisam concordar.
+  // Vitor (09/09/2026), sobre a RNC-012/26: "temos 3 apontamentos onde 2 é procedente e um não é e
+  // não conseguimos fazer isso de uma forma separada nas rncs hoje". Antes disto a RNC tinha UM
+  // `pertinente`, UMA `disposicao` e UMA justificativa para o conjunto — não havia como dizer
+  // "parcial", que era exatamente o estado da 12.
+  // [{ id, descricao, referencia, procedente, decisao, disposicao, pesoKg, setor }]
+  // ⚠ `disposicao` do item é TEXTO (o termo substituiu "justificativa da procedência/improcedência"
+  //   na tela e no PDF); `decisao` é o enum do produto — o antigo campo `disposicao` da RNC.
+  // ⚠ Lista vazia = RNC antiga: lida como um apontamento só, derivado dos campos abaixo por
+  //   `apontamentosDaRnc` (lib/rnc-apontamentos). Não houve backfill — ver o aviso lá.
+  apontamentos        Json      @default("[]")
   necessitaAcao       String? // CORRETIVA | PREVENTIVA | NAO_NECESSARIO
   motivoNaoAcao       String?
   causas              String?

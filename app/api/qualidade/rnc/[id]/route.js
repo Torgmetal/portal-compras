@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 import { log } from "@/lib/log";
+import { apontamentosDaRnc, resumoDosApontamentos, faltaDisposicao, normalizarApontamento, pesoRetrabalhoPorSetor } from "@/lib/rnc-apontamentos";
 
 const registroLog = log("api/qualidade/rnc/[id]");
 
@@ -34,6 +35,12 @@ const schema = z.object({
     qtd: z.number().nullable().optional(), pesoKg: z.number().nullable().optional(),
   })).nullable().optional(),
   setorRetrabalho: z.string().nullable().optional(),
+  // os apontamentos da RNC — cada um com a sua procedência e a sua disposição (ver lib/rnc-apontamentos)
+  apontamentos: z.array(z.object({
+    id: z.string().optional(), descricao: dstr, referencia: dstr,
+    procedente: z.boolean().optional(), decisao: dstr, disposicao: dstr,
+    pesoKg: z.number().nullable().optional(), setor: dstr,
+  })).optional(),
   elaborador: dstr, resultadoReinspecao: dstr, abrangencia: dstr,
   // evidência da reinspeção do FORM 20 — quem conferiu, quando, e as fotos do resultado
   reinspecaoPor: dstr, reinspecaoEm: dstr,
@@ -56,7 +63,7 @@ const DATES = new Set(["data", "prazoResposta", "realizadoEm", "reinspecaoEm"]);
 export async function PATCH(req, { params }) {
   try { await requireRole(["ADMIN", "QUALIDADE"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
-  const atual = await prisma.naoConformidade.findUnique({ where: { id: params.id }, select: { id: true, encerradaEm: true } });
+  const atual = await prisma.naoConformidade.findUnique({ where: { id: params.id }, select: { id: true, encerradaEm: true, tipo: true, apontamentos: true, descricao: true, desenhoProjetoMarca: true, pertinente: true, disposicao: true, respostaCliente: true, pesoRetrabalhoKg: true, setorRetrabalho: true } });
   if (!atual) return NextResponse.json({ error: "RNC não encontrada" }, { status: 404 });
 
   let body;
@@ -70,6 +77,27 @@ export async function PATCH(req, { params }) {
     else if (DATES.has(k)) data[k] = asDate(body[k]);
     else data[k] = body[k]; // fotos, cincoPorques, evidencias, status, pertinente, recorrente
   }
+  /* ⚠⚠ OS APONTAMENTOS MANDAM NOS CAMPOS DE RESUMO. `pertinente`, `disposicao`, `pesoRetrabalhoKg`
+     e `setorRetrabalho` continuam gravados porque indicador ISO, indicador de retrabalho, PDF e
+     FORM 34 leem deles — mas passam a ser DERIVADOS da lista, num lugar só. Aceitar os dois pela
+     tela deixaria a RNC dizer "improcedente" no carimbo e "retrabalhar" na disposição. */
+  if (body.apontamentos) {
+    const aps = body.apontamentos.map(normalizarApontamento);
+    data.apontamentos = aps;
+    Object.assign(data, (({ procedencia, ...r }) => r)(resumoDosApontamentos(aps)));
+  }
+  // ⚠ A disposição é exigida para ENCERRAR, não para salvar — ver o aviso em lib/rnc-apontamentos.
+  if (body.status === "ENCERRADA") {
+    const aps = data.apontamentos || apontamentosDaRnc({ ...atual, apontamentos: atual.apontamentos });
+    const faltam = faltaDisposicao(aps);
+    if (faltam.length) {
+      return NextResponse.json({
+        error: faltam.length === aps.length
+          ? "Preencha a disposição antes de encerrar a RNC."
+          : `Preencha a disposição ${faltam.length === 1 ? "do apontamento" : "dos apontamentos"} ${faltam.map((_, i) => aps.findIndex((a) => a.id === faltam[i]) + 1).join(", ")}.`,
+      }, { status: 400 });
+    }
+  }
   // Encerramento: ao virar ENCERRADA, carimba encerradaEm (uma vez); ao reabrir, limpa.
   if (body.status === "ENCERRADA" && !atual.encerradaEm) data.encerradaEm = new Date();
   if (body.status && body.status !== "ENCERRADA") data.encerradaEm = null;
@@ -80,7 +108,12 @@ export async function PATCH(req, { params }) {
   // É de lá que o indicador soma; sem espelhar aqui, uma RNC com peças escolhidas não apareceria no
   // retrabalho do setor. O vínculo `rncId` garante que ela conte UMA vez (ver lib/retrabalho).
   try {
-    const ehRetrabalho = rnc.disposicao === "RETRABALHAR";
+    /* ⚠⚠ RNC COM MAIS DE UM SETOR NÃO VIRA ESPELHO. `ApontamentoRetrabalho` é uma linha por RNC
+       (`rncId` é único) e carrega UM setor; o indicador ignora a RNC que tem espelho, então gravar
+       um só faria os outros setores sumirem da conta. Nesses casos a RNC fica sem espelho e
+       `retrabalhoDoAno` a abre apontamento por apontamento — ver o aviso lá. */
+    const setoresRe = pesoRetrabalhoPorSetor(apontamentosDaRnc(rnc));
+    const ehRetrabalho = rnc.disposicao === "RETRABALHAR" && setoresRe.length <= 1;
     const pecas = Array.isArray(rnc.pecas) ? rnc.pecas : [];
     const peso = pecas.length
       ? Math.round(pecas.reduce((t, p2) => t + (Number(p2.pesoKg) || (Number(p2.qtd) || 0) * (Number(p2.pesoUnitKg) || 0)), 0) * 100) / 100
