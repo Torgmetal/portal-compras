@@ -1,11 +1,14 @@
 "use client";
-import { FileSpreadsheet, Loader2, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, FileSpreadsheet, Loader2, Plus, Trash2 } from "lucide-react";
 import { CLASSES, ESTRUTURAS, ESTRUTURA_ROTULO, METODOS, METODO_ROTULO, PERFIS, coefSugerido, perdaDaEstrutura } from "@/lib/lqc";
 import { Bloco, Campo, Inp, Sel } from "./campos";
 import { fmtKg, fmtR$, num } from "../_lib/formatos";
+import styles from "../Lqc.module.css";
 
 /** Um elemento do quantitativo, com a consequência de cada escolha à vista. */
 export function CartaoLinha({ l, i, set, del, dup, porArea, cores, doEsquema, onImportarPeso, importando }) {
+  const [aberto, setAberto] = useState(i === 0 || !l.area);
   const dentro = l.ativo !== false;
   const custo = (porArea || []).find((x) => x.area === (l.area || l.item));
   // null = ainda não há esquema de acabamento para comparar
@@ -27,27 +30,32 @@ export function CartaoLinha({ l, i, set, del, dup, porArea, cores, doEsquema, on
   const unPeso = l.un === "m" ? "kg/m" : l.un === "m²" ? "kg/m²" : "kg/un";
 
   return (
-    <div className={`bg-white border rounded-xl overflow-hidden ${dentro ? "border-gray-100" : "border-gray-200 opacity-60"}`}>
-      <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 border-b border-gray-100 ${dentro ? "bg-gray-50" : "bg-gray-100"}`}>
-        <input type="checkbox" checked={dentro} onChange={(e) => set(i, "ativo", e.target.checked)}
-          title={dentro ? "no escopo — desmarque para tirar da conta" : "fora do escopo — o levantamento continua guardado"}
-          className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
-        <span className="text-[12px] font-bold text-torg-blue font-mono">{l.item || `1.${i + 1}`}</span>
-        <span className="text-[12px] font-semibold text-torg-dark">{l.area || "sem área"}</span>
-        {l.estrutura && <span className="text-[12px] text-torg-gray">· {ESTRUTURA_ROTULO[l.estrutura] || l.estrutura}</span>}
-        {l.elemento && <span className="text-[12px] text-torg-gray">· {l.elemento}</span>}
-        {l.cor && (
-          <span className={`text-[10px] font-semibold rounded px-1.5 py-0.5 ${corCasa === false ? "bg-[#FFF7ED] text-torg-orange-700 border border-[#F4801F]/40" : "bg-white text-torg-gray border border-gray-200"}`}>
-            {l.cor}{corCasa === false ? " · sem acabamento" : ""}
-          </span>
-        )}
-        <span className={`ml-auto text-[13px] font-extrabold tabular-nums whitespace-nowrap ${dentro ? "text-torg-dark" : "text-torg-gray line-through"}`}>{fmtKg(peso)}</span>
-        {!dentro && <span className="text-[10px] font-semibold text-torg-gray uppercase tracking-wide">fora do escopo</span>}
-        <button onClick={() => dup(i)} title="duplicar" className="text-gray-300 hover:text-torg-blue"><Plus size={14} /></button>
-        <button onClick={() => del(i)} title="remover" className="text-gray-300 hover:text-red-600"><Trash2 size={14} /></button>
-      </div>
+    <details open={aberto} onToggle={(ev) => setAberto(ev.currentTarget.open)} className={`${styles.area} ${!dentro ? styles.fora : ""}`}>
+      <summary className={styles.areaCabecalho}>
+        <span className={styles.numero}>{l.item || `1.${i + 1}`}</span>
+        <span className={styles.areaIdentidade}>
+          <strong>{l.area || "Nova área"}</strong>
+          <span>{[ESTRUTURA_ROTULO[l.estrutura] || l.estrutura, l.elemento].filter(Boolean).join(" · ") || "Preencha a identificação e o peso da estrutura"}</span>
+        </span>
+        {l.cor && <span className={`text-[11px] ${corCasa === false ? "text-orange-700" : "text-torg-gray"}`}>
+          {l.cor}{corCasa === false ? " · sem acabamento" : ""}
+        </span>}
+        <span className={styles.areaPeso}>{fmtKg(peso)}{!dentro && <small>fora do escopo</small>}</span>
+        <ChevronDown size={18} className={styles.seta} />
+      </summary>
+      <div className={styles.areaCorpo}>
+        <div className={styles.areaAcoes}>
+          <label className="inline-flex items-center gap-2 text-xs text-torg-gray">
+            <input type="checkbox" checked={dentro} onChange={(e) => set(i, "ativo", e.target.checked)}
+              className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
+            Incluir esta área no escopo
+          </label>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => dup(i)} title="duplicar" className={styles.acaoArea}><Plus size={14} /> Duplicar</button>
+            <button type="button" onClick={() => del(i)} title="remover" className={styles.acaoArea}><Trash2 size={14} /> Remover</button>
+          </div>
+        </div>
 
-      <div className="p-4 space-y-4">
         <Bloco titulo="Onde fica">
           <Campo r="Item" ajuda="numeração da proposta">
             <Inp value={l.item || ""} onChange={(ev) => set(i, "item", ev.target.value)} className="w-full" /></Campo>
@@ -237,6 +245,6 @@ export function CartaoLinha({ l, i, set, del, dup, porArea, cores, doEsquema, on
           </p>
         )}
       </div>
-    </div>
+    </details>
   );
 }

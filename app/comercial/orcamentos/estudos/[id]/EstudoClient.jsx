@@ -18,6 +18,7 @@ import { Resumos } from "./_componentes/Resumos";
 import { Terceiros } from "./_componentes/Terceiros";
 import { Kpi } from "./_componentes/campos";
 import { fmtKg, fmtR$ } from "./_lib/formatos";
+import styles from "./Lqc.module.css";
 
 // ⚠ AS ABAS SÃO AS DA LQC, NA ORDEM DA LQC. Vitor (22/08/2026): "que você transforme cada aba da
 // geração de custo igual está na nossa LQC". Quem orça já sabe onde cada coisa fica; inventar uma
@@ -126,13 +127,14 @@ export default function EstudoClient({ id }) {
   const codigo = `LQC-${String(e.numero || 0).padStart(3, "0")}-${String(e.ano).slice(-2)}-R${String(e.revisao || 0).padStart(2, "0")}`;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+    <div className={styles.pagina}>
+      <div className={styles.cabecalho}>
         <div>
           <p className="text-[11px] font-mono font-bold text-torg-blue">{codigo}</p>
-          <h1 className="text-xl font-bold text-torg-dark">{e.cliente}{e.obra ? ` · ${e.obra}` : ""}</h1>
+          <h1 className={styles.titulo}>{e.obra || e.cliente}</h1>
+          <p className={styles.subtitulo}>{e.obra ? `${e.cliente} · ` : ""}Composição de custo</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className={styles.acoes}>
           <span className="text-[11px] text-torg-gray">
             {salvando ? <span className="inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> salvando…</span>
               : sujo ? "alterações pendentes" : <span className="inline-flex items-center gap-1"><Save size={11} /> salvo</span>}
@@ -150,7 +152,7 @@ export default function EstudoClient({ id }) {
           12.096.000,00" saía com o "R$" numa linha e o número na outra. Número partido ao meio é
           número que se lê errado, e num painel de preço isso é grave. A grade abre em 3 colunas
           antes de ir pra 6: espremer seis valores de moeda numa linha só é o que causa a quebra. */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-px bg-gray-100 border border-gray-100 rounded-xl overflow-hidden mb-5">
+      <div className={styles.indicadores}>
         <Kpi r={res.escopo?.total > res.escopo?.selecionadas ? `Peso · ${res.escopo.selecionadas} de ${res.escopo.total} áreas` : "Peso"} v={fmtKg(res.pesoTotal)} />
         <Kpi r="Custo" v={fmtR$(res.custo)} />
         <Kpi r={`BDI ${res.bdiPct || 0}%`} v={fmtR$(res.bdiValor)} />
@@ -159,15 +161,15 @@ export default function EstudoClient({ id }) {
         <Kpi r="R$/kg" v={fmtR$(res.precoPorKg)} cor="text-green-700" />
       </div>
 
-      <div className="flex flex-wrap gap-1 mb-4 border-b border-gray-100">
+      <nav className={styles.abas} aria-label="Etapas da LQC">
         {ABAS.map((a) => (
-          <button key={a.k} onClick={() => setAba(a.k)}
-            className={`px-3 py-2 -mb-px border-b-2 text-left ${aba === a.k ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
+          <button key={a.k} onClick={() => setAba(a.k)} aria-current={aba === a.k ? "page" : undefined} title={a.ajuda || a.planilha || a.r}
+            className={`px-3 py-2 -mb-px border-b-2 text-left ${aba === a.k ? "border-torg-orange text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
             <span className="block text-[12px] font-semibold whitespace-nowrap">{a.r}</span>
-            {(a.ajuda || a.planilha) && <span className="block text-[9px] opacity-60 whitespace-nowrap">{a.ajuda || a.planilha}</span>}
+
           </button>
         ))}
-      </div>
+      </nav>
 
       {aba === "RESUMOS" && <Resumos e={e} c={c} setComp={setComp} mexer={mexer} res={res} />}
       {aba === "MATERIAL" && <Material c={c} res={res} setComp={setComp} estudoId={e.id} />}

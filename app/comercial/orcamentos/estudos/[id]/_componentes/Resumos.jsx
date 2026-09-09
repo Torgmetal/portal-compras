@@ -94,7 +94,9 @@ export function Resumos({ e, c, setComp, mexer: _mexer, res }) {
 
   return (
     <div>
-      <div className="bg-white border border-gray-100 rounded-xl p-4 mb-4">
+      <div className="mb-5">
+        <h2 className="text-lg font-semibold text-torg-dark">Quantitativo da obra</h2>
+        <p className="text-sm text-torg-gray mb-3">Áreas, elementos e pesos que compõem o estudo. Abra uma área para preencher ou conferir.</p>
         <p className="text-[12px] text-torg-gray mb-3">
           Cada bloco é um pedaço da obra. O peso lançado aqui é o que alimenta a industrialização:
           a <strong className="text-torg-dark">classificação</strong> escolhe o preço de fabricação e pintura,
