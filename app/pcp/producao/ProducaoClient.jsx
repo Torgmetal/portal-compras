@@ -230,6 +230,7 @@ export default function ProducaoClient() {
     try {
       const qs = new URLSearchParams({ opId });
       if (setor) qs.set("setor", setor);
+      if (setor === "MONTAGEM") qs.set("preprogramar", "1");
       const r = await fetch(`/api/pcp/despacho?${qs}`, { cache: "no-store" });
       const j = await lerJson(r, "Peças da OP");
       setDetalhe(j);
@@ -804,6 +805,8 @@ export default function ProducaoClient() {
                           return (
                             <div className="mx-3 mb-3 rounded-lg border border-torg-blue-100 bg-torg-blue-50/50 px-3 py-2.5 text-[12px] text-torg-dark flex items-center gap-2 flex-wrap">
                               <Users size={14} className="text-torg-blue shrink-0" />
+                              <button onClick={() => setSel(new Set(pecas.map((p) => p.id)))}
+                                className="text-torg-blue font-semibold underline">marcar todos os {pecas.length} para programar sem bancada</button>
                               {prontos > 0 ? (
                                 <>
                                   <b>{prontos}</b> conjunto(s) com todos os croquis cortados.

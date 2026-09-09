@@ -78,6 +78,10 @@ export async function GET(req) {
 
   const opInfo = await prisma.oP.findUnique({ where: { id: opId }, select: { emProducao: true, numero: true } });
   const setor = url.searchParams.get("setor"); // opcional: escopo do setor pela ROTA da peça
+  // A pré-programação precisa enxergar também os conjuntos ainda fora do lote liberado.
+  // A entrada em bancada continua validada pelo Gantt, após o apontamento do corte.
+  const preprogramar = setor === "MONTAGEM" && url.searchParams.get("preprogramar") === "1";
+  const podePreprogramar = (p) => preprogramar && p.fonte === "LPC_IMPORT" && p.tipoPeca === "CONJUNTO";
   const todasRaw = await prisma.pecaConjunto.findMany({
     where: { opId },
     select: { id: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoUnitKg: true, pesoTotalKg: true, qte: true, qteProduzida: true, corteConcluidoEm: true, status: true, destino: true, destinoTerceirizado: true, terceirizado: true, terceirizadoRecebidoEm: true, encaminhadoSetor: true, prioridade: true, baixaSetores: true, montagemDiaProgramado: true, corteDiaProgramado: true, _count: { select: { conjuntoCroquis: true } } },
@@ -213,7 +217,7 @@ export async function GET(req) {
       // que não têm liberação nem GRD.
       const jaDesceu = (p) => grdEmitidas.has(String(p.marca || "").trim().toUpperCase());
       if (!frenteInteira && ids.size) {
-        escopo = semEntregues.filter((p) => ids.has(p.id) || temProducao(p) || jaDesceu(p));
+        escopo = semEntregues.filter((p) => ids.has(p.id) || temProducao(p) || jaDesceu(p) || podePreprogramar(p));
       }
       const foraDoLote = new Set(
         frenteInteira || !ids.size ? [] : escopo.filter((p) => !ids.has(p.id)).map((p) => p.id)
@@ -223,7 +227,7 @@ export async function GET(req) {
         pecasLiberadas: frenteInteira ? null : ids.size,
         dias: [...new Set(libs.map((l) => (l.dataProgramada ? l.dataProgramada.toISOString().slice(0, 10) : null)).filter(Boolean))],
         // ⚠ diz quanto ficou de fora: um recorte silencioso faz o PCP achar que a obra acabou
-        foraDoRecorte: frenteInteira ? 0 : semEntregues.filter((p) => !ids.has(p.id) && !temProducao(p) && !jaDesceu(p)).length,
+        foraDoRecorte: frenteInteira ? 0 : semEntregues.filter((p) => !ids.has(p.id) && !temProducao(p) && !jaDesceu(p) && !podePreprogramar(p)).length,
         // ⚠ ponteiro que não existe mais: a liberação diz que soltou N peças e M delas foram
         // apagadas por uma reimportação da lista. Silenciar isso faz o lote parecer menor do que
         // foi — e some trabalho que alguém combinou.
