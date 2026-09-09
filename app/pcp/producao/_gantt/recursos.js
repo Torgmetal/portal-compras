@@ -1,5 +1,6 @@
 import { META_KG_DIA_ACABAMENTO, META_KG_DIA_JATO } from "@/lib/capacidade-acabamento";
 import { BANCADAS as BANCADAS_SOLDA, nomeDaBancada } from "@/lib/solda-capacidade";
+import { BANCADAS as BANCADAS_MONT, nomeDaBancada as nomeMontagem } from "@/lib/montagem-capacidade";
 import { META_KG_DIA_PINTURA } from "@/lib/capacidade-pintura";
 
 // ─── RECURSOS, SETORES E CORES ─────────────────────────────────────────────────────────────────
@@ -19,19 +20,12 @@ export const RECURSOS = {
     { k:"LASER_CANTONEIRA", nome:"Laser Cantoneira", cap:1065 },
     { k:"CORTE_MANUAL", nome:"Corte Manual", cap:419 },
   ],
-  /* ⚠⚠ A BANCADA DA MONTAGEM TEM NOME DE GENTE. Vitor (08/09/2026): "nas bancadas da montagem vamos
-     colocar os nomes dos operários: Jurandir, Adenilson, Vando, Rodrigo". Quem programa fala em
-     pessoa, não em número — e o quadro é lido por quem distribui o trabalho.
-
-     ⚠ A CHAVE NÃO MUDA. "MONTAGEM 1" está gravado em `PecaConjunto.montagemBancada` (59 peças na 1,
-     55 na 2, 2 na 3 em 08/09/2026) e é o que lib/montagem-capacidade.js conhece. Trocar a chave
-     apagaria a atribuição de todas elas. Muda só o RÓTULO.
-
-     ⚠ São CINCO bancadas e vieram QUATRO nomes: a quinta segue "Montagem 5" até alguém dizer de
-     quem é. Inventar um nome ali seria pôr no quadro uma pessoa que não foi citada. */
+  /* ⚠⚠ A BANCADA DA MONTAGEM TEM NOME DE GENTE, e o mapa mora em lib/montagem-capacidade.js — junto
+     da capacidade, como na solda. Os quatro nomes que entraram em 08/09 estavam TROCADOS: eu apliquei
+     a lista do Vitor na ordem em que veio, sem conferir contra o apontamento. Corrigido em 09/09 com
+     90 dias de Syneco; o porquê de cada um está lá. */
   MONTAGEM: [{ k:null, nome:"sem bancada", obs:"atribuir bancada" },
-    ...[["MONTAGEM 1","Jurandir"],["MONTAGEM 2","Adenilson"],["MONTAGEM 3","Vando"],
-        ["MONTAGEM 4","Rodrigo"],["MONTAGEM 5","Montagem 5"]].map(([k,nome])=>({k,nome,cap:1}))],
+    ...BANCADAS_MONT.map(n=>({k:n,nome:nomeMontagem(n),cap:1}))],
   /* ⚠⚠ A BANCADA DA SOLDA TAMBÉM TEM NOME DE GENTE. Vitor (09/09/2026): "nas bancadas da solda
      coloque o nome dos operadores no lugar de solda 1, 2, 3". A chave continua "SOLDA n" — é o que
      o Syneco aponta e o que está gravado em `PecaConjunto.soldaBancada`; muda só o rótulo.
