@@ -1,7 +1,12 @@
 {
-  "build": 3043,
-  "gerado": "2026-09-09T19:17:59.160Z",
+  "build": 3044,
+  "gerado": "2026-09-09T19:38:05.977Z",
   "commits": [
+    {
+      "hash": "4c0388fa",
+      "data": "09/09/2026",
+      "titulo": "fix(pcp): incluir todos os conjuntos na pre-programacao sem bancada"
+    },
     {
       "hash": "caa85be6",
       "data": "09/09/2026",
@@ -146,11 +151,6 @@
       "hash": "4d62c6f2",
       "data": "08/09/2026",
       "titulo": "Conferência: autocomplete só depois de digitar, e corrigir a quantidade lançada"
-    },
-    {
-      "hash": "61a16832",
-      "data": "08/09/2026",
-      "titulo": "Conferência: escolher a marca não preenche mais a quantidade"
     }
   ]
 }
