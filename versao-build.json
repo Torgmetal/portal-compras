@@ -1,7 +1,12 @@
 {
-  "build": 3021,
-  "gerado": "2026-09-08T23:53:47.581Z",
+  "build": 3022,
+  "gerado": "2026-09-09T00:00:49.253Z",
   "commits": [
+    {
+      "hash": "72e6eefb",
+      "data": "08/09/2026",
+      "titulo": "Rastreio: no U enrijecido a espessura da chapa é a quarta medida"
+    },
     {
       "hash": "144228a1",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "9d175ddb",
       "data": "08/09/2026",
       "titulo": "Expedição abre no celular: barra vira gaveta abaixo de md"
-    },
-    {
-      "hash": "2681b442",
-      "data": "08/09/2026",
-      "titulo": "Expedição: Conferência de Peça, ligada à Lista de Expedição"
     }
   ]
 }
