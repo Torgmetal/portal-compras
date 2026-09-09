@@ -70,9 +70,19 @@ export function criarGrade(dep){
           if(f<0){ f=faixas.length; faixas.push(-1); }
           faixas[f]=r.fim; r.faixa=f;
         }
-        const naJanela = meus.filter(r=>r.fim>=dep.getInicio() && r.ini<dep.getInicio()+larg).length;
+        const visiveis = meus.filter(r=>r.fim>=dep.getInicio() && r.ini<dep.getInicio()+larg);
+        const naJanela = visiveis.length;
         const emp = dep.empurraoDoRecurso(setor, rec.k);
-        const alt = naJanela ? Math.max(1,faixas.length)*30 + 8 + 16 : 38;
+        /* ⚠⚠ A ALTURA SAI DO QUE ESTÁ NA JANELA, não de todas as faixas do recurso. Vitor
+           (09/09/2026): "o jato deve estar com algum problema, ele está ficando em aberto, uma
+           página enorme". `faixas` empilha TODO lote que se sobrepõe no tempo, inclusive o que está
+           semanas à frente: 65 previsões de terceiro no mesmo dia 25/09 davam 65 faixas e
+           65×30+24 = 1.974px de linha vazia, com quatro blocos aparecendo na tela.
+           A causa principal era a previsão emitir um lote por marca (corrigido em
+           lib/terceiros-previsao), mas a altura precisa se defender sozinha: um dia cheio de lotes
+           reais fora da janela derrubaria a página do mesmo jeito. */
+        const faixasVisiveis = visiveis.length ? Math.max(...visiveis.map(r=>r.faixa)) + 1 : 1;
+        const alt = naJanela ? Math.max(1,faixasVisiveis)*30 + 8 + 16 : 38;
         html += '<div class="linha'+(rec.k?"":" pousio")+'" data-setor="'+setor+'" data-rec="'+(rec.k||"")+'" '
              +  'data-row="'+setor+'|'+(rec.k||"")+'" style="min-height:'+alt+'px">';
         /* ⚠⚠ A LISTA DO POSTO SAI DAQUI. Vitor (08/09/2026): "na frente do nome do montador, uma

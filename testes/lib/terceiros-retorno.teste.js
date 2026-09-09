@@ -33,3 +33,41 @@ describe('distribuição do retorno entre setores',()=>{
   expect(retornoEmAtraso({...rom,status:'CANCELADO'},'2026-09-11')).toBe(false);
  });
 });
+
+/* ⚠⚠ UM BLOCO POR DESTINO. Vitor (09/09/2026): "o jato deve estar com algum problema, ele está
+   ficando em aberto, uma página enorme" — o romaneio da OP-097 tem 65 marcas voltando no mesmo dia
+   para o jato, e a previsão emitia um lote por marca: 65 blocos numa coluna só, 149 dos 213 lotes
+   do quadro. O resto do Gantt agrupa por setor+OP+dia; a previsão passava por fora. */
+describe('previsão agrupa as marcas do mesmo destino', () => {
+  const muitas = {
+    id: 'r9', numero: 12, status: 'ENVIADO', opRefNumero: '97', dataPrevRetorno: '2026-09-25',
+    itens: [
+      { marca: 'M1', qte: 2, pesoUn: 10, destino: 'JATO' },
+      { marca: 'M2', qte: 3, pesoUn: 10, destino: 'JATO' },
+      { marca: 'M3', qte: 1, pesoUn: 20, destino: 'EXPEDICAO' },
+    ],
+    retornos: [],
+  };
+
+  it('três marcas em dois destinos viram DOIS lotes, não três', () => {
+    const l = previsoesTerceiro([muitas]);
+    expect(l).toHaveLength(2);
+    const jato = l.find((x) => x.setor === 'JATO');
+    expect(jato).toMatchObject({ pecas: 5, kg: 50, recurso: null, custo: 0, terceiroPrevisto: true });
+    expect(jato.itens.map((i) => i.m)).toEqual(['M1', 'M2']);
+    expect(l.find((x) => x.setor === 'EXPEDICAO')).toMatchObject({ pecas: 1, kg: 20 });
+  });
+
+  it('o id do lote é estável por destino, e o do item continua único por marca', () => {
+    const jato = previsoesTerceiro([muitas]).find((x) => x.setor === 'JATO');
+    expect(jato.id).toBe('previsao:r9:JATO');
+    expect(new Set(jato.itens.map((i) => i.id)).size).toBe(2);
+    // o prefixo continua sendo `previsao:` — é o que barra o arraste em terceiros-programacao
+    expect(jato.itens.every((i) => i.id.startsWith('previsao:'))).toBe(true);
+  });
+
+  it('o peso do lote é a soma das marcas, não o da primeira', () => {
+    const jato = previsoesTerceiro([muitas]).find((x) => x.setor === 'JATO');
+    expect(jato.kg).toBe(jato.itens.reduce((t, i) => t + i.kg, 0));
+  });
+});
