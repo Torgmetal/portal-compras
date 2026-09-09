@@ -25,7 +25,10 @@ export async function GET() {
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const lotes = await lotesProgramados();
-  return NextResponse.json({ lotes, hoje: new Date().toISOString().slice(0, 10) });
+  // peça na bancada de obra que o PCP tirou do quadro — vai à parte, para a tela listar sem desenhar
+  const foraDoQuadro = Object.entries(lotes.foraDoQuadro || {}).flatMap(([setor, arr]) =>
+    arr.map((p) => ({ ...p, setor })));
+  return NextResponse.json({ lotes, foraDoQuadro, hoje: new Date().toISOString().slice(0, 10) });
 }
 
 const schema = z.object({

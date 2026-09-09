@@ -121,6 +121,13 @@ model UserModulo {
 model OP {
   id                   String               @id @default(cuid())
   numero               String               @unique
+  /* ⚠ QUAIS OBRAS O PCP ESTÁ TOCANDO AGORA. Vitor (08/09/2026): "83, 84 e 89 não pode ser, prefiro
+     que faça uma lista disso à parte; só pode aparecer 97, 102, 103". Nenhum dado separa os dois
+     grupos — medido no dia: a 083 tem liberação e GRD recentes e a 089 tem 54 GRDs em 15 dias, as
+     duas MAIS ativas que a 102 pelos números. É decisão de quem toca a fábrica, não dedução; por
+     isso é um campo, e não uma regra derivada que quebraria na semana seguinte.
+     Falso NÃO esconde: a obra vai para a lista "fora do quadro" do Gantt, com o que está na bancada. */
+  pcpNoQuadro Boolean @default(true)
   cliente              String
   obra                 String?
   refCliente           String? // código/nº de referência da obra no cliente (aparece nos relatórios enviados)
