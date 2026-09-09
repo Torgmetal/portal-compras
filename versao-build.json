@@ -1,7 +1,12 @@
 {
-  "build": 3051,
-  "gerado": "2026-09-09T22:31:50.204Z",
+  "build": 3052,
+  "gerado": "2026-09-09T22:44:47.936Z",
   "commits": [
+    {
+      "hash": "fd38991b",
+      "data": "09/09/2026",
+      "titulo": "Montagem: os quatro nomes das bancadas estavam trocados"
+    },
     {
       "hash": "c91ef1b0",
       "data": "09/09/2026",
@@ -146,11 +151,6 @@
       "hash": "61ffa732",
       "data": "08/09/2026",
       "titulo": "Liberação: conjunto não compra aço — ele herda o material dos croquis"
-    },
-    {
-      "hash": "72e6eefb",
-      "data": "08/09/2026",
-      "titulo": "Rastreio: no U enrijecido a espessura da chapa é a quarta medida"
     }
   ]
 }
