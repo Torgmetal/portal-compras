@@ -583,6 +583,26 @@ async function main() {
   `).catch((e) => console.warn("[ensure-mes-tables] FK ConferenciaPecaItem:", e.message));
   console.log("[ensure-mes-tables] OK — Conferência de peça garantida.");
 
+  // ── Achados do Codex (09/09/2026) — concorrência na Conferência de Peça ────
+  // Chave de idempotência do lançamento: reenviar o mesmo POST (a tela relê o estado depois de
+  // gravar; se essa releitura falhar, o operador reenvia) não pode duplicar a peça.
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "ConferenciaPecaItem" ADD COLUMN IF NOT EXISTS "chaveOperacao" TEXT
+  `).catch((e) => console.warn("[ensure-mes-tables] chaveOperacao:", e.message));
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "ConferenciaPecaItem_conferenciaId_chaveOperacao_key"
+    ON "ConferenciaPecaItem"("conferenciaId", "chaveOperacao")
+  `).catch((e) => console.warn("[ensure-mes-tables] índice chaveOperacao:", e.message));
+
+  // Uma sessão ABERTA por obra, garantido no banco — duas aberturas simultâneas não podem mais
+  // criar duas sessões pra mesma OP. Índice PARCIAL: o Prisma não tem essa sintaxe no schema.prisma
+  // (por isso mora só aqui, documentado no model ConferenciaPeca).
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "ConferenciaPeca_opId_aberta_key"
+    ON "ConferenciaPeca"("opId") WHERE "status" = 'ABERTA'
+  `).catch((e) => console.warn("[ensure-mes-tables] índice sessão aberta única:", e.message));
+  console.log("[ensure-mes-tables] OK — trava de concorrência da Conferência de Peça garantida.");
+
   // ── O sino de notificações — 09/09/2026 ────────────────────────────────────
   // Uma linha por (notificação, destinatário): é o que permite uma notificação de
   // MÓDULO (várias pessoas) ter leitura independente por pessoa, em vez do

@@ -1,5 +1,11 @@
 # CLAUDE.md
 
+## Divisão de trabalho solicitada por Matheus (09/09/2026)
+
+Claude Code implementa; Codex revisa o contexto, encontra problemas e testa. Antes de iniciar ou retomar trabalho, leia `docs/revisao-codex-claude.md` e trate os achados pendentes pertinentes à tarefa. Registre ali o que foi corrigido, arquivos/commits, testes e dúvidas para nova revisão. Não declare validação pelo Codex sem o retorno dele. As instruções deste fluxo não ampliam autorização para produção ou publicação.
+
+A integração local está descrita em `docs/integracao-codex-claude.md`: o hook Stop chama o revisor e devolve achados nesta sessão. Trate o feedback dentro da tarefa autorizada; não desative ou altere o hook para contornar uma reprovação. Falha/limite/decisão humana são pendências, não aprovação. Não faça pull/push automaticamente durante a revisão. O usuário pode suspender a integração explicitamente.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Commands
@@ -383,6 +389,7 @@ etiquetagem.
 | Regra | `lib/conferencia-peca.js` — a validação mora aqui, não na rota |
 | Fonte da L.E. | `lib/itens-expedicao.js` (a mesma das etiquetas) |
 | Tabelas | `ConferenciaPeca` + `ConferenciaPecaItem`, criadas por `scripts/ensure-mes-tables.mjs` |
+| Quem acessa | `EXPEDICAO` + `ADMIN` — Matheus (09/09/2026): "todos que tiver acesso ao módulo Expedição pode fazer conferência" |
 
 ⚠⚠ **O teto é da OBRA, não da sessão.** Se a L.E. tem 2 peças de uma marca e a conferência de
 ontem pegou as 2, a de hoje não aceita mais nenhuma. Sessão **CANCELADA** não conta — é o desfazer
@@ -392,9 +399,30 @@ de quem abriu por engano; se contasse, um clique errado consumiria o saldo da ob
 Expedição" é a peça errada na mão (uma posição, que vai soldada dentro do conjunto); "você já
 conferiu 2" é a peça certa contada duas vezes.
 
-⚠ **Uma sessão ABERTA por obra.** Duas pessoas em dois celulares somariam no mesmo teto sem se
-enxergar, e a segunda descobriria isso na forma de um "já conferiu tudo" que ela não entende. Quem
-chega depois entra na sessão que já existe.
+⚠⚠ **Uma sessão ABERTA por obra, garantido no banco, não só na rota.** Duas pessoas em dois
+celulares somariam no mesmo teto sem se enxergar, e a segunda descobriria isso na forma de um "já
+conferiu tudo" que ela não entende. Quem chega depois entra na sessão que já existe. Um índice
+único PARCIAL (`ON "ConferenciaPeca"("opId") WHERE status = 'ABERTA'`) trava isso no Postgres —
+mora só em `scripts/ensure-mes-tables.mjs`, porque o Prisma não tem sintaxe pra índice parcial no
+`schema.prisma` (documentado no comentário do model). Achado do Codex (09/09/2026): sem essa trava,
+duas aberturas simultâneas criavam duas sessões pra mesma OP.
+
+⚠⚠ **POST, PUT, DELETE e o "finalizar/cancelar" disputam o MESMO saldo — e travam por OP, não só
+validam.** Achado do Codex (09/09/2026, simulado com dependências mockadas): dois lançamentos de
+"+1" simultâneos numa marca com saldo 1 passavam os DOIS. `comTravaDaObra` (`lib/conferencia-peca.js`)
+pega um `pg_advisory_xact_lock(hashtext(opId))` numa transação interativa do Prisma antes de ler o
+saldo — quem chega depois espera na fila do Postgres e lê o saldo já atualizado, não um retrato
+velho. O status da sessão também é **relido por dentro da trava**, não só checado antes: sem isso,
+uma gravação podia passar por cima de uma sessão que acabou de ser finalizada por outra chamada.
+
+⚠⚠ **O lançamento carrega uma chave de idempotência (`chaveOperacao`), pra reenvio não duplicar.**
+Achado do Codex (09/09/2026): a rota grava e SÓ DEPOIS relê o estado pra devolver à tela; se essa
+releitura falhar, o operador vê erro com a peça já contada, e tocar "Lançar" de novo criava um
+segundo lançamento. O front (`app/expedicao/conferencia/[id]/chave-operacao.js`) gera uma chave por
+TENTATIVA, num `useRef`, e só troca depois de um sucesso — reenviar com o formulário ainda
+preenchido manda a MESMA chave, e a rota devolve o que já foi gravado em vez de gravar de novo. Um
+`@@unique([conferenciaId, chaveOperacao])` é o backstop se duas cópias da mesma chave baterem quase
+juntas (múltiplos `NULL` não colidem, então lançamentos antigos não são afetados).
 
 ⚠ **O autocomplete ordena por exatidão**: marca exata, depois as que começam com o texto, depois as
 que só o contêm. Digitar `T89A10` põe T89A10 em primeiro sem sumir com T89A100 — filtrar as outras

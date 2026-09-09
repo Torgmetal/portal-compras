@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
+import { chaveDeOperacao } from "./chave-operacao";
 import { Check, Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 
 // As peças da tela de conferência. Ficam num arquivo à parte porque a tela é para CELULAR: cada
@@ -102,6 +103,10 @@ export function FormLancamento({ marcas, onLancar, salvando, encerrada }) {
   const [marca, setMarca] = useState("");
   const [qte, setQte] = useState("1");
   const [obs, setObs] = useState("");
+  // ⚠⚠ A CHAVE SÓ TROCA QUANDO GRAVA. Enquanto o mesmo lançamento não foi confirmado, reenviar
+  // (o operador vendo um erro de rede e tocando "Lançar" de novo) usa a MESMA chave — é o que
+  // deixa o servidor responder "já gravei isso" em vez de contar a peça duas vezes.
+  const chaveRef = useRef(chaveDeOperacao());
 
   const escolhida = useMemo(
     () => marcas.find((m) => m.marca.toUpperCase() === String(marca).trim().toUpperCase()) || null,
@@ -109,10 +114,10 @@ export function FormLancamento({ marcas, onLancar, salvando, encerrada }) {
 
   const enviar = async (e) => {
     e.preventDefault();
-    const ok = await onLancar({ marca, qte: Number(qte), observacao: obs });
+    const ok = await onLancar({ marca, qte: Number(qte), observacao: obs, chaveOperacao: chaveRef.current });
     // ⚠ SÓ LIMPA QUANDO GRAVOU. Limpar num erro apagaria o que a pessoa digitou junto com o aviso
     // que explica por que não deu — e ela teria de redigitar sem saber o que estava errado.
-    if (ok) { setMarca(""); setQte("1"); setObs(""); }
+    if (ok) { setMarca(""); setQte("1"); setObs(""); chaveRef.current = chaveDeOperacao(); }
   };
 
   if (encerrada) return null;

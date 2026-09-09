@@ -245,4 +245,31 @@ describe("conferência no celular", () => {
     expect(screen.queryByRole("button", { name: /Lançar conferência/ })).toBeNull();
     expect(screen.getByText(/foi encerrada/)).toBeTruthy();
   });
+
+  // ⚠⚠ Achado do Codex (09/09/2026): quando o GET inicial falhava, a tela antiga caía no render
+  // normal com `dados` nulo — cabeçalho vazio, mas o botão de lançar e o de encerrar continuavam
+  // ativos, mexendo numa sessão que nunca chegou a carregar.
+  describe("GET inicial falha", () => {
+    it("mostra o erro com 'tentar novamente', sem formulário nem botão de encerrar", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => ({
+        ok: false, status: 500, text: async () => JSON.stringify({ error: "banco fora do ar" }),
+      })));
+      render(<SessaoClient id="c1" />);
+      expect(await screen.findByText(/banco fora do ar/)).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /Lançar conferência/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Encerrar conferência/ })).toBeNull();
+      expect(screen.getByRole("button", { name: /Tentar novamente/ })).toBeTruthy();
+    });
+
+    it("tentar novamente busca de novo, e mostra a tela normal se der certo desta vez", async () => {
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce({ ok: false, status: 500, text: async () => JSON.stringify({ error: "banco fora do ar" }) })
+        .mockResolvedValue({ ok: true, status: 200, text: async () => JSON.stringify(estado()) });
+      vi.stubGlobal("fetch", fetchMock);
+      render(<SessaoClient id="c1" />);
+      fireEvent.click(await screen.findByRole("button", { name: /Tentar novamente/ }));
+      await screen.findByText(/MEGASTEAM/);
+      expect(screen.queryByText(/banco fora do ar/)).toBeNull();
+    });
+  });
 });

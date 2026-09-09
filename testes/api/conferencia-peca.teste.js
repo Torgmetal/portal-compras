@@ -107,6 +107,54 @@ describe("POST — o vínculo com a Lista de Expedição", () => {
     expect((await POST(req({ marca: "T97A140", qte: 1 }), { params })).status).toBe(403);
     expect(mockPrisma.conferenciaPecaItem.create).not.toHaveBeenCalled();
   });
+
+  // ⚠ Matheus (09/09/2026): "Todos que tiver acesso ao módulos Expedição pode fazer conferencia" —
+  // só EXPEDICAO + ADMIN, o mesmo que middleware.js já exige pra abrir a tela.
+  it("só pede EXPEDICAO ou ADMIN, não o módulo inteiro de produção", async () => {
+    await POST(req({ marca: "T97A140", qte: 1 }), { params });
+    expect(mocks.role).toHaveBeenCalledWith(["ADMIN", "EXPEDICAO"]);
+  });
+
+  // ⚠⚠ Achado do Codex (09/09/2026): a rota persistia e SÓ DEPOIS relia o estado. Se essa leitura
+  // falhasse, o operador via erro com o lançamento já gravado, e reenviar duplicava a contagem.
+  it("trava a obra antes de validar e gravar — serializa quem disputa o mesmo saldo", async () => {
+    await POST(req({ marca: "T97A140", qte: 1 }), { params });
+    expect(mockPrisma.$executeRaw).toHaveBeenCalled();
+  });
+
+  it("registra AuditLog do lançamento, com marca, quantidade e autor", async () => {
+    await POST(req({ marca: "T97A140", qte: 1 }), { params });
+    expect(mockPrisma.auditLog.create.mock.calls[0][0].data).toMatchObject({
+      action: "LANCAR_CONFERENCIA_PECA",
+      entity: "ConferenciaPeca", entityId: "c1",
+      diff: expect.objectContaining({ op: "097", marca: "T97A140", qte: 1, por: "Zé" }),
+    });
+  });
+
+  describe("chaveOperacao — reenvio não duplica", () => {
+    // ⚠ Reenviar (a tela mostrou erro na releitura do estado, o operador tocou "Lançar" de novo
+    // com a MESMA chave) não pode virar um segundo lançamento — devolve o que já foi gravado.
+    it("já existe um lançamento com esta chave: não grava de novo", async () => {
+      mockPrisma.conferenciaPecaItem.findFirst.mockResolvedValueOnce({ id: "i-existente" });
+      const r = await POST(req({ marca: "T97A140", qte: 1, chaveOperacao: "tentativa-1" }), { params });
+      expect(r.status).toBe(200);
+      expect(mockPrisma.conferenciaPecaItem.create).not.toHaveBeenCalled();
+    });
+
+    // Backstop do índice único: duas cópias da mesma chave bateram na trava quase juntas.
+    it("corrida na mesma chave (P2002 no create): trata como reenvio, não como erro", async () => {
+      mockPrisma.conferenciaPecaItem.create.mockRejectedValueOnce(Object.assign(new Error("dup"), { code: "P2002" }));
+      const r = await POST(req({ marca: "T97A140", qte: 1, chaveOperacao: "tentativa-1" }), { params });
+      expect(r.status).toBe(200);
+      expect((await r.json()).success).toBe(true);
+    });
+
+    it("chave nova de verdade grava normalmente", async () => {
+      const r = await POST(req({ marca: "T97A140", qte: 1, chaveOperacao: "tentativa-1" }), { params });
+      expect(r.status).toBe(200);
+      expect(mockPrisma.conferenciaPecaItem.create.mock.calls[0][0].data.chaveOperacao).toBe("tentativa-1");
+    });
+  });
 });
 
 describe("GET — o saldo que a tela mostra", () => {
@@ -220,6 +268,22 @@ describe("PATCH — encerrar", () => {
 
   it("ação inventada é recusada", async () => {
     expect((await patch({ acao: "apagar-tudo" })).status).toBe(400);
+    expect(mockPrisma.conferenciaPeca.update).not.toHaveBeenCalled();
+  });
+
+  // ⚠ Mesma trava do lançamento — encerrar não pode passar por cima de um POST em andamento nem
+  // deixar dois "finalizar"/"cancelar" simultâneos decidirem o status final aos dois ao mesmo tempo.
+  it("trava a obra antes de mudar o status", async () => {
+    mockPrisma.conferenciaPeca.update.mockResolvedValue({ id: "c1", status: "FINALIZADA" });
+    await patch({ acao: "finalizar" });
+    expect(mockPrisma.$executeRaw).toHaveBeenCalled();
+  });
+
+  it("já encerrada por outra chamada concorrente: recusa em vez de encerrar de novo", async () => {
+    mockPrisma.conferenciaPeca.findUnique.mockResolvedValueOnce(SESSAO) // checagem de fora
+      .mockResolvedValueOnce({ ...SESSAO, status: "FINALIZADA" }); // relida dentro da trava
+    const r = await patch({ acao: "cancelar" });
+    expect(r.status).toBe(400);
     expect(mockPrisma.conferenciaPeca.update).not.toHaveBeenCalled();
   });
 });

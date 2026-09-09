@@ -7,11 +7,15 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { opsComItensExpediveis } from "@/lib/itens-expedicao";
-import { STATUS, autorDe } from "@/lib/conferencia-peca";
+import { STATUS, autorDe, comTravaDaObra } from "@/lib/conferencia-peca";
 import { log } from "@/lib/log";
 
 const registro = log("api/expedicao/conferencia");
-const PERFIS = ["ADMIN", "EXPEDICAO", "PRODUCAO", "QUALIDADE", "PCP", "PLANEJAMENTO"];
+// ⚠ Matheus (09/09/2026): "Todos que tiver acesso ao módulos Expedição pode fazer conferencia" —
+// só EXPEDICAO (+ ADMIN), igual ao que `middleware.js` já exige pra abrir a tela. Achado do Codex
+// (09/09/2026): a API aceitava mais perfis do que a tela deixava entrar — quem tivesse só
+// PRODUCAO/QUALIDADE/PCP/PLANEJAMENTO passava aqui sem conseguir nem abrir a página.
+const PERFIS = ["ADMIN", "EXPEDICAO"];
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,32 +72,52 @@ export async function POST(req) {
   const op = await prisma.oP.findUnique({ where: { id: lido.data.opId }, select: { id: true, numero: true } });
   if (!op) return NextResponse.json({ success: false, error: "OP não encontrada" }, { status: 404 });
 
-  // ⚠ UMA SESSÃO ABERTA POR OBRA. Duas pessoas conferindo a mesma OP ao mesmo tempo em dois
+  const quem = autorDe(user);
+
+  // ⚠⚠ UMA SESSÃO ABERTA POR OBRA — E É TRAVADO, NÃO SÓ CONFERIDO (achado do Codex, 09/09/2026:
+  // duas aberturas simultâneas criavam duas sessões pra mesma OP porque o findFirst e o create
+  // rodavam sem exclusão mútua). Duas pessoas conferindo a mesma OP ao mesmo tempo em dois
   // celulares somariam no mesmo teto sem se enxergar — e a segunda descobriria isso na forma de um
   // "já conferiu tudo" que ela não entende. Quem chega depois entra na sessão que já existe.
-  const aberta = await prisma.conferenciaPeca.findFirst({
-    where: { opId: op.id, status: STATUS.ABERTA },
-    select: { id: true, iniciadaPorNome: true },
+  const resultado = await comTravaDaObra(prisma, op.id, async (tx) => {
+    const aberta = await tx.conferenciaPeca.findFirst({
+      where: { opId: op.id, status: STATUS.ABERTA },
+      select: { id: true, iniciadaPorNome: true },
+    });
+    if (aberta) return { jaAberta: true, id: aberta.id, por: aberta.iniciadaPorNome };
+
+    let nova;
+    try {
+      nova = await tx.conferenciaPeca.create({
+        data: {
+          opId: op.id, opNumero: op.numero, status: STATUS.ABERTA,
+          iniciadaPorId: quem.id, iniciadaPorNome: quem.nome,
+        },
+        select: { id: true },
+      });
+    } catch (e) {
+      // Backstop do índice único parcial (ver ensure-mes-tables.mjs) — se ele disparar mesmo com a
+      // trava (não deveria, mas é o que a garante de verdade), devolve a sessão que ganhou a corrida.
+      if (e.code === "P2002") {
+        const jaAberta = await tx.conferenciaPeca.findFirst({
+          where: { opId: op.id, status: STATUS.ABERTA }, select: { id: true, iniciadaPorNome: true },
+        });
+        if (jaAberta) return { jaAberta: true, id: jaAberta.id, por: jaAberta.iniciadaPorNome };
+      }
+      throw e;
+    }
+
+    await tx.auditLog.create({
+      data: {
+        userId: quem.id, action: "INICIAR_CONFERENCIA_PECA",
+        entity: "ConferenciaPeca", entityId: nova.id,
+        diff: { op: op.numero, por: quem.nome },
+      },
+    }).catch(() => {});
+
+    return { id: nova.id };
   });
-  if (aberta) return NextResponse.json({ success: true, id: aberta.id, jaAberta: true, por: aberta.iniciadaPorNome });
 
-  const quem = autorDe(user);
-  const nova = await prisma.conferenciaPeca.create({
-    data: {
-      opId: op.id, opNumero: op.numero, status: STATUS.ABERTA,
-      iniciadaPorId: quem.id, iniciadaPorNome: quem.nome,
-    },
-    select: { id: true },
-  });
-
-  await prisma.auditLog.create({
-    data: {
-      userId: quem.id, action: "INICIAR_CONFERENCIA_PECA",
-      entity: "ConferenciaPeca", entityId: nova.id,
-      diff: { op: op.numero, por: quem.nome },
-    },
-  }).catch(() => {});
-
-  registro.info(`OP ${op.numero}: conferência ${nova.id} aberta por ${quem.nome || "?"}`);
-  return NextResponse.json({ success: true, id: nova.id });
+  if (!resultado.jaAberta) registro.info(`OP ${op.numero}: conferência ${resultado.id} aberta por ${quem.nome || "?"}`);
+  return NextResponse.json({ success: true, ...resultado });
 }

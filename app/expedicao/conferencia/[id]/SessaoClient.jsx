@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import { FormLancamento, ListaLancamentos, PainelMarcas } from "./componentes";
 import { useSessao } from "./useSessao";
 
@@ -108,6 +108,27 @@ function Abas({ aba, setAba, quantasMarcas }) {
   );
 }
 
+/**
+ * ⚠⚠ SEM DADOS, SEM CONTROLES. Achado do Codex (09/09/2026): quando o GET inicial falha, a tela
+ * antiga caía direto no render normal com `dados` nulo — cabeçalho vazio, mas o formulário de
+ * lançar e o botão de encerrar continuavam lá, mexendo numa sessão que a tela nem confirmou que
+ * existe. "Tentar novamente" é o único caminho daqui: sem sessão carregada, não tem o que lançar.
+ */
+function ErroInicial({ erro, onTentar }) {
+  return (
+    <div className="max-w-md mx-auto mt-16 bg-white rounded-xl border-2 border-red-200 p-6 text-center space-y-4">
+      <AlertCircle size={32} className="mx-auto text-red-500" />
+      <p className="text-[15px] font-semibold text-torg-dark leading-snug">
+        {erro || "Não deu para carregar esta conferência."}
+      </p>
+      <button onClick={onTentar}
+        className="w-full bg-torg-blue text-white font-semibold rounded-lg px-4 py-3 text-sm flex items-center justify-center gap-2">
+        <RefreshCw size={16} /> Tentar novamente
+      </button>
+    </div>
+  );
+}
+
 export default function SessaoClient({ id }) {
   const s = useSessao(id);
   const [aba, setAba] = useState("lancar");
@@ -116,6 +137,18 @@ export default function SessaoClient({ id }) {
     return (
       <div className="flex items-center justify-center py-20 gap-3 text-torg-gray">
         <Loader2 size={22} className="animate-spin" /> Carregando a conferência…
+      </div>
+    );
+  }
+
+  if (!s.carregando && !s.dados) {
+    return (
+      <div className="max-w-3xl space-y-4 pb-10">
+        <Link href="/expedicao/conferencia"
+          className="inline-flex items-center gap-1.5 text-sm text-torg-gray hover:text-torg-blue">
+          <ArrowLeft size={15} /> Conferências
+        </Link>
+        <ErroInicial erro={s.erro} onTentar={s.recarregar} />
       </div>
     );
   }

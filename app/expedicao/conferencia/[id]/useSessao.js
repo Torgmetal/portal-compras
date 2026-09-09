@@ -26,12 +26,12 @@ export function useSessao(id) {
   }, [url]);
   useEffect(() => { carregar(); }, [carregar]);
 
-  const lancar = useCallback(async ({ marca, qte, observacao }) => {
+  const lancar = useCallback(async ({ marca, qte, observacao, chaveOperacao }) => {
     setSalvando(true); setErro(""); setOk("");
     try {
       setDados(await lerJson(await fetch(url, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ marca, qte, observacao }),
+        body: JSON.stringify({ marca, qte, observacao, chaveOperacao }),
       }), "Lançamento"));
       setOk(`${qte} × ${String(marca).toUpperCase()} conferida(s).`);
       return true;
@@ -71,6 +71,7 @@ export function useSessao(id) {
   return {
     dados, carregando, salvando, apagando, agindo, erro, ok,
     limparErro: () => setErro(""),
+    recarregar: carregar,
     lancar, editar, apagar, encerrar,
     encerrada: !!dados && dados?.conferencia?.status !== "ABERTA",
     marcas: dados?.marcas || [],

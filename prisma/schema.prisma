@@ -4522,6 +4522,13 @@ model RomaneioPrevio {
 //
 // ⚠ Uma SESSÃO por vez que alguém confere um lote, não uma lista acumulada por obra: o lote de
 // hoje e o da semana que vem são conferências diferentes, com autor e data próprios.
+//
+// ⚠⚠ "UMA SESSÃO ABERTA POR OBRA" TAMBÉM É REGRA DE BANCO, NÃO SÓ DA ROTA (achado do Codex,
+// 09/09/2026: duas aberturas simultâneas criavam duas sessões ABERTA para a mesma OP). O Prisma
+// não tem sintaxe para índice único PARCIAL (`WHERE status = 'ABERTA'`), então esse índice é
+// criado por SQL cru em `scripts/ensure-mes-tables.mjs` — mesmo padrão de
+// `ExpedicaoItemExcluido`/vagas preenchidas: existe no banco, não aparece aqui. NÃO RODAR
+// `prisma db push` cru sem conferir que ele não vai tentar apagar esse índice.
 model ConferenciaPeca {
   id                String    @id @default(cuid())
   opId              String
@@ -4549,11 +4556,19 @@ model ConferenciaPecaItem {
   marca         String
   qte           Int
   observacao    String?
+  // ⚠⚠ CHAVE DE IDEMPOTÊNCIA, GERADA NO NAVEGADOR (achado do Codex, 09/09/2026: a tela grava e
+  // DEPOIS relê o estado; se essa releitura falhar, o operador vê erro com o lançamento já
+  // gravado, e reenviar duplicava). O front manda a MESMA chave enquanto o formulário não for
+  // limpo por um sucesso — reenviar com a chave repetida devolve o estado atual em vez de gravar
+  // de novo. Nula nas linhas antigas (de antes desta correção) e em correções administrativas
+  // diretas no banco — múltiplos NULL não colidem num índice único do Postgres, de propósito.
+  chaveOperacao String?
   criadoEm      DateTime @default(now())
   criadoPorNome String?
 
   conferencia ConferenciaPeca @relation(fields: [conferenciaId], references: [id], onDelete: Cascade)
 
+  @@unique([conferenciaId, chaveOperacao])
   @@index([conferenciaId])
   @@index([marca])
 }
