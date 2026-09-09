@@ -1,7 +1,12 @@
 {
-  "build": 3027,
-  "gerado": "2026-09-09T00:40:12.640Z",
+  "build": 3028,
+  "gerado": "2026-09-09T00:52:18.419Z",
   "commits": [
+    {
+      "hash": "e087c90c",
+      "data": "08/09/2026",
+      "titulo": "PCP: o que foi para o terceiro sai do painel, e não só do Gantt"
+    },
     {
       "hash": "3c1d70ca",
       "data": "08/09/2026",
@@ -146,11 +151,6 @@
       "hash": "0bd33851",
       "data": "08/09/2026",
       "titulo": "Qualidade: permitir editar tolerâncias das cotas e respeitar os limites informados"
-    },
-    {
-      "hash": "04d92c09",
-      "data": "08/09/2026",
-      "titulo": "PCP: peça já cortada sai do aviso — ela não precisa de dia"
     }
   ]
 }
