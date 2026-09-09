@@ -9,6 +9,24 @@ import SessaoClient from "../app/expedicao/conferencia/[id]/SessaoClient";
 // que aparece é o que o servidor devolveu — nunca um número que o navegador somou sozinho.
 
 vi.mock("next/link", () => ({ default: ({ children, ...p }) => <a {...p}>{children}</a> }));
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+
+/** Simula um celular: `usarEhCelular` decide pela largura (jsdom não implementa matchMedia). */
+function comoCelular() {
+  Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 390 });
+  window.dispatchEvent(new Event("resize"));
+}
+function comoDesktop() {
+  Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 1024 });
+  window.dispatchEvent(new Event("resize"));
+}
+// No Modo Pátio o nome da obra aparece DUAS vezes (no cabeçalho da moldura e no Cabecalho de
+// sempre) — de propósito, um contexto por camada. `findByText` explode com múltiplos matches.
+const abrirCelular = async () => {
+  render(<SessaoClient id="c1" />);
+  await screen.findAllByText(/MEGASTEAM/);
+};
 
 const MARCAS = [
   { marca: "T97A140", descricao: "TRAVAMENTO EL.9325", previsto: 2, conferido: 0, saldo: 2, completa: false },
@@ -54,8 +72,8 @@ const abrir = async () => {
 const digitar = (rotulo, valor) => fireEvent.change(screen.getByPlaceholderText(rotulo), { target: { value: valor } });
 const campoMarca = () => screen.getByPlaceholderText(/letras da marca/);
 
-beforeEach(() => { globalThis.React = React; });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+beforeEach(() => { globalThis.React = React; push.mockClear(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); comoDesktop(); });
 
 describe("conferência no celular", () => {
   it("mostra a obra e o andamento vindos do servidor", async () => {
@@ -270,6 +288,71 @@ describe("conferência no celular", () => {
       fireEvent.click(await screen.findByRole("button", { name: /Tentar novamente/ }));
       await screen.findByText(/MEGASTEAM/);
       expect(screen.queryByText(/banco fora do ar/)).toBeNull();
+    });
+  });
+
+  // ⚠⚠ Matheus (08/09/2026): "quando clicar em iniciar conferencia entrar em modo tela full no
+  // celular para não ter chance do operador sair sem querer". No celular a tela entra na moldura
+  // do Modo Pátio; em telas largas, nunca — a sidebar continua visível, é só a tela normal.
+  describe("Modo Pátio (celular)", () => {
+    it("no celular, mostra a moldura do Modo Pátio em vez do link normal de voltar", async () => {
+      comoCelular();
+      vi.stubGlobal("fetch", servidor());
+      await abrirCelular();
+      expect(screen.getByText("Modo pátio")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Sair do modo pátio" })).toBeTruthy();
+      // o link de voltar "solto" (sem confirmação) do desktop existe no DOM (é só CSS `hidden`
+      // abaixo de `md:`, jsdom não computa layout) — o que importa é que ele NÃO é a saída visível
+      // no celular: fica marcado `hidden`, e quem sai por aqui passa pelo botão com confirmação.
+      expect(screen.getByRole("link", { name: /Conferências/ }).className).toMatch(/\bhidden\b/);
+    });
+
+    it("em tela larga, não entra no Modo Pátio — o link de voltar normal continua", async () => {
+      comoDesktop();
+      vi.stubGlobal("fetch", servidor());
+      await abrir();
+      expect(screen.queryByText("Modo pátio")).toBeNull();
+      expect(screen.getByRole("link", { name: /Conferências/ })).toBeTruthy();
+    });
+
+    it("sair pede confirmação — um toque não basta", async () => {
+      comoCelular();
+      vi.stubGlobal("fetch", servidor());
+      await abrirCelular();
+      fireEvent.click(screen.getByRole("button", { name: "Sair do modo pátio" }));
+      expect(await screen.findByText("Sair do modo pátio?")).toBeTruthy();
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("confirmar a saída volta pra lista de conferências", async () => {
+      comoCelular();
+      vi.stubGlobal("fetch", servidor());
+      await abrirCelular();
+      fireEvent.click(screen.getByRole("button", { name: "Sair do modo pátio" }));
+      fireEvent.click(await screen.findByRole("button", { name: /^Sair$/ }));
+      expect(push).toHaveBeenCalledWith("/expedicao/conferencia");
+    });
+
+    it("continuar fecha a folha sem sair", async () => {
+      comoCelular();
+      vi.stubGlobal("fetch", servidor());
+      await abrirCelular();
+      fireEvent.click(screen.getByRole("button", { name: "Sair do modo pátio" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Continuar" }));
+      await waitFor(() => expect(screen.queryByText("Sair do modo pátio?")).toBeNull());
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("continua lançando normalmente dentro da moldura", async () => {
+      comoCelular();
+      const fetchMock = servidor({ aoLancar: () => ok({}) });
+      vi.stubGlobal("fetch", fetchMock);
+      await abrirCelular();
+      digitar(/letras da marca/, "T97A140");
+      const sugestao = await waitFor(() => within(document.querySelector("ul")).getByText("T97A140"));
+      fireEvent.click(sugestao);
+      fireEvent.click(screen.getByRole("button", { name: /Lançar conferência/ }));
+      await waitFor(() => expect(fetchMock.mock.calls.some(([, o]) => o?.method === "POST")).toBe(true));
     });
   });
 });

@@ -1,7 +1,12 @@
 {
-  "build": 3035,
-  "gerado": "2026-09-09T14:53:41.960Z",
+  "build": 3036,
+  "gerado": "2026-09-09T15:24:03.016Z",
   "commits": [
+    {
+      "hash": "f049567133",
+      "data": "09/09/2026",
+      "titulo": "Conferência de peça: concorrência, idempotência e acesso corrigidos"
+    },
     {
       "hash": "c2b4991ebb",
       "data": "09/09/2026",
@@ -146,11 +151,6 @@
       "hash": "8a3b780ba8",
       "data": "08/09/2026",
       "titulo": "PCP: peça que está no terceiro sai da programação de todos os setores"
-    },
-    {
-      "hash": "a0b4da6c75",
-      "data": "08/09/2026",
-      "titulo": "Emissão em lote: parar de varrer a mesma pasta a cada bloco"
     }
   ]
 }

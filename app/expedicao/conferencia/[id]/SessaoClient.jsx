@@ -4,9 +4,17 @@ import Link from "next/link";
 import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import { FormLancamento, ListaLancamentos, PainelMarcas } from "./componentes";
 import { useSessao } from "./useSessao";
+import ModoPatio from "./ModoPatio";
+import { usarEhCelular } from "../modo-patio";
 
 // A TELA DE CAMPO. Matheus (08/09/2026): "a ideia é usar essa tela em um celular em campo ou tablet
 // para ele conferir as peças antes de ir para pintura e etiquetagem".
+//
+// ⚠⚠ NO CELULAR, ESTA TELA MORA DENTRO DO MODO PÁTIO. Matheus (08/09/2026): "quando clicar em
+// iniciar conferencia entrar em modo tela full no celular para não ter chance do operador sair
+// sem querer". `ModoPatio` (../ModoPatio.jsx) cobre a viewport e troca a saída livre (o Link
+// "← Conferências" de sempre) por uma que exige confirmação — por isso esse Link só aparece na
+// versão de tablet/desktop aqui embaixo, onde a moldura de campo não entra.
 
 function Barra({ p }) {
   return (
@@ -129,65 +137,75 @@ function ErroInicial({ erro, onTentar }) {
   );
 }
 
+/** O topo em telas largas — no celular, `ModoPatio` já dá o caminho de saída (com confirmação). */
+function VoltarDesktop() {
+  return (
+    <Link href="/expedicao/conferencia"
+      className="hidden md:inline-flex items-center gap-1.5 text-sm text-torg-gray hover:text-torg-blue">
+      <ArrowLeft size={15} /> Conferências
+    </Link>
+  );
+}
+
 export default function SessaoClient({ id }) {
   const s = useSessao(id);
   const [aba, setAba] = useState("lancar");
+  const ehCelular = usarEhCelular();
+
+  let conteudo;
+  let titulo = "";
 
   if (s.carregando && !s.dados) {
-    return (
+    conteudo = (
       <div className="flex items-center justify-center py-20 gap-3 text-torg-gray">
         <Loader2 size={22} className="animate-spin" /> Carregando a conferência…
       </div>
     );
-  }
-
-  if (!s.carregando && !s.dados) {
-    return (
+  } else if (!s.dados) {
+    conteudo = (
       <div className="max-w-3xl space-y-4 pb-10">
-        <Link href="/expedicao/conferencia"
-          className="inline-flex items-center gap-1.5 text-sm text-torg-gray hover:text-torg-blue">
-          <ArrowLeft size={15} /> Conferências
-        </Link>
+        <VoltarDesktop />
         <ErroInicial erro={s.erro} onTentar={s.recarregar} />
+      </div>
+    );
+  } else {
+    const op = s.dados.op;
+    titulo = op ? `OP-${op.numero} · ${op.cliente}` : "";
+    conteudo = (
+      <div className="max-w-3xl space-y-4 pb-10">
+        <VoltarDesktop />
+
+        <Cabecalho dados={s.dados} encerrada={s.encerrada} />
+        <Avisos erro={s.erro} ok={s.ok} limparErro={s.limparErro} />
+
+        {s.encerrada && (
+          <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-[13px] text-torg-gray">
+            Esta conferência foi encerrada. Para conferir mais peças desta obra, abra uma nova.
+          </div>
+        )}
+
+        <Abas aba={aba} setAba={setAba} quantasMarcas={s.marcas.length} />
+
+        {aba === "lancar" ? (
+          <>
+            <FormLancamento marcas={s.marcas} onLancar={s.lancar} salvando={s.salvando} encerrada={s.encerrada} />
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+              <h2 className="text-[11px] font-bold uppercase tracking-wide text-torg-gray mb-1">
+                Conferido nesta sessão
+              </h2>
+              <ListaLancamentos lancamentos={s.lancamentos} onApagar={s.apagar} onEditar={s.editar}
+                apagando={s.apagando} salvando={s.salvando} encerrada={s.encerrada} />
+            </div>
+            {!s.encerrada && <Encerrar onAcao={s.encerrar} agindo={s.agindo} />}
+          </>
+        ) : (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <PainelMarcas marcas={s.marcas} />
+          </div>
+        )}
       </div>
     );
   }
 
-  return (
-    <div className="max-w-3xl space-y-4 pb-10">
-      <Link href="/expedicao/conferencia"
-        className="inline-flex items-center gap-1.5 text-sm text-torg-gray hover:text-torg-blue">
-        <ArrowLeft size={15} /> Conferências
-      </Link>
-
-      <Cabecalho dados={s.dados} encerrada={s.encerrada} />
-      <Avisos erro={s.erro} ok={s.ok} limparErro={s.limparErro} />
-
-      {s.encerrada && (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-[13px] text-torg-gray">
-          Esta conferência foi encerrada. Para conferir mais peças desta obra, abra uma nova.
-        </div>
-      )}
-
-      <Abas aba={aba} setAba={setAba} quantasMarcas={s.marcas.length} />
-
-      {aba === "lancar" ? (
-        <>
-          <FormLancamento marcas={s.marcas} onLancar={s.lancar} salvando={s.salvando} encerrada={s.encerrada} />
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-            <h2 className="text-[11px] font-bold uppercase tracking-wide text-torg-gray mb-1">
-              Conferido nesta sessão
-            </h2>
-            <ListaLancamentos lancamentos={s.lancamentos} onApagar={s.apagar} onEditar={s.editar}
-              apagando={s.apagando} salvando={s.salvando} encerrada={s.encerrada} />
-          </div>
-          {!s.encerrada && <Encerrar onAcao={s.encerrar} agindo={s.agindo} />}
-        </>
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-          <PainelMarcas marcas={s.marcas} />
-        </div>
-      )}
-    </div>
-  );
+  return ehCelular ? <ModoPatio titulo={titulo}>{conteudo}</ModoPatio> : conteudo;
 }

@@ -6,6 +6,18 @@ Claude Code implementa; Codex revisa o contexto, encontra problemas e testa. Ant
 
 A integração local está descrita em `docs/integracao-codex-claude.md`: o hook Stop chama o revisor e devolve achados nesta sessão. Trate o feedback dentro da tarefa autorizada; não desative ou altere o hook para contornar uma reprovação. Falha/limite/decisão humana são pendências, não aprovação. Não faça pull/push automaticamente durante a revisão. O usuário pode suspender a integração explicitamente.
 
+**Você (Claude Code) é o orquestrador único.** Além da revisão automática acima, você pode
+consultar o Codex como especialista pontual ANTES de implementar algo não-trivial — nova tela
+(`design`), mudança estrutural grande (`architecture`), schema/query/concorrência (`database`),
+login/permissão/endpoint (`security`), feature pronta (`testing`). Skills em `.codex/skills/*.md`;
+chamada via `python3 scripts/revisao-codex/consultar.py <skill> --arquivo <pedido>` — mande
+contexto mínimo (diff, arquivos, trecho relevante), nunca o projeto inteiro. É sempre read-only:
+o Codex nunca edita código por conta própria, só quando você ou o usuário delegar explicitamente,
+e nesse caso não edite o mesmo arquivo enquanto isso não terminar. Nem toda tarefa precisa de
+especialista — use quando isso economizar retrabalho ou aumentar a qualidade da decisão, não por
+reflexo. Máximo 2 ciclos de correção por tarefa (automático ou manual); sem solução depois disso,
+pare e reporte ao usuário em vez de insistir.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Commands
@@ -448,6 +460,27 @@ resolve — ele flutua sobre a viewport. Está na mesma lista de exceções de `
 ⚠ **A validação é no servidor.** A tela mostra o saldo e evita a maioria dos erros, mas lê um
 retrato de alguns segundos atrás. Toda gravação responde com o estado inteiro recalculado — o
 navegador nunca soma saldo sozinho.
+
+⚠⚠ **Modo Pátio — tela cheia no celular, com saída que exige confirmação.** Matheus (08/09/2026):
+"quando clicar em iniciar conferencia entrar em modo tela full no celular para não ter chance do
+operador sair sem querer". `app/expedicao/conferencia/modo-patio.js` (hooks `usarEhCelular`,
+`usarModoPatio`, `pedirTelaCheia`) + `[id]/ModoPatio.jsx` (a moldura). Só entra no celular
+(`window.innerWidth < 768`, o mesmo corte do `md:` do Tailwind) — em tablet deitado/desktop a tela
+normal, com a sidebar, continua. Sair pede confirmação numa folha ("Continuar" / "Sair"); a
+conferência nunca é perdida, só a tela volta pra lista.
+
+⚠ **Duas camadas de "tela cheia", porque só uma funciona no iPhone.** `pedirTelaCheia()` chama o
+Fullscreen API de verdade (`requestFullscreen`), mas só funciona onde o navegador suporta —
+Android, desktop — e só dentro de um gesto do usuário, por isso é chamada no CLIQUE de "Iniciar
+conferência"/retomar sessão (`ConferenciaClient.jsx`), não na tela de destino (a navegação é
+client-side, o estado sobrevive à troca de rota). **No iPhone — Safari, Chrome, qualquer
+navegador — o Fullscreen API não existe**, é limitação do WebKit da Apple, não dá pra contornar em
+JS. A moldura de CSS (`ModoPatio.jsx`, `position: fixed` + `100dvh`) cobre a tela de qualquer
+jeito, sempre; quando o Fullscreen API não está disponível e a página não está em modo `standalone`
+(instalada na Tela de Início), aparece uma dica única (guardada em `localStorage`) explicando o
+único jeito real de tirar a barra do navegador no iPhone: Compartilhar → Adicionar à Tela de
+Início. As páginas de conferência declaram `appleWebApp` no `metadata` (`page.js`, list e sessão)
+pra isso funcionar quando adicionadas.
 
 ### Validar uma tela logado, antes do push
 

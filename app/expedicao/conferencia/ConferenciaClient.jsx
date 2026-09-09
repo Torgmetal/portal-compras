@@ -4,12 +4,19 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AlertCircle, CheckCircle2, ClipboardCheck, Loader2, Play } from "lucide-react";
 import { lerJson } from "@/lib/ler-json";
+import { pedirTelaCheia } from "./modo-patio";
 
 // CONFERÊNCIA DE PEÇA — a porta de entrada: começar uma, ou voltar para uma que já está aberta.
 //
 // Matheus (08/09/2026): "clicar em iniciar conferência, seleciona a OP (…) a ideia é usar essa tela
 // em um celular em campo ou tablet para ele conferir as peças antes de ir para pintura e
-// etiquetagem".
+// etiquetagem". E (08/09/2026, sobre o modo pátio): "quando clicar em iniciar conferencia entrar
+// em modo tela full no celular".
+//
+// ⚠ O PEDIDO DE TELA CHEIA MORA AQUI, NO CLIQUE — não na tela de destino. O Fullscreen API só
+// aceita ser chamado dentro de um gesto do usuário (toque/clique); chamar depois, já na tela da
+// sessão, o navegador ignora silenciosamente. Como a navegação é client-side (SPA, `router.push`
+// ou `Link`), o estado de tela cheia sobrevive à troca de rota — pede aqui, chega cheio lá.
 
 const quando = (iso) => {
   if (!iso) return "—";
@@ -21,7 +28,7 @@ const quando = (iso) => {
 function Cartao({ c }) {
   const aberta = c.status === "ABERTA";
   return (
-    <Link href={`/expedicao/conferencia/${c.id}`}
+    <Link href={`/expedicao/conferencia/${c.id}`} onClick={pedirTelaCheia}
       className="block bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-torg-blue transition-colors">
       <div className="flex items-start gap-3">
         <div className={`mt-0.5 shrink-0 ${aberta ? "text-torg-orange" : "text-emerald-600"}`}>
@@ -88,6 +95,7 @@ export default function ConferenciaClient() {
 
   const iniciar = async (opId) => {
     if (!opId) return;
+    pedirTelaCheia(); // gesto do usuário está aqui, no clique — chamar depois não funciona
     setIniciando(true); setErro("");
     try {
       const j = await lerJson(await fetch("/api/expedicao/conferencia", {
