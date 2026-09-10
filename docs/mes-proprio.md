@@ -6,32 +6,34 @@
 
 ## ► ESTADO ATUAL E PRÓXIMO PASSO (10/09/2026)
 
-**Branch:** `matheus/mes-proprio` — 7 commits, **nada em produção**: nenhuma tabela criada,
-nenhum `db push`, nenhum push da branch.
+**Branch:** `matheus/mes-proprio` — **nada em produção**: nenhum `db push` no Neon, nenhum push da
+branch. O laboratório roda inteiro na máquina do desenvolvedor.
 
 **Feito:** levantamento (§1-5) · engenharia reversa ao vivo do Syneco (§6) · reconciliação com a
-pesquisa do Codex (§7) · schema Prisma dos 8 modelos, validado (`npx prisma validate`) · IoT real
-(§8) · arquitetura do gateway local fechada (§9).
+pesquisa do Codex (§7) · schema Prisma dos 8 modelos (§10) · IoT real (§8) · arquitetura do gateway
+local fechada (§9) · **laboratório local no ar, com dado real de produção dentro** (§10).
 
-**Decisão do Matheus (10/09/2026):** montar um **banco Postgres LOCAL** com o **schema completo**
-(portal + MES) e semeá-lo com **dados históricos reais de produção** (somente leitura na origem),
-para desenhar as telas contra dado realista, com isolamento total.
+**O laboratório, em uma linha:**
 
-> Com o schema completo no local, o MES **enxerga `OP`/`PecaConjunto` de verdade** — resolve a
-> objeção que existia contra "banco separado" no §7.4.
+```bash
+node scripts/mes-lab/subir.mjs                                 # sobe o Postgres (porta 55432)
+MES_LAB_URL=postgresql://torg:torg@localhost:55432/torg_mes_lab \
+  node --env-file=.env.local scripts/mes-lab/importar.mjs --meses=6
+```
+
+Dentro dele hoje: **47 obras · 21.772 peças · 123.824 ordens · 28.064 apontamentos** de 6 meses
+reais, em 6 setores. Números conferidos **contando no destino**, não somando as gravações.
 
 **Próximo passo, em ordem:**
 
-1. **Instalar Postgres no WSL** — `sudo apt install postgresql` (⚠ **pede senha do sudo**; não há
-   Postgres nem Docker na máquina hoje — conferido em 10/09/2026).
-2. Criar o banco local e apontar uma `DATABASE_URL` **só do laboratório** (nunca a de produção).
-3. `npx prisma db push` **contra o banco LOCAL** — seguro ali; **jamais** contra o Neon.
-4. Adicionar em `scripts/ensure-mes-tables.mjs` o **índice parcial** de uma sessão aberta por
-   recurso (`ON "MesSessao"("recursoId") WHERE status='ABERTA'`) — ver o aviso no `schema.prisma`.
-5. Script de **importação** (produção → local, só leitura na origem): recursos e operadores vêm
-   do **Syneco** (API de relatórios, datasets 27 e 20); OPs, marcas e apontamentos históricos vêm
-   do **Neon**.
-6. Aí sim: fluxo do totem e monitor, contra o banco local.
+1. ⛔ **BLOQUEADO — falta credencial.** `scripts/mes-lab/importar-syneco.mjs`: **recursos**
+   (dataset 27) e **operadores** (dataset 20) vêm do Syneco, não do Neon. O servidor
+   (`192.168.0.190:1000`) **responde** da máquina do Matheus, mas `SKA_USER`/`SKA_PASS` não estão
+   nela — o `scripts/.env` que os outros scripts SKA leem não existe. Sem os 53 recursos e 68
+   operadores não há totem para testar.
+2. Fluxo do **totem** contra o banco local: abrir sessão, apontar quantidade, parar, encerrar.
+   Os testes de aceitação do §7.5 são o critério de pronto.
+3. **Monitor** de máquinas — o contrato de tela é o dataset 131 (§6.4).
 
 > ⚠ Os dados importados incluem **nomes reais de operadores**. Ficam **só na máquina local** — não
 > vão para o repositório, nem para prévia publicada, nem para massa de demonstração compartilhada.
@@ -511,3 +513,96 @@ ruído). Ou seja, mesmo reaproveitando o hardware, **a tradução sinal → even
   rende várias marcas e várias peças por ciclo (ver §7.3);
 - `DeviceConnectionChange` → alimenta a dimensão **conectividade**, que é separada do estado
   produtivo (§7.3): coletor mudo **não** é máquina parada.
+
+---
+
+# 10. O laboratório local (10/09/2026)
+
+O banco onde o MES vai ser desenhado. Schema **completo** (portal + MES), dado **real** de
+produção, e **zero** conexão com o Neon na hora de escrever.
+
+## 10.1 ⚠⚠ Postgres SEM `sudo` — e por que não foi `apt install`
+
+O plano dizia `sudo apt install postgresql`. **Não foi assim**, e a troca é melhor, não um
+contorno:
+
+| | `apt install` | o que foi feito |
+|---|---|---|
+| Instalação | pede **senha do sudo** | nenhuma senha |
+| Onde vive | serviço do sistema, `/var/lib/postgresql` | `~/.local/share/torg-mes-lab` |
+| Descartar | `apt purge` + limpar diretórios | `rm -rf` numa pasta |
+| Colide com a máquina | porta 5432, usuário `postgres` do sistema | porta **55432**, usuário próprio |
+
+`npm i embedded-postgres` baixa o binário **oficial** do PostgreSQL (é 18.4 de verdade, não uma
+emulação) para o diretório do usuário e o roda como processo comum. É o mesmo padrão que o
+`graphify` e o Playwright já usam neste projeto: **ferramenta pesada em `~/.local/share`, fora do
+repositório** — 200 MB dentro do projeto seriam um acidente esperando o `git add -A`.
+
+O ganho que importa não é evitar a senha: é o laboratório ser **descartável**. Errar aqui não
+suja a máquina, e recomeçar do zero é apagar uma pasta.
+
+## 10.2 ⚠⚠ A trava que impede o import de escrever em produção
+
+`scripts/mes-lab/destino.mjs`. Duas regras, e as duas existem por um acidente concreto:
+
+1. **Origem e destino saem de variáveis DIFERENTES.** A origem é `DATABASE_URL` (Neon, só leitura);
+   o destino é `MES_LAB_URL`, e só ela. Se o destino também caísse em `DATABASE_URL`, **esquecer de
+   exportar a variável** faria o script despejar dado de demonstração dentro da operação. Assim,
+   esquecer não faz nada acontecer — o script para antes de abrir conexão.
+2. **O destino é validado: tem que ser esta máquina.** Variáveis separadas não bastam, porque o
+   erro provável é *copiar a URL do `.env.local`* para a variável certa. A URL do Neon é
+   sintaticamente perfeita; só a checagem de host a separa do desastre.
+
+Coberta por `testes/lib/mes-lab-destino.teste.js` — código puro, sem banco. É o teste mais barato
+do projeto e cobre o pior acidente possível deste script.
+
+> ⚠ Antes do `db push` foi preciso **provar** que a variável de ambiente vence o `.env` que o
+> Prisma carrega sozinho. A prova foi uma sonda inofensiva (`CREATE TABLE "_sonda_isolamento"`) e a
+> conferência de **onde ela caiu**. Se tivesse caído no Neon, o `db push` seguinte teria tentado
+> dropar `ExpedicaoItemExcluido` — o drift conhecido do schema.
+
+## 10.3 O que NÃO viaja para o laboratório
+
+O import traz `User` porque `OP.createdById` tem FK — sem os usuários o Postgres recusa toda obra.
+Mas duas coisas são cortadas na entrada:
+
+- **Hash de senha** → substituído por `LABORATORIO-SEM-SENHA`. Hash não é "dado realista", é
+  **credencial**: nada no laboratório precisa autenticar ninguém, e copiá-lo criaria uma segunda
+  cópia do material que abre o portal, num banco sem senha forte e sem backup.
+- **`User.funcionarioId`** → zerado. Ele aponta para `Funcionario`, a ficha de RH (CPF, salário,
+  holerite). Trazer a tabela junto arrastaria o RH inteiro para um laboratório **para nada** — o
+  MES não usa esse vínculo. Cortar o ponteiro é mais barato e mais seguro que copiar o alvo.
+
+Conferido depois de importar: **0 hashes bcrypt, 0 vínculos de RH, 0 linhas de `Funcionario`.**
+
+## 10.4 ⚠⚠ Um `return` engolia metade do `ensure-mes-tables.mjs`
+
+Achado ao instalar o índice parcial de `MesSessao` (§7.3): o índice não aparecia no banco, e o
+script dizia "OK" no fim.
+
+A causa: uma guarda no meio do arquivo — *"as tabelas `MesApontamento`/`MesSyncLog` já existem?"* —
+saía com `return` **da função inteira**, em vez de pular só a criação delas. Como em qualquer banco
+já inicializado essas tabelas existem, **tudo o que vinha depois nunca rodava**. Junto com o meu
+índice ia a verificação do **event trigger de proteção**, que portanto nunca foi conferida em
+produção desde que existe.
+
+Virou guarda de **bloco** (`if/else` + função `criarTabelasDoAgente`): o que é condicional é a
+criação, não o fim do script.
+
+> **A lição, que é a mesma da aba `Revisao`:** um script que termina dizendo "OK" sem ter feito o
+> trabalho é pior que um que falha. Os dois defeitos deste projeto em 2026 são a mesma família —
+> **relatar intenção como se fosse resultado**.
+
+## 10.5 A trava de sessão única por recurso, provada
+
+`travaDaSessaoDoRecurso` cria o índice parcial
+`ON "MesSessao"("recursoId") WHERE status = 'ABERTA'`. Testado contra o banco de verdade:
+
+| Tentativa | Resultado |
+|---|---|
+| 1ª sessão ABERTA no recurso `09` | aceita |
+| 2ª sessão ABERTA no mesmo recurso | **recusada** — `MesSessao_recursoId_aberta_key` |
+| 2ª sessão depois de encerrar a 1ª | aceita |
+
+A terceira linha é a que importa: um índice que travasse também isso deixaria o recurso com uma
+única sessão na vida inteira.

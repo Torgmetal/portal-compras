@@ -5941,12 +5941,12 @@ model MesSessao {
   eventos     MesEvento[]
   apontamentos MesApontamentoQtd[]
 
-  // ⚠⚠ UMA SESSÃO ABERTA POR RECURSO tem de ser garantida por ÍNDICE PARCIAL no
-  // Postgres (`ON "MesSessao"("recursoId") WHERE status = 'ABERTA'`), que o
-  // Prisma não sabe declarar. AINDA NÃO EXISTE — entra em
-  // scripts/ensure-mes-tables.mjs junto com a criação das tabelas, igual ao da
-  // ConferenciaPeca. Sem ele, dois totens abrem duas sessões no mesmo recurso e
-  // ninguém percebe. Validar a rota só depois que o índice estiver no banco.
+  // ⚠⚠ UMA SESSÃO ABERTA POR RECURSO é garantida por ÍNDICE PARCIAL no Postgres
+  // (`ON "MesSessao"("recursoId") WHERE status = 'ABERTA'`), que o Prisma não
+  // sabe declarar — por isso mora em scripts/ensure-mes-tables.mjs
+  // (`travaDaSessaoDoRecurso`), igual ao da ConferenciaPeca. Sem ele, dois totens
+  // abrem duas sessões no mesmo recurso e ninguém percebe: os apontamentos se
+  // dividem entre as duas e o monitor mostra a máquina em dois estados.
   @@index([recursoId, status])
   @@index([opId])
   @@index([opNumero, marca])

@@ -687,11 +687,25 @@ async function main() {
   const nomes = existentes.map((r) => r.tablename);
   const faltando = ["MesApontamento", "MesSyncLog"].filter((t) => !nomes.includes(t));
 
+  // ⚠ ISTO ERA UM `return`, E O `return` ENGOLIA O RESTO DO ARQUIVO. A intenção era pular só a
+  // CRIAÇÃO das duas tabelas do agente quando elas já existem — mas, como saía da função inteira,
+  // levava junto tudo o que vem depois: o event trigger de proteção nunca era conferido em nenhum
+  // banco onde as tabelas já estavam (ou seja, sempre, em produção). Guarda de bloco, não de
+  // função: o que é condicional é a criação, não o fim do script.
   if (faltando.length === 0) {
     console.log("[ensure-mes-tables] OK — tabelas MesApontamento e MesSyncLog existem.");
-    return;
+  } else {
+    await criarTabelasDoAgente(prisma, faltando);
   }
 
+  await travaDaSessaoDoRecurso(prisma);
+
+  // Após criar as tabelas, garante o event trigger de proteção
+  await ensureEventTrigger(prisma);
+}
+
+/** As duas tabelas que o agente do Syneco alimenta (`MesApontamento`, `MesSyncLog`). */
+async function criarTabelasDoAgente(prisma, faltando) {
   console.log(`[ensure-mes-tables] AVISO — tabelas ausentes: ${faltando.join(", ")}. Criando...`);
 
   // SQL idempotente (IF NOT EXISTS) — mesma lógica da migration oficial
@@ -770,9 +784,32 @@ async function main() {
   }
 
   console.log("[ensure-mes-tables] Tabelas MES criadas com sucesso.");
+}
 
-  // Após criar as tabelas, garante o event trigger de proteção
-  await ensureEventTrigger(prisma);
+/**
+ * UMA SESSÃO ABERTA POR RECURSO — o MES próprio (`MesSessao`).
+ *
+ * ⚠⚠ É a MESMA lição da Conferência de Peça, um andar acima: dois totens no mesmo recurso abrem
+ * duas sessões simultâneas e ninguém percebe — os apontamentos se dividem entre as duas e o
+ * monitor mostra a máquina em dois estados ao mesmo tempo. Validar na rota não basta: as duas
+ * aberturas leem o banco antes de qualquer uma gravar, e as duas passam.
+ *
+ * ⚠ Índice PARCIAL, que o Prisma não sabe declarar no `schema.prisma` — por isso mora só aqui,
+ * documentado no model. Sessão ENCERRADA/CANCELADA fica de fora do índice, senão o recurso só
+ * poderia ter uma sessão na vida inteira.
+ *
+ * ⚠ Tolerante à tabela não existir: em produção `MesSessao` ainda não foi criada (o MES próprio
+ * roda por enquanto só no banco de laboratório), e este script é chamado no build — ele não pode
+ * derrubar deploy nenhum por causa de uma tabela que ainda não nasceu.
+ */
+async function travaDaSessaoDoRecurso(prisma) {
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "MesSessao_recursoId_aberta_key"
+    ON "MesSessao"("recursoId") WHERE "status" = 'ABERTA'
+  `).then(
+    () => console.log("[ensure-mes-tables] OK — uma sessão aberta por recurso (MesSessao)."),
+    (e) => console.warn("[ensure-mes-tables] índice de sessão única por recurso:", e.message),
+  );
 }
 
 async function ensureEventTrigger(prisma) {

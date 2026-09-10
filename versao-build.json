@@ -1,7 +1,12 @@
 {
-  "build": 3055,
-  "gerado": "2026-09-10T18:08:26.921Z",
+  "build": 3056,
+  "gerado": "2026-09-10T18:26:15.573Z",
   "commits": [
+    {
+      "hash": "9938241c79",
+      "data": "10/09/2026",
+      "titulo": "MES proprio: ponto de retomada no topo do documento"
+    },
     {
       "hash": "4cac213ec4",
       "data": "10/09/2026",
@@ -146,11 +151,6 @@
       "hash": "3c1d70ca6f",
       "data": "08/09/2026",
       "titulo": "Gantt: botão para apagar uma programação e tirar as peças da fila"
-    },
-    {
-      "hash": "0daf3a6108",
-      "data": "08/09/2026",
-      "titulo": "fix(rh): encontrar CBO com ou sem hífen no cadastro e na busca"
     }
   ]
 }
