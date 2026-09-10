@@ -242,3 +242,92 @@ operador**.
 `..._OBRA`, `..._OBRA_CARDS`, `TORG_Production_Analytics_V03`. São *table-valued functions* no
 banco do Syneco — **elas somem quando o Syneco sair**, e é exatamente o que a projeção do nosso
 MES para `MesApontamento`/`MesOrdem` precisa substituir.
+
+---
+
+# 7. Reconciliação com a pesquisa do Codex (10/09/2026)
+
+Duas pesquisas independentes: o Codex foi pelas fontes públicas da SKA + rigor de produto
+(ISA-95, OEE.com); esta foi pela engenharia reversa ao vivo. **Convergem quase totalmente.**
+O que segue é o que ficou decidido a partir das duas.
+
+## 7.1 Decisões confirmadas pelo Matheus (10/09/2026)
+
+- **Escopo da fase 1: apontar PRODUÇÃO e PARADAS.** Setup, OEE e o resto vêm depois.
+- **Totens:** PCs com navegador, teclado, mouse, **leitor USB e leitor Bluetooth**. Ambos os
+  leitores emulam teclado (digitam o código + Enter) — é o caminho mais simples e o que o totem
+  deve assumir.
+- **Modelo PWA aprovado** — com a ressalva de disponibilidade abaixo, que é decisiva.
+
+## 7.2 ⚠️⚠️ A verdade sobre "PWA resolve a queda de internet"
+
+**Não resolve.** Registrado aqui porque a decisão de arquitetura depende disso e a intuição
+natural (e a minha própria recomendação anterior, incompleta) engana. Com PWA offline-first:
+
+| Continua | Para |
+|---|---|
+| Tela do totem abre (service worker) | **Monitor da supervisão fica cego** (lê da nuvem) |
+| Operador aponta produção/parada/quantidade | **Totens não se enxergam** — trava de exclusividade é no servidor |
+| Fila local sincroniza quando a rede volta | **Validações rodam em cache velho** (saldo, marca, roteiro) |
+| | **PC do totem morrer antes de sincronizar = apontamento perdido** |
+
+**PWA faz a fábrica continuar CAPTURANDO, não continuar OPERANDO.** Cobre queda de minutos.
+Não substitui servidor local.
+
+**E o Syneco hoje é local.** Trocar por nuvem+PWA seria **rebaixar a disponibilidade** — a
+fábrica percebe na primeira queda. O Codex chegou à mesma conclusão por outro caminho:
+*"Cache no navegador não é equivalente a operação industrial offline."*
+
+**Plano em duas etapas:**
+1. **Laboratório e piloto** — PWA + fila, só nuvem. Suficiente para construir e validar.
+2. **Antes de desligar o Syneco** — **gateway local** na LAN da fábrica (serviço num PC, com
+   banco durável próprio) atendendo os totens e replicando pro portal. É o que iguala o Syneco.
+
+O modelo de dados nasce preparado para (2), mesmo que (2) só venha depois.
+
+## 7.3 Onde o Codex corrigiu/refinou o meu desenho
+
+1. **Sessão ≠ evento ≠ acumulado.** Eu ia direto para `MesEvento`. O correto são três níveis —
+   e isso espelha o próprio Syneco (`Production` = sessão, `Event` = instante):
+   - **`MesSessao`** — recurso + ordem/marca + operador(es), com abertura e fechamento.
+   - **`MesEvento`** — transições de estado (instantes), como no Syneco.
+   - **`MesApontamentoQtd`** — quantidade **incremental** de boas/rejeitadas/retrabalho.
+2. **Event sourcing completo não é obrigatório.** Uma transação grava o evento, atualiza a
+   projeção e enfileira a mensagem de saída. Auditoria e consistência com menos infraestrutura.
+3. **Conectividade é uma dimensão SEPARADA do estado produtivo.** `conectado / atrasado /
+   desconectado / desconhecido`. **Falta de sinal não é parada de máquina** — o monitor deve
+   mostrar o último estado conhecido com a idade do dado, não inventar "parado".
+4. **Indicador sem base é "indisponível", com a causa** — nunca 0% nem 100%. (Na tela do laser
+   que o Matheus mandou aparece Efic. e OEE em 0% com ciclo planejado zero: é exatamente esse
+   defeito, no Syneco.)
+5. **Nesting/laser:** um ciclo CNC pode render várias marcas e várias peças. **Não converter
+   ciclo em peça boa automaticamente**, nem copiar o tempo da máquina para cada marca.
+6. **A marca não é única globalmente** — a chave é obra/OP + item + revisão + operação. Isso
+   ecoa o que o portal já sofreu com `obraParaNumeroOP` e com `opNumero` de `PecaConjunto`.
+7. **Idempotência desde o primeiro dia** — duplo clique, retry e sinal repetido produzem efeito
+   único. O portal já tem esse padrão em `chaveOperacao` na Conferência de Peça; reusar a ideia.
+
+## 7.4 Onde há tensão a resolver com o Matheus
+
+**Isolamento do laboratório.** O Codex pede *aplicação/deploy separado e base separada*
+("não basta criar uma rota escondida"); o Matheus pediu **"já nascido dentro do mesmo banco do
+PORTAL"**.
+
+- A favor do Codex: dado de demonstração não pode poluir a operação, e nome de operador real
+  não deve virar massa fictícia.
+- A favor do Matheus: o MES **precisa** conviver com `OP`, `PecaConjunto` e `ListaExpedicao` —
+  banco separado viraria uma segunda verdade e um problema de integração permanente. E um
+  segundo deploy é infraestrutura que uma equipe de duas pessoas vai manter.
+
+**Proposta de meio-termo:** tabelas do MES no **mesmo banco**, com um campo `ambiente`
+(`DEMO`/`PROD`) em sessão/evento/apontamento, e **regra dura: nada com `ambiente=DEMO` projeta
+para `MesApontamento`/`MesOrdem` nem sai no portal operacional**. Isolamento por dado, não por
+infraestrutura. `/mes-lab` já é fechado no servidor (middleware, só ADMIN) — não é "rota
+escondida", mas o gate precisa cobrir **API, tempo real e exportação** também, não só a página.
+
+## 7.5 Testes de aceitação adotados
+
+Os 12 do relatório do Codex viram o critério de pronto do piloto. Os que mais pegam bug aqui:
+duplo clique não duplica; dois totens não abrem sessão concorrente no mesmo recurso;
+encerramento parcial preserva saldo; falta de comunicação não vira "parada"; sinal CNC repetido
+ou fora de ordem tem resultado explícito; usuário sem permissão é negado **também na API**.

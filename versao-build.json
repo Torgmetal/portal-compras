@@ -1,7 +1,12 @@
 {
-  "build": 3048,
-  "gerado": "2026-09-10T11:41:56.860Z",
+  "build": 3049,
+  "gerado": "2026-09-10T13:07:17.234Z",
   "commits": [
+    {
+      "hash": "9a4ef25508",
+      "data": "10/09/2026",
+      "titulo": "MES proprio: engenharia reversa do Syneco feita na rede da fabrica"
+    },
     {
       "hash": "2585dc83ae",
       "data": "09/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c6e615d1ae",
       "data": "08/09/2026",
       "titulo": "Rastreio: o UE da Engenharia é o UDCE do fornecedor"
-    },
-    {
-      "hash": "53a097a6ba",
-      "data": "08/09/2026",
-      "titulo": "Expedição: a Lista de Expedição define a lista, não completa PecaConjunto"
     }
   ]
 }
