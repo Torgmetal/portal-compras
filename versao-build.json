@@ -1,7 +1,12 @@
 {
-  "build": 3062,
-  "gerado": "2026-09-10T17:01:38.961Z",
+  "build": 3063,
+  "gerado": "2026-09-10T17:14:35.893Z",
   "commits": [
+    {
+      "hash": "72d2b3716d",
+      "data": "10/09/2026",
+      "titulo": "Etiquetas: modelo do cliente QWS/Petrobras, com uma TAG por unidade"
+    },
     {
       "hash": "1a921bbb25",
       "data": "10/09/2026",
@@ -146,11 +151,6 @@
       "hash": "2ff928afc7",
       "data": "09/09/2026",
       "titulo": "O sino: notificações por módulo e por pessoa, em toda sidebar"
-    },
-    {
-      "hash": "f484941eb5",
-      "data": "09/09/2026",
-      "titulo": "LQC: refina cabeçalho, totais e áreas recolhíveis"
     }
   ]
 }
