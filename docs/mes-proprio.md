@@ -331,3 +331,75 @@ Os 12 do relatório do Codex viram o critério de pronto do piloto. Os que mais 
 duplo clique não duplica; dois totens não abrem sessão concorrente no mesmo recurso;
 encerramento parcial preserva saldo; falta de comunicação não vira "parada"; sinal CNC repetido
 ou fora de ordem tem resultado explícito; usuário sem permissão é negado **também na API**.
+
+---
+
+# 8. O IoT dos lasers — configuração real (10/09/2026)
+
+Extraída **inteiramente pela API de relatórios** (datasets 207/209/210/211/212), sem encostar em
+nenhum equipamento industrial. O produto é o **SYNECO I/O Collect**, que a SKA descreve como
+coleta por **Modbus TCP** ligada a "módulos I/O de mercado".
+
+## 8.1 São só TRÊS máquinas sensorizadas
+
+Base `TORG_SYNECO`: **54 máquinas ativas, 3 sensorizadas, 3 devices ativos.** (E o banco inteiro
+tem **19 meses em 0,07 GB** — migrar o histórico é trivial.)
+
+| Device | Recurso | Código | Terminal | Contador acumulado |
+|---|---|---|---|---|
+| `IOUSB - LASER CHAPA` | 11 | **09** | TERMINAL 6 | 92 |
+| `IOUSB - LASER PERFIL` | 12 | **10** (Laser Tubo) | TERMINAL 7 | 3 |
+| `IOUSB - CENTRO FURAÇAO` | 13 | **11** (Laser Perfil) | TERMINAL 8 | 2340 |
+
+> ⚠ **Os nomes dos devices estão desalinhados com as máquinas** (o device "CENTRO FURAÇAO" está no
+> recurso "LASER PERFIL"). É rótulo, não função — mas confunde quem for conferir, e vale
+> corrigir no cadastro deles ou simplesmente não herdar esses nomes.
+
+## 8.2 As variáveis coletadas
+
+`Spindle` (máquina cortando — é o sinal de tensão), `CycleCount64` (contador de ciclos),
+`InstantSpindle`, `DeviceConnectionChange` (saúde da conexão) e `ManualTimerState`.
+
+Configuração dos três, idêntica:
+- `SignalWay = Normal` (sinal não invertido)
+- `Interval = 0`, `Duration = 0` — **sem filtro de debounce configurado**
+- `ResourceTolerance = 300s` — tolerância de **5 minutos** antes de virar parada automática
+- `CountAcc = 1`, `TimeAcc = 1` — contagem e tempo acumulados
+
+## 8.3 ⚠⚠ O achado que muda o plano: provavelmente é **USB**, não Ethernet
+
+Os três devices se chamam **`IOUSB`**, e o "Client" de cada um é o **PC do terminal**
+(`TERMINAL 6/7/8`). Além disso, os datasets 205 e 206 — os únicos que expõem `Host` (IP),
+`StartAddress` e `RegisterType` — **devolvem zero linhas**, o que é o sintoma exato de `Host`
+ser **NULL** (`NULL LIKE '%'` é falso no SQL Server).
+
+**Leitura:** o módulo I/O não é um escravo Modbus TCP na rede; é um **módulo USB plugado no PC do
+terminal**, e o serviço da SKA naquele PC lê o USB e manda o evento pro servidor. A página
+comercial fala em Modbus TCP, mas **esta instalação não parece ser assim**.
+
+**Consequência:** não dá para o nosso gateway "escutar o mesmo sinal pela rede". Precisa de uma
+das saídas:
+
+1. **Trocar os 3 coletores por módulos Modbus TCP** (Ethernet, DIN, de mercado). São **três
+   máquinas** — custo baixo, e nos dá arquitetura aberta, sem software de fornecedor, com o nosso
+   gateway lendo por Modbus TCP e podendo rodar **em paralelo** com o Syneco durante a migração.
+   **É a recomendação.**
+2. **Reaproveitar os módulos USB** — exige saber fabricante/modelo e se há driver/protocolo
+   aberto, e obriga software nosso rodando **em cada PC de terminal**. Só vale se o hardware for
+   de um fabricante conhecido com biblioteca disponível.
+
+**A confirmar em campo (foto resolve):** atrás do PC de cada laser, o módulo sai por **cabo USB**
+ou por **cabo de rede**? Tem etiqueta de fabricante/modelo?
+
+## 8.4 A lógica que teremos de reescrever
+
+O I/O Collect não entrega evento pronto: ele entrega **sinal**, e o SYNECO Device aplica regras
+("sequência de regras padrão que tratam as informações vindas das máquinas", incluindo filtro de
+ruído). Ou seja, mesmo reaproveitando o hardware, **a tradução sinal → evento é nossa**:
+
+- borda de subida/descida do `Spindle` → início/fim de produção;
+- ausência de sinal por mais que a tolerância (hoje 300s) → parada automática;
+- incremento de `CycleCount64` → ciclo concluído — **e ciclo NÃO é peça**: um nesting de laser
+  rende várias marcas e várias peças por ciclo (ver §7.3);
+- `DeviceConnectionChange` → alimenta a dimensão **conectividade**, que é separada do estado
+  produtivo (§7.3): coletor mudo **não** é máquina parada.
