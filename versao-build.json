@@ -1,7 +1,12 @@
 {
-  "build": 3066,
-  "gerado": "2026-09-10T20:00:08.212Z",
+  "build": 3067,
+  "gerado": "2026-09-10T20:24:44.910Z",
   "commits": [
+    {
+      "hash": "1964d51409",
+      "data": "10/09/2026",
+      "titulo": "Etiqueta: a lista de papel do driver esta em POLEGADAS - corrige a instrucao"
+    },
     {
       "hash": "09cd709b17",
       "data": "10/09/2026",
@@ -146,11 +151,6 @@
       "hash": "13123e956e",
       "data": "09/09/2026",
       "titulo": "Conferência de peça: cancelar sessão aberta por engano, direto na saída"
-    },
-    {
-      "hash": "bae39f9791",
-      "data": "09/09/2026",
-      "titulo": "Conferência de peça: Modo Pátio de verdade (tela cheia no celular)"
     }
   ]
 }
