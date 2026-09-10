@@ -179,6 +179,10 @@ export default function TorguinhoChat() {
   // botão de lançar. Visto na validação da tela em 390×844 (08/09/2026). Padding não resolve:
   // o balão flutua sobre a viewport, não sobre o conteúdo.
   if (pathname?.startsWith("/expedicao/conferencia")) return null;
+  // ⚠ O totem do MES pela MESMA razão, e mais forte: é tela cheia num monitor do chão de fábrica,
+  // operada com luva e pressa, e o balão fica bem em cima do botão "Encerrar". Quem está no totem
+  // também não é do time do portal — é o operador da máquina.
+  if (pathname?.startsWith("/mes-lab/totem")) return null;
   if (status !== "authenticated" || !config || !config.ativo || !temAcesso) return null;
 
   user?.name?.split(" ")[0] || "colega";

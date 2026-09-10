@@ -166,7 +166,14 @@ async function main() {
   await lancamentosDiferentes(sessao);
   await apontarContraEncerrar(recurso);
   await encerrarDuasVezes(recurso);
+
+  // ⚠ APAGA O RECURSO E O SETOR DE TESTE, não só as sessões. A primeira versão limpava os dados
+  // mas deixava "Recurso de teste" no cadastro — e ele apareceu na tela de escolha do totem, num
+  // setor "TESTE" que ninguém criou. Rastro de ferramenta virando cadastro é como nasce a linha
+  // que ninguém sabe explicar seis meses depois.
   await limpar(recurso.id);
+  await prisma.mesRecurso.delete({ where: { id: recurso.id } });
+  await prisma.mesSetor.deleteMany({ where: { codigo: "TESTE" } });
 
   console.log(falhas ? `\n✗ ${falhas} verificação(ões) falharam.` : "\n✓ Todas as travas seguraram.");
   process.exitCode = falhas ? 1 : 0;

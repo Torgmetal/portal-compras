@@ -206,6 +206,38 @@ function relatarDeFora(deFora) {
   console.log("  → se alguma ainda for usada no chão, cadastre pela tela (ou acrescente ao Gantt).");
 }
 
+/**
+ * ⚠⚠ CATÁLOGO PROVISÓRIO — PRECISA DA LISTA REAL DA TORG. Estes motivos são um conjunto genérico de
+ * caldeiraria, posto aqui para o botão "Parada" do totem funcionar; o Syneco tem a lista de verdade
+ * e ninguém a leu ainda. Motivo de parada é o que vira Pareto: uma lista inventada produz um
+ * gráfico bonito sobre categorias que a fábrica não usa, o que é pior que não ter gráfico.
+ *
+ * ⚠ `planejada` separa o que TIRA do tempo planejado (refeição, setup, reunião) do que conta contra
+ * a Disponibilidade. Errar essa coluna faz o OEE mentir para cima — refeição vira "máquina parada
+ * por problema" e o índice despenca sem que nada tenha dado errado.
+ */
+const MOTIVOS = [
+  ["FALTA_MATERIAL", "Falta de material", false],
+  ["AGUARDANDO_PONTE", "Aguardando ponte rolante", false],
+  ["MANUTENCAO", "Manutenção corretiva", false],
+  ["FALTA_ENERGIA", "Falta de energia", false],
+  ["FALTA_PROGRAMACAO", "Sem programação", false],
+  ["QUALIDADE", "Problema de qualidade", false],
+  ["SETUP", "Preparação / setup", true],
+  ["REFEICAO", "Refeição", true],
+  ["REUNIAO", "Reunião ou treinamento", true],
+  ["OUTRO", "Outro (descrever)", false],
+];
+
+async function semearMotivos() {
+  for (const [codigo, descricao, planejada] of MOTIVOS) {
+    await lab.mesMotivoParada.upsert({
+      where: { codigo }, update: {}, create: { codigo, descricao, planejada },
+    });
+  }
+  console.log(`Motivos de parada: ${MOTIVOS.length} (⚠ catálogo PROVISÓRIO — falta a lista real)`);
+}
+
 async function conferir() {
   console.log("\nNo laboratório, contado no destino:");
   for (const s of await lab.mesSetor.findMany({ orderBy: { ordem: "asc" }, include: { recursos: true } })) {
@@ -218,7 +250,7 @@ async function conferir() {
 }
 
 semearSetores()
-  .then(semearRecursos)
+  .then(async (setores) => { await semearRecursos(setores); await semearMotivos(); })
   .then(conferir)
   .catch((e) => { console.error("\nERRO:", e.message); process.exitCode = 1; })
   .finally(async () => { await origem.$disconnect(); await lab.$disconnect(); });
