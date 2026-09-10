@@ -65,8 +65,31 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
   const [arquivoNome, setArquivoNome] = useState(""); // nome do arquivo importado (vai no aviso)
   const [mudancas, setMudancas] = useState("");
   const inputRef = useRef(null);
+  // ⚠ O QUE FOI MANDADO AO SERVIDOR FICA GUARDADO PRA TENTAR DE NOVO. Vitor (10/09/2026), OP-107: a LE
+  // entrou no portal mas não chegou à pasta 2.6, e a tela só dizia "salvo automático" — sem botão pra
+  // repetir só o salvamento, o jeito era reimportar a lista inteira. O arquivo já lido fica aqui até
+  // a próxima importação.
+  const ultimoEnvioRef = useRef(null); // { sigla, opNumero, fileNome, fileBase64 }
 
   const revLabel = revArquivo && revArquivo.num != null ? "R" + String(revArquivo.num).padStart(2, "0") : null;
+
+  // Salva (ou re-salva) no servidor o arquivo da última importação.
+  async function salvarNoServidor(envio) {
+    ultimoEnvioRef.current = envio;
+    setServidor({ estado: "salvando" });
+    try {
+      const sr = await fetch("/api/engenharia/listas/servidor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo: envio.sigla, opNumero: envio.opNumero, fileNome: envio.fileNome, fileBase64: envio.fileBase64 }),
+      });
+      const sj = await lerResposta(sr);
+      if (!sr.ok) throw new Error(sj.error || "Falha ao salvar no servidor");
+      setServidor({ estado: "ok", ...sj });
+    } catch (e2) {
+      setServidor({ estado: "erro", erro: e2.message });
+    }
+  }
 
   async function importar(file) {
     if (!file) return;
@@ -94,33 +117,22 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
       // Salva o arquivo no servidor (SharePoint), na pasta da OP importada.
       const opFinal = j.opNumero || op.trim();
       if (opFinal) {
-        setServidor({ estado: "salvando" });
-        try {
-          // Numa revisão (R01+), embute uma aba "Revisao" com o diff no xlsx antes de
-          // salvar no servidor — assim o arquivo vigente carrega o que foi revisado.
-          let bufParaSalvar = buffer;
-          const ehRev = revNum != null ? revNum >= 1 : Number(j.atualizados) > 0;
-          if (ehRev && j.diff) {
-            try {
-              const revLabelLocal = revNum != null ? "R" + String(revNum).padStart(2, "0") : null;
-              const idx = wb.SheetNames.indexOf("Revisao");
-              if (idx >= 0) { wb.SheetNames.splice(idx, 1); delete wb.Sheets["Revisao"]; }
-              XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(montarAbaRevisao({ sigla, j, revLabel: revLabelLocal })), "Revisao");
-              bufParaSalvar = XLSX.write(wb, { type: "array", bookType: "xlsx" });
-            } catch { bufParaSalvar = buffer; }
-          }
-          const b64 = bufToBase64(bufParaSalvar);
-          const sr = await fetch("/api/engenharia/listas/servidor", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ tipo: sigla, opNumero: String(opFinal), fileNome: file.name, fileBase64: b64 }),
-          });
-          const sj = await lerResposta(sr);
-          if (!sr.ok) throw new Error(sj.error || "Falha ao salvar no servidor");
-          setServidor({ estado: "ok", ...sj });
-        } catch (e2) {
-          setServidor({ estado: "erro", erro: e2.message });
+        // Numa revisão (R01+), embute uma aba "Revisao" com o diff no xlsx antes de
+        // salvar no servidor — assim o arquivo vigente carrega o que foi revisado.
+        let bufParaSalvar = buffer;
+        const ehRev = revNum != null ? revNum >= 1 : Number(j.atualizados) > 0;
+        if (ehRev && j.diff) {
+          try {
+            const revLabelLocal = revNum != null ? "R" + String(revNum).padStart(2, "0") : null;
+            const idx = wb.SheetNames.indexOf("Revisao");
+            if (idx >= 0) { wb.SheetNames.splice(idx, 1); delete wb.Sheets["Revisao"]; }
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(montarAbaRevisao({ sigla, j, revLabel: revLabelLocal })), "Revisao");
+            bufParaSalvar = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+          } catch { bufParaSalvar = buffer; }
         }
+        await salvarNoServidor({ sigla, opNumero: String(opFinal), fileNome: file.name, fileBase64: bufToBase64(bufParaSalvar) });
+      } else {
+        setServidor({ estado: "erro", erro: "a OP não foi identificada — escolha a OP e importe de novo, ou salve o arquivo na pasta da OP à mão." });
       }
     } catch (e) {
       setErro(e.message);
@@ -299,6 +311,11 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
               {servidor.estado === "ok" && <><CheckCircle2 size={13} className="mt-0.5 flex-shrink-0" /> Arquivo salvo no servidor · {servidor.pastaOp}</>}
               {servidor.estado === "erro" && <><AlertCircle size={13} className="mt-0.5 flex-shrink-0" /> Importado, mas não salvou no servidor: {servidor.erro}</>}
             </p>
+          )}
+          {servidor?.estado === "erro" && ultimoEnvioRef.current && (
+            <button type="button" onClick={() => salvarNoServidor(ultimoEnvioRef.current)} className="mt-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg border border-red-200 text-red-700 hover:bg-red-50 inline-flex items-center gap-1.5">
+              <Upload size={12} /> Tentar salvar no servidor de novo
+            </button>
           )}
         </div>
       )}

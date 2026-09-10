@@ -1,7 +1,12 @@
 {
-  "build": 3060,
-  "gerado": "2026-09-10T11:34:28.784Z",
+  "build": 3061,
+  "gerado": "2026-09-10T15:34:22.400Z",
   "commits": [
+    {
+      "hash": "665cefa6",
+      "data": "10/09/2026",
+      "titulo": "fix(pcp): reconhecer croquis pelo vínculo com seus conjuntos"
+    },
     {
       "hash": "96a857ab",
       "data": "10/09/2026",
@@ -146,11 +151,6 @@
       "hash": "bf370cf6",
       "data": "08/09/2026",
       "titulo": "Gantt: obra fora do quadro sai de todas as raias, não só da bancada"
-    },
-    {
-      "hash": "b0f41132",
-      "data": "08/09/2026",
-      "titulo": "Gantt: lote concluído e velho sai do quadro; o recente fica"
     }
   ]
 }
