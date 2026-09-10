@@ -1,7 +1,12 @@
 {
-  "build": 3059,
-  "gerado": "2026-09-10T22:15:20.562Z",
+  "build": 3060,
+  "gerado": "2026-09-10T22:21:03.937Z",
   "commits": [
+    {
+      "hash": "e4ac2ee3e8",
+      "data": "10/09/2026",
+      "titulo": "MES proprio: a sessao do totem, com as travas provadas contra o Postgres real"
+    },
     {
       "hash": "c9470d317a",
       "data": "10/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b0f4113299",
       "data": "08/09/2026",
       "titulo": "Gantt: lote concluído e velho sai do quadro; o recente fica"
-    },
-    {
-      "hash": "dd0b092956",
-      "data": "08/09/2026",
-      "titulo": "Gantt: a bancada só traz as obras que o PCP está tocando; o resto vai numa lista"
     }
   ]
 }
