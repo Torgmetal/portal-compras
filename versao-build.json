@@ -1,7 +1,12 @@
 {
-  "build": 3070,
-  "gerado": "2026-09-10T21:59:14.344Z",
+  "build": 3071,
+  "gerado": "2026-09-10T22:54:06.679Z",
   "commits": [
+    {
+      "hash": "4367ace4",
+      "data": "10/09/2026",
+      "titulo": "fix: atualiza telefone de Diego Dias no portal do cliente"
+    },
     {
       "hash": "7ff2cdd8",
       "data": "10/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7486262c",
       "data": "09/09/2026",
       "titulo": "feat(pcp): programar conjuntos pendentes no Gantt e liberar aptos parcialmente"
-    },
-    {
-      "hash": "fb87d86f",
-      "data": "09/09/2026",
-      "titulo": "RNC: a reclamação vira apontamentos, cada um com a sua disposição"
     }
   ]
 }

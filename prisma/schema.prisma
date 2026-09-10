@@ -5850,3 +5850,40 @@ model GanttDistribuicao {
   @@unique([pecaId, setor])
   @@index([setor])
 }
+
+// ─── Análise Crítica de Projeto (PO-13) ───────────────────────────────────────
+// Um registro por OP, na aba Engenharia. Os blocos são JSON (listas de linhas com id)
+// porque o formato ainda vai mudar com o uso ("vamos vendo como será no dia a dia",
+// Vitor 10/09/2026). Revisão anterior fica congelada em `historico`.
+// Tabela criada por scripts/ensure-analise-critica.mjs (não usar `prisma db push`).
+model AnaliseCriticaProjeto {
+  id             String    @id @default(cuid())
+  opId           String    @unique
+  opNumero       String
+  revisao        Int       @default(0)
+  status         String    @default("EM_ANALISE") // EM_ANALISE | VERIFICADA | APROVADA
+  responsavelNome String?
+  responsavelId  String?
+  abertoEm       DateTime  @default(now())
+  aprovadoPorNome String?
+  aprovadoPorId  String?
+  aprovadoEm     DateTime?
+  entradas       Json      @default("[]")
+  requisitos     Json      @default("[]")
+  areas          Json      @default("[]")
+  riscos         Json      @default("[]")
+  saidas         Json      @default("[]")
+  comentarios    Json      @default("[]")
+  reunioes       Json      @default("[]")
+  acoes          Json      @default("[]")
+  historico      Json      @default("[]") // [{ revisao, data, porQuem, motivo, snapshot }]
+  form08Url      String?
+  form08EmitidoEm DateTime?
+  sharepointPath String?
+  sharepointEm   DateTime?
+  criadoPorId    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([opNumero])
+}
