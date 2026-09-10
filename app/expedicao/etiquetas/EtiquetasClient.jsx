@@ -260,10 +260,21 @@ export default function EtiquetasClient() {
       </div>
 
       <div className="bg-torg-blue-50/60 border border-torg-blue-100 rounded-xl px-4 py-3 text-[12.5px] text-torg-dark mb-5 mt-4">
-        <b>Antes de imprimir</b>, no diálogo do navegador: escolha a impressora
-        <b> Argox OS-214 plus</b>, deixe a escala em <b>100%</b> (nunca &quot;ajustar à página&quot;) e as margens
-        em <b>nenhuma</b>. A página do PDF já tem o tamanho exato da etiqueta — qualquer ajuste do
-        navegador só faz ela sair torta.
+        <b>Antes de imprimir</b>, no diálogo do navegador: impressora <b>Argox OS-214 plus</b>,
+        <b> Tamanho do papel: 100 × 50 mm</b>, escala em <b>100%</b> (nunca &quot;ajustar à área de
+        impressão&quot;) e margens <b>nenhuma</b>. A página do PDF já tem o tamanho exato da etiqueta.
+        <br />
+        {/* ⚠⚠ O TAMANHO DO PAPEL VEM PRIMEIRO PORQUE FOI ELE QUE ERROU. Matheus, 10/09/2026: a
+            primeira impressão real saiu deitada e esticada por três etiquetas. O diálogo estava em
+            "4 x 6" (101,6 × 152,4 mm, em pé) com "ajustar à área de impressão" — o navegador gira a
+            página deitada de 100×50 para caber num papel em pé e estica. O aviso antigo falava de
+            escala e margem, que estavam certas; o que faltava era esta linha. */}
+        <span className="block mt-1.5 text-torg-gray">
+          <b>Saiu deitada, gigante, ocupando várias etiquetas?</b> Não é o PDF — é o papel do
+          diálogo em <b>4&nbsp;×&nbsp;6</b>. Se 100&nbsp;×&nbsp;50&nbsp;mm não aparecer na lista, ele
+          precisa ser cadastrado uma vez no driver: <i>Painel de Controle → Dispositivos e
+          Impressoras → Argox → Preferências de impressão → tamanho da etiqueta</i>.
+        </span>
       </div>
 
       {erro && (

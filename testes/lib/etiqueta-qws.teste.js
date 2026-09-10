@@ -139,6 +139,18 @@ describe("gerarEtiquetasCarregamentoPDF — modelo qws", () => {
     expect(height / MM).toBeCloseTo(50, 5);
   });
 
+  // ⚠⚠ 10/09/2026: a primeira impressão de verdade na Argox saiu DEITADA e esticada por três
+  // etiquetas do rolo. O PDF estava certo — o diálogo do Windows estava com papel "4 x 6" e escala
+  // "Ajustar à área de impressão", e o Chrome girou a página de 100×50 para caber num papel em pé.
+  // O conserto principal é no driver, e está escrito na tela; estas duas chaves são o que o PDF
+  // pode fazer pela sua parte. O teste existe para elas não sumirem numa refatoração futura.
+  it("pede ao visualizador para NÃO redimensionar e escolher a mídia pelo tamanho da página", async () => {
+    const bytes = await gerarEtiquetasCarregamentoPDF({ ...base, pecas: [PECA] });
+    const prefs = (await PDFDocument.load(bytes)).catalog.getOrCreateViewerPreferences();
+    expect(String(prefs.getPrintScaling())).toBe("None");
+    expect(prefs.getPickTrayByPDFSize()).toBe(true);
+  });
+
   it("continua uma etiqueta por PEÇA, não por marca", async () => {
     const bytes = await gerarEtiquetasCarregamentoPDF({ ...base, pecas: [{ ...PECA, qte: 4 }] });
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(4);
