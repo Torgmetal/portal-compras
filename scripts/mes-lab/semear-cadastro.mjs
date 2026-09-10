@@ -84,6 +84,30 @@ function acharSyneco(vistas, { k, nome }) {
   return vistas.find((v) => alvos.includes(chave(v.nome))) || null;
 }
 
+/**
+ * ⚠⚠ ONDE O GANTT PLANEJA EM BALDE, O TOTEM PRECISA DO POSTO FÍSICO.
+ *
+ * O Gantt e o totem medem coisas diferentes, e isso só apareceu com o dado na mão:
+ *
+ * - **Acabamento**: o Gantt tem UMA bancada — decisão do Vitor (06/09/2026: "não temos bancadas
+ *   (…) a bancada única do acabamento"), certa para PLANEJAR, porque ali a capacidade é kg/dia. Mas
+ *   o chão teve **7 postos apontando no mesmo dia**. Com um recurso só e a trava de uma sessão
+ *   aberta por recurso, a segunda pessoa do dia não conseguiria abrir sessão — a trava viraria
+ *   impedimento.
+ * - **Pintura**: o Gantt fala em GALPÃO (onde) e o apontamento em MÁQUINA (com o quê). São eixos
+ *   diferentes, e a Air-less, com 8.440 apontamentos, é a máquina mais movimentada da fábrica.
+ *
+ * Planejamento e execução podem ter granularidades diferentes sem virar duas verdades: o vínculo
+ * entre elas é o SETOR. Matheus decidiu por estes dois em 10/09/2026.
+ *
+ * ⚠ O JATO NÃO ENTRA AQUI, e a exceção é deliberada. O Gantt tem Turbina e Manual — duas máquinas
+ * FÍSICAS (Vitor: "temos dois jatos, o turbina e o manual") — enquanto o Syneco cadastra as duas
+ * sob um `60A` só. Ali o Gantt é o mais PRECISO dos dois, não o mais grosso. Trocar pelos dados do
+ * histórico perderia a distinção e faria o totem não achar o `jatoBancada = "JATO_MANUAL"` que o
+ * Gantt já gravou em 22 peças.
+ */
+const POSTOS_DO_HISTORICO = new Set(["ACABAMENTO", "PINTURA"]);
+
 async function semearRecursos(setores) {
   const vistas = await maquinasVistas();
   const usadas = new Set();
@@ -91,6 +115,7 @@ async function semearRecursos(setores) {
 
   for (const gantt of SETORES) {
     const codigoSetor = SETOR_DO_GANTT[gantt] || gantt;
+    if (POSTOS_DO_HISTORICO.has(codigoSetor)) continue;   // semeado do histórico, mais abaixo
     const setorId = setores.get(codigoSetor);
     // ⚠ Entradas com `k: null` são o "sem bancada / atribuir" da tela do Gantt — opção de interface,
     // não recurso. Semear isso criaria uma máquina fantasma chamada "sem bancada".
@@ -109,6 +134,8 @@ async function semearRecursos(setores) {
       criado.createdAt.getTime() === criado.updatedAt.getTime() ? novos++ : existentes++;
     }
   }
+
+  await semearPostosFisicos(setores, vistas, usadas);
 
   // ⚠⚠ SÓ AS MÁQUINAS DA PREPARAÇÃO DO SYNECO ENTRAM ALÉM DO GANTT — o resto do histórico FICA DE
   // FORA, e isso é o ponto todo.
@@ -139,6 +166,24 @@ async function semearRecursos(setores) {
   console.log(`Recursos do Gantt: ${novos} novo(s), ${existentes} já existia(m)`);
   console.log(`Máquinas da Preparação do Syneco: ${entram.length}`);
   relatarDeFora(doHistorico.filter((v) => v.setor !== "Preparação"));
+}
+
+/** Os postos que só o histórico conhece: Acabamento e Pintura (ver `POSTOS_DO_HISTORICO`). */
+async function semearPostosFisicos(setores, vistas, usadas) {
+  const alvo = vistas.filter((v) => POSTOS_DO_HISTORICO.has(SETOR_DO_SYNECO[v.setor] || ""));
+  for (const m of alvo) {
+    usadas.add(m.codigoSyneco);
+    await lab.mesRecurso.upsert({
+      where: { codigo: chave(m.nome) },
+      update: {},
+      create: {
+        codigo: chave(m.nome), nome: m.nome, codigoSyneco: m.codigoSyneco,
+        setorId: setores.get(SETOR_DO_SYNECO[m.setor]),
+        tipo: SETOR_DO_SYNECO[m.setor] === "ACABAMENTO" ? "BANCADA" : "MAQUINA",
+      },
+    });
+  }
+  console.log(`Postos físicos (Acabamento e Pintura, do histórico): ${alvo.length}`);
 }
 
 /**
