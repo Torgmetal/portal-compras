@@ -1,7 +1,12 @@
 {
-  "build": 3051,
-  "gerado": "2026-09-10T17:38:07.313Z",
+  "build": 3052,
+  "gerado": "2026-09-10T17:48:44.782Z",
   "commits": [
+    {
+      "hash": "d0477aca44",
+      "data": "10/09/2026",
+      "titulo": "MES proprio: configuracao real do IoT dos lasers, extraida pela API"
+    },
     {
       "hash": "e2971f5ab0",
       "data": "10/09/2026",
@@ -146,11 +151,6 @@
       "hash": "61ffa732d4",
       "data": "08/09/2026",
       "titulo": "Liberação: conjunto não compra aço — ele herda o material dos croquis"
-    },
-    {
-      "hash": "72e6eefb03",
-      "data": "08/09/2026",
-      "titulo": "Rastreio: no U enrijecido a espessura da chapa é a quarta medida"
     }
   ]
 }

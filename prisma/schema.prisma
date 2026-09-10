@@ -5834,3 +5834,229 @@ model FotoObra {
   @@index([opId])
   @@index([criadoEm])
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TORG MES — execução da produção (ver docs/mes-proprio.md)
+//
+// Substituto do Syneco, nascido no banco do portal. NADA aqui está em produção:
+// a rota é /mes-lab, fechada ao ADMIN, e o apontamento de verdade continua no
+// Syneco até a virada.
+//
+// ⚠⚠ ACOPLAMENTO FRACO COM O PORTAL, DE PROPÓSITO. `funcionarioId`, `opId` e
+// `pecaId` são String SEM `@relation`. Não é descuido: (1) o MES precisa poder
+// rodar amanhã num GATEWAY LOCAL na fábrica, com banco próprio, e FK rígida pra
+// tabela do portal viraria impedimento; (2) mantém a fronteira do módulo
+// explícita — quem manda no cadastro é o portal, quem manda no evento de
+// execução é o MES.
+//
+// ⚠⚠ `ambiente` EM TUDO QUE É FATO (sessão, evento, quantidade). DEMO nunca
+// projeta pro operacional nem soma em relatório. É o isolamento do laboratório
+// por DADO, já que o banco é o mesmo.
+//
+// ⚠ O modelo copia o acerto do Syneco: o EVENTO é um INSTANTE (`ocorridoEm`),
+// não um intervalo. A duração de um estado é o tempo até o próximo evento do
+// recurso. Assim OEE, tempo decorrido e paradas caem todos da mesma fonte.
+// ══════════════════════════════════════════════════════════════════════════════
+
+model MesRecurso {
+  id          String   @id @default(cuid())
+  codigo      String   @unique // "09", "30A", "50J" — o que o operador vê no totem
+  nome        String // "LASER CHAPA"
+  setor       String // Corte, Montagem, Solda, Acabamento, Jato, Pintura, Serralheria, Expedição
+  tipo        String   @default("MAQUINA") // MAQUINA | BANCADA | POSTO
+  ativo       Boolean  @default(true)
+  temTerminal Boolean  @default(true)
+  ambiente    String   @default("PROD")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sessoes      MesSessao[]
+  eventos      MesEvento[]
+  dispositivos MesDispositivo[]
+
+  @@index([setor])
+  @@index([ativo])
+  @@index([ambiente])
+}
+
+model MesOperador {
+  id            String   @id @default(cuid())
+  cracha        String   @unique // o que o leitor bipa
+  nome          String // desnormalizado: o histórico não pode mudar se o cadastro mudar
+  funcionarioId String? // -> Funcionario.id (sem FK, ver cabeçalho)
+  ativo         Boolean  @default(true)
+  ambiente      String   @default("PROD")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessoes MesSessao[]
+  eventos MesEvento[]
+
+  @@index([ativo])
+  @@index([funcionarioId])
+}
+
+// Catálogo de motivos de parada. `planejada` separa o que TIRA do tempo planejado
+// (refeição, manutenção programada) do que conta contra a Disponibilidade.
+model MesMotivoParada {
+  id        String   @id @default(cuid())
+  codigo    String   @unique
+  descricao String
+  planejada Boolean  @default(false)
+  cor       String? // para o monitor
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  eventos MesEvento[]
+
+  @@index([ativo])
+}
+
+// SESSÃO = o operador produzindo uma marca num recurso. Abre e fecha.
+//
+// ⚠ Encerrar a sessão NÃO é concluir a OP: a sessão pode produzir parte do
+// saldo, e o restante continua disponível para a próxima.
+model MesSessao {
+  id         String    @id @default(cuid())
+  recursoId  String
+  operadorId String?
+  // Contexto produtivo. A marca NÃO é única globalmente — a chave é obra + marca
+  // (+ operação), por isso `opId`/`opNumero` andam junto e nunca a marca sozinha.
+  opId       String? // -> OP.id
+  opNumero   String? // "T112A56" (código da obra no chão de fábrica)
+  marca      String?
+  pecaId     String? // -> PecaConjunto.id, quando resolvido
+  operacao   String? // etapa/setor da vez
+  planejadoQtd Float   @default(0)
+  status     String    @default("ABERTA") // ABERTA | ENCERRADA | CANCELADA
+  abertaEm   DateTime  @default(now())
+  encerradaEm DateTime?
+  ambiente   String    @default("PROD")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  recurso     MesRecurso          @relation(fields: [recursoId], references: [id])
+  operador    MesOperador?        @relation(fields: [operadorId], references: [id])
+  eventos     MesEvento[]
+  apontamentos MesApontamentoQtd[]
+
+  // ⚠⚠ UMA SESSÃO ABERTA POR RECURSO tem de ser garantida por ÍNDICE PARCIAL no
+  // Postgres (`ON "MesSessao"("recursoId") WHERE status = 'ABERTA'`), que o
+  // Prisma não sabe declarar. AINDA NÃO EXISTE — entra em
+  // scripts/ensure-mes-tables.mjs junto com a criação das tabelas, igual ao da
+  // ConferenciaPeca. Sem ele, dois totens abrem duas sessões no mesmo recurso e
+  // ninguém percebe. Validar a rota só depois que o índice estiver no banco.
+  @@index([recursoId, status])
+  @@index([opId])
+  @@index([opNumero, marca])
+  @@index([abertaEm])
+  @@index([ambiente])
+}
+
+// EVENTO = transição de estado, num INSTANTE. Fato imutável.
+model MesEvento {
+  id         String   @id @default(cuid())
+  recursoId  String
+  sessaoId   String?
+  operadorId String?
+  tipo       String // PRODUCAO | SETUP | PARADA | RETRABALHO | MANUTENCAO | FORA_TURNO | ENCERRAMENTO
+  motivoId   String? // obrigatório na prática quando tipo = PARADA
+  origem     String   @default("TERMINAL") // TERMINAL | IOT | CORRECAO | SIMULADOR
+  // ⚠ DOIS RELÓGIOS, de propósito: `ocorridoEm` é quando aconteceu na fábrica;
+  // `recebidoEm` é quando o servidor soube. Com fila offline e coletor atrasado
+  // os dois divergem, e misturar os dois é o que faz OEE mentir.
+  ocorridoEm DateTime
+  recebidoEm DateTime @default(now())
+  // Idempotência: mesmo clique/retry/sinal repetido = um efeito só.
+  chaveIdem  String?
+  sequencia  Int? // sequência do dispositivo, quando houver
+  detalhe    String?
+  ambiente   String   @default("PROD")
+  createdAt  DateTime @default(now())
+
+  recurso  MesRecurso       @relation(fields: [recursoId], references: [id])
+  sessao   MesSessao?       @relation(fields: [sessaoId], references: [id])
+  operador MesOperador?     @relation(fields: [operadorId], references: [id])
+  motivo   MesMotivoParada? @relation(fields: [motivoId], references: [id])
+
+  @@unique([recursoId, chaveIdem])
+  @@index([recursoId, ocorridoEm])
+  @@index([sessaoId])
+  @@index([tipo])
+  @@index([ocorridoEm])
+  @@index([ambiente])
+}
+
+// QUANTIDADE = incremento explícito. Nunca acumulado, nunca implícito.
+//
+// ⚠ Rejeito não é peça boa e retrabalho não é produção nova — três colunas
+// separadas, e quem soma decide o que quer somar.
+model MesApontamentoQtd {
+  id         String   @id @default(cuid())
+  sessaoId   String
+  operadorId String?
+  boas       Float    @default(0)
+  rejeitadas Float    @default(0)
+  retrabalho Float    @default(0)
+  unidade    String   @default("UN") // UN | KG
+  origem     String   @default("TERMINAL")
+  // Mesma chave de idempotência da Conferência de Peça: o front gera uma por
+  // TENTATIVA e só troca depois do sucesso, então reenviar não duplica.
+  chaveOperacao String?
+  observacao String?
+  ocorridoEm DateTime @default(now())
+  ambiente   String   @default("PROD")
+  createdAt  DateTime @default(now())
+
+  sessao MesSessao @relation(fields: [sessaoId], references: [id])
+
+  @@unique([sessaoId, chaveOperacao])
+  @@index([sessaoId])
+  @@index([ocorridoEm])
+  @@index([ambiente])
+}
+
+// COLETOR de sinal. Hoje o Syneco usa módulo USB no PC do terminal; a proposta
+// é migrar pra Modbus TCP (ver docs/mes-proprio.md §8).
+//
+// ⚠⚠ CONECTIVIDADE É DIMENSÃO SEPARADA DO ESTADO PRODUTIVO. Coletor mudo NÃO é
+// máquina parada — o monitor mostra o último estado conhecido com a idade do
+// dado, e nunca inventa "parado" por falta de sinal.
+model MesDispositivo {
+  id             String    @id @default(cuid())
+  recursoId      String
+  nome           String
+  tipo           String    @default("MODBUS_TCP") // MODBUS_TCP | USB | SIMULADOR
+  host           String? // IP, quando em rede
+  porta          Int? // 502 no Modbus TCP
+  config         Json? // mapa de registradores/variáveis: Spindle, CycleCount...
+  ativo          Boolean   @default(true)
+  estadoConexao  String    @default("DESCONHECIDO") // CONECTADO | ATRASADO | DESCONECTADO | DESCONHECIDO
+  ultimoContatoEm DateTime?
+  ambiente       String    @default("PROD")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  recurso MesRecurso @relation(fields: [recursoId], references: [id])
+
+  @@index([recursoId])
+  @@index([ativo])
+}
+
+// CORREÇÃO — o fato original nunca é apagado. Guarda o antes/depois e o motivo,
+// espelhando o que as procs MCA_Correcao_* do Syneco faziam de certo.
+model MesCorrecao {
+  id         String   @id @default(cuid())
+  entidade   String // MesEvento | MesApontamentoQtd | MesSessao
+  entidadeId String
+  campo      String
+  valorAntes String?
+  valorDepois String?
+  motivo     String
+  userId     String? // -> User.id (quem corrigiu no portal)
+  criadoEm   DateTime @default(now())
+
+  @@index([entidade, entidadeId])
+  @@index([criadoEm])
+}
