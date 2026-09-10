@@ -1,7 +1,12 @@
 {
-  "build": 3058,
-  "gerado": "2026-09-10T11:06:14.375Z",
+  "build": 3059,
+  "gerado": "2026-09-10T11:22:39.421Z",
   "commits": [
+    {
+      "hash": "279f4860",
+      "data": "10/09/2026",
+      "titulo": "fix(pcp): distribuir quantidades de marcas entre dias e bancadas"
+    },
     {
       "hash": "8fa0993d",
       "data": "09/09/2026",
@@ -146,11 +151,6 @@
       "hash": "dd0b0929",
       "data": "08/09/2026",
       "titulo": "Gantt: a bancada só traz as obras que o PCP está tocando; o resto vai numa lista"
-    },
-    {
-      "hash": "a8b2e829",
-      "data": "08/09/2026",
-      "titulo": "Gantt: o que já está na bancada aparece, mesmo sem ninguém ter programado"
     }
   ]
 }

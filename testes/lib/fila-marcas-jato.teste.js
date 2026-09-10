@@ -55,3 +55,9 @@ it('volta a oferecer a peça na Solda após recebimento',async()=>{
  feitos.set('C1|MONTAGEM',2);
  expect((await filasSemProgramacao()).SOLDA.map(p=>p.id)).toEqual(['C1']);
 });
+it('ordem aberta no Syneco não recoloca croqui nas filas posteriores ao Corte',async()=>{
+ pecas=[peca('P1','CROQUI')];
+ mockPrisma.mesOrdem.findMany.mockResolvedValue([{opId:'op112',item:'P1',setor:'Jato',saldoUn:2}]);
+ const filas=await filasSemProgramacao();
+ expect(filas.JATO).toEqual([]);
+});

@@ -45,3 +45,8 @@ it('conserva peso e custo também nos totais dos lotes usados para capacidade',a
  expect(ls.reduce((s,l)=>s+l.custo,0)).toBeCloseTo(4/53,10);
  vi.useRealTimers();
 });
+it('programação antiga de croqui não reaparece no Jato sem bancada',async()=>{
+ db.pecaConjunto.findMany.mockImplementation(async({where})=>where.jatoDiaProgramado?[{...p,tipoPeca:'CROQUI',jatoDiaProgramado:new Date('2026-09-10'),jatoBancada:null}]:[]);
+ db.ganttDistribuicao.findMany.mockResolvedValue([]);
+ expect(await lotesProgramados()).toEqual([]);vi.useRealTimers();
+});

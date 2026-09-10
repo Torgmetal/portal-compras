@@ -129,3 +129,10 @@ it('avisa no diálogo de exclusão que apagar a marca afeta todos os seus dias e
  expect(document.querySelector('dialog h3').textContent).toContain('Apagar a programação');
  delete HTMLDialogElement.prototype.showModal;
 });
+it('oferece planilha completa na raia sem bancada do Jato',async()=>{
+ const {baixarListaDoPosto}=await import('@/lib/lista-posto-cliente');
+ vi.stubGlobal('fetch',vi.fn(async()=>resposta({hoje:dia,lotes:[{...structuredClone(lote),setor:'JATO',recurso:null}]})));
+ render(<GanttProgramacao/>);await waitFor(()=>expect(document.querySelector('[data-lista="fila"][data-setor="JATO"]')).toBeTruthy());
+ fireEvent.click(document.querySelector('[data-lista="fila"][data-setor="JATO"]'));
+ expect(baixarListaDoPosto).toHaveBeenCalledWith(expect.objectContaining({setor:'JATO',recurso:'',periodo:'fila'}));
+});
