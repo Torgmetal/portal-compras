@@ -1,7 +1,9 @@
 // Etiquetas de carregamento — as que hoje saem do BarTender.
 //
 // GET  ?opId=xxx   → as marcas daquela OP, para a tela montar a seleção
-// POST { opId, marcas[] } → o PDF, uma página de 100×50 mm por PEÇA
+// POST { opId, marcas[], modelo? } → o PDF, uma página de 100×50 mm por PEÇA
+//   `modelo` é "padrao" (o desenho de sempre) ou "qws" (o do cliente da OP-102, que pede TAG
+//   Petrobras e referência de desenho — ver `lib/etiqueta-qws-pdf.js`).
 //
 // ⚠ NÃO EXISTE UPLOAD DE PLANILHA AQUI, E ISSO É DE PROPÓSITO. O fluxo do BarTender era exportar
 // planilha → importar no BarTender → imprimir. A Lista de Expedição já está no portal (ver
@@ -10,7 +12,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { gerarEtiquetasCarregamentoPDF } from "@/lib/etiqueta-carregamento-pdf";
+import { MODELOS, gerarEtiquetasCarregamentoPDF } from "@/lib/etiqueta-carregamento-pdf";
+import { camposExtrasDaOP, juntarCamposExtras } from "@/lib/etiqueta-campos-extras";
 import { itensExpediveisDaOP, opsComItensExpediveis } from "@/lib/itens-expedicao";
 import { log } from "@/lib/log";
 
@@ -123,14 +126,23 @@ async function selecionar(corpo) {
   const opId = corpo?.opId;
   const marcas = Array.isArray(corpo?.marcas) ? corpo.marcas : [];
   if (!opId || !marcas.length) return { recusa: erro400("Escolha a OP e ao menos uma marca.") };
+  // ⚠ Modelo vindo da tela é validado contra a lista, não usado direto: um valor qualquer no corpo
+  // não pode escolher um caminho de desenho que não existe.
+  const modelo = MODELOS.includes(corpo?.modelo) ? corpo.modelo : "padrao";
 
   const dados = await carregar(opId);
   if (!dados) return { recusa: NextResponse.json({ success: false, error: "OP não encontrada" }, { status: 404 }) };
 
   const escolhidas = new Set(marcas.map(String));
-  const pecas = dados.pecas.filter((p) => escolhidas.has(p.marca));
+  let pecas = dados.pecas.filter((p) => escolhidas.has(p.marca));
   if (!pecas.length) return { recusa: erro400("Nenhuma das marcas enviadas existe nesta OP.") };
-  return { op: dados.op, pecas };
+
+  // Só o modelo do cliente lê estes campos — o padrão não faria nada com eles, e a consulta seria
+  // um round-trip ao Neon por impressão sem serventia nenhuma.
+  if (modelo === "qws") {
+    pecas = juntarCamposExtras(pecas, await camposExtrasDaOP(prisma, dados.op.numero));
+  }
+  return { op: dados.op, pecas, modelo };
 }
 
 /**
@@ -140,7 +152,7 @@ async function selecionar(corpo) {
  * ⚠ Não-fatal de propósito: uma falha ao registrar não pode segurar o PDF que já foi gerado. O
  * pior caso é a coluna dizer "—" para uma etiqueta impressa; imprimir de novo custa um adesivo.
  */
-async function registrarImpressao(user, op, pecas) {
+async function registrarImpressao(user, op, pecas, modelo) {
   try {
     await prisma.auditLog.createMany({
       data: pecas.map((p) => ({
@@ -148,7 +160,7 @@ async function registrarImpressao(user, op, pecas) {
         action: ACAO,
         entity: ENTIDADE,
         entityId: chaveHistorico(op.numero, p.marca),
-        diff: { op: op.numero, marca: p.marca, etiquetas: Math.max(1, p.qte || 1), por: user?.name || null },
+        diff: { op: op.numero, marca: p.marca, etiquetas: Math.max(1, p.qte || 1), modelo, por: user?.name || null },
       })),
     });
   } catch (e) {
@@ -162,7 +174,7 @@ export async function POST(req) {
 
   let corpo;
   try { corpo = await req.json(); } catch { corpo = null; }
-  const { recusa, op, pecas } = await selecionar(corpo);
+  const { recusa, op, pecas, modelo } = await selecionar(corpo);
   if (recusa) return recusa;
 
   const dados = { op };
@@ -184,10 +196,11 @@ export async function POST(req) {
       // etiqueta mostrar exatamente o que está na OP, seja lá qual for a convenção que ela use.
       opNumero: dados.op.numero,
       pecas,
+      modelo,
     });
     // ⚠ SÓ DEPOIS DE O PDF EXISTIR. Carimbar antes marcaria como impressa uma marca cuja geração
     // falhou — e a tela ficaria dizendo "já saiu" para uma etiqueta que ninguém viu.
-    await registrarImpressao(user, dados.op, pecas);
+    await registrarImpressao(user, dados.op, pecas, modelo);
     registro.info(`OP ${dados.op.numero}: ${pecas.length} marca(s), ${total} etiqueta(s)`);
     return new NextResponse(Buffer.from(pdf), {
       headers: {

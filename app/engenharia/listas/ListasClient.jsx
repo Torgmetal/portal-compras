@@ -1,7 +1,8 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Upload, Loader2, CheckCircle2, AlertCircle, ListChecks, FileSpreadsheet, Info, Send } from "lucide-react";
+import { Upload, Loader2, CheckCircle2, AlertCircle, AlertTriangle, ListChecks, FileSpreadsheet, Info, Send } from "lucide-react";
 import CoberturaListas from "./CoberturaListas";
+import { montarAbaRevisao, divergencia } from "./revisao-lista";
 
 const fmt = (n) => Number(n || 0).toLocaleString("pt-BR");
 
@@ -12,28 +13,6 @@ function bufToBase64(buffer) {
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
   return btoa(bin);
-}
-
-// Monta a aba "Revisão" (AoA) que vai embutida no xlsx salvo no servidor: metadados
-// + o diff automático (marcas incluídas / removidas / alteradas por peso).
-function montarAbaRevisao({ sigla, j, revLabel }) {
-  const d = j.diff || {};
-  const nome = sigla === "LPC" ? "Lista de Peças por Conjunto (LPC)" : "Lista de Expedição (LE)";
-  return [
-    ["REVISÃO DA LISTA"],
-    ["Tipo", nome],
-    ["OP", j.opNumero || ""],
-    ["Obra", j.obra || ""],
-    ["Revisão", revLabel || ""],
-    ["Importado em", new Date().toLocaleString("pt-BR")],
-    [],
-    ["Resumo", `${d.nIncluidas || 0} incluídas · ${d.nRemovidas || 0} removidas · ${d.nAlteradas || 0} alteradas`],
-    [],
-    ["Marca", "Situação", "Peso anterior (kg)", "Peso novo (kg)"],
-    ...(d.incluidas || []).map((x) => [x.marca, "INCLUÍDA", "", x.peso]),
-    ...(d.alteradas || []).map((x) => [x.marca, "ALTERADA", x.de, x.para]),
-    ...(d.removidas || []).map((x) => [x.marca, "REMOVIDA", x.peso, ""]),
-  ];
 }
 
 // Lê a resposta como JSON; se vier HTML (timeout/413/500), mostra o motivo real
@@ -126,7 +105,7 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
             const revLabelLocal = revNum != null ? "R" + String(revNum).padStart(2, "0") : null;
             const idx = wb.SheetNames.indexOf("Revisao");
             if (idx >= 0) { wb.SheetNames.splice(idx, 1); delete wb.Sheets["Revisao"]; }
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(montarAbaRevisao({ sigla, j, revLabel: revLabelLocal })), "Revisao");
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(montarAbaRevisao({ sigla, j, revLabel: revLabelLocal, sobrescrever })), "Revisao");
             bufParaSalvar = XLSX.write(wb, { type: "array", bookType: "xlsx" });
           } catch { bufParaSalvar = buffer; }
         }
@@ -178,6 +157,9 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
     }
   }
 
+  // O aviso de divergência entre o que o import previu e o que gravou (ver `revisao-lista.js`).
+  const aviso = divergencia(res, sobrescrever);
+
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
       <div className="flex items-start gap-3">
@@ -218,6 +200,20 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
             {res.marcas != null && <span>Marcas: {fmt(res.marcas)}</span>}
             {res.pesoTotal != null && <span>Peso: {fmt(Math.round(res.pesoTotal))} kg</span>}
           </div>
+          {/* ⚠⚠ "IMPORTADO" NÃO É "ENTROU". A LE R01 da OP-102 (13/08/2026) fechou com o aviso
+              verde e o arquivo arquivado dizendo "18 incluídas" — e nenhuma das 18 chegou ao banco.
+              O defeito era do importador e já foi corrigido, mas o que deixou isso passar quatro
+              semanas foi a tela não ter onde mostrar a diferença entre o que ia gravar e o que
+              gravou. Aqui a divergência aparece ANTES de alguém tratar a lista como vigente. */}
+          {aviso && (
+            <div className="mt-2.5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-[12px] text-amber-900">
+              <p className="font-semibold flex items-start gap-1.5">
+                <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
+                O import não gravou o que tinha previsto
+              </p>
+              <p className="mt-1">{aviso}</p>
+            </div>
+          )}
           {/* ⚠⚠ O QUE A REVISÃO TROUXE — e o que ela levou. Vitor (03/09/2026): "vamos perder
               programação já feita e teríamos retrabalho; o correto é apenas alertar as peças novas,
               não tirar tudo da programação; deixar em aberto para programar apenas as peças novas

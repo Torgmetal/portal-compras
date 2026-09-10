@@ -3200,6 +3200,35 @@ model PecaConjunto {
   @@index([tipoPeca])
 }
 
+// Campos que só o modelo de etiqueta de um cliente pede (hoje: QWS/Petrobras, OP-102) e que
+// não existem em `PecaConjunto` — não é dado de fabricação, é dado do formulário do cliente
+// final. Fica em tabela própria, não em mais colunas em `PecaConjunto`, porque é específico de
+// UMA etiqueta, não do fluxo de produção.
+//
+// ⚠ Chave é (opNumero, marca, unidade) — o id de `PecaConjunto` não sobrevive a uma reimportação
+// da LE, a marca sim (mesma lição de `chaveHistorico` em app/api/expedicao/etiquetas/route.js).
+//
+// ⚠⚠ UMA LINHA POR UNIDADE, NÃO POR MARCA. Matheus (10/09/2026): "quando eu importar uma planilha
+// e uma marca se repetir é porque a REFERENCIA E TAG PETROBRAS são diferentes para cada unidade
+// dessa peça, então em cada etiqueta vai uma referência igual na planilha". A T102A15 da OP-102 são
+// 3 peças em 3 linhas, cada uma com a sua TAG (HC725-001, HC725-002, HC726-001). Guardar por marca
+// faria as 3 etiquetas saírem com a TAG da primeira — e o recebimento do cliente confere por ela.
+model EtiquetaCampoExtra {
+  id       String @id @default(cuid())
+  opNumero String
+  marca    String
+  /// 1, 2, 3… na ordem em que a linha aparece na planilha. A etiqueta "2/3" leva a unidade 2.
+  unidade      Int      @default(1)
+  descricao    String? // a "DESCRIÇÃO" da planilha do cliente (ex.: "SE-001") — não é o perfil;
+  // `PecaConjunto.descricao` guarda o perfil ("L2''X1/4''"), este é a posição/etiqueta do desenho.
+  referencia   String? // ex.: "2"-HC-20A-2371-Cc-NI"
+  tagPetrobras String? // ex.: "PS-20A-V1419338-001"
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([opNumero, marca, unidade])
+}
+
 // Divisão da entrega de um conjunto por endereço/local (mesma OP pode ter
 // vários destinos; cada linha = quantas unidades vão para aquele local).
 model ConjuntoEntrega {

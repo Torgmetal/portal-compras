@@ -12,7 +12,11 @@ import { mockPrisma } from "@/testes/apoio/prisma";
 const mocks = vi.hoisted(() => ({ role: vi.fn(), pdf: vi.fn() }));
 vi.mock("@/lib/session", () => ({ requireRole: mocks.role }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma, prismaDirect: mockPrisma }));
-vi.mock("@/lib/etiqueta-carregamento-pdf", () => ({ gerarEtiquetasCarregamentoPDF: mocks.pdf }));
+vi.mock("@/lib/etiqueta-carregamento-pdf", () => ({
+  gerarEtiquetasCarregamentoPDF: mocks.pdf,
+  // A rota valida o modelo pedido contra esta lista antes de desenhar.
+  MODELOS: ["padrao", "qws"],
+}));
 import { GET, POST } from "@/app/api/expedicao/etiquetas/route";
 
 // O retrato da OP-97: dois conjuntos e um parafuso na LE, duas posições fora dela.

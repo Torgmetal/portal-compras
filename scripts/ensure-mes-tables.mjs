@@ -57,6 +57,33 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "MesInativo_item_idx" ON "MesInativo"("item")`);
   console.log("[ensure-mes-tables] OK — MesInativo garantida.");
 
+  // EtiquetaCampoExtra — os campos que só o modelo de etiqueta de um cliente pede
+  // (QWS/Petrobras, OP-102): referência do desenho, TAG Petrobras e a "descrição" de posição
+  // ("SE-001"), que não é o perfil guardado em `PecaConjunto.descricao`. Chave por
+  // (opNumero, marca): o id da peça não sobrevive a uma reimportação da LE, a marca sim.
+  // 10/09/2026. Idempotente.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "EtiquetaCampoExtra" (
+      "id"           TEXT         NOT NULL,
+      "opNumero"     TEXT         NOT NULL,
+      "marca"        TEXT         NOT NULL,
+      "unidade"      INTEGER      NOT NULL DEFAULT 1,
+      "descricao"    TEXT,
+      "referencia"   TEXT,
+      "tagPetrobras" TEXT,
+      "criadoEm"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "atualizadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "EtiquetaCampoExtra_pkey" PRIMARY KEY ("id")
+    )
+  `);
+  // ⚠ UMA LINHA POR UNIDADE. A primeira versão desta tabela era única por (opNumero, marca) e a
+  // marca com 3 peças perdia 2 TAGs. Os dois comandos abaixo levam a tabela antiga para o formato
+  // novo sem apagar nada — e não fazem efeito nenhum numa tabela já criada certa.
+  await prisma.$executeRawUnsafe(`ALTER TABLE "EtiquetaCampoExtra" ADD COLUMN IF NOT EXISTS "unidade" INTEGER NOT NULL DEFAULT 1`);
+  await prisma.$executeRawUnsafe(`DROP INDEX IF EXISTS "EtiquetaCampoExtra_opNumero_marca_key"`);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "EtiquetaCampoExtra_opNumero_marca_unidade_key" ON "EtiquetaCampoExtra"("opNumero","marca","unidade")`);
+  console.log("[ensure-mes-tables] OK — EtiquetaCampoExtra garantida.");
+
   // PrioridadeTvOp (OPs fixadas manualmente na TV de Prioridades por setor). Idempotente.
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "PrioridadeTvOp" (

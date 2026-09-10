@@ -1,156 +1,156 @@
 {
-  "build": 3061,
-  "gerado": "2026-09-10T15:34:22.400Z",
+  "build": 3062,
+  "gerado": "2026-09-10T17:01:38.961Z",
   "commits": [
     {
-      "hash": "665cefa6",
+      "hash": "1a921bbb25",
+      "data": "10/09/2026",
+      "titulo": "Listas: botão para tentar salvar no servidor de novo quando o salvamento automático falha"
+    },
+    {
+      "hash": "665cefa6cd",
       "data": "10/09/2026",
       "titulo": "fix(pcp): reconhecer croquis pelo vínculo com seus conjuntos"
     },
     {
-      "hash": "96a857ab",
+      "hash": "96a857ab83",
       "data": "10/09/2026",
       "titulo": "fix(pcp): imprimir fila sem bancada e excluir croquis posteriores ao corte"
     },
     {
-      "hash": "279f4860",
+      "hash": "279f4860ac",
       "data": "10/09/2026",
       "titulo": "fix(pcp): distribuir quantidades de marcas entre dias e bancadas"
     },
     {
-      "hash": "8fa0993d",
+      "hash": "8fa0993d66",
       "data": "09/09/2026",
       "titulo": "fix: alinhar fila do Gantt ao bloqueio de terceiros"
     },
     {
-      "hash": "53b000af",
+      "hash": "53b000afb1",
       "data": "09/09/2026",
       "titulo": "Amplia o Gantt e mantém navegação e salvamento acessíveis"
     },
     {
-      "hash": "513bd47a",
+      "hash": "513bd47a34",
       "data": "09/09/2026",
       "titulo": "Permite programar fabricação aos sábados pelo Gantt"
     },
     {
-      "hash": "04eb38a6",
+      "hash": "04eb38a6cf",
       "data": "09/09/2026",
       "titulo": "PCP: Baixa em Lote — um clique fecha um setor inteiro de uma OP"
     },
     {
-      "hash": "cfe8eadd",
+      "hash": "cfe8eadd1e",
       "data": "09/09/2026",
       "titulo": "Produção: peça expedida dá baixa na rota inteira"
     },
     {
-      "hash": "88ca2b72",
+      "hash": "88ca2b7258",
       "data": "09/09/2026",
       "titulo": "Gantt: da solda em diante a fila aparece sem esperar liberação"
     },
     {
-      "hash": "fd38991b",
+      "hash": "fd38991bc8",
       "data": "09/09/2026",
       "titulo": "Montagem: os quatro nomes das bancadas estavam trocados"
     },
     {
-      "hash": "c91ef1b0",
+      "hash": "c91ef1b043",
       "data": "09/09/2026",
       "titulo": "Produção: apontamento na frente dá baixa nos setores anteriores"
     },
     {
-      "hash": "0bfeced9",
+      "hash": "0bfeced9e7",
       "data": "09/09/2026",
       "titulo": "Encaminha marcas avulsas do corte diretamente ao jato"
     },
     {
-      "hash": "81b92be3",
+      "hash": "81b92be350",
       "data": "09/09/2026",
       "titulo": "Corrige persistência e atualização do Gantt em todos os setores"
     },
     {
-      "hash": "03e3fc62",
+      "hash": "03e3fc620a",
       "data": "09/09/2026",
       "titulo": "Gantt: a raia do jato deixa de virar uma página em branco"
     },
     {
-      "hash": "9b38a021",
+      "hash": "9b38a0213d",
       "data": "09/09/2026",
       "titulo": "Remessa Terceiro: vincula o Projeto no Omie automaticamente"
     },
     {
-      "hash": "3ec99dcb",
+      "hash": "3ec99dcb54",
       "data": "09/09/2026",
       "titulo": "Remessa Terceiro: campo pra informar o valor por kg (faltava na tela)"
     },
     {
-      "hash": "d11b5150",
+      "hash": "d11b51500e",
       "data": "09/09/2026",
       "titulo": "PCP: peça no terceiro sai do aviso de liberações"
     },
     {
-      "hash": "4c0388fa",
+      "hash": "4c0388fae4",
       "data": "09/09/2026",
       "titulo": "fix(pcp): incluir todos os conjuntos na pre-programacao sem bancada"
     },
     {
-      "hash": "caa85be6",
+      "hash": "caa85be6d9",
       "data": "09/09/2026",
       "titulo": "Solda: a bancada passa a ter nome de soldador"
     },
     {
-      "hash": "7486262c",
+      "hash": "7486262cb8",
       "data": "09/09/2026",
       "titulo": "feat(pcp): programar conjuntos pendentes no Gantt e liberar aptos parcialmente"
     },
     {
-      "hash": "fb87d86f",
+      "hash": "fb87d86f6d",
       "data": "09/09/2026",
       "titulo": "RNC: a reclamação vira apontamentos, cada um com a sua disposição"
     },
     {
-      "hash": "626a6f1b",
+      "hash": "626a6f1b6e",
       "data": "09/09/2026",
       "titulo": "feat(qualidade): anexar relatório às auditorias"
     },
     {
-      "hash": "7c3ca4d2",
+      "hash": "7c3ca4d2c3",
       "data": "09/09/2026",
       "titulo": "Comercial: página de Custo de Fabricação — só o custo, medido"
     },
     {
-      "hash": "13123e95",
+      "hash": "13123e956e",
       "data": "09/09/2026",
       "titulo": "Conferência de peça: cancelar sessão aberta por engano, direto na saída"
     },
     {
-      "hash": "bae39f97",
+      "hash": "bae39f9791",
       "data": "09/09/2026",
       "titulo": "Conferência de peça: Modo Pátio de verdade (tela cheia no celular)"
     },
     {
-      "hash": "f0495671",
+      "hash": "f049567133",
       "data": "09/09/2026",
       "titulo": "Conferência de peça: concorrência, idempotência e acesso corrigidos"
     },
     {
-      "hash": "c2b4991e",
+      "hash": "c2b4991ebb",
       "data": "09/09/2026",
       "titulo": "feat(lqc): integrar itens comerciais, pintura e boletins por fabricante"
     },
     {
-      "hash": "2ff928af",
+      "hash": "2ff928afc7",
       "data": "09/09/2026",
       "titulo": "O sino: notificações por módulo e por pessoa, em toda sidebar"
     },
     {
-      "hash": "f484941e",
+      "hash": "f484941eb5",
       "data": "09/09/2026",
       "titulo": "LQC: refina cabeçalho, totais e áreas recolhíveis"
-    },
-    {
-      "hash": "bf370cf6",
-      "data": "08/09/2026",
-      "titulo": "Gantt: obra fora do quadro sai de todas as raias, não só da bancada"
     }
   ]
 }
