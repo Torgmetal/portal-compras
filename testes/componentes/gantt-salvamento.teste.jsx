@@ -68,3 +68,22 @@ it('preserva a semana e o setor selecionado ao recarregar a programação',async
  fireEvent.click($('recarregar'));await act(async()=>{});
  expect($('periodo').textContent).toBe(periodo);expect(document.querySelector('.barra [data-setor="CORTE"]').classList.contains('on')).toBe(false);
 });
+it('ampliar e reduzir com Escape preserva as alterações pendentes',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>resposta(dados())));
+ render(<GanttProgramacao/>);await waitFor(()=>expect(document.querySelector('.barra-op')).toBeTruthy());await mover();
+ fireEvent.click($('pFechar'));fireEvent.click($('cheio'));
+ expect(document.querySelector('.gpcp').classList.contains('cheio')).toBe(true);
+ expect($('nAlt').textContent).toBe('1');
+ fireEvent.keyDown(window,{key:'Escape'});
+ expect(document.querySelector('.gpcp').classList.contains('cheio')).toBe(false);
+ expect($('nAlt').textContent).toBe('1');
+ expect(document.querySelector('.barra-op').closest('[data-rec]').dataset.rec).toBe('SOLDA 2');
+});
+it('recarregar no modo ampliado mantém o controle de reduzir a tela',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>resposta(dados())));
+ render(<GanttProgramacao/>);await waitFor(()=>expect(document.querySelector('.barra-op')).toBeTruthy());
+ fireEvent.click($('cheio'));fireEvent.click($('recarregar'));await act(async()=>{});
+ expect(document.querySelector('.gpcp').classList.contains('cheio')).toBe(true);
+ expect($('cheio').textContent).toBe('Reduzir Gantt');
+ expect($('cheio').getAttribute('aria-pressed')).toBe('true');
+});

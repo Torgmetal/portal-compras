@@ -8,6 +8,7 @@ export const MARKUP = `<div class="wrap">
   <div class="topo">
     <h1>Gantt da Programação — PCP</h1>
     <p>Arraste para remanejar · clique na barra para ver os projetos e quebrar em bancadas</p>
+    <button class="btn ampliar" id="gp-cheio" aria-pressed="false" title="Ocupar toda a janela com o Gantt · Esc para reduzir">Ampliar Gantt</button>
   </div>
 
   <div class="barra">
@@ -28,7 +29,6 @@ export const MARKUP = `<div class="wrap">
     <button class="btn on" id="gp-regua">Ritmo normal</button>
     <div class="sep"></div>
     <button class="btn" id="gp-recarregar">Atualizar</button>
-    <button class="btn" id="gp-cheio">Tela cheia</button>
     <button class="btn" id="gp-empurrar" hidden></button>
     <span class="leg">
       <span>Bancada:</span>

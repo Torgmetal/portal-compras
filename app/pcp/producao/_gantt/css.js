@@ -8,18 +8,18 @@
 
 export const CSS = `
   .gpcp{
-    --alt:740px; position:relative; margin:0; color:var(--tinta); font-size:13px;
+    --alt:max(740px, calc(100dvh - 32px)); position:relative; margin:0; color:var(--tinta); font-size:13px;
     --navy:#0D1F3C; --laranja:#F4801F; --azul:#006EAB;
     --tinta:#16202e; --tinta-2:#5b6a7d; --linha:#e3e8ef; --fundo:#f4f6f9; --papel:#fff;
     --ok:#0f9d58; --alerta:#d98700; --ruim:#c62828;
     --col:106px;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
   }
-  .gpcp .wrap{height:var(--alt);display:flex;flex-direction:column}
+  .gpcp .wrap{height:var(--alt);min-height:0;display:flex;flex-direction:column}
   .gpcp .topo, .gpcp .barra{flex:0 0 auto}
 
   .gpcp .topo{background:var(--navy);border-radius:10px 10px 0 0;padding:10px 18px;color:#fff;
-        border-bottom:3px solid var(--laranja);display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+        border-bottom:3px solid var(--laranja);display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap}
   .gpcp .topo h1{margin:0;font-size:16px;font-weight:700;letter-spacing:.2px}
   .gpcp .topo p{margin:0;font-size:11.5px;color:#a9bbd4}
   .gpcp .barra{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:9px 18px;
@@ -38,6 +38,8 @@ export const CSS = `
   .gpcp dialog .pe .btn.perigo:hover:not([disabled]){background:#b91c1c}
   .gpcp .btn.on{background:var(--navy);border-color:var(--navy);color:#fff}
   .gpcp .btn.mini{padding:3px 8px;font-size:11px}
+  .gpcp .topo .ampliar{margin-left:auto;background:var(--laranja);border-color:var(--laranja);color:#fff;padding:7px 14px;white-space:nowrap}
+  .gpcp .topo .ampliar:hover{background:#d96a12;border-color:#d96a12}
   .gpcp .periodo{font-weight:700;font-size:13px;min-width:180px;text-align:center}
   .gpcp .sep{width:1px;height:22px;background:var(--linha)}
   .gpcp .rot{font-size:11px;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.5px;font-weight:700}
@@ -45,9 +47,9 @@ export const CSS = `
   .gpcp .leg i{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:4px}
 
   .gpcp /* ── grade ─────────────────────────────────────────────────────── */
-  .quadro{flex:1 1 auto;min-height:180px;display:flex;background:var(--papel);
+  .quadro{flex:1 1 auto;min-height:0;display:flex;background:var(--papel);
           border:1px solid var(--linha);border-top:0;border-radius:0 0 10px 10px;overflow:hidden}
-  .gpcp .rolagem{flex:1 1 auto;min-width:0;overflow:auto;overscroll-behavior:contain}
+  .gpcp .rolagem{flex:1 1 auto;min-width:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
   .gpcp .linha{display:flex;align-items:stretch;border-bottom:1px solid var(--linha)}
   .gpcp .rotulo{flex:0 0 186px;position:sticky;left:0;z-index:4;background:var(--papel);
           box-shadow:3px 0 4px -3px rgba(13,31,60,.18);
@@ -168,13 +170,14 @@ export const CSS = `
             white-space:nowrap}
 
   .gpcp /* ── alterações ────────────────────────────────────────────────── */
-  .pend{flex:0 0 auto;margin-top:10px;background:var(--papel);border:1px solid var(--linha);
+  .pend{flex:0 0 auto;margin-top:6px;background:var(--papel);border:1px solid var(--linha);
         border-radius:10px;overflow:hidden}
-  .gpcp .pend h2{margin:0;padding:10px 16px;font-size:13px;background:#fbfcfe;border-bottom:1px solid var(--linha);
+  .gpcp .pend h2{margin:0;padding:7px 12px;font-size:12px;background:#fbfcfe;border-bottom:1px solid var(--linha);
            display:flex;align-items:center;gap:10px}
   .gpcp .pend h2 .n{background:var(--laranja);color:#fff;border-radius:11px;padding:1px 9px;font-size:11px}
   .gpcp .pend h2 .acoes{margin-left:auto;display:flex;gap:8px}
-  .gpcp .pend ul{list-style:none;margin:0;padding:0;max-height:20vh;overflow:auto}
+  .gpcp .pend ul{list-style:none;margin:0;padding:0;max-height:min(110px,14dvh);overflow:auto}
+  .gpcp[data-pendente="false"] .pend .vazio{display:none}
   .gpcp .pend li{display:flex;align-items:center;gap:10px;padding:7px 16px;border-bottom:1px solid #f0f3f7;font-size:12px}
   .gpcp .pend li:last-child{border-bottom:0}
   .gpcp .tag{font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
@@ -289,7 +292,17 @@ export const CSS = `
   .gpcp .trava .mot{font-size:10.5px;color:#a01c1c;line-height:1.45}
 
   .gpcp, .gpcp *{box-sizing:border-box}
-  .gpcp.cheio{position:fixed;inset:0;z-index:60;background:var(--fundo);padding:10px 14px;--alt:100%}
+  /* O space-y da página não pode acrescentar margem ao quadro fixo e cortar o rodapé. */
+  .gpcp.cheio{position:fixed;inset:0;margin:0!important;z-index:60;background:var(--fundo);padding:8px 10px;--alt:calc(100dvh - 16px)}
+  .gpcp.cheio .topo p{display:none}
+  .gpcp.cheio .barra{gap:6px;padding:6px 10px}
+  .gpcp.cheio .topo{padding:7px 12px}
+  @media(max-width:900px){
+    .gpcp .topo p{display:none}
+    .gpcp .pend h2{flex-wrap:wrap;gap:6px}
+    .gpcp .pend h2 .acoes{flex-wrap:wrap}
+    .gpcp .leg{display:none}
+  }
   .gpcp .carregando{display:flex;align-items:center;justify-content:center;gap:10px;height:200px;color:var(--tinta-2)}
 
   .gpcp .avisoTela{display:flex;align-items:flex-start;gap:8px;font-size:12px;padding:8px 18px;

@@ -143,9 +143,14 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     }
     recarregar();
   };
+  function ajustarTelaCheia(cheio){
+    raiz.classList.toggle("cheio", cheio);
+    $("cheio").textContent = cheio ? "Reduzir Gantt" : "Ampliar Gantt";
+    $("cheio").setAttribute("aria-pressed", String(cheio));
+  }
+  ajustarTelaCheia(raiz.classList.contains("cheio"));
   $("cheio").onclick = ()=>{
-    const c = raiz.classList.toggle("cheio");
-    $("cheio").textContent = c ? "Sair da tela cheia" : "Tela cheia";
+    ajustarTelaCheia(!raiz.classList.contains("cheio"));
     desenhar();
   };
 
@@ -276,7 +281,11 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   });
   $("pFechar").onclick = fecharPainel;
   for(const b of raiz.querySelectorAll(".abas button")) b.onclick = ()=>{ abaP=b.dataset.aba; pintarPainel(); };
-  const aoTeclar = (e)=>{ if(e.key==="Escape" && painel) fecharPainel(); };
+  const aoTeclar = (e)=>{
+    if(e.key!=="Escape" || raiz.querySelector('dialog[open]')) return;
+    if(painel) fecharPainel();
+    else if(raiz.classList.contains("cheio")){ ajustarTelaCheia(false); desenhar(); }
+  };
   window.addEventListener("keydown", aoTeclar);
   const aoSair = (e)=>{ if(alteracoes.length || salvando){ e.preventDefault(); e.returnValue = ''; } };
   window.addEventListener('beforeunload', aoSair);
