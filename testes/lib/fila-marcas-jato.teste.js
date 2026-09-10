@@ -40,3 +40,18 @@ it('não encaminha ao Jato marca com corte ainda incompleto',async()=>{
  feitos.clear();pecas=[{...peca('T112A51'),qteProduzida:1}];
  expect((await filaDoSetor('JATO')).fila).toEqual([]);
 });
+it('não oferece na fila da Solda peça terceirizada sem recebimento, mesmo com montagem apontada',async()=>{
+ pecas=[{...peca('C1','CONJUNTO',2),terceirizado:true,terceirizadoRecebidoEm:null}];
+ feitos.set('C1|MONTAGEM',2);
+ expect((await filasSemProgramacao()).SOLDA).toEqual([]);
+});
+it('não reintroduz terceiro sem recebimento pelo apontamento parcial de bancada',async()=>{
+ pecas=[{...peca('C1','CONJUNTO',2),terceirizado:true,terceirizadoRecebidoEm:null}];
+ mockPrisma.mesOrdem.findMany.mockResolvedValue([{opId:'op112',item:'C1',setor:'Solda',saldoUn:1}]);
+ expect((await filasSemProgramacao()).SOLDA).toEqual([]);
+});
+it('volta a oferecer a peça na Solda após recebimento',async()=>{
+ pecas=[{...peca('C1','CONJUNTO',2),terceirizado:true,terceirizadoRecebidoEm:new Date('2026-09-09')}];
+ feitos.set('C1|MONTAGEM',2);
+ expect((await filasSemProgramacao()).SOLDA.map(p=>p.id)).toEqual(['C1']);
+});
