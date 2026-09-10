@@ -154,3 +154,91 @@ Endpoint autenticado por chave de máquina (`POST /api/mes/iot/<recurso>/evento`
 - Escopo da fase 1: só apontar produção, ou já com parada/setup/OEE?
 - Os totens são PCs com navegador? Tela sensível ao toque? O leitor de código de barras é USB?
 - Mantém os conceitos de "Repasse" e "Documentos" do Syneco?
+
+---
+
+# 6. Engenharia reversa ao vivo (10/09/2026)
+
+Feita da rede da fábrica, com a credencial `portal` da API de relatórios. **Tudo somente leitura.**
+
+## 6.1 A porta de entrada: `GET /v1/dataset` devolve o SQL de tudo
+
+O maior achado. A API da porta 1000 expõe **os 242 datasets com o SQL de cada um** — ou seja, o
+esquema do banco inteiro, sem precisar de acesso ao SQL Server (que segue fechado: 1433 fechada,
+porta dinâmica só local). Também respondem `GET /v1/reports` (183+ relatórios) e
+`GET /v1/dashboard`. Não há Swagger; o header de auth é `token: <jwt>` (não `Bearer`).
+
+Cópias salvas durante a análise: `dataset.json` (324 KB), `reports.json`, `dashboard.json`.
+
+## 6.2 O núcleo do modelo (confirmado)
+
+```
+Resource   ResourceID, Code, Name, CostCenter(=setor), Type, IsEnabled,
+           ParentResourceID, DataColGroupID
+Production ProductionID, OrderNum(=obra/OP), Operation, PartCode(=marca), PartName,
+           PlanQty, PartCount, ScrapCount, CycleTime, PlannedBeginTimestamp,
+           FirstBeginEventID, ParentProductionID
+Event      EventID, EventTypeID, ResourceID, OperatorID, ProductionID, ServerTimestamp
+```
+
+> ⚠⚠ **`Event` guarda um INSTANTE (`ServerTimestamp`), não um intervalo.** A duração de cada
+> estado é o tempo **até o evento seguinte** daquele recurso. É essa escolha que faz o OEE,
+> o "Tempo Decorrido" e as paradas caírem todos do mesmo lugar, sem campo de fim para
+> desencontrar. **É o desenho que devemos copiar.**
+
+Complementos: `EventDetail` (detalhamento/motivo), `EventOperator` (operador do evento),
+`EventType` (**179 tipos**), `ShiftData` (turnos), `ResourceInterruptionTolerance` (tolerância de
+microparada). Configuração é **EAV**: `TypeData` + `ResourceData` + `DataColGroupData` +
+`EventDetailData`.
+
+## 6.3 Catálogos reais da Torg
+
+- **Setores (`CostCenter`)**: Acabamento, Corte, Expedição, Jato, Montagem, Pintura,
+  **Serralheria**, Solda.
+- **53 recursos** ativos no monitor (54 na lista), **68 operadores**.
+- `EventTypeID = 2` → "Em Produção" (`Cor=verde`, `Detalhamento=Normal`).
+
+> ⚠ **`normalizeSetorSyneco` (`lib/syneco-dia.js`) não mapeia "Serralheria"** — ela cai no
+> fallback e vira o literal `SERRALHERIA`. Conferir se isso esconde produção em algum painel.
+
+## 6.4 O monitor de máquinas (dataset 131, `SKA_Production_GeneralMonitor`)
+
+É a tela de cards. Sem parâmetros, devolve o estado vivo dos 53 recursos com:
+`Código, Máquina, Setor, OP, Operação, Item, Desc. Item, Planejado, Operador, Status,
+Detalhamento, Tempo Decorrido, Produzido, Rejeitado, Retrabalhado, Cor, ResourceID,
+ProductionID, EventTypeID, EventDetailID`. **É o contrato de tela do nosso monitor.**
+
+## 6.5 O terminal do operador
+
+**Angular** (build CLI: `runtime/polyfills/main-es2015`) servido por **IIS**, com
+`manifest.json` — ou seja, o terminal do Syneco **já é um PWA**. Confirma a escolha de PWA para
+o nosso, e mostra que rodar no navegador do totem é caminho batido.
+
+## 6.6 A camada IOT (o sinal do CNC)
+
+Existe e é tabela de primeira classe: **`Device`, `DeviceConfiguration`,
+`DeviceConfigurationData`, `ResourceProtocolInfo`, `Signal`, `VW_SKA_DeviceInfo`**, mais
+`fn_ska_VerifyDeviceFullConfig`. O laser não fala com o Syneco por API: existe um **dispositivo
+coletor** por recurso, com protocolo configurado, que grava sinal e vira evento. Para manter esse
+automatismo no MES próprio, é esse elo que precisa ser mapeado em campo (qual hardware, qual
+protocolo).
+
+## 6.7 O tamanho real do Syneco (o que ele faz além de apontar)
+
+Pelos 242 datasets, os módulos são: **OEE** (global, por máquina, grupo, setor),
+**Paradas/Interrupções** (pareto, evolução, por operador), **Setup**, **Refugo (Scrap)**,
+**Retrabalho**, **Manutenção** (MTBF, breakdown), **Inspeção/Qualidade** (CEP, Cp/Cpk,
+histograma, limites de controle), **CheckList**, **Cadeia de Ajuda / Andon**, **Moldes**,
+**Pintura**, **Prateleiras**, **Lean Board**, **Logística de localização** e **habilidades do
+operador**.
+
+> **Conclusão de escopo:** não vamos reimplementar isso tudo — nem precisamos. A Torg usa uma
+> fração. O MES próprio deve nascer com **apontamento + estados + OEE + paradas**, que é o que
+> alimenta o portal hoje, e crescer só no que a Torg realmente usa.
+
+## 6.8 Funções feitas sob medida para a Torg
+
+`TORG_Production_Traceability_V01` (dataset 150), `..._V01_Eventos` (dataset 242),
+`..._OBRA`, `..._OBRA_CARDS`, `TORG_Production_Analytics_V03`. São *table-valued functions* no
+banco do Syneco — **elas somem quando o Syneco sair**, e é exatamente o que a projeção do nosso
+MES para `MesApontamento`/`MesOrdem` precisa substituir.
