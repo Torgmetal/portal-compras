@@ -1,7 +1,12 @@
 {
-  "build": 3065,
-  "gerado": "2026-09-10T19:51:55.491Z",
+  "build": 3066,
+  "gerado": "2026-09-10T20:00:08.212Z",
   "commits": [
+    {
+      "hash": "09cd709b17",
+      "data": "10/09/2026",
+      "titulo": "Etiqueta: PDF pede impressao sem ajuste, e a tela diz qual e o papel"
+    },
     {
       "hash": "0639fcbf48",
       "data": "10/09/2026",
@@ -146,11 +151,6 @@
       "hash": "bae39f9791",
       "data": "09/09/2026",
       "titulo": "Conferência de peça: Modo Pátio de verdade (tela cheia no celular)"
-    },
-    {
-      "hash": "f049567133",
-      "data": "09/09/2026",
-      "titulo": "Conferência de peça: concorrência, idempotência e acesso corrigidos"
     }
   ]
 }
