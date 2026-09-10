@@ -1,7 +1,12 @@
 {
-  "build": 3068,
-  "gerado": "2026-09-10T20:35:30.208Z",
+  "build": 3069,
+  "gerado": "2026-09-10T20:55:16.598Z",
   "commits": [
+    {
+      "hash": "2cdc94f5f8",
+      "data": "10/09/2026",
+      "titulo": "Etiqueta QWS: centraliza os titulos de QTDE, PESO e TAG, e o nome do cliente"
+    },
     {
       "hash": "121332f766",
       "data": "10/09/2026",
@@ -146,11 +151,6 @@
       "hash": "626a6f1b6e",
       "data": "09/09/2026",
       "titulo": "feat(qualidade): anexar relatório às auditorias"
-    },
-    {
-      "hash": "7c3ca4d2c3",
-      "data": "09/09/2026",
-      "titulo": "Comercial: página de Custo de Fabricação — só o custo, medido"
     }
   ]
 }

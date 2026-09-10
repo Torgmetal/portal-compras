@@ -289,9 +289,43 @@ marcar as peças, gerar. Sai uma etiqueta **por peça** (numerada `001/N`), não
 | Engine | `pdf-lib` (o mesmo dos outros 35 PDFs) + `qrcode` |
 | Código | `lib/etiqueta-carregamento-pdf.js`, `app/api/expedicao/etiquetas/` |
 
-**Ao imprimir**: escolher a Argox, escala em **100%** (nunca "ajustar à página") e margens
-**nenhuma**. A página do PDF já tem o tamanho exato do rolo — qualquer ajuste do navegador
-faz a etiqueta sair torta. O aviso está na própria tela.
+**Ao imprimir**: escolher a Argox, **Tamanho do papel `Etiqueta 100x50`**, escala **Padrão** (nunca
+"ajustar à área de impressão") e margens **nenhuma**. O aviso está na própria tela.
+
+⚠⚠ **A LISTA DE TAMANHOS DO DRIVER ESTÁ EM POLEGADAS, E NENHUM DELES SERVE.** A primeira impressão
+real (10/09/2026) saiu deitada e esticada por três etiquetas do rolo. O diálogo estava em **"4 x 6"**
+— 4 × 6 **polegadas** (101,6 × 152,4 mm, em pé): a largura casava com o rolo, mas o comprimento era
+**3 etiquetas** (152,4 ÷ 50 = 3,05 — exatamente o que saiu). O Chrome ainda girava a página deitada
+para caber num papel em pé, e "ajustar à área de impressão" esticava.
+
+Os 100 × 50 mm equivalem a **4 × 2 pol**, e a lista do driver (`2x1, 2x4, 2.25x1.25, 2.50x0.50, 4x1,
+4x3, 4x4, 4x5, 4x6`) **não tem esse tamanho**. A saída é criar um **formulário do Windows** — vale
+para qualquer impressora e não depende da UI da Argox:
+
+> *Painel de Controle → Dispositivos e Impressoras* → clicar numa impressora → **Propriedades do
+> servidor de impressão** → aba **Formulários** → "Criar um novo formulário" → `Etiqueta 100x50`,
+> largura 10,00 cm × altura 5,00 cm, margens zero → **Salvar formulário**.
+
+Depois disso, **recarregar a página do PDF**: o diálogo do Chrome só lê a lista de tamanhos ao abrir.
+
+⚠ **Girar o PDF NÃO resolve, e a conta prova.** Cheguei a propor gerar a página em 50 × 100 mm para
+usar o "2 x 4" da lista. Errado: `2 x 4` diz à impressora que o rolo tem **50,8 mm de largura**
+(metade do real) e que cada etiqueta avança **101,6 mm** (o dobro). Erraria nos dois eixos. O
+problema nunca foi a orientação do desenho, foi a **medida da mídia**.
+
+⚠ **Conteúdo deslocado na etiqueta é calibração da impressora, não do PDF.** A moldura vai de 1,2 a
+98,8 mm numa página de 100 — está centrada. Se sair encostado num lado: guias do rolo frouxas
+(causa mais comum), offset do driver (a 203 dpi, **1 mm = 8 dots**), ou margem do Chrome fora de
+"nenhuma". Compensar no PDF deixaria o arquivo errado para qualquer outra impressora.
+
+O PDF declara `PrintScaling /None` e `PickTrayByPDFSize` (`pedirImpressaoSemAjuste`). São do padrão
+PDF e evitam que um "ajustar à página" lembrado da última impressão volte sozinho — mas **não
+sobrepõem a mídia configurada no driver**. Não são o conserto.
+
+> 📌 **PENDENTE (Matheus, 10/09/2026):** "vamos voltar futuramente a ajustar essas etiquetas para
+> ficar mais visível as escritas pequenas". Os rótulos estão em 4,2 pt e a referência/posição em
+> 6,5 pt — pequenos porque o rodapé tem 12,8 mm para duas faixas de rótulo + valor. Aumentar a fonte
+> exige remanejar `RODAPE`/`GRADE_QWS`, não só trocar o número.
 
 ⚠ **A impressora só imprime PRETO** — o laranja é o material do rolo. Por isso o logo da
 etiqueta é o `public/torg-logo-etiqueta.png` (chapado e horizontal), e não o `torg-logo.png`
