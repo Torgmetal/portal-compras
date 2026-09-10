@@ -377,19 +377,42 @@ ser **NULL** (`NULL LIKE '%'` é falso no SQL Server).
 terminal**, e o serviço da SKA naquele PC lê o USB e manda o evento pro servidor. A página
 comercial fala em Modbus TCP, mas **esta instalação não parece ser assim**.
 
-**Consequência:** não dá para o nosso gateway "escutar o mesmo sinal pela rede". Precisa de uma
-das saídas:
+**Confirmado em campo pelo Matheus (10/09/2026):** é um módulo que se conecta por **USB ao PC do
+terminal**, e os **cabos do painel da máquina** chegam nas entradas desse módulo.
 
-1. **Trocar os 3 coletores por módulos Modbus TCP** (Ethernet, DIN, de mercado). São **três
-   máquinas** — custo baixo, e nos dá arquitetura aberta, sem software de fornecedor, com o nosso
-   gateway lendo por Modbus TCP e podendo rodar **em paralelo** com o Syneco durante a migração.
-   **É a recomendação.**
-2. **Reaproveitar os módulos USB** — exige saber fabricante/modelo e se há driver/protocolo
-   aberto, e obriga software nosso rodando **em cada PC de terminal**. Só vale se o hardware for
-   de um fabricante conhecido com biblioteca disponível.
+## 8.3.1 ⚠⚠ OS MÓDULOS SÃO ALUGADOS DA SKA — e isso decide a arquitetura
 
-**A confirmar em campo (foto resolve):** atrás do PC de cada laser, o módulo sai por **cabo USB**
-ou por **cabo de rede**? Tem etiqueta de fabricante/modelo?
+Matheus (10/09/2026): *"esses IO são da SKA alugados, então se migramos pro nosso MES vamos ter
+que comprar novos dispositivos"*.
+
+Isso **encerra a discussão de reaproveitamento**: o hardware volta junto com o contrato. Não há o
+que reaproveitar, e portanto **não há concessão a fazer** — compramos o hardware certo:
+
+**→ Módulo de entradas digitais Modbus TCP (Ethernet), trilho DIN, 24 VDC. Três unidades.**
+
+**O que se aproveita, e é o que importa:** a **fiação do painel** de cada máquina é da Torg e
+continua. Os mesmos fios saem dos bornes do módulo USB e entram nos bornes do módulo novo —
+serviço de eletricista, não de reengenharia.
+
+**Por que Ethernet é melhor do que o que existe hoje**, e não só "equivalente":
+- O coletor deixa de depender do **PC do terminal estar ligado** e de um serviço de fornecedor
+  rodando nele. Hoje, PC desligado = sinal perdido.
+- Protocolo aberto: qualquer linguagem lê Modbus TCP (em Node, `modbus-serial`/`jsmodbus`).
+- Vários clientes podem ler o mesmo escravo → dá para **rodar em paralelo** com o sistema antigo
+  durante a validação, se ainda houver sobreposição.
+
+**A levantar antes de comprar:**
+1. **Natureza do sinal no painel** — os fios que hoje chegam ao módulo são contato seco, 24 VDC
+   ou tensão de comando (110/220 VAC)? Isso define o tipo de entrada do módulo; sinal em VAC
+   exige entrada apropriada ou relé interposto.
+2. **Quantas entradas por máquina** — hoje o Syneco lê `Spindle` e `CycleCount64`. Um módulo de
+   8 ou 16 entradas dá folga para parada, alarme e o que vier.
+3. **Quando termina o contrato de locação da SKA** — é o que define o prazo real da migração.
+
+> **Sequenciamento:** a compra **não bloqueia nada**. Das 54 máquinas, 51 são apontamento
+> manual. O piloto começa por um **posto manual**, validando sessão, evento, quantidade, parada e
+> monitor; o laser com IoT entra depois, quando o núcleo já estiver provado — que é exatamente a
+> ordem que o roadmap do Codex propõe (§11 do relatório dele).
 
 ## 8.4 A lógica que teremos de reescrever
 

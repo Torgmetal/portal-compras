@@ -1,7 +1,12 @@
 {
-  "build": 3052,
-  "gerado": "2026-09-10T17:48:44.782Z",
+  "build": 3053,
+  "gerado": "2026-09-10T17:52:01.758Z",
   "commits": [
+    {
+      "hash": "b61054d22a",
+      "data": "10/09/2026",
+      "titulo": "MES proprio: schema do dominio (recurso, sessao, evento, quantidade, coletor)"
+    },
     {
       "hash": "d0477aca44",
       "data": "10/09/2026",
@@ -146,11 +151,6 @@
       "hash": "f0db952e62",
       "data": "08/09/2026",
       "titulo": "feat(rh): registrar contratações parciais e manter saldo de vagas"
-    },
-    {
-      "hash": "61ffa732d4",
-      "data": "08/09/2026",
-      "titulo": "Liberação: conjunto não compra aço — ele herda o material dos croquis"
     }
   ]
 }
