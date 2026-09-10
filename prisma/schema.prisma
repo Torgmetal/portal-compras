@@ -5858,11 +5858,43 @@ model FotoObra {
 // recurso. Assim OEE, tempo decorrido e paradas caem todos da mesma fonte.
 // ══════════════════════════════════════════════════════════════════════════════
 
+// SETOR — tabela, não string, porque vai ter tela de criar/excluir (Matheus, 10/09/2026:
+// "precisamos ter essas telas depois para criar e excluir setores, máquinas dos setores/bancadas").
+//
+// ⚠⚠ `ordem` É A CADEIA FÍSICA DA FÁBRICA, e é dado justamente por isso. Hoje ela é um array fixo
+// no código (`CADEIA_SYNECO` em lib/conjuntos-setor.js: Montagem → Solda → Acabamento → Jato →
+// Pintura), e é essa sequência que decide o que é "adiantado" e o que é "furo de apontamento".
+// Setor criado por tela precisa poder entrar no meio da cadeia sem alguém editar um array.
+model MesSetor {
+  id     String @id @default(cuid())
+  /// "PREPARACAO", "MONTAGEM" — a chave estável. O nome muda; esta não.
+  codigo String @unique
+  nome   String // "Preparação", "Montagem"
+  ordem  Int // posição na cadeia física: 10, 20, 30…
+  cor    String? // para o monitor e o Gantt
+  ativo  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  recursos MesRecurso[]
+
+  @@index([ativo])
+  @@index([ordem])
+}
+
 model MesRecurso {
-  id          String   @id @default(cuid())
-  codigo      String   @unique // "09", "30A", "50J" — o que o operador vê no totem
-  nome        String // "LASER CHAPA"
-  setor       String // Corte, Montagem, Solda, Acabamento, Jato, Pintura, Serralheria, Expedição
+  id String @id @default(cuid())
+  /// ⚠⚠ A CHAVE É A DO GANTT, NÃO A DO SYNECO. "SOLDA 5", "MONTAGEM 1", "LASER_CHAPA" — é o que
+  /// `PecaConjunto.soldaBancada`/`montagemBancada`/`maquina` já gravam, então é por aqui que o
+  /// totem acha o que o PCP programou. O Syneco chamaria esta mesma bancada de "40E".
+  codigo String @unique
+  /// Como a fábrica chama: "Wilson Barros", "Jurandir", "Laser Chapa". Vitor batizou as bancadas
+  /// com o nome de quem senta nelas — quem distribui trabalho fala em pessoa, não em código.
+  nome   String
+  /// ⚠ SÓ PARA RECONCILIAR ENQUANTO OS DOIS RODAM EM PARALELO ("40E", "09"). Morre com o Syneco;
+  /// nada de lógica nova deve depender dele.
+  codigoSyneco String?
+  setorId     String
   tipo        String   @default("MAQUINA") // MAQUINA | BANCADA | POSTO
   ativo       Boolean  @default(true)
   temTerminal Boolean  @default(true)
@@ -5870,13 +5902,15 @@ model MesRecurso {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  setor        MesSetor         @relation(fields: [setorId], references: [id])
   sessoes      MesSessao[]
   eventos      MesEvento[]
   dispositivos MesDispositivo[]
 
-  @@index([setor])
+  @@index([setorId])
   @@index([ativo])
   @@index([ambiente])
+  @@index([codigoSyneco])
 }
 
 model MesOperador {

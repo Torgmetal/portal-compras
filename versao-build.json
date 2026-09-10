@@ -1,7 +1,12 @@
 {
-  "build": 3056,
-  "gerado": "2026-09-10T18:26:15.573Z",
+  "build": 3057,
+  "gerado": "2026-09-10T21:20:16.996Z",
   "commits": [
+    {
+      "hash": "1059190049",
+      "data": "10/09/2026",
+      "titulo": "MES proprio: laboratorio local com dado real, e a trava que o separa da producao"
+    },
     {
       "hash": "9938241c79",
       "data": "10/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e087c90c57",
       "data": "08/09/2026",
       "titulo": "PCP: o que foi para o terceiro sai do painel, e não só do Gantt"
-    },
-    {
-      "hash": "3c1d70ca6f",
-      "data": "08/09/2026",
-      "titulo": "Gantt: botão para apagar uma programação e tirar as peças da fila"
     }
   ]
 }

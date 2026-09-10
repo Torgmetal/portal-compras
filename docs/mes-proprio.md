@@ -26,14 +26,15 @@ reais, em 6 setores. Números conferidos **contando no destino**, não somando a
 
 **Próximo passo, em ordem:**
 
-1. ⛔ **BLOQUEADO — falta credencial.** `scripts/mes-lab/importar-syneco.mjs`: **recursos**
-   (dataset 27) e **operadores** (dataset 20) vêm do Syneco, não do Neon. O servidor
-   (`192.168.0.190:1000`) **responde** da máquina do Matheus, mas `SKA_USER`/`SKA_PASS` não estão
-   nela — o `scripts/.env` que os outros scripts SKA leem não existe. Sem os 53 recursos e 68
-   operadores não há totem para testar.
-2. Fluxo do **totem** contra o banco local: abrir sessão, apontar quantidade, parar, encerrar.
-   Os testes de aceitação do §7.5 são o critério de pronto.
-3. **Monitor** de máquinas — o contrato de tela é o dataset 131 (§6.4).
+1. Semear `MesSetor`/`MesRecurso` **do vocabulário do Gantt** (§11), não do Syneco.
+2. `lib/mes/sessao.js` — abrir, apontar, parar, encerrar, com as travas de concorrência do §7.5.
+3. Fluxo do **totem** contra o banco local.
+4. **Monitor** de máquinas — o contrato de tela é o dataset 131 (§6.4).
+5. **Telas de cadastro** de setores, máquinas e bancadas (§11.3) — pedidas pelo Matheus para depois
+   do totem, mas elas já mandam na modelagem de agora.
+
+> ~~BLOQUEADO por credencial SKA~~ — **caiu** (§11). Não vamos importar o cadastro do Syneco: os
+> recursos saem do Gantt, que é nosso.
 
 > ⚠ Os dados importados incluem **nomes reais de operadores**. Ficam **só na máquina local** — não
 > vão para o repositório, nem para prévia publicada, nem para massa de demonstração compartilhada.
@@ -606,3 +607,81 @@ criação, não o fim do script.
 
 A terceira linha é a que importa: um índice que travasse também isso deixaria o recurso com uma
 única sessão na vida inteira.
+
+---
+
+# 11. O cadastro é NOSSO, não do Syneco (10/09/2026)
+
+Matheus, depois de eu propor importar recursos e operadores da API do SKA: *"o ideal não é usar os
+dados do Syneco para fazer nosso MES, o ideal é usar as funcionalidades dele para criar o nosso com
+nossa cara"*. E na sequência, apontando o caminho: *"tem o Gantt que o Vitor fez para programar
+produção da fábrica, nele podemos usar para liberar as marcas em cada máquina/bancada"*.
+
+Isso **derrubou o bloqueio por credencial SKA** e mudou o desenho.
+
+## 11.1 O Gantt já é o que faltava
+
+Eu tinha concluído que só o `MesOrdem` do Syneco sabia o que falta por setor — nove módulos de
+`lib/` leem dali. Estava errado: `app/pcp/producao/_gantt/` **programa marca por bancada e por dia**,
+e grava direto na peça (`corteDiaProgramado`+`maquina`, `montagemDiaProgramado`+`montagemBancada`,
+`soldaDiaProgramado`+`soldaBancada`). O totem não inventa nada — **lê o que o PCP já programou**.
+
+⚠ **A cobertura é fina, e isso é normal.** 246 peças com bancada de montagem, 168 de solda, 3 de
+pintura, de 21.772. O Gantt programa o horizonte próximo, não o backlog. Então o totem **precisa** de
+saída para "não há programação para hoje" — é aí que o bipar livre entra, validado contra a L.E.
+Sem isso, máquina não programada não aponta nada.
+
+## 11.2 ⚠⚠ O VOCABULÁRIO É O DO GANTT
+
+| | Syneco | Gantt (**adotado**) |
+|---|---|---|
+| Solda 5 | `40E` | `SOLDA 5`, rotulado **Wilson Barros** |
+| Montagem 1 | `30A` | `MONTAGEM 1`, rotulado **Jurandir** |
+| Laser Chapa | `09` | `LASER_CHAPA` |
+
+O Vitor já tomou essa decisão quando batizou as bancadas com o nome de quem senta nelas — quem
+distribui trabalho fala em pessoa, não em código. O código do Syneco entra só como campo de
+reconciliação enquanto os dois rodarem em paralelo, e **morre junto com o Syneco**.
+
+De brinde, descarta os **15 recursos mortos**: o Syneco tem 53 cadastrados, mas só **38** apontaram
+em 6 meses. Nascer do que produz é mais limpo que herdar cadastro com linha morta.
+
+## 11.3 ⚠⚠ CORTE VIRA **PREPARAÇÃO** — E ABSORVE AS MÁQUINAS `20x`
+
+Matheus (10/09/2026): *"o Corte vai ser Preparação o nome do setor"*.
+
+Antes de aplicar, conferido no dado — porque **"Preparação" já existia no Syneco como outro setor**:
+
+| Setor | Op. | Máquinas | Último apontamento |
+|---|---|---|---|
+| **Corte** | 10 | `09` Laser Chapa, `10` Laser Tubo, `10A` Laser Cantoneira, `11` Laser Perfil, `10C` Metaleira, `10E` Policorte | **hoje** |
+| **Preparação** | 20 | `20C`/`20D` Furadeira Magnética, `20A`/`20B` Plasma Manual, `20F` Rosqueadeira | **05/02/2026** |
+
+A Preparação rodou set/2025 → fev/2026 e **parou de apontar há sete meses** — 399 apontamentos
+contra 16.824 do Corte. Matheus confirmou a leitura: **os dois viraram um setor só**, chamado
+**Preparação**, com os 6 lasers **mais** as 6 máquinas `20x`. O silêncio de fevereiro não foi o setor
+morrendo; foi ele sendo absorvido.
+
+⚠ **Ao projetar de volta para `MesApontamento`/`MesOrdem`** (o contrato do §2), lembrar que lá
+"Corte" e "Preparação" são operações DIFERENTES (10 e 20). `lib/conjuntos-setor.js`
+(`CADEIA_SYNECO`) e `lib/produzido-setor.js` mapeiam pelos nomes do Syneco — a fusão não pode
+vazar para eles sem revisão, senão dois setores viram um no meio de um relatório que hoje bate.
+
+## 11.4 ⚠⚠ AS TELAS DE CADASTRO MANDAM NA MODELAGEM DE AGORA
+
+Matheus: *"precisamos ter essas telas depois para criar e excluir setores, máquinas dos
+setores/bancadas"*. É "depois" no cronograma, mas **não** na modelagem:
+
+- Setor deixa de ser string em `MesRecurso` e vira **`MesSetor`** (com `ordem`, que é a cadeia
+  física da fábrica — hoje um array fixo em `CADEIA_SYNECO`).
+- O semeio a partir do Gantt é **bootstrap de uma vez**, não fonte permanente. Depois dele, quem
+  manda é o banco.
+
+⚠⚠ **E AQUI NASCE UMA SEGUNDA VERDADE SE NINGUÉM OLHAR.** Hoje os recursos do Gantt são
+**constantes no código**: `RECURSOS` em `app/pcp/producao/_gantt/recursos.js`, `BANCADAS` e
+`SOLDADOR_DA_BANCADA` em `lib/solda-capacidade.js`. Se o MES ganhar cadastro em banco com telas de
+criar/excluir, passam a existir **duas listas de bancadas** — e a primeira bancada nova cadastrada
+pela tela não aparece no Gantt. O fim de linha correto é o Gantt **ler o cadastro do MES**, e as
+capacidades (que são medidas, não escolhidas) migrarem para colunas de `MesRecurso`. Isto é o mesmo
+erro que `lib/baixa-syneco.js` e o sino de notificações já documentam ter custado caro neste
+projeto; está escrito aqui para não ser redescoberto na terceira vez.
