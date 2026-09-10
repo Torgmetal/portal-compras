@@ -336,6 +336,51 @@ já saiu.
 limitação do BarTender, que importava a planilha com o campo de largura fixa — aqui o número vem
 do banco a cada etiqueta e a largura se ajusta sozinha.
 
+### Modelo de etiqueta por cliente (QWS/Petrobras)
+
+Um seletor **Modelo da etiqueta** na tela escolhe entre `padrao` e `qws` (`MODELOS` em
+`lib/etiqueta-carregamento-pdf.js`, que só despacha; cada desenho mora no seu arquivo —
+`etiqueta-qws-pdf.js`, com o que é comum aos dois em `etiqueta-pdf-base.js`).
+
+⚠ **O modelo é por IMPRESSÃO, não por cliente cadastrado.** Amarrar o desenho ao nome do cliente
+pareceria mais esperto, mas a mesma obra pode precisar dos dois e um cliente novo com a mesma
+exigência viraria um `if` aqui.
+
+⚠⚠ **O modelo QWS identifica a peça pela TAG PETROBRAS**, não pela marca da Torg — é por esse
+código que o recebimento do cliente confere. TAG, referência de desenho e posição ("SE-001") **não
+existem no cadastro**: vêm da planilha "Lista Equivalência de Marcas" do cliente, importada na
+própria tela (`lib/parse-equivalencia-marcas.js` → tabela `EtiquetaCampoExtra`). Quantidade e peso
+continuam vindo da L.E., pra etiqueta nunca discordar da tela. Peça sem esses campos imprime "—":
+a etiqueta sai e o buraco aparece na hora de colar, não depois que o caminhão saiu.
+
+⚠ **O QR continua codificando a MARCA da Torg** nos dois modelos. Quem lê o código no pátio é a
+Torg (conferência, carregamento) e a leitura tem que cair na mesma chave que o portal usa.
+
+⚠⚠ **MARCA REPETIDA NA PLANILHA DO CLIENTE É UNIDADE, NÃO LINHA DUPLICADA.** Matheus (10/09/2026):
+"a T102A15 são 3 unidades aí repetiu 3 linhas dela apenas porque cada unidade tem uma referência e
+tag da QWS". Por isso `EtiquetaCampoExtra` é única por **(opNumero, marca, unidade)** e a etiqueta
+`2/3` leva a TAG da segunda linha (`unidadeDaEtiqueta`) — guardar por marca fazia as 3 saírem com a
+TAG da primeira.
+
+⚠ **A L.E. (FORM 21) NÃO repete marca** — lá a T102A15 é UMA linha com `QTD. 3`. Quem repete é só a
+lista de equivalência do cliente, que precisa de uma linha por TAG. Cheguei a somar marcas repetidas
+no import da L.E. achando que ela também repetia; conferido no arquivo real (T102-LE-R01), não
+repete, e a mudança foi desfeita. As duas planilhas são complementares: a L.E. manda em marca,
+quantidade e peso; a de equivalência, só em TAG/referência/posição.
+
+⚠ **A marca e a posição saem separadas por `  /  `**, não coladas por hífen. Matheus (10/09/2026):
+"ficou T102A1-SE-001, parece um negócio só". São códigos de sistemas diferentes — o hífen os funde
+num terceiro código, que não existe em lugar nenhum.
+
+⚠⚠ **MEXEU NO `schema.prisma`? REINICIE O `npm run dev`.** O client do Prisma é gerado em disco por
+`npx prisma generate`, mas o Next segura o módulo já carregado: o servidor que subiu antes continua
+com o client velho e devolve `Unknown argument` numa chave que existe no banco e no client novo
+(10/09/2026 — custou dois erros que pareciam bug de código: um 500 na geração das etiquetas e uma
+falha no upsert de `EtiquetaCampoExtra`).
+
+⚠ **Etiqueta além das unidades importadas cai na primeira**, não em branco — acontece quando a L.E.
+do portal está numa revisão e a lista do cliente em outra.
+
 O cabeçalho da lista tem os **funis tipo Excel** do `components/FiltroColuna` (Marca, Descrição e
 Etiqueta). Peças e Peso ficam sem funil de propósito — número contínuo vira menu de 200 valores.
 
@@ -352,6 +397,44 @@ Tirar esse pulo tira junto a chance de imprimir com dado velho.
 > **Se a qualidade de impressão decepcionar**, o caminho de upgrade é gerar **PPLA cru** em vez
 > de PDF — o layout e os dados se aproveitam, troca só o renderizador. Isso exige um agente
 > local no PC da expedição para mandar os bytes à USB, que é a razão de não ter começado por aí.
+
+## Import de lista (LE/LPC) — o recibo tem que ser recibo
+
+`Engenharia › Listas` importa a planilha, grava as peças e **arquiva o arquivo no SharePoint** com
+uma aba `Revisao` embutida (`app/engenharia/listas/revisao-lista.js`).
+
+⚠⚠ **ESSA ABA JÁ MENTIU, E O PAPEL CIRCULOU COMO VERDADE.** A LE R01 da OP-102, importada em
+**13/08/2026**, foi arquivada dizendo "18 incluídas" — e **nenhuma das 18 entrou no banco**. O
+`diff` da rota é calculado **ANTES** da gravação: ele responde "quais marcas do arquivo ainda não
+existem", que é uma **previsão**, não um recibo. Quem abriu o arquivo depois leu 18 incluídas e
+seguiu a vida; a divergência só apareceu **quatro semanas depois**, quando a tela de etiquetas
+mostrou 71 marcas numa lista de 77 e Matheus perguntou por quê (10/09/2026).
+
+O defeito que engoliu as 18 era do importador e já estava corrigido (`67fea4eb48`, 27/08 — a busca
+da marca existente não filtrava por fonte, então a linha que a LPC já tinha virava UPDATE e a da LE
+nunca nascia). O que deixou passar quatro semanas foi **não existir onde ver a diferença entre o
+previsto e o gravado**. Agora:
+
+- A aba tem duas linhas com nomes diferentes — **Previsto (antes de gravar)** e **Gravado (o que
+  foi ao banco)**, esta última vinda de `criados`/`atualizados`/`ignorados`, que são o que a rota de
+  fato escreveu — e uma linha `⚠ ATENÇÃO` que **só existe quando os dois discordam**.
+- A coluna por marca se chama **"Situação (previsão)"**, não "Situação".
+- A tela mostra o mesmo aviso em tarja âmbar logo abaixo do "Importado", antes de alguém tratar a
+  lista como vigente.
+
+⚠⚠ **O ESPERADO DEPENDE DO MODO, E ERRAR ISSO É PIOR QUE NÃO AVISAR.** Com **sobrescrever** a rota
+apaga a lista anterior e recria tudo, então o certo é `criados == totalNoArquivo`. Comparar isso com
+a previsão (calculada contra as linhas que a própria rota ia apagar em seguida) acusaria "gravou
+mais do que o esperado" num import perfeito — e alarme falso em ferramenta de alarme ensina a
+ignorar a tarja. A aba diz em qual **Modo** rodou, e o cálculo do aviso muda junto.
+
+⚠ **Remoção não entra na comparação.** Sem marcar "sobrescrever" o import **não apaga** — a lista de
+removidas é aviso de que aquelas marcas saíram do arquivo, não promessa de exclusão. Cobrar isso
+marcaria o comportamento normal como defeito.
+
+⚠ **"Importado" nunca quis dizer "entrou".** Salvar o arquivo no servidor
+(`/api/engenharia/listas/servidor`) e gravar as peças (`/api/producao/pecas/importar-le`) são duas
+chamadas separadas: o arquivo pode estar na pasta da obra sem que uma linha tenha chegado ao banco.
 
 ## O sino (notificações)
 

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, Check, Loader2, Printer, Search, Tag } from "lucide-react";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import { lerJson } from "@/lib/ler-json";
+import ModeloEtiqueta from "./ModeloEtiqueta";
 
 // ETIQUETAS DE CARREGAMENTO — a aba que substitui o BarTender.
 //
@@ -161,17 +162,10 @@ function useListaFiltrada(pecas, busca) {
   };
 }
 
-export default function EtiquetasClient() {
+/** As obras que têm item expedível — carregadas uma vez, quando a tela abre. */
+function useOps(setErro) {
   const [ops, setOps] = useState([]);
-  const [opId, setOpId] = useState("");
-  const [dados, setDados] = useState(null);
-  const [sel, setSel] = useState(() => new Set());
-  const [busca, setBusca] = useState("");
   const [carregandoOps, setCarregandoOps] = useState(true);
-  const [carregando, setCarregando] = useState(false);
-  const [gerando, setGerando] = useState(false);
-  const [erro, setErro] = useState("");
-
   useEffect(() => {
     (async () => {
       try {
@@ -179,7 +173,22 @@ export default function EtiquetasClient() {
         setOps(j.ops || []);
       } catch (e) { setErro(e.message); } finally { setCarregandoOps(false); }
     })();
-  }, []);
+  }, [setErro]);
+  return { ops, carregandoOps };
+}
+
+export default function EtiquetasClient() {
+  const [opId, setOpId] = useState("");
+  const [dados, setDados] = useState(null);
+  const [sel, setSel] = useState(() => new Set());
+  const [busca, setBusca] = useState("");
+  const [carregando, setCarregando] = useState(false);
+  const [gerando, setGerando] = useState(false);
+  const [erro, setErro] = useState("");
+  // ⚠ O modelo NÃO volta ao padrão ao trocar de obra: quem imprime para um cliente costuma
+  // imprimir várias OPs dele seguidas, e voltar sozinho faria a etiqueta errada sair sem aviso.
+  const [modelo, setModelo] = useState("padrao");
+  const { ops, carregandoOps } = useOps(setErro);
 
   const buscarPecas = useCallback(async (id) => lerJson(
     await fetch(`/api/expedicao/etiquetas?opId=${encodeURIComponent(id)}`, { cache: "no-store" }),
@@ -217,7 +226,7 @@ export default function EtiquetasClient() {
     try {
       const r = await fetch("/api/expedicao/etiquetas", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opId, marcas: [...sel] }),
+        body: JSON.stringify({ opId, marcas: [...sel], modelo }),
       });
       if (!r.ok) {
         const bruto = await r.text().catch(() => "");
@@ -285,6 +294,8 @@ export default function EtiquetasClient() {
           </select>
         )}
       </div>
+
+      {opId && <ModeloEtiqueta opId={opId} modelo={modelo} setModelo={setModelo} />}
 
       {carregando && (
         <div className="flex items-center justify-center py-16 gap-3 text-torg-gray">
