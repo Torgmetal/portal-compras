@@ -50,3 +50,8 @@ it('programação antiga de croqui não reaparece no Jato sem bancada',async()=>
  db.ganttDistribuicao.findMany.mockResolvedValue([]);
  expect(await lotesProgramados()).toEqual([]);vi.useRealTimers();
 });
+it('componente rotulado CONJUNTO não reaparece como avulsa no Jato',async()=>{
+ db.pecaConjunto.findMany.mockImplementation(async({where})=>where.jatoDiaProgramado?[{...p,tipoPeca:'CONJUNTO',_count:{croquiConjuntos:5},jatoDiaProgramado:new Date('2026-09-10'),jatoBancada:null}]:[]);
+ db.ganttDistribuicao.findMany.mockResolvedValue([]);
+ expect(await lotesProgramados()).toEqual([]);vi.useRealTimers();
+});

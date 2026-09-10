@@ -22,3 +22,8 @@ it('soma peso fracionado sem arredondar cada faixa para zero',async()=>{
  const r=await listaDoPosto('MONTAGEM','A','2026-09-10','2026-09-13');
  expect(r.linhas.map(l=>l.kg)).toEqual([0.4,0.4,0.4,0.4]);expect(r.total.kg).toBeCloseTo(1.6,10);
 });
+it('lista de bancada não inclui componente com tipo legado incorreto após o Corte',async()=>{
+ db.pecaConjunto.findMany.mockResolvedValue([{id:'p',marca:'T113A-P13',qte:18,pesoTotalKg:200.81,tipoPeca:'CONJUNTO',_count:{croquiConjuntos:5},jatoDiaProgramado:new Date('2026-09-10'),jatoBancada:'JATO_MANUAL'}]);
+ db.ganttDistribuicao.findMany.mockResolvedValue([]);
+ expect((await listaDoPosto('JATO','JATO_MANUAL','2026-09-10','2026-09-10')).linhas).toEqual([]);
+});

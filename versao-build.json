@@ -1,7 +1,12 @@
 {
-  "build": 3059,
-  "gerado": "2026-09-10T11:22:39.421Z",
+  "build": 3060,
+  "gerado": "2026-09-10T11:34:28.784Z",
   "commits": [
+    {
+      "hash": "96a857ab",
+      "data": "10/09/2026",
+      "titulo": "fix(pcp): imprimir fila sem bancada e excluir croquis posteriores ao corte"
+    },
     {
       "hash": "279f4860",
       "data": "10/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b0f41132",
       "data": "08/09/2026",
       "titulo": "Gantt: lote concluído e velho sai do quadro; o recente fica"
-    },
-    {
-      "hash": "dd0b0929",
-      "data": "08/09/2026",
-      "titulo": "Gantt: a bancada só traz as obras que o PCP está tocando; o resto vai numa lista"
     }
   ]
 }

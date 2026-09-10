@@ -52,3 +52,8 @@ for (const fracionado of [false,true]) it(`salva 300 marcas inteiras em lote (${
  expect(db.ganttDistribuicao.deleteMany).toHaveBeenCalledTimes(1);
  expect(db.ganttDistribuicao.deleteMany.mock.calls[0][0].where.OR).toEqual([{setor:'CORTE',pecaId:{in:pecas.map(p=>p.id)}}]);
 });
+it('recusa programar componente no Jato mesmo enviado por uma aba antiga',async()=>{
+ db.pecaConjunto.findMany.mockResolvedValue([{...p,tipoPeca:'CONJUNTO',_count:{croquiConjuntos:5}}]);
+ await expect(aplicarRemanejo([{...b(0,4),setor:'JATO',recurso:null}],{})).rejects.toThrow(/croqui|componente/i);
+ expect(db.pecaConjunto.updateMany).not.toHaveBeenCalled();
+});

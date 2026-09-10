@@ -61,3 +61,10 @@ it('ordem aberta no Syneco não recoloca croqui nas filas posteriores ao Corte',
  const filas=await filasSemProgramacao();
  expect(filas.JATO).toEqual([]);
 });
+it('vínculo como componente prevalece sobre tipo CONJUNTO incorreto da OP113',async()=>{
+ pecas=[{...peca('T113A-P13','CONJUNTO'),_count:{conjuntoCroquis:0,croquiConjuntos:5}}];
+ mockPrisma.mesOrdem.findMany.mockResolvedValue([{opId:'op112',item:'T113A-P13',setor:'Jato',saldoUn:18}]);
+ feitos.set('T113A-P13|CORTE',18);
+ expect((await filasSemProgramacao()).JATO).toEqual([]);
+ expect((await filaDoSetor('JATO')).fila).toEqual([]);
+});
