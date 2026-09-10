@@ -1,7 +1,12 @@
 {
-  "build": 3067,
-  "gerado": "2026-09-10T20:24:44.910Z",
+  "build": 3068,
+  "gerado": "2026-09-10T20:35:30.208Z",
   "commits": [
+    {
+      "hash": "121332f766",
+      "data": "10/09/2026",
+      "titulo": "Etiqueta QWS: TAG PETROBRAS, QTDE e PESO centrados na celula"
+    },
     {
       "hash": "1964d51409",
       "data": "10/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7c3ca4d2c3",
       "data": "09/09/2026",
       "titulo": "Comercial: página de Custo de Fabricação — só o custo, medido"
-    },
-    {
-      "hash": "13123e956e",
-      "data": "09/09/2026",
-      "titulo": "Conferência de peça: cancelar sessão aberta por engano, direto na saída"
     }
   ]
 }
