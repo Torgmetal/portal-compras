@@ -1,7 +1,12 @@
 {
-  "build": 3053,
-  "gerado": "2026-09-10T17:52:01.758Z",
+  "build": 3054,
+  "gerado": "2026-09-10T18:03:04.383Z",
   "commits": [
+    {
+      "hash": "ad1149d03e",
+      "data": "10/09/2026",
+      "titulo": "MES proprio: os coletores IoT sao alugados da SKA - decide a arquitetura"
+    },
     {
       "hash": "b61054d22a",
       "data": "10/09/2026",
@@ -146,11 +151,6 @@
       "hash": "a333438af8",
       "data": "08/09/2026",
       "titulo": "feat(rh): buscar cargos por nome categoria e CBO"
-    },
-    {
-      "hash": "f0db952e62",
-      "data": "08/09/2026",
-      "titulo": "feat(rh): registrar contratações parciais e manter saldo de vagas"
     }
   ]
 }

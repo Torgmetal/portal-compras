@@ -414,6 +414,59 @@ serviço de eletricista, não de reengenharia.
 > monitor; o laser com IoT entra depois, quando o núcleo já estiver provado — que é exatamente a
 > ordem que o roadmap do Codex propõe (§11 do relatório dele).
 
+---
+
+# 9. O gateway local deixa de ser opção e vira obrigação (10/09/2026)
+
+Pergunta do Matheus: *"se cair a internet, as máquinas param de mandar sinal pro terminal PC?"*
+A resposta desfaz uma confusão e **fecha a arquitetura**.
+
+## 9.1 Internet ≠ rede local
+
+O módulo Modbus TCP se liga ao **switch da fábrica**, não à internet. Internet fora → **a LAN
+continua**, e o módulo segue respondendo a quem perguntar de dentro da fábrica. O que cai é a
+ponte fábrica → nuvem. É o que já acontece hoje: o serviço da SKA lê o USB e entrega ao
+**servidor Syneco na LAN** — internet nunca entrou nessa conta, e é por isso que a fábrica é
+resiliente hoje.
+
+## 9.2 ⚠⚠ Gateway na nuvem não funcionaria NEM COM internet
+
+Um poller hospedado na Vercel **não alcança** esses módulos: IP privado, atrás do NAT da fábrica.
+Para alcançá-los seria preciso **expor um dispositivo Modbus à internet** — e **Modbus não tem
+autenticação nenhuma**. Seria publicar as entradas da máquina para qualquer um. Não se faz.
+
+**Portanto: o gateway local é requisito do IoT, não preferência de arquitetura.**
+
+## 9.3 A arquitetura que isso fecha
+
+```
+Painel da máquina → módulo Modbus TCP (LAN)
+                          ↑ polling
+              GATEWAY LOCAL TORG (PC na LAN, fila durável)
+                          ↓ HTTPS, quando houver internet
+                    Portal (Vercel + Neon)
+
+Totens (navegador) ──→ falam com o GATEWAY LOCAL primeiro
+```
+
+**E aqui o problema de disponibilidade do §7.2 se resolve de brinde:** o mesmo gateway que faz o
+polling do Modbus **serve os totens e guarda a fila durável**. Internet cai → a fábrica continua
+**operando inteira** (aponta, vê o monitor, coleta sinal), não apenas capturando. Quando volta, o
+gateway descarrega no portal.
+
+Isso **substitui** a mitigação anterior (PWA offline-first como resposta principal). O PWA
+continua útil como camada extra — se o totem perder a LAN, ele ainda enfileira — mas a resposta
+de verdade é o gateway.
+
+## 9.4 O hardware do gateway já existe
+
+Quando o Syneco sair, o servidor **`DESKTOP-IONH0V7` / 192.168.0.190** fica livre — é onde o
+gateway vai morar. Sem compra adicional além dos 3 módulos de I/O.
+
+> **Consequência para o §7.4 (isolamento):** o gateway ter banco próprio local reforça a decisão
+> de **acoplamento fraco** já tomada no schema (`opId`/`funcionarioId` sem FK). O que roda no
+> gateway não pode depender de FK para tabela do portal.
+
 ## 8.4 A lógica que teremos de reescrever
 
 O I/O Collect não entrega evento pronto: ele entrega **sinal**, e o SYNECO Device aplica regras
