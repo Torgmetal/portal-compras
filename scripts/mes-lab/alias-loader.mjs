@@ -24,7 +24,13 @@ function arquivoDe(base) {
   return null;
 }
 
+// ⚠ `server-only` é um marcador do Next: existir no import basta para o bundler recusar o módulo no
+// cliente. Fora do Next o pacote não resolve e derruba o script — então vira um módulo vazio. Isso
+// NÃO afrouxa nada: o marcador continua no arquivo e continua valendo no build de verdade.
+const VAZIO = "data:text/javascript,export default {};";
+
 export function resolve(especificador, contexto, proximo) {
+  if (especificador === "server-only") return { url: VAZIO, shortCircuit: true };
   if (especificador.startsWith("@/")) {
     const alvo = arquivoDe(path.join(RAIZ, especificador.slice(2)));
     if (alvo) return proximo(pathToFileURL(alvo).href, contexto);
