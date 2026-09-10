@@ -1,7 +1,12 @@
 {
-  "build": 3057,
-  "gerado": "2026-09-10T00:38:34.900Z",
+  "build": 3058,
+  "gerado": "2026-09-10T11:06:14.375Z",
   "commits": [
+    {
+      "hash": "8fa0993d",
+      "data": "09/09/2026",
+      "titulo": "fix: alinhar fila do Gantt ao bloqueio de terceiros"
+    },
     {
       "hash": "53b000af",
       "data": "09/09/2026",
@@ -146,11 +151,6 @@
       "hash": "a8b2e829",
       "data": "08/09/2026",
       "titulo": "Gantt: o que já está na bancada aparece, mesmo sem ninguém ter programado"
-    },
-    {
-      "hash": "e087c90c",
-      "data": "08/09/2026",
-      "titulo": "PCP: o que foi para o terceiro sai do painel, e não só do Gantt"
     }
   ]
 }

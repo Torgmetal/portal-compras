@@ -11,6 +11,8 @@
 // ⚠ OCUPAÇÃO É DA BANCADA NAQUELE DIA, não progresso da OP — foi essa confusão que fez o "532%"
 // parecer sem sentido. Acima da capacidade a leitura vira múltiplo ("5,3×").
 
+import {agruparFracoes} from '@/lib/gantt-fracoes';
+
 export function criarLotes(dep){
 
   /* junta dep.getLotes() que ficaram no mesmo setor/recurso/OP/dia depois de um remanejo ou de uma quebra */
@@ -21,7 +23,7 @@ export function criarLotes(dep){
       const k = l.setor+"|"+(l.recurso||"—")+"|"+l.op+"|"+l.dia+"|"+(l.veioDe||l.desde||"")+"|"+(l.familia||"")+"|"+((l.terceiroPrevisto||l.terceiroRecebido)?l.id:"");
       const a = por.get(k);
       if(!a){ por.set(k,l); fora.push(l); continue; }
-      a.itens = a.itens.concat(l.itens);
+      a.itens = agruparFracoes(a.itens.concat(l.itens));
       a.pecas += l.pecas; a.kg += l.kg; a.custo += l.custo; a.feitas += l.feitas;
       a.adiado = Math.max(a.adiado, l.adiado||0);
     }
@@ -29,8 +31,8 @@ export function criarLotes(dep){
   }
   const recalc = (l)=>{
     l.pecas = l.itens.reduce((s,i)=>s+i.q,0);
-    l.kg = Math.round(l.itens.reduce((s,i)=>s+i.kg,0));
-    l.custo = Math.round(l.itens.reduce((s,i)=>s+i.c,0)*100)/100;
+    l.kg = l.itens.reduce((s,i)=>s+i.kg,0);
+    l.custo = l.itens.reduce((s,i)=>s+i.c,0);
     l.feitas = l.itens.reduce((s,i)=>s+(i.f||0),0);
     return l;
   };
@@ -81,7 +83,7 @@ export function criarLotes(dep){
       r.feitas = r.lotes.reduce((s,l)=>s+l.feitas,0);
       r.custo = r.lotes.reduce((s,l)=>s+dep.custoLote(l),0);
       r.itens = r.lotes.flatMap(l=>l.itens);
-      r.semGrd = (r.terceiroPrevisto||r.terceiroRecebido)?0:r.itens.filter(i=>!i.g).length;
+      r.semGrd = (r.terceiroPrevisto||r.terceiroRecebido)?0:new Set(r.itens.filter(i=>!i.g).map(i=>i.id)).size;
       r.mexida = r.lotes.some(l=>l.recurso!==l.recursoOrig || l.dia!==l.diaOrig);
       r.adiado = Math.max(0, ...r.lotes.map(l=>l.adiado||0));
       // ⚠ de onde a barra veio quando o dia programado venceu sem ser atendido (lib/gantt-pcp.js).

@@ -3037,6 +3037,7 @@ model EstoqueFisicoSync {
 }
 
 model PecaConjunto {
+  ganttDistribuicoes       GanttDistribuicao[]
   id                      String                  @id @default(cuid())
   opId                    String?
   opNumero                String
@@ -5804,4 +5805,19 @@ model FotoObra {
 
   @@index([opId])
   @@index([criadoEm])
+}
+
+// Partes da programação; os campos da peça continuam sendo a âncora legada.
+model GanttDistribuicao {
+  id String @id @default(cuid())
+  pecaId String
+  setor String
+  quantidade Int
+  ancoraDia DateTime? @db.Date
+  ancoraRecurso String?
+  partes Json
+  updatedAt DateTime @updatedAt
+  peca PecaConjunto @relation(fields: [pecaId], references: [id], onDelete: Cascade)
+  @@unique([pecaId, setor])
+  @@index([setor])
 }

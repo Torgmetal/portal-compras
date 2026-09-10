@@ -1,6 +1,7 @@
 import { abrirFiltroColuna } from "./filtro-coluna";
 import { filtrarProjetos, escapar } from "./selecao-projetos";
 import { itemAptoMontagem } from "@/lib/gantt-prontidao";
+import { resumirMarcas } from '@/lib/gantt-fracoes';
 // ─── ABA "PROJETOS PROGRAMADOS" ────────────────────────────────────────────────────────────────
 //
 // ⚠ GRD = IMPRESSÃO. No portal não existe estado "liberado" separado da impressão: a GRD nasce
@@ -18,7 +19,7 @@ export function criarPainelProjetos(dep){
   function reiniciar(){ sel = new Set(); soFalta = false; colunas = {}; }
 
   function pintarProjetos(r){
-    const itens = [...r.itens].sort((a,b)=> (a.g?1:0)-(b.g?1:0) || String(a.m).localeCompare(String(b.m)));
+    const itens = resumirMarcas(r.itens).sort((a,b)=> (a.g?1:0)-(b.g?1:0) || String(a.m).localeCompare(String(b.m)));
     const mostra = filtrarProjetos(itens, { colunas, soFalta: soFalta && temGrd(r.setor) });
     const teto = 300, corte = mostra.slice(0, teto);
     const grd = temGrd(r.setor);
@@ -100,6 +101,9 @@ export function criarPainelProjetos(dep){
        botões usam a lista acima", e um botão morto ali só levanta a pergunta de por que não
        funciona. Gerar planilha não escreve nada, então agir sobre a lista toda é seguro. */
     const alvoBaixa = sel.size ? itens.filter(i=>sel.has(i.id)) : mostra;
+    const idsExportacao=new Set(alvoBaixa.map(i=>i.id));
+    const fracoesExportacao=r.itens.filter(i=>idsExportacao.has(i.id))
+      .map(i=>({id:i.id,inicio:i.inicioUnidade||0,quantidade:i.q}));
     const btnBaixa = '<button class="btn" id="gp-xlsBaixa"'+(alvoBaixa.length?"":" disabled")+'>Baixa Syneco ('+alvoBaixa.length+')</button>';
     dep.$("pFoot").innerHTML = grd
       ? '<div class="info">'+(sel.size ? sel.size+" marca(s) selecionada(s)" : "Nada selecionado — os botões usam a lista acima")+'</div>'
@@ -113,7 +117,7 @@ export function criarPainelProjetos(dep){
     /* ⚠ APAGAR usa a SELEÇÃO, ou a lista inteira — como imprimir e Baixa Syneco. Botão morto sem
        seleção só levanta a pergunta de por que não funciona (foi o que aconteceu com a Baixa). */
     const alvoApagar = sel.size ? itens.filter(i=>sel.has(i.id)) : mostra;
-    dep.$("pFoot").innerHTML += '<button class="btn perigo" id="gp-apagar"'+(alvoApagar.length?'':' disabled')+'>Apagar a programação ('+alvoApagar.length+')</button>';
+    dep.$("pFoot").innerHTML += '<button class="btn perigo" id="gp-apagar"'+(alvoApagar.length?'':' disabled')+'>Apagar programação das marcas ('+alvoApagar.length+')</button>';
     /* ⚠ o filtro só existe quando há GRD; sem a guarda, `$("fSemGrd")` volta null e o painel
        inteiro morre no `.onchange`. */
     const fg = dep.$("fSemGrd");
@@ -141,16 +145,16 @@ export function criarPainelProjetos(dep){
       bp.disabled = true; const antes = bp.textContent; bp.textContent = "Gerando…";
       /* ⚠ manda os IDS do lote, não a OP inteira: a barra representa o que vai ser pintado agora, e
          a folha tem de dimensionar a tinta desse lote — não da obra toda. */
-      try{ await dep.baixarPintura(r.op, alvoBaixa.map(i=>i.id).filter(Boolean)); }
-      catch(e){ dep.avisar(e?.message || "Falha ao gerar o caderno de pintura", "erro"); }
+      try{ await dep.baixarPintura(r.op, [...idsExportacao], r.terceiroRecebido ? undefined : fracoesExportacao); }
+      catch(e){ dep.avisar(false, e?.message || "Falha ao gerar o caderno de pintura"); }
       finally{ bp.disabled = false; bp.textContent = antes; }
     };
     const bb = dep.$("xlsBaixa");
     if(bb) bb.onclick = async ()=>{
       bb.disabled = true; const antes = bb.textContent; bb.textContent = "Gerando…";
       // ⚠ manda as MARCAS selecionadas, resolvidas para os ids das peças do lote clicado
-      try{ await dep.baixarBaixaSyneco(r.op, r.setor, alvoBaixa.map(i=>i.id).filter(Boolean)); }
-      catch(e){ dep.avisar(e?.message || "Falha ao gerar a planilha de baixa", "erro"); }
+      try{ await dep.baixarBaixaSyneco(r.op, r.setor, [...idsExportacao], r.terceiroRecebido ? undefined : fracoesExportacao); }
+      catch(e){ dep.avisar(false, e?.message || "Falha ao gerar a planilha de baixa"); }
       finally{ bb.disabled = false; bb.textContent = antes; }
     };
     const im = dep.$("impFalta");
@@ -371,6 +375,7 @@ export function criarPainelProjetos(dep){
       dlg.innerHTML =
         '<h3>Apagar a programação — '+r.setor.toLowerCase()+' · '+(r.recurso||"sem recurso")+' · '+dep.dbr(r.dia)+'</h3>'
         + '<div class="corpo">'
+        + '<p><b>Apaga a programação inteira das marcas selecionadas neste setor, em todos os dias e bancadas.</b> Se a marca foi dividida, todas as suas partes serão removidas.</p>'
         + '<p>As peças saem do quadro <b>e da fila</b> — não voltam para a faixa "sem bancada". Quem decide se elas '
           + 'voltam é o Planejamento, liberando de novo.</p>'
         + (semApont.length

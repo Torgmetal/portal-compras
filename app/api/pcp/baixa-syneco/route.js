@@ -1,5 +1,6 @@
 // GET /api/pcp/baixa-syneco?op=067&setor=CORTE&ids=a,b,c
 // → a lista das marcas selecionadas para dar baixa NO SYNECO (o portal não baixa nada).
+import { lerFracoesExportacao } from "@/lib/exportacao-fracoes";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { listaBaixaSyneco } from "@/lib/baixa-syneco";
@@ -20,6 +21,6 @@ export async function GET(req) {
   const ids = String(u.searchParams.get("ids") || "").split(",").map((s) => s.trim()).filter(Boolean).slice(0, 5000);
   if (!op) return NextResponse.json({ error: "Informe a OP." }, { status: 400 });
 
-  try { return NextResponse.json(await listaBaixaSyneco(op, setor, ids)); }
+  try { return NextResponse.json(await listaBaixaSyneco(op, setor, ids, lerFracoesExportacao(u.searchParams.get("fracoes")))); }
   catch (e) { return NextResponse.json({ error: e.message || "Falha ao montar a lista" }, { status: 400 }); }
 }

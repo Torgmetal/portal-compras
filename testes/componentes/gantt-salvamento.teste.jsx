@@ -87,3 +87,45 @@ it('recarregar no modo ampliado mantém o controle de reduzir a tela',async()=>{
  expect($('cheio').textContent).toBe('Reduzir Gantt');
  expect($('cheio').getAttribute('aria-pressed')).toBe('true');
 });
+it('envia quantidades por dia sem reduzir os dez destinos da OP115 a um destino por marca',async()=>{
+ const op={...structuredClone(lote),op:'115',pecas:50,kg:6099,custo:9.4,itens:[{id:'a1',m:'T115A1',q:44,kg:5777,c:8.8},{id:'a2',m:'T115A2',q:6,kg:322,c:0.6}]};
+ let enviado;
+ vi.stubGlobal('confirm',vi.fn(()=>true));
+ vi.stubGlobal('fetch',vi.fn(async(_url,opt)=>{
+  if(opt?.method==='POST'){enviado=JSON.parse(opt.body);return resposta({total:50});}
+  return resposta({hoje:dia,lotes:[structuredClone(op)]});
+ }));
+ render(<GanttProgramacao/>);await waitFor(()=>expect(document.querySelector('.barra-op')).toBeTruthy());
+ const barra=document.querySelector('.barra-op');
+ fireEvent(barra,new MouseEvent('pointerdown',{bubbles:true,button:0}));
+ fireEvent(window,new MouseEvent('pointerup',{bubbles:true,button:0}));
+ fireEvent.click($('selTodos'));fireEvent.click($('distribuir'));
+ fireEvent.change($('qDias'),{target:{value:'10'}});
+ expect(document.querySelectorAll('.prev tbody tr')).toHaveLength(10);
+ fireEvent.click($('aplicar'));fireEvent.click($('salvar'));
+ await waitFor(()=>expect(enviado).toBeTruthy());
+ expect(new Set(enviado.blocos.map(b=>b.dia)).size).toBe(10);
+ const fracoes=enviado.blocos.flatMap(b=>b.fracoes);
+ expect(fracoes.filter(f=>f.id==='a1').reduce((s,f)=>s+f.quantidade,0)).toBe(44);
+ expect(fracoes.filter(f=>f.id==='a2').reduce((s,f)=>s+f.quantidade,0)).toBe(6);
+});
+it('desfaz apenas a parte movida da marca, preservando a outra bancada',async()=>{
+ const parte=(id,recurso,inicioUnidade)=>({...structuredClone(lote),id,recurso,pecas:5,kg:500,custo:1,itens:[{id:'p1',m:'P1',q:5,qTotal:10,inicioUnidade,kg:500,c:1}]});
+ vi.stubGlobal('fetch',vi.fn(async()=>resposta({hoje:dia,lotes:[parte('l1','SOLDA 1',0),parte('l2','SOLDA 2',5)]})));
+ render(<GanttProgramacao/>);await waitFor(()=>expect(document.querySelectorAll('.barra-op')).toHaveLength(2));
+ await mover();fireEvent.click($('desfazer'));
+ expect(document.querySelectorAll('.barra-op')).toHaveLength(2);
+ expect([...document.querySelectorAll('.barra-op')].map(b=>b.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('5 pç'),expect.stringContaining('5 pç')]));
+});
+it('avisa no diálogo de exclusão que apagar a marca afeta todos os seus dias e bancadas',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>resposta(dados())));
+ Object.defineProperty(HTMLDialogElement.prototype,'showModal',{configurable:true,value:function(){this.open=true;}});
+ render(<GanttProgramacao/>);await waitFor(()=>expect(document.querySelector('.barra-op')).toBeTruthy());
+ const barra=document.querySelector('.barra-op');
+ fireEvent(barra,new MouseEvent('pointerdown',{bubbles:true,button:0}));
+ fireEvent(window,new MouseEvent('pointerup',{bubbles:true,button:0}));
+ fireEvent.click($('apagar'));
+ expect(document.querySelector('dialog').textContent).toContain('todos os dias e bancadas');
+ expect(document.querySelector('dialog h3').textContent).toContain('Apagar a programação');
+ delete HTMLDialogElement.prototype.showModal;
+});

@@ -22,6 +22,7 @@ it('recusa seleção com peça removida antes de gravar qualquer destino',async(
 it('usa o cliente transacional para todas as escritas e desfaz o primeiro bloco se o segundo falhar',async()=>{
  const estado={p1:'2026-09-09',p2:'2026-09-09'};const original={...estado};let escritas=0;
  const tx={pecaConjunto:{findMany:vi.fn().mockResolvedValue([conjunto('p1'),conjunto('p2')]),updateMany:vi.fn(async({where,data})=>{if(++escritas===2)throw Error('falha no segundo bloco');for(const id of where.id.in)estado[id]=data.soldaDiaProgramado.toISOString().slice(0,10);return {count:where.id.in.length};})}};
+ tx.ganttDistribuicao={findMany:vi.fn().mockResolvedValue([])};
  tx.romaneioTerceiro={findMany:vi.fn().mockResolvedValue([])};
  transacao.run.mockImplementation(async fn=>{try{return await fn(tx);}catch(e){Object.assign(estado,original);throw e;}});
  await expect(aplicarRemanejo([bloco(['p1']),bloco(['p2'],'2026-09-11')],{})).rejects.toThrow('segundo bloco');

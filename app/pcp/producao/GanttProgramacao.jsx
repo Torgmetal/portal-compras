@@ -17,6 +17,7 @@ import { criarGrade } from "./_gantt/grade";
 import { criarAtraso } from "./_gantt/atraso";
 import { criarLotes } from "./_gantt/lotes";
 import { destinosFinais } from "@/lib/gantt-destinos";
+import { removerFracoes, fracoesSobrepostas, inicioDaFracao } from "@/lib/gantt-fracoes";
 
 // ─── O QUADRO DE PROGRAMAÇÃO DO PCP ────────────────────────────────────────────────────────────
 //
@@ -105,27 +106,27 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     for(const l of alt.antes){
       const i = lotes.findIndex(x=>x.uid===l.uid);
       if(i<0) continue;
-      const ids = new Set(l.itens.map(it=>it.id));
-      const fica = alt.parcial ? lotes[i].itens.filter(it=>!ids.has(it.id)) : [];
+      const fica = removerFracoes(lotes[i].itens, l.itens);
       if(fica.length) lotes[i] = recalc({...lotes[i], itens:fica}); else lotes.splice(i,1);
     }
     for(const n of alt.novos) lotes.push(recalc(n));
     mesclar();
-    alt.depois = alt.novos.map(n=>({ recurso:n.recurso, dia:n.dia, ids:n.itens.map(i=>i.id) }));
+    alt.depois = alt.novos.map(n=>({ recurso:n.recurso, dia:n.dia, ids:[...new Set(n.itens.map(i=>i.id))],
+      ...(!n.itens.some(i=>String(i.id).includes(':') || !Number.isInteger(i.q)) ? {fracoes:n.itens.map(i=>({id:i.id,inicio:inicioDaFracao(i),quantidade:i.q}))} : {}) }));
+    alt.fracoes = alt.antes.flatMap(l=>l.itens);
     alt.ids = new Set(alt.antes.flatMap(l=>l.itens.map(i=>i.id)));
     alteracoes.push(alt);
   }
   function desfazer(i){
     const a = alteracoes[i]; if(!a) return;
-    if(alteracoes.slice(i+1).some(b=>b.setor===a.setor && [...b.ids].some(id=>a.ids.has(id)))){
+    if(alteracoes.slice(i+1).some(b=>b.setor===a.setor && fracoesSobrepostas(b.fracoes,a.fracoes))){
       alert("Há uma alteração mais recente sobre as mesmas peças.\nDesfaça primeiro a de baixo.");
       return;
     }
     const restantes = [];
     for(const l of lotes){
       if(l.setor!==a.setor){ restantes.push(l); continue; }
-      const fica = l.itens.filter(x=>!a.ids.has(x.id));
-      if(fica.length === l.itens.length){ restantes.push(l); continue; }
+      const fica = removerFracoes(l.itens, a.fracoes);
       if(fica.length){ l.itens = fica; restantes.push(recalc(l)); }
     }
     lotes = restantes;
@@ -196,8 +197,12 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   const quebra = criarQuebra({ $, raiz, RECURSOS, DIAS, capDe, nomeRec, nkg, dbr, fdsISO, diasDaQuebra,
     ocup, carga, custoItem, classeOc, rotuloOc, novoLote, registrar, redesenhar, pintarPainel,
     esconderPainel });
+  const exportarSalvo = fn => (...args) => {
+    if(alteracoes.length || salvando) throw new Error('Salve a programação antes de exportar as quantidades por dia e bancada.');
+    return fn(...args);
+  };
   const projetos = criarPainelProjetos({ $, raiz, nkg, dbr, MAX_LOTE, avisar, recarregar, baixarZip,
-    baixarPintura, baixarBaixaSyneco, pintarPainel, abrirQuebra: ()=>{ abaP="quebrar"; pintarPainel(); } });
+    baixarPintura:exportarSalvo(baixarPintura), baixarBaixaSyneco:exportarSalvo(baixarBaixaSyneco), pintarPainel, abrirQuebra: ()=>{ abaP="quebrar"; pintarPainel(); } });
   const arraste = criarArraste({ raiz, grade, COL, DIAS, IDX, montarRuns,
     avisar,
     novoLote, registrar, nomeRec, dbr, abrirPainel, desenhar, redesenhar,
@@ -208,7 +213,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
     RECURSOS, nkg, empurraoDoRecurso: atraso.empurraoDoRecurso, loteAtrasado: atraso.loteAtrasado,
     IDX, corDaOp, tintaOp, dbr, ocup, classeOc,
     rotuloOc, estado, getInicio: ()=>inicio, getPainel: ()=>painel, getSetoresOn: ()=>setoresOn,
-    pegar: ()=>arraste.pegar, baixarListaPosto, avisar });
+    pegar: ()=>arraste.pegar, baixarListaPosto:exportarSalvo(baixarListaPosto), avisar });
 
   function pintarPainel(){
     const r = acharRun(painel);
@@ -235,7 +240,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
   $("salvar").onclick = async ()=>{
     if(!alteracoes.length || salvando) return;
     const blocos = [];
-    for(const a of alteracoes) for(const d of a.depois) blocos.push({ setor:a.setor, ids:d.ids, recurso:d.recurso, dia:d.dia });
+    for(const a of alteracoes) for(const d of a.depois) blocos.push({ setor:a.setor, ...d });
     const pecas = alteracoes.reduce((s,a)=>s+a.pecas,0);
     if(!confirm("Gravar "+alteracoes.length+" alteração(ões) de programação ("+pecas+" peças)?\n\nIsto muda o dia e o recurso das peças no portal.")) return;
     const b = $("salvar"); b.disabled = true; b.textContent = "Salvando…";
@@ -250,7 +255,7 @@ function iniciar(raiz, LOTES, HOJE, ajuda) {
       pintarAlteracoes();
       raiz.dataset.salvando = 'false';
       const atualizou = await recarregar();
-      avisar(true, j.total+" peça(s) reprogramada(s)." + (atualizou ? '' : ' A gravação foi confirmada; atualize o quadro quando a conexão voltar.'));
+      avisar(true, "Programação salva." + (atualizou ? '' : ' A gravação foi confirmada; atualize o quadro quando a conexão voltar.'));
     }catch(e){ avisar(false, e.message); b.disabled=false; }
     finally{ salvando = false; raiz.dataset.salvando = 'false'; raiz.inert = false; b.textContent = "Salvar programação"; }
   };

@@ -55,7 +55,7 @@ it.each([
   fireEvent(window, new MouseEvent('pointerup', { bubbles: true }));
   expect(document.querySelector('.barra-op').title).toContain('12/09');
   await act(async () => fireEvent.click(document.querySelector('#gp-salvar')));
-  expect(enviado.blocos).toEqual([{ setor, recurso, dia: '2026-09-12', ids: ['p1'] }]);
+  expect(enviado.blocos).toEqual([{ setor, recurso, dia: '2026-09-12', ids: ['p1'], fracoes:[{id:'p1',inicio:0,quantidade:1}] }]);
   await waitFor(() => expect(document.querySelector('#gp-nAlt').textContent).toBe('0'));
   expect(document.querySelector('.barra-op').title).toContain('12/09');
 });
