@@ -4,6 +4,38 @@
 > trocar o Syneco, já nascido dentro do mesmo banco do PORTAL").
 > Rota de trabalho isolada: **`/mes-lab`** (só ADMIN, fora de qualquer menu).
 
+## ► ESTADO ATUAL E PRÓXIMO PASSO (10/09/2026)
+
+**Branch:** `matheus/mes-proprio` — 7 commits, **nada em produção**: nenhuma tabela criada,
+nenhum `db push`, nenhum push da branch.
+
+**Feito:** levantamento (§1-5) · engenharia reversa ao vivo do Syneco (§6) · reconciliação com a
+pesquisa do Codex (§7) · schema Prisma dos 8 modelos, validado (`npx prisma validate`) · IoT real
+(§8) · arquitetura do gateway local fechada (§9).
+
+**Decisão do Matheus (10/09/2026):** montar um **banco Postgres LOCAL** com o **schema completo**
+(portal + MES) e semeá-lo com **dados históricos reais de produção** (somente leitura na origem),
+para desenhar as telas contra dado realista, com isolamento total.
+
+> Com o schema completo no local, o MES **enxerga `OP`/`PecaConjunto` de verdade** — resolve a
+> objeção que existia contra "banco separado" no §7.4.
+
+**Próximo passo, em ordem:**
+
+1. **Instalar Postgres no WSL** — `sudo apt install postgresql` (⚠ **pede senha do sudo**; não há
+   Postgres nem Docker na máquina hoje — conferido em 10/09/2026).
+2. Criar o banco local e apontar uma `DATABASE_URL` **só do laboratório** (nunca a de produção).
+3. `npx prisma db push` **contra o banco LOCAL** — seguro ali; **jamais** contra o Neon.
+4. Adicionar em `scripts/ensure-mes-tables.mjs` o **índice parcial** de uma sessão aberta por
+   recurso (`ON "MesSessao"("recursoId") WHERE status='ABERTA'`) — ver o aviso no `schema.prisma`.
+5. Script de **importação** (produção → local, só leitura na origem): recursos e operadores vêm
+   do **Syneco** (API de relatórios, datasets 27 e 20); OPs, marcas e apontamentos históricos vêm
+   do **Neon**.
+6. Aí sim: fluxo do totem e monitor, contra o banco local.
+
+> ⚠ Os dados importados incluem **nomes reais de operadores**. Ficam **só na máquina local** — não
+> vão para o repositório, nem para prévia publicada, nem para massa de demonstração compartilhada.
+
 ## 1. O que o Syneco é hoje, na Torg
 
 Três serviços no servidor **`DESKTOP-IONH0V7` / 192.168.0.190**:
