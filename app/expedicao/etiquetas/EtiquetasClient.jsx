@@ -111,8 +111,16 @@ const nomeDoArquivo = (opId, ops) => {
 function usarImpressao() {
   const [tagObra, setTagObra] = useState("");
   const [pdf, setPdf] = useState(null);
+  // ⚠ As marcas que vão FECHADAS NUMA CAIXA: uma etiqueta só, dizendo "N/N". Vive aqui junto com a
+  // TAG porque tem o mesmo ciclo de vida — trocou de obra, os dois deixam de valer.
+  const [emCaixa, setEmCaixa] = useState(new Set());
+  const alternarCaixa = (marca) => setEmCaixa((antes) => {
+    const novo = new Set(antes);
+    if (novo.has(marca)) novo.delete(marca); else novo.add(marca);
+    return novo;
+  });
   useEffect(() => () => { if (pdf) URL.revokeObjectURL(pdf.url); }, [pdf]);
-  return { tagObra, setTagObra, pdf, setPdf };
+  return { tagObra, setTagObra, pdf, setPdf, emCaixa, setEmCaixa, alternarCaixa };
 }
 
 const daObra = (dados) => ({ obra: dados?.op?.obra || "", tag: dados?.tagObra || "" });
@@ -128,7 +136,7 @@ export default function EtiquetasClient() {
   // ⚠ O modelo NÃO volta ao padrão ao trocar de obra: quem imprime para um cliente costuma
   // imprimir várias OPs dele seguidas, e voltar sozinho faria a etiqueta errada sair sem aviso.
   const [modelo, setModelo] = useState("padrao");
-  const { tagObra, setTagObra, pdf, setPdf } = usarImpressao();
+  const { tagObra, setTagObra, pdf, setPdf, emCaixa, setEmCaixa, alternarCaixa } = usarImpressao();
   const { ops, carregandoOps } = useOps(setErro);
 
   const buscarPecas = useCallback(async (id) => lerJson(
@@ -136,7 +144,7 @@ export default function EtiquetasClient() {
     "Peças da OP"), []);
 
   const abrirOp = useCallback(async (id) => {
-    setOpId(id); setDados(null); setSel(new Set()); setBusca(""); setErro(""); setTagObra("");
+    setOpId(id); setDados(null); setSel(new Set()); setBusca(""); setErro(""); setTagObra(""); setEmCaixa(new Set());
     if (!id) return;
     setCarregando(true);
     try {
@@ -154,8 +162,10 @@ export default function EtiquetasClient() {
 
   // Quantas ETIQUETAS, não quantas marcas: é o número que decide se o rolo aguenta.
   const totalEtiquetas = useMemo(
-    () => pecas.filter((p) => sel.has(p.marca)).reduce((s, p) => s + Math.max(1, p.qte || 1), 0),
-    [pecas, sel]);
+    // ⚠ A CAIXA CONTA 1, e é por isso que este número existe: é ele que diz se o rolo aguenta.
+    () => pecas.filter((p) => sel.has(p.marca))
+      .reduce((s, p) => s + (emCaixa.has(p.marca) ? 1 : Math.max(1, p.qte || 1)), 0),
+    [pecas, sel, emCaixa]);
 
   const alterna = (marca) => setSel((prev) => {
     const n = new Set(prev);
@@ -173,7 +183,7 @@ export default function EtiquetasClient() {
     try {
       const r = await fetch("/api/expedicao/etiquetas", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opId, marcas: [...sel], modelo, tagObra }),
+        body: JSON.stringify({ opId, marcas: [...sel], modelo, tagObra, emCaixa: [...emCaixa] }),
       });
       if (!r.ok) {
         const bruto = await r.text().catch(() => "");
@@ -267,7 +277,8 @@ export default function EtiquetasClient() {
               marcarVisiveis={marcarVisiveis} limpar={limpar} filtrosAtivos={filtrosAtivos} pdf={pdf}
               imprimir={imprimir} gerando={gerando}
             />
-            <TabelaMarcas visiveis={visiveis} sel={sel} alterna={alterna} busca={busca} fp={fp} />
+            <TabelaMarcas visiveis={visiveis} sel={sel} alterna={alterna} busca={busca} fp={fp}
+              emCaixa={emCaixa} alternarCaixa={alternarCaixa} />
           </div>
         )
       )}

@@ -201,7 +201,14 @@ async function selecionar(corpo) {
   if (!dados) return { recusa: NextResponse.json({ success: false, error: "OP não encontrada" }, { status: 404 }) };
 
   const escolhidas = new Set(marcas.map(String));
-  let pecas = dados.pecas.filter((p) => escolhidas.has(p.marca));
+  // ⚠⚠ A TELA MANDA UM SIM/NÃO POR MARCA, NUNCA UM NÚMERO — e a distinção é a regra desta rota.
+  // "A quantidade vem do banco, não do navegador": aceitar um número deixaria a etiqueta dizer
+  // "3/5" para uma marca que tem 2 peças. `emCaixa` só troca a REGRA de contagem (uma etiqueta para
+  // o lote, dizendo "N/N"); o N continua saindo da Lista de Expedição.
+  const emCaixa = new Set((Array.isArray(corpo?.emCaixa) ? corpo.emCaixa : []).map(String));
+  let pecas = dados.pecas
+    .filter((p) => escolhidas.has(p.marca))
+    .map((p) => (emCaixa.has(p.marca) ? { ...p, emCaixa: true } : p));
   if (!pecas.length) return { recusa: erro400("Nenhuma das marcas enviadas existe nesta OP.") };
 
   // Só o modelo do cliente lê estes campos — o padrão não faria nada com eles, e a consulta seria
@@ -227,7 +234,8 @@ async function registrarImpressao(user, { op, pecas, modelo, tagObra }) {
         action: ACAO,
         entity: ENTIDADE,
         entityId: chaveHistorico(op.numero, p.marca),
-        diff: { op: op.numero, marca: p.marca, etiquetas: Math.max(1, p.qte || 1), modelo, tagObra, por: user?.name || null },
+        diff: { op: op.numero, marca: p.marca, etiquetas: p.emCaixa ? 1 : Math.max(1, p.qte || 1),
+                emCaixa: !!p.emCaixa, modelo, tagObra, por: user?.name || null },
       })),
     });
   } catch (e) {

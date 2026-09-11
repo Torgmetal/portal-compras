@@ -307,3 +307,39 @@ describe("emMilimetros — o que a calibragem aceita", () => {
     for (const lixo of ["", null, undefined, "abc", {}]) expect(emMilimetros(lixo)).toBe(0);
   });
 });
+
+// ⚠⚠ UMA ETIQUETA PARA A CAIXA. Matheus (11/09/2026): "pode ocorrer casos de uma marca ter 50 peças
+// mas são todas pequenas, aí montamos uma caixa com as 50 peças e colamos somente 1 etiqueta 50/50;
+// se não tiver essa opção o portal vai imprimir as 50 etiquetas".
+describe("marca fechada numa caixa", () => {
+  const base = { cliente: "TMSA", obra: "Torocua", opNumero: "103" };
+
+  it("50 peças em caixa rendem UMA etiqueta, não 50", async () => {
+    const bytes = await gerarEtiquetasCarregamentoPDF({
+      ...base, pecas: [{ marca: "M1", qte: 50, emCaixa: true }],
+    });
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+  });
+
+  // ⚠ A etiqueta única diz "50/50" — o volume é um só e carrega o lote inteiro. Dissesse "1/50",
+  // quem confere o carregamento procuraria outras 49 caixas que não existem.
+  it("a etiqueta da caixa diz N/N, não 1/N", async () => {
+    const texto = textoDoPdf(await gerarEtiquetasCarregamentoPDF({
+      ...base, pecas: [{ marca: "M1", qte: 50, emCaixa: true }],
+    }));
+    expect(texto).toContain("50/50");
+    expect(texto).not.toContain("1/50");
+  });
+
+  it("sem a marcação continua uma etiqueta por peça", async () => {
+    const bytes = await gerarEtiquetasCarregamentoPDF({ ...base, pecas: [{ marca: "M1", qte: 50 }] });
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(50);
+  });
+
+  it("convive com marcas normais no mesmo lote", async () => {
+    const bytes = await gerarEtiquetasCarregamentoPDF({
+      ...base, pecas: [{ marca: "M1", qte: 50, emCaixa: true }, { marca: "M2", qte: 3 }],
+    });
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(4);
+  });
+});

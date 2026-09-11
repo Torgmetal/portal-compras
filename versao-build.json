@@ -1,7 +1,12 @@
 {
-  "build": 3076,
-  "gerado": "2026-09-11T12:00:42.209Z",
+  "build": 3077,
+  "gerado": "2026-09-11T12:00:42.356Z",
   "commits": [
+    {
+      "hash": "5295a759c6",
+      "data": "11/09/2026",
+      "titulo": "Etiqueta padrao: texto longe da borda esquerda, e o download volta a funcionar"
+    },
     {
       "hash": "7aa5f661fa",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "03e3fc620a",
       "data": "09/09/2026",
       "titulo": "Gantt: a raia do jato deixa de virar uma página em branco"
-    },
-    {
-      "hash": "9b38a0213d",
-      "data": "09/09/2026",
-      "titulo": "Remessa Terceiro: vincula o Projeto no Omie automaticamente"
     }
   ]
 }

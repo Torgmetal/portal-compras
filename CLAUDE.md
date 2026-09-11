@@ -370,6 +370,54 @@ já saiu.
 limitação do BarTender, que importava a planilha com o campo de largura fixa — aqui o número vem
 do banco a cada etiqueta e a largura se ajusta sozinha.
 
+### Uma etiqueta para a caixa (coluna "Imprimir")
+
+Cada marca tem na lista uma coluna **Imprimir** com quantas etiquetas ela vai render. Clicando,
+troca para **1 · caixa**: sai UMA etiqueta, dizendo `50/50`. Matheus (11/09/2026): *"uma marca tem
+50 peças mas são todas pequenas, aí montamos uma caixa com as 50 peças e colamos somente 1 etiqueta
+50/50; se não tiver essa opção o portal vai imprimir as 50 etiquetas"*. Na OP-103 há uma marca com
+**210 chapas de 0,23 kg** — 210 adesivos que ninguém colaria.
+
+⚠⚠ **A TELA MANDA UM SIM/NÃO POR MARCA, NUNCA UM NÚMERO** — e é isso que mantém a regra de cima
+("a quantidade vem do banco, não do navegador") de pé. Um campo livre deixaria a etiqueta dizer
+"3/5" numa marca de 2 peças. `emCaixa` troca a REGRA de contagem; o N continua vindo da L.E.
+
+⚠ **A etiqueta da caixa diz `N/N`, não `1/N`.** Dissesse "1/50", quem confere o carregamento
+procuraria outras 49 caixas que não existem.
+
+⚠ **Zera ao trocar de obra**, como a TAG. E marca de 1 peça não mostra o botão: caixa de uma peça é
+a mesma etiqueta, e um controle que não muda nada só faz duvidar se mudou.
+
+⚠ **A coluna se chama "Imprimir", não "Etiquetas"** — a última coluna já é "Etiqueta" (o histórico
+de impressão). Duas colunas quase homônimas lado a lado fazem conferir a errada; chegaram a fazer
+um teste apontar para a coluna errada.
+
+### Baixar o PDF gerado
+
+⚠⚠ **URL DE BLOB NÃO CARREGA NOME DE ARQUIVO, E É REVOGÁVEL.** O download quebrava por dois motivos
+somados (11/09/2026): o blob era revogado em 60 s — e quem abre o PDF, confere as marcas e só então
+clica em baixar passa fácil disso, recebendo *"verifique a conexão com a Internet"* num arquivo com
+nome de UUID (não era rede: era o link revogado) — e o `Content-Disposition` que a rota manda é
+ignorado por URL de blob. Agora o blob vive enquanto a tela estiver aberta (revogado ao sair: blob
+de 400 etiquetas pendurado numa tela que fica aberta o dia todo é vazamento com hora marcada) e o
+botão **Baixar PDF** é um `<a download="etiquetas-OP-103.pdf">`.
+
+### Calibragem da impressora
+
+Um painel recolhido na tela move a impressão inteira em mm. ⚠⚠ **É conserto de máquina, não design**:
+o PDF desenha de 1,2 a 98,8 mm numa página de 100 — está centrado. Se sai cortado, a origem da Argox
+está deslocada e o lugar certo é o driver; isto existe porque o driver dela nem sempre expõe o
+ajuste. Guardado GLOBAL (`EtiquetaCalibragem`, chave `argox`) porque é propriedade da IMPRESSORA.
+
+⚠⚠ **Deslocar sozinho não serve.** A página tem 100 mm e o desenho já usa 1,2–98,8: empurrar 5 mm
+para a direita jogaria a coluna do QR para fora — trocaria o corte da esquerda pelo da direita. O
+desenho também **encolhe** o bastante para caber (5 mm = 5%), e a tela avisa quanto.
+
+⚠ Dois erros de geometria que só apareceram renderizando um quadro de referência, e viraram teste:
+`scaleContent` ancora no canto de **baixo** (descer ingenuamente empurra o rodapé para fora), e ir
+para a **esquerda não é `tx` negativo** (isso joga o desenho para fora do papel — ele encosta na
+borda e encolhe).
+
 ### TAG da obra (modelo padrão)
 
 Um campo **TAG da obra** na tela, só no modelo `padrao`, sai impresso **em todas** as etiquetas

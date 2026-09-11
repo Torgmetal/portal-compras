@@ -1,5 +1,5 @@
 "use client";
-import { Check } from "lucide-react";
+import { Check, Package } from "lucide-react";
 import { ThFiltro } from "@/components/FiltroColuna";
 
 // A TABELA DE MARCAS — o que vai ser impresso.
@@ -44,7 +44,37 @@ export const COLUNAS_ETIQUETA = [
   { key: "impressa", label: "Etiqueta", valor: (p) => (p.impressaEm ? "Já impressa" : "Não impressa") },
 ];
 
-export default function TabelaMarcas({ visiveis, sel, alterna, busca, fp }) {
+/**
+ * QUANTAS ETIQUETAS ESTA MARCA VAI RENDER — e o botão para trocar de regra.
+ *
+ * ⚠⚠ MATHEUS (11/09/2026): "pode ocorrer casos de uma marca ter 50 peças mas são todas pequenas, aí
+ * montamos uma caixa com as 50 peças e colamos somente 1 etiqueta 50/50; se não tiver essa opção o
+ * portal vai imprimir as 50 etiquetas". Sem isto, o rolo sai com 49 adesivos que ninguém vai colar.
+ *
+ * ⚠ É UM SIM/NÃO, NÃO UM CAMPO DE NÚMERO, e isso é deliberado. A regra da rota é "a quantidade vem
+ * do banco, não do navegador" — um campo livre deixaria a etiqueta dizer "3/5" numa marca de 2
+ * peças. Aqui a tela escolhe entre DUAS regras; o total continua saindo da Lista de Expedição.
+ *
+ * ⚠ Marca de 1 peça não mostra o botão: caixa de uma peça é a mesma etiqueta, e um controle que
+ * não muda nada só faz duvidar se mudou.
+ */
+function QuantasEtiquetas({ peca, emCaixa, alternarCaixa }) {
+  const total = Math.max(1, peca.qte || 1);
+  if (total === 1) return <span className="tabular-nums text-torg-gray">1</span>;
+  return (
+    <button type="button"
+      onClick={(e) => { e.stopPropagation(); alternarCaixa(peca.marca); }}
+      title={emCaixa
+        ? `Uma etiqueta só, dizendo ${total}/${total} — para o lote fechado numa caixa`
+        : `Uma etiqueta por peça (${total} no total)`}
+      className={`tabular-nums rounded-lg px-2 py-1 text-[12.5px] font-semibold border ${
+        emCaixa ? "border-torg-orange text-torg-orange bg-orange-50" : "border-gray-200 text-torg-dark"}`}>
+      {emCaixa ? <><Package size={12} className="inline mb-0.5 mr-1" />1 · caixa</> : total}
+    </button>
+  );
+}
+
+export default function TabelaMarcas({ visiveis, sel, alterna, busca, fp, emCaixa, alternarCaixa }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-[13px]" style={{ minWidth: 640 }}>
@@ -54,6 +84,10 @@ export default function TabelaMarcas({ visiveis, sel, alterna, busca, fp }) {
             <ThFiltro col="marca" label="Marca" className="text-left px-2 py-2" {...fp} />
             <ThFiltro col="descricao" label="Descrição" className="text-left px-2 py-2" {...fp} />
             <th className="text-right px-2 py-2">Peças</th>
+            {/* ⚠ "Imprimir", não "Etiquetas": a última coluna já se chama "Etiqueta" (o histórico
+                de impressão). Duas colunas quase homônimas ao lado uma da outra fazem quem usa
+                conferir a errada — e fizeram um teste apontar para a coluna errada. */}
+            <th className="text-center px-2 py-2">Imprimir</th>
             <th className="text-right px-2 py-2">Peso unit. (kg)</th>
             <ThFiltro col="impressa" label="Etiqueta" className="text-left px-4 py-2" {...fp} />
           </tr>
@@ -68,12 +102,15 @@ export default function TabelaMarcas({ visiveis, sel, alterna, busca, fp }) {
               <td className="px-2 py-2 font-bold text-torg-dark">{p.marca}</td>
               <td className="px-2 py-2 text-torg-gray">{p.descricao || "—"}</td>
               <td className="px-2 py-2 text-right tabular-nums">{Math.max(1, p.qte || 1)}</td>
+              <td className="px-2 py-2 text-center">
+                <QuantasEtiquetas peca={p} emCaixa={emCaixa.has(p.marca)} alternarCaixa={alternarCaixa} />
+              </td>
               <td className="px-2 py-2 text-right tabular-nums">{nkg(p.pesoUnitKg)}</td>
               <td className="px-4 py-2"><Impressa peca={p} /></td>
             </tr>
           ))}
           {!visiveis.length && (
-            <tr><td colSpan={6} className="px-4 py-10 text-center text-torg-gray">
+            <tr><td colSpan={7} className="px-4 py-10 text-center text-torg-gray">
               {busca
                 ? <>Nenhuma marca bate com &quot;{busca}&quot;.</>
                 : "Nenhuma marca passa pelos filtros do cabeçalho."}

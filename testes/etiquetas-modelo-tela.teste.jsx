@@ -12,7 +12,7 @@ const OPS = [
   { id: "op102", numero: "102", cliente: "QWS", obra: "Revamp", marcas: 2 },
   { id: "op97", numero: "097", cliente: "MEGASTEAM", obra: "Unipar", marcas: 1 },
 ];
-const PECAS = [{ id: "p1", marca: "T102A1", descricao: "L2''X1/4''", qte: 1, pesoUnitKg: 13.26, impressaEm: null, impressoes: 0 }];
+const PECAS = [{ id: "p1", marca: "T102A1", descricao: "L2''X1/4''", qte: 50, pesoUnitKg: 13.26, impressaEm: null, impressoes: 0 }];
 
 // A TAG usada na última impressão desta obra — a rota devolve no GET para a tela sugerir.
 let TAG_ANTERIOR = null;
@@ -148,5 +148,49 @@ describe("TAG da obra", () => {
     TAG_ANTERIOR = "TPR00870";
     await abrirOP();
     await waitFor(() => expect(campoTag().value).toBe("TPR00870"));
+  });
+});
+
+// ⚠⚠ A MARCA QUE VAI NUMA CAIXA. Matheus (11/09/2026): "montamos uma caixa com as 50 peças e
+// colamos somente 1 etiqueta 50/50; se não tiver essa opção o portal vai imprimir as 50 etiquetas".
+//
+// ⚠ A tela manda um SIM/NÃO por marca, nunca um número: a regra da rota é "a quantidade vem do
+// banco, não do navegador". É isso que precisa ficar provado aqui.
+describe("marca fechada numa caixa", () => {
+  const botaoDaCaixa = () => screen.getByRole("button", { name: /^50$|caixa/ });
+
+  it("o botão mostra quantas etiquetas a marca vai render", async () => {
+    await abrirOP();
+    expect(botaoDaCaixa().textContent).toContain("50");
+  });
+
+  it("marcar a caixa troca 50 por 1 e o total da barra acompanha", async () => {
+    await abrirOP();
+    fireEvent.click(screen.getByText("T102A1"));
+    // ⚠ O contador é `<b>50</b> etiqueta(s)` — quebrado em vários elementos, então `findByText` não
+    // casa. O que importa é o texto que a pessoa lê, e ele está no textContent.
+    await waitFor(() => expect(document.body.textContent).toMatch(/50 etiqueta\(s\)/));
+    fireEvent.click(botaoDaCaixa());
+    await waitFor(() => expect(document.body.textContent).toMatch(/1 etiqueta\(s\)/));
+  });
+
+  it("vai no pedido como lista de marcas, não como número", async () => {
+    await abrirOP();
+    fireEvent.click(botaoDaCaixa());
+    fireEvent.click(screen.getByText("T102A1"));
+    fireEvent.click(screen.getByText(/Gerar etiquetas/));
+    await waitFor(() => {
+      const post = chamadas.find((c) => c.init?.method === "POST" && !c.url.includes("campos-extras"));
+      expect(JSON.parse(post.init.body).emCaixa).toEqual(["T102A1"]);
+    });
+  });
+
+  // ⚠ Zera ao trocar de obra, como a TAG: marca de outra obra não tem caixa nenhuma aqui.
+  it("trocar de obra desmarca as caixas", async () => {
+    await abrirOP();
+    fireEvent.click(botaoDaCaixa());
+    await waitFor(() => expect(botaoDaCaixa().textContent).toMatch(/caixa/));
+    fireEvent.change(seletores()[0], { target: { value: "op97" } });
+    await waitFor(() => expect(botaoDaCaixa().textContent).not.toMatch(/caixa/));
   });
 });
