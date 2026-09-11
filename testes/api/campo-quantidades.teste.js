@@ -1,0 +1,14 @@
+import {it,expect,vi,beforeEach} from 'vitest';
+import {mockPrisma} from '@/testes/apoio/prisma';
+vi.mock('@/lib/prisma',()=>({prisma:mockPrisma}));
+vi.mock('@/lib/session',()=>({requireRole:vi.fn().mockResolvedValue({id:'u'})}));
+import {GET as buscar} from '@/app/api/campo/pecas/route';
+import {PATCH} from '@/app/api/campo/relatorios/[id]/route';
+let rel;
+beforeEach(()=>{vi.clearAllMocks();rel={id:'r',tipo:'PINTURA',marcas:['P1'],linhas:[],resultados:{prepData:'2026-09-11'},equipamentos:[]};mockPrisma.relatorioInspecao.findUnique.mockImplementation(async()=>rel);mockPrisma.relatorioInspecao.update.mockImplementation(async({data})=>(rel={...rel,...data}));mockPrisma.auditLog.create.mockResolvedValue({});});
+it('soma quantidade da mesma marca em frentes diferentes',async()=>{mockPrisma.pecaConjunto.findMany.mockResolvedValue([{marca:'P1',qte:4},{marca:'P1',qte:6}]);const r=await buscar(new Request('http://localhost?opId=op&todas=1'));expect((await r.json()).pecas[0].quantidade).toBe(10);});
+it.each(['PINTURA','VISUAL_SOLDA'])('salva ajuste em %s mantendo condições',async tipo=>{rel.tipo=tipo;const r=await PATCH(new Request('http://localhost',{method:'PATCH',body:JSON.stringify({pecasInformadas:[{marca:'P1',quantidade:3}]})}),{params:{id:'r'}});expect(r.status).toBe(200);expect(rel.resultados).toMatchObject({quantidade:'3',qtdPeca:{P1:3},prepData:'2026-09-11'});});
+it('não permite alteração de quantidades em dimensional',async()=>{rel.tipo='DIMENSIONAL';const r=await PATCH(new Request('http://localhost',{method:'PATCH',body:JSON.stringify({pecasInformadas:[{marca:'P1',quantidade:3}]})}),{params:{id:'r'}});expect(r.status).toBe(400);expect(mockPrisma.relatorioInspecao.update).not.toHaveBeenCalled();});
+it.each([0,-1,1.5,null])('rejeita quantidade inválida %s sem gravar',async quantidade=>{const r=await PATCH(new Request('http://localhost',{method:'PATCH',body:JSON.stringify({pecasInformadas:[{marca:'P1',quantidade}]})}),{params:{id:'r'}});expect(r.status).toBe(400);expect(mockPrisma.relatorioInspecao.update).not.toHaveBeenCalled();});
+it('impede alterar peças do relatório por meio do ajuste de quantidade',async()=>{const r=await PATCH(new Request('http://localhost',{method:'PATCH',body:JSON.stringify({pecasInformadas:[{marca:'P2',quantidade:3}]})}),{params:{id:'r'}});expect(r.status).toBe(400);});
+it('mantém bloqueio de assinatura',async()=>{rel.envioAssinaturaId='a';const r=await PATCH(new Request('http://localhost',{method:'PATCH',body:JSON.stringify({pecasInformadas:[{marca:'P1',quantidade:3}]})}),{params:{id:'r'}});expect(r.status).toBe(409);expect(mockPrisma.relatorioInspecao.update).not.toHaveBeenCalled();});

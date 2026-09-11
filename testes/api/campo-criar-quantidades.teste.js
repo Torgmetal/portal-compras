@@ -1,0 +1,11 @@
+import {it,expect,vi,beforeEach} from 'vitest';
+import {mockPrisma} from '@/testes/apoio/prisma';
+vi.mock('@/lib/prisma',()=>({prisma:mockPrisma}));
+vi.mock('@/lib/session',()=>({requireRole:vi.fn().mockResolvedValue({id:'u'})}));
+vi.mock('@/lib/relatorio-inspecao',()=>({vincularNoDataBook:vi.fn().mockResolvedValue({}),proximoNumero:vi.fn().mockResolvedValue(1)}));
+vi.mock('@/lib/importar-procedimentos',()=>({procedimentoDoTipo:vi.fn().mockResolvedValue(null)}));
+vi.mock('@/lib/relatorio-dimensional',()=>({procedimentoTolerancia:vi.fn().mockResolvedValue(null)}));
+import {POST} from '@/app/api/qualidade/inspecoes/dimensional/route';
+beforeEach(()=>{vi.clearAllMocks();mockPrisma.oP.findFirst.mockResolvedValue(null);mockPrisma.planoPintura.findUnique.mockResolvedValue(null);mockPrisma.auditLog.create.mockResolvedValue({});mockPrisma.relatorioInspecao.create.mockImplementation(async({data})=>({id:'r',...data}));});
+it.each(['PINTURA','VISUAL_SOLDA'])('cria %s com quantidades selecionadas e total',async tipo=>{const r=await POST(new Request('http://localhost',{method:'POST',body:JSON.stringify({opNumero:'106',tipo,marcas:['P1','P2'],pecasInformadas:[{marca:'P1',quantidade:212},{marca:'P2',quantidade:16}]})}));expect(r.status).toBe(200);expect((await r.json()).relatorio.resultados).toMatchObject({quantidade:'228',qtdPeca:{P1:212,P2:16}});});
+it('rejeita quantidades para outro tipo',async()=>{const r=await POST(new Request('http://localhost',{method:'POST',body:JSON.stringify({opNumero:'106',tipo:'LP',marcas:['P1'],pecasInformadas:[{marca:'P1',quantidade:2}]})}));expect(r.status).toBe(400);expect(mockPrisma.relatorioInspecao.create).not.toHaveBeenCalled();});

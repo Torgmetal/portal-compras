@@ -107,9 +107,9 @@ export async function POST(req, { params }) {
 
   const jaTem = await prisma.assinaturaDocumento.findMany({
     where: { envioId },
-    select: { email: true },
+    select: { email: true, token: true, assinadoEm: true },
   });
-  const emails = new Set(jaTem.map((a) => a.email.toLowerCase()));
+  const existentes = new Map(jaTem.map(a => [a.email.toLowerCase(), a]));
 
   // ⚠ O ANEXO É O DOCUMENTO DE VERDADE. Aqui também estava o gerador antigo, que não conhece os
   // modelos novos — quem recebia o e-mail lia uma folha que não é o relatório. Mesmo despacho da
@@ -132,10 +132,14 @@ export async function POST(req, { params }) {
   // da conta, endereço recusado, anexo grande) é a única informação que resolve.
   const falhas = [];
   for (const d of assinantes) {
-    if (emails.has(d.email.toLowerCase())) continue;
-    const token = gerarTokenForte(24);
-    await prisma.assinaturaDocumento.create({ data: { envioId, nome: d.nome, email: d.email, setor: d.setor, token } });
-    novos++;
+    const existente = existentes.get(d.email.toLowerCase());
+    if (existente?.assinadoEm) continue;
+    const token = existente?.token || gerarTokenForte(24);
+    if (!existente) {
+      await prisma.assinaturaDocumento.create({ data: { envioId, nome: d.nome, email: d.email, setor: d.setor, token } });
+      existentes.set(d.email.toLowerCase(), {token, assinadoEm:null});
+      novos++;
+    }
     const link = `${base}/assinar/${token}`;
     const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#0D1F3C">
       ${cabecalhoEmail("Assinatura — Relatório de Inspeção")}

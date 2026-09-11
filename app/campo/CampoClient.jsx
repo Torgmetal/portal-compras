@@ -25,6 +25,7 @@ export default function CampoClient({ nome }) {
   const [op, setOp] = useState(null);          // { id, numero }
   // "medir" | "rnc" | "novo" — o que o inspetor veio fazer nesta OP
   const [modo, setModo] = useState(null);
+  const [relatorioCriadoId, setRelatorioCriadoId] = useState(null);
   // Vitor (21/08/2026): "além de informar a peça e a OP, ele seleciona os equipamentos que está
   // usando para compor no relatório". Fica fixo como a peça — o inspetor mede a manhã inteira com
   // a mesma trena, e remarcar a cada foto seria trabalho à toa.
@@ -60,7 +61,7 @@ export default function CampoClient({ nome }) {
       <Tela titulo={`OP-${op.numero}`} voltar={() => setOp(null)}>
         <p className="text-sm text-torg-gray mb-3">O que você vai fazer?</p>
         <div className="space-y-2">
-          <button onClick={() => setModo("medir")}
+          <button onClick={() => {setRelatorioCriadoId(null);setModo("medir");}}
             className="w-full text-left bg-white border-2 border-torg-blue rounded-xl px-4 py-4 active:bg-torg-blue/5">
             <span className="block text-base font-semibold text-torg-blue">Preenchimento de relatórios</span>
             <span className="block text-[13px] text-torg-gray">informar as medidas dos relatórios desta obra</span>
@@ -93,14 +94,14 @@ export default function CampoClient({ nome }) {
   }
 
   if (modo === "medir") {
-    return <Medir op={op} onSair={() => setModo(null)} Tela={Tela} Equipamentos={Equipamentos} />;
+    return <Medir op={op} relatorioInicialId={relatorioCriadoId} onSair={() => setModo(null)} Tela={Tela} Equipamentos={Equipamentos} />;
   }
 
   if (modo === "novo") {
     return (
       <NovoRelatorio op={op} Tela={Tela} onSair={() => setModo(null)}
         // criado, cai direto no preenchimento: o inspetor está com a peça na frente
-        onCriado={() => setModo("medir")} />
+        onCriado={rel => {setRelatorioCriadoId(rel.id);setModo("medir");}} />
     );
   }
 

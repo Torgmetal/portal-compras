@@ -1,7 +1,12 @@
 {
-  "build": 3089,
-  "gerado": "2026-09-11T16:14:09.350Z",
+  "build": 3090,
+  "gerado": "2026-09-11T16:43:38.468Z",
   "commits": [
+    {
+      "hash": "f22d0a33",
+      "data": "11/09/2026",
+      "titulo": "Portal do fornecedor: página em branco por data escrita em dois fusos"
+    },
     {
       "hash": "68e52f85",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "665cefa6",
       "data": "10/09/2026",
       "titulo": "fix(pcp): reconhecer croquis pelo vínculo com seus conjuntos"
-    },
-    {
-      "hash": "96a857ab",
-      "data": "10/09/2026",
-      "titulo": "fix(pcp): imprimir fila sem bancada e excluir croquis posteriores ao corte"
     }
   ]
 }

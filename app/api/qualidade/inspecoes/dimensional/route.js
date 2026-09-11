@@ -1,3 +1,4 @@
+import {usaQuantidadeInspecao, pecasInformadasSchema, resultadosComPecas} from "@/lib/inspecao-pecas";
 // POST — cria o relatório dimensional.  { opNumero, escopo, marcas[], titulo, inspetor }
 //
 // ⚠ CRIAR É INSTANTÂNEO, DE PROPÓSITO. Vitor (21/08/2026): "vamos mudar esse caminho para criar o
@@ -56,6 +57,15 @@ export async function POST(req) {
   // "Nº DESENHO", "FOLHA 1 DE 1"). Agrupar é privilégio da peça avulsa.
   if (ehDimensional && escopo === "CONJUNTO" && marcas.length > 1) {
     return NextResponse.json({ error: "Relatório de conjunto é um por conjunto. Para agrupar, use o escopo de peças avulsas." }, { status: 400 });
+  }
+
+  let pecasInformadas;
+  if (body.pecasInformadas !== undefined) {
+    if (!usaQuantidadeInspecao(tipo)) return NextResponse.json({error:"Quantidades por peça disponíveis apenas para pintura e solda."},{status:400});
+    const v = pecasInformadasSchema.safeParse(body.pecasInformadas);
+    if (!v.success) return NextResponse.json({error:v.error.issues[0].message},{status:400});
+    if (v.data.length !== marcas.length || v.data.some(p=>!marcas.includes(p.marca))) return NextResponse.json({error:"As quantidades devem corresponder às peças selecionadas."},{status:400});
+    pecasInformadas=v.data;
   }
 
   // ⚠ NADA DE VARRER O SERVIDOR AQUI. Vitor (21/08/2026): "vamos mudar esse caminho para criar o
@@ -196,7 +206,7 @@ export async function POST(req) {
           // o critério do ensaio visual de solda é fixado pelo PO-06, item 9.4
           criterio: tipo === "VISUAL_SOLDA" ? CRITERIO_PADRAO : null,
           // o especificado do PLP (só na pintura; vazio quando a obra não tem PLP)
-          ...semente },
+          ...semente, ...(pecasInformadas ? resultadosComPecas({}, pecasInformadas) : {}) },
         criadoPorId: user.id, criadoPorNome: user.name || null,
       },
     });

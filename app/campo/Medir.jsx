@@ -5,6 +5,9 @@ import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2, Camera,
 import LeitorQR from "./LeitorQR";
 import VistaCotas from "./VistaCotas";
 import { marcaDoQR, TIPOS_RELATORIO, usaCotas } from "@/lib/qualidade-campo";
+import {useStore} from "@/lib/store";
+import QuantidadesPecas from "./QuantidadesPecas";
+import {usaQuantidadeInspecao, pecasDoRelatorio, pecasInformadasSchema} from "@/lib/inspecao-pecas";
 import Pintura from "./Pintura";
 import { ParametrosLP, IndicacaoLP } from "./Lp";
 import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA } from "@/lib/evs-campos";
@@ -32,9 +35,9 @@ import {
  * ⚠ TELA DE CHÃO DE FÁBRICA: alvo grande, teclado numérico, uma coisa por vez. Quem usa está de
  * luva, com o celular numa mão e o instrumento na outra.
  */
-export default function Medir({ op, onSair, Tela, Equipamentos }) {
+export default function Medir({ op, onSair, Tela, Equipamentos, relatorioInicialId = null }) {
   const [lista, setLista] = useState(null);
-  const [abertoId, setAbertoId] = useState(null);
+  const [abertoId, setAbertoId] = useState(relatorioInicialId);
 
   useEffect(() => {
     if (abertoId) return;
@@ -214,7 +217,9 @@ function agruparPorTipo(lista) {
 }
 
 function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
+  const {showToast}=useStore();
   const [rel, setRel] = useState(null);
+  const [pecasQuantidades, setPecasQuantidades] = useState([]);
   const [erro, setErro] = useState("");
   const [linhas, setLinhas] = useState([]);
   const [equipamentos, setEquipamentos] = useState([]);
@@ -248,6 +253,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "Erro"); return j; })
       .then((j) => {
         setRel(j.relatorio);
+        setPecasQuantidades(pecasDoRelatorio(j.relatorio,j.quantidadesLista));
         setResultado(j.relatorio.resultadoInspecao || null);
         setLinhas(Array.isArray(j.relatorio.linhas) ? j.relatorio.linhas : []);
         setEquipamentos(Array.isArray(j.relatorio.equipamentos) ? j.relatorio.equipamentos : []);
@@ -265,6 +271,9 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           prepData: r0.prepData || "", prepIni: r0.prepIni || "", prepFim: r0.prepFim || "",
           prepTAmb: r0.prepTAmb ?? "", prepTSup: r0.prepTSup ?? "", prepOrvalho: r0.prepOrvalho ?? "",
           prepUmidade: r0.prepUmidade ?? "", tempo: r0.tempo || "",
+          poeira: r0.poeira ?? "", salinidade: r0.salinidade ?? "",
+          pullOffEquip: r0.pullOffEquip ?? "", pullOffValor: r0.pullOffValor ?? "",
+          pullOffMin: r0.pullOffMin ?? "", pullOffRuptura: r0.pullOffRuptura ?? "",
           rugLeituras: Array.isArray(r0.rugLeituras) ? r0.rugLeituras : ["", "", "", "", ""],
           // ── líquido penetrante ──
           tipoPenetrante: r0.tipoPenetrante || "", metodo: r0.metodo || "",
@@ -404,6 +413,12 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   }
 
   async function salvar() {
+    let pecasInformadas;
+    if(usaQuantidadeInspecao(rel.tipo) && pecasQuantidades.length){
+      const v=pecasInformadasSchema.safeParse(pecasQuantidades.map(p=>({...p,quantidade:Number(p.quantidade)})));
+      if(!v.success){showToast(v.error.issues[0].message,"error");return;}
+      pecasInformadas=v.data;
+    }
     setSalvando(true);
     try {
       // ⚠ manda só o que o campo pode escrever, com o ÍNDICE da linha — o servidor mescla. Mandar a
@@ -429,7 +444,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       }));
       const r = await fetch(`/api/campo/relatorios/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ medidas, equipamentos, observacoes, assumirInspetor: !rel.inspetor, condicoes: ehDim ? undefined : (({ __espec, ...resto }) => resto)(cond), resultadoInspecao: resultado }),
+        body: JSON.stringify({ pecasInformadas, medidas, equipamentos, observacoes, assumirInspetor: !rel.inspetor, condicoes: ehDim ? undefined : (({ __espec, ...resto }) => resto)(cond), resultadoInspecao: resultado }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
@@ -495,6 +510,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         </div>
       )}
 
+      {usaQuantidadeInspecao(rel.tipo) && pecasQuantidades.length > 0 && <QuantidadesPecas pecas={pecasQuantidades} onChange={setPecasQuantidades} disabled={salvando} />}
       {ehPintura && <Pintura cond={cond} setCond={setCond} tintas={tintas} plp={plp} />}
 
       {ehLp && <ParametrosLP cond={cond} setCond={setCond} />}

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
-import { pecasDoRelatorio, pecasInformadasSchema } from "@/lib/inspecao-pecas";
+import { pecasDoRelatorio, pecasInformadasSchema, usaQuantidadeInspecao } from "@/lib/inspecao-pecas";
 import PecasInformadasEditor from "./PecasInformadasEditor";
 import { Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, Lock, FolderOpen, Crop, RotateCcw } from "lucide-react";
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
@@ -91,7 +91,7 @@ export default function RelatorioDetalheClient({ id }) {
   async function salvar() {
     let pecasInformadas;
     const pecasAtuais = pecasEditadas ?? pecasDoRelatorio(rel, dados.quantidadesLista);
-    if (pecasAtuais.length || pecasEditadas !== null) {
+    if (usaQuantidadeInspecao(rel.tipo) && (pecasAtuais.length || pecasEditadas !== null)) {
       const validacao = pecasInformadasSchema.safeParse(pecasAtuais.map(p => ({ ...p, quantidade: p.quantidade === "" ? null : Number(p.quantidade) })));
       if (!validacao.success && pecasEditadas !== null) { showToast(validacao.error.issues[0].message, "error"); return; }
       if (validacao.success) pecasInformadas = validacao.data;
@@ -148,7 +148,10 @@ export default function RelatorioDetalheClient({ id }) {
           {!travado && (
             <details className="mt-1.5">
               <summary className="text-[12px] text-torg-blue cursor-pointer select-none">Editar peças informadas ({Array.isArray(rel.marcas) ? rel.marcas.length : 0})</summary>
+              {usaQuantidadeInspecao(rel.tipo) ? (
               <PecasInformadasEditor pecas={pecasEditadas ?? pecasDoRelatorio(rel, dados.quantidadesLista)} quantidadesLista={{ ...dados.quantidadesLista, ...res.qtdPeca }} onChange={setPecasEditadas} disabled={salvando} />
+              ) : <textarea rows={4} value={(rel.marcas || []).join("\n")} onChange={e=>setCampo("marcas",e.target.value.split("\n"))} placeholder="Uma marca por linha" className="mt-2 w-full border rounded-lg p-2 text-sm" />}
+
               {dados.avisoQuantidades && <p className="text-xs text-amber-700 mt-2">{dados.avisoQuantidades}</p>}
             </details>
           )}

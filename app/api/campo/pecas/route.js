@@ -29,15 +29,18 @@ export async function GET(req) {
       ...(todas ? {} : { tipoPeca: "CONJUNTO" }),
       ...(busca ? { marca: { contains: busca, mode: "insensitive" } } : {}),
     },
-    select: { marca: true, descricao: true, tipoPeca: true, perfil: true },
+    select: { marca: true, descricao: true, tipoPeca: true, perfil: true, qte: true },
     orderBy: { marca: "asc" },
-    take: 60,
   });
 
   // a mesma marca aparece em sub-obras diferentes (ver lib/rastreio-peca) — na busca isso vira
   // linha repetida sem serventia; o que interessa aqui é o nome que a pessoa vai reconhecer
-  const vistas = new Set();
-  const lista = pecas.filter((p) => !vistas.has(p.marca) && vistas.add(p.marca));
-
-  return NextResponse.json({ pecas: lista });
+  const porMarca = new Map();
+  for (const p of pecas) {
+    const marca = p.marca.trim().toUpperCase();
+    const anterior = porMarca.get(marca);
+    porMarca.set(marca, { ...p, marca, quantidade: (anterior?.quantidade || 0) + (p.qte || 0) });
+  }
+  const lista = [...porMarca.values()];
+  return NextResponse.json({ pecas: lista.slice(0, 60), temMais: lista.length > 60 });
 }

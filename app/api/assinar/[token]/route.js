@@ -240,8 +240,10 @@ export async function POST(req, { params }) {
       const r = await sendEmail({ to: proximo.email, subject: `${a.envio.titulo} — sua assinatura`, html }).catch(() => ({ ok: false }));
       if (r?.ok) await prisma.assinaturaDocumento.update({ where: { id: proximo.id }, data: { convidadoEm: new Date() } });
     } else {
-      // ninguém mais na fila: a etapa fechou
-      await prisma.envioAssinatura.update({ where: { id: a.envioId }, data: { status: "CONCLUIDO" } }).catch(() => {});
+      // Relatórios podem ter assinantes em paralelo, sem ordem. Não haver próximo
+      // na fila sequencial não significa que todos já assinaram.
+      const pendentes = await prisma.assinaturaDocumento.count({where:{envioId:a.envioId,assinadoEm:null}});
+      if (!pendentes) await prisma.envioAssinatura.update({ where: { id: a.envioId }, data: { status: "CONCLUIDO" } }).catch(() => {});
     }
   } catch (e) { registro.erro("[assinar] convite do próximo:", e?.message); }
 
