@@ -83,6 +83,13 @@ export async function PATCH(req, { params }) {
   if (body.titulo !== undefined) dados.titulo = String(body.titulo || "").trim() || null;
   if (body.observacoes !== undefined) dados.observacoes = String(body.observacoes || "").trim() || null;
   if (body.inspetor !== undefined) dados.inspetor = String(body.inspetor || "").trim() || null;
+  // ⚠ as PEÇAS INFORMADAS (marcas) editam-se aqui, não só na criação. Vitor (11/09/2026), OP-106:
+  // "permitir que eu consiga editar as peças informadas, pois isso também não consigo fazer no
+  // portal". Uma marca por linha, sem repetição, com teto — é o que sai no cabeçalho do PDF.
+  if (Array.isArray(body.marcas)) {
+    const vistas = new Set();
+    dados.marcas = body.marcas.map((m) => String(m || "").trim().toUpperCase().slice(0, 40)).filter((m) => m && !vistas.has(m) && vistas.add(m)).slice(0, 2000);
+  }
 
   // ⚠ APROVAR TAMBÉM SE FAZ NO COMPUTADOR. Até aqui só o celular gravava o resultado geral —
   // quem monta o relatório na mesa (LP, pintura) não tinha como aprová-lo, e sem resultado o

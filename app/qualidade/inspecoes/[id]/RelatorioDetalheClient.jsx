@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, Lock, FolderOpen, Crop } from "lucide-react";
+import { Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, Lock, FolderOpen, Crop, RotateCcw } from "lucide-react";
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
 import CampoTolerancia from "./CampoTolerancia";
 import {foraDaTolerancia} from "@/lib/tolerancia-inspecao";
@@ -92,10 +92,25 @@ export default function RelatorioDetalheClient({ id }) {
           titulo: rel.titulo, observacoes: rel.observacoes, inspetor: rel.inspetor,
           linhas: rel.linhas, resultados: rel.resultados, equipamentos: rel.equipamentos,
           resultadoInspecao: rel.resultadoInspecao ?? null,
+          marcas: Array.isArray(rel.marcas) ? rel.marcas : undefined,
         }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
+    } catch (e) { alert(e.message); } finally { setSalvando(false); }
+  }
+
+  /** Relatório já assinado não se edita por baixo: abre a revisão seguinte e o ciclo recomeça. */
+  async function abrirRevisao() {
+    const motivo = window.prompt("O que vai ser revisto neste relatório? (vai para o histórico e para quem já assinou)");
+    if (motivo == null) return;
+    setSalvando(true);
+    try {
+      const r = await fetch(`/api/qualidade/inspecoes/${id}/revisao`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ motivo }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao abrir revisão");
+      alert(`Revisão R${String(j.relatorio.revisao).padStart(2, "0")} aberta. A rodada anterior ficou no histórico com ${j.assinaturasCongeladas} assinatura(s). Edite e envie de novo para assinatura.`);
+      window.location.reload();
     } catch (e) { alert(e.message); } finally { setSalvando(false); }
   }
 
@@ -113,12 +128,29 @@ export default function RelatorioDetalheClient({ id }) {
             {rel.escopo === "AVULSAS" ? " · peças avulsas agrupadas" : rel.escopo === "CONJUNTO" ? " · conjunto" : ""}
             {Array.isArray(rel.marcas) && rel.marcas.length ? ` · ${rel.marcas.join(", ")}` : ""}
           </p>
+          {/* Peças informadas editáveis — Vitor (11/09/2026): "editar as peças informadas, pois isso também não consigo fazer no portal" */}
+          {!travado && (
+            <details className="mt-1.5">
+              <summary className="text-[12px] text-torg-blue cursor-pointer select-none">Editar peças informadas ({Array.isArray(rel.marcas) ? rel.marcas.length : 0})</summary>
+              <textarea rows={4} defaultValue={(rel.marcas || []).join("\n")} placeholder="uma marca por linha (ou separadas por vírgula)"
+                onBlur={(e) => setCampo("marcas", e.target.value.split(/[\n,;]+/).map((m) => m.trim()).filter(Boolean))}
+                className="mt-1 w-full max-w-lg border border-gray-200 rounded-lg px-2.5 py-1.5 text-[12px] font-mono text-torg-dark" />
+              <p className="text-[11px] text-torg-gray">Sai do campo para aplicar; grava no Salvar.</p>
+            </details>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {travado ? (
-            <span className="text-[11px] px-2 py-1 rounded-lg bg-gray-100 text-torg-gray inline-flex items-center gap-1.5">
-              <Lock size={12} /> enviado para assinatura — somente leitura
-            </span>
+            <>
+              <span className="text-[11px] px-2 py-1 rounded-lg bg-gray-100 text-torg-gray inline-flex items-center gap-1.5">
+                <Lock size={12} /> enviado para assinatura — somente leitura · R{String(rel.revisao ?? 0).padStart(2, "0")}
+              </span>
+              {/* Vitor (11/09/2026): "voltar as assinaturas" = abrir a revisão seguinte; a rodada assinada fica no histórico */}
+              <button onClick={abrirRevisao} disabled={salvando} title="Congela a rodada assinada no histórico, sobe a revisão e libera a edição"
+                className="text-[12px] font-semibold text-torg-dark bg-amber-100 hover:bg-amber-200 rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-50">
+                {salvando ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />} Abrir revisão
+              </button>
+            </>
           ) : (
             <button onClick={salvar} disabled={salvando}
               className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-50">

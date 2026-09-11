@@ -80,7 +80,9 @@ export async function GET(_req, { params }) {
     motivo: a.motivo || null,
     // de quem ainda se espera antes desta pessoa
     aguardando: anterior ? { nome: anterior.nome, papel: anterior.setor } : null,
-    podePedirRevisao: ehTipoDePlano(a.envio.tipo),
+    // relatório de inspeção também devolve: Vitor (11/09/2026) — "na hora que as pessoas estão indo
+    // para assinar não tem como revisar, apenas o botão para assinar direto"
+    podePedirRevisao: ehTipoDePlano(a.envio.tipo) || a.envio.tipo === "RELATORIO_INSPECAO",
   });
 }
 
@@ -109,23 +111,35 @@ export async function POST(req, { params }) {
 
   // ── pedido de revisão: devolve o documento e sobe a revisão ──
   if (pedirRevisao) {
-    if (!ehTipoDePlano(a.envio.tipo)) {
+    const ehRelatorio = a.envio.tipo === "RELATORIO_INSPECAO";
+    if (!ehTipoDePlano(a.envio.tipo) && !ehRelatorio) {
       return NextResponse.json({ error: "Este documento não aceita pedido de revisão por aqui." }, { status: 400 });
     }
     const motivo = String(body?.motivo || "").trim().slice(0, 1000);
     if (motivo.length < 5) return NextResponse.json({ error: "Escreva o que precisa ser revisto." }, { status: 400 });
 
-    const doc = docDoTipo(a.envio.tipo);
+    const doc = ehRelatorio ? null : docDoTipo(a.envio.tipo);
     const opNumero = a.envio.opNumero || a.envio.snapshot?.opNumero || null;
 
     await prisma.assinaturaDocumento.update({ where: { id: a.id }, data: { revisaoPedidaEm: new Date(), motivo, ip } });
     await prisma.envioAssinatura.update({ where: { id: a.envioId }, data: { status: "REVISAO_PEDIDA" } });
 
+    // ⚠ relatório de inspeção: congela a rodada e sobe R no próprio relatório (lib/relatorio-revisao),
+    // a mesma coisa que a Qualidade faz pelo portal — o assinante só não precisa esperar por ela
+    let revRelatorio = null;
+    if (ehRelatorio && a.envio.snapshot?.relatorioId) {
+      try {
+        const { abrirRevisaoRelatorio } = await import("@/lib/relatorio-revisao");
+        const r = await abrirRevisaoRelatorio(a.envio.snapshot.relatorioId, { motivo, porQuem: a.nome, origem: "ASSINANTE" });
+        revRelatorio = `R${String(r.relatorio.revisao).padStart(2, "0")}`;
+      } catch (e) { registro.erro("[assinar] revisão do relatório:", e?.message); }
+    }
+
     // ⚠⚠ A REVISÃO SOBE NO DOCUMENTO, não só no envio. Vitor: "pedir revisão para voltar o processo
     // e subir revisão dos dois documentos". Sem isso, o próximo envio sairia com o MESMO número de
     // revisão do que foi recusado — e o portão que impede reenviar revisão já aceita bloquearia o
     // reenvio legítimo.
-    let novaRev = null;
+    let novaRev = revRelatorio;
     try {
       if (opNumero && doc === "PIT") {
         const op = await prisma.oP.findFirst({ where: { numero: opNumero }, select: { id: true, pitRevisao: true } });
