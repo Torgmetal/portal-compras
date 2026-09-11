@@ -1,7 +1,12 @@
 {
-  "build": 3086,
-  "gerado": "2026-09-11T15:14:27.898Z",
+  "build": 3087,
+  "gerado": "2026-09-11T15:58:39.364Z",
   "commits": [
+    {
+      "hash": "66071c39",
+      "data": "11/09/2026",
+      "titulo": "Inspeções: abrir revisão de relatório assinado e editar as peças informadas"
+    },
     {
       "hash": "1495b706",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "8fa0993d",
       "data": "09/09/2026",
       "titulo": "fix: alinhar fila do Gantt ao bloqueio de terceiros"
-    },
-    {
-      "hash": "53b000af",
-      "data": "09/09/2026",
-      "titulo": "Amplia o Gantt e mantém navegação e salvamento acessíveis"
     }
   ]
 }

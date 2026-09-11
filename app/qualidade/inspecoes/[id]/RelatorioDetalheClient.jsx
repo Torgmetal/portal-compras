@@ -1,6 +1,9 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useStore } from "@/lib/store";
+import { pecasDoRelatorio, pecasInformadasSchema } from "@/lib/inspecao-pecas";
+import PecasInformadasEditor from "./PecasInformadasEditor";
 import { Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, Lock, FolderOpen, Crop, RotateCcw } from "lucide-react";
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
 import CampoTolerancia from "./CampoTolerancia";
@@ -30,6 +33,8 @@ import { usaCotas } from "@/lib/qualidade-campo";
 const RESULTADOS = ["APROVADO", "REPROVADO", "RETRABALHAR"];
 
 export default function RelatorioDetalheClient({ id }) {
+  const { showToast } = useStore();
+  const [pecasEditadas, setPecasEditadas] = useState(null);
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -84,11 +89,18 @@ export default function RelatorioDetalheClient({ id }) {
     setDados((d) => ({ ...d, relatorio: { ...d.relatorio, resultados: { ...(d.relatorio.resultados || {}), [campo]: v } } }));
 
   async function salvar() {
+    let pecasInformadas;
+    if (pecasEditadas !== null) {
+      const validacao = pecasInformadasSchema.safeParse(pecasEditadas.map(p => ({ ...p, quantidade: p.quantidade === "" ? null : Number(p.quantidade) })));
+      if (!validacao.success) { showToast(validacao.error.issues[0].message, "error"); return; }
+      pecasInformadas = validacao.data;
+    }
     setSalvando(true);
     try {
       const r = await fetch(`/api/qualidade/inspecoes/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          pecasInformadas,
           titulo: rel.titulo, observacoes: rel.observacoes, inspetor: rel.inspetor,
           linhas: rel.linhas, resultados: rel.resultados, equipamentos: rel.equipamentos,
           resultadoInspecao: rel.resultadoInspecao ?? null,
@@ -97,7 +109,10 @@ export default function RelatorioDetalheClient({ id }) {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
-    } catch (e) { alert(e.message); } finally { setSalvando(false); }
+      setDados(d => ({ ...d, relatorio: j.relatorio }));
+      setPecasEditadas(null);
+      showToast("Relatório salvo. Peças e quantidades atualizadas.", "success");
+    } catch (e) { showToast(e.message, "error"); } finally { setSalvando(false); }
   }
 
   /** Relatório já assinado não se edita por baixo: abre a revisão seguinte e o ciclo recomeça. */
@@ -126,16 +141,13 @@ export default function RelatorioDetalheClient({ id }) {
           <p className="text-[13px] text-torg-gray">
             OP-{rel.opNumero} · {TIPO_LABEL[rel.tipo] || rel.tipo}
             {rel.escopo === "AVULSAS" ? " · peças avulsas agrupadas" : rel.escopo === "CONJUNTO" ? " · conjunto" : ""}
-            {Array.isArray(rel.marcas) && rel.marcas.length ? ` · ${rel.marcas.join(", ")}` : ""}
+            {Array.isArray(rel.marcas) && rel.marcas.length ? ` · ${rel.marcas.length} marcas` : ""}
           </p>
           {/* Peças informadas editáveis — Vitor (11/09/2026): "editar as peças informadas, pois isso também não consigo fazer no portal" */}
           {!travado && (
             <details className="mt-1.5">
               <summary className="text-[12px] text-torg-blue cursor-pointer select-none">Editar peças informadas ({Array.isArray(rel.marcas) ? rel.marcas.length : 0})</summary>
-              <textarea rows={4} defaultValue={(rel.marcas || []).join("\n")} placeholder="uma marca por linha (ou separadas por vírgula)"
-                onBlur={(e) => setCampo("marcas", e.target.value.split(/[\n,;]+/).map((m) => m.trim()).filter(Boolean))}
-                className="mt-1 w-full max-w-lg border border-gray-200 rounded-lg px-2.5 py-1.5 text-[12px] font-mono text-torg-dark" />
-              <p className="text-[11px] text-torg-gray">Sai do campo para aplicar; grava no Salvar.</p>
+              <PecasInformadasEditor pecas={pecasEditadas ?? pecasDoRelatorio(rel)} onChange={setPecasEditadas} disabled={salvando} />
             </details>
           )}
         </div>

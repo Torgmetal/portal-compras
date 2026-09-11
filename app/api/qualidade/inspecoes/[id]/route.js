@@ -1,3 +1,4 @@
+import { pecasInformadasSchema, textoPeca } from "@/lib/inspecao-pecas";
 // GET   — o relatório para a tela de edição/prévia.
 // PATCH  — salva o que o elaborador preencheu (dimensões encontradas, resultados, observações).
 //
@@ -298,6 +299,20 @@ export async function PATCH(req, { params }) {
     }
   }
 
+  if (body.pecasInformadas !== undefined) {
+    const validacao = pecasInformadasSchema.safeParse(body.pecasInformadas);
+    if (!validacao.success) return NextResponse.json({ error: validacao.error.issues[0]?.message || "Confira as peças e quantidades." }, { status: 400 });
+    dados.marcas = validacao.data.map(p => p.marca);
+    dados.resultados = { ...(dados.resultados || rel.resultados || {}), pecasInformadas: validacao.data };
+  } else if (dados.marcas && rel.resultados?.pecasInformadas && JSON.stringify(dados.marcas) !== JSON.stringify(rel.marcas)) {
+    return NextResponse.json({ error: "Atualize a página e edite as marcas junto com suas quantidades." }, { status: 409 });
+  }
+  const pecasSalvas = dados.resultados?.pecasInformadas;
+  if (pecasSalvas?.length) {
+    dados.resultados.quantidade = String(pecasSalvas.reduce((s, p) => s + p.quantidade, 0));
+    dados.resultados.pecas = pecasSalvas.map(textoPeca).join(", ");
+  }
+
   const atualizado = await prisma.relatorioInspecao.update({ where: { id }, data: dados });
 
   // ⚠ BACKUP NA PASTA DA OBRA, na APROVAÇÃO. Vitor (22/08/2026): "salvar os relatórios em PDF na
@@ -318,7 +333,7 @@ export async function PATCH(req, { params }) {
   }
 
   await prisma.auditLog.create({
-    data: { userId: user.id, action: "EDITAR_RELATORIO_INSPECAO", entity: "RelatorioInspecao", entityId: id, diff: { campos: Object.keys(dados) } },
+    data: { userId: user.id, action: "EDITAR_RELATORIO_INSPECAO", entity: "RelatorioInspecao", entityId: id, diff: { campos: Object.keys(dados), ...(body.pecasInformadas !== undefined ? { antes: { marcas: rel.marcas, pecasInformadas: rel.resultados?.pecasInformadas ?? null }, depois: { marcas: dados.marcas, pecasInformadas: dados.resultados.pecasInformadas } } : {}) } },
   }).catch(() => {});
 
   return NextResponse.json({ ok: true, relatorio: atualizado, arquivo });
