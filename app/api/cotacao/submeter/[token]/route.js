@@ -13,6 +13,16 @@ const registro = log("api/cotacao/submeter/[token]");
 
 const postLimiter = createRateLimiter({ name: "cotacao-submeter-post", maxRequests: 10, windowMs: 60000 });
 
+export const runtime = "nodejs";
+// ⚠⚠ MESMO BURACO DA ROTA IRMÃ (`/api/cotacao/[id]/lancar-manual`): sem `maxDuration` isto roda no
+// padrão de 10s da Vercel, e uma função morta não devolve corpo — o navegador faz `res.json()` no
+// vazio e mostra "Unexpected end of JSON input". Aqui é ainda pior, porque quem vê o erro é o
+// FORNECEDOR, que não tem a quem perguntar e simplesmente não envia a proposta.
+//
+// O orçamento: consulta do CNPJ no Omie (rede, com retry) + uma escrita por item + atualização da
+// cotação e das RMItens + e-mail/notificação. Proposta de dezenas de itens passa de 10s.
+export const maxDuration = 60;
+
 const itemSchema = z.object({
   cotacaoItemId: z.string().min(1),
   precoUnit: z.number().min(0),
@@ -113,6 +123,11 @@ export async function POST(req, { params }) {
     }
   }
 
+  // ⚠ O teto padrão da transação interativa do Prisma é 5s e é independente do limite da função —
+  // estourado, a gravação aborta depois de já ter feito metade. Fica abaixo do `maxDuration` de
+  // propósito: quem falha primeiro tem de ser a transação, que desfaz tudo.
+  const OPCOES_TX = { maxWait: 10_000, timeout: 45_000 };
+
   await prisma.$transaction(async (tx) => {
     // Atualiza todos os itens em paralelo (independentes dentro da mesma transação)
     await Promise.all(itensValidos.map((it) =>
@@ -193,7 +208,7 @@ export async function POST(req, { params }) {
         },
       },
     });
-  });
+  }, OPCOES_TX);
 
   // Invalida cache do Next.js pras paginas que mostram a cotacao — sem isso,
   // o mapa de cotacao pode continuar mostrando dados antigos mesmo apos

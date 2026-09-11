@@ -1,7 +1,12 @@
 {
-  "build": 3100,
-  "gerado": "2026-09-11T19:50:10.470Z",
+  "build": 3101,
+  "gerado": "2026-09-11T20:14:41.258Z",
   "commits": [
+    {
+      "hash": "17388a2fac",
+      "data": "11/09/2026",
+      "titulo": "Cotação por IA: a resposta não vinha com ruído, vinha cortada"
+    },
     {
       "hash": "23b6948a43",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c5ae294182",
       "data": "10/09/2026",
       "titulo": "Engenharia: Análise Crítica de Projeto (PO-13) na aba Engenharia da OP"
-    },
-    {
-      "hash": "4367ace42f",
-      "data": "10/09/2026",
-      "titulo": "fix: atualiza telefone de Diego Dias no portal do cliente"
     }
   ]
 }

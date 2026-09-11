@@ -6,6 +6,32 @@ import { numeroBR } from "@/lib/numero-br";
 import { PropostaUploadIA } from "./PropostaUploadIA";
 import { TabelaLinhasProposta } from "./TabelaLinhasProposta";
 
+/**
+ * LÊ A RESPOSTA COM TOLERÂNCIA — corpo vazio não pode virar erro de programador na cara do usuário.
+ *
+ * ⚠⚠ MATHEUS (11/09/2026): "Unexpected end of JSON input", ao salvar depois da IA preencher. Isso
+ * não é erro de JSON: é a função do servidor tendo sido MORTA por tempo (proposta grande = uma
+ * escrita por item + consulta do CNPJ no Omie) e devolvendo corpo VAZIO. O `res.json()` estourava
+ * em cima do nada e a mensagem do motor do JavaScript ia direto para a tela — dizendo ao comprador
+ * exatamente nada sobre o que fazer.
+ *
+ * ⚠⚠ E A MENSAGEM PRECISA AVISAR DA DÚVIDA. Morta por tempo, a gravação pode ter acontecido ou não;
+ * mandar "tente de novo" sem mais nada convida a lançar a proposta duas vezes.
+ *
+ * ⚠ O padrão já existia no projeto (`app/rh/holerite`, "corpo vazio (timeout/504)"). Faltava aqui.
+ */
+async function lerResposta(res) {
+  const txt = await res.text();
+  if (txt) {
+    try { return JSON.parse(txt); } catch { /* corpo não-JSON: cai no tratamento abaixo */ }
+  }
+  return {
+    error: !txt
+      ? "O servidor demorou demais para responder e a proposta pode não ter sido salva. Recarregue a tela e confira antes de lançar de novo."
+      : `Erro ${res.status} do servidor.`,
+  };
+}
+
 export function ModalLancarManual({ cotacao, rm, onClose }) {
   const router = useRouter();
   const [cnpj, setCnpj] = useState(cotacao.cnpj || "");
@@ -136,8 +162,8 @@ export function ModalLancarManual({ cotacao, rm, onClose }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao processar");
+      const data = await lerResposta(res);
+      if (!res.ok || (data.error && !data.itens)) throw new Error(data.error || "Erro ao processar");
 
       // Aplica os itens via rmIndex (a IA ja casou com a RM)
       const itensIA = data.itens || [];
@@ -226,8 +252,8 @@ export function ModalLancarManual({ cotacao, rm, onClose }) {
           anexo: anexoPendente,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
+      const data = await lerResposta(res);
+      if (!res.ok || data.error) throw new Error(data.error || "Erro");
       router.refresh();
       onClose();
     } catch (e) {

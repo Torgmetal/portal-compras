@@ -441,7 +441,22 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
           observacao: observacaoGeral || null,
         }),
       });
-      const data = await res.json();
+      // ⚠⚠ CORPO VAZIO É TIMEOUT, NÃO ERRO DE JSON. Se a função do servidor for morta por tempo
+      // (proposta com dezenas de itens: uma escrita por item + consulta do CNPJ no Omie), a resposta
+      // vem SEM CORPO e o `res.json()` estoura com "Unexpected end of JSON input" — uma frase do
+      // motor do JavaScript, na cara de um fornecedor que não tem a quem perguntar e simplesmente
+      // desiste de enviar. E a mensagem tem de admitir a dúvida: morta por tempo, a proposta pode
+      // ter sido gravada ou não, e reenviar às cegas cria uma segunda.
+      const txt = await res.text();
+      let data = null;
+      try { data = txt ? JSON.parse(txt) : null; } catch { /* corpo não-JSON */ }
+      if (!data) {
+        throw new Error(
+          txt
+            ? `Erro ${res.status} do servidor. Tente de novo em instantes.`
+            : "O servidor demorou demais para responder. Recarregue a página e confira se a proposta chegou antes de enviar de novo."
+        );
+      }
       if (!res.ok) throw new Error(data.error || "Erro ao enviar");
       setEnviadoEm(
 dataHoraBR(new Date())
