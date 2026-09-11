@@ -1,7 +1,12 @@
 {
-  "build": 3071,
-  "gerado": "2026-09-10T22:54:06.679Z",
+  "build": 3072,
+  "gerado": "2026-09-11T11:09:09.706Z",
   "commits": [
+    {
+      "hash": "c5ae2941",
+      "data": "10/09/2026",
+      "titulo": "Engenharia: Análise Crítica de Projeto (PO-13) na aba Engenharia da OP"
+    },
     {
       "hash": "4367ace4",
       "data": "10/09/2026",
@@ -146,11 +151,6 @@
       "hash": "caa85be6",
       "data": "09/09/2026",
       "titulo": "Solda: a bancada passa a ter nome de soldador"
-    },
-    {
-      "hash": "7486262c",
-      "data": "09/09/2026",
-      "titulo": "feat(pcp): programar conjuntos pendentes no Gantt e liberar aptos parcialmente"
     }
   ]
 }
