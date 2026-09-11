@@ -4,6 +4,13 @@
 // alguém fecha o navegador na metade, o job fica parado com o cursor gravado; este
 // cron é quem termina. Trabalha vários volumes por invocação, até perto do teto de
 // tempo da função.
+//
+// ⚠ AGENDA: de hora em hora, só em horário comercial (vercel.json: "15 10-21 * * 1-5", em UTC =
+// 7h15–18h15 de Brasília, seg–sex). Rodava a cada 5 minutos, dia e noite: 288 disparos por dia
+// para quase sempre não achar nada — e era o que não deixava a compute do Neon dormir de
+// madrugada. Vitor (11/09/2026), depois do aviso de crédito da Vercel: "vamos mudar esse cron do
+// data book para apenas no horário comercial, não no noturno e a cada 1 hora". Geração
+// abandonada à noite é terminada na primeira passada da manhã.
 import { NextResponse } from "next/server";
 import { temCronSecret } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";

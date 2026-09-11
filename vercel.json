@@ -82,7 +82,7 @@
     },
     {
       "path": "/api/cron/data-book",
-      "schedule": "*/5 * * * *"
+      "schedule": "15 10-21 * * 1-5"
     },
     {
       "path": "/api/cron/rnc-abertas",
