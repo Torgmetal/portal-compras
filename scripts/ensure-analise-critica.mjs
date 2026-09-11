@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS "AnaliseCriticaProjeto" (
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE "AnaliseCriticaProjeto" ADD COLUMN IF NOT EXISTS "planoAcaoId" TEXT;
 CREATE INDEX IF NOT EXISTS "AnaliseCriticaProjeto_opNumero_idx" ON "AnaliseCriticaProjeto"("opNumero");
 `;
 try {

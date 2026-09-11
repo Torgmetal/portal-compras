@@ -5,7 +5,7 @@
 // dia a dia" — por isso o formato é simples de mexer: cada bloco é uma lista de linhas editada
 // num modal genérico (CAMPOS abaixo), e a situação troca direto na tabela.
 import { useEffect, useState, useCallback } from "react";
-import { Search, Plus, Pencil, Trash2, Loader2, History, Download, CloudUpload, CheckCircle2, AlertTriangle, XCircle, ShieldCheck, X } from "lucide-react";
+import { Search, Plus, Pencil, Trash2, Loader2, History, Download, CloudUpload, CheckCircle2, AlertTriangle, XCircle, ShieldCheck, X, FileText, ClipboardList, ExternalLink } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { SITUACOES, SITUACAO_ACAO, STATUS_REGISTRO, nivelRisco } from "@/lib/analise-critica";
 
@@ -107,6 +107,20 @@ export default function AnaliseCriticaSection({ opId }) {
       setDados((p) => ({ ...p, registro: d.registro })); showToast(`FORM 08 salvo em ${d.pasta.split("/").slice(-2).join("/")}.`, "sucesso");
     } catch (e) { showToast(e.message, "erro"); } finally { setSalvando(false); }
   };
+  // FORM 10 (ata) e plano 5W2H saem do registro GRAVADO — com alteração pendente o PDF/plano sairia de um dado que o banco ainda não tem
+  const exigeSalvo = () => { if (sujo || reg?.novo) { showToast("Salve a análise antes — a ata e o plano saem do que está gravado.", "erro"); return false; } return true; };
+  const abrirAta = (reuniaoId) => { if (exigeSalvo()) window.open(`/api/comercial/op/${opId}/analise-critica/ata/${reuniaoId}/pdf`, "_blank", "noopener"); };
+  const levarAo5W2H = async () => {
+    if (!exigeSalvo()) return;
+    setSalvando(true);
+    try {
+      const r = await fetch(`/api/comercial/op/${opId}/analise-critica/plano-5w2h`, { method: "POST" });
+      const d = await r.json();
+      if (!d.success) throw new Error(d.error || "Falha ao criar o plano 5W2H");
+      setDados((p) => ({ ...p, registro: { ...p.registro, planoAcaoId: d.planoId } }));
+      showToast(d.itensNovos ? `${d.itensNovos} ação(ões) levada(s) ao plano PA-${String(d.numero).padStart(3, "0")}.` : `Plano PA-${String(d.numero).padStart(3, "0")} já tinha todas as ações.`, "sucesso");
+    } catch (e) { showToast(e.message, "erro"); } finally { setSalvando(false); }
+  };
 
   if (erro) return <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-sm text-red-700 flex items-center justify-between"><span>Análise crítica: {erro}</span><button onClick={carregar} className="text-xs border border-gray-300 rounded-lg px-2.5 py-1.5">Tentar novamente</button></div>;
   if (!dados) return <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-sm text-torg-gray flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Carregando análise crítica…</div>;
@@ -115,10 +129,10 @@ export default function AnaliseCriticaSection({ opId }) {
   const codigo = `ACP-${String(reg.opNumero || "").replace(/^0+/, "").padStart(3, "0")} · R${reg.revisao || 0}`;
   const linhas = (bloco, filtro) => { const l = reg[bloco] || []; if (mostrarTudo[bloco] || !filtro) return l; return l.filter(filtro); };
   const Acoes = ({ bloco, linha }) => podeEditar ? <span className="inline-flex gap-1.5 whitespace-nowrap"><button onClick={() => setModal({ bloco, linha })} className="text-torg-gray hover:text-torg-blue" title="Editar"><Pencil size={13} /></button><button onClick={() => remover(bloco, linha.id)} className="text-torg-gray hover:text-red-600" title="Remover"><Trash2 size={13} /></button></span> : null;
-  const Titulo = ({ n, t, chip, sub, bloco }) => (
+  const Titulo = ({ n, t, chip, sub, bloco, extra }) => (
     <div className="px-6 pt-5 pb-2 flex items-start justify-between gap-3 flex-wrap">
       <div><h4 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><span className="w-5 h-5 rounded-md bg-torg-blue-50 text-torg-blue text-[11px] font-bold grid place-items-center">{n}</span> {t} {chip && <Chip>{chip}</Chip>}</h4>{sub && <p className="text-xs text-torg-gray mt-0.5">{sub}</p>}</div>
-      {podeEditar && bloco && <button onClick={() => setModal({ bloco })} className="text-xs text-torg-blue font-medium inline-flex items-center gap-1"><Plus size={13} /> Adicionar</button>}
+      <span className="inline-flex items-center gap-3 flex-wrap">{extra}{podeEditar && bloco && <button onClick={() => setModal({ bloco })} className="text-xs text-torg-blue font-medium inline-flex items-center gap-1"><Plus size={13} /> Adicionar</button>}</span>
     </div>
   );
   const Ocultas = ({ bloco, n, oq }) => n > 0 ? <div className="px-6 py-2 text-[11px] text-torg-gray">{n} {oq} ocultas · <button onClick={() => setMostrarTudo((p) => ({ ...p, [bloco]: !p[bloco] }))} className="text-torg-blue">{mostrarTudo[bloco] ? "ocultar" : "mostrar todas"}</button></div> : null;
@@ -201,11 +215,14 @@ export default function AnaliseCriticaSection({ opId }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-gray-100 border-t border-gray-100">
         <div className="bg-white">
           <Titulo n={7} t="Reuniões de análise crítica" chip="FORM 10" bloco="reunioes" />
-          <div className="px-6 pb-4 space-y-2">{(reg.reunioes || []).map((l) => <div key={l.id} className="border border-gray-100 rounded-lg px-3 py-2.5"><div className="flex items-center justify-between gap-2 flex-wrap"><span className="text-sm font-medium text-torg-dark">{l.codigo || "Reunião"} · {dataCurta(l.data) || "sem data"}</span><span className="inline-flex items-center gap-2">{l.ataAceita ? <Badge cls="bg-emerald-50 text-emerald-700">Ata aceita</Badge> : <Badge cls="bg-torg-blue-50 text-torg-blue">Convocada</Badge>}<Acoes bloco="reunioes" linha={l} /></span></div><div className="text-xs text-torg-gray mt-0.5">{l.participantes}{l.pauta ? ` · ${l.pauta}` : ""}</div>{l.decisoes && <div className="text-xs text-torg-dark mt-1 whitespace-pre-line">{l.decisoes}</div>}</div>)}
+          <div className="px-6 pb-4 space-y-2">{(reg.reunioes || []).map((l) => <div key={l.id} className="border border-gray-100 rounded-lg px-3 py-2.5"><div className="flex items-center justify-between gap-2 flex-wrap"><span className="text-sm font-medium text-torg-dark">{l.codigo || "Reunião"} · {dataCurta(l.data) || "sem data"}</span><span className="inline-flex items-center gap-2">{l.ataAceita ? <Badge cls="bg-emerald-50 text-emerald-700">Ata aceita</Badge> : <Badge cls="bg-torg-blue-50 text-torg-blue">Convocada</Badge>}<button type="button" onClick={() => abrirAta(l.id)} className="text-xs text-torg-blue font-medium inline-flex items-center gap-1" title="Ata da reunião em PDF (FORM 10)"><FileText size={13} /> Ata FORM 10</button><Acoes bloco="reunioes" linha={l} /></span></div><div className="text-xs text-torg-gray mt-0.5">{l.participantes}{l.pauta ? ` · ${l.pauta}` : ""}</div>{l.decisoes && <div className="text-xs text-torg-dark mt-1 whitespace-pre-line">{l.decisoes}</div>}</div>)}
             {!(reg.reunioes || []).length && <p className="text-xs text-torg-gray">Nenhuma reunião registrada.</p>}</div>
         </div>
         <div className="bg-white">
-          <Titulo n="" t="Ações" chip="5W2H" bloco="acoes" />
+          <Titulo n="" t="Ações" chip="5W2H" bloco="acoes" extra={<>
+            {reg.planoAcaoId && <a href={`/qualidade/planos-acao/${reg.planoAcaoId}`} target="_blank" rel="noopener" className="text-xs text-torg-gray hover:text-torg-blue inline-flex items-center gap-1" title="Abrir o plano 5W2H na Qualidade"><ExternalLink size={13} /> Plano 5W2H</a>}
+            {podeEditar && (reg.acoes || []).length > 0 && <button type="button" onClick={levarAo5W2H} disabled={salvando} className="text-xs text-torg-blue font-medium inline-flex items-center gap-1 disabled:opacity-50" title={reg.planoAcaoId ? "Acrescenta ao plano as ações que ainda não estão lá" : "Cria um plano 5W2H na Qualidade com estas ações"}><ClipboardList size={13} /> {reg.planoAcaoId ? "Atualizar 5W2H" : "Levar ao 5W2H"}</button>}
+          </>} />
           <div className="px-6 pb-4 divide-y divide-gray-50 text-sm">{(reg.acoes || []).map((l) => { const hoje = new Date().toISOString().slice(0, 10); const atras = l.situacao !== "CONCLUIDA" && l.quando && l.quando < hoje; const s = atras ? { label: "Atrasada", cls: "bg-red-50 text-red-700" } : SITUACAO_ACAO[l.situacao] || SITUACAO_ACAO.A_FAZER;
             return <div key={l.id} className="flex items-center justify-between gap-2 py-2"><div className="min-w-0"><div className="text-torg-dark">{l.codigo ? `${l.codigo} · ` : ""}{l.acao}</div><div className="text-[11px] text-torg-gray">{l.quem || "—"}{l.quando ? ` · ${dataCurta(l.quando)}` : ""}</div></div><span className="inline-flex items-center gap-2"><SitSelect valor={l.situacao} opcoes={atras ? { ...SITUACAO_ACAO, [l.situacao]: s } : SITUACAO_ACAO} podeEditar={podeEditar} onChange={(v) => mudarSit("acoes", l.id, v)} /><Acoes bloco="acoes" linha={l} /></span></div>; })}
             {!(reg.acoes || []).length && <p className="text-xs text-torg-gray py-2">Nenhuma ação.</p>}</div>

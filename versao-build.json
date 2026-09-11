@@ -1,7 +1,12 @@
 {
-  "build": 3092,
-  "gerado": "2026-09-11T17:10:46.961Z",
+  "build": 3093,
+  "gerado": "2026-09-11T17:21:03.675Z",
   "commits": [
+    {
+      "hash": "5d643c9b",
+      "data": "11/09/2026",
+      "titulo": "Autoriza Guilherme a aprovar Análise Crítica de Projeto"
+    },
     {
       "hash": "c299e59f",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "d6ff811f",
       "data": "10/09/2026",
       "titulo": "Etiqueta QWS: centraliza o numero da O.P. e a marca sob o QR"
-    },
-    {
-      "hash": "72d2b371",
-      "data": "10/09/2026",
-      "titulo": "Etiquetas: modelo do cliente QWS/Petrobras, com uma TAG por unidade"
     }
   ]
 }

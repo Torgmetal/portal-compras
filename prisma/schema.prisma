@@ -5899,6 +5899,7 @@ model AnaliseCriticaProjeto {
   historico      Json      @default("[]") // [{ revisao, data, porQuem, motivo, snapshot }]
   form08Url      String?
   form08EmitidoEm DateTime?
+  planoAcaoId    String? // plano 5W2H da Qualidade criado a partir das ações (bloco 7)
   sharepointPath String?
   sharepointEm   DateTime?
   criadoPorId    String?
