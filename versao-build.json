@@ -1,7 +1,12 @@
 {
-  "build": 3103,
-  "gerado": "2026-09-11T21:03:04.236Z",
+  "build": 3104,
+  "gerado": "2026-09-11T22:22:22.689Z",
   "commits": [
+    {
+      "hash": "f7110844",
+      "data": "11/09/2026",
+      "titulo": "Planos de ação: PDF horizontal 5W2H e exclusão com auditoria"
+    },
     {
       "hash": "fcad0bf6",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ee53dff7",
       "data": "11/09/2026",
       "titulo": "fix: restringir dados da obra e liberar PDF dos indicadores ao RH"
-    },
-    {
-      "hash": "1c9e1c81",
-      "data": "11/09/2026",
-      "titulo": "Etiqueta padrao: TAG da obra, digitada na tela e repetida em todas"
     }
   ]
 }

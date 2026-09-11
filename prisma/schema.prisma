@@ -5912,3 +5912,18 @@ model AnaliseCriticaProjeto {
 
   @@index([opNumero])
 }
+
+// Escolhas do inspetor reutilizadas nos próximos relatórios da mesma OP/tipo.
+// Sem FK para o relatório de origem: excluir um relatório não apaga o padrão.
+model PadraoInspecao {
+  id          String   @id @default(cuid())
+  opNumero    String
+  tipo        String
+  campo       String
+  valor       String?
+  relatorioId String
+  userId      String
+  updatedAt   DateTime @updatedAt
+
+  @@unique([opNumero, tipo, campo])
+}

@@ -1,4 +1,5 @@
 "use client";
+import AvisoPadroesInspecao from "@/components/AvisoPadroesInspecao";
 import {foraDaTolerancia} from "@/lib/tolerancia-inspecao";
 import { useEffect, useState, useRef } from "react";
 import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2, Camera, X, FileText } from "lucide-react";
@@ -267,6 +268,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           acoplante: r0.acoplante || "", blocoPadrao: r0.blocoPadrao || "",
           ganhoVarredura: r0.ganhoVarredura || "", local: r0.local || "",
           // ── pintura: o que se MEDE ──
+          abrasivo: r0.abrasivo || "",
           limpeza: r0.limpeza || "", intemperismo: r0.intemperismo || "",
           prepData: r0.prepData || "", prepIni: r0.prepIni || "", prepFim: r0.prepFim || "",
           prepTAmb: r0.prepTAmb ?? "", prepTSup: r0.prepTSup ?? "", prepOrvalho: r0.prepOrvalho ?? "",
@@ -479,6 +481,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         </div>
       )}
 
+      <AvisoPadroesInspecao tipo={rel.tipo} resultados={{ ...cond, padroesInspecao: rel.resultados?.padroesInspecao }} />
       <Equipamentos escolhidos={equipamentos} onMudar={setEquipamentos} tipo={rel.tipo} />
 
       {ehUS && (

@@ -1,3 +1,4 @@
+import { salvarInspecaoComPadroes } from "@/lib/padroes-inspecao";
 import {usaQuantidadeInspecao, pecasInformadasSchema, resultadosComPecas, quantidadesPorMarca} from "@/lib/inspecao-pecas";
 // GET   — abre um relatório para medir no celular.
 // PATCH — grava o que o inspetor mediu.
@@ -226,10 +227,10 @@ export async function PATCH(req, { params }) {
                      // ensaio por ultrassom (PI-QUA-003): aparelhagem e condição do ensaio
                      "carregamento", "apModelo", "apSerie", "cbModelo", "cbSerie", "cbAngulo",
                      "acoplante", "blocoPadrao", "ganhoVarredura", "local",
-                     // pintura (PO-05) — o que o inspetor MEDE no galpão. O especificado
-                     // (abrasivo, faixa de rugosidade, espessura mínima) vem do PLP e é gravado
-                     // na criação do relatório; o celular não reescreve isso.
-                     "limpeza", "intemperismo", "prepData", "prepIni", "prepFim", "rugObtido",
+                     // pintura: medições desta inspeção e escolhas editáveis por OP.
+                     // Alterar limpeza/abrasivo não modifica o PLP; somente a memória
+                     // de escolhas para os próximos relatórios.
+                     "limpeza", "abrasivo", "intemperismo", "prepData", "prepIni", "prepFim", "rugObtido",
                      "poeira", "salinidade", "tempo", "prepTAmb", "prepTSup", "prepOrvalho",
                      "prepUmidade", "laudo",
                      // aderência pull-off: valor OU "N/A" — quem faz o ensaio é quem está na peça
@@ -281,7 +282,7 @@ export async function PATCH(req, { params }) {
     dados.resultados=resultadosComPecas(dados.resultados || rel.resultados, v.data);
   }
 
-  const atualizado = await prisma.relatorioInspecao.update({ where: { id }, data: dados });
+  const atualizado = await salvarInspecaoComPadroes(rel, dados, user.id);
 
   // ⚠ BACKUP NA PASTA DA OBRA quando o inspetor aprova pelo celular — mesma regra do computador
   // (ver lib/relatorio-arquivo.js). Falhar aqui não desfaz a aprovação: o inspetor está no chão de

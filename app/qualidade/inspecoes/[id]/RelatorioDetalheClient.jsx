@@ -1,4 +1,5 @@
 "use client";
+import AvisoPadroesInspecao from "@/components/AvisoPadroesInspecao";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
@@ -132,6 +133,7 @@ export default function RelatorioDetalheClient({ id }) {
 
   return (
     <div className="p-4 sm:p-6 max-w-[1500px] mx-auto">
+      {!travado && <div className="mb-3"><AvisoPadroesInspecao tipo={rel.tipo} resultados={res} /></div>}
       <Link href="/qualidade/inspecoes" className="text-[12px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 mb-3"><ArrowLeft size={13} /> Inspeções</Link>
 
       <div className="flex items-start justify-between gap-3 flex-wrap">

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { AlertCircle, CheckCircle2, Paintbrush } from "lucide-react";
 import {
-  GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, TEMPO,
+  GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, TEMPO, METODOS_APLICACAO,
   RUGOSIDADE_MIN, RUGOSIDADE_MAX, mediaRugosidade, mediaEspessura, condicoesPermitemPintar,
 } from "@/lib/pintura-campos";
 
@@ -15,11 +15,9 @@ import {
 // pintura. Justamente o ensaio que mais precisa do celular: quem mede DFT, ponto de
 // orvalho e rugosidade está na frente da peça, não na mesa.
 //
-// ⚠ SÓ O QUE SE MEDE. O especificado (abrasivo, faixa de rugosidade, espessura mínima,
-// produto e fabricante de cada demão) vem do PLP e já está gravado no relatório —
-// aparece aqui em CINZA, para conferência, e não em campo editável. Pré-preencher
-// medição é fabricar registro; deixar o especificado editável no galpão é deixar o
-// plano da obra ser reescrito na beira do jato.
+// Vitor (11/09/2026): padrões por OP, mantendo alternativas selecionáveis.
+// Grau de limpeza, abrasivo e escolhas das demãos são editáveis e lembrados ao salvar.
+// Limites especificados continuam visíveis para conferência; medições nascem vazias.
 
 const DEMAOS = ["1", "2", "3"];
 
@@ -144,7 +142,7 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
       {(espec.abrasivo || espec.rugEspec || espec.espessuraMinima || espec.prepProcedimento) && (
         <div className="rounded-xl bg-gray-100 px-3 py-2">
           <p className="text-[11px] font-semibold text-torg-gray inline-flex items-center gap-1.5">
-            <Paintbrush size={12} /> Especificado no PLP
+            <Paintbrush size={12} /> Referência na criação do relatório
           </p>
           <div className="text-[12px] text-torg-dark mt-1 space-y-0.5">
             {espec.prepProcedimento && <p>Preparo: <strong>{espec.prepProcedimento}</strong></p>}
@@ -161,6 +159,7 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
         <div className="space-y-2.5">
           <Sel rot="Grau de limpeza obtido" v={cond.limpeza} onMudar={(v) => set("limpeza", v)}
             opcoes={GRAUS_LIMPEZA.map((g) => ({ v: g.id, t: g.nome }))} />
+          <Txt rot="Abrasivo" v={cond.abrasivo} onMudar={(v) => set("abrasivo", v)} />
           <Sel rot="Grau de intemperismo" v={cond.intemperismo} onMudar={(v) => set("intemperismo", v)}
             opcoes={GRAUS_INTEMPERISMO.map((g) => ({ v: g, t: g }))} />
           <div className="grid grid-cols-3 gap-2">
@@ -242,12 +241,9 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
           <SelLote rot="Endurecedor — lote" campo="loteB" campoVal="valB" comp="B" />
           <SelLote rot="Diluente — lote" campo="loteD" campoVal="valD" comp="D" />
 
-          {dem[aba]?.produto && (
-            <p className="text-[12px] text-torg-gray -mt-1">
-              Tinta: <strong className="text-torg-dark">{dem[aba].produto}</strong>
-              {dem[aba]?.fabricante ? ` · ${dem[aba].fabricante}` : ""}
-            </p>
-          )}
+          <Txt rot="Produto / norma" v={dem[aba]?.produto} onMudar={(v) => setDem(aba, "produto", v)} />
+          <Txt rot="Fabricante" v={dem[aba]?.fabricante} onMudar={(v) => setDem(aba, "fabricante", v)} />
+          <Sel rot="Método de aplicação" v={dem[aba]?.metodo} onMudar={(v) => setDem(aba, "metodo", v)} opcoes={METODOS_APLICACAO.map(t => ({ v: t, t }))} />
 
           {cores.length > 0
             ? <Sel rot="Cor aplicada" v={dem[aba]?.cor} onMudar={(v) => setDem(aba, "cor", v)}
@@ -342,7 +338,7 @@ function Sel({ rot, v, opcoes, onMudar }) {
   return (
     <label className="block">
       <span className="block text-[12px] text-torg-gray mb-1">{rot}</span>
-      <select value={v ?? ""} onChange={(e) => onMudar(e.target.value)}
+      <select aria-label={rot} value={v ?? ""} onChange={(e) => onMudar(e.target.value)}
         className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none">
         <option value="">—</option>
         {opcoes.map((o) => <option key={o.v} value={o.v}>{o.t}</option>)}

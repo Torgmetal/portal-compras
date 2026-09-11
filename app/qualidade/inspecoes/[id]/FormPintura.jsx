@@ -145,7 +145,7 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
         )}
       </span>
       {opcoes ? (
-        <select value={res[k] || ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
+        <select aria-label={rot} value={res[k] || ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
           className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue disabled:bg-gray-50">
           <option value="">—</option>
           {opcoes.map((o) => <option key={o.id || o} value={o.id || o}>{o.nome || o}</option>)}
