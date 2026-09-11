@@ -1,7 +1,12 @@
 {
-  "build": 3062,
-  "gerado": "2026-09-11T18:09:17.877Z",
+  "build": 3063,
+  "gerado": "2026-09-11T19:36:36.260Z",
   "commits": [
+    {
+      "hash": "ebcd3f7611",
+      "data": "11/09/2026",
+      "titulo": "MES proprio: o desenho da engine de nesting da Preparacao (bloqueado no formato)"
+    },
     {
       "hash": "27834a1196",
       "data": "10/09/2026",
@@ -146,11 +151,6 @@
       "hash": "2ff928afc7",
       "data": "09/09/2026",
       "titulo": "O sino: notificações por módulo e por pessoa, em toda sidebar"
-    },
-    {
-      "hash": "f484941eb5",
-      "data": "09/09/2026",
-      "titulo": "LQC: refina cabeçalho, totais e áreas recolhíveis"
     }
   ]
 }

@@ -774,3 +774,113 @@ muda, porque o casamento tem de ser explícito e conferível, nunca adivinhado p
   não tiver chapa cortada.
 - ⚠ **Sobra/retalho** fica fora deste escopo — é a tela `/pcp/aproveitamento`, hoje em construção.
   Anotado para não virar escopo por acidente.
+
+---
+
+# 12.7 Os formatos, decifrados (11/09/2026)
+
+Matheus mandou `ARQUIVOS MARTHA 1.rar` com um nesting real de **cada uma das três máquinas**, mais a
+explicação do próprio programador. O §12.5 está **desbloqueado**. Nada aqui é binário fechado.
+
+| Máquina | Software | Arquivos | O que é |
+|---|---|---|---|
+| Laser Perfil | **TubesT azul** | `.pdf` · `.yxy` · `.zh` | PDF do operador · projeto · **1 arquivo por barra** |
+| Laser Cantoneira / Laser Tubo | **TubesT verde** | `.pdf` · `.yxy` · `.zx` | idem |
+| Laser Chapa | **Libellula** | `.pdf` · `.lxd` | PDF do operador · arquivo da máquina |
+
+O programador, sobre os `.zx`: *"cada Nest 1, 2, 3, 4… são cada BARRA que ele precisa cortar"*.
+
+⚠⚠ **NO PERFIL/TUBO, "NESTING" É UMA BARRA — NÃO UMA CHAPA.** O §12.4 decidiu apontar por chapa; a
+unidade física real aqui é **a barra**, e cada uma tem seu próprio arquivo. Isso *melhora* o desenho:
+o operador escolhe o trabalho e aponta **Nest 1, Nest 2…** conforme corta cada barra, e a lista de
+marcas daquela barra é conhecida. No Laser Chapa a unidade continua sendo a chapa.
+
+## 12.7.1 ⚠⚠ O ARQUIVO DA LIBELLULA NÃO TEM NOME DE PEÇA NENHUM — E ISSO DECIDE A ENGINE
+
+O `.lxd` é XML aberto (`<LXDDocument>`), mas só geometria: **744 polilinhas, 21 círculos, zero
+texto**. As marcas gravadas na chapa são vetorizadas — viraram desenho, não texto. Não existe ali o
+nome de uma peça sequer.
+
+Os `.zx`/`.zh`/`.yxy` do TubesT são **ZIP** e, dentro, `Portions/content.xml` lista as marcas:
+
+```xml
+<NestedTube Name="I-Beam 148 X 100 X 4,3 X 4,9  R11,1,45°_Nest 1">
+  <PackSegments><WorkSeq><Seg .../>…7 segmentos…</WorkSeq></PackSegments>
+</NestedTube>
+<ExtParts>
+  <NestPart Name="T107A-P3_10"/> <NestPart Name="T107A-P12_2"/> …
+</ExtParts>
+```
+
+⚠ **Mas a quantidade por barra vem indireta** — são os `<Seg>` do `WorkSeq` (7 peças em 5 tipos na
+Nest 1); é preciso casar handle de segmento com `NestPart`. O PDF entrega isso pronto.
+
+**Conclusão que fecha o desenho:** uma engine que lesse os arquivos de máquina **não funcionaria para
+o Laser Chapa**, que é justamente a que mais produz. O **PDF é o leitor primário** — é a única fonte
+que cobre as três máquinas com a mesma informação. Os arquivos de máquina entram como **conferência**
+e como o vínculo "qual arquivo é esta barra".
+
+## 12.7.2 O que cada PDF entrega
+
+**TubesT** (as duas cores, layout idêntico) — três blocos:
+- `Part Info` — a lista mestra: `ID · Part Name · Qty (feitas/total) · Part Length`;
+- `Tube Info` — `Tube Count 4/999 · Tube Length 12000,00 · Cutoff`;
+- `Nesting List` — **um bloco por barra**, com `Parts per tube`, `Remnant Length`, `Utilization`, e a
+  tabela `Part Name · Qty · Identical parts per tube`.
+
+**Libellula** — duas páginas:
+- pág. 1, o cabeçalho do plano: `Chapas n° 1`, material `AÇO`, espessura `9.53`, chapa `1500 x 3000`,
+  peso da chapa e das peças, tempo de corte, aproveitamento;
+- pág. 2, a tabela: `ID · Código de peça · Dimensão · Perímetro · Peso · Qty peça · Piercing`.
+
+⚠ Na Libellula o código vem com a pasta do projeto na frente — **`T107-TMSA\T107A-P14`**. A marca é o
+que está depois da contrabarra.
+
+## 12.7.3 ⚠⚠ CONFERIDO CONTRA O BANCO: 28 DE 28 MARCAS CASARAM
+
+A pergunta do §12.5 era *"a MARCA da Torg aparece no arquivo?"*. Aparece — e casa exato com
+`PecaConjunto`:
+
+| Plano | Marcas | Casaram |
+|---|---|---|
+| OP T107A · Laser Cantoneira/Tubo (4 barras) | 11 | **11/11** |
+| OP T107A · Laser Chapa (1 chapa, 64 peças) | 15 | **15/15** |
+| OP 097 · Laser Perfil (1 barra) | 2 | **2/2** |
+
+E **as quantidades também batem**: `T107A-P1` tem `qte=8` no portal, o arquivo o chama de
+`T107A-P1_8` e o PDF diz `Qty 8/8`. Idem `P3_10` (qte 10), `P12_2` (qte 2), `T97A5_1` (qte 1).
+
+⚠ **O sufixo `_N` é convenção do programador, não campo do software.** Serve de *conferência* — se
+discordar do `qte` do portal, ou a LPC mudou ou o nesting saiu de uma lista velha, e isso tem de
+aparecer. Nunca como fonte da quantidade.
+
+⚠⚠ **O NOME DA MARCA MUDA DE PLANO PARA PLANO.** Laser Cantoneira/Tubo: `T107A-P1`. Laser Perfil:
+`T97A5` — sem hífen e sem "P". A única regra estável é *"o que vem antes do último `_N`"*. Casamento
+tem de ser **exato contra `PecaConjunto`**, com o que não casar virando pendência visível — nunca
+aproximação por semelhança de nome.
+
+## 12.7.4 O nome do arquivo já traz a OP
+
+`11-09-2026 - T107A - W150X13.pdf` → data · **chave da OP** · perfil. E `T107A` é literalmente o
+`opNumero` de `PecaConjunto` (55 das 90 chaves distintas começam com "T" — o problema multi-chave do
+CLAUDE.md). Melhor ainda: **`opId` está preenchido** nas peças conferidas, então a baixa pode casar
+por `opId|marca`, igual `lib/reconciliar-syneco-corte.js`, sem depender da forma da chave.
+
+No Laser Chapa o nome é `T107A - 9.50mm.pdf` — OP + espessura, e o perfil da peça no portal é
+`CH9.50X128`. A espessura do nome bate com o perfil; a largura, não. Serve para conferir, não para
+casar.
+
+## 12.7.5 Estado de verdade, medido
+
+As duas marcas da OP-097 (plano de **14/08**) estão `status=CORTE`, `qteProduzida=1` — já cortadas e
+com baixa pelo Syneco. As da OP-107 (plano de **hoje**) estão `PENDENTE`, `qteProduzida=0`. O dado do
+portal concorda com a data dos arquivos, o que é uma checagem de sanidade de graça.
+
+## 12.7.6 O que ainda falta do pacote
+
+A *"lista que ele dá para o operador ver o que são as marcas do dia"* **não veio** nesta amostra — o
+`.rar` tem só as três pastas de máquina. Ela importa: é o documento que hoje faz o papel que a tela
+do totem vai fazer, e vale ver o formato antes de desenhar a tela.
+
+> ⚠ Os arquivos de exemplo têm dado real de obra (OP-107/TMSA, OP-097). Ficaram **fora do
+> repositório**, no diretório temporário da sessão — como os dados do laboratório (§10.3).
