@@ -1,7 +1,12 @@
 {
-  "build": 3093,
-  "gerado": "2026-09-11T17:21:03.675Z",
+  "build": 3094,
+  "gerado": "2026-09-11T18:22:04.241Z",
   "commits": [
+    {
+      "hash": "988d0466",
+      "data": "11/09/2026",
+      "titulo": "Análise crítica: ata FORM 10 em PDF e ações levadas ao 5W2H da Qualidade"
+    },
     {
       "hash": "5d643c9b",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "0639fcbf",
       "data": "10/09/2026",
       "titulo": "fix: preservar referências externas de romaneio na reimportação da LE"
-    },
-    {
-      "hash": "d6ff811f",
-      "data": "10/09/2026",
-      "titulo": "Etiqueta QWS: centraliza o numero da O.P. e a marca sob o QR"
     }
   ]
 }

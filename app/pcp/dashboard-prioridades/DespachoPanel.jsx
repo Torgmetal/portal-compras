@@ -44,11 +44,12 @@ const PROG = {
   FINALIZADA: { txt: "finalizado", cls: "bg-emerald-50 text-emerald-700", dica: "Toda a quantidade desta marca já saiu neste setor." },
   PROGRAMADA: { txt: "liberado", cls: "bg-sky-50 text-sky-700", dica: "O programador já lançou a peça na produção (ordem aberta no Syneco)." },
   OUTRO_SETOR: { txt: "liberado", cls: "bg-slate-100 text-slate-600", dica: "O programador lançou a peça na produção, mas o Syneco não tem ordem deste setor pra ela." },
+  LIBERADA_SEM_ORDEM: { txt: "sem ordem no Syneco", cls: "bg-amber-50 text-amber-700", dica: "A GRD já foi impressa, mas o programador ainda não lançou a peça no Syneco — sem a ordem a fábrica não aponta." },
   NAO_LANCADA: { txt: "não liberado", cls: "bg-red-50 text-red-700", dica: "Ainda não foi enviada para a bancada (sem ordem no Syneco)." },
 };
 // "Programada" pro filtro = o programador LANÇOU a peça (existe ordem no Syneco), mesmo que a
 // ordem deste setor específico não exista. A coluna mostra o detalhe.
-const foiProgramada = (p) => !!p?.programacao && p.programacao.situacao !== "NAO_LANCADA";
+const foiProgramada = (p) => !!p?.programacao && !["NAO_LANCADA", "LIBERADA_SEM_ORDEM"].includes(p.programacao.situacao);
 // Botãozinho de filtro (segmentado) — "todos / com / sem", pra selecionar em bloco.
 function Seg({ valor, onChange, opcoes, titulo }) {
   return (

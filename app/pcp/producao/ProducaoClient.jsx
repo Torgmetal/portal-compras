@@ -49,7 +49,10 @@ const PROG = {
   INICIADA: { txt: "iniciada", cls: "bg-emerald-50 text-emerald-700 border-emerald-200", dica: "A ordem deste setor já rodou no Syneco." },
   PROGRAMADA: { txt: "programada", cls: "bg-sky-50 text-sky-700 border-sky-200", dica: "O programador programou a peça e a ordem ainda não iniciou — é o que pode descer para a fábrica." },
   OUTRO_SETOR: { txt: "outro setor", cls: "bg-slate-100 text-slate-600 border-slate-200", dica: "Programada no Syneco, mas sem ordem deste setor." },
-  NAO_LANCADA: { txt: "não programada", cls: "bg-red-50 text-red-700 border-red-200", dica: "O programador ainda NÃO programou esta peça no Syneco." },
+  // ⚠ liberada pelo PCP (GRD impressa) mas sem ordem: pendência de lançamento, não alarme. Vitor
+  // (11/09/2026): "programada" segue vindo só do Syneco — é lá que a fábrica aponta.
+  LIBERADA_SEM_ORDEM: { txt: "liberada · falta lançar no Syneco", cls: "bg-amber-50 text-amber-700 border-amber-200", dica: "O PCP já liberou (GRD impressa), mas o Syneco ainda não tem ordem desta peça — sem a ordem a fábrica não consegue apontar. Assim que for lançada, a sincronização troca para \"programada\" sozinha." },
+  NAO_LANCADA: { txt: "não programada", cls: "bg-red-50 text-red-700 border-red-200", dica: "Nem liberada pelo PCP nem programada no Syneco." },
 };
 
 // ⚠⚠ A ORDEM É A DA FÁBRICA, NÃO A DO BANCO.
@@ -491,6 +494,7 @@ export default function ProducaoClient() {
         + (filtroPecas.trim() ? ` · busca "${filtroPecas.trim()}"` : ""),
       kpis: [
         `${lista.filter((p) => p.programacao?.situacao === "NAO_LANCADA").length} não programada(s)`,
+        `${lista.filter((p) => p.programacao?.situacao === "LIBERADA_SEM_ORDEM").length} liberada(s) sem ordem no Syneco`,
         `${lista.filter((p) => p.programacao?.situacao === "PROGRAMADA").length} programada(s)`,
         `${lista.filter((p) => p.grd).length} liberada(s)`,
       ],
@@ -648,6 +652,7 @@ export default function ProducaoClient() {
                             {pct != null && <>corte {pct}% · </>}
                             {fmtKg(o.kg.pendente)} na fila · {fmtN(o.pecas.lancadas)}/{fmtN(o.pecas.total)} programadas
                             {o.pecas.naoLancadas > 0 && <span className="text-red-600 font-semibold"> · {fmtN(o.pecas.naoLancadas)} não programadas</span>}
+                            {o.pecas.liberadasSemOrdem > 0 && <span className="text-amber-700 font-semibold" title="GRD impressa e nenhuma ordem no Syneco — falta o lançamento"> · {fmtN(o.pecas.liberadasSemOrdem)} liberadas sem ordem no Syneco</span>}
                             {" · "}{fmtN(o.pecas.liberadas)} liberadas
                           </span>
                         </div>

@@ -402,13 +402,21 @@ export async function GET(req) {
     }
   } catch {}
   // Situação da programação da peça NESTE setor:
-  //   NAO_LANCADA  → o programador ainda não lançou a peça no Syneco (nenhuma ordem)
-  //   OUTRO_SETOR  → tem ordem lançada, mas não pra este setor (rota diferente no Syneco)
-  //   PROGRAMADA   → ordem lançada e ainda não iniciada
-  //   INICIADA     → a ordem deste setor já rodou (produzindo/finalizada)
-  const programacaoDe = (marca, qte) => {
+  //   NAO_LANCADA         → nem liberada pelo PCP nem lançada no Syneco (nenhuma ordem)
+  //   LIBERADA_SEM_ORDEM  → o PCP já liberou (GRD impressa), mas o Syneco ainda não tem ordem
+  //   OUTRO_SETOR         → tem ordem lançada, mas não pra este setor (rota diferente no Syneco)
+  //   PROGRAMADA          → ordem lançada e ainda não iniciada
+  //   INICIADA            → a ordem deste setor já rodou (produzindo/finalizada)
+  //
+  // ⚠⚠ "PROGRAMADA" CONTINUA VINDO SÓ DO SYNECO — a liberação do PCP não a substitui. Vitor
+  // (11/09/2026), na OP-107 liberada pela GRD e sem ordem: chegou a propor que liberar já saísse
+  // "programada"; ficou combinado o contrário, porque a fábrica aponta no Syneco e o portal não
+  // dá baixa em nada por conta própria — peça sem ordem é peça que ninguém consegue apontar, e a
+  // coluna é o único lugar que mostra esse buraco. Como quem libera e quem lança é a mesma pessoa
+  // (Gabriel), a peça liberada sem ordem sai em âmbar como pendência dele, não em vermelho.
+  const programacaoDe = (marca, qte, liberada = false) => {
     const g = progPorMarca.get(marca);
-    if (!g) return { situacao: "NAO_LANCADA", setores: [], planejadoUn: 0, nOrdens: 0 };
+    if (!g) return { situacao: liberada ? "LIBERADA_SEM_ORDEM" : "NAO_LANCADA", setores: [], planejadoUn: 0, nOrdens: 0 };
     const planejadoUn = Math.round(g.planejadoUn || 0);
     // Confere a quantidade: o programador lançou a peça INTEIRA ou só parte dela? (a qtd da LPC
     // é a verdade do portal; divergência = programação parcial ou peça relançada no Syneco)
@@ -548,8 +556,8 @@ export async function GET(req) {
     const mat = matFull ? (({ entradas: _entradas, ...resto }) => resto)(matFull) : null;
     // trava: quantos conjuntos esperam ESTE croqui pra poder montar
     const tr = travaPorCroqui.get(p.marca);
-    return { ...p, material: mat, programacao: programacaoDe(p.marca, p.qte), expedida,
-      grd: grdPorMarca.get(String(p.marca || "").toUpperCase()) || null,
+    const grd = grdPorMarca.get(String(p.marca || "").toUpperCase()) || null;
+    return { ...p, material: mat, programacao: programacaoDe(p.marca, p.qte, !!grd), expedida, grd,
       // ⚠⚠ ONDE A PEÇA ESTÁ ≠ POR ONDE ELA PASSA.
       // `programacao.setores` é a ROTA: todos os setores que têm ordem no Syneco para aquela marca.
       // Serve para saber o caminho, não o lugar. A tela nova do PCP saiu mostrando essa rota numa
