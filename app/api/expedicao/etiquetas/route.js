@@ -15,6 +15,7 @@ import { requireRole } from "@/lib/session";
 import { MODELOS, gerarEtiquetasCarregamentoPDF } from "@/lib/etiqueta-carregamento-pdf";
 import { camposExtrasDaOP, juntarCamposExtras } from "@/lib/etiqueta-campos-extras";
 import { itensExpediveisDaOP, opsComItensExpediveis } from "@/lib/itens-expedicao";
+import { lerCalibragem } from "@/lib/etiqueta-calibragem";
 import { log } from "@/lib/log";
 
 const registro = log("api/expedicao/etiquetas");
@@ -264,6 +265,10 @@ export async function POST(req) {
       pecas,
       modelo,
       tagObra,
+      // ⚠ Lida a CADA impressão, não cacheada: quem está calibrando imprime, mede, ajusta e
+      // imprime de novo. Um cache de segundos faria a etiqueta seguinte sair com o valor velho e a
+      // pessoa concluir que o ajuste não funciona.
+      calibragem: await lerCalibragem(prisma),
     });
     // ⚠ SÓ DEPOIS DE O PDF EXISTIR. Carimbar antes marcaria como impressa uma marca cuja geração
     // falhou — e a tela ficaria dizendo "já saiu" para uma etiqueta que ninguém viu.

@@ -3213,6 +3213,26 @@ model PecaConjunto {
 // dessa peça, então em cada etiqueta vai uma referência igual na planilha". A T102A15 da OP-102 são
 // 3 peças em 3 linhas, cada uma com a sua TAG (HC725-001, HC725-002, HC726-001). Guardar por marca
 // faria as 3 etiquetas saírem com a TAG da primeira — e o recebimento do cliente confere por ela.
+/// CALIBRAGEM DA IMPRESSORA DE ETIQUETAS — quanto o desenho precisa andar para cair no adesivo.
+///
+/// ⚠⚠ ISTO NÃO É DESIGN DA ETIQUETA, É CONSERTO DE MÁQUINA. O PDF desenha a moldura de 1,2 a 98,8 mm
+/// numa página de 100 — está centrado. Se sai cortado, a origem de impressão da Argox está deslocada.
+/// O lugar certo de corrigir é o driver, e está escrito na tela; isto existe porque o driver da Argox
+/// nem sempre expõe esse ajuste, e aí a expedição fica sem saída nenhuma.
+///
+/// ⚠ GLOBAL, NÃO POR USUÁRIO: é uma propriedade da IMPRESSORA, e a expedição tem uma. Guardar por
+/// navegador faria cada PC da fábrica imprimir diferente e ninguém entender por quê.
+model EtiquetaCalibragem {
+  /// "argox" — uma impressora hoje. A chave existe para uma segunda caber sem migração.
+  id            String   @id
+  /// milimetros para a DIREITA (negativo = esquerda)
+  deslocX       Float    @default(0)
+  /// milimetros para BAIXO (negativo = cima)
+  deslocY       Float    @default(0)
+  atualizadoEm  DateTime @updatedAt
+  atualizadoPor String?
+}
+
 model EtiquetaCampoExtra {
   id       String @id @default(cuid())
   opNumero String

@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import zlib from "zlib";
-import { gerarEtiquetasCarregamentoPDF, ajustarTexto, numeroDaEtiqueta, contagemDaEtiqueta, GRADE, MM } from "@/lib/etiqueta-carregamento-pdf";
+import { emMilimetros, LIMITE_MM } from "@/lib/etiqueta-calibragem";
+import { gerarEtiquetasCarregamentoPDF, ajustarTexto, numeroDaEtiqueta, contagemDaEtiqueta, transformeDaCalibragem, GRADE, MM } from "@/lib/etiqueta-carregamento-pdf";
 
 // ⚠ POR QUE ESTE TESTE EXISTE, E NÃO UMA OLHADA NA TELA.
 //
@@ -231,5 +232,78 @@ describe("TAG da obra no modelo padrão", () => {
     const r = ajustarTexto(longa, bold, { xIni: 4.5, xFim: GRADE.colDir - 1.5, tamMax: 8 });
     expect(r.xFim).toBeLessThanOrEqual(GRADE.colDir - 1.5);
     expect(r.tam).toBeLessThan(8);
+  });
+});
+
+// ⚠⚠ A CALIBRAGEM DA IMPRESSORA. Matheus (11/09/2026): "minha etiqueta ainda está saindo bem para
+// esquerda a impressão aí fica cortando, como eu consigo centralizar ela mais para direita".
+//
+// Duas coisas precisam ficar provadas, e a segunda foi um erro real da primeira tentativa:
+//   1. deslocar SOZINHO não serve — o desenho já usa 1,2–98,8 de 100 mm, então tem que encolher;
+//   2. `scaleContent` ancora no canto de BAIXO: descer ingenuamente joga o rodapé para fora.
+describe("calibragem da impressora", () => {
+  const cantos = (t) => ({
+    esq: t.tx, dir: t.tx + 100 * t.escala,
+    topo: 50 - (t.ty + 50 * t.escala), base: 50 - t.ty,
+  });
+
+  it("sem deslocamento não transforma nada — o desenho já é centrado", () => {
+    expect(transformeDaCalibragem({})).toBeNull();
+    expect(transformeDaCalibragem({ deslocX: 0, deslocY: 0 })).toBeNull();
+  });
+
+  it("deslocar para a direita encolhe o bastante para o QR não sair pelo outro lado", () => {
+    const t = transformeDaCalibragem({ deslocX: 5 });
+    expect(t.escala).toBeCloseTo(0.95, 5);
+    const c = cantos(t);
+    expect(c.esq).toBeCloseTo(5, 5);
+    expect(c.dir).toBeLessThanOrEqual(100 + 1e-9);
+  });
+
+  // ⚠ O caso que a primeira versão errou: a moldura de baixo saía da página.
+  it("deslocar para baixo não empurra o rodapé para fora", () => {
+    const c = cantos(transformeDaCalibragem({ deslocY: 2 }));
+    expect(c.topo).toBeCloseTo(2, 5);
+    expect(c.base).toBeLessThanOrEqual(50 + 1e-9);
+  });
+
+  it.each([[6, 2], [-4, -1.5], [10, 10], [3, 0], [0, 3]])(
+    "desloc %s,%s mantém o desenho inteiro dentro da etiqueta", (deslocX, deslocY) => {
+      const c = cantos(transformeDaCalibragem({ deslocX, deslocY }));
+      expect(c.esq).toBeGreaterThanOrEqual(-1e-9);
+      expect(c.dir).toBeLessThanOrEqual(100 + 1e-9);
+      expect(c.topo).toBeGreaterThanOrEqual(-1e-9);
+      expect(c.base).toBeLessThanOrEqual(50 + 1e-9);
+    });
+
+  it("a página continua 100×50 mm — a calibragem move o conteúdo, não o papel", async () => {
+    const bytes = await gerarEtiquetasCarregamentoPDF({
+      cliente: "TMSA", obra: "Torocua", opNumero: "103",
+      pecas: [{ marca: "M1", qte: 2 }], calibragem: { deslocX: 4, deslocY: 1 },
+    });
+    const pdf = await PDFDocument.load(bytes);
+    expect(pdf.getPageCount()).toBe(2);
+    const { width, height } = pdf.getPage(0).getSize();
+    expect(width / MM).toBeCloseTo(100, 5);
+    expect(height / MM).toBeCloseTo(50, 5);
+  });
+});
+
+// ⚠ A ENTRADA VEM DE UM CAMPO DE TEXTO, e o que chega nem sempre é número. Vírgula é o separador
+// decimal de quem digita aqui; valor absurdo é quase certamente erro de digitação, e uma etiqueta
+// encolhida a 40% seria um segundo problema em cima do primeiro.
+describe("emMilimetros — o que a calibragem aceita", () => {
+  it("aceita vírgula como separador decimal", () => {
+    expect(emMilimetros("1,5")).toBe(1.5);
+    expect(emMilimetros("-2,5")).toBe(-2.5);
+  });
+
+  it("limita ao que o papel aguenta, nos dois sentidos", () => {
+    expect(emMilimetros(40)).toBe(LIMITE_MM);
+    expect(emMilimetros(-40)).toBe(-LIMITE_MM);
+  });
+
+  it("texto e vazio viram zero — sem calibragem, não um NaN que arrasta para o PDF", () => {
+    for (const lixo of ["", null, undefined, "abc", {}]) expect(emMilimetros(lixo)).toBe(0);
   });
 });

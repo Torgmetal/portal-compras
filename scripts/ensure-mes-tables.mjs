@@ -677,6 +677,20 @@ async function main() {
   `).catch((e) => console.warn("[ensure-mes-tables] FK userId:", e.message));
   console.log("[ensure-mes-tables] OK — NotificacaoDestinatario garantida.");
 
+  // ── Calibragem da impressora de etiquetas — 11/09/2026 ──────────────────────
+  // Duas medidas em mm, uma linha só. Mora aqui e não num `prisma db push` porque o schema em
+  // produção tem drift conhecido (ExpedicaoItemExcluido) e o push tentaria dropar tabela com dado.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "EtiquetaCalibragem" (
+      "id"            TEXT             NOT NULL,
+      "deslocX"       DOUBLE PRECISION NOT NULL DEFAULT 0,
+      "deslocY"       DOUBLE PRECISION NOT NULL DEFAULT 0,
+      "atualizadoEm"  TIMESTAMP(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "atualizadoPor" TEXT,
+      CONSTRAINT "EtiquetaCalibragem_pkey" PRIMARY KEY ("id")
+    )`).catch((e) => console.warn("[ensure-mes-tables] EtiquetaCalibragem:", e.message));
+  console.log("[ensure-mes-tables] OK — EtiquetaCalibragem garantida.");
+
   const existentes = await prisma.$queryRawUnsafe(`
     SELECT tablename
     FROM pg_tables
