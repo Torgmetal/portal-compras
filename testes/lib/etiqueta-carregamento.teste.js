@@ -189,13 +189,13 @@ describe("gerarEtiquetasCarregamentoPDF", () => {
 describe("TAG da obra no modelo padrão", () => {
   const base = { cliente: "TMSA", obra: "Torocua", opNumero: "103" };
 
-  it("sai na frente do nome da obra, separada por | e não por hífen", async () => {
+  it("sai DEPOIS do nome da obra, separada por | e não por hífen", async () => {
     const bytes = await gerarEtiquetasCarregamentoPDF({
       ...base, tagObra: "TPR00870", pecas: [{ marca: "M1", qte: 1 }],
     });
     const texto = textoDoPdf(bytes);
-    expect(texto).toContain("TPR00870 | Torocua");
-    expect(texto).not.toContain("TPR00870-Torocua");
+    expect(texto).toContain("Torocua | TPR00870");
+    expect(texto).not.toContain("Torocua-TPR00870");
   });
 
   it("repete em TODAS as etiquetas, não só na primeira", async () => {
@@ -211,7 +211,7 @@ describe("TAG da obra no modelo padrão", () => {
   it("sem TAG a obra sai sozinha, sem separador solto", async () => {
     const texto = textoDoPdf(await gerarEtiquetasCarregamentoPDF({ ...base, pecas: [{ marca: "M1", qte: 1 }] }));
     expect(texto).toContain("Torocua");
-    expect(texto).not.toContain("| Torocua");
+    expect(texto).not.toContain("Torocua |");
   });
 
   // ⚠ O QWS IGNORA A TAG. A célula de cima dele já é "cliente | obra" e a peça é identificada pela
@@ -228,7 +228,7 @@ describe("TAG da obra no modelo padrão", () => {
   // O corte com reticência é feio e visível; texto invadindo a célula vizinha é feio e silencioso.
   it("obra comprida COM tag é encaixada em vez de vazar a célula", async () => {
     const { bold } = await fontes();
-    const longa = "TPR00870 | TMSA — Torocua - Ñacunday - Bloco Norte";
+    const longa = "TMSA — Torocua - Ñacunday - Bloco Norte | TPR00870";
     const r = ajustarTexto(longa, bold, { xIni: 4.5, xFim: GRADE.colDir - 1.5, tamMax: 8 });
     expect(r.xFim).toBeLessThanOrEqual(GRADE.colDir - 1.5);
     expect(r.tam).toBeLessThan(8);

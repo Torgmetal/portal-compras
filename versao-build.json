@@ -1,7 +1,12 @@
 {
-  "build": 3075,
-  "gerado": "2026-09-11T12:00:31.767Z",
+  "build": 3076,
+  "gerado": "2026-09-11T12:00:42.209Z",
   "commits": [
+    {
+      "hash": "7aa5f661fa",
+      "data": "11/09/2026",
+      "titulo": "Etiqueta: calibragem da impressora, para a etiqueta parar de sair cortada"
+    },
     {
       "hash": "ee53dff772",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "9b38a0213d",
       "data": "09/09/2026",
       "titulo": "Remessa Terceiro: vincula o Projeto no Omie automaticamente"
-    },
-    {
-      "hash": "3ec99dcb54",
-      "data": "09/09/2026",
-      "titulo": "Remessa Terceiro: campo pra informar o valor por kg (faltava na tela)"
     }
   ]
 }

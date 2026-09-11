@@ -1,10 +1,12 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Check, Loader2, Printer, Search, Tag } from "lucide-react";
-import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
+import { AlertCircle, Loader2, Tag } from "lucide-react";
+import { useFiltroColunas } from "@/components/FiltroColuna";
 import { lerJson } from "@/lib/ler-json";
 import ModeloEtiqueta from "./ModeloEtiqueta";
 import AvisoImpressao from "./AvisoImpressao";
+import BarraSelecao from "./BarraSelecao";
+import TabelaMarcas, { COLUNAS_ETIQUETA } from "./TabelaMarcas";
 import Calibragem from "./Calibragem";
 
 // ETIQUETAS DE CARREGAMENTO — a aba que substitui o BarTender.
@@ -20,49 +22,7 @@ import Calibragem from "./Calibragem";
 // (faltou uma, descolou, borrou), e reaproveitar a aba aberta é um clique em vez de quatro.
 
 /** "05/09 14:20" — dia e hora bastam; o ano não ajuda a decidir se reimprime. */
-const quando = (iso) => {
-  if (!iso) return null;
-  const d = new Date(iso);
-  return Number.isNaN(+d)
-    ? null
-    : d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-};
 
-const nkg = (n) =>
-  Number(n) > 0 ? Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
-
-function BarraSelecao({ busca, setBusca, visiveis, sel, totalEtiquetas, marcarVisiveis, limpar, imprimir, gerando, filtrosAtivos }) {
-  return (
-    <div className="flex flex-wrap items-center gap-3 p-3 border-b border-gray-100 bg-gray-50/60">
-      <div className="relative flex-1 min-w-[220px]">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-torg-gray" />
-        <input value={busca} onChange={(e) => setBusca(e.target.value)}
-          placeholder="Filtrar por marca ou descrição"
-          className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-1.5 text-sm" />
-      </div>
-      <button onClick={marcarVisiveis} className="text-[13px] font-semibold text-torg-blue hover:underline">
-        Marcar {busca ? "os filtrados" : "todas"} ({visiveis.length})
-      </button>
-      {/* ⚠ HABILITADO TAMBÉM COM FUNIL ATIVO E NADA MARCADO. Antes olhava só a seleção, e aí quem
-          filtrasse uma coluna encontrava um "Limpar" apagado — morto justamente na hora em que ele
-          é mais necessário, porque é o filtro que está escondendo marca da tela. */}
-      <button onClick={limpar} disabled={!sel.size && !filtrosAtivos}
-        className="text-[13px] text-torg-gray hover:underline disabled:opacity-40">Limpar</button>
-      <div className="ml-auto flex items-center gap-3">
-        {/* Quantas ETIQUETAS, não quantas marcas: é o número que decide se o rolo aguenta. */}
-        <span className="text-[13px] text-torg-gray">
-          <b className="text-torg-dark">{sel.size}</b> marca(s) ·{" "}
-          <b className="text-torg-dark">{totalEtiquetas}</b> etiqueta(s)
-        </span>
-        <button onClick={imprimir} disabled={!sel.size || gerando}
-          className="bg-torg-blue text-white text-sm font-semibold rounded-lg px-4 py-2 flex items-center gap-2 disabled:opacity-40">
-          {gerando ? <Loader2 size={15} className="animate-spin" /> : <Printer size={15} />}
-          {gerando ? "Gerando…" : "Gerar etiquetas"}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 /**
  * Se a etiqueta desta marca já saiu, e quando.
@@ -71,72 +31,6 @@ function BarraSelecao({ busca, setBusca, visiveis, sel, totalEtiquetas, marcarVi
  * impressas". O "×2" não é enfeite: reimpressão é rotina (descolou, borrou), mas reimprimir SEM
  * saber que já tinha saído é como a peça sai do pátio com dois adesivos diferentes.
  */
-function Impressa({ peca }) {
-  const em = quando(peca.impressaEm);
-  if (!em) return <span className="text-gray-300">—</span>;
-  return (
-    <span className="inline-flex items-center gap-1 text-[12px] text-emerald-700 whitespace-nowrap">
-      <Check size={13} className="shrink-0" />
-      {em}
-      {peca.impressoes > 1 && <b className="text-torg-gray">×{peca.impressoes}</b>}
-    </span>
-  );
-}
-
-// Os funis do cabeçalho. Matheus (08/09/2026): "no cabeçalho coloque os filtros igual fizemos
-// anteriormente tipo excel" — é o `components/FiltroColuna`, o mesmo das Listas de Expedição e da
-// consulta do Comercial, e não mais um filtro inventado só para esta tela.
-//
-// ⚠ Peças e Peso ficam SEM funil de propósito: são números contínuos, e uma lista de 200 valores
-// distintos não é filtro, é ruído. Para eles vale a busca por texto que já está na barra.
-export const COLUNAS_ETIQUETA = [
-  { key: "marca", label: "Marca", valor: (p) => p.marca || "—" },
-  { key: "descricao", label: "Descrição", valor: (p) => p.descricao || "—" },
-  // ⚠ O QUE FILTRA É "JÁ SAIU OU NÃO", não a data. Filtrar por "08/09 14:20" separaria duas
-  // impressões do mesmo lote; quem abre este funil quer as que faltam imprimir.
-  { key: "impressa", label: "Etiqueta", valor: (p) => (p.impressaEm ? "Já impressa" : "Não impressa") },
-];
-
-function TabelaMarcas({ visiveis, sel, alterna, busca, fp }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-[13px]" style={{ minWidth: 640 }}>
-        <thead className="bg-gray-50/60 text-[11px] uppercase text-torg-gray">
-          <tr>
-            <th className="w-10 px-3 py-2"></th>
-            <ThFiltro col="marca" label="Marca" className="text-left px-2 py-2" {...fp} />
-            <ThFiltro col="descricao" label="Descrição" className="text-left px-2 py-2" {...fp} />
-            <th className="text-right px-2 py-2">Peças</th>
-            <th className="text-right px-2 py-2">Peso unit. (kg)</th>
-            <ThFiltro col="impressa" label="Etiqueta" className="text-left px-4 py-2" {...fp} />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-50">
-          {visiveis.map((p) => (
-            <tr key={p.id} onClick={() => alterna(p.marca)}
-              className={`cursor-pointer ${sel.has(p.marca) ? "bg-torg-blue-50/50" : "hover:bg-gray-50/60"}`}>
-              <td className="px-3 py-2">
-                <input type="checkbox" readOnly checked={sel.has(p.marca)} className="pointer-events-none" />
-              </td>
-              <td className="px-2 py-2 font-bold text-torg-dark">{p.marca}</td>
-              <td className="px-2 py-2 text-torg-gray">{p.descricao || "—"}</td>
-              <td className="px-2 py-2 text-right tabular-nums">{Math.max(1, p.qte || 1)}</td>
-              <td className="px-2 py-2 text-right tabular-nums">{nkg(p.pesoUnitKg)}</td>
-              <td className="px-4 py-2"><Impressa peca={p} /></td>
-            </tr>
-          ))}
-          {!visiveis.length && (
-            <tr><td colSpan={6} className="px-4 py-10 text-center text-torg-gray">
-              {busca
-                ? <>Nenhuma marca bate com &quot;{busca}&quot;.</>
-                : "Nenhuma marca passa pelos filtros do cabeçalho."}
-            </td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 /**
  * O que a tabela mostra: a busca por texto e, depois dela, os funis do cabeçalho.
@@ -185,6 +79,42 @@ function useOps(setErro) {
  * ⚠ Fora do componente de propósito: são três encadeamentos opcionais que, inline no JSX, empurram
  * o `EtiquetasClient` para fora do teto de complexidade. Aqui eles são uma função com um nome.
  */
+/**
+ * O nome do arquivo baixado.
+ *
+ * ⚠ URL de blob NÃO carrega nome: o `Content-Disposition` que a rota manda é ignorado, e o
+ * navegador salva com o UUID do blob. O nome só existe se o `<a download>` disser qual é.
+ */
+const nomeDoArquivo = (opId, ops) => {
+  const op = (ops || []).find((o) => o.id === opId);
+  return `etiquetas-OP-${op?.numero || "obra"}.pdf`;
+};
+
+/**
+ * O que está sendo preparado para imprimir: a TAG digitada e o último PDF gerado.
+ *
+ * ⚠ Os dois juntos porque são o mesmo assunto e têm o mesmo ciclo de vida — a obra muda, os dois
+ * deixam de valer.
+ *
+ * ⚠⚠ O BLOB FICA VIVO ENQUANTO A TELA ESTIVER ABERTA. Antes era revogado em 60 s, e era isso que
+ * quebrava o download: quem abre o PDF, confere as marcas e só então clica em baixar passa fácil de
+ * um minuto — aí o link já não existe, e o navegador mostra "verifique a conexão com a Internet"
+ * num arquivo com nome de UUID. Não era rede; era o link revogado.
+ *
+ * ⚠ Mas revoga ao SAIR da tela: blob de 400 etiquetas não é pequeno, e deixá-lo pendurado numa tela
+ * que a expedição mantém aberta o dia todo é vazamento de memória com hora marcada.
+ */
+// ⚠ A TAG DA OBRA ZERA AO TROCAR DE OBRA, ao contrário do modelo da etiqueta. Ela é um código
+// DAQUELE embarque: manter a de outra obra na tela carregaria, em centenas de adesivos, um código
+// que não é daquela carga. O `abrirOp` repõe a da última impressão da obra nova, se houver.
+
+function usarImpressao() {
+  const [tagObra, setTagObra] = useState("");
+  const [pdf, setPdf] = useState(null);
+  useEffect(() => () => { if (pdf) URL.revokeObjectURL(pdf.url); }, [pdf]);
+  return { tagObra, setTagObra, pdf, setPdf };
+}
+
 const daObra = (dados) => ({ obra: dados?.op?.obra || "", tag: dados?.tagObra || "" });
 
 export default function EtiquetasClient() {
@@ -198,10 +128,7 @@ export default function EtiquetasClient() {
   // ⚠ O modelo NÃO volta ao padrão ao trocar de obra: quem imprime para um cliente costuma
   // imprimir várias OPs dele seguidas, e voltar sozinho faria a etiqueta errada sair sem aviso.
   const [modelo, setModelo] = useState("padrao");
-  // ⚠ A TAG ZERA AO TROCAR DE OBRA, ao contrário do modelo. Ela é um código DAQUELE embarque: manter
-  // a de outra obra na tela seria carregar, em centenas de adesivos, um código que não é daquela
-  // carga. O `abrirOp` repõe a da última impressão da obra nova, se houver.
-  const [tagObra, setTagObra] = useState("");
+  const { tagObra, setTagObra, pdf, setPdf } = usarImpressao();
   const { ops, carregandoOps } = useOps(setErro);
 
   const buscarPecas = useCallback(async (id) => lerJson(
@@ -256,8 +183,12 @@ export default function EtiquetasClient() {
       }
       const url = URL.createObjectURL(await r.blob());
       window.open(url, "_blank", "noopener");
-      // Revogar na hora fecharia o PDF antes de a aba lê-lo.
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      // ⚠⚠ O BLOB FICA VIVO ENQUANTO A TELA ESTIVER ABERTA. Antes ele era revogado em 60 s, e era
+      // isso que quebrava o download: Matheus (11/09/2026) "tento baixar o arquivo que gera das
+      // etiquetas mas não baixa". Quem abre o PDF, confere as marcas e só então clica em baixar
+      // passa fácil de um minuto — aí o blob já não existe, e o navegador mostra "verifique a
+      // conexão com a Internet" num arquivo com nome de UUID. Não era rede; era o link revogado.
+      setPdf({ url, nome: nomeDoArquivo(opId, ops) });
       // Recarrega só os dados — a coluna "Etiqueta" tem que refletir o que acabou de sair, e o
       // filtro e a seleção continuam onde estavam (quem imprime costuma imprimir de novo).
       const atualizado = await buscarPecas(opId).catch(() => null);
@@ -333,7 +264,7 @@ export default function EtiquetasClient() {
             <BarraSelecao
               busca={busca} setBusca={setBusca}
               visiveis={visiveis} sel={sel} totalEtiquetas={totalEtiquetas}
-              marcarVisiveis={marcarVisiveis} limpar={limpar} filtrosAtivos={filtrosAtivos}
+              marcarVisiveis={marcarVisiveis} limpar={limpar} filtrosAtivos={filtrosAtivos} pdf={pdf}
               imprimir={imprimir} gerando={gerando}
             />
             <TabelaMarcas visiveis={visiveis} sel={sel} alterna={alterna} busca={busca} fp={fp} />

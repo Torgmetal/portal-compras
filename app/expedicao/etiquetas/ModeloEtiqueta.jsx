@@ -120,9 +120,9 @@ function TagDaObra({ tagObra, setTagObra, sugestao }) {
         {/* ⚠ A PRÉVIA USA A OBRA DE VERDADE, não um exemplo. Mostrar "TPR00870 | Torocua" enquanto a
             obra é "Torocua - Ñacunday" faria a pessoa conferir um texto que não é o que vai sair —
             que é o oposto do que uma prévia existe para fazer. */}
-        Sai em <b>todas</b> as etiquetas, na frente do nome da obra:{" "}
+        Sai em <b>todas</b> as etiquetas, depois do nome da obra:{" "}
         <span className="font-mono text-torg-dark">
-          {[tagObra.trim().toUpperCase(), obra].filter(Boolean).join(" | ") || "\u2014"}
+          {[obra, tagObra.trim().toUpperCase()].filter(Boolean).join(" | ") || "\u2014"}
         </span>.
         {sugerida && !tagObra && (
           <>
