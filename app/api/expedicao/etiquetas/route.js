@@ -81,6 +81,31 @@ function historicoDaMarca(hist, chave, ids) {
   return { em, vezes };
 }
 
+/**
+ * A TAG usada na ÚLTIMA impressão desta obra, para a tela já vir preenchida.
+ *
+ * ⚠⚠ SAI DO `AuditLog`, SEM TABELA NOVA. O carimbo de cada impressão já guarda a TAG no `diff` —
+ * perguntar a ele "qual foi a última" é de graça, e evita uma segunda cópia do mesmo fato.
+ *
+ * ⚠⚠ E EXISTE PARA EVITAR UM ERRO CARO, NÃO POR CONFORTO. A obra é impressa em lotes, ao longo de
+ * dias. Se a TAG for digitada do zero a cada lote, mais cedo ou mais tarde um lote sai sem ela — ou
+ * com ela errada — e vai para o caminhão misturado com os que saíram certos. Ninguém confere 442
+ * adesivos um a um. Vir preenchida com o que foi usado da última vez transforma "lembrar" em
+ * "conferir", que é o que dá para fazer com a peça na mão.
+ *
+ * ⚠ É SUGESTÃO, NÃO TRAVA: quem imprime pode apagar ou trocar. A TAG muda de embarque para
+ * embarque, e travar no valor antigo seria pior que não sugerir.
+ */
+async function ultimaTagDaObra(opNumero) {
+  const ultimo = await prisma.auditLog.findFirst({
+    where: { action: ACAO, entity: ENTIDADE, entityId: { startsWith: `${opNumero}|` } },
+    orderBy: { createdAt: "desc" },
+    select: { diff: true },
+  }).catch(() => null);
+  const tag = ultimo?.diff?.tagObra;
+  return typeof tag === "string" && tag.trim() ? tag.trim() : null;
+}
+
 async function carregar(opId) {
   // ⚠ QUEM DEFINE A LISTA É A LISTA DE EXPEDIÇÃO — a regra e o porquê moram em
   // `lib/itens-expedicao.js`, a mesma fonte usada pela Conferência de Peça.
@@ -88,9 +113,13 @@ async function carregar(opId) {
   if (!dados) return null;
 
   const chaves = dados.pecas.map((p) => chaveHistorico(dados.op.numero, p.marca));
-  const hist = await impressoes(chaves, dados.pecas.flatMap((p) => p.ids));
+  const [hist, tagObra] = await Promise.all([
+    impressoes(chaves, dados.pecas.flatMap((p) => p.ids)),
+    ultimaTagDaObra(dados.op.numero),
+  ]);
   return {
     op: dados.op,
+    tagObra,
     pecas: dados.pecas.map(({ ids, id: _id, naPlanilha: _naPlanilha, ...p }, i) => {
       const h = historicoDaMarca(hist, chaves[i], ids);
       return { ...p, id: chaves[i], impressaEm: h.em, impressoes: h.vezes };
@@ -116,6 +145,42 @@ export async function GET(req) {
 const erro400 = (msg) => NextResponse.json({ success: false, error: msg }, { status: 400 });
 
 /**
+ * A TAG que o cliente pede na frente da OBRA, digitada na tela.
+ *
+ * ⚠⚠ NORMALIZADA NO SERVIDOR, NÃO NA TELA. Ela vai impressa em centenas de adesivos que saem no
+ * caminhão: um espaço sobrando ou uma minúscula viram duas "TAGs" diferentes no olho de quem
+ * confere no recebimento. Maiúsculas e sem espaço nas pontas é o mínimo — e o servidor é o único
+ * lugar por onde TODA impressão passa.
+ *
+ * ⚠ 24 caracteres é o que a célula da OBRA aguenta sem espremer o nome da obra a ponto de não se
+ * ler. Passar disso é quase certamente colar errado, não uma TAG legítima.
+ */
+const TAG_MAX = 24;
+function normalizarTagObra(bruto) {
+  const tag = String(bruto ?? "").trim().toUpperCase().replace(/\s+/g, " ");
+  if (!tag) return { tag: null };
+  if (tag.length > TAG_MAX) return { erro: `A TAG da obra tem no máximo ${TAG_MAX} caracteres.` };
+  return { tag };
+}
+
+/**
+ * Qual desenho usar e com qual TAG.
+ *
+ * ⚠ Modelo vindo da tela é validado contra a lista, não usado direto: um valor qualquer no corpo
+ * não pode escolher um caminho de desenho que não existe.
+ *
+ * ⚠ A TAG É SÓ DO MODELO PADRÃO. O QWS já usa a célula de cima para "cliente | obra" e identifica a
+ * peça pela TAG Petrobras — mais um código ali brigaria por espaço com o que o cliente confere.
+ * Mandar a tag com modelo qws é ignorado em silêncio, não é erro: a tela nem mostra o campo, então
+ * isso só acontece em chamada feita fora dela.
+ */
+function resolverDesenho(corpo) {
+  const modelo = MODELOS.includes(corpo?.modelo) ? corpo.modelo : "padrao";
+  const { tag, erro } = normalizarTagObra(modelo === "padrao" ? corpo?.tagObra : null);
+  return { modelo, tagObra: tag ?? null, erro };
+}
+
+/**
  * O que vai ser impresso, ou a mensagem de por que não vai.
  *
  * ⚠ A QUANTIDADE VEM DO BANCO, NÃO DO NAVEGADOR. A tela manda quais marcas; quantas etiquetas cada
@@ -128,7 +193,8 @@ async function selecionar(corpo) {
   if (!opId || !marcas.length) return { recusa: erro400("Escolha a OP e ao menos uma marca.") };
   // ⚠ Modelo vindo da tela é validado contra a lista, não usado direto: um valor qualquer no corpo
   // não pode escolher um caminho de desenho que não existe.
-  const modelo = MODELOS.includes(corpo?.modelo) ? corpo.modelo : "padrao";
+  const { modelo, tagObra, erro: erroDoDesenho } = resolverDesenho(corpo);
+  if (erroDoDesenho) return { recusa: erro400(erroDoDesenho) };
 
   const dados = await carregar(opId);
   if (!dados) return { recusa: NextResponse.json({ success: false, error: "OP não encontrada" }, { status: 404 }) };
@@ -142,7 +208,7 @@ async function selecionar(corpo) {
   if (modelo === "qws") {
     pecas = juntarCamposExtras(pecas, await camposExtrasDaOP(prisma, dados.op.numero));
   }
-  return { op: dados.op, pecas, modelo };
+  return { op: dados.op, pecas, modelo, tagObra };
 }
 
 /**
@@ -152,7 +218,7 @@ async function selecionar(corpo) {
  * ⚠ Não-fatal de propósito: uma falha ao registrar não pode segurar o PDF que já foi gerado. O
  * pior caso é a coluna dizer "—" para uma etiqueta impressa; imprimir de novo custa um adesivo.
  */
-async function registrarImpressao(user, op, pecas, modelo) {
+async function registrarImpressao(user, { op, pecas, modelo, tagObra }) {
   try {
     await prisma.auditLog.createMany({
       data: pecas.map((p) => ({
@@ -160,7 +226,7 @@ async function registrarImpressao(user, op, pecas, modelo) {
         action: ACAO,
         entity: ENTIDADE,
         entityId: chaveHistorico(op.numero, p.marca),
-        diff: { op: op.numero, marca: p.marca, etiquetas: Math.max(1, p.qte || 1), modelo, por: user?.name || null },
+        diff: { op: op.numero, marca: p.marca, etiquetas: Math.max(1, p.qte || 1), modelo, tagObra, por: user?.name || null },
       })),
     });
   } catch (e) {
@@ -174,7 +240,7 @@ export async function POST(req) {
 
   let corpo;
   try { corpo = await req.json(); } catch { corpo = null; }
-  const { recusa, op, pecas, modelo } = await selecionar(corpo);
+  const { recusa, op, pecas, modelo, tagObra } = await selecionar(corpo);
   if (recusa) return recusa;
 
   const dados = { op };
@@ -197,10 +263,11 @@ export async function POST(req) {
       opNumero: dados.op.numero,
       pecas,
       modelo,
+      tagObra,
     });
     // ⚠ SÓ DEPOIS DE O PDF EXISTIR. Carimbar antes marcaria como impressa uma marca cuja geração
     // falhou — e a tela ficaria dizendo "já saiu" para uma etiqueta que ninguém viu.
-    await registrarImpressao(user, dados.op, pecas, modelo);
+    await registrarImpressao(user, { op: dados.op, pecas, modelo, tagObra });
     registro.info(`OP ${dados.op.numero}: ${pecas.length} marca(s), ${total} etiqueta(s)`);
     return new NextResponse(Buffer.from(pdf), {
       headers: {

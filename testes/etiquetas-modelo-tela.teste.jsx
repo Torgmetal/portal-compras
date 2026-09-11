@@ -14,17 +14,20 @@ const OPS = [
 ];
 const PECAS = [{ id: "p1", marca: "T102A1", descricao: "L2''X1/4''", qte: 1, pesoUnitKg: 13.26, impressaEm: null, impressoes: 0 }];
 
+// A TAG usada na última impressão desta obra — a rota devolve no GET para a tela sugerir.
+let TAG_ANTERIOR = null;
 let chamadas;
 
 const responder = (url) => {
   const u = String(url);
   if (u.includes("campos-extras")) return { success: true, opNumero: "102", total: 77 };
-  if (u.includes("opId=")) return { success: true, op: OPS[0], pecas: PECAS };
+  if (u.includes("opId=")) return { success: true, op: OPS[0], pecas: PECAS, tagObra: TAG_ANTERIOR };
   return { success: true, ops: OPS };
 };
 
 beforeEach(() => {
   chamadas = [];
+  TAG_ANTERIOR = null;
   globalThis.React = React;
   // `imprimir` lê o PDF como blob e abre em aba nova — nada disso existe no jsdom.
   vi.stubGlobal("URL", { ...URL, createObjectURL: () => "blob:x", revokeObjectURL: () => {} });
@@ -102,5 +105,48 @@ describe("seletor de modelo da etiqueta", () => {
     await escolherModelo("qws");
     fireEvent.change(seletores()[0], { target: { value: "op97" } });
     await waitFor(() => expect(seletores()[1].value).toBe("qws"));
+  });
+});
+
+// ⚠⚠ A TAG DA OBRA — Matheus (11/09/2026): "inserir uma TAG manualmente que se repita em todas as
+// etiquetas na frente do nome da OBRA". O que precisa ficar provado aqui é a fiação: o campo só
+// existe no modelo que o usa, o valor chega na rota, e ele NÃO sobrevive à troca de obra.
+describe("TAG da obra", () => {
+  const campoTag = () => screen.getByPlaceholderText(/TPR00870/);
+
+  it("só aparece no modelo padrão — no QWS a célula de cima já é cliente | obra", async () => {
+    await abrirOP();
+    expect(campoTag()).toBeTruthy();
+    await escolherModelo("qws");
+    expect(screen.queryByPlaceholderText(/TPR00870/)).toBeNull();
+  });
+
+  it("o que foi digitado vai junto no pedido de impressão", async () => {
+    await abrirOP();
+    fireEvent.change(campoTag(), { target: { value: "TPR00870" } });
+    fireEvent.click(screen.getByText("T102A1"));
+    fireEvent.click(screen.getByText(/Gerar etiquetas/));
+    await waitFor(() => {
+      const post = chamadas.find((c) => c.init?.method === "POST" && !c.url.includes("campos-extras"));
+      expect(JSON.parse(post.init.body)).toMatchObject({ modelo: "padrao", tagObra: "TPR00870" });
+    });
+  });
+
+  // ⚠⚠ AO CONTRÁRIO DO MODELO, A TAG ZERA AO TROCAR DE OBRA. Ela é um código DAQUELE embarque:
+  // carregada para a obra seguinte, sairia em centenas de adesivos de uma carga que não é dela.
+  it("trocar de obra limpa a TAG", async () => {
+    await abrirOP();
+    fireEvent.change(campoTag(), { target: { value: "TPR00870" } });
+    expect(campoTag().value).toBe("TPR00870");
+    fireEvent.change(seletores()[0], { target: { value: "op97" } });
+    await waitFor(() => expect(campoTag().value).toBe(""));
+  });
+
+  // ⚠ Vem preenchida com a da última impressão DESTA obra: a obra sai em lotes ao longo de dias, e
+  // digitar do zero a cada lote é como um lote sai sem a TAG e vai misturado com os certos.
+  it("vem preenchida com a TAG da última impressão da obra", async () => {
+    TAG_ANTERIOR = "TPR00870";
+    await abrirOP();
+    await waitFor(() => expect(campoTag().value).toBe("TPR00870"));
   });
 });

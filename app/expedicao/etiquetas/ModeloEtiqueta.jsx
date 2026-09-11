@@ -93,7 +93,50 @@ function Planilha({ opId, quantos, recarregar }) {
   );
 }
 
-export default function ModeloEtiqueta({ opId, modelo, setModelo }) {
+/**
+ * A TAG que o cliente pede na frente da OBRA.
+ *
+ * ⚠⚠ SÓ NO MODELO PADRÃO. Matheus (11/09/2026): "preciso que tenha uma opção nas etiquetas padrão
+ * Torg para inserir uma TAG manualmente que se repita em todas as etiquetas na frente do nome da
+ * OBRA". No QWS a célula de cima já é "cliente | obra" e a peça é identificada pela TAG Petrobras.
+ *
+ * ⚠ VEM PREENCHIDA COM A DA ÚLTIMA IMPRESSÃO DESTA OBRA, e isso é o ponto. A obra sai em lotes ao
+ * longo de dias; digitada do zero a cada lote, uma hora um lote sai sem a TAG e vai para o caminhão
+ * misturado com os certos. Ninguém confere 442 adesivos um a um. Preenchida, "lembrar" vira
+ * "conferir" — que é o que dá para fazer com a peça na mão.
+ */
+function TagDaObra({ tagObra, setTagObra, sugestao }) {
+  const { obra, tag: sugerida } = sugestao;
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-100">
+      <label className="block text-[11px] font-bold uppercase tracking-wide text-torg-gray mb-1.5">
+        TAG da obra <span className="font-normal normal-case tracking-normal">(opcional)</span>
+      </label>
+      <input
+        value={tagObra} onChange={(e) => setTagObra(e.target.value)} maxLength={24}
+        placeholder="ex.: TPR00870"
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm uppercase tracking-wide" />
+      <p className="text-[12.5px] text-torg-gray mt-1.5">
+        {/* ⚠ A PRÉVIA USA A OBRA DE VERDADE, não um exemplo. Mostrar "TPR00870 | Torocua" enquanto a
+            obra é "Torocua - Ñacunday" faria a pessoa conferir um texto que não é o que vai sair —
+            que é o oposto do que uma prévia existe para fazer. */}
+        Sai em <b>todas</b> as etiquetas, na frente do nome da obra:{" "}
+        <span className="font-mono text-torg-dark">
+          {[tagObra.trim().toUpperCase(), obra].filter(Boolean).join(" | ") || "\u2014"}
+        </span>.
+        {sugerida && !tagObra && (
+          <>
+            {" "}Na última impressão desta obra foi{" "}
+            <button type="button" onClick={() => setTagObra(sugerida)}
+              className="font-mono text-torg-blue underline underline-offset-2">{sugerida}</button>.
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
+export default function ModeloEtiqueta({ opId, modelo, setModelo, tagObra, setTagObra, sugestao }) {
   const [quantos, setQuantos] = useState(null);
 
   const contar = useCallback(async () => {
@@ -121,6 +164,7 @@ export default function ModeloEtiqueta({ opId, modelo, setModelo }) {
       </select>
       <p className="text-[12.5px] text-torg-gray mt-1.5">{atual.ajuda}</p>
       {modelo === "qws" && <Planilha opId={opId} quantos={quantos} recarregar={contar} />}
+      {modelo === "padrao" && <TagDaObra tagObra={tagObra} setTagObra={setTagObra} sugestao={sugestao} />}
     </div>
   );
 }

@@ -370,6 +370,32 @@ já saiu.
 limitação do BarTender, que importava a planilha com o campo de largura fixa — aqui o número vem
 do banco a cada etiqueta e a largura se ajusta sozinha.
 
+### TAG da obra (modelo padrão)
+
+Um campo **TAG da obra** na tela, só no modelo `padrao`, sai impresso **em todas** as etiquetas
+daquele lote, na frente do nome da obra: `OBRA: TPR00870 | Torocua - Ñacunday`. Matheus
+(11/09/2026): *"na OP 103 preciso colocar a tag TPR00870 na frente de todas as etiquetas"*.
+
+⚠ **É código do CLIENTE para aquele embarque, não do cadastro.** Não existe campo de TAG na OP e
+não deve existir: obrigaria a engenharia a preenchê-lo em toda obra que não usa. Ela é digitada na
+impressão e gravada no `AuditLog` junto com o resto do carimbo.
+
+⚠⚠ **VEM PREENCHIDA COM A DA ÚLTIMA IMPRESSÃO DAQUELA OBRA** (`ultimaTagDaObra`, lida do próprio
+`AuditLog` — sem tabela nova). A obra sai em lotes ao longo de dias; digitada do zero a cada lote,
+uma hora um lote sai sem a TAG e vai para o caminhão misturado com os certos, e ninguém confere 442
+adesivos um a um. É **sugestão, não trava**: dá para apagar ou trocar.
+
+⚠ **Zera ao trocar de obra** — ao contrário do modelo, que é mantido. A TAG é daquele embarque;
+carregada para a obra seguinte sairia em centenas de adesivos de uma carga que não é dela.
+
+⚠ **Separador ` | `, não hífen** — mesma lição da TAG/DESCRIÇÃO do QWS: hífen funde dois códigos de
+origens diferentes num terceiro que não existe.
+
+⚠ **CLIENTE e OBRA passaram a ser `encaixar` em vez de `p.campo`.** O valor era escrito CRU: obra
+comprida já corria por cima da coluna do QR e ninguém tinha notado, porque as obras testadas eram
+curtas. Com a TAG na frente isso deixa de ser sorte. Corte com reticência é visível; texto
+invadindo a célula vizinha é silencioso.
+
 ### Modelo de etiqueta por cliente (QWS/Petrobras)
 
 Um seletor **Modelo da etiqueta** na tela escolhe entre `padrao` e `qws` (`MODELOS` em

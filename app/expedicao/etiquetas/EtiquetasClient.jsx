@@ -4,6 +4,7 @@ import { AlertCircle, Check, Loader2, Printer, Search, Tag } from "lucide-react"
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import { lerJson } from "@/lib/ler-json";
 import ModeloEtiqueta from "./ModeloEtiqueta";
+import AvisoImpressao from "./AvisoImpressao";
 
 // ETIQUETAS DE CARREGAMENTO — a aba que substitui o BarTender.
 //
@@ -177,6 +178,14 @@ function useOps(setErro) {
   return { ops, carregandoOps };
 }
 
+/**
+ * O que a TAG da obra precisa saber do que veio do servidor.
+ *
+ * ⚠ Fora do componente de propósito: são três encadeamentos opcionais que, inline no JSX, empurram
+ * o `EtiquetasClient` para fora do teto de complexidade. Aqui eles são uma função com um nome.
+ */
+const daObra = (dados) => ({ obra: dados?.op?.obra || "", tag: dados?.tagObra || "" });
+
 export default function EtiquetasClient() {
   const [opId, setOpId] = useState("");
   const [dados, setDados] = useState(null);
@@ -188,6 +197,10 @@ export default function EtiquetasClient() {
   // ⚠ O modelo NÃO volta ao padrão ao trocar de obra: quem imprime para um cliente costuma
   // imprimir várias OPs dele seguidas, e voltar sozinho faria a etiqueta errada sair sem aviso.
   const [modelo, setModelo] = useState("padrao");
+  // ⚠ A TAG ZERA AO TROCAR DE OBRA, ao contrário do modelo. Ela é um código DAQUELE embarque: manter
+  // a de outra obra na tela seria carregar, em centenas de adesivos, um código que não é daquela
+  // carga. O `abrirOp` repõe a da última impressão da obra nova, se houver.
+  const [tagObra, setTagObra] = useState("");
   const { ops, carregandoOps } = useOps(setErro);
 
   const buscarPecas = useCallback(async (id) => lerJson(
@@ -195,10 +208,16 @@ export default function EtiquetasClient() {
     "Peças da OP"), []);
 
   const abrirOp = useCallback(async (id) => {
-    setOpId(id); setDados(null); setSel(new Set()); setBusca(""); setErro("");
+    setOpId(id); setDados(null); setSel(new Set()); setBusca(""); setErro(""); setTagObra("");
     if (!id) return;
     setCarregando(true);
-    try { setDados(await buscarPecas(id)); }
+    try {
+      const j = await buscarPecas(id);
+      setDados(j);
+      // Vem preenchida com a da última impressão desta obra — ver `ultimaTagDaObra` na rota. Sem
+      // condição: obra que nunca foi impressa devolve vazio, que é exatamente o que deve aparecer.
+      setTagObra(daObra(j).tag);
+    }
     catch (e) { setErro(e.message); } finally { setCarregando(false); }
   }, [buscarPecas]);
 
@@ -226,7 +245,7 @@ export default function EtiquetasClient() {
     try {
       const r = await fetch("/api/expedicao/etiquetas", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opId, marcas: [...sel], modelo }),
+        body: JSON.stringify({ opId, marcas: [...sel], modelo, tagObra }),
       });
       if (!r.ok) {
         const bruto = await r.text().catch(() => "");
@@ -258,32 +277,7 @@ export default function EtiquetasClient() {
           </p>
         </div>
       </div>
-
-      <div className="bg-torg-blue-50/60 border border-torg-blue-100 rounded-xl px-4 py-3 text-[12.5px] text-torg-dark mb-5 mt-4">
-        <b>Antes de imprimir</b>, no diálogo do navegador: impressora <b>Argox OS-214 plus</b>,
-        <b> Tamanho do papel: USER</b>, <b>Escala: Padrão</b> (nunca &quot;ajustar à área de
-        impressão&quot;) e margens <b>nenhuma</b>. A página do PDF já tem o tamanho exato da etiqueta.
-        <br />
-        {/* ⚠⚠ A LISTA DE PAPEL DO DRIVER ESTÁ EM POLEGADAS, E É POR ISSO QUE NADA CASA. Matheus,
-            10/09/2026: a etiqueta saiu deitada e esticada por três etiquetas do rolo. O diálogo
-            estava em "4 x 6" — que são 4 × 6 POLEGADAS (101,6 × 152,4 mm, em pé). A nossa etiqueta
-            de 100 × 50 mm são 3,94 × 1,97 pol, ou seja "4 x 2", e ESSE TAMANHO NÃO EXISTE na lista
-            do driver (2x1, 2x4, 2.25x1.25, 2.50x0.50, 4x1, 4x3, 4x4, 4x5, 4x6). Sobra o USER, que
-            precisa ser definido uma vez nas preferências da impressora.
-
-            ⚠ Um aviso anterior mandava procurar "100 × 50 mm" na lista. Nunca ia aparecer — a lista
-            é em polegadas e não tem tamanho equivalente. Instrução que manda procurar o que não
-            existe é pior que instrução nenhuma: faz quem está imprimindo achar que errou. */}
-        <span className="block mt-1.5 text-torg-gray">
-          <b>Saiu deitada, ocupando várias etiquetas?</b> Não é o PDF — é o tamanho do papel. A lista
-          do driver está em <b>polegadas</b>: &quot;4 x 6&quot; são 4 × 6 pol (101,6 × 152,4 mm, em
-          pé), e o navegador gira a etiqueta deitada para caber nesse papel. Os 100 × 50 mm da
-          etiqueta equivalem a <b>4 × 2 pol</b>, que <b>não existe na lista</b> — por isso se usa o
-          <b> USER</b>. Defina-o uma vez em <i>Painel de Controle → Dispositivos e Impressoras →
-          Argox → Preferências de impressão</i> como <b>100 mm de largura × 50 mm de altura</b>,
-          depois <b>recarregue esta página</b> (o diálogo só lê a lista ao abrir).
-        </span>
-      </div>
+      <AvisoImpressao />
 
       {erro && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-5 flex items-start gap-2 text-red-700">
@@ -314,7 +308,9 @@ export default function EtiquetasClient() {
         )}
       </div>
 
-      {opId && <ModeloEtiqueta opId={opId} modelo={modelo} setModelo={setModelo} />}
+      {opId && <ModeloEtiqueta opId={opId} modelo={modelo} setModelo={setModelo}
+                               tagObra={tagObra} setTagObra={setTagObra}
+                               sugestao={daObra(dados)} />}
 
       {carregando && (
         <div className="flex items-center justify-center py-16 gap-3 text-torg-gray">

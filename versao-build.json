@@ -1,156 +1,156 @@
 {
-  "build": 3072,
-  "gerado": "2026-09-11T11:09:09.706Z",
+  "build": 3073,
+  "gerado": "2026-09-11T11:34:27.088Z",
   "commits": [
     {
-      "hash": "c5ae2941",
+      "hash": "f02c3b7553",
+      "data": "11/09/2026",
+      "titulo": "fix(indicadores): aceitar planos detalhados e identificar erros de validação"
+    },
+    {
+      "hash": "c5ae294182",
       "data": "10/09/2026",
       "titulo": "Engenharia: Análise Crítica de Projeto (PO-13) na aba Engenharia da OP"
     },
     {
-      "hash": "4367ace4",
+      "hash": "4367ace42f",
       "data": "10/09/2026",
       "titulo": "fix: atualiza telefone de Diego Dias no portal do cliente"
     },
     {
-      "hash": "7ff2cdd8",
+      "hash": "7ff2cdd84a",
       "data": "10/09/2026",
       "titulo": "CLAUDE.md: como imprimir na Argox de verdade (a lista do driver e em polegadas)"
     },
     {
-      "hash": "2cdc94f5",
+      "hash": "2cdc94f5f8",
       "data": "10/09/2026",
       "titulo": "Etiqueta QWS: centraliza os titulos de QTDE, PESO e TAG, e o nome do cliente"
     },
     {
-      "hash": "121332f7",
+      "hash": "121332f766",
       "data": "10/09/2026",
       "titulo": "Etiqueta QWS: TAG PETROBRAS, QTDE e PESO centrados na celula"
     },
     {
-      "hash": "1964d514",
+      "hash": "1964d51409",
       "data": "10/09/2026",
       "titulo": "Etiqueta: a lista de papel do driver esta em POLEGADAS - corrige a instrucao"
     },
     {
-      "hash": "09cd709b",
+      "hash": "09cd709b17",
       "data": "10/09/2026",
       "titulo": "Etiqueta: PDF pede impressao sem ajuste, e a tela diz qual e o papel"
     },
     {
-      "hash": "0639fcbf",
+      "hash": "0639fcbf48",
       "data": "10/09/2026",
       "titulo": "fix: preservar referências externas de romaneio na reimportação da LE"
     },
     {
-      "hash": "d6ff811f",
+      "hash": "d6ff811f47",
       "data": "10/09/2026",
       "titulo": "Etiqueta QWS: centraliza o numero da O.P. e a marca sob o QR"
     },
     {
-      "hash": "72d2b371",
+      "hash": "72d2b3716d",
       "data": "10/09/2026",
       "titulo": "Etiquetas: modelo do cliente QWS/Petrobras, com uma TAG por unidade"
     },
     {
-      "hash": "1a921bbb",
+      "hash": "1a921bbb25",
       "data": "10/09/2026",
       "titulo": "Listas: botão para tentar salvar no servidor de novo quando o salvamento automático falha"
     },
     {
-      "hash": "665cefa6",
+      "hash": "665cefa6cd",
       "data": "10/09/2026",
       "titulo": "fix(pcp): reconhecer croquis pelo vínculo com seus conjuntos"
     },
     {
-      "hash": "96a857ab",
+      "hash": "96a857ab83",
       "data": "10/09/2026",
       "titulo": "fix(pcp): imprimir fila sem bancada e excluir croquis posteriores ao corte"
     },
     {
-      "hash": "279f4860",
+      "hash": "279f4860ac",
       "data": "10/09/2026",
       "titulo": "fix(pcp): distribuir quantidades de marcas entre dias e bancadas"
     },
     {
-      "hash": "8fa0993d",
+      "hash": "8fa0993d66",
       "data": "09/09/2026",
       "titulo": "fix: alinhar fila do Gantt ao bloqueio de terceiros"
     },
     {
-      "hash": "53b000af",
+      "hash": "53b000afb1",
       "data": "09/09/2026",
       "titulo": "Amplia o Gantt e mantém navegação e salvamento acessíveis"
     },
     {
-      "hash": "513bd47a",
+      "hash": "513bd47a34",
       "data": "09/09/2026",
       "titulo": "Permite programar fabricação aos sábados pelo Gantt"
     },
     {
-      "hash": "04eb38a6",
+      "hash": "04eb38a6cf",
       "data": "09/09/2026",
       "titulo": "PCP: Baixa em Lote — um clique fecha um setor inteiro de uma OP"
     },
     {
-      "hash": "cfe8eadd",
+      "hash": "cfe8eadd1e",
       "data": "09/09/2026",
       "titulo": "Produção: peça expedida dá baixa na rota inteira"
     },
     {
-      "hash": "88ca2b72",
+      "hash": "88ca2b7258",
       "data": "09/09/2026",
       "titulo": "Gantt: da solda em diante a fila aparece sem esperar liberação"
     },
     {
-      "hash": "fd38991b",
+      "hash": "fd38991bc8",
       "data": "09/09/2026",
       "titulo": "Montagem: os quatro nomes das bancadas estavam trocados"
     },
     {
-      "hash": "c91ef1b0",
+      "hash": "c91ef1b043",
       "data": "09/09/2026",
       "titulo": "Produção: apontamento na frente dá baixa nos setores anteriores"
     },
     {
-      "hash": "0bfeced9",
+      "hash": "0bfeced9e7",
       "data": "09/09/2026",
       "titulo": "Encaminha marcas avulsas do corte diretamente ao jato"
     },
     {
-      "hash": "81b92be3",
+      "hash": "81b92be350",
       "data": "09/09/2026",
       "titulo": "Corrige persistência e atualização do Gantt em todos os setores"
     },
     {
-      "hash": "03e3fc62",
+      "hash": "03e3fc620a",
       "data": "09/09/2026",
       "titulo": "Gantt: a raia do jato deixa de virar uma página em branco"
     },
     {
-      "hash": "9b38a021",
+      "hash": "9b38a0213d",
       "data": "09/09/2026",
       "titulo": "Remessa Terceiro: vincula o Projeto no Omie automaticamente"
     },
     {
-      "hash": "3ec99dcb",
+      "hash": "3ec99dcb54",
       "data": "09/09/2026",
       "titulo": "Remessa Terceiro: campo pra informar o valor por kg (faltava na tela)"
     },
     {
-      "hash": "d11b5150",
+      "hash": "d11b51500e",
       "data": "09/09/2026",
       "titulo": "PCP: peça no terceiro sai do aviso de liberações"
     },
     {
-      "hash": "4c0388fa",
+      "hash": "4c0388fae4",
       "data": "09/09/2026",
       "titulo": "fix(pcp): incluir todos os conjuntos na pre-programacao sem bancada"
-    },
-    {
-      "hash": "caa85be6",
-      "data": "09/09/2026",
-      "titulo": "Solda: a bancada passa a ter nome de soldador"
     }
   ]
 }

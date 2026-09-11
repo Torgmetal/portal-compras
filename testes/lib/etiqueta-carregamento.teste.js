@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { PDFDocument, StandardFonts } from "pdf-lib";
+import zlib from "zlib";
 import { gerarEtiquetasCarregamentoPDF, ajustarTexto, numeroDaEtiqueta, contagemDaEtiqueta, GRADE, MM } from "@/lib/etiqueta-carregamento-pdf";
 
 // ⚠ POR QUE ESTE TESTE EXISTE, E NÃO UMA OLHADA NA TELA.
@@ -10,6 +11,32 @@ import { gerarEtiquetasCarregamentoPDF, ajustarTexto, numeroDaEtiqueta, contagem
 // (a marca sob o QR, essa sim sem ajuste nenhum) não aparecia no olho.
 //
 // Pixel não prova geometria. Aqui a pergunta é numérica: o texto termina antes da moldura?
+
+/**
+ * O texto desenhado no PDF — para conferir CONTEÚDO, não só geometria.
+ *
+ * ⚠ Os fluxos saem COMPRIMIDOS (FlateDecode) e o pdf-lib escreve o texto como string HEXADECIMAL
+ * (`<4142…> Tj`), não entre parênteses. Procurar nos bytes crus, ou por `(texto) Tj`, devolve vazio
+ * — e o teste passaria dizendo nada. Mesma função do teste do modelo QWS.
+ */
+function textoDoPdf(bytes) {
+  const bruto = Buffer.from(bytes);
+  const partes = [];
+  let i = 0;
+  while ((i = bruto.indexOf("stream", i)) !== -1) {
+    let ini = i + 6;
+    if (bruto[ini] === 0x0d) ini++;
+    if (bruto[ini] === 0x0a) ini++;
+    const fim = bruto.indexOf("endstream", ini);
+    if (fim === -1) break;
+    try { partes.push(zlib.inflateSync(bruto.subarray(ini, fim)).toString("latin1")); }
+    catch { /* fluxo que não é Flate (QR, fonte) */ }
+    i = fim + 9;
+  }
+  return (partes.join("").match(/<([0-9A-Fa-f]+)>\s*Tj/g) || [])
+    .map((m) => Buffer.from(m.replace(/[^0-9A-Fa-f]/g, ""), "hex").toString("latin1"))
+    .join("");
+}
 
 async function fontes() {
   const pdf = await PDFDocument.create();
@@ -150,5 +177,59 @@ describe("gerarEtiquetasCarregamentoPDF", () => {
       pecas: [{ marca: "T90C1", descricao: "Treliça de cobertura", qte: 1, pesoUnitKg: null }],
     });
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+  });
+});
+
+// ⚠⚠ A TAG DA OBRA — Matheus (11/09/2026): "inserir uma TAG manualmente que se repita em TODAS as
+// etiquetas na frente do nome da OBRA, exemplo na OP 103 preciso colocar a tag TPR00870".
+//
+// "Em todas" é o requisito, e é o que mais fácil quebraria numa refatoração: bastaria a tag ser
+// lida uma vez fora do laço das peças para sair só na primeira.
+describe("TAG da obra no modelo padrão", () => {
+  const base = { cliente: "TMSA", obra: "Torocua", opNumero: "103" };
+
+  it("sai na frente do nome da obra, separada por | e não por hífen", async () => {
+    const bytes = await gerarEtiquetasCarregamentoPDF({
+      ...base, tagObra: "TPR00870", pecas: [{ marca: "M1", qte: 1 }],
+    });
+    const texto = textoDoPdf(bytes);
+    expect(texto).toContain("TPR00870 | Torocua");
+    expect(texto).not.toContain("TPR00870-Torocua");
+  });
+
+  it("repete em TODAS as etiquetas, não só na primeira", async () => {
+    const bytes = await gerarEtiquetasCarregamentoPDF({
+      ...base, tagObra: "TPR00870", pecas: [{ marca: "M1", qte: 3 }, { marca: "M2", qte: 2 }],
+    });
+    const pdf = await PDFDocument.load(bytes);
+    expect(pdf.getPageCount()).toBe(5);
+    const texto = textoDoPdf(bytes);
+    expect(texto.split("TPR00870").length - 1).toBe(5);
+  });
+
+  it("sem TAG a obra sai sozinha, sem separador solto", async () => {
+    const texto = textoDoPdf(await gerarEtiquetasCarregamentoPDF({ ...base, pecas: [{ marca: "M1", qte: 1 }] }));
+    expect(texto).toContain("Torocua");
+    expect(texto).not.toContain("| Torocua");
+  });
+
+  // ⚠ O QWS IGNORA A TAG. A célula de cima dele já é "cliente | obra" e a peça é identificada pela
+  // TAG Petrobras — mais um código ali brigaria por espaço com o que o cliente confere.
+  it("o modelo QWS não recebe a TAG mesmo se ela vier", async () => {
+    const texto = textoDoPdf(await gerarEtiquetasCarregamentoPDF({
+      ...base, modelo: "qws", tagObra: "TPR00870", pecas: [{ marca: "M1", qte: 1 }],
+    }));
+    expect(texto).not.toContain("TPR00870");
+  });
+
+  // ⚠⚠ ESTE É O TESTE QUE JUSTIFICA TER TROCADO `p.campo` POR `encaixar` NA OBRA. Antes o valor era
+  // escrito CRU: obra comprida já corria por cima da coluna do QR, e a TAG na frente garante isso.
+  // O corte com reticência é feio e visível; texto invadindo a célula vizinha é feio e silencioso.
+  it("obra comprida COM tag é encaixada em vez de vazar a célula", async () => {
+    const { bold } = await fontes();
+    const longa = "TPR00870 | TMSA — Torocua - Ñacunday - Bloco Norte";
+    const r = ajustarTexto(longa, bold, { xIni: 4.5, xFim: GRADE.colDir - 1.5, tamMax: 8 });
+    expect(r.xFim).toBeLessThanOrEqual(GRADE.colDir - 1.5);
+    expect(r.tam).toBeLessThan(8);
   });
 });
