@@ -1,156 +1,156 @@
 {
-  "build": 3091,
-  "gerado": "2026-09-11T16:52:17.253Z",
+  "build": 3092,
+  "gerado": "2026-09-11T17:10:46.961Z",
   "commits": [
     {
-      "hash": "9ecd5e0342",
+      "hash": "c299e59f",
+      "data": "11/09/2026",
+      "titulo": "Cotação: \"não tenho\" ganha do preço, e o texto livre para de passar batido"
+    },
+    {
+      "hash": "9ecd5e03",
       "data": "11/09/2026",
       "titulo": "Ajusta quantidades no celular e corrige ciclo das inspeções e assinaturas"
     },
     {
-      "hash": "f22d0a334c",
+      "hash": "f22d0a33",
       "data": "11/09/2026",
       "titulo": "Portal do fornecedor: página em branco por data escrita em dois fusos"
     },
     {
-      "hash": "68e52f85e3",
+      "hash": "68e52f85",
       "data": "11/09/2026",
       "titulo": "Preenche quantidades de inspeção a partir das listas da OP"
     },
     {
-      "hash": "092504ff15",
+      "hash": "092504ff",
       "data": "11/09/2026",
       "titulo": "Permite editar quantidades por peça nos relatórios de inspeção"
     },
     {
-      "hash": "66071c39c6",
+      "hash": "66071c39",
       "data": "11/09/2026",
       "titulo": "Inspeções: abrir revisão de relatório assinado e editar as peças informadas"
     },
     {
-      "hash": "1495b70632",
+      "hash": "1495b706",
       "data": "11/09/2026",
       "titulo": "CMR: editar a linha lançada, lançar sem esperar a planilha, e escolher o item repetido"
     },
     {
-      "hash": "d1823d0b5e",
+      "hash": "d1823d0b",
       "data": "11/09/2026",
       "titulo": "Etiqueta: os corpos e os traços da do BarTender, que é a que se lê"
     },
     {
-      "hash": "5ab6e30fa6",
+      "hash": "5ab6e30f",
       "data": "11/09/2026",
       "titulo": "Etiqueta: endereco da Torg no maior corpo que cabe, em vez de 3,5 pt borrado"
     },
     {
-      "hash": "d8da9a5b37",
+      "hash": "d8da9a5b",
       "data": "11/09/2026",
       "titulo": "Indicadores Engenharia: detalhe da aderência ao prazo voltava erro"
     },
     {
-      "hash": "f02a6159f5",
+      "hash": "f02a6159",
       "data": "11/09/2026",
       "titulo": "feat(op): exibir endereços do cliente e da entrega na aba Obra"
     },
     {
-      "hash": "7c49e19bbc",
+      "hash": "7c49e19b",
       "data": "11/09/2026",
       "titulo": "fix(op): remover orçamento comercial da aba Obra para todos"
     },
     {
-      "hash": "0a6542fb30",
+      "hash": "0a6542fb",
       "data": "11/09/2026",
       "titulo": "fix(listas): incluir marcas compartilhadas e reconhecer LE formatada"
     },
     {
-      "hash": "fd206ca635",
+      "hash": "fd206ca6",
       "data": "11/09/2026",
       "titulo": "Análise crítica: responsável (Eng.º de Projeto) editável no registro"
     },
     {
-      "hash": "0d7aea88f5",
+      "hash": "0d7aea88",
       "data": "11/09/2026",
       "titulo": "Etiqueta: uma etiqueta para a caixa, na coluna \"Imprimir\" da lista"
     },
     {
-      "hash": "5295a759c6",
+      "hash": "5295a759",
       "data": "11/09/2026",
       "titulo": "Etiqueta padrao: texto longe da borda esquerda, e o download volta a funcionar"
     },
     {
-      "hash": "7aa5f661fa",
+      "hash": "7aa5f661",
       "data": "11/09/2026",
       "titulo": "Etiqueta: calibragem da impressora, para a etiqueta parar de sair cortada"
     },
     {
-      "hash": "ee53dff772",
+      "hash": "ee53dff7",
       "data": "11/09/2026",
       "titulo": "fix: restringir dados da obra e liberar PDF dos indicadores ao RH"
     },
     {
-      "hash": "1c9e1c81a3",
+      "hash": "1c9e1c81",
       "data": "11/09/2026",
       "titulo": "Etiqueta padrao: TAG da obra, digitada na tela e repetida em todas"
     },
     {
-      "hash": "f02c3b7553",
+      "hash": "f02c3b75",
       "data": "11/09/2026",
       "titulo": "fix(indicadores): aceitar planos detalhados e identificar erros de validação"
     },
     {
-      "hash": "c5ae294182",
+      "hash": "c5ae2941",
       "data": "10/09/2026",
       "titulo": "Engenharia: Análise Crítica de Projeto (PO-13) na aba Engenharia da OP"
     },
     {
-      "hash": "4367ace42f",
+      "hash": "4367ace4",
       "data": "10/09/2026",
       "titulo": "fix: atualiza telefone de Diego Dias no portal do cliente"
     },
     {
-      "hash": "7ff2cdd84a",
+      "hash": "7ff2cdd8",
       "data": "10/09/2026",
       "titulo": "CLAUDE.md: como imprimir na Argox de verdade (a lista do driver e em polegadas)"
     },
     {
-      "hash": "2cdc94f5f8",
+      "hash": "2cdc94f5",
       "data": "10/09/2026",
       "titulo": "Etiqueta QWS: centraliza os titulos de QTDE, PESO e TAG, e o nome do cliente"
     },
     {
-      "hash": "121332f766",
+      "hash": "121332f7",
       "data": "10/09/2026",
       "titulo": "Etiqueta QWS: TAG PETROBRAS, QTDE e PESO centrados na celula"
     },
     {
-      "hash": "1964d51409",
+      "hash": "1964d514",
       "data": "10/09/2026",
       "titulo": "Etiqueta: a lista de papel do driver esta em POLEGADAS - corrige a instrucao"
     },
     {
-      "hash": "09cd709b17",
+      "hash": "09cd709b",
       "data": "10/09/2026",
       "titulo": "Etiqueta: PDF pede impressao sem ajuste, e a tela diz qual e o papel"
     },
     {
-      "hash": "0639fcbf48",
+      "hash": "0639fcbf",
       "data": "10/09/2026",
       "titulo": "fix: preservar referências externas de romaneio na reimportação da LE"
     },
     {
-      "hash": "d6ff811f47",
+      "hash": "d6ff811f",
       "data": "10/09/2026",
       "titulo": "Etiqueta QWS: centraliza o numero da O.P. e a marca sob o QR"
     },
     {
-      "hash": "72d2b3716d",
+      "hash": "72d2b371",
       "data": "10/09/2026",
       "titulo": "Etiquetas: modelo do cliente QWS/Petrobras, com uma TAG por unidade"
-    },
-    {
-      "hash": "1a921bbb25",
-      "data": "10/09/2026",
-      "titulo": "Listas: botão para tentar salvar no servidor de novo quando o salvamento automático falha"
     }
   ]
 }

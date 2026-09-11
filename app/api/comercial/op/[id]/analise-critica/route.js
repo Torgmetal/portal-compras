@@ -2,11 +2,11 @@
 // Análise Crítica de Projeto (PO-13) — um registro por OP, na aba Engenharia.
 // GET devolve o registro (ou o esqueleto inicial, sem gravar) + as verificações que o portal
 // faz sozinho a partir dos itens da OP e das listas. PUT grava os blocos; `acao` = "salvar" |
-// "verificada" | "nova-revisao" | "aprovar" (só Diretoria).
+// "verificada" | "nova-revisao" | "aprovar" (responsáveis autorizados).
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole, requireUser } from "@/lib/session";
-import { temAcessoDiretoria } from "@/lib/diretoria";
+import { podeAprovarAnaliseCritica } from "@/lib/analise-critica-acesso";
 import { registroInicial, registroSchema, verificacoesAutomaticas, resumo } from "@/lib/analise-critica";
 
 export const runtime = "nodejs";
@@ -34,7 +34,7 @@ export async function GET(_req, { params }) {
   const reg = registro || { ...registroInicial(), opId: op.id, opNumero: op.numero, revisao: 0, status: "EM_ANALISE", historico: [], novo: true };
   return NextResponse.json({
     success: true, registro: reg, verificacoes: verificacoesAutomaticas({ itens: op.itens, pecas }), resumo: resumo(reg),
-    podeEditar: podeEditar(user), podeAprovar: await temAcessoDiretoria(user.email),
+    podeEditar: podeEditar(user), podeAprovar: await podeAprovarAnaliseCritica(user.email),
   });
 }
 
@@ -51,7 +51,7 @@ export async function PUT(req, { params }) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || "Dados inválidos" }, { status: 400 });
   const dados = parsed.data;
 
-  if (acao === "aprovar" && !(await temAcessoDiretoria(user.email))) return NextResponse.json({ error: "Só a Diretoria aprova a análise crítica." }, { status: 403 });
+  if (acao === "aprovar" && !(await podeAprovarAnaliseCritica(user.email))) return NextResponse.json({ error: "Somente os responsáveis autorizados podem aprovar a análise crítica." }, { status: 403 });
 
   const atual = await prisma.analiseCriticaProjeto.findUnique({ where: { opId: op.id } });
   const blocos = Object.fromEntries(BLOCOS.map((b) => [b, dados[b]]));
@@ -75,5 +75,5 @@ export async function PUT(req, { params }) {
       diff: { opNumero: op.numero, revisao: registro.revisao, status: registro.status, linhas: Object.fromEntries(BLOCOS.map((b) => [b, (dados[b] || []).length])) } },
   }).catch(() => {});
   const pecas = await carregarPecas(op.id);
-  return NextResponse.json({ success: true, registro, verificacoes: verificacoesAutomaticas({ itens: op.itens, pecas }), resumo: resumo(registro), podeEditar: true, podeAprovar: await temAcessoDiretoria(user.email) });
+  return NextResponse.json({ success: true, registro, verificacoes: verificacoesAutomaticas({ itens: op.itens, pecas }), resumo: resumo(registro), podeEditar: true, podeAprovar: await podeAprovarAnaliseCritica(user.email) });
 }

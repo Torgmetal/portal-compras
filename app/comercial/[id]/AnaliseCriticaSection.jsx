@@ -64,7 +64,7 @@ const SitSelect = ({ valor, opcoes, onChange, podeEditar }) => {
   return <select value={valor || ""} onChange={(e) => onChange(e.target.value)} className={`text-[10px] px-2 py-0.5 rounded-full font-medium border-0 ${s.cls}`}>{Object.entries(opcoes).map(([v, o]) => <option key={v} value={v}>{o.label}</option>)}</select>;
 };
 
-export default function AnaliseCriticaSection({ opId, isDiretoria = false }) {
+export default function AnaliseCriticaSection({ opId }) {
   const { showToast } = useStore();
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState(null);
@@ -216,7 +216,7 @@ export default function AnaliseCriticaSection({ opId, isDiretoria = false }) {
         <span className="inline-flex items-center gap-1.5"><ShieldCheck size={13} /> {codigo}{reg.abertoEm ? ` · aberto em ${new Date(reg.abertoEm).toLocaleDateString("pt-BR")}` : ""}{reg.aprovadoPorNome ? ` · aprovado por ${reg.aprovadoPorNome} em ${new Date(reg.aprovadoEm).toLocaleDateString("pt-BR")}` : " · aprovação do Diretor Técnico pendente"}{Array.isArray(reg.historico) && reg.historico.length ? ` · ${reg.historico.length} revisão(ões) no histórico` : ""}</span>
         <span className="inline-flex items-center gap-2 flex-wrap">{reg.sharepointPath ? <span>Salvo em <span className="font-mono">{reg.sharepointPath.split("/").slice(-3).join("/")}</span></span> : <span>FORM 08 Rev.02 · retenção 2 anos (PO-13 §7)</span>}
           {podeEditar && !reg.novo && reg.status === "EM_ANALISE" && <button disabled={salvando || sujo} onClick={() => enviar("verificada")} className="text-torg-blue font-medium disabled:opacity-50">Marcar como verificada</button>}
-          {isDiretoria && dados.podeAprovar && !reg.novo && reg.status !== "APROVADA" && <button disabled={salvando || sujo} onClick={() => { if (window.confirm("Aprovar esta revisão da análise crítica?")) enviar("aprovar"); }} className="text-emerald-700 font-semibold disabled:opacity-50">Aprovar (Diretoria)</button>}</span>
+          {dados.podeAprovar && !reg.novo && reg.status !== "APROVADA" && <button disabled={salvando || sujo} onClick={() => { if (window.confirm("Aprovar esta revisão da análise crítica?")) enviar("aprovar"); }} className="text-emerald-700 font-semibold disabled:opacity-50">Aprovar análise</button>}</span>
       </div>
       </>)}
 
