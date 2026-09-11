@@ -3,7 +3,7 @@ import { PDFDocument, StandardFonts } from "pdf-lib";
 import zlib from "zlib";
 import { emMilimetros, LIMITE_MM } from "@/lib/etiqueta-calibragem";
 import { desenharEndereco } from "@/lib/etiqueta-pdf-base";
-import { gerarEtiquetasCarregamentoPDF, ajustarTexto, numeroDaEtiqueta, contagemDaEtiqueta, transformeDaCalibragem, GRADE, MM } from "@/lib/etiqueta-carregamento-pdf";
+import { gerarEtiquetasCarregamentoPDF, ajustarTexto, numeroDaEtiqueta, contagemDaEtiqueta, transformeDaCalibragem, BASES, CORPOS, GRADE, MM } from "@/lib/etiqueta-carregamento-pdf";
 
 // ⚠ POR QUE ESTE TESTE EXISTE, E NÃO UMA OLHADA NA TELA.
 //
@@ -42,7 +42,10 @@ function textoDoPdf(bytes) {
 
 async function fontes() {
   const pdf = await PDFDocument.create();
-  return { bold: await pdf.embedFont(StandardFonts.HelveticaBold) };
+  return {
+    font: await pdf.embedFont(StandardFonts.Helvetica),
+    bold: await pdf.embedFont(StandardFonts.HelveticaBold),
+  };
 }
 
 const MARCA_LONGA = "T89-CONJUNTO-LONGO-999-XYZ";
@@ -351,16 +354,25 @@ describe("marca fechada numa caixa", () => {
 //
 // O que precisa ficar provado: o corpo CRESCE até o limite do espaço, e nunca passa por cima do logo.
 describe("endereço da Torg no cabeçalho", () => {
-  /** Um pincel de mentira: só mede e anota onde cada linha foi desenhada. */
+  /** Um pincel de mentira: só mede e anota onde cada linha foi desenhada, e com qual fonte. */
   const pincelFalso = async () => {
-    const { bold } = await fontes();
+    const { font, bold } = await fontes();
     const escritas = [];
     return {
-      escritas,
-      larg: (s, tam) => bold.widthOfTextAtSize(String(s), tam) / MM,
-      txt: (s, mmX, mmY, tam) => escritas.push({ s, mmX, mmY, tam }),
+      escritas, font, bold,
+      larg: (s, tam, f = font) => f.widthOfTextAtSize(String(s), tam) / MM,
+      txt: (s, mmX, mmY, tam) => escritas.push({ s, mmX, mmY, tam, f: "normal" }),
+      negrito: (s, mmX, mmY, tam) => escritas.push({ s, mmX, mmY, tam, f: "negrito" }),
     };
   };
+
+  // ⚠⚠ O NEGRITO IMPORTA MAIS QUE O CORPO. Era o único texto fino da etiqueta: na transferência
+  // térmica a haste de uma Helvetica normal a 5 pt não fecha, e sai a letra esburacada da foto.
+  it("sai em negrito, como todo o resto da etiqueta", async () => {
+    const p = await pincelFalso();
+    desenharEndereco(p, { xMin: 42, xFim: 73, yIni: 4.6, entreLinhas: 3.5 });
+    for (const e of p.escritas) expect(e.f).toBe("negrito");
+  });
 
   it("cresce bem acima dos 3,5 pt que borravam", async () => {
     const p = await pincelFalso();
@@ -382,7 +394,7 @@ describe("endereço da Torg no cabeçalho", () => {
     const p = await pincelFalso();
     const xFim = 73;
     desenharEndereco(p, { xMin: 42, xFim, yIni: 4.6, entreLinhas: 3.5 });
-    for (const e of p.escritas) expect(e.mmX + p.larg(e.s, e.tam)).toBeLessThanOrEqual(xFim + 0.001);
+    for (const e of p.escritas) expect(e.mmX + p.larg(e.s, e.tam, p.bold)).toBeLessThanOrEqual(xFim + 0.001);
   });
 
   // ⚠ No QWS caberiam 9 pt — o endereço ficaria do tamanho da TAG PETROBRAS, que é o que o cliente
@@ -390,5 +402,71 @@ describe("endereço da Torg no cabeçalho", () => {
   it("com muito espaço sobrando, para no teto em vez de competir com a TAG", async () => {
     const p = await pincelFalso();
     expect(desenharEndereco(p, { xMin: 36, xFim: 97.3, yIni: 4.2, entreLinhas: 3.2 })).toBeLessThanOrEqual(5.5);
+  });
+});
+
+// ⚠⚠ POR QUE ESTE BLOCO EXISTE. Matheus (11/09/2026) pediu a etiqueta "mais visível, maior, sem
+// falhas", com a do BarTender ao lado — e os corpos dobraram. O risco de aumentar corpo numa grade
+// que não muda é sempre o mesmo: a letra passa a cruzar o traço da célula. E ele NÃO aparece no
+// olho, porque o que estoura é o descendente (a vírgula de "41,40", o "Ç" de "QTDE. (PÇ)"), que a
+// gente não procura quando bate o olho no PDF.
+//
+// A conta usa a altura REAL da fonte — `heightAtSize`, ascendente e descendente do Helvetica Bold —
+// e não uma regra de bolso. Mexeu num corpo sem mexer na base, aqui acusa.
+describe("nada cruza o traço da célula depois do aumento de corpo", () => {
+  const acima = (f, tam) => f.heightAtSize(tam, { descender: false }) / MM;
+  const abaixo = (f, tam) => (f.heightAtSize(tam) - f.heightAtSize(tam, { descender: false })) / MM;
+
+  // [base, corpo, topo da célula, fundo da célula]
+  const LINHAS = () => [
+    ["CLIENTE", BASES.cliente, CORPOS.campo, GRADE.yCabecalho, GRADE.yCliente],
+    ["OBRA", BASES.obra, CORPOS.campo, GRADE.yCliente, GRADE.yObra],
+    ["rótulo QTDE", BASES.rot1, CORPOS.rotulo, GRADE.yObra, GRADE.yTag],
+    ["valor QTDE", BASES.val1, CORPOS.celula, GRADE.yObra, GRADE.yTag],
+    ["TAG", BASES.tag, CORPOS.tag, GRADE.yObra, GRADE.yTag],
+    ["rótulo PESO", BASES.rot2, CORPOS.rotulo, GRADE.yTag, GRADE.fim],
+    ["valor PESO", BASES.val2, CORPOS.celula, GRADE.yTag, GRADE.fim],
+  ];
+
+  it("nenhum texto sobe acima do traço de cima nem desce abaixo do de baixo", async () => {
+    const { bold } = await fontes();
+    // ⚠ O relatório sai NOMEADO. Um `expect` dentro de laço que falha só diz um número; com o nome
+    // do campo na mensagem, quem lê a falha sabe qual base mexer sem recontar a grade.
+    const estouros = LINHAS()
+      .filter(([, base, tam, topo, fundo]) =>
+        base - acima(bold, tam) <= topo || base + abaixo(bold, tam) >= fundo)
+      .map(([nome]) => nome);
+    expect(estouros).toEqual([]);
+  });
+
+  // ⚠ Rótulo e valor dividem a mesma célula, um sobre o outro. A primeira tentativa de subir os
+  // dois juntos fez o "PESO (kg):" ser desenhado por cima do próprio 41,40 — mesmo tropeço que o
+  // rodapé do modelo QWS já tinha custado antes.
+  it("o rótulo não encosta no valor que vem embaixo dele", async () => {
+    const { bold } = await fontes();
+    for (const [rot, val] of [[BASES.rot1, BASES.val1], [BASES.rot2, BASES.val2]]) {
+      expect(rot + abaixo(bold, CORPOS.rotulo)).toBeLessThan(val - acima(bold, CORPOS.celula));
+    }
+  });
+
+  // ⚠ O corpo continua sendo TETO, não promessa: nome comprido encolhe sozinho. Sem isto, subir o
+  // teto de 8 para 13 pt teria soltado o nome do cliente por cima da coluna do QR.
+  it("cliente e obra compridos continuam dentro da própria coluna", async () => {
+    const bytes = await gerarEtiquetasCarregamentoPDF({
+      cliente: "CONSTRUTORA E MONTAGENS INDUSTRIAIS REUNIDAS DO BRASIL S.A.",
+      obra: "AMPLIACAO DA UNIDADE DE TRATAMENTO DE GAS NATURAL - FASE 2",
+      tagObra: "TPR00870", opNumero: "103",
+      pecas: [{ marca: "T103A1", descricao: DESC_LONGA, qte: 1, pesoUnitKg: 12.5 }],
+    });
+    const { bold } = await fontes();
+    const xRot = 3.5;
+    const xVal = xRot + Math.max(bold.widthOfTextAtSize("CLIENTE:", CORPOS.rotulo),
+                                 bold.widthOfTextAtSize("OBRA:", CORPOS.rotulo)) / MM + 2;
+    const texto = textoDoPdf(bytes);
+    // O que sobrou do nome foi encolhido/cortado para caber — e o que importa é caber.
+    const cabe = (s) => ajustarTexto(s, bold, { xIni: xVal, xFim: GRADE.colDir - 1.5, tamMax: CORPOS.campo });
+    expect(cabe("CONSTRUTORA E MONTAGENS INDUSTRIAIS REUNIDAS DO BRASIL S.A.").xFim)
+      .toBeLessThanOrEqual(GRADE.colDir - 1.5 + 0.001);
+    expect(texto).toContain("TPR00870");
   });
 });

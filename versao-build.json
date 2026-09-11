@@ -1,7 +1,12 @@
 {
-  "build": 3083,
-  "gerado": "2026-09-11T12:38:31.952Z",
+  "build": 3084,
+  "gerado": "2026-09-11T13:37:41.422Z",
   "commits": [
+    {
+      "hash": "5ab6e30fa6",
+      "data": "11/09/2026",
+      "titulo": "Etiqueta: endereco da Torg no maior corpo que cabe, em vez de 3,5 pt borrado"
+    },
     {
       "hash": "d8da9a5b37",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "04eb38a6cf",
       "data": "09/09/2026",
       "titulo": "PCP: Baixa em Lote — um clique fecha um setor inteiro de uma OP"
-    },
-    {
-      "hash": "cfe8eadd1e",
-      "data": "09/09/2026",
-      "titulo": "Produção: peça expedida dá baixa na rota inteira"
     }
   ]
 }

@@ -322,10 +322,41 @@ O PDF declara `PrintScaling /None` e `PickTrayByPDFSize` (`pedirImpressaoSemAjus
 PDF e evitam que um "ajustar à página" lembrado da última impressão volte sozinho — mas **não
 sobrepõem a mídia configurada no driver**. Não são o conserto.
 
-> 📌 **PENDENTE (Matheus, 10/09/2026):** "vamos voltar futuramente a ajustar essas etiquetas para
-> ficar mais visível as escritas pequenas". Os rótulos estão em 4,2 pt e a referência/posição em
-> 6,5 pt — pequenos porque o rodapé tem 12,8 mm para duas faixas de rótulo + valor. Aumentar a fonte
-> exige remanejar `RODAPE`/`GRADE_QWS`, não só trocar o número.
+### Os corpos vieram da etiqueta do BarTender, não do espaço livre
+
+⚠⚠ **A REFERÊNCIA É A ETIQUETA ANTIGA, LADO A LADO NA MESMA FOTO.** Matheus (11/09/2026): "a parte
+operacional está funcionando, agora precisamos deixar mais próximo da etiqueta da esquerda — ela é
+bem mais visível, maior, sem falhas; ajuste tudo para ficar mais próximo possível da qualidade que
+tínhamos". A nossa escrevia os dados em 7,5–8 pt onde o BarTender usa o dobro: sobrava célula vazia
+em todo canto, e na térmica o que é pequeno sai borrado.
+
+`CORPOS` e `BASES` (`lib/etiqueta-carregamento-pdf.js`) e `RODAPE` (`lib/etiqueta-qws-pdf.js`)
+concentram os números. Resumo do que mudou: rótulos 4,2 → **5,5** (QWS 5), cliente/obra 8 → **13**,
+QTDE/PESO 7,5 → **12** (QWS 6,5 → 8), TAG 15 → **16**, descrição 8 → **11**, O.P. 7,5 → **10**.
+
+⚠ **O NÚMERO É TETO, NÃO PROMESSA** — `ajustarTexto` encolhe sozinho. É o que deixa ser generoso
+aqui sem risco de o nome do cliente invadir a coluna do QR; o inverso (célula vazia) é que era o
+defeito.
+
+⚠ **O RÓTULO NÃO ACOMPANHA O VALOR.** "CLIENTE:" é legenda; quem lê no pátio procura o valor. Subir
+os dois juntos devolveria a etiqueta cinzenta e sem hierarquia que a nossa era.
+
+⚠⚠ **TRAÇO DE 0,7 pt SAÍA FALHADO — virou 1,1 (`ESPESSURA`).** A 203 dpi, 0,7 pt = 0,25 mm = **2
+dots**, e 2 dots é onde a térmica falha: um ponto frio da cabeça e a linha sai picotada. Sobe junto
+com as letras, nunca sozinho — moldura grossa em volta de texto miúdo faz o texto parecer menor.
+
+⚠⚠ **AUMENTAR CORPO EM GRADE QUE NÃO MUDA QUEBRA PELO DESCENDENTE, E ISSO NÃO APARECE NO OLHO.** A
+vírgula de "41,40" a 12 pt desce 0,9 mm e cruzava a moldura de baixo; a TAG a 16 pt cruzava o traço
+de 41,5. Por isso as linhas de base saíram dos literais e viraram `BASES`, calculadas contra o
+`heightAtSize` real do Helvetica Bold — e o teste refaz a conta, nomeando qual campo estourou.
+
+⚠ **O ENDEREÇO VAI EM NEGRITO, e isso pesa mais que o corpo.** Era o único texto fino da etiqueta:
+a haste de uma Helvetica normal a 5 pt não fecha na transferência térmica, e sai a letra esburacada
+da foto. O negrito é ~5% mais largo, então o corpo calculado cai um pouco — e ainda assim imprime
+melhor, porque o que borra é a espessura da haste, não a altura.
+
+⚠ **No padrão o logo caiu de 37 para 34 mm**, e só por isso o endereço pôde crescer: é ele que
+define o limite (`xMin`). No QWS quem limita é o teto de hierarquia, não o espaço.
 
 ⚠ **A impressora só imprime PRETO** — o laranja é o material do rolo. Por isso o logo da
 etiqueta é o `public/torg-logo-etiqueta.png` (chapado e horizontal), e não o `torg-logo.png`
@@ -378,7 +409,8 @@ altura — na transferência térmica isso vira mancha, não letra. É o menor t
 primeiro a sofrer.
 
 `desenharEndereco` (`lib/etiqueta-pdf-base.js`) calcula o **maior corpo que ainda cabe** entre o fim
-do logo e a borda da célula: padrão vai a **4,5 pt**, QWS a **5,5 pt** (eram 3,5 e 3,3).
+do logo e a borda da célula, e escreve em **negrito**: padrão vai a ~5 pt, QWS a **5,5 pt** (eram
+3,5 e 3,3, em fonte normal).
 
 ⚠ **Calculado, não fixo**, porque a folga difere por modelo (32 mm no padrão, 60 no QWS) — e porque
 número fixo cresceria por cima do logo sem ninguém notar. O logo tem largura **medida** contra a
