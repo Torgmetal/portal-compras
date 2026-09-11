@@ -80,7 +80,7 @@ const VISTAS = [
   { key: "financeiro", label: "Financeiro", icon: DollarSign },
 ];
 
-export default function OPDetailClient({ op, userRole, userId: _userId, podeAlterarVerba = false, podeVerFinanceiro = false, isDiretoria = false, proposta = null, comprasSlot = null, pecas = [], abas = null }) {
+export default function OPDetailClient({ op, userRole, userId: _userId, podeAlterarVerba = false, podeVerFinanceiro = false, podeGerenciarComercial = false, isDiretoria = false, proposta = null, comprasSlot = null, pecas = [], abas = null }) {
   const router = useRouter();
   const isMaster = userRole === "ADMIN";
   // As abas vêm do servidor, por módulo (lib/op-abas.js). Blindagem dupla: Resumo e Financeiro
@@ -266,7 +266,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
                   <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${s.className}`}>
                     {s.label}
                   </span>
-                  {!encerradaOuCancelada && (
+                  {podeGerenciarComercial && !encerradaOuCancelada && (
                     <button
                       onClick={() => setModalEditarOP(true)}
                       className="text-xs text-torg-gray hover:text-torg-blue inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-torg-blue-50 transition-colors"
@@ -876,7 +876,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
         </div>
       )}
 
-      {vista === "obra" && <AbaObra op={op} podeEditar={!encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} />}
+      {vista === "obra" && <AbaObra op={op} podeGerenciarComercial={podeGerenciarComercial} podeEditar={podeGerenciarComercial && !encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} />}
 
       {vista === "planejamento" && (
         <div className="space-y-6">

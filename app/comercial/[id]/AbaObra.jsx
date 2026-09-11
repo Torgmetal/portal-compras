@@ -5,7 +5,6 @@ import OrcamentoComercial from "@/components/OrcamentoComercial";
 import { resumoEscopo } from "@/lib/qualidade-escopo";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
-const fmtR$ = (v) => (v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }));
 const ESTOQUE = { PROPRIO_TORG: "Estoque próprio da Torg", CLIENTE_TERCEIRO: "Fornecido pelo cliente / terceiro" };
 const DATABOOK = { PADRAO_TORG: "Padrão Torg", SNQC: "SNQC", RELATORIO_ACOMPANHAMENTO: "Relatório de acompanhamento" };
 
@@ -20,7 +19,7 @@ function Campo({ rotulo, valor, destaque, dica, pre }) {
   );
 }
 
-export default function AbaObra({ op, podeEditar, onEditar }) {
+export default function AbaObra({ op, podeEditar, onEditar, podeGerenciarComercial = false }) {
   // Vínculo com o orçamento do Comercial — as OPs antigas também precisam ser ligadas
   // (Vitor 19/08: "as OPs já criadas vamos conseguir vincular elas também?").
   const [orc, setOrc] = useState({
@@ -85,14 +84,13 @@ export default function AbaObra({ op, podeEditar, onEditar }) {
         )}
       </div>
 
-      {/* Prazos, contrato e definições */}
+      {/* Prazos e definições */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h4 className="text-sm font-semibold text-torg-dark flex items-center gap-2 mb-4"><CalendarRange size={15} className="text-torg-blue" /> Prazos, contrato e definições</h4>
+        <h4 className="text-sm font-semibold text-torg-dark flex items-center gap-2 mb-4"><CalendarRange size={15} className="text-torg-blue" /> Prazos e definições</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Campo rotulo="Início" valor={fmtD(op.dataInicio)} />
           <Campo rotulo="Fim previsto" valor={fmtD(op.dataFimPrevista)} />
           <Campo rotulo="Fim real" valor={op.dataFimReal ? fmtD(op.dataFimReal) : null} />
-          <Campo rotulo="Valor do contrato" valor={fmtR$(op.valorTotalContrato)} />
           <Campo rotulo="Material" valor={ESTOQUE[op.estoqueMaterial] || null} />
           <Campo rotulo="Data Book" valor={DATABOOK[op.tipoDataBook] || null} />
           {/* O que a obra exige de inspeção — decide o que o inspetor vê e o que o data
@@ -134,8 +132,8 @@ export default function AbaObra({ op, podeEditar, onEditar }) {
       </div>
 
       {/* Orçamento do Comercial: proposta, estudo e as quantidades estimadas */}
-      <OrcamentoComercial valor={orc} onChange={(v) => { setOrc(v); setSalvandoOrc(""); }} opId={op.id} onSalvar={salvarOrc} />
-      {salvandoOrc && (
+      {podeGerenciarComercial && <OrcamentoComercial valor={orc} onChange={(v) => { setOrc(v); setSalvandoOrc(""); }} opId={op.id} onSalvar={salvarOrc} />}
+      {podeGerenciarComercial && salvandoOrc && (
         <p className={`text-[12px] ${salvandoOrc === "salvo" ? "text-emerald-700" : salvandoOrc === "salvando" ? "text-torg-gray" : "text-red-700"}`}>
           {salvandoOrc === "salvo" ? "Vínculo salvo na OP." : salvandoOrc === "salvando" ? "Salvando…" : salvandoOrc}
         </p>

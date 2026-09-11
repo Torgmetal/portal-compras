@@ -10,11 +10,18 @@ export const maxDuration = 60;
 
 export async function GET(_req, { params }) {
   let user;
-  try { user = await requireRole(["ADMIN", "QUALIDADE"]); }
+  try { user = await requireRole(["ADMIN", "QUALIDADE", "PRODUCAO", "PCP", "ENGENHARIA", "COMERCIAL", "COMPRAS", "RH"]); }
   catch (e) { return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const p = await prisma.planoAcao.findUnique({ where: { id: params.id } });
   if (!p) return NextResponse.json({ success: false, error: "Plano não encontrado" }, { status: 404 });
+
+  // Planos internos continuam exclusivos da Qualidade; cada setor exporta seus indicadores.
+  const modulos = user.modulos || [];
+  const acessoQualidade = user.tipo === "ADMIN" || modulos.includes("QUALIDADE");
+  if (!acessoQualidade && (!p.indicador || !modulos.includes(p.processo))) {
+    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+  }
 
   let out;
   try { out = await gerarPlanoAcaoPDF(p); }

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { temAcessoDiretoria } from "@/lib/diretoria";
+import { podeGerenciarComercialOP, protegerDadosObra } from "@/lib/op-obra-acesso";
 import { abasDaOP } from "@/lib/op-abas";
 import { ArrowLeft, Clock } from "lucide-react";
 import OPDetailClient from "./OPDetailClient";
@@ -377,15 +378,18 @@ export async function carregarDetalheOP(id, user) {
     delete opData.faturamento;
   }
 
+  const podeGerenciarComercial = podeGerenciarComercialOP(user);
+  protegerDadosObra(opData, { podeVerFinanceiro, podeGerenciarComercial });
+
   const abas = abasDaOP(user, { isDiretoria });
 
-  return { opData, pecas, pedidos, propostaVinc, propostaPend, podeVerFinanceiro, isDiretoria, abas };
+  return { opData, pecas, pedidos, propostaVinc, propostaPend, podeVerFinanceiro, podeGerenciarComercial, isDiretoria, abas };
 }
 
 // UI do detalhe (compartilhada). O destino do "Voltar" muda por portal via
 // `voltarHref` — assim a OP abre dentro do portal atual, sem migrar pro Comercial.
 export function DetalheOPUI({ data, user, voltarHref = "/comercial" }) {
-  const { opData, pecas, pedidos, propostaVinc, propostaPend, podeVerFinanceiro, isDiretoria, abas } = data;
+  const { opData, pecas, pedidos, propostaVinc, propostaPend, podeVerFinanceiro, podeGerenciarComercial, isDiretoria, abas } = data;
   return (
     <div className="space-y-6 max-w-7xl">
       <Link href={voltarHref} className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1">
@@ -403,7 +407,7 @@ export function DetalheOPUI({ data, user, voltarHref = "/comercial" }) {
         </div>
       )}
 
-      <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} podeVerFinanceiro={podeVerFinanceiro} isDiretoria={!!isDiretoria} abas={abas} proposta={propostaVinc} pecas={pecas} comprasSlot={<PedidosOmieSection pedidos={pedidos} />} />
+      <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} podeVerFinanceiro={podeVerFinanceiro} podeGerenciarComercial={podeGerenciarComercial} isDiretoria={!!isDiretoria} abas={abas} proposta={propostaVinc} pecas={pecas} comprasSlot={<PedidosOmieSection pedidos={pedidos} />} />
     </div>
   );
 }

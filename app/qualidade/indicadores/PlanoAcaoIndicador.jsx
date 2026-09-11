@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, X, Plus, Trash2, Check, ClipboardList, AlertCircle, FileDown } from "lucide-react";
+import { useStore } from "@/lib/store";
 import { STATUS_ITEM, STATUS_ITEM_OPCOES, situacaoItem, SITUACAO_ITEM } from "@/lib/plano-acao";
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -18,6 +19,7 @@ const inp = "w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 ou
  * mesma coisa — e quem preenche os dois teria de aprender duas telas para a mesma pergunta.
  */
 export default function PlanoAcaoIndicador({ ind, processo, ano, mes, valor, onFechar }) {
+  const { showToast } = useStore();
   const [aba, setAba] = useState("ABERTOS");
   const [planos, setPlanos] = useState(null);
   const [aberto, setAberto] = useState(null); // plano em edição
@@ -69,8 +71,10 @@ export default function PlanoAcaoIndicador({ ind, processo, ano, mes, valor, onF
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao salvar.");
-      await carregar();
-      setAberto(j.plano);
+      setPlanos((anteriores) => (anteriores || []).map((p) => p.id === j.plano.id ? j.plano : p));
+      abrir(j.plano);
+      setAba(j.plano.status === "EM_ANDAMENTO" ? "ABERTOS" : "ENCERRADOS");
+      showToast("Plano salvo com sucesso.", "success");
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
   }
 
@@ -209,16 +213,7 @@ export default function PlanoAcaoIndicador({ ind, processo, ano, mes, valor, onF
                   className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5">
                   {salvando ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Salvar plano
                 </button>
-                {/* ⚠⚠ O PDF ESTAVA ESCONDIDO. Vitor (02/09/2026): "preciso que tenha como gerar o
-                    PDF de plano de ação, para podermos apresentar para os responsáveis (…) o que eu
-                    digo é o dos indicadores". Ele já existia — mas o único botão estava em
-                    /qualidade/planos-acao/[id], e quem cria o plano cria AQUI, na tela do indicador.
-                    Função que existe e não tem porta na tela onde se trabalha é função que não
-                    existe.
-                    ⚠ Só aparece com o plano JÁ SALVO: sem id não há o que gerar, e um botão que às
-                    vezes falha ensina a não confiar nele.
-                    ⚠ A rota exige login (ADMIN ou QUALIDADE), então o link não vaza para fora —
-                    era o pedido do Vitor de "apenas usuários da Torg conseguirem acessar". */}
+                {/* O PDF usa os dados já salvos e exige acesso ao setor do indicador. */}
                 {aberto?.id && (
                   <a href={`/api/qualidade/planos-acao/${aberto.id}/pdf`} target="_blank" rel="noopener noreferrer"
                     title="Abre o PDF do plano — só para quem tem login da Torg"
