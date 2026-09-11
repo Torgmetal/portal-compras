@@ -19,7 +19,8 @@ it("oculta orçamento por padrão e não consulta pastas comerciais", () => {
   expect(screen.queryByText("Orçamento do Comercial")).toBeNull();
   expect(fetch).not.toHaveBeenCalled();
 });
-it("mantém orçamento disponível para quem tem permissão comercial", () => {
+it("não exibe orçamento nem consulta pastas mesmo com permissão comercial", () => {
   render(<AbaObra op={op} podeGerenciarComercial />);
-  expect(screen.getByText("Orçamento do Comercial")).toBeTruthy();
+  expect(screen.queryByText("Orçamento do Comercial")).toBeNull();
+  expect(fetch).not.toHaveBeenCalled();
 });

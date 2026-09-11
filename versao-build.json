@@ -1,7 +1,12 @@
 {
-  "build": 3079,
-  "gerado": "2026-09-11T12:00:29.984Z",
+  "build": 3080,
+  "gerado": "2026-09-11T12:04:33.756Z",
   "commits": [
+    {
+      "hash": "0a6542fb",
+      "data": "11/09/2026",
+      "titulo": "fix(listas): incluir marcas compartilhadas e reconhecer LE formatada"
+    },
     {
       "hash": "fd206ca6",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c91ef1b0",
       "data": "09/09/2026",
       "titulo": "Produção: apontamento na frente dá baixa nos setores anteriores"
-    },
-    {
-      "hash": "0bfeced9",
-      "data": "09/09/2026",
-      "titulo": "Encaminha marcas avulsas do corte diretamente ao jato"
     }
   ]
 }

@@ -876,7 +876,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
         </div>
       )}
 
-      {vista === "obra" && <AbaObra op={op} podeGerenciarComercial={podeGerenciarComercial} podeEditar={podeGerenciarComercial && !encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} />}
+      {vista === "obra" && <AbaObra op={op} podeEditar={podeGerenciarComercial && !encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} />}
 
       {vista === "planejamento" && (
         <div className="space-y-6">
