@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, LogOut, Search, User } from "lucide-react";
+import { AlertCircle, CheckCircle2, LogOut, Search, User } from "lucide-react";
 import { visualDo } from "./FaixaEstado";
 import Produzindo from "./Produzindo";
 
@@ -35,6 +35,7 @@ export default function TotemClient({ codigo }) {
   const [busca, setBusca] = useState([]);
   const [qtd, setQtd] = useState(vazio);
   const [pedindoMotivo, setPedindoMotivo] = useState(false);
+  const [feito, setFeito] = useState("");
 
   // ⚠ UMA CHAVE POR TENTATIVA, trocada só depois do sucesso. É o padrão da Conferência de Peça
   // (`chave-operacao.js`): se a resposta se perder e o operador tocar de novo, chega a MESMA chave
@@ -72,6 +73,27 @@ export default function TotemClient({ codigo }) {
     finally { setOcupado(false); }
   }
 
+  /**
+   * Lança a quantidade e, se a marca fechou, ENCERRA a sessão e volta para a lista.
+   *
+   * ⚠⚠ QUEM DIZ QUE FECHOU É O SERVIDOR (`concluiu`), não a tela. O saldo que o navegador tem é de
+   * alguns segundos atrás; decidindo aqui, dois totens na mesma marca encerrariam a sessão um do
+   * outro — ou nenhum encerraria.
+   *
+   * ⚠ VOLTA PARA A LISTA, NÃO PULA PARA A PRÓXIMA MARCA. Abrir a próxima sozinho gravaria um evento
+   * de PRODUÇÃO numa máquina que pode estar parada (o operador foi almoçar, buscar a chapa) — tempo
+   * produtivo que ninguém viveu, exatamente o que envenena o OEE. O próximo passo é um toque, e é
+   * do operador.
+   */
+  async function apontar(sessao) {
+    const r = await agir("apontar", { sessaoId: sessao.id, ...numeros(qtd) });
+    if (!r) return;
+    setQtd(vazio);
+    if (!r.concluiu) return;
+    await agir("encerrar", { sessaoId: sessao.id });
+    setFeito(`${sessao.marca} concluída — ${r.saldo?.boas ?? "?"} de ${r.saldo?.planejado ?? "?"} peças.`);
+  }
+
   async function entrar(cracha) {
     setOcupado(true);
     try {
@@ -93,18 +115,19 @@ export default function TotemClient({ codigo }) {
       <Cabecalho recurso={dados.recurso} operador={operador} estado={dados.estado}
                  aoSair={() => { setOperador(null); setQtd(vazio); }} />
       {erro && <Aviso texto={erro} />}
+      {feito && <Concluida texto={feito} />}
 
       {!operador && <PedirCracha aoEnviar={entrar} ocupado={ocupado} />}
 
       {operador && !dados.sessao && (
         <Escolher dados={dados} codigo={codigo} busca={busca} setBusca={setBusca}
                   ocupado={ocupado}
-                  aoAbrir={(m) => agir("abrir", { marca: m.marca, opId: m.opId, opNumero: m.opNumero, planejadoQtd: m.qte })} />
+                  aoAbrir={(m) => { setFeito(""); return agir("abrir", { marca: m.marca, opId: m.opId, opNumero: m.opNumero, planejadoQtd: m.qte }); }} />
       )}
 
       {operador && dados.sessao && (
         <Produzindo dados={dados} qtd={qtd} setQtd={setQtd} ocupado={ocupado}
-                    aoApontar={async () => { if (await agir("apontar", { sessaoId: dados.sessao.id, ...numeros(qtd) })) setQtd(vazio); }}
+                    aoApontar={() => apontar(dados.sessao)}
                     aoParar={() => setPedindoMotivo(true)}
                     aoProduzir={() => agir("produzir", { sessaoId: dados.sessao.id })}
                     aoEncerrar={() => agir("encerrar", { sessaoId: dados.sessao.id })} />
@@ -129,6 +152,17 @@ const numeros = (q) => ({
 const Aguarde = ({ erro }) => (
   <div className="min-h-screen bg-torg-dark text-white grid place-items-center p-8 text-center">
     {erro ? <p className="text-red-300 text-lg">{erro}</p> : <p className="text-white/60">Carregando o posto…</p>}
+  </div>
+);
+
+/**
+ * ⚠ O FIM DA MARCA PRECISA DE CONFIRMAÇÃO VISÍVEL. Sem ela, o operador lança a última peça e a tela
+ * simplesmente volta para a lista — e "voltou sozinho" se parece com "deu erro e perdeu o que eu
+ * digitei". Verde, com o número, para ele conferir sem perguntar a ninguém.
+ */
+const Concluida = ({ texto }) => (
+  <div className="bg-emerald-500/20 border border-emerald-400/50 text-emerald-100 rounded-xl px-4 py-4 mb-5 flex items-start gap-3">
+    <CheckCircle2 size={24} className="shrink-0 mt-0.5" /> <span className="text-xl font-semibold">{texto}</span>
   </div>
 );
 
@@ -208,7 +242,7 @@ function Escolher({ dados, codigo, busca, setBusca, aoAbrir, ocupado }) {
 
       {temProgramacao ? dados.lotes.map((lote) => (
         <Secao key={lote.opNumero} titulo={`Obra ${lote.opNumero}`}
-               nota={`${lote.marcas.length} marca(s) · ${lote.pecas} peça(s) · ${Math.round(lote.kg)} kg`}>
+               nota={`${lote.concluidas || 0} de ${lote.marcas.length} marca(s) prontas · ${lote.pecas} peça(s) · ${Math.round(lote.kg)} kg`}>
           {lote.marcas.map((m) => <Cartao key={m.id} m={{ ...m, opNumero: lote.opNumero, opId: lote.opId }}
                                           onClick={() => aoAbrir({ ...m, opNumero: lote.opNumero, opId: lote.opId })} ocupado={ocupado} />)}
         </Secao>
@@ -233,16 +267,37 @@ const Secao = ({ titulo, nota, children }) => (
   </section>
 );
 
+/**
+ * ⚠⚠ A MARCA PRONTA CONTINUA NA LISTA, MARCADA — não some. Sumindo, o operador que terminou procura
+ * o que fez e não acha; e quem precisa lançar RETRABALHO depois (que não consome o planejado) ficaria
+ * sem caminho nenhum até a marca. Ela fica clicável, só deixa de parecer trabalho pendente.
+ *
+ * ⚠ O PARCIAL TAMBÉM APARECE ("3 de 7 feitas"). Marca começada por outro turno parecia intocada, e
+ * o operador só descobria o que já existia depois de abrir a sessão.
+ */
 const Cartao = ({ m, onClick, ocupado }) => (
   <button onClick={onClick} disabled={ocupado}
-          className="w-full text-left bg-white/8 hover:bg-white/15 border border-white/10 rounded-xl px-5 py-4 flex items-center justify-between gap-4 disabled:opacity-50">
-    <span>
-      <span className="block text-2xl font-bold leading-tight">{m.marca}</span>
-      <span className="block text-white/50 text-sm">{m.descricao || "—"}</span>
+          className={`w-full text-left border rounded-xl px-5 py-4 flex items-center justify-between gap-4 disabled:opacity-50 ${
+            m.concluida
+              ? "bg-emerald-500/15 border-emerald-400/40 hover:bg-emerald-500/25"
+              : "bg-white/8 border-white/10 hover:bg-white/15"
+          }`}>
+    <span className="min-w-0">
+      <span className="flex items-center gap-2">
+        <span className="text-2xl font-bold leading-tight">{m.marca}</span>
+        {m.concluida && (
+          <span className="flex items-center gap-1 text-emerald-300 text-xs font-bold uppercase tracking-wide">
+            <CheckCircle2 size={16} /> produzida
+          </span>
+        )}
+      </span>
+      <span className="block text-white/50 text-sm truncate">{m.descricao || "—"}</span>
     </span>
     <span className="text-right shrink-0">
       <span className="block text-xl font-semibold">{m.qte} pç</span>
-      <span className="block text-white/40 text-sm">{Math.round(m.kg || 0)} kg</span>
+      {m.feitas > 0 && !m.concluida
+        ? <span className="block text-amber-300 text-sm">{m.feitas} de {m.qte} feitas</span>
+        : <span className="block text-white/40 text-sm">{Math.round(m.kg || 0)} kg</span>}
     </span>
   </button>
 );

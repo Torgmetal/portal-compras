@@ -217,6 +217,38 @@ describe("apontarQuantidade — a trava do planejado", () => {
     expect((await apontarQuantidade(prisma, { sessaoId: "s1", boas: 999 })).erro).toBeUndefined();
   });
 
+  // ⚠⚠ É O `concluiu` QUE FECHA A MARCA NA TELA. Matheus (11/09/2026): "quando o operador lançar
+  // 100% das peças planejadas naquela marca deve marcar como concluído e voltar para a listagem".
+  // Quem decide é o SERVIDOR: o saldo que o navegador tem é de alguns segundos atrás, e dois totens
+  // na mesma marca encerrariam a sessão um do outro — ou nenhum encerraria.
+  it("avisa que a marca fechou quando a última peça entra", async () => {
+    const { prisma } = prismaFalso({ sessao: PLANEJADA, jaBoas: 5 });
+    const r = await apontarQuantidade(prisma, { sessaoId: "s1", boas: 2 });
+    expect(r.concluiu).toBe(true);
+    expect(r.saldo).toMatchObject({ planejado: 7, boas: 7, saldo: 0 });
+  });
+
+  it("não avisa que fechou quando ainda falta peça", async () => {
+    const { prisma } = prismaFalso({ sessao: PLANEJADA, jaBoas: 5 });
+    const r = await apontarQuantidade(prisma, { sessaoId: "s1", boas: 1 });
+    expect(r.concluiu).toBe(false);
+    expect(r.saldo.saldo).toBe(1);
+  });
+
+  // ⚠ Sem planejado não existe "100%" — e encerrar a sessão sozinho aqui tiraria do operador a
+  // marca que ele bipou para trabalhar o dia inteiro.
+  it("marca sem planejado nunca conclui sozinha", async () => {
+    const { prisma } = prismaFalso({ sessao: ABERTA });
+    expect((await apontarQuantidade(prisma, { sessaoId: "s1", boas: 500 })).concluiu).toBe(false);
+  });
+
+  it("retrabalho sozinho não conclui a marca", async () => {
+    const { prisma } = prismaFalso({ sessao: PLANEJADA, jaBoas: 6 });
+    const r = await apontarQuantidade(prisma, { sessaoId: "s1", boas: 0, retrabalho: 5 });
+    expect(r.concluiu).toBe(false);
+    expect(r.saldo.saldo).toBe(1);
+  });
+
   // ⚠⚠ O SUSTO QUE A ORDEM DAS CHECAGENS EVITA. O toque repetido chega com a MESMA chave; se o
   // saldo fosse conferido antes, o reenvio bateria no teto que ele próprio acabou de ocupar e o
   // operador veria "não cabe mais" logo depois de um lançamento que deu certo.

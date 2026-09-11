@@ -1,7 +1,12 @@
 {
-  "build": 3120,
-  "gerado": "2026-09-11T21:23:18.090Z",
+  "build": 3121,
+  "gerado": "2026-09-11T21:43:56.693Z",
   "commits": [
+    {
+      "hash": "08c1b0b3af",
+      "data": "11/09/2026",
+      "titulo": "MES proprio: o estado do posto visivel de longe, e o teto do planejado"
+    },
     {
       "hash": "8bfe758a2c",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5295a759c6",
       "data": "11/09/2026",
       "titulo": "Etiqueta padrao: texto longe da borda esquerda, e o download volta a funcionar"
-    },
-    {
-      "hash": "7aa5f661fa",
-      "data": "11/09/2026",
-      "titulo": "Etiqueta: calibragem da impressora, para a etiqueta parar de sair cortada"
     }
   ]
 }
