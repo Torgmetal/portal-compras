@@ -11,6 +11,8 @@
 // fecham sobre `lotes` e `regua`; passar as FUNÇÕES em vez das variáveis é o que permite este
 // módulo existir sem duplicar a verdade sobre o que está programado.
 
+import {fracionarItem,agruparFracoes,inicioDaFracao} from '@/lib/gantt-fracoes';
+
 export function criarQuebra(dep){
   let bancadas = null, dias = 1;
 
@@ -26,7 +28,7 @@ export function criarQuebra(dep){
     const recs = dep.RECURSOS[r.setor].filter(x=>x.k);
     const cortePorMaquina = r.setor==="CORTE";   // no corte a máquina é UMA só
     if(bancadas===null) bancadas = new Set(r.recurso ? [r.recurso] : []);
-    let h = '<div class="dica"><b>'+r.itens.length+' marca(s) · '+r.pecas+' peças selecionadas</b>. '+(r.parcial?'As demais peças permanecem na programação original.':'Divisão de todos os itens exibidos.')+'</div><div class="bloco"><h4>'+(cortePorMaquina?"Máquina":"Bancadas que vão receber")+'</h4><div class="chips">';
+    let h = '<div class="dica"><b>'+new Set(r.itens.map(i=>i.id)).size+' marca(s) · '+r.pecas+' peças selecionadas</b>. '+(r.parcial?'As demais peças permanecem na programação original.':'Divisão de todos os itens exibidos.')+'</div><div class="bloco"><h4>'+(cortePorMaquina?"Máquina":"Bancadas que vão receber")+'</h4><div class="chips">';
     const meus = new Set(r.lotes.map(l=>l.uid));
     for(const x of recs){
       let o = 0;
@@ -79,9 +81,8 @@ export function criarQuebra(dep){
             + cheias.slice(0,4).map(s=>'<b>'+dep.nomeRec(r.setor,s.recurso)+' '+dep.dbr(s.dia)+'</b> ('+Math.round(s.base/s.cap*100)+'%)').join(", ")
             + (cheias.length>4 ? " e mais "+(cheias.length-4) : "") : "")
         + '</div></div>';
-      h += '<div class="dica">A divisão usa a mesma regra do portal: <b>o conjunto mais caro entra primeiro</b>, sempre na '
-        + 'bancada-dia mais livre. Equilibra <b>trabalho</b> (dias-bancada), não peso nem contagem — repartir "metade do peso '
-        + 'para cada" empata por acaso e entrega a obra na mão errada.</div>';
+      h += '<div class="dica"><b>As unidades de uma mesma marca podem ficar em dias e bancadas diferentes.</b> '
+        + 'Cada peça entra onde há mais capacidade livre, considerando o tempo de produção e a carga já programada.</div>';
       dep.$("pCorpo").innerHTML = h;
       dep.$("pFoot").innerHTML =
           '<div class="info">'+r.pecas+' peças · hoje em <b>'+r.dias+' dia(s)</b> '
@@ -125,12 +126,17 @@ export function criarQuebra(dep){
       const cap = dep.capDe(r.setor, b);
       slots.push({ recurso:b, dia, cap, base: dep.carga(r.setor, b, dia, meus) + cargaRestante(r,b,dia,meus), carga:0, itens:[] });
     }
-    const ord = [...r.itens].sort((a,b)=>dep.custoItem(b,r.setor)-dep.custoItem(a,r.setor));
+    // Cada unidade pode ocupar um dia. Uma marca com 44 peças não é uma única peça indivisível.
+    // Retornos de terceiro mantêm a identidade do lote recebido e o protocolo próprio.
+    const unidades=r.itens.flatMap(it=>r.terceiroRecebido || r.terceiroPrevisto || String(it.id).includes(':') || !Number.isInteger(it.q)
+      ? [it] : Array.from({length:it.q},(_,n)=>fracionarItem(it,inicioDaFracao(it)+n,1)));
+    const ord = unidades.sort((a,b)=>dep.custoItem(b,r.setor)-dep.custoItem(a,r.setor));
     for(const it of ord){
       let alvo = slots[0], livre = -Infinity;
       for(const s of slots){ const l = s.cap - s.base - s.carga; if(l > livre + 1e-9){ livre = l; alvo = s; } }
       alvo.itens.push(it); alvo.carga += dep.custoItem(it, r.setor);
     }
+    for(const s of slots)s.itens=agruparFracoes(s.itens);
     return { slots, usados: slots.filter(s=>s.itens.length).length };
   }
 
@@ -139,6 +145,7 @@ export function criarQuebra(dep){
     const novos = plano.slots.filter(s=>s.itens.length).map(s=>dep.novoLote({
       setor:r.setor, recurso:s.recurso, dia:s.dia, op:r.op, obra:r.obra,
       recursoOrig: antes[0].recursoOrig, diaOrig: antes[0].diaOrig, adiado: r.adiado,
+      ...((r.terceiroRecebido||r.terceiroPrevisto)?{id:antes[0].id,terceiroRecebido:r.terceiroRecebido,terceiroPrevisto:r.terceiroPrevisto}:{}),
       itens: s.itens, pecas:0, kg:0, custo:0, feitas:0,
     }));
     const nB = new Set(novos.map(n=>n.recurso)).size, nD = new Set(novos.map(n=>n.dia)).size;

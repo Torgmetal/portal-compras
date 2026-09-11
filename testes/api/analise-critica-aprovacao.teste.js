@@ -1,0 +1,14 @@
+import {beforeEach,it,expect,vi} from 'vitest';
+import {mockPrisma} from '@/testes/apoio/prisma';
+vi.mock('@/lib/prisma',()=>({prisma:mockPrisma}));
+const contexto=vi.hoisted(()=>({user:{},diretoria:false}));
+vi.mock('@/lib/session',()=>({requireUser:vi.fn(async()=>contexto.user),requireRole:vi.fn(async()=>contexto.user)}));
+vi.mock('@/lib/diretoria',()=>({temAcessoDiretoria:vi.fn(async()=>contexto.diretoria)}));
+import {GET,PUT} from '@/app/api/comercial/op/[id]/analise-critica/route';
+import {registroInicial} from '@/lib/analise-critica';
+beforeEach(()=>{vi.clearAllMocks();contexto.user={id:'g',name:'Guilherme',email:'guilherme@torg.com.br',tipo:'USUARIO',modulos:['ENGENHARIA']};contexto.diretoria=false;mockPrisma.oP.findUnique.mockResolvedValue({id:'op',numero:'106',itens:[]});mockPrisma.pecaConjunto.findMany.mockResolvedValue([]);mockPrisma.analiseCriticaProjeto.findUnique.mockResolvedValue({id:'ac',opId:'op',...registroInicial()});mockPrisma.analiseCriticaProjeto.upsert.mockImplementation(async({update})=>({id:'ac',opId:'op',...registroInicial(),...update}));mockPrisma.auditLog.create.mockResolvedValue({});});
+const aprovar=()=>PUT(new Request('http://localhost',{method:'PUT',body:JSON.stringify({acao:'aprovar',registro:registroInicial()})}),{params:{id:'op'}});
+it('mostra a aprovação para Guilherme sem acesso ao módulo Diretoria',async()=>{const r=await GET(null,{params:{id:'op'}});expect((await r.json()).podeAprovar).toBe(true);});
+it('permite que Guilherme aprove e registra quem aprovou',async()=>{const r=await aprovar();expect(r.status).toBe(200);expect((await r.json()).registro).toMatchObject({status:'APROVADA',aprovadoPorId:'g',aprovadoPorNome:'Guilherme'});expect(mockPrisma.auditLog.create).toHaveBeenCalled();});
+it('não libera a aprovação para outros usuários da Engenharia',async()=>{contexto.user.email='engenharia@example.test';expect((await aprovar()).status).toBe(403);expect(mockPrisma.analiseCriticaProjeto.upsert).not.toHaveBeenCalled();});
+it('mantém aprovação de quem já tem permissão de Diretoria',async()=>{contexto.user.email='diretor@example.test';contexto.diretoria=true;expect((await aprovar()).status).toBe(200);});

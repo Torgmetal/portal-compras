@@ -1,3 +1,4 @@
+import {usaQuantidadeInspecao, pecasInformadasSchema, resultadosComPecas, quantidadesPorMarca} from "@/lib/inspecao-pecas";
 // GET   — abre um relatório para medir no celular.
 // PATCH — grava o que o inspetor mediu.
 //
@@ -28,7 +29,7 @@ export async function GET(_req, { params }) {
   const rel = await prisma.relatorioInspecao.findUnique({
     where: { id },
     select: {
-      id: true, codigo: true, tipo: true, titulo: true, opNumero: true, marcas: true,
+      id: true, opId: true, codigo: true, tipo: true, titulo: true, opNumero: true, marcas: true,
       linhas: true, resultados: true, equipamentos: true, inspetor: true, envioAssinaturaId: true,
       revisao: true, resultadoInspecao: true, revisoes: true,
       // a observação geral do relatório, que o celular também edita
@@ -41,7 +42,13 @@ export async function GET(_req, { params }) {
   if (!rel) return NextResponse.json({ error: "Relatório não encontrado." }, { status: 404 });
   if (rel.envioAssinaturaId) return NextResponse.json({ error: "Este relatório já foi enviado para assinatura." }, { status: 409 });
 
+  let quantidadesLista = {};
+  if (usaQuantidadeInspecao(rel.tipo)) {
+    const opId=rel.opId || (await prisma.oP.findFirst({where:{numero:rel.opNumero},select:{id:true}}))?.id;
+    if(opId) quantidadesLista=quantidadesPorMarca(await prisma.pecaConjunto.findMany({where:{opId,marca:{in:rel.marcas || []}},select:{marca:true,qte:true}}));
+  }
   return NextResponse.json({
+    quantidadesLista,
     relatorio: {
       ...rel,
       tipoLabel: TIPO_LABEL[rel.tipo] || rel.tipo,
@@ -265,6 +272,15 @@ export async function PATCH(req, { params }) {
     }
   }
 
+  if (body.pecasInformadas !== undefined) {
+    if (!usaQuantidadeInspecao(rel.tipo)) return NextResponse.json({error:"Quantidades por peça disponíveis apenas para pintura e solda."},{status:400});
+    const v=pecasInformadasSchema.safeParse(body.pecasInformadas);
+    if(!v.success) return NextResponse.json({error:v.error.issues[0].message},{status:400});
+    const marcas=(rel.marcas || []).map(m=>m.trim().toUpperCase());
+    if(v.data.length!==marcas.length || v.data.some(p=>!marcas.includes(p.marca))) return NextResponse.json({error:"As quantidades devem corresponder às peças deste relatório."},{status:400});
+    dados.resultados=resultadosComPecas(dados.resultados || rel.resultados, v.data);
+  }
+
   const atualizado = await prisma.relatorioInspecao.update({ where: { id }, data: dados });
 
   // ⚠ BACKUP NA PASTA DA OBRA quando o inspetor aprova pelo celular — mesma regra do computador
@@ -297,7 +313,7 @@ export async function PATCH(req, { params }) {
   await prisma.auditLog.create({
     data: {
       userId: user.id, action: "MEDIR_RELATORIO_CAMPO", entity: "RelatorioInspecao", entityId: id,
-      diff: { codigo: rel.codigo, medidas: medidas.length, equipamentos: dados.equipamentos?.length ?? null },
+      diff: { codigo: rel.codigo, medidas: medidas.length, equipamentos: dados.equipamentos?.length ?? null, ...(body.pecasInformadas ? {antes:{pecasInformadas:rel.resultados?.pecasInformadas ?? null},depois:{pecasInformadas:dados.resultados.pecasInformadas}} : {}) },
     },
   }).catch(() => {});
 

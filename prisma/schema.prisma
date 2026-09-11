@@ -122,13 +122,15 @@ model UserModulo {
 model OP {
   id                   String               @id @default(cuid())
   numero               String               @unique
-  /* ⚠ QUAIS OBRAS O PCP ESTÁ TOCANDO AGORA. Vitor (08/09/2026): "83, 84 e 89 não pode ser, prefiro
-     que faça uma lista disso à parte; só pode aparecer 97, 102, 103". Nenhum dado separa os dois
-     grupos — medido no dia: a 083 tem liberação e GRD recentes e a 089 tem 54 GRDs em 15 dias, as
-     duas MAIS ativas que a 102 pelos números. É decisão de quem toca a fábrica, não dedução; por
-     isso é um campo, e não uma regra derivada que quebraria na semana seguinte.
-     Falso NÃO esconde: a obra vai para a lista "fora do quadro" do Gantt, com o que está na bancada. */
-  pcpNoQuadro Boolean @default(true)
+  /**
+   * ⚠ QUAIS OBRAS O PCP ESTÁ TOCANDO AGORA. Vitor (08/09/2026): "83, 84 e 89 não pode ser, prefiro
+   * que faça uma lista disso à parte; só pode aparecer 97, 102, 103". Nenhum dado separa os dois
+   * grupos — medido no dia: a 083 tem liberação e GRD recentes e a 089 tem 54 GRDs em 15 dias, as
+   * duas MAIS ativas que a 102 pelos números. É decisão de quem toca a fábrica, não dedução; por
+   * isso é um campo, e não uma regra derivada que quebraria na semana seguinte.
+   * Falso NÃO esconde: a obra vai para a lista "fora do quadro" do Gantt, com o que está na bancada.
+   */
+  pcpNoQuadro          Boolean              @default(true)
   cliente              String
   obra                 String?
   refCliente           String? // código/nº de referência da obra no cliente (aparece nos relatórios enviados)
@@ -1119,6 +1121,7 @@ model CategoriaFornecedor {
 // `NotificacaoDestinatario`, uma linha por (notificação, pessoa).
 model Notificacao {
   id            String                    @id @default(cuid())
+  chaveEvento   String?                   @unique
   tipo          NotificacaoTipo
   titulo        String
   mensagem      String
@@ -1968,54 +1971,54 @@ model DataBookQualidade {
 // 209 µm a 15% — por isso `camadas` é uma TABELA [{ diluicao, umida, seca }], não um número. Guardar
 // um valor só obrigaria o PLP a mentir em duas das três situações.
 model ProdutoTinta {
-  id               String    @id @default(cuid())
-  fabricante       String
-  produto          String
+  id                String    @id @default(cuid())
+  fabricante        String
+  produto           String
   // ⚠⚠ TINTA, ENDURECEDOR E DILUENTE SÃO FICHAS DIFERENTES E TODAS ENTRAM. Vitor (27/08/2026):
   // "precisa incluir tanto a ficha técnica do diluente e você descrever qual diluente vamos usar, e
   // também trazer o componente A e B". Um esquema epóxi ou PU é um CONJUNTO: base (A) + endurecedor
   // (B) + diluente, cada um com o seu boletim e a sua validade. O PLP que cita só a tinta manda
   // aplicar metade do produto.
-  categoria        String    @default("TINTA") // TINTA | ENDURECEDOR | DILUENTE
-  componenteA      String? // a base, como o boletim nomeia
-  componenteB      String? // o endurecedor / catalisador
-  proporcaoMistura String? // "4:1 em volume"
-  potLife          String? // vida útil da mistura ("4 h a 25 °C")
-  diluenteId       String? // o diluente indicado, quando ele também está no catálogo
-  tipo             String? // PRIMER | INTERMEDIARIA | ACABAMENTO | UNICA
-  norma            String?
-  diluente         String?
-  diluicaoMin      Float? // %
-  diluicaoMax      Float? // %
-  camadas          Json? // [{ diluicao, umida, seca }]
-  secaMin          Float? // µm
-  secaMax          Float? // µm
-  secagemToque     String?
-  secagemManuseio  String?
-  secagemRepintura String?
-  rendimento       String?
-  solidos          String? // como o boletim escreve ("72 ± 2% em volume")
+  categoria         String    @default("TINTA") // TINTA | ENDURECEDOR | DILUENTE
+  componenteA       String? // a base, como o boletim nomeia
+  componenteB       String? // o endurecedor / catalisador
+  proporcaoMistura  String? // "4:1 em volume"
+  potLife           String? // vida útil da mistura ("4 h a 25 °C")
+  diluenteId        String? // o diluente indicado, quando ele também está no catálogo
+  tipo              String? // PRIMER | INTERMEDIARIA | ACABAMENTO | UNICA
+  norma             String?
+  diluente          String?
+  diluicaoMin       Float? // %
+  diluicaoMax       Float? // %
+  camadas           Json? // [{ diluicao, umida, seca }]
+  secaMin           Float? // µm
+  secaMax           Float? // µm
+  secagemToque      String?
+  secagemManuseio   String?
+  secagemRepintura  String?
+  rendimento        String?
+  solidos           String? // como o boletim escreve ("72 ± 2% em volume")
   // ⚠⚠ O NÚMERO DOS SÓLIDOS EM VOLUME É O QUE FAZ A CONTA. A camada ÚMIDA não é um dado de tabela:
   // é EPU = EPS × (100 + %DIL) / SV — a fórmula que a própria planilha do Vitor usa. Com o SV, a
   // úmida sai para QUALQUER espessura seca e QUALQUER diluição; sem ele, só para as três linhas que
   // o boletim listou. Conferido no INDUSTHANE RHB DF: SV 55,2% dá 181 / 199 / 208 µm, contra os
   // 181 / 200 / 209 da planilha dele.
-  solidosVol       Float? // % em volume, só o número
-  especificacao    String? // a descrição do tipo ("Tinta poliuretano dupla função…")
-  boletimUrl       String?
-  boletimNome      String?
-  boletimRevisao   String?
-  boletimData      String?
-  conferidoEm      DateTime?
-  conferidoPorNome String?
+  solidosVol        Float? // % em volume, só o número
+  especificacao     String? // a descrição do tipo ("Tinta poliuretano dupla função…")
+  boletimUrl        String?
+  boletimNome       String?
+  boletimRevisao    String?
+  boletimData       String?
+  conferidoEm       DateTime?
+  conferidoPorNome  String?
   historicoBoletins Json? // versões anteriores completas, preservadas a cada alteração
-  extraidoEm       DateTime?
-  observacoes      String?
-  ativo            Boolean   @default(true)
-  criadoPorId      String?
-  criadoPorNome    String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  extraidoEm        DateTime?
+  observacoes       String?
+  ativo             Boolean   @default(true)
+  criadoPorId       String?
+  criadoPorNome     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([tipo])
 }
@@ -3037,6 +3040,7 @@ model EstoqueFisicoSync {
 }
 
 model PecaConjunto {
+  ganttDistribuicoes      GanttDistribuicao[]
   id                      String                  @id @default(cuid())
   opId                    String?
   opNumero                String
@@ -3212,10 +3216,30 @@ model PecaConjunto {
 // dessa peça, então em cada etiqueta vai uma referência igual na planilha". A T102A15 da OP-102 são
 // 3 peças em 3 linhas, cada uma com a sua TAG (HC725-001, HC725-002, HC726-001). Guardar por marca
 // faria as 3 etiquetas saírem com a TAG da primeira — e o recebimento do cliente confere por ela.
+/// CALIBRAGEM DA IMPRESSORA DE ETIQUETAS — quanto o desenho precisa andar para cair no adesivo.
+///
+/// ⚠⚠ ISTO NÃO É DESIGN DA ETIQUETA, É CONSERTO DE MÁQUINA. O PDF desenha a moldura de 1,2 a 98,8 mm
+/// numa página de 100 — está centrado. Se sai cortado, a origem de impressão da Argox está deslocada.
+/// O lugar certo de corrigir é o driver, e está escrito na tela; isto existe porque o driver da Argox
+/// nem sempre expõe esse ajuste, e aí a expedição fica sem saída nenhuma.
+///
+/// ⚠ GLOBAL, NÃO POR USUÁRIO: é uma propriedade da IMPRESSORA, e a expedição tem uma. Guardar por
+/// navegador faria cada PC da fábrica imprimir diferente e ninguém entender por quê.
+model EtiquetaCalibragem {
+  /// "argox" — uma impressora hoje. A chave existe para uma segunda caber sem migração.
+  id            String   @id
+  /// milimetros para a DIREITA (negativo = esquerda)
+  deslocX       Float    @default(0)
+  /// milimetros para BAIXO (negativo = cima)
+  deslocY       Float    @default(0)
+  atualizadoEm  DateTime @updatedAt
+  atualizadoPor String?
+}
+
 model EtiquetaCampoExtra {
-  id       String @id @default(cuid())
-  opNumero String
-  marca    String
+  id           String   @id @default(cuid())
+  opNumero     String
+  marca        String
   /// 1, 2, 3… na ordem em que a linha aparece na planilha. A etiqueta "2/3" leva a unidade 2.
   unidade      Int      @default(1)
   descricao    String? // a "DESCRIÇÃO" da planilha do cliente (ex.: "SE-001") — não é o perfil;
@@ -4761,6 +4785,8 @@ enum CotacaoStatus {
 }
 
 enum NotificacaoTipo {
+  MATERIAL_RECEBIDO
+  RASTREABILIDADE_DEFINIDA
   RM_CRIADA
   COTACAO_RESPONDIDA
   CONSULTA_ESTOQUE
@@ -4800,12 +4826,13 @@ model SolicitacaoProducao {
 // A partir dela o motor de rastreio para de usar o FIFO naquele material e passa a usar o R
 // registrado — deixa de ser regra de consumo e vira fato.
 model TrocaRastreabilidade {
-  id             String   @id @default(cuid())
-  opId           String?
-  opNumero       String
-  perfil         String
-  rIndicado      String? // o que o FIFO tinha apontado (fica pra auditoria)
-  rUsado         String // o R do fardo efetivamente separado
+  id               String   @id @default(cuid())
+  estoqueConferido Boolean  @default(false)
+  opId             String?
+  opNumero         String
+  perfil           String
+  rIndicado        String? // o que o FIFO tinha apontado (fica pra auditoria)
+  rUsado           String // o R do fardo efetivamente separado
   // ⚠⚠ ATÉ ONDE A DECLARAÇÃO VALE. Vitor (28/08/2026), sobre a OP-106: "precisamos ver como vamos
   // resolver sem você quebrar outras coisas". São dois fatos diferentes registrados no mesmo lugar:
   //   TODAS  → "todo este perfil, nesta OP, veio deste lote" (o fardo trocado na separação; era o
@@ -4814,12 +4841,12 @@ model TrocaRastreabilidade {
   //            R que o CMR da própria OP já respondeu. É o caso da peça cortada antes da entrega:
   //            na OP-106, o perfil CH12.50X100 tem 1 peça de estoque e 3 corretamente rastreadas,
   //            e aplicar a declaração nas 4 apagaria rastreio bom.
-  escopo         String   @default("TODAS") // TODAS | SEM_R
-  motivo         String?
-  trocadoPorId   String?
-  trocadoPorNome String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  escopo           String   @default("TODAS") // TODAS | SEM_R
+  motivo           String?
+  trocadoPorId     String?
+  trocadoPorNome   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@unique([opNumero, perfil])
   @@index([opNumero])
@@ -5835,6 +5862,60 @@ model FotoObra {
   @@index([criadoEm])
 }
 
+// Partes da programação; os campos da peça continuam sendo a âncora legada.
+model GanttDistribuicao {
+  id            String       @id @default(cuid())
+  pecaId        String
+  setor         String
+  quantidade    Int
+  ancoraDia     DateTime?    @db.Date
+  ancoraRecurso String?
+  partes        Json
+  updatedAt     DateTime     @updatedAt
+  peca          PecaConjunto @relation(fields: [pecaId], references: [id], onDelete: Cascade)
+
+  @@unique([pecaId, setor])
+  @@index([setor])
+}
+
+// ─── Análise Crítica de Projeto (PO-13) ───────────────────────────────────────
+// Um registro por OP, na aba Engenharia. Os blocos são JSON (listas de linhas com id)
+// porque o formato ainda vai mudar com o uso ("vamos vendo como será no dia a dia",
+// Vitor 10/09/2026). Revisão anterior fica congelada em `historico`.
+// Tabela criada por scripts/ensure-analise-critica.mjs (não usar `prisma db push`).
+model AnaliseCriticaProjeto {
+  id              String    @id @default(cuid())
+  opId            String    @unique
+  opNumero        String
+  revisao         Int       @default(0)
+  status          String    @default("EM_ANALISE") // EM_ANALISE | VERIFICADA | APROVADA
+  responsavelNome String?
+  responsavelId   String?
+  abertoEm        DateTime  @default(now())
+  aprovadoPorNome String?
+  aprovadoPorId   String?
+  aprovadoEm      DateTime?
+  entradas        Json      @default("[]")
+  requisitos      Json      @default("[]")
+  areas           Json      @default("[]")
+  riscos          Json      @default("[]")
+  saidas          Json      @default("[]")
+  comentarios     Json      @default("[]")
+  reunioes        Json      @default("[]")
+  acoes           Json      @default("[]")
+  historico       Json      @default("[]") // [{ revisao, data, porQuem, motivo, snapshot }]
+  form08Url       String?
+  form08EmitidoEm DateTime?
+  planoAcaoId     String? // plano 5W2H da Qualidade criado a partir das ações (bloco 7)
+  sharepointPath  String?
+  sharepointEm    DateTime?
+  criadoPorId     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([opNumero])
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // TORG MES — execução da produção (ver docs/mes-proprio.md)
 //
@@ -5866,13 +5947,13 @@ model FotoObra {
 // Pintura), e é essa sequência que decide o que é "adiantado" e o que é "furo de apontamento".
 // Setor criado por tela precisa poder entrar no meio da cadeia sem alguém editar um array.
 model MesSetor {
-  id     String @id @default(cuid())
+  id        String   @id @default(cuid())
   /// "PREPARACAO", "MONTAGEM" — a chave estável. O nome muda; esta não.
-  codigo String @unique
-  nome   String // "Preparação", "Montagem"
-  ordem  Int // posição na cadeia física: 10, 20, 30…
-  cor    String? // para o monitor e o Gantt
-  ativo  Boolean  @default(true)
+  codigo    String   @unique
+  nome      String // "Preparação", "Montagem"
+  ordem     Int // posição na cadeia física: 10, 20, 30…
+  cor       String? // para o monitor e o Gantt
+  ativo     Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -5883,24 +5964,24 @@ model MesSetor {
 }
 
 model MesRecurso {
-  id String @id @default(cuid())
+  id           String   @id @default(cuid())
   /// ⚠⚠ A CHAVE É A DO GANTT, NÃO A DO SYNECO. "SOLDA 5", "MONTAGEM 1", "LASER_CHAPA" — é o que
   /// `PecaConjunto.soldaBancada`/`montagemBancada`/`maquina` já gravam, então é por aqui que o
   /// totem acha o que o PCP programou. O Syneco chamaria esta mesma bancada de "40E".
-  codigo String @unique
+  codigo       String   @unique
   /// Como a fábrica chama: "Wilson Barros", "Jurandir", "Laser Chapa". Vitor batizou as bancadas
   /// com o nome de quem senta nelas — quem distribui trabalho fala em pessoa, não em código.
-  nome   String
+  nome         String
   /// ⚠ SÓ PARA RECONCILIAR ENQUANTO OS DOIS RODAM EM PARALELO ("40E", "09"). Morre com o Syneco;
   /// nada de lógica nova deve depender dele.
   codigoSyneco String?
-  setorId     String
-  tipo        String   @default("MAQUINA") // MAQUINA | BANCADA | POSTO
-  ativo       Boolean  @default(true)
-  temTerminal Boolean  @default(true)
-  ambiente    String   @default("PROD")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  setorId      String
+  tipo         String   @default("MAQUINA") // MAQUINA | BANCADA | POSTO
+  ativo        Boolean  @default(true)
+  temTerminal  Boolean  @default(true)
+  ambiente     String   @default("PROD")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   setor        MesSetor         @relation(fields: [setorId], references: [id])
   sessoes      MesSessao[]
@@ -5952,27 +6033,27 @@ model MesMotivoParada {
 // ⚠ Encerrar a sessão NÃO é concluir a OP: a sessão pode produzir parte do
 // saldo, e o restante continua disponível para a próxima.
 model MesSessao {
-  id         String    @id @default(cuid())
-  recursoId  String
-  operadorId String?
+  id           String    @id @default(cuid())
+  recursoId    String
+  operadorId   String?
   // Contexto produtivo. A marca NÃO é única globalmente — a chave é obra + marca
   // (+ operação), por isso `opId`/`opNumero` andam junto e nunca a marca sozinha.
-  opId       String? // -> OP.id
-  opNumero   String? // "T112A56" (código da obra no chão de fábrica)
-  marca      String?
-  pecaId     String? // -> PecaConjunto.id, quando resolvido
-  operacao   String? // etapa/setor da vez
-  planejadoQtd Float   @default(0)
-  status     String    @default("ABERTA") // ABERTA | ENCERRADA | CANCELADA
-  abertaEm   DateTime  @default(now())
-  encerradaEm DateTime?
-  ambiente   String    @default("PROD")
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  opId         String? // -> OP.id
+  opNumero     String? // "T112A56" (código da obra no chão de fábrica)
+  marca        String?
+  pecaId       String? // -> PecaConjunto.id, quando resolvido
+  operacao     String? // etapa/setor da vez
+  planejadoQtd Float     @default(0)
+  status       String    @default("ABERTA") // ABERTA | ENCERRADA | CANCELADA
+  abertaEm     DateTime  @default(now())
+  encerradaEm  DateTime?
+  ambiente     String    @default("PROD")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  recurso     MesRecurso          @relation(fields: [recursoId], references: [id])
-  operador    MesOperador?        @relation(fields: [operadorId], references: [id])
-  eventos     MesEvento[]
+  recurso      MesRecurso          @relation(fields: [recursoId], references: [id])
+  operador     MesOperador?        @relation(fields: [operadorId], references: [id])
+  eventos      MesEvento[]
   apontamentos MesApontamentoQtd[]
 
   // ⚠⚠ UMA SESSÃO ABERTA POR RECURSO é garantida por ÍNDICE PARCIAL no Postgres
@@ -6027,21 +6108,21 @@ model MesEvento {
 // ⚠ Rejeito não é peça boa e retrabalho não é produção nova — três colunas
 // separadas, e quem soma decide o que quer somar.
 model MesApontamentoQtd {
-  id         String   @id @default(cuid())
-  sessaoId   String
-  operadorId String?
-  boas       Float    @default(0)
-  rejeitadas Float    @default(0)
-  retrabalho Float    @default(0)
-  unidade    String   @default("UN") // UN | KG
-  origem     String   @default("TERMINAL")
+  id            String   @id @default(cuid())
+  sessaoId      String
+  operadorId    String?
+  boas          Float    @default(0)
+  rejeitadas    Float    @default(0)
+  retrabalho    Float    @default(0)
+  unidade       String   @default("UN") // UN | KG
+  origem        String   @default("TERMINAL")
   // Mesma chave de idempotência da Conferência de Peça: o front gera uma por
   // TENTATIVA e só troca depois do sucesso, então reenviar não duplica.
   chaveOperacao String?
-  observacao String?
-  ocorridoEm DateTime @default(now())
-  ambiente   String   @default("PROD")
-  createdAt  DateTime @default(now())
+  observacao    String?
+  ocorridoEm    DateTime @default(now())
+  ambiente      String   @default("PROD")
+  createdAt     DateTime @default(now())
 
   sessao MesSessao @relation(fields: [sessaoId], references: [id])
 
@@ -6058,19 +6139,19 @@ model MesApontamentoQtd {
 // máquina parada — o monitor mostra o último estado conhecido com a idade do
 // dado, e nunca inventa "parado" por falta de sinal.
 model MesDispositivo {
-  id             String    @id @default(cuid())
-  recursoId      String
-  nome           String
-  tipo           String    @default("MODBUS_TCP") // MODBUS_TCP | USB | SIMULADOR
-  host           String? // IP, quando em rede
-  porta          Int? // 502 no Modbus TCP
-  config         Json? // mapa de registradores/variáveis: Spindle, CycleCount...
-  ativo          Boolean   @default(true)
-  estadoConexao  String    @default("DESCONHECIDO") // CONECTADO | ATRASADO | DESCONECTADO | DESCONHECIDO
+  id              String    @id @default(cuid())
+  recursoId       String
+  nome            String
+  tipo            String    @default("MODBUS_TCP") // MODBUS_TCP | USB | SIMULADOR
+  host            String? // IP, quando em rede
+  porta           Int? // 502 no Modbus TCP
+  config          Json? // mapa de registradores/variáveis: Spindle, CycleCount...
+  ativo           Boolean   @default(true)
+  estadoConexao   String    @default("DESCONHECIDO") // CONECTADO | ATRASADO | DESCONECTADO | DESCONHECIDO
   ultimoContatoEm DateTime?
-  ambiente       String    @default("PROD")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  ambiente        String    @default("PROD")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   recurso MesRecurso @relation(fields: [recursoId], references: [id])
 
@@ -6081,15 +6162,15 @@ model MesDispositivo {
 // CORREÇÃO — o fato original nunca é apagado. Guarda o antes/depois e o motivo,
 // espelhando o que as procs MCA_Correcao_* do Syneco faziam de certo.
 model MesCorrecao {
-  id         String   @id @default(cuid())
-  entidade   String // MesEvento | MesApontamentoQtd | MesSessao
-  entidadeId String
-  campo      String
-  valorAntes String?
+  id          String   @id @default(cuid())
+  entidade    String // MesEvento | MesApontamentoQtd | MesSessao
+  entidadeId  String
+  campo       String
+  valorAntes  String?
   valorDepois String?
-  motivo     String
-  userId     String? // -> User.id (quem corrigiu no portal)
-  criadoEm   DateTime @default(now())
+  motivo      String
+  userId      String? // -> User.id (quem corrigiu no portal)
+  criadoEm    DateTime @default(now())
 
   @@index([entidade, entidadeId])
   @@index([criadoEm])

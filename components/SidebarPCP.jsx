@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ListOrdered, FileText, Truck, FolderKanban, Printer, Factory, Gauge, Flame, Wrench,
-  Sparkles, Paintbrush, Brush,
+  Sparkles, Paintbrush, Brush, CheckCheck,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -46,6 +46,8 @@ const menu = [
   // ⚠ PINTURA É A ÚLTIMA FILA. Depois dela a peça sai do PCP inteiro (Vitor, 06/09/2026: "após
   // passar pela pintura essas peças não devem nem aparecer em fila alguma mais").
   { href: "/pcp/fila-pintura", label: "Pintura",          icon: Brush },
+  // ⚠ fecha um setor inteiro de uma OP num clique — a SKA não tem API de escrita (09/09/2026)
+  { href: "/pcp/baixa-lote",   label: "Baixa em Lote",    icon: CheckCheck },
   // ⚠ o indicador ISO do setor mora no menu do setor, como nos outros — quem responde por ele é
   // quem opera, não a Qualidade.
   { href: "/pcp/indicadores",  label: "Indicadores",      icon: Gauge },

@@ -10,6 +10,7 @@ import MateriaisOPSection from "@/components/MateriaisOPSection";
 import { pesoRealPecas } from "@/lib/peso-op";
 import RelatoriosOPSection from "@/components/RelatoriosOPSection";
 import AbaPlanejamento from "./AbaPlanejamento";
+import AnaliseCriticaSection from "./AnaliseCriticaSection";
 import AbaExpedicao from "./AbaExpedicao";
 import ConsultaExpedicao from "./ConsultaExpedicao";
 import DesenhosOPSection from "./DesenhosOPSection";
@@ -79,7 +80,7 @@ const VISTAS = [
   { key: "financeiro", label: "Financeiro", icon: DollarSign },
 ];
 
-export default function OPDetailClient({ op, userRole, userId: _userId, podeAlterarVerba = false, podeVerFinanceiro = false, isDiretoria = false, proposta = null, comprasSlot = null, pecas = [], abas = null }) {
+export default function OPDetailClient({ op, userRole, userId: _userId, podeAlterarVerba = false, podeVerFinanceiro = false, podeGerenciarComercial = false, isDiretoria = false, proposta = null, comprasSlot = null, pecas = [], abas = null }) {
   const router = useRouter();
   const isMaster = userRole === "ADMIN";
   // As abas vêm do servidor, por módulo (lib/op-abas.js). Blindagem dupla: Resumo e Financeiro
@@ -265,7 +266,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
                   <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${s.className}`}>
                     {s.label}
                   </span>
-                  {!encerradaOuCancelada && (
+                  {podeGerenciarComercial && !encerradaOuCancelada && (
                     <button
                       onClick={() => setModalEditarOP(true)}
                       className="text-xs text-torg-gray hover:text-torg-blue inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-torg-blue-50 transition-colors"
@@ -875,7 +876,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
         </div>
       )}
 
-      {vista === "obra" && <AbaObra op={op} podeEditar={!encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} />}
+      {vista === "obra" && <AbaObra op={op} podeEditar={podeGerenciarComercial && !encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} />}
 
       {vista === "planejamento" && (
         <div className="space-y-6">
@@ -892,6 +893,8 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
       {vista === "engenharia" && (
         <div className="space-y-4">
           <DesenhosOPSection opId={op.id} opNumero={op.numero} obra={op.obra} cliente={op.cliente} refCliente={op.refCliente} />
+          {/* Análise Crítica de Projeto (PO-13) — Vitor (10/09/2026): na pasta da OP, aba Engenharia, "para não ficar alguma coisa a mais" */}
+          <AnaliseCriticaSection opId={op.id} isDiretoria={isDiretoria} />
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-1"><Ruler size={18} className="text-torg-blue" /> Engenharia</h3>
             <p className="text-sm text-torg-gray mb-4">RMs emitidas e listas de material da OP.</p>

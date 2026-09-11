@@ -1,8 +1,13 @@
 "use client";
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useStore } from "@/lib/store";
-import { Loader2, Plus, ClipboardPaste, Save, Trash2, Search, Check, X, PackagePlus, Filter, ArrowUp, ArrowDown, FileDown, RefreshCw, AlertCircle } from "lucide-react";
-import { ehMaterialDeTinta, avisosDeTinta } from "@/lib/material-tinta";
+import { Loader2, Plus, ClipboardPaste, Save, Trash2, Search, Check, X, PackagePlus, Filter, ArrowUp, ArrowDown, FileDown, RefreshCw, AlertCircle, Pencil } from "lucide-react";
+import { avisosDeTinta } from "@/lib/material-tinta";
+import CmrCampos, { VAZIO } from "./CmrCampos";
+import CmrEditarModal from "./CmrEditarModal";
+import CmrColarMassa from "./CmrColarMassa";
+import CmrExcluirModal from "./CmrExcluirModal";
+import ColunaFiltro from "./ColunaFiltro";
 
 const anoAtual = new Date().getFullYear();
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -14,10 +19,6 @@ function parseObs(observacao) {
   if (!m) return { rc: "", obs: s };
   return { rc: m[1].toUpperCase(), obs: s.slice(m[0].length).trim() };
 }
-const inp = "w-full text-sm border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-torg-blue outline-none";
-const lbl = "block text-[11px] font-medium text-torg-gray uppercase tracking-wide mb-1";
-
-const VAZIO = { rc: "R", descricao: "", especificacao: "", certificado: "", loteCorrida: "", pedidoCompra: "", dataRecebimento: "", nf: "", fornecedor: "", obra: "", qtd: "", pesoLitro: "", validade: "", observacao: "" };
 // Ordem das colunas ao COLAR do Excel (igual à planilha CMR; o índice R é automático).
 const COLS_MASSA = ["rc", "_indice", "descricao", "certificado", "loteCorrida", "especificacao", "pedidoCompra", "dataRecebimento", "nf", "fornecedor", "obra", "qtd", "pesoLitro", "observacao"];
 
@@ -53,6 +54,7 @@ export default function CmrLancarClient() {
   const [salvando, setSalvando] = useState(false);
   const [pedido, setPedido] = useState(null); // itens puxados do pedido de compra
   const [buscandoPed, setBuscandoPed] = useState(false);
+  const [itemPedido, setItemPedido] = useState(null); // idx da linha do pedido escolhida
   const [filtros, setFiltros] = useState({}); // { colKey: Set(valores) }
   const [ordenar, setOrdenar] = useState(null); // { key, dir }
   const [filtroAberto, setFiltroAberto] = useState(null); // { key, rect }
@@ -61,6 +63,7 @@ export default function CmrLancarClient() {
   const [excluir, setExcluir] = useState(null);      // linha em confirmação de exclusão
   const [confExcl, setConfExcl] = useState(false);   // checkbox de confirmação
   const [excluindo, setExcluindo] = useState(false);
+  const [editar, setEditar] = useState(null);        // linha aberta para edição
 
   // Normaliza cada item p/ o filtro/ordenação (rc derivado, cert, data formatada).
   const linhas = useMemo(() => (dados?.itens || []).map((it) => {
@@ -113,7 +116,7 @@ export default function CmrLancarClient() {
   async function puxarPedido() {
     const num = (form.pedidoCompra || "").trim();
     if (!num) { showToast("Digite o nº do pedido de compra", "erro"); return; }
-    setBuscandoPed(true); setPedido(null);
+    setBuscandoPed(true); setPedido(null); setItemPedido(null);
     try {
       const j = await fetch(`/api/compras/cmr/pedido?numero=${encodeURIComponent(num)}`).then((r) => r.json());
       if (!j.success) throw new Error(j.error || "Pedido não encontrado");
@@ -122,12 +125,22 @@ export default function CmrLancarClient() {
       setForm((s) => ({ ...s, fornecedor: j.fornecedor || s.fornecedor, obra: (j.obra || s.obra || "").replace(/^OP\s*/i, "OP "), nf: j.nf || s.nf }));
     } catch (e) { showToast(e.message, "erro"); } finally { setBuscandoPed(false); }
   }
+  /**
+   * ⚠⚠ A ESCOLHA É PELO ÍNDICE DA LINHA DO PEDIDO, NUNCA PELA DESCRIÇÃO. Matheus (11/09/2026):
+   * "quando ele digita um número de pedido e aparecem itens repetidos, ele precisa conseguir
+   * selecionar apenas o que quer e ver a quantidade que está no pedido". Comparando descrição, um
+   * pedido com a MESMA peça em três linhas acendia as três ao clicar em qualquer uma — e não havia
+   * como dizer qual delas tinha sido escolhida, nem quanto faltava de cada uma.
+   *
+   * ⚠ A QUANTIDADE SUGERIDA É O SALDO, não o total do pedido. Numa linha de 40 peças com 25 já
+   * recebidas, quem chega hoje traz 15; sugerir 40 faz o lançamento nascer errado por padrão. O
+   * campo continua editável, e o saldo está escrito ao lado.
+   */
   function escolherItemPedido(it) {
-    setForm((s) => ({ ...s, descricao: it.descricao, qtd: it.qtd ? String(it.qtd) : s.qtd }));
+    setItemPedido(it.idx);
+    const saldo = Math.max(0, (Number(it.qtd) || 0) - (Number(it.qtdRecebida) || 0)) || Number(it.qtd) || 0;
+    setForm((s) => ({ ...s, descricao: it.descricao, qtd: saldo ? String(saldo) : s.qtd }));
   }
-
-  // ⚠ lê a descrição ao vivo: o campo tem de aparecer enquanto a pessoa digita, não depois de salvar
-  const ehTintaAqui = ehMaterialDeTinta(form.descricao);
 
   async function salvarForm() {
     if (!form.descricao.trim()) { showToast("Informe a descrição do material", "erro"); return; }
@@ -141,14 +154,52 @@ export default function CmrLancarClient() {
     )) return;
     setSalvando(true);
     try {
-      const r = await fetch("/api/compras/cmr", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ano, lancamentos: [form] }) });
-      const j = await r.json();
-      if (!j.success) throw new Error(j.error || "Erro");
-      const sp = j.planilha ? (j.planilha.ok ? " · planilha atualizada" : " · ⚠ planilha não atualizada") : "";
-      showToast(`Lançado — índice R ${j.indices?.[0] || ""}${sp}`, "success");
-      setForm({ ...VAZIO, rc: form.rc, obra: form.obra, fornecedor: form.fornecedor, dataRecebimento: form.dataRecebimento, nf: form.nf }); // mantém campos repetitivos
-      carregar();
+      const j = await lancar([form]);
+      showToast(`Lançado — índice R ${j.indices?.[0] || ""} · enviando para a planilha…`, "success");
+      // Mantém os campos repetitivos: quem lança uma nota inteira repete fornecedor, obra e NF.
+      setForm({ ...VAZIO, rc: form.rc, obra: form.obra, fornecedor: form.fornecedor, dataRecebimento: form.dataRecebimento, nf: form.nf });
+      setItemPedido(null);
     } catch (e) { showToast(e.message, "erro"); } finally { setSalvando(false); }
+  }
+
+  /**
+   * GRAVA E DEVOLVE A TELA NA HORA — a planilha vai atrás, sem segurar ninguém.
+   *
+   * ⚠⚠ MATHEUS (11/09/2026): "está lento o botão de lançar; quando clicar já entrar na linha e ir
+   * carregando o que precisar nesse meio tempo". Os segundos eram do writeback no SharePoint —
+   * seis chamadas ao Graph esperadas ANTES da resposta. Agora a rota grava e responde (`espelhar:
+   * false`), a linha entra na tabela com o R já definitivo, e `/espelhar` roda em seguida.
+   *
+   * ⚠ A LINHA QUE ENTRA VEM DO SERVIDOR, não é montada aqui. Uma linha "otimista" montada no
+   * navegador mostraria a obra como foi digitada ("OP 0105") em vez da forma canônica que o banco
+   * guardou — e a pessoa conferiria a tela achando que conferiu o registro.
+   *
+   * ⚠ FALHAR AQUI NÃO PERDE NADA: a reconciliação (diária e no botão Sincronizar) reenvia à
+   * planilha os R que o portal tem e ela não. Por isso o erro só avisa, não desfaz.
+   */
+  async function lancar(lancamentos) {
+    const r = await fetch("/api/compras/cmr", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ano, lancamentos, espelhar: false }),
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error || "Erro");
+    if (j.itens?.length) setDados((d) => (d ? { ...d, itens: [...j.itens, ...d.itens], total: (d.total || 0) + j.itens.length } : d));
+    espelhar(j.indices || []);
+    return j;
+  }
+
+  async function espelhar(indices) {
+    if (!indices.length) return;
+    try {
+      const j = await fetch("/api/compras/cmr/espelhar", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ano, indices }),
+      }).then((r) => r.json());
+      if (!j.ok) showToast(`R ${indices[0]} gravado, mas a planilha não recebeu — use Sincronizar planilha`, "erro");
+    } catch {
+      showToast("Lançado no portal; a planilha será atualizada na próxima sincronização", "info");
+    }
   }
 
   function colar(texto) {
@@ -166,12 +217,9 @@ export default function CmrLancarClient() {
     if (!validos.length) { showToast("Cole linhas com descrição preenchida", "erro"); return; }
     setSalvando(true);
     try {
-      const r = await fetch("/api/compras/cmr", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ano, lancamentos: validos }) });
-      const j = await r.json();
-      if (!j.success) throw new Error(j.error || "Erro");
-      const sp = j.planilha ? (j.planilha.ok ? " · planilha atualizada" : " · ⚠ planilha não atualizada") : "";
-      showToast(`${j.criados} lançamento(s) gravados (${j.indices?.[0]}…${j.indices?.[j.indices.length - 1]})${sp}`, "success");
-      setMassa([]); setModo(null); carregar();
+      const j = await lancar(validos);
+      showToast(`${j.criados} lançamento(s) gravados (${j.indices?.[0]}…${j.indices?.[j.indices.length - 1]}) · enviando para a planilha…`, "success");
+      setMassa([]); setModo(null);
     } catch (e) { showToast(e.message, "erro"); } finally { setSalvando(false); }
   }
 
@@ -263,59 +311,48 @@ export default function CmrLancarClient() {
                 <p className="text-[12px] font-semibold text-torg-dark">Pedido {pedido.pedido} · {pedido.fornecedor || "—"}{pedido.obra ? ` · ${pedido.obra}` : ""} <span className="font-normal text-torg-gray">— toque no item que chegou</span></p>
                 <button onClick={() => setPedido(null)} className="text-torg-gray hover:text-red-600"><X size={15} /></button>
               </div>
-              <div className="max-h-44 overflow-y-auto divide-y divide-torg-blue-100/60">
+              {/* ⚠⚠ UMA LINHA DO PEDIDO NÃO É UMA DESCRIÇÃO. Matheus (11/09/2026): "quando digita
+                  um número de pedido e aparecem itens repetidos, precisa conseguir selecionar
+                  apenas o que quer e ver a quantidade que está no pedido". O pedido traz a mesma
+                  peça em várias linhas (entregas, obras, preços diferentes); marcando por descrição,
+                  clicar numa acendia TODAS e não dava para saber qual foi. Agora cada linha tem
+                  número, quantidade, quanto já chegou e quanto falta. */}
+              <div className="max-h-52 overflow-y-auto divide-y divide-torg-blue-100/60">
                 {pedido.itens.length === 0 ? <p className="px-3 py-2 text-xs text-torg-gray">Pedido sem itens.</p>
                   : pedido.itens.map((it) => {
-                    const escolhido = form.descricao === it.descricao;
+                    const escolhido = itemPedido === it.idx;
+                    const falta = Math.max(0, (Number(it.qtd) || 0) - (Number(it.qtdRecebida) || 0));
                     return (
                       <button key={it.idx} type="button" onClick={() => escolherItemPedido(it)}
-                        className={`w-full text-left px-3 py-2 text-xs hover:bg-white/70 flex items-center gap-2 ${escolhido ? "bg-white" : ""}`}>
-                        <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${escolhido ? "bg-torg-blue border-torg-blue" : "border-gray-300"}`}>{escolhido && <Check size={11} className="text-white" />}</span>
-                        <span className="flex-1 min-w-0"><span className="text-torg-dark block truncate">{it.descricao}</span>
-                          <span className="text-torg-gray">{fmtNum(it.qtd)} {it.unidade || ""}{it.qtdRecebida > 0 ? ` · já receb. ${fmtNum(it.qtdRecebida)}` : ""}</span></span>
+                        className={`w-full text-left px-3 py-2 text-xs hover:bg-white/70 flex items-start gap-2 ${escolhido ? "bg-white ring-1 ring-inset ring-torg-blue" : ""}`}>
+                        <span className={`w-4 h-4 mt-0.5 rounded border flex items-center justify-center shrink-0 ${escolhido ? "bg-torg-blue border-torg-blue" : "border-gray-300"}`}>{escolhido && <Check size={11} className="text-white" />}</span>
+                        {/* O número do item é o que separa duas linhas idênticas — sem ele, "qual
+                            das três?" não tem resposta na tela. */}
+                        <span className="font-mono text-[10px] text-torg-gray mt-0.5 shrink-0 w-5">{it.idx + 1}.</span>
+                        <span className="flex-1 min-w-0">
+                          <span className="text-torg-dark block truncate" title={it.descricao}>{it.descricao}</span>
+                          <span className="text-torg-gray tabular-nums">
+                            pedido {fmtNum(it.qtd)} {it.unidade || ""}
+                            {it.qtdRecebida > 0 && <> · já recebido <b className="text-torg-dark">{fmtNum(it.qtdRecebida)}</b></>}
+                            {" · "}
+                            {falta > 0
+                              ? <b className="text-torg-orange">faltam {fmtNum(falta)}</b>
+                              : <b className="text-emerald-700">entregue</b>}
+                          </span>
+                        </span>
                       </button>
                     );
                   })}
               </div>
             </div>
           )}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div><span className={lbl}>R / RC</span>
-              <div className="flex gap-1">
-                {["R", "RC"].map((t) => <button key={t} type="button" onClick={() => setF("rc", t)} className={`flex-1 py-2.5 rounded-lg text-sm font-medium border ${form.rc === t ? "bg-torg-blue text-white border-torg-blue" : "border-gray-300 text-torg-dark"}`}>{t}</button>)}
-              </div>
-            </div>
-            <div className="col-span-2 sm:col-span-3"><span className={lbl}>Descrição do material *</span>
-              <Autocomplete campo="descricao" value={form.descricao} onChange={(v) => setF("descricao", v)} placeholder="ex.: PERFIL W ACO CARBONO…" /></div>
-            <div className="col-span-2"><span className={lbl}>Especificação técnica (norma)</span>
-              <Autocomplete campo="norma" value={form.especificacao} onChange={(v) => setF("especificacao", v)} placeholder="ex.: ASTM A572" /></div>
-            <div><span className={lbl}>Nº certificado</span><input value={form.certificado} onChange={(e) => setF("certificado", e.target.value)} className={inp} /></div>
-            <div><span className={lbl}>Lote / corrida</span><input value={form.loteCorrida} onChange={(e) => setF("loteCorrida", e.target.value)} className={inp} /></div>
-            <div><span className={lbl}>Pedido compra</span>
-              <div className="flex gap-1">
-                <input value={form.pedidoCompra} onChange={(e) => setF("pedidoCompra", e.target.value)} onKeyDown={(e) => e.key === "Enter" && puxarPedido()} placeholder="nº" className={inp} />
-                <button type="button" onClick={puxarPedido} disabled={buscandoPed} title="Puxar os itens do pedido" className="px-3 rounded-lg bg-torg-blue text-white hover:bg-torg-dark disabled:opacity-50 shrink-0">{buscandoPed ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}</button>
-              </div>
-            </div>
-            <div><span className={lbl}>Data receb.</span><input type="date" value={form.dataRecebimento} onChange={(e) => setF("dataRecebimento", e.target.value)} className={inp} /></div>
-            <div><span className={lbl}>Nº NF</span><input value={form.nf} onChange={(e) => setF("nf", e.target.value)} inputMode="numeric" className={inp} /></div>
-            <div><span className={lbl}>Fornecedor</span><input value={form.fornecedor} onChange={(e) => setF("fornecedor", e.target.value)} className={inp} /></div>
-            <div><span className={lbl}>Obra (OP)</span><input value={form.obra} onChange={(e) => setF("obra", e.target.value)} placeholder="ex.: OP 067" className={inp} /></div>
-            <div><span className={lbl}>Qtd peças</span><input value={form.qtd} onChange={(e) => setF("qtd", e.target.value)} inputMode="numeric" className={inp} /></div>
-            <div><span className={lbl}>Peso / litro</span><input value={form.pesoLitro} onChange={(e) => setF("pesoLitro", e.target.value)} inputMode="decimal" className={inp} /></div>
-            {/* ⚠⚠ O CAMPO APARECE SOZINHO QUANDO É TINTA. Vitor (07/09/2026): "quando identificar
-                que é recebimento de tinta isso deve ser solicitado para o preenchimento na tela de
-                recebimento". Sem validade não existe FEFO, e um campo permanente na tela seria mais
-                um que ninguém preenche — ele só aparece quando importa, e aí pede atenção. */}
-            {ehTintaAqui && (
-              <div>
-                <span className={lbl}>Validade do lote <span className="text-torg-orange">· tinta</span></span>
-                <input type="date" value={form.validade} onChange={(e) => setF("validade", e.target.value)}
-                  className={`${inp} ${form.validade ? "" : "border-torg-orange bg-orange-50"}`} />
-              </div>
-            )}
-            <div className="col-span-2 sm:col-span-4"><span className={lbl}>Observação</span><input value={form.observacao} onChange={(e) => setF("observacao", e.target.value)} className={inp} /></div>
-          </div>
+          <CmrCampos form={form} setF={setF} aoBuscarPedido={puxarPedido}
+            pedidoSlot={
+              <button type="button" onClick={puxarPedido} disabled={buscandoPed} title="Puxar os itens do pedido"
+                className="px-3 rounded-lg bg-torg-blue text-white hover:bg-torg-dark disabled:opacity-50 shrink-0">
+                {buscandoPed ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
+              </button>
+            } />
           <div className="flex justify-end gap-2">
             <button onClick={() => setModo(null)} className="px-4 py-2.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
             <button onClick={salvarForm} disabled={salvando} className="px-5 py-2.5 bg-torg-blue text-white rounded-lg text-sm font-medium inline-flex items-center gap-2 hover:bg-torg-dark disabled:opacity-50">
@@ -327,44 +364,9 @@ export default function CmrLancarClient() {
 
       {/* Colar em massa */}
       {modo === "massa" && (
-        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-3">
-          <p className="text-[12px] text-torg-gray">Copie as linhas do Excel (na ordem da planilha) e cole abaixo. O <strong>índice R é automático</strong>. Confira na prévia e grave.</p>
-          <textarea rows={4} onPaste={(e) => { e.preventDefault(); colar(e.clipboardData.getData("text")); }} onChange={(e) => colar(e.target.value)}
-            placeholder="Cole aqui (Ctrl+V) as linhas copiadas do Excel…" className="w-full text-xs border border-gray-300 rounded-lg px-3 py-2 font-mono focus:ring-2 focus:ring-torg-blue outline-none" />
-          {massa.length > 0 && (
-            <>
-              <div className="overflow-x-auto border border-gray-100 rounded-lg max-h-72 overflow-y-auto">
-                <table className="w-full text-xs whitespace-nowrap">
-                  <thead className="bg-gray-50/60 sticky top-0"><tr className="text-[10px] text-gray-500 uppercase">
-                    <th className="px-2 py-1.5 text-left">R/RC</th><th className="px-2 py-1.5 text-left">Descrição</th><th className="px-2 py-1.5 text-left">Espec.</th><th className="px-2 py-1.5 text-left">Certif.</th><th className="px-2 py-1.5 text-left">Corrida</th><th className="px-2 py-1.5 text-left">Pedido</th><th className="px-2 py-1.5 text-left">Data</th><th className="px-2 py-1.5 text-left">NF</th><th className="px-2 py-1.5 text-left">Forn.</th><th className="px-2 py-1.5 text-left">Obra</th><th className="px-2 py-1.5 text-right">Qtd</th><th className="px-2 py-1.5 text-right">Peso</th><th className="px-2 py-1.5"></th>
-                  </tr></thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {massa.map((m, i) => (
-                      <tr key={i} className="hover:bg-gray-50/50">
-                        <td className="px-2 py-1 font-mono">{m.rc}</td>
-                        <td className="px-2 py-1 max-w-[260px] truncate" title={m.descricao}>{m.descricao}</td>
-                        <td className="px-2 py-1">{m.especificacao}</td><td className="px-2 py-1">{m.certificado}</td><td className="px-2 py-1">{m.loteCorrida}</td><td className="px-2 py-1">{m.pedidoCompra}</td><td className="px-2 py-1">{m.dataRecebimento}</td><td className="px-2 py-1">{m.nf}</td><td className="px-2 py-1">{m.fornecedor}</td><td className="px-2 py-1">{m.obra}</td>
-                        <td className="px-2 py-1 text-right tabular-nums">{m.qtd}</td><td className="px-2 py-1 text-right tabular-nums">{m.pesoLitro}</td>
-                        <td className="px-2 py-1 text-right"><button onClick={() => setMassa((a) => a.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-600"><Trash2 size={13} /></button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] text-torg-gray">{massa.length} linha(s) prontas.</span>
-                <div className="flex gap-2">
-                  <button onClick={() => setMassa([])} className="px-4 py-2 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-50">Limpar</button>
-                  <button onClick={salvarMassa} disabled={salvando} className="px-5 py-2 bg-torg-blue text-white rounded-lg text-sm font-medium inline-flex items-center gap-2 hover:bg-torg-dark disabled:opacity-50">
-                    {salvando ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Gravar {massa.length}
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        <CmrColarMassa massa={massa} setMassa={setMassa} colar={colar}
+          salvarMassa={salvarMassa} salvando={salvando} />
       )}
-
       {/* Lista do ano */}
       <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
@@ -426,7 +428,12 @@ export default function CmrLancarClient() {
                   const rowBg = sel ? "bg-torg-blue-100" : (l.certOk ? "bg-yellow-50" : "bg-red-50");
                   const rowHover = sel ? "" : (l.certOk ? "hover:bg-yellow-100/70" : "hover:bg-red-100/60");
                   return (
+                  // ⚠ DUPLO CLIQUE ABRE A EDIÇÃO, clique simples continua só marcando a linha.
+                  // Matheus (11/09/2026): "tem um ícone de editar ou dar um duplo clique na coluna
+                  // liberar edição da linha". O clique simples já tinha dono (marcar a linha para
+                  // conferir de olho na tabela larga) e trocá-lo abriria um modal a cada toque.
                   <tr key={l.id} onClick={() => setSelecionada(sel ? null : l.id)}
+                    onDoubleClick={() => setEditar(l)} title="Duplo clique para editar"
                     className={`align-top cursor-pointer ${rowBg} ${rowHover}`}>
                     <td className={`px-2.5 py-1 font-mono font-semibold sticky left-0 z-10 min-w-[56px] max-w-[56px] ${rowBg}`}>{l.rc}</td>
                     <td className={`px-2.5 py-1 font-mono text-torg-blue sticky left-[56px] z-10 min-w-[80px] ${rowBg}`}>{l.importRef}</td>
@@ -442,7 +449,9 @@ export default function CmrLancarClient() {
                     <td className="px-2.5 py-1 text-right tabular-nums">{fmtNum(l.quantidade)}</td>
                     <td className="px-2.5 py-1 text-right tabular-nums">{fmtNum(l.pesoKg)}</td>
                     <td className="px-2.5 py-1 min-w-[220px] max-w-[340px] whitespace-normal break-words leading-snug text-torg-gray" title={l.obs}><span className="line-clamp-2">{l.obs || "—"}</span></td>
-                    <td className="px-2.5 py-1 text-right">
+                    <td className="px-2.5 py-1 text-right whitespace-nowrap">
+                      <button onClick={(e) => { e.stopPropagation(); setEditar(l); }} title="Editar este lançamento"
+                        className="text-gray-400 hover:text-torg-blue p-1 rounded hover:bg-torg-blue-50"><Pencil size={14} /></button>
                       <button onClick={(e) => { e.stopPropagation(); setExcluir(l); setConfExcl(false); }} title="Excluir este lançamento"
                         className="text-gray-300 hover:text-red-600 p-1 rounded hover:bg-red-50"><Trash2 size={14} /></button>
                     </td>
@@ -454,37 +463,20 @@ export default function CmrLancarClient() {
         </div>
       </div>
 
-      {/* Modal de confirmação de exclusão (várias confirmações) */}
       {excluir && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => !excluindo && setExcluir(null)}>
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-              <AlertCircle size={18} className="text-red-600" />
-              <h3 className="text-base font-bold text-torg-dark">Excluir lançamento CMR</h3>
-            </div>
-            <div className="px-5 py-4 space-y-3 text-sm">
-              <p className="text-torg-dark">Você está prestes a excluir o rastreio abaixo. <strong className="text-red-600">Esta ação é permanente.</strong></p>
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-[13px] space-y-0.5">
-                <p><span className="text-torg-gray">Índice R:</span> <strong className="font-mono text-torg-blue">{excluir.importRef}</strong></p>
-                <p><span className="text-torg-gray">Material:</span> {excluir.nome}</p>
-                {excluir.fornecedor && <p><span className="text-torg-gray">Fornecedor:</span> {excluir.fornecedor}</p>}
-                {excluir.nfNumero && <p><span className="text-torg-gray">NF:</span> {excluir.nfNumero}</p>}
-              </div>
-              <p className="text-[12px] text-torg-gray">O índice R continua reservado na planilha (a linha é limpa), e a exclusão fica registrada no log com seu usuário e horário.</p>
-              <label className="flex items-start gap-2 cursor-pointer bg-red-50 border border-red-200 rounded-lg p-2.5">
-                <input type="checkbox" checked={confExcl} onChange={(e) => setConfExcl(e.target.checked)} className="mt-0.5" />
-                <span className="text-[13px] text-red-700">Confirmo que quero excluir o <strong>R {excluir.importRef}</strong> permanentemente.</span>
-              </label>
-            </div>
-            <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
-              <button onClick={() => { setExcluir(null); setConfExcl(false); }} disabled={excluindo} className="px-4 py-2 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
-              <button onClick={executarExcluir} disabled={!confExcl || excluindo}
-                className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                {excluindo ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />} Excluir R {excluir.importRef}
-              </button>
-            </div>
-          </div>
-        </div>
+        <CmrExcluirModal excluir={excluir} setExcluir={setExcluir} confExcl={confExcl}
+          setConfExcl={setConfExcl} excluindo={excluindo} executarExcluir={executarExcluir} />
+      )}
+
+      {editar && (
+        <CmrEditarModal linha={editar} ano={ano} onFechar={() => setEditar(null)}
+          onSalvo={(item) => {
+            // ⚠ ATUALIZA A LINHA NO LUGAR em vez de recarregar a lista inteira: a tabela tem
+            // milhares de linhas com filtro e rolagem, e um refetch devolveria a pessoa ao topo
+            // logo depois de ela corrigir uma linha que estava procurando.
+            setDados((d) => d ? { ...d, itens: d.itens.map((x) => (x.id === item.id ? { ...x, ...item } : x)) } : d);
+            setEditar(null);
+          }} />
       )}
 
       {filtroAberto && (
@@ -498,82 +490,6 @@ export default function CmrLancarClient() {
           onAplicar={(sel) => { setFiltros((f) => { const n = { ...f }; if (sel) n[filtroAberto.key] = sel; else delete n[filtroAberto.key]; return n; }); setFiltroAberto(null); }}
           onClose={() => setFiltroAberto(null)}
         />
-      )}
-    </div>
-  );
-}
-
-// Popup de filtro de coluna (estilo Excel): ordenar, pesquisar, marcar/desmarcar valores.
-function ColunaFiltro({ col, rect, valores, selecionados, ordenar, onOrdenar, onAplicar, onClose }) {
-  const [q, setQ] = useState("");
-  const [sel, setSel] = useState(() => new Set(selecionados || valores)); // undefined = todos
-  const filtrados = valores.filter((v) => v.toLowerCase().includes(q.toLowerCase()));
-  const todosMarcados = filtrados.every((v) => sel.has(v));
-  const toggle = (v) => setSel((s) => { const n = new Set(s); n.has(v) ? n.delete(v) : n.add(v); return n; });
-  const marcarTodos = () => setSel((s) => { const n = new Set(s); if (todosMarcados) filtrados.forEach((v) => n.delete(v)); else filtrados.forEach((v) => n.add(v)); return n; });
-  function aplicar() {
-    // se selecionou tudo → sem filtro (undefined); senão manda o set
-    onAplicar(sel.size === valores.length ? null : new Set(sel));
-  }
-  const left = Math.max(8, Math.min(rect.left, (typeof window !== "undefined" ? window.innerWidth : 1200) - 300));
-  const top = rect.bottom + 4;
-  return (
-    <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="fixed z-50 w-72 bg-white border border-gray-200 rounded-lg shadow-xl text-[12px]" style={{ left, top }}>
-        <div className="p-2 border-b border-gray-100">
-          <p className="text-[10px] font-semibold text-torg-gray uppercase px-1 pb-1">{col.label}</p>
-          <button onClick={() => onOrdenar(ordenar === "asc" ? null : "asc")} className={`w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 inline-flex items-center gap-2 ${ordenar === "asc" ? "text-torg-blue" : ""}`}><ArrowUp size={13} /> Ordenar A→Z (menor→maior)</button>
-          <button onClick={() => onOrdenar(ordenar === "desc" ? null : "desc")} className={`w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 inline-flex items-center gap-2 ${ordenar === "desc" ? "text-torg-blue" : ""}`}><ArrowDown size={13} /> Ordenar Z→A (maior→menor)</button>
-        </div>
-        <div className="p-2">
-          <div className="relative mb-2">
-            <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} autoFocus placeholder="Pesquisar…" className="w-full pl-7 pr-2 py-1.5 border border-gray-300 rounded-lg text-xs" />
-          </div>
-          <label className="flex items-center gap-2 px-1 py-1 font-medium cursor-pointer">
-            <input type="checkbox" checked={todosMarcados} onChange={marcarTodos} /> (Selecionar tudo)
-          </label>
-          <div className="max-h-56 overflow-y-auto border-t border-gray-100 mt-1 pt-1">
-            {filtrados.length === 0 ? <p className="px-1 py-2 text-torg-gray">Nada encontrado.</p>
-              : filtrados.map((v) => (
-                <label key={v} className="flex items-center gap-2 px-1 py-0.5 cursor-pointer hover:bg-gray-50 rounded">
-                  <input type="checkbox" checked={sel.has(v)} onChange={() => toggle(v)} />
-                  <span className="truncate" title={v}>{v}</span>
-                </label>
-              ))}
-          </div>
-        </div>
-        <div className="p-2 border-t border-gray-100 flex justify-end gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
-          <button onClick={aplicar} className="px-3 py-1.5 bg-torg-blue text-white rounded-lg hover:bg-torg-dark">OK</button>
-        </div>
-      </div>
-    </>
-  );
-}
-
-// Input com autocomplete (/api/compras/cmr/sugestoes).
-function Autocomplete({ campo, value, onChange, placeholder }) {
-  const [lista, setLista] = useState([]);
-  const [aberto, setAberto] = useState(false);
-  const box = useRef(null);
-  useEffect(() => {
-    if (!aberto || (value || "").trim().length < 2) { setLista([]); return; }
-    const t = setTimeout(() => {
-      fetch(`/api/compras/cmr/sugestoes?campo=${campo}&q=${encodeURIComponent(value.trim())}`).then((r) => r.json()).then((j) => setLista(j.sugestoes || [])).catch(() => setLista([]));
-    }, 250);
-    return () => clearTimeout(t);
-  }, [value, aberto, campo]);
-  return (
-    <div className="relative" ref={box}>
-      <input value={value} onChange={(e) => { onChange(e.target.value); setAberto(true); }} onFocus={() => setAberto(true)} onBlur={() => setTimeout(() => setAberto(false), 150)} placeholder={placeholder} className={inp} />
-      {aberto && lista.length > 0 && (
-        <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-          {lista.map((v, i) => (
-            <button key={i} type="button" onMouseDown={(e) => { e.preventDefault(); onChange(v); setAberto(false); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-torg-blue-50 border-b border-gray-50 last:border-0">{v}</button>
-          ))}
-        </div>
       )}
     </div>
   );

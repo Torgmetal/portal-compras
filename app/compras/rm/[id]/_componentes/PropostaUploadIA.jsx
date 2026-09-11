@@ -61,6 +61,20 @@ export function PropostaUploadIA({
           </button>
         </div>
       )}
+      {/* ⚠⚠ A LEITURA VEIO PELA METADE — E ISSO TEM DE SER A PRIMEIRA COISA QUE SE VÊ. Proposta
+          grande estoura o teto de saída da IA e ela para no meio de um item; o portal aproveita o
+          que fechou (antes devolvia zero), mas o que fechou NÃO é a proposta inteira. A tarja fica
+          acima da contagem de propósito: lida na ordem errada, "47 itens preenchidos" é a frase que
+          faz alguém dar a cotação por conferida. */}
+      {parseInfo?.parcial && (
+        <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <p className="font-bold">⚠ Leitura incompleta — a proposta é maior do que o que foi lido.</p>
+          <p className="mt-0.5">
+            Vieram <strong>{parseInfo.parcial.lidos}</strong> {parseInfo.parcial.lidos === 1 ? "item" : "itens"} do arquivo.
+            {" "}Confira a proposta e preencha à mão o que ficou de fora — ou envie o PDF em partes.
+          </p>
+        </div>
+      )}
       {parseInfo && (
         <div className="mt-2 flex items-center justify-between flex-wrap gap-2 text-xs">
           {parseInfo.match > 0 ? (

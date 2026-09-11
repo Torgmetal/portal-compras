@@ -22,9 +22,22 @@ export async function POST(req, { params }) {
 
   const cotItem = await prisma.cotacaoItem.findUnique({
     where: { id: params.id },
-    select: { id: true, rmItemId: true, cotacaoId: true },
+    select: { id: true, rmItemId: true, cotacaoId: true, semEstoque: true, precoUnit: true },
   });
   if (!cotItem) return NextResponse.json({ error: "Item de cotação não encontrado." }, { status: 404 });
+
+  // ⚠⚠ ITEM SEM DISPONIBILIDADE NÃO PODE VENCER, E A REGRA É DO SERVIDOR. Matheus (11/09/2026):
+  // "quando eles marcarem sem disponibilidade, mesmo que preencham números de valores, deve ficar
+  // como sem disponibilidade no portal". A tela já não deixa clicar na célula, mas quem garantia
+  // isso era só a tela — e é do vencedor que sai o pedido. Vencedor com preço zero também não: o
+  // gerador o ignoraria em silêncio e o comprador ficaria esperando um pedido que nunca sai.
+  if (body.vencedor && (cotItem.semEstoque || !(Number(cotItem.precoUnit) > 0))) {
+    return NextResponse.json({
+      error: cotItem.semEstoque
+        ? "Este fornecedor informou que não tem disponibilidade deste item."
+        : "Item sem preço não pode ser marcado como vencedor.",
+    }, { status: 409 });
+  }
 
   await prisma.$transaction(async (tx) => {
     if (body.vencedor) {

@@ -113,10 +113,14 @@ export default function RemessaTerceiroClient() {
           <div className="px-6 py-12 text-center"><Factory size={28} className="mx-auto text-gray-300 mb-2" /><p className="text-sm font-semibold text-torg-dark">Nenhuma remessa {filtro === "pendente" ? "aguardando emissão" : ""}</p><p className="text-xs text-torg-gray mt-1">As remessas aparecem aqui quando a Expedição cria um romaneio a terceiro.</p></div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[920px]">
+            <table className="w-full text-sm min-w-[1010px]">
               <thead className="bg-gray-50/60">
                 <tr className="text-[11px] text-gray-500 uppercase">
                   <th className="px-3 py-2 text-left font-medium">RT</th>
+                  {/* ⚠ Matheus (11/09/2026): "precisamos colocar data que a remessa foi criada, uma
+                      coluna dessa". A tela já buscava `dataEnvio` e não mostrava data nenhuma — dava
+                      para ordenar por ela sem nunca saber de quando era a linha. */}
+                  <th className="px-3 py-2 text-left font-medium">Criada em</th>
                   <th className="px-3 py-2 text-left font-medium">Terceiro / CNPJ</th>
                   <th className="px-3 py-2 text-left font-medium">OP ref</th>
                   <th className="px-3 py-2 text-right font-medium">Itens</th>
@@ -132,6 +136,18 @@ export default function RemessaTerceiroClient() {
                   return (
                     <tr key={r.id} className="hover:bg-gray-50/60">
                       <td className="px-3 py-2 font-mono text-torg-dark text-xs whitespace-nowrap">RT-{String(r.numero).padStart(3, "0")}</td>
+                      {/* ⚠⚠ DUAS DATAS, E SÓ UMA COLUNA. "Criada em" é quando a remessa entrou nesta
+                          fila (pré-criada junto do romaneio); `dataEnvio` é o dia em que o material
+                          saiu de verdade — e é por ela que a lista vem ordenada. Quase sempre é o
+                          mesmo dia; a segunda linha só aparece QUANDO DIFEREM, porque aí a diferença
+                          é informação (romaneio lançado depois do embarque) e, quando são iguais,
+                          repetir a data seria ruído numa tabela já larga. */}
+                      <td className="px-3 py-2 text-xs text-torg-gray whitespace-nowrap">
+                        {fmtD(r.criadaEm)}
+                        {r.dataEnvio && fmtD(r.dataEnvio) !== fmtD(r.criadaEm) && (
+                          <span className="block text-[10px] text-torg-gray/80">envio {fmtD(r.dataEnvio)}</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2">
                         <span className="text-torg-dark font-medium">{r.terceiro?.nome}</span>
                         <span className="block text-[11px] text-torg-gray">{r.terceiro?.cnpj || "sem CNPJ no cadastro"}{r.terceiro?.uf ? ` · ${r.terceiro.uf}` : ""}{r.servico ? ` · ${r.servico}` : ""}</span>

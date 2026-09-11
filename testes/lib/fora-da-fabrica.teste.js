@@ -20,6 +20,15 @@ beforeEach(()=>{
 });
 
 describe('peças que estão com terceiro',()=>{
+ it('usa o banco recebido para consultar remessas, conjuntos e croquis dentro da transação',async()=>{
+  const tx={romaneioTerceiro:{findMany:vi.fn().mockResolvedValue([remessa])},pecaConjunto:{findMany:vi.fn().mockResolvedValue(conjuntos)},conjuntoCroqui:{findMany:vi.fn().mockResolvedValue(usos)}};
+  vi.clearAllMocks();
+  expect([...(await pecasNoTerceiro(tx))].sort()).toEqual(['c1','c2','p1','p2']);
+  for(const modelo of ['romaneioTerceiro','pecaConjunto','conjuntoCroqui']) {
+   expect(tx[modelo].findMany).toHaveBeenCalledOnce();
+   expect(mockPrisma[modelo].findMany).not.toHaveBeenCalled();
+  }
+ });
  it('leva junto os croquis exclusivos do conjunto — é o que faltava na preparação',async()=>{
   const fora=await pecasNoTerceiro();
   expect([...fora].sort()).toEqual(['c1','c2','p1','p2']);

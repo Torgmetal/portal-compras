@@ -70,18 +70,27 @@ export function criarGrade(dep){
           if(f<0){ f=faixas.length; faixas.push(-1); }
           faixas[f]=r.fim; r.faixa=f;
         }
-        const naJanela = meus.filter(r=>r.fim>=dep.getInicio() && r.ini<dep.getInicio()+larg).length;
+        const visiveis = meus.filter(r=>r.fim>=dep.getInicio() && r.ini<dep.getInicio()+larg);
+        const naJanela = visiveis.length;
         const emp = dep.empurraoDoRecurso(setor, rec.k);
-        const alt = naJanela ? Math.max(1,faixas.length)*30 + 8 + 16 : 38;
+        /* ⚠⚠ A ALTURA SAI DO QUE ESTÁ NA JANELA, não de todas as faixas do recurso. Vitor
+           (09/09/2026): "o jato deve estar com algum problema, ele está ficando em aberto, uma
+           página enorme". `faixas` empilha TODO lote que se sobrepõe no tempo, inclusive o que está
+           semanas à frente: 65 previsões de terceiro no mesmo dia 25/09 davam 65 faixas e
+           65×30+24 = 1.974px de linha vazia, com quatro blocos aparecendo na tela.
+           A causa principal era a previsão emitir um lote por marca (corrigido em
+           lib/terceiros-previsao), mas a altura precisa se defender sozinha: um dia cheio de lotes
+           reais fora da janela derrubaria a página do mesmo jeito. */
+        const faixasVisiveis = visiveis.length ? Math.max(...visiveis.map(r=>r.faixa)) + 1 : 1;
+        const alt = naJanela ? Math.max(1,faixasVisiveis)*30 + 8 + 16 : 38;
         html += '<div class="linha'+(rec.k?"":" pousio")+'" data-setor="'+setor+'" data-rec="'+(rec.k||"")+'" '
              +  'data-row="'+setor+'|'+(rec.k||"")+'" style="min-height:'+alt+'px">';
         /* ⚠⚠ A LISTA DO POSTO SAI DAQUI. Vitor (08/09/2026): "na frente do nome do montador, uma
            opção para imprimir a lista completa do que está no nome dele, por dia ou semana".
-           Vale para qualquer posto COM chave — o laser e o galpão têm a mesma pergunta. A linha
-           "sem bancada" não tem: ali ninguém é dono de nada, é fila esperando decisão. */
+           Postos têm dia/semana; a raia sem bancada exporta a fila completa de todas as datas. */
         html += '<div class="rotulo"><b>'+rec.nome+'</b>'
              +  (rec.k?'<span class="lista"><button class="mini" data-lista="dia" data-setor="'+setor+'" data-rec="'+rec.k+'" data-nome="'+rec.nome+'" title="lista de hoje">dia</button>'
-                      +'<button class="mini" data-lista="semana" data-setor="'+setor+'" data-rec="'+rec.k+'" data-nome="'+rec.nome+'" title="lista da semana">semana</button></span>':'')
+                      +'<button class="mini" data-lista="semana" data-setor="'+setor+'" data-rec="'+rec.k+'" data-nome="'+rec.nome+'" title="lista da semana">semana</button></span>':'<span class="lista"><button class="mini" data-lista="fila" data-setor="'+setor+'" data-rec="" data-nome="Sem bancada — '+setor+'" title="Baixar planilha completa para imprimir">Imprimir lista completa</button></span>')
              +  (rec.obs?'<small>'+rec.obs+'</small>':(rec.cap>1?'<small>meta '+dep.nkg(rec.cap)+' kg/dia</small>':'<small>1 bancada-dia</small>'))+'</div>';
         html += '<div class="trilho" style="width:'+(larg*dep.COL)+'px"><div class="celulas">';
         for(const s of janela) html += '<div class="cel'+(dep.fdsISO(s)?" fds":"")+'" data-dia="'+s+'"></div>';
@@ -161,7 +170,7 @@ export function criarGrade(dep){
       const antes = b.textContent; b.disabled = true; b.textContent = "…";
       try{ await dep.baixarListaPosto({ setor:b.dataset.setor, recurso:b.dataset.rec,
         nomePosto:b.dataset.nome, de, ate, periodo:per }); }
-      catch(e){ dep.avisar(e?.message || "Falha ao gerar a lista", "erro"); }
+      catch(e){ dep.avisar(false, e?.message || "Falha ao gerar a lista"); }
       finally{ b.disabled = false; b.textContent = antes; }
     };
   }

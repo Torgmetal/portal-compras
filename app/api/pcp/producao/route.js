@@ -87,6 +87,9 @@ export async function GET(req) {
     const marcas = o.universo.map((p) => String(p.marca || "").toUpperCase()).filter(Boolean);
     const nLancadas = marcas.filter((m) => lancadas.has(m)).length;
     const nLiberadas = marcas.filter((m) => liberadas.has(m)).length;
+    // GRD impressa e nenhuma ordem no Syneco: o PCP liberou, falta o lançamento (pendência do
+    // Gabriel, que faz os dois). Sai do "não programadas" — vermelho é só quem não teve nem um nem outro.
+    const nLiberadasSemOrdem = marcas.filter((m) => liberadas.has(m) && !lancadas.has(m)).length;
 
     // ⚠ a fila da OP é a soma do que falta em CADA setor, não o peso da obra: a mesma peça passa
     // por corte, solda e pintura, e somar o peso dela uma vez por setor é o que a TV mostra na
@@ -113,7 +116,7 @@ export async function GET(req) {
       opId: o.opId, opNumero: o.opNumero, cliente: o.cliente, obra: o.obra, refCliente: o.refCliente,
       entrega: entrega ? new Date(entrega).toISOString() : null, atrasoDias, alertas,
       kg: { total: Math.round(totalKg), pendente: Math.round(pendenteKg) },
-      pecas: { total: marcas.length, lancadas: nLancadas, naoLancadas: marcas.length - nLancadas, liberadas: nLiberadas },
+      pecas: { total: marcas.length, lancadas: nLancadas, naoLancadas: marcas.length - nLancadas - nLiberadasSemOrdem, liberadasSemOrdem: nLiberadasSemOrdem, liberadas: nLiberadas },
       setores: setores
         .filter((s) => (s.totalKg || 0) > 0)
         .map((s) => {

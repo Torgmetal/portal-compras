@@ -1,0 +1,5 @@
+ALTER TYPE "NotificacaoTipo" ADD VALUE IF NOT EXISTS 'MATERIAL_RECEBIDO';
+ALTER TYPE "NotificacaoTipo" ADD VALUE IF NOT EXISTS 'RASTREABILIDADE_DEFINIDA';
+ALTER TABLE "Notificacao" ADD COLUMN IF NOT EXISTS "chaveEvento" TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS "Notificacao_chaveEvento_key" ON "Notificacao"("chaveEvento");
+ALTER TABLE "TrocaRastreabilidade" ADD COLUMN IF NOT EXISTS "estoqueConferido" BOOLEAN NOT NULL DEFAULT false;

@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { gerarEtiquetasCarregamentoPDF, ajustarTexto, numeroDaEtiqueta, contagemDaEtiqueta, GRADE, MM } from "@/lib/etiqueta-carregamento-pdf";
+import zlib from "zlib";
+import { emMilimetros, LIMITE_MM } from "@/lib/etiqueta-calibragem";
+import { desenharEndereco } from "@/lib/etiqueta-pdf-base";
+import { gerarEtiquetasCarregamentoPDF, ajustarTexto, numeroDaEtiqueta, contagemDaEtiqueta, transformeDaCalibragem, BASES, CORPOS, GRADE, MM } from "@/lib/etiqueta-carregamento-pdf";
 
 // ⚠ POR QUE ESTE TESTE EXISTE, E NÃO UMA OLHADA NA TELA.
 //
@@ -11,9 +14,38 @@ import { gerarEtiquetasCarregamentoPDF, ajustarTexto, numeroDaEtiqueta, contagem
 //
 // Pixel não prova geometria. Aqui a pergunta é numérica: o texto termina antes da moldura?
 
+/**
+ * O texto desenhado no PDF — para conferir CONTEÚDO, não só geometria.
+ *
+ * ⚠ Os fluxos saem COMPRIMIDOS (FlateDecode) e o pdf-lib escreve o texto como string HEXADECIMAL
+ * (`<4142…> Tj`), não entre parênteses. Procurar nos bytes crus, ou por `(texto) Tj`, devolve vazio
+ * — e o teste passaria dizendo nada. Mesma função do teste do modelo QWS.
+ */
+function textoDoPdf(bytes) {
+  const bruto = Buffer.from(bytes);
+  const partes = [];
+  let i = 0;
+  while ((i = bruto.indexOf("stream", i)) !== -1) {
+    let ini = i + 6;
+    if (bruto[ini] === 0x0d) ini++;
+    if (bruto[ini] === 0x0a) ini++;
+    const fim = bruto.indexOf("endstream", ini);
+    if (fim === -1) break;
+    try { partes.push(zlib.inflateSync(bruto.subarray(ini, fim)).toString("latin1")); }
+    catch { /* fluxo que não é Flate (QR, fonte) */ }
+    i = fim + 9;
+  }
+  return (partes.join("").match(/<([0-9A-Fa-f]+)>\s*Tj/g) || [])
+    .map((m) => Buffer.from(m.replace(/[^0-9A-Fa-f]/g, ""), "hex").toString("latin1"))
+    .join("");
+}
+
 async function fontes() {
   const pdf = await PDFDocument.create();
-  return { bold: await pdf.embedFont(StandardFonts.HelveticaBold) };
+  return {
+    font: await pdf.embedFont(StandardFonts.Helvetica),
+    bold: await pdf.embedFont(StandardFonts.HelveticaBold),
+  };
 }
 
 const MARCA_LONGA = "T89-CONJUNTO-LONGO-999-XYZ";
@@ -150,5 +182,291 @@ describe("gerarEtiquetasCarregamentoPDF", () => {
       pecas: [{ marca: "T90C1", descricao: "Treliça de cobertura", qte: 1, pesoUnitKg: null }],
     });
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+  });
+});
+
+// ⚠⚠ A TAG DA OBRA — Matheus (11/09/2026): "inserir uma TAG manualmente que se repita em TODAS as
+// etiquetas na frente do nome da OBRA, exemplo na OP 103 preciso colocar a tag TPR00870".
+//
+// "Em todas" é o requisito, e é o que mais fácil quebraria numa refatoração: bastaria a tag ser
+// lida uma vez fora do laço das peças para sair só na primeira.
+describe("TAG da obra no modelo padrão", () => {
+  const base = { cliente: "TMSA", obra: "Torocua", opNumero: "103" };
+
+  it("sai DEPOIS do nome da obra, separada por | e não por hífen", async () => {
+    const bytes = await gerarEtiquetasCarregamentoPDF({
+      ...base, tagObra: "TPR00870", pecas: [{ marca: "M1", qte: 1 }],
+    });
+    const texto = textoDoPdf(bytes);
+    expect(texto).toContain("Torocua | TPR00870");
+    expect(texto).not.toContain("Torocua-TPR00870");
+  });
+
+  it("repete em TODAS as etiquetas, não só na primeira", async () => {
+    const bytes = await gerarEtiquetasCarregamentoPDF({
+      ...base, tagObra: "TPR00870", pecas: [{ marca: "M1", qte: 3 }, { marca: "M2", qte: 2 }],
+    });
+    const pdf = await PDFDocument.load(bytes);
+    expect(pdf.getPageCount()).toBe(5);
+    const texto = textoDoPdf(bytes);
+    expect(texto.split("TPR00870").length - 1).toBe(5);
+  });
+
+  it("sem TAG a obra sai sozinha, sem separador solto", async () => {
+    const texto = textoDoPdf(await gerarEtiquetasCarregamentoPDF({ ...base, pecas: [{ marca: "M1", qte: 1 }] }));
+    expect(texto).toContain("Torocua");
+    expect(texto).not.toContain("Torocua |");
+  });
+
+  // ⚠ O QWS IGNORA A TAG. A célula de cima dele já é "cliente | obra" e a peça é identificada pela
+  // TAG Petrobras — mais um código ali brigaria por espaço com o que o cliente confere.
+  it("o modelo QWS não recebe a TAG mesmo se ela vier", async () => {
+    const texto = textoDoPdf(await gerarEtiquetasCarregamentoPDF({
+      ...base, modelo: "qws", tagObra: "TPR00870", pecas: [{ marca: "M1", qte: 1 }],
+    }));
+    expect(texto).not.toContain("TPR00870");
+  });
+
+  // ⚠⚠ ESTE É O TESTE QUE JUSTIFICA TER TROCADO `p.campo` POR `encaixar` NA OBRA. Antes o valor era
+  // escrito CRU: obra comprida já corria por cima da coluna do QR, e a TAG na frente garante isso.
+  // O corte com reticência é feio e visível; texto invadindo a célula vizinha é feio e silencioso.
+  it("obra comprida COM tag é encaixada em vez de vazar a célula", async () => {
+    const { bold } = await fontes();
+    const longa = "TMSA — Torocua - Ñacunday - Bloco Norte | TPR00870";
+    const r = ajustarTexto(longa, bold, { xIni: 4.5, xFim: GRADE.colDir - 1.5, tamMax: 8 });
+    expect(r.xFim).toBeLessThanOrEqual(GRADE.colDir - 1.5);
+    expect(r.tam).toBeLessThan(8);
+  });
+});
+
+// ⚠⚠ A CALIBRAGEM DA IMPRESSORA. Matheus (11/09/2026): "minha etiqueta ainda está saindo bem para
+// esquerda a impressão aí fica cortando, como eu consigo centralizar ela mais para direita".
+//
+// Duas coisas precisam ficar provadas, e a segunda foi um erro real da primeira tentativa:
+//   1. deslocar SOZINHO não serve — o desenho já usa 1,2–98,8 de 100 mm, então tem que encolher;
+//   2. `scaleContent` ancora no canto de BAIXO: descer ingenuamente joga o rodapé para fora.
+describe("calibragem da impressora", () => {
+  const cantos = (t) => ({
+    esq: t.tx, dir: t.tx + 100 * t.escala,
+    topo: 50 - (t.ty + 50 * t.escala), base: 50 - t.ty,
+  });
+
+  it("sem deslocamento não transforma nada — o desenho já é centrado", () => {
+    expect(transformeDaCalibragem({})).toBeNull();
+    expect(transformeDaCalibragem({ deslocX: 0, deslocY: 0 })).toBeNull();
+  });
+
+  it("deslocar para a direita encolhe o bastante para o QR não sair pelo outro lado", () => {
+    const t = transformeDaCalibragem({ deslocX: 5 });
+    expect(t.escala).toBeCloseTo(0.95, 5);
+    const c = cantos(t);
+    expect(c.esq).toBeCloseTo(5, 5);
+    expect(c.dir).toBeLessThanOrEqual(100 + 1e-9);
+  });
+
+  // ⚠ O caso que a primeira versão errou: a moldura de baixo saía da página.
+  it("deslocar para baixo não empurra o rodapé para fora", () => {
+    const c = cantos(transformeDaCalibragem({ deslocY: 2 }));
+    expect(c.topo).toBeCloseTo(2, 5);
+    expect(c.base).toBeLessThanOrEqual(50 + 1e-9);
+  });
+
+  it.each([[6, 2], [-4, -1.5], [10, 10], [3, 0], [0, 3]])(
+    "desloc %s,%s mantém o desenho inteiro dentro da etiqueta", (deslocX, deslocY) => {
+      const c = cantos(transformeDaCalibragem({ deslocX, deslocY }));
+      expect(c.esq).toBeGreaterThanOrEqual(-1e-9);
+      expect(c.dir).toBeLessThanOrEqual(100 + 1e-9);
+      expect(c.topo).toBeGreaterThanOrEqual(-1e-9);
+      expect(c.base).toBeLessThanOrEqual(50 + 1e-9);
+    });
+
+  it("a página continua 100×50 mm — a calibragem move o conteúdo, não o papel", async () => {
+    const bytes = await gerarEtiquetasCarregamentoPDF({
+      cliente: "TMSA", obra: "Torocua", opNumero: "103",
+      pecas: [{ marca: "M1", qte: 2 }], calibragem: { deslocX: 4, deslocY: 1 },
+    });
+    const pdf = await PDFDocument.load(bytes);
+    expect(pdf.getPageCount()).toBe(2);
+    const { width, height } = pdf.getPage(0).getSize();
+    expect(width / MM).toBeCloseTo(100, 5);
+    expect(height / MM).toBeCloseTo(50, 5);
+  });
+});
+
+// ⚠ A ENTRADA VEM DE UM CAMPO DE TEXTO, e o que chega nem sempre é número. Vírgula é o separador
+// decimal de quem digita aqui; valor absurdo é quase certamente erro de digitação, e uma etiqueta
+// encolhida a 40% seria um segundo problema em cima do primeiro.
+describe("emMilimetros — o que a calibragem aceita", () => {
+  it("aceita vírgula como separador decimal", () => {
+    expect(emMilimetros("1,5")).toBe(1.5);
+    expect(emMilimetros("-2,5")).toBe(-2.5);
+  });
+
+  it("limita ao que o papel aguenta, nos dois sentidos", () => {
+    expect(emMilimetros(40)).toBe(LIMITE_MM);
+    expect(emMilimetros(-40)).toBe(-LIMITE_MM);
+  });
+
+  it("texto e vazio viram zero — sem calibragem, não um NaN que arrasta para o PDF", () => {
+    for (const lixo of ["", null, undefined, "abc", {}]) expect(emMilimetros(lixo)).toBe(0);
+  });
+});
+
+// ⚠⚠ UMA ETIQUETA PARA A CAIXA. Matheus (11/09/2026): "pode ocorrer casos de uma marca ter 50 peças
+// mas são todas pequenas, aí montamos uma caixa com as 50 peças e colamos somente 1 etiqueta 50/50;
+// se não tiver essa opção o portal vai imprimir as 50 etiquetas".
+describe("marca fechada numa caixa", () => {
+  const base = { cliente: "TMSA", obra: "Torocua", opNumero: "103" };
+
+  it("50 peças em caixa rendem UMA etiqueta, não 50", async () => {
+    const bytes = await gerarEtiquetasCarregamentoPDF({
+      ...base, pecas: [{ marca: "M1", qte: 50, emCaixa: true }],
+    });
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+  });
+
+  // ⚠ A etiqueta única diz "50/50" — o volume é um só e carrega o lote inteiro. Dissesse "1/50",
+  // quem confere o carregamento procuraria outras 49 caixas que não existem.
+  it("a etiqueta da caixa diz N/N, não 1/N", async () => {
+    const texto = textoDoPdf(await gerarEtiquetasCarregamentoPDF({
+      ...base, pecas: [{ marca: "M1", qte: 50, emCaixa: true }],
+    }));
+    expect(texto).toContain("50/50");
+    expect(texto).not.toContain("1/50");
+  });
+
+  it("sem a marcação continua uma etiqueta por peça", async () => {
+    const bytes = await gerarEtiquetasCarregamentoPDF({ ...base, pecas: [{ marca: "M1", qte: 50 }] });
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(50);
+  });
+
+  it("convive com marcas normais no mesmo lote", async () => {
+    const bytes = await gerarEtiquetasCarregamentoPDF({
+      ...base, pecas: [{ marca: "M1", qte: 50, emCaixa: true }, { marca: "M2", qte: 3 }],
+    });
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(4);
+  });
+});
+
+// ⚠⚠ O ENDEREÇO BORRAVA NA IMPRESSORA A 3,5 pt. Matheus (11/09/2026): "deixe maior também o endereço
+// da Torg e telefone, está saindo todo borrado por conta do tamanho". A 203 dpi, 3,5 pt tem ~10
+// pontos de altura — na térmica isso vira mancha, não letra.
+//
+// O que precisa ficar provado: o corpo CRESCE até o limite do espaço, e nunca passa por cima do logo.
+describe("endereço da Torg no cabeçalho", () => {
+  /** Um pincel de mentira: só mede e anota onde cada linha foi desenhada, e com qual fonte. */
+  const pincelFalso = async () => {
+    const { font, bold } = await fontes();
+    const escritas = [];
+    return {
+      escritas, font, bold,
+      larg: (s, tam, f = font) => f.widthOfTextAtSize(String(s), tam) / MM,
+      txt: (s, mmX, mmY, tam) => escritas.push({ s, mmX, mmY, tam, f: "normal" }),
+      negrito: (s, mmX, mmY, tam) => escritas.push({ s, mmX, mmY, tam, f: "negrito" }),
+    };
+  };
+
+  // ⚠⚠ O NEGRITO IMPORTA MAIS QUE O CORPO. Era o único texto fino da etiqueta: na transferência
+  // térmica a haste de uma Helvetica normal a 5 pt não fecha, e sai a letra esburacada da foto.
+  it("sai em negrito, como todo o resto da etiqueta", async () => {
+    const p = await pincelFalso();
+    desenharEndereco(p, { xMin: 42, xFim: 73, yIni: 4.6, entreLinhas: 3.5 });
+    for (const e of p.escritas) expect(e.f).toBe("negrito");
+  });
+
+  it("cresce bem acima dos 3,5 pt que borravam", async () => {
+    const p = await pincelFalso();
+    const tam = desenharEndereco(p, { xMin: 42, xFim: 73, yIni: 4.6, entreLinhas: 3.5 });
+    expect(tam).toBeGreaterThan(3.5);
+  });
+
+  // ⚠ O logo tem tamanho MEDIDO contra a etiqueta em uso (37 mm) e não pode ser invadido. É por isso
+  // que o corpo é calculado em vez de fixo: um número fixo cresceria por cima dele sem avisar.
+  it("nenhuma linha começa antes do fim do logo", async () => {
+    const p = await pincelFalso();
+    const xMin = 42;
+    desenharEndereco(p, { xMin, xFim: 73, yIni: 4.6, entreLinhas: 3.5 });
+    expect(p.escritas).toHaveLength(3);
+    for (const e of p.escritas) expect(e.mmX).toBeGreaterThanOrEqual(xMin - 0.001);
+  });
+
+  it("todas as linhas terminam exatamente na borda direita da célula", async () => {
+    const p = await pincelFalso();
+    const xFim = 73;
+    desenharEndereco(p, { xMin: 42, xFim, yIni: 4.6, entreLinhas: 3.5 });
+    for (const e of p.escritas) expect(e.mmX + p.larg(e.s, e.tam, p.bold)).toBeLessThanOrEqual(xFim + 0.001);
+  });
+
+  // ⚠ No QWS caberiam 9 pt — o endereço ficaria do tamanho da TAG PETROBRAS, que é o que o cliente
+  // lê de longe. O teto é hierarquia, não falta de espaço.
+  it("com muito espaço sobrando, para no teto em vez de competir com a TAG", async () => {
+    const p = await pincelFalso();
+    expect(desenharEndereco(p, { xMin: 36, xFim: 97.3, yIni: 4.2, entreLinhas: 3.2 })).toBeLessThanOrEqual(5.5);
+  });
+});
+
+// ⚠⚠ POR QUE ESTE BLOCO EXISTE. Matheus (11/09/2026) pediu a etiqueta "mais visível, maior, sem
+// falhas", com a do BarTender ao lado — e os corpos dobraram. O risco de aumentar corpo numa grade
+// que não muda é sempre o mesmo: a letra passa a cruzar o traço da célula. E ele NÃO aparece no
+// olho, porque o que estoura é o descendente (a vírgula de "41,40", o "Ç" de "QTDE. (PÇ)"), que a
+// gente não procura quando bate o olho no PDF.
+//
+// A conta usa a altura REAL da fonte — `heightAtSize`, ascendente e descendente do Helvetica Bold —
+// e não uma regra de bolso. Mexeu num corpo sem mexer na base, aqui acusa.
+describe("nada cruza o traço da célula depois do aumento de corpo", () => {
+  const acima = (f, tam) => f.heightAtSize(tam, { descender: false }) / MM;
+  const abaixo = (f, tam) => (f.heightAtSize(tam) - f.heightAtSize(tam, { descender: false })) / MM;
+
+  // [base, corpo, topo da célula, fundo da célula]
+  const LINHAS = () => [
+    ["CLIENTE", BASES.cliente, CORPOS.campo, GRADE.yCabecalho, GRADE.yCliente],
+    ["OBRA", BASES.obra, CORPOS.campo, GRADE.yCliente, GRADE.yObra],
+    ["rótulo QTDE", BASES.rot1, CORPOS.rotulo, GRADE.yObra, GRADE.yTag],
+    ["valor QTDE", BASES.val1, CORPOS.celula, GRADE.yObra, GRADE.yTag],
+    ["TAG", BASES.tag, CORPOS.tag, GRADE.yObra, GRADE.yTag],
+    ["rótulo PESO", BASES.rot2, CORPOS.rotulo, GRADE.yTag, GRADE.fim],
+    ["valor PESO", BASES.val2, CORPOS.celula, GRADE.yTag, GRADE.fim],
+  ];
+
+  it("nenhum texto sobe acima do traço de cima nem desce abaixo do de baixo", async () => {
+    const { bold } = await fontes();
+    // ⚠ O relatório sai NOMEADO. Um `expect` dentro de laço que falha só diz um número; com o nome
+    // do campo na mensagem, quem lê a falha sabe qual base mexer sem recontar a grade.
+    const estouros = LINHAS()
+      .filter(([, base, tam, topo, fundo]) =>
+        base - acima(bold, tam) <= topo || base + abaixo(bold, tam) >= fundo)
+      .map(([nome]) => nome);
+    expect(estouros).toEqual([]);
+  });
+
+  // ⚠ Rótulo e valor dividem a mesma célula, um sobre o outro. A primeira tentativa de subir os
+  // dois juntos fez o "PESO (kg):" ser desenhado por cima do próprio 41,40 — mesmo tropeço que o
+  // rodapé do modelo QWS já tinha custado antes.
+  it("o rótulo não encosta no valor que vem embaixo dele", async () => {
+    const { bold } = await fontes();
+    for (const [rot, val] of [[BASES.rot1, BASES.val1], [BASES.rot2, BASES.val2]]) {
+      expect(rot + abaixo(bold, CORPOS.rotulo)).toBeLessThan(val - acima(bold, CORPOS.celula));
+    }
+  });
+
+  // ⚠ O corpo continua sendo TETO, não promessa: nome comprido encolhe sozinho. Sem isto, subir o
+  // teto de 8 para 13 pt teria soltado o nome do cliente por cima da coluna do QR.
+  it("cliente e obra compridos continuam dentro da própria coluna", async () => {
+    const bytes = await gerarEtiquetasCarregamentoPDF({
+      cliente: "CONSTRUTORA E MONTAGENS INDUSTRIAIS REUNIDAS DO BRASIL S.A.",
+      obra: "AMPLIACAO DA UNIDADE DE TRATAMENTO DE GAS NATURAL - FASE 2",
+      tagObra: "TPR00870", opNumero: "103",
+      pecas: [{ marca: "T103A1", descricao: DESC_LONGA, qte: 1, pesoUnitKg: 12.5 }],
+    });
+    const { bold } = await fontes();
+    const xRot = 3.5;
+    const xVal = xRot + Math.max(bold.widthOfTextAtSize("CLIENTE:", CORPOS.rotulo),
+                                 bold.widthOfTextAtSize("OBRA:", CORPOS.rotulo)) / MM + 2;
+    const texto = textoDoPdf(bytes);
+    // O que sobrou do nome foi encolhido/cortado para caber — e o que importa é caber.
+    const cabe = (s) => ajustarTexto(s, bold, { xIni: xVal, xFim: GRADE.colDir - 1.5, tamMax: CORPOS.campo });
+    expect(cabe("CONSTRUTORA E MONTAGENS INDUSTRIAIS REUNIDAS DO BRASIL S.A.").xFim)
+      .toBeLessThanOrEqual(GRADE.colDir - 1.5 + 0.001);
+    expect(texto).toContain("TPR00870");
   });
 });

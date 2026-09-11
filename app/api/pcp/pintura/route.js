@@ -6,6 +6,7 @@
 //
 // ⚠ SÓ LÊ. Nada aqui grava: o PLP é documento da Qualidade e o CMR é do Almoxarifado. O que o PCP
 // informa para destravar uma liberação vai para o AuditLog em /api/pcp/fila-setor, não para cá.
+import { lerFracoesExportacao } from "@/lib/exportacao-fracoes";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { cadernoDePintura } from "@/lib/pintura-lote";
@@ -28,7 +29,7 @@ export async function GET(req) {
   const ids = String(u.searchParams.get("ids") || "").split(",").map((s) => s.trim()).filter(Boolean).slice(0, 5000);
 
   try {
-    return NextResponse.json(await cadernoDePintura(op, ids));
+    return NextResponse.json(await cadernoDePintura(op, ids, lerFracoesExportacao(u.searchParams.get("fracoes"))));
   } catch (e) {
     return NextResponse.json({ error: e.message || "Falha ao montar o caderno de pintura" }, { status: 400 });
   }

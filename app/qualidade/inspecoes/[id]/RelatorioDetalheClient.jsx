@@ -1,7 +1,10 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, Lock, FolderOpen, Crop } from "lucide-react";
+import { useStore } from "@/lib/store";
+import { pecasDoRelatorio, pecasInformadasSchema, usaQuantidadeInspecao } from "@/lib/inspecao-pecas";
+import PecasInformadasEditor from "./PecasInformadasEditor";
+import { Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, Lock, FolderOpen, Crop, RotateCcw } from "lucide-react";
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
 import CampoTolerancia from "./CampoTolerancia";
 import {foraDaTolerancia} from "@/lib/tolerancia-inspecao";
@@ -30,6 +33,8 @@ import { usaCotas } from "@/lib/qualidade-campo";
 const RESULTADOS = ["APROVADO", "REPROVADO", "RETRABALHAR"];
 
 export default function RelatorioDetalheClient({ id }) {
+  const { showToast } = useStore();
+  const [pecasEditadas, setPecasEditadas] = useState(null);
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -84,18 +89,44 @@ export default function RelatorioDetalheClient({ id }) {
     setDados((d) => ({ ...d, relatorio: { ...d.relatorio, resultados: { ...(d.relatorio.resultados || {}), [campo]: v } } }));
 
   async function salvar() {
+    let pecasInformadas;
+    const pecasAtuais = pecasEditadas ?? pecasDoRelatorio(rel, dados.quantidadesLista);
+    if (usaQuantidadeInspecao(rel.tipo) && (pecasAtuais.length || pecasEditadas !== null)) {
+      const validacao = pecasInformadasSchema.safeParse(pecasAtuais.map(p => ({ ...p, quantidade: p.quantidade === "" ? null : Number(p.quantidade) })));
+      if (!validacao.success && pecasEditadas !== null) { showToast(validacao.error.issues[0].message, "error"); return; }
+      if (validacao.success) pecasInformadas = validacao.data;
+    }
     setSalvando(true);
     try {
       const r = await fetch(`/api/qualidade/inspecoes/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          pecasInformadas,
           titulo: rel.titulo, observacoes: rel.observacoes, inspetor: rel.inspetor,
           linhas: rel.linhas, resultados: rel.resultados, equipamentos: rel.equipamentos,
           resultadoInspecao: rel.resultadoInspecao ?? null,
+          marcas: Array.isArray(rel.marcas) ? rel.marcas : undefined,
         }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
+      setDados(d => ({ ...d, relatorio: j.relatorio }));
+      setPecasEditadas(null);
+      showToast("Relatório salvo. Peças e quantidades atualizadas.", "success");
+    } catch (e) { showToast(e.message, "error"); } finally { setSalvando(false); }
+  }
+
+  /** Relatório já assinado não se edita por baixo: abre a revisão seguinte e o ciclo recomeça. */
+  async function abrirRevisao() {
+    const motivo = window.prompt("O que vai ser revisto neste relatório? (vai para o histórico e para quem já assinou)");
+    if (motivo == null) return;
+    setSalvando(true);
+    try {
+      const r = await fetch(`/api/qualidade/inspecoes/${id}/revisao`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ motivo }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao abrir revisão");
+      alert(`Revisão R${String(j.relatorio.revisao).padStart(2, "0")} aberta. A rodada anterior ficou no histórico com ${j.assinaturasCongeladas} assinatura(s). Edite e envie de novo para assinatura.`);
+      window.location.reload();
     } catch (e) { alert(e.message); } finally { setSalvando(false); }
   }
 
@@ -111,14 +142,32 @@ export default function RelatorioDetalheClient({ id }) {
           <p className="text-[13px] text-torg-gray">
             OP-{rel.opNumero} · {TIPO_LABEL[rel.tipo] || rel.tipo}
             {rel.escopo === "AVULSAS" ? " · peças avulsas agrupadas" : rel.escopo === "CONJUNTO" ? " · conjunto" : ""}
-            {Array.isArray(rel.marcas) && rel.marcas.length ? ` · ${rel.marcas.join(", ")}` : ""}
+            {Array.isArray(rel.marcas) && rel.marcas.length ? ` · ${rel.marcas.length} marcas` : ""}
           </p>
+          {/* Peças informadas editáveis — Vitor (11/09/2026): "editar as peças informadas, pois isso também não consigo fazer no portal" */}
+          {!travado && (
+            <details className="mt-1.5">
+              <summary className="text-[12px] text-torg-blue cursor-pointer select-none">Editar peças informadas ({Array.isArray(rel.marcas) ? rel.marcas.length : 0})</summary>
+              {usaQuantidadeInspecao(rel.tipo) ? (
+              <PecasInformadasEditor pecas={pecasEditadas ?? pecasDoRelatorio(rel, dados.quantidadesLista)} quantidadesLista={{ ...dados.quantidadesLista, ...res.qtdPeca }} onChange={setPecasEditadas} disabled={salvando} />
+              ) : <textarea rows={4} value={(rel.marcas || []).join("\n")} onChange={e=>setCampo("marcas",e.target.value.split("\n"))} placeholder="Uma marca por linha" className="mt-2 w-full border rounded-lg p-2 text-sm" />}
+
+              {dados.avisoQuantidades && <p className="text-xs text-amber-700 mt-2">{dados.avisoQuantidades}</p>}
+            </details>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {travado ? (
-            <span className="text-[11px] px-2 py-1 rounded-lg bg-gray-100 text-torg-gray inline-flex items-center gap-1.5">
-              <Lock size={12} /> enviado para assinatura — somente leitura
-            </span>
+            <>
+              <span className="text-[11px] px-2 py-1 rounded-lg bg-gray-100 text-torg-gray inline-flex items-center gap-1.5">
+                <Lock size={12} /> enviado para assinatura — somente leitura · R{String(rel.revisao ?? 0).padStart(2, "0")}
+              </span>
+              {/* Vitor (11/09/2026): "voltar as assinaturas" = abrir a revisão seguinte; a rodada assinada fica no histórico */}
+              <button onClick={abrirRevisao} disabled={salvando} title="Congela a rodada assinada no histórico, sobe a revisão e libera a edição"
+                className="text-[12px] font-semibold text-torg-dark bg-amber-100 hover:bg-amber-200 rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-50">
+                {salvando ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />} Abrir revisão
+              </button>
+            </>
           ) : (
             <button onClick={salvar} disabled={salvando}
               className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-50">

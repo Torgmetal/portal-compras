@@ -37,3 +37,9 @@ it('não distribui a lista quando nenhuma peça foi selecionada',async()=>{
  const painel=criarPainelProjetos({});
  expect([...painel.idsParaDividir({itens,setor:'MONTAGEM'})]).toEqual([]);
 });
+it('preserva saldos de origens e famílias diferentes ao editar outra programação',async()=>{
+ const {criarLotes}=await import('@/app/pcp/producao/_gantt/lotes');
+ let lotes=[['p1','2026-09-07','CHAPA'],['p2','2026-09-08','CHAPA'],['p3','2026-09-07','TUBO']].map(([id,veioDe,familia])=>({uid:id,setor:'SOLDA',recurso:'SOLDA 1',op:'097',dia:'2026-09-09',veioDe,familia,itens:[{id,q:1,kg:10,c:1}],pecas:1,kg:10,custo:1,feitas:0}));
+ const api=criarLotes({getLotes:()=>lotes,setLotes:v=>{lotes=v;}});api.mesclar();
+ expect(lotes).toHaveLength(3);
+});

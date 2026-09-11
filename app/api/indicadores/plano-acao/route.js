@@ -55,20 +55,44 @@ export async function GET(req) {
   return NextResponse.json({ planos: planos.map(resumir) });
 }
 
+// Identifica o campo mesmo quando o bundle do Zod retorna apenas "Invalid input".
+function erroValidacao(erro) {
+  const problema = erro.issues?.[0];
+  if (!problema) return "Dados inválidos. Confira o preenchimento do plano.";
+  const caminho = problema.path || [];
+  const campo = caminho[caminho.length - 1];
+  const rotulos = {
+    id: "Plano", titulo: "Título", responsavel: "Responsável pelo plano",
+    indicador: "Indicador", processo: "Setor", ano: "Ano", mes: "Mês",
+    valor: "Valor", metaValor: "Meta", itens: "Ações",
+    oque: "O quê", porque: "Por quê", onde: "Onde", quem: "Quem",
+    quando: "Prazo", como: "Como", quanto: "Quanto",
+    acompanhamento: "Acompanhamento", concluidoEm: "Data de conclusão",
+    status: caminho[0] === "itens" ? "Situação da ação" : "Situação do plano",
+  };
+  const prefixo = caminho[0] === "itens" && Number.isInteger(caminho[1])
+    ? `Ação ${caminho[1] + 1} — ` : "";
+  const rotulo = prefixo + (rotulos[campo] || "Plano");
+  if (problema.code === "too_big") {
+    return `${rotulo}: use no máximo ${problema.maximum} ${problema.origin === "array" ? "ações" : "caracteres"}.`;
+  }
+  return `${rotulo}: valor inválido.`;
+}
+
 const item = z.object({
-  oque: z.string().max(600).optional().nullable(), porque: z.string().max(600).optional().nullable(),
-  onde: z.string().max(200).optional().nullable(), quem: z.string().max(160).optional().nullable(),
-  quando: z.string().max(30).optional().nullable(), como: z.string().max(600).optional().nullable(),
-  quanto: z.string().max(120).optional().nullable(),
+  oque: z.string().max(4000).optional().nullable(), porque: z.string().max(4000).optional().nullable(),
+  onde: z.string().max(1000).optional().nullable(), quem: z.string().max(500).optional().nullable(),
+  quando: z.string().max(30).optional().nullable(), como: z.string().max(4000).optional().nullable(),
+  quanto: z.string().max(1000).optional().nullable(),
   status: z.enum(["A_FAZER", "EM_ANDAMENTO", "CONCLUIDO", "CANCELADO"]).optional(),
-  acompanhamento: z.string().max(600).optional().nullable(),
+  acompanhamento: z.string().max(4000).optional().nullable(),
   concluidoEm: z.string().max(30).optional().nullable(),
 });
 const schema = z.object({
   indicador: z.string().min(1), processo: z.string().min(1),
   ano: z.number().int(), mes: z.number().int().min(-1).max(11).nullable().optional(),
   valor: z.number().nullable().optional(), metaValor: z.number().nullable().optional(),
-  responsavel: z.string().max(120).optional().nullable(),
+  responsavel: z.string().max(500).optional().nullable(),
   itens: z.array(item).max(40).optional(),
 });
 
@@ -79,7 +103,7 @@ export async function POST(req) {
 
   let body;
   try { body = schema.parse(await req.json()); }
-  catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
+  catch (e) { return NextResponse.json({ error: erroValidacao(e) }, { status: 400 }); }
 
   const def = INDICADORES_ISO.find((i) => i.id === body.indicador);
   if (!def) return NextResponse.json({ error: "Indicador desconhecido." }, { status: 400 });
@@ -123,7 +147,7 @@ export async function POST(req) {
 const patchSchema = z.object({
   id: z.string().min(1),
   titulo: z.string().max(200).optional(),
-  responsavel: z.string().max(120).optional().nullable(),
+  responsavel: z.string().max(500).optional().nullable(),
   status: z.enum(["EM_ANDAMENTO", "CONCLUIDO", "CANCELADO"]).optional(),
   itens: z.array(item).max(40).optional(),
 });
@@ -134,7 +158,7 @@ export async function PATCH(req) {
 
   let body;
   try { body = patchSchema.parse(await req.json()); }
-  catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
+  catch (e) { return NextResponse.json({ error: erroValidacao(e) }, { status: 400 }); }
 
   const atual = await prisma.planoAcao.findUnique({ where: { id: body.id }, select: { id: true, indicador: true } });
   if (!atual?.indicador) return NextResponse.json({ error: "Plano não encontrado neste painel." }, { status: 404 });

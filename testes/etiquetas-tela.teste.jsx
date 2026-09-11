@@ -88,12 +88,21 @@ describe("filtros de coluna na lista de marcas", () => {
     await waitFor(() => expect(linhas()).toHaveLength(3));
   });
 
+  // ⚠ A COLUNA É ACHADA PELO CABEÇALHO, NÃO POR ÍNDICE. Este teste já quebrou uma vez por isso: ao
+  // inserir a coluna "Etiquetas" (a da caixa) antes desta, o `cells[5]` passou a apontar para o
+  // peso. Índice fixo transforma qualquer coluna nova num teste vermelho que não diz nada sobre o
+  // que de fato quebrou.
+  const celulaDa = (marca, cabecalho) => {
+    const titulos = [...document.querySelectorAll("table thead th")].map((th) => th.textContent.trim());
+    const i = titulos.findIndex((t) => t.toLowerCase() === cabecalho.toLowerCase());
+    const tr = within(document.querySelector("table tbody")).getByText(marca).closest("tr");
+    return tr.cells[i];
+  };
+
   it("a coluna Etiqueta mostra a data e as reimpressões", async () => {
     await abrirOP();
-    const tr = within(document.querySelector("table tbody")).getByText("T97A140").closest("tr");
-    expect(tr.cells[5].textContent).toMatch(/08\/09/);
-    expect(tr.cells[5].textContent).toContain("×2");
-    const outra = within(document.querySelector("table tbody")).getByText("T97A180").closest("tr");
-    expect(outra.cells[5].textContent.trim()).toBe("—");
+    expect(celulaDa("T97A140", "Etiqueta").textContent).toMatch(/08\/09/);
+    expect(celulaDa("T97A140", "Etiqueta").textContent).toContain("×2");
+    expect(celulaDa("T97A180", "Etiqueta").textContent.trim()).toBe("—");
   });
 });

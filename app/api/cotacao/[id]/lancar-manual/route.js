@@ -13,6 +13,20 @@ import { resolverFornecedorPorCnpj } from "@/lib/omie-pedido-compra";
 import { log } from "@/lib/log";
 
 const registro = log("api/cotacao/[id]/lancar-manual");
+export const runtime = "nodejs";
+// ⚠⚠ SEM ISTO A ROTA MORRIA EM 10 SEGUNDOS — o padrão da Vercel — e morrer aqui não devolve corpo
+// nenhum: o navegador faz `res.json()` num corpo VAZIO e mostra "Unexpected end of JSON input".
+// Matheus (11/09/2026), lançando uma proposta grande: "deu esse erro para salvar depois da IA
+// preencher". A leitura por IA tinha funcionado; quem caiu foi a GRAVAÇÃO.
+//
+// O orçamento de tempo daqui não é pequeno: consulta do CNPJ no Omie (rede, com retry) + uma
+// escrita por item da proposta + atualização da cotação, das RMItens e do status de cada RM
+// envolvida. Numa proposta de dezenas de itens isso passa de 10s com folga.
+//
+// ⚠ É o mesmo defeito que o import de LPC já documenta neste projeto ("60s estourava → timeout →
+// HTML → token JSON"). O sintoma engana porque parece erro de JSON; é a função sendo morta.
+export const maxDuration = 60;
+
 
 const itemSchema = z.object({
   rmItemId: z.string(),
@@ -120,8 +134,18 @@ export async function POST(req, { params }) {
   );
   const eRevisao = cotacao.status === "RECEBIDA";
 
+  // ⚠⚠ O TETO PADRÃO DA TRANSAÇÃO INTERATIVA DO PRISMA É 5 SEGUNDOS, e ele é independente do limite
+  // da função: estourado, a gravação aborta com "Transaction already closed" DEPOIS de já ter feito
+  // metade do trabalho. Uma proposta com dezenas de itens é uma escrita por item na mesma conexão,
+  // então 5s não dá. O número aqui fica abaixo do `maxDuration` de propósito — se algo travar, quem
+  // tem de falhar primeiro é a transação (que desfaz tudo), não a função (que morre sem resposta).
+  const OPCOES_TX = { maxWait: 10_000, timeout: 45_000 };
+
   await prisma.$transaction(async (tx) => {
-    for (const it of itensValidos) {
+    // ⚠ As linhas são independentes (uma por rmItemId), então vão juntas em vez de uma de cada vez
+    // — é o mesmo que /api/cotacao/submeter já faz. O laço sequencial pagava uma ida e volta ao
+    // Neon por item, e é isso que fazia a proposta grande estourar o tempo.
+    await Promise.all(itensValidos.map(async (it) => {
       const existing = cotItemPorRm.get(it.rmItemId);
       if (existing) {
         await tx.cotacaoItem.update({
@@ -131,6 +155,13 @@ export async function POST(req, { params }) {
             qtdCotada: it.qtdCotada,
             icmsPct: it.icmsPct ?? null,
             ipiPct: it.ipiPct ?? null,
+            // ⚠⚠ PREÇO E "SEM DISPONIBILIDADE" NÃO PODEM COEXISTIR. Esta rota gravava o preço sem
+            // olhar a flag: se o fornecedor tinha respondido pelo portal marcando "não tenho" e
+            // depois a proposta era lançada à mão com preço, o item ficava com OS DOIS. No mapa ele
+            // volta a parecer preço normal (a célula só esconde quando o preço é zero), fica
+            // clicável, pode vencer e virar pedido — com o "não tenho" do fornecedor ainda gravado
+            // nele. Lançar um preço é afirmar que ele tem; a flag antiga é a resposta velha e sai.
+            semEstoque: false,
             // A qtd digitada manualmente passa a mandar — limpa o snapshot do
             // abatimento de estoque para nao ficar contraditorio/orfao.
             qtdPecasCotada: null,
@@ -150,7 +181,7 @@ export async function POST(req, { params }) {
           },
         });
       }
-    }
+    }));
 
     const obsParts = [];
     if (body.prazoEntrega) obsParts.push(`Prazo de entrega: ${body.prazoEntrega}`);
@@ -222,7 +253,7 @@ export async function POST(req, { params }) {
         },
       },
     });
-  });
+  }, OPCOES_TX);
 
   return NextResponse.json({ ok: true, total });
 }

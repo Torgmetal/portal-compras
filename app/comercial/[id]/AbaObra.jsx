@@ -1,11 +1,8 @@
 "use client";
-import { useState } from "react";
 import { Building2, Pencil, Hash, MapPin, CalendarRange, Users, AlertCircle } from "lucide-react";
-import OrcamentoComercial from "@/components/OrcamentoComercial";
 import { resumoEscopo } from "@/lib/qualidade-escopo";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
-const fmtR$ = (v) => (v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }));
 const ESTOQUE = { PROPRIO_TORG: "Estoque próprio da Torg", CLIENTE_TERCEIRO: "Fornecido pelo cliente / terceiro" };
 const DATABOOK = { PADRAO_TORG: "Padrão Torg", SNQC: "SNQC", RELATORIO_ACOMPANHAMENTO: "Relatório de acompanhamento" };
 
@@ -21,26 +18,6 @@ function Campo({ rotulo, valor, destaque, dica, pre }) {
 }
 
 export default function AbaObra({ op, podeEditar, onEditar }) {
-  // Vínculo com o orçamento do Comercial — as OPs antigas também precisam ser ligadas
-  // (Vitor 19/08: "as OPs já criadas vamos conseguir vincular elas também?").
-  const [orc, setOrc] = useState({
-    pasta: op.orcamentoPasta || null, ref: op.orcamentoRef || null,
-    propostas: op.propostas || [],
-    estudo: op.estudoArquivo || null, dados: op.estudoDados || null,
-  });
-  const [salvandoOrc, setSalvandoOrc] = useState("");
-  const salvarOrc = async (v) => {
-    setSalvandoOrc("salvando");
-    try {
-      const r = await fetch(`/api/comercial/op/${op.id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orcamentoPasta: v.pasta, orcamentoRef: v.ref, propostas: v.propostas, estudoArquivo: v.estudo, estudoDados: v.dados }),
-      });
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Erro ao salvar");
-      setSalvandoOrc("salvo");
-    } catch (e) { setSalvandoOrc(e.message); }
-  };
-
   const contatos = Array.isArray(op.clienteContatos) ? op.clienteContatos : [];
   const endereco = [op.clienteEndereco, op.clienteCidade, op.clienteUF, op.clienteCep].filter(Boolean).join(" · ");
 
@@ -60,6 +37,11 @@ export default function AbaObra({ op, podeEditar, onEditar }) {
           <Campo rotulo="Nº da OP (Torg)" valor={op.numero} destaque />
           <Campo rotulo="Cliente" valor={op.cliente} destaque />
           <Campo rotulo="Obra / empreendimento" valor={op.obra} destaque />
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-lg border border-gray-100 bg-gray-50/60 p-4">
+          <Campo rotulo="Endereço do cliente" valor={endereco || "Não informado"} pre />
+          <Campo rotulo="Endereço de entrega" valor={op.kickoff?.entregaEndereco?.trim() || "Não informado"} pre />
         </div>
 
         {/* Referência do cliente — o número que cada cliente usa */}
@@ -85,14 +67,13 @@ export default function AbaObra({ op, podeEditar, onEditar }) {
         )}
       </div>
 
-      {/* Prazos, contrato e definições */}
+      {/* Prazos e definições */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h4 className="text-sm font-semibold text-torg-dark flex items-center gap-2 mb-4"><CalendarRange size={15} className="text-torg-blue" /> Prazos, contrato e definições</h4>
+        <h4 className="text-sm font-semibold text-torg-dark flex items-center gap-2 mb-4"><CalendarRange size={15} className="text-torg-blue" /> Prazos e definições</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Campo rotulo="Início" valor={fmtD(op.dataInicio)} />
           <Campo rotulo="Fim previsto" valor={fmtD(op.dataFimPrevista)} />
           <Campo rotulo="Fim real" valor={op.dataFimReal ? fmtD(op.dataFimReal) : null} />
-          <Campo rotulo="Valor do contrato" valor={fmtR$(op.valorTotalContrato)} />
           <Campo rotulo="Material" valor={ESTOQUE[op.estoqueMaterial] || null} />
           <Campo rotulo="Data Book" valor={DATABOOK[op.tipoDataBook] || null} />
           {/* O que a obra exige de inspeção — decide o que o inspetor vê e o que o data
@@ -112,7 +93,6 @@ export default function AbaObra({ op, podeEditar, onEditar }) {
           <Campo rotulo="E-mail" valor={op.clienteEmail} />
           <Campo rotulo="Telefone" valor={op.clienteTelefone} />
         </div>
-        {endereco && <div className="mt-4"><Campo rotulo="Endereço" valor={endereco} /></div>}
       </div>
 
       {/* Contatos usados nos envios */}
@@ -133,13 +113,6 @@ export default function AbaObra({ op, podeEditar, onEditar }) {
         )}
       </div>
 
-      {/* Orçamento do Comercial: proposta, estudo e as quantidades estimadas */}
-      <OrcamentoComercial valor={orc} onChange={(v) => { setOrc(v); setSalvandoOrc(""); }} opId={op.id} onSalvar={salvarOrc} />
-      {salvandoOrc && (
-        <p className={`text-[12px] ${salvandoOrc === "salvo" ? "text-emerald-700" : salvandoOrc === "salvando" ? "text-torg-gray" : "text-red-700"}`}>
-          {salvandoOrc === "salvo" ? "Vínculo salvo na OP." : salvandoOrc === "salvando" ? "Salvando…" : salvandoOrc}
-        </p>
-      )}
     </div>
   );
 }

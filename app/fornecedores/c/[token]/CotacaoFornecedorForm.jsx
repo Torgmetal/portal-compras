@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo, useRef } from "react";
+import { dataBR, dataHoraBR } from "@/lib/data-br";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
@@ -9,7 +10,8 @@ import { numeroBR } from "@/lib/numero-br";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+// ⚠ fuso fixo de Brasília (ver page.js): servidor em UTC e navegador em BRT não podem escrever dias diferentes
+const fmtData = (d) => (d ? dataBR(d) : "—");
 
 // Extrai prazo/pagamento da observacao salva (formato "Prazo de entrega: X | Pagamento: Y | <obs>")
 function parseObservacao(obs) {
@@ -344,6 +346,11 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
             // o que o fornecedor via — sem saber se o PDF dele é escaneado, se o limite de leituras
             // estourou ou se o arquivo é grande demais.
             motivoIA: data.motivoIA || null,
+            // ⚠⚠ LEITURA CORTADA NO MEIO. Proposta grande estoura o teto de saída da IA; o portal
+            // aproveita os itens que fecharam (antes devolvia zero), mas eles NÃO são a proposta
+            // inteira. Sem esta tarja o fornecedor envia meia proposta achando que enviou tudo — e
+            // quem descobre é o comprador, depois, procurando o item que não veio.
+            parcial: data.parcial || null,
             avisos: data.avisos || [],
           });
           if (data.fornecedor && !razaoSocial) setRazaoSocial(data.fornecedor);
@@ -434,12 +441,25 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
           observacao: observacaoGeral || null,
         }),
       });
-      const data = await res.json();
+      // ⚠⚠ CORPO VAZIO É TIMEOUT, NÃO ERRO DE JSON. Se a função do servidor for morta por tempo
+      // (proposta com dezenas de itens: uma escrita por item + consulta do CNPJ no Omie), a resposta
+      // vem SEM CORPO e o `res.json()` estoura com "Unexpected end of JSON input" — uma frase do
+      // motor do JavaScript, na cara de um fornecedor que não tem a quem perguntar e simplesmente
+      // desiste de enviar. E a mensagem tem de admitir a dúvida: morta por tempo, a proposta pode
+      // ter sido gravada ou não, e reenviar às cegas cria uma segunda.
+      const txt = await res.text();
+      let data = null;
+      try { data = txt ? JSON.parse(txt) : null; } catch { /* corpo não-JSON */ }
+      if (!data) {
+        throw new Error(
+          txt
+            ? `Erro ${res.status} do servidor. Tente de novo em instantes.`
+            : "O servidor demorou demais para responder. Recarregue a página e confira se a proposta chegou antes de enviar de novo."
+        );
+      }
       if (!res.ok) throw new Error(data.error || "Erro ao enviar");
       setEnviadoEm(
-        new Date().toLocaleString("pt-BR", {
-          day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
-        })
+dataHoraBR(new Date())
       );
       setEnviadoAgora(true);
       setEnviando(false);
@@ -814,6 +834,18 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
               </div>
             )}
 
+            {/* ⚠⚠ ACIMA DA CONTAGEM DE PROPÓSITO. Lida na ordem errada, "47 itens preenchidos" é a
+                frase que faz alguém dar a proposta por completa. */}
+            {parseInfo?.parcial && (
+              <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <p className="font-bold">⚠ A leitura do seu PDF ficou incompleta.</p>
+                <p className="mt-0.5 text-[13px]">
+                  Conseguimos ler <strong>{parseInfo.parcial.lidos}</strong> {parseInfo.parcial.lidos === 1 ? "item" : "itens"}, mas a proposta é maior que isso.
+                  {" "}<strong>Confira a lista abaixo e preencha à mão o que faltou</strong> antes de enviar.
+                </p>
+              </div>
+            )}
+
             {parseInfo && (
               <div className="mt-3 bg-torg-orange-50/40 border border-torg-orange-100 rounded-lg px-3 py-2 text-sm">
                 {parseInfo.match > 0 ? (
@@ -883,7 +915,8 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
             <div className="px-6 py-4 border-b border-gray-100">
               <h2 className="text-lg font-semibold text-torg-dark">Itens solicitados</h2>
               <p className="text-xs text-torg-gray mt-1">
-                Preencha o preço unitário e ajuste a quantidade se necessário. Itens sem preço serão ignorados. Se não tiver algum item, marque <strong>&quot;Sem estoque&quot;</strong>.
+                Preencha o preço unitário e ajuste a quantidade se necessário. Itens sem preço serão ignorados.
+                {" "}<strong className="text-red-700">Se você não tem algum item, clique em &quot;Não tenho&quot; na linha dele</strong> — não preencha preço nesse caso.
               </p>
             </div>
             <div className="overflow-x-auto">
@@ -892,7 +925,11 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                   <tr>
                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase w-[80px]">Sem estoque</th>
+                    {/* ⚠ "Não tenho", não "Sem estoque". Matheus (11/09/2026), depois da
+                        T67-011-R00: o fornecedor não achou este botão e digitou "SEM
+                        DISPONIBILIDADE" no campo de prazo, com R$ 2,00 no preço — o texto ninguém
+                        lia e o preço ganhou. O rótulo agora é a frase que ele ia escrever. */}
+                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase w-[110px]">Não tenho</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd RM</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd cotada *</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço unit. *</th>
@@ -963,20 +1000,28 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                             <p className="mt-1 text-[10px] text-torg-blue font-medium">✓ conferido</p>
                           )}
                         </td>
-                        {/* Toggle "Sem estoque" */}
+                        {/* ⚠⚠ ESTE BOTÃO PRECISA SER ACHADO SEM PROCURAR. Ele existia como um "—"
+                            cinza de 10px; o fornecedor da T67-011-R00 não o viu, escreveu "SEM
+                            DISPONIBILIDADE" no campo de prazo e pôs R$ 2,00 — o preço ganhou e virou
+                            pedido. Marcado, ele é uma tarja vermelha sólida que se lê de relance na
+                            tabela inteira; desmarcado, é um botão com a palavra escrita, não um
+                            traço. */}
                         <td className="px-2 py-2 text-center align-top pt-2.5">
                           <button
                             type="button"
                             onClick={() => setLinha(l.id, "semEstoque", !l.semEstoque)}
-                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${
+                            aria-pressed={!!l.semEstoque}
+                            className={`w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-[11px] font-semibold border transition-colors ${
                               l.semEstoque
-                                ? "bg-red-100 text-red-700 border border-red-200 hover:bg-red-50"
-                                : "bg-gray-100 text-gray-400 border border-gray-200 hover:bg-gray-200 hover:text-gray-600"
+                                ? "bg-red-600 text-white border-red-600 hover:bg-red-700"
+                                : "bg-white text-red-700 border-red-300 hover:bg-red-50"
                             }`}
-                            title={l.semEstoque ? "Clique pra desmarcar" : "Marcar como sem estoque"}
+                            title={l.semEstoque
+                              ? "Você marcou que não tem este item. Clique para desmarcar."
+                              : "Clique se você NÃO tem este item — o preço fica em branco"}
                           >
-                            <PackageX size={11} />
-                            {l.semEstoque ? "Sem" : "—"}
+                            <PackageX size={12} className="shrink-0" />
+                            {l.semEstoque ? "NÃO TENHO" : "Não tenho"}
                           </button>
                         </td>
                         <td className="px-2 py-2 text-right text-torg-gray text-xs tabular-nums whitespace-nowrap align-top pt-3">
@@ -1059,10 +1104,12 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                       <td className="px-3 py-2 text-right font-medium text-torg-dark tabular-nums text-sm">{fmtMoeda(totalComIPI)}</td>
                     </tr>
                   )}
+                  {/* ⚠ O resumo repete a contagem porque a tabela pode ter 26 linhas e rolar: quem
+                      marcou 3 itens e vai enviar precisa ver os 3 sem subir a página. */}
                   {linhas.some((l) => l.semEstoque) && (
                     <tr>
                       <td colSpan={10} className="px-3 py-2 text-right text-xs text-red-500">
-                        {linhas.filter((l) => l.semEstoque).length} item(s) marcado(s) como &quot;sem estoque&quot;
+                        {linhas.filter((l) => l.semEstoque).length} item(s) marcado(s) como &quot;não tenho&quot; — vão para a Torg sem preço
                       </td>
                     </tr>
                   )}

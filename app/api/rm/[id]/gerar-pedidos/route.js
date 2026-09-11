@@ -9,6 +9,7 @@ import { previsaoEntregaDDMMYYYY } from "@/lib/prazo-entrega";
 import { TEXTO_CERTIFICADO_QUALIDADE } from "@/lib/certificado-qualidade";
 import { reavaliarStatusRM } from "@/lib/rm-status";
 import { itensDoPedido, divergenciaProposta } from "@/lib/pedido-itens";
+import { bloqueioPorIndisponibilidade } from "@/lib/cotacao-indisponibilidade";
 import { log } from "@/lib/log";
 
 const registro = log("api/rm/[id]/gerar-pedidos");
@@ -113,6 +114,21 @@ export async function POST(req, { params }) {
       { error: "Nenhum vencedor selecionado. Marque vencedores no Mapa antes de gerar pedidos." },
       { status: 400 }
     );
+  }
+
+  // ⚠⚠ "SEM DISPONIBILIDADE" ESCRITO NA PROPOSTA TRAVA AQUI. T67-011-R00 (10/09/2026): a SOUFER
+  // digitou isso no campo de prazo, pôs R$ 2,00 (o outro fornecedor pedia R$ 7,80), ganhou por ser
+  // o menor e o pedido 2037 saiu. Matheus: "sem querer eu gerei pedido". O texto livre não decide
+  // nada sozinho — mas também não pode mais passar sem alguém olhar.
+  const bloqueios = bloqueioPorIndisponibilidade(
+    [...grupos.values()].map((g) => g.cotacao),
+    Array.isArray(body.confirmarIndisponibilidade) ? body.confirmarIndisponibilidade : []
+  );
+  if (bloqueios.length) {
+    return NextResponse.json({
+      error: "Há proposta que diz não ter disponibilidade e mesmo assim veio com preço. Confirme antes de gerar.",
+      indisponibilidade: bloqueios,
+    }, { status: 409 });
   }
 
   const resultados = [];

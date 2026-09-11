@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Loader2, Check, Plus } from "lucide-react";
+import QuantidadesPecas from "./QuantidadesPecas";
+import {usaQuantidadeInspecao, pecasInformadasSchema} from "@/lib/inspecao-pecas";
 import { TIPOS_RELATORIO, usaCotas } from "@/lib/qualidade-campo";
 
 // ─── CRIAR O RELATÓRIO PELO CELULAR ───────────────────────────────────────────
@@ -19,6 +21,10 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
   const [tipo, setTipo] = useState(null);
   const [pecas, setPecas] = useState(null);
   const [q, setQ] = useState("");
+  const [quantidades, setQuantidades] = useState({});
+  const [erroBusca, setErroBusca] = useState("");
+  const [tentativa, setTentativa] = useState(0);
+  const [temMais, setTemMais] = useState(false);
   const [sel, setSel] = useState([]);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -28,22 +34,31 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
   useEffect(() => {
     if (!tipo) { setPecas(null); return; }
     let vivo = true;
-    setPecas(null);
+    setPecas(null); setErroBusca("");
     const t = setTimeout(() => {
       fetch(`/api/campo/pecas?opId=${op.id}&q=${encodeURIComponent(q)}&todas=1`)
-        .then((r) => r.json()).then((j) => { if (vivo) setPecas(j.pecas || []); })
-        .catch(() => vivo && setPecas([]));
+        .then(async r => {const j=await r.json(); if(!r.ok) throw new Error(j.error || "Erro ao buscar peças."); return j;}).then(j => {if(vivo){setPecas(j.pecas || []);setTemMais(!!j.temMais);}})
+        .catch(e => {if(vivo){setPecas([]);setErroBusca(e.message);}});
     }, 250);
     return () => { vivo = false; clearTimeout(t); };
-  }, [tipo, op.id, q]);
+  }, [tipo, op.id, q, tentativa]);
+
+  const comQuantidade = usaQuantidadeInspecao(tipo);
+  const selecionadas = sel.map(marca => ({marca, quantidade: quantidades[marca] ?? ""}));
 
   async function criar() {
     if (!sel.length) { setErro("Escolha ao menos uma peça."); return; }
+    let pecasInformadas;
+    if (comQuantidade) {
+      const v = pecasInformadasSchema.safeParse(selecionadas.map(p=>({...p,quantidade:Number(p.quantidade)})));
+      if(!v.success){setErro(v.error.issues[0].message);return;}
+      pecasInformadas=v.data;
+    }
     setSalvando(true); setErro("");
     try {
       const r = await fetch("/api/qualidade/inspecoes/dimensional", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: op.numero, tipo, escopo: "AVULSAS", marcas: sel }),
+        body: JSON.stringify({ opNumero: op.numero, tipo, escopo: "AVULSAS", marcas: sel, pecasInformadas }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao criar.");
@@ -58,7 +73,7 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
         <p className="text-sm text-torg-gray mb-3">Que inspeção você vai fazer?</p>
         <div className="space-y-2">
           {tipos.map((t) => (
-            <button key={t.id} onClick={() => { setTipo(t.id); setSel([]); }}
+            <button key={t.id} onClick={() => { setTipo(t.id); setSel([]); setQuantidades({}); }}
               className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-4 active:bg-gray-50">
               <span className="block text-base font-semibold text-torg-dark">{t.label}</span>
               <span className="block text-[12px] text-torg-gray font-mono">{t.sigla}</span>
@@ -95,6 +110,8 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
         </div>
       )}
 
+      {comQuantidade && sel.length > 0 && <QuantidadesPecas pecas={selecionadas} onChange={ps=>setQuantidades(Object.fromEntries(ps.map(p=>[p.marca,p.quantidade])))} disabled={salvando} />}
+      {erroBusca && <p className="text-sm text-red-600">{erroBusca} <button onClick={()=>setTentativa(v=>v+1)} className="min-h-11 underline">Tentar novamente</button></p>}
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="buscar marca…"
         autoCapitalize="characters" autoCorrect="off" spellCheck={false}
         className="w-full text-base font-mono border-2 border-gray-200 rounded-xl px-3 py-3 mb-2 focus:border-torg-blue outline-none" />
@@ -108,13 +125,14 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
         {pecas?.slice(0, 80).map((p) => {
           const on = sel.includes(p.marca);
           return (
-            <button key={p.marca} onClick={() => setSel((s) => (on ? s.filter((x) => x !== p.marca) : [...s, p.marca]))}
+            <button key={p.marca} disabled={salvando} onClick={() => {setSel(s => on ? s.filter(x=>x!==p.marca) : [...s,p.marca]); if(!on) setQuantidades(v=>({...v,[p.marca]:v[p.marca] ?? (p.quantidade || "")}));}}
               className={`w-full text-left px-3 py-3 border-b border-gray-100 last:border-0 flex items-center gap-2 ${on ? "bg-torg-blue/10" : "active:bg-gray-50"}`}>
               <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${on ? "bg-torg-blue border-torg-blue" : "border-gray-300"}`}>
                 {on && <Check size={11} className="text-white" />}
               </span>
               <span className="min-w-0">
                 <span className="block text-[15px] font-mono font-semibold text-torg-dark">{p.marca}</span>
+                {comQuantidade && <span className="block text-sm text-torg-blue">{p.quantidade || "Sem quantidade na lista"}{p.quantidade ? " peças na lista" : ""}</span>}
                 {p.descricao && <span className="block text-[12px] text-torg-gray truncate">{p.descricao}</span>}
               </span>
             </button>
@@ -123,6 +141,7 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
         {pecas && !pecas.length && <p className="p-3 text-sm text-torg-gray">Nenhuma peça encontrada.</p>}
       </div>
 
+      {temMais && <p className="text-xs text-torg-gray mb-2">Mostrando as primeiras 60 marcas. Use a busca para localizar outras.</p>}
       {erro && <p className="text-[13px] text-red-600 mb-2">{erro}</p>}
 
       <button onClick={criar} disabled={salvando || !sel.length}

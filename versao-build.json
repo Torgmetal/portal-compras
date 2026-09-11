@@ -1,7 +1,12 @@
 {
-  "build": 3063,
-  "gerado": "2026-09-11T19:36:36.260Z",
+  "build": 3101,
+  "gerado": "2026-09-11T20:42:20.585Z",
   "commits": [
+    {
+      "hash": "6b2bafb0b0",
+      "data": "11/09/2026",
+      "titulo": "MES proprio: os tres formatos de nesting decifrados, e 28 de 28 marcas casaram"
+    },
     {
       "hash": "ebcd3f7611",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c2b4991ebb",
       "data": "09/09/2026",
       "titulo": "feat(lqc): integrar itens comerciais, pintura e boletins por fabricante"
-    },
-    {
-      "hash": "2ff928afc7",
-      "data": "09/09/2026",
-      "titulo": "O sino: notificações por módulo e por pessoa, em toda sidebar"
     }
   ]
 }

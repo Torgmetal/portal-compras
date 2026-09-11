@@ -6,6 +6,7 @@ import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
+  { href: "/planejamento/recebimento", label: "Recebimento", icon: PackageCheck },
   { href: "/planejamento/cronogramas", label: "Cronogramas", icon: GanttChart },
   { href: "/planejamento/datas-setor", label: "Programação PCP", icon: CalendarClock },
   { href: "/planejamento/programacao-cargas", label: "Programação de Cargas", icon: PackageCheck },

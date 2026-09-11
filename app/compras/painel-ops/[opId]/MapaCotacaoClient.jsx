@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { BarChart3, CheckCircle2, AlertCircle, Loader2, Truck, Award, Wand2, X, XCircle, Mail, Send, TrendingDown } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 import { numeroBR } from "@/lib/numero-br";
+import { contradicaoDeDisponibilidade } from "@/lib/cotacao-indisponibilidade";
 
 const fmtMoeda = (v) =>
   v != null && v > 0 ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -240,12 +241,29 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
   // O modal chama com cotacoesIds=[id] pra gerar 1 por vez.
   const gerarPedidos = async ({ categoria, localEstoque, cnpjsPorCotacao, cotacoesIds }) => {
     setErro("");
-    const res = await fetch(`${apiBase}/gerar-pedidos`, {
+    const enviar = (confirmarIndisponibilidade) => fetch(`${apiBase}/gerar-pedidos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ categoria, localEstoque, cnpjsPorCotacao, cotacoesIds }),
+      body: JSON.stringify({ categoria, localEstoque, cnpjsPorCotacao, cotacoesIds, confirmarIndisponibilidade }),
     });
-    const data = await res.json();
+
+    let res = await enviar([]);
+    let data = await res.json();
+
+    // ⚠⚠ A CONFIRMAÇÃO NOMEIA O FORNECEDOR E CITA O QUE ELE ESCREVEU. Um "deseja continuar?" genérico
+    // vira reflexo de clicar em OK; lendo "SOUFER escreveu: SEM DISPONIBILIDADE" a pessoa PARA. Foi
+    // assim que o pedido 2037 saiu — ninguém tinha o que ler (T67-011-R00, 10/09/2026).
+    if (res.status === 409 && data?.indisponibilidade?.length) {
+      const lista = data.indisponibilidade.map((b) => `• ${b.fornecedor} escreveu: "${b.texto}"`).join("\n");
+      const segue = confirm(
+        `Atenção — proposta com preço, mas dizendo que NÃO TEM o material:\n\n${lista}\n\n` +
+        "Gerar o pedido assim mesmo?"
+      );
+      if (!segue) throw new Error("Geração cancelada — confira as propostas marcadas em vermelho no mapa.");
+      res = await enviar(data.indisponibilidade.map((b) => b.id));
+      data = await res.json();
+    }
+
     if (!res.ok) throw new Error(extractError(data.error) || "Erro");
     return data.resultados || [];
   };
@@ -524,6 +542,12 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
                     {totalCells > 0 && (
                       <p className="text-[9px] font-normal mt-0.5 normal-case">
                         {vencidos > 0 ? `${vencidos}/${totalCells} ganhando` : "click pra marcar todos"}
+                      </p>
+                    )}
+                    {f.indisponibilidade?.contradiz && (
+                      <p className="mt-1 rounded bg-red-600 px-1 py-0.5 text-[9px] font-bold normal-case text-white leading-tight"
+                        title={`A proposta diz: "${f.indisponibilidade.texto}" — mas veio com preço. Confira antes de gerar pedido.`}>
+                        ⚠ escreveu que NÃO TEM
                       </p>
                     )}
                   </th>
@@ -1448,6 +1472,11 @@ function buildMatriz(op) {
             cnpj: cot.cnpj || "",
             nCodOmie: cot.nCodOmie || "",
             totalProposta: cot.totalProposta || null,
+            // ⚠⚠ O FORNECEDOR ESCREVEU "NÃO TENHO" E MANDOU PREÇO? Caso real: T67-011-R00
+            // (10/09/2026). A SOUFER digitou "SEM DISPONIBILIDADE" no campo de prazo e pôs R$ 2,00
+            // — o texto ficou só na observação, que nada lia, e o R$ 2,00 ganhou por ser o menor.
+            // Isto não decide nada: acende a luz na coluna e obriga confirmação antes do pedido.
+            indisponibilidade: contradicaoDeDisponibilidade(cot),
           });
         }
         // Garante que o RMItem está na matriz (lookup global — multi-RM)

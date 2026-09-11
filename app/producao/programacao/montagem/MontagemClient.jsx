@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo } from "react";
+import { nomeDaBancada } from "@/lib/montagem-capacidade";
 import { useRouter } from "next/navigation";
 import { Wrench, ChevronDown, ChevronUp, Filter, Search, CheckCircle2, Download, Loader2, AlertCircle, ArrowRight, Package, Undo2, Printer, Flag, Clock, CalendarClock, Layers } from "lucide-react";
 import KpiSetor from "@/components/KpiSetor";
@@ -719,8 +720,8 @@ export default function MontagemClient({ conjuntosIniciais, userRole: _userRole,
                         {/* ⚠ a bancada atribuída fica no cartão: é o que o encarregado confere
                             contra o maço impresso. Sem isso o papel e a tela divergem em silêncio. */}
                         {c.montagemBancada && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold whitespace-nowrap">
-                            {c.montagemBancada}
+                          <span title={c.montagemBancada} className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold whitespace-nowrap">
+                            {nomeDaBancada(c.montagemBancada)}
                           </span>
                         )}
                         {c.prioridade != null && (

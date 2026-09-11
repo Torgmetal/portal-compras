@@ -67,7 +67,7 @@ export function criarAtraso(dep){
     for(const r of alvos){
       const d = porRec.get(r.setor+"|"+(r.recurso||"—"));
       const antes = r.lotes.map(l=>({...l, itens:l.itens}));
-      /* mesma regra do arraste: cair no sábado escorrega para a segunda, e quem JÁ estava no fim de
+      /* no empurrão automático, cair no sábado escorrega para a segunda, e quem JÁ estava no fim de
          semana continua lá - o empurrão não é lugar de desfazer uma decisão de alguém. */
       const novos = r.lotes.map(l=>{
         const cru = Math.max(0, Math.min(dep.DIAS.length-1, dep.IDX.get(l.dia)+d));

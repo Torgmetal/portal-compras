@@ -1,3 +1,4 @@
+import { pecasInformadasSchema, textoPeca, quantidadesPorMarca } from "@/lib/inspecao-pecas";
 // GET   — o relatório para a tela de edição/prévia.
 // PATCH  — salva o que o elaborador preencheu (dimensões encontradas, resultados, observações).
 //
@@ -58,7 +59,20 @@ export async function GET(_req, { params }) {
       : Promise.resolve([]),
   ]);
 
-  return NextResponse.json({ relatorio: rel, fotos, assinaturas });
+  // Sugestões de leitura: só viram conteúdo do relatório quando o inspetor salva.
+  // opNumero nas peças pode ser a frente da Engenharia; o vínculo correto é opId.
+  let quantidadesLista = {}, avisoQuantidades = null;
+  if (!rel.envioAssinaturaId) {
+    try {
+      const opId = rel.opId || (await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { id: true } }))?.id;
+      if (opId) quantidadesLista = quantidadesPorMarca(await prisma.pecaConjunto.findMany({
+        where: { opId }, select: { marca: true, qte: true },
+      }));
+    } catch {
+      avisoQuantidades = "Não foi possível consultar as quantidades da lista da OP. As quantidades já registradas foram mantidas.";
+    }
+  }
+  return NextResponse.json({ relatorio: rel, fotos, assinaturas, quantidadesLista, avisoQuantidades });
 }
 
 export async function PATCH(req, { params }) {
@@ -83,6 +97,13 @@ export async function PATCH(req, { params }) {
   if (body.titulo !== undefined) dados.titulo = String(body.titulo || "").trim() || null;
   if (body.observacoes !== undefined) dados.observacoes = String(body.observacoes || "").trim() || null;
   if (body.inspetor !== undefined) dados.inspetor = String(body.inspetor || "").trim() || null;
+  // ⚠ as PEÇAS INFORMADAS (marcas) editam-se aqui, não só na criação. Vitor (11/09/2026), OP-106:
+  // "permitir que eu consiga editar as peças informadas, pois isso também não consigo fazer no
+  // portal". Uma marca por linha, sem repetição, com teto — é o que sai no cabeçalho do PDF.
+  if (Array.isArray(body.marcas)) {
+    const vistas = new Set();
+    dados.marcas = body.marcas.map((m) => String(m || "").trim().toUpperCase().slice(0, 40)).filter((m) => m && !vistas.has(m) && vistas.add(m)).slice(0, 2000);
+  }
 
   // ⚠ APROVAR TAMBÉM SE FAZ NO COMPUTADOR. Até aqui só o celular gravava o resultado geral —
   // quem monta o relatório na mesa (LP, pintura) não tinha como aprová-lo, e sem resultado o
@@ -291,6 +312,21 @@ export async function PATCH(req, { params }) {
     }
   }
 
+  if (body.pecasInformadas !== undefined) {
+    const validacao = pecasInformadasSchema.safeParse(body.pecasInformadas);
+    if (!validacao.success) return NextResponse.json({ error: validacao.error.issues[0]?.message || "Confira as peças e quantidades." }, { status: 400 });
+    dados.marcas = validacao.data.map(p => p.marca);
+    dados.resultados = { ...(dados.resultados || rel.resultados || {}), pecasInformadas: validacao.data };
+  } else if (dados.marcas && rel.resultados?.pecasInformadas && JSON.stringify(dados.marcas) !== JSON.stringify(rel.marcas)) {
+    return NextResponse.json({ error: "Atualize a página e edite as marcas junto com suas quantidades." }, { status: 409 });
+  }
+  const pecasSalvas = dados.resultados?.pecasInformadas;
+  if (pecasSalvas?.length) {
+    dados.resultados.qtdPeca = Object.fromEntries(pecasSalvas.map(p => [p.marca, p.quantidade]));
+    dados.resultados.quantidade = String(pecasSalvas.reduce((s, p) => s + p.quantidade, 0));
+    dados.resultados.pecas = pecasSalvas.map(textoPeca).join(", ");
+  }
+
   const atualizado = await prisma.relatorioInspecao.update({ where: { id }, data: dados });
 
   // ⚠ BACKUP NA PASTA DA OBRA, na APROVAÇÃO. Vitor (22/08/2026): "salvar os relatórios em PDF na
@@ -311,7 +347,7 @@ export async function PATCH(req, { params }) {
   }
 
   await prisma.auditLog.create({
-    data: { userId: user.id, action: "EDITAR_RELATORIO_INSPECAO", entity: "RelatorioInspecao", entityId: id, diff: { campos: Object.keys(dados) } },
+    data: { userId: user.id, action: "EDITAR_RELATORIO_INSPECAO", entity: "RelatorioInspecao", entityId: id, diff: { campos: Object.keys(dados), ...(body.pecasInformadas !== undefined ? { antes: { marcas: rel.marcas, pecasInformadas: rel.resultados?.pecasInformadas ?? null }, depois: { marcas: dados.marcas, pecasInformadas: dados.resultados.pecasInformadas } } : {}) } },
   }).catch(() => {});
 
   return NextResponse.json({ ok: true, relatorio: atualizado, arquivo });

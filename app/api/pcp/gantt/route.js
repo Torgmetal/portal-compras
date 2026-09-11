@@ -36,6 +36,7 @@ const schema = z.object({
   blocos: z.array(z.object({
     setor: z.enum(SETORES_GANTT),
     ids: z.array(z.string()).min(1),
+    fracoes: z.array(z.object({id:z.string(),inicio:z.number().int().min(0),quantidade:z.number().int().min(1)})).min(1).max(10000).optional(),
     recurso: z.string().trim().max(60).nullable(),
     dia: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida"),
   })).min(1, "Nada para salvar").max(400),
@@ -53,11 +54,12 @@ export async function POST(req) {
   const temRetorno = body.blocos.some(b=>b.ids.some(id=>id.startsWith("retorno:")));
   const temPeca = body.blocos.some(b=>b.ids.some(id=>!id.startsWith("retorno:")));
   if(temRetorno&&temPeca)return NextResponse.json({error:"Salve os retornos de terceiros separadamente das outras programações."},{status:400});
+  if (temRetorno && body.blocos.some(b => b.fracoes)) return NextResponse.json({error:"Retornos de terceiros são programados como lote inteiro."},{status:400});
   let r;
   try {r = temRetorno ? await programarRetornos(body.blocos,user) : await aplicarRemanejo(body.blocos, user);}
   catch(e){return NextResponse.json({error:e.message},{status:400});}
 
-  await prisma.auditLog.create({
+  if (temRetorno) await prisma.auditLog.create({
     data: {
       userId: user.id, action: "PCP_GANTT_REMANEJAR", entity: "PecaConjunto",
       entityId: `${r.total} peças`,
