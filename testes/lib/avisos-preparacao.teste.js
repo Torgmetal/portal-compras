@@ -1,5 +1,12 @@
 import { expect, it } from "vitest";
-import { avisosPreparacao } from "@/lib/avisos-preparacao";
+import { avisosPreparacao, materialResolvido } from "@/lib/avisos-preparacao";
+it("material na OP ou estoque com R definido não entra no aviso de falta de material", () => {
+  expect(materialResolvido({ material: "NA_OP" })).toBe(true);
+  expect(materialResolvido({ material: "ENTREGUE" })).toBe(true);
+  expect(materialResolvido({ material: "ESTOQUE", materialRInformado: "261234" })).toBe(true);
+  expect(materialResolvido({ material: "ESTOQUE" })).toBe(false);
+  expect(materialResolvido({ material: "SEM_MATERIAL" })).toBe(false);
+});
 it("não anuncia que uma marca sem desenho tem desenho", () => {
   const r = avisosPreparacao([{ marca: "A", qte: 3, temDesenho: false, temMaquina: false }]);
   expect(r.semDesenho).toMatchObject({ marcas: 1, quantidade: 3 });

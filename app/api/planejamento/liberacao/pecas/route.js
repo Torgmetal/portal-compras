@@ -8,6 +8,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { portaoDoDesenho, temDesenhoNaPasta, temMaquinaNaPasta } from "@/lib/pasta-engenharia";
 import { analisarMaterial } from "@/lib/material-liberacao";
+import { materialResolvido } from "@/lib/avisos-preparacao";
 import { requireRole } from "@/lib/session";
 import { pecaCortada, poolDaPeca, POOLS } from "@/lib/liberacao-producao";
 
@@ -140,7 +141,7 @@ export async function GET(req) {
   }).sort((a,b) => b.pesoKg - a.pesoKg);
 
   // material que a obra ainda deve: entregue resolve, e estoque com o fardo apontado também.
-  const pendenteDeMaterial = (x) => x.material && x.material !== "ENTREGUE" && !(x.material === "ESTOQUE" && x.materialRInformado);
+  const pendenteDeMaterial = (x) => x.material && !materialResolvido(x);
 
   return NextResponse.json({
     op, temLpc: true, pecas, pools: POOLS, materiais,

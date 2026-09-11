@@ -1,5 +1,5 @@
 "use client";
-import { avisosPreparacao } from "@/lib/avisos-preparacao";
+import { avisosPreparacao, materialResolvido } from "@/lib/avisos-preparacao";
 // LIBERAR PARA O PCP — planilha de peças, com filtro, prioridade e pré-seleção do dia.
 //
 // Vitor (25/08/2026): "ficou bem ruim para selecionar, quero que deixe como planilha com filtro e
@@ -53,7 +53,7 @@ const MAT_OK = (v) => v === "ENTREGUE" || v === "NA_OP";
 // A linha guarda o `estado` cru (ESTOQUE), que não muda quando alguém aponta o fardo; quem sabe se
 // foi apontado é o `materialRInformado`. Ler só o estado fazia a peça continuar contada como
 // pendente na barra de resumo e continuar fora da seleção "pronta para liberar" depois de declarada.
-const MAT_RESOLVIDO = (p) => MAT_OK(p?.material) || (p?.material === "ESTOQUE" && !!p?.materialRInformado);
+const MAT_RESOLVIDO = materialResolvido;
 
 const NAT = { croqui: "Croqui", avulsa: "Marca", conjunto: "Conjunto" };
 
@@ -452,15 +452,16 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         <div className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2.5 text-[12px] text-sky-900 flex items-start gap-2">
           <AlertCircle size={15} className="mt-0.5 shrink-0" />
           <span>
-            <b>{fmtN(d.material.naoEntregue)} peça(s) · {fmtKg(d.material.kgNaoEntregue)} sem material entregue</b>
-            {(d.material.aguardandoEntrega > 0 || d.material.solicitado > 0 || d.material.naoComprado > 0) && <>
+            <b>Na OP inteira: {fmtN(d.material.naoEntregue)} marca(s) · {fmtKg(d.material.kgNaoEntregue)} sem material entregue</b>
+            {(d.material.aguardandoEntrega > 0 || d.material.solicitado > 0 || d.material.naoComprado > 0 || d.material.estoqueSemR > 0) && <>
               {" "}— {[
                 d.material.aguardandoEntrega > 0 ? `${fmtN(d.material.aguardandoEntrega)} a caminho` : null,
                 d.material.solicitado > 0 ? `${fmtN(d.material.solicitado)} em cotação` : null,
                 d.material.naoComprado > 0 ? `${fmtN(d.material.naoComprado)} não comprado` : null,
+                d.material.estoqueSemR > 0 ? `${fmtN(d.material.estoqueSemR)} aguardando definição do R de estoque` : null,
               ].filter(Boolean).join(" · ")}
             </>}.
-            {" "}Essas não entram na programação enquanto o aço não chegar nesta obra.
+            {" "}Para programar, confirme o recebimento ou defina o R do material disponível em estoque.
           </span>
         </div>
       )}
@@ -483,7 +484,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
               que está 90% travada. */}
           {!selecionadas.length && travadasNoEscopo > 0 && (
             <p className="text-[12px] text-amber-800">
-              {fmtN(travadasNoEscopo)} destas peças ainda não podem ser liberadas (falta desenho ou NC1) —
+              {fmtN(travadasNoEscopo)} destas peças não estão disponíveis para nova liberação (conferência de arquivos, material pendente ou programação já registrada) —
               o prazo acima é o do setor, não o do que desce hoje.
             </p>
           )}

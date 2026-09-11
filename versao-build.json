@@ -1,7 +1,12 @@
 {
-  "build": 3096,
-  "gerado": "2026-09-11T19:07:39.365Z",
+  "build": 3097,
+  "gerado": "2026-09-11T19:12:03.391Z",
   "commits": [
+    {
+      "hash": "3b95884d",
+      "data": "11/09/2026",
+      "titulo": "feat(planejamento): consultar recebimentos e encaminhar rastreabilidade ao PCP"
+    },
     {
       "hash": "2844dea9",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "121332f7",
       "data": "10/09/2026",
       "titulo": "Etiqueta QWS: TAG PETROBRAS, QTDE e PESO centrados na celula"
-    },
-    {
-      "hash": "1964d514",
-      "data": "10/09/2026",
-      "titulo": "Etiqueta: a lista de papel do driver esta em POLEGADAS - corrige a instrucao"
     }
   ]
 }
