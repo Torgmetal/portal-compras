@@ -346,6 +346,11 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
             // o que o fornecedor via — sem saber se o PDF dele é escaneado, se o limite de leituras
             // estourou ou se o arquivo é grande demais.
             motivoIA: data.motivoIA || null,
+            // ⚠⚠ LEITURA CORTADA NO MEIO. Proposta grande estoura o teto de saída da IA; o portal
+            // aproveita os itens que fecharam (antes devolvia zero), mas eles NÃO são a proposta
+            // inteira. Sem esta tarja o fornecedor envia meia proposta achando que enviou tudo — e
+            // quem descobre é o comprador, depois, procurando o item que não veio.
+            parcial: data.parcial || null,
             avisos: data.avisos || [],
           });
           if (data.fornecedor && !razaoSocial) setRazaoSocial(data.fornecedor);
@@ -811,6 +816,18 @@ dataHoraBR(new Date())
                     <span className="text-[10px] text-emerald-700 font-medium uppercase">enviado</span>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* ⚠⚠ ACIMA DA CONTAGEM DE PROPÓSITO. Lida na ordem errada, "47 itens preenchidos" é a
+                frase que faz alguém dar a proposta por completa. */}
+            {parseInfo?.parcial && (
+              <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <p className="font-bold">⚠ A leitura do seu PDF ficou incompleta.</p>
+                <p className="mt-0.5 text-[13px]">
+                  Conseguimos ler <strong>{parseInfo.parcial.lidos}</strong> {parseInfo.parcial.lidos === 1 ? "item" : "itens"}, mas a proposta é maior que isso.
+                  {" "}<strong>Confira a lista abaixo e preencha à mão o que faltou</strong> antes de enviar.
+                </p>
               </div>
             )}
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
+import { extrairJson, recuperarJsonTruncado, motivoDaFalhaIA } from "@/lib/ia-json";
 import { log } from "@/lib/log";
 
 const registro = log("api/parse-cotacao-ai");
@@ -11,7 +12,20 @@ export const runtime = "nodejs";
 // documento/visão é ~4x mais lento e estourava o timeout de 60s em RMs
 // grandes (ex: 43 itens → FUNCTION_INVOCATION_TIMEOUT, o fornecedor caía no
 // regex fraco e "casava 0"). 120s dá folga p/ cold start + variação da API.
-export const maxDuration = 120;
+// ⚠⚠ 120s CORTAVA PROPOSTA GRANDE. Matheus (11/09/2026), lançando a proposta de um fornecedor:
+// "deu erro para importar um PDF grande". Cem linhas de proposta são milhares de tokens de SAÍDA, e
+// a saída é a parte lenta — o tempo aqui não é do PDF, é do texto que a IA escreve de volta. 300s é
+// o teto usado no resto do projeto para trabalho longo (importação de LPC, varredura de NF no Omie).
+export const maxDuration = 300;
+
+// ⚠⚠ O TETO DE SAÍDA É O QUE ESTOURAVA DE VERDADE. Com 8000, uma proposta de ~90 itens batia no
+// limite e a IA parava NO MEIO de um item: o JSON vinha íntegro até ali e sem fechar. O sintoma era
+// "resposta não-JSON", que mandava procurar defeito no PDF. Não tem defeito no PDF.
+//
+// ⚠ Mas o teto maior não é a garantia — é a folga. A garantia é `recuperarJsonTruncado`
+// (`lib/ia-json.js`): mesmo batendo no limite, os itens que fecharam voltam para a tela. Subir o
+// número sem isso só empurraria o mesmo buraco para a proposta seguinte, um pouco maior.
+const LIMITE_SAIDA = 16000;
 
 // Rota pública (portal do fornecedor) que consome créditos Anthropic —
 // rate-limit por IP e cap de payload contra abuso/queima de créditos.
@@ -113,17 +127,6 @@ Devolva APENAS um JSON válido envolvido em <json></json>, sem comentários adic
   ]
 }
 </json>`;
-
-function extractJsonFromResponse(text) {
-  // Tenta achar <json>...</json> primeiro
-  const tagged = text.match(/<json>([\s\S]*?)<\/json>/i);
-  if (tagged) return tagged[1].trim();
-  // Fallback: tenta achar o primeiro objeto JSON válido
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start >= 0 && end > start) return text.substring(start, end + 1);
-  return text;
-}
 
 // Arredonda pra N casas decimais — evita problemas com inputs step="0.01"
 // e bate com a precisao mostrada nas propostas (PDF, Omie, etc).
@@ -295,7 +298,7 @@ export async function POST(request) {
 
     const message = await anthropic.messages.create({
       model: MODELO_FIXO,
-      max_tokens: 8000,
+      max_tokens: LIMITE_SAIDA,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content }],
     });
@@ -306,19 +309,53 @@ export async function POST(request) {
         .map((c) => c.text)
         .join("\n") || "";
 
-    let parsed;
+    let parsed = null;
+    let parcial = null;
     try {
-      const jsonStr = extractJsonFromResponse(rawText);
-      parsed = JSON.parse(jsonStr);
+      parsed = JSON.parse(extrairJson(rawText));
     } catch {
+      // ⚠⚠ CORTADA NÃO É PERDIDA. Antes daqui, uma proposta de cem linhas interrompida no item 93
+      // devolvia ZERO e o comprador digitava as cem à mão — o que falta na resposta não é dado, é um
+      // "]" e um "}". O item interrompido é descartado inteiro (ver `lib/ia-json.js`).
+      const salvo = recuperarJsonTruncado(rawText);
+      if (salvo) {
+        parsed = salvo.objeto;
+        parcial = {
+          lidos: salvo.itens,
+          motivo: motivoDaFalhaIA({ stopReason: message.stop_reason, texto: rawText }),
+        };
+      }
+    }
+
+    if (!parsed) {
+      // ⚠⚠ ANTES, ESTE CAMINHO NÃO REGISTRAVA NADA. A falha do Matheus não deixou rastro nenhum no
+      // servidor: sobrou a frase da tela, e ela apontava para a causa errada. Sem este log, a
+      // próxima seria investigada do zero outra vez.
+      registro.erro("parse-cotacao-ai: resposta não parseável", {
+        stopReason: message.stop_reason,
+        outputTokens: message.usage?.output_tokens,
+        limiteSaida: LIMITE_SAIDA,
+        itensRM: (rmItens || []).length,
+        tamanhoResposta: rawText.length,
+        preview: rawText.slice(0, 300),
+      });
       return NextResponse.json(
         {
-          error: "IA devolveu resposta não-JSON. Provável ruído na extração.",
+          error: motivoDaFalhaIA({ stopReason: message.stop_reason, texto: rawText }),
           rawPreview: rawText.slice(0, 500),
           stop_reason: message.stop_reason,
         },
         { status: 502 }
       );
+    }
+
+    if (parcial) {
+      registro.erro("parse-cotacao-ai: resposta truncada, itens recuperados", {
+        stopReason: message.stop_reason,
+        recuperados: parcial.lidos,
+        limiteSaida: LIMITE_SAIDA,
+        itensRM: (rmItens || []).length,
+      });
     }
 
     const itensSan = sanitizeItens(parsed.itens, (rmItens || []).length);
@@ -329,6 +366,10 @@ export async function POST(request) {
       validade: parsed.validade || "",
       tipoFrete: parsed.tipoFrete || "",
       itens: itensSan,
+      // ⚠ Presente SÓ quando a leitura foi cortada. A tela tem de gritar isso: meia proposta que
+      // parece inteira é pior que proposta nenhuma — é o mesmo defeito da aba `Revisao` das listas,
+      // que relatava intenção como se fosse resultado.
+      parcial,
       _meta: {
         model: message.model,
         inputTokens: message.usage?.input_tokens,

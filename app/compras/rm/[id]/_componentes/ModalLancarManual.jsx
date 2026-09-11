@@ -158,7 +158,12 @@ export function ModalLancarManual({ cotacao, rm, onClose }) {
       setLinhas(linhasNovas);
       setAutoFilled(idsAuto);
       setRevisado(new Set());
-      setParseInfo({ match: casados, total: itensIA.length, fornecedor: data.fornecedor, prazo: data.prazoPagamento });
+      // ⚠⚠ `parcial` VEM QUANDO A LEITURA FOI CORTADA no meio (proposta grande demais para o teto
+      // de saída da IA). Os itens que chegaram são bons, mas NÃO SÃO TODOS — e uma tela que mostra
+      // "47 itens preenchidos" sem dizer isso faz o comprador fechar a cotação achando que conferiu
+      // a proposta inteira. É o mesmo defeito da aba `Revisao` das listas: relatar intenção como
+      // resultado.
+      setParseInfo({ match: casados, total: itensIA.length, fornecedor: data.fornecedor, prazo: data.prazoPagamento, parcial: data.parcial || null });
 
       // Pre-popula identificacao se vier no PDF
       if (data.fornecedor && !razaoSocial) setRazaoSocial(data.fornecedor);
