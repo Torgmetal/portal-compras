@@ -1,7 +1,12 @@
 {
-  "build": 3078,
-  "gerado": "2026-09-11T11:57:36.415Z",
+  "build": 3079,
+  "gerado": "2026-09-11T12:00:29.984Z",
   "commits": [
+    {
+      "hash": "fd206ca6",
+      "data": "11/09/2026",
+      "titulo": "Análise crítica: responsável (Eng.º de Projeto) editável no registro"
+    },
     {
       "hash": "0d7aea88",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "0bfeced9",
       "data": "09/09/2026",
       "titulo": "Encaminha marcas avulsas do corte diretamente ao jato"
-    },
-    {
-      "hash": "81b92be3",
-      "data": "09/09/2026",
-      "titulo": "Corrige persistência e atualização do Gantt em todos os setores"
     }
   ]
 }
