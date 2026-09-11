@@ -1,7 +1,12 @@
 {
-  "build": 3097,
-  "gerado": "2026-09-11T19:12:03.391Z",
+  "build": 3098,
+  "gerado": "2026-09-11T19:19:06.683Z",
   "commits": [
+    {
+      "hash": "23005fa2",
+      "data": "11/09/2026",
+      "titulo": "fix(planejamento): contar corretamente materiais pendentes nos avisos"
+    },
     {
       "hash": "3b95884d",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "2cdc94f5",
       "data": "10/09/2026",
       "titulo": "Etiqueta QWS: centraliza os titulos de QTDE, PESO e TAG, e o nome do cliente"
-    },
-    {
-      "hash": "121332f7",
-      "data": "10/09/2026",
-      "titulo": "Etiqueta QWS: TAG PETROBRAS, QTDE e PESO centrados na celula"
     }
   ]
 }
