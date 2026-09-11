@@ -685,3 +685,92 @@ pela tela não aparece no Gantt. O fim de linha correto é o Gantt **ler o cadas
 capacidades (que são medidas, não escolhidas) migrarem para colunas de `MesRecurso`. Isto é o mesmo
 erro que `lib/baixa-syneco.js` e o sino de notificações já documentam ter custado caro neste
 projeto; está escrito aqui para não ser redescoberto na terceira vez.
+
+---
+
+# 12. A engine de NESTING da Preparação (11/09/2026)
+
+Matheus: *"precisamos pensar em uma engine para ser os arquivos NESTING do programador das máquinas
+da Preparação, dessa forma o operador apenas seleciona o NESTING que ele vai cortar e já puxa todas
+as MARCAS para abrir na tela do operador"*.
+
+## 12.1 ⚠⚠ O NESTING É A PEÇA QUE FALTA ENTRE O CICLO DO CNC E A MARCA
+
+O §8.4 já tinha topado com o buraco sem nome: *"incremento de `CycleCount64` → ciclo concluído — e
+ciclo NÃO é peça: um nesting de laser rende várias marcas e várias peças por ciclo"*. Enquanto o
+portal não souber **o que tem dentro da chapa**, o contador do laser é um número sem tradução.
+
+Com o plano carregado, um ciclo deixa de ser um número e vira **um conjunto conhecido de marcas**.
+É a mesma peça que atende o pedido do Matheus (o operador escolhe o plano, não digita marca) e a que
+torna o apontamento automático possível depois. Não são dois trabalhos, é um.
+
+## 12.2 ⚠⚠ E FECHA A RASTREABILIDADE DO MATERIAL — DE DECLARAÇÃO PARA FATO
+
+Hoje o rastreio do material no corte é uma **declaração por perfil**: `TrocaRastreabilidade` grava
+*"todo este perfil, nesta OP, veio deste lote"*. O próprio schema documenta o preço disso na OP-106
+— o perfil `CH12.50X100` tinha 1 peça de estoque e 3 corretamente rastreadas, e aplicar a declaração
+nas 4 **apagaria rastreio bom**; foi de onde nasceu o escopo `SEM_R`.
+
+O nesting é por **chapa**. Bipando o R da chapa ao abrir o plano, **todas as marcas daquele plano
+herdam o R como fato**, não como declaração — e a distinção `TODAS`/`SEM_R` deixa de ser necessária
+para o que passar por aqui. É o mesmo ganho que a Conferência de Peça teve ao contar contra a L.E.
+em vez de contra a memória de quem confere.
+
+## 12.3 As entidades (provisórias)
+
+- **`MesNesting`** — o plano: número, máquina (`MesRecurso`), material + espessura, dimensão da
+  chapa, nº de chapas previstas, arquivo de origem, hash do arquivo, quem programou, estado.
+- **`MesNestingItem`** — uma linha por marca no plano: marca, `pecaConjuntoId` (quando casar),
+  `opNumero`, **quantidade POR CHAPA**. É aqui que mora a explosão.
+- **`MesNestingChapa`** — o fato: chapa nº N do plano cortada, quando, por quem, com qual R, e se
+  saiu inteira ou sucateada.
+
+⚠ **A quantidade do item é POR CHAPA, não total.** Guardar o total obrigaria a dividir de volta a
+cada apontamento, e divisão que não fecha em inteiro é onde nascem as meias-peças. Total = por chapa
+× chapas cortadas, sempre derivado — a mesma regra do §3.1 (o fato é o evento; quantidade é
+projeção).
+
+## 12.4 O fluxo, decidido com o Matheus (11/09/2026)
+
+**Entrada: os dois caminhos.** Pasta varrida como padrão — o programador salva onde já salva hoje e o
+plano aparece sozinho, sem passo novo no trabalho dele (*passo novo é passo que se esquece, e um
+nesting não subido é máquina parada esperando*) — mais upload manual na tela do PCP para o que a
+pasta não cobre: plano refeito na hora, arquivo que veio por e-mail.
+
+**Apontamento: "cortei mais uma chapa".** Um toque por chapa; o portal explode nas marcas do plano.
+Marca a marca era justamente o trabalho a tirar do operador — um nesting de laser tem dezenas de
+marcas. ⚠ **Precisa de saída para a chapa que não saiu inteira** (colisão, sucata, chapa curta): sem
+ela, o operador mente na contagem ou não aponta, e os dois estragam o mesmo número.
+
+## 12.5 ⚠⚠ O QUE ESTÁ BLOQUEADO, E POR QUE NÃO DÁ PARA COMEÇAR SEM
+
+**O formato do arquivo.** Matheus vai mandar um nesting real exportado. Escrever o leitor contra uma
+suposição de formato é o erro mais caro possível aqui: o leitor é 80% do trabalho, e um leitor feito
+para o formato errado não se conserta, se joga fora.
+
+O que precisa vir no exemplo, do **mesmo plano**:
+
+1. o **relatório do plano** (PDF/HTML/CSV/XLS — o que o software exportar), que é onde costuma estar
+   a lista de peças com quantidade por chapa;
+2. o **programa NC** (`.nc`, `.tap`, `.cnc`…), porque em alguns fluxos a lista de marcas só existe
+   nos comentários dele;
+3. qualquer **exportação estruturada** que o software ofereça (XML/CSV/JSON).
+
+A pergunta que o exemplo tem de responder: **a MARCA da Torg aparece no arquivo?** Se o nesting
+chamar as peças por um id interno do software de CAM, falta um passo de casamento — e aí o desenho
+muda, porque o casamento tem de ser explícito e conferível, nunca adivinhado por semelhança de nome.
+
+## 12.6 Riscos já visíveis
+
+- ⚠⚠ **Plano que mistura OPs.** É normal e é o ponto do nesting (aproveitar chapa). A baixa tem de
+  cair na OP certa marca a marca — `lib/reconciliar-syneco-corte.js` casa por `opId|marca`, então o
+  item do plano precisa carregar a OP, não só a marca.
+- ⚠⚠ **Segunda verdade de "o que produzir".** O §3.2 é explícito: *não criar tabela nova de ordem de
+  produção*. O nesting **não** é uma nova lista do que fazer — é um agrupamento físico de marcas que
+  já existem em `PecaConjunto`. Item de plano que não casar com marca conhecida tem de aparecer como
+  pendência, não entrar calado.
+- ⚠ **Replano.** O programador refaz o plano e salva por cima. O hash do arquivo existe para isso: o
+  mesmo número com conteúdo diferente é um plano NOVO, e o antigo só pode ser substituído se ainda
+  não tiver chapa cortada.
+- ⚠ **Sobra/retalho** fica fora deste escopo — é a tela `/pcp/aproveitamento`, hoje em construção.
+  Anotado para não virar escopo por acidente.
