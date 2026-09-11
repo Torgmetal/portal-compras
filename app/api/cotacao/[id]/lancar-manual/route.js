@@ -131,6 +131,13 @@ export async function POST(req, { params }) {
             qtdCotada: it.qtdCotada,
             icmsPct: it.icmsPct ?? null,
             ipiPct: it.ipiPct ?? null,
+            // ⚠⚠ PREÇO E "SEM DISPONIBILIDADE" NÃO PODEM COEXISTIR. Esta rota gravava o preço sem
+            // olhar a flag: se o fornecedor tinha respondido pelo portal marcando "não tenho" e
+            // depois a proposta era lançada à mão com preço, o item ficava com OS DOIS. No mapa ele
+            // volta a parecer preço normal (a célula só esconde quando o preço é zero), fica
+            // clicável, pode vencer e virar pedido — com o "não tenho" do fornecedor ainda gravado
+            // nele. Lançar um preço é afirmar que ele tem; a flag antiga é a resposta velha e sai.
+            semEstoque: false,
             // A qtd digitada manualmente passa a mandar — limpa o snapshot do
             // abatimento de estoque para nao ficar contraditorio/orfao.
             qtdPecasCotada: null,

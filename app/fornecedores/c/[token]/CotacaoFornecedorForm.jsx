@@ -883,7 +883,8 @@ dataHoraBR(new Date())
             <div className="px-6 py-4 border-b border-gray-100">
               <h2 className="text-lg font-semibold text-torg-dark">Itens solicitados</h2>
               <p className="text-xs text-torg-gray mt-1">
-                Preencha o preço unitário e ajuste a quantidade se necessário. Itens sem preço serão ignorados. Se não tiver algum item, marque <strong>&quot;Sem estoque&quot;</strong>.
+                Preencha o preço unitário e ajuste a quantidade se necessário. Itens sem preço serão ignorados.
+                {" "}<strong className="text-red-700">Se você não tem algum item, clique em &quot;Não tenho&quot; na linha dele</strong> — não preencha preço nesse caso.
               </p>
             </div>
             <div className="overflow-x-auto">
@@ -892,7 +893,11 @@ dataHoraBR(new Date())
                   <tr>
                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase w-[80px]">Sem estoque</th>
+                    {/* ⚠ "Não tenho", não "Sem estoque". Matheus (11/09/2026), depois da
+                        T67-011-R00: o fornecedor não achou este botão e digitou "SEM
+                        DISPONIBILIDADE" no campo de prazo, com R$ 2,00 no preço — o texto ninguém
+                        lia e o preço ganhou. O rótulo agora é a frase que ele ia escrever. */}
+                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase w-[110px]">Não tenho</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd RM</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd cotada *</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço unit. *</th>
@@ -963,20 +968,28 @@ dataHoraBR(new Date())
                             <p className="mt-1 text-[10px] text-torg-blue font-medium">✓ conferido</p>
                           )}
                         </td>
-                        {/* Toggle "Sem estoque" */}
+                        {/* ⚠⚠ ESTE BOTÃO PRECISA SER ACHADO SEM PROCURAR. Ele existia como um "—"
+                            cinza de 10px; o fornecedor da T67-011-R00 não o viu, escreveu "SEM
+                            DISPONIBILIDADE" no campo de prazo e pôs R$ 2,00 — o preço ganhou e virou
+                            pedido. Marcado, ele é uma tarja vermelha sólida que se lê de relance na
+                            tabela inteira; desmarcado, é um botão com a palavra escrita, não um
+                            traço. */}
                         <td className="px-2 py-2 text-center align-top pt-2.5">
                           <button
                             type="button"
                             onClick={() => setLinha(l.id, "semEstoque", !l.semEstoque)}
-                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${
+                            aria-pressed={!!l.semEstoque}
+                            className={`w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-[11px] font-semibold border transition-colors ${
                               l.semEstoque
-                                ? "bg-red-100 text-red-700 border border-red-200 hover:bg-red-50"
-                                : "bg-gray-100 text-gray-400 border border-gray-200 hover:bg-gray-200 hover:text-gray-600"
+                                ? "bg-red-600 text-white border-red-600 hover:bg-red-700"
+                                : "bg-white text-red-700 border-red-300 hover:bg-red-50"
                             }`}
-                            title={l.semEstoque ? "Clique pra desmarcar" : "Marcar como sem estoque"}
+                            title={l.semEstoque
+                              ? "Você marcou que não tem este item. Clique para desmarcar."
+                              : "Clique se você NÃO tem este item — o preço fica em branco"}
                           >
-                            <PackageX size={11} />
-                            {l.semEstoque ? "Sem" : "—"}
+                            <PackageX size={12} className="shrink-0" />
+                            {l.semEstoque ? "NÃO TENHO" : "Não tenho"}
                           </button>
                         </td>
                         <td className="px-2 py-2 text-right text-torg-gray text-xs tabular-nums whitespace-nowrap align-top pt-3">
@@ -1059,10 +1072,12 @@ dataHoraBR(new Date())
                       <td className="px-3 py-2 text-right font-medium text-torg-dark tabular-nums text-sm">{fmtMoeda(totalComIPI)}</td>
                     </tr>
                   )}
+                  {/* ⚠ O resumo repete a contagem porque a tabela pode ter 26 linhas e rolar: quem
+                      marcou 3 itens e vai enviar precisa ver os 3 sem subir a página. */}
                   {linhas.some((l) => l.semEstoque) && (
                     <tr>
                       <td colSpan={10} className="px-3 py-2 text-right text-xs text-red-500">
-                        {linhas.filter((l) => l.semEstoque).length} item(s) marcado(s) como &quot;sem estoque&quot;
+                        {linhas.filter((l) => l.semEstoque).length} item(s) marcado(s) como &quot;não tenho&quot; — vão para a Torg sem preço
                       </td>
                     </tr>
                   )}

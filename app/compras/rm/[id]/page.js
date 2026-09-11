@@ -51,6 +51,9 @@ export default async function RMComprasDetail({ params }) {
       status: true, total: true, totalProposta: true, numeroRevisao: true,
       createdAt: true, prazoResposta: true, recebidaEm: true,
       cnpj: true, nCodOmie: true,
+      // ⚠ A observação carrega o texto livre que o fornecedor digitou em prazo/pagamento — é onde a
+      // SOUFER escreveu "SEM DISPONIBILIDADE" (T67-011-R00). Sem ela o mapa não tem como avisar.
+      observacao: true,
       // Itens completos com rmItem details — pra mostrar todos os itens
       // (incluindo de outras RMs) no modal de lancamento manual
       itens: {
