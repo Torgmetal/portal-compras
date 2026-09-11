@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { retrabalhoDoAno, SETOR_RETRABALHO } from "@/lib/retrabalho";
 import { EH_RNC_DE_PROJETO, ehDeRnc } from "@/lib/indicadores-engenharia-iso";
+import { esperaDeFora } from "@/lib/etapa-projeto";
 
 export const runtime = "nodejs";
 
@@ -101,20 +102,21 @@ export async function GET(req) {
     // ⚠ a OP não está na tarefa: vem do CRONOGRAMA dono dela. Vitor (28/08/2026): "as que estiverem
     // em atraso você deve apontar e informar de qual cronograma se trata" — sem a OP, uma lista de
     // "Detalhamento" e "Modelo" repetidos não diz de qual obra é o atraso.
-    const selTarefa = { nome: true, dataFimPrevista: true, dataFimBase: true, dataFimReal: true, cronograma: { select: { opNumero: true, nome: true } } };
+    // ⚠ Cronograma tem `titulo`/`nomeArquivo`, não `nome` — o select com `nome` derrubava o detalhamento (Vitor, 11/09/2026: "está dando erro para mostrar como ficou")
+    const selTarefa = { nome: true, dataFimPrevista: true, dataFimBase: true, dataFimReal: true, motivoBloqueio: true, dataLiberacao: true, esperaDe: true, cronograma: { select: { opNumero: true, titulo: true, nomeArquivo: true } } };
     const [tar, emAtraso] = await Promise.all([
       prisma.cronogramaTarefa.findMany({
-        where: { departamento: "ENGENHARIA", dataFimReal: { gte: pIni, lt: pFim }, dataFimPrevista: { not: null } },
+        where: { departamento: "ENGENHARIA", isSummary: false, dataFimReal: { gte: pIni, lt: pFim }, dataFimPrevista: { not: null } },
         select: selTarefa, orderBy: { dataFimReal: "asc" },
       }),
       // vencidas e ainda EM ABERTO com prazo no período — entram como atraso no mês do vencimento
       prisma.cronogramaTarefa.findMany({
-        where: { departamento: "ENGENHARIA", dataFimReal: null, dataFimPrevista: { gte: pIni, lt: pFim < hoje ? pFim : hoje } },
+        where: { departamento: "ENGENHARIA", isSummary: false, dataFimReal: null, dataFimPrevista: { gte: pIni, lt: pFim < hoje ? pFim : hoje } },
         select: selTarefa, orderBy: { dataFimPrevista: "asc" },
       }),
     ]);
     const dias = (a, b) => Math.round((new Date(a) - new Date(b)) / 86400000);
-    const daObra = (t) => (t.cronograma?.opNumero ? `OP-${t.cronograma.opNumero}` : t.cronograma?.nome || "—");
+    const daObra = (t) => (t.cronograma?.opNumero ? `OP-${t.cronograma.opNumero}` : t.cronograma?.titulo || t.cronograma?.nomeArquivo || "—");
     const linhas = tar.map((t) => {
       const atraso = dias(t.dataFimReal, t.dataFimPrevista);
       return [
@@ -128,20 +130,26 @@ export async function GET(req) {
         atraso <= 0 ? "No prazo" : `${atraso} dia(s) de atraso`,
       ];
     });
-    // as vencidas e em aberto entram na lista com a data real vazia — é o atraso que ainda corre
+    // as vencidas e em aberto entram na lista com a data real vazia — é o atraso que ainda corre.
+    // ⚠ Mesma regra da série (lib/indicadores-engenharia-iso): parada esperando o CLIENTE não conta
+    // como atraso do setor, mas continua na lista, dizendo que não conta — senão o detalhe dá um
+    // número e o card outro.
+    let esperaCliente = 0;
     for (const t of emAtraso) {
+      const foraDaConta = !!(t.motivoBloqueio && !t.dataLiberacao) && esperaDeFora(t);
+      if (foraDaConta) esperaCliente++;
       linhas.push([
         daObra(t), t.nome || "—",
         fmtD(t.dataFimPrevista), t.dataFimBase ? fmtD(t.dataFimBase) : "—",
         "— (em aberto)",
-        `EM ATRASO há ${dias(hoje, t.dataFimPrevista)} dia(s)`,
+        foraDaConta ? `Em espera de ${t.esperaDe || "fora"} há ${dias(hoje, t.dataFimPrevista)} dia(s) — não conta como atraso` : `EM ATRASO há ${dias(hoje, t.dataFimPrevista)} dia(s)`,
       ]);
     }
     const noPrazo = tar.filter((t) => new Date(t.dataFimReal) <= new Date(t.dataFimPrevista)).length;
-    const total = tar.length + emAtraso.length;
+    const total = tar.length + emAtraso.length - esperaCliente;
     const perc = total ? Math.round((noPrazo / total) * 1000) / 10 : null;
     const aviso = emAtraso.length
-      ? ` · ${emAtraso.length} vencida(s) e ainda em aberto no cronograma, contadas como atraso`
+      ? ` · ${emAtraso.length - esperaCliente} vencida(s) e ainda em aberto no cronograma, contadas como atraso${esperaCliente ? ` · ${esperaCliente} em espera do cliente, fora da conta` : ""}`
       : "";
     return NextResponse.json({
       titulo: "Aderência ao Prazo de Entrega do Projeto",

@@ -1,7 +1,12 @@
 {
-  "build": 3081,
-  "gerado": "2026-09-11T12:27:12.706Z",
+  "build": 3082,
+  "gerado": "2026-09-11T12:29:44.262Z",
   "commits": [
+    {
+      "hash": "f02a6159",
+      "data": "11/09/2026",
+      "titulo": "feat(op): exibir endereços do cliente e da entrega na aba Obra"
+    },
     {
       "hash": "7c49e19b",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "88ca2b72",
       "data": "09/09/2026",
       "titulo": "Gantt: da solda em diante a fila aparece sem esperar liberação"
-    },
-    {
-      "hash": "fd38991b",
-      "data": "09/09/2026",
-      "titulo": "Montagem: os quatro nomes das bancadas estavam trocados"
     }
   ]
 }
