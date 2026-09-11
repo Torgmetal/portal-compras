@@ -15,7 +15,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { abrirSessao, apontarQuantidade, encerrarSessao, mudarEstado, estadoDoRecurso, ESTADO } from "@/lib/mes/sessao";
+import { abrirSessao, apontarQuantidade, encerrarSessao, mudarEstado, estadoDoRecurso, saldoDaMarca, ESTADO } from "@/lib/mes/sessao";
 import { programadoPara, acharMarca } from "@/lib/mes/programado";
 
 export const runtime = "nodejs";
@@ -49,20 +49,30 @@ export async function GET(req, { params }) {
 
   // A sessão aberta traz o que já foi apontado nela: é o número que o operador confere antes de
   // encerrar, e sem ele a tela pediria fé.
+  //
+  // ⚠ `apontado` é DESTA SESSÃO; `saldo` é da MARCA inteira. São perguntas diferentes e a tela
+  // mostra as duas: "o que eu fiz agora" e "quanto ainda falta para a marca" — a segunda é a que
+  // a trava do lançamento usa, e esconder dela o total já feito em outros turnos faria a recusa
+  // parecer arbitrária.
   let apontado = null;
+  let saldo = null;
   if (estado.sessao) {
-    const s = await prisma.mesApontamentoQtd.aggregate({
-      where: { sessaoId: estado.sessao.id },
-      _sum: { boas: true, rejeitadas: true, retrabalho: true },
-    });
+    const [s, conta] = await Promise.all([
+      prisma.mesApontamentoQtd.aggregate({
+        where: { sessaoId: estado.sessao.id },
+        _sum: { boas: true, rejeitadas: true, retrabalho: true },
+      }),
+      saldoDaMarca(prisma, estado.sessao),
+    ]);
     apontado = { boas: s._sum.boas || 0, rejeitadas: s._sum.rejeitadas || 0, retrabalho: s._sum.retrabalho || 0 };
+    saldo = conta;
   }
 
   return NextResponse.json({
     success: true,
     recurso: { id: recurso.id, codigo: recurso.codigo, nome: recurso.nome, tipo: recurso.tipo,
                setor: { codigo: recurso.setor.codigo, nome: recurso.setor.nome, cor: recurso.setor.cor } },
-    ...estado, apontado, motivos, ...programado,
+    ...estado, apontado, saldo, motivos, ...programado,
   });
 }
 

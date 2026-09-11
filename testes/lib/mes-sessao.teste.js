@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { validarQuantidade, mudarEstado, apontarQuantidade, abrirSessao, ESTADO, STATUS } from "@/lib/mes/sessao";
+import { validarQuantidade, mudarEstado, apontarQuantidade, abrirSessao, saldoDaMarca, ESTADO, STATUS } from "@/lib/mes/sessao";
 
 // MES — AS REGRAS DA SESSÃO DO TOTEM.
 //
@@ -12,13 +12,19 @@ import { validarQuantidade, mudarEstado, apontarQuantidade, abrirSessao, ESTADO,
 // Aqui ficam as recusas que valem antes de qualquer banco — as que impedem dado sem sentido de
 // nascer.
 
-/** Um Prisma mínimo: a trava vira "só execute a função", que é o que ela é fora do Postgres. */
-function prismaFalso({ sessao = null, recurso = "r1" } = {}) {
+/**
+ * Um Prisma mínimo: a trava vira "só execute a função", que é o que ela é fora do Postgres.
+ *
+ * `jaBoas` é quanto a MARCA já tem lançado somando todas as sessões dela — é o que
+ * `saldoDaMarca` vai ler para decidir se ainda cabe.
+ */
+function prismaFalso({ sessao = null, recurso = "r1", jaBoas = 0, jaGravado = null } = {}) {
   const tx = {
     $executeRaw: vi.fn().mockResolvedValue(1),
     mesSessao: {
       findUnique: vi.fn().mockResolvedValue(sessao),
       findFirst: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([{ id: "s1" }, { id: "s-ontem" }]),
       create: vi.fn().mockImplementation(({ data }) => ({ id: "s1", ...data })),
       update: vi.fn().mockImplementation(({ data }) => ({ ...sessao, ...data })),
     },
@@ -27,6 +33,8 @@ function prismaFalso({ sessao = null, recurso = "r1" } = {}) {
       upsert: vi.fn().mockImplementation(({ create }) => ({ id: "e1", ...create })),
     },
     mesApontamentoQtd: {
+      findUnique: vi.fn().mockResolvedValue(jaGravado),
+      aggregate: vi.fn().mockResolvedValue({ _sum: { boas: jaBoas } }),
       create: vi.fn().mockImplementation(({ data }) => ({ id: "q1", ...data })),
       upsert: vi.fn().mockImplementation(({ create }) => ({ id: "q1", ...create })),
     },
@@ -133,6 +141,92 @@ describe("apontarQuantidade", () => {
     const { prisma, tx } = prismaFalso({ sessao: ABERTA });
     await apontarQuantidade(prisma, { sessaoId: "s1", boas: 1 });
     expect(tx.mesApontamentoQtd.create.mock.calls[0][0].data.operadorId).toBe("op1");
+  });
+});
+
+// ─── O TETO DO PLANEJADO ──────────────────────────────────────────────────────
+//
+// Matheus (11/09/2026): "quando lançar é importante que ele trave a quantidade que dá para lançar
+// comparando na quantidade planejada". Trava que RECUSA — quem corrige o planejado é o PCP.
+
+const PLANEJADA = { ...ABERTA, marca: "T82A-P25", opId: "op-82", planejadoQtd: 7 };
+
+describe("saldoDaMarca — o teto é da marca, não da sessão", () => {
+  it("desconta o que JÁ foi lançado em outras sessões da mesma marca", async () => {
+    const { prisma, tx } = prismaFalso({ sessao: PLANEJADA, jaBoas: 5 });
+    const r = await saldoDaMarca(tx, PLANEJADA);
+    expect(r).toMatchObject({ planejado: 7, boas: 5, saldo: 2, semTeto: false });
+    void prisma;
+  });
+
+  // ⚠⚠ É ESTE O BUG QUE A FUNÇÃO EXISTE PARA EVITAR. `planejadoQtd` é cópia feita na abertura: se o
+  // saldo saísse dela, a sessão de hoje acharia que tem 7 inteiras pela frente depois de a de ontem
+  // ter feito 5, e o total lançado chegaria a 12 numa marca de 7.
+  it("não confia no planejadoQtd da própria sessão como se nada tivesse sido feito", async () => {
+    const { tx } = prismaFalso({ sessao: PLANEJADA, jaBoas: 7 });
+    expect((await saldoDaMarca(tx, PLANEJADA)).saldo).toBe(0);
+  });
+
+  // ⚠ Marca bipada à mão (fora da programação do Gantt) não tem planejado — e é o caso COMUM.
+  it("planejado zero é SEM TETO, não proibido", async () => {
+    const { tx } = prismaFalso({ sessao: ABERTA });
+    expect((await saldoDaMarca(tx, ABERTA)).semTeto).toBe(true);
+    expect(tx.mesApontamentoQtd.aggregate).not.toHaveBeenCalled();
+  });
+
+  it("nunca devolve saldo negativo, mesmo se já passou do planejado", async () => {
+    const { tx } = prismaFalso({ sessao: PLANEJADA, jaBoas: 99 });
+    expect((await saldoDaMarca(tx, PLANEJADA)).saldo).toBe(0);
+  });
+});
+
+describe("apontarQuantidade — a trava do planejado", () => {
+  it("aceita o que cabe no saldo", async () => {
+    const { prisma, tx } = prismaFalso({ sessao: PLANEJADA, jaBoas: 5 });
+    const r = await apontarQuantidade(prisma, { sessaoId: "s1", boas: 2 });
+    expect(r.erro).toBeUndefined();
+    expect(tx.mesApontamentoQtd.create).toHaveBeenCalled();
+  });
+
+  it("recusa o que passa do planejado, e diz quantas faltam", async () => {
+    const { prisma, tx } = prismaFalso({ sessao: PLANEJADA, jaBoas: 5 });
+    const r = await apontarQuantidade(prisma, { sessaoId: "s1", boas: 3 });
+    expect(r.erro).toMatch(/faltam 2/i);
+    expect(tx.mesApontamentoQtd.create).not.toHaveBeenCalled();
+  });
+
+  it("quando o planejado já foi cumprido, a mensagem diz isso — não 'faltam 0'", async () => {
+    const { prisma } = prismaFalso({ sessao: PLANEJADA, jaBoas: 7 });
+    const r = await apontarQuantidade(prisma, { sessaoId: "s1", boas: 1 });
+    expect(r.erro).toMatch(/já foram lançadas/i);
+    expect(r.erro).not.toMatch(/faltam 0/i);
+  });
+
+  // ⚠⚠ SÓ AS PRODUZIDAS CONSOMEM O SALDO. Retrabalho é PERDA: a peça passou pela máquina e continua
+  // faltando. Descontando do planejado, uma refugação alta trancaria a marca antes de ela ficar
+  // pronta — e o operador não teria como registrar as peças que ainda precisa fazer.
+  it("retrabalho não consome o planejado", async () => {
+    const { prisma, tx } = prismaFalso({ sessao: PLANEJADA, jaBoas: 7 });
+    const r = await apontarQuantidade(prisma, { sessaoId: "s1", boas: 0, retrabalho: 4 });
+    expect(r.erro).toBeUndefined();
+    expect(tx.mesApontamentoQtd.create).toHaveBeenCalled();
+  });
+
+  it("sem planejado, lança o que vier", async () => {
+    const { prisma } = prismaFalso({ sessao: ABERTA });
+    expect((await apontarQuantidade(prisma, { sessaoId: "s1", boas: 999 })).erro).toBeUndefined();
+  });
+
+  // ⚠⚠ O SUSTO QUE A ORDEM DAS CHECAGENS EVITA. O toque repetido chega com a MESMA chave; se o
+  // saldo fosse conferido antes, o reenvio bateria no teto que ele próprio acabou de ocupar e o
+  // operador veria "não cabe mais" logo depois de um lançamento que deu certo.
+  it("reenvio da mesma chave devolve o que já foi gravado, mesmo com o saldo esgotado", async () => {
+    const gravado = { id: "q1", sessaoId: "s1", boas: 7, chaveOperacao: "k1" };
+    const { prisma, tx } = prismaFalso({ sessao: PLANEJADA, jaBoas: 7, jaGravado: gravado });
+    const r = await apontarQuantidade(prisma, { sessaoId: "s1", boas: 7, chaveOperacao: "k1" });
+    expect(r.erro).toBeUndefined();
+    expect(r.jaEstava).toBe(true);
+    expect(tx.mesApontamentoQtd.upsert).not.toHaveBeenCalled();
   });
 });
 

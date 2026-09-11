@@ -1,11 +1,56 @@
 {
-  "build": 3101,
-  "gerado": "2026-09-11T20:42:20.585Z",
+  "build": 3120,
+  "gerado": "2026-09-11T21:23:18.090Z",
   "commits": [
+    {
+      "hash": "8bfe758a2c",
+      "data": "11/09/2026",
+      "titulo": "Merge branch 'main' into matheus/mes-proprio"
+    },
+    {
+      "hash": "2a290582cb",
+      "data": "11/09/2026",
+      "titulo": "Cotação: salvar proposta grande morria em 10s e voltava sem corpo"
+    },
+    {
+      "hash": "17388a2fac",
+      "data": "11/09/2026",
+      "titulo": "Cotação por IA: a resposta não vinha com ruído, vinha cortada"
+    },
     {
       "hash": "6b2bafb0b0",
       "data": "11/09/2026",
       "titulo": "MES proprio: os tres formatos de nesting decifrados, e 28 de 28 marcas casaram"
+    },
+    {
+      "hash": "23b6948a43",
+      "data": "11/09/2026",
+      "titulo": "Teste do plano de ação dos indicadores lê o campo pelo rótulo novo"
+    },
+    {
+      "hash": "7f9f55d96b",
+      "data": "11/09/2026",
+      "titulo": "Plano de ação 5W2H: ficha por ação no PDF e formulário legível nos indicadores"
+    },
+    {
+      "hash": "23005fa2e0",
+      "data": "11/09/2026",
+      "titulo": "fix(planejamento): contar corretamente materiais pendentes nos avisos"
+    },
+    {
+      "hash": "3b95884d8e",
+      "data": "11/09/2026",
+      "titulo": "feat(planejamento): consultar recebimentos e encaminhar rastreabilidade ao PCP"
+    },
+    {
+      "hash": "2844dea93b",
+      "data": "11/09/2026",
+      "titulo": "Fiscal: a Remessa Terceiro mostra de quando ela é"
+    },
+    {
+      "hash": "5954391a0c",
+      "data": "11/09/2026",
+      "titulo": "PCP: peça liberada pela GRD e sem ordem no Syneco vira pendência de lançamento"
     },
     {
       "hash": "ebcd3f7611",
@@ -13,144 +58,99 @@
       "titulo": "MES proprio: o desenho da engine de nesting da Preparacao (bloqueado no formato)"
     },
     {
-      "hash": "27834a1196",
-      "data": "10/09/2026",
-      "titulo": "MES proprio: a tela do totem -- cracha, o que o PCP programou, apontar e parar"
+      "hash": "988d0466cd",
+      "data": "11/09/2026",
+      "titulo": "Análise crítica: ata FORM 10 em PDF e ações levadas ao 5W2H da Qualidade"
     },
     {
-      "hash": "cc817f090d",
-      "data": "10/09/2026",
-      "titulo": "MES proprio: operadores do totem, com a matricula do RH como cracha"
+      "hash": "5d643c9bd9",
+      "data": "11/09/2026",
+      "titulo": "Autoriza Guilherme a aprovar Análise Crítica de Projeto"
     },
     {
-      "hash": "e4ac2ee3e8",
-      "data": "10/09/2026",
-      "titulo": "MES proprio: a sessao do totem, com as travas provadas contra o Postgres real"
+      "hash": "c299e59f37",
+      "data": "11/09/2026",
+      "titulo": "Cotação: \"não tenho\" ganha do preço, e o texto livre para de passar batido"
     },
     {
-      "hash": "c9470d317a",
-      "data": "10/09/2026",
-      "titulo": "MES proprio: onde o Gantt planeja em balde, o totem cadastra o posto fisico"
+      "hash": "9ecd5e0342",
+      "data": "11/09/2026",
+      "titulo": "Ajusta quantidades no celular e corrige ciclo das inspeções e assinaturas"
     },
     {
-      "hash": "bbc3e640ee",
-      "data": "10/09/2026",
-      "titulo": "MES proprio: cadastro de setores e recursos, semeado do vocabulario do Gantt"
+      "hash": "f22d0a334c",
+      "data": "11/09/2026",
+      "titulo": "Portal do fornecedor: página em branco por data escrita em dois fusos"
     },
     {
-      "hash": "1059190049",
-      "data": "10/09/2026",
-      "titulo": "MES proprio: laboratorio local com dado real, e a trava que o separa da producao"
+      "hash": "68e52f85e3",
+      "data": "11/09/2026",
+      "titulo": "Preenche quantidades de inspeção a partir das listas da OP"
     },
     {
-      "hash": "9938241c79",
-      "data": "10/09/2026",
-      "titulo": "MES proprio: ponto de retomada no topo do documento"
+      "hash": "092504ff15",
+      "data": "11/09/2026",
+      "titulo": "Permite editar quantidades por peça nos relatórios de inspeção"
     },
     {
-      "hash": "4cac213ec4",
-      "data": "10/09/2026",
-      "titulo": "MES proprio: o gateway local vira obrigacao, e isso fecha a arquitetura"
+      "hash": "66071c39c6",
+      "data": "11/09/2026",
+      "titulo": "Inspeções: abrir revisão de relatório assinado e editar as peças informadas"
     },
     {
-      "hash": "ad1149d03e",
-      "data": "10/09/2026",
-      "titulo": "MES proprio: os coletores IoT sao alugados da SKA - decide a arquitetura"
+      "hash": "1495b70632",
+      "data": "11/09/2026",
+      "titulo": "CMR: editar a linha lançada, lançar sem esperar a planilha, e escolher o item repetido"
     },
     {
-      "hash": "b61054d22a",
-      "data": "10/09/2026",
-      "titulo": "MES proprio: schema do dominio (recurso, sessao, evento, quantidade, coletor)"
+      "hash": "d1823d0b5e",
+      "data": "11/09/2026",
+      "titulo": "Etiqueta: os corpos e os traços da do BarTender, que é a que se lê"
     },
     {
-      "hash": "d0477aca44",
-      "data": "10/09/2026",
-      "titulo": "MES proprio: configuracao real do IoT dos lasers, extraida pela API"
+      "hash": "5ab6e30fa6",
+      "data": "11/09/2026",
+      "titulo": "Etiqueta: endereco da Torg no maior corpo que cabe, em vez de 3,5 pt borrado"
     },
     {
-      "hash": "e2971f5ab0",
-      "data": "10/09/2026",
-      "titulo": "Etiquetas: modelo do cliente QWS/Petrobras, com uma TAG por unidade"
+      "hash": "d8da9a5b37",
+      "data": "11/09/2026",
+      "titulo": "Indicadores Engenharia: detalhe da aderência ao prazo voltava erro"
     },
     {
-      "hash": "874dcc2cb5",
-      "data": "10/09/2026",
-      "titulo": "MES proprio: reconciliacao com a pesquisa do Codex e decisoes do escopo"
+      "hash": "f02a6159f5",
+      "data": "11/09/2026",
+      "titulo": "feat(op): exibir endereços do cliente e da entrega na aba Obra"
     },
     {
-      "hash": "9a4ef25508",
-      "data": "10/09/2026",
-      "titulo": "MES proprio: engenharia reversa do Syneco feita na rede da fabrica"
+      "hash": "7c49e19bbc",
+      "data": "11/09/2026",
+      "titulo": "fix(op): remover orçamento comercial da aba Obra para todos"
     },
     {
-      "hash": "2585dc83ae",
-      "data": "09/09/2026",
-      "titulo": "MES proprio: levantamento, arquitetura e area isolada /mes-lab"
+      "hash": "0a6542fb30",
+      "data": "11/09/2026",
+      "titulo": "fix(listas): incluir marcas compartilhadas e reconhecer LE formatada"
     },
     {
-      "hash": "9b38a0213d",
-      "data": "09/09/2026",
-      "titulo": "Remessa Terceiro: vincula o Projeto no Omie automaticamente"
+      "hash": "fd206ca635",
+      "data": "11/09/2026",
+      "titulo": "Análise crítica: responsável (Eng.º de Projeto) editável no registro"
     },
     {
-      "hash": "3ec99dcb54",
-      "data": "09/09/2026",
-      "titulo": "Remessa Terceiro: campo pra informar o valor por kg (faltava na tela)"
+      "hash": "0d7aea88f5",
+      "data": "11/09/2026",
+      "titulo": "Etiqueta: uma etiqueta para a caixa, na coluna \"Imprimir\" da lista"
     },
     {
-      "hash": "d11b51500e",
-      "data": "09/09/2026",
-      "titulo": "PCP: peça no terceiro sai do aviso de liberações"
+      "hash": "5295a759c6",
+      "data": "11/09/2026",
+      "titulo": "Etiqueta padrao: texto longe da borda esquerda, e o download volta a funcionar"
     },
     {
-      "hash": "4c0388fae4",
-      "data": "09/09/2026",
-      "titulo": "fix(pcp): incluir todos os conjuntos na pre-programacao sem bancada"
-    },
-    {
-      "hash": "caa85be6d9",
-      "data": "09/09/2026",
-      "titulo": "Solda: a bancada passa a ter nome de soldador"
-    },
-    {
-      "hash": "7486262cb8",
-      "data": "09/09/2026",
-      "titulo": "feat(pcp): programar conjuntos pendentes no Gantt e liberar aptos parcialmente"
-    },
-    {
-      "hash": "fb87d86f6d",
-      "data": "09/09/2026",
-      "titulo": "RNC: a reclamação vira apontamentos, cada um com a sua disposição"
-    },
-    {
-      "hash": "626a6f1b6e",
-      "data": "09/09/2026",
-      "titulo": "feat(qualidade): anexar relatório às auditorias"
-    },
-    {
-      "hash": "7c3ca4d2c3",
-      "data": "09/09/2026",
-      "titulo": "Comercial: página de Custo de Fabricação — só o custo, medido"
-    },
-    {
-      "hash": "13123e956e",
-      "data": "09/09/2026",
-      "titulo": "Conferência de peça: cancelar sessão aberta por engano, direto na saída"
-    },
-    {
-      "hash": "bae39f9791",
-      "data": "09/09/2026",
-      "titulo": "Conferência de peça: Modo Pátio de verdade (tela cheia no celular)"
-    },
-    {
-      "hash": "f049567133",
-      "data": "09/09/2026",
-      "titulo": "Conferência de peça: concorrência, idempotência e acesso corrigidos"
-    },
-    {
-      "hash": "c2b4991ebb",
-      "data": "09/09/2026",
-      "titulo": "feat(lqc): integrar itens comerciais, pintura e boletins por fabricante"
+      "hash": "7aa5f661fa",
+      "data": "11/09/2026",
+      "titulo": "Etiqueta: calibragem da impressora, para a etiqueta parar de sair cortada"
     }
   ]
 }

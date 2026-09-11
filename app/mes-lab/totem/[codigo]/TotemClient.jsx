@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, LogOut, Pause, Play, Search, Square, User } from "lucide-react";
+import { AlertCircle, LogOut, Search, User } from "lucide-react";
+import { visualDo } from "./FaixaEstado";
+import Produzindo from "./Produzindo";
 
 // ─── O TOTEM DO OPERADOR ──────────────────────────────────────────────────────
 //
@@ -16,7 +18,14 @@ import { AlertCircle, CheckCircle2, LogOut, Pause, Play, Search, Square, User } 
 // ⚠ O leitor USB/Bluetooth EMULA TECLADO: digita o código e manda Enter. Por isso os campos são
 // `<form>` com submit, e não botões — bipar já dispara sozinho.
 
-const vazio = { boas: "", rejeitadas: "", retrabalho: "" };
+// ⚠⚠ `produzidas` NA TELA, `boas` NO BANCO. Matheus (11/09/2026): "remova o Boas, coloque algo
+// como Produzidas; e rejeitadas pode remover esse campo". A coluna `boas` continua com o nome
+// antigo no schema — renomeá-la exigiria migração e reescreveria o histórico já importado do
+// Syneco por nada. `numeros()` faz a tradução num lugar só.
+//
+// ⚠ REJEITADAS SAIU DA TELA, NÃO DO BANCO. A coluna fica: o histórico importado tem valores nela,
+// e apagá-la para tirar um campo da tela perderia dado que já existe. O totem passa a mandar zero.
+const vazio = { produzidas: "", retrabalho: "" };
 
 export default function TotemClient({ codigo }) {
   const [dados, setDados] = useState(null);
@@ -114,7 +123,7 @@ export default function TotemClient({ codigo }) {
 }
 
 const numeros = (q) => ({
-  boas: Number(q.boas) || 0, rejeitadas: Number(q.rejeitadas) || 0, retrabalho: Number(q.retrabalho) || 0,
+  boas: Number(q.produzidas) || 0, rejeitadas: 0, retrabalho: Number(q.retrabalho) || 0,
 });
 
 const Aguarde = ({ erro }) => (
@@ -129,11 +138,10 @@ const Aviso = ({ texto }) => (
   </div>
 );
 
-// ⚠ O ESTADO É O ÚLTIMO EVENTO, e "sem evento" é DESCONHECIDO — não "parado". Conectividade é
-// dimensão separada do estado produtivo (§7.3 do doc): máquina muda não é máquina parada, e pintar
-// de vermelho o que ninguém sabe envenena o Pareto.
-const CORES = { PRODUCAO: "bg-emerald-500", PARADA: "bg-red-500", SETUP: "bg-amber-500",
-                RETRABALHO: "bg-orange-500", MANUTENCAO: "bg-sky-500", FORA_TURNO: "bg-gray-500" };
+// ⚠⚠ O ESTADO TEM UMA FONTE SÓ (`FaixaEstado.jsx`). Antes eram duas — uma tabela de cores aqui e um
+// rótulo fixo no card da sessão — e foi assim que a tela passou a dizer "PRODUZINDO" com a máquina
+// parada. Cor e palavra saem do mesmo lugar agora, e o cabeçalho mostra o rótulo legível
+// ("PARADO"), não o nome do enum ("PARADA").
 
 function Cabecalho({ recurso, operador, estado, aoSair }) {
   return (
@@ -144,9 +152,9 @@ function Cabecalho({ recurso, operador, estado, aoSair }) {
         <p className="text-white/40 text-sm">{recurso.codigo}</p>
       </div>
       <div className="flex items-center gap-4">
-        <span className="flex items-center gap-2 text-sm">
-          <span className={`w-3 h-3 rounded-full ${CORES[estado] || "bg-white/25"}`} />
-          {estado || "sem registro"}
+        <span className="flex items-center gap-2 text-sm font-semibold tracking-wide">
+          <span className={`w-3 h-3 rounded-full ${visualDo(estado).fundo}`} />
+          {visualDo(estado).rotulo}
         </span>
         {operador && (
           <button onClick={aoSair} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 rounded-xl px-4 py-2">
@@ -239,51 +247,6 @@ const Cartao = ({ m, onClick, ocupado }) => (
   </button>
 );
 
-function Produzindo({ dados, qtd, setQtd, aoApontar, aoParar, aoProduzir, aoEncerrar, ocupado }) {
-  const { sessao, apontado, estado } = dados;
-  const parado = estado === "PARADA";
-  return (
-    <div className="max-w-4xl mx-auto">
-      <div className="bg-white/8 border border-white/10 rounded-2xl p-6 mb-5">
-        <p className="text-white/50 text-sm uppercase tracking-widest">Produzindo</p>
-        <p className="text-4xl md:text-5xl font-bold leading-tight">{sessao.marca || "—"}</p>
-        <p className="text-white/50">Obra {sessao.opNumero || "—"} · planejado {sessao.planejadoQtd || 0} pç</p>
-        <div className="flex gap-6 mt-4 text-lg">
-          <Contador rotulo="Boas" valor={apontado?.boas} destaque />
-          <Contador rotulo="Rejeitadas" valor={apontado?.rejeitadas} />
-          <Contador rotulo="Retrabalho" valor={apontado?.retrabalho} />
-        </div>
-      </div>
-
-      <div className="bg-white/8 border border-white/10 rounded-2xl p-6 mb-5">
-        <p className="text-white/60 mb-3">Apontar quantidade</p>
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          {[["boas", "Boas"], ["rejeitadas", "Rejeitadas"], ["retrabalho", "Retrabalho"]].map(([k, r]) => (
-            <label key={k} className="block">
-              <span className="block text-white/45 text-sm mb-1">{r}</span>
-              <input inputMode="numeric" value={qtd[k]} onChange={(e) => setQtd({ ...qtd, [k]: e.target.value })}
-                     className="w-full bg-white/10 rounded-xl px-4 py-4 text-2xl text-center outline-none focus:ring-2 ring-torg-blue/60" placeholder="0" />
-            </label>
-          ))}
-        </div>
-        <button onClick={aoApontar} disabled={ocupado}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-xl py-5 text-xl font-bold flex items-center justify-center gap-2">
-          <CheckCircle2 size={24} /> Lançar
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        {parado ? (
-          <Botao cor="bg-emerald-600 hover:bg-emerald-500" onClick={aoProduzir} ocupado={ocupado}><Play size={22} /> Retomar</Botao>
-        ) : (
-          <Botao cor="bg-red-600 hover:bg-red-500" onClick={aoParar} ocupado={ocupado}><Pause size={22} /> Parada</Botao>
-        )}
-        <Botao cor="bg-white/10 hover:bg-white/20" onClick={aoEncerrar} ocupado={ocupado}><Square size={20} /> Encerrar</Botao>
-      </div>
-    </div>
-  );
-}
-
 /**
  * ⚠⚠ PARADA SEM MOTIVO NÃO EXISTE, E O BOTÃO NÃO PODE FINGIR QUE SIM. A primeira versão desta tela
  * mandava `motivoId: null` — e `mudarEstado` recusa parada sem motivo, então o botão vermelho
@@ -317,16 +280,3 @@ function EscolherMotivo({ motivos, aoEscolher, aoFechar, ocupado }) {
   );
 }
 
-const Contador = ({ rotulo, valor, destaque }) => (
-  <span>
-    <span className="block text-white/45 text-xs uppercase tracking-wide">{rotulo}</span>
-    <span className={`block font-bold ${destaque ? "text-3xl text-emerald-400" : "text-2xl text-white/80"}`}>{valor ?? 0}</span>
-  </span>
-);
-
-const Botao = ({ cor, onClick, ocupado, children }) => (
-  <button onClick={onClick} disabled={ocupado}
-          className={`${cor} disabled:opacity-50 rounded-xl py-5 text-xl font-bold flex items-center justify-center gap-2`}>
-    {children}
-  </button>
-);
