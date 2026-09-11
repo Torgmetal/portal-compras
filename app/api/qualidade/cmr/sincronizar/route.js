@@ -1,3 +1,4 @@
+import { notificarMateriaisRecebidos } from "@/lib/recebimento-notificacoes";
 // Sincroniza o CMR (planilha de rastreabilidade do Almoxarifado) → DocumentoQualidade.
 // Serve pro BOTÃO "atualizar agora" e pro CRON diário: acha a planilha atual no SharePoint
 // (o nome muda de ano/versão), parseia e cria só as linhas NOVAS (dedupe por importRef).
@@ -57,6 +58,7 @@ async function sincronizar(userId) {
   for (let i = 0; i < data.length; i += 200) {
     const res = await prismaDirect.documentoQualidade.createMany({ data: data.slice(i, i + 200) });
     criados += res.count;
+    await notificarMateriaisRecebidos(data.slice(i, i + 200), userId);
   }
   /* ⚠⚠ A OBRA DA PLANILHA CONTRA A OBRA DO PEDIDO. Vitor pegou à mão que a OP-105 tinha tinta da
      Induscolor que era da OP-064 (pedido 1871) — obra digitada errada no Almoxarifado, aceita

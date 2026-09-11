@@ -1119,6 +1119,7 @@ model CategoriaFornecedor {
 // `NotificacaoDestinatario`, uma linha por (notificação, pessoa).
 model Notificacao {
   id            String                    @id @default(cuid())
+  chaveEvento   String?                   @unique
   tipo          NotificacaoTipo
   titulo        String
   mensagem      String
@@ -4782,6 +4783,8 @@ enum CotacaoStatus {
 }
 
 enum NotificacaoTipo {
+  MATERIAL_RECEBIDO
+  RASTREABILIDADE_DEFINIDA
   RM_CRIADA
   COTACAO_RESPONDIDA
   CONSULTA_ESTOQUE
@@ -4822,6 +4825,7 @@ model SolicitacaoProducao {
 // registrado — deixa de ser regra de consumo e vira fato.
 model TrocaRastreabilidade {
   id             String   @id @default(cuid())
+  estoqueConferido Boolean @default(false)
   opId           String?
   opNumero       String
   perfil         String

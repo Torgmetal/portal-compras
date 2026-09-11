@@ -56,6 +56,7 @@ function moduloNegado(path, token) {
   // Board de tarefas do Planejamento é compartilhado: QUALQUER setor logado vê e responde as
   // tarefas do seu setor (a lista filtra por setor).
   if (path.startsWith("/planejamento/tarefas")) return null;
+  if (path.startsWith("/planejamento/recebimento")) return nega("PLANEJAMENTO", "PCP");
   if (path.startsWith("/planejamento")) return nega("PLANEJAMENTO", "PRODUCAO");
   if (path.startsWith("/pcp")) return nega("PCP", "PLANEJAMENTO", "PRODUCAO");
   // ⚠ Inspeções: o INSPETOR preenche o relatório no computador também (Vitor, 04/09/2026: "ela

@@ -1,4 +1,5 @@
 "use client";
+import { avisosPreparacao } from "@/lib/avisos-preparacao";
 // LIBERAR PARA O PCP — planilha de peças, com filtro, prioridade e pré-seleção do dia.
 //
 // Vitor (25/08/2026): "ficou bem ruim para selecionar, quero que deixe como planilha com filtro e
@@ -57,6 +58,7 @@ const MAT_RESOLVIDO = (p) => MAT_OK(p?.material) || (p?.material === "ESTOQUE" &
 const NAT = { croqui: "Croqui", avulsa: "Marca", conjunto: "Conjunto" };
 
 const COLUNAS = [
+  { key: "marca", label: "Marca", valor: (p) => p.marca || "—" },
   { key: "frente",   label: "Frente",   valor: (p) => p.frente || "—" },
   // ⚠ estar na LPC não é ter desenho — e é por esta coluna que dá para separar os dois.
   // ⚠ o FILTRO fica por extenso (ninguém procura por um ícone numa lista de opções); quem encurta
@@ -171,10 +173,9 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
      mas 104 são croquis da parte A e 65 são CONJUNTOS, que nem passam pela preparação. Filtrando a
      parte B, a tela acusava 169 travas numa lista onde 262 das 327 peças podiam descer. O número
      assustava e escondia que dava para programar. */
-  const semDesenhoNaLista = useMemo(
-    () => f.filtradas.reduce((n, p) => n + (p.temDesenho === false ? 1 : 0), 0), [f.filtradas]);
-  const semMaquinaNaLista = useMemo(
-    () => f.filtradas.reduce((n, p) => n + (p.temMaquina === false ? 1 : 0), 0), [f.filtradas]);
+  const avisos = useMemo(() => avisosPreparacao(f.filtradas), [f.filtradas]);
+  const semDesenhoNaLista = avisos.semDesenho.marcas;
+  const semMaquinaNaLista = avisos.semMaquina.marcas;
   const selecionadas = useMemo(() => f.filtradas.filter((p) => sel.has(p.id)), [f.filtradas, sel]);
   const somaSel = useMemo(() => selecionadas.reduce((a, p) => ({
     kg: a.kg + (p.pesoTotalKg || 0), n: a.n + (p.qte || 1),
@@ -403,13 +404,14 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-[12px] text-amber-800 flex items-start gap-2">
           <AlertCircle size={15} className="mt-0.5 shrink-0" />
           <div className="flex-1">
-            <b>{fmtN(semDesenhoNaLista)} peça(s) desta lista estão travadas por falta de desenho</b> em
+            <b>{fmtN(semDesenhoNaLista)} marca(s) · {fmtN(avisos.semDesenho.quantidade)} peças desta lista sem desenho identificado</b> em
             2.5.2 Fabricação — só desce para o PCP o que tem projeto na pasta.
             {d.pasta.semDesenho > semDesenhoNaLista && (
               <span className="block mt-0.5 text-amber-700">
-                Na OP inteira são {fmtN(d.pasta.semDesenho)} — o resto está fora do filtro atual.
+                Na lista completa da OP são {fmtN(d.pasta.semDesenho)} marcas sem desenho, incluindo conjuntos e marcas fora dos filtros atuais.
               </span>
             )}
+            <details className="mt-2"><summary className="cursor-pointer font-semibold">Ver marcas afetadas</summary><ul className="max-h-40 overflow-auto mt-1 space-y-1">{avisos.semDesenho.itens.map((p) => <li key={p.id || p.marca}>{p.marca} · {fmtN(p.qte)} peça(s){p.temMaquina === false ? " · também sem arquivo de máquina" : ""}</li>)}</ul></details>
             <span className="block mt-0.5 text-amber-700">
               Conferido em {new Date(d.pasta.checadoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
               {" "}· se a Engenharia acabou de salvar, reconfira.
@@ -423,9 +425,10 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-[12px] text-amber-800 flex items-start gap-2">
           <AlertCircle size={15} className="mt-0.5 shrink-0" />
           <div className="flex-1">
-            <b>{fmtN(semMaquinaNaLista)} peça(s) têm desenho mas não têm arquivo de máquina</b> (NC1, DXF
+            <b>{fmtN(semMaquinaNaLista)} marca(s) · {fmtN(avisos.semMaquina.quantidade)} peças com desenho, mas sem arquivo de máquina</b> (NC1, DXF
             ou modelo 3D) na pasta da obra. O desenho a bancada abre; sem o NC1 a máquina não tem o
-            que ler, então também não desce.
+            que ler, então também não desce. Este grupo não inclui as marcas sem desenho do aviso acima.
+            <details className="mt-2"><summary className="cursor-pointer font-semibold">Ver marcas afetadas</summary><ul className="max-h-40 overflow-auto mt-1 space-y-1">{avisos.semMaquina.itens.map((p) => <li key={p.id || p.marca}>{p.marca} · {fmtN(p.qte)} peça(s)</li>)}</ul></details>
           </div>
           <BotaoConferir onClick={conferirPasta} conferindo={conferindo} />
         </div>
@@ -704,7 +707,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                     checked={todasMarcadas}
                     onChange={() => setSel(todasMarcadas ? new Set() : new Set(selecionaveis.map((p) => p.id)))} />
                 </th>
-                <th className="px-3 py-2 text-left font-semibold">Marca</th>
+                <ThFiltro col="marca" label="Marca" className="px-3 py-2 font-semibold text-left" {...fp} />
                 <ThFiltro col="frente" label="Frente" className="px-3 py-2 font-semibold text-left" {...fp} />
                 <ThFiltro col="natureza" label="Tipo" className="px-3 py-2 font-semibold text-left" {...fp} />
                 <ThFiltro col="desenho" label="Desenho" className="px-3 py-2 font-semibold text-left" {...fp} />

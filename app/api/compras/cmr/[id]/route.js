@@ -1,3 +1,4 @@
+import { notificarMateriaisRecebidos } from "@/lib/recebimento-notificacoes";
 // PATCH  /api/compras/cmr/[id] — edita um lançamento CMR já gravado (o índice R não muda).
 // DELETE /api/compras/cmr/[id] — exclui um lançamento CMR (DocumentoQualidade MATERIAL).
 // Os dois gravam AuditLog e refletem na planilha do SharePoint (a edição reescreve a linha do R;
@@ -125,6 +126,7 @@ export async function PATCH(req, { params }) {
   if (!diff.mudou) return NextResponse.json({ success: true, importRef: antes.importRef, semMudanca: true });
 
   const depois = await prisma.documentoQualidade.update({ where: { id: antes.id }, data });
+  if (!antes.nome?.trim() || antes.nome === "(sem descrição)") await notificarMateriaisRecebidos([depois], user.id);
 
   await prisma.auditLog.create({
     data: {

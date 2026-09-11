@@ -1,3 +1,4 @@
+import { criarNotificacao } from "@/lib/notificacoes";
 // LISTA DE SEPARAÇÃO DE MATERIAL — o que o Almoxarifado tira do estoque pra atender os croquis.
 // GET ?opId=&setor=[&ids=a,b,c]
 //
@@ -22,6 +23,7 @@ import { ehItemComprado } from "@/lib/item-comprado";
 import { dedupLpcLe } from "@/lib/pecas-producao";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 const BARRA_MM = 6000; // barra comercial padrão — a estimativa é o MÍNIMO pelo comprimento
@@ -250,6 +252,8 @@ export async function GET(req) {
 // FIFO naquele material e passa a usar este R — vira fato observado, não regra de consumo.
 const schemaPost = z.object({
   opId: z.string().min(1),
+  encaminharPCP: z.boolean().optional(),
+  estoqueConferido: z.boolean().optional(),
   trocas: z.array(z.object({
     perfil: z.string().min(1),
     rIndicado: z.string().nullable().optional(),
@@ -258,7 +262,7 @@ const schemaPost = z.object({
     // peças que ficaram sem R — não mexe no que o CMR da OP já respondeu). Ver o schema.
     escopo: z.enum(["TODAS", "SEM_R"]).optional(),
     motivo: z.string().max(300).nullable().optional(),
-  })).min(1),
+  })).min(1).max(500),
 });
 
 export async function POST(req) {
@@ -273,26 +277,57 @@ export async function POST(req) {
   const op = await prisma.oP.findUnique({ where: { id: body.opId }, select: { id: true, numero: true } });
   if (!op) return NextResponse.json({ error: "OP não encontrada." }, { status: 404 });
 
-  const salvas = [];
-  for (const t of body.trocas) {
-    const perfil = t.perfil.trim();
-    const reg = await prisma.trocaRastreabilidade.upsert({
-      where: { opNumero_perfil: { opNumero: op.numero, perfil } },
-      create: {
-        opId: op.id, opNumero: op.numero, perfil,
-        rIndicado: t.rIndicado || null, rUsado: t.rUsado.trim(), escopo: t.escopo || "TODAS", motivo: t.motivo || null,
-        trocadoPorId: user.id, trocadoPorNome: user.name || null,
-      },
-      update: {
-        rIndicado: t.rIndicado || null, rUsado: t.rUsado.trim(), escopo: t.escopo || "TODAS", motivo: t.motivo || null,
-        trocadoPorId: user.id, trocadoPorNome: user.name || null,
-      },
-    });
-    salvas.push({ perfil: reg.perfil, rUsado: reg.rUsado, rIndicado: reg.rIndicado, escopo: reg.escopo });
+  // Verifica a existência dos lotes antes de gravar qualquer vínculo.
+  const lotes = await prisma.documentoQualidade.findMany({
+    where: { categoria: "MATERIAL", importRef: { in: body.trocas.map((t) => t.rUsado.trim()) } },
+    select: { importRef: true, nome: true, opNumero: true },
+  });
+  const porR = new Map(lotes.map((l) => [l.importRef, l]));
+  if (body.trocas.some((t) => !porR.has(t.rUsado.trim()))) {
+    return NextResponse.json({ error: "Um dos Rs não existe no recebimento. Atualize a lista e confira o lote." }, { status: 400 });
   }
-  await prisma.auditLog.create({
-    data: { userId: user.id, action: "TROCAR_RASTREABILIDADE", entity: "TrocaRastreabilidade", entityId: op.numero, diff: { op: op.numero, trocas: salvas } },
-  }).catch(() => {});
-
-  return NextResponse.json({ ok: true, salvas: salvas.length });
+  if (body.encaminharPCP) {
+    const perfis = await prisma.pecaConjunto.findMany({ where: { opId: op.id, perfil: { not: null } }, select: { perfil: true } });
+    const validos = new Set(perfis.map((p) => p.perfil.trim().toUpperCase()));
+    if (body.trocas.some((t) => !validos.has(t.perfil.trim().toUpperCase()))) return NextResponse.json({ error: "Perfil não pertence à OP." }, { status: 400 });
+    if (body.trocas.some((t) => porR.get(t.rUsado.trim()).opNumero !== op.numero) && !body.estoqueConferido) {
+      return NextResponse.json({ error: "Confirme a disponibilidade física e a compatibilidade do material de estoque antes de encaminhar." }, { status: 400 });
+    }
+  }
+  const anteriores = await prisma.trocaRastreabilidade.findMany({ where: { opNumero: op.numero, perfil: { in: body.trocas.map((t) => t.perfil.trim()) } } });
+  let salvas;
+  try { salvas = await prisma.$transaction(async (tx) => {
+    const resultados = [];
+    for (const t of body.trocas) {
+      const perfil = t.perfil.trim();
+      const anterior = anteriores.find((a) => a.perfil === perfil);
+      const estoqueConferido = porR.get(t.rUsado.trim()).opNumero !== op.numero && Boolean(
+        (body.encaminharPCP && body.estoqueConferido === true) ||
+        (anterior?.rUsado === t.rUsado.trim() && anterior.estoqueConferido === true)
+      );
+      const data = {
+        rIndicado: t.rIndicado || null, rUsado: t.rUsado.trim(), escopo: t.escopo || "TODAS", motivo: t.motivo || null,
+        trocadoPorId: user.id, trocadoPorNome: user.name || null, estoqueConferido,
+      };
+      const reg = await tx.trocaRastreabilidade.upsert({
+        where: { opNumero_perfil: { opNumero: op.numero, perfil } },
+        create: { opId: op.id, opNumero: op.numero, perfil, ...data }, update: data,
+      });
+      resultados.push({ perfil: reg.perfil, rUsado: reg.rUsado, rIndicado: reg.rIndicado, escopo: reg.escopo, estoqueConferido: reg.estoqueConferido });
+    }
+    await tx.auditLog.create({ data: {
+      userId: user.id, action: body.encaminharPCP ? "ENCAMINHAR_RASTREABILIDADE_PCP" : "TROCAR_RASTREABILIDADE",
+      entity: "TrocaRastreabilidade", entityId: op.numero, diff: { antes: anteriores, depois: resultados },
+    } });
+    return resultados;
+  }, { timeout: 30000 });
+  } catch { return NextResponse.json({ error: "Não foi possível registrar os Rs. Tente novamente." }, { status: 500 }); }
+  let notificado = null;
+  if (body.encaminharPCP) notificado = await criarNotificacao({
+    tipo: "RASTREABILIDADE_DEFINIDA", titulo: `OP-${op.numero} · Rs conferidos para o PCP`,
+    mensagem: `${user.name || "Planejamento"} conferiu: ${salvas.map((t) => `${t.perfil}: R ${t.rUsado}`).join("; ")}. Consulte a lista de separação da OP.`,
+    link: "/pcp/producao", modulos: ["PCP"], origemUserId: user.id,
+    dados: { opId: op.id, opNumero: op.numero, trocas: salvas },
+  });
+  return NextResponse.json({ ok: true, salvas: salvas.length, notificado: !!notificado });
 }

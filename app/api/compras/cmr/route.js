@@ -2,6 +2,7 @@
 //   GET ?ano=2026&q=  → lista os lançamentos do ano (DocumentoQualidade categoria MATERIAL).
 //   POST { lancamentos: [ {...} ] } → grava 1..N lançamentos com índice R automático por ano.
 // Estoque/Almoxarifado lança; concilia com as RMs (lib/recebimento-cmr.js).
+import { notificarMateriaisRecebidos } from "@/lib/recebimento-notificacoes";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -128,8 +129,9 @@ export async function POST(req) {
         nf: l.nf, fornecedor: l.fornecedor, obra: l.obra, qtd: l.qtd, pesoLitro: l.pesoLitro,
         validade: l.validade, observacao: l.observacao,
       });
-    } catch (e) { return NextResponse.json({ error: `Falha ao gravar (${indiceR}): ${e.message}`, criados: criados.length }, { status: 500 }); }
+    } catch (e) { await notificarMateriaisRecebidos(criados, user.id); return NextResponse.json({ error: `Falha ao gravar (${indiceR}): ${e.message}`, criados: criados.length }, { status: 500 }); }
   }
+  await notificarMateriaisRecebidos(criados, user.id);
   await aprenderReferencias(body.lancamentos).catch(() => {});
   await prisma.auditLog.create({ data: { userId: user.id, action: "CMR_LANCAR", entity: "DocumentoQualidade", entityId: String(criados.length), diff: { ano, qtd: criados.length, de: criados[0]?.importRef, ate: criados[criados.length - 1]?.importRef } } }).catch(() => {});
 

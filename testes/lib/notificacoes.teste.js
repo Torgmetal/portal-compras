@@ -18,6 +18,14 @@ beforeEach(() => {
   mockPrisma.notificacao.create.mockImplementation(async ({ data }) => ({ id: "n1", ...data }));
 });
 
+it("evento repetido reutiliza o aviso e os destinatários sem duplicar", async () => {
+  mockPrisma.notificacao.upsert.mockResolvedValue({ id: "n-r" });
+  await criarNotificacao({ ...OP_BASE, destinatarios: ["gabriel"], chaveEvento: "CMR_RECEBIDO:261234" });
+  expect(mockPrisma.notificacao.create).not.toHaveBeenCalled();
+  expect(mockPrisma.notificacao.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { chaveEvento: "CMR_RECEBIDO:261234" }, update: {} }));
+  expect(mockPrisma.notificacaoDestinatario.createMany).toHaveBeenCalledWith({ data: [{ notificacaoId: "n-r", userId: "gabriel" }], skipDuplicates: true });
+});
+
 describe("criarNotificacao — resolver destinatários", () => {
   it("módulo resolve para os usuários ativos daquele módulo + ADMIN", async () => {
     mockPrisma.user.findMany.mockResolvedValue([{ id: "u1" }, { id: "u2" }]);
