@@ -1,4 +1,4 @@
-import { pecasInformadasSchema, textoPeca } from "@/lib/inspecao-pecas";
+import { pecasInformadasSchema, textoPeca, quantidadesPorMarca } from "@/lib/inspecao-pecas";
 // GET   — o relatório para a tela de edição/prévia.
 // PATCH  — salva o que o elaborador preencheu (dimensões encontradas, resultados, observações).
 //
@@ -59,7 +59,20 @@ export async function GET(_req, { params }) {
       : Promise.resolve([]),
   ]);
 
-  return NextResponse.json({ relatorio: rel, fotos, assinaturas });
+  // Sugestões de leitura: só viram conteúdo do relatório quando o inspetor salva.
+  // opNumero nas peças pode ser a frente da Engenharia; o vínculo correto é opId.
+  let quantidadesLista = {}, avisoQuantidades = null;
+  if (!rel.envioAssinaturaId) {
+    try {
+      const opId = rel.opId || (await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { id: true } }))?.id;
+      if (opId) quantidadesLista = quantidadesPorMarca(await prisma.pecaConjunto.findMany({
+        where: { opId }, select: { marca: true, qte: true },
+      }));
+    } catch {
+      avisoQuantidades = "Não foi possível consultar as quantidades da lista da OP. As quantidades já registradas foram mantidas.";
+    }
+  }
+  return NextResponse.json({ relatorio: rel, fotos, assinaturas, quantidadesLista, avisoQuantidades });
 }
 
 export async function PATCH(req, { params }) {
@@ -309,6 +322,7 @@ export async function PATCH(req, { params }) {
   }
   const pecasSalvas = dados.resultados?.pecasInformadas;
   if (pecasSalvas?.length) {
+    dados.resultados.qtdPeca = Object.fromEntries(pecasSalvas.map(p => [p.marca, p.quantidade]));
     dados.resultados.quantidade = String(pecasSalvas.reduce((s, p) => s + p.quantidade, 0));
     dados.resultados.pecas = pecasSalvas.map(textoPeca).join(", ");
   }

@@ -4,7 +4,7 @@ vi.mock('@/lib/prisma',()=>({prisma:mockPrisma}));
 vi.mock('@/lib/session',()=>({requireRole:vi.fn().mockResolvedValue({id:'u'})}));
 vi.mock('@/lib/relatorio-inspecao',()=>({vincularNoDataBook:vi.fn()}));
 vi.mock('@/lib/relatorio-dimensional',()=>({garantirDesenhos:vi.fn()}));
-import {PATCH} from '@/app/api/qualidade/inspecoes/[id]/route';
+import {PATCH,GET} from '@/app/api/qualidade/inspecoes/[id]/route';
 let rel;
 beforeEach(()=>{vi.clearAllMocks();rel={id:'r',marcas:['P1'],linhas:[{letra:'A',qtd:99}],resultados:{observacao:'preservar'}};mockPrisma.relatorioInspecao.findUnique.mockImplementation(async()=>rel);mockPrisma.relatorioInspecao.update.mockImplementation(async({data})=>(rel={...rel,...data}));mockPrisma.auditLog.create.mockResolvedValue({});});
 const salvar=body=>PATCH(new Request('http://localhost',{method:'PATCH',body:JSON.stringify(body)}),{params:{id:'r'}});
@@ -20,4 +20,18 @@ it('preserva quantidades salvas ao editar outro campo e recalcula o total',async
 it('impede cliente antigo de deixar marcas e quantidades inconsistentes',async()=>{
  rel.resultados.pecasInformadas=[{marca:'P1',quantidade:5}];
  expect((await salvar({marcas:['P2']})).status).toBe(409);expect(mockPrisma.relatorioInspecao.update).not.toHaveBeenCalled();
+});
+
+it('consulta a lista pelo vínculo da OP sem gravar sugestões no relatório',async()=>{
+ rel.opId='obra-106';rel.opNumero='106';
+ mockPrisma.fotoInspecao.findMany.mockResolvedValue([]);
+ mockPrisma.pecaConjunto.findMany.mockResolvedValue([{marca:'P1',qte:6},{marca:'P1',qte:4}]);
+ const r=await GET(null,{params:{id:'r'}});const j=await r.json();
+ expect(j.quantidadesLista).toEqual({P1:10});
+ expect(mockPrisma.pecaConjunto.findMany).toHaveBeenCalledWith({where:{opId:'obra-106'},select:{marca:true,qte:true}});
+ expect(mockPrisma.relatorioInspecao.update).not.toHaveBeenCalled();
+});
+it('não busca listas atuais para relatório enviado para assinatura',async()=>{
+ rel.envioAssinaturaId='assinado';mockPrisma.fotoInspecao.findMany.mockResolvedValue([]);mockPrisma.assinaturaDocumento.findMany.mockResolvedValue([]);
+ await GET(null,{params:{id:'r'}});expect(mockPrisma.pecaConjunto.findMany).not.toHaveBeenCalled();
 });

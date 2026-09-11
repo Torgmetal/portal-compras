@@ -1,7 +1,12 @@
 {
-  "build": 3087,
-  "gerado": "2026-09-11T15:58:39.364Z",
+  "build": 3088,
+  "gerado": "2026-09-11T16:09:09.792Z",
   "commits": [
+    {
+      "hash": "092504ff",
+      "data": "11/09/2026",
+      "titulo": "Permite editar quantidades por peça nos relatórios de inspeção"
+    },
     {
       "hash": "66071c39",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "279f4860",
       "data": "10/09/2026",
       "titulo": "fix(pcp): distribuir quantidades de marcas entre dias e bancadas"
-    },
-    {
-      "hash": "8fa0993d",
-      "data": "09/09/2026",
-      "titulo": "fix: alinhar fila do Gantt ao bloqueio de terceiros"
     }
   ]
 }

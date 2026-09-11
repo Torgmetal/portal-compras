@@ -90,10 +90,11 @@ export default function RelatorioDetalheClient({ id }) {
 
   async function salvar() {
     let pecasInformadas;
-    if (pecasEditadas !== null) {
-      const validacao = pecasInformadasSchema.safeParse(pecasEditadas.map(p => ({ ...p, quantidade: p.quantidade === "" ? null : Number(p.quantidade) })));
-      if (!validacao.success) { showToast(validacao.error.issues[0].message, "error"); return; }
-      pecasInformadas = validacao.data;
+    const pecasAtuais = pecasEditadas ?? pecasDoRelatorio(rel, dados.quantidadesLista);
+    if (pecasAtuais.length || pecasEditadas !== null) {
+      const validacao = pecasInformadasSchema.safeParse(pecasAtuais.map(p => ({ ...p, quantidade: p.quantidade === "" ? null : Number(p.quantidade) })));
+      if (!validacao.success && pecasEditadas !== null) { showToast(validacao.error.issues[0].message, "error"); return; }
+      if (validacao.success) pecasInformadas = validacao.data;
     }
     setSalvando(true);
     try {
@@ -147,7 +148,8 @@ export default function RelatorioDetalheClient({ id }) {
           {!travado && (
             <details className="mt-1.5">
               <summary className="text-[12px] text-torg-blue cursor-pointer select-none">Editar peças informadas ({Array.isArray(rel.marcas) ? rel.marcas.length : 0})</summary>
-              <PecasInformadasEditor pecas={pecasEditadas ?? pecasDoRelatorio(rel)} onChange={setPecasEditadas} disabled={salvando} />
+              <PecasInformadasEditor pecas={pecasEditadas ?? pecasDoRelatorio(rel, dados.quantidadesLista)} quantidadesLista={{ ...dados.quantidadesLista, ...res.qtdPeca }} onChange={setPecasEditadas} disabled={salvando} />
+              {dados.avisoQuantidades && <p className="text-xs text-amber-700 mt-2">{dados.avisoQuantidades}</p>}
             </details>
           )}
         </div>
