@@ -128,7 +128,13 @@ export default function AnaliseCriticaSection({ opId, isDiretoria = false }) {
       <div className="px-6 pt-5 pb-4 flex items-start justify-between gap-3 flex-wrap border-b border-gray-100">
         <div>
           <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 flex-wrap"><Search size={18} className="text-torg-blue" /> Análise Crítica de Projeto <Badge cls="bg-torg-blue-50 text-torg-blue">PO-13 Rev.3</Badge><Badge cls={st.cls}>{codigo} · {st.label}</Badge>{reg.novo && <Chip>ainda não salva</Chip>}</h3>
-          <p className="text-sm text-torg-gray mt-1 max-w-3xl">Um registro por OP, com revisões. Cada bloco responde a uma pergunta do PO-13 com evidência; o FORM 08 sai daqui.{reg.responsavelNome ? ` Responsável: ${reg.responsavelNome}.` : ""}{reg.aprovadoPorNome ? ` Aprovada por ${reg.aprovadoPorNome}.` : ""}</p>
+          <p className="text-sm text-torg-gray mt-1 max-w-3xl">Um registro por OP, com revisões. Cada bloco responde a uma pergunta do PO-13 com evidência; o FORM 08 sai daqui.{reg.aprovadoPorNome ? ` Aprovada por ${reg.aprovadoPorNome}.` : ""}</p>
+          {/* Responsável editável — Vitor (11/09/2026): quem cria o registro não é necessariamente o Eng.º de Projeto que assina */}
+          <label className="mt-2 flex items-center gap-2 text-xs text-torg-gray max-w-md">Responsável (Eng.º de Projeto)
+            {podeEditar
+              ? <input value={reg.responsavelNome || ""} onChange={(e) => { setDados((p) => ({ ...p, registro: { ...p.registro, responsavelNome: e.target.value } })); setSujo(true); }} placeholder="nome de quem assina a verificação" className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1 text-sm text-torg-dark" />
+              : <span className="text-sm text-torg-dark">{reg.responsavelNome || "—"}</span>}
+          </label>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => setAberto((a) => !a)} className="text-xs text-torg-gray border border-gray-300 rounded-lg px-2.5 py-1.5 font-medium">{aberto ? "Recolher" : "Expandir"}</button>
