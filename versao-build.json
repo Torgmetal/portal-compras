@@ -1,7 +1,12 @@
 {
-  "build": 3102,
-  "gerado": "2026-09-11T20:35:19.294Z",
+  "build": 3103,
+  "gerado": "2026-09-11T21:03:04.236Z",
   "commits": [
+    {
+      "hash": "fcad0bf6",
+      "data": "11/09/2026",
+      "titulo": "Cron do data book: de hora em hora, só em horário comercial"
+    },
     {
       "hash": "2a290582",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "1c9e1c81",
       "data": "11/09/2026",
       "titulo": "Etiqueta padrao: TAG da obra, digitada na tela e repetida em todas"
-    },
-    {
-      "hash": "f02c3b75",
-      "data": "11/09/2026",
-      "titulo": "fix(indicadores): aceitar planos detalhados e identificar erros de validação"
     }
   ]
 }

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, X, Plus, Trash2, Check, ClipboardList, AlertCircle, FileDown } from "lucide-react";
+import ConfirmModal from "@/components/admin/ConfirmModal";
 import { useStore } from "@/lib/store";
 import { STATUS_ITEM, STATUS_ITEM_OPCOES, situacaoItem, SITUACAO_ITEM } from "@/lib/plano-acao";
 
@@ -36,6 +37,8 @@ export default function PlanoAcaoIndicador({ ind, processo, ano, mes, valor, onF
   const [itens, setItens] = useState([]);
   const [cab, setCab] = useState({ responsavel: "", status: "EM_ANDAMENTO" });
   const [salvando, setSalvando] = useState(false);
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
   const [erro, setErro] = useState("");
 
   const carregar = useCallback(async () => {
@@ -88,11 +91,26 @@ export default function PlanoAcaoIndicador({ ind, processo, ano, mes, valor, onF
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
   }
 
+  async function excluir() {
+    if (!aberto?.id) return;
+    setExcluindo(true); setErro("");
+    try {
+      const r = await fetch(`/api/qualidade/planos-acao/${aberto.id}`, { method: "DELETE" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao excluir o plano.");
+      setPlanos((anteriores) => anteriores.filter((p) => p.id !== aberto.id));
+      setAberto(null); setItens([]);
+      showToast("Plano excluído com sucesso.", "success");
+    } catch (e) { setErro(e.message); }
+    finally { setExcluindo(false); setConfirmarExclusao(false); }
+  }
+
   const setIt = (i, k, v) => setItens((x) => x.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
   const lista = (planos || []).filter((p) => (aba === "ABERTOS" ? p.status === "EM_ANDAMENTO" : p.status !== "EM_ANDAMENTO"));
   const doMes = (planos || []).find((p) => p.ano === ano && (mes == null ? p.mes == null : p.mes === mes));
 
   return (
+    <>
     <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={onFechar}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl my-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start gap-3 px-5 py-4 border-b border-gray-100">
@@ -218,7 +236,7 @@ export default function PlanoAcaoIndicador({ ind, processo, ano, mes, valor, onF
                   className="text-sm font-semibold text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={14} /> Adicionar ação</button>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button onClick={salvar} disabled={salvando}
                   className="text-sm font-semibold text-white bg-torg-blue rounded-lg px-4 py-2 hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5">
                   {salvando ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Salvar plano
@@ -231,6 +249,7 @@ export default function PlanoAcaoIndicador({ ind, processo, ano, mes, valor, onF
                     <FileDown size={14} /> PDF do plano
                   </a>
                 )}
+                <button onClick={() => setConfirmarExclusao(true)} disabled={salvando || excluindo} className="text-sm font-semibold text-red-600 border border-red-200 rounded-lg px-4 py-2 inline-flex items-center gap-1.5 disabled:opacity-50"><Trash2 size={14} /> Excluir plano</button>
                 <span className="text-xs text-torg-gray">
                   Fica no painel deste setor — não entra na aba Planos de Ação da Qualidade.
                 </span>
@@ -240,5 +259,7 @@ export default function PlanoAcaoIndicador({ ind, processo, ano, mes, valor, onF
         </div>
       </div>
     </div>
+    <ConfirmModal open={confirmarExclusao} onClose={() => setConfirmarExclusao(false)} onConfirm={excluir} loading={excluindo} variant="destrutivo" titulo="Excluir plano de ação" mensagem={`Excluir PA-${String(aberto?.numero || "").padStart(3, "0")} — ${aberto?.titulo || ""}? O plano e suas ações serão removidos do portal. PDFs já arquivados serão preservados.`} labelConfirmar="Excluir definitivamente" />
+    </>
   );
 }

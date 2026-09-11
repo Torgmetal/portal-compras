@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import ConfirmModal from "@/components/admin/ConfirmModal";
+import { useStore } from "@/lib/store";
 import Link from "next/link";
 import { ArrowLeft, ListChecks, Loader2, FileDown, Trash2, Plus, CheckCircle2, AlertCircle } from "lucide-react";
 import { numPA, STATUS_PLANO, STATUS_PLANO_OPCOES, STATUS_ITEM, STATUS_ITEM_OPCOES, SITUACAO_ITEM, situacaoItem, situacaoItemLabel } from "@/lib/plano-acao";
@@ -10,6 +12,8 @@ const novoItem = () => ({ oque: "", porque: "", onde: "", quem: "", quando: "", 
 
 export default function PlanoAcaoDetalheClient({ id }) {
   const router = useRouter();
+  const { showToast } = useStore();
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
   const [p, setP] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -48,16 +52,18 @@ export default function PlanoAcaoDetalheClient({ id }) {
   }
 
   async function excluir() {
-    if (!confirm("Excluir este plano de ação? Esta ação não pode ser desfeita.")) return;
     setSalvando(true);
     try {
       const r = await fetch(`/api/qualidade/planos-acao/${id}`, { method: "DELETE" });
-      if (!r.ok) throw new Error("Erro ao excluir");
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao excluir");
+      showToast("Plano excluído com sucesso.", "success");
       // ⚠ NÃO EXISTE /qualidade/planos-acao: a lista é uma ABA, em Auditorias Internas ou na RNC,
       // conforme a origem do plano. Mandar para a rota "raiz" dava 404 logo depois de excluir —
       // o usuário via um erro no lugar da confirmação. Mesma regra do link "voltar" do cabeçalho.
       router.push(p?.origem?.startsWith("RNC-") ? "/qualidade/rnc?aba=PLANOS" : "/qualidade/auditorias-internas?aba=planos");
-    } catch (e) { alert(e.message); setSalvando(false); }
+    } catch (e) { showToast(e.message, "error"); }
+    finally { setSalvando(false); setConfirmarExclusao(false); }
   }
 
   if (loading) return <div className="py-20 text-center text-torg-gray"><Loader2 size={26} className="mx-auto animate-spin mb-2" /> Carregando…</div>;
@@ -67,11 +73,12 @@ export default function PlanoAcaoDetalheClient({ id }) {
 
   return (
     <div className="space-y-5 max-w-5xl">
+      <ConfirmModal open={confirmarExclusao} onClose={() => setConfirmarExclusao(false)} onConfirm={excluir} loading={salvando} variant="destrutivo" titulo="Excluir plano de ação" mensagem={`Excluir ${numPA(p.numero)}? O plano e suas ações serão removidos do portal. PDFs já arquivados serão preservados.`} labelConfirmar="Excluir definitivamente" />
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Link href={p?.origem?.startsWith("RNC-") ? "/qualidade/rnc?aba=PLANOS" : "/qualidade/auditorias-internas?aba=planos"} className="text-sm text-torg-gray hover:text-torg-blue inline-flex items-center gap-1"><ArrowLeft size={15} /> Planos de ação</Link>
         <div className="flex items-center gap-2">
           <a href={`/api/qualidade/planos-acao/${id}/pdf`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-torg-dark inline-flex items-center gap-1.5"><FileDown size={14} /> PDF</a>
-          <button onClick={excluir} disabled={salvando} className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-red-50 hover:border-red-200 hover:text-red-600 text-torg-gray"><Trash2 size={14} /></button>
+          <button aria-label="Excluir plano" onClick={() => setConfirmarExclusao(true)} disabled={salvando} className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-red-50 hover:border-red-200 hover:text-red-600 text-torg-gray"><Trash2 size={14} /> Excluir plano</button>
         </div>
       </div>
 

@@ -31,3 +31,11 @@ it("mantém texto digitado e mostra erro quando a API recusa o salvamento", asyn
   expect(screen.getByLabelText(/^Quanto/).value).toBe(plano.itens[0].quanto);
   expect(mocks.showToast).not.toHaveBeenCalled();
 });
+it('só exclui após confirmação e remove o plano da lista', async () => {
+  await abrir();
+  fireEvent.click(screen.getByRole('button', {name:'Excluir plano',exact:true}));
+  expect(fetch.mock.calls.some(([,init])=>init?.method==='DELETE')).toBe(false);
+  fireEvent.click(screen.getByRole('button', {name:'Excluir definitivamente'}));
+  await waitFor(()=>expect(mocks.showToast).toHaveBeenCalledWith('Plano excluído com sucesso.','success'));
+  expect(screen.getByRole('button',{name:'Em aberto (0)'})).toBeTruthy();
+});
