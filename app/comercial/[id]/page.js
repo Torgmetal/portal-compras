@@ -23,6 +23,7 @@ export async function carregarDetalheOP(id, user) {
   const op = await prisma.oP.findUnique({
     where: { id },
     include: {
+      kickoff: { select: { entregaEndereco: true } },
       createdBy: { select: { name: true, email: true } },
       itens: {
         orderBy: { ordem: "asc" },

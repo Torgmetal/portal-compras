@@ -39,6 +39,11 @@ export default function AbaObra({ op, podeEditar, onEditar }) {
           <Campo rotulo="Obra / empreendimento" valor={op.obra} destaque />
         </div>
 
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-lg border border-gray-100 bg-gray-50/60 p-4">
+          <Campo rotulo="Endereço do cliente" valor={endereco || "Não informado"} pre />
+          <Campo rotulo="Endereço de entrega" valor={op.kickoff?.entregaEndereco?.trim() || "Não informado"} pre />
+        </div>
+
         {/* Referência do cliente — o número que cada cliente usa */}
         <div className={`mt-4 rounded-lg border p-4 ${op.refCliente ? "border-amber-200 bg-amber-50/60" : "border-dashed border-gray-300 bg-gray-50"}`}>
           <div className="flex items-start gap-3">
@@ -88,7 +93,6 @@ export default function AbaObra({ op, podeEditar, onEditar }) {
           <Campo rotulo="E-mail" valor={op.clienteEmail} />
           <Campo rotulo="Telefone" valor={op.clienteTelefone} />
         </div>
-        {endereco && <div className="mt-4"><Campo rotulo="Endereço" valor={endereco} /></div>}
       </div>
 
       {/* Contatos usados nos envios */}

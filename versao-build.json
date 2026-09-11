@@ -1,7 +1,12 @@
 {
-  "build": 3080,
-  "gerado": "2026-09-11T12:04:33.756Z",
+  "build": 3081,
+  "gerado": "2026-09-11T12:27:12.706Z",
   "commits": [
+    {
+      "hash": "7c49e19b",
+      "data": "11/09/2026",
+      "titulo": "fix(op): remover orçamento comercial da aba Obra para todos"
+    },
     {
       "hash": "0a6542fb",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "fd38991b",
       "data": "09/09/2026",
       "titulo": "Montagem: os quatro nomes das bancadas estavam trocados"
-    },
-    {
-      "hash": "c91ef1b0",
-      "data": "09/09/2026",
-      "titulo": "Produção: apontamento na frente dá baixa nos setores anteriores"
     }
   ]
 }

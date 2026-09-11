@@ -24,3 +24,16 @@ it("não exibe orçamento nem consulta pastas mesmo com permissão comercial", (
   expect(screen.queryByText("Orçamento do Comercial")).toBeNull();
   expect(fetch).not.toHaveBeenCalled();
 });
+it("mostra endereço do cliente e de entrega separados para qualquer usuário", () => {
+  render(<AbaObra op={{ ...op, clienteEndereco: "Rua do Cliente, 10", clienteCidade: "Conchal", clienteUF: "SP", clienteCep: "13835-000", kickoff: { entregaEndereco: "Portaria 2\nRua da Obra, 200 — Itaguaí/RJ" } }} />);
+  expect(screen.getByText("Endereço do cliente")).toBeTruthy();
+  expect(screen.getByText("Rua do Cliente, 10 · Conchal · SP · 13835-000")).toBeTruthy();
+  expect(screen.getByText("Endereço de entrega")).toBeTruthy();
+  expect(screen.getByText(/Portaria 2/)).toBeTruthy();
+});
+it("indica entrega não informada sem repetir o endereço fiscal", () => {
+  render(<AbaObra op={{ ...op, clienteEndereco: "Rua Fiscal, 10" }} />);
+  const campo = screen.getByText("Endereço de entrega").parentElement;
+  expect(campo.textContent).toContain("Não informado");
+  expect(campo.textContent).not.toContain("Rua Fiscal");
+});
