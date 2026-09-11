@@ -1,7 +1,12 @@
 {
-  "build": 3098,
-  "gerado": "2026-09-11T19:19:06.683Z",
+  "build": 3099,
+  "gerado": "2026-09-11T19:20:07.457Z",
   "commits": [
+    {
+      "hash": "7f9f55d9",
+      "data": "11/09/2026",
+      "titulo": "Plano de ação 5W2H: ficha por ação no PDF e formulário legível nos indicadores"
+    },
     {
       "hash": "23005fa2",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7ff2cdd8",
       "data": "10/09/2026",
       "titulo": "CLAUDE.md: como imprimir na Argox de verdade (a lista do driver e em polegadas)"
-    },
-    {
-      "hash": "2cdc94f5",
-      "data": "10/09/2026",
-      "titulo": "Etiqueta QWS: centraliza os titulos de QTDE, PESO e TAG, e o nome do cliente"
     }
   ]
 }

@@ -28,6 +28,6 @@ it("mantém texto digitado e mostra erro quando a API recusa o salvamento", asyn
   fetch.mockResolvedValueOnce({ ok: false, json: async () => ({ error: "Ação 1 — Quanto: valor inválido." }) });
   fireEvent.click(screen.getByText("Salvar plano"));
   expect(await screen.findByText("Ação 1 — Quanto: valor inválido.")).toBeTruthy();
-  expect(screen.getByPlaceholderText("How much — quanto").value).toBe(plano.itens[0].quanto);
+  expect(screen.getByLabelText(/^Quanto/).value).toBe(plano.itens[0].quanto);
   expect(mocks.showToast).not.toHaveBeenCalled();
 });
