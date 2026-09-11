@@ -1,7 +1,17 @@
 {
-  "build": 3084,
-  "gerado": "2026-09-11T13:37:41.422Z",
+  "build": 3086,
+  "gerado": "2026-09-11T14:39:39.278Z",
   "commits": [
+    {
+      "hash": "1adb7b9e5b",
+      "data": "11/09/2026",
+      "titulo": "CMR: editar a linha lançada, lançar sem esperar a planilha, e escolher o item repetido"
+    },
+    {
+      "hash": "d1823d0b5e",
+      "data": "11/09/2026",
+      "titulo": "Etiqueta: os corpos e os traços da do BarTender, que é a que se lê"
+    },
     {
       "hash": "5ab6e30fa6",
       "data": "11/09/2026",
@@ -141,16 +151,6 @@
       "hash": "53b000afb1",
       "data": "09/09/2026",
       "titulo": "Amplia o Gantt e mantém navegação e salvamento acessíveis"
-    },
-    {
-      "hash": "513bd47a34",
-      "data": "09/09/2026",
-      "titulo": "Permite programar fabricação aos sábados pelo Gantt"
-    },
-    {
-      "hash": "04eb38a6cf",
-      "data": "09/09/2026",
-      "titulo": "PCP: Baixa em Lote — um clique fecha um setor inteiro de uma OP"
     }
   ]
 }

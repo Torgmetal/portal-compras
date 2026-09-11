@@ -39,6 +39,10 @@ export async function GET(req) {
         id: true, importRef: true, nome: true, norma: true, opNumero: true, numeroCorrida: true,
         numeroDocumento: true, fornecedor: true, pedidoCompra: true, nfNumero: true, dataRecebimento: true,
         pesoKg: true, quantidade: true, observacao: true, arquivoUrl: true, origem: true,
+        // ⚠ A VALIDADE PRECISA VIR PARA A TELA POR CAUSA DA EDIÇÃO. O formulário de edição chega
+        // preenchido com o que a listagem trouxe; sem este campo, editar a NF de um lote de tinta
+        // devolveria a validade em branco e APAGARIA o FEFO daquele lote sem ninguém pedir.
+        dataValidade: true,
       },
     }),
     prisma.documentoQualidade.count({ where: { categoria: CMR_CAT, importRef: { startsWith: pre } } }),
@@ -74,7 +78,28 @@ const lancSchema = z.object({
   arquivoNome: z.string().max(200).nullable().optional(),
 }).passthrough();
 
-const schema = z.object({ ano: z.number().int().optional(), lancamentos: z.array(lancSchema).min(1).max(500) });
+const schema = z.object({
+  ano: z.number().int().optional(),
+  lancamentos: z.array(lancSchema).min(1).max(500),
+  // ⚠⚠ `espelhar: false` É O QUE DESTRAVA O BOTÃO "LANÇAR". Matheus (11/09/2026): "está lento o
+  // botão de lançar; quando clicar já entrar na linha e ir carregando o que precisar nesse meio
+  // tempo". A gravação no banco leva milissegundos; quem custava os segundos era o writeback no
+  // SharePoint — seis chamadas ao Graph (achar o arquivo, detalhar, abrir sessão, achar o fim,
+  // escrever, fechar) presas na frente da resposta. Com isto a rota responde assim que o R existe,
+  // e a tela chama `/espelhar` em seguida sem travar ninguém.
+  //
+  // ⚠ NÃO ABRE BURACO: o que não for espelhado é reenviado pela reconciliação (diária, e no botão
+  // "Sincronizar planilha"), que justamente anexa à planilha os R que o portal tem e ela não.
+  espelhar: z.boolean().optional(),
+});
+
+// Os campos que a tela mostra na listagem — a resposta do lançamento devolve a linha pronta para
+// entrar na tabela sem um GET novo.
+const SELECT_LISTA = {
+  id: true, importRef: true, nome: true, norma: true, opNumero: true, numeroCorrida: true,
+  numeroDocumento: true, fornecedor: true, pedidoCompra: true, nfNumero: true, dataRecebimento: true,
+  pesoKg: true, quantidade: true, observacao: true, arquivoUrl: true, origem: true, dataValidade: true,
+};
 
 export async function POST(req) {
   let user;
@@ -95,7 +120,7 @@ export async function POST(req) {
     seq++;
     const data = mapearLancamento(l, indiceR, user.id);
     try {
-      const doc = await prisma.documentoQualidade.create({ data, select: { id: true, importRef: true } });
+      const doc = await prisma.documentoQualidade.create({ data, select: SELECT_LISTA });
       criados.push(doc);
       linhasSP.push({
         rc: l.rc, indiceR, descricao: l.descricao, certificado: l.certificado, loteCorrida: l.loteCorrida,
@@ -109,9 +134,15 @@ export async function POST(req) {
   await prisma.auditLog.create({ data: { userId: user.id, action: "CMR_LANCAR", entity: "DocumentoQualidade", entityId: String(criados.length), diff: { ano, qtd: criados.length, de: criados[0]?.importRef, ate: criados[criados.length - 1]?.importRef } } }).catch(() => {});
 
   // Espelha na planilha do SharePoint (best-effort — NUNCA trava o lançamento no portal).
+  // Com `espelhar: false` a tela faz isso depois, por /api/compras/cmr/espelhar, e não espera.
   let planilha = null;
-  try { planilha = await appendLinhasCmr(ano, linhasSP); }
-  catch (e) { planilha = { ok: false, erro: e.message }; }
+  if (body.espelhar !== false) {
+    try { planilha = await appendLinhasCmr(ano, linhasSP); }
+    catch (e) { planilha = { ok: false, erro: e.message }; }
+  }
 
-  return NextResponse.json({ success: true, criados: criados.length, indices: criados.map((c) => c.importRef), planilha });
+  return NextResponse.json({
+    success: true, ano, criados: criados.length,
+    indices: criados.map((c) => c.importRef), itens: criados, planilha,
+  });
 }
