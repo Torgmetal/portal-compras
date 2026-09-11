@@ -28,6 +28,11 @@ export async function GET(req) {
       remessaNfNumero: true, remessaNfSerie: true, remessaNfChave: true, remessaNfEmitidaEm: true,
       remessaPedidoOmie: true, remessaPedidoNumero: true, remessaErroEmissao: true,
       remessaObservacao: true, remessaPorNome: true,
+      // ⚠ `createdAt` é QUANDO A REMESSA NASCEU na fila do Fiscal — ela é pré-criada junto com o
+      // romaneio da Expedição. `dataEnvio` é outra coisa: o dia em que o material saiu, digitado por
+      // quem despachou. Quase sempre são o mesmo dia, e é justamente por isso que confundir os dois
+      // passaria despercebido até o dia em que não forem.
+      createdAt: true,
     },
   });
 
@@ -53,6 +58,7 @@ export async function GET(req) {
       itens: itens.map((it) => ({ marca: it.marca || null, descricao: it.descricao || null, qte: Number(it.qte || 0) || 0, pesoTotal: Number(it.pesoTotal || 0) || 0 })),
       materiais: materiais.map((m) => ({ perfil: m.perfil || null, descricao: m.descricao || null, qtd: Number(m.qtd || 0) || 0, unidade: m.unidade || null, pesoKg: Number(m.pesoKg || 0) || 0, codigoOmie: m.codigoOmie || null, descricaoOmie: m.descricaoOmie || null })),
       dataEnvio: r.dataEnvio,
+      criadaEm: r.createdAt,
       remessaStatus: r.remessaStatus,
       cfop: r.remessaCfop || cfopSugerido,
       cfopSugerido,
