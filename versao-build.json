@@ -1,7 +1,12 @@
 {
-  "build": 3088,
-  "gerado": "2026-09-11T16:09:09.792Z",
+  "build": 3089,
+  "gerado": "2026-09-11T16:14:09.350Z",
   "commits": [
+    {
+      "hash": "68e52f85",
+      "data": "11/09/2026",
+      "titulo": "Preenche quantidades de inspeção a partir das listas da OP"
+    },
     {
       "hash": "092504ff",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "96a857ab",
       "data": "10/09/2026",
       "titulo": "fix(pcp): imprimir fila sem bancada e excluir croquis posteriores ao corte"
-    },
-    {
-      "hash": "279f4860",
-      "data": "10/09/2026",
-      "titulo": "fix(pcp): distribuir quantidades de marcas entre dias e bancadas"
     }
   ]
 }

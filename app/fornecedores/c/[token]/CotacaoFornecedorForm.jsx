@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo, useRef } from "react";
+import { dataBR, dataHoraBR } from "@/lib/data-br";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
@@ -9,7 +10,8 @@ import { numeroBR } from "@/lib/numero-br";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+// ⚠ fuso fixo de Brasília (ver page.js): servidor em UTC e navegador em BRT não podem escrever dias diferentes
+const fmtData = (d) => (d ? dataBR(d) : "—");
 
 // Extrai prazo/pagamento da observacao salva (formato "Prazo de entrega: X | Pagamento: Y | <obs>")
 function parseObservacao(obs) {
@@ -437,9 +439,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao enviar");
       setEnviadoEm(
-        new Date().toLocaleString("pt-BR", {
-          day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
-        })
+dataHoraBR(new Date())
       );
       setEnviadoAgora(true);
       setEnviando(false);

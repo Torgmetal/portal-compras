@@ -2,6 +2,7 @@ import MarketingShell from "@/components/MarketingShell";
 import { Lock, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { DADOS_TORG } from "@/lib/empresa";
+import { dataBR } from "@/lib/data-br";
 import { mapearFDPorRM, itemEhFD } from "@/lib/faturamento-direto";
 import CotacaoFornecedorForm from "./CotacaoFornecedorForm";
 
@@ -11,7 +12,9 @@ export const metadata = {
   title: "Workspace Torg — Upload de Cotação",
 };
 
-const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+// ⚠ SEMPRE no fuso de Brasília: o servidor da Vercel roda em UTC e o navegador do fornecedor em BRT — a mesma data
+// escrita de dois jeitos (prazo 14/09 × 13/09) quebrava a hidratação e a página ficava em branco (A2 Metais, 11/09/2026).
+const fmtData = (d) => (d ? dataBR(d) : "—");
 
 export default async function CotacaoPorToken({ params }) {
   const cotacao = await prisma.cotacao.findUnique({
