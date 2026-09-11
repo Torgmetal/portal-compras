@@ -1,7 +1,12 @@
 {
-  "build": 3121,
-  "gerado": "2026-09-11T21:43:56.693Z",
+  "build": 3122,
+  "gerado": "2026-09-11T21:59:25.000Z",
   "commits": [
+    {
+      "hash": "c3120b68b5",
+      "data": "11/09/2026",
+      "titulo": "MES proprio: marca fechada encerra a sessao e volta marcada na lista"
+    },
     {
       "hash": "08c1b0b3af",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "0d7aea88f5",
       "data": "11/09/2026",
       "titulo": "Etiqueta: uma etiqueta para a caixa, na coluna \"Imprimir\" da lista"
-    },
-    {
-      "hash": "5295a759c6",
-      "data": "11/09/2026",
-      "titulo": "Etiqueta padrao: texto longe da borda esquerda, e o download volta a funcionar"
     }
   ]
 }

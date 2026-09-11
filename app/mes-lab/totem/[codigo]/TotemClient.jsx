@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, LogOut, Search, User } from "lucide-react";
-import { visualDo } from "./FaixaEstado";
+import { visualDo } from "./estado-visual";
 import Produzindo from "./Produzindo";
+import PedirCracha from "./PedirCracha";
 
 // ─── O TOTEM DO OPERADOR ──────────────────────────────────────────────────────
 //
@@ -91,7 +92,7 @@ export default function TotemClient({ codigo }) {
     setQtd(vazio);
     if (!r.concluiu) return;
     await agir("encerrar", { sessaoId: sessao.id });
-    setFeito(`${sessao.marca} concluída — ${r.saldo?.boas ?? "?"} de ${r.saldo?.planejado ?? "?"} peças.`);
+    setFeito(avisoDeConclusao(sessao, r.saldo));
   }
 
   async function entrar(cracha) {
@@ -110,6 +111,10 @@ export default function TotemClient({ codigo }) {
 
   if (!dados) return <Aguarde erro={erro} />;
 
+  const linkDasBancadas = bancadasDoSetor(dados.recurso);
+  const emProducao = Boolean(operador && dados.sessao);
+  const escolhendo = Boolean(operador && !dados.sessao);
+
   return (
     <div className="min-h-screen bg-torg-dark text-white p-5 md:p-8">
       <Cabecalho recurso={dados.recurso} operador={operador} estado={dados.estado}
@@ -117,15 +122,15 @@ export default function TotemClient({ codigo }) {
       {erro && <Aviso texto={erro} />}
       {feito && <Concluida texto={feito} />}
 
-      {!operador && <PedirCracha aoEnviar={entrar} ocupado={ocupado} />}
+      {!operador && <PedirCracha aoEnviar={entrar} ocupado={ocupado} voltarPara={linkDasBancadas} />}
 
-      {operador && !dados.sessao && (
+      {escolhendo && (
         <Escolher dados={dados} codigo={codigo} busca={busca} setBusca={setBusca}
                   ocupado={ocupado}
                   aoAbrir={(m) => { setFeito(""); return agir("abrir", { marca: m.marca, opId: m.opId, opNumero: m.opNumero, planejadoQtd: m.qte }); }} />
       )}
 
-      {operador && dados.sessao && (
+      {emProducao && (
         <Produzindo dados={dados} qtd={qtd} setQtd={setQtd} ocupado={ocupado}
                     aoApontar={() => apontar(dados.sessao)}
                     aoParar={() => setPedindoMotivo(true)}
@@ -144,6 +149,16 @@ export default function TotemClient({ codigo }) {
     </div>
   );
 }
+
+/**
+ * ⚠ O DESTINO DA VOLTA É O SETOR DO PRÓPRIO POSTO, nunca a lista da fábrica inteira: o PC da
+ * montagem tem de voltar para as bancadas da montagem, e não para uma tela que oferece o laser.
+ */
+const bancadasDoSetor = (recurso) =>
+  recurso?.setor?.codigo ? `/mes-lab/totem/setor/${encodeURIComponent(recurso.setor.codigo)}` : null;
+
+const avisoDeConclusao = (sessao, saldo) =>
+  `${sessao.marca} concluída — ${saldo?.boas ?? "?"} de ${saldo?.planejado ?? "?"} peças.`;
 
 const numeros = (q) => ({
   boas: Number(q.produzidas) || 0, rejeitadas: 0, retrabalho: Number(q.retrabalho) || 0,
@@ -197,22 +212,6 @@ function Cabecalho({ recurso, operador, estado, aoSair }) {
         )}
       </div>
     </header>
-  );
-}
-
-function PedirCracha({ aoEnviar, ocupado }) {
-  const [valor, setValor] = useState("");
-  const campo = useRef(null);
-  useEffect(() => { campo.current?.focus(); }, []);
-  return (
-    <form className="max-w-lg mx-auto text-center pt-10"
-          onSubmit={(e) => { e.preventDefault(); aoEnviar(valor.trim()); setValor(""); }}>
-      <h2 className="text-2xl mb-6 text-white/80">Bipe o seu crachá</h2>
-      <input ref={campo} value={valor} onChange={(e) => setValor(e.target.value)} disabled={ocupado}
-             className="w-full text-center text-4xl tracking-[0.3em] bg-white/10 rounded-2xl px-6 py-6 outline-none focus:ring-4 ring-torg-blue/60"
-             placeholder="• • • •" autoComplete="off" />
-      <p className="text-white/40 text-sm mt-4">Ou digite a matrícula e aperte Enter.</p>
-    </form>
   );
 }
 

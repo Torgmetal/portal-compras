@@ -1,6 +1,7 @@
 "use client";
 
 import { Pause, Play, Square, Wrench, Clock, Hammer, HelpCircle } from "lucide-react";
+import { visualDo } from "./estado-visual";
 
 // ─── O ESTADO DO POSTO, VISÍVEL DO CORREDOR ───────────────────────────────────
 //
@@ -13,23 +14,13 @@ import { Pause, Play, Square, Wrench, Clock, Hammer, HelpCircle } from "lucide-r
 // (daltonismo é comum no chão de fábrica), e o reflexo do galpão come saturação. Por isso a faixa
 // tem COR + PALAVRA + ÍCONE — três sinais para a mesma informação.
 //
-// ⚠ SEM EVENTO É "SEM REGISTRO", NÃO "PARADO". Conectividade é dimensão separada do estado
-// produtivo (§7.3 do doc): máquina que nunca apontou não é máquina parada, e pintar de vermelho o
-// que ninguém sabe envenena o Pareto e a Disponibilidade com tempo que ninguém viveu.
+// ⚠ Os NOMES e as CORES moram em `estado-visual.js`, que é neutro: a lista de bancadas do setor é
+// Server Component e não consegue importar função de um arquivo `"use client"`.
 
-export const ESTADO_VISUAL = {
-  PRODUCAO:   { rotulo: "PRODUZINDO",    fundo: "bg-emerald-600", Icone: Play },
-  PARADA:     { rotulo: "PARADO",        fundo: "bg-red-600",     Icone: Pause },
-  SETUP:      { rotulo: "EM SETUP",      fundo: "bg-amber-500",   Icone: Wrench },
-  RETRABALHO: { rotulo: "RETRABALHO",    fundo: "bg-orange-600",  Icone: Hammer },
-  MANUTENCAO: { rotulo: "EM MANUTENÇÃO", fundo: "bg-sky-600",     Icone: Wrench },
-  FORA_TURNO: { rotulo: "FORA DE TURNO", fundo: "bg-slate-600",   Icone: Clock },
-  ENCERRAMENTO: { rotulo: "ENCERRADO",   fundo: "bg-slate-700",   Icone: Square },
+const ICONES = {
+  play: Play, pause: Pause, chave: Wrench, martelo: Hammer,
+  relogio: Clock, quadrado: Square, duvida: HelpCircle,
 };
-
-const DESCONHECIDO = { rotulo: "SEM REGISTRO", fundo: "bg-white/15", Icone: HelpCircle };
-
-export const visualDo = (estado) => ESTADO_VISUAL[estado] || DESCONHECIDO;
 
 const hora = (d) => {
   if (!d) return null;
@@ -44,7 +35,8 @@ const hora = (d) => {
  * corre até a máquina. É o mesmo `desde` que o monitor usa para saber se o dado está velho demais.
  */
 export default function FaixaEstado({ estado, desde, detalhe }) {
-  const { rotulo, fundo, Icone } = visualDo(estado);
+  const { rotulo, fundo, icone } = visualDo(estado);
+  const Icone = ICONES[icone] || HelpCircle;
   const inicio = hora(desde);
 
   return (

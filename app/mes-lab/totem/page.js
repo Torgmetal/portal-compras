@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { Factory, ArrowRight } from "lucide-react";
+import { Factory, ArrowRight, Monitor } from "lucide-react";
 
 // A ESCOLHA DO RECURSO — só existe no laboratório.
 //
-// ⚠ NO CHÃO DE FÁBRICA ESTA TELA NÃO EXISTE. Cada totem fica preso a UMA máquina: o navegador abre
-// direto em /mes-lab/totem/<codigo> e o operador nunca escolhe onde está. Deixar escolher seria
-// deixar apontar produção da bancada do vizinho — e ninguém descobriria por semanas.
+// ⚠⚠ NO CHÃO DE FÁBRICA ESTA TELA NÃO EXISTE. Ela lista a fábrica INTEIRA: aberta no PC da montagem,
+// deixaria alguém apontar produção no laser, e ninguém descobriria por semanas. O que vai no
+// navegador de cada PC é o totem DO SETOR (`/mes-lab/totem/setor/<codigo>`), pedido pelo Matheus em
+// 11/09/2026 — "um link apenas para o totem da montagem com as bancadas da montagem". O link de
+// cada setor está ao lado do nome dele, para copiar.
 
 export const metadata = { title: "Totem (laboratório)", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
@@ -25,15 +27,24 @@ export default async function EscolherRecurso() {
         <h1 className="text-2xl font-bold text-torg-dark">Totem — escolher o posto</h1>
       </div>
       <p className="text-torg-gray text-sm mb-6">
-        No chão de fábrica cada totem abre direto no seu posto. Esta lista existe só para testar.
+        Esta lista mostra a fábrica inteira e existe só para testar. No chão de fábrica, cada PC abre
+        o <b>totem do seu setor</b> — o link de cada um está ao lado do nome, abaixo.
       </p>
 
       {setores.map((setor) => (
         <section key={setor.id} className="mb-6">
-          <h2 className="text-xs font-bold uppercase tracking-wide text-torg-gray mb-2 flex items-center gap-2">
+          <h2 className="text-xs font-bold uppercase tracking-wide text-torg-gray mb-2 flex items-center gap-2 flex-wrap">
             <span className="w-2.5 h-2.5 rounded-full" style={{ background: setor.cor || "#576D7E" }} />
             {setor.nome}
             <span className="font-normal normal-case">({setor.recursos.length})</span>
+            {/* ⚠ É ESTE O LINK QUE VAI NO PC DO SETOR — ver o comentário no topo do arquivo. */}
+            <Link href={`/mes-lab/totem/setor/${encodeURIComponent(setor.codigo)}`}
+                  className="normal-case font-semibold text-torg-blue hover:underline flex items-center gap-1">
+              <Monitor size={13} /> abrir o totem deste setor
+            </Link>
+            <code className="normal-case font-normal text-[11px] text-torg-gray bg-gray-50 border border-gray-100 rounded px-1.5 py-0.5">
+              /mes-lab/totem/setor/{setor.codigo}
+            </code>
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {setor.recursos.map((r) => (
