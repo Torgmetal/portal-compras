@@ -1,7 +1,12 @@
 {
-  "build": 3122,
-  "gerado": "2026-09-11T21:59:25.000Z",
+  "build": 3123,
+  "gerado": "2026-09-11T22:11:34.985Z",
   "commits": [
+    {
+      "hash": "0c650a033b",
+      "data": "11/09/2026",
+      "titulo": "MES proprio: um totem por setor, e a tela do cracha que se devolve sozinha"
+    },
     {
       "hash": "c3120b68b5",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "fd206ca635",
       "data": "11/09/2026",
       "titulo": "Análise crítica: responsável (Eng.º de Projeto) editável no registro"
-    },
-    {
-      "hash": "0d7aea88f5",
-      "data": "11/09/2026",
-      "titulo": "Etiqueta: uma etiqueta para a caixa, na coluna \"Imprimir\" da lista"
     }
   ]
 }
