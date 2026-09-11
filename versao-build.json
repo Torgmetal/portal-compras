@@ -1,156 +1,156 @@
 {
-  "build": 3082,
-  "gerado": "2026-09-11T12:29:44.262Z",
+  "build": 3083,
+  "gerado": "2026-09-11T12:38:31.952Z",
   "commits": [
     {
-      "hash": "f02a6159",
+      "hash": "d8da9a5b37",
+      "data": "11/09/2026",
+      "titulo": "Indicadores Engenharia: detalhe da aderência ao prazo voltava erro"
+    },
+    {
+      "hash": "f02a6159f5",
       "data": "11/09/2026",
       "titulo": "feat(op): exibir endereços do cliente e da entrega na aba Obra"
     },
     {
-      "hash": "7c49e19b",
+      "hash": "7c49e19bbc",
       "data": "11/09/2026",
       "titulo": "fix(op): remover orçamento comercial da aba Obra para todos"
     },
     {
-      "hash": "0a6542fb",
+      "hash": "0a6542fb30",
       "data": "11/09/2026",
       "titulo": "fix(listas): incluir marcas compartilhadas e reconhecer LE formatada"
     },
     {
-      "hash": "fd206ca6",
+      "hash": "fd206ca635",
       "data": "11/09/2026",
       "titulo": "Análise crítica: responsável (Eng.º de Projeto) editável no registro"
     },
     {
-      "hash": "0d7aea88",
+      "hash": "0d7aea88f5",
       "data": "11/09/2026",
       "titulo": "Etiqueta: uma etiqueta para a caixa, na coluna \"Imprimir\" da lista"
     },
     {
-      "hash": "5295a759",
+      "hash": "5295a759c6",
       "data": "11/09/2026",
       "titulo": "Etiqueta padrao: texto longe da borda esquerda, e o download volta a funcionar"
     },
     {
-      "hash": "7aa5f661",
+      "hash": "7aa5f661fa",
       "data": "11/09/2026",
       "titulo": "Etiqueta: calibragem da impressora, para a etiqueta parar de sair cortada"
     },
     {
-      "hash": "ee53dff7",
+      "hash": "ee53dff772",
       "data": "11/09/2026",
       "titulo": "fix: restringir dados da obra e liberar PDF dos indicadores ao RH"
     },
     {
-      "hash": "1c9e1c81",
+      "hash": "1c9e1c81a3",
       "data": "11/09/2026",
       "titulo": "Etiqueta padrao: TAG da obra, digitada na tela e repetida em todas"
     },
     {
-      "hash": "f02c3b75",
+      "hash": "f02c3b7553",
       "data": "11/09/2026",
       "titulo": "fix(indicadores): aceitar planos detalhados e identificar erros de validação"
     },
     {
-      "hash": "c5ae2941",
+      "hash": "c5ae294182",
       "data": "10/09/2026",
       "titulo": "Engenharia: Análise Crítica de Projeto (PO-13) na aba Engenharia da OP"
     },
     {
-      "hash": "4367ace4",
+      "hash": "4367ace42f",
       "data": "10/09/2026",
       "titulo": "fix: atualiza telefone de Diego Dias no portal do cliente"
     },
     {
-      "hash": "7ff2cdd8",
+      "hash": "7ff2cdd84a",
       "data": "10/09/2026",
       "titulo": "CLAUDE.md: como imprimir na Argox de verdade (a lista do driver e em polegadas)"
     },
     {
-      "hash": "2cdc94f5",
+      "hash": "2cdc94f5f8",
       "data": "10/09/2026",
       "titulo": "Etiqueta QWS: centraliza os titulos de QTDE, PESO e TAG, e o nome do cliente"
     },
     {
-      "hash": "121332f7",
+      "hash": "121332f766",
       "data": "10/09/2026",
       "titulo": "Etiqueta QWS: TAG PETROBRAS, QTDE e PESO centrados na celula"
     },
     {
-      "hash": "1964d514",
+      "hash": "1964d51409",
       "data": "10/09/2026",
       "titulo": "Etiqueta: a lista de papel do driver esta em POLEGADAS - corrige a instrucao"
     },
     {
-      "hash": "09cd709b",
+      "hash": "09cd709b17",
       "data": "10/09/2026",
       "titulo": "Etiqueta: PDF pede impressao sem ajuste, e a tela diz qual e o papel"
     },
     {
-      "hash": "0639fcbf",
+      "hash": "0639fcbf48",
       "data": "10/09/2026",
       "titulo": "fix: preservar referências externas de romaneio na reimportação da LE"
     },
     {
-      "hash": "d6ff811f",
+      "hash": "d6ff811f47",
       "data": "10/09/2026",
       "titulo": "Etiqueta QWS: centraliza o numero da O.P. e a marca sob o QR"
     },
     {
-      "hash": "72d2b371",
+      "hash": "72d2b3716d",
       "data": "10/09/2026",
       "titulo": "Etiquetas: modelo do cliente QWS/Petrobras, com uma TAG por unidade"
     },
     {
-      "hash": "1a921bbb",
+      "hash": "1a921bbb25",
       "data": "10/09/2026",
       "titulo": "Listas: botão para tentar salvar no servidor de novo quando o salvamento automático falha"
     },
     {
-      "hash": "665cefa6",
+      "hash": "665cefa6cd",
       "data": "10/09/2026",
       "titulo": "fix(pcp): reconhecer croquis pelo vínculo com seus conjuntos"
     },
     {
-      "hash": "96a857ab",
+      "hash": "96a857ab83",
       "data": "10/09/2026",
       "titulo": "fix(pcp): imprimir fila sem bancada e excluir croquis posteriores ao corte"
     },
     {
-      "hash": "279f4860",
+      "hash": "279f4860ac",
       "data": "10/09/2026",
       "titulo": "fix(pcp): distribuir quantidades de marcas entre dias e bancadas"
     },
     {
-      "hash": "8fa0993d",
+      "hash": "8fa0993d66",
       "data": "09/09/2026",
       "titulo": "fix: alinhar fila do Gantt ao bloqueio de terceiros"
     },
     {
-      "hash": "53b000af",
+      "hash": "53b000afb1",
       "data": "09/09/2026",
       "titulo": "Amplia o Gantt e mantém navegação e salvamento acessíveis"
     },
     {
-      "hash": "513bd47a",
+      "hash": "513bd47a34",
       "data": "09/09/2026",
       "titulo": "Permite programar fabricação aos sábados pelo Gantt"
     },
     {
-      "hash": "04eb38a6",
+      "hash": "04eb38a6cf",
       "data": "09/09/2026",
       "titulo": "PCP: Baixa em Lote — um clique fecha um setor inteiro de uma OP"
     },
     {
-      "hash": "cfe8eadd",
+      "hash": "cfe8eadd1e",
       "data": "09/09/2026",
       "titulo": "Produção: peça expedida dá baixa na rota inteira"
-    },
-    {
-      "hash": "88ca2b72",
-      "data": "09/09/2026",
-      "titulo": "Gantt: da solda em diante a fila aparece sem esperar liberação"
     }
   ]
 }

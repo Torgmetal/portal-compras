@@ -370,6 +370,23 @@ já saiu.
 limitação do BarTender, que importava a planilha com o campo de largura fixa — aqui o número vem
 do banco a cada etiqueta e a largura se ajusta sozinha.
 
+### O endereço da Torg — corpo calculado, não fixo
+
+⚠⚠ **3,5 pt BORRAVA NA IMPRESSORA.** Matheus (11/09/2026): *"deixe maior também o endereço da Torg e
+telefone, está saindo todo borrado por conta do tamanho"*. A 203 dpi, 3,5 pt tem **~10 pontos** de
+altura — na transferência térmica isso vira mancha, não letra. É o menor texto da etiqueta e o
+primeiro a sofrer.
+
+`desenharEndereco` (`lib/etiqueta-pdf-base.js`) calcula o **maior corpo que ainda cabe** entre o fim
+do logo e a borda da célula: padrão vai a **4,5 pt**, QWS a **5,5 pt** (eram 3,5 e 3,3).
+
+⚠ **Calculado, não fixo**, porque a folga difere por modelo (32 mm no padrão, 60 no QWS) — e porque
+número fixo cresceria por cima do logo sem ninguém notar. O logo tem largura **medida** contra a
+etiqueta em uso (37 mm) e é ele que define o limite.
+
+⚠ **O teto de 5,5 pt é hierarquia, não espaço.** No QWS caberiam 9 pt: o endereço ficaria do tamanho
+da TAG PETROBRAS, que é o que o cliente lê de longe. Endereço é apoio e tem que parecer.
+
 ### Uma etiqueta para a caixa (coluna "Imprimir")
 
 Cada marca tem na lista uma coluna **Imprimir** com quantas etiquetas ela vai render. Clicando,

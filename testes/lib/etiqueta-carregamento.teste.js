@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import zlib from "zlib";
 import { emMilimetros, LIMITE_MM } from "@/lib/etiqueta-calibragem";
+import { desenharEndereco } from "@/lib/etiqueta-pdf-base";
 import { gerarEtiquetasCarregamentoPDF, ajustarTexto, numeroDaEtiqueta, contagemDaEtiqueta, transformeDaCalibragem, GRADE, MM } from "@/lib/etiqueta-carregamento-pdf";
 
 // ⚠ POR QUE ESTE TESTE EXISTE, E NÃO UMA OLHADA NA TELA.
@@ -341,5 +342,53 @@ describe("marca fechada numa caixa", () => {
       ...base, pecas: [{ marca: "M1", qte: 50, emCaixa: true }, { marca: "M2", qte: 3 }],
     });
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(4);
+  });
+});
+
+// ⚠⚠ O ENDEREÇO BORRAVA NA IMPRESSORA A 3,5 pt. Matheus (11/09/2026): "deixe maior também o endereço
+// da Torg e telefone, está saindo todo borrado por conta do tamanho". A 203 dpi, 3,5 pt tem ~10
+// pontos de altura — na térmica isso vira mancha, não letra.
+//
+// O que precisa ficar provado: o corpo CRESCE até o limite do espaço, e nunca passa por cima do logo.
+describe("endereço da Torg no cabeçalho", () => {
+  /** Um pincel de mentira: só mede e anota onde cada linha foi desenhada. */
+  const pincelFalso = async () => {
+    const { bold } = await fontes();
+    const escritas = [];
+    return {
+      escritas,
+      larg: (s, tam) => bold.widthOfTextAtSize(String(s), tam) / MM,
+      txt: (s, mmX, mmY, tam) => escritas.push({ s, mmX, mmY, tam }),
+    };
+  };
+
+  it("cresce bem acima dos 3,5 pt que borravam", async () => {
+    const p = await pincelFalso();
+    const tam = desenharEndereco(p, { xMin: 42, xFim: 73, yIni: 4.6, entreLinhas: 3.5 });
+    expect(tam).toBeGreaterThan(3.5);
+  });
+
+  // ⚠ O logo tem tamanho MEDIDO contra a etiqueta em uso (37 mm) e não pode ser invadido. É por isso
+  // que o corpo é calculado em vez de fixo: um número fixo cresceria por cima dele sem avisar.
+  it("nenhuma linha começa antes do fim do logo", async () => {
+    const p = await pincelFalso();
+    const xMin = 42;
+    desenharEndereco(p, { xMin, xFim: 73, yIni: 4.6, entreLinhas: 3.5 });
+    expect(p.escritas).toHaveLength(3);
+    for (const e of p.escritas) expect(e.mmX).toBeGreaterThanOrEqual(xMin - 0.001);
+  });
+
+  it("todas as linhas terminam exatamente na borda direita da célula", async () => {
+    const p = await pincelFalso();
+    const xFim = 73;
+    desenharEndereco(p, { xMin: 42, xFim, yIni: 4.6, entreLinhas: 3.5 });
+    for (const e of p.escritas) expect(e.mmX + p.larg(e.s, e.tam)).toBeLessThanOrEqual(xFim + 0.001);
+  });
+
+  // ⚠ No QWS caberiam 9 pt — o endereço ficaria do tamanho da TAG PETROBRAS, que é o que o cliente
+  // lê de longe. O teto é hierarquia, não falta de espaço.
+  it("com muito espaço sobrando, para no teto em vez de competir com a TAG", async () => {
+    const p = await pincelFalso();
+    expect(desenharEndereco(p, { xMin: 36, xFim: 97.3, yIni: 4.2, entreLinhas: 3.2 })).toBeLessThanOrEqual(5.5);
   });
 });
