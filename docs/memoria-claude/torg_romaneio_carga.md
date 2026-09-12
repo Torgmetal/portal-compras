@@ -1,0 +1,37 @@
+---
+name: torg_romaneio_carga
+description: Montar romaneio a partir da carga do Planejamento + gerar FORM 22 e salvar no SharePoint (fecha o loop do expedido)
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: dcd073c6-4b21-46d4-b2d3-f4c7977df22a
+  modified: 2026-07-30T18:58:40.667Z
+---
+
+Fluxo Planejamento→Expedição→Romaneio (construído 28/07). Existem 3 mecanismos paralelos de "carga/romaneio" (ver histórico), mas o oficial que o Vitor usa é a **Nova Carga do Checklist = `PlanejamentoCarga`** (FK real pra `PecaConjunto`, itens com status PLANEJADO/CARREGADO/PARCIAL/NAO_ENVIADO/REPROGRAMADO + `motivoNaoEnvio` + `reprogramadoParaId`; `PlanejamentoCarga.romaneioId` @unique = 1 carga↔1 romaneio).
+
+**Montagem (Expedição › por OP › aba "Montar romaneio", `MontarRomaneio.jsx`):** carrega as peças da carga da OP (GET `/api/expedicao/planejamento?opId`) + as **REPROGRAMADO** (prioridade, reaparecem). Incluir marca segue livre (colar). **Tirar peça da carga** abre modal com **motivo obrigatório** + "mandar pro próximo romaneio?": sim→`REPROGRAMADO` (reaparece na próxima montagem), não→`NAO_ENVIADO`. A aba aparece mesmo **sem** Lista de Expedição importada (a maioria das OPs tem peças/cargas mas não a FORM21 LE).
+
+**Gerar (POST `/api/expedicao/op/[id]/romaneio`):** cria `Romaneio` + `RomaneioItem` (com `pecaConjuntoId`); se veio de carga (`cargaId`): itens levados→`CARREGADO`, `removidos`→NAO_ENVIADO/REPROGRAMADO c/ motivo, carga→`CONCLUIDO`+romaneioId. Campos transportadora/motorista/placa/contato/destino/observação já existiam no modelo Romaneio. `nfStatus="PENDENTE"` = gancho pro futuro portal fiscal (emissão de NF, regras de faturamento — Vitor deixou pra depois).
+
+**FORM 22 + SharePoint (fecha o loop do "expedido"):** ao gerar, `lib/romaneio-form22.js` preenche o template original da Torg (`lib/templates/romaneio-form22.b64.js`, .xlsm em base64) com exceljs preservando layout/logo. Colunas do FORM 22 (lidas pelo `lib/parse-romaneio.js`): **D=Marca, E=Qte, H=Descrição, J=Peso** (peso vai como NÚMERO — fórmula quebraria o parser), "Total Geral" após os itens. Cabeçalho: C11=T{OP}, J11=R#, E14=cliente, J14=obra, E15=endereço, E22=transportadora. Salva em `4. Expedição/4.2 Romaneios` da OP via `salvarRomaneioNoServidor` (em `lib/sharepoint-lista.js`; NÃO move pra Obsoleto — cada R# coexiste). Validado no round-trip (parseRomaneio lê de volta). Best-effort: se o SharePoint falhar, o romaneio já está no portal e a UI avisa.
+
+**Romaneio pela PÁGINA DA OP (aba Expedição / `AbaExpedicao.jsx`, foco do Vitor 29/07):** o romaneio também sai do **Lote de entrega** (LoteExpedicao) — as marcas vêm do `RomaneioPrevio` vinculado (JSON), e o endpoint `lotes-expedicao/pecas` cai pro prévio quando não há PecaLote. Expandir o lote mostra as marcas. `LoteExpedicao` ganhou `transportadora/motorista/placaVeiculo/placaCarreta/contatoTransporte` (SQL no Neon) — editáveis no modal do lote (não redigitar). Export do romaneio (`lotes-expedicao/[loteId]/romaneio`, POST): checkbox pra escolher as marcas, pré-preenche o transportador do lote, gera o FORM 22 só com as selecionadas (reusa `gerarRomaneioForm22`) + salva em 4.2 Romaneios. Sector portal (Expedição por OP / MontarRomaneio) fica pra depois. O FORM 22 não tem células próprias de motorista/placa: vão juntos na linha do contato (E24 = contato · Mot. X · Placa CAM / CARRETA); transportadora em E22.
+
+**Emitir/revisar romaneio (wizard, 29/07):** botão "Emitir"/"Revisar" na linha do lote (AbaExpedicao) + badge de status; wizard 3 passos (marcas com checkbox → transportador → emitir). `RomaneioPrevio` ganhou `emitidoEm/emitidoPorId/revisao/historico` (SQL no Neon). 1ª emissão = R00 (seta emitidoEm); reemitir = **revisão** (exige "o que mudou"): `salvarRomaneioNoServidor({moverPrefixo})` move o Excel anterior DAQUELE romaneio pra Obsoleto (filtro por nome, não move os outros R#), e `gerarRomaneioForm22({historico})` adiciona uma aba "Historico" (exceljs `addWorksheet`, não atrapalha o parseRomaneio que usa a 1ª aba). **Só Excel** (Vitor dispensou o PDF por ora). "Baixar prévia" (`body.previa=true`) gera o FORM 22 pra conferir SEM salvar/emitir/virar revisão. **Ao emitir**, grava `arquivoUrl` (webUrl do FORM 22 no SharePoint) e o romaneio passa a aparecer no **[[torg_fiscal]]** aguardando NF.
+
+**Quantidade por item (30/07):** 3 superfícies montam romaneio/carga — a qtd é editável nas 3: (1) **wizard Emitir da página da OP** (`AbaExpedicao.jsx`) — input por marca, body manda `itensSel` [{marca, qtd}], endpoint monta com **peso proporcional** (pesoUnit = pesoTotal/qte × qtd; o prévio traz o peso da qtd cheia), marca com qtd 0 sai, campo `marcas` legado; (2) **Montar Romaneio do Expedição** (`MontarRomaneio.jsx`) — JÁ tinha input de qtd por linha (peso qtd×pesoUnit); (3) **Nova Carga do Planejamento** (`NovaCargaModal` em `PlanejamentoCargaSection.jsx`) — antes só marcava a peça (qtdPlanejada cheia, editável só depois); agora tem input de qtd na seleção (default=disponível, teto na disponível, peso proporcional, filtra qtd>0). "Expedição e Planejamento" do Vitor = superfícies (1)+(3).
+
+**Dois fixes de impressão do FORM 22 (críticos, exceljs estraga o template ao regravar):** (1) copia o estilo da linha-modelo (32) pra cada item — senão itens 2+ saem sem borda ("desconfigurado"); (2) **página A4**: o exceljs perde as linhas ocultas + a área de impressão, e o template ainda vem com **`scale=20`** — alguns leitores imprimem a 20% num canto. O gerador reesconde as linhas vazias (31–529) e fixa o pageSetup EXPLÍCITO: paperSize 9 (A4), portrait, fitToPage, fitToWidth/Height=1, **scale=100**, printArea `A1:J546`. (Sem LibreOffice na máquina pra renderizar PDF — validei via openpyxl, não visualmente.)
+
+**Pendências/follow-ups:** tipo de frete (emitente/destinatário) não preenchido; atalho "Montar romaneio" direto da Programação de Cargas (hoje entra pela aba por OP). Commits: 042c8b1 (FORM22), 35bf765 (API carga), 34aab0f (UI), a3e114a (esconde linhas+printArea), 1703b87 (qtd por item+placa carreta), 7a60d42 (placa carreta no FORM22+A4 scale100).
+
+**Montar romaneio prévio pelo Planejamento (24/08/2026):** Vitor pediu "selecionar várias peças para compor um romaneio prévio no planejamento". O compositor **já existia** — é o `app/comercial/[id]/ConsultaExpedicao.jsx` (marca peça a peça ou importa Excel/PDF, fecha o prévio, aprova → Expedição), que só era alcançável pela aba Expedição da OP no Comercial.
+
+Criado **`/planejamento/romaneios-previos`**: escolhe a obra e renderiza o MESMO componente (`key={opId}` para não vazar seleção entre obras). Mesmo desenho de `/planejamento/programacao-cargas`, que é a vizinha de menu. ⚠️ Não reescrever o compositor: duas telas montando o mesmo romaneio compartilham numeração e divergem na primeira correção.
+
+⚠️ As rotas (`romaneios-previos`, `lista-expedicao/marcas`, `baixa-expedicao`) **já aceitavam PLANEJAMENTO** — faltava navegação, não permissão.
+
+⚠️ **O compositor lê as marcas da Lista de Expedição.** Em 24/08/2026, só **12 das 30** OPs ativas tinham LE importada; nas outras a tabela abre vazia. Ver [[torg_status_obra]].
+
+⚠️ `ListaExpedicao.opNumero` guarda **"70"/"84"/"97"** enquanto `OP.numero` é "070"/"084"/"097", e há listas **sem `opId`**. O `proximoNumero` do prévio passou a casar as variantes — senão romaneio já emitido fica invisível e a numeração recomeça por cima. (Sem efeito medido hoje: as divergentes têm `opId`.)

@@ -1,0 +1,31 @@
+---
+name: torg_kickoff
+description: "Kick Off da OP (/comercial/[id]/kickoff) tem DOIS tipos — GERAL (setores) e FISCAL (fiscal/financeiro); PDF agora é pdf-lib no padrão Torg, não window.print"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: 1754de4f-06da-423d-8c20-70c99cbd5bad
+  modified: 2026-08-08T16:43:15.955Z
+---
+
+**Kick Off da OP** — `/comercial/[id]/kickoff` (`KickoffClient.jsx`), model `OPKickOff` (1:1 com OP) + `KickoffAceite`. Alinhamento de início de obra. Duas ABAS = dois tipos:
+- **GERAL** ("Kick Off"): divulgação aos SETORES DE PRODUÇÃO — escopo, incluído/excluído, resumo de pesos, cronograma prévio, prioridades, padrão de pintura, inspeção, pontos de atenção. **Sem valores em R$.**
+- **FISCAL** ("Fiscal & Financeiro"): comunicado ao FISCAL/FINANCEIRO — dados fiscais do cliente, nota de retorno, tipo de faturamento, eventos de faturamento (COM R$), faturamento por linha do pedido (Torg vs Direto/cliente), retenção contratual, seguros.
+
+**Painel de aceites (novo 08/08):** `/comercial/kickoffs` (link "Kick Offs — Aceites" na SidebarComercial) — histórico de TODAS as obras com Kick Off divulgado: quem já confirmou e quem falta (GERAL/FISCAL), dias desde o envio, farol por atraso (≥30d vermelho), filtro "só com pendência", link pro Kick Off da OP. API `GET /api/comercial/kickoff/aceites` agrega os `KickoffAceite` por opId. (No levantamento inicial: 15 obras com pendência, 165 aceites aguardando de 289 → 08/08 o Vitor pediu pra marcar TODOS os pendentes como lidos, com `aceitoEm = enviadoEm + 1 dia` (opção "envio+1", coerente; a "criação da OP+1" ficava antes do envio em 103 casos). Feito via script; backup dos 165 ids no scratchpad. Painel zerado.)
+
+**Quem recebe cada um (estrutura):** NÃO é fixo. No botão laranja "Divulgar aos setores" (tab-driven: aba geral→tipo GERAL, aba fiscal→tipo FISCAL) abre modal que lista usuários **agrupados por módulo/setor** (`/api/comercial/kickoff-destinatarios` → Diretoria/Comercial/Engenharia/Planejamento/PCP/Compras/Produção/Almoxarifado/Expedição/Financeiro/RH). O comercial marca os setores → resolve os e-mails de quem tem aquele módulo. Cada destinatário recebe um e-mail (banner "NOVA OBRA CONFIRMADA!" + Gantt em tabela p/ o GERAL) com botão único "Li e estou de acordo" → registra `KickoffAceite` (tipo GERAL|FISCAL, token). Rota `.../kickoff/enviar` (POST {para, mensagem?, tipo}).
+
+**PDF (corrigido 08/08/2026):** o "Salvar PDF" antigo abria `/kickoff/imprimir` e chamava `window.print()` → saía como IMAGEM/print da tela, fora do padrão. Agora: `lib/kickoff-pdf.js` `gerarKickoffPDF({op,kickoff,tipo,itens})` (pdf-lib, modelado no [[torg_relatorios]]/`ata-op-pdf.js`: faixa navy `#0D1F3C` + filete laranja + logo, seções, tabelas com quebra de página, rodapé paginado, `san()` p/ WinAnsi) → rota `GET /api/comercial/op/[id]/kickoff/pdf?tipo=geral|fiscal`. Botão "Salvar PDF" virou **dropdown** com os dois tipos (salva antes de gerar). A página `/kickoff/imprimir` ficou órfã (não deletada). Validado gerando OP-092: Geral 3 págs, Fiscal 2 págs. Acentos renderizam (Helvetica/Latin-1); só emojis/fora-de-Latin-1 são removidos pelo `san`.
+
+**Pintura & Inspeção viram tabela (08/08):** os campos `padraoPintura`/`inspecao` são texto livre MUITO variável (Condição N:, "Rótulo: valor", numerado "N)", ";"-separado, ou prosa). `parsePintura`/`parseInspecao` (em kickoff-pdf.js) detectam a estrutura e viram tabela — Pintura: "Condição N" → [Condição|Sistema|Espessura], "Rótulo:" → [Item|Especificação]; Inspeção → tabela 3 col [Atividade/etapa | Critério/método | Abrangência]; detecta numerada "N)", ";", OU **vírgula com parênteses "item (critério, %), item (%)…"** (formato mais comum — ancora nos PARÊNTESES via matchAll, não na vírgula, que aparece dentro e fora); nota final sem item sai em itálico após a tabela. **Prosa curta sem estrutura → mantém parágrafo (fallback)** — não força tabela. Só no PDF GERAL (o e-mail de "Divulgar" ainda usa parágrafo nesses 2 campos).
+
+🚨 **183 aceites marcados por fora (24/08/2026)**: dos 395 aceites do banco, 183 tinham `aceitoEm` **exatamente 1.440 minutos** (24 h cravadas) depois do `enviadoEm` — os 183, sem exceção — e **nenhum AuditLog**. Os outros 212, com log, tinham 151 intervalos distintos, que é o que gente clicando produz. Foram UPDATE manual no banco, em **15 OPs (092 a 107)**, e o PDF do Kick Off imprime isso como *"Confirmado em <data>"* para Qualidade, Financeiro e PCP. Nenhum caminho do código faz isso — `/api/kickoff/aceite/[token]` é o único que escreve `aceitoEm`, e escreve `new Date()`.
+
+Blindagem: o aceite grava **`aceitoIp`** e o **AuditLog entra na MESMA transação** (era `.catch(() => {})`, então "sem log" podia ser só o log falhando; agora "sem log" é prova de que não passou pela rota). `scripts/limpar-aceites-kickoff-falsos.mjs` devolveu os 183 para "Pendente" (**rodado em 24/08/2026, autorizado pelo Vitor**) — o token do e-mail segue valendo, então quem realmente leu confirma de novo pelo link. Restaram 213 confirmados de 496 convites.
+
+**Cobrar o aceite (24/08/2026):** em `/comercial/kickoffs` (Comercial › "Kick Offs — Aceites"), cada obra com pendência tem botão **"Cobrar"** → `POST /api/comercial/kickoff/aceites/reenviar {opId, alvos?}`. Sem `alvos` cobra todos os pendentes da OP; com as caixinhas da lista, só os marcados. A tela mostra `cobrancas`/`cobradoEm` por pessoa.
+- ⚠ **reusa o convite**, não cria outro: cada `KickoffAceite` é o convite de UMA pessoa com o token dela; linha nova contaria a pendência 2× e deixaria dois links vivos.
+- ⚠ **alvo = (e-mail + tipo)**: a mesma pessoa pode ter GERAL e FISCAL pendentes na mesma OP (convites separados, tokens separados). Chavear só por e-mail cobrava as duas.
+- ⚠ **`enviadoEm` não é tocado** — é do 1º convite e é dele que sai o "há N dias" da tela. Cobrança grava em `cobradoEm`/`cobrancas`.
+- O corpo do e-mail saiu do POST de `.../kickoff/enviar` para **`lib/kickoff-email.js`** (`montarEmailKickoff`, `blocoAceite`, `SELECT_OP_EMAIL_KICKOFF`, `urlBase`) — as duas rotas montam por lá, e a cobrança manda o comunicado INTEIRO (aceite por cima de resumo não vale) mais uma faixa dizendo há quantos dias está parado. O recado livre do comercial **não é guardado** no `OPKickOff`, então a cobrança não o repete.

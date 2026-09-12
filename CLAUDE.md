@@ -18,6 +18,23 @@ especialista — use quando isso economizar retrabalho ou aumentar a qualidade d
 reflexo. Máximo 2 ciclos de correção por tarefa (automático ou manual); sem solução depois disso,
 pare e reporte ao usuário em vez de insistir.
 
+## Memória compartilhada do Claude — Mac e Windows (12/09/2026)
+
+**Leia `docs/memoria-claude/MEMORY.md` ao iniciar qualquer sessão** e abra os arquivos que tiverem a ver
+com a tarefa. É a memória de projeto do Claude (regras do Vitor, decisões, armadilhas, números medidos),
+um arquivo por fato. Ela mora no repositório para que a sessão do Mac, a do Windows e as do Matheus
+partam do mesmo conhecimento — a pasta de memória do próprio Claude Code (`~/.claude/projects/.../memory`)
+é por máquina e não se sincroniza.
+
+- **Ao aprender algo novo**, grave em `docs/memoria-claude/` (arquivo novo ou o existente atualizado),
+  acrescente a linha no `MEMORY.md` e commite junto com o trabalho. Nunca segredo: senha, token e chave
+  ficam no `.env.local`.
+- **Duas máquinas, um repositório**: `git pull --rebase` antes de começar e antes de subir, commits pequenos.
+  No Windows: `git config core.hooksPath .githooks` (os hooks rodam no sh do Git for Windows) e
+  `npx vercel env pull .env.local` para os segredos. Mac cuida de portal, banco e deploy; Windows, do Tekla.
+- **Commit só de docs, testes ou `.md` não gera build na Vercel** (`ignoreCommand` no `vercel.json`).
+  Memória nova, portanto, sobe sem custo.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Commands

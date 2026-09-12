@@ -1,7 +1,12 @@
 {
-  "build": 3106,
-  "gerado": "2026-09-12T12:28:48.661Z",
+  "build": 3107,
+  "gerado": "2026-09-12T14:39:11.042Z",
   "commits": [
+    {
+      "hash": "66dc71ce",
+      "data": "12/09/2026",
+      "titulo": "Import de lista: marca que a LPC já tinha conta como gravada, não como faltante"
+    },
     {
       "hash": "5b25158b",
       "data": "12/09/2026",
@@ -146,11 +151,6 @@
       "hash": "0d7aea88",
       "data": "11/09/2026",
       "titulo": "Etiqueta: uma etiqueta para a caixa, na coluna \"Imprimir\" da lista"
-    },
-    {
-      "hash": "5295a759",
-      "data": "11/09/2026",
-      "titulo": "Etiqueta padrao: texto longe da borda esquerda, e o download volta a funcionar"
     }
   ]
 }
