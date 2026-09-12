@@ -365,7 +365,7 @@ export default function ModeloClient({ ops }) {
           {ops.map((o) => <option key={o.id} value={o.id} className="text-torg-dark">OP-{o.numero} — {o.obra || o.cliente || "sem obra"}</option>)}
         </select>
         {lista?.modelos?.length > 1 && (
-          <select value={modelo?.rel || ""} onChange={(e) => { setModelo(lista.modelos.find((m) => m.rel === e.target.value)); setSel(null); setPeca(null); setIndice(null); setFNiveis(new Set()); setFTipos(new Set()); }}
+          <select value={modelo?.rel || ""} onChange={(e) => { setModelo(lista.modelos.find((m) => m.rel === e.target.value)); setSel(null); setPeca(null); setIndice(null); setNiveis([]); setFNiveis(new Set()); setFTipos(new Set()); setFSetores(new Set()); setOcultos(new Set()); setBusca(""); setIndice(null); setFNiveis(new Set()); setFTipos(new Set()); }}
             className="text-[12px] bg-white/10 border border-white/15 rounded-md px-2 py-1 max-w-[340px] outline-none focus:border-white/40">
             {lista.modelos.map((m) => (
               <option key={m.rel} value={m.rel} disabled={m.grande} className="text-torg-dark">
