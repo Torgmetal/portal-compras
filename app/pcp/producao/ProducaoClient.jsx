@@ -172,7 +172,7 @@ async function lerJson(r, oQue) {
   return j;
 }
 
-export default function ProducaoClient() {
+export default function ProducaoClient({ portalProducao = false } = {}) {
   const [revisaoGantt, setRevisaoGantt] = useState(0);
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -535,14 +535,14 @@ export default function ProducaoClient() {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-extrabold text-torg-dark tracking-tight inline-flex items-center gap-2">
-            <Factory size={22} className="text-torg-orange" /> Produção
+            <Factory size={22} className="text-torg-orange" /> {portalProducao ? "Ordens e peças" : "Produção"}
           </h1>
           <p className="text-sm text-torg-gray mt-1">
             As obras na fábrica. Clique numa OP para ver as peças, o que o programador já programou e liberar para fabricar.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/pcp/dashboard-prioridades"
+          <Link href={portalProducao ? "/producao/prioridades" : "/pcp/dashboard-prioridades"}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50">
             <Monitor size={15} /> Painel da fábrica
           </Link>

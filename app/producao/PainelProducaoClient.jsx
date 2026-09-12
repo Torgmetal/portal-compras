@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   RefreshCw, AlertTriangle, Clock, ChevronDown, ChevronUp, ArrowRight,
-  Scissors, Wrench, Flame, Sparkles, Wind, Paintbrush, Truck, CalendarClock, Download, Flag,
+  Scissors, Wrench, Flame, Sparkles, Wind, Paintbrush, Truck, CalendarClock, Download, Flag, Layers, CalendarDays, PackageSearch, Box, FileText, CheckCircle2,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import { SETORES_SOLICITACAO, SETOR_LABEL_SOLIC, STATUS_SOLIC } from "@/lib/solicitacao-producao-const";
@@ -13,6 +13,7 @@ const fmtKg = (v) => {
   const kg = Number(v) || 0;
   return `${Math.round(kg).toLocaleString("pt-BR")} kg`;
 };
+const ABAS = ["Visão geral", "Andamento", "Resultados", "Solicitações"];
 const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0);
 
 // Etapas do fluxo (status do pipeline → rota da aba + ícone/cor)
@@ -26,8 +27,9 @@ const FLUXO = [
   { status: "EXPEDIDO", label: "Expedido", href: "/producao/programacao/expedicao", icon: Truck, cor: "text-emerald-600" },
 ];
 
-export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setores, semanas, furos, paradas, solicitacoes = [] }) {
+export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setores, semanas, furos, paradas, solicitacoes = [], consultadoEm }) {
   const router = useRouter();
+  const [aba, setAba] = useState("Visão geral");
   const [verFuros, setVerFuros] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -57,16 +59,24 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
 
   const maxHoje = Math.max(1, ...setores.map((s) => s.hojeKg));
   const maxSem = Math.max(1, ...semanas.map((s) => s.kg));
-  const dataHora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const dataHora = consultadoEm ? new Date(consultadoEm).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : hoje.split("-").reverse().join("/");
+  const atalhos = [
+    { titulo: "Ordens e peças", texto: "Peças, materiais, desenhos, GRD e qualidade por OP.", href: "/producao/ordens", icon: Layers },
+    { titulo: "Programação semanal", texto: "Metas, datas necessárias e realizado da semana.", href: "/producao/semana", icon: CalendarDays },
+    { titulo: "Materiais e estoque", texto: "Consulte o material disponível para fabricar.", href: "/producao/consulta-estoque", icon: PackageSearch },
+    { titulo: "Obra em 3D", texto: "Localize a marca e acompanhe o modelo da obra.", href: "/producao/modelo", icon: Box },
+    { titulo: "Qualidade por OP", texto: "Resultados de inspeção e marcas cobertas pelos relatórios.", href: "/producao/qualidade", icon: FileText },
+    { titulo: "Expedição", texto: "Acompanhe as peças na etapa de saída.", href: "/producao/programacao/expedicao", icon: Truck },
+  ];
 
   return (
     <div className="space-y-5 max-w-7xl">
       {/* Cabeçalho */}
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight">Painel de Produção</h2>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight">Central de Produção</h2>
           <p className="text-xs text-torg-gray mt-0.5">
-            Pulso da fábrica ao vivo (Syneco) · pipeline das peças · metas do mês — atualizado {dataHora}
+            Planeje, acompanhe e confira a fabricação · consulta em {dataHora}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -85,9 +95,83 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
         </div>
       </div>
 
+      <div role="tablist" aria-label="Visões da produção" className="flex flex-wrap gap-1 border-b border-gray-200 pb-2">
+        {ABAS.map(item => <button key={item} role="tab" id={`tab-producao-${ABAS.indexOf(item)}`} aria-selected={aba === item} aria-controls="visao-producao" tabIndex={aba === item ? 0 : -1} onKeyDown={e => {
+          const i = ABAS.indexOf(item);
+          const proxima = e.key === "ArrowRight" ? (i + 1) % ABAS.length : e.key === "ArrowLeft" ? (i + ABAS.length - 1) % ABAS.length : e.key === "Home" ? 0 : e.key === "End" ? ABAS.length - 1 : null;
+          if (proxima !== null) { e.preventDefault(); setAba(ABAS[proxima]); document.getElementById(`tab-producao-${proxima}`)?.focus(); }
+        }} onClick={() => setAba(item)} className={`min-h-11 px-4 rounded-lg text-sm font-semibold ${aba === item ? "bg-torg-dark text-white" : "text-torg-gray hover:bg-white"}`}>{item}</button>)}
+      </div>
+      <div id="visao-producao" role="tabpanel" aria-labelledby={`tab-producao-${ABAS.indexOf(aba)}`} className="space-y-5">
+      {aba === "Visão geral" && <>
+        <section className="rounded-2xl bg-torg-dark text-white p-4 sm:p-5">
+
+          <h3 className="text-xl sm:text-2xl font-bold mt-2">Trabalho por OP</h3>
+          <p className="text-sm text-white/75 mt-2 max-w-2xl">Consulte as peças, o R e os desenhos antes de liberar a fabricação.</p>
+          <Link href="/producao/ordens" className="inline-flex items-center gap-2 mt-3 min-h-11 rounded-lg bg-white text-torg-dark px-4 font-semibold text-sm">Abrir ordens <ArrowRight size={16}/></Link>
+        </section>
+        <section aria-label="Resumo da produção" className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="col-span-2 sm:col-span-1 p-4 bg-white rounded-xl border border-gray-100"><p className="text-xs text-torg-gray">Processado hoje · soma das etapas</p><p className="text-2xl font-bold text-torg-dark mt-2">{fmtKg(apontHoje.kg)}</p><p className="text-xs text-torg-gray mt-1">Uma peça pode passar por mais de uma etapa.</p></div>
+          <button onClick={() => setAba("Solicitações")} className="p-4 text-left bg-white rounded-xl border border-gray-100 hover:border-torg-blue"><p className="text-xs text-torg-gray">Solicitações do Planejamento</p><p className="text-2xl font-bold text-torg-dark mt-2">{solicitacoes.length}</p><p className="text-xs text-torg-blue mt-1">Conferir datas necessárias →</p></button>
+          <div className="p-4 bg-white rounded-xl border border-gray-100"><p className="text-xs text-torg-gray">Ocorrências de apontamento</p><p className="text-2xl font-bold text-torg-dark mt-2">{furos.length}</p><p className="text-xs text-torg-gray mt-1">Diferenças entre etapas para conferir.</p></div>
+        </section>
+      {aba === "Visão geral" && <>
+      {/* Alertas */}
+      {(furos.length > 0 || paradas > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {furos.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+              <div className="flex items-center justify-between gap-2">
+                <button onClick={() => setVerFuros((v) => !v)} className="flex-1 flex items-center justify-between gap-2 text-left">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-red-800">
+                    <AlertTriangle size={16} className="text-red-600" />
+                    {furos.length} furo{furos.length > 1 ? "s" : ""} de apontamento no Syneco
+                  </span>
+                  {verFuros ? <ChevronUp size={16} className="text-red-600" /> : <ChevronDown size={16} className="text-red-600" />}
+                </button>
+                <button
+                  onClick={exportarFuros}
+                  className="shrink-0 px-2 py-1 bg-white border border-red-200 text-red-700 text-xs rounded-lg hover:bg-red-100 font-medium flex items-center gap-1.5"
+                  title="Exportar lista de furos para Excel"
+                >
+                  <Download size={13} /> Excel
+                </button>
+              </div>
+              {verFuros && (
+                <div className="mt-2 space-y-1 text-xs text-red-800">
+                  {furos.map((f) => (
+                    <p key={f.marca} className="tabular-nums">
+                      <span className="font-mono font-bold">{f.marca}</span> (OP {f.opNumero}) — {f.resumo}
+                    </p>
+                  ))}
+                  <p className="text-red-600 pt-1">Corrija os lançamentos no Syneco; exporte o relatório nas abas de setor.</p>
+                </div>
+              )}
+            </div>
+          )}
+          {paradas > 0 && (
+            <Link href="/producao/mapa"
+              className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between gap-2 hover:bg-amber-100/60 transition-colors">
+              <span className="flex items-center gap-2 text-sm font-semibold text-amber-800">
+                <Clock size={16} className="text-amber-600" />
+                {paradas} registros sem atualização há mais de 1 dia
+              </span>
+              <span className="text-xs text-amber-700 flex items-center gap-1">ver no mapa <ArrowRight size={13} /></span>
+            </Link>
+          )}
+        </div>
+      )}
+
+      </>}
+        <section aria-label="Ferramentas de produção" className="grid grid-cols-2 xl:grid-cols-3 gap-3">
+          {atalhos.map(a => { const Icon = a.icon; return <Link key={a.href} href={a.href} className="flex flex-col sm:flex-row gap-3 bg-white border border-gray-100 rounded-xl p-4 hover:border-torg-blue shadow-sm"><Icon className="text-torg-blue shrink-0 mt-1" size={22}/><div className="min-w-0"><h3 className="text-sm font-bold text-torg-dark">{a.titulo}</h3><p className="text-xs text-torg-gray mt-1">{a.texto}</p></div></Link>; })}
+        </section>
+        {!furos.length && !paradas && <p className="flex items-center gap-2 text-sm text-torg-gray bg-white p-4 rounded-xl border border-gray-100"><CheckCircle2 size={18} className="text-emerald-600"/>Nenhuma ocorrência nos controles de apontamento e atualização consultados.</p>}
+      </>}
+      {aba === "Andamento" && <>
       {/* Pipeline da fábrica */}
       <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-        <h3 className="text-sm font-bold text-torg-dark mb-3">Pipeline da fábrica</h3>
+        <h3 className="text-sm font-bold text-torg-dark mb-3">Fluxo da fábrica</h3><p className="text-xs text-torg-gray mb-3">Registros da lista de produção por etapa. Abra o setor para conferir quantidades e apontamentos.</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
           {FLUXO.map((f) => {
             const Icon = f.icon;
@@ -99,7 +183,7 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
                   <Icon size={15} className={f.cor} />
                   <span className="text-[11px] font-semibold text-torg-dark">{f.label}</span>
                 </div>
-                <p className="text-xl font-extrabold tabular-nums text-torg-dark leading-none">{d.pecas}</p>
+                <p className="text-xl font-extrabold tabular-nums text-torg-dark leading-none">{d.pecas} <span className="text-xs font-normal">registros</span></p>
                 <p className="text-[10px] text-torg-gray mt-0.5">{fmtKg(d.kg)}</p>
               </Link>
             );
@@ -107,6 +191,9 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
         </div>
       </section>
 
+      </>}
+      {aba === "Solicitações" && <>
+      {!solicitacoes.length && <p className="bg-white p-6 rounded-xl border text-sm text-torg-gray">Nenhuma solicitação de produção pendente.</p>}
       {/* Solicitações de produção (Planejamento) */}
       {solicitacoes.length > 0 && (
         <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -161,52 +248,8 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
         </section>
       )}
 
-      {/* Alertas */}
-      {(furos.length > 0 || paradas > 0) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {furos.length > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-              <div className="flex items-center justify-between gap-2">
-                <button onClick={() => setVerFuros((v) => !v)} className="flex-1 flex items-center justify-between gap-2 text-left">
-                  <span className="flex items-center gap-2 text-sm font-semibold text-red-800">
-                    <AlertTriangle size={16} className="text-red-600" />
-                    {furos.length} furo{furos.length > 1 ? "s" : ""} de apontamento no Syneco
-                  </span>
-                  {verFuros ? <ChevronUp size={16} className="text-red-600" /> : <ChevronDown size={16} className="text-red-600" />}
-                </button>
-                <button
-                  onClick={exportarFuros}
-                  className="shrink-0 px-2 py-1 bg-white border border-red-200 text-red-700 text-xs rounded-lg hover:bg-red-100 font-medium flex items-center gap-1.5"
-                  title="Exportar lista de furos para Excel"
-                >
-                  <Download size={13} /> Excel
-                </button>
-              </div>
-              {verFuros && (
-                <div className="mt-2 space-y-1 text-xs text-red-800">
-                  {furos.map((f) => (
-                    <p key={f.marca} className="tabular-nums">
-                      <span className="font-mono font-bold">{f.marca}</span> (OP {f.opNumero}) — {f.resumo}
-                    </p>
-                  ))}
-                  <p className="text-red-600 pt-1">Corrija os lançamentos no Syneco; exporte o relatório nas abas de setor.</p>
-                </div>
-              )}
-            </div>
-          )}
-          {paradas > 0 && (
-            <Link href="/producao/mapa"
-              className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between gap-2 hover:bg-amber-100/60 transition-colors">
-              <span className="flex items-center gap-2 text-sm font-semibold text-amber-800">
-                <Clock size={16} className="text-amber-600" />
-                {paradas} peça{paradas > 1 ? "s" : ""} parada{paradas > 1 ? "s" : ""} há mais de 1 dia
-              </span>
-              <span className="text-xs text-amber-700 flex items-center gap-1">ver no mapa <ArrowRight size={13} /></span>
-            </Link>
-          )}
-        </div>
-      )}
-
+      </>}
+      {aba === "Resultados" && <>
       {/* Apontamento Syneco hoje por setor */}
       <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <h3 className="text-sm font-bold text-torg-dark mb-3">Apontamento de hoje por setor (Syneco)</h3>
@@ -217,7 +260,7 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
               <div className="flex-1 bg-gray-100 rounded h-3 overflow-hidden">
                 <div className="h-full bg-torg-blue" style={{ width: `${pct(s.hojeKg, maxHoje)}%` }} />
               </div>
-              <span className="w-32 shrink-0 text-right tabular-nums text-torg-dark">
+              <span className="w-24 sm:w-32 shrink-0 text-right tabular-nums text-torg-dark">
                 {fmtKg(s.hojeKg)} {s.hojeUn > 0 && <span className="text-torg-gray">· {s.hojeUn} un</span>}
               </span>
             </div>
@@ -257,7 +300,7 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
       {/* Evolução semanal (Syneco) */}
       {semanas.length > 0 && (
         <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-          <h3 className="text-sm font-bold text-torg-dark mb-3">Produção apontada por semana (todos os setores)</h3>
+          <h3 className="text-sm font-bold text-torg-dark mb-3">Produção apontada por semana (todos os setores)</h3><p className="text-xs text-torg-gray mb-2">Soma do processamento por etapa; não representa peso físico único de peças.</p>
           {/* Altura da barra em PIXEL (a maior semana = 140px). Usar % aqui não
               funciona: a coluna não tem altura definida e o % colapsa. */}
           <div className="flex items-end gap-1.5 h-44">
@@ -274,6 +317,8 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
           </div>
         </section>
       )}
+      </>}
+      </div>
     </div>
   );
 }

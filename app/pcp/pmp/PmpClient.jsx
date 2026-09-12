@@ -38,7 +38,7 @@ const fmtDiaMes = (iso) => (iso ? new Date(iso + "T12:00:00Z").toLocaleDateStrin
 // Seg–Sáb: a fábrica corta aos sábados — domingo fica de fora
 const DIAS_SEMANA = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-export default function PmpClient() {
+export default function PmpClient({ portalProducao = false } = {}) {
   const [semana, setSemana] = useState(() => getMonday(new Date()));
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -129,7 +129,7 @@ export default function PmpClient() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="animate-spin text-torg-blue" size={32} />
-        <span className="ml-3 text-torg-gray">Carregando PMP...</span>
+        <span className="ml-3 text-torg-gray">{portalProducao ? "Carregando programação semanal…" : "Carregando PMP…"}</span>
       </div>
     );
   }
@@ -151,10 +151,10 @@ export default function PmpClient() {
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
-            <Target size={24} className="text-torg-blue" /> PMP — Corte
+            <Target size={24} className="text-torg-blue" /> {portalProducao ? "Programação semanal — Corte" : "PMP — Corte"}
           </h2>
           <p className="text-xs text-torg-gray mt-0.5">
-            As metas nascem da programação da <Link href="/pcp/fila-corte" className="text-torg-blue hover:underline font-medium">Fila de Corte</Link>;
+            As metas nascem da programação da <Link href={portalProducao ? "/producao/programacao/fila-corte" : "/pcp/fila-corte"} className="text-torg-blue hover:underline font-medium">Fila de Corte</Link>;
             o realizado vem dos apontamentos do Syneco.
           </p>
         </div>
@@ -255,7 +255,7 @@ export default function PmpClient() {
           <TrendingUp size={40} className="mx-auto text-gray-300 mb-3" />
           <p className="text-sm text-torg-gray">Nada programado nem cortado nesta semana.</p>
           <p className="text-xs text-gray-400 mt-1">
-            Programe peças na <Link href="/pcp/fila-corte" className="text-torg-blue hover:underline">Fila de Corte</Link> — as metas aparecem aqui automaticamente.
+            Programe peças na <Link href={portalProducao ? "/producao/programacao/fila-corte" : "/pcp/fila-corte"} className="text-torg-blue hover:underline">Fila de Corte</Link> — as metas aparecem aqui automaticamente.
           </p>
         </div>
       ) : (

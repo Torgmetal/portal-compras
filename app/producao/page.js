@@ -146,6 +146,7 @@ export default async function PainelProducao() {
 
   return (
     <PainelProducaoClient
+      consultadoEm={new Date().toISOString()}
       hoje={hojeIso}
       dia={dia}
       diasNoMes={diasNoMes}
