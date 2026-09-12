@@ -12,6 +12,41 @@ main.ml-64 { transition: margin-left 0.22s ease; }
 html.menu-oculto aside.fixed.left-0 { transform: translateX(-100%); pointer-events: none; }
 html.menu-oculto main.ml-64 { margin-left: 0 !important; }
 
+/* Navegação compartilhada dos módulos em celular e tablet. */
+@media screen and (max-width: 1023px) {
+  aside.fixed.left-0 {
+    width: min(320px, calc(100vw - 48px));
+    height: 100dvh;
+    z-index: 60;
+    transform: translateX(-100%);
+    pointer-events: none;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  html.menu-mobile-aberto aside.fixed.left-0 {
+    transform: translateX(0);
+    pointer-events: auto;
+    box-shadow: 8px 0 32px #00294530;
+  }
+  aside.fixed.left-0 nav { min-height: 0; overscroll-behavior: contain; }
+  aside.fixed.left-0 nav a, aside.fixed.left-0 button { min-height: 44px; }
+  main.ml-64 {
+    margin-left: 0 !important;
+    width: 100%;
+    min-width: 0;
+    padding: calc(72px + env(safe-area-inset-top)) 12px 24px;
+  }
+  .portal-barra-mobile {
+    position: fixed; inset: 0 0 auto; z-index: 40;
+    display: flex; align-items: center; gap: 8px;
+    min-height: 60px; padding: env(safe-area-inset-top) 12px 0;
+    background: white; border-bottom: 1px solid #e2e8f0;
+    color: #002945; font-weight: 700;
+  }
+  .portal-barra-mobile button { display: grid; place-items: center; width: 44px; height: 44px; color: #006eab; flex-shrink: 0; }
+  .portal-barra-mobile span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .portal-fundo-mobile { position: fixed; inset: 0; z-index: 50; background: #00294580; }
+}
+
 :root {
   --torg-blue: #006eab;
   --torg-dark: #002945;
@@ -69,3 +104,5 @@ h1, h2, h3, h4 {
   max-height: none !important;
   height: auto;
 }
+
+@media print { .portal-barra-mobile, .portal-fundo-mobile { display: none !important; } }

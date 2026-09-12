@@ -51,13 +51,14 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
 
   return (
     <div ref={ref} className="relative px-5 py-5 border-b border-torg-blue-100">
-      <div className="absolute top-2 right-2 z-10"><ToggleSidebar /></div>
+      <div className="absolute top-2 right-2 z-10"><ToggleSidebar moduloAtual={moduloAtual} /></div>
       <button
         onClick={() => temMultiplos && setAberto((v) => !v)}
         className={`flex items-center gap-2 w-full group ${
           temMultiplos ? "cursor-pointer" : "cursor-default"
         }`}
         title={temMultiplos ? "Trocar de módulo" : undefined}
+        aria-label={temMultiplos ? "Trocar de módulo" : moduloAtual}
         aria-expanded={temMultiplos ? aberto : undefined}
       >
         <TorgLogo size="sm" />
@@ -85,10 +86,14 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
       <p className="text-[10px] text-torg-gray mt-1 tracking-wider uppercase">
         {moduloAtual}
       </p>
+      {temMultiplos && <button onClick={() => setAberto((v) => !v)} aria-expanded={aberto}
+        className="lg:hidden mt-2 w-full rounded-lg border border-torg-blue-100 px-3 text-sm font-semibold text-torg-blue flex items-center justify-between">
+        Trocar de área <LayoutGrid size={18} />
+      </button>}
 
       {/* Dropdown de módulos */}
       {aberto && (
-        <div className="absolute left-3 top-full mt-1 w-[308px] max-w-[calc(100vw-24px)] bg-white rounded-[14px] border border-slate-200 shadow-[0_8px_24px_rgba(0,41,69,0.08)] z-50 p-2 animate-in fade-in slide-in-from-top-1 duration-150 max-h-[min(75vh,calc(100dvh-120px))] overflow-y-auto overscroll-contain">
+        <div className="absolute left-3 top-full mt-1 w-[308px] max-w-[calc(100vw-24px)] bg-white rounded-[14px] border border-slate-200 shadow-[0_8px_24px_rgba(0,41,69,0.08)] z-50 p-2 animate-in fade-in slide-in-from-top-1 duration-150 max-h-[calc(100dvh-230px)] lg:max-h-[min(75vh,calc(100dvh-120px))] overflow-y-auto overscroll-contain">
           <div className="px-3 pt-2 pb-3">
             <p className="text-[10px] text-torg-gray uppercase tracking-[0.12em] font-semibold flex items-center gap-2">
               <LayoutGrid size={13} strokeWidth={1.7} />

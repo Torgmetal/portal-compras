@@ -1,7 +1,12 @@
 {
-  "build": 3110,
-  "gerado": "2026-09-12T18:46:05.756Z",
+  "build": 3111,
+  "gerado": "2026-09-12T19:02:47.553Z",
   "commits": [
+    {
+      "hash": "e64682bc",
+      "data": "12/09/2026",
+      "titulo": "fix(3d): melhorar painéis e seleção por toque no celular"
+    },
     {
       "hash": "6b713fa3",
       "data": "12/09/2026",
@@ -146,11 +151,6 @@
       "hash": "f02a6159",
       "data": "11/09/2026",
       "titulo": "feat(op): exibir endereços do cliente e da entrega na aba Obra"
-    },
-    {
-      "hash": "7c49e19b",
-      "data": "11/09/2026",
-      "titulo": "fix(op): remover orçamento comercial da aba Obra para todos"
     }
   ]
 }
