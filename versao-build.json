@@ -1,7 +1,12 @@
 {
-  "build": 3107,
-  "gerado": "2026-09-12T14:39:11.042Z",
+  "build": 3108,
+  "gerado": "2026-09-12T14:43:58.750Z",
   "commits": [
+    {
+      "hash": "881df564",
+      "data": "12/09/2026",
+      "titulo": "Memória do Claude compartilhada no repositório, para Mac e Windows"
+    },
     {
       "hash": "66dc71ce",
       "data": "12/09/2026",
@@ -146,11 +151,6 @@
       "hash": "fd206ca6",
       "data": "11/09/2026",
       "titulo": "Análise crítica: responsável (Eng.º de Projeto) editável no registro"
-    },
-    {
-      "hash": "0d7aea88",
-      "data": "11/09/2026",
-      "titulo": "Etiqueta: uma etiqueta para a caixa, na coluna \"Imprimir\" da lista"
     }
   ]
 }

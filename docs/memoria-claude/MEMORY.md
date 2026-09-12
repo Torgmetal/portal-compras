@@ -157,3 +157,4 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Assinatura eletrônica de documentos](torg_assinatura_doc.md) — fluxo genérico p/ validar doc por setor: PDF padrão Torg + envio por e-mail + `/assinar/[token]` (confirmação+data+IP) + revisão auto; EnvioAssinatura/AssinaturaDocumento/DocumentoRevisao (por `tipo`); usado em Plano de Treinamentos e Cronograma de Auditoria
 - [Não sobrescrever arquivo com `cat >`](torg_nao_sobrescrever_arquivo.md) — conferir `ls`/`git ls-files` antes; ` M` no git status onde eu esperava `??` = sobrescrevi algo
 - [Baixa de etapa anterior (Produção)](torg_baixa_etapa_anterior.md) — "Apontamento numa etapa à frente dá baixa nas anteriores — a peça jateada foi montada e soldada, mesmo sem registro"
+- [OP-122 Vale/TMSA + Tekla](torg_tekla_tmsa_vale.md) — acompanhamento no formato TMSA (avanço, mapa, romaneio); SKU é da TMSA; pacote Tekla 2025 em docs/tekla-tmsa-vale
