@@ -1,7 +1,12 @@
 {
-  "build": 3104,
-  "gerado": "2026-09-11T22:22:22.689Z",
+  "build": 3105,
+  "gerado": "2026-09-12T12:16:54.645Z",
   "commits": [
+    {
+      "hash": "e3ceba47",
+      "data": "11/09/2026",
+      "titulo": "Inspeções: lembrar escolhas por OP com padrões editáveis"
+    },
     {
       "hash": "f7110844",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7aa5f661",
       "data": "11/09/2026",
       "titulo": "Etiqueta: calibragem da impressora, para a etiqueta parar de sair cortada"
-    },
-    {
-      "hash": "ee53dff7",
-      "data": "11/09/2026",
-      "titulo": "fix: restringir dados da obra e liberar PDF dos indicadores ao RH"
     }
   ]
 }
