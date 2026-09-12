@@ -160,6 +160,13 @@ describe("data de início digitada à mão guarda a defasagem", () => {
 });
 
 describe("estimativa envelhece", () => {
+  it("revisar os mesmos dias registra o carimbo anterior e o novo na auditoria", async () => {
+    const estimativaEm = new Date("2026-09-01T12:00:00Z");
+    const r = await montar({ diasParaConcluir: 5 }, { ...TAREFA, diasParaConcluir: 5, estimativaEm });
+    expect(r.diffAntes.estimativaEm).toEqual(estimativaEm);
+    expect(r.diffDepois.estimativaEm).toEqual(r.data.estimativaEm);
+    expect(r.diffDepois.estimativaEm).not.toEqual(estimativaEm);
+  });
   it("informar dias para concluir carimba a data da estimativa", async () => {
     const r = await montar({ diasParaConcluir: 5 });
     expect(r.data.diasParaConcluir).toBe(5);

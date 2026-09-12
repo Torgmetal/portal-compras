@@ -1,7 +1,12 @@
 {
-  "build": 3108,
-  "gerado": "2026-09-12T14:43:58.750Z",
+  "build": 3109,
+  "gerado": "2026-09-12T18:11:24.908Z",
   "commits": [
+    {
+      "hash": "8a1095a8",
+      "data": "12/09/2026",
+      "titulo": "Tekla 2025: pacote do teste TMSA/Vale (UDAs de montagem) e memória da OP-122"
+    },
     {
       "hash": "881df564",
       "data": "12/09/2026",
@@ -146,11 +151,6 @@
       "hash": "0a6542fb",
       "data": "11/09/2026",
       "titulo": "fix(listas): incluir marcas compartilhadas e reconhecer LE formatada"
-    },
-    {
-      "hash": "fd206ca6",
-      "data": "11/09/2026",
-      "titulo": "Análise crítica: responsável (Eng.º de Projeto) editável no registro"
     }
   ]
 }
