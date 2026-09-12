@@ -1,7 +1,12 @@
 {
-  "build": 3114,
-  "gerado": "2026-09-12T19:58:34.627Z",
+  "build": 3115,
+  "gerado": "2026-09-12T22:42:01.559Z",
   "commits": [
+    {
+      "hash": "3210e413",
+      "data": "12/09/2026",
+      "titulo": "fix(3d): limpar seleção e contagens ao trocar de IFC"
+    },
     {
       "hash": "b78b2865",
       "data": "12/09/2026",
@@ -146,11 +151,6 @@
       "hash": "1495b706",
       "data": "11/09/2026",
       "titulo": "CMR: editar a linha lançada, lançar sem esperar a planilha, e escolher o item repetido"
-    },
-    {
-      "hash": "d1823d0b",
-      "data": "11/09/2026",
-      "titulo": "Etiqueta: os corpos e os traços da do BarTender, que é a que se lê"
     }
   ]
 }

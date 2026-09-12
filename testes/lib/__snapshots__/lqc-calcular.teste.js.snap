@@ -112,6 +112,14 @@ exports[`calcularLqc — bordas que não podem virar NaN > estudo vazio devolve 
   "custosExternos": 0,
   "debitoImpostos": 0,
   "demaos": 1,
+  "embalagem": {
+    "nivel": null,
+    "nome": "Não informada",
+    "porKg": 0,
+    "rsKg": 0,
+    "tabelaRsKg": 0,
+    "total": 0,
+  },
   "ensaios": {
     "linhas": [
       {
@@ -762,6 +770,7 @@ exports[`calcularLqc — bordas que não podem virar NaN > estudo vazio devolve 
   },
   "totais": {
     "comerciais": 0,
+    "embalagem": 0,
     "ensaios": 0,
     "industrializacao": {
       "icms": 0,
@@ -877,6 +886,14 @@ exports[`calcularLqc — snapshot do estudo de referência > o resultado inteiro
   "custosExternos": 4118.33,
   "debitoImpostos": 1768.55,
   "demaos": 2,
+  "embalagem": {
+    "nivel": null,
+    "nome": "Não informada",
+    "porKg": 0,
+    "rsKg": 0,
+    "tabelaRsKg": 0,
+    "total": 0,
+  },
   "ensaios": {
     "linhas": [
       {
@@ -1666,6 +1683,7 @@ exports[`calcularLqc — snapshot do estudo de referência > o resultado inteiro
   },
   "totais": {
     "comerciais": 0,
+    "embalagem": 0,
     "ensaios": 0,
     "industrializacao": {
       "icms": 606,

@@ -102,3 +102,23 @@ carregador; cada regra acima veio de uma correção dele sobre uma versão errad
 **How to apply:** ao levar isso ao portal (Expedição › prévia de carga → romaneio prévio), essas
 regras entram como cadastro/regra, não como constante; ver [[torg_romaneio_carga]] e
 [[torg_croqui_nao_expede]].
+
+**12/09/2026 — orientação da peça e perfil Vale/TMSA (slots4.mjs).** O IFC da 118 é **Y-UP (índice 1)**: a maior dimensão
+das 64 colunas está no eixo 1. A caixa orientada (obb.mjs) só pode ALINHAR O COMPRIMENTO; a permutação "menor dimensão
+para baixo" deitava viga de lado, deixava mão-francesa de banda (giro 44°, "pacote flutuando") e mandava barra de 7 m para
+transporte especial. Regra: perfil (viga, coluna, terça, treliça, mão-francesa, contraventamento) viaja com a **alma em pé**
+(altura = eixo Y depois do giro; coluna deita no comprimento, seção maior para cima); família CHAPA (chapa, grade, GC, piso,
+plataforma, tala) deita com a menor dimensão para baixo; quadro plano alto (> 80 cm e > 1,5× a largura) deita.
+**Perfil `vale`** = espec. de embalagem TMSA/Hydro TPR00864 lida do jeito mais produtivo: feixe ≤ 2 t e ≤ 12 m, miúdo em caixa
+sobre palete ≤ 1 t (caixa por marca só com 6+ peças), GC deitado em engradado (empilha), grade/chapa em engradado deitado,
+madeira fumigada ×1,35, volume numerado por embalagem + `romaneio` por carga (`c.romaneio`, `c.volumes`). OP-118 por nível:
+econômico/recomendado 15 viagens · R$ 24 mil de madeira; exigente 19 · R$ 39 mil; **vale 18 · R$ 86 mil**; vale-literal
+(caixa manual 34 kg + GC em pé) 21 · R$ 131 mil · 868 volumes. Colunas 12,5–14 m nunca em feixe (Vitor). `PERFIL=a,b` roda só
+esses perfis e preserva o comparativo dos outros.
+
+**12/09/2026 — Embalagem na LQC (aba Frete).** Vitor: "vamos colocar essa parte do material de embalagem no portal (…) pode
+impactar bem no preço" → `NIVEIS_EMBALAGEM` em lib/lqc.js: **Econômica 0,14 · Padrão 0,18 · Reforçada 0,29 · Especificada
+0,63 R$/kg** (nomes escolhidos por ele; "Reforçada" no lugar de "Premium"). `calcularEmbalagem(cfg, pesoTotal)` entra em
+`custoTorg`, diluída no R$/kg de cada área (rateio como frete diluído), e em `custosExternos`; `resultado.embalagem`. Estudo
+novo nasce Padrão; estudo antigo sem nível fica com zero e a aba Frete mostra tarja. R$/kg digitado sobrepõe a tabela.
+Calibrar os níveis conforme as obras saírem com romaneio (a Econômica é o real de 2026).

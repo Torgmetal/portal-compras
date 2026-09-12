@@ -109,6 +109,8 @@ export async function POST(req) {
       obra: String(b.obra || "").trim() || null,
       orcamentoId,
       metodo: b.metodo || "ESTIMATIVA",
+      // estudo novo já nasce com a Embalagem Padrão na composição (lib/lqc NIVEIS_EMBALAGEM)
+      cenario: { embalagem: { nivel: "PADRAO" } },
       criadoPorId: user.id, criadoPorNome: user.name || null,
     },
   });
