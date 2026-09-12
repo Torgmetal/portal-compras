@@ -1,7 +1,12 @@
 {
-  "build": 3115,
-  "gerado": "2026-09-12T22:42:01.559Z",
+  "build": 3116,
+  "gerado": "2026-09-12T23:14:46.089Z",
   "commits": [
+    {
+      "hash": "78fa9203",
+      "data": "12/09/2026",
+      "titulo": "LQC: madeira de embalagem por nível na aba Frete, entra no R$/kg"
+    },
     {
       "hash": "3210e413",
       "data": "12/09/2026",
@@ -146,11 +151,6 @@
       "hash": "66071c39",
       "data": "11/09/2026",
       "titulo": "Inspeções: abrir revisão de relatório assinado e editar as peças informadas"
-    },
-    {
-      "hash": "1495b706",
-      "data": "11/09/2026",
-      "titulo": "CMR: editar a linha lançada, lançar sem esperar a planilha, e escolher o item repetido"
     }
   ]
 }

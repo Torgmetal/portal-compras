@@ -19,6 +19,7 @@ import Link from "next/link";
 import { Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, Printer, Factory, Monitor, CalendarClock, Clock, Package, CheckCircle2, FileText, FileSpreadsheet, Flag, X, Users, BellRing } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import CompraChip, { ModalRastreabilidade } from "@/components/CompraChip";
+import FichaPecaModal from "@/components/FichaPecaModal";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 import SeparacaoModal from "@/components/SeparacaoModal";
 import GanttProgramacao from "./GanttProgramacao";
@@ -186,6 +187,7 @@ export default function ProducaoClient() {
   const [imprimindo, setImprimindo] = useState(false);
   const [aviso, setAviso] = useState(null);
   const [desenho, setDesenho] = useState(null);
+  const [ficha, setFicha] = useState(null);
   const [filtroPecas, setFiltroPecas] = useState("");
   // ⚠ Vitor (24/08/2026): "preciso ter o filtro para selecionar o que não iniciou". "Não iniciou"
   // é união de duas situações — a que o programador nem programou e a que ele programou e a fábrica não
@@ -892,6 +894,7 @@ export default function ProducaoClient() {
                                         <FileText size={11} className="text-torg-gray-light shrink-0" />
                                         <span className="truncate">{p.marca}</span>
                                       </button>
+                                      <button type="button" onClick={() => setFicha({ opId: aberta, marca: p.marca })} className="ml-2 min-h-11 px-2 text-xs text-torg-blue underline underline-offset-2" aria-label={`Abrir ficha da peça ${p.marca}`}>Ficha</button>
                                       {/* ⚠ o número é a POSIÇÃO NA FILA da OP — é assim que a peça aparece
                                           ordenada no Painel de Produção, e é o que prova que ela foi
                                           mandada. Sem número, não foi. */}
@@ -1043,6 +1046,7 @@ export default function ProducaoClient() {
         </div>
       )}
 
+      {ficha && <FichaPecaModal {...ficha} onClose={() => setFicha(null)} />}
       {desenho && <DesenhoPecaModal opNumero={desenho.opNumero} marca={desenho.marca} onClose={() => setDesenho(null)} />}
       {rastro && <ModalRastreabilidade opNumero={rastro} onClose={() => setRastro(null)} />}
       {separacao && (
