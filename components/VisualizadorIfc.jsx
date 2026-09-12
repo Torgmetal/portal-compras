@@ -1,4 +1,5 @@
 "use client";
+import { criarSeletorPorToque } from "@/lib/ifc-toque";
 // ─── VISUALIZADOR DE MODELO IFC ───────────────────────────────────────────────
 //
 // Vitor (03/09/2026): "não está aparecendo os perfis, o Tekla lê com muito mais detalhe, quero que
@@ -662,17 +663,10 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         // um pixel de tremida. No trackpad isso é quase todo clique, e piora quanto mais pesado o
         // modelo (mais tempo entre o down e o up). Agora só conta como giro de câmera quem andou
         // mais de 5 px.
-        const TOLERANCIA_PX = 5;
-        let ini = null, arrastou = false;
-        const down = (ev) => { ini = { x: ev.clientX, y: ev.clientY }; arrastou = false; };
-        const move = (ev) => {
-          if (!ini) return;
-          if (Math.hypot(ev.clientX - ini.x, ev.clientY - ini.y) > TOLERANCIA_PX) arrastou = true;
-        };
+        const gesto = criarSeletorPorToque();
+        const down = gesto.down, move = gesto.move, cancel = gesto.cancel;
         const up = (ev) => {
-          const girou = arrastou;
-          ini = null; arrastou = false;
-          if (girou) return;                    // girou a câmera: não é seleção
+          if (!gesto.up(ev)) return;
           const r = rend.domElement.getBoundingClientRect();
           pt.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
           pt.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
@@ -687,6 +681,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         rend.domElement.addEventListener("pointerdown", down);
         rend.domElement.addEventListener("pointermove", move);
         rend.domElement.addEventListener("pointerup", up);
+        rend.domElement.addEventListener("pointercancel", cancel);
 
         // ⚠⚠ DESENHA SÓ QUANDO MUDA. Redesenhar 60 vezes por segundo uma cena parada é queimar GPU
         // à toa — e, num laptop, é o que faz o ventilador subir e o quadro cair justamente quando a
@@ -730,6 +725,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
           rend.domElement.removeEventListener("pointerdown", down);
           rend.domElement.removeEventListener("pointermove", move);
           rend.domElement.removeEventListener("pointerup", up);
+          rend.domElement.removeEventListener("pointercancel", cancel);
           ctrl.removeEventListener("change", pedirQuadro);
           ctrl.dispose();
           for (const m of malhas.values()) { m.geometry.dispose(); m.material.dispose(); }
@@ -839,7 +835,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
         </div>
       )}
       {info && (
-        <div className="absolute left-3 top-3 text-[10.5px] font-semibold text-torg-gray bg-gray-50/90 border border-gray-200 rounded px-2 py-1">
+        <div data-ifc-contagem className="absolute left-3 top-3 text-[10.5px] font-semibold text-torg-gray bg-gray-50/90 border border-gray-200 rounded px-2 py-1">
           {info.conjuntos} conjuntos · {info.geometrias} peças
         </div>
       )}
@@ -847,7 +843,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
       {/* ⚠ controles no canto, sobre a cena — é onde quem usa modelo procura por reflexo */}
       {pronto && (
         <>
-          <div className="absolute right-3 top-3 flex flex-col gap-1 items-end">
+          <div data-ifc-vistas className="absolute right-3 top-3 flex flex-col gap-1 items-end">
             <div className="flex gap-0.5 bg-white/95 border border-gray-200 rounded-lg p-0.5 shadow-sm">
               {[["iso", "Isométrica", [0.72, 0.48, 0.72]], ["frente", "Frente", [0, 0, 1]],
                 ["lado", "Lateral", [1, 0, 0]], ["topo", "Topo", [0, 1, 0.001]]].map(([k, t, dir]) => (
@@ -871,7 +867,7 @@ export default function VisualizadorIfc({ url, onSelecionar, onIndice, visiveis,
           <img src="/torg-logo.png" alt="Torg Metal" draggable="false"
             className="absolute left-4 bottom-4 h-9 opacity-70 pointer-events-none select-none" />
 
-          <button onClick={alternarCheia} title={cheia ? "Sair da tela cheia (Esc)" : "Preencher a tela"}
+          <button data-ifc-tela-cheia onClick={alternarCheia} title={cheia ? "Sair da tela cheia (Esc)" : "Preencher a tela"}
             className="absolute right-3 top-[68px] bg-white/95 border border-gray-200 rounded-lg shadow-sm px-2 py-1 text-torg-gray hover:bg-torg-blue-50 hover:text-torg-blue">
             {cheia ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>

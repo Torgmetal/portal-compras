@@ -18,6 +18,7 @@ import { Loader2, Box, SlidersHorizontal, Search, EyeOff, Eye, FileSpreadsheet, 
 import dynamic from "next/dynamic";
 const ComparadorIfc = dynamic(() => import("@/components/ComparadorIfc"), { ssr: false, loading: () => <p>Preparando comparação…</p> });
 import VisualizadorIfc from "@/components/VisualizadorIfc";
+import mobile from "./modelo-mobile.module.css";
 
 const SEM = "sem informação";
 
@@ -231,6 +232,7 @@ export default function ModeloObraCliente({ token }) {
   }
 
   const abrir = useCallback((item) => {
+    if (window.matchMedia('(max-width: 1023px)').matches) { setPainel(false); setPainelEtapa(false); }
     setSel(item || null);
     setDetalhesAbertos(true);
     const m = item?.marca;
@@ -284,8 +286,9 @@ export default function ModeloObraCliente({ token }) {
           níveis e tipos dentro da tela cheia também". O `data-tela-cheia` é o que o botão procura
           para saber o que levar junto — estava só no quadro do 3D, então o seletor de modelo e o
           botão de filtros ficavam de fora justamente onde mais se precisa deles. */}
-      <div data-tela-cheia className="flex flex-col gap-3 bg-white">
-      <div className="flex items-center gap-2 flex-wrap rounded-xl border border-gray-200 bg-slate-50/70 p-3">
+      <div data-tela-cheia className={`flex flex-col gap-3 bg-white ${mobile.modelo}`}>
+      <p className="lg:hidden text-[12px] text-slate-500 px-1">1 dedo: girar · 2 dedos: mover e aproximar · toque: selecionar</p>
+      <div className={`flex items-center gap-2 flex-wrap rounded-xl border border-gray-200 bg-slate-50/70 p-3 ${mobile.barra}`}>
       {lista.modelos.length > 1 && (
         <select value={modelo?.rel || ""} onChange={(e) => { setModelo(lista.modelos.find((m) => m.rel === e.target.value)); setSel(null); setPeca(null); }}
           className="text-[13px] border border-gray-200 rounded-lg px-3 py-2 max-w-full outline-none focus:border-[#006EAB]">
@@ -295,7 +298,7 @@ export default function ModeloObraCliente({ token }) {
         </select>
       )}
         {indice && (
-          <button onClick={() => setPainel((v) => !v)}
+          <button onClick={() => { setPainel((v) => !v); if (window.matchMedia('(max-width: 1023px)').matches) { setDetalhesAbertos(false); setPainelEtapa(false); } }}
             className={`text-[12.5px] font-semibold px-3 py-2 rounded-lg border inline-flex items-center gap-2 ${
               painel || selecionados ? "bg-[#0D1F3C] text-white border-[#0D1F3C]" : "border-gray-200 text-gray-600 hover:border-[#006EAB] hover:text-[#006EAB]"}`}>
             <SlidersHorizontal size={13} />
@@ -306,14 +309,15 @@ export default function ModeloObraCliente({ token }) {
         )}
         {indice && (
           <div className="relative order-first">
-            <button aria-expanded={painelEtapa} onClick={() => setPainelEtapa((v) => !v)}
+            <button aria-expanded={painelEtapa} onClick={() => { setPainelEtapa((v) => !v); if (window.matchMedia('(max-width: 1023px)').matches) { setPainel(false); setDetalhesAbertos(false); } }}
               className={`text-[12.5px] font-semibold px-3 py-2 rounded-lg border inline-flex items-center gap-2 ${
                 "bg-[#006EAB] text-white border-[#006EAB] hover:bg-[#00598b]"}`}>
               <Factory size={13} />
               Status da fabricação{fSetores.size > 0 ? ` · ${rotuloEtapa([...fSetores][0])}` : ""}
             </button>
             {painelEtapa && (
-              <div className="absolute left-0 top-full mt-1 z-30 w-[250px] bg-white border border-gray-200 rounded-xl shadow-lg p-2">
+              <div className={`absolute left-0 top-full mt-1 z-30 w-[250px] bg-white border border-gray-200 rounded-xl shadow-lg p-2 ${mobile.etapas}`}>
+                <button className="lg:hidden float-right px-3" aria-label="Fechar status da fabricação" onClick={() => setPainelEtapa(false)}><X size={18} /></button>
                 <p className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide px-1.5 mb-1">Onde está</p>
                 {/* ⚠⚠ SEM APONTAMENTO, O BOTÃO EXPLICA — não some. Vitor (05/09/2026): "o botão de
                     etapa de fabricação ainda não aparece no portal do cliente". Ele sumia quando a
@@ -378,12 +382,13 @@ export default function ModeloObraCliente({ token }) {
       {/* ⚠ o `flex-1 min-h-0` aqui serve à TELA CHEIA (o pai vira coluna de 100vh e esta linha
           precisa esticar). Fora dela o contêiner tem altura automática, e quem manda é a altura do
           quadro da cena. */}
-      <div className="flex flex-col lg:flex-row gap-0 border border-gray-200 rounded-xl overflow-hidden bg-white flex-1 min-h-0">
+      <div className={`flex flex-col lg:flex-row gap-0 border border-gray-200 rounded-xl overflow-hidden bg-white flex-1 min-h-0 ${mobile.quadro}`}>
         {painel && indice && (
-          <aside data-painel-3d className="w-full lg:w-[260px] shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200 overflow-y-auto" style={{ maxHeight: "clamp(440px, 68vh, 760px)" }}>
+          <aside data-painel-3d aria-label="Filtros do modelo" className={`w-full lg:w-[260px] shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200 overflow-y-auto ${mobile.filtros}`} style={{ maxHeight: "clamp(440px, 68vh, 760px)" }}>
             <div className="p-3.5 space-y-3.5">
               <div className="flex items-center justify-between">
                 <h4 className="text-[12px] font-bold text-[#0D1F3C] uppercase tracking-wide">Filtrar a vista</h4>
+                <button className="lg:hidden px-3" aria-label="Fechar filtros" onClick={() => setPainel(false)}><X size={18} /></button>
                 {selecionados && (
                   <button onClick={() => { setFNiveis(new Set()); setFTipos(new Set()); setFSetores(new Set()); }} className="text-[11px] text-[#006EAB] hover:underline">limpar</button>
                 )}
@@ -465,7 +470,7 @@ export default function ModeloObraCliente({ token }) {
             COLUNA — e aí `flex-1` passa a valer no eixo vertical, com base 0: a altura de 560
             morria e o canvas nascia com 300 px de altura desenhando nada. Em coluna ele é um bloco
             de altura própria; em linha, o item que estica. */}
-        <div data-cena-3d className="w-full lg:flex-1 min-w-0 relative" style={{ height: "clamp(440px, 68vh, 760px)" }}>
+        <div data-cena-3d className={`w-full lg:flex-1 min-w-0 relative ${mobile.cena}`} style={{ height: "clamp(440px, 68vh, 760px)" }}>
           {url && (
             <VisualizadorIfc key={url} url={url} onSelecionar={abrir} onIndice={receberIndice}
               visiveis={visiveis} ocultos={ocultos} esconderResto={esconderResto}
@@ -530,8 +535,9 @@ export default function ModeloObraCliente({ token }) {
         )}
 
         {sel && detalhesAbertos && (
-          <aside data-painel-3d className="w-full lg:w-[330px] shrink-0 border-t lg:border-t-0 lg:border-l border-gray-200 overflow-y-auto" style={{ maxHeight: "clamp(440px, 68vh, 760px)" }}>
+          <aside data-painel-3d aria-label="Detalhes da peça" className={`w-full lg:w-[330px] shrink-0 border-t lg:border-t-0 lg:border-l border-gray-200 overflow-y-auto ${mobile.detalhes}`} style={{ maxHeight: "clamp(440px, 68vh, 760px)" }}>
             <div className="p-4 space-y-3">
+              <button className="lg:hidden float-right px-3" aria-label="Fechar detalhes" onClick={() => setDetalhesAbertos(false)}><X size={18} /></button>
               <button onClick={() => setOcultos((v) => new Set(v).add(sel.id))}
                 className="text-[11.5px] text-gray-500 hover:text-[#0D1F3C] inline-flex items-center gap-1.5 border border-gray-200 rounded-md px-2 py-1">
                 <EyeOff size={12} /> ocultar esta peça

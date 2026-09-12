@@ -1,7 +1,12 @@
 {
-  "build": 3109,
-  "gerado": "2026-09-12T18:11:24.908Z",
+  "build": 3110,
+  "gerado": "2026-09-12T18:46:05.756Z",
   "commits": [
+    {
+      "hash": "6b713fa3",
+      "data": "12/09/2026",
+      "titulo": "fix(engenharia): fixar e revisar previsão da sequência com auditoria"
+    },
     {
       "hash": "8a1095a8",
       "data": "12/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7c49e19b",
       "data": "11/09/2026",
       "titulo": "fix(op): remover orçamento comercial da aba Obra para todos"
-    },
-    {
-      "hash": "0a6542fb",
-      "data": "11/09/2026",
-      "titulo": "fix(listas): incluir marcas compartilhadas e reconhecer LE formatada"
     }
   ]
 }
