@@ -59,16 +59,25 @@ export function montarAbaRevisao({ sigla, j, revLabel, sobrescrever = false }) {
  * ⚠ "REMOVIDA" não é comparada com nada de propósito: SEM sobrescrever o import não apaga, e a
  * lista de removidas é só o aviso de que aquelas marcas saíram do arquivo. Cobrar remoção aqui
  * marcaria como defeito o comportamento normal.
+ *
+ * ⚠⚠ NO SOBRESCREVER, "GRAVADA" É CRIADA **OU ATUALIZADA**. A marca que a LPC já tem nesta OP não
+ * nasce de novo: a rota atualiza a linha da LPC e liga `naLE` nela (é a MESMA peça, duplicar seria
+ * o defeito). Esse caminho conta em `atualizados`, não em `criados` — e a tarja comparava só os
+ * criados com o arquivo. OP-107 (Vitor, 12/09/2026): arquivo com 162 marcas, 113 criadas + 49
+ * atualizadas (guarda-corpos, Retorno 204 e escadas móveis que a LPC já tinha), e a tela gritou
+ * "gravou 113 de 162" com o import perfeito. Alarme falso é o que ensina a ignorar a tarja.
  */
-export function alertaDeDivergencia({ previu, criou, ignorou, jaNaOutraLista, sobrescrever, totalNoArquivo }) {
+export function alertaDeDivergencia({ previu, criou, atualizou = 0, ignorou, jaNaOutraLista, sobrescrever, totalNoArquivo }) {
   const partes = [];
   const esperado = sobrescrever ? (Number(totalNoArquivo) || 0) : previu;
+  const gravou = sobrescrever ? criou + (Number(atualizou) || 0) : criou;
   const comoEsperava = sobrescrever
     ? `a lista inteira do arquivo (${esperado} marca(s))`
     : `${esperado} marca(s) nova(s)`;
-  if (esperado !== criou) {
-    partes.push(`o import deveria gravar ${comoEsperava} e gravou ${criou}` +
-      (criou < esperado ? ` — ${esperado - criou} NÃO entrou(aram) no portal` : " — mais do que o esperado"));
+  if (esperado !== gravou) {
+    const detalhe = sobrescrever && atualizou > 0 ? ` (${criou} nova(s) e ${atualizou} que a LPC já tinha)` : "";
+    partes.push(`o import deveria gravar ${comoEsperava} e gravou ${gravou}${detalhe}` +
+      (gravou < esperado ? ` — ${esperado - gravou} NÃO entrou(aram) no portal` : " — mais do que o esperado"));
   }
   if (ignorou > 0) partes.push(`${ignorou} linha(s) do arquivo foram ignoradas`);
   if (jaNaOutraLista?.length) {
@@ -83,6 +92,7 @@ export function alertaDeDivergencia({ previu, criou, ignorou, jaNaOutraLista, so
 export const divergencia = (r, sobrescrever = false) => alertaDeDivergencia({
   previu: r?.diff?.nIncluidas || 0,
   criou: Number(r?.criados) || 0,
+  atualizou: Number(r?.atualizados) || 0,
   ignorou: Number(r?.ignorados) || 0,
   jaNaOutraLista: r?.jaNaOutraLista,
   totalNoArquivo: r?.totalNoArquivo,
