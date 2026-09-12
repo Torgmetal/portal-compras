@@ -1,7 +1,12 @@
 {
-  "build": 3111,
-  "gerado": "2026-09-12T19:02:47.553Z",
+  "build": 3112,
+  "gerado": "2026-09-12T19:41:17.450Z",
   "commits": [
+    {
+      "hash": "ad9e8d78",
+      "data": "12/09/2026",
+      "titulo": "feat: navegação móvel compartilhada com menu sobreposto"
+    },
     {
       "hash": "e64682bc",
       "data": "12/09/2026",
@@ -146,11 +151,6 @@
       "hash": "d8da9a5b",
       "data": "11/09/2026",
       "titulo": "Indicadores Engenharia: detalhe da aderência ao prazo voltava erro"
-    },
-    {
-      "hash": "f02a6159",
-      "data": "11/09/2026",
-      "titulo": "feat(op): exibir endereços do cliente e da entrega na aba Obra"
     }
   ]
 }

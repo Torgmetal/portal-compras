@@ -1,4 +1,5 @@
 "use client";
+import mobile from "./modelo-mobile.module.css";
 // ─── OBRA EM 3D: o modelo do Tekla como porta de entrada ──────────────────────
 //
 // Vitor (03/09/2026): "clicar na peça, dar o tipo do material, número do conjunto, quais croquis
@@ -225,6 +226,7 @@ export default function ModeloClient({ ops }) {
 
   // ── o dossiê da peça clicada ──
   const abrir = useCallback((item) => {
+    if (window.matchMedia("(max-width: 1023px)").matches) setPainel(false);
     setSel(item || null);
     const m = item?.marca;
     if (!m) return setPeca(null);
@@ -346,9 +348,9 @@ export default function ModeloClient({ ops }) {
     // ⚠ `left-64` casa com o `ml-64` do layout de Produção e com a `w-64 fixed` da barra lateral
     // (conferido nos dois arquivos). Fixo em vez de fluido porque a tela precisa da altura inteira
     // da janela: dentro do `p-8` do layout, o modelo nunca passaria de meia tela.
-    <div data-tela-cheia className="fixed inset-y-0 right-0 left-64 flex flex-col bg-torg-dark">
+    <div data-tela-cheia className={`fixed inset-y-0 right-0 left-64 flex flex-col bg-torg-dark ${mobile.tela}`}>
       {/* faixa de controle: tudo numa linha, escura, para a obra ficar sendo a única coisa clara */}
-      <div className="flex items-center gap-2 flex-wrap px-3 py-2 shrink-0 text-white/90">
+      <div className={`flex items-center gap-2 flex-wrap px-3 py-2 shrink-0 text-white/90 ${mobile.barra}`}>
         <span className="text-[13px] font-bold tracking-tight mr-1">Obra em 3D</span>
         <select value={opId} onChange={(e) => setOpId(e.target.value)}
           className="text-[12px] bg-white/10 border border-white/15 rounded-md px-2 py-1 max-w-[300px] outline-none focus:border-white/40">
@@ -397,7 +399,7 @@ export default function ModeloClient({ ops }) {
         )}
 
         {indice && (
-          <button onClick={() => setPainel((v) => !v)}
+          <button onClick={() => { setPainel((v) => !v); if (window.matchMedia("(max-width: 1023px)").matches) { setSel(null); setPeca(null); } }}
             className={`text-[11.5px] font-semibold px-2.5 py-1 rounded-md border inline-flex items-center gap-1.5 ${
               painel || selecionados ? "bg-white text-torg-dark border-white" : "bg-white/10 text-white/80 border-white/15 hover:text-white"}`}>
             <SlidersHorizontal size={12} />
@@ -427,7 +429,7 @@ export default function ModeloClient({ ops }) {
           janela os painéis iam para BAIXO da cena — e como a cena ocupa a altura toda, o painel da
           peça nascia fora da tela. O sintoma era o pior possível: clicar na peça parecia não fazer
           nada. Numa tela de modelo 3D, painel ao lado é o único arranjo que funciona. */}
-      <div className="flex-1 min-h-0 flex flex-row bg-white">
+      <div className={`flex-1 min-h-0 flex flex-row bg-white ${mobile.quadro}`}>
         {/* ⚠ o filtro fica À ESQUERDA e o dossiê à direita: são movimentos opostos — um escolhe o
             que ver, o outro lê o que foi escolhido — e disputar o mesmo lado faria um fechar o
             outro justamente quando se usa os dois juntos. */}
@@ -436,6 +438,7 @@ export default function ModeloClient({ ops }) {
             <div className="p-3.5 space-y-3.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-[12px] font-bold text-torg-dark uppercase tracking-wide">Filtrar a vista</h3>
+                <button className="lg:hidden px-3" aria-label="Fechar filtros" onClick={() => setPainel(false)}>Fechar</button>
                 {(selecionados || fSetores.size) && (
                   <button onClick={() => { setFNiveis(new Set()); setFTipos(new Set()); setFSetores(new Set()); }}
                     className="text-[11px] text-torg-blue hover:underline">limpar</button>
@@ -649,6 +652,7 @@ export default function ModeloClient({ ops }) {
         {sel && (
           <aside data-painel-3d className="w-[360px] max-w-[42vw] shrink-0 border-l border-gray-200 overflow-y-auto bg-white">
             <div className="p-4">
+              <button className="lg:hidden float-right px-3" aria-label="Fechar detalhes" onClick={() => { setSel(null); setPeca(null); }}>Fechar</button>
               <div className="flex items-center gap-3 mb-3">
                 <button onClick={() => setOcultos((v) => new Set(v).add(sel.id))}
                   className="text-[11.5px] text-torg-gray hover:text-torg-dark inline-flex items-center gap-1.5 border border-gray-200 rounded-md px-2 py-1">
