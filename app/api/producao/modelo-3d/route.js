@@ -76,7 +76,7 @@ export async function GET(req) {
     const marcas = [...new Set(pecas.map((p) => p.marca).filter(Boolean))];
 
     // ⚠ ordem física da fábrica: o setor VALENDO é o mais avançado com produção lançada.
-    const CADEIA = ["Montagem", "Solda", "Acabamento", "Jato", "Pintura"];
+    const CADEIA = ["Corte", "Preparação", "Montagem", "Solda", "Acabamento", "Jato", "Pintura"];
     const ordens = marcas.length
       ? await prisma.mesOrdem.findMany({
           where: { item: { in: marcas }, setor: { in: CADEIA } },
@@ -84,12 +84,9 @@ export async function GET(req) {
         })
       : [];
 
-    const feitoEm = new Map();       // marca → Set(setor com produção)
     let ultimo = null;
     for (const o of ordens) {
       if ((o.produzidoUn || 0) <= 0) continue;
-      if (!feitoEm.has(o.item)) feitoEm.set(o.item, new Set());
-      feitoEm.get(o.item).add(o.setor);
       if (o.dataFim && (!ultimo || o.dataFim > ultimo)) ultimo = o.dataFim;
     }
 
@@ -115,7 +112,7 @@ export async function GET(req) {
       // vez de pintar tudo de cinza e deixar quem olha achando que a obra está parada.
       apontamento: {
         marcas: marcas.length,
-        comProducao: feitoEm.size,
+        comProducao: Object.keys(setores).length,
         ultimo: ultimo ? ultimo.toISOString() : null,
       },
       resumo: {

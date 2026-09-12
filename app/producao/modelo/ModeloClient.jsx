@@ -28,6 +28,7 @@ function dataCurta(iso) {
 }
 
 const COR = { pronta: "#0E7A5F", andando: "#B4761E", parado: "#9FB0BF" };
+const chaveMarca = (m) => String(m || "").toUpperCase().replace(/\s/g, "");
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 const fmtD = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "—");
@@ -100,9 +101,9 @@ export default function ModeloClient({ ops }) {
 
   // ⚠ cores por MARCA, montadas uma vez: o visualizador pinta a cena inteira de uma vez só.
   const cores = useMemo(() => {
-    const e = lista?.estados || {};
-    return Object.fromEntries(Object.entries(e).map(([m, st]) => [m, COR[st] || COR.parado]));
-  }, [lista]);
+    const e = Object.fromEntries(Object.entries(lista?.estados || {}).map(([m, st]) => [chaveMarca(m), st]));
+    return Object.fromEntries((indice || []).map(x => [x.marca, COR[e[chaveMarca(x.marca)]] || COR.parado]));
+  }, [lista, indice]);
 
   // ⚠ o visualizador entrega o índice pronto uma vez; guardar numa função estável evita remontar
   // a cena a cada render do pai (a dependência do efeito lá dentro é a URL, mas o React avisa).
@@ -115,7 +116,6 @@ export default function ModeloClient({ ops }) {
   // fazer uma seleção de várias áreas e você listar as peças?".
   // ⚠ marca casa por texto normalizado: a planilha escreve "T118B256" e o Tag do IFC também, mas
   // um espaço à toa de um lado quebraria o cruzamento inteiro sem dar sinal nenhum.
-  const chaveMarca = (m) => String(m || "").toUpperCase().replace(/\s/g, "");
 
   const daObra = !!niveisObra?.achou && niveisObra.niveis?.length > 0;
   const niveisNaTela = useMemo(() => {
@@ -125,7 +125,8 @@ export default function ModeloClient({ ops }) {
     }));
   }, [daObra, niveisObra, niveis]);
 
-  const setorDe = useCallback((x) => (x?.marca ? lista?.setores?.[x.marca] || null : null), [lista]);
+  const setoresPorMarca = useMemo(() => Object.fromEntries(Object.entries(lista?.setores || {}).map(([m, s]) => [chaveMarca(m), s])), [lista]);
+  const setorDe = useCallback((x) => setoresPorMarca[chaveMarca(x?.marca)] || null, [setoresPorMarca]);
 
   const setores = useMemo(() => {
     const c = new Map();
@@ -136,9 +137,16 @@ export default function ModeloClient({ ops }) {
     return [...c.entries()].sort((a, b) => b[1] - a[1]);
   }, [indice, setorDe]);
 
+  const resumoModelo = useMemo(() => {
+    const itens = (indice || []).filter(x => !x.parafuso);
+    const pintura = itens.filter(x => setorDe(x) === "Pintura").length;
+    const comEtapa = itens.filter(x => setorDe(x)).length;
+    return { pintura, emFabricacao: comEtapa - pintura, semInformacao: itens.length - comEtapa, comEtapa };
+  }, [indice, setorDe]);
+
   const selecionados = useMemo(() => {
     if (!indice) return null;
-    if (!fNiveis.size && !fTipos.size) return null;
+    if (!fNiveis.size && !fTipos.size && !fSetores.size) return null;
     // quando o nível é o da Engenharia, quem manda é a lista de marcas dele
     const alvo = daObra && fNiveis.size
       ? new Set(niveisNaTela.filter((nv) => fNiveis.has(nv.chave)).flatMap((nv) => [...nv.marcas]))
@@ -386,15 +394,16 @@ export default function ModeloClient({ ops }) {
           </div>
         )}
 
-        {modo === "andamento" && lista?.apontamento && !lista.apontamento.comProducao && (
-          <span className="text-[11.5px] text-amber-300">sem apontamento no Syneco — tudo em cinza</span>
+        {modo === "andamento" && indice && !resumoModelo.comEtapa && (
+          <span className="text-[11.5px] text-amber-300">sem etapa identificada para as marcas deste modelo</span>
         )}
 
-        {lista?.resumo && modo === "andamento" && lista?.apontamento?.comProducao > 0 && (
-          <div className="flex items-center gap-2.5 text-[11.5px] text-white/70">
-            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.pronta }} /> {lista.resumo.prontas}</span>
-            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.andando }} /> {lista.resumo.andando}</span>
-            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.parado }} /> {lista.resumo.marcas - lista.resumo.prontas - lista.resumo.andando}</span>
+        {indice && modo === "andamento" && resumoModelo.comEtapa > 0 && (
+          <div className="flex flex-wrap items-center gap-2.5 text-[11.5px] text-white/70">
+            <span>Itens do modelo:</span>
+            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.pronta }} /> {resumoModelo.pintura} com pintura</span>
+            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.andando }} /> {resumoModelo.emFabricacao} em fabricação</span>
+            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.parado }} /> {resumoModelo.semInformacao} sem informação</span>
           </div>
         )}
 
@@ -500,6 +509,7 @@ export default function ModeloClient({ ops }) {
                     <span className="normal-case font-normal text-[10px]"> · até {dataCurta(lista.apontamento.ultimo)}</span>
                   )}
                 </p>
+                <p className="text-[11px] text-torg-gray mb-1">Contagem de itens presentes no modelo.</p>
                 {setores.length > 0 ? (
                   /* ⚠⚠ UMA ETAPA POR VEZ, igual ao portal do cliente. Vitor (05/09/2026): "clico em
                      qual área eu quero saber e aparecem apenas as peças apontadas naquele setor;
@@ -527,9 +537,8 @@ export default function ModeloClient({ ops }) {
                   </div>
                 ) : (
                   <p className="text-[11.5px] text-amber-700 px-1.5 leading-snug">
-                    Esta obra ainda não tem produção lançada no Syneco
-                    {lista?.apontamento?.marcas ? ` (${lista.apontamento.marcas} marcas na lista, nenhuma com ordem apontada)` : " e não tem lista importada no portal"}.
-                    Sem isso não dá para dizer o que está pronto — o modelo mostra a obra, não o andamento.
+                    Não foi identificada uma etapa de fabricação para as marcas deste modelo.
+                    Confira a correspondência das marcas com a lista e os apontamentos da OP.
                   </p>
                 )}
               </div>
