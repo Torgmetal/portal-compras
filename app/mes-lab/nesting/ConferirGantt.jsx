@@ -59,63 +59,85 @@ export default function ConferirGantt({ planoId, recursos }) {
         {erro ? <span className="text-xs font-semibold text-red-600">{erro}</span> : null}
       </div>
 
-      {c ? (
-        <>
+      {c ? <Resultado c={c} dados={dados} /> : null}
+    </div>
+  );
+}
+
+function Resultado({ c, dados }) {
+  return (
+    <>
+          {/* ⚠⚠ "COMPATÍVEL COM O SETOR" NÃO É "CONFIRMADO PARA ESTA MÁQUINA" (achado do Codex).
+              Quando o PCP programa em balde, a liberação é do setor — dizer que a marca está
+              liberada "para o Laser Chapa" seria dar um aval que o Gantt não deu. */}
           {dados.doSetor ? (
             <p className="mt-3 rounded-lg bg-torg-blue-50 px-3 py-2 text-xs font-semibold text-torg-blue-700">
-              O PCP programa o setor {dados.recurso.setor}, não cada máquina — a lista abaixo é a do
-              setor inteiro.
+              O PCP programa o setor {dados.recurso.setor}, não cada máquina: o que aparece abaixo é
+              <strong> compatível com o setor</strong>, não confirmado para esta máquina.
             </p>
           ) : null}
 
           {c.resumo.bate ? (
             <p className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
               <CheckCircle2 size={16} />
-              O plano e o Gantt falam da mesma coisa: {c.resumo.casadas} marcas.
+              Tudo o que este plano corta está liberado: {c.resumo.liberadas} marcas.
             </p>
           ) : null}
 
-          {c.foraDoGantt.length ? (
+          {c.semLiberacao.length ? (
             <Grupo
               cor="border-red-200 bg-red-50 text-red-900"
-              titulo={`${c.foraDoGantt.length} marca(s) no plano que o PCP não liberou para esta máquina`}
-              itens={c.foraDoGantt}
+              titulo={`${c.semLiberacao.length} marca(s) no plano que o PCP não liberou para esta máquina`}
+              itens={c.semLiberacao}
               texto={(x) => `${x.qtd}× ${x.marca} (obra ${x.opNumero || "—"})`}
             />
           ) : null}
 
-          {c.semNesting.length ? (
+          {c.semObra.length ? (
             <Grupo
-              cor="border-amber-200 bg-amber-50 text-amber-900"
-              titulo={`${c.semNesting.length} marca(s) liberada(s) que este plano não corta`}
-              itens={c.semNesting}
-              texto={(x) => `${x.qte}× ${x.marca}${x.feitas ? ` (${x.feitas} já feitas)` : ""}`}
+              cor="border-red-200 bg-red-50 text-red-900"
+              titulo={`${c.semObra.length} peça(s) do plano sem obra — não dá para conferir`}
+              itens={c.semObra}
+              texto={(x) => `${x.qtd}× ${x.marca} (barra ${x.unidade})`}
             />
           ) : null}
 
-          {/* ⚠ Cortar mais do que o liberado é legítimo — aproveitamento de chapa —, mas o excedente
-              não tem para onde ir na obra, e quem confere precisa ver. */}
+          {/* ⚠ Cortar mais do que o SALDO liberado é legítimo (aproveitamento de chapa), mas o
+              excedente não tem para onde ir na obra, e quem confere precisa ver. */}
           {c.resumo.aMais ? (
             <Grupo
-              cor="border-torg-blue-200 bg-torg-blue-50 text-torg-blue-800"
-              titulo={`${c.resumo.aMais} marca(s) com mais peças no plano do que o PCP liberou`}
-              itens={c.casadas.filter((x) => x.aMais > 0)}
-              texto={(x) => `${x.marca}: plano ${x.qtd}, liberado ${x.qte}`}
+              cor="border-amber-200 bg-amber-50 text-amber-900"
+              titulo={`${c.resumo.aMais} marca(s) com mais peças no plano do que ainda falta produzir`}
+              itens={c.liberadas.filter((x) => x.aMais > 0)}
+              texto={(x) => `${x.marca}: plano ${x.qtd}, falta ${x.saldo} de ${x.qte}`}
             />
           ) : null}
 
-          {c.casadas.length ? (
+          {c.liberadas.length ? (
             <details className="mt-3">
               <summary className="cursor-pointer text-xs font-bold text-torg-gray">
-                {c.casadas.length} marca(s) conferindo
+                {c.liberadas.length} marca(s) liberada(s) e no plano
               </summary>
               <p className="mt-1.5 text-xs text-torg-gray">
-                {c.casadas.map((x) => `${x.qtd}× ${x.marca}`).join("   ·   ")}
+                {c.liberadas.map((x) => `${x.qtd}× ${x.marca}`).join("   ·   ")}
               </p>
             </details>
           ) : null}
-        </>
-      ) : null}
-    </div>
+
+          {/* ⚠⚠ A FILA NÃO É DIVERGÊNCIA, e por isso fica recolhida e fora do veredito: a fila da
+              máquina é o backlog inteiro (432 marcas no Laser Chapa, medido), e nada obriga este
+              plano a cobri-la. */}
+          {c.naFila.length ? (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs font-bold text-torg-gray-light">
+                {c.naFila.length} marca(s) na fila desta máquina, fora deste plano — não é divergência
+              </summary>
+              <p className="mt-1.5 text-xs text-torg-gray-light">
+                {c.naFila.slice(0, 40).map((x) => `${x.saldo}× ${x.marca}`).join("   ·   ")}
+                {c.naFila.length > 40 ? `   …e mais ${c.naFila.length - 40}` : ""}
+              </p>
+            </details>
+          ) : null}
+    </>
   );
 }

@@ -1199,18 +1199,72 @@ Subidos pela própria rota, logado — não por script direto no banco.
 - ⚠ **A quantidade do item é POR UNIDADE** (§12.3): total = por unidade × unidades cortadas, sempre
   derivado.
 
-## 16.3 ⚠⚠ O QUE FALTA, E É UMA DECISÃO — NÃO CÓDIGO
+## 16.3 Bater o nesting com o Gantt (13/09/2026)
 
-O plano está no portal; o operador ainda não o escolhe no totem. E aqui há uma pergunta de modelo
-que **não dá para responder sozinho**:
+Matheus: *"o planejamento vai subir no Gantt as marcas liberadas para produzir naquela máquina; a
+ideia é bater o nesting do dia com o que está programado no Gantt"*. Feito:
+`lib/mes/nesting/conferir-gantt.js`, `GET /api/mes-lab/nesting/<id>/gantt?recurso=CODIGO`, e o
+painel no card do plano.
 
-**`MesSessao` tem UMA marca.** Uma barra do nesting tem várias (a Nest 2 tem 6 marcas diferentes).
-As saídas possíveis:
+⚠⚠ **A COMPARAÇÃO É DIRECIONAL — DO PLANO PARA A LIBERAÇÃO, NUNCA IGUALDADE DE CONJUNTOS.** Minha
+primeira versão comparou os dois lados e, medida no laboratório, acusou **432 marcas "liberadas e
+fora do plano"**. A causa está escrita no próprio `lib/mes/programado.js`: a fila da máquina é o
+**backlog** (`lte fimDoDia`, de propósito — *"atrasado continua sendo trabalho"*), não o dia. Estar
+liberado **não** obriga a entrar neste nesting: o programador escolhe o que cabe naquela chapa,
+naquela espessura, naquele material. Cobrar as 432 seria alarme falso, e alarme falso ensina a
+ignorar a tarja — o preço que este projeto já pagou no import de listas.
 
-1. **Sessão de NESTING** — a sessão aponta para a barra/chapa, e "cortei mais uma" explode nas
-   marcas do plano. É o fluxo do §12.4 e o que o Matheus pediu; muda `MesSessao` (marca passa a ser
-   opcional, entra `nestingUnidadeId`) e muda a trava do teto do planejado, que hoje é por marca.
-2. **Sessão por marca, como hoje**, com o nesting só sugerindo a lista. Não mexe em nada — e não
-   entrega o pedido, que era justamente **não** apontar marca a marca.
+O que é divergência de verdade:
 
-Fica parado aqui de propósito: a (1) mexe no coração do apontamento, que já está validado e rodando.
+| Caso | Por que é problema |
+|---|---|
+| Marca no plano **sem liberação** | sai material da chapa que não tem destino na obra |
+| Plano corta **mais que o saldo** liberado | o excedente não tem para onde ir (⚠ mede contra `qte - feitas`, não contra o total: medir contra o total faria a produção de ontem parecer folga de hoje) |
+| Peça do plano **sem obra** | sem obra não existe chave, e casar sem ela é casamento inventado |
+
+A fila (`naFila`) continua na tela, **recolhida e fora do veredito**, para quem quiser ver o que
+mais espera naquela máquina.
+
+⚠ **"Compatível com o setor" não é "confirmado para esta máquina".** Quando o PCP programa em balde
+(§14.1), `programadoPara` cai para o setor — e a tela diz isso com todas as letras, senão daria um
+aval que o Gantt não deu.
+
+⚠ Medido no laboratório: os três planos do T107A dão **tudo sem liberação** — e está certo. A OP-107
+tem **154 peças e ZERO programadas para corte** no retrato do Gantt que foi importado. A tela está
+dizendo a verdade sobre este banco, não errando.
+
+## 16.4 ⚠⚠ MULTI MARCAS NA MESMA MÁQUINA — A DECISÃO, COM O PARECER DO CODEX
+
+Matheus (13/09/2026): *"o nesting vai servir para ABRIR TODAS AS MARCAS e iniciar a produção delas
+sem que o operador precise abrir uma por uma (…) tem que ser possível MULTI MARCAS ao mesmo tempo
+numa máquina"*.
+
+Hoje: **uma marca por sessão** e **uma sessão ABERTA por recurso**, esta garantida por índice
+parcial no Postgres. As duas coisas precisam mudar — e é o coração do apontamento, que já está
+validado e rodando.
+
+**Decisão: (A) sessão continua POR MARCA, abertas em LOTE pelo nesting.** Preserva o teto por marca,
+preserva `MesApontamentoQtd`, e "multi marcas ao mesmo tempo" é literalmente o que ela permite. A
+alternativa (sessão de nesting, com a quantidade apontada por barra) só passa a valer se o pedido
+virar *"apontar por barra cortada"* — e aí espalha mudança pelo código inteiro.
+
+**O Codex concordou com (A) e corrigiu o COMO** — o que segue é dele, e muda o plano:
+
+1. ⚠⚠ **A unicidade não é `(recurso, marca)` — é `(recurso, OBRA, marca)`.** Marca se repete entre
+   obras; o índice que eu ia criar misturaria as duas.
+2. ⚠⚠ **O ESTADO É DO RECURSO, E NÃO PODE SAIR DAS SESSÕES.** Hoje toda abertura grava `PRODUCAO` e
+   todo encerramento grava `ENCERRAMENTO`. Repetindo isso por marca, **abrir uma marca apagaria uma
+   PARADA** e **fechar uma marca liberaria a máquina inteira** — e o tempo/OEE seria contado várias
+   vezes no mesmo recurso. As transições compartilhadas viram evento **do recurso**
+   (`sessaoId: null`), um por comando; "iniciar produção" passa a ser explícito.
+3. ⚠⚠ **Encerrar o lote encerra as sessões DAQUELA EXECUÇÃO**, nunca "todas as abertas do recurso" —
+   e marca com saldo pode ser encerrada sem completar quantidade.
+4. ⚠ **Não chamar `abrirSessao` N vezes**, cada uma com sua transação: as operações internas têm de
+   receber `tx` e o lote abrir numa transação só, com a execução identificada para o reenvio não
+   criar um segundo lote.
+5. ⚠ **`CREATE INDEX IF NOT EXISTS` com o mesmo nome NÃO substitui o índice existente** — trocar a
+   trava exige derrubar a antiga explicitamente.
+
+E um achado que **não é deste trabalho, é de hoje**: ⚠⚠ `saldoDaMarca` soma as sessões de **vários
+recursos**, mas `comTravaDoRecurso` serializa **um**. Dois recursos podem consumir o mesmo saldo ao
+mesmo tempo. Fica anotado como defeito existente, a tratar junto.
