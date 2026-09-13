@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight, TriangleAlert } from "lucide-react";
+import ConferirGantt from "./ConferirGantt";
 
 function doPlano(plano) {
   const avisos = plano.divergencias?.avisos || [];
@@ -14,7 +15,7 @@ function doPlano(plano) {
 }
 
 /** Um plano já importado. Fechado por padrão: a lista cresce rápido e o que se procura é o de hoje. */
-export default function Plano({ plano }) {
+export default function Plano({ plano, recursos = [] }) {
   const [aberto, setAberto] = useState(false);
   const { unidades, tudo } = doPlano(plano);
 
@@ -54,6 +55,8 @@ export default function Plano({ plano }) {
               </div>
             ))}
           </div>
+          {recursos.length ? <ConferirGantt planoId={plano.id} recursos={recursos} /> : null}
+
           {/* ⚠ O hash é o que amarra a versão do plano: mesmo nome com conteúdo diferente é plano
               NOVO, não uma atualização deste (§12.3). */}
           <p className="mt-3 text-[11px] text-torg-gray-light">

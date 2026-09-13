@@ -10,7 +10,7 @@ import Plano from "./Plano";
 // porque o número era uma PREVISÃO apresentada como recibo. Aqui a pessoa vê a prévia, olha as
 // divergências, e só então grava.
 
-export default function NestingClient({ iniciais }) {
+export default function NestingClient({ iniciais, recursos = [] }) {
   const [planos, setPlanos] = useState(iniciais);
   const [previa, setPrevia] = useState(null);
   const [arquivos, setArquivos] = useState([]);
@@ -110,7 +110,7 @@ export default function NestingClient({ iniciais }) {
           </p>
         ) : (
           <div className="space-y-3">
-            {planos.map((p) => <Plano key={p.id} plano={p} />)}
+            {planos.map((p) => <Plano key={p.id} plano={p} recursos={recursos} />)}
           </div>
         )}
       </div>

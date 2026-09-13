@@ -13,6 +13,13 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function NestingPage() {
+  // ⚠ Só os postos da PREPARAÇÃO: nesting é corte. Oferecer a fábrica inteira faria alguém conferir
+  // um plano de laser contra a programação da solda e achar que nada bate.
+  const recursos = await prisma.mesRecurso.findMany({
+    where: { ativo: true, setor: { codigo: "PREPARACAO" } },
+    select: { codigo: true, nome: true },
+    orderBy: { nome: "asc" },
+  });
   const planos = await prisma.mesNesting.findMany({
     orderBy: { createdAt: "desc" },
     take: 30,
@@ -23,5 +30,5 @@ export default async function NestingPage() {
       },
     },
   });
-  return <NestingClient iniciais={JSON.parse(JSON.stringify(planos))} />;
+  return <NestingClient iniciais={JSON.parse(JSON.stringify(planos))} recursos={recursos} />;
 }
