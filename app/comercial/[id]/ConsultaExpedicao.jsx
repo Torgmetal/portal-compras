@@ -507,29 +507,37 @@ export default function ConsultaExpedicao({ opId, readOnly = false, focoPendente
                 const st = STATUS[p.status] || STATUS.PREVISTO;
                 const busy = ocupado[p.id];
                 return (
-                  <div key={p.id} className={`border rounded-lg overflow-hidden ${p.status === "APROVADO" ? "border-emerald-200" : "border-amber-200"}`}>
-                    <div className={`px-3 py-2 flex items-center gap-2 flex-wrap ${p.status === "APROVADO" ? "bg-emerald-50/70" : "bg-amber-50/70"}`}>
-                      <span className="text-[11px] font-mono font-bold text-white bg-torg-blue rounded px-1.5 py-0.5">{String(p.numero).padStart(2, "0")}</span>
-                      <span className="text-[13px] font-semibold text-torg-dark">{(p.itens || []).length} peça(s) · {fmtKg(p.pesoKg)}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${st.c}`}>{st.l}</span>
-                      {p.dataPrevista && <span className="text-[11px] text-torg-gray inline-flex items-center gap-0.5"><CalendarDays size={11} /> {fmtD(p.dataPrevista)}</span>}
-                      {p.local && <span className="text-[11px] text-torg-gray inline-flex items-center gap-0.5"><MapPin size={11} /> {p.local}</span>}
-                      {nomeLote(p.loteId) && <span className="text-[10px] px-2 py-0.5 rounded-full bg-torg-blue-50 text-torg-blue font-medium">lote: {nomeLote(p.loteId)}</span>}
-                      {p.nfNumero && <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium inline-flex items-center gap-1" title={p.nfEmitidaEm ? `NF registrada em ${fmtD(p.nfEmitidaEm)}` : "NF vinculada pelo Fiscal"}>NF {p.nfNumero}{p.nfTipo ? ` · ${p.nfTipo}` : ""}</span>}
-                      <div className="ml-auto flex items-center gap-2">
-                        {p.status !== "APROVADO"
-                          ? <button onClick={() => aprovar(p)} disabled={!!busy} className="text-[12px] bg-emerald-600 text-white rounded-lg px-2 py-1 font-medium inline-flex items-center gap-1 hover:bg-emerald-700 disabled:opacity-50">{busy === "ok" ? <Loader2 size={11} className="animate-spin" /> : <ThumbsUp size={11} />} Aprovar entrega</button>
-                          : <button onClick={() => reabrir(p)} disabled={!!busy} className="text-[12px] text-torg-gray hover:text-amber-700 inline-flex items-center gap-1 font-medium disabled:opacity-50">{busy === "ok" ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />} reabrir</button>}
-                        <button onClick={() => setSimular(p)} className="text-[12px] bg-torg-blue text-white rounded-lg px-2 py-1 font-medium inline-flex items-center gap-1 hover:bg-torg-dark" title="Veículo, volumes e 3D desta carga"><Truck size={12} /> Simular carga</button>
-                        <button onClick={() => setAb((a) => ({ ...a, [p.id]: !aberto }))} className="text-[12px] text-torg-blue hover:text-torg-dark font-medium">{aberto ? "ocultar" : "ver/editar"} peças</button>
-                        <button onClick={() => copiarCronograma(p)} className="text-torg-gray hover:text-torg-blue" title="Copiar a linha para o cronograma"><Copy size={13} /></button>
-                        <button onClick={() => excluirPrevio(p)} className="text-torg-gray hover:text-red-600" title="Excluir"><Trash2 size={13} /></button>
-                      </div>
+                  <div key={p.id} className={`border rounded-xl overflow-hidden bg-white ${p.status === "APROVADO" ? "border-emerald-200" : "border-amber-200"}`}>
+                    {/* ⚠ Layout em três linhas — cabeçalho, dados, ações — pensado para o celular: os botões antes quebravam em
+                        duas linhas cada um e o card virava uma escada (Vitor, 13/09/2026: "está bem ruim"). */}
+                    <div className={`px-3 py-2 flex items-center gap-2 ${p.status === "APROVADO" ? "bg-emerald-50/70" : "bg-amber-50/70"}`}>
+                      <span className="text-[12px] font-mono font-bold text-white bg-torg-blue rounded-md px-2 py-0.5">{String(p.numero).padStart(2, "0")}</span>
+                      <span className="text-[13px] font-semibold text-torg-dark truncate">{(p.itens || []).length} peças · {fmtKg(p.pesoKg)}</span>
+                      <span className={`ml-auto shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium ${st.c}`}>{st.l}</span>
                     </div>
-
-                    <div className="px-3 py-2 bg-amber-50/40 border-t border-amber-100">
-                      <p className="text-[10px] font-semibold text-amber-800 uppercase tracking-wide mb-0.5">Para o cronograma (ainda não lançado)</p>
-                      <p className="text-[12px] text-torg-dark font-mono">Entrega — Romaneio prévio {String(p.numero).padStart(2, "0")} · {(p.itens || []).length} peças · {fmtKg(p.pesoKg)}{p.dataPrevista ? ` · previsto ${fmtD(p.dataPrevista)}` : ""}{p.local ? ` · ${p.local}` : ""}</p>
+                    {(p.dataPrevista || p.local || nomeLote(p.loteId) || p.nfNumero || p.simulacao) && (
+                      <div className="px-3 py-1.5 flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px] text-torg-gray border-t border-gray-100">
+                        {p.dataPrevista && <span className="inline-flex items-center gap-1"><CalendarDays size={11} /> {fmtD(p.dataPrevista)}</span>}
+                        {p.local && <span className="inline-flex items-center gap-1 min-w-0"><MapPin size={11} className="shrink-0" /> <span className="truncate">{p.local}</span></span>}
+                        {nomeLote(p.loteId) && <span className="px-2 py-0.5 rounded-full bg-torg-blue-50 text-torg-blue font-medium">lote: {nomeLote(p.loteId)}</span>}
+                        {p.nfNumero && <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium" title={p.nfEmitidaEm ? `NF registrada em ${fmtD(p.nfEmitidaEm)}` : "NF vinculada pelo Fiscal"}>NF {p.nfNumero}{p.nfTipo ? ` · ${p.nfTipo}` : ""}</span>}
+                        {p.simulacao && (
+                          <span className={`inline-flex items-center gap-1 ${p.simulacao.desatualizada ? "text-amber-700" : "text-emerald-700"}`} title={`Simulado em ${new Date(p.simulacao.createdAt).toLocaleString("pt-BR")} · embalagem ${p.simulacao.perfilNome || ""}`}>
+                            <Truck size={11} /> {p.simulacao.resumo?.viagens === 1 ? (p.simulacao.veiculos?.[0] || "1 veículo") : `${p.simulacao.resumo?.viagens} cargas`} · {p.simulacao.resumo?.volumes} volumes{p.simulacao.desatualizada ? " · romaneio mudou, simule de novo" : ""}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <div className="px-3 py-2 border-t border-gray-100 flex flex-wrap items-center gap-2">
+                      {p.status !== "APROVADO"
+                        ? <button onClick={() => aprovar(p)} disabled={!!busy} className="flex-1 sm:flex-none text-[12px] bg-emerald-600 text-white rounded-lg px-3 py-1.5 font-medium inline-flex items-center justify-center gap-1.5 hover:bg-emerald-700 disabled:opacity-50 whitespace-nowrap">{busy === "ok" ? <Loader2 size={12} className="animate-spin" /> : <ThumbsUp size={12} />} Aprovar</button>
+                        : <button onClick={() => reabrir(p)} disabled={!!busy} className="flex-1 sm:flex-none text-[12px] text-torg-gray border border-gray-200 rounded-lg px-3 py-1.5 font-medium inline-flex items-center justify-center gap-1.5 hover:text-amber-700 disabled:opacity-50 whitespace-nowrap">{busy === "ok" ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />} Reabrir</button>}
+                      <button onClick={() => setSimular(p)} className="flex-1 sm:flex-none text-[12px] bg-torg-blue text-white rounded-lg px-3 py-1.5 font-medium inline-flex items-center justify-center gap-1.5 hover:bg-torg-dark whitespace-nowrap" title="Veículo, volumes e 3D desta carga"><Truck size={12} /> Simular carga</button>
+                      <button onClick={() => setAb((a) => ({ ...a, [p.id]: !aberto }))} className="flex-1 sm:flex-none text-[12px] text-torg-blue border border-torg-blue-200 rounded-lg px-3 py-1.5 font-medium inline-flex items-center justify-center gap-1.5 hover:bg-torg-blue-50 whitespace-nowrap">{aberto ? "Ocultar peças" : "Peças"}</button>
+                      <span className="ml-auto flex items-center gap-1 shrink-0">
+                        <button onClick={() => copiarCronograma(p)} className="p-1.5 rounded-md text-torg-gray hover:text-torg-blue hover:bg-gray-50" title={`Copiar a linha para o cronograma: Entrega — Romaneio prévio ${String(p.numero).padStart(2, "0")} · ${(p.itens || []).length} peças · ${fmtKg(p.pesoKg)}`}><Copy size={14} /></button>
+                        <button onClick={() => excluirPrevio(p)} className="p-1.5 rounded-md text-torg-gray hover:text-red-600 hover:bg-red-50" title="Excluir"><Trash2 size={14} /></button>
+                      </span>
                     </div>
 
                     {aberto && (

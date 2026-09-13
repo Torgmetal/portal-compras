@@ -1,7 +1,12 @@
 {
-  "build": 3130,
-  "gerado": "2026-09-13T14:34:51.113Z",
+  "build": 3131,
+  "gerado": "2026-09-13T23:57:50.951Z",
   "commits": [
+    {
+      "hash": "5911aa96",
+      "data": "13/09/2026",
+      "titulo": "Simulador: nada em cima de quadro vazado, caibros só sobre apoio, rótulos discretos"
+    },
     {
       "hash": "7c3fabd1",
       "data": "13/09/2026",
@@ -146,11 +151,6 @@
       "hash": "2a290582",
       "data": "11/09/2026",
       "titulo": "Cotação: salvar proposta grande morria em 10s e voltava sem corpo"
-    },
-    {
-      "hash": "17388a2f",
-      "data": "11/09/2026",
-      "titulo": "Cotação por IA: a resposta não vinha com ruído, vinha cortada"
     }
   ]
 }

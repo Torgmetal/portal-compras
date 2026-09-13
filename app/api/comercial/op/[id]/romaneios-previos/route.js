@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { hashItens } from "@/lib/carga/hash-itens";
 
 export const runtime = "nodejs";
 const ROLES = ["ADMIN", "COMERCIAL", "PLANEJAMENTO", "PCP", "ENGENHARIA"];
@@ -47,7 +48,12 @@ export async function GET(_req, { params }) {
     prisma.romaneioPrevio.findMany({ where: { opId: op.id }, orderBy: { numero: "desc" } }),
     proximoNumero(op.id, op.numero),
   ]);
-  return NextResponse.json({ success: true, previos, proximoNumero: proximo });
+  // última simulação de carga de cada romaneio (resumo só), para o card mostrar veículo e volumes
+  const sims = await prisma.cargaSimulada.findMany({ where: { romaneioPrevioId: { in: previos.map((p) => p.id) } }, orderBy: { createdAt: "desc" }, select: { romaneioPrevioId: true, resumo: true, perfilNome: true, itensHash: true, createdAt: true, cargas: true } }).catch(() => []);
+  const simDe = new Map();
+  for (const s of sims) if (!simDe.has(s.romaneioPrevioId)) simDe.set(s.romaneioPrevioId, s);
+  const comSim = previos.map((p) => { const s = simDe.get(p.id); return { ...p, simulacao: s ? { resumo: s.resumo, perfilNome: s.perfilNome, createdAt: s.createdAt, veiculos: (Array.isArray(s.cargas) ? s.cargas : []).map((c) => c.veiculo?.nome).filter(Boolean), desatualizada: s.itensHash !== hashItens(p.itens) } : null }; });
+  return NextResponse.json({ success: true, previos: comSim, proximoNumero: proximo });
 }
 
 const schema = z.object({
