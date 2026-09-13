@@ -144,3 +144,13 @@ describe("catálogo de veículos configurado", () => {
     expect(r.cargas[0].veiculo.chave).toBe("toco");
   });
 });
+
+describe("quadro vazado (pórtico, treliça) deitado", () => {
+  it("nada sobe num pórtico a não ser outro pórtico igual — o feixe de colunas vai para o chão, não para o vão do quadro", () => {
+    const lista = [{ marca: "T107C2", desc: "PORTICO", qtd: 2, kgUn: 140 }, { marca: "T107A13", desc: "COLUNA", qtd: 2, kgUn: 45 }];
+    const r = simularCarga({ lista, geometria: { T107C2: geo([2900, 250, 1130]), T107A13: geo([200, 2650, 270]) }, perfil: "recomendado", prefixo: "T107" });
+    const c = r.cargas[0], porticos = c.itens.filter((u) => u.membros[0].desc === "PORTICO"), colunas = c.itens.find((u) => u.membros[0].desc === "COLUNA");
+    for (const u of colunas ? [colunas] : []) for (const id of u.sobre || []) expect(porticos.map((p) => p.id)).not.toContain(id);
+    const emCima = porticos.find((p) => p.y > 0); if (emCima) expect(emCima.sobre.every((id) => porticos.some((p) => p.id === id))).toBe(true);
+  });
+});

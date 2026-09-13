@@ -164,3 +164,8 @@ colorida e numerada, o já carregado em cinza, o que falta escondido) + ordem de
   frente e aí sim trazer A, B, C, D, E". A letra da marca (T118G = fase G) é a FASE da SKA; rótulos do simulador e dos PDFs
   usam `fase G`. A página "Separar as peças" do modelo é por fase: uma linha por marca (marca · descrição · nível · qtd ·
   volume), 3 colunas, ordenada — a parede de chips por nível × frente era "muito poluída e difícil de entender".
+- ⚠ **Quadro VAZADO deitado (pórtico, treliça, escada, armação) não segura nada em cima** — Vitor (13/09/2026, OP-107,
+  "o volume 15 não pode ir dessa maneira"): um feixe de colunas estava sobre um pórtico; a caixa é cheia, a peça é
+  vazada, o feixe cai no vão. `ehQuadroVazado` → tampa 6: só outro quadro do mesmo tamanho (mesma marca ou C/L a 5 %)
+  encaixa em cima. Caibros no 3D só onde há apoio embaixo (deslocam até ±75 cm; sem apoio, não desenha). Rótulos
+  dos volumes com tamanho fixo na tela (`sizeAttenuation:false`), discretos.

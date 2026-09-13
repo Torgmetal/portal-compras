@@ -1,7 +1,12 @@
 {
-  "build": 3129,
-  "gerado": "2026-09-13T13:30:44.049Z",
+  "build": 3130,
+  "gerado": "2026-09-13T14:34:51.113Z",
   "commits": [
+    {
+      "hash": "7c3fabd1",
+      "data": "13/09/2026",
+      "titulo": "Simular carga: percorre todos os IFCs da obra e deixa os AC fora"
+    },
     {
       "hash": "c52fb7bf",
       "data": "13/09/2026",
@@ -146,11 +151,6 @@
       "hash": "17388a2f",
       "data": "11/09/2026",
       "titulo": "Cotação por IA: a resposta não vinha com ruído, vinha cortada"
-    },
-    {
-      "hash": "23b6948a",
-      "data": "11/09/2026",
-      "titulo": "Teste do plano de ação dos indicadores lê o campo pelo rótulo novo"
     }
   ]
 }

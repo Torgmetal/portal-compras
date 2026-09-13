@@ -39,7 +39,8 @@ const VisualizadorCarga = forwardRef(function VisualizadorCarga({ carga, malhas,
     chao.position.y = veiculo3d.solo - 0.01; grade.position.y = veiculo3d.solo - 0.005;
     const grupo = new THREE.Group(), grupoRot = new THREE.Group(); scene.add(grupo, grupoRot);
     const unidades = [], madeiras = [];
-    for (const u of carga.itens) { const g = montarUnidade(u, malhas); grupo.add(g); unidades.push(g); for (const m of montarCaibros(u, madeira)) { grupo.add(m); madeiras.push(m); } }
+    const porId = new Map(carga.itens.map((u) => [u.id, u]));
+    for (const u of carga.itens) { const g = montarUnidade(u, malhas); grupo.add(g); unidades.push(g); for (const m of montarCaibros(u, madeira, (u.sobre || []).map((id) => porId.get(id)).filter(Boolean))) { grupo.add(m); madeiras.push(m); } }
     // enquadra SÓ a caçamba num ângulo que mostra comprimento, altura e lado
     const enquadrar = (nome = "iso") => {
       const alvo = new THREE.Vector3(C / 2, A * 0.45, L / 2);
@@ -49,8 +50,7 @@ const VisualizadorCarga = forwardRef(function VisualizadorCarga({ carga, malhas,
       else if (nome === "lado") { alvo.y = A / 2 + 0.2; dist = Math.max((C / 2 + 0.6) / Math.tan(hfov), (A / 2 + 0.9) / Math.tan(fov / 2)) + L / 2; }
       else { const raio = Math.sqrt((C / 2) ** 2 + (L / 2) ** 2 + (A / 2) ** 2) * 0.74; dist = raio / Math.sin(Math.min(fov / 2, hfov * 0.95)); }
       camera.position.copy(alvo).addScaledVector(dir, dist); controls.target.copy(alvo); controls.update(); };
-    const escalaRotulo = Math.max(0.42, C / 20);
-    const rotular = (visiveis) => { grupoRot.clear(); for (const g of unidades) if (g.visible) grupoRot.add(rotuloVolume(g.userData.u, escalaRotulo)); grupoRot.visible = visiveis; };
+    const rotular = (visiveis) => { grupoRot.clear(); for (const g of unidades) if (g.visible) grupoRot.add(rotuloVolume(g.userData.u, st.current?.tamRotulo || 0.05)); grupoRot.visible = visiveis; };
     const pintar = (g, cinza) => g.traverse((o) => { if (!o.material || o.isSprite || o.isLineSegments) return; if (!o.userData.matOrig) o.userData.matOrig = o.material; o.material = cinza ? MATERIAL_CINZA : o.userData.matOrig; });
     const mostrarPasso = (p, camada = null) => {
       const ate = new Set(carga.passos.slice(0, p + 1)), atual = carga.passos[p];
@@ -74,12 +74,12 @@ const VisualizadorCarga = forwardRef(function VisualizadorCarga({ carga, malhas,
       // tamanho fixo e pixelRatio 1: o PDF vai por upload e o corpo tem teto (~600 KB por imagem)
       const el = s.renderer.domElement, W0 = el.clientWidth, H0 = el.clientHeight, pr = s.renderer.getPixelRatio();
       s.renderer.setPixelRatio(1); s.renderer.setSize(1200, 560, false); s.camera.aspect = 1200 / 560; s.camera.updateProjectionMatrix();
-      s.rotulos = true;
+      s.rotulos = true; s.tamRotulo = 0.075;
       if (ci == null) s.mostrarPasso(carga.passos.length - 1); else { const byId = new Map(carga.itens.map((u) => [u.id, u])); let k = -1; carga.passos.forEach((id, i) => { if ((byId.get(id)?.camada || 0) === ci) k = i; }); s.mostrarPasso(k, ci); }
       s.enquadrar(vista); s.renderer.render(s.scene, s.camera);
       const url = el.toDataURL("image/jpeg", 0.8);
       s.renderer.setPixelRatio(pr); s.renderer.setSize(W0, H0); s.camera.aspect = W0 / H0; s.camera.updateProjectionMatrix();
-      s.rotulos = rotulos; s.mostrarPasso(passo); s.enquadrar("iso"); return url;
+      s.rotulos = rotulos; s.tamRotulo = 0.05; s.mostrarPasso(passo); s.enquadrar("iso"); return url;
     },
     enquadrar: (v) => st.current?.enquadrar(v),
   }), [carga, passo, rotulos]);
