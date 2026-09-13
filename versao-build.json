@@ -1,9 +1,14 @@
 {
-  "build": 3119,
-  "gerado": "2026-09-13T00:14:32.865Z",
+  "build": 3120,
+  "gerado": "2026-09-13T00:18:01.752Z",
   "commits": [
     {
-      "hash": "7f9e199e",
+      "hash": "c0e1445b",
+      "data": "12/09/2026",
+      "titulo": "Memória: rodas do simulador de carga"
+    },
+    {
+      "hash": "ad12bb7e",
       "data": "12/09/2026",
       "titulo": "Memória: modelo de carga com capturas 3D e caminhão v2"
     },
@@ -146,11 +151,6 @@
       "hash": "9ecd5e03",
       "data": "11/09/2026",
       "titulo": "Ajusta quantidades no celular e corrige ciclo das inspeções e assinaturas"
-    },
-    {
-      "hash": "f22d0a33",
-      "data": "11/09/2026",
-      "titulo": "Portal do fornecedor: página em branco por data escrita em dois fusos"
     }
   ]
 }
