@@ -1,7 +1,12 @@
 {
-  "build": 3125,
-  "gerado": "2026-09-13T17:59:41.619Z",
+  "build": 3126,
+  "gerado": "2026-09-13T18:28:20.657Z",
   "commits": [
+    {
+      "hash": "8c883d04a6",
+      "data": "13/09/2026",
+      "titulo": "MES proprio: o monitor de maquinas, e o que o Codex achou nele antes de ir ao ar"
+    },
     {
       "hash": "084e22be0f",
       "data": "13/09/2026",
@@ -146,11 +151,6 @@
       "hash": "f02a6159f5",
       "data": "11/09/2026",
       "titulo": "feat(op): exibir endereços do cliente e da entrega na aba Obra"
-    },
-    {
-      "hash": "7c49e19bbc",
-      "data": "11/09/2026",
-      "titulo": "fix(op): remover orçamento comercial da aba Obra para todos"
     }
   ]
 }

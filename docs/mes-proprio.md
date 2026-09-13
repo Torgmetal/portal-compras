@@ -31,8 +31,8 @@ reais, em 6 setores. Números conferidos **contando no destino**, não somando a
 3. ~~Fluxo do **totem** contra o banco local~~ — **feito** (§13).
 4. ~~**Telas de cadastro** de setores, máquinas e bancadas (§11.3)~~ — **feito** (§14).
 5. ~~**Monitor** de máquinas — contrato: dataset 131 (§6.4)~~ — **feito** (§15).
-6. Engine de **nesting** da Preparação (§12) — formatos decifrados; falta a lista do operador.
-   **← É AQUI QUE SE RETOMA.**
+6. **Engine de nesting** — os três formatos lidos, conferidos contra os arquivos reais (§12.8).
+   Falta a **tela**: importar o plano e o operador escolher no totem. **← É AQUI QUE SE RETOMA.**
 
 > ⚠ A lista do totem está **longa demais** (a captura da tela inteira do Laser Chapa deu 41.607 px).
 > As marcas concluídas deveriam ir para o fim ou para uma seção recolhida, e a busca ganhar foco
@@ -890,6 +890,100 @@ do totem vai fazer, e vale ver o formato antes de desenhar a tela.
 > ⚠ Os arquivos de exemplo têm dado real de obra (OP-107/TMSA, OP-097). Ficaram **fora do
 > repositório**, no diretório temporário da sessão — como os dados do laboratório (§10.3).
 
+
+---
+
+# 12.8 A ENGINE, ESCRITA E CONFERIDA NOS ARQUIVOS REAIS (13/09/2026)
+
+Relendo o `.rar` **inteiro** — não só o `Portions/content.xml`, que foi até onde a primeira análise
+foi — apareceu o que faltava. Código em `lib/mes/nesting/`; roda com:
+
+```bash
+npx vite-node -c vitest.config.mjs scripts/mes-lab/ler-nesting.mjs -- <pasta-do-plano>
+```
+
+## 12.8.1 ⚠⚠ A MARCA ESTÁ GRAVADA NA PEÇA, E O ARQUIVO DIZ QUAL É
+
+O §12.7.1 dizia que a quantidade por barra "vem indireta" e que o PDF entregava isso pronto. Vem
+direta: `Shapes/content.xml` tem `<TextData Text="T107A-P12_2"/>` — **o texto que o laser grava na
+peça** — e `Segments/content.xml` diz qual `TubeSegment` carrega qual `<Text>`. Com isso o arquivo
+da máquina entrega **a ordem de corte, peça a peça**, que o PDF não tem. É o que vai permitir ao
+totem dizer *"está cortando a 3ª de 7"*.
+
+O inventário completo do ZIP (o que a primeira leitura não viu): `info.xml` (**quem gerou**:
+`TubesT 2025V2.12`, motor CypTube, computador `ENGENHARIA02`), `content.xml` (metadados +
+`CADLabelSettingsManager`, que é onde mora a regra de gravação), `Segments/`, `Shapes/`, `Curves/`,
+`Surfaces/`, `Geometrys/`, `Portions/`, `Technical/`, `Configs/`, `Layers/`, `Viewports/`,
+`Thumbnail/` (uma imagem por tipo de peça).
+
+## 12.8.2 ⚠⚠ A PEÇA CURTA NÃO TEM NOME — E É POR ISSO QUE O PDF CONTINUA MANDANDO
+
+A `T107A-P3` tem **62,30 mm**. Não cabe gravação, e o TubesT não põe texto nela: ela sai **sem nome**
+no arquivo da máquina. São **10 das 35 peças** do plano T107A.
+
+O relatório diz quantas são. Cruzando os dois (`conciliarBarra`), cada corte ganha nome:
+
+| Barra | Peças | Gravadas | Deduzidas do PDF | Confere |
+|---|---|---|---|---|
+| Nest 1 | 7 | 6 | 1 | ✔ |
+| Nest 2 | 11 | 11 | 0 | ✔ |
+| Nest 3 | 11 | 7 | 4 | ✔ |
+| Nest 4 | 6 | 1 | 5 | ✔ |
+| Laser Perfil, Nest 1 | 2 | 2 | 0 | ✔ |
+
+**35 de 35 nomeadas, as quatro barras fechando peça a peça.**
+
+⚠⚠ **A DEDUÇÃO É TENTATIVA, E SE DESFAZ.** Só vale quando sobra **uma** marca candidata *e* a barra
+fica sem nenhuma outra divergência. Nomear peça no meio de um plano que já não bate é carimbar
+palpite em cima de dado suspeito.
+
+⚠⚠ **E ELA SUPÕE QUE O PDF E O ARQUIVO SÃO DA MESMA VERSÃO — que nenhum dos dois prova sozinho**
+(achado do Codex). No replano (PDF velho, arquivo novo com a peça sem gravação já trocada), a conta
+fecha e a marca sai errada, calada. Quem tem de garantir isso é a **importação**, gravando o hash
+dos dois arquivos **como um par**. Por isso `deduzida: true` viaja até a tela: peça deduzida é peça
+para conferir no olho.
+
+## 12.8.3 A Libellula: o censo de tags fecha a questão
+
+Censo do `.lxd` real: `LwPolyline` 744 · `Point` 6.202 · `LeadIn` 185 · `Circle` 21 · `Channel` 17 —
+e **nenhuma tag de texto**. A marca gravada na chapa está no **canal 2** (579 polilinhas
+vetorizadas). Não existe nome de peça ali, e não é questão de procurar melhor.
+
+⚠ **A conta que confere:** contornos de corte (canal 1, **164**) + furos (**21**) = **185** =
+`Piercing N.` do relatório. É o que pega o par errado sem depender do nome do arquivo — mas **não é
+prova de identidade** (dois planos da mesma obra podem dar os mesmos números), e está escrito assim
+no código.
+
+## 12.8.4 O que quebrou ao rodar nos arquivos de verdade
+
+Duas coisas que os testes com recortes não pegariam, e a rodada real pegou:
+
+1. **O `.yxy` não disputa a barra com o `.zx`.** O plano inteiro contém as mesmas barras que os
+   recortes — a minha detecção de "índice repetido" (pedida pelo Codex, e correta) acusou
+   ambiguidade nas **quatro** barras de um plano perfeito. Vale o arquivo **da barra**, que é o que
+   vai para a máquina; o plano só preenche a barra sem recorte.
+2. **A chapa não está no `<ExtMax>`** — ele vem `-50..50`, o padrão do documento vazio. A chapa é a
+   polilinha de **contorno** (`NoExport="1"`). Lendo do cabeçalho, a conferência acusava
+   *"1500x3000 contra 50x50"* num arquivo correto.
+
+## 12.8.5 O número escrito de dois jeitos
+
+⚠⚠ O TubesT escreve `679,60` e a Libellula escreve `9.53` — **no mesmo plano, no mesmo dia**. Minha
+primeira conta apagava todo ponto: um relatório em `679.60` viraria **67960**, uma barra 100× mais
+comprida, sem erro nenhum. E adivinhar não resolve, porque a ambiguidade é real: `1.352` é o peso
+1,352 kg de uma peça da Libellula e `1.500` são mil e quinhentos milímetros no TubesT — a mesma
+string, dois números. Por isso **quem chama declara a convenção** (`numeroTubesT` / `numeroLibellula`),
+e quem chama sabe, porque sabe de qual software é o arquivo.
+
+## 12.8.6 A "engine" não era um download
+
+O que era preciso instalar, na verdade, era **o extrator do `.rar`** — e ele já existia na máquina
+(o WinRAR do Windows, chamado do WSL). Para ler os planos, as duas bibliotecas necessárias **já são
+dependências do portal**: `pizzip` (os `.zx`/`.zh`/`.yxy` são ZIP) e `unpdf` (os relatórios). Nada
+proprietário: os três formatos são ZIP+XML ou XML puro. O TubesT e a Libellula continuam sendo do
+programador — o portal não precisa deles para ler o que eles exportam.
+
+
 ---
 
 # 14. As telas de cadastro (13/09/2026)
@@ -1025,3 +1119,28 @@ Conserto: `~/.local/bin/codex`, um lançador que resolve o caminho **na hora**, 
 mais recente **pela data** (não pela ordem alfabética: "26.10" viria antes de "26.9" num `sort` de
 texto). A configuração passou a apontar para ele. A próxima atualização da extensão não quebra
 nada.
+
+## 15.4 O visual: o padrão das TVs do portal (13/09/2026)
+
+Matheus: *"deixe a tela do monitor com visual definido pelo nosso portal TORG, para seguir o mesmo
+padrão dos relatórios e telas de TV que o Vitor está ajustando"*.
+
+A referência é `app/planejamento/prioridades/PrioridadesClient.jsx` (a TV de Prioridades, que o PCP
+reaproveita em `/pcp/dashboard-prioridades`). O monitor passou a usar o mesmo desenho: barra **navy**
+(`bg-torg-dark`) com o logo branco, divisor, nome da tela e **relógio**; corpo claro (`#F3F6F9`);
+título com a **tarja laranja** curta em cima; botão de **tela cheia**; cards brancos com borda fina.
+
+⚠ **A cor do setor é a do CADASTRO (`MesSetor.cor`), que veio do `COR_SETOR` do Gantt** — a mesma
+que pinta o setor na tela do PCP. Inventar uma paleta aqui faria o mesmo setor ter duas cores no
+mesmo portal.
+
+> ⚠ **Anotado para o Vitor decidir:** o Gantt e a TV de Prioridades **já discordam** entre si.
+> `COR_SETOR` (Gantt) diz `CORTE #8e5cd9`, `SOLDA #c2410c`; `LANE_ACC` (TV) diz `CORTE #F4801F`,
+> `SOLDA #D26713`. Não mexi em nenhum dos dois — escolher por conta própria criaria uma terceira
+> verdade. O monitor segue o Gantt porque é de lá que o cadastro do MES nasceu.
+
+⚠⚠ **"SEM REGISTRO" SUMIA NO FUNDO CLARO.** O mapa de estados nasceu para o totem, que é escuro, e
+lá o estado desconhecido é `bg-white/15` — em cima do branco isso é invisível, e o card ficava sem
+faixa nenhuma, parecendo defeito de renderização. O mapa ganhou `fundoClaro`/`textoClaro` para quem
+pinta superfície clara, em vez de uma segunda tabela de cores — que foi exatamente o que já fez a
+tela do operador dizer "PRODUZINDO" com a máquina parada.
