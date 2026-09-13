@@ -1,7 +1,12 @@
 {
-  "build": 3124,
-  "gerado": "2026-09-13T02:00:40.753Z",
+  "build": 3125,
+  "gerado": "2026-09-13T02:27:00.724Z",
   "commits": [
+    {
+      "hash": "a2ce9999",
+      "data": "12/09/2026",
+      "titulo": "Memória: grades de piso em camadas, degraus junto, fusão de cargas leves"
+    },
     {
       "hash": "6c89310d",
       "data": "12/09/2026",
@@ -146,11 +151,6 @@
       "hash": "2844dea9",
       "data": "11/09/2026",
       "titulo": "Fiscal: a Remessa Terceiro mostra de quando ela é"
-    },
-    {
-      "hash": "5954391a",
-      "data": "11/09/2026",
-      "titulo": "PCP: peça liberada pela GRD e sem ordem no Syneco vira pendência de lançamento"
     }
   ]
 }

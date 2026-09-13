@@ -160,3 +160,7 @@ colorida e numerada, o já carregado em cinza, o que falta escondido) + ordem de
 - Fusão de cargas leves (`consolidar`): além de tentar inserir peça a peça, remonta a UNIÃO com a vizinha (4 arranjos, calço
   300 mm). Na OP-118 ainda não fundiu as duas cargas de ~4 e ~6 t (13 e 16): pacotes de 8–10 m não acham apoio contínuo sobre
   peças curtas — pendente; viagens 16 (era 15 com as grades em torre).
+- **"Fase", não "frente"** — Vitor (12/09/2026): "hoje as partes vc chama de frente, o ideal seria colocar fase no lugar de
+  frente e aí sim trazer A, B, C, D, E". A letra da marca (T118G = fase G) é a FASE da SKA; rótulos do simulador e dos PDFs
+  usam `fase G`. A página "Separar as peças" do modelo é por fase: uma linha por marca (marca · descrição · nível · qtd ·
+  volume), 3 colunas, ordenada — a parede de chips por nível × frente era "muito poluída e difícil de entender".
