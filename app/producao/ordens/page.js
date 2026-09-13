@@ -1,7 +1,7 @@
 import { requireRole } from "@/lib/session";
-import ProducaoClient from "@/app/pcp/producao/ProducaoClient";
-export const metadata = { title: "Produção — Ordens e peças" };
+import ProducaoOperacional from "@/components/producao/ProducaoOperacional";
+export const metadata = { title: "Produção — Operação da fábrica" };
 export default async function Page() {
  await requireRole(["ADMIN", "PRODUCAO", "PCP", "PLANEJAMENTO"]);
- return <ProducaoClient portalProducao />;
+ return <ProducaoOperacional inicial="execucao"/>;
 }

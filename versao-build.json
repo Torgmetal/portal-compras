@@ -1,7 +1,17 @@
 {
-  "build": 3120,
-  "gerado": "2026-09-13T00:18:01.752Z",
+  "build": 3122,
+  "gerado": "2026-09-13T00:29:07.806Z",
   "commits": [
+    {
+      "hash": "0afe69e4",
+      "data": "12/09/2026",
+      "titulo": "feat(producao): remodela operação por OP, peças e recursos"
+    },
+    {
+      "hash": "9a960368",
+      "data": "12/09/2026",
+      "titulo": "Memória: commit em branch de outra sessão (worktree de main)"
+    },
     {
       "hash": "c0e1445b",
       "data": "12/09/2026",
@@ -141,16 +151,6 @@
       "hash": "5d643c9b",
       "data": "11/09/2026",
       "titulo": "Autoriza Guilherme a aprovar Análise Crítica de Projeto"
-    },
-    {
-      "hash": "c299e59f",
-      "data": "11/09/2026",
-      "titulo": "Cotação: \"não tenho\" ganha do preço, e o texto livre para de passar batido"
-    },
-    {
-      "hash": "9ecd5e03",
-      "data": "11/09/2026",
-      "titulo": "Ajusta quantidades no celular e corrige ciclo das inspeções e assinaturas"
     }
   ]
 }

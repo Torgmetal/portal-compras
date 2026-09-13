@@ -13,38 +13,21 @@ import SidebarUserFooter from "@/components/SidebarUserFooter";
 // Abas do fluxo de produção soltas no topo (mesmo padrão do PCP). As telas são
 // as mesmas dos dois portais, mas a navegação fica sempre dentro da Produção.
 const menu = [
-  { href: "/producao", label: "Visão geral", icon: Activity, exact: true },
-  { href: "/producao/ordens", label: "Ordens e peças", icon: Layers },
-  { href: "/producao/pecas", label: "Catálogo de peças", icon: PackageSearch },
-  { href: "/producao/semana", label: "Programação semanal", icon: CalendarDays },
-  { href: "/producao/mapa", label: "Mapa da Produção", icon: Map },
-  // ⚠ logo abaixo do mapa: as duas respondem "onde está a obra", uma pela tabela e outra pelo
-  // modelo. Ver app/producao/modelo — o 3D é a porta, o dado continua vindo do portal.
+  { href: "/producao", label: "Carteira de OPs", icon: Layers, exact: true },
+  { href: "/producao/ordens", label: "Peças e execução", icon: Factory },
+  { href: "/producao/materiais", label: "Materiais e rastreabilidade", icon: PackageSearch },
+  { href: "/producao/qualidade", label: "Inspeções", icon: ClipboardCheck },
+  { href: "/producao/romaneios", label: "Romaneios", icon: Truck },
+  { href: "/producao/semana", label: "Carga da preparação", icon: CalendarDays },
+  { href: "/producao/agenda", label: "Programação e recursos", icon: CalendarDays },
   { href: "/producao/modelo", label: "Obra em 3D", icon: Box },
-  { href: "/producao/programacao/corte", label: "Programação", icon: Package, exact: true },
-  { href: "/producao/programacao/fila-corte", label: "Corte", icon: ListOrdered },
-  { href: "/producao/programacao/montagem", label: "Montagem", icon: Wrench },
-  { href: "/producao/programacao/solda", label: "Solda", icon: Flame },
-  { href: "/producao/programacao/acabamento", label: "Acabamento", icon: Sparkles },
-  { href: "/producao/programacao/jato", label: "Jato", icon: Wind },
-  { href: "/producao/programacao/pintura", label: "Pintura", icon: Paintbrush },
-  { href: "/producao/programacao/expedicao", label: "Expedição", icon: Truck },
-  { href: "/producao/qualidade", label: "Qualidade por OP", icon: ClipboardCheck },
-  { href: "/producao/consulta-estoque", label: "Estoque", icon: PackageSearch },
-  { href: "/producao/romaneios", label: "Romaneios", icon: FileText },
-  { href: "/producao/mes", label: "Rastreabilidade Syneco", icon: Factory },
-  { href: "/producao/indicadores", label: "Indicadores", icon: Gauge },
 ];
 
 export default function SidebarProducao() {
   const pathname = usePathname();
   const [busca, setBusca] = useState("");
   const norm = v => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const grupos = [
-    { nome: "Gestão da fábrica", itens: menu.slice(0, 6) },
-    { nome: "Execução por setor", itens: menu.slice(6, 14) },
-    { nome: "Materiais e resultados", itens: menu.slice(14) },
-  ];
+  const grupos = [{ nome: "Operação da fábrica", itens: menu.slice(0,7) }, { nome: "Consulta", itens: menu.slice(7) }];
 
   return (
     <aside className="w-64 bg-white border-r border-torg-blue-100 flex flex-col h-screen fixed left-0 top-0">
