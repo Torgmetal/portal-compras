@@ -71,14 +71,18 @@ const VisualizadorCarga = forwardRef(function VisualizadorCarga({ carga, malhas,
     /** Imagem PNG (data URL) da carga: vista iso|lado|topo|tras, opcionalmente só até a camada `ci` com as anteriores em cinza. */
     capturar(vista = "iso", ci = null) {
       const s = st.current; if (!s) return null;
-      const grupoRotVisivel = s.rotulos;
+      // tamanho fixo e pixelRatio 1: o PDF vai por upload e o corpo tem teto (~600 KB por imagem)
+      const el = s.renderer.domElement, W0 = el.clientWidth, H0 = el.clientHeight, pr = s.renderer.getPixelRatio();
+      s.renderer.setPixelRatio(1); s.renderer.setSize(1200, 560, false); s.camera.aspect = 1200 / 560; s.camera.updateProjectionMatrix();
+      s.rotulos = true;
       if (ci == null) s.mostrarPasso(carga.passos.length - 1); else { const byId = new Map(carga.itens.map((u) => [u.id, u])); let k = -1; carga.passos.forEach((id, i) => { if ((byId.get(id)?.camada || 0) === ci) k = i; }); s.mostrarPasso(k, ci); }
       s.enquadrar(vista); s.renderer.render(s.scene, s.camera);
-      const url = s.renderer.domElement.toDataURL("image/jpeg", 0.85);
-      s.rotulos = grupoRotVisivel; s.mostrarPasso(passo); s.enquadrar("iso"); return url;
+      const url = el.toDataURL("image/jpeg", 0.8);
+      s.renderer.setPixelRatio(pr); s.renderer.setSize(W0, H0); s.camera.aspect = W0 / H0; s.camera.updateProjectionMatrix();
+      s.rotulos = rotulos; s.mostrarPasso(passo); s.enquadrar("iso"); return url;
     },
     enquadrar: (v) => st.current?.enquadrar(v),
-  }), [carga, passo]);
+  }), [carga, passo, rotulos]);
 
   const n = carga?.passos?.length || 0, fim = passo >= n - 1, u = passo >= 0 && !fim ? carga.itens.find((x) => x.id === carga.passos[passo]) : null;
   const btn = "px-2 py-1 rounded-md border border-gray-200 bg-white text-torg-dark hover:bg-gray-50 disabled:opacity-40 inline-flex items-center";

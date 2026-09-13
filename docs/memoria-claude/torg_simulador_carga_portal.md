@@ -28,5 +28,13 @@ monta a carga daquela lista.
 - **Diferença do protótipo:** sem sequência por nível nem grade separada (numa lista única, grade vai em cima
   como delicado; lista SÓ de grade sai em camadas). Novas ordens `delicadoMeio`/`pesoPuro` + tentativa com
   reserva do topo foram o que fez a carga 3 da OP-118 caber numa carreta como lista solta.
-- **Próximas entregas combinadas:** PDF do modelo (separar por fase, volumes, camadas) e etiquetas por volume;
-  tela de configuração de veículos/frete/embalagem; import de lista de prioridades que corta em caminhões.
+- **PDF do modelo** (`lib/carga/modelo-carga-pdf.js`, rota `…/simulacao/modelo-pdf`): pdf-lib A4 paisagem padrão Torg;
+  as fotos do 3D vêm do navegador (`VisualizadorCarga.capturar` em 1200×560 JPEG, pixelRatio 1 — corpo ≤ ~3 MB).
+  Páginas: carga pronta, separar por fase (3 colunas que fluem), formar volumes (cartões), uma folha por camada.
+  ⚠ pdftoppm/poppler desta máquina não desenha as fontes base-14 (sai em branco): renderizar com PyMuPDF
+  (`/tmp/pdfenv`) ou Quick Look para conferir.
+- **Veículos configuráveis:** `ConfigCarga` (id "padrao"), tela Planejamento › Configuração da expedição
+  (`ConfigCargaSection`), rota `/api/planejamento/expedicao/config-carga`; `catalogoDeVeiculos(cfg)` mescla com o
+  padrão e entra em `opcoes.veiculos/frete` da simulação. Carreta e carreta 14 m nunca saem do catálogo.
+- **Próximas entregas combinadas:** etiquetas por volume; import de lista de prioridades que corta em caminhões
+  (caminho 2); comparativo de embalagem ligado à LQC.

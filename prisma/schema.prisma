@@ -5901,6 +5901,16 @@ model CargaSimulada {
   @@index([opId])
 }
 
+// Veículos e índice de frete do simulador de carga (Planejamento › Configuração da expedição). Uma linha
+// só (id "padrao"); vazio = premissas de lib/carga/premissas.js. Criada por scripts/ensure-carga-simulada.mjs.
+model ConfigCarga {
+  id              String   @id
+  veiculos        Json     @default("[]")
+  frete           Json     @default("{}")
+  atualizadoPorId String?
+  updatedAt       DateTime @default(now())
+}
+
 model AnaliseCriticaProjeto {
   id             String    @id @default(cuid())
   opId           String    @unique

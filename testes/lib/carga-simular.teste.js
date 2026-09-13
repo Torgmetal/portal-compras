@@ -109,3 +109,38 @@ describe("perfil da LQC e hash dos itens", () => {
     expect(hashItens([{ marca: "A1", qte: 3 }, { marca: "B2", qte: 1 }])).not.toBe(a);
   });
 });
+
+describe("modelo de carga em PDF", () => {
+  it("gera A4 paisagem com carga pronta, separação por fase, volumes e uma folha por camada", async () => {
+    const { gerarModeloCargaPDF } = await import("@/lib/carga/modelo-carga-pdf");
+    const lista = [{ marca: "T118A1", desc: "VIGA", qtd: 6, kgUn: 700 }, { marca: "T118C7", desc: "CANTONEIRA", qtd: 10, kgUn: 4 }, { marca: "T118D1", desc: "G.C", qtd: 3, kgUn: 60 }];
+    const r = simularCarga({ lista, geometria: { T118A1: geo([12000, 550, 300]), T118C7: geo([800, 50, 50]), T118D1: geo([3000, 1100, 60]) }, perfil: "recomendado", prefixo: "T118" });
+    const { bytes, filename } = await gerarModeloCargaPDF({ op: { numero: "118", cliente: "DANPOWER", obra: "Caldeira" }, previo: { numero: 3 }, carga: r.cargas[0], indice: 0, total: 1, perfilNome: "Padrão", prefixo: "T118", imagens: {} });
+    expect(filename).toContain("OP 118");
+    expect(Buffer.from(bytes.slice(0, 4)).toString()).toBe("%PDF");
+    const camadas = new Set(r.cargas[0].itens.map((u) => u.camada || 0)).size;
+    const { PDFDocument } = await import("pdf-lib");
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(3 + camadas);
+  });
+});
+
+describe("catálogo de veículos configurado", () => {
+  it("o gravado sobrepõe o padrão; veículo desmarcado sai, mas a carreta e a de 14 m nunca saem", async () => {
+    const { catalogoDeVeiculos, linhasDeConfiguracao } = await import("@/lib/carga/config-carga");
+    const cfg = { veiculos: [{ chave: "truck", ativo: false }, { chave: "carreta", ativo: false, pesoMax: 27000, frete: 120 }, { chave: "hr", nome: "HR da Torg", C: 3300 }], frete: { toco: 60 } };
+    const c = catalogoDeVeiculos(cfg);
+    expect(c.veiculos.truck).toBeUndefined();
+    expect(c.veiculos.carreta.pesoMax).toBe(27000); expect(c.frete.carreta).toBe(120); expect(c.frete.toco).toBe(60);
+    expect(c.veiculos.hr).toMatchObject({ nome: "HR da Torg", C: 3300, L: 1900 });
+    expect(c.ordem).toEqual(["hr", "tresquartos", "toco", "carreta"]);
+    const linhas = linhasDeConfiguracao(cfg);
+    expect(linhas.find((l) => l.chave === "truck").ativo).toBe(false);
+    expect(linhas.find((l) => l.chave === "carreta").ativo).toBe(true);
+  });
+  it("a simulação respeita o catálogo: sem HR e 3/4, a carga pequena vai no toco", async () => {
+    const { catalogoDeVeiculos } = await import("@/lib/carga/config-carga");
+    const cat = catalogoDeVeiculos({ veiculos: [{ chave: "hr", ativo: false }, { chave: "tresquartos", ativo: false }] });
+    const r = simularCarga({ lista: [{ marca: "T118C1", desc: "CANTONEIRA", qtd: 4, kgUn: 10 }], geometria: { T118C1: geo([1500, 60, 60]) }, perfil: "recomendado", prefixo: "T118", opcoes: { veiculos: cat.veiculos, frete: cat.frete } });
+    expect(r.cargas[0].veiculo.chave).toBe("toco");
+  });
+});

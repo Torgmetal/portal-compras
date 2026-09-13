@@ -6,7 +6,7 @@
 // Vitor (12/09/2026): a lista é o romaneio prévio; "se a lista não cabe num veículo, ele avisa na hora".
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Loader2, X, Play, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, X, Play, RefreshCw, AlertCircle, CheckCircle2, FileText } from "lucide-react";
 import { geometriaDoIfc } from "@/lib/carga/geometria-ifc";
 import { prefixoDaOp } from "@/lib/carga/classificar";
 import { ResumoSimulacao, VolumesDaCarga } from "./ResultadoSimulacao";
@@ -19,7 +19,7 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
   const [dados, setDados] = useState(null), [erro, setErro] = useState(null);
   const [fase, setFase] = useState("carregando"), [progresso, setProgresso] = useState({ msg: "", frac: 0 });
   const [geo, setGeo] = useState(null), [perfil, setPerfil] = useState("recomendado");
-  const [resultado, setResultado] = useState(null), [cargaSel, setCargaSel] = useState(0), [gravada, setGravada] = useState(null);
+  const [resultado, setResultado] = useState(null), [cargaSel, setCargaSel] = useState(0), [gravada, setGravada] = useState(null), [pdf, setPdf] = useState(null);
   const worker = useRef(null), viz = useRef(null);
 
   // 1) a lista, o perfil da LQC e a última simulação
@@ -71,8 +71,25 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
       } catch { setErro("A simulação não foi gravada."); }
     };
     w.onerror = (e) => { setErro(e.message || "Falha no simulador"); setFase("pronto"); };
-    w.postMessage({ lista: dados.lista, geometria: geo.geometria, perfil, prefixo: prefixoDaOp(opNumero), opcoes: {} });
+    w.postMessage({ lista: dados.lista, geometria: geo.geometria, perfil, prefixo: prefixoDaOp(opNumero), opcoes: dados.opcoes || {} });
   };
+
+  // PDF do modelo: fotografa o 3D (carga pronta + cada camada) e manda para a rota montar o A4
+  const gerarPdf = async () => {
+    const v = viz.current, c = resultado?.cargas?.[cargaSel]; if (!v || !c || !gravada) return;
+    setPdf({ gerando: true });
+    try {
+      await new Promise((r) => setTimeout(r, 50));
+      const camadas = [...new Set(c.itens.map((u) => u.camada || 0))].sort((a, b) => a - b);
+      const imagens = { full: { iso: v.capturar("iso"), lado: v.capturar("lado"), topo: v.capturar("topo") }, camadas: camadas.map((ci) => ({ ci, iso: v.capturar("iso", ci), topo: v.capturar("topo", ci) })) };
+      const res = await fetch(`/api/comercial/op/${opId}/romaneios-previos/${previo.id}/simulacao/modelo-pdf`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ simulacaoId: gravada.id, indice: cargaSel, imagens }) });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || "Não consegui gerar o PDF."); }
+      const blob = await res.blob(), url = URL.createObjectURL(blob);
+      const nome = (res.headers.get("Content-Disposition") || "").match(/filename\*?=(?:UTF-8'')?"?([^";]+)/)?.[1];
+      setPdf({ url, nome: nome ? decodeURIComponent(nome) : `modelo-carga-OP-${opNumero}.pdf` }); window.open(url, "_blank");
+    } catch (e) { setPdf(null); setErro(e.message); }
+  };
+  useEffect(() => () => { if (pdf?.url) URL.revokeObjectURL(pdf.url); }, [pdf]);
 
   const carga = resultado?.cargas?.[cargaSel] || null;
   const ocupado = fase === "carregando" || fase === "ifc" || fase === "simulando";
@@ -90,6 +107,9 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
             </select>
             <button onClick={simular} disabled={ocupado || !geo} className="text-[12px] font-semibold bg-torg-orange text-white rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-50 hover:bg-orange-600">
               {fase === "simulando" ? <Loader2 size={14} className="animate-spin" /> : resultado ? <RefreshCw size={14} /> : <Play size={14} />} {resultado ? "Simular de novo" : "Simular"}
+            </button>
+            <button onClick={gerarPdf} disabled={ocupado || !gravada || !geo || pdf?.gerando} className="text-[12px] font-semibold bg-white/15 text-white rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-40 hover:bg-white/25" title="PDF do modelo de carga para a Expedição (separar, formar volumes, montar por camada)">
+              {pdf?.gerando ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} PDF do modelo
             </button>
             <button onClick={onClose} className="text-white/70 hover:text-white"><X size={20} /></button>
           </div>
@@ -114,6 +134,7 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
               <div className="flex items-center gap-2 text-[11px] text-torg-gray">
                 {gravada ? <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 size={13} /> Simulação gravada em {fmtD(gravada.createdAt)} · embalagem {gravada.perfilNome}</span> : <span>Resultado não gravado</span>}
                 {resultado.gcModo && <span>· guarda-corpo: {resultado.gcModo === "engradado" ? "em pé em engradado" : "deitado em pacote"}</span>}
+                {pdf?.url && <a href={pdf.url} download={pdf.nome} className="ml-auto text-torg-blue font-medium hover:underline inline-flex items-center gap-1"><FileText size={12} /> Baixar {pdf.nome}</a>}
               </div>
               <ResumoSimulacao resultado={resultado} cargaSel={cargaSel} onCarga={setCargaSel} />
               {carga && geo && <VisualizadorCarga ref={viz} carga={carga} malhas={geo.malhas} madeira={resultado.madeira || 100} altura={480} />}

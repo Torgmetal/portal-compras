@@ -1,7 +1,12 @@
 {
-  "build": 3127,
-  "gerado": "2026-09-13T03:34:22.393Z",
+  "build": 3128,
+  "gerado": "2026-09-13T04:12:00.086Z",
   "commits": [
+    {
+      "hash": "1e22c714",
+      "data": "13/09/2026",
+      "titulo": "Expedição: Simular carga no romaneio prévio (motor lib/carga, IFC no navegador, 3D)"
+    },
     {
       "hash": "616c32a8",
       "data": "12/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7f9f55d9",
       "data": "11/09/2026",
       "titulo": "Plano de ação 5W2H: ficha por ação no PDF e formulário legível nos indicadores"
-    },
-    {
-      "hash": "23005fa2",
-      "data": "11/09/2026",
-      "titulo": "fix(planejamento): contar corretamente materiais pendentes nos avisos"
     }
   ]
 }

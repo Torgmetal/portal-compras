@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { hashItens } from "@/lib/carga/hash-itens";
 import { PERFIS, perfilDaLqc } from "@/lib/carga/premissas";
+import { catalogoDeVeiculos } from "@/lib/carga/config-carga";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,9 +38,10 @@ export async function GET(_req, { params }) {
   const estudo = await prisma.estudoFabricacao.findFirst({ where: { orcamento: { opId: op.id } }, orderBy: { updatedAt: "desc" }, select: { cenario: true } }).catch(() => null);
   const perfilLqc = perfilDaLqc(estudo?.cenario?.embalagem?.nivel);
   const ultima = await prisma.cargaSimulada.findFirst({ where: { romaneioPrevioId: previo.id }, orderBy: { createdAt: "desc" } });
+  const cfg = await prisma.configCarga.findUnique({ where: { id: "padrao" } }).catch(() => null), catalogo = catalogoDeVeiculos(cfg);
   const hash = hashItens(itens);
   return NextResponse.json({ success: true, op, previo: { id: previo.id, numero: previo.numero, status: previo.status, pesoKg: previo.pesoKg, dataPrevista: previo.dataPrevista }, lista, hash,
-    perfilPadrao: perfilLqc.chave, perfis: Object.values(PERFIS).map((p) => ({ chave: p.chave, nome: p.nome, resumo: p.resumo })),
+    perfilPadrao: perfilLqc.chave, perfis: Object.values(PERFIS).map((p) => ({ chave: p.chave, nome: p.nome, resumo: p.resumo })), opcoes: { veiculos: catalogo.veiculos, frete: catalogo.frete },
     simulacao: ultima ? { ...ultima, desatualizada: ultima.itensHash !== hash } : null });
 }
 
