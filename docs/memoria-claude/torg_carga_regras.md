@@ -141,3 +141,6 @@ colorida e numerada, o já carregado em cinza, o que falta escondido) + ordem de
   frente da carroceria; cabine 2,3 m com 0,85 m de folga até a carroceria. Ambiente `RoomEnvironment` + ACES.
 - ⚠ Para-lama = `CylinderGeometry(..., openEnded=true, θ=π/2..3π/2)` girado em X: com `openEnded=false` e θ=π
   saía um meio-disco EM PÉ na frente da roda (foi o "caminhão bem ruim" da primeira versão).
+- ⚠ Rodas (Vitor, 12/09: "as rodas estão bem ruins"): disco chapado branco parece brinquedo. O que convence é o
+  **prato rebaixado** (côncavo, 0,3 da largura para dentro), furos de ventilação, círculo de 10 porcas, cubo saliente,
+  flanco bojudo no perfil torneado e o **eixo terminando dentro do cubo** (L − 0,3), nunca atravessando a roda.

@@ -1,7 +1,12 @@
 {
-  "build": 3118,
-  "gerado": "2026-09-13T00:08:32.865Z",
+  "build": 3119,
+  "gerado": "2026-09-13T00:14:32.865Z",
   "commits": [
+    {
+      "hash": "7f9e199e",
+      "data": "12/09/2026",
+      "titulo": "Memória: modelo de carga com capturas 3D e caminhão v2"
+    },
     {
       "hash": "8c0c4fd7",
       "data": "12/09/2026",
@@ -146,11 +151,6 @@
       "hash": "f22d0a33",
       "data": "11/09/2026",
       "titulo": "Portal do fornecedor: página em branco por data escrita em dois fusos"
-    },
-    {
-      "hash": "68e52f85",
-      "data": "11/09/2026",
-      "titulo": "Preenche quantidades de inspeção a partir das listas da OP"
     }
   ]
 }
