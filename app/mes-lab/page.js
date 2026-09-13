@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Factory, CircleAlert, ArrowRight, MonitorSpeaker, Settings, Tv } from "lucide-react";
+import { Factory, CircleAlert, ArrowRight, MonitorSpeaker, Settings, Tv, Scissors } from "lucide-react";
 
 // MES PRÓPRIO — área de construção, fora do portal.
 //
@@ -65,6 +65,7 @@ const ATALHOS = [
   { href: "/mes-lab/monitor", titulo: "Monitor de máquinas", nota: "o chão de fábrica agora", icone: MonitorSpeaker },
   { href: "/mes-lab/cadastro", titulo: "Cadastro", nota: "setores, postos, motivos, operadores", icone: Settings },
   { href: "/mes-lab/totem/setor/MONTAGEM", titulo: "Totem por setor", nota: "trocar MONTAGEM pelo setor do PC", icone: Tv },
+  { href: "/mes-lab/nesting", titulo: "Nesting da Preparação", nota: "importar o plano de corte", icone: Scissors },
 ];
 
 export default function MesLabPage() {
@@ -97,7 +98,7 @@ export default function MesLabPage() {
 
         {/* ⚠ As telas prontas ficam aqui porque NENHUMA delas aparece em menu do portal — e sem
             isto a única forma de chegar nelas é saber a URL de cor. */}
-        <nav className="mt-6 grid gap-3 sm:grid-cols-3">
+        <nav className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {ATALHOS.map((a) => (
             <Link
               key={a.href}

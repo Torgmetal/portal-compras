@@ -881,11 +881,26 @@ As duas marcas da OP-097 (plano de **14/08**) estão `status=CORTE`, `qteProduzi
 com baixa pelo Syneco. As da OP-107 (plano de **hoje**) estão `PENDENTE`, `qteProduzida=0`. O dado do
 portal concorda com a data dos arquivos, o que é uma checagem de sanidade de graça.
 
-## 12.7.6 O que ainda falta do pacote
+## 12.7.6 ⚠⚠ A LISTA DO OPERADOR É O PRÓPRIO PDF — NÃO FALTA NADA NO PACOTE
 
-A *"lista que ele dá para o operador ver o que são as marcas do dia"* **não veio** nesta amostra — o
-`.rar` tem só as três pastas de máquina. Ela importa: é o documento que hoje faz o papel que a tela
-do totem vai fazer, e vale ver o formato antes de desenhar a tela.
+Eu tinha registrado como pendência que *"a lista que ele dá para o operador ver as marcas do dia não
+veio"*. **Veio.** Matheus (13/09/2026): *"a lista são os PDFs que estão dentro das pastas de cada
+máquina"*. O PDF é **os dois documentos ao mesmo tempo**: o relatório do plano e o papel que vai
+para a mão do operador.
+
+Isso não é detalhe de catalogação — **é o contrato da tela do totem**. A tela não precisa inventar
+como apresentar o trabalho: ela tem de mostrar o que o operador já lê hoje, na mesma ordem e com os
+mesmos nomes, senão ele passa a conferir a tela contra o papel em vez de confiar nela. Ou seja:
+
+- **TubesT:** `Part Info` (a lista mestra: marca · feitas/total · comprimento) e, por barra, o bloco
+  `Nesting List` com `Parts per tube`, sobra e a tabela de marcas. É exatamente o que
+  `lerRelatorioTubesT` já devolve.
+- **Libellula:** o cabeçalho da chapa (material, espessura, dimensão, peso, tempo) e a tabela
+  `ID · Código de peça · Dimensão · Peso · Qty · Piercing`. É o que `lerRelatorioLibellula` devolve.
+
+⚠ E fecha a razão de o PDF ser o **leitor primário** (§12.7.1): não é só porque cobre as três
+máquinas — é porque é **o documento que a fábrica já usa**. O arquivo da máquina entra por cima,
+dando a ordem de corte e a conferência peça a peça (§12.8.1).
 
 > ⚠ Os arquivos de exemplo têm dado real de obra (OP-107/TMSA, OP-097). Ficaram **fora do
 > repositório**, no diretório temporário da sessão — como os dados do laboratório (§10.3).
@@ -1144,3 +1159,58 @@ lá o estado desconhecido é `bg-white/15` — em cima do branco isso é invisí
 faixa nenhuma, parecendo defeito de renderização. O mapa ganhou `fundoClaro`/`textoClaro` para quem
 pinta superfície clara, em vez de uma segunda tabela de cores — que foi exatamente o que já fez a
 tela do operador dizer "PRODUZINDO" com a máquina parada.
+
+---
+
+# 16. A tela do nesting (13/09/2026)
+
+`/mes-lab/nesting` — o plano do programador entra no portal. Regras em `lib/mes/nesting/`, rota
+`GET/POST /api/mes-lab/nesting`.
+
+⚠⚠ **LER E GRAVAR SÃO DUAS CHAMADAS, E A PRIMEIRA NÃO ESCREVE NADA.** O import de lista do portal já
+ensinou o preço de misturar os dois: a aba "Revisão" dizia *"18 incluídas"* e **nenhuma entrou**,
+porque o número era uma **previsão** apresentada como recibo, e a divergência só apareceu quatro
+semanas depois (CLAUDE.md). Aqui a prévia mostra exatamente o que a gravação vai escrever —
+divergências e pendências **antes** do botão — e o que fica gravado é esse mesmo recibo.
+
+## 16.1 O que a tela faz hoje, medido nos arquivos reais
+
+| Plano | Máquina | Unidades | Marcas | Casaram | Deduzidas |
+|---|---|---|---|---|---|
+| `11-09-2026 - T107A - W150X13` | Cantoneira/Tubo | 4 barras | 11 | **11/11** | 10 peças |
+| `T107A - 9.50mm` | Laser Chapa | 1 chapa (64 peças) | 15 | **15/15** | — |
+| `14-08-2026 - T97A - W310X44.5` | Laser Perfil | 1 barra | 2 | **2/2** | — |
+
+Subidos pela própria rota, logado — não por script direto no banco.
+
+## 16.2 As regras que a tela impõe
+
+- ⚠⚠ **Casamento EXATO e DENTRO DA OBRA.** A mesma marca se repete entre obras (`T97A16` existe na
+  097 e na 102): casar só pela marca daria baixa na obra errada, e erro de baixa aparece no
+  inventário meses depois. Quando a obra do arquivo não desempata, o item fica **sem peça** e a tela
+  cobra. ⚠ A obra é comparada **só pelos dígitos**, porque o banco tem 90 grafias para as mesmas
+  obras ("89", "089", "T89A").
+- ⚠⚠ **Replano é plano NOVO, e o hash é quem diz.** `@@unique([hashRelatorio, ambiente])` recusa o
+  mesmo conteúdo duas vezes; conteúdo diferente com o mesmo nome entra como outro plano, em vez de
+  sobrescrever em silêncio. O hash do arquivo da máquina é gravado **junto** — é o par que amarra a
+  versão, e é dele que depende a dedução do nome da peça curta (§12.8.2).
+- ⚠ **Peça deduzida vai marcada na tela** (`·dz`). Peça sem gravação, nomeada por cruzamento, é peça
+  para conferir no olho.
+- ⚠ **A quantidade do item é POR UNIDADE** (§12.3): total = por unidade × unidades cortadas, sempre
+  derivado.
+
+## 16.3 ⚠⚠ O QUE FALTA, E É UMA DECISÃO — NÃO CÓDIGO
+
+O plano está no portal; o operador ainda não o escolhe no totem. E aqui há uma pergunta de modelo
+que **não dá para responder sozinho**:
+
+**`MesSessao` tem UMA marca.** Uma barra do nesting tem várias (a Nest 2 tem 6 marcas diferentes).
+As saídas possíveis:
+
+1. **Sessão de NESTING** — a sessão aponta para a barra/chapa, e "cortei mais uma" explode nas
+   marcas do plano. É o fluxo do §12.4 e o que o Matheus pediu; muda `MesSessao` (marca passa a ser
+   opcional, entra `nestingUnidadeId`) e muda a trava do teto do planejado, que hoje é por marca.
+2. **Sessão por marca, como hoje**, com o nesting só sugerindo a lista. Não mexe em nada — e não
+   entrega o pedido, que era justamente **não** apontar marca a marca.
+
+Fica parado aqui de propósito: a (1) mexe no coração do apontamento, que já está validado e rodando.

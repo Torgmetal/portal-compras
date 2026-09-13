@@ -1,7 +1,12 @@
 {
-  "build": 3126,
-  "gerado": "2026-09-13T18:28:20.657Z",
+  "build": 3127,
+  "gerado": "2026-09-13T18:47:50.791Z",
   "commits": [
+    {
+      "hash": "1f88f803da",
+      "data": "13/09/2026",
+      "titulo": "MES proprio: a engine de nesting le os tres formatos, e o monitor no padrao TORG"
+    },
     {
       "hash": "8c883d04a6",
       "data": "13/09/2026",
@@ -146,11 +151,6 @@
       "hash": "d8da9a5b37",
       "data": "11/09/2026",
       "titulo": "Indicadores Engenharia: detalhe da aderência ao prazo voltava erro"
-    },
-    {
-      "hash": "f02a6159f5",
-      "data": "11/09/2026",
-      "titulo": "feat(op): exibir endereços do cliente e da entrega na aba Obra"
     }
   ]
 }

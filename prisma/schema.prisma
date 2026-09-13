@@ -6175,3 +6175,89 @@ model MesCorrecao {
   @@index([entidade, entidadeId])
   @@index([criadoEm])
 }
+
+// ─── NESTING DA PREPARAÇÃO (§12) ──────────────────────────────────────────────
+//
+// O plano de corte do programador. ⚠⚠ NÃO É UMA NOVA LISTA DO QUE PRODUZIR (§3.2): é um
+// AGRUPAMENTO FÍSICO de marcas que já existem em `PecaConjunto`. Item que não casar com marca
+// conhecida vira pendência visível — nunca entra calado.
+model MesNesting {
+  id     String @id @default(cuid())
+  /// Como o programador chama o plano — na prática, o nome do arquivo do relatório.
+  nome   String
+  origem String // TUBEST | LIBELLULA
+  /// "TubesT 2025V2.12", lido de dentro do próprio arquivo da máquina.
+  programa    String?
+  /// O texto de "Section:" (perfil) ou material+espessura. Serve para conferir, não para casar.
+  descricao   String?
+  material    String?
+  espessuraMm Float?
+  recursoId   String?
+  /// A OP tirada do nome do arquivo. ⚠ É PISTA, não chave — quem decide é o casamento das marcas.
+  opNumero    String?
+
+  arquivoRelatorio String
+  arquivoMaquina   String?
+  // ⚠⚠ O HASH DOS DOIS, JUNTOS, É O QUE AMARRA A VERSÃO DO PLANO. O relatório e o arquivo da
+  // máquina sozinhos não provam ser da mesma versão — e é dessa premissa que depende a dedução do
+  // nome da peça curta (§12.8.2). Replano = conteúdo diferente = plano NOVO.
+  hashRelatorio String
+  hashMaquina   String?
+  /// Os avisos da conciliação, congelados no momento do import — o recibo, não uma previsão.
+  divergencias Json?
+
+  ambiente  String   @default("PROD")
+  criadoPor String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  unidades MesNestingUnidade[]
+
+  @@unique([hashRelatorio, ambiente])
+  @@index([opNumero])
+  @@index([recursoId])
+}
+
+/// Uma BARRA (perfil/tubo) ou uma CHAPA (laser chapa) — a unidade que o operador aponta.
+/// ⚠ No TubesT "Nest 1, 2, 3…" são BARRAS, não chapas (§12.7): cada uma tem o seu arquivo.
+model MesNestingUnidade {
+  id             String  @id @default(cuid())
+  nestingId      String
+  indice         Int
+  tipo           String  @default("BARRA") // BARRA | CHAPA
+  pecas          Int     @default(0)
+  comprimentoMm  Float?
+  sobraMm        Float?
+  aproveitamento Float?
+  arquivoMaquina String?
+
+  nesting MesNesting         @relation(fields: [nestingId], references: [id], onDelete: Cascade)
+  itens   MesNestingItem[]
+
+  @@unique([nestingId, indice])
+}
+
+/// Uma marca dentro de uma barra/chapa.
+/// ⚠⚠ A QUANTIDADE É POR UNIDADE, NÃO O TOTAL DO PLANO (§12.3). Total = por unidade × unidades
+/// cortadas, sempre derivado: guardar o total obrigaria a dividir de volta a cada apontamento, e
+/// divisão que não fecha em inteiro é onde nascem as meias-peças.
+model MesNestingItem {
+  id        String @id @default(cuid())
+  unidadeId String
+  marca     String
+  qtd       Int    @default(0)
+  /// Posição na ordem de corte, quando o arquivo da máquina a entrega.
+  ordem     Int?
+  /// ⚠ Peça SEM GRAVAÇÃO, nomeada por cruzamento com o relatório (§12.8.2). Viaja até a tela de
+  /// propósito: peça deduzida é peça para conferir no olho.
+  deduzida  Boolean @default(false)
+  /// Nulo = não casou com nenhuma marca do portal. É pendência, e a tela mostra.
+  pecaConjuntoId String?
+  opNumero       String?
+
+  unidade MesNestingUnidade @relation(fields: [unidadeId], references: [id], onDelete: Cascade)
+
+  @@index([unidadeId])
+  @@index([marca])
+  @@index([pecaConjuntoId])
+}
