@@ -30,8 +30,9 @@ reais, em 6 setores. Números conferidos **contando no destino**, não somando a
 2. ~~`lib/mes/sessao.js` — abrir, apontar, parar, encerrar, com as travas do §7.5~~ — **feito**.
 3. ~~Fluxo do **totem** contra o banco local~~ — **feito** (§13).
 4. ~~**Telas de cadastro** de setores, máquinas e bancadas (§11.3)~~ — **feito** (§14).
-5. **Monitor** de máquinas — o contrato de tela é o dataset 131 (§6.4). **← É AQUI QUE SE RETOMA.**
+5. ~~**Monitor** de máquinas — contrato: dataset 131 (§6.4)~~ — **feito** (§15).
 6. Engine de **nesting** da Preparação (§12) — formatos decifrados; falta a lista do operador.
+   **← É AQUI QUE SE RETOMA.**
 
 > ⚠ A lista do totem está **longa demais** (a captura da tela inteira do Laser Chapa deu 41.607 px).
 > As marcas concluídas deveriam ir para o fim ou para uma seção recolhida, e a busca ganhar foco
@@ -951,3 +952,76 @@ terminal nenhum.
 > ⚠ O Gantt continua com os recursos em **constante no código** (`RECURSOS`, `BANCADAS`). O fim de
 > linha correto é ele ler este cadastro, mas as tabelas `Mes*` **não existem no Neon** e o Gantt é
 > produção: pendurá-lo nelas hoje quebraria o que funciona. Fica para quando o MES virar a chave.
+
+
+---
+
+# 15. O monitor de máquinas (13/09/2026)
+
+`/mes-lab/monitor` — a tela de cards da supervisão, feita para TV. Contrato: o dataset 131 do
+Syneco (§6.4). Regras em `lib/mes/monitor.js`, rota `GET /api/mes-lab/monitor`, tela em
+`app/mes-lab/monitor/`.
+
+**⚠⚠ ELE SÓ LÊ.** Não existe POST, PATCH nem DELETE nessa rota, e nenhum caminho da tela grava
+evento. É a decisão central: o monitor fica aberto o dia inteiro se atualizando sozinho, e um
+defeito num caminho de escrita dele viraria apontamento fantasma repetido a cada 10 segundos.
+
+## 15.1 O que o Codex corrigiu antes de isto ir ao ar
+
+A primeira versão foi escrita por mim e revisada por ele (perfil `architecture`) **antes** de
+existir tela. Três achados viraram código:
+
+1. **Evento sem sessão não é máquina livre.** Eu tinha achatado três procedências num caso só: se
+   não havia sessão aberta, *qualquer* último evento virava `LIVRE`. Só que `MesEvento.sessaoId` é
+   **opcional** de propósito — é por aí que entram manutenção e o sinal do CNC (§6.6). Uma máquina
+   **EM MANUTENÇÃO** apareceria como disponível, e o supervisor mandaria trabalho para ela. Agora:
+   evento da sessão aberta vale; evento **do recurso** (sem sessão) vale, porque fala da MÁQUINA;
+   evento de **outra** sessão não vale.
+2. **O último evento não tinha desempate.** Eu buscava `groupBy(_max ocorridoEm)` e depois casava
+   por igualdade de data num `OR` de pares. Dois problemas: sem `orderBy`, dois eventos no mesmo
+   milissegundo faziam o card **piscar** entre dois estados a cada atualização; e a igualdade de
+   `DateTime` falha **calada** se a coluna guardar precisão que o `Date` do JavaScript não carrega —
+   o posto apareceria "SEM REGISTRO" sem erro nenhum. Trocado por `take: 1` na relação, com ordem
+   **total** (`ocorridoEm`, `recebidoEm`, `id`). Sumiram as duas armadilhas e uma consulta.
+3. **O saldo divergia do totem.** O monitor enxerga UMA sessão; `saldoDaMarca` soma **todas** as
+   sessões da mesma obra+marca. Marca de 10 com 6 feitas ontem e 2 hoje: o monitor diria "faltam 8"
+   e o totem "faltam 2" — duas verdades sobre o mesmo número, na mesma fábrica. **O campo foi
+   removido**; volta quando for calculado pela mesma conta do totem.
+
+Ele também apontou o que ficou **aceito como está**, e está escrito no código: as consultas não
+compartilham um retrato único (a tela se corrige no ciclo seguinte, e prender uma transação
+`RepeatableRead` a cada poll custaria conexão no Neon), e o desempenho do `take: 1` por relação
+**não foi medido** em Neon — só no laboratório.
+
+## 15.2 As decisões da tela
+
+- **Parado, livre e sem registro são três contas separadas** no cabeçalho. Somar os três em "não
+  produzindo" é o número que o Syneco entrega hoje e que não serve para agir: parada é problema
+  para resolver agora, livre é máquina esperando trabalho, sem registro é posto que ninguém sabe.
+- **O tempo decorrido é contado no navegador** (o servidor manda só o instante). Calculado no
+  servidor, o número congela entre uma atualização e outra: a TV mostraria "12 min" parado por 10
+  segundos e depois pularia para 13.
+- **`setTimeout` depois da resposta, não `setInterval`** (recomendação do Codex): com intervalo
+  fixo, uma consulta lenta faz as chamadas se empilharem. O passo dobra a cada falha até 2 min.
+- **Falha de atualização aparece separada do estado da fábrica.** Rede caída mantém os cards com o
+  último panorama e acende "sem atualizar há X"; apagar a tela faria o supervisor achar que a
+  fábrica parou, quando quem parou foi o Wi-Fi.
+- **Posto sem trabalho mostra só nome e estado.** Com 31 postos sem sessão, as linhas de "—"
+  empurravam para fora da tela justamente os que estão produzindo (a captura caiu de 4.653 px para
+  2.544 px ao encurtar o card vazio).
+- **Alerta de sessão aberta há mais de 12 h.** Um turno tem 8-9 h; passou disso, atravessou a
+  noite — quase sempre é o operador que foi embora sem encerrar. O monitor **aponta**, não
+  conserta: escrever daqui é proibido. Na primeira validação ele pegou um caso real
+  (MONTAGEM 1, 43 h — resto dos testes de 11/09).
+
+## 15.3 A ponte com o Codex tinha quebrado, e ninguém sabia
+
+`consultar.py` devolvia `CLI codex não encontrado`. Causa: o binário do Codex mora **dentro da
+extensão ChatGPT do VSCode**, e o nome da pasta tem a versão (`openai.chatgpt-26.903.61454-…`). A
+extensão se atualizou para `26.908` e o caminho gravado em `.claude/revisao-codex.local.json`
+deixou de existir — a revisão automática morria em silêncio a cada Stop.
+
+Conserto: `~/.local/bin/codex`, um lançador que resolve o caminho **na hora**, pegando a extensão
+mais recente **pela data** (não pela ordem alfabética: "26.10" viria antes de "26.9" num `sort` de
+texto). A configuração passou a apontar para ele. A próxima atualização da extensão não quebra
+nada.

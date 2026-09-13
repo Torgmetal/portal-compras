@@ -1,7 +1,12 @@
 {
-  "build": 3124,
-  "gerado": "2026-09-13T17:25:25.045Z",
+  "build": 3125,
+  "gerado": "2026-09-13T17:59:41.619Z",
   "commits": [
+    {
+      "hash": "084e22be0f",
+      "data": "13/09/2026",
+      "titulo": "MES proprio: o cadastro da fabrica, e o totem que nunca achava o Acabamento"
+    },
     {
       "hash": "1b8888394f",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7c49e19bbc",
       "data": "11/09/2026",
       "titulo": "fix(op): remover orçamento comercial da aba Obra para todos"
-    },
-    {
-      "hash": "0a6542fb30",
-      "data": "11/09/2026",
-      "titulo": "fix(listas): incluir marcas compartilhadas e reconhecer LE formatada"
     }
   ]
 }

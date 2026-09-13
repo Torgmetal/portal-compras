@@ -1,4 +1,5 @@
-import { Factory, CircleAlert, ArrowRight } from "lucide-react";
+import Link from "next/link";
+import { Factory, CircleAlert, ArrowRight, MonitorSpeaker, Settings, Tv } from "lucide-react";
 
 // MES PRÓPRIO — área de construção, fora do portal.
 //
@@ -60,6 +61,12 @@ const COR = {
 };
 const ROTULO = { feito: "Concluído", proximo: "Próximo", planejado: "Planejado" };
 
+const ATALHOS = [
+  { href: "/mes-lab/monitor", titulo: "Monitor de máquinas", nota: "o chão de fábrica agora", icone: MonitorSpeaker },
+  { href: "/mes-lab/cadastro", titulo: "Cadastro", nota: "setores, postos, motivos, operadores", icone: Settings },
+  { href: "/mes-lab/totem/setor/MONTAGEM", titulo: "Totem por setor", nota: "trocar MONTAGEM pelo setor do PC", icone: Tv },
+];
+
 export default function MesLabPage() {
   return (
     <div className="min-h-screen bg-torg-blue-50/30">
@@ -87,6 +94,24 @@ export default function MesLabPage() {
             chave. Rota fechada ao ADMIN e fora de todos os menus.
           </p>
         </div>
+
+        {/* ⚠ As telas prontas ficam aqui porque NENHUMA delas aparece em menu do portal — e sem
+            isto a única forma de chegar nelas é saber a URL de cor. */}
+        <nav className="mt-6 grid gap-3 sm:grid-cols-3">
+          {ATALHOS.map((a) => (
+            <Link
+              key={a.href}
+              href={a.href}
+              className="group flex items-center gap-3 rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm transition hover:border-torg-blue/40 hover:shadow"
+            >
+              <a.icone size={18} className="shrink-0 text-torg-blue" />
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-torg-dark">{a.titulo}</span>
+                <span className="block truncate text-xs text-torg-gray">{a.nota}</span>
+              </span>
+            </Link>
+          ))}
+        </nav>
 
         <section className="mt-8 space-y-4">
           {FASES.map((f) => (

@@ -183,6 +183,9 @@ export default function TorguinhoChat() {
   // operada com luva e pressa, e o balão fica bem em cima do botão "Encerrar". Quem está no totem
   // também não é do time do portal — é o operador da máquina.
   if (pathname?.startsWith("/mes-lab/totem")) return null;
+  // ⚠ E o monitor da supervisão, que é uma TV ligada o dia inteiro: o balão cobre um card de posto
+  // e ninguém vai clicar nele de lá — mas alguém vai deixar de ver a máquina que está atrás.
+  if (pathname?.startsWith("/mes-lab/monitor")) return null;
   if (status !== "authenticated" || !config || !config.ativo || !temAcesso) return null;
 
   user?.name?.split(" ")[0] || "colega";
