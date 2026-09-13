@@ -1,6 +1,6 @@
 import { META_KG_DIA_ACABAMENTO, META_KG_DIA_JATO } from "@/lib/capacidade-acabamento";
 import { BANCADAS as BANCADAS_SOLDA, nomeDaBancada } from "@/lib/solda-capacidade";
-import { BANCADAS as BANCADAS_MONT, nomeDaBancada as nomeMontagem } from "@/lib/montagem-capacidade";
+import { BANCADAS_CONSULTA_MONTAGEM as BANCADAS_MONT, rotuloPosto as nomeMontagem } from "@/lib/postos-operador";
 import { META_KG_DIA_PINTURA } from "@/lib/capacidade-pintura";
 
 // ─── RECURSOS, SETORES E CORES ─────────────────────────────────────────────────────────────────

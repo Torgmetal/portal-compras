@@ -13,7 +13,11 @@ export const data = (v) =>
         String(v).length === 10 ? `${v}T12:00:00Z` : v,
       ).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
     : "Não informado";
-export function useConsulta(url, manterDados = false) {
+export function useConsulta(
+  url,
+  manterDados = false,
+  forcarAtualizacao = false,
+) {
   const [tentativa, setTentativa] = useState(0),
     [estado, setEstado] = useState({});
   useEffect(() => {
@@ -29,7 +33,14 @@ export function useConsulta(url, manterDados = false) {
     );
     (async () => {
       try {
-        const r = await fetch(url, { cache: "no-store", signal: abort.signal });
+        const endereco =
+          forcarAtualizacao && tentativa > 0
+            ? `${url}${url.includes("?") ? "&" : "?"}consultaAtual=1`
+            : url;
+        const r = await fetch(endereco, {
+          cache: "no-store",
+          signal: abort.signal,
+        });
         const dados = await r.json();
         if (!r.ok) throw new Error(dados.error || "Falha na consulta.");
         if (!abort.signal.aborted) setEstado({ url, dados });
@@ -38,7 +49,7 @@ export function useConsulta(url, manterDados = false) {
       }
     })();
     return () => abort.abort();
-  }, [url, tentativa, manterDados]);
+  }, [url, tentativa, manterDados, forcarAtualizacao]);
   const recarregar = useCallback(() => setTentativa((t) => t + 1), []);
   // Não mostra nem permite agir nos dados de outra OP durante uma troca.
   return {

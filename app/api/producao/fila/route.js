@@ -27,7 +27,9 @@ export async function GET(req) {
       { status: 400 },
     );
   try {
-    const dados = await carregarFilaOperador();
+    const dados = await carregarFilaOperador({
+      atualizar: new URL(req.url).searchParams.get("consultaAtual") === "1",
+    });
     return NextResponse.json(
       { ...dados, lotes: dados.lotes.filter((l) => l.setor === s.data) },
       { headers: { "Cache-Control": "private, no-store" } },

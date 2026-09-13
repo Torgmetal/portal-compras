@@ -12,9 +12,16 @@ import {
   FileText,
   Box,
   SlidersHorizontal,
+  Flag,
 } from "lucide-react";
 import { ETAPAS } from "@/lib/producao-operacional";
-import { montarFilaOperador } from "@/lib/fila-operador";
+import {
+  montarFilaOperador,
+  temPrioridade,
+  aplicarRemanejoNaFila,
+} from "@/lib/fila-operador";
+import { rotuloPosto } from "@/lib/postos-operador";
+import RemanejarBancada from "./RemanejarBancada";
 import FichaPecaModal from "@/components/FichaPecaModal";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 import {
@@ -51,6 +58,7 @@ export default function MinhaFila() {
     [aberto, setAberto] = useState(null),
     [desenho, setDesenho] = useState(null),
     [ficha, setFicha] = useState(null);
+  const [remanejar, setRemanejar] = useState(null);
   useEffect(() => {
     try {
       const p = JSON.parse(localStorage.getItem(CHAVE) || "null");
@@ -65,14 +73,15 @@ export default function MinhaFila() {
   const estado = useConsulta(
     posto ? `/api/producao/fila?setor=${posto.setor}` : null,
     true,
+    true,
   );
   useEffect(() => {
-    if (!posto) return;
+    if (!posto || remanejar) return;
     const id = setInterval(() => {
       if (document.visibilityState === "visible") estado.recarregar();
     }, 60000);
     return () => clearInterval(id);
-  }, [posto, estado.recarregar]);
+  }, [posto, remanejar, estado.recarregar]);
   function escolherPosto(setor, recurso = "") {
     const p = { setor, recurso };
     setPosto(p);
@@ -81,6 +90,7 @@ export default function MinhaFila() {
     setAba("hoje");
     setDesenho(null);
     setFicha(null);
+    setRemanejar(null);
     try {
       localStorage.setItem(CHAVE, JSON.stringify(p));
     } catch {}
@@ -98,7 +108,14 @@ export default function MinhaFila() {
         .filter((l) => l.setor === posto?.setor && l.recurso)
         .map((l) => l.recurso),
     ]),
-  ].sort();
+  ].sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }));
+  const filaSetor = montarFilaOperador(
+    estado.dados?.lotes,
+    posto?.setor,
+    "",
+    estado.dados?.hoje || "",
+  );
+  const prioritarias = fila[aba].reduce((s, l) => s + l.saldoPrioritario, 0);
   if (!carregado)
     return (
       <p role="status" className="p-5 text-torg-gray">
@@ -164,6 +181,7 @@ export default function MinhaFila() {
         </div>
         <button
           className={`${botao} flex items-center gap-2`}
+          disabled={!!remanejar}
           onClick={() => setEscolher(true)}
         >
           <SlidersHorizontal size={16} />
@@ -175,27 +193,71 @@ export default function MinhaFila() {
           Minha bancada / máquina
           <select
             aria-label="Minha bancada ou máquina"
+            disabled={!!remanejar}
             className={`${campo} block w-full mt-1`}
             value={posto.recurso}
             onChange={(e) => escolherPosto(posto.setor, e.target.value)}
           >
             <option value="">Todo o setor</option>
             {posto.recurso && !recursos.includes(posto.recurso) && (
-              <option value={posto.recurso}>{posto.recurso}</option>
+              <option value={posto.recurso}>
+                {rotuloPosto(posto.recurso)}
+              </option>
             )}
             {recursos.map((r) => (
               <option key={r} value={r}>
-                {r.replaceAll("_", " ")}
+                {rotuloPosto(r)}
               </option>
             ))}
           </select>
         </label>
         <Atualizar
           onClick={estado.recarregar}
-          disabled={estado.carregando || estado.atualizando}
+          disabled={estado.carregando || estado.atualizando || !!remanejar}
         />
       </div>
       <EstadoConsulta estado={estado}>
+        {posto.setor === "MONTAGEM" && (
+          <details className="bg-white border rounded-xl p-4">
+            <summary className="cursor-pointer font-semibold text-torg-blue min-h-7">
+              Ver todas as bancadas ({recursos.length})
+            </summary>
+            <p className="text-xs text-torg-gray mt-2">
+              Confira a fila de cada posto. Bancadas sem programação podem
+              receber novos lotes após definição com o PCP e confirmação do
+              montador no turno.
+            </p>
+            <div className="grid sm:grid-cols-2 gap-2 mt-3">
+              {recursos.map((r) => {
+                const tarefas = Object.values(filaSetor)
+                  .flat()
+                  .filter((l) => l.recurso === r);
+                const saldo = filaSetor.hoje
+                  .filter((l) => l.recurso === r)
+                  .reduce((s, l) => s + l.saldo, 0);
+                return (
+                  <button
+                    key={r}
+                    className={`text-left rounded-lg border p-3 min-h-16 ${posto.recurso === r ? "border-torg-blue bg-blue-50" : "border-gray-200"}`}
+                    onClick={() => escolherPosto(posto.setor, r)}
+                    disabled={!!remanejar}
+                  >
+                    <span className="block text-sm font-semibold text-torg-dark">
+                      {rotuloPosto(r)}
+                    </span>
+                    <span className="block text-xs text-torg-gray mt-1">
+                      {saldo
+                        ? `${fmt(saldo)} peças para fazer`
+                        : tarefas.length
+                          ? "Ver pendências / próximos dias"
+                          : "Sem programação"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </details>
+        )}
         <nav
           className="grid grid-cols-3 gap-1 bg-gray-100 p-1 rounded-xl"
           aria-label="Fila de trabalho"
@@ -209,6 +271,7 @@ export default function MinhaFila() {
               key={k}
               className={`min-h-12 rounded-lg px-1 py-2 text-xs sm:text-sm font-semibold ${aba === k ? "bg-white text-torg-blue shadow-sm" : "text-torg-gray"}`}
               aria-pressed={aba === k}
+              disabled={!!remanejar}
               onClick={() => {
                 setAba(k);
                 setAberto(null);
@@ -218,6 +281,17 @@ export default function MinhaFila() {
             </button>
           ))}
         </nav>
+        {prioritarias > 0 && (
+          <p className="flex items-center gap-2 rounded-lg bg-orange-50 border border-orange-200 text-orange-900 p-3 text-sm font-semibold">
+            <Flag size={18} className="shrink-0" />
+            {fmt(prioritarias)} peças prioritárias
+            {aba === "aguardando"
+              ? " aguardando liberação"
+              : aba === "proximos"
+                ? " na programação futura"
+                : " para fazer primeiro"}
+          </p>
+        )}
         {aba === "hoje" && (
           <div>
             <h2 className="font-bold text-lg text-torg-dark">
@@ -267,7 +341,7 @@ export default function MinhaFila() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs text-torg-gray">
-                      {l.recurso?.replaceAll("_", " ") || "Sem posto definido"}
+                      {rotuloPosto(l.recurso)}
                       {aba === "proximos" ? ` · ${data(l.dia)}` : ""}
                     </p>
                     <h3 className="font-bold text-xl text-torg-dark mt-1">
@@ -286,6 +360,12 @@ export default function MinhaFila() {
                     </span>
                   </div>
                 </div>
+                {l.saldoPrioritario > 0 && (
+                  <p className="text-xs font-bold text-orange-800 mt-3 flex gap-2 items-center">
+                    <Flag size={15} />
+                    Prioridade · {fmt(l.saldoPrioritario)} peças
+                  </p>
+                )}
                 {aba === "aguardando" ? (
                   <div className="text-sm bg-amber-50 text-amber-900 p-3 rounded-lg mt-3">
                     {[...new Set(l.itens.map((i) => i.motivo))].map((m) => (
@@ -316,6 +396,38 @@ export default function MinhaFila() {
                     className={aberto === l.id ? "rotate-90" : ""}
                   />
                 </button>
+                {posto.setor === "MONTAGEM" &&
+                  aba !== "aguardando" &&
+                  l.recurso &&
+                  !l.terceiroRecebido &&
+                  !l.terceiroPrevisto &&
+                  (remanejar?.id === l.id ? (
+                    <RemanejarBancada
+                      trabalho={remanejar}
+                      hoje={estado.dados.hoje}
+                      onClose={() => setRemanejar(null)}
+                      onSalvo={(recurso, dia) => {
+                        estado.atualizar((d) => ({
+                          ...d,
+                          lotes: aplicarRemanejoNaFila(
+                            d.lotes,
+                            remanejar,
+                            recurso,
+                            dia,
+                          ),
+                          geradoEm: new Date().toISOString(),
+                        }));
+                      }}
+                    />
+                  ) : (
+                    <button
+                      className={`${botao} mt-2 w-full`}
+                      disabled={estado.atualizando || !!remanejar}
+                      onClick={() => setRemanejar(l)}
+                    >
+                      Trocar bancada / data
+                    </button>
+                  ))}
               </div>
               {aberto === l.id && (
                 <div className="border-t divide-y">
@@ -329,6 +441,11 @@ export default function MinhaFila() {
                           <p className="font-bold text-torg-dark break-all">
                             {i.m}
                           </p>
+                          {temPrioridade(i) && (
+                            <p className="text-xs font-bold text-orange-800 mt-1">
+                              Prioridade {i.prioridade} nesta OP
+                            </p>
+                          )}
                           {i.pf && (
                             <p className="text-xs text-torg-gray mt-1">
                               {i.pf}

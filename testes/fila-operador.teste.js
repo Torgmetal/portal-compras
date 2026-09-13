@@ -103,3 +103,66 @@ it("reúne a OP na bancada somando as faixas restantes de cada marca", () => {
   expect(f.hoje[0].itens).toHaveLength(1);
   expect(f.hoje[0].itens[0].q).toBe(2);
 });
+
+it("destaca prioridades reais sem liberar pendências ou antecipar datas", () => {
+  const montagem = (id, dia, prioridade, pronto = true) => ({
+    ...lote,
+    id,
+    op: id,
+    dia,
+    setor: "MONTAGEM",
+    recurso: "MONTAGEM 1",
+    itens: [
+      {
+        id,
+        m: id,
+        q: 4,
+        prioridade,
+        prontidao: { pronto, motivo: "Croquis pendentes" },
+      },
+    ],
+  });
+  const f = montarFilaOperador(
+    [
+      montagem("normal", "2026-09-10", null),
+      montagem("prioritaria", "2026-09-12", 5),
+      montagem("bloqueada", "2026-09-12", 1, false),
+      montagem("futura", "2026-09-14", 1),
+    ],
+    "MONTAGEM",
+    "",
+    "2026-09-12",
+  );
+  expect(f.hoje.map((l) => l.op)).toEqual(["prioritaria", "normal"]);
+  expect(f.hoje[0].saldoPrioritario).toBe(4);
+  expect(f.aguardando[0].itens[0].motivo).toBe("Croquis pendentes");
+  expect(f.proximos[0].op).toBe("futura");
+});
+
+it("ordena marcas prioritárias dentro da OP e mantém datas futuras em ordem", () => {
+  const f = montarFilaOperador(
+    [
+      {
+        ...lote,
+        itens: [
+          { id: "a", m: "A", q: 2 },
+          { id: "b", m: "B", q: 3, prioridade: 2 },
+          { id: "c", m: "C", q: 5, prioridade: 1 },
+        ],
+      },
+      { ...lote, id: "amanha", dia: "2026-09-13", itens: [{ id: "d", q: 3 }] },
+      {
+        ...lote,
+        id: "depois",
+        dia: "2026-09-14",
+        itens: [{ id: "e", q: 3, prioridade: 1 }],
+      },
+    ],
+    "SOLDA",
+    "",
+    "2026-09-12",
+  );
+  expect(f.hoje[0].itens.map((i) => i.m)).toEqual(["C", "B", "A"]);
+  expect(f.hoje[0].saldoPrioritario).toBe(8);
+  expect(f.proximos.map((l) => l.dia)).toEqual(["2026-09-13", "2026-09-14"]);
+});
