@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Loader2, RefreshCw, PackageOpen } from "lucide-react";
 export const botao =
   "min-h-11 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium bg-white text-torg-dark hover:bg-gray-50 disabled:opacity-40";
@@ -13,7 +13,7 @@ export const data = (v) =>
         String(v).length === 10 ? `${v}T12:00:00Z` : v,
       ).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
     : "Não informado";
-export function useConsulta(url) {
+export function useConsulta(url, manterDados = false) {
   const [tentativa, setTentativa] = useState(0),
     [estado, setEstado] = useState({});
   useEffect(() => {
@@ -22,7 +22,11 @@ export function useConsulta(url) {
       return;
     }
     const abort = new AbortController();
-    setEstado({ url, carregando: true });
+    setEstado((anterior) =>
+      manterDados && anterior.url === url && anterior.dados
+        ? { ...anterior, erro: null, atualizando: true }
+        : { url, carregando: true },
+    );
     (async () => {
       try {
         const r = await fetch(url, { cache: "no-store", signal: abort.signal });
@@ -34,11 +38,12 @@ export function useConsulta(url) {
       }
     })();
     return () => abort.abort();
-  }, [url, tentativa]);
+  }, [url, tentativa, manterDados]);
+  const recarregar = useCallback(() => setTentativa((t) => t + 1), []);
   // Não mostra nem permite agir nos dados de outra OP durante uma troca.
   return {
     ...(estado.url === url ? estado : url ? { carregando: true } : {}),
-    recarregar: () => setTentativa((t) => t + 1),
+    recarregar,
     atualizar: (fn) => setEstado((e) => ({ ...e, dados: fn(e.dados) })),
   };
 }

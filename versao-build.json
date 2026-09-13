@@ -1,9 +1,14 @@
 {
-  "build": 3122,
-  "gerado": "2026-09-13T00:29:07.806Z",
+  "build": 3123,
+  "gerado": "2026-09-13T00:55:15.447Z",
   "commits": [
     {
-      "hash": "0afe69e4",
+      "hash": "ef28964d",
+      "data": "12/09/2026",
+      "titulo": "feat(producao): abre fila de trabalho por setor e posto"
+    },
+    {
+      "hash": "7d9fc3b1",
       "data": "12/09/2026",
       "titulo": "feat(producao): remodela operação por OP, peças e recursos"
     },
@@ -146,11 +151,6 @@
       "hash": "988d0466",
       "data": "11/09/2026",
       "titulo": "Análise crítica: ata FORM 10 em PDF e ações levadas ao 5W2H da Qualidade"
-    },
-    {
-      "hash": "5d643c9b",
-      "data": "11/09/2026",
-      "titulo": "Autoriza Guilherme a aprovar Análise Crítica de Projeto"
     }
   ]
 }

@@ -13,8 +13,8 @@ import SidebarUserFooter from "@/components/SidebarUserFooter";
 // Abas do fluxo de produção soltas no topo (mesmo padrão do PCP). As telas são
 // as mesmas dos dois portais, mas a navegação fica sempre dentro da Produção.
 const menu = [
-  { href: "/producao", label: "Carteira de OPs", icon: Layers, exact: true },
-  { href: "/producao/ordens", label: "Peças e execução", icon: Factory },
+  { href: "/producao", label: "Meu trabalho", icon: Layers, exact: true },
+  { href: "/producao/gestao", label: "Gestão das OPs", icon: Factory },
   { href: "/producao/materiais", label: "Materiais e rastreabilidade", icon: PackageSearch },
   { href: "/producao/qualidade", label: "Inspeções", icon: ClipboardCheck },
   { href: "/producao/romaneios", label: "Romaneios", icon: Truck },
