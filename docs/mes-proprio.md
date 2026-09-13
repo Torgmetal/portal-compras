@@ -26,12 +26,16 @@ reais, em 6 setores. Números conferidos **contando no destino**, não somando a
 
 **Próximo passo, em ordem:**
 
-1. Semear `MesSetor`/`MesRecurso` **do vocabulário do Gantt** (§11), não do Syneco.
-2. `lib/mes/sessao.js` — abrir, apontar, parar, encerrar, com as travas de concorrência do §7.5.
-3. Fluxo do **totem** contra o banco local.
-4. **Monitor** de máquinas — o contrato de tela é o dataset 131 (§6.4).
-5. **Telas de cadastro** de setores, máquinas e bancadas (§11.3) — pedidas pelo Matheus para depois
-   do totem, mas elas já mandam na modelagem de agora.
+1. ~~Semear `MesSetor`/`MesRecurso` **do vocabulário do Gantt** (§11)~~ — **feito**.
+2. ~~`lib/mes/sessao.js` — abrir, apontar, parar, encerrar, com as travas do §7.5~~ — **feito**.
+3. ~~Fluxo do **totem** contra o banco local~~ — **feito** (§13).
+4. ~~**Telas de cadastro** de setores, máquinas e bancadas (§11.3)~~ — **feito** (§14).
+5. **Monitor** de máquinas — o contrato de tela é o dataset 131 (§6.4). **← É AQUI QUE SE RETOMA.**
+6. Engine de **nesting** da Preparação (§12) — formatos decifrados; falta a lista do operador.
+
+> ⚠ A lista do totem está **longa demais** (a captura da tela inteira do Laser Chapa deu 41.607 px).
+> As marcas concluídas deveriam ir para o fim ou para uma seção recolhida, e a busca ganhar foco
+> automático. Não foi feito porque não foi pedido; fica anotado antes que vire hábito rolar.
 
 > ~~BLOQUEADO por credencial SKA~~ — **caiu** (§11). Não vamos importar o cadastro do Syneco: os
 > recursos saem do Gantt, que é nosso.
@@ -884,3 +888,66 @@ do totem vai fazer, e vale ver o formato antes de desenhar a tela.
 
 > ⚠ Os arquivos de exemplo têm dado real de obra (OP-107/TMSA, OP-097). Ficaram **fora do
 > repositório**, no diretório temporário da sessão — como os dados do laboratório (§10.3).
+
+---
+
+# 14. As telas de cadastro (13/09/2026)
+
+`/mes-lab/cadastro` — setores, postos, motivos de parada e operadores. Até aqui tudo isso só nascia
+do `scripts/mes-lab/semear-cadastro.mjs`, que é **bootstrap de uma vez, não fonte permanente**
+(§11.4): depois dele, quem manda é o banco, e é aqui que se escreve.
+
+Regras em `lib/mes/cadastro.js` (a rota e a tela só as chamam):
+
+- ⚠⚠ **O que tem histórico não se apaga, se desativa.** Um posto com apontamento é a âncora do que
+  foi produzido nele; apagá-lo deixaria o evento órfão e o relatório do mês passado passaria a
+  mentir. O botão de excluir **só existe** para quem nunca foi usado — mostrar e deixar o servidor
+  recusar é prometer o que não se cumpre.
+- ⚠⚠ **O código congela ao primeiro uso.** Ele é o vínculo com o que o PCP programou
+  (`PecaConjunto.soldaBancada = "SOLDA 5"`). Trocado depois, a bancada continua na tela e para de
+  receber programação — falha silenciosa. O campo fica travado, com o motivo à vista.
+- ⚠ **O espaço do meio do código fica.** "SOLDA 5", "MONTAGEM 1" — é a string gravada em 21.772
+  peças. Normalizar tirando o espaço criaria um posto que não casa com nada.
+
+## 14.1 ⚠⚠ O TOTEM DO ACABAMENTO E DA PINTURA NUNCA MOSTRAVA NADA
+
+Achado **pela própria tela de cadastro**, no primeiro carregamento, e confirmado no banco:
+
+| Campo do Gantt | O que está gravado | O que o MES cadastra |
+|---|---|---|
+| `acabamentoBancada` | `ACABAMENTO` (83 peças) | `ACABAMENTO1`…`ACABAMENTO10` |
+| `pinturaBancada` | `GALPAO_1` (3 peças) | `PINTURAAIRLESS`, `PINTURAELETROSTATICA` |
+| `soldaBancada` | `SOLDA 1`…`SOLDA 7` | os mesmos ✔ |
+| `maquina` | `LASER_CHAPA`… | os mesmos ✔ |
+
+`programadoPara` filtrava por `campo = recurso.codigo`. No Acabamento isso procurava
+`acabamentoBancada = "ACABAMENTO7"`, que **não existe em peça nenhuma** — a tela dizia *"nada
+programado para este posto hoje"* todo dia, para sempre, sem erro visível. Solda e Preparação batem
+código a código, e foi por isso que passou despercebido em toda a validação do totem.
+
+**As duas granularidades estão certas** e foram decididas com o Matheus (10/09/2026): o Gantt planeja
+em balde onde a capacidade é kg/dia; o chão tem os postos físicos, porque **7 postos de acabamento
+apontaram no mesmo dia** e uma sessão por recurso travaria o segundo operador. O que faltava era o
+encaixe — e ele já estava escrito no semeador: **o vínculo entre planejar e executar é o SETOR**.
+
+Agora, quando o código do posto **não é** um código que o Gantt conhece, a lista passa a ser a do
+**setor inteiro**, e a tela diz isso (*"Esta é a programação de Acabamento — o PCP programa o setor,
+não cada posto"*). Sem esse aviso, dois postos pegariam a mesma marca achando que era só deles.
+
+Medido depois do conserto, contra o laboratório: `ACABAMENTO7` passou de **0 para 90 marcas**,
+`PINTURAAIRLESS` de **0 para 3**; `LASER_CHAPA` (433) e `SOLDA 5` (60) seguem filtrando pelo posto.
+
+## 14.2 ⚠⚠ O PRIMEIRO AVISO DA TELA ERA ALARME FALSO — E FOI TROCADO
+
+A primeira versão comparava os postos **código a código** com a lista do Gantt e acusava 15
+divergências. Depois do encaixe por setor, aquilo virou ruído: Acabamento, Pintura e as máquinas
+`20x` da Preparação **são** diferentes de propósito. Alarme falso em ferramenta de alarme ensina a
+ignorar a tarja — a mesma lição que o import de listas (§"Import de lista" no CLAUDE.md) já pagou.
+
+Sobrou a pergunta que continua sendo defeito de verdade, em `setoresSemPosto`: **setor que o PCP
+programa e que não tem nenhum posto ativo no MES**. Aí o trabalho existe no Gantt e não aparece em
+terminal nenhum.
+
+> ⚠ O Gantt continua com os recursos em **constante no código** (`RECURSOS`, `BANCADAS`). O fim de
+> linha correto é ele ler este cadastro, mas as tabelas `Mes*` **não existem no Neon** e o Gantt é
+> produção: pendurá-lo nelas hoje quebraria o que funciona. Fica para quando o MES virar a chave.

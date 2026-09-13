@@ -8,6 +8,9 @@ import { programadoPara } from "@/lib/mes/programado";
 // seguinte é se o lançamento se perdeu.
 
 const RECURSO = { codigo: "LASER_CHAPA", setor: { codigo: "PREPARACAO" } };
+// ⚠ No Acabamento o Gantt planeja em BALDE (uma bancada só, código "ACABAMENTO") e o chão tem 10
+// postos físicos — decisão do Matheus em 10/09/2026, porque 7 postos apontaram no mesmo dia.
+const POSTO_DE_ACABAMENTO = { codigo: "ACABAMENTO05", setor: { codigo: "ACABAMENTO" } };
 
 const peca = (id, marca, qte, extra = {}) => ({
   id, marca, qte, descricao: "COLUNA", perfil: "", pesoTotalKg: 100,
@@ -119,5 +122,56 @@ describe("programadoPara — a marca produzida aparece marcada", () => {
   it("setor sem mapa para o Gantt não quebra — devolve vazio", async () => {
     const r = await programadoPara(prismaFalso(), { codigo: "X", setor: { codigo: "EXPEDICAO" } });
     expect(r).toMatchObject({ lotes: [], semMapa: true });
+  });
+});
+
+// ─── QUANDO O PCP PLANEJA EM BALDE E O CHÃO TEM VÁRIOS POSTOS ─────────────────
+//
+// ⚠⚠ O DEFEITO QUE ESTES TESTES CONGELAM (13/09/2026). O Gantt grava `acabamentoBancada =
+// "ACABAMENTO"` (83 peças) e `pinturaBancada = "GALPAO_1"` (3 peças) — códigos de BALDE, do
+// planejamento. O MES cadastra os postos FÍSICOS: ACABAMENTO01…10, PINTURAAIRLESS. Buscando por
+// recurso, o totem do acabamento procurava `acabamentoBancada = "ACABAMENTO05"` e NUNCA achava
+// nada: dizia "nada programado para este posto hoje" todo dia, para sempre. Solda e Preparação
+// batem código a código, e foi por isso que passou despercebido.
+//
+// O vínculo entre planejamento e execução é o SETOR — está escrito no próprio semeador. Quando o
+// posto não é um código que o Gantt conhece, a lista passa a ser a DO SETOR.
+
+describe("programadoPara — posto físico dentro de um balde do Gantt", () => {
+  it("lista o programado do SETOR quando o posto não é um código do Gantt", async () => {
+    const prisma = prismaFalso({ pecas: [peca("p1", "T97A16", 1)] });
+    const r = await programadoPara(prisma, POSTO_DE_ACABAMENTO);
+
+    expect(r.doSetor).toBe(true);
+    // ⚠ O filtro NÃO pode citar o código do posto: é justamente ele que não existe no Gantt.
+    const onde = prisma.pecaConjunto.findMany.mock.calls[0][0].where;
+    expect(onde.acabamentoBancada).toBeUndefined();
+    expect(onde.acabamentoDiaProgramado).toBeTruthy();
+    expect(r.lotes[0].marcas).toHaveLength(1);
+  });
+
+  it("o posto que o Gantt conhece continua filtrando por ele mesmo", async () => {
+    const prisma = prismaFalso({ pecas: [peca("p1", "T97A16", 1)] });
+    const r = await programadoPara(prisma, RECURSO);
+
+    expect(r.doSetor).toBe(false);
+    expect(prisma.pecaConjunto.findMany.mock.calls[0][0].where.maquina).toBe("LASER_CHAPA");
+  });
+
+  // ⚠ A bancada única do acabamento é um código do Gantt: quem cadastrar um posto com ESSE código
+  // tem de continuar filtrando por recurso, senão o balde vira lista do setor sem necessidade.
+  it("o próprio código do balde continua sendo filtro de recurso", async () => {
+    const prisma = prismaFalso({ pecas: [] });
+    const r = await programadoPara(prisma, { codigo: "ACABAMENTO", setor: { codigo: "ACABAMENTO" } });
+    expect(r.doSetor).toBe(false);
+    expect(prisma.pecaConjunto.findMany.mock.calls[0][0].where.acabamentoBancada).toBe("ACABAMENTO");
+  });
+
+  // ⚠ Peça do setor ainda SEM posto atribuído (`recurso: null` no Gantt) é trabalho que alguém tem
+  // de fazer — e some se a busca exigir recurso preenchido.
+  it("traz também a peça do setor que ainda não tem posto atribuído", async () => {
+    const prisma = prismaFalso({ pecas: [peca("p1", "T97A16", 1, { acabamentoBancada: null })] });
+    const r = await programadoPara(prisma, POSTO_DE_ACABAMENTO);
+    expect(r.lotes[0].marcas).toHaveLength(1);
   });
 });

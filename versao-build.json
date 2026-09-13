@@ -1,7 +1,12 @@
 {
-  "build": 3123,
-  "gerado": "2026-09-11T22:11:34.985Z",
+  "build": 3124,
+  "gerado": "2026-09-13T17:25:25.045Z",
   "commits": [
+    {
+      "hash": "1b8888394f",
+      "data": "11/09/2026",
+      "titulo": "MES proprio: as bancadas do setor, legiveis a dois metros"
+    },
     {
       "hash": "0c650a033b",
       "data": "11/09/2026",
@@ -146,11 +151,6 @@
       "hash": "0a6542fb30",
       "data": "11/09/2026",
       "titulo": "fix(listas): incluir marcas compartilhadas e reconhecer LE formatada"
-    },
-    {
-      "hash": "fd206ca635",
-      "data": "11/09/2026",
-      "titulo": "Análise crítica: responsável (Eng.º de Projeto) editável no registro"
     }
   ]
 }

@@ -239,6 +239,16 @@ function Escolher({ dados, codigo, busca, setBusca, aoAbrir, ocupado }) {
         </Secao>
       )}
 
+      {/* ⚠ QUANDO A LISTA É DO SETOR, A TELA DIZ ISSO. No Acabamento e na Pintura o PCP planeja em
+          balde e o posto físico é mais fino que o planejamento: a lista é a do setor inteiro. Sem o
+          aviso, o operador acha que aquele trabalho todo é dele e dois postos pegam a mesma marca. */}
+      {temProgramacao && dados.doSetor && (
+        <p className="bg-white/8 border border-white/15 rounded-xl px-4 py-3 mb-4 text-white/70">
+          Esta é a programação de <b className="text-white">{dados.recurso.setor.nome}</b> — o PCP
+          programa o setor, não cada posto. Confira com o time quem pega o quê.
+        </p>
+      )}
+
       {temProgramacao ? dados.lotes.map((lote) => (
         <Secao key={lote.opNumero} titulo={`Obra ${lote.opNumero}`}
                nota={`${lote.concluidas || 0} de ${lote.marcas.length} marca(s) prontas · ${lote.pecas} peça(s) · ${Math.round(lote.kg)} kg`}>
