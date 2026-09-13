@@ -1,7 +1,12 @@
 {
-  "build": 3128,
-  "gerado": "2026-09-13T04:12:00.086Z",
+  "build": 3129,
+  "gerado": "2026-09-13T13:30:44.049Z",
   "commits": [
+    {
+      "hash": "c52fb7bf",
+      "data": "13/09/2026",
+      "titulo": "Expedição: PDF do modelo de carga e veículos configuráveis do simulador"
+    },
     {
       "hash": "1e22c714",
       "data": "13/09/2026",
@@ -146,11 +151,6 @@
       "hash": "23b6948a",
       "data": "11/09/2026",
       "titulo": "Teste do plano de ação dos indicadores lê o campo pelo rótulo novo"
-    },
-    {
-      "hash": "7f9f55d9",
-      "data": "11/09/2026",
-      "titulo": "Plano de ação 5W2H: ficha por ação no PDF e formulário legível nos indicadores"
     }
   ]
 }
