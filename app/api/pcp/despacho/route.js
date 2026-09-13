@@ -61,6 +61,8 @@ export async function GET(req) {
     error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }
   const url = new URL(req.url);
+  const decisaoSolicitada = url.searchParams.get("decisao") === "1";
+  let dadosDecisaoCompletos = true;
   let opId = url.searchParams.get("opId");
   const obra = url.searchParams.get("obra");
   // O dashboard é por NOME de obra ("T64", "OP-67"); resolve pro opId pelo número da OP.
@@ -79,11 +81,11 @@ export async function GET(req) {
   const setor = url.searchParams.get("setor"); // opcional: escopo do setor pela ROTA da peça
   // A pré-programação precisa enxergar também os conjuntos ainda fora do lote liberado.
   // A entrada em bancada continua validada pelo Gantt, após o apontamento do corte.
-  const preprogramar = setor === "MONTAGEM" && url.searchParams.get("preprogramar") === "1";
+  const preprogramar = !decisaoSolicitada && setor === "MONTAGEM" && url.searchParams.get("preprogramar") === "1";
   const podePreprogramar = (p) => preprogramar && p.fonte === "LPC_IMPORT" && pecaEhComposta(p);
   const todasRaw = await prisma.pecaConjunto.findMany({
     where: { opId },
-    select: { id: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoUnitKg: true, pesoTotalKg: true, qte: true, qteProduzida: true, corteConcluidoEm: true, status: true, destino: true, destinoTerceirizado: true, terceirizado: true, terceirizadoRecebidoEm: true, encaminhadoSetor: true, prioridade: true, baixaSetores: true, montagemDiaProgramado: true, corteDiaProgramado: true, _count: { select: { conjuntoCroquis: true } } },
+    select: { id: true, opNumero: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoUnitKg: true, pesoTotalKg: true, qte: true, qteProduzida: true, corteConcluidoEm: true, status: true, destino: true, destinoTerceirizado: true, terceirizado: true, terceirizadoRecebidoEm: true, encaminhadoSetor: true, prioridade: true, baixaSetores: true, montagemDiaProgramado: true, corteDiaProgramado: true, _count: { select: { conjuntoCroquis: true } } },
     orderBy: [{ marca: "asc" }],
   });
   // Descarta linhas-lixo do import (ex.: a linha "TOTAL" da Lista de Expedição que entrou como peça)
@@ -146,7 +148,7 @@ export async function GET(req) {
       // lista por causa de um rótulo antigo.
       where: { opNumero: opInfo?.numero || undefined },
       select: { marca: true },
-    }).catch(() => [])).map((g) => String(g.marca || "").trim().toUpperCase())
+    }).catch(() => { dadosDecisaoCompletos = false; return []; })).map((g) => String(g.marca || "").trim().toUpperCase())
   );
 
   // ⚠⚠ SÓ O QUE O PLANEJAMENTO LIBEROU. Vitor (26/08/2026): "na pagina do pcp eu importei apenas as
@@ -159,14 +161,14 @@ export async function GET(req) {
   //
   // ⚠ LIBERAÇÃO DE FRENTE INTEIRA (pecaIds nulo) NÃO RESTRINGE NADA — é o caso "desce tudo".
   // ⚠ E `?tudo=1` mostra a OP inteira, para quem precisa procurar uma peça que não foi liberada.
-  const tudo = url.searchParams.get("tudo") === "1";
+  const tudo = !decisaoSolicitada && url.searchParams.get("tudo") === "1";
   let escopo = semEntregues, liberacaoInfo = null, marcadasForaDoLote = new Set();
   if (!tudo) {
     const libs = await prisma.liberacaoProducao.findMany({
       where: { opId, status: { in: ["LIBERADA", "EM_PRODUCAO"] } },
       select: { id: true, frente: true, dataProgramada: true, pecaIds: true, pecaMarcas: true, prioridade: true },
       orderBy: [{ dataProgramada: "asc" }, { liberadoEm: "asc" }],
-    }).catch(() => []);
+    }).catch(() => { dadosDecisaoCompletos = false; return []; });
     if (libs.length) {
       const frenteInteira = libs.some((l) => !Array.isArray(l.pecaIds) || !l.pecaIds.length);
       // ⚠⚠ O LOTE SE RESOLVE PELO ID **E PELA MARCA**. O id não sobrevive à reimportação da lista
@@ -213,11 +215,11 @@ export async function GET(req) {
       // T97A136 voltou a aparecer (GRD impressa hoje) sem trazer junto os 61 do bloco das 09:45,
       // que não têm liberação nem GRD.
       const jaDesceu = (p) => grdEmitidas.has(String(p.marca || "").trim().toUpperCase());
-      if (!frenteInteira && ids.size) {
+      if (!frenteInteira && (ids.size || decisaoSolicitada)) {
         escopo = semEntregues.filter((p) => ids.has(p.id) || temProducao(p) || jaDesceu(p) || podePreprogramar(p));
       }
       const foraDoLote = new Set(
-        frenteInteira || !ids.size ? [] : escopo.filter((p) => !ids.has(p.id)).map((p) => p.id)
+        frenteInteira || (!ids.size && !decisaoSolicitada) ? [] : escopo.filter((p) => !ids.has(p.id)).map((p) => p.id)
       );
       liberacaoInfo = {
         lotes: libs.length, frenteInteira,
@@ -238,6 +240,8 @@ export async function GET(req) {
       marcadasForaDoLote = foraDoLote;
     }
   }
+
+  if (decisaoSolicitada && !liberacaoInfo) escopo = [];
 
   // Reconciliação com o Syneco: quantidade PRODUZIDA no mesOrdem daquele setor, por marca
   // (extremo sincronismo portal×Syneco — o histórico e o export usam isto).
@@ -265,7 +269,7 @@ export async function GET(req) {
         _min: { dataInicio: true },
       });
       for (const a of ap) if (a.opSka && a._min?.dataInicio) apontadoDesde.set(a.opSka, a._min.dataInicio.toISOString());
-    } catch {}
+    } catch { dadosDecisaoCompletos = false; }
   }
   // SETOR REAL de cada peça (Syneco de TODOS os setores + status + terceiro + encaminhamento).
   // Serve pra não deixar peça que JÁ AVANÇOU aparecer na fila de um setor ANTERIOR (Vitor 18/08:
@@ -275,7 +279,7 @@ export async function GET(req) {
   try {
     const synAll = await prisma.mesOrdem.groupBy({ by: ["item", "setor"], where: { opId, produzidoUn: { gt: 0 } }, _sum: { produzidoUn: true } });
     realMapOp = mapaSetorReal(synAll.map((l) => ({ item: l.item, setor: l.setor })), normalizeSetorSyneco);
-  } catch {}
+  } catch { dadosDecisaoCompletos = false; }
   const jaAvancouAlem = (p) => (setor ? setorRealIndex(p, realMapOp) > (IDX_SETOR[setor] ?? -1) : false);
 
   // MONTAGEM — "pronto para montar" vs "pendente": um conjunto está pronto quando TODOS os croquis
@@ -334,7 +338,7 @@ export async function GET(req) {
         if (!g.conjuntos.includes(lk.conjunto.marca)) g.conjuntos.push(lk.conjunto.marca);
         travaPorCroqui.set(lk.croqui.marca, g);
       }
-    } catch {}
+    } catch { dadosDecisaoCompletos = false; }
   }
 
   // MATERIAL por peça (do CMR do Almoxarifado): o corte precisa saber, item a item, se o
@@ -343,11 +347,11 @@ export async function GET(req) {
   let compraOp = null;
   try {
     if (opInfo?.numero) matPorPerfil = await materialPorPerfil(opInfo.numero, escopo.map((p) => p.perfil));
-  } catch {}
+  } catch { dadosDecisaoCompletos = false; }
   // Status de COMPRA da OP inteira (pro chip do cabeçalho que abre a rastreabilidade completa).
   try {
     if (opInfo?.numero) compraOp = (await statusCompraPorOp([opInfo.numero])).get(String(opInfo.numero)) || null;
-  } catch {}
+  } catch { dadosDecisaoCompletos = false; }
 
   // PROGRAMAÇÃO — "o programador já lançou esta peça na produção?" (Vitor 18/08).
   // Quando o programador lança a peça no Syneco, nascem as ORDENS de toda a rota dela de uma vez
@@ -400,7 +404,7 @@ export async function GET(req) {
       }
       progPorMarca.set(o.item, g);
     }
-  } catch {}
+  } catch { dadosDecisaoCompletos = false; }
   // Situação da programação da peça NESTE setor:
   //   NAO_LANCADA         → nem liberada pelo PCP nem lançada no Syneco (nenhuma ordem)
   //   LIBERADA_SEM_ORDEM  → o PCP já liberou (GRD impressa), mas o Syneco ainda não tem ordem
@@ -439,7 +443,7 @@ export async function GET(req) {
       select: { pecaConjunto: { select: { marca: true } } },
     });
     for (const x of ri) if (x.pecaConjunto?.marca) expedidaPorRomaneio.add(x.pecaConjunto.marca);
-  } catch {}
+  } catch { dadosDecisaoCompletos = false; }
 
   // ── O CROQUI JÁ VIROU CONJUNTO? ────────────────────────────────────────────────────────────
   // Vitor (24/08/2026): "as que já foram para a montagem e já foram apontadas em alguma peça
@@ -478,7 +482,7 @@ export async function GET(req) {
       if (!g.conjuntos.length) { montadoPorCroqui.delete(k); continue; } // nenhum montado: nada a dizer
       montadoPorCroqui.set(k, { conjuntos: g.conjuntos, montados: g.conjuntos.length, total: g.total.size });
     }
-  } catch { /* sem estrutura de conjunto a peça segue avulsa — informação a menos, não erro */ }
+  } catch { dadosDecisaoCompletos = false; /* sem estrutura de conjunto a peça segue avulsa — informação a menos, não erro */ }
 
   // ── JÁ FOI LIBERADO PARA A FÁBRICA? ────────────────────────────────────────────────────────
   // Vitor (24/08/2026): liberar É imprimir a GRD. Então "liberado" não é campo novo — é a GRD
@@ -500,7 +504,7 @@ export async function GET(req) {
           grdPorMarca.set(k, { em: em ? new Date(em).toISOString() : null, por: g.liberadoPorNome || null, impressoes: g.impressoes || 1, formato: g.formato || null });
         }
       }
-    } catch { /* GRD é informação, não pode derrubar a listagem */ }
+    } catch { dadosDecisaoCompletos = false; /* GRD é informação, não pode derrubar a listagem */ }
   }
 
   // ── O PRODUZIDO DO SYNECO REPARTIDO ENTRE AS LINHAS DA MESMA MARCA ─────────────────────────
@@ -603,7 +607,15 @@ export async function GET(req) {
   const baixados = setor ? pecas.filter((p) => p.baixadoPortal).length : 0;
   const precisamSyneco = setor ? pecas.filter((p) => p.precisaSyneco).length : 0;
 
+  let decisao;
+  if (decisaoSolicitada && ["CORTE", "MONTAGEM"].includes(setor)) {
+    const { conferirDecisaoPcp } = await import("@/lib/pcp-conferencias-decisao");
+    decisao = await conferirDecisaoPcp({ opId, opNumero: opInfo?.numero, setor, pecas, todas,
+      dadosCompletos: dadosDecisaoCompletos && !!liberacaoInfo });
+  }
+
   return NextResponse.json({
+    ...(decisao ? { decisao } : {}),
     opId, opNumero: opInfo?.numero || null, emProducao: !!opInfo?.emProducao, setor: setor || null,
     total: pecas.length, placar, baixados, precisamSyneco, compra: compraOp,
     // ⚠ o recorte do Planejamento vai declarado: lista cortada em silêncio faz o PCP achar que a

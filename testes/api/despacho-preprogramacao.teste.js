@@ -22,3 +22,30 @@ it('consulta normal mantém o recorte de liberação',async()=>{
  const r=await GET(new Request('http://localhost/api/pcp/despacho?opId=op94&setor=MONTAGEM'));
  expect((await r.json()).pecas.map(p=>p.id)).toEqual(['c1','c2']);
 });
+vi.mock('@/lib/pcp-conferencias-decisao',()=>({conferirDecisaoPcp:vi.fn().mockResolvedValue({porId:{}})}));
+import {conferirDecisaoPcp} from '@/lib/pcp-conferencias-decisao';
+it('fila de decisão ignora tentativas de ampliar o recorte por query string',async()=>{
+ const r=await GET(new Request('http://localhost/api/pcp/despacho?opId=op94&setor=MONTAGEM&decisao=1&tudo=1&preprogramar=1'));
+ expect((await r.json()).pecas.map(p=>p.id)).toEqual(['c1','c2']);
+});
+it('fila de decisão sem liberação ativa fica vazia',async()=>{
+ mockPrisma.liberacaoProducao.findMany.mockResolvedValue([]);
+ const r=await GET(new Request('http://localhost/api/pcp/despacho?opId=op94&setor=MONTAGEM&decisao=1'));
+ expect((await r.json()).pecas).toEqual([]);
+});
+it('ponteiros perdidos não transformam o lote em uma liberação da OP inteira',async()=>{
+ mockPrisma.liberacaoProducao.findMany.mockResolvedValue([{id:'l1',pecaIds:['apagada'],dataProgramada:null}]);
+ const r=await GET(new Request('http://localhost/api/pcp/despacho?opId=op94&setor=MONTAGEM&decisao=1'));
+ expect((await r.json()).pecas).toEqual([]);
+});
+it('recupera marcas liberadas após reimportação da lista',async()=>{
+ mockPrisma.pecaConjunto.findMany.mockResolvedValue(conjuntos.map(p=>({...p,opNumero:'T94'})));
+ mockPrisma.liberacaoProducao.findMany.mockResolvedValue([{id:'l1',pecaIds:['apagada'],pecaMarcas:['T94|C2'],dataProgramada:null}]);
+ const r=await GET(new Request('http://localhost/api/pcp/despacho?opId=op94&setor=MONTAGEM&decisao=1'));
+ expect((await r.json()).pecas.map(p=>p.id)).toEqual(['c2']);
+});
+it('falha no Syneco invalida recomendação de prontidão sem derrubar consulta antiga',async()=>{
+ mockPrisma.mesOrdem.groupBy.mockRejectedValue(new Error('indisponível'));
+ await GET(new Request('http://localhost/api/pcp/despacho?opId=op94&setor=MONTAGEM&decisao=1'));
+ expect(conferirDecisaoPcp.mock.calls.at(-1)[0].dadosCompletos).toBe(false);
+});

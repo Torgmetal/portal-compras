@@ -1,7 +1,17 @@
 {
-  "build": 3125,
-  "gerado": "2026-09-13T02:27:00.724Z",
+  "build": 3127,
+  "gerado": "2026-09-13T02:35:08.016Z",
   "commits": [
+    {
+      "hash": "e4da7ab1",
+      "data": "12/09/2026",
+      "titulo": "feat(pcp): orienta liberação e cortes que destravam montagem"
+    },
+    {
+      "hash": "275e3aaf",
+      "data": "12/09/2026",
+      "titulo": "Memória: fase no lugar de frente; separação por fase no modelo de carga"
+    },
     {
       "hash": "a2ce9999",
       "data": "12/09/2026",
@@ -141,16 +151,6 @@
       "hash": "23005fa2",
       "data": "11/09/2026",
       "titulo": "fix(planejamento): contar corretamente materiais pendentes nos avisos"
-    },
-    {
-      "hash": "3b95884d",
-      "data": "11/09/2026",
-      "titulo": "feat(planejamento): consultar recebimentos e encaminhar rastreabilidade ao PCP"
-    },
-    {
-      "hash": "2844dea9",
-      "data": "11/09/2026",
-      "titulo": "Fiscal: a Remessa Terceiro mostra de quando ela é"
     }
   ]
 }

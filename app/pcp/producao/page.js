@@ -11,7 +11,7 @@ import ProducaoClient from "./ProducaoClient";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "PCP — Produção" };
 
-export default async function ProducaoPCPPage() {
+export default async function ProducaoPCPPage({ searchParams }) {
   await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]);
-  return <ProducaoClient />;
+  return <ProducaoClient entradaDecisao={searchParams?.fila ? { opId: searchParams.opId, setor: searchParams.setor, fila: searchParams.fila, marca: searchParams.marca } : null} />;
 }

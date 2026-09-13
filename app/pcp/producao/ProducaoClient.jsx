@@ -14,8 +14,9 @@
 // própria GRD emitida, que já grava quem imprimiu, quando e quantas vezes. Por isso o botão diz
 // "Imprimir e liberar" — o ato é um só, e chamar de duas coisas faria alguém procurar um segundo
 // botão que não existe.
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
+import { FILAS_DECISAO, pertenceFilaDecisao } from "@/lib/pcp-fila-decisao";
 import { Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, Printer, Factory, Monitor, CalendarClock, Clock, Package, CheckCircle2, FileText, FileSpreadsheet, Flag, X, Users, BellRing } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import CompraChip, { ModalRastreabilidade } from "@/components/CompraChip";
@@ -172,7 +173,11 @@ async function lerJson(r, oQue) {
   return j;
 }
 
-export default function ProducaoClient({ portalProducao = false } = {}) {
+export default function ProducaoClient({ portalProducao = false, entradaDecisao = null } = {}) {
+  const [filaDecisao, setFilaDecisao] = useState("");
+  const [marcaDecisao, setMarcaDecisao] = useState("");
+  const entradaAplicada = useRef(null);
+  const consultaDetalhe = useRef(0);
   const [revisaoGantt, setRevisaoGantt] = useState(0);
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -230,31 +235,52 @@ export default function ProducaoClient({ portalProducao = false } = {}) {
   }, [verTodas]);
   useEffect(() => { carregar(); }, [carregar]);
 
-  const carregarDetalhe = useCallback(async (opId, setor) => {
+  const carregarDetalhe = useCallback(async (opId, setor, conferir = !!filaDecisao) => {
+    const consulta = ++consultaDetalhe.current;
     setCarregandoDet(true); setSel(new Set());
     try {
       const qs = new URLSearchParams({ opId });
       if (setor) qs.set("setor", setor);
-      if (setor === "MONTAGEM") qs.set("preprogramar", "1");
+      if (conferir) qs.set("decisao", "1");
+      else if (setor === "MONTAGEM") qs.set("preprogramar", "1");
       const r = await fetch(`/api/pcp/despacho?${qs}`, { cache: "no-store" });
       const j = await lerJson(r, "Peças da OP");
-      setDetalhe(j);
-    } catch (e) { setDetalhe(null); setAviso({ ok: false, texto: e.message }); }
-    finally { setCarregandoDet(false); }
-  }, []);
+      if (consulta === consultaDetalhe.current) setDetalhe(j);
+    } catch (e) { if (consulta === consultaDetalhe.current) { setDetalhe(null); setAviso({ ok: false, texto: e.message }); } }
+    finally { if (consulta === consultaDetalhe.current) setCarregandoDet(false); }
+  }, [filaDecisao]);
+
+  useEffect(() => {
+    const chave = JSON.stringify(entradaDecisao);
+    if (!entradaDecisao || entradaAplicada.current === chave || !dados) return;
+    entradaAplicada.current = chave;
+    const { opId, setor, fila, marca } = entradaDecisao;
+    if (!Object.hasOwn(FILAS_DECISAO, fila) || !["CORTE", "MONTAGEM"].includes(setor)) return;
+    if (!dados.ops?.some(o => o.opId === opId)) {
+      setAviso({ ok: false, texto: "Esta OP não está mais na fila liberada. Atualize o painel do PCP." });
+      return;
+    }
+    setAberta(opId); setSetorAba(setor); setFilaDecisao(fila); setMarcaDecisao(marca || "");
+    setDetalhe(null); setSel(new Set());
+    carregarDetalhe(opId, setor, true);
+    requestAnimationFrame(() => document.getElementById('pcp-op-' + opId)?.scrollIntoView({block:'start'}));
+  }, [entradaDecisao, dados, carregarDetalhe]);
+  useEffect(() => () => { consultaDetalhe.current++; }, []);
 
   function abrir(op, setorSolicitado) {
-    if (aberta === op.opId && !setorSolicitado) { setAberta(null); setDetalhe(null); return; }
+    setFilaDecisao(""); setMarcaDecisao("");
+    if (aberta === op.opId && !setorSolicitado) { consultaDetalhe.current++; setAberta(null); setDetalhe(null); return; }
     // ⚠ abre no setor que o filtro já escolheu; sem filtro, no primeiro que tem fila — é onde a
     // obra está parada, e é a pergunta que o PCP faz ao clicar.
     const setor = setorSolicitado || op.setores.find((s) => s.pendenteKg > 0)?.setor || op.setores[0]?.setor || "";
     setAberta(op.opId); setSetorAba(setor); setDetalhe(null); setFiltroPecas(""); limparColunas(); setColAberta(null);
-    carregarDetalhe(op.opId, setor);
+    carregarDetalhe(op.opId, setor, false);
   }
 
   function trocarSetor(op, setor) {
+    setFilaDecisao(""); setMarcaDecisao("");
     setSetorAba(setor); setDetalhe(null); setFiltroPecas(""); limparColunas(); setColAberta(null);
-    carregarDetalhe(op.opId, setor);
+    carregarDetalhe(op.opId, setor, false);
   }
 
   // ⚠ A BARRA DE FILTROS SAIU (Vitor, 01/09/2026: "remova essa parte") — busca, abas de setor e a
@@ -273,11 +299,13 @@ export default function ProducaoClient({ portalProducao = false } = {}) {
   // Situação já têm funil próprio, e dois controles para o mesmo recorte se contradizem na tela
   // (chip dizendo "Programadas 47" com a coluna filtrada em outra coisa).
   const pecas = useMemo(() => {
-    const base = (detalhe?.pecas || []).filter((p) => passaColuna(p, null));
+    const base = (detalhe?.pecas || []).filter((p) => passaColuna(p, null))
+      .filter(p => !filaDecisao || pertenceFilaDecisao(p, filaDecisao, detalhe?.decisao?.porId[p.id]))
+      .filter(p => !marcaDecisao || p.marca === marcaDecisao);
     const q = filtroPecas.trim().toLowerCase();
     if (!q) return base;
     return base.filter((p) => [p.marca, p.descricao, p.perfil].some((x) => String(x || "").toLowerCase().includes(q)));
-  }, [detalhe, filtroPecas, passaColuna]);
+  }, [detalhe, filtroPecas, passaColuna, filaDecisao, marcaDecisao]);
 
   const marcasSel = useMemo(() => [...new Set(pecas.filter((p) => sel.has(p.id)).map((p) => p.marca))], [pecas, sel]);
 
@@ -601,6 +629,11 @@ export default function ProducaoClient({ portalProducao = false } = {}) {
             const open = aberta === o.opId;
             return (
               <div id={"pcp-op-"+o.opId} key={o.opId} className={`bg-white rounded-xl border shadow-[0_1px_3px_rgba(0,41,69,0.06)] overflow-hidden ${open ? "border-torg-blue-200" : "border-gray-100"}`}>
+                {open && filaDecisao && <div className="p-4 bg-sky-50 text-sm text-torg-dark flex flex-wrap gap-3 items-center">
+                  <span className="flex-1 min-w-0"><b>{FILAS_DECISAO[filaDecisao]}</b>{marcaDecisao ? ` · ${marcaDecisao}` : ""}. Conferências atualizadas ao abrir; selecione as peças para continuar.</span>
+                  <button className="min-h-[44px] text-torg-blue underline" onClick={()=>{setFilaDecisao("");setMarcaDecisao("");setSel(new Set());setDetalhe(null);carregarDetalhe(o.opId,setorAba,false);}}>Ver todas as peças da OP</button>
+                  <Link href="/pcp#decisao-pcp" className="min-h-[44px] inline-flex items-center text-torg-blue underline">Voltar à fila</Link>
+                </div>}
                 {/* ⚠ DIV, NÃO BUTTON. A linha carrega o CompraChip, que é um botão com modal
                     próprio — botão dentro de botão é HTML inválido e o React avisa em cada
                     render. O chevron é o botão de verdade (é por ele que o teclado abre a OP);
