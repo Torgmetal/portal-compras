@@ -122,3 +122,22 @@ impactar bem no preço" → `NIVEIS_EMBALAGEM` em lib/lqc.js: **Econômica 0,14 
 `custoTorg`, diluída no R$/kg de cada área (rateio como frete diluído), e em `custosExternos`; `resultado.embalagem`. Estudo
 novo nasce Padrão; estudo antigo sem nível fica com zero e a aba Frete mostra tarja. R$/kg digitado sobrepõe a tabela.
 Calibrar os níveis conforme as obras saírem com romaneio (a Econômica é o real de 2026).
+
+## Modelo de carga em PDF com capturas 3D (12/09/2026)
+
+Vitor achou as plantas 2D por camada "bem ruins" e o caminhão "bem ruim". Hoje o modelo de UMA carga
+(`gerar-modelo-carga.mjs`, A4 paisagem, ~9 páginas) usa **fotos do próprio simulador**: página 1 com iso +
+lateral + de cima (número do volume numa bolinha da cor da camada) e **uma folha por camada** (camada da vez
+colorida e numerada, o já carregado em cinza, o que falta escondido) + ordem de descida (1º, 2º…).
+
+- `viewer.js` expõe `window.viewerApi` (`irPara`, `destacarCamada`, `rotular`, `enquadrar("iso|topo|lado|tras")`,
+  `olhar`, `limpar`) e `window.viewerPronto`; `capturar-camadas.mjs` (Playwright + Chrome headless, SwiftShader)
+  gera `cam-op<OP>-c<carga>-*.png`; `pdf-modelo.mjs <nome>` fecha o PDF. Roda por carga: `OP=118 PERFIL=recomendado CARGA=3`.
+- **Enquadramento:** ajustar pela CAIXA da caçamba, não pela esfera envolvente (deixava a carga com 60 % do
+  quadro); na vista de cima somar A/2 e na lateral L/2 à distância (a face mais próxima da câmera aparece maior).
+- **Caminhão v2** (`caminhao.js`): cavalo 6x2 cabine avançada com dormitório (casca extrudada do perfil lateral,
+  para-brisa inclinado, grade, faróis, retrovisores, degraus na frente da roda, tanques, quinta roda, mangueiras)
+  e semirreboque com pescoço baixo, pés de apoio, para-lama corrido, barra anti-intrusão. Pino-rei a 1,4 m da
+  frente da carroceria; cabine 2,3 m com 0,85 m de folga até a carroceria. Ambiente `RoomEnvironment` + ACES.
+- ⚠ Para-lama = `CylinderGeometry(..., openEnded=true, θ=π/2..3π/2)` girado em X: com `openEnded=false` e θ=π
+  saía um meio-disco EM PÉ na frente da roda (foi o "caminhão bem ruim" da primeira versão).
