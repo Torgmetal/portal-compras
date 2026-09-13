@@ -1,9 +1,9 @@
 {
   "build": 3127,
-  "gerado": "2026-09-13T02:35:08.016Z",
+  "gerado": "2026-09-13T03:34:22.393Z",
   "commits": [
     {
-      "hash": "e4da7ab1",
+      "hash": "616c32a8",
       "data": "12/09/2026",
       "titulo": "feat(pcp): orienta liberação e cortes que destravam montagem"
     },

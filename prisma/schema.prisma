@@ -5880,6 +5880,27 @@ model GanttDistribuicao {
 // porque o formato ainda vai mudar com o uso ("vamos vendo como será no dia a dia",
 // Vitor 10/09/2026). Revisão anterior fica congelada em `historico`.
 // Tabela criada por scripts/ensure-analise-critica.mjs (não usar `prisma db push`).
+// Simulação de carga de um romaneio prévio (Planejamento › Romaneios prévios › Simular carga).
+// Criada por scripts/ensure-carga-simulada.mjs. `cargas` é a saída do simulador (lib/carga): volumes
+// posicionados, passos de montagem, madeira — sem as malhas do IFC, que ficam no navegador.
+// `itensHash` = hash dos itens do romaneio na hora da simulação: mudou o romaneio, a simulação está desatualizada.
+model CargaSimulada {
+  id               String   @id @default(cuid())
+  opId             String
+  romaneioPrevioId String?
+  perfil           String
+  perfilNome       String?
+  itensHash        String?
+  resumo           Json     @default("{}")
+  cargas           Json     @default("[]")
+  avisos           Json     @default("{}")
+  criadoPorId      String?
+  createdAt        DateTime @default(now())
+
+  @@index([romaneioPrevioId])
+  @@index([opId])
+}
+
 model AnaliseCriticaProjeto {
   id             String    @id @default(cuid())
   opId           String    @unique

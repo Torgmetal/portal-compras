@@ -3,6 +3,9 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { PackageSearch, Search, Loader2, FileSpreadsheet, CheckCircle2, Clock, AlertCircle, X, Truck, Trash2, Copy, CalendarDays, MapPin, Upload, Plus, ThumbsUp, RotateCcw, Star } from "lucide-react";
 import { exportarListaExpedicao } from "@/lib/export-lista-expedicao";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
+import dynamic from "next/dynamic";
+// ⚠ carregado sob demanda: o simulador traz three.js e web-ifc, que não têm o que fazer na lista de peças
+const SimularCargaModal = dynamic(() => import("@/components/carga/SimularCargaModal"), { ssr: false });
 
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`;
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -47,6 +50,7 @@ export default function ConsultaExpedicao({ opId, readOnly = false, focoPendente
   const [obsBaixa, setObsBaixa] = useState("");
   const [salvandoBaixa, setSalvandoBaixa] = useState(false);
   const [previos, setPrevios] = useState([]);
+  const [simular, setSimular] = useState(null); // romaneio prévio aberto no simulador de carga
   const [lotes, setLotes] = useState([]);
   const [proximo, setProximo] = useState(null);
   const [modal, setModal] = useState(false);
@@ -516,6 +520,7 @@ export default function ConsultaExpedicao({ opId, readOnly = false, focoPendente
                         {p.status !== "APROVADO"
                           ? <button onClick={() => aprovar(p)} disabled={!!busy} className="text-[12px] bg-emerald-600 text-white rounded-lg px-2 py-1 font-medium inline-flex items-center gap-1 hover:bg-emerald-700 disabled:opacity-50">{busy === "ok" ? <Loader2 size={11} className="animate-spin" /> : <ThumbsUp size={11} />} Aprovar entrega</button>
                           : <button onClick={() => reabrir(p)} disabled={!!busy} className="text-[12px] text-torg-gray hover:text-amber-700 inline-flex items-center gap-1 font-medium disabled:opacity-50">{busy === "ok" ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />} reabrir</button>}
+                        <button onClick={() => setSimular(p)} className="text-[12px] bg-torg-blue text-white rounded-lg px-2 py-1 font-medium inline-flex items-center gap-1 hover:bg-torg-dark" title="Veículo, volumes e 3D desta carga"><Truck size={12} /> Simular carga</button>
                         <button onClick={() => setAb((a) => ({ ...a, [p.id]: !aberto }))} className="text-[12px] text-torg-blue hover:text-torg-dark font-medium">{aberto ? "ocultar" : "ver/editar"} peças</button>
                         <button onClick={() => copiarCronograma(p)} className="text-torg-gray hover:text-torg-blue" title="Copiar a linha para o cronograma"><Copy size={13} /></button>
                         <button onClick={() => excluirPrevio(p)} className="text-torg-gray hover:text-red-600" title="Excluir"><Trash2 size={13} /></button>
@@ -569,6 +574,7 @@ export default function ConsultaExpedicao({ opId, readOnly = false, focoPendente
       )}
 
       {imp && <ImportarListaModal rows={imp.rows} nome={imp.nome} marcaNaCelula={marcaNaCelula} onAplicar={aplicarImport} onClose={() => setImp(null)} />}
+      {simular && <SimularCargaModal opId={opId} opNumero={simular.opNumero} previo={simular} onClose={() => setSimular(null)} />}
       {modalBaixa && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && setModalBaixa(false)}>
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">

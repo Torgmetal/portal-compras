@@ -159,3 +159,4 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Baixa de etapa anterior (Produção)](torg_baixa_etapa_anterior.md) — "Apontamento numa etapa à frente dá baixa nas anteriores — a peça jateada foi montada e soldada, mesmo sem registro"
 - [OP-122 Vale/TMSA + Tekla](torg_tekla_tmsa_vale.md) — acompanhamento no formato TMSA (avanço, mapa, romaneio); SKU é da TMSA; pacote Tekla 2025 em docs/tekla-tmsa-vale
 - [Branch de outra sessão](torg_branch_de_outra_sessao.md) — conferir `git rev-parse --abbrev-ref HEAD` antes de commitar; se não for main, worktree de main; nunca `reset --hard` no diretório dos outros
+- [Simulador de carga no portal](torg_simulador_carga_portal.md) — "Simular carga" no romaneio prévio; motor lib/carga em Web Worker; IFC medido no navegador; CargaSimulada com itensHash
