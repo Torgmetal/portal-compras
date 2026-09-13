@@ -144,3 +144,19 @@ colorida e numerada, o já carregado em cinza, o que falta escondido) + ordem de
 - ⚠ Rodas (Vitor, 12/09: "as rodas estão bem ruins"): disco chapado branco parece brinquedo. O que convence é o
   **prato rebaixado** (côncavo, 0,3 da largura para dentro), furos de ventilação, círculo de 10 porcas, cubo saliente,
   flanco bojudo no perfil torneado e o **eixo terminando dentro do cubo** (L − 0,3), nunca atravessando a roda.
+
+## Grades de piso e degraus (12/09/2026)
+
+- **Degrau vai junto com a grade de piso** — Vitor: "os degraus tbm vão juntos com as grades de piso". `ehDegrau` entra em
+  `ehGrade`; pacote de degraus = 4 fileiras lado a lado (1,0 × 1,0 m) até 0,5 m (~24 degraus, 170 kg), classe delicada.
+  Na OP-118 são 213 degraus (1,5 t) que antes iam em 11 caixas de madeira nas cargas de estrutura.
+- ⚠⚠ **Carga SÓ de grade saía em TORRES** (chão 53 %, 2,87 m) — Vitor: "essa carga de grades está muito perigosa". Causa: a
+  regra "delicado vai para o alto" (custo −y, certa na carga mista para nada subir na grade) numa carga só de grade vira
+  "empilha no ponto mais alto". Agora `MODO_GRUPO="grades"` → carga `emCamadas`: chão primeiro, painel maior embaixo (ordem
+  por área, nível da obra só desempata), apoio ≥ 80 %, teto 2,4 m (`GRADE_CARGA`). Resultado: 17,9 t, 2,38 m, 71 % do chão, 7 camadas.
+- **310 tamanhos de grade em 389 painéis** (232 únicos): pacote = painéis parecidos (frente, faixa de 1 m × 0,5 m) até 0,5 m;
+  sobra de 1–3 painéis sobe cintada num pacote maior da mesma frente (senão ficam 11 "pacotes" de um painel espalhados).
+- Na carga em camadas `camada = nivelPilha` (quantos pacotes há embaixo), não o y arredondado — senão o modelo em PDF saía com 23 "camadas".
+- Fusão de cargas leves (`consolidar`): além de tentar inserir peça a peça, remonta a UNIÃO com a vizinha (4 arranjos, calço
+  300 mm). Na OP-118 ainda não fundiu as duas cargas de ~4 e ~6 t (13 e 16): pacotes de 8–10 m não acham apoio contínuo sobre
+  peças curtas — pendente; viagens 16 (era 15 com as grades em torre).

@@ -1,9 +1,9 @@
 {
   "build": 3124,
-  "gerado": "2026-09-13T01:41:31.708Z",
+  "gerado": "2026-09-13T02:00:40.753Z",
   "commits": [
     {
-      "hash": "4326e67f",
+      "hash": "6c89310d",
       "data": "12/09/2026",
       "titulo": "feat(producao): identifica montadores e remaneja saldo pelo Gantt"
     },
