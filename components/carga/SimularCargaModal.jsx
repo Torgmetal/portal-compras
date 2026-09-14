@@ -99,7 +99,9 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
   // `window.open` depois do `await` caía no bloqueador de pop-up. Agora nada sobe: o pdf-lib roda
   // aqui (import dinâmico, fora do bundle da tela) e o arquivo desce por um <a download>.
   const gerarPdf = async () => {
-    const v = viz.current, c = resultado?.cargas?.[cargaSel]; if (!v || !c || !dados?.op) return;
+    const v = viz.current, c = resultado?.cargas?.[cargaSel]; if (!c || !dados?.op) return;
+    // ⚠ nunca falhar em silêncio: se o 3D não entregou a API (ver apiRef no VisualizadorCarga), a tela diz
+    if (!v?.capturar) { setErro("O 3D ainda não está pronto para fotografar — espere o modelo aparecer e clique de novo."); return; }
     setPdf({ gerando: true }); setErro(null);
     try {
       await new Promise((r) => setTimeout(r, 50));
@@ -169,7 +171,7 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
                 {pdf?.url && <a href={pdf.url} download={pdf.nome} className="ml-auto text-torg-blue font-medium hover:underline inline-flex items-center gap-1"><FileText size={12} /> Baixar {pdf.nome}</a>}
               </div>
               <ResumoSimulacao resultado={resultado} cargaSel={cargaSel} onCarga={setCargaSel} />
-              {carga && geo && <VisualizadorCarga ref={viz} carga={carga} malhas={geo.malhas} madeira={resultado.madeira || 100} altura={480} />}
+              {carga && geo && <VisualizadorCarga apiRef={viz} carga={carga} malhas={geo.malhas} madeira={resultado.madeira || 100} altura={480} />}
               {carga && !geo && <p className="text-[12px] text-torg-gray">Baixando o modelo para desenhar o 3D…</p>}
               {carga && <VolumesDaCarga carga={carga} ajustes={ajustes} onAjustar={(marca, desc) => setEditando({ marca, desc })} />}
             </>

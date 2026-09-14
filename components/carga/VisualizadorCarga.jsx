@@ -15,7 +15,11 @@ const mm = (v) => v / 1000;
  * @param {{ carga: object, malhas?: object, madeira?: number, altura?: number }} props
  *   carga = uma carga da simulação (itens, passos, veiculo); malhas = geometria por marca (do IFC)
  */
-const VisualizadorCarga = forwardRef(function VisualizadorCarga({ carga, malhas, madeira = 100, altura = 480 }, ref) {
+// ⚠⚠ A API (capturar/enquadrar) SAI POR `apiRef`, NÃO SÓ PELO `ref`. O modal carrega este componente com
+// `next/dynamic`, e o wrapper do dynamic NÃO repassa `ref` ao componente de dentro — `viz.current` ficava
+// null para sempre e o botão "PDF do modelo" não fazia nada, em silêncio (Vitor, 14/09/2026: "não estou
+// conseguindo exportar o pdf", pela segunda vez). Um prop comum passa por qualquer wrapper.
+const VisualizadorCarga = forwardRef(function VisualizadorCarga({ carga, malhas, madeira = 100, altura = 480, apiRef = null }, ref) {
   const host = useRef(null), st = useRef(null);
   const [passo, setPasso] = useState(-1), [rotulos, setRotulos] = useState(true);
 
@@ -67,7 +71,7 @@ const VisualizadorCarga = forwardRef(function VisualizadorCarga({ carga, malhas,
   useEffect(() => { setPasso(carga ? carga.passos.length - 1 : -1); }, [carga]);
   useEffect(() => { if (st.current) { st.current.rotulos = rotulos; st.current.mostrarPasso(passo); } }, [passo, rotulos]);
 
-  useImperativeHandle(ref, () => ({
+  useImperativeHandle(apiRef || ref, () => ({
     /** Imagem PNG (data URL) da carga: vista iso|lado|topo|tras, opcionalmente só até a camada `ci` com as anteriores em cinza. */
     capturar(vista = "iso", ci = null) {
       const s = st.current; if (!s) return null;

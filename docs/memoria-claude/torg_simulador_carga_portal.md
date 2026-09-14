@@ -87,3 +87,17 @@ Pela tag, 19 marcas levavam a geometria da vizinha e 5 ficavam sem nada.
   (IPPE1099P8 ×11 = o P7 ×11 da lista; IPPE1100P7 = o P6…). O jato apontou em 14/09 nos números
   velhos, e o portal casa Syneco × peça pela marca — as quantidades de jato/pintura dessas marcas
   saem trocadas até o programador renumerar as ordens no Syneco (ou apontar nos números novos).
+
+## O botão do PDF nunca tinha funcionado: `next/dynamic` engole o `ref` (14/09/2026)
+
+Segunda vez que o Vitor disse "não estou conseguindo gerar o pdf" — desta vez com o PDF já montado no
+navegador. Reproduzido num harness local (esbuild + Browser pane, scratch `harness/`): `viz.current`
+era **null** — o `VisualizadorCarga` é carregado com `next/dynamic`, e o wrapper do dynamic não
+repassa `ref` ao componente de dentro. `gerarPdf` começava com `if (!v …) return;` e saía calado.
+- A API (capturar/enquadrar) agora chega por um prop comum, `apiRef`, e o botão explica quando o 3D
+  não está pronto em vez de não fazer nada. Teste: `testes/components/simular-carga-modal.teste.js`.
+- ⚠ Regra: componente de `dynamic()` nunca recebe `ref` — passe a API por prop.
+- ⚠ Lição de método: o PDF foi validado por node (rota/lib) sem nunca clicar no botão num navegador.
+  Fluxo de tela se prova NO NAVEGADOR — o harness (`entrada.jsx` + fetch falso servindo JSON do banco
+  e os IFCs baixados) faz isso sem login e reproduziu o defeito no primeiro clique.
+- Conferido: OP-107 romaneio 02, 33 volumes, 17 camadas → PDF de 22 páginas, 2,4 MB, em 3 s.
