@@ -52,18 +52,20 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
         if (!modelos.length) throw new Error(lst.error || (grandes.length ? `O modelo da obra (${grandes[0].nome}) passa de 60 MB e não abre no navegador — a Engenharia precisa publicar o IFC por frente.` : "A obra não tem modelo IFC publicado na pasta da Engenharia — sem ele não dá para medir as peças."));
         const ac = dados.lista.filter((i) => marcaEhAC(i.marca)).map((i) => i.marca);
         let faltantes = [...new Set(dados.lista.filter((i) => !marcaEhAC(i.marca)).map((i) => i.marca))];
-        const geometria = {}, malhas = {}, usados = [];
+        const descDe = new Map(dados.lista.map((i) => [String(i.marca).toUpperCase(), i.desc || ""]));
+        const geometria = {}, malhas = {}, usados = [], porNome = [];
         for (const [k, mod] of modelos.entries()) {
           if (!faltantes.length) break;
           setProgresso({ msg: `Baixando ${mod.nome} (${k + 1} de ${modelos.length})…`, frac: 0.05 + 0.9 * k / modelos.length });
           const res = await fetch(`/api/producao/modelo-3d?opId=${opId}&rel=${encodeURIComponent(mod.rel)}`, { cache: "force-cache" });
           if (!res.ok) continue;
           const bytes = new Uint8Array(await res.arrayBuffer()); if (cancelado) return;
-          const g = await geometriaDoIfc(bytes, faltantes, (msg, frac) => !cancelado && setProgresso({ msg: `${mod.nome}: ${msg}`, frac: 0.05 + 0.9 * (k + frac) / modelos.length })); if (cancelado) return;
+          // a descrição vai junto: se o IFC for de antes da renumeração da lista, a peça é achada pelo nome
+          const g = await geometriaDoIfc(bytes, faltantes.map((m) => ({ marca: m, desc: descDe.get(m) || "" })), (msg, frac) => !cancelado && setProgresso({ msg: `${mod.nome}: ${msg}`, frac: 0.05 + 0.9 * (k + frac) / modelos.length })); if (cancelado) return;
           const achou = Object.keys(g.geometria); if (achou.length) usados.push({ nome: mod.nome, marcas: achou.length });
-          Object.assign(geometria, g.geometria); Object.assign(malhas, g.malhas); faltantes = g.faltantes;
+          Object.assign(geometria, g.geometria); Object.assign(malhas, g.malhas); faltantes = g.faltantes; porNome.push(...(g.porNome || []));
         }
-        setGeo({ geometria, malhas, faltantes, ac: [...new Set(ac)], usados, modelo: usados.map((u) => u.nome).join(", ") || modelos[0].nome }); setFase("pronto");
+        setGeo({ geometria, malhas, faltantes, porNome, ac: [...new Set(ac)], usados, modelo: usados.map((u) => u.nome).join(", ") || modelos[0].nome }); setFase("pronto");
       } catch (e) { if (!cancelado) { setErro(e.message); setFase("erro"); } }
     })();
     return () => { cancelado = true; };
@@ -83,7 +85,7 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
       const r = ev.data.resultado; setResultado(r); setCargaSel(0); setFase("pronto");
       try {
         const res = await fetch(`/api/comercial/op/${opId}/romaneios-previos/${previo.id}/simulacao`, { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ perfil, itensHash: dados.hash, resumo: r.resumo, cargas: r.cargas, avisos: { especiais: r.especiais, ajustadas: r.ajustadas, semCaixa: r.semCaixa, estimadas: r.estimadas, perfil: r.perfil, gcModo: r.gcModo, faltantes: geo.faltantes, ajustes } }) }).then((x) => x.json());
+          body: JSON.stringify({ perfil, itensHash: dados.hash, resumo: r.resumo, cargas: r.cargas, avisos: { especiais: r.especiais, ajustadas: r.ajustadas, semCaixa: r.semCaixa, estimadas: r.estimadas, perfil: r.perfil, gcModo: r.gcModo, porNome: geo.porNome || [], faltantes: geo.faltantes, ajustes } }) }).then((x) => x.json());
         if (res.success) setGravada(res.simulacao); else setErro(res.error || "A simulação não foi gravada.");
       } catch { setErro("A simulação não foi gravada."); }
     };
@@ -152,6 +154,7 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
           {geo && !resultado && fase === "pronto" && (
             <div className="bg-white rounded-xl border border-gray-100 px-4 py-3 text-[12px] text-torg-dark">
               Marcas medidas no modelo: <b>{Object.keys(geo.geometria).length}</b> de {dados.lista.length}{geo.ac?.length ? <> · {geo.ac.length} AC (parafusos e acessórios comprados) ficam fora da carga</> : null}.
+              {geo.porNome?.length > 0 && <p className="mt-1 text-amber-800"><b>Numeração do IFC diferente da lista ({geo.porNome.length}):</b> {geo.porNome.slice(0, 15).join(", ")}{geo.porNome.length > 15 ? ` e mais ${geo.porNome.length - 15}` : ""} — o modelo é de antes da revisão; a peça foi achada pela descrição, confira a medida.</p>}
               {geo.faltantes.length > 0 && <p className="mt-1 text-amber-800"><b>Fora do IFC ({geo.faltantes.length}):</b> {geo.faltantes.slice(0, 15).join(", ")}{geo.faltantes.length > 15 ? ` e mais ${geo.faltantes.length - 15}` : ""} — entram na carga com medida estimada pelo peso; conferir no pátio.</p>}
               <p className="mt-1">Escolha a embalagem e clique em <b>Simular</b>.</p>
               {dados.simulacao?.desatualizada && <p className="mt-1 text-amber-800">A última simulação ({fmtD(dados.simulacao.createdAt)}) é de antes de o romaneio mudar — simule de novo.</p>}

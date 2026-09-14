@@ -68,3 +68,22 @@ Além disso o `window.open` depois do `await` caía no bloqueador de pop-up.
   `<a download>` — nada sobe para o servidor.
 - A rota continua existindo para quem quiser o PDF por API (limite de ~3 MB de fotos), mas a tela não a usa.
 - Teste: `carga-simular.teste.js › roda sem Node` confere que a lib não importa fs/path e que logo e foto entram no PDF.
+
+## IFC de antes da revisão: a peça é achada pelo NOME (14/09/2026)
+
+OP-085 (guarda-corpos da DANPOWER, 46 marcas / 79 peças / 4,8 t, chamados de "CORRIMAO nnnnMM"): o IFC
+`T85 - DANPOWER - ENC 0325.ifc` é de 02/06 e a LPC R01 (21/07) renumerou os desenhos IPPE1099/IPPE1100 —
+na lista IPPE1100P7 é "CORRIMAO 840MM", no IFC a tag IPPE1100P7 é "CORRIMAO 2081MM" (o P6 da lista).
+Pela tag, 19 marcas levavam a geometria da vizinha e 5 ficavam sem nada.
+
+- `casarMarcas` (lib/carga/geometria-ifc.js): tag com o mesmo Name → é ela; tag ausente ou com outro
+  nome → o conjunto cujo Name é igual à descrição da lista, só se o nome for específico (tem número)
+  ou único no modelo. "VIGA" solta não casa. O modal manda `{marca, desc}` e mostra o aviso
+  "Numeração do IFC diferente da lista (N)"; `porNome` vai nos avisos da simulação gravada.
+- Resultado na 085: 44 de 46 medidas (faltam IPPE1090P2/P3, corrimão de escada ×5 — no IFC estão como
+  IPPE1091P2/P3 "P/ ESCADA E2/E3", nome diferente; usar "medidas à mão" 4945×1096×160 se precisar).
+- `ehGC` passou a reconhecer CORRIM(ÃO): sem isso os 46 painéis viajariam como peça solta.
+- ⚠ O mesmo desencontro está no SYNECO: as ordens foram criadas em 05/06 com a numeração R00
+  (IPPE1099P8 ×11 = o P7 ×11 da lista; IPPE1100P7 = o P6…). O jato apontou em 14/09 nos números
+  velhos, e o portal casa Syneco × peça pela marca — as quantidades de jato/pintura dessas marcas
+  saem trocadas até o programador renumerar as ordens no Syneco (ou apontar nos números novos).
