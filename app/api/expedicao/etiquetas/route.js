@@ -26,7 +26,11 @@ const PERFIS = ["ADMIN", "EXPEDICAO", "PRODUCAO", "PCP", "PLANEJAMENTO"];
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 // Um lote grande de etiquetas é muita geração de QR: sai do teto padrão de 10 s da Vercel.
-export const maxDuration = 60;
+// ⚠⚠ 300s, E NÃO 60 (14/09/2026). A OP-105 inteira são 1.793 etiquetas; a função morria em 504
+// antes de terminar. O conserto de verdade foi gerar UM QR por marca em vez de um por etiqueta
+// (29,3s → 3,3s, medido), mas o teto de 60s não tinha folga nenhuma para obra grande — e obra
+// grande aqui chega a dezenas de milhares de adesivos.
+export const maxDuration = 300;
 
 const erroDeAcesso = (e) =>
   NextResponse.json({ success: false, error: e.message },
