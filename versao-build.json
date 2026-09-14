@@ -1,7 +1,12 @@
 {
-  "build": 3135,
-  "gerado": "2026-09-14T01:07:24.580Z",
+  "build": 3136,
+  "gerado": "2026-09-14T01:27:26.057Z",
   "commits": [
+    {
+      "hash": "d0923cb4a8",
+      "data": "13/09/2026",
+      "titulo": "Cron financeiro: o orçamento sai de um prazo único, com reserva para o heartbeat"
+    },
     {
       "hash": "38b849a545",
       "data": "13/09/2026",
@@ -146,11 +151,6 @@
       "hash": "66dc71cee7",
       "data": "12/09/2026",
       "titulo": "Import de lista: marca que a LPC já tinha conta como gravada, não como faltante"
-    },
-    {
-      "hash": "5b25158b6d",
-      "data": "12/09/2026",
-      "titulo": "fix: separar referência FORM 20 da faixa no PDF de RNC"
     }
   ]
 }

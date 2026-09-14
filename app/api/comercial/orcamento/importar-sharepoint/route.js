@@ -39,7 +39,10 @@ async function lerPlanilha(ano) {
 
   // ⚠ SheetJS, não ExcelJS: a planilha tem 5 abas e só uma interessa. Mesmo motivo do import do
   // CMR, onde o ExcelJS estourava a memória lendo o arquivo inteiro.
-  const XLSX = (await import("xlsx")).default;
+  // ⚠ SEM `.default`: o pacote `xlsx` é CJS e o namespace vem direto do `await import`. Com o
+  // `.default` o módulo vinha `undefined` e a rota morria em "Cannot read properties of undefined
+  // (reading 'read')" — o resto do portal sempre importou sem ele (`lib/grd-engenharia-sync.js`).
+  const XLSX = await import("xlsx");
   const wb = XLSX.read(buffer, { type: "buffer", cellDates: true });
   const ws = wb.Sheets[ABA];
   if (!ws) throw new Error(`A planilha não tem a aba "${ABA}" (tem: ${wb.SheetNames.join(", ")})`);
