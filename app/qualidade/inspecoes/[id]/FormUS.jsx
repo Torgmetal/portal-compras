@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useComponenteEstavel } from "@/lib/react-estavel";
 import { Plus, Trash2, AlertTriangle } from "lucide-react";
 import {
   APARELHOS, CABECOTES, ANGULOS, ACOPLANTES, BLOCOS_PADRAO, FACES,
@@ -32,7 +33,7 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
   const set = (i, campo, v) => setLinhas(linhas.map((l, k) => (k === i ? { ...l, [campo]: v } : l)));
   const addLinha = () => setLinhas([...linhas, { marca: marcas[0] || "", indicacao: String(linhas.length + 1), laudo: "R" }]);
 
-  const Campo = ({ rot, k, opcoes = null, tipo = "text", destaque = false }) => (
+  const Campo = useComponenteEstavel(({ rot, k, opcoes = null, tipo = "text", destaque = false }) => (
     <label className="block">
       <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">{rot}</span>
       {opcoes ? (
@@ -47,15 +48,15 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
           className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
       )}
     </label>
-  );
+  ));
 
-  const N = ({ l, i, k, rot }) => (
+  const N = useComponenteEstavel(({ l, i, k, rot }) => (
     <label className="block">
       <span className="block text-[10px] text-torg-gray mb-0.5">{rot}</span>
       <input type="number" value={l[k] ?? ""} disabled={travado} onChange={(e) => set(i, k, e.target.value)}
         className="w-full text-[12px] border border-gray-200 rounded px-1.5 py-1 disabled:bg-gray-50" />
     </label>
-  );
+  ));
 
   return (
     <div className="space-y-3">

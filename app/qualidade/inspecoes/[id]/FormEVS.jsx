@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useComponenteEstavel } from "@/lib/react-estavel";
 import { Plus, Trash2, AlertTriangle, Check } from "lucide-react";
 import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA, CRITERIO_PADRAO } from "@/lib/evs-campos";
 import { criteriosDoDefeito, ONDE_VALE } from "@/lib/aws-d11";
@@ -55,7 +56,7 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
     } : l)));
   }
 
-  const Campo = ({ rot, k, tipo = "text", opcoes = null, largura = "" }) => (
+  const Campo = useComponenteEstavel(({ rot, k, tipo = "text", opcoes = null, largura = "" }) => (
     <label className={`block ${largura}`}>
       <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">{rot}</span>
       {opcoes ? (
@@ -70,7 +71,7 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
           className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
       )}
     </label>
-  );
+  ));
 
   return (
     <div className="space-y-3">

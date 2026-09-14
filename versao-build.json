@@ -1,7 +1,12 @@
 {
-  "build": 3149,
-  "gerado": "2026-09-14T17:35:37.496Z",
+  "build": 3150,
+  "gerado": "2026-09-14T18:06:27.384Z",
   "commits": [
+    {
+      "hash": "75542bcc",
+      "data": "14/09/2026",
+      "titulo": "LPC: a chave da lista é a fase, nunca o número da OP — a OP-094 tinha 591 marcas duplicadas"
+    },
     {
       "hash": "4ba3dcbd",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "9a960368",
       "data": "12/09/2026",
       "titulo": "Memória: commit em branch de outra sessão (worktree de main)"
-    },
-    {
-      "hash": "c0e1445b",
-      "data": "12/09/2026",
-      "titulo": "Memória: rodas do simulador de carga"
     }
   ]
 }

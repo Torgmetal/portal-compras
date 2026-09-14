@@ -63,6 +63,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Padrão dos e-mails](torg_email_padrao.md) — faixa navy `#0D1F3C` + filete laranja `#F4801F`; `cabecalhoEmail()` de lib/email-layout.js; corpo/botões (#006EAB) iguais
 - [Logo no avatar do e-mail (BIMI)](torg_bimi_logo_email.md) — trocar "WT" pelo logo = BIMI (DNS+certificado VMC/CMC pago); DMARC já ok, falta BIMI; PARADO p/ depois
 - [Capricho visual (feedback)](torg_ui_capricho.md) — alinhamento/quebra/plural é ponto fraco recorrente; espelhar o padrão e conferir o PDF ANTES de subir
+- [Input perde o foco a cada tecla](torg_input_perde_foco.md) — componente com <input> definido DENTRO do pai remonta a cada render ("clicar número por número"); usar useComponenteEstavel de lib/react-estavel.js
 - [Peso sempre em kg](torg_peso_kg.md) — nunca t/ton no portal (exceto comercial/frete e admin/metas)
 - [Acabamento galvanizado](torg_acabamento_galvanizado.md) — galvanizado pula jato+pintura; há obra que pinta DEPOIS; regra dita, não implementada
 

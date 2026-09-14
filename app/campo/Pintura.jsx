@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useComponenteEstavel } from "@/lib/react-estavel";
 import { AlertCircle, CheckCircle2, Paintbrush } from "lucide-react";
 import {
   GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, TEMPO, METODOS_APLICACAO,
@@ -84,7 +85,7 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
     set("demaos", { ...dem, [aba]: bloco });
   }
 
-  const SelLote = ({ rot, campo, campoVal, comp }) => {
+  const SelLote = useComponenteEstavel(({ rot, campo, campoVal, comp }) => {
     const lista = porComp(comp);
     const lotes = partes(dem[aba]?.[campo]);
     return (
@@ -120,7 +121,7 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
         </label>
       </div>
     );
-  };
+  });
 
   const mRug = mediaRugosidade(rug);
   const rugFora = mRug != null && (mRug < RUGOSIDADE_MIN || mRug > RUGOSIDADE_MAX);

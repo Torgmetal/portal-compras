@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useComponenteEstavel } from "@/lib/react-estavel";
 import { Loader2, Paintbrush, Pencil, Check, X, FolderSearch, Download, FileText } from "lucide-react";
 import { METODOS_PREPARO, PLP_PADRAO, resumoPlp, camposDoRelatorioPintura } from "@/lib/plp";
 import { GRAUS_LIMPEZA, METODOS_APLICACAO } from "@/lib/pintura-campos";
@@ -147,10 +148,10 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas, onPlp, res =
 
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const setD = (i, k, v) => setF((p) => ({ ...p, demaos: p.demaos.map((d, j) => (j === i ? { ...d, [k]: v } : d)) }));
-  const Inp = ({ v, on, ph = "", tipo = "text", w = "" }) => (
+  const Inp = useComponenteEstavel(({ v, on, ph = "", tipo = "text", w = "" }) => (
     <input type={tipo} value={v ?? ""} placeholder={ph} onChange={(e) => on(e.target.value)}
       className={`text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue ${w || "w-full"}`} />
-  );
+  ));
 
   if (!editando) {
     return (
