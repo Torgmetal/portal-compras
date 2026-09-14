@@ -38,3 +38,8 @@ monta a carga daquela lista.
   padrão e entra em `opcoes.veiculos/frete` da simulação. Carreta e carreta 14 m nunca saem do catálogo.
 - **Próximas entregas combinadas:** etiquetas por volume; import de lista de prioridades que corta em caminhões
   (caminho 2); comparativo de embalagem ligado à LQC.
+- **Peça fora do IFC não some da carga** — Vitor (13/09/2026): "o ideal seria ignorar [o aviso dos parafusos], pois isso
+  vai dar problema para o setor de carregamento". Duas famílias: **AC/parafuso sem peso** fica fora em silêncio (só a
+  contagem); **peça com peso sem geometria** (escada móvel, contrapeso, batente da OP-107 — desenho do cliente, fora
+  do modelo) entra com **caixa estimada pelo peso e pela família** (`caixaEstimada`), marcada `estimada`, e a tela
+  pede conferência em âmbar. Nunca em vermelho: aviso vermelho na tela do carregamento vira peça deixada no pátio.

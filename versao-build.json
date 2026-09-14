@@ -1,7 +1,12 @@
 {
-  "build": 3131,
-  "gerado": "2026-09-13T23:57:50.951Z",
+  "build": 3132,
+  "gerado": "2026-09-14T00:08:41.476Z",
   "commits": [
+    {
+      "hash": "d4469726",
+      "data": "13/09/2026",
+      "titulo": "Romaneio prévio: card em três linhas (cabeçalho, dados, ações) e resumo da simulação"
+    },
     {
       "hash": "5911aa96",
       "data": "13/09/2026",
@@ -146,11 +151,6 @@
       "hash": "fcad0bf6",
       "data": "11/09/2026",
       "titulo": "Cron do data book: de hora em hora, só em horário comercial"
-    },
-    {
-      "hash": "2a290582",
-      "data": "11/09/2026",
-      "titulo": "Cotação: salvar proposta grande morria em 10s e voltava sem corpo"
     }
   ]
 }

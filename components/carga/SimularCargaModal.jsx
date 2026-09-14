@@ -75,7 +75,7 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
       const r = ev.data.resultado; setResultado(r); setCargaSel(0); setFase("pronto");
       try {
         const res = await fetch(`/api/comercial/op/${opId}/romaneios-previos/${previo.id}/simulacao`, { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ perfil, itensHash: dados.hash, resumo: r.resumo, cargas: r.cargas, avisos: { especiais: r.especiais, ajustadas: r.ajustadas, semCaixa: r.semCaixa, perfil: r.perfil, gcModo: r.gcModo, faltantes: geo.faltantes } }) }).then((x) => x.json());
+          body: JSON.stringify({ perfil, itensHash: dados.hash, resumo: r.resumo, cargas: r.cargas, avisos: { especiais: r.especiais, ajustadas: r.ajustadas, semCaixa: r.semCaixa, estimadas: r.estimadas, perfil: r.perfil, gcModo: r.gcModo, faltantes: geo.faltantes } }) }).then((x) => x.json());
         if (res.success) setGravada(res.simulacao); else setErro(res.error || "A simulação não foi gravada.");
       } catch { setErro("A simulação não foi gravada."); }
     };
@@ -135,7 +135,7 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
           {geo && !resultado && fase === "pronto" && (
             <div className="bg-white rounded-xl border border-gray-100 px-4 py-3 text-[12px] text-torg-dark">
               Marcas medidas no modelo: <b>{Object.keys(geo.geometria).length}</b> de {dados.lista.length}{geo.ac?.length ? <> · {geo.ac.length} AC (parafusos e acessórios comprados) ficam fora da carga</> : null}.
-              {geo.faltantes.length > 0 && <p className="mt-1 text-red-700"><b>Sem geometria em nenhum IFC da obra ({geo.faltantes.length}):</b> {geo.faltantes.slice(0, 15).join(", ")}{geo.faltantes.length > 15 ? ` e mais ${geo.faltantes.length - 15}` : ""}. Essas ficam fora da carga — confira se a marca no modelo é a mesma da lista de expedição.</p>}
+              {geo.faltantes.length > 0 && <p className="mt-1 text-amber-800"><b>Fora do IFC ({geo.faltantes.length}):</b> {geo.faltantes.slice(0, 15).join(", ")}{geo.faltantes.length > 15 ? ` e mais ${geo.faltantes.length - 15}` : ""} — entram na carga com medida estimada pelo peso; conferir no pátio.</p>}
               <p className="mt-1">Escolha a embalagem e clique em <b>Simular</b>.</p>
               {dados.simulacao?.desatualizada && <p className="mt-1 text-amber-800">A última simulação ({fmtD(dados.simulacao.createdAt)}) é de antes de o romaneio mudar — simule de novo.</p>}
             </div>

@@ -32,11 +32,12 @@ describe("orientarPeca — perfil com a alma em pé, chapa deitada", () => {
 });
 
 describe("expandirPecas", () => {
-  it("expande a quantidade e marca sem caixa a marca sem geometria", () => {
-    const p = expandirPecas([{ marca: "t118a1", desc: "VIGA", qtd: 3, kgUn: 100 }, { marca: "T118Z9", desc: "TALA", qtd: 2, kgUn: 5 }], { T118A1: geo([6000, 300, 200]) });
-    expect(p).toHaveLength(5);
-    expect(p.filter((u) => u.marca === "T118A1" && !u.semCaixa)).toHaveLength(3);
-    expect(p.filter((u) => u.semCaixa).map((u) => u.marca)).toEqual(["T118Z9", "T118Z9"]);
+  it("expande a quantidade; marca sem geometria mas com peso entra com caixa estimada; sem peso fica sem caixa", () => {
+    const p = expandirPecas([{ marca: "t118a1", desc: "VIGA", qtd: 3, kgUn: 100 }, { marca: "T118Z9", desc: "TALA", qtd: 2, kgUn: 5 }, { marca: "T118-AC1", desc: "PARAFUSO", qtd: 4, kgUn: 0 }], { T118A1: geo([6000, 300, 200]) });
+    expect(p).toHaveLength(9);
+    expect(p.filter((u) => u.marca === "T118A1" && !u.semCaixa && !u.estimada)).toHaveLength(3);
+    expect(p.filter((u) => u.marca === "T118Z9").every((u) => u.estimada && u.C > 0)).toBe(true);
+    expect(p.filter((u) => u.semCaixa).map((u) => u.marca)).toEqual(["T118-AC1", "T118-AC1", "T118-AC1", "T118-AC1"]);
   });
 });
 
@@ -90,10 +91,11 @@ describe("simularCarga", () => {
     expect(chao.length).toBeGreaterThan(0);
     for (const u of acima) expect(u.sobre.length).toBeGreaterThan(0);
   });
-  it("carga pequena vai no menor veículo em que cabe (HR), e marca sem geometria fica listada", () => {
-    const r = simularCarga({ lista: [{ marca: "T118C1", desc: "CANTONEIRA", qtd: 4, kgUn: 10 }, { marca: "T118X1", desc: "TALA", qtd: 2, kgUn: 3 }], geometria: { T118C1: geo([1500, 60, 60]) }, perfil: "recomendado", prefixo: "T118" });
+  it("carga pequena vai no menor veículo em que cabe (HR); marca sem geometria entra estimada e parafuso sem peso fica listado", () => {
+    const r = simularCarga({ lista: [{ marca: "T118C1", desc: "CANTONEIRA", qtd: 4, kgUn: 10 }, { marca: "T118X1", desc: "TALA", qtd: 2, kgUn: 3 }, { marca: "T118-AC2", desc: "PORCA", qtd: 2, kgUn: 0 }], geometria: { T118C1: geo([1500, 60, 60]) }, perfil: "recomendado", prefixo: "T118" });
     expect(r.cargas[0].veiculo.chave).toBe("hr");
-    expect(r.semCaixa.map((s) => s.marca)).toEqual(["T118X1", "T118X1"]);
+    expect(r.estimadas.map((e) => e.marca)).toEqual(["T118X1"]);
+    expect(r.semCaixa.map((s) => s.marca)).toEqual(["T118-AC2", "T118-AC2"]);
   });
 });
 
@@ -152,5 +154,20 @@ describe("quadro vazado (pórtico, treliça) deitado", () => {
     const c = r.cargas[0], porticos = c.itens.filter((u) => u.membros[0].desc === "PORTICO"), colunas = c.itens.find((u) => u.membros[0].desc === "COLUNA");
     for (const u of colunas ? [colunas] : []) for (const id of u.sobre || []) expect(porticos.map((p) => p.id)).not.toContain(id);
     const emCima = porticos.find((p) => p.y > 0); if (emCima) expect(emCima.sobre.every((id) => porticos.some((p) => p.id === id))).toBe(true);
+  });
+});
+
+describe("peça fora do IFC entra com caixa estimada pelo peso", () => {
+  it("escada móvel, contrapeso e batente não somem da carga; parafuso sem peso fica fora", async () => {
+    const { caixaEstimada } = await import("@/lib/carga/geometria");
+    expect(caixaEstimada("ESCADA MOVEL", 50)[0]).toBeGreaterThanOrEqual(1500);
+    expect(caixaEstimada("CONTRA PESO", 22)[0]).toBeLessThan(200);
+    expect(caixaEstimada("BARRA ROSCADA M12", 0)).toBeNull();
+    const lista = [{ marca: "72162417", desc: "ESCADA MOVEL MENOR 205", qtd: 1, kgUn: 50 }, { marca: "72162401", desc: "CONTRA PESO", qtd: 2, kgUn: 11 }, { marca: "72162413", desc: "BATENTE INFERIOR", qtd: 4, kgUn: 1 }, { marca: "T107-AC1", desc: "BARRA ROSCADA M12", qtd: 16, kgUn: 0 }];
+    const r = simularCarga({ lista, geometria: {}, perfil: "recomendado", prefixo: "T107" });
+    expect(r.estimadas.map((e) => e.marca).sort()).toEqual(["72162401", "72162413", "72162417"]);
+    expect(r.semCaixa.every((s) => s.marca === "T107-AC1")).toBe(true);
+    const pecasNaCarga = r.cargas.flatMap((c) => c.itens).reduce((t, u) => t + u.membros.length, 0);
+    expect(pecasNaCarga).toBe(7);
   });
 });

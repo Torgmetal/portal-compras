@@ -21,11 +21,14 @@ export function ResumoSimulacao({ resultado, cargaSel, onCarga }) {
       {cargas.length > 1 && (
         <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-start gap-2"><AlertTriangle size={14} className="mt-0.5 shrink-0" /><span><b>Não cabe num veículo só:</b> a lista pede {cargas.length} cargas. Tire peças do romaneio ou passe parte para o próximo, e simule de novo.</span></p>
       )}
+      {r.estimadas?.length > 0 && (
+        <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"><b>Medidas estimadas pelo peso</b> (não estão no IFC da obra; conferir no pátio): {r.estimadas.map((e) => `${e.marca} ${Math.round(e.C / 10)}×${Math.round(e.L / 10)}×${Math.round(e.A / 10)} cm`).join(", ")}</p>
+      )}
       {(r.resumo?.especiais > 0 || r.resumo?.semLugar?.length > 0 || r.semCaixa?.length > 0) && (
         <div className="text-[12px] text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2 space-y-1">
           {r.especiais?.map((e) => <div key={e.id}><b>Transporte especial:</b> {e.rotulo} — {e.aviso}</div>)}
           {r.resumo?.semLugar?.map((s, i) => <div key={i}><b>Sem lugar:</b> {s}</div>)}
-          {r.semCaixa?.length > 0 && <div><b>Sem geometria no IFC ({r.semCaixa.length} pç, ficaram fora):</b> {[...new Set(r.semCaixa.map((s) => s.marca))].join(", ")}</div>}
+          {r.semCaixa?.length > 0 && <div><b>Sem peso e sem geometria ({r.semCaixa.length} pç, ficaram fora):</b> {[...new Set(r.semCaixa.map((s) => s.marca))].join(", ")}</div>}
         </div>
       )}
     </div>
