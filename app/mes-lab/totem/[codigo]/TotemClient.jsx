@@ -240,12 +240,15 @@ const daPassagem = ({ agir, sairDaTela, setFeito }) => ({
   // botões que o servidor agora recusa — e a recusa pareceria defeito.
   aoEntregar: async (cracha) => {
     const r = await agir("entregarPosto", { crachaAlvo: cracha });
-    if (!r) return;
+    if (!r) return false;
     sairDaTela();
     setFeito("Posto passado. O crachá de quem assumiu já está aberto aqui.");
+    return true;
   },
+  // ⚠ VAI O VÍNCULO, NÃO SÓ A PESSOA (achado do Codex): a lista é um retrato, e se aquela presença
+  // terminou e outra abriu no mesmo posto, o toque antigo encerraria a que está trabalhando agora.
   aoAssumir: async (p) => {
-    const r = await agir("assumirPosto", { deOperadorId: p.operadorId });
+    const r = await agir("assumirPosto", { deOperadorId: p.operadorId, dePresencaId: p.id });
     if (r) setFeito(`Você assumiu o posto de ${r.saiu}. ${r.marcasQueSeguemAbertas} marca(s) seguem abertas.`);
   },
 });

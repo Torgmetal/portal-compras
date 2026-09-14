@@ -321,3 +321,82 @@ describe("passar o posto", () => {
     expect(tx.mesPresenca.update).not.toHaveBeenCalled();
   });
 });
+
+// ─── O QUE A REVISÃO DA PASSAGEM ACHOU (Codex, 14/09/2026) ───────────────────
+
+describe("quem executa a passagem também passa pelo porteiro", () => {
+  const comJurandirNoLaser = () => bancoFalso({
+    presencas: [presencaEm(LASER.id, "p-jur", "op-jurandir")],
+    sessoesAbertas: { [LASER.id]: 4 },
+  });
+
+  // ⚠⚠ ERA UM FURO DE VERDADE: a rota montava o contexto de presença e as duas ações da passagem
+  // simplesmente não o usavam. Uma aba antiga podia entregar um vínculo já reaberto.
+  it("contexto de presença com id velho recusa a passagem", async () => {
+    const { prisma, estado } = comJurandirNoLaser();
+    const r = await passarPosto(prisma, {
+      deOperadorId: "op-jurandir", paraOperadorId: "op-rodrigo", recursoId: LASER.id,
+      presenca: { operadorId: "op-jurandir", presencaId: "p-velho", exigirId: true },
+    });
+    expect(r.erro).toContain("desatualizada");
+    expect(estado.presencas[0].status).toBe("ABERTA");
+  });
+
+  it("sem o id do vínculo, o comando do totem é recusado", async () => {
+    const { prisma } = comJurandirNoLaser();
+    const r = await passarPosto(prisma, {
+      deOperadorId: "op-jurandir", paraOperadorId: "op-rodrigo", recursoId: LASER.id,
+      presenca: { operadorId: "op-jurandir", presencaId: null, exigirId: true },
+    });
+    expect(r.erro).toContain("Bipe o crachá");
+  });
+
+  it("com o contexto certo, a passagem acontece", async () => {
+    const { prisma, estado } = comJurandirNoLaser();
+    const r = await passarPosto(prisma, {
+      deOperadorId: "op-jurandir", paraOperadorId: "op-rodrigo", recursoId: LASER.id,
+      presenca: { operadorId: "op-jurandir", presencaId: "p-jur", exigirId: true },
+    });
+    expect(r.erro).toBeUndefined();
+    expect(estado.presencas[0].status).toBe("ENCERRADA");
+  });
+});
+
+describe("o vínculo escolhido na tela, não só a pessoa", () => {
+  // ⚠⚠ A lista do totem é um RETRATO. Se aquela presença terminou e outra abriu no mesmo posto para
+  // a mesma pessoa, o toque antigo encerraria a presença NOVA — a que está trabalhando agora.
+  it("id de presença que não é mais a ativa recusa", async () => {
+    const { prisma, estado } = bancoFalso({
+      presencas: [presencaEm(LASER.id, "p-nova", "op-jurandir")],
+      sessoesAbertas: { [LASER.id]: 2 },
+    });
+    const r = await passarPosto(prisma, {
+      deOperadorId: "op-jurandir", paraOperadorId: "op-rodrigo", recursoId: LASER.id,
+      dePresencaId: "p-que-morreu",
+    });
+    expect(r.erro).toContain("Esta lista está desatualizada");
+    expect(estado.presencas[0].status).toBe("ABERTA");
+  });
+});
+
+describe("reenvio depois de resposta perdida", () => {
+  // ⚠⚠ A passagem já aconteceu e o operador toca de novo. Devolver "não está mais com o crachá
+  // neste posto" faria parecer defeito logo depois de um gesto que deu certo.
+  it("passagem já feita devolve o que é verdade, não erro", async () => {
+    const { prisma } = bancoFalso({
+      presencas: [presencaEm(LASER.id, "p-rod", "op-rodrigo")],
+      sessoesAbertas: { [LASER.id]: 5 },
+    });
+    const r = await passarPosto(prisma, { deOperadorId: "op-jurandir", paraOperadorId: "op-rodrigo", recursoId: LASER.id });
+    expect(r.erro).toBeUndefined();
+    expect(r.jaEstava).toBe(true);
+    expect(r.marcasQueSeguemAbertas).toBe(5);
+  });
+
+  // ⚠ Mas se quem assume TAMBÉM não está no posto, aí é engano de verdade e a recusa fica.
+  it("render quem não está, sem estar no posto, continua sendo erro", async () => {
+    const { prisma } = bancoFalso({ presencas: [], sessoesAbertas: { [LASER.id]: 5 } });
+    const r = await passarPosto(prisma, { deOperadorId: "op-jurandir", paraOperadorId: "op-rodrigo", recursoId: LASER.id });
+    expect(r.erro).toContain("não está mais com o crachá neste posto");
+  });
+});

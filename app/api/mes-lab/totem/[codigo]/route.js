@@ -19,11 +19,13 @@ import { abrirSessao, apontarQuantidade, encerrarSessao, mudarEstado, estadoDoRe
 import { abrirLote, encerrarLote } from "@/lib/mes/lote";
 import { programadoPara, acharMarca } from "@/lib/mes/programado";
 import { entrarNoPosto, sairDoPosto, liberarPresenca, passarPosto } from "@/lib/mes/cracha";
+import { carimbarPassagem } from "@/lib/mes/passagem-auditoria";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const PERFIS = ["ADMIN"];
+
 const erroDeAcesso = (e) =>
   NextResponse.json({ success: false, error: e.message },
     { status: e.message === "Unauthorized" ? 401 : 403 });
@@ -183,10 +185,14 @@ const ACOES = {
    *
    * ⚠ Não encerra marca nem grava evento: a barra não para porque o turno virou.
    */
-  async entregarPosto({ corpo, recurso, operador }) {
+  async entregarPosto({ corpo, recurso, operador, presenca, usuario }) {
     const quemAssume = await prisma.mesOperador.findUnique({ where: { cracha: String(corpo.crachaAlvo || "").trim() } });
     if (!quemAssume || !quemAssume.ativo) return { erro: `Crachá ${corpo.crachaAlvo} não encontrado.` };
-    return passarPosto(prisma, { deOperadorId: operador.id, paraOperadorId: quemAssume.id, recursoId: recurso.id });
+    // ⚠ Quem executa a ENTREGA é quem sai — e é o contexto dele que o porteiro confere.
+    const r = await passarPosto(prisma, {
+      deOperadorId: operador.id, paraOperadorId: quemAssume.id, recursoId: recurso.id, presenca,
+    });
+    return carimbarPassagem(prisma, r, { usuario, recurso, modo: "ENTREGOU", de: operador, para: quemAssume });
   },
 
   /**
@@ -199,8 +205,14 @@ const ACOES = {
    * ⚠ NÃO É CONSEQUÊNCIA DE BIPAR (pedido do Codex): bipar num posto que tem outro operador não
    * rende ninguém — só um toque neste botão, que diz de quem é o posto que está sendo assumido.
    */
-  async assumirPosto({ corpo, recurso, operador }) {
-    return passarPosto(prisma, { deOperadorId: corpo.deOperadorId, paraOperadorId: operador.id, recursoId: recurso.id });
+  async assumirPosto({ corpo, recurso, operador, presenca, usuario }) {
+    // ⚠ Quem executa a RENDIÇÃO é quem assume; e `dePresencaId` amarra o toque ao vínculo que
+    // estava na tela, não só à pessoa (achado do Codex).
+    const r = await passarPosto(prisma, {
+      deOperadorId: corpo.deOperadorId, paraOperadorId: operador.id, recursoId: recurso.id,
+      dePresencaId: corpo.dePresencaId ?? null, presenca,
+    });
+    return carimbarPassagem(prisma, r, { usuario, recurso, modo: "ASSUMIU", de: { id: corpo.deOperadorId }, para: operador });
   },
 
   /**
@@ -286,7 +298,8 @@ const ACOES = {
 };
 
 export async function POST(req, { params }) {
-  try { await requireRole(PERFIS); } catch (e) { return erroDeAcesso(e); }
+  let usuario;
+  try { usuario = await requireRole(PERFIS); } catch (e) { return erroDeAcesso(e); }
 
   let corpo;
   try { corpo = await req.json(); } catch { return erro("Corpo inválido."); }
@@ -311,7 +324,7 @@ export async function POST(req, { params }) {
   // tende a não mandar. Scripts e importações usam as libs sem contexto de presença, que é um
   // caminho explícito e não se confunde com um comando de gente.
   const presenca = { operadorId: operador.id, presencaId: corpo.presencaId ?? null, exigirId: true };
-  const r = await executar({ corpo, recurso, operador, presenca });
+  const r = await executar({ corpo, recurso, operador, presenca, usuario });
   if (r?.erro) return erro(r.erro, 409);
   return NextResponse.json({ success: true, ...r, operador: { id: operador.id, nome: operador.nome, cracha: operador.cracha } });
 }

@@ -115,6 +115,16 @@ conferir(`a passagem troca o vínculo e NÃO encerra marca (${antesDaPassagem} �
   !passou.erro && antesDaPassagem === depoisDaPassagem && depoisDaPassagem > 0);
 console.log(`     ↳ saiu ${passou.saiu}, assumiu ${opB.nome.trim()}, ${passou.marcasQueSeguemAbertas} marca(s) seguem abertas`);
 
+// 10b — reenviar a MESMA passagem (resposta perdida) devolve o que é verdade, não erro.
+const dedeNovo = await passarPosto(prisma, { deOperadorId: opA.id, paraOperadorId: opB.id, recursoId: p1.id });
+conferir("reenvio da passagem não vira erro", !dedeNovo.erro && dedeNovo.jaEstava === true);
+
+// 10c — e um toque vindo de uma lista velha (vínculo que já morreu) é recusado.
+const listaVelha = await passarPosto(prisma, {
+  deOperadorId: opB.id, paraOperadorId: opA.id, recursoId: p1.id, dePresencaId: "vinculo-que-morreu",
+});
+conferir("toque vindo de lista velha é recusado", !!listaVelha.erro && listaVelha.erro.includes("desatualizada"));
+
 // 11 — E É ISTO QUE A PASSAGEM EXISTE PARA RESOLVER: quem entregou consegue abrir em outro posto.
 const agoraVai = await entrarNoPosto(prisma, { operadorId: opA.id, recursoId: p2.id });
 conferir("quem entregou o posto consegue abrir o crachá em outra máquina", !agoraVai.erro && !!agoraVai.presenca);

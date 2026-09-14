@@ -49,8 +49,15 @@ export default function PassarPosto({ presencas = [], operador, ocupado, aoEntre
       )}
 
       {entregando ? (
+        // ⚠ O CAMPO SÓ SE LIMPA DEPOIS DO SUCESSO (achado do Codex). Limpando antes de saber o
+        // resultado, uma recusa ou uma falha de rede apagava o crachá que o operador acabou de
+        // bipar — e ele teria de pedir o crachá de volta para a pessoa que já foi embora.
         <form className="bg-white/5 border border-white/10 rounded-2xl p-4"
-              onSubmit={(e) => { e.preventDefault(); aoEntregar(cracha.trim()); setCracha(""); setEntregando(false); }}>
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!await aoEntregar(cracha.trim())) return;
+                setCracha(""); setEntregando(false);
+              }}>
           <p className="text-white/70 mb-3">Bipe o crachá de quem assume o posto.</p>
           {/* ⚠ O leitor emula teclado e manda Enter — por isso é `<form>` com submit, não botão. */}
           <input autoFocus value={cracha} onChange={(e) => setCracha(e.target.value)} disabled={ocupado}
