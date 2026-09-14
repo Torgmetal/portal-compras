@@ -13,7 +13,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { MODELOS, gerarEtiquetasCarregamentoPDF } from "@/lib/etiqueta-carregamento-pdf";
-import { camposExtrasDaOP, juntarCamposExtras } from "@/lib/etiqueta-campos-extras";
+import { camposExtrasDaOP, juntarCamposExtras, juntarTagsCliente, tagsPorUnidade } from "@/lib/etiqueta-campos-extras";
+import { conferirCobertura, tagsDaOP } from "@/lib/etiqueta-tag-cliente";
+import { chaveMarca } from "@/lib/itens-expedicao";
 import { itensExpediveisDaOP, opsComItensExpediveis } from "@/lib/itens-expedicao";
 import { lerCalibragem } from "@/lib/etiqueta-calibragem";
 import { log } from "@/lib/log";
@@ -143,6 +145,49 @@ export async function GET(req) {
   return NextResponse.json({ success: true, ...dados });
 }
 
+/**
+ * A TAG DO CLIENTE NA FRENTE DA DESCRIÇÃO (Padrão Torg). Obra sem mapa importado segue exatamente
+ * como antes: a consulta devolve vazio e nada muda.
+ *
+ * ⚠⚠ A COBERTURA É CONFERIDA NO SERVIDOR, E NÃO SÓ NA TELA (pedido do Codex). Uma confirmação dada
+ * sobre quatro peças não pode encobrir a quinta que a revisão da L.E. criou depois: a etiqueta dela
+ * sairia sem TAG e ninguém veria. A conferência é só sobre o que foi ESCOLHIDO para imprimir.
+ */
+async function camposDoModelo(op, pecas, modelo, confirmado) {
+  // Só o modelo do cliente lê os campos do QWS — o padrão não faria nada com eles, e a consulta
+  // seria um round-trip ao Neon por impressão sem serventia nenhuma.
+  if (modelo === "qws") return { pecas: juntarCamposExtras(pecas, await camposExtrasDaOP(prisma, op.numero)) };
+
+  const mapa = await tagsDaOP(prisma, op.numero);
+  if (!mapa.length) return { pecas };
+
+  // ⚠⚠ A COBERTURA CONFERIDA AQUI É A DESTE LOTE, não a da obra. O mapa tem as 96 marcas da OP e a
+  // impressão costuma ser de uma; comparando o mapa inteiro contra a seleção, TODA impressão
+  // parcial acusaria 95 marcas "fora da lista" e pediria confirmação sempre — e confirmação que
+  // sempre aparece é confirmação que ninguém lê. Filtrar pelo que foi escolhido é o que faz a
+  // pergunta significar o que ela diz.
+  const escolhidas = new Set(pecas.map((p) => chaveMarca(p.marca)));
+  const cobertura = conferirCobertura(mapa.filter((u) => escolhidas.has(chaveMarca(u.marca))), pecas);
+  if (!cobertura.completa && !confirmado) {
+    return {
+      recusa: NextResponse.json(
+        { success: false, precisaConfirmar: true, error: frasedaCobertura(cobertura), cobertura },
+        { status: 409 }),
+    };
+  }
+  return { pecas: juntarTagsCliente(pecas, tagsPorUnidade(mapa)) };
+}
+
+/** A frase da recusa por cobertura: diz QUANTAS etiquetas sairiam sem TAG, e de quais marcas. */
+function frasedaCobertura({ semTag, foraDaLista }) {
+  const faltando = semTag.reduce((n, m) => n + (m.qte - m.comTag), 0);
+  const quais = semTag.slice(0, 4).map((m) => `${m.marca} (${m.qte - m.comTag} de ${m.qte})`).join(", ");
+  const resto = semTag.length > 4 ? ` e mais ${semTag.length - 4} marca(s)` : "";
+  const fora = foraDaLista.length ? ` A planilha tem ${foraDaLista.length} marca(s) que não estão na Lista de Expedição.` : "";
+  if (!faltando) return `A planilha de TAGs não bate com esta obra.${fora}`;
+  return `${faltando} etiqueta(s) sairão SEM TAG: ${quais}${resto}.${fora} Confirme para imprimir assim.`;
+}
+
 const erro400 = (msg) => NextResponse.json({ success: false, error: msg }, { status: 400 });
 
 /**
@@ -188,6 +233,22 @@ function resolverDesenho(corpo) {
  * uma rende é decisão do dado. Aceitar um número vindo da tela seria deixar a etiqueta dizer
  * "003/5" para uma marca que tem 2 peças.
  */
+/**
+ * As peças que a tela escolheu, já com o carimbo de caixa.
+ *
+ * ⚠⚠ A TELA MANDA UM SIM/NÃO POR MARCA, NUNCA UM NÚMERO — e a distinção é a regra desta rota.
+ * "A quantidade vem do banco, não do navegador": aceitar um número deixaria a etiqueta dizer "3/5"
+ * para uma marca que tem 2 peças. `emCaixa` só troca a REGRA de contagem (uma etiqueta para o lote,
+ * dizendo "N/N"); o N continua saindo da Lista de Expedição.
+ */
+function pecasEscolhidas(dados, marcas, corpo) {
+  const escolhidas = new Set(marcas.map(String));
+  const emCaixa = new Set((Array.isArray(corpo?.emCaixa) ? corpo.emCaixa : []).map(String));
+  return dados.pecas
+    .filter((p) => escolhidas.has(p.marca))
+    .map((p) => (emCaixa.has(p.marca) ? { ...p, emCaixa: true } : p));
+}
+
 async function selecionar(corpo) {
   const opId = corpo?.opId;
   const marcas = Array.isArray(corpo?.marcas) ? corpo.marcas : [];
@@ -200,23 +261,12 @@ async function selecionar(corpo) {
   const dados = await carregar(opId);
   if (!dados) return { recusa: NextResponse.json({ success: false, error: "OP não encontrada" }, { status: 404 }) };
 
-  const escolhidas = new Set(marcas.map(String));
-  // ⚠⚠ A TELA MANDA UM SIM/NÃO POR MARCA, NUNCA UM NÚMERO — e a distinção é a regra desta rota.
-  // "A quantidade vem do banco, não do navegador": aceitar um número deixaria a etiqueta dizer
-  // "3/5" para uma marca que tem 2 peças. `emCaixa` só troca a REGRA de contagem (uma etiqueta para
-  // o lote, dizendo "N/N"); o N continua saindo da Lista de Expedição.
-  const emCaixa = new Set((Array.isArray(corpo?.emCaixa) ? corpo.emCaixa : []).map(String));
-  let pecas = dados.pecas
-    .filter((p) => escolhidas.has(p.marca))
-    .map((p) => (emCaixa.has(p.marca) ? { ...p, emCaixa: true } : p));
+  const pecas = pecasEscolhidas(dados, marcas, corpo);
   if (!pecas.length) return { recusa: erro400("Nenhuma das marcas enviadas existe nesta OP.") };
 
-  // Só o modelo do cliente lê estes campos — o padrão não faria nada com eles, e a consulta seria
-  // um round-trip ao Neon por impressão sem serventia nenhuma.
-  if (modelo === "qws") {
-    pecas = juntarCamposExtras(pecas, await camposExtrasDaOP(prisma, dados.op.numero));
-  }
-  return { op: dados.op, pecas, modelo, tagObra };
+  const extras = await camposDoModelo(dados.op, pecas, modelo, corpo?.confirmarSemTag === true);
+  if (extras.recusa) return extras;
+  return { op: dados.op, pecas: extras.pecas, modelo, tagObra };
 }
 
 /**

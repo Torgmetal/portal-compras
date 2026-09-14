@@ -39,7 +39,11 @@ export default function BarraSelecao({ busca, setBusca, visiveis, sel, totalEtiq
             <Download size={15} /> Baixar PDF
           </a>
         )}
-        <button onClick={imprimir} disabled={!sel.size || gerando}
+        {/* ⚠⚠ `() => imprimir()`, NUNCA `onClick={imprimir}`. Desde que `imprimir` recebe
+            `confirmarSemTag`, passar a função direto entregaria o EVENTO DE MOUSE como argumento —
+            e um MouseEvent é truthy: toda impressão sairia "confirmada", pulando justamente o aviso
+            de etiqueta sem TAG que existe para não mandar peça ao transportador errado. */}
+        <button onClick={() => imprimir()} disabled={!sel.size || gerando}
           className="bg-torg-blue text-white text-sm font-semibold rounded-lg px-4 py-2 flex items-center gap-2 disabled:opacity-40">
           {gerando ? <Loader2 size={15} className="animate-spin" /> : <Printer size={15} />}
           {gerando ? "Gerando…" : "Gerar etiquetas"}

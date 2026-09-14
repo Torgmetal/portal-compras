@@ -31,6 +31,9 @@ const get = (q = "") => GET(new Request(`http://localhost/api/expedicao/etiqueta
 const marcas = async (r) => (await r.json()).pecas.map((p) => p.marca);
 
 beforeEach(() => {
+  // ⚠ Desde 14/09/2026 o modelo PADRÃO também lê esta tabela (a TAG do cliente que sai na
+  // frente da descrição). Sem mapa importado, a obra imprime exatamente como antes.
+  mockPrisma.etiquetaCampoExtra.findMany.mockResolvedValue([]);
   vi.clearAllMocks();
   mocks.role.mockResolvedValue({ id: "u1", name: "Expedição" });
   mocks.pdf.mockResolvedValue(new Uint8Array([1]));

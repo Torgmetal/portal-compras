@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle, Check, Loader2, Upload } from "lucide-react";
 import * as XLSX from "xlsx";
 import { lerJson } from "@/lib/ler-json";
+import TagsCliente from "./TagsCliente";
 
 // ESCOLHA DO MODELO DA ETIQUETA + a planilha que alimenta o modelo do cliente.
 //
@@ -164,7 +165,14 @@ export default function ModeloEtiqueta({ opId, modelo, setModelo, tagObra, setTa
       </select>
       <p className="text-[12.5px] text-torg-gray mt-1.5">{atual.ajuda}</p>
       {modelo === "qws" && <Planilha opId={opId} quantos={quantos} recarregar={contar} />}
-      {modelo === "padrao" && <TagDaObra tagObra={tagObra} setTagObra={setTagObra} sugestao={sugestao} />}
+      {modelo === "padrao" && (
+        <>
+          <TagDaObra tagObra={tagObra} setTagObra={setTagObra} sugestao={sugestao} />
+          {/* ⚠ SÃO DUAS TAGs DIFERENTES, e a tela precisa deixar isso óbvio: a de cima é UMA para a
+              obra inteira e sai junto do nome da obra; esta é por PEÇA e sai na frente da descrição. */}
+          <TagsCliente opId={opId} />
+        </>
+      )}
     </div>
   );
 }

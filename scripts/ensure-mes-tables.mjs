@@ -26,6 +26,13 @@ async function main() {
   // Vinculo da OP com o orcamento do Comercial (proposta + estudo). Idempotente. 19/08/2026.
   for (const c of [
     // Escopo de qualidade da obra (quais relatórios ela exige). 22/08/2026.
+    // ⚠⚠ A TAG DO CLIENTE QUE SAI NA FRENTE DA DESCRIÇÃO (etiqueta Padrão Torg, 14/09/2026).
+    // DDL idempotente aqui, e NÃO `prisma db push`: medido nesta data, o banco de produção tem
+    // DRIFT em relação ao `schema.prisma` — chaves estrangeiras e índices que existem lá e não
+    // estão declarados —, e um `db push` os DERRUBARIA (`prisma migrate diff` mostra isso em
+    // dezenas de linhas de DROP). Acrescentar coluna anulável por ALTER é o caminho seguro
+    // enquanto o drift não for reconciliado.
+    `ALTER TABLE "EtiquetaCampoExtra" ADD COLUMN IF NOT EXISTS "tagCliente" TEXT`,
     `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "escopoQualidade" JSONB`,
     `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "orcamentoPasta" TEXT`,
     `ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "orcamentoRef" TEXT`,

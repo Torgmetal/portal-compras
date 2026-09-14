@@ -122,13 +122,15 @@ model UserModulo {
 model OP {
   id                   String               @id @default(cuid())
   numero               String               @unique
-  /* ⚠ QUAIS OBRAS O PCP ESTÁ TOCANDO AGORA. Vitor (08/09/2026): "83, 84 e 89 não pode ser, prefiro
-     que faça uma lista disso à parte; só pode aparecer 97, 102, 103". Nenhum dado separa os dois
-     grupos — medido no dia: a 083 tem liberação e GRD recentes e a 089 tem 54 GRDs em 15 dias, as
-     duas MAIS ativas que a 102 pelos números. É decisão de quem toca a fábrica, não dedução; por
-     isso é um campo, e não uma regra derivada que quebraria na semana seguinte.
-     Falso NÃO esconde: a obra vai para a lista "fora do quadro" do Gantt, com o que está na bancada. */
-  pcpNoQuadro Boolean @default(true)
+  /**
+   * ⚠ QUAIS OBRAS O PCP ESTÁ TOCANDO AGORA. Vitor (08/09/2026): "83, 84 e 89 não pode ser, prefiro
+   * que faça uma lista disso à parte; só pode aparecer 97, 102, 103". Nenhum dado separa os dois
+   * grupos — medido no dia: a 083 tem liberação e GRD recentes e a 089 tem 54 GRDs em 15 dias, as
+   * duas MAIS ativas que a 102 pelos números. É decisão de quem toca a fábrica, não dedução; por
+   * isso é um campo, e não uma regra derivada que quebraria na semana seguinte.
+   * Falso NÃO esconde: a obra vai para a lista "fora do quadro" do Gantt, com o que está na bancada.
+   */
+  pcpNoQuadro          Boolean              @default(true)
   cliente              String
   obra                 String?
   refCliente           String? // código/nº de referência da obra no cliente (aparece nos relatórios enviados)
@@ -1969,54 +1971,54 @@ model DataBookQualidade {
 // 209 µm a 15% — por isso `camadas` é uma TABELA [{ diluicao, umida, seca }], não um número. Guardar
 // um valor só obrigaria o PLP a mentir em duas das três situações.
 model ProdutoTinta {
-  id               String    @id @default(cuid())
-  fabricante       String
-  produto          String
+  id                String    @id @default(cuid())
+  fabricante        String
+  produto           String
   // ⚠⚠ TINTA, ENDURECEDOR E DILUENTE SÃO FICHAS DIFERENTES E TODAS ENTRAM. Vitor (27/08/2026):
   // "precisa incluir tanto a ficha técnica do diluente e você descrever qual diluente vamos usar, e
   // também trazer o componente A e B". Um esquema epóxi ou PU é um CONJUNTO: base (A) + endurecedor
   // (B) + diluente, cada um com o seu boletim e a sua validade. O PLP que cita só a tinta manda
   // aplicar metade do produto.
-  categoria        String    @default("TINTA") // TINTA | ENDURECEDOR | DILUENTE
-  componenteA      String? // a base, como o boletim nomeia
-  componenteB      String? // o endurecedor / catalisador
-  proporcaoMistura String? // "4:1 em volume"
-  potLife          String? // vida útil da mistura ("4 h a 25 °C")
-  diluenteId       String? // o diluente indicado, quando ele também está no catálogo
-  tipo             String? // PRIMER | INTERMEDIARIA | ACABAMENTO | UNICA
-  norma            String?
-  diluente         String?
-  diluicaoMin      Float? // %
-  diluicaoMax      Float? // %
-  camadas          Json? // [{ diluicao, umida, seca }]
-  secaMin          Float? // µm
-  secaMax          Float? // µm
-  secagemToque     String?
-  secagemManuseio  String?
-  secagemRepintura String?
-  rendimento       String?
-  solidos          String? // como o boletim escreve ("72 ± 2% em volume")
+  categoria         String    @default("TINTA") // TINTA | ENDURECEDOR | DILUENTE
+  componenteA       String? // a base, como o boletim nomeia
+  componenteB       String? // o endurecedor / catalisador
+  proporcaoMistura  String? // "4:1 em volume"
+  potLife           String? // vida útil da mistura ("4 h a 25 °C")
+  diluenteId        String? // o diluente indicado, quando ele também está no catálogo
+  tipo              String? // PRIMER | INTERMEDIARIA | ACABAMENTO | UNICA
+  norma             String?
+  diluente          String?
+  diluicaoMin       Float? // %
+  diluicaoMax       Float? // %
+  camadas           Json? // [{ diluicao, umida, seca }]
+  secaMin           Float? // µm
+  secaMax           Float? // µm
+  secagemToque      String?
+  secagemManuseio   String?
+  secagemRepintura  String?
+  rendimento        String?
+  solidos           String? // como o boletim escreve ("72 ± 2% em volume")
   // ⚠⚠ O NÚMERO DOS SÓLIDOS EM VOLUME É O QUE FAZ A CONTA. A camada ÚMIDA não é um dado de tabela:
   // é EPU = EPS × (100 + %DIL) / SV — a fórmula que a própria planilha do Vitor usa. Com o SV, a
   // úmida sai para QUALQUER espessura seca e QUALQUER diluição; sem ele, só para as três linhas que
   // o boletim listou. Conferido no INDUSTHANE RHB DF: SV 55,2% dá 181 / 199 / 208 µm, contra os
   // 181 / 200 / 209 da planilha dele.
-  solidosVol       Float? // % em volume, só o número
-  especificacao    String? // a descrição do tipo ("Tinta poliuretano dupla função…")
-  boletimUrl       String?
-  boletimNome      String?
-  boletimRevisao   String?
-  boletimData      String?
-  conferidoEm      DateTime?
-  conferidoPorNome String?
+  solidosVol        Float? // % em volume, só o número
+  especificacao     String? // a descrição do tipo ("Tinta poliuretano dupla função…")
+  boletimUrl        String?
+  boletimNome       String?
+  boletimRevisao    String?
+  boletimData       String?
+  conferidoEm       DateTime?
+  conferidoPorNome  String?
   historicoBoletins Json? // versões anteriores completas, preservadas a cada alteração
-  extraidoEm       DateTime?
-  observacoes      String?
-  ativo            Boolean   @default(true)
-  criadoPorId      String?
-  criadoPorNome    String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  extraidoEm        DateTime?
+  observacoes       String?
+  ativo             Boolean   @default(true)
+  criadoPorId       String?
+  criadoPorNome     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([tipo])
 }
@@ -3038,7 +3040,7 @@ model EstoqueFisicoSync {
 }
 
 model PecaConjunto {
-  ganttDistribuicoes       GanttDistribuicao[]
+  ganttDistribuicoes      GanttDistribuicao[]
   id                      String                  @id @default(cuid())
   opId                    String?
   opNumero                String
@@ -3235,15 +3237,25 @@ model EtiquetaCalibragem {
 }
 
 model EtiquetaCampoExtra {
-  id       String @id @default(cuid())
-  opNumero String
-  marca    String
+  id           String   @id @default(cuid())
+  opNumero     String
+  marca        String
   /// 1, 2, 3… na ordem em que a linha aparece na planilha. A etiqueta "2/3" leva a unidade 2.
   unidade      Int      @default(1)
   descricao    String? // a "DESCRIÇÃO" da planilha do cliente (ex.: "SE-001") — não é o perfil;
   // `PecaConjunto.descricao` guarda o perfil ("L2''X1/4''"), este é a posição/etiqueta do desenho.
   referencia   String? // ex.: "2"-HC-20A-2371-Cc-NI"
   tagPetrobras String? // ex.: "PS-20A-V1419338-001"
+  /// ⚠⚠ A TAG DO CLIENTE QUE SAI NA FRENTE DA DESCRIÇÃO, no modelo Padrão Torg — ex.: "TC 4706".
+  /// Vem da "Lista de Equivalência de TAG" do TMSA, que tem uma ABA por TAG. Campo SEPARADO do
+  /// `tagPetrobras` de propósito: são clientes e modelos de etiqueta diferentes, e a mesma OP pode
+  /// um dia usar os dois. Quem grava TMSA só toca neste campo; quem grava QWS, só nos dele.
+  ///
+  /// ⚠⚠ ELA É DA PEÇA, NÃO DA MARCA. Medido no arquivo da OP-105: 51 das 96 marcas aparecem em
+  /// mais de uma aba, e as quantidades por aba SOMAM a quantidade da Lista de Expedição — das 4
+  /// peças da 105A3, duas vão para o TC 4706 e duas para o TC 4707. Por isso ela mora aqui, na
+  /// linha por UNIDADE, e não numa coluna de `PecaConjunto`.
+  tagCliente   String?
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
@@ -4824,13 +4836,13 @@ model SolicitacaoProducao {
 // A partir dela o motor de rastreio para de usar o FIFO naquele material e passa a usar o R
 // registrado — deixa de ser regra de consumo e vira fato.
 model TrocaRastreabilidade {
-  id             String   @id @default(cuid())
-  estoqueConferido Boolean @default(false)
-  opId           String?
-  opNumero       String
-  perfil         String
-  rIndicado      String? // o que o FIFO tinha apontado (fica pra auditoria)
-  rUsado         String // o R do fardo efetivamente separado
+  id               String   @id @default(cuid())
+  estoqueConferido Boolean  @default(false)
+  opId             String?
+  opNumero         String
+  perfil           String
+  rIndicado        String? // o que o FIFO tinha apontado (fica pra auditoria)
+  rUsado           String // o R do fardo efetivamente separado
   // ⚠⚠ ATÉ ONDE A DECLARAÇÃO VALE. Vitor (28/08/2026), sobre a OP-106: "precisamos ver como vamos
   // resolver sem você quebrar outras coisas". São dois fatos diferentes registrados no mesmo lugar:
   //   TODAS  → "todo este perfil, nesta OP, veio deste lote" (o fardo trocado na separação; era o
@@ -4839,12 +4851,12 @@ model TrocaRastreabilidade {
   //            R que o CMR da própria OP já respondeu. É o caso da peça cortada antes da entrega:
   //            na OP-106, o perfil CH12.50X100 tem 1 peça de estoque e 3 corretamente rastreadas,
   //            e aplicar a declaração nas 4 apagaria rastreio bom.
-  escopo         String   @default("TODAS") // TODAS | SEM_R
-  motivo         String?
-  trocadoPorId   String?
-  trocadoPorNome String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  escopo           String   @default("TODAS") // TODAS | SEM_R
+  motivo           String?
+  trocadoPorId     String?
+  trocadoPorNome   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@unique([opNumero, perfil])
   @@index([opNumero])
@@ -5862,15 +5874,16 @@ model FotoObra {
 
 // Partes da programação; os campos da peça continuam sendo a âncora legada.
 model GanttDistribuicao {
-  id String @id @default(cuid())
-  pecaId String
-  setor String
-  quantidade Int
-  ancoraDia DateTime? @db.Date
+  id            String       @id @default(cuid())
+  pecaId        String
+  setor         String
+  quantidade    Int
+  ancoraDia     DateTime?    @db.Date
   ancoraRecurso String?
-  partes Json
-  updatedAt DateTime @updatedAt
-  peca PecaConjunto @relation(fields: [pecaId], references: [id], onDelete: Cascade)
+  partes        Json
+  updatedAt     DateTime     @updatedAt
+  peca          PecaConjunto @relation(fields: [pecaId], references: [id], onDelete: Cascade)
+
   @@unique([pecaId, setor])
   @@index([setor])
 }
@@ -5926,34 +5939,34 @@ model ConfigCarga {
 }
 
 model AnaliseCriticaProjeto {
-  id             String    @id @default(cuid())
-  opId           String    @unique
-  opNumero       String
-  revisao        Int       @default(0)
-  status         String    @default("EM_ANALISE") // EM_ANALISE | VERIFICADA | APROVADA
+  id              String    @id @default(cuid())
+  opId            String    @unique
+  opNumero        String
+  revisao         Int       @default(0)
+  status          String    @default("EM_ANALISE") // EM_ANALISE | VERIFICADA | APROVADA
   responsavelNome String?
-  responsavelId  String?
-  abertoEm       DateTime  @default(now())
+  responsavelId   String?
+  abertoEm        DateTime  @default(now())
   aprovadoPorNome String?
-  aprovadoPorId  String?
-  aprovadoEm     DateTime?
-  entradas       Json      @default("[]")
-  requisitos     Json      @default("[]")
-  areas          Json      @default("[]")
-  riscos         Json      @default("[]")
-  saidas         Json      @default("[]")
-  comentarios    Json      @default("[]")
-  reunioes       Json      @default("[]")
-  acoes          Json      @default("[]")
-  historico      Json      @default("[]") // [{ revisao, data, porQuem, motivo, snapshot }]
-  form08Url      String?
+  aprovadoPorId   String?
+  aprovadoEm      DateTime?
+  entradas        Json      @default("[]")
+  requisitos      Json      @default("[]")
+  areas           Json      @default("[]")
+  riscos          Json      @default("[]")
+  saidas          Json      @default("[]")
+  comentarios     Json      @default("[]")
+  reunioes        Json      @default("[]")
+  acoes           Json      @default("[]")
+  historico       Json      @default("[]") // [{ revisao, data, porQuem, motivo, snapshot }]
+  form08Url       String?
   form08EmitidoEm DateTime?
-  planoAcaoId    String? // plano 5W2H da Qualidade criado a partir das ações (bloco 7)
-  sharepointPath String?
-  sharepointEm   DateTime?
-  criadoPorId    String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  planoAcaoId     String? // plano 5W2H da Qualidade criado a partir das ações (bloco 7)
+  sharepointPath  String?
+  sharepointEm    DateTime?
+  criadoPorId     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([opNumero])
 }
