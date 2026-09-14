@@ -713,6 +713,7 @@ async function main() {
   }
 
   await travaDoTrabalhoNoRecurso(prisma);
+  await travaDoCrachaAtivo(prisma);
 
   // Após criar as tabelas, garante o event trigger de proteção
   await ensureEventTrigger(prisma);
@@ -816,6 +817,27 @@ async function criarTabelasDoAgente(prisma, faltando) {
  * roda por enquanto só no banco de laboratório), e este script é chamado no build — ele não pode
  * derrubar deploy nenhum por causa de uma tabela que ainda não nasceu.
  */
+/**
+ * UM CRACHÁ ATIVO POR VEZ — índice PARCIAL, que o Prisma não sabe declarar no schema.
+ *
+ * ⚠⚠ É AQUI QUE A REGRA MORA, não na rota. Matheus (13/09/2026): "quando um crachá estiver ativado
+ * em uma máquina, não pode ser aberto em outro até ele fechar a operação dele na máquina aberta".
+ * A checagem em JS lê um retrato; dois totens bipando o mesmo crachá no mesmo segundo leem os dois
+ * "não há vínculo" e criam dois. Mesma lição da Conferência de Peça e da trava do trabalho.
+ *
+ * ⚠ Tolerante à tabela não existir: em produção `MesPresenca` ainda não foi criada (o MES próprio
+ * roda por enquanto só no banco de laboratório) e este script é chamado no build.
+ */
+async function travaDoCrachaAtivo(prisma) {
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "MesPresenca_operador_ativa_key"
+    ON "MesPresenca"("operadorId") WHERE "status" = 'ABERTA'
+  `).then(
+    () => console.log('[ensure-mes-tables] OK — índice "MesPresenca_operador_ativa_key".'),
+    (e) => console.warn("[ensure-mes-tables] índice do crachá ativo não criado:", e.message),
+  );
+}
+
 async function travaDoTrabalhoNoRecurso(prisma) {
   // ⚠⚠ O ÍNDICE ANTIGO TEM DE CAIR EXPLICITAMENTE (achado do Codex, 13/09/2026). Ele travava UMA
   // sessão aberta por recurso; agora o que não pode repetir é o TRABALHO (obra+marca), porque o

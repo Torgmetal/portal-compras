@@ -83,3 +83,31 @@ describe("PedirCracha — volta para as bancadas sozinho", () => {
     expect(campo.value).toBe("");
   });
 });
+
+// ⚠⚠ O BOTÃO "VOLTAR" (Matheus, 13/09/2026). A volta automática já existia, mas obrigava a esperar
+// dez segundos parado olhando para a tela errada — e quem chega ao totem errado sabe disso no
+// primeiro olhar.
+describe("PedirCracha — o botão Voltar", () => {
+  it("leva para as bancadas na hora, sem esperar a contagem", () => {
+    render(<PedirCracha aoEnviar={vi.fn()} ocupado={false} voltarPara={BANCADAS} />);
+    fireEvent.click(screen.getByText(/Voltar para as bancadas/i));
+    expect(empurrar).toHaveBeenCalledWith(BANCADAS);
+  });
+
+  // ⚠ Sem destino não há volta: totem preso a um posto de um setor que sumiu do cadastro não pode
+  // oferecer um botão que navega para lugar nenhum.
+  it("sem destino, o botão não aparece", () => {
+    render(<PedirCracha aoEnviar={vi.fn()} ocupado={false} voltarPara={null} />);
+    expect(screen.queryByText(/Voltar para as bancadas/i)).toBeNull();
+  });
+
+  // ⚠⚠ VOLTAR É NAVEGAÇÃO, NÃO É SAIR DO POSTO (pedido do Codex). Nesta tela ninguém está
+  // identificado, então não há vínculo de crachá a liberar — e uma operação aberta jamais pode ser
+  // solta por um gesto de navegação. Quem libera o crachá é o "Sair", com o operador na tela.
+  it("não dispara nenhuma ação no servidor", () => {
+    const aoEnviar = vi.fn();
+    render(<PedirCracha aoEnviar={aoEnviar} ocupado={false} voltarPara={BANCADAS} />);
+    fireEvent.click(screen.getByText(/Voltar para as bancadas/i));
+    expect(aoEnviar).not.toHaveBeenCalled();
+  });
+});

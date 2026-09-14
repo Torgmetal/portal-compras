@@ -18,6 +18,7 @@ import { requireRole } from "@/lib/session";
 import { abrirSessao, apontarQuantidade, encerrarSessao, mudarEstado, estadoDoRecurso, saldoDaMarca, ESTADO } from "@/lib/mes/sessao";
 import { abrirLote, encerrarLote } from "@/lib/mes/lote";
 import { programadoPara, acharMarca } from "@/lib/mes/programado";
+import { entrarNoPosto, sairDoPosto, liberarPresenca } from "@/lib/mes/cracha";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,13 +80,21 @@ export async function GET(req, { params }) {
     success: true,
     recurso: { id: recurso.id, codigo: recurso.codigo, nome: recurso.nome, tipo: recurso.tipo,
                setor: { codigo: recurso.setor.codigo, nome: recurso.setor.nome, cor: recurso.setor.cor } },
-    ...estado, trabalhos,
+    ...estado, trabalhos, presencas: await presencasDoPosto(recurso.id),
     // ⚠ `apontado`/`saldo` no topo continuam sendo os do PRIMEIRO trabalho: a tela do totem antiga
     // os lê assim, e trocar o contrato de uma vez quebraria o que já está validado no chão.
     apontado: primeiro?.apontado ?? null, saldo: primeiro?.saldo ?? null,
     motivos, planos, ...programado,
   });
 }
+
+/** Quem está com o crachá aberto neste posto — a tela mostra, o operador se reconhece. */
+const presencasDoPosto = (recursoId) =>
+  prisma.mesPresenca.findMany({
+    where: { recursoId, status: "ABERTA" },
+    orderBy: { abertaEm: "asc" },
+    select: { id: true, abertaEm: true, operador: { select: { nome: true, cracha: true } } },
+  });
 
 /**
  * Os planos de corte que este posto pode abrir.
@@ -140,41 +149,69 @@ async function operadorDoCracha(cracha) {
 }
 
 const ACOES = {
-  async entrar({ operador }) { return { operador }; },
+  /**
+   * ⚠⚠ ENTRAR DEIXOU DE SER SÓ IDENTIFICAR. Matheus (13/09/2026): "quando um crachá estiver ativado
+   * em uma máquina, não pode ser aberto em outro até ele fechar a operação dele na máquina aberta".
+   * Agora a entrada ADQUIRE um vínculo (`MesPresenca`), e é ele que a trava usa — ver
+   * `lib/mes/cracha.js` para por que isso não podia sair de `MesSessao.operadorId`.
+   */
+  async entrar({ recurso, operador }) {
+    const r = await entrarNoPosto(prisma, { operadorId: operador.id, recursoId: recurso.id });
+    if (r.erro) return r;
+    return { operador, presencaId: r.presenca.id, liberou: r.liberou ?? null };
+  },
 
-  async abrir({ corpo, recurso, operador }) {
+  /** ⚠ Só o botão explícito passa por aqui — recarregar a tela não solta operação aberta. */
+  async sair({ recurso, operador }) {
+    return sairDoPosto(prisma, { operadorId: operador.id, recursoId: recurso.id });
+  },
+
+  /**
+   * A SAÍDA DE EMERGÊNCIA, e ela é do ADMIN (a rota inteira já é ADMIN-only).
+   *
+   * ⚠⚠ LIBERA O VÍNCULO E NADA MAIS. Não encerra marca nem grava evento: fabricar um encerramento
+   * que ninguém viveu no chão de fábrica envenena o OEE com tempo que não existiu (pedido do
+   * Codex). O trabalho segue aberto onde está, para quem estiver lá resolver.
+   */
+  async liberarCracha({ corpo, operador }) {
+    const alvo = await prisma.mesOperador.findUnique({ where: { cracha: String(corpo.crachaAlvo || "").trim() } });
+    if (!alvo) return { erro: `Crachá ${corpo.crachaAlvo} não encontrado.` };
+    return liberarPresenca(prisma, { operadorId: alvo.id, porQuem: operador.nome });
+  },
+
+  async abrir({ corpo, recurso, operador , presenca }) {
     return abrirSessao(prisma, {
-      recursoId: recurso.id, operadorId: operador.id,
+      presenca, recursoId: recurso.id, operadorId: operador.id,
       opId: corpo.opId ?? null, opNumero: corpo.opNumero ?? null,
       marca: corpo.marca ?? null, operacao: recurso.setor.codigo,
       planejadoQtd: corpo.planejadoQtd,
     });
   },
 
-  async apontar({ corpo, operador }) {
+  async apontar({ corpo, operador , presenca }) {
     return apontarQuantidade(prisma, {
-      sessaoId: corpo.sessaoId, operadorId: operador.id,
+      presenca, sessaoId: corpo.sessaoId, operadorId: operador.id,
       boas: corpo.boas, rejeitadas: corpo.rejeitadas, retrabalho: corpo.retrabalho,
       observacao: corpo.observacao, chaveOperacao: corpo.chaveOperacao,
     });
   },
 
-  async parar({ corpo, operador }) {
+  async parar({ corpo, operador , presenca }) {
     return mudarEstado(prisma, {
-      sessaoId: corpo.sessaoId, tipo: ESTADO.PARADA, motivoId: corpo.motivoId,
+      presenca, sessaoId: corpo.sessaoId, tipo: ESTADO.PARADA, motivoId: corpo.motivoId,
       detalhe: corpo.detalhe, operadorId: operador.id, chaveIdem: corpo.chaveOperacao,
     });
   },
 
-  async produzir({ corpo, operador }) {
+  async produzir({ corpo, operador , presenca }) {
     return mudarEstado(prisma, {
-      sessaoId: corpo.sessaoId, tipo: ESTADO.PRODUCAO,
+      presenca, sessaoId: corpo.sessaoId, tipo: ESTADO.PRODUCAO,
       operadorId: operador.id, chaveIdem: corpo.chaveOperacao,
     });
   },
 
-  async encerrar({ corpo, operador }) {
-    return encerrarSessao(prisma, { sessaoId: corpo.sessaoId, operadorId: operador.id, chaveIdem: corpo.chaveOperacao });
+  async encerrar({ corpo, operador , presenca }) {
+    return encerrarSessao(prisma, { presenca, sessaoId: corpo.sessaoId, operadorId: operador.id, chaveIdem: corpo.chaveOperacao });
   },
 
   /**
@@ -182,7 +219,7 @@ const ACOES = {
    * abrir todas as marcas e iniciar a produção delas sem que o operador precise abrir uma por
    * uma"*. O que chega é a BARRA (ou a chapa); o que abre são as marcas dela.
    */
-  async abrirNesting({ corpo, recurso, operador }) {
+  async abrirNesting({ corpo, recurso, operador , presenca }) {
     const unidade = await prisma.mesNestingUnidade.findUnique({
       where: { id: corpo.unidadeId },
       include: { itens: true, nesting: { select: { nome: true, opNumero: true } } },
@@ -191,7 +228,7 @@ const ACOES = {
     if (!unidade.itens.length) return { erro: "Esta barra não tem marca nenhuma." };
 
     const r = await abrirLote(prisma, {
-      recursoId: recurso.id, operadorId: operador.id, nestingUnidadeId: unidade.id,
+      presenca, recursoId: recurso.id, operadorId: operador.id, nestingUnidadeId: unidade.id,
       loteId: corpo.chaveOperacao || null,
       trabalhos: unidade.itens.map((i) => ({
         marca: i.marca,
@@ -206,8 +243,8 @@ const ACOES = {
     return { ...r, plano: unidade.nesting.nome, unidade: unidade.indice };
   },
 
-  async encerrarLote({ corpo, recurso, operador }) {
-    return encerrarLote(prisma, { recursoId: recurso.id, loteId: corpo.loteId, operadorId: operador.id });
+  async encerrarLote({ corpo, recurso, operador , presenca }) {
+    return encerrarLote(prisma, { presenca, recursoId: recurso.id, loteId: corpo.loteId, operadorId: operador.id });
   },
 };
 
@@ -226,7 +263,14 @@ export async function POST(req, { params }) {
   const { operador, erro: semCracha } = await operadorDoCracha(corpo.cracha);
   if (semCracha) return erro(semCracha, 403);
 
-  const r = await executar({ corpo, recurso, operador });
+  // ⚠⚠ O CONTEXTO DE PRESENÇA VAI EM TODA AÇÃO, não só na entrada. O totem guarda o crachá em
+  // `useState` e o reenvia em todo comando: validando só o `entrar`, quem foi recusado ainda
+  // poderia apontar, parar ou encerrar numa sessão que já existe no posto (achado do Codex).
+  //
+  // ⚠ `presencaId` vem da tela e é conferido contra o vínculo ativo — é o que impede uma aba velha,
+  // aberta antes de uma liberação, de voltar a funcionar sozinha.
+  const presenca = { operadorId: operador.id, presencaId: corpo.presencaId ?? null };
+  const r = await executar({ corpo, recurso, operador, presenca });
   if (r?.erro) return erro(r.erro, 409);
   return NextResponse.json({ success: true, ...r, operador: { id: operador.id, nome: operador.nome, cracha: operador.cracha } });
 }

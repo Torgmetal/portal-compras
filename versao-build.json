@@ -1,7 +1,12 @@
 {
-  "build": 3131,
-  "gerado": "2026-09-14T00:17:44.310Z",
+  "build": 3132,
+  "gerado": "2026-09-14T01:55:41.033Z",
   "commits": [
+    {
+      "hash": "07dc491651",
+      "data": "13/09/2026",
+      "titulo": "MES proprio: o operador escolhe a barra e as marcas abrem juntas"
+    },
     {
       "hash": "9ed15a5271",
       "data": "13/09/2026",
@@ -146,11 +151,6 @@
       "hash": "092504ff15",
       "data": "11/09/2026",
       "titulo": "Permite editar quantidades por peça nos relatórios de inspeção"
-    },
-    {
-      "hash": "66071c39c6",
-      "data": "11/09/2026",
-      "titulo": "Inspeções: abrir revisão de relatório assinado e editar as peças informadas"
     }
   ]
 }

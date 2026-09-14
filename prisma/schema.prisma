@@ -5986,6 +5986,7 @@ model MesRecurso {
   setor        MesSetor         @relation(fields: [setorId], references: [id])
   sessoes      MesSessao[]
   eventos      MesEvento[]
+  presencas    MesPresenca[]
   dispositivos MesDispositivo[]
 
   @@index([setorId])
@@ -6004,8 +6005,9 @@ model MesOperador {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sessoes MesSessao[]
-  eventos MesEvento[]
+  sessoes   MesSessao[]
+  eventos   MesEvento[]
+  presencas MesPresenca[]
 
   @@index([ativo])
   @@index([funcionarioId])
@@ -6032,36 +6034,79 @@ model MesMotivoParada {
 //
 // ⚠ Encerrar a sessão NÃO é concluir a OP: a sessão pode produzir parte do
 // saldo, e o restante continua disponível para a próxima.
+/// O CRACHÁ ATIVO NUM POSTO — quem está operando o quê, AGORA.
+///
+/// ⚠⚠ NÃO SE INFERE DE `MesSessao.operadorId` (achado do Codex, 13/09/2026, e era exatamente o que
+/// eu ia fazer). Aquele campo é AUTORIA DA ABERTURA: quem abriu a marca. Como "quem chega depois
+/// entra na sessão que já existe", a sessão que o Jurandir abriu continua com o nome dele mesmo
+/// depois de ele ir embora e o Rodrigo assumir a máquina — então inferir presença dali prenderia o
+/// Jurandir fora da fábrica inteira por uma máquina que ele não opera mais, e ao mesmo tempo não
+/// representaria o Rodrigo, que está lá. São duas perguntas diferentes e precisam de dois
+/// registros.
+///
+/// ⚠⚠ PRESENÇA ≠ ESTADO DA MÁQUINA. Esta tabela responde ONDE O OPERADOR ESTÁ VINCULADO; os
+/// `MesEvento` respondem EM QUE ESTADO A MÁQUINA ESTÁ. Foi o erro que já custou caro neste módulo
+/// (abrir marca apagava parada) e não se repete aqui: nada nesta tabela é usado para inferir
+/// estado produtivo, e nenhum evento libera um vínculo.
+model MesPresenca {
+  id          String    @id @default(cuid())
+  operadorId  String
+  recursoId   String
+  status      String    @default("ABERTA") // ABERTA | ENCERRADA
+  /// Por que o vínculo terminou: "saiu" | "posto ocioso" | "liberada por <quem>".
+  motivoFim   String?
+  abertaEm    DateTime  @default(now())
+  encerradaEm DateTime?
+  ambiente    String    @default("PROD")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  operador MesOperador @relation(fields: [operadorId], references: [id])
+  recurso  MesRecurso  @relation(fields: [recursoId], references: [id])
+
+  // ⚠⚠ UM CRACHÁ ATIVO POR VEZ — `("operadorId") WHERE status = 'ABERTA'`, índice PARCIAL no
+  // Postgres, que o Prisma não sabe declarar; mora em scripts/ensure-mes-tables.mjs
+  // (`travaDoCrachaAtivo`). É ELE a regra de verdade: sem o índice, dois totens bipando o mesmo
+  // crachá ao mesmo tempo criariam dois vínculos e o operador ficaria "em duas máquinas".
+  //
+  // ⚠ Não há exclusividade inversa: VÁRIOS operadores podem estar no MESMO posto (turno que se
+  // sobrepõe, dois na mesma bancada). O pedido é "um operador não pode estar em duas máquinas",
+  // não "uma máquina não pode ter dois operadores".
+  @@index([operadorId, status])
+  @@index([recursoId, status])
+  @@index([abertaEm])
+}
+
 model MesSessao {
-  id           String    @id @default(cuid())
-  recursoId    String
-  operadorId   String?
+  id              String    @id @default(cuid())
+  recursoId       String
+  operadorId      String?
   // Contexto produtivo. A marca NÃO é única globalmente — a chave é obra + marca
   // (+ operação), por isso `opId`/`opNumero` andam junto e nunca a marca sozinha.
-  opId         String? // -> OP.id
-  opNumero     String? // "T112A56" (código da obra no chão de fábrica)
-  marca        String?
-  pecaId       String? // -> PecaConjunto.id, quando resolvido
-  operacao     String? // etapa/setor da vez
+  opId            String? // -> OP.id
+  opNumero        String? // "T112A56" (código da obra no chão de fábrica)
+  marca           String?
+  pecaId          String? // -> PecaConjunto.id, quando resolvido
+  operacao        String? // etapa/setor da vez
   /// ⚠⚠ A IDENTIDADE DO TRABALHO: "89|T89A16" (obra só em dígitos + marca), ou "—" quando o
   /// operador abriu a máquina sem marca. É ela que a trava de unicidade usa — ver
   /// `lib/mes/chave-trabalho.js` e o índice parcial em `scripts/ensure-mes-tables.mjs`.
-  chaveTrabalho String  @default("—")
+  chaveTrabalho   String    @default("—")
   /// ⚠⚠ SÃO LISTAS, NÃO UM CAMPO SÓ — e o motivo apareceu na primeira prova contra o banco
   /// (13/09/2026): a MESMA marca pode estar em duas barras do mesmo plano abertas ao mesmo tempo, e
   /// a sessão é uma só (a trava é por obra+marca). Guardando um `loteId` único, encerrar a barra 2
   /// fecharia a marca que a barra 3 ainda está cortando. Aqui a sessão acumula os comandos que a
   /// usam, e só fecha quando o último deles termina — foi o que o Codex chamou de "encerrar as
   /// sessões daquela execução que não estejam sendo usadas por outra unidade ainda ativa".
-  lotes             String[]
-  nestingUnidades   String[]
-  planejadoQtd Float     @default(0)
-  status       String    @default("ABERTA") // ABERTA | ENCERRADA | CANCELADA
-  abertaEm     DateTime  @default(now())
-  encerradaEm  DateTime?
-  ambiente     String    @default("PROD")
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  lotes           String[]
+  nestingUnidades String[]
+  planejadoQtd    Float     @default(0)
+  status          String    @default("ABERTA") // ABERTA | ENCERRADA | CANCELADA
+  abertaEm        DateTime  @default(now())
+  encerradaEm     DateTime?
+  ambiente        String    @default("PROD")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   recurso      MesRecurso          @relation(fields: [recursoId], references: [id])
   operador     MesOperador?        @relation(fields: [operadorId], references: [id])
@@ -6069,7 +6114,6 @@ model MesSessao {
   apontamentos MesApontamentoQtd[]
 
   @@index([lotes])
-
   // ⚠⚠ UM TRABALHO ABERTO POR RECURSO — `(recursoId, chaveTrabalho) WHERE status = 'ABERTA'`,
   // índice PARCIAL no Postgres, que o Prisma não sabe declarar; mora em
   // scripts/ensure-mes-tables.mjs (`travaDoTrabalhoNoRecurso`), igual ao da
@@ -6201,10 +6245,10 @@ model MesCorrecao {
 // AGRUPAMENTO FÍSICO de marcas que já existem em `PecaConjunto`. Item que não casar com marca
 // conhecida vira pendência visível — nunca entra calado.
 model MesNesting {
-  id     String @id @default(cuid())
+  id          String  @id @default(cuid())
   /// Como o programador chama o plano — na prática, o nome do arquivo do relatório.
-  nome   String
-  origem String // TUBEST | LIBELLULA
+  nome        String
+  origem      String // TUBEST | LIBELLULA
   /// "TubesT 2025V2.12", lido de dentro do próprio arquivo da máquina.
   programa    String?
   /// O texto de "Section:" (perfil) ou material+espessura. Serve para conferir, não para casar.
@@ -6220,10 +6264,10 @@ model MesNesting {
   // ⚠⚠ O HASH DOS DOIS, JUNTOS, É O QUE AMARRA A VERSÃO DO PLANO. O relatório e o arquivo da
   // máquina sozinhos não provam ser da mesma versão — e é dessa premissa que depende a dedução do
   // nome da peça curta (§12.8.2). Replano = conteúdo diferente = plano NOVO.
-  hashRelatorio String
-  hashMaquina   String?
+  hashRelatorio    String
+  hashMaquina      String?
   /// Os avisos da conciliação, congelados no momento do import — o recibo, não uma previsão.
-  divergencias Json?
+  divergencias     Json?
 
   ambiente  String   @default("PROD")
   criadoPor String?
@@ -6250,7 +6294,7 @@ model MesNestingUnidade {
   aproveitamento Float?
   arquivoMaquina String?
 
-  nesting MesNesting         @relation(fields: [nestingId], references: [id], onDelete: Cascade)
+  nesting MesNesting       @relation(fields: [nestingId], references: [id], onDelete: Cascade)
   itens   MesNestingItem[]
 
   @@unique([nestingId, indice])
@@ -6261,15 +6305,15 @@ model MesNestingUnidade {
 /// cortadas, sempre derivado: guardar o total obrigaria a dividir de volta a cada apontamento, e
 /// divisão que não fecha em inteiro é onde nascem as meias-peças.
 model MesNestingItem {
-  id        String @id @default(cuid())
-  unidadeId String
-  marca     String
-  qtd       Int    @default(0)
+  id             String  @id @default(cuid())
+  unidadeId      String
+  marca          String
+  qtd            Int     @default(0)
   /// Posição na ordem de corte, quando o arquivo da máquina a entrega.
-  ordem     Int?
+  ordem          Int?
   /// ⚠ Peça SEM GRAVAÇÃO, nomeada por cruzamento com o relatório (§12.8.2). Viaja até a tela de
   /// propósito: peça deduzida é peça para conferir no olho.
-  deduzida  Boolean @default(false)
+  deduzida       Boolean @default(false)
   /// Nulo = não casou com nenhuma marca do portal. É pendência, e a tela mostra.
   pecaConjuntoId String?
   opNumero       String?

@@ -34,6 +34,10 @@ const vazio = { produzidas: "", retrabalho: "" };
 
 export default function TotemClient({ codigo }) {
   const [dados, setDados] = useState(null);
+  // ⚠⚠ `operador.presencaId` É O ID DO VÍNCULO DE CRACHÁ, e ele viaja em TODO comando. É o que
+  // impede uma aba esquecida, aberta desde antes de uma liberação, de voltar a funcionar sozinha
+  // quando o operador reentrar no mesmo posto (pedido do Codex): o servidor compara com o vínculo
+  // ativo e recusa o que é velho. Mora junto do operador porque nasce e morre com ele.
   const [operador, setOperador] = useState(null);
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
@@ -68,7 +72,7 @@ export default function TotemClient({ codigo }) {
     try {
       const r = await fetch(`/api/mes-lab/totem/${encodeURIComponent(codigo)}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ acao, cracha: operador.cracha, chaveOperacao: chave.current, ...corpo }),
+        body: JSON.stringify({ acao, cracha: operador.cracha, presencaId: operador.presencaId ?? null, chaveOperacao: chave.current, ...corpo }),
       });
       const j = await r.json();
       if (!j.success) { setErro(j.error); return null; }
@@ -109,9 +113,12 @@ export default function TotemClient({ codigo }) {
         body: JSON.stringify({ acao: "entrar", cracha }),
       });
       const j = await r.json();
+      // ⚠ A RECUSA POR CRACHÁ ABERTO EM OUTRO POSTO CHEGA AQUI, e a mensagem do servidor já diz
+      // ONDE ele está e quantas marcas faltam encerrar. A tela não inventa texto: quem sabe o que
+      // está aberto é o banco, não o navegador.
       if (!j.success) return setErro(j.error);
-      setOperador(j.operador);
-      setErro("");
+      setOperador({ ...j.operador, presencaId: j.presencaId ?? null });
+      setErro(j.liberou ? `O seu crachá foi liberado de ${j.liberou} — aquele posto estava sem marca aberta.` : "");
     } finally { setOcupado(false); }
   }
 
@@ -123,8 +130,18 @@ export default function TotemClient({ codigo }) {
 
   return (
     <div className="min-h-screen bg-torg-dark text-white p-5 md:p-8">
+      {/* ⚠⚠ SAIR É UMA AÇÃO NO SERVIDOR, não um `setOperador(null)`. Enquanto era só estado da
+          tela, o operador largava o posto com a barra aberta e bipava na máquina ao lado — que é
+          exatamente o que o Matheus pediu para impedir. O servidor recusa a saída com marca aberta
+          e diz o que falta encerrar.
+
+          ⚠ Recusada a saída, o operador CONTINUA na tela: jogá-lo para fora com o crachá ainda
+          preso seria o pior dos dois mundos — ele perderia a tela de onde consegue encerrar. */}
       <Cabecalho recurso={dados.recurso} operador={operador} estado={dados.estado}
-                 aoSair={() => { setOperador(null); setQtd(vazio); }} />
+                 aoSair={async () => {
+                   if (!await agir("sair")) return;
+                   setOperador(null); setQtd(vazio); setSelecionada(null);
+                 }} />
       {erro && <Aviso texto={erro} />}
       {feito && <Concluida texto={feito} />}
 

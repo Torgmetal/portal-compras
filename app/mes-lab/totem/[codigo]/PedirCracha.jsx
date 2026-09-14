@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 
 
 /**
@@ -21,6 +22,14 @@ import { useRouter } from "next/navigation";
  *
  * ⚠ A CONTAGEM APARECE nos últimos segundos. Tela que salta sozinha, sem aviso, se parece com
  * defeito — e o operador tenta de novo achando que travou.
+ *
+ * ⚠⚠ O BOTÃO "VOLTAR" (Matheus, 13/09/2026). A volta automática já existia, mas obrigava a esperar
+ * dez segundos parado olhando para uma tela que não é a certa — e quem chega ao totem errado sabe
+ * disso no primeiro olhar. O botão é o mesmo destino da volta automática, na hora.
+ *
+ * ⚠ VOLTAR É NAVEGAÇÃO, NÃO É SAIR DO POSTO (pedido do Codex). Ninguém está identificado nesta
+ * tela, então não há vínculo de crachá a liberar aqui — e uma operação aberta jamais pode ser
+ * solta por um gesto de navegação. Quem libera o crachá é o botão "Sair", com o operador na tela.
  */
 const SEGUNDOS_ATE_VOLTAR = 10;
 
@@ -60,8 +69,16 @@ export default function PedirCracha({ aoEnviar, ocupado, voltarPara }) {
              className="w-full text-center text-4xl tracking-[0.3em] bg-white/10 rounded-2xl px-6 py-6 outline-none focus:ring-4 ring-torg-blue/60"
              placeholder="• • • •" autoComplete="off" />
       <p className="text-white/40 text-sm mt-4">Ou digite a matrícula e aperte Enter.</p>
-      {voltarPara && resta <= 5 && (
-        <p className="text-amber-300/90 text-lg mt-5">Voltando para as bancadas em {resta}…</p>
+      {voltarPara && (
+        <>
+          <button type="button" onClick={() => router.push(voltarPara)}
+                  className="mt-8 w-full flex items-center justify-center gap-3 bg-white/10 hover:bg-white/20 rounded-2xl px-6 py-5 text-xl">
+            <ArrowLeft size={24} /> Voltar para as bancadas
+          </button>
+          {resta <= 5 && (
+            <p className="text-amber-300/90 text-lg mt-5">Voltando para as bancadas em {resta}…</p>
+          )}
+        </>
       )}
     </form>
   );
