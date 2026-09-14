@@ -106,7 +106,9 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
     try {
       await new Promise((r) => setTimeout(r, 50));
       const camadas = [...new Set(c.itens.map((u) => u.camada || 0))].sort((a, b) => a - b);
-      const imagens = { full: { iso: v.capturar("iso"), lado: v.capturar("lado"), topo: v.capturar("topo") }, camadas: camadas.map((ci) => ({ ci, iso: v.capturar("iso", ci), topo: v.capturar("topo", ci) })) };
+      const imagens = { full: { iso: v.capturar("iso"), lado: v.capturar("lado"), topo: v.capturar("topo") }, camadas: camadas.map((ci) => ({ ci, iso: v.capturar("iso", ci), topo: v.capturar("topo", ci) })),
+        // cada volume sozinho: é o desenho de referência para quem monta a embalagem
+        volumes: Object.fromEntries(c.itens.map((u) => [u.id, v.capturarVolume?.(u.id) || null])) };
       const [{ gerarModeloCargaPDF }, logo] = await Promise.all([
         import("@/lib/carga/modelo-carga-pdf"),
         fetch("/torg-logo-white.png").then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null),

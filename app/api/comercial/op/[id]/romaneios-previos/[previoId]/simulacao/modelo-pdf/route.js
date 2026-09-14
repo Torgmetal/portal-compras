@@ -21,7 +21,7 @@ const imagem = z.string().max(600000).regex(/^data:image\/jpeg;base64,/).optiona
 const schema = z.object({
   simulacaoId: z.string().optional(),
   indice: z.number().int().min(0).max(19).default(0),
-  imagens: z.object({ full: z.object({ iso: imagem, lado: imagem, topo: imagem }).partial().optional(), camadas: z.array(z.object({ ci: z.number().int().min(0), iso: imagem, topo: imagem })).max(30).optional() }).default({}),
+  imagens: z.object({ full: z.object({ iso: imagem, lado: imagem, topo: imagem }).partial().optional(), camadas: z.array(z.object({ ci: z.number().int().min(0), iso: imagem, topo: imagem })), volumes: z.record(z.string(), imagem).optional() }).default({}),
 });
 
 export async function POST(req, { params }) {

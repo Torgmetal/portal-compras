@@ -85,6 +85,22 @@ const VisualizadorCarga = forwardRef(function VisualizadorCarga({ carga, malhas,
       s.renderer.setPixelRatio(pr); s.renderer.setSize(W0, H0); s.camera.aspect = W0 / H0; s.camera.updateProjectionMatrix();
       s.rotulos = rotulos; s.tamRotulo = 0.05; s.mostrarPasso(passo); s.enquadrar("iso"); return url;
     },
+    /** Foto (JPEG data URL) de UM volume sozinho, em isométrica, com a embalagem dele — o desenho de referência do cartão no PDF. */
+    capturarVolume(uId, W = 640, H = 400) {
+      const s = st.current, u = carga?.itens?.find((i) => i.id === uId); if (!s || !u) return null;
+      const cena = new THREE.Scene(); cena.background = new THREE.Color(0xffffff); cena.environment = s.scene.environment;
+      cena.add(new THREE.HemisphereLight(0xffffff, 0x8d99a6, 0.7)); const sol = new THREE.DirectionalLight(0xffffff, 1.1); sol.position.set(-3, 6, 4); cena.add(sol);
+      const g = montarUnidade({ ...u, x: 0, y: 0, z: 0, girada: false }, malhas); cena.add(g);
+      const C = u.C / 1000, L = u.L / 1000, A = u.A / 1000, centro = new THREE.Vector3(C / 2, A / 2, L / 2), raio = Math.hypot(C, L, A) / 2;
+      const cam = new THREE.PerspectiveCamera(28, W / H, 0.01, 200); const fov = cam.fov * Math.PI / 360;
+      cam.position.copy(centro).addScaledVector(new THREE.Vector3(-0.75, 0.55, 1).normalize(), (raio / Math.sin(fov)) * 1.08); cam.lookAt(centro);
+      const el = s.renderer.domElement, W0 = el.clientWidth, H0 = el.clientHeight, pr = s.renderer.getPixelRatio();
+      s.renderer.setPixelRatio(1); s.renderer.setSize(W, H, false); s.renderer.render(cena, cam);
+      const url = el.toDataURL("image/jpeg", 0.85);
+      s.renderer.setPixelRatio(pr); s.renderer.setSize(W0, H0); s.renderer.render(s.scene, s.camera);
+      cena.traverse((o) => { o.geometry?.dispose?.(); if (o.material && o.material !== MATERIAL_CINZA) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose?.()); });
+      return url;
+    },
     enquadrar: (v) => st.current?.enquadrar(v),
   }), [carga, passo, rotulos]);
 

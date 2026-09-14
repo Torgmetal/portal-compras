@@ -101,3 +101,20 @@ repassa `ref` ao componente de dentro. `gerarPdf` começava com `if (!v …) ret
   Fluxo de tela se prova NO NAVEGADOR — o harness (`entrada.jsx` + fetch falso servindo JSON do banco
   e os IFCs baixados) faz isso sem login e reproduziu o defeito no primeiro clique.
 - Conferido: OP-107 romaneio 02, 33 volumes, 17 camadas → PDF de 22 páginas, 2,4 MB, em 3 s.
+
+## PDF v2: modelos de embalagem + um cartão por volume com a foto 3D (14/09/2026)
+
+Vitor: "o pdf está bem ruim, mal formatado, e o ideal seria um desenho do modelo das embalagens para
+usarmos como referência para montagem". A v1 tinha 22 páginas (17 delas com 1–3 volumes e o resto em
+branco), a lista por fase estourava a coluna e a legenda invadia a foto. Estrutura nova:
+1. A carga pronta (como era, com a legenda quebrando dentro da coluna).
+2. **Modelos de embalagem** (`lib/carga/modelo-embalagem-desenho.js`): desenho esquemático em vetor
+   (vista de frente + de ponta, cotas, madeira, cintas) + regras, por TIPO usado na carga; números vêm
+   das premissas. É o padrão, igual para toda obra.
+3. **Volumes**: 6 cartões por folha, cada um com a **foto 3D do volume sozinho** (`capturarVolume` no
+   VisualizadorCarga: cena própria, fundo branco, isométrica), peças, madeira, cintas e "na carga: x a
+   y m da frente · lado · camada · sobre …".
+4. Montar a carga: 4 camadas por folha (foto 1200×560 na proporção certa) + lista de volumes.
+5. Anexo: separação por fase em 4 colunas; fase "?" vira "Sem fase (marca do cliente)".
+- ⚠ WinAnsi não tem "→" nem "≤" (saía "?"): usar "·", "até".
+- OP-107: 14 páginas (eram 22), 1,9 MB, 5 s no navegador.

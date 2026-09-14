@@ -1,7 +1,12 @@
 {
-  "build": 3147,
-  "gerado": "2026-09-14T16:12:11.413Z",
+  "build": 3148,
+  "gerado": "2026-09-14T16:55:35.244Z",
   "commits": [
+    {
+      "hash": "e8d317df",
+      "data": "14/09/2026",
+      "titulo": "Simulador: o botão do PDF não fazia nada — next/dynamic engolia o ref do 3D"
+    },
     {
       "hash": "54f7af92",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ad12bb7e",
       "data": "12/09/2026",
       "titulo": "Memória: modelo de carga com capturas 3D e caminhão v2"
-    },
-    {
-      "hash": "8c0c4fd7",
-      "data": "12/09/2026",
-      "titulo": "feat: integra ordens programação e qualidade na central de produção"
     }
   ]
 }

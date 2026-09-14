@@ -113,16 +113,17 @@ describe("perfil da LQC e hash dos itens", () => {
 });
 
 describe("modelo de carga em PDF", () => {
-  it("gera A4 paisagem com carga pronta, separação por fase, volumes e uma folha por camada", async () => {
+  it("gera A4 paisagem: carga pronta, modelos de embalagem, cartões de volume (6 por folha), camadas (4 por folha) e o anexo por fase", async () => {
     const { gerarModeloCargaPDF } = await import("@/lib/carga/modelo-carga-pdf");
     const lista = [{ marca: "T118A1", desc: "VIGA", qtd: 6, kgUn: 700 }, { marca: "T118C7", desc: "CANTONEIRA", qtd: 10, kgUn: 4 }, { marca: "T118D1", desc: "G.C", qtd: 3, kgUn: 60 }];
     const r = simularCarga({ lista, geometria: { T118A1: geo([12000, 550, 300]), T118C7: geo([800, 50, 50]), T118D1: geo([3000, 1100, 60]) }, perfil: "recomendado", prefixo: "T118" });
     const { bytes, filename } = await gerarModeloCargaPDF({ op: { numero: "118", cliente: "DANPOWER", obra: "Caldeira" }, previo: { numero: 3 }, carga: r.cargas[0], indice: 0, total: 1, perfilNome: "Padrão", prefixo: "T118", imagens: {} });
     expect(filename).toContain("OP 118");
     expect(Buffer.from(bytes.slice(0, 4)).toString()).toBe("%PDF");
-    const camadas = new Set(r.cargas[0].itens.map((u) => u.camada || 0)).size;
+    const camadas = new Set(r.cargas[0].itens.map((u) => u.camada || 0)).size, volumes = r.cargas[0].itens.length;
     const { PDFDocument } = await import("pdf-lib");
-    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(3 + camadas);
+    // 1 (carga) + 1 (modelos) + cartões (6 por folha) + camadas (4 por folha) + anexo (1)
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(2 + Math.ceil(volumes / 6) + Math.ceil(camadas / 4) + 1);
   });
 
   // ⚠ o PDF é montado NO NAVEGADOR (14/09/2026): a lib não pode depender de fs/Buffer, o logo entra por
