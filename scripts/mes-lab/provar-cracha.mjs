@@ -69,6 +69,26 @@ const sobraram = await prisma.mesSessao.count({ where: { recursoId: p1.id, statu
 const s2 = await sairDoPosto(prisma, { operadorId: opA.id, recursoId: p1.id });
 conferir(`encerrada a marca (sobram ${sobraram} no posto), Sair libera`, sobraram === 0 ? !!s2.liberou : !!s2.erro);
 
+// 8b — A ABA ESQUECIDA: com o crachá já no posto 2, "Sair" disparado do posto 1 não solta nada.
+await prisma.mesPresenca.updateMany({ where: { operadorId: opA.id, status: "ABERTA" },
+  data: { status: "ENCERRADA", encerradaEm: new Date(), motivoFim: "limpeza da prova" } });
+const noDois = await entrarNoPosto(prisma, { operadorId: opA.id, recursoId: p2.id });
+const sairDoErrado = await sairDoPosto(prisma, { operadorId: opA.id, recursoId: p1.id });
+const seguiuVivo = await prisma.mesPresenca.count({ where: { id: noDois.presenca?.id, status: "ABERTA" } });
+conferir("Sair na aba do posto errado NÃO solta o crachá do outro posto", !!sairDoErrado.erro && seguiuVivo === 1);
+console.log(`     ↳ "${sairDoErrado.erro}"`);
+
+// 8c — e nem com o posto certo, se o id do vínculo for de uma ativação morta.
+const sairVelho = await sairDoPosto(prisma, { operadorId: opA.id, recursoId: p2.id, presencaId: "vinculo-que-morreu" });
+conferir("Sair com id de vínculo antigo é recusado", !!sairVelho.erro && sairVelho.erro.includes("desatualizada"));
+
+// 8d — comando do totem SEM o id do vínculo é recusado (o caminho da tela velha).
+const semId = await abrirSessao(prisma, {
+  recursoId: p2.id, operadorId: opA.id, marca: `${marca}-S`, opNumero: "999", planejadoQtd: 1,
+  presenca: { operadorId: opA.id, presencaId: null, exigirId: true },
+});
+conferir("comando do totem sem o id do vínculo é recusado", !!semId.erro);
+
 // 9 — a corrida: dois totens, o mesmo crachá, ao mesmo tempo
 await prisma.mesPresenca.updateMany({ where: { operadorId: opA.id, status: "ABERTA" },
   data: { status: "ENCERRADA", encerradaEm: new Date(), motivoFim: "limpeza da prova" } });

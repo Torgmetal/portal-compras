@@ -161,9 +161,16 @@ const ACOES = {
     return { operador, presencaId: r.presenca.id, liberou: r.liberou ?? null };
   },
 
-  /** ⚠ Só o botão explícito passa por aqui — recarregar a tela não solta operação aberta. */
-  async sair({ recurso, operador }) {
-    return sairDoPosto(prisma, { operadorId: operador.id, recursoId: recurso.id });
+  /**
+   * ⚠ Só o botão explícito passa por aqui — recarregar a tela não solta operação aberta.
+   *
+   * ⚠⚠ O POSTO E O VÍNCULO VÃO JUNTOS, e não é detalhe (achado do Codex sobre a implementação):
+   * sem eles, um toque numa aba esquecida do posto A liberava o crachá que já estava no posto B.
+   */
+  async sair({ recurso, operador, presenca }) {
+    return sairDoPosto(prisma, {
+      operadorId: operador.id, recursoId: recurso.id, presencaId: presenca.presencaId,
+    });
   },
 
   /**
@@ -269,7 +276,11 @@ export async function POST(req, { params }) {
   //
   // ⚠ `presencaId` vem da tela e é conferido contra o vínculo ativo — é o que impede uma aba velha,
   // aberta antes de uma liberação, de voltar a funcionar sozinha.
-  const presenca = { operadorId: operador.id, presencaId: corpo.presencaId ?? null };
+  // ⚠⚠ `exigirId: true` — no totem o id do vínculo é OBRIGATÓRIO (achado do Codex). Conferindo-o
+  // só quando ele vem, quem não o manda pula a proteção inteira, e a tela velha é justamente quem
+  // tende a não mandar. Scripts e importações usam as libs sem contexto de presença, que é um
+  // caminho explícito e não se confunde com um comando de gente.
+  const presenca = { operadorId: operador.id, presencaId: corpo.presencaId ?? null, exigirId: true };
   const r = await executar({ corpo, recurso, operador, presenca });
   if (r?.erro) return erro(r.erro, 409);
   return NextResponse.json({ success: true, ...r, operador: { id: operador.id, nome: operador.nome, cracha: operador.cracha } });

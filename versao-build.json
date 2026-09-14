@@ -1,7 +1,12 @@
 {
-  "build": 3132,
-  "gerado": "2026-09-14T01:55:41.033Z",
+  "build": 3133,
+  "gerado": "2026-09-14T11:25:57.737Z",
   "commits": [
+    {
+      "hash": "dee6658dd1",
+      "data": "13/09/2026",
+      "titulo": "MES proprio: um cracha, um posto — e o botao Voltar na tela do cracha"
+    },
     {
       "hash": "07dc491651",
       "data": "13/09/2026",
@@ -146,11 +151,6 @@
       "hash": "68e52f85e3",
       "data": "11/09/2026",
       "titulo": "Preenche quantidades de inspeção a partir das listas da OP"
-    },
-    {
-      "hash": "092504ff15",
-      "data": "11/09/2026",
-      "titulo": "Permite editar quantidades por peça nos relatórios de inspeção"
     }
   ]
 }

@@ -834,7 +834,18 @@ async function travaDoCrachaAtivo(prisma) {
     ON "MesPresenca"("operadorId") WHERE "status" = 'ABERTA'
   `).then(
     () => console.log('[ensure-mes-tables] OK — índice "MesPresenca_operador_ativa_key".'),
-    (e) => console.warn("[ensure-mes-tables] índice do crachá ativo não criado:", e.message),
+    (e) => {
+      // ⚠⚠ SÓ A TABELA AUSENTE É TOLERADA (achado do Codex). Engolir QUALQUER falha como aviso
+      // esconderia o que importa — falta de permissão, ou linhas duplicadas que impedem o índice
+      // único de nascer. Nos dois casos a trava do crachá simplesmente não existe, e o portal
+      // seguiria dizendo "OK" enquanto o mesmo crachá abre em duas máquinas.
+      const tabelaAusente = e.code === "42P01" || /does not exist|não existe/i.test(e.message);
+      if (tabelaAusente) {
+        console.log("[ensure-mes-tables] MesPresenca ainda não existe aqui — índice do crachá adiado.");
+        return;
+      }
+      console.error("[ensure-mes-tables] ⚠ TRAVA DO CRACHÁ NÃO INSTALADA:", e.message);
+    },
   );
 }
 

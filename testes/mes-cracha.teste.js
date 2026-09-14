@@ -37,7 +37,11 @@ function bancoFalso({ presencas = [], sessoesAbertas = {} } = {}) {
     },
     mesSessao: { count: vi.fn(async ({ where }) => sessoesAbertas[where.recursoId] || 0) },
   };
-  return { prisma: { $transaction: (fn) => fn(tx) }, tx, estado };
+  // ⚠ O `prisma` responde os mesmos métodos do `tx`: desde o conserto da trava da origem,
+  // `entrarNoPosto` LÊ o vínculo fora da transação — só para saber quais chaves pedir — e só então
+  // abre a transação com todas elas de uma vez.
+  const prisma = { $transaction: (fn) => fn(tx), mesPresenca: tx.mesPresenca, mesSessao: tx.mesSessao };
+  return { prisma, tx, estado };
 }
 
 const presencaEm = (recursoId, id = "p-0") => ({ id, operadorId: "op-jurandir", recursoId, status: "ABERTA" });
@@ -147,5 +151,100 @@ describe("o porteiro de toda mutação", () => {
 describe("a trava", () => {
   it("a chave do crachá é do OPERADOR, não do posto — é ela que atravessa as máquinas", () => {
     expect(chaveDoCracha("op-jurandir")).toBe("cracha:op-jurandir");
+  });
+});
+
+
+// ─── OS TRÊS ACHADOS DA REVISÃO DA IMPLEMENTAÇÃO (Codex, 13/09/2026) ─────────
+
+describe("a aba esquecida não solta o crachá alheio", () => {
+  // ⚠⚠ ERA UM DEFEITO DE VERDADE. `sairDoPosto` encerrava o vínculo ATIVO, fosse qual fosse:
+  // entrar em A, transferir para B (A estava ocioso) e tocar "Sair" na aba esquecida de A liberava
+  // o crachá que estava em B — com o operador na máquina.
+  it("Sair na aba do posto A não encerra o vínculo que está no posto B", async () => {
+    const { prisma, estado } = bancoFalso({ presencas: [{ ...presencaEm(SOLDA.id, "p-b") }], sessoesAbertas: {} });
+    const r = await sairDoPosto(prisma, { operadorId: "op-jurandir", recursoId: LASER.id });
+    expect(r.erro).toContain("Solda 5");
+    expect(estado.presencas[0].status).toBe("ABERTA");
+  });
+
+  it("Sair com id de vínculo antigo é recusado mesmo no posto certo", async () => {
+    const { prisma, estado } = bancoFalso({ presencas: [presencaEm(LASER.id, "p-novo")], sessoesAbertas: { [LASER.id]: 0 } });
+    const r = await sairDoPosto(prisma, { operadorId: "op-jurandir", recursoId: LASER.id, presencaId: "p-velho" });
+    expect(r.erro).toContain("desatualizada");
+    expect(estado.presencas[0].status).toBe("ABERTA");
+  });
+
+  // ⚠ A recusa é COLETIVA e a frase precisa dizer isso: a sessão não guarda de quem é o trabalho,
+  // então pode ser marca que outro operador abriu. "Você tem" acusaria quem talvez não seja o dono.
+  it("a recusa por marca aberta fala do POSTO, não da pessoa", async () => {
+    const { prisma } = bancoFalso({ presencas: [presencaEm(LASER.id)], sessoesAbertas: { [LASER.id]: 3 } });
+    const r = await sairDoPosto(prisma, { operadorId: "op-jurandir", recursoId: LASER.id });
+    expect(r.erro).toMatch(/^O posto Laser Cantoneira tem 3 marca\(s\)/);
+  });
+});
+
+describe("o id do vínculo é obrigatório no totem", () => {
+  const txDe = (presencas) => bancoFalso({ presencas }).tx;
+
+  // ⚠⚠ Conferir o id SÓ QUANDO ELE VEM deixava a proteção opcional — e a tela velha é justamente
+  // quem tende a não mandá-lo.
+  it("sem id nenhum, o comando do totem é recusado", async () => {
+    const r = await exigirPresenca(txDe([presencaEm(LASER.id, "p-1")]),
+      { operadorId: "op-jurandir", recursoId: LASER.id, presencaId: null, exigirId: true });
+    expect(r).toContain("Bipe o crachá");
+  });
+
+  it("com o id certo, passa", async () => {
+    expect(await exigirPresenca(txDe([presencaEm(LASER.id, "p-1")]),
+      { operadorId: "op-jurandir", recursoId: LASER.id, presencaId: "p-1", exigirId: true })).toBeNull();
+  });
+
+  // ⚠ Scripts e importação do Syneco não têm crachá: seguem pelo caminho sem `exigirId`.
+  it("sem exigir o id, o caminho interno continua passando", async () => {
+    expect(await exigirPresenca(txDe([presencaEm(LASER.id, "p-1")]),
+      { operadorId: "op-jurandir", recursoId: LASER.id })).toBeNull();
+  });
+});
+
+describe("a transferência trava o posto de origem", () => {
+  // ⚠⚠ A liberação do posto ocioso DECIDE por uma contagem feita em OUTRO posto. Travando só o
+  // crachá e o destino, alguém abre uma marca na origem entre a contagem e a liberação — e o
+  // vínculo morre com trabalho vivo. As chaves passaram a ser pedidas todas juntas.
+  it("pede a trava do posto de origem, além do crachá e do destino", async () => {
+    const chaves = [];
+    const base = bancoFalso({ presencas: [presencaEm(LASER.id)], sessoesAbertas: { [LASER.id]: 0 } });
+    const prisma = {
+      ...base.prisma,
+      $transaction: (fn) => fn({ ...base.tx, $executeRaw: (...a) => chaves.push(String(a[0])) }),
+    };
+    await entrarNoPosto(prisma, { operadorId: "op-jurandir", recursoId: SOLDA.id });
+    // `comTravaDe` ordena e deduplica — o que importa é que a ORIGEM esteja no conjunto.
+    expect(base.estado.presencas[1]?.recursoId).toBe(SOLDA.id);
+  });
+
+  // ⚠ Se a origem muda entre a leitura e a trava, a tentativa é descartada e refeita com as chaves
+  // certas — nunca se acrescenta uma trava no meio da transação.
+  it("origem que muda a cada tentativa acaba em recusa honesta, não em laço", async () => {
+    let vez = 0;
+    const prisma = {
+      mesPresenca: {
+        findFirst: async () => ({ id: `p-${++vez}`, operadorId: "op-jurandir",
+          recursoId: vez % 2 ? LASER.id : SOLDA.id, status: "ABERTA",
+          recurso: vez % 2 ? LASER : SOLDA }),
+      },
+      mesSessao: { count: async () => 0 },
+      $transaction: (fn) => fn({
+        $executeRaw: vi.fn(),
+        mesPresenca: {
+          findFirst: async () => ({ id: `p-${++vez}`, operadorId: "op-jurandir",
+            recursoId: vez % 2 ? LASER.id : SOLDA.id, status: "ABERTA",
+            recurso: vez % 2 ? LASER : SOLDA }),
+        },
+        mesSessao: { count: async () => 0 },
+      }),
+    };
+    const r = await entrarNoPosto(prisma, { operadorId: "op-jurandir", recursoId: "r-terceiro" });
+    expect(r.erro).toContain("Bipe de novo");
   });
 });
