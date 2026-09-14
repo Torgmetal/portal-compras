@@ -49,6 +49,11 @@ const bipar = async (posto) => {
 await bipar(P1);
 const entrou = await pg.locator("text=Bipe o seu crachá").count();
 console.log(entrou === 0 ? `✓ bipou e entrou em ${P1}` : `✗ continuou na tela do crachá em ${P1}`);
+// ⚠ A passagem do posto fica à mão em qualquer tela do operador: o turno vira no meio do trabalho,
+// não numa tela específica.
+const temPassagem = await pg.locator("text=Passar o posto para outro operador").count();
+console.log(temPassagem ? "✓ a passagem do posto está na tela" : "✗ a passagem do posto NÃO aparece");
+await pg.screenshot({ path: SAIDA.replace(/\.png$/, "-dentro.png"), fullPage: true });
 
 await bipar(P2);
 const aviso = await pg.locator("body").innerText();

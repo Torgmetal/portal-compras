@@ -7,6 +7,7 @@ import Produzindo from "./Produzindo";
 import Trabalhos from "./Trabalhos";
 import EscolherPlano from "./EscolherPlano";
 import PedirCracha from "./PedirCracha";
+import PassarPosto from "./PassarPosto";
 import Escolher from "./Escolher";
 import EscolherMotivo from "./EscolherMotivo";
 
@@ -122,10 +123,11 @@ export default function TotemClient({ codigo }) {
     } finally { setOcupado(false); }
   }
 
+  const sairDaTela = () => { setOperador(null); setQtd(vazio); setSelecionada(null); };
+
   if (!dados) return <Aguarde erro={erro} />;
 
-  const linkDasBancadas = bancadasDoSetor(dados.recurso);
-  const { abertos, atual, emProducao, escolhendoMarca, escolhendoTrabalho } =
+  const { abertos, atual, emProducao, escolhendoMarca, escolhendoTrabalho, presencas, planos, motivos, bancadas } =
     qualTela(dados, operador, selecionada);
 
   return (
@@ -138,14 +140,12 @@ export default function TotemClient({ codigo }) {
           ⚠ Recusada a saída, o operador CONTINUA na tela: jogá-lo para fora com o crachá ainda
           preso seria o pior dos dois mundos — ele perderia a tela de onde consegue encerrar. */}
       <Cabecalho recurso={dados.recurso} operador={operador} estado={dados.estado}
-                 aoSair={async () => {
-                   if (!await agir("sair")) return;
-                   setOperador(null); setQtd(vazio); setSelecionada(null);
-                 }} />
+                 aoSair={async () => { if (await agir("sair")) sairDaTela(); }} />
       {erro && <Aviso texto={erro} />}
       {feito && <Concluida texto={feito} />}
 
-      {!operador && <PedirCracha aoEnviar={entrar} ocupado={ocupado} voltarPara={linkDasBancadas} />}
+      {!operador && <PedirCracha aoEnviar={entrar} ocupado={ocupado} voltarPara={bancadas} />}
+
 
       {escolhendoTrabalho && (
         <Trabalhos trabalhos={abertos} ocupado={ocupado}
@@ -158,7 +158,7 @@ export default function TotemClient({ codigo }) {
 
       {escolhendoMarca && (
         <>
-          <EscolherPlano planos={dados.planos || []} ocupado={ocupado}
+          <EscolherPlano planos={planos} ocupado={ocupado}
                          aoAbrir={async (u) => {
                            setFeito("");
                            const r = await agir("abrirNesting", { unidadeId: u.id, chaveOperacao: chaveDaAbertura(u) });
@@ -189,8 +189,19 @@ export default function TotemClient({ codigo }) {
         </>
       )}
 
+      {/* ⚠⚠ A PASSAGEM FICA SEMPRE À MÃO, em qualquer tela do operador: o turno vira no meio do
+          trabalho, não numa tela específica — e quem tem marca aberta não consegue liberar o
+          próprio crachá, então sem isto o fim de turno dependeria de um ADMIN.
+
+          ⚠ MAS FICA NO RODAPÉ, DEPOIS DO TRABALHO. Ela é a ação do fim do turno, não a do minuto:
+          acima do cartão de produção, empurrava para baixo o número que o operador veio lançar. */}
+      {operador && (
+        <PassarPosto presencas={presencas} operador={operador} ocupado={ocupado}
+                     {...daPassagem({ agir, sairDaTela, setFeito })} />
+      )}
+
       {pedindoMotivo && (
-        <EscolherMotivo motivos={dados.motivos || []} ocupado={ocupado}
+        <EscolherMotivo motivos={motivos} ocupado={ocupado}
                         aoFechar={() => setPedindoMotivo(false)}
                         aoEscolher={async (m) => {
                           await agir("parar", { sessaoId: atual.sessao.id, motivoId: m.id });
@@ -200,13 +211,6 @@ export default function TotemClient({ codigo }) {
     </div>
   );
 }
-
-/**
- * ⚠ O DESTINO DA VOLTA É O SETOR DO PRÓPRIO POSTO, nunca a lista da fábrica inteira: o PC da
- * montagem tem de voltar para as bancadas da montagem, e não para uma tela que oferece o laser.
- */
-const bancadasDoSetor = (recurso) =>
-  recurso?.setor?.codigo ? `/mes-lab/totem/setor/${encodeURIComponent(recurso.setor.codigo)}` : null;
 
 const avisoDeConclusao = (sessao, saldo) =>
   `${sessao.marca} concluída — ${saldo?.boas ?? "?"} de ${saldo?.planejado ?? "?"} peças.`;
@@ -225,11 +229,47 @@ const chaveDaAbertura = (u) => `nest-${u.id}`;
  * existe para o caso novo (a barra do nesting, com várias marcas); obrigar um toque a mais em quem
  * tem uma só seria cobrar pelo que ele não pediu.
  */
+/**
+ * Os dois lados da passagem do posto.
+ *
+ * ⚠ Fora do componente de propósito: pôr as duas inline empurrava o `TotemClient` para fora do teto
+ * de complexidade — que existe justamente para esta tela não virar o arquivo onde tudo acontece.
+ */
+const daPassagem = ({ agir, sairDaTela, setFeito }) => ({
+  // ⚠⚠ QUEM ENTREGA PERDEU O VÍNCULO: a tela volta para o crachá. Sem isso ele continuaria vendo
+  // botões que o servidor agora recusa — e a recusa pareceria defeito.
+  aoEntregar: async (cracha) => {
+    const r = await agir("entregarPosto", { crachaAlvo: cracha });
+    if (!r) return;
+    sairDaTela();
+    setFeito("Posto passado. O crachá de quem assumiu já está aberto aqui.");
+  },
+  aoAssumir: async (p) => {
+    const r = await agir("assumirPosto", { deOperadorId: p.operadorId });
+    if (r) setFeito(`Você assumiu o posto de ${r.saiu}. ${r.marcasQueSeguemAbertas} marca(s) seguem abertas.`);
+  },
+});
+
+/**
+ * As listas da tela, já normalizadas, e o destino da volta.
+ *
+ * ⚠ O DESTINO DA VOLTA É O SETOR DO PRÓPRIO POSTO, nunca a lista da fábrica inteira: o PC da
+ * montagem tem de voltar para as bancadas da montagem, e não para uma tela que oferece o laser.
+ */
+const listasDe = (dados) => ({
+  presencas: dados.presencas || [], planos: dados.planos || [], motivos: dados.motivos || [],
+  bancadas: dados.recurso?.setor?.codigo
+    ? `/mes-lab/totem/setor/${encodeURIComponent(dados.recurso.setor.codigo)}` : null,
+});
+
 function qualTela(dados, operador, selecionada) {
   const abertos = dados.trabalhos || [];
   const atual = abertos.length === 1 ? abertos[0] : abertos.find((t) => t.sessao.id === selecionada);
   return {
     abertos, atual,
+    // ⚠ As listas saem daqui já normalizadas. Espalhar `dados.x || []` pelo JSX empurrava o
+    // componente para fora do teto de complexidade.
+    ...listasDe(dados),
     emProducao: Boolean(operador && atual),
     escolhendoMarca: Boolean(operador && !abertos.length),
     escolhendoTrabalho: Boolean(operador && abertos.length > 1 && !atual),

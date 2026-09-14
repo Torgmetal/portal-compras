@@ -18,7 +18,7 @@ import { requireRole } from "@/lib/session";
 import { abrirSessao, apontarQuantidade, encerrarSessao, mudarEstado, estadoDoRecurso, saldoDaMarca, ESTADO } from "@/lib/mes/sessao";
 import { abrirLote, encerrarLote } from "@/lib/mes/lote";
 import { programadoPara, acharMarca } from "@/lib/mes/programado";
-import { entrarNoPosto, sairDoPosto, liberarPresenca } from "@/lib/mes/cracha";
+import { entrarNoPosto, sairDoPosto, liberarPresenca, passarPosto } from "@/lib/mes/cracha";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -93,7 +93,7 @@ const presencasDoPosto = (recursoId) =>
   prisma.mesPresenca.findMany({
     where: { recursoId, status: "ABERTA" },
     orderBy: { abertaEm: "asc" },
-    select: { id: true, abertaEm: true, operador: { select: { nome: true, cracha: true } } },
+    select: { id: true, operadorId: true, abertaEm: true, operador: { select: { nome: true, cracha: true } } },
   });
 
 /**
@@ -171,6 +171,36 @@ const ACOES = {
     return sairDoPosto(prisma, {
       operadorId: operador.id, recursoId: recurso.id, presencaId: presenca.presencaId,
     });
+  },
+
+  /**
+   * ENTREGAR O POSTO — o Jurandir sai e bipa o crachá de quem assume.
+   *
+   * ⚠⚠ É A SAÍDA HONESTA DA TROCA DE TURNO. Quem tem marca aberta não consegue liberar o próprio
+   * crachá (e não deve: é isso que o impede de abrir a máquina ao lado com trabalho vivo aqui).
+   * Sem a passagem, o único caminho era chamar um ADMIN — e chamar ADMIN todo fim de turno é como
+   * se aprende a contornar a regra.
+   *
+   * ⚠ Não encerra marca nem grava evento: a barra não para porque o turno virou.
+   */
+  async entregarPosto({ corpo, recurso, operador }) {
+    const quemAssume = await prisma.mesOperador.findUnique({ where: { cracha: String(corpo.crachaAlvo || "").trim() } });
+    if (!quemAssume || !quemAssume.ativo) return { erro: `Crachá ${corpo.crachaAlvo} não encontrado.` };
+    return passarPosto(prisma, { deOperadorId: operador.id, paraOperadorId: quemAssume.id, recursoId: recurso.id });
+  },
+
+  /**
+   * ASSUMIR O POSTO — o Rodrigo chega e o Jurandir já foi embora.
+   *
+   * ⚠⚠ ESTE É O CASO COMUM, e por isso ele existe além do `entregarPosto`. A entrega exige os dois
+   * no totem ao mesmo tempo; na vida real o turno anterior já saiu e deixou o crachá preso. Quem
+   * está fisicamente no posto assume, e o nome de quem saiu fica gravado no `motivoFim`.
+   *
+   * ⚠ NÃO É CONSEQUÊNCIA DE BIPAR (pedido do Codex): bipar num posto que tem outro operador não
+   * rende ninguém — só um toque neste botão, que diz de quem é o posto que está sendo assumido.
+   */
+  async assumirPosto({ corpo, recurso, operador }) {
+    return passarPosto(prisma, { deOperadorId: corpo.deOperadorId, paraOperadorId: operador.id, recursoId: recurso.id });
   },
 
   /**

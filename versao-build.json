@@ -1,7 +1,17 @@
 {
-  "build": 3133,
-  "gerado": "2026-09-14T11:25:57.737Z",
+  "build": 3135,
+  "gerado": "2026-09-14T11:35:52.692Z",
   "commits": [
+    {
+      "hash": "454944c613",
+      "data": "14/09/2026",
+      "titulo": "MES proprio: a passagem do posto — o turno vira sem a barra parar"
+    },
+    {
+      "hash": "c8e9035f3d",
+      "data": "14/09/2026",
+      "titulo": "MES proprio: os tres furos que a revisao do cracha achou"
+    },
     {
       "hash": "dee6658dd1",
       "data": "13/09/2026",
@@ -141,16 +151,6 @@
       "hash": "9ecd5e0342",
       "data": "11/09/2026",
       "titulo": "Ajusta quantidades no celular e corrige ciclo das inspeções e assinaturas"
-    },
-    {
-      "hash": "f22d0a334c",
-      "data": "11/09/2026",
-      "titulo": "Portal do fornecedor: página em branco por data escrita em dois fusos"
-    },
-    {
-      "hash": "68e52f85e3",
-      "data": "11/09/2026",
-      "titulo": "Preenche quantidades de inspeção a partir das listas da OP"
     }
   ]
 }

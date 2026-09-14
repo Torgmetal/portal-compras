@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { entrarNoPosto, sairDoPosto, liberarPresenca, exigirPresenca, chaveDoCracha } from "@/lib/mes/cracha";
+import { entrarNoPosto, sairDoPosto, liberarPresenca, exigirPresenca, chaveDoCracha, passarPosto } from "@/lib/mes/cracha";
 
 // ─── UM CRACHÁ, UM POSTO ─────────────────────────────────────────────────────
 //
@@ -36,15 +36,18 @@ function bancoFalso({ presencas = [], sessoesAbertas = {} } = {}) {
       }),
     },
     mesSessao: { count: vi.fn(async ({ where }) => sessoesAbertas[where.recursoId] || 0) },
+    mesOperador: { findUnique: vi.fn(async ({ where }) => NOMES[where.id] || null) },
   };
   // ⚠ O `prisma` responde os mesmos métodos do `tx`: desde o conserto da trava da origem,
   // `entrarNoPosto` LÊ o vínculo fora da transação — só para saber quais chaves pedir — e só então
   // abre a transação com todas elas de uma vez.
-  const prisma = { $transaction: (fn) => fn(tx), mesPresenca: tx.mesPresenca, mesSessao: tx.mesSessao };
+  const prisma = { $transaction: (fn) => fn(tx), mesPresenca: tx.mesPresenca, mesSessao: tx.mesSessao, mesOperador: tx.mesOperador };
   return { prisma, tx, estado };
 }
 
-const presencaEm = (recursoId, id = "p-0") => ({ id, operadorId: "op-jurandir", recursoId, status: "ABERTA" });
+const NOMES = { "op-jurandir": { nome: "Jurandir" }, "op-rodrigo": { nome: "Rodrigo" } };
+
+const presencaEm = (recursoId, id = "p-0", operadorId = "op-jurandir") => ({ id, operadorId, recursoId, status: "ABERTA" });
 
 describe("entrar no posto", () => {
   it("sem vínculo nenhum, o crachá entra", async () => {
@@ -246,5 +249,75 @@ describe("a transferência trava o posto de origem", () => {
     };
     const r = await entrarNoPosto(prisma, { operadorId: "op-jurandir", recursoId: "r-terceiro" });
     expect(r.erro).toContain("Bipe de novo");
+  });
+});
+
+
+// ─── A PASSAGEM DO POSTO (Matheus, 14/09/2026) ───────────────────────────────
+//
+// ⚠⚠ QUEM TEM MARCA ABERTA NÃO LIBERA O PRÓPRIO CRACHÁ — de propósito. Só que o turno vira e a
+// barra continua cortando: sem passagem explícita, todo fim de turno dependeria de um ADMIN, e
+// chamar ADMIN todo dia é como se aprende a contornar a regra.
+
+describe("passar o posto", () => {
+  const doisNoLaser = (marcas = 6) => bancoFalso({
+    presencas: [presencaEm(LASER.id, "p-jur", "op-jurandir")],
+    sessoesAbertas: { [LASER.id]: marcas },
+  });
+
+  it("o Jurandir entrega e o Rodrigo assume, sem encerrar marca nenhuma", async () => {
+    const { prisma, estado, tx } = doisNoLaser();
+    const r = await passarPosto(prisma, { deOperadorId: "op-jurandir", paraOperadorId: "op-rodrigo", recursoId: LASER.id });
+
+    expect(r.erro).toBeUndefined();
+    expect(r.saiu).toBe("Jurandir");
+    expect(r.marcasQueSeguemAbertas).toBe(6);
+    expect(estado.presencas[0]).toMatchObject({ status: "ENCERRADA", motivoFim: "passou para Rodrigo" });
+    expect(estado.presencas[1]).toMatchObject({ operadorId: "op-rodrigo", recursoId: LASER.id, status: "ABERTA" });
+    // ⚠⚠ A barra não para porque o turno virou: a passagem é troca de VÍNCULO e mais nada.
+    expect(tx.mesSessao.update).toBeUndefined();
+  });
+
+  // ⚠ Dois operadores no mesmo posto é permitido; quem já está lá não ganha vínculo novo.
+  it("quem já está no posto não ganha um segundo vínculo", async () => {
+    const { prisma, estado } = bancoFalso({
+      presencas: [presencaEm(LASER.id, "p-jur", "op-jurandir"), presencaEm(LASER.id, "p-rod", "op-rodrigo")],
+      sessoesAbertas: { [LASER.id]: 2 },
+    });
+    const r = await passarPosto(prisma, { deOperadorId: "op-jurandir", paraOperadorId: "op-rodrigo", recursoId: LASER.id });
+    expect(r.presenca.id).toBe("p-rod");
+    expect(estado.presencas).toHaveLength(2);
+    expect(estado.presencas[0].status).toBe("ENCERRADA");
+  });
+
+  // ⚠⚠ QUEM ASSUME PASSA PELA MESMA PORTA DE SEMPRE. Abrir exceção aqui seria ensinar que existe um
+  // caminho lateral para estar em duas máquinas.
+  it("quem assume com o crachá preso em outro posto é recusado com a mesma frase do entrar", async () => {
+    const { prisma, estado } = bancoFalso({
+      presencas: [presencaEm(LASER.id, "p-jur", "op-jurandir"), presencaEm(SOLDA.id, "p-rod", "op-rodrigo")],
+      sessoesAbertas: { [LASER.id]: 2, [SOLDA.id]: 4 },
+    });
+    const r = await passarPosto(prisma, { deOperadorId: "op-jurandir", paraOperadorId: "op-rodrigo", recursoId: LASER.id });
+    expect(r.erro).toContain("Solda 5");
+    expect(estado.presencas[0].status).toBe("ABERTA"); // o Jurandir não foi solto no meio
+  });
+
+  it("render quem já não está no posto é recusado", async () => {
+    const { prisma } = bancoFalso({ presencas: [], sessoesAbertas: { [LASER.id]: 2 } });
+    const r = await passarPosto(prisma, { deOperadorId: "op-jurandir", paraOperadorId: "op-rodrigo", recursoId: LASER.id });
+    expect(r.erro).toContain("não está mais com o crachá neste posto");
+  });
+
+  it("passar o posto para si mesmo é recusado", async () => {
+    const { prisma } = doisNoLaser();
+    const r = await passarPosto(prisma, { deOperadorId: "op-jurandir", paraOperadorId: "op-jurandir", recursoId: LASER.id });
+    expect(r.erro).toBe("O posto já é seu.");
+  });
+
+  it("sem os três dados, recusa antes de tocar no banco", async () => {
+    const { prisma, tx } = doisNoLaser();
+    expect((await passarPosto(prisma, { deOperadorId: "op-jurandir", recursoId: LASER.id })).erro)
+      .toContain("Informe quem sai");
+    expect(tx.mesPresenca.update).not.toHaveBeenCalled();
   });
 });
