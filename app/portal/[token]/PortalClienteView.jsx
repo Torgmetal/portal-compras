@@ -617,7 +617,7 @@ function Certificados({ token, lista }) {
       sub={`${lista.length} materiais com rastreabilidade`}>
       {erro && <p className="text-[12px] text-red-600 mb-2">{erro}</p>}
       <div className="overflow-x-auto -mx-1">
-        <table className="w-full text-[13px] min-w-[540px]">
+        <table className="w-full text-[13px] min-w-[640px]">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wide text-gray-400">
               {/* ⚠ A CAIXA MESTRA FICA NO CABEÇALHO DA COLUNA, onde a pessoa procura. Vitor
@@ -637,6 +637,7 @@ function Certificados({ token, lista }) {
               </th>
               <th className="font-semibold pb-2 px-1">Rastreio</th>
               <th className="font-semibold pb-2 px-1">Material</th>
+              <th className="font-semibold pb-2 px-1">Aplicado em (perfil do projeto)</th>
               <th className="font-semibold pb-2 px-1">Corrida</th>
               <th className="font-semibold pb-2 px-1">Certificado</th>
               <th className="font-semibold pb-2 px-1">Fornecedor</th>
@@ -658,6 +659,8 @@ function Certificados({ token, lista }) {
                   {c.r ? `R ${c.r}` : "—"}
                 </td>
                 <td className="py-2 px-1">{c.material}</td>
+                {/* o nome do fornecedor de um lado, o perfil do projeto do outro — o mesmo aço, sem parecer material estranho */}
+                <td className="py-2 px-1 text-gray-600">{c.aplicadoEm || <span className="text-gray-400">—</span>}</td>
                 <td className="py-2 px-1 whitespace-nowrap">{c.corrida || "—"}</td>
                 <td className="py-2 px-1 whitespace-nowrap">{c.certificado || "—"}</td>
                 <td className="py-2 px-1 whitespace-nowrap">{c.fornecedor || "—"}</td>

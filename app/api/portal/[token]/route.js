@@ -17,6 +17,7 @@ import { pecasDaLista, sincronizarRevisao, revisaoParaOCliente } from "@/lib/por
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
 import { pecasTekla, pesoRealPecas } from "@/lib/peso-op";
 import { etapaDasMarcas } from "@/lib/portal-obra-consulta";
+import { rastreioDaOp } from "@/lib/rastreio-peca";
 import { aplicarAvancoSyneco } from "@/lib/cronograma-syneco";
 
 export const runtime = "nodejs";
@@ -349,9 +350,23 @@ export async function GET(req, { params }) {
       orderBy: [{ importRef: "asc" }, { nome: "asc" }],
       take: 500,
     });
+    // ⚠⚠ O NOME DO CMR É O DO FORNECEDOR; O CLIENTE CONHECE O PERFIL DO PROJETO. OP-113, Alexandre
+    // (14/09/2026): "tem materiais no portal que não constam na lista de materiais do projeto" — era
+    // "PERFIL DOBRADO UDCE 200x75x25x2,25" (SOUFER) para o UE200X75X20X2.25 do projeto. O mesmo aço
+    // com dois nomes parecia material estranho. A coluna "aplicado em" diz em qual perfil do projeto
+    // cada R foi consumido (pelo mesmo casamento que dá o R à peça); quem não foi consumido por peça
+    // nenhuma (tinta, consumível, material ainda não cortado) fica sem — e isso também informa.
+    const aplicadoEm = new Map();
+    if (op?.id) {
+      try {
+        const r = await rastreioDaOp(portal.opNumero, op.id);
+        for (const v of r.porMarca.values()) for (const u of v.usadas || []) { if (!u.rastreio) continue; const s = aplicadoEm.get(u.rastreio) || new Set(); if (v.perfil) s.add(v.perfil); aplicadoEm.set(u.rastreio, s); }
+      } catch { /* a tabela sai sem a coluna — nunca sem a tabela */ }
+    }
     dados.certificados = certs.map((c) => ({
       id: c.id, r: c.importRef || null, material: c.nome, certificado: c.numeroDocumento,
       corrida: c.numeroCorrida, fornecedor: c.fornecedor, norma: c.norma,
+      aplicadoEm: c.importRef && aplicadoEm.has(c.importRef) ? [...aplicadoEm.get(c.importRef)].sort().join(", ") : null,
       // só oferece download do que tem arquivo de verdade atrás
       baixavel: !!(c.sharepointItemId || c.arquivoUrl),
     }));
