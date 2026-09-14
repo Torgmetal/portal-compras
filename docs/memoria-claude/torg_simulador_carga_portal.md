@@ -36,8 +36,15 @@ monta a carga daquela lista.
 - **Veículos configuráveis:** `ConfigCarga` (id "padrao"), tela Planejamento › Configuração da expedição
   (`ConfigCargaSection`), rota `/api/planejamento/expedicao/config-carga`; `catalogoDeVeiculos(cfg)` mescla com o
   padrão e entra em `opcoes.veiculos/frete` da simulação. Carreta e carreta 14 m nunca saem do catálogo.
-- **Próximas entregas combinadas:** etiquetas por volume; import de lista de prioridades que corta em caminhões
-  (caminho 2); comparativo de embalagem ligado à LQC.
+- **Ajustes por marca** (14/09/2026, `lib/carga/ajustes.js`, tabela `AjusteCargaMarca` por OP, rota
+  `…/op/[id]/ajustes-carga`): embalagem (solta, feixe, caixa, engradado, em pé), "junto com" (mesmo nome de grupo =
+  um pacote), posição (chão, só em cima, nada em cima), orientação (deitar, alma em pé), medidas à mão (valem acima
+  do IFC e da estimativa), observação. Aplicados em `expandirPecas` (medidas/orientação), `montarUnidades`
+  (partição antes das famílias) e `tentaPor` (`soChao`, `nadaEmCima`). UI: clique na marca na tabela de volumes ou
+  busca no painel "Ajustes por marca" → editor → "Simular de novo". Gravados com a simulação (`avisos.ajustes`) e
+  listados na página 1 do PDF. Arrastar no 3D ficou de fora de propósito (revalidar apoio a cada movimento).
+- **Próximas entregas combinadas:** prévia guardada no SharePoint com aprovação da Expedição; etiquetas por volume;
+  import de lista de prioridades que corta em caminhões (caminho 2); comparativo de embalagem ligado à LQC.
 - **Peça fora do IFC não some da carga** — Vitor (13/09/2026): "o ideal seria ignorar [o aviso dos parafusos], pois isso
   vai dar problema para o setor de carregamento". Duas famílias: **AC/parafuso sem peso** fica fora em silêncio (só a
   contagem); **peça com peso sem geometria** (escada móvel, contrapeso, batente da OP-107 — desenho do cliente, fora

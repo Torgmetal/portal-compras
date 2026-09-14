@@ -1,6 +1,6 @@
 "use client";
 // Resultado de uma simulação de carga: resumo, avisos e a lista de volumes da carga escolhida.
-import { AlertTriangle, Package, Truck } from "lucide-react";
+import { AlertTriangle, Package, Truck, SlidersHorizontal } from "lucide-react";
 
 const fmtKg = (v) => `${Math.round(v || 0).toLocaleString("pt-BR")} kg`;
 const TIPO_COR = { "caixa de madeira": "bg-amber-100 text-amber-900", "feixe cintado": "bg-blue-100 text-blue-900", "pacote de guarda-corpo cintado": "bg-emerald-100 text-emerald-900", "pacote de grade cintado": "bg-teal-100 text-teal-900", "pacote de degraus cintado": "bg-lime-100 text-lime-900", "peça solta calçada": "bg-gray-100 text-gray-800" };
@@ -35,7 +35,7 @@ export function ResumoSimulacao({ resultado, cargaSel, onCarga }) {
   );
 }
 
-export function VolumesDaCarga({ carga }) {
+export function VolumesDaCarga({ carga, onAjustar, ajustes }) {
   const rom = carga?.romaneio || [];
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -44,18 +44,19 @@ export function VolumesDaCarga({ carga }) {
         <table className="w-full text-[12px]">
           <thead className="bg-gray-50/60 sticky top-0 text-torg-gray"><tr>
             <th className="text-left px-3 py-1 font-medium w-12">Vol.</th><th className="text-left px-2 py-1 font-medium w-40">Tipo</th><th className="text-left px-2 py-1 font-medium">Conteúdo</th>
-            <th className="text-right px-2 py-1 font-medium w-12">Pç</th><th className="text-right px-2 py-1 font-medium w-20">kg</th><th className="text-right px-2 py-1 font-medium w-32">C×L×A (cm)</th><th className="text-right px-3 py-1 font-medium w-16">Camada</th>
+            <th className="text-right px-2 py-1 font-medium w-12">Pç</th><th className="text-right px-2 py-1 font-medium w-20">kg</th><th className="text-right px-2 py-1 font-medium w-32">C×L×A (cm)</th><th className="text-right px-2 py-1 font-medium w-16">Camada</th>{onAjustar && <th className="px-2 py-1 w-24"></th>}
           </tr></thead>
           <tbody className="divide-y divide-gray-50">
             {rom.map((v) => { const u = carga.itens.find((x) => x.id === v.id); return (
               <tr key={v.volume}>
                 <td className="px-3 py-1 font-mono font-bold text-torg-dark">{v.volume}</td>
                 <td className="px-2 py-1"><span className={`px-1.5 py-0.5 rounded text-[11px] ${TIPO_COR[v.tipo] || "bg-gray-100 text-gray-800"}`}>{v.tipo}</span></td>
-                <td className="px-2 py-1 text-torg-dark">{(() => { const g = new Map(); for (const m of u?.membros || []) g.set(m.marca, (g.get(m.marca) || 0) + 1); return [...g].map(([k, n]) => `${k}${n > 1 ? ` ×${n}` : ""}`).join(", "); })()}</td>
+                <td className="px-2 py-1 text-torg-dark">{(() => { const g = new Map(); for (const m of u?.membros || []) g.set(m.marca, { n: (g.get(m.marca)?.n || 0) + 1, desc: m.desc }); return [...g].map(([k, v], i) => <span key={k}>{i ? ", " : ""}{onAjustar ? <button onClick={() => onAjustar(k, v.desc)} className={`hover:underline ${ajustes?.[k] ? "text-torg-blue font-semibold" : ""}`} title={ajustes?.[k] ? "Marca com ajuste — clique para editar" : "Ajustar esta marca"}>{k}</button> : k}{v.n > 1 ? ` ×${v.n}` : ""}</span>); })()}</td>
                 <td className="px-2 py-1 text-right tabular-nums">{v.pecas}</td>
                 <td className="px-2 py-1 text-right tabular-nums">{v.kgBruto.toLocaleString("pt-BR")}</td>
                 <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">{v.dimsCm.join(" × ")}</td>
-                <td className="px-3 py-1 text-right tabular-nums">{(u?.camada || 0) + 1}</td>
+                <td className="px-2 py-1 text-right tabular-nums">{(u?.camada || 0) + 1}</td>
+                {onAjustar && <td className="px-2 py-1 text-right">{u?.membros?.length === 1 ? <button onClick={() => onAjustar(u.membros[0].marca, u.membros[0].desc)} className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><SlidersHorizontal size={11} /> Ajustar</button> : <span className="text-[10px] text-torg-gray">clique na marca</span>}</td>}
               </tr>); })}
           </tbody>
         </table>

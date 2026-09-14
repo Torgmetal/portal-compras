@@ -5903,6 +5903,20 @@ model CargaSimulada {
 
 // Veículos e índice de frete do simulador de carga (Planejamento › Configuração da expedição). Uma linha
 // só (id "padrao"); vazio = premissas de lib/carga/premissas.js. Criada por scripts/ensure-carga-simulada.mjs.
+// Ajustes por marca do simulador de carga (não empacotar, junto com, embalagem, posição, medidas à mão).
+// Por OP: valem para todos os romaneios da obra. Criada por scripts/ensure-carga-simulada.mjs.
+model AjusteCargaMarca {
+  id              String   @id @default(cuid())
+  opId            String
+  marca           String
+  regras          Json     @default("{}")
+  atualizadoPorId String?
+  updatedAt       DateTime @default(now())
+
+  @@unique([opId, marca])
+  @@index([opId])
+}
+
 model ConfigCarga {
   id              String   @id
   veiculos        Json     @default("[]")

@@ -1,7 +1,12 @@
 {
-  "build": 3138,
-  "gerado": "2026-09-14T11:22:09.375Z",
+  "build": 3139,
+  "gerado": "2026-09-14T11:35:51.364Z",
   "commits": [
+    {
+      "hash": "fa540831",
+      "data": "14/09/2026",
+      "titulo": "Desenhos em lote: diz qual marca falhou e por quê; avulsa sem croqui explica que vai ao Jato"
+    },
     {
       "hash": "28935e02",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "6b713fa3",
       "data": "12/09/2026",
       "titulo": "fix(engenharia): fixar e revisar previsão da sequência com auditoria"
-    },
-    {
-      "hash": "8a1095a8",
-      "data": "12/09/2026",
-      "titulo": "Tekla 2025: pacote do teste TMSA/Vale (UDAs de montagem) e memória da OP-122"
     }
   ]
 }

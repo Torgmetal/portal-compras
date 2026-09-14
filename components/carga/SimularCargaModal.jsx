@@ -11,6 +11,7 @@ import { geometriaDoIfc } from "@/lib/carga/geometria-ifc";
 import { prefixoDaOp } from "@/lib/carga/classificar";
 import { marcaEhAC } from "@/lib/marca-ac";
 import { ResumoSimulacao, VolumesDaCarga } from "./ResultadoSimulacao";
+import { EditorAjuste, ListaAjustes } from "./AjustesCarga";
 
 const VisualizadorCarga = dynamic(() => import("./VisualizadorCarga"), { ssr: false, loading: () => <div className="h-[480px] rounded-xl bg-[#eef2f6] flex items-center justify-center text-sm text-torg-gray">Carregando o 3D…</div> });
 
@@ -22,6 +23,13 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
   const [geo, setGeo] = useState(null), [perfil, setPerfil] = useState("recomendado");
   const [resultado, setResultado] = useState(null), [cargaSel, setCargaSel] = useState(0), [gravada, setGravada] = useState(null), [pdf, setPdf] = useState(null);
   const worker = useRef(null), viz = useRef(null);
+  // ajustes por marca da obra (AjusteCargaMarca): carregados junto com a lista; editar aqui e simular de novo
+  const [ajustes, setAjustes] = useState({}), [editando, setEditando] = useState(null), [ajustesMudaram, setAjustesMudaram] = useState(false);
+  useEffect(() => { fetch(`/api/comercial/op/${opId}/ajustes-carga`).then((r) => r.json()).then((j) => { if (j.success) setAjustes(j.ajustes || {}); }).catch(() => {}); }, [opId]);
+  const salvarAjuste = async (marca, regras) => {
+    const r = await fetch(`/api/comercial/op/${opId}/ajustes-carga`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ marca, regras }) }).then((x) => x.json());
+    if (!r.success) throw new Error(r.error || "Não salvou"); setAjustes(r.ajustes || {}); setAjustesMudaram(true);
+  };
 
   // 1) a lista, o perfil da LQC e a última simulação
   useEffect(() => {
@@ -66,7 +74,7 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
   // 3) o motor, num worker; 4) grava
   const simular = () => {
     if (!dados || !geo) return;
-    setFase("simulando"); setErro(null); setGravada(null); setProgresso({ msg: "Montando os volumes e a carga…", frac: 0.5 });
+    setFase("simulando"); setErro(null); setGravada(null); setAjustesMudaram(false); setProgresso({ msg: "Montando os volumes e a carga…", frac: 0.5 });
     worker.current?.terminate();
     // ⚠ tem de ser exatamente `new Worker(new URL(…, import.meta.url))`: é essa forma que o webpack reconhece para empacotar o worker
     const w = new Worker(new URL("./simular.worker.js", import.meta.url)); worker.current = w;
@@ -75,12 +83,12 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
       const r = ev.data.resultado; setResultado(r); setCargaSel(0); setFase("pronto");
       try {
         const res = await fetch(`/api/comercial/op/${opId}/romaneios-previos/${previo.id}/simulacao`, { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ perfil, itensHash: dados.hash, resumo: r.resumo, cargas: r.cargas, avisos: { especiais: r.especiais, ajustadas: r.ajustadas, semCaixa: r.semCaixa, estimadas: r.estimadas, perfil: r.perfil, gcModo: r.gcModo, faltantes: geo.faltantes } }) }).then((x) => x.json());
+          body: JSON.stringify({ perfil, itensHash: dados.hash, resumo: r.resumo, cargas: r.cargas, avisos: { especiais: r.especiais, ajustadas: r.ajustadas, semCaixa: r.semCaixa, estimadas: r.estimadas, perfil: r.perfil, gcModo: r.gcModo, faltantes: geo.faltantes, ajustes } }) }).then((x) => x.json());
         if (res.success) setGravada(res.simulacao); else setErro(res.error || "A simulação não foi gravada.");
       } catch { setErro("A simulação não foi gravada."); }
     };
     w.onerror = (e) => { setErro(e.message || "Falha no simulador"); setFase("pronto"); };
-    w.postMessage({ lista: dados.lista.filter((i) => !marcaEhAC(i.marca)), geometria: geo.geometria, perfil, prefixo: prefixoDaOp(opNumero), opcoes: dados.opcoes || {} });
+    w.postMessage({ lista: dados.lista.filter((i) => !marcaEhAC(i.marca)), geometria: geo.geometria, perfil, prefixo: prefixoDaOp(opNumero), opcoes: dados.opcoes || {}, ajustes });
   };
 
   // PDF do modelo: fotografa o 3D (carga pronta + cada camada) e manda para a rota montar o A4
@@ -140,6 +148,7 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
               {dados.simulacao?.desatualizada && <p className="mt-1 text-amber-800">A última simulação ({fmtD(dados.simulacao.createdAt)}) é de antes de o romaneio mudar — simule de novo.</p>}
             </div>
           )}
+          {dados && fase !== "carregando" && <ListaAjustes ajustes={ajustes} lista={dados.lista} desatualizada={ajustesMudaram && !!resultado} onEditar={(marca, desc) => setEditando({ marca, desc })} />}
           {resultado && (
             <>
               <div className="flex items-center gap-2 text-[11px] text-torg-gray">
@@ -150,11 +159,12 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
               <ResumoSimulacao resultado={resultado} cargaSel={cargaSel} onCarga={setCargaSel} />
               {carga && geo && <VisualizadorCarga ref={viz} carga={carga} malhas={geo.malhas} madeira={resultado.madeira || 100} altura={480} />}
               {carga && !geo && <p className="text-[12px] text-torg-gray">Baixando o modelo para desenhar o 3D…</p>}
-              {carga && <VolumesDaCarga carga={carga} />}
+              {carga && <VolumesDaCarga carga={carga} ajustes={ajustes} onAjustar={(marca, desc) => setEditando({ marca, desc })} />}
             </>
           )}
         </div>
       </div>
+      {editando && <EditorAjuste marca={editando.marca} desc={editando.desc} regras={ajustes[editando.marca] || null} semGeometria={!!geo && !geo.geometria[editando.marca]} onSalvar={salvarAjuste} onFechar={() => setEditando(null)} />}
     </div>
   );
 }

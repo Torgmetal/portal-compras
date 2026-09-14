@@ -174,3 +174,42 @@ describe("peça fora do IFC entra com caixa estimada pelo peso", () => {
     expect(r.resumo.foraDoModelo).toBe(3);
   });
 });
+
+describe("ajustes por marca", () => {
+  const g = { T118A1: geo([12000, 550, 300]), T118C7: geo([800, 50, 50]), T118C8: geo([900, 60, 60]), T118D1: geo([3000, 1100, 60]) };
+  it("normaliza regras: opção desconhecida cai fora, medidas incompletas são recusadas, vazio vira null", async () => {
+    const { normalizarRegras, resumoDaRegra } = await import("@/lib/carga/ajustes");
+    expect(normalizarRegras({ embalagem: "xyz", posicao: "chao" })).toEqual(expect.objectContaining({ embalagem: "", posicao: "chao" }));
+    expect(normalizarRegras({})).toBeNull();
+    expect(() => normalizarRegras({ medidas: { C: 1000 } })).toThrow(/medidas/i);
+    expect(resumoDaRegra(normalizarRegras({ embalagem: "caixa", juntoCom: "kit 1" }))).toContain("Caixa de madeira");
+  });
+  it("não empacotar: a cantoneira miúda vai solta em vez de para a caixa", () => {
+    const lista = [{ marca: "T118C7", desc: "CANTONEIRA", qtd: 4, kgUn: 4 }];
+    const r = simularCarga({ lista, geometria: g, perfil: "recomendado", prefixo: "T118", ajustes: { T118C7: { embalagem: "solta" } } });
+    expect(r.cargas[0].itens.every((u) => u.tipo === "PECA")).toBe(true); expect(r.cargas[0].volumes).toBe(4);
+  });
+  it("junto com: duas marcas de famílias diferentes viajam num pacote só", () => {
+    const lista = [{ marca: "T118C7", desc: "CANTONEIRA", qtd: 4, kgUn: 4 }, { marca: "T118C8", desc: "TALA", qtd: 2, kgUn: 5 }];
+    const r = simularCarga({ lista, geometria: g, perfil: "recomendado", prefixo: "T118", ajustes: { T118C7: { juntoCom: "kit 1" }, T118C8: { juntoCom: "kit 1" } } });
+    expect(r.cargas[0].volumes).toBe(1); const u = r.cargas[0].itens[0]; expect(u.membros).toHaveLength(6); expect(u.rotulo).toContain("kit 1");
+  });
+  it("no chão: a viga marcada fica no assoalho mesmo com lugar em cima; nada em cima: nada sobe nela", () => {
+    const lista = [{ marca: "T118A1", desc: "VIGA", qtd: 3, kgUn: 700 }, { marca: "T118D1", desc: "G.C", qtd: 3, kgUn: 60 }];
+    const r1 = simularCarga({ lista, geometria: g, perfil: "recomendado", prefixo: "T118", ajustes: { T118A1: { posicao: "chao" } } });
+    for (const v of r1.cargas[0].itens.filter((u) => u.membros[0].marca === "T118A1")) expect(v.y).toBe(0);
+    const r2 = simularCarga({ lista, geometria: g, perfil: "recomendado", prefixo: "T118", ajustes: { T118A1: { posicao: "nadaEmCima" } } });
+    const vigas = r2.cargas.flatMap((c) => c.itens).filter((u) => u.membros[0].marca === "T118A1").map((v) => v.id);
+    for (const u of r2.cargas.flatMap((c) => c.itens).filter((u) => u.y > 0)) for (const id of u.sobre) expect(vigas).not.toContain(id);
+  });
+  it("medidas à mão: marca sem IFC entra com a medida informada, em caixa, sem estimativa", () => {
+    const lista = [{ marca: "72162417", desc: "ESCADA MOVEL", qtd: 1, kgUn: 50 }];
+    const r = simularCarga({ lista, geometria: {}, perfil: "recomendado", prefixo: "T118", ajustes: { 72162417: { medidas: { C: 3200, L: 600, A: 200 }, embalagem: "caixa" } } });
+    expect(r.estimadas).toHaveLength(0); const m = r.cargas[0].itens[0].membros[0]; expect([m.C, m.L, m.A]).toEqual([3200, 600, 200]); expect(r.cargas[0].itens[0].tipo).toBe("CAIXA");
+  });
+  it("engradado forçado: o pacote de guarda-corpo vira engradado deitado", () => {
+    const lista = [{ marca: "T118D1", desc: "G.C", qtd: 3, kgUn: 60 }];
+    const r = simularCarga({ lista, geometria: g, perfil: "recomendado", prefixo: "T118", ajustes: { T118D1: { embalagem: "engradado" } }, opcoes: { gcModo: "topo" } });
+    expect(r.cargas[0].itens[0].tipo).toBe("ENGRADADO");
+  });
+});

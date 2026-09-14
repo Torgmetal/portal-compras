@@ -34,6 +34,6 @@ export async function POST(req, { params }) {
   const cargas = Array.isArray(sim.cargas) ? sim.cargas : [], carga = cargas[body.indice];
   if (!carga) return NextResponse.json({ error: "Carga não encontrada na simulação." }, { status: 404 });
   const estimadas = Array.isArray(sim.avisos?.estimadas) ? sim.avisos.estimadas.filter((e) => carga.itens?.some((u) => (u.membros || []).some((m) => m.marca === e.marca))) : [];
-  const { bytes, filename } = await gerarModeloCargaPDF({ op, previo, carga, indice: body.indice, total: cargas.length, perfilNome: sim.perfilNome || sim.perfil, prefixo: prefixoDaOp(op.numero), imagens: body.imagens, estimadas });
+  const { bytes, filename } = await gerarModeloCargaPDF({ op, previo, carga, indice: body.indice, total: cargas.length, perfilNome: sim.perfilNome || sim.perfil, prefixo: prefixoDaOp(op.numero), imagens: body.imagens, estimadas, ajustes: sim.avisos?.ajustes || {} });
   return new NextResponse(Buffer.from(bytes), { headers: { "Content-Type": "application/pdf", "Content-Disposition": dispArquivo(filename, "inline") } });
 }

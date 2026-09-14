@@ -18,6 +18,16 @@ CREATE TABLE IF NOT EXISTS "CargaSimulada" (
 );
 CREATE INDEX IF NOT EXISTS "CargaSimulada_romaneioPrevioId_idx" ON "CargaSimulada"("romaneioPrevioId");
 CREATE INDEX IF NOT EXISTS "CargaSimulada_opId_idx" ON "CargaSimulada"("opId");
+CREATE TABLE IF NOT EXISTS "AjusteCargaMarca" (
+  "id" TEXT PRIMARY KEY,
+  "opId" TEXT NOT NULL,
+  "marca" TEXT NOT NULL,
+  "regras" JSONB NOT NULL DEFAULT '{}',
+  "atualizadoPorId" TEXT,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "AjusteCargaMarca_opId_marca_key" UNIQUE ("opId", "marca")
+);
+CREATE INDEX IF NOT EXISTS "AjusteCargaMarca_opId_idx" ON "AjusteCargaMarca"("opId");
 CREATE TABLE IF NOT EXISTS "ConfigCarga" (
   "id" TEXT PRIMARY KEY,
   "veiculos" JSONB NOT NULL DEFAULT '[]',
@@ -28,7 +38,7 @@ CREATE TABLE IF NOT EXISTS "ConfigCarga" (
 `;
 try {
   for (const stmt of SQL.split(";").map((s) => s.trim()).filter(Boolean)) await prisma.$executeRawUnsafe(stmt);
-  console.log("[Expedição] Tabelas CargaSimulada e ConfigCarga prontas.");
+  console.log("[Expedição] Tabelas CargaSimulada, AjusteCargaMarca e ConfigCarga prontas.");
 } catch (e) {
   console.error("[Expedição] Não foi possível criar a tabela:", e.message);
   process.exitCode = 1;
