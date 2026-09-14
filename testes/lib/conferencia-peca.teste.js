@@ -148,3 +148,38 @@ describe("progresso — o número do topo da tela", () => {
     expect(progresso([])).toMatchObject({ previsto: 0, conferido: 0, pct: 0 });
   });
 });
+
+// ─── A MARCA QUE SAIU DA L.E. NUMA REVISÃO (14/09/2026) ──────────────────────
+//
+// ⚠⚠ Desde que a planilha passou a definir sozinha o conjunto de marcas, uma revisão da engenharia
+// pode excluir uma marca que JÁ FOI conferida. O lançamento continua gravado — como tem de
+// continuar —, mas ela não está mais em `saldosDaOP`. Sem tratamento, `validarLancamento` diria
+// "não está na Lista de Expedição" e recusaria QUALQUER correção, inclusive as que DIMINUEM: quem
+// quisesse desfazer o excesso ficaria preso a ele. Achado do Codex.
+describe("corrigir lançamento de marca que saiu da lista", () => {
+  const semAMarca = { marcas: [{ marca: "T97A140", previsto: 5, conferido: 0, saldo: 5, completa: false }] };
+  const item = { marca: "105A92", qte: 3 };
+
+  it("diminuir é permitido", () => {
+    expect(validarEdicao(semAMarca, item, 1)).toMatchObject({ ok: true, foraDaLista: true });
+  });
+
+  it("manter a mesma quantidade é permitido — é o caso de corrigir só a observação", () => {
+    expect(validarEdicao(semAMarca, item, 3).ok).toBe(true);
+  });
+
+  // ⚠ Não existe planejado contra o que medir o aumento: deixar crescer livre seria criar teto
+  // infinito justamente onde a lista não ampara mais nada.
+  it("aumentar é recusado, e a frase diz por quê", () => {
+    const r = validarEdicao(semAMarca, item, 4);
+    expect(r.ok).toBe(false);
+    expect(r.erro).toContain("saiu da Lista de Expedição");
+  });
+
+  // ⚠ A marca que CONTINUA na lista segue pela regra de sempre — o teto é o previsto.
+  it("marca que continua na lista não passa por esta saída", () => {
+    const naLista = { marcas: [{ marca: "T97A140", previsto: 5, conferido: 5, saldo: 0, completa: true }] };
+    expect(validarEdicao(naLista, { marca: "T97A140", qte: 5 }, 9).ok).toBe(false);
+    expect(validarEdicao(naLista, { marca: "T97A140", qte: 5 }, 4).ok).toBe(true);
+  });
+});

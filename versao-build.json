@@ -1,7 +1,12 @@
 {
-  "build": 3145,
-  "gerado": "2026-09-14T14:31:05.967Z",
+  "build": 3146,
+  "gerado": "2026-09-14T14:44:14.674Z",
   "commits": [
+    {
+      "hash": "c56c1771bd",
+      "data": "14/09/2026",
+      "titulo": "Etiquetas: o fechamento da lista, com marcas, pecas, etiquetas e quilos"
+    },
     {
       "hash": "f702344eb4",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e0602c57bb",
       "data": "12/09/2026",
       "titulo": "feat: disponibiliza ficha da peça nas listas de produção e PCP"
-    },
-    {
-      "hash": "78fa92031c",
-      "data": "12/09/2026",
-      "titulo": "LQC: madeira de embalagem por nível na aba Frete, entra no R$/kg"
     }
   ]
 }

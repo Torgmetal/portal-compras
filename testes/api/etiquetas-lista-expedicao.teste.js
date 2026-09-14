@@ -50,11 +50,22 @@ describe("a lista de marcas é a Lista de Expedição", () => {
     expect(await marcas(await get("?opId=op1"))).toContain("T97-AC8");
   });
 
-  it("a marca que só existe na ListaExpedicao importada também entra", async () => {
+  // ⚠⚠ A PLANILHA IMPORTADA DEFINE SOZINHA O CONJUNTO (14/09/2026). Antes o cadastro ACRESCENTAVA
+  // marcas pelo carimbo `naLE`, e esse carimbo é um retrato do dia em que o importador da Produção
+  // rodou: quando a engenharia revisa a lista e exclui uma marca, ninguém o limpa. Provado na
+  // OP-105 — a revisão R02 excluiu `105A92`, a planilha ficou com 102 e a tela mostrava 103.
+  it("a planilha manda: marca só dela entra, marca só do cadastro sai", async () => {
     mockPrisma.listaExpedicao.findMany.mockResolvedValue([
       { marcasJson: [{ marca: "T97A180", descricao: "VIGA", qte: 2 }] },
     ]);
-    expect(await marcas(await get("?opId=op1"))).toEqual(["T97-AC8", "T97A140", "T97A180"]);
+    expect(await marcas(await get("?opId=op1"))).toEqual(["T97A180"]);
+  });
+
+  // ⚠ O FALLBACK CONTINUA, e é a razão de o carimbo existir: obra cuja planilha NUNCA foi importada
+  // (a OP-118) só tem o cadastro. O que mudou é que ele deixou de valer quando HÁ planilha.
+  it("sem nenhuma lista importada, o cadastro carimbado `naLE` continua mandando", async () => {
+    mockPrisma.listaExpedicao.findMany.mockResolvedValue([]);
+    expect(await marcas(await get("?opId=op1"))).toEqual(["T97-AC8", "T97A140"]);
   });
 
   // ⚠ a comparação é por chave normalizada; a GRAFIA exibida vem do cadastro, que é a registrada.
@@ -63,11 +74,15 @@ describe("a lista de marcas é a Lista de Expedição", () => {
     expect(await marcas(await get("?opId=op1"))).toContain("T97A180");
   });
 
-  it("marcasJson vazio, nulo ou torto não derruba a tela", async () => {
+  // ⚠⚠ LISTA IMPORTADA VAZIA NÃO RESSUSCITA O CADASTRO (pedido do Codex, 14/09/2026). A existência
+  // da lista é um fato SEPARADO do tamanho dela: inferi-la de `marcas.size > 0` faria um parser que
+  // falhou, ou uma planilha em branco, caírem no caminho de "obra sem planilha" e trazerem de volta
+  // o carimbo velho. A tela vazia é um sinal visível; o fallback silencioso não é.
+  it("lista importada vazia ou torta devolve vazio, não o cadastro", async () => {
     mockPrisma.listaExpedicao.findMany.mockResolvedValue([
       { marcasJson: null }, { marcasJson: [] }, { marcasJson: [{ semMarca: 1 }] },
     ]);
-    expect(await marcas(await get("?opId=op1"))).toEqual(["T97-AC8", "T97A140"]);
+    expect(await marcas(await get("?opId=op1"))).toEqual([]);
   });
 
   // ⚠ "097" e "97" são a mesma obra em tabelas diferentes.
@@ -190,13 +205,18 @@ describe("a quantidade vem da planilha da L.E. quando ela existe", () => {
     expect(j.pecas[0]).toMatchObject({ marca: "T89-AC13", qte: 55, descricao: "GRAMPO TIPO 2" });
   });
 
-  // ⚠ 4 marcas reais da OP-89 existem só no PecaConjunto — restringir à planilha as perderia.
-  it("marca que não está na planilha mantém a quantidade da peça", async () => {
+  // ⚠⚠ ESTE TESTE DIZIA O CONTRÁRIO ATÉ 14/09/2026, e a inversão é deliberada. Ele guardava "4
+  // marcas reais da OP-89 existem só no PecaConjunto — restringir à planilha as perderia". Medido
+  // na base inteira: são 33 marcas em 4 obras nessa situação, e pelo menos uma (`105A92`, OP-105)
+  // está PROVADA como excluída por revisão da engenharia. Marca fora da L.E. vigente não recebe
+  // etiqueta de carregamento — decisão do Matheus, com os números na mão.
+  it("marca que está só no cadastro não entra quando existe planilha", async () => {
     mockPrisma.pecaConjunto.findMany.mockResolvedValue(
       [{ id: "c", marca: "T89C98", descricao: "L1.1/2''X1/8''", qte: 7, naLE: true, fonte: "LE_IMPORT" }]);
     mockPrisma.listaExpedicao.findMany.mockResolvedValue([{ marcasJson: [{ marca: "OUTRA", qte: 1 }] }]);
     const j = await (await get("?opId=op1")).json();
-    expect(j.pecas.find((p) => p.marca === "T89C98")).toMatchObject({ qte: 7 });
+    expect(j.pecas.find((p) => p.marca === "T89C98")).toBeUndefined();
+    expect(j.pecas.map((p) => p.marca)).toEqual(["OUTRA"]);
   });
 
   it("planilha com qte zerada ou ausente não zera a peça", async () => {
@@ -248,13 +268,15 @@ describe("a lista de obras só traz o que tem LE", () => {
       .toEqual([["097", 537], ["118", 1641], ["101", 8]]);
   });
 
-  // ⚠ As duas fontes são a MESMA lista por caminhos diferentes: somar contaria a obra duas vezes.
-  it("obra presente nas duas fontes conta uma vez só, pelo maior", async () => {
+  // ⚠⚠ O NÚMERO DO SELETOR SEGUE A MESMA REGRA DO DETALHE (14/09/2026). Era o MÁXIMO entre as duas
+  // fontes; assim que a planilha passou a mandar sozinha, o seletor diria "537 marcas" numa obra
+  // que abre com 530. Número que muda ao abrir a tela faz duvidar das duas.
+  it("havendo planilha, o cadastro não levanta o número do seletor", async () => {
     mockPrisma.pecaConjunto.groupBy.mockResolvedValue(marcasDe("op1", 537));
     mockPrisma.listaExpedicao.findMany.mockResolvedValue([{ opId: "op1", opNumero: "097", marcas: 530 }]);
     const j = await (await get()).json();
     expect(j.ops).toHaveLength(1);
-    expect(j.ops[0].marcas).toBe(537);
+    expect(j.ops[0].marcas).toBe(530);
   });
 
   it("pergunta ao banco só pelas peças da LE", async () => {
