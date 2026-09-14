@@ -87,7 +87,9 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
       const r = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows, opNumero: op.trim() || null, sobrescrever }),
+        // ⚠ o nome do arquivo vai junto: é dele que sai a FASE (T94A-LPC → T94A), a chave da lista — sem ele a
+        // LPC entrava sob o número da OP e duplicava a que a tela de Peças já tinha gravado (OP-094, 14/09/2026)
+        body: JSON.stringify({ rows, opNumero: op.trim() || null, sobrescrever, arquivoNome: file.name }),
       });
       const j = await lerResposta(r);
       if (!r.ok) throw new Error(j.error || "Erro ao importar");

@@ -141,6 +141,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Materiais da OP (compras)](torg_materiais_op.md) — MateriaisOPSection: solicitado→pedido→NF→recebido; RMItem.peso=kg, qtd=barras; API /api/op/[id]/materiais
 - [OP.refCliente](torg_op_refcliente.md) — código do CLIENTE p/ a obra (≠ obra/numero); editável; aparece nos docs ao cliente; doc novo ao cliente DEVE incluir
 - [PecaConjunto.opNumero = código SKA](torg_pecaconjunto_opnumero.md) — LPC guarda T67B, não 067; casa por opId (a4c5775); frentes reconciliadas 17/06
+- [Chave da LPC = FASE, nunca a OP](torg_lpc_chave_fase.md) — "094" × "T94A" duplicou 591 marcas na programação do corte; lib/lpc-chave.js; toda tela manda arquivoNome; resíduos na 089/113/067
 - [Fluxo da Produção (Diretoria)](torg_fluxo_producao.md) — Eng→programador→setor; 4.576 itens fora do mapa, OP-067 parada há 31d
 - [Módulo Diretoria (restrito)](torg_modulo_diretoria.md) — /diretoria tem allowlist própria (lib/diretoria.js); ADMIN NÃO burla; dono vitor@torg.com.br. Não usar requireRole lá
 - [Painel /admin + alerta de cron = allowlist](torg_admin_portal_allowlist.md) — Vitor e Matheus; os outros 3 ADMINs seguem full, sem painel

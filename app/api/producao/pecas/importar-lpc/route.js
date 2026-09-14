@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { parseLPC } from "@/lib/parse-lpc";
+import { chaveParaOParser, chaveAjustadaPeloBanco, ehSoNumero } from "@/lib/lpc-chave";
 import { classificarMaquina } from "@/lib/maquina-corte";
 import { chaveDaPeca } from "@/lib/liberacao-pecas";
 import { log } from "@/lib/log";
@@ -40,14 +41,16 @@ export async function POST(req) {
   // A CHAVE da lista é a FASE (ex.: T83F), NÃO a OP (083): cada fase é uma lista
   // própria (T83F e T83D coexistem). Prioridade: fase no nome do arquivo
   // (T83F-LPC) > fase/OP selecionada > detecção automática pela marca.
-  const faseArquivo = String(arquivoNome || "").toUpperCase().match(/T\d+[A-Z]*/)?.[0] || null;
-  const chave = faseArquivo || opForcada || null;
-  const parsed = parseLPC(rows, { opNumeroForcado: chave });
+  // ⚠⚠ O NÚMERO DA OP ESCOLHIDO NA TELA ("094") NÃO É A CHAVE — a chave é a FASE (T94A). Ver lib/lpc-chave.js
+  // (OP-094, 14/09/2026: 591 marcas duplicadas por a mesma LPC ter entrado sob "094" e sob "T94A").
+  const chave = chaveParaOParser({ arquivoNome, opForcada });
+  let parsed = parseLPC(rows, { opNumeroForcado: chave });
+  if (!parsed.erro && !parsed.opNumero && opForcada) parsed = parseLPC(rows, { opNumeroForcado: opForcada });
   if (parsed.erro) {
     return NextResponse.json({ error: parsed.erro }, { status: 400 });
   }
 
-  const opNumero = parsed.opNumero;
+  let opNumero = parsed.opNumero;
   if (!opNumero) {
     return NextResponse.json({ error: "Não consegui detectar a fase/OP. Nomeie o arquivo com a fase (ex.: T83F-LPC) ou selecione a OP e importe de novo." }, { status: 400 });
   }
@@ -64,6 +67,13 @@ export async function POST(req) {
   const cands = new Set();
   for (const src of [opForcada, opNumero]) { const d = digitosDe(src); if (d) { cands.add(d); cands.add(d.padStart(3, "0")); cands.add(String(Number(d))); } }
   const op = cands.size ? await prisma.oP.findFirst({ where: { numero: { in: [...cands] } } }) : null;
+  // chave só numérica com uma lista já gravada sob a fase (ex.: "094" × "T94A" existente): usa a existente
+  let chaveAjustada = null;
+  if (op && ehSoNumero(opNumero)) {
+    const existentes = (await prisma.pecaConjunto.groupBy({ by: ["opNumero"], where: { opId: op.id, fonte: "LPC_IMPORT" } })).map((e) => e.opNumero);
+    const para = chaveAjustadaPeloBanco(opNumero, existentes);
+    if (para) { chaveAjustada = { de: opNumero, para }; opNumero = para; parsed = { ...parsed, opNumero }; }
+  }
 
   // Diff da revisão (o que mudou vs a lista anterior): snapshot das marcas+peso
   // ANTES do upsert. incluídas = novas; removidas = sumiram; alteradas = peso mudou.
@@ -496,6 +506,7 @@ export async function POST(req) {
   return NextResponse.json({
     ok: true,
     opNumero,
+    chaveAjustada,
     opEncontrada: !!op,
     obra: parsed.obra,
     cliente: parsed.cliente,

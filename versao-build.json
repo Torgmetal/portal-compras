@@ -1,7 +1,12 @@
 {
-  "build": 3148,
-  "gerado": "2026-09-14T16:55:35.244Z",
+  "build": 3149,
+  "gerado": "2026-09-14T17:35:37.496Z",
   "commits": [
+    {
+      "hash": "4ba3dcbd",
+      "data": "14/09/2026",
+      "titulo": "Simulador: PDF v2 — modelos de embalagem desenhados e um cartão por volume com a foto 3D"
+    },
     {
       "hash": "e8d317df",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c0e1445b",
       "data": "12/09/2026",
       "titulo": "Memória: rodas do simulador de carga"
-    },
-    {
-      "hash": "ad12bb7e",
-      "data": "12/09/2026",
-      "titulo": "Memória: modelo de carga com capturas 3D e caminhão v2"
     }
   ]
 }
