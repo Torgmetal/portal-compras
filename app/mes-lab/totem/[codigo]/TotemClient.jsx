@@ -1,10 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, LogOut, Search, User } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, LogOut, User } from "lucide-react";
 import { visualDo } from "./estado-visual";
 import Produzindo from "./Produzindo";
+import Trabalhos from "./Trabalhos";
+import EscolherPlano from "./EscolherPlano";
 import PedirCracha from "./PedirCracha";
+import Escolher from "./Escolher";
+import EscolherMotivo from "./EscolherMotivo";
 
 // ─── O TOTEM DO OPERADOR ──────────────────────────────────────────────────────
 //
@@ -37,6 +41,8 @@ export default function TotemClient({ codigo }) {
   const [qtd, setQtd] = useState(vazio);
   const [pedindoMotivo, setPedindoMotivo] = useState(false);
   const [feito, setFeito] = useState("");
+  // ⚠ Qual das marcas abertas o operador está lançando. Com uma só, não é usada — ela entra direto.
+  const [selecionada, setSelecionada] = useState(null);
 
   // ⚠ UMA CHAVE POR TENTATIVA, trocada só depois do sucesso. É o padrão da Conferência de Peça
   // (`chave-operacao.js`): se a resposta se perder e o operador tocar de novo, chega a MESMA chave
@@ -112,8 +118,8 @@ export default function TotemClient({ codigo }) {
   if (!dados) return <Aguarde erro={erro} />;
 
   const linkDasBancadas = bancadasDoSetor(dados.recurso);
-  const emProducao = Boolean(operador && dados.sessao);
-  const escolhendo = Boolean(operador && !dados.sessao);
+  const { abertos, atual, emProducao, escolhendoMarca, escolhendoTrabalho } =
+    qualTela(dados, operador, selecionada);
 
   return (
     <div className="min-h-screen bg-torg-dark text-white p-5 md:p-8">
@@ -124,25 +130,53 @@ export default function TotemClient({ codigo }) {
 
       {!operador && <PedirCracha aoEnviar={entrar} ocupado={ocupado} voltarPara={linkDasBancadas} />}
 
-      {escolhendo && (
+      {escolhendoTrabalho && (
+        <Trabalhos trabalhos={abertos} ocupado={ocupado}
+                   aoEscolher={(id) => { setFeito(""); setSelecionada(id); }}
+                   aoEncerrarLote={async (lote) => {
+                     const r = await agir("encerrarLote", { loteId: lote });
+                     if (r?.success) setFeito(`Barra encerrada — ${r.encerradas} marca(s).`);
+                   }} />
+      )}
+
+      {escolhendoMarca && (
+        <>
+          <EscolherPlano planos={dados.planos || []} ocupado={ocupado}
+                         aoAbrir={async (u) => {
+                           setFeito("");
+                           const r = await agir("abrirNesting", { unidadeId: u.id, chaveOperacao: chaveDaAbertura(u) });
+                           if (r?.success) setFeito(`Barra ${u.indice} aberta — ${r.sessoes?.length} marcas.`);
+                         }} />
         <Escolher dados={dados} codigo={codigo} busca={busca} setBusca={setBusca}
                   ocupado={ocupado}
                   aoAbrir={(m) => { setFeito(""); return agir("abrir", { marca: m.marca, opId: m.opId, opNumero: m.opNumero, planejadoQtd: m.qte }); }} />
+        </>
       )}
 
       {emProducao && (
-        <Produzindo dados={dados} qtd={qtd} setQtd={setQtd} ocupado={ocupado}
-                    aoApontar={() => apontar(dados.sessao)}
-                    aoParar={() => setPedindoMotivo(true)}
-                    aoProduzir={() => agir("produzir", { sessaoId: dados.sessao.id })}
-                    aoEncerrar={() => agir("encerrar", { sessaoId: dados.sessao.id })} />
+        <>
+          {/* ⚠ Com várias marcas abertas, a volta para a lista precisa existir e ser óbvia: sem
+              ela, quem escolhe a marca errada fica preso nela. */}
+          {abertos.length > 1 ? (
+            <button onClick={() => setSelecionada(null)}
+                    className="max-w-4xl mx-auto mb-4 flex items-center gap-2 text-white/60 hover:text-white">
+              <ArrowLeft size={20} /> <span className="text-lg">as {abertos.length} marcas do posto</span>
+            </button>
+          ) : null}
+          <Produzindo dados={{ ...dados, sessao: atual.sessao, apontado: atual.apontado, saldo: atual.saldo }}
+                      qtd={qtd} setQtd={setQtd} ocupado={ocupado}
+                      aoApontar={() => apontar(atual.sessao)}
+                      aoParar={() => setPedindoMotivo(true)}
+                      aoProduzir={() => agir("produzir", { sessaoId: atual.sessao.id })}
+                      aoEncerrar={() => agir("encerrar", { sessaoId: atual.sessao.id })} />
+        </>
       )}
 
       {pedindoMotivo && (
         <EscolherMotivo motivos={dados.motivos || []} ocupado={ocupado}
                         aoFechar={() => setPedindoMotivo(false)}
                         aoEscolher={async (m) => {
-                          await agir("parar", { sessaoId: dados.sessao.id, motivoId: m.id });
+                          await agir("parar", { sessaoId: atual.sessao.id, motivoId: m.id });
                           setPedindoMotivo(false);
                         }} />
       )}
@@ -159,6 +193,31 @@ const bancadasDoSetor = (recurso) =>
 
 const avisoDeConclusao = (sessao, saldo) =>
   `${sessao.marca} concluída — ${saldo?.boas ?? "?"} de ${saldo?.planejado ?? "?"} peças.`;
+
+/**
+ * ⚠⚠ A CHAVE DE ABERTURA É DA BARRA, NÃO DO TOQUE. Se a resposta se perder e o operador tocar de
+ * novo, a MESMA chave chega e o servidor devolve o lote que já existe, em vez de abrir a barra duas
+ * vezes. Mesma ideia da chave por tentativa do lançamento, mas aqui a identidade é a barra.
+ */
+const chaveDaAbertura = (u) => `nest-${u.id}`;
+
+/**
+ * Qual das telas mostrar.
+ *
+ * ⚠⚠ COM UMA MARCA SÓ, NADA MUDA — o operador entra direto no lançamento, como sempre foi. A lista
+ * existe para o caso novo (a barra do nesting, com várias marcas); obrigar um toque a mais em quem
+ * tem uma só seria cobrar pelo que ele não pediu.
+ */
+function qualTela(dados, operador, selecionada) {
+  const abertos = dados.trabalhos || [];
+  const atual = abertos.length === 1 ? abertos[0] : abertos.find((t) => t.sessao.id === selecionada);
+  return {
+    abertos, atual,
+    emProducao: Boolean(operador && atual),
+    escolhendoMarca: Boolean(operador && !abertos.length),
+    escolhendoTrabalho: Boolean(operador && abertos.length > 1 && !atual),
+  };
+}
 
 const numeros = (q) => ({
   boas: Number(q.produzidas) || 0, rejeitadas: 0, retrabalho: Number(q.retrabalho) || 0,
@@ -214,133 +273,3 @@ function Cabecalho({ recurso, operador, estado, aoSair }) {
     </header>
   );
 }
-
-function Escolher({ dados, codigo, busca, setBusca, aoAbrir, ocupado }) {
-  const [termo, setTermo] = useState("");
-  async function procurar(e) {
-    e.preventDefault();
-    const r = await fetch(`/api/mes-lab/totem/${encodeURIComponent(codigo)}?buscar=${encodeURIComponent(termo)}`);
-    const j = await r.json();
-    setBusca(j.marcas || []);
-  }
-  const temProgramacao = dados.lotes?.length > 0;
-
-  return (
-    <div className="max-w-4xl mx-auto">
-      <form onSubmit={procurar} className="flex gap-2 mb-6">
-        <input value={termo} onChange={(e) => setTermo(e.target.value)} placeholder="Bipe ou digite a marca"
-               className="flex-1 bg-white/10 rounded-xl px-5 py-4 text-xl outline-none focus:ring-2 ring-torg-blue/60" autoComplete="off" />
-        <button className="bg-white/10 hover:bg-white/20 rounded-xl px-5"><Search size={22} /></button>
-      </form>
-
-      {busca.length > 0 && (
-        <Secao titulo="Encontradas">
-          {busca.map((m) => <Cartao key={m.id} m={m} onClick={() => aoAbrir(m)} ocupado={ocupado} />)}
-        </Secao>
-      )}
-
-      {/* ⚠ QUANDO A LISTA É DO SETOR, A TELA DIZ ISSO. No Acabamento e na Pintura o PCP planeja em
-          balde e o posto físico é mais fino que o planejamento: a lista é a do setor inteiro. Sem o
-          aviso, o operador acha que aquele trabalho todo é dele e dois postos pegam a mesma marca. */}
-      {temProgramacao && dados.doSetor && (
-        <p className="bg-white/8 border border-white/15 rounded-xl px-4 py-3 mb-4 text-white/70">
-          Esta é a programação de <b className="text-white">{dados.recurso.setor.nome}</b> — o PCP
-          programa o setor, não cada posto. Confira com o time quem pega o quê.
-        </p>
-      )}
-
-      {temProgramacao ? dados.lotes.map((lote) => (
-        <Secao key={lote.opNumero} titulo={`Obra ${lote.opNumero}`}
-               nota={`${lote.concluidas || 0} de ${lote.marcas.length} marca(s) prontas · ${lote.pecas} peça(s) · ${Math.round(lote.kg)} kg`}>
-          {lote.marcas.map((m) => <Cartao key={m.id} m={{ ...m, opNumero: lote.opNumero, opId: lote.opId }}
-                                          onClick={() => aoAbrir({ ...m, opNumero: lote.opNumero, opId: lote.opId })} ocupado={ocupado} />)}
-        </Secao>
-      )) : (
-        // ⚠ SEM PROGRAMAÇÃO É O CASO COMUM, e a tela diz isso sem parecer defeito. O Gantt programa
-        // o horizonte próximo; a maioria dos postos, na maioria dos dias, não está nele.
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
-          <p className="text-xl text-white/70 mb-1">Nada programado para este posto hoje.</p>
-          <p className="text-white/40">Bipe a marca que você vai produzir no campo acima.</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-const Secao = ({ titulo, nota, children }) => (
-  <section className="mb-6">
-    <h3 className="text-xs uppercase tracking-widest text-white/50 mb-2">
-      {titulo} {nota && <span className="normal-case tracking-normal text-white/35">— {nota}</span>}
-    </h3>
-    <div className="grid gap-2">{children}</div>
-  </section>
-);
-
-/**
- * ⚠⚠ A MARCA PRONTA CONTINUA NA LISTA, MARCADA — não some. Sumindo, o operador que terminou procura
- * o que fez e não acha; e quem precisa lançar RETRABALHO depois (que não consome o planejado) ficaria
- * sem caminho nenhum até a marca. Ela fica clicável, só deixa de parecer trabalho pendente.
- *
- * ⚠ O PARCIAL TAMBÉM APARECE ("3 de 7 feitas"). Marca começada por outro turno parecia intocada, e
- * o operador só descobria o que já existia depois de abrir a sessão.
- */
-const Cartao = ({ m, onClick, ocupado }) => (
-  <button onClick={onClick} disabled={ocupado}
-          className={`w-full text-left border rounded-xl px-5 py-4 flex items-center justify-between gap-4 disabled:opacity-50 ${
-            m.concluida
-              ? "bg-emerald-500/15 border-emerald-400/40 hover:bg-emerald-500/25"
-              : "bg-white/8 border-white/10 hover:bg-white/15"
-          }`}>
-    <span className="min-w-0">
-      <span className="flex items-center gap-2">
-        <span className="text-2xl font-bold leading-tight">{m.marca}</span>
-        {m.concluida && (
-          <span className="flex items-center gap-1 text-emerald-300 text-xs font-bold uppercase tracking-wide">
-            <CheckCircle2 size={16} /> produzida
-          </span>
-        )}
-      </span>
-      <span className="block text-white/50 text-sm truncate">{m.descricao || "—"}</span>
-    </span>
-    <span className="text-right shrink-0">
-      <span className="block text-xl font-semibold">{m.qte} pç</span>
-      {m.feitas > 0 && !m.concluida
-        ? <span className="block text-amber-300 text-sm">{m.feitas} de {m.qte} feitas</span>
-        : <span className="block text-white/40 text-sm">{Math.round(m.kg || 0)} kg</span>}
-    </span>
-  </button>
-);
-
-/**
- * ⚠⚠ PARADA SEM MOTIVO NÃO EXISTE, E O BOTÃO NÃO PODE FINGIR QUE SIM. A primeira versão desta tela
- * mandava `motivoId: null` — e `mudarEstado` recusa parada sem motivo, então o botão vermelho
- * falharia SEMPRE, com uma mensagem que o operador não teria como resolver. Perguntar é o que
- * transforma a barra vermelha do monitor em Pareto: sem o motivo, sabe-se que parou e nunca por quê.
- *
- * ⚠ Os planejados vêm marcados porque não são o mesmo tipo de parada: refeição e setup TIRAM do
- * tempo planejado, em vez de contar contra a Disponibilidade. Quem escolhe precisa ver a diferença.
- */
-function EscolherMotivo({ motivos, aoEscolher, aoFechar, ocupado }) {
-  return (
-    <div className="fixed inset-0 bg-black/70 grid place-items-center p-5 z-50" onClick={aoFechar}>
-      <div className="bg-torg-dark border border-white/15 rounded-2xl p-6 w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-2xl font-bold mb-1">Por que a máquina parou?</h3>
-        <p className="text-white/45 mb-5">A parada só é registrada com o motivo.</p>
-        <div className="grid md:grid-cols-2 gap-2 max-h-[55vh] overflow-y-auto">
-          {motivos.map((m) => (
-            <button key={m.id} disabled={ocupado} onClick={() => aoEscolher(m)}
-                    className="text-left bg-white/8 hover:bg-white/16 border border-white/10 rounded-xl px-4 py-4 text-lg disabled:opacity-50">
-              {m.descricao}
-              {m.planejada && <span className="block text-white/40 text-xs mt-0.5">parada planejada</span>}
-            </button>
-          ))}
-          {!motivos.length && <p className="text-white/50 col-span-full">Nenhum motivo cadastrado.</p>}
-        </div>
-        <button onClick={aoFechar} className="mt-5 w-full bg-white/10 hover:bg-white/20 rounded-xl py-4 text-lg">
-          Voltar
-        </button>
-      </div>
-    </div>
-  );
-}
-

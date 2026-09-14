@@ -1356,3 +1356,39 @@ chama precisa de pelo menos um teste, nem que seja para provar que ela existe.
 
 ⚠ E um segundo tropeço na mesma tarde: um `replace` de refatoração que **não casou virou no-op
 silencioso**, e eu segui adiante achando que tinha editado. Conferir o arquivo depois de mexer.
+
+
+## 17.7 A tela do totem, com a barra na mão do operador
+
+`/mes-lab/totem/<posto>` ganhou três telas novas, e a antiga não mudou para quem tem uma marca só.
+
+- **Planos de corte** (`EscolherPlano.jsx`) — só na Preparação, logo depois do crachá: plano, barra,
+  e as marcas de cada barra. Um toque abre **todas** elas. ⚠ A barra já aberta aparece marcada e não
+  abre de novo — duas barras iguais em dois turnos dividiriam o apontamento da mesma peça.
+  ⚠ As marcas aparecem no cartão porque é o que ele confere contra o papel **antes** de abrir;
+  depois de aberto, conferir já é tarde.
+- **Marcas abertas** (`Trabalhos.jsx`) — cartão grande por marca, com planejado/feitas/falta, e
+  "encerrar a barra inteira". ⚠ Esse botão só aparece quando **todas** as marcas vieram do mesmo
+  comando; com marca solta por cima, encerrar tudo fecharia o que ninguém mandou.
+- ⚠⚠ **COM UMA MARCA SÓ, NADA MUDA** — entra direto no lançamento, como sempre foi. Obrigar um
+  toque a mais em quem tem uma só seria cobrar pelo que ele não pediu.
+
+⚠ A chave de idempotência da abertura é **da barra** (`nest-<id>`), não do toque: resposta perdida +
+toque repetido devolve o lote que já existe, em vez de abrir a barra duas vezes.
+
+## 17.8 ⚠⚠ A LISTA DO POSTO DAVA 70.360 PIXELS
+
+Medido na captura de tela inteira do Laser Cantoneira (13/09/2026): **730 marcas** de backlog
+empilhadas num monitor de chão de fábrica. A fila é o backlog inteiro de propósito
+(`lib/mes/programado.js`: *"atrasado continua sendo trabalho"*), mas despejar tudo é o mesmo que não
+mostrar nada — ninguém rola 70 mil pixels de luva.
+
+`lista-marcas.js`, três regras: **concluída vai para o fim** (é histórico, não trabalho), **obra com
+pendência vem antes**, e **12 marcas por obra**, com o resto a um toque. ⚠ O corte é **por obra**:
+cortando a lista toda, a segunda obra sumiria inteira e o operador acharia que ela não está
+programada. A busca continua achando qualquer marca — o leitor de código não depende desta lista.
+
+**Medido depois: 8.258 px.** Oito vezes e meia menor.
+
+⚠ `TotemClient.jsx` passou de 350 linhas e foi dividido: `Escolher.jsx`, `EscolherMotivo.jsx`,
+`EscolherPlano.jsx`, `Trabalhos.jsx`, `lista-marcas.js`.
