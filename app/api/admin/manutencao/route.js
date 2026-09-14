@@ -91,46 +91,13 @@ const TAREFAS = [
       return `${r.casados} certificado(s) vinculado(s)`;
     },
   },
-  {
-    id: "baixa-preparacao-113",
-    titulo: "Baixa da preparação da OP-113",
-    porque:
-      "Vitor (04/09/2026): a preparação da 113 está concluída e a obra já está em acabamento e pintura. A fábrica não aponta Preparação no Syneco (115 ordens, zero produzido), então o portal nunca ficaria sabendo sozinho: as peças seguem na fila do corte e os lotes de corte seguem abertos.",
-    async checar() {
-      const op = await opDaObra("113");
-      if (!op) return { falta: false, detalhe: "OP-113 não encontrada" };
-      const [pecas, libs] = await Promise.all([
-        prisma.pecaConjunto.count({ where: alvoPreparacao(op.id) }),
-        prisma.liberacaoProducao.count({ where: alvoLotesCorte(op.id) }),
-      ]);
-      return {
-        falta: pecas > 0 || libs > 0,
-        detalhe: pecas || libs ? `${pecas} peça(s) sem baixa · ${libs} lote(s) de corte aberto(s)` : "já dada",
-      };
-    },
-    async aplicar() {
-      const op = await opDaObra("113");
-      if (!op) throw new Error("OP-113 não encontrada");
-      const agora = new Date();
-      // ⚠ SÓ A PREPARAÇÃO. Conjunto (montagem), solda, acabamento e pintura NÃO são tocados aqui:
-      // dizer que a preparação acabou é o que ele afirmou; declarar os outros setores concluídos
-      // seria inventar produção que ninguém apontou.
-      const r = await prisma.pecaConjunto.updateMany({
-        where: alvoPreparacao(op.id),
-        data: { corteConcluidoEm: agora, status: "CORTE", ultimoSetor: "Corte" },
-      });
-      // quem nunca teve início ganha início = conclusão (mesma regra da fila de corte)
-      await prisma.pecaConjunto.updateMany({
-        where: { opId: op.id, corteConcluidoEm: { not: null }, corteIniciadoEm: null },
-        data: { corteIniciadoEm: agora },
-      });
-      const l = await prisma.liberacaoProducao.updateMany({
-        where: alvoLotesCorte(op.id),
-        data: { status: "CONCLUIDA", concluidaEm: agora },
-      });
-      return `${r.count} peça(s) com baixa e ${l.count} lote(s) de corte fechado(s)`;
-    },
-  },
+  // ⚠⚠ A "BAIXA DA PREPARAÇÃO DA OP-113" (04/09/2026) FOI APOSENTADA EM 14/09/2026 — e não volta.
+  // Ela declarou cortado TUDO que não era conjunto, de uma vez. Em 14/09 a produção mostrou que os
+  // 16 croquis de perfil U (U75X40 e UE200) NUNCA foram cortados ("falta perfil U para preparar"),
+  // e os conjuntos T113A38–A45 desceram para a bancada com metade das peças. Baixa em massa sem
+  // apontamento é declaração, não fato — a partir daqui a baixa de corte é por peça, pela TV de
+  // prioridades (baixa portal, com qtd/quem/quando) ou pela fila de corte. Ver
+  // docs/memoria-claude/torg_baixa_em_massa_113.md.
   {
     // ⚠⚠ ISTO GRAVA UMA DECLARAÇÃO DE RASTREABILIDADE, e por isso o botão está aqui e não num
     // script meu: quem clica assina. O registro guarda quem declarou e quando, e o motivo diz em
@@ -177,22 +144,6 @@ const TAREFAS = [
     },
   },
 ];
-
-const opDaObra = (numero) => prisma.oP.findFirst({ where: { numero }, select: { id: true } });
-
-/** Croqui e avulsa da obra que ainda não têm o corte concluído — conjunto entra pela montagem. */
-const alvoPreparacao = (opId) => ({
-  opId,
-  NOT: { tipoPeca: "CONJUNTO" },
-  corteConcluidoEm: null,
-});
-
-/** Lotes de corte ainda abertos da obra. */
-const alvoLotesCorte = (opId) => ({
-  opId,
-  status: { in: ["LIBERADA", "EM_PRODUCAO"] },
-  setores: { array_contains: ["CORTE"] },
-});
 
 // ── ESCOLHA DO FARDO ─────────────────────────────────────────────────────────────────────────
 //

@@ -1,7 +1,12 @@
 {
-  "build": 3141,
-  "gerado": "2026-09-14T11:55:27.092Z",
+  "build": 3142,
+  "gerado": "2026-09-14T12:24:37.851Z",
   "commits": [
+    {
+      "hash": "000cc110",
+      "data": "14/09/2026",
+      "titulo": "Melhora visão dos encarregados na produção por bancada e prioridade"
+    },
     {
       "hash": "a4ad3065",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "dc1b5577",
       "data": "12/09/2026",
       "titulo": "fix(producao): corrigir recuo e controles do modelo 3D no celular"
-    },
-    {
-      "hash": "ad9e8d78",
-      "data": "12/09/2026",
-      "titulo": "feat: navegação móvel compartilhada com menu sobreposto"
     }
   ]
 }

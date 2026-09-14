@@ -212,10 +212,12 @@ export default function FilaCorteClient({ pecasIniciais }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro");
-      const set = new Set(ids);
-      setPecas((prev) => prev.filter((p) => !set.has(p.id))); // saem da fila (status MONTAGEM)
+      const recusadas = new Set((data.ignoradas || []).map((p) => p.id));
+      const set = new Set(ids.filter((id) => !recusadas.has(id)));
+      setPecas((prev) => prev.filter((p) => !set.has(p.id))); // saem da fila (status MONTAGEM); posição de conjunto fica
       setSel(new Set());
       if (data.atualizados > 0) setOkMsg(`${data.atualizados} peça(s) viraram conjunto → Montagem.`);
+      if (data.aviso) setAvisos([data.aviso]);
     } catch (e) {
       setErro(e.message);
     } finally {
