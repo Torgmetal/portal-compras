@@ -14,7 +14,17 @@ import { log } from "@/lib/log";
 const registro = log("api/cron/financeiro");
 
 export const runtime = "nodejs";
-export const maxDuration = 120; // pagar+receber juntos chegam a ~60s; folga p/ não cortar
+// ⚠⚠ 300s, E O ORÇAMENTO SAI DE UM PRAZO ÚNICO. Com teto de 120s e dois orçamentos fixos somando
+// 52s, medido em 13/09/2026: a passada boa levava 87s e uma em cada duas dava 504. A conta não
+// fechava porque `getMapas()` — que lista TODOS os clientes e categorias do Omie — roda dentro de
+// cada sync ANTES de qualquer checagem de orçamento, e não é contada por nenhum dos dois.
+//
+// ⚠ A RESERVA NÃO É ENFEITE: é o que sobra para gravar o heartbeat e responder. Sem ela, a função
+// morre no 504 e o monitor volta a dizer "sem sucesso há N horas" em vez de "falhou" — que foi
+// exatamente o que escondeu esta pane por duas semanas.
+export const maxDuration = 300;
+const TETO_MS = 300_000;
+const RESERVA_MS = 25_000;
 
 function autorizado(req) {
   // Só Bearer CRON_SECRET (User-Agent é spoofável — SEC-01).
@@ -24,15 +34,19 @@ function autorizado(req) {
 export async function GET(req) {
   if (!autorizado(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await aquecerBanco(prisma).catch(() => {}); // acorda o Neon (scale-to-zero) antes do 1º query
+  const t0 = Date.now();
+  const restanteMs = () => Math.max(5_000, TETO_MS - RESERVA_MS - (Date.now() - t0));
   const out = { ok: true };
   try {
-    out.pagar = await sincronizarContasPagar({ incremental: true, maxDetalhe: 60, orcamentoMs: 28000 });
+    // ⚠ 60% do que sobra para o a pagar, o resto para o a receber — o a pagar é o caro (15.549
+    // títulos contra 597 movimentos) e é ele que tem janela para recuperar quando fica atrasado.
+    out.pagar = await sincronizarContasPagar({ incremental: true, maxDetalhe: 60, orcamentoMs: Math.floor(restanteMs() * 0.6) });
   } catch (e) {
     out.pagarErro = e?.message;
     registro.erro("[cron financeiro] pagar:", e?.message);
   }
   try {
-    out.receber = await sincronizarContasReceber({ orcamentoMs: 24000 });
+    out.receber = await sincronizarContasReceber({ orcamentoMs: restanteMs() });
   } catch (e) {
     out.receberErro = e?.message;
     registro.erro("[cron financeiro] receber:", e?.message);

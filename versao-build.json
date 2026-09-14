@@ -1,7 +1,12 @@
 {
-  "build": 3134,
-  "gerado": "2026-09-14T00:49:32.253Z",
+  "build": 3135,
+  "gerado": "2026-09-14T01:07:24.580Z",
   "commits": [
+    {
+      "hash": "38b849a545",
+      "data": "13/09/2026",
+      "titulo": "Crons: quatro nunca rodaram, o financeiro se estrangulava e dois alarmes eram falsos"
+    },
     {
       "hash": "04e24ff808",
       "data": "13/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5b25158b6d",
       "data": "12/09/2026",
       "titulo": "fix: separar referência FORM 20 da faixa no PDF de RNC"
-    },
-    {
-      "hash": "e3ceba47a0",
-      "data": "11/09/2026",
-      "titulo": "Inspeções: lembrar escolhas por OP com padrões editáveis"
     }
   ]
 }
