@@ -21,6 +21,11 @@ acusava: a importação "deu certo" duas vezes.
 - Toda tela que importa LPC manda `arquivoNome` no body (Listas da Engenharia passou a mandar).
 - Limpeza da 094: apagadas as 591 peças sob "094" (sem programação, sem vínculo de romaneio/carga);
   ficou a T94A, que tem as 98 programadas do PCP. AuditLog `LIMPAR_LPC_DUPLICADA`.
-- Resíduo do mesmo padrão em outras obras (marcas repetidas entre chaves): OP-089 (22, entre T89C/T89A/089),
-  OP-113 (6, T113A × 113), OP-067 (3). Ainda não limpas.
+- Limpeza do resíduo em 14/09 (AuditLog `LIMPAR_LPC_DUPLICADA` "089,113"): OP-113 (5 croquis "113" sem
+  vínculo + T113A104, que virou avulsa sob T113A) e OP-089 (22 marcas "089" que também existiam em T89C).
+  OP-067 ficou: T67CT-P42/P43/P46 existem em "T67" (chapa) e "T67CT" (U200) com PERFIL diferente — são
+  peças diferentes, marca repetida entre sub-obras [[torg_marca_nao_unica]], não duplicata.
+- ⚠ Sobrou na OP-089 um conjunto de 104 croquis T89C só sob a chave "089" (import de 05/08), cujos
+  vínculos apontam para linhas da LE, não da LPC — é a "contaminação croqui↔LE" já conhecida, não é
+  duplicata; ficou como está.
 - Relacionado: [[torg_pecaconjunto_opnumero]], [[torg_listas_le_lpc]], [[torg_producao_e_lpc]].

@@ -1,7 +1,12 @@
 {
-  "build": 3158,
-  "gerado": "2026-09-14T19:46:57.612Z",
+  "build": 3159,
+  "gerado": "2026-09-14T20:00:33.798Z",
   "commits": [
+    {
+      "hash": "a0f140b3",
+      "data": "14/09/2026",
+      "titulo": "Melhora navegação do simulador e referências de embalagem no PDF"
+    },
     {
       "hash": "c564f949",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7c3fabd1",
       "data": "13/09/2026",
       "titulo": "Simular carga: percorre todos os IFCs da obra e deixa os AC fora"
-    },
-    {
-      "hash": "c52fb7bf",
-      "data": "13/09/2026",
-      "titulo": "Expedição: PDF do modelo de carga e veículos configuráveis do simulador"
     }
   ]
 }
