@@ -1,7 +1,12 @@
 {
-  "build": 3159,
-  "gerado": "2026-09-14T20:00:33.798Z",
+  "build": 3160,
+  "gerado": "2026-09-14T20:04:24.951Z",
   "commits": [
+    {
+      "hash": "0afc90d7",
+      "data": "14/09/2026",
+      "titulo": "Memória: limpeza da LPC duplicada nas OPs 089 e 113; 067 é marca repetida entre sub-obras"
+    },
     {
       "hash": "a0f140b3",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5911aa96",
       "data": "13/09/2026",
       "titulo": "Simulador: nada em cima de quadro vazado, caibros só sobre apoio, rótulos discretos"
-    },
-    {
-      "hash": "7c3fabd1",
-      "data": "13/09/2026",
-      "titulo": "Simular carga: percorre todos os IFCs da obra e deixa os AC fora"
     }
   ]
 }

@@ -25,7 +25,8 @@ acusava: a importação "deu certo" duas vezes.
   vínculo + T113A104, que virou avulsa sob T113A) e OP-089 (22 marcas "089" que também existiam em T89C).
   OP-067 ficou: T67CT-P42/P43/P46 existem em "T67" (chapa) e "T67CT" (U200) com PERFIL diferente — são
   peças diferentes, marca repetida entre sub-obras [[torg_marca_nao_unica]], não duplicata.
-- ⚠ Sobrou na OP-089 um conjunto de 104 croquis T89C só sob a chave "089" (import de 05/08), cujos
-  vínculos apontam para linhas da LE, não da LPC — é a "contaminação croqui↔LE" já conhecida, não é
-  duplicata; ficou como está.
+- Os 104 croquis T89C que só existiam sob "089" (import de 05/08, 103 já cortados) foram rechaveados
+  para T89C e os 175 vínculos que apontavam para linhas da LE passaram para os conjuntos da LPC
+  (AuditLog `REGULARIZAR_LPC_CHAVE`). 14 conjuntos T89C que estavam sem croqui na LPC ganharam os seus.
+  Só T89C100 não tem linha na LPC; o vínculo dele ficou na LE.
 - Relacionado: [[torg_pecaconjunto_opnumero]], [[torg_listas_le_lpc]], [[torg_producao_e_lpc]].
