@@ -91,20 +91,29 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
     w.postMessage({ lista: dados.lista.filter((i) => !marcaEhAC(i.marca)), geometria: geo.geometria, perfil, prefixo: prefixoDaOp(opNumero), opcoes: dados.opcoes || {}, ajustes });
   };
 
-  // PDF do modelo: fotografa o 3D (carga pronta + cada camada) e manda para a rota montar o A4
+  // PDF do modelo: fotografa o 3D (carga pronta + cada camada) e monta o A4 AQUI, no navegador.
+  // ⚠ Vitor (14/09/2026): "não estou conseguindo exportar o pdf". Mandar as fotos para a rota estourava
+  // os 4,5 MB de corpo da Vercel numa carga com várias camadas (3 + 2×camadas JPEGs) — e o
+  // `window.open` depois do `await` caía no bloqueador de pop-up. Agora nada sobe: o pdf-lib roda
+  // aqui (import dinâmico, fora do bundle da tela) e o arquivo desce por um <a download>.
   const gerarPdf = async () => {
-    const v = viz.current, c = resultado?.cargas?.[cargaSel]; if (!v || !c || !gravada) return;
-    setPdf({ gerando: true });
+    const v = viz.current, c = resultado?.cargas?.[cargaSel]; if (!v || !c || !dados?.op) return;
+    setPdf({ gerando: true }); setErro(null);
     try {
       await new Promise((r) => setTimeout(r, 50));
       const camadas = [...new Set(c.itens.map((u) => u.camada || 0))].sort((a, b) => a - b);
       const imagens = { full: { iso: v.capturar("iso"), lado: v.capturar("lado"), topo: v.capturar("topo") }, camadas: camadas.map((ci) => ({ ci, iso: v.capturar("iso", ci), topo: v.capturar("topo", ci) })) };
-      const res = await fetch(`/api/comercial/op/${opId}/romaneios-previos/${previo.id}/simulacao/modelo-pdf`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ simulacaoId: gravada.id, indice: cargaSel, imagens }) });
-      if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || "Não consegui gerar o PDF."); }
-      const blob = await res.blob(), url = URL.createObjectURL(blob);
-      const nome = (res.headers.get("Content-Disposition") || "").match(/filename\*?=(?:UTF-8'')?"?([^";]+)/)?.[1];
-      setPdf({ url, nome: nome ? decodeURIComponent(nome) : `modelo-carga-OP-${opNumero}.pdf` }); window.open(url, "_blank");
-    } catch (e) { setPdf(null); setErro(e.message); }
+      const [{ gerarModeloCargaPDF }, logo] = await Promise.all([
+        import("@/lib/carga/modelo-carga-pdf"),
+        fetch("/torg-logo-white.png").then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null),
+      ]);
+      const estimadas = (resultado.estimadas || []).filter((e) => c.itens?.some((u) => (u.membros || []).some((m) => m.marca === e.marca)));
+      const perfilNome = gravada?.perfilNome || resultado.perfil?.nome || dados.perfis?.find((p) => p.chave === perfil)?.nome || perfil;
+      const { bytes, filename } = await gerarModeloCargaPDF({ op: dados.op, previo: dados.previo || previo, carga: c, indice: cargaSel, total: resultado.cargas.length, perfilNome, prefixo: prefixoDaOp(dados.op.numero || opNumero), imagens, estimadas, ajustes, logo });
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      setPdf({ url, nome: filename });
+      const a = document.createElement("a"); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    } catch (e) { setPdf(null); setErro(e.message || "Não consegui gerar o PDF."); }
   };
   useEffect(() => () => { if (pdf?.url) URL.revokeObjectURL(pdf.url); }, [pdf]);
 
@@ -125,7 +134,7 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
             <button onClick={simular} disabled={ocupado || !geo} className="text-[12px] font-semibold bg-torg-orange text-white rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-50 hover:bg-orange-600">
               {fase === "simulando" ? <Loader2 size={14} className="animate-spin" /> : resultado ? <RefreshCw size={14} /> : <Play size={14} />} {resultado ? "Simular de novo" : "Simular"}
             </button>
-            <button onClick={gerarPdf} disabled={ocupado || !gravada || !geo || pdf?.gerando} className="text-[12px] font-semibold bg-white/15 text-white rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-40 hover:bg-white/25" title="PDF do modelo de carga para a Expedição (separar, formar volumes, montar por camada)">
+            <button onClick={gerarPdf} disabled={ocupado || !resultado || !geo || pdf?.gerando} className="text-[12px] font-semibold bg-white/15 text-white rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-40 hover:bg-white/25" title="PDF do modelo de carga para a Expedição (separar, formar volumes, montar por camada)">
               {pdf?.gerando ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} PDF do modelo
             </button>
             <button onClick={onClose} className="text-white/70 hover:text-white"><X size={20} /></button>

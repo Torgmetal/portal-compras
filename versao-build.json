@@ -1,7 +1,12 @@
 {
-  "build": 3142,
-  "gerado": "2026-09-14T12:24:37.851Z",
+  "build": 3143,
+  "gerado": "2026-09-14T12:50:46.037Z",
   "commits": [
+    {
+      "hash": "11e46f38",
+      "data": "14/09/2026",
+      "titulo": "PCP: posição de conjunto nunca vira conjunto; aposenta a baixa em massa da OP-113"
+    },
     {
       "hash": "000cc110",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b78b2865",
       "data": "12/09/2026",
       "titulo": "fix(3d): aplicar filtro de etapa e conferir status por item do modelo"
-    },
-    {
-      "hash": "dc1b5577",
-      "data": "12/09/2026",
-      "titulo": "fix(producao): corrigir recuo e controles do modelo 3D no celular"
     }
   ]
 }

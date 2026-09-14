@@ -1,6 +1,10 @@
 // POST → PDF do modelo de carga (separar por fase, formar volumes, montar por camada) de uma carga da
 // simulação gravada. As fotos do 3D vêm no corpo (o 3D é desenhado no navegador); o resto sai do banco.
-// ⚠ corpo até ~3 MB: o navegador captura em 1200×560 JPEG por isso.
+// ⚠ A TELA NÃO USA MAIS ESTA ROTA: o modal monta o PDF no navegador (lib/carga/modelo-carga-pdf roda lá),
+// porque uma carga com várias camadas estoura os 4,5 MB de corpo da função na Vercel (14/09/2026).
+// Fica como caminho de servidor para quem já tem as fotos e quer o PDF por API (limite de ~3 MB).
+import fs from "fs";
+import path from "path";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -34,6 +38,7 @@ export async function POST(req, { params }) {
   const cargas = Array.isArray(sim.cargas) ? sim.cargas : [], carga = cargas[body.indice];
   if (!carga) return NextResponse.json({ error: "Carga não encontrada na simulação." }, { status: 404 });
   const estimadas = Array.isArray(sim.avisos?.estimadas) ? sim.avisos.estimadas.filter((e) => carga.itens?.some((u) => (u.membros || []).some((m) => m.marca === e.marca))) : [];
-  const { bytes, filename } = await gerarModeloCargaPDF({ op, previo, carga, indice: body.indice, total: cargas.length, perfilNome: sim.perfilNome || sim.perfil, prefixo: prefixoDaOp(op.numero), imagens: body.imagens, estimadas, ajustes: sim.avisos?.ajustes || {} });
+  let logo = null; try { logo = fs.readFileSync(path.join(process.cwd(), "public", "torg-logo-white.png")); } catch { logo = null; }
+  const { bytes, filename } = await gerarModeloCargaPDF({ op, previo, carga, indice: body.indice, total: cargas.length, perfilNome: sim.perfilNome || sim.perfil, prefixo: prefixoDaOp(op.numero), imagens: body.imagens, estimadas, ajustes: sim.avisos?.ajustes || {}, logo });
   return new NextResponse(Buffer.from(bytes), { headers: { "Content-Type": "application/pdf", "Content-Disposition": dispArquivo(filename, "inline") } });
 }

@@ -124,6 +124,26 @@ describe("modelo de carga em PDF", () => {
     const { PDFDocument } = await import("pdf-lib");
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(3 + camadas);
   });
+
+  // ⚠ o PDF é montado NO NAVEGADOR (14/09/2026): a lib não pode depender de fs/Buffer, o logo entra por
+  // parâmetro e a foto entra como data URL (o pdf-lib decodifica o base64 sozinho).
+  it("roda sem Node: sem fs, sem Buffer, logo por parâmetro e foto em data URL", async () => {
+    const fonte = (await import("fs")).readFileSync(new URL("../../lib/carga/modelo-carga-pdf.js", import.meta.url), "utf8");
+    expect(fonte).not.toMatch(/^import .*from "(fs|path|server-only)"|^import "server-only"|Buffer\./m);
+    const { gerarModeloCargaPDF } = await import("@/lib/carga/modelo-carga-pdf");
+    const lista = [{ marca: "T118A1", desc: "VIGA", qtd: 2, kgUn: 700 }];
+    const r = simularCarga({ lista, geometria: { T118A1: geo([12000, 550, 300]) }, perfil: "recomendado", prefixo: "T118" });
+    // JPEG mínimo válido (1×1) em data URL, como o canvas do 3D devolve
+    const jpeg = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=";
+    const logo = (await import("fs")).readFileSync(new URL("../../public/torg-logo-white.png", import.meta.url));
+    const { bytes } = await gerarModeloCargaPDF({ op: { numero: "118" }, previo: { numero: 1 }, carga: r.cargas[0], perfilNome: "Padrão", prefixo: "T118", imagens: { full: { iso: jpeg }, camadas: [] }, logo: new Uint8Array(logo) });
+    const { PDFDocument, PDFName, PDFRawStream } = await import("pdf-lib");
+    const doc = await PDFDocument.load(bytes);
+    expect(doc.getPageCount()).toBeGreaterThanOrEqual(3);
+    // o logo (PNG) e a foto (JPEG) entraram como imagens do documento
+    const imagens = doc.context.enumerateIndirectObjects().filter(([, o]) => o instanceof PDFRawStream && o.dict.get(PDFName.of("Subtype")) === PDFName.of("Image"));
+    expect(imagens.length).toBeGreaterThanOrEqual(2);
+  });
 });
 
 describe("catálogo de veículos configurado", () => {

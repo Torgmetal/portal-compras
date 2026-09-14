@@ -53,3 +53,18 @@ monta a carga daquela lista.
   Vitor (13/09): "só deve fazer pacote para esses itens, exemplo de caixas" → peça estimada viaja SEMPRE em caixa de
   madeira (nunca solta nem em feixe); e "essas peças que têm peso mas não têm IFC aí sim é importante avisar" → aviso
   destacado no modal, no card do romaneio ("N fora do IFC (conferir)") e na página 1 do PDF.
+
+## PDF do modelo é montado no navegador (14/09/2026)
+
+Vitor: "não estou conseguindo exportar o pdf". A rota `…/simulacao/modelo-pdf` recebia as fotos do 3D
+no corpo — e uma carga tem 3 + 2×camadas JPEGs de 1200×560 (a da OP-107 tem 17 camadas → 37 fotos),
+muito acima dos **4,5 MB** que a função da Vercel aceita (mesmo teto do upload, [[torg_upload_4mb]]).
+Além disso o `window.open` depois do `await` caía no bloqueador de pop-up.
+
+- `lib/carga/modelo-carga-pdf.js` roda **no navegador e no servidor**: sem `fs`/`path`/`server-only`/`Buffer`;
+  o logo entra por parâmetro (`logo`: bytes do PNG) e a foto entra como data URL (o pdf-lib decodifica).
+- O modal importa a lib dinamicamente (pdf-lib fica num chunk à parte, ~425 KB), monta o PDF com o que
+  já tem em memória (`dados.op`, `dados.previo`, a carga do resultado, estimadas, ajustes) e baixa por
+  `<a download>` — nada sobe para o servidor.
+- A rota continua existindo para quem quiser o PDF por API (limite de ~3 MB de fotos), mas a tela não a usa.
+- Teste: `carga-simular.teste.js › roda sem Node` confere que a lib não importa fs/path e que logo e foto entram no PDF.
