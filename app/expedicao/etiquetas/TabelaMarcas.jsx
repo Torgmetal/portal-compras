@@ -74,7 +74,55 @@ function QuantasEtiquetas({ peca, emCaixa, alternarCaixa }) {
   );
 }
 
-export default function TabelaMarcas({ visiveis, sel, alterna, busca, fp, emCaixa, alternarCaixa }) {
+/**
+ * O FECHAMENTO DA LISTA — quantas marcas, quantas peças, quantas etiquetas e quantos quilos.
+ *
+ * Matheus (14/09/2026): *"preciso arrumar a tela de etiquetas para ter um total no fim da lista
+ * calculando o total de itens e total de marcas"*.
+ *
+ * ⚠⚠ O TOTAL É DO QUE ESTÁ NA TELA, não da obra inteira — e quando o filtro esconde alguma coisa a
+ * linha DIZ isso ("de 103"). Um rodapé que soma a obra toda enquanto a tela mostra 12 marcas
+ * filtradas é pior que rodapé nenhum: quem confere o carregamento leria um número que não
+ * corresponde a nada visível.
+ *
+ * ⚠ ETIQUETAS ≠ PEÇAS, e por isso são duas colunas. A marca em caixa rende UMA etiqueta para as 50
+ * peças (`emCaixa`); somar peças no lugar de etiquetas diria que o rolo precisa de 50 adesivos que
+ * ninguém vai colar.
+ *
+ * ⚠ O total de PESO fica na coluna do peso UNITÁRIO, e o rótulo desfaz a ambiguidade: é
+ * `peças × unitário`, não a soma dos unitários — que não significaria nada.
+ */
+function Totais({ visiveis, emCaixa, totalDaObra }) {
+  if (!visiveis.length) return null;
+  const pecas = visiveis.reduce((s, p) => s + Math.max(1, p.qte || 1), 0);
+  const etiquetas = visiveis.reduce((s, p) => s + (emCaixa.has(p.marca) ? 1 : Math.max(1, p.qte || 1)), 0);
+  const kg = visiveis.reduce((s, p) => s + Math.max(1, p.qte || 1) * (Number(p.pesoUnitKg) || 0), 0);
+  const filtrando = totalDaObra > visiveis.length;
+
+  return (
+    <tfoot className="border-t-2 border-gray-200 bg-gray-50/80 font-semibold text-torg-dark">
+      <tr>
+        <td className="px-3 py-3"></td>
+        <td className="px-2 py-3">
+          Total
+          {filtrando && <span className="ml-2 font-normal text-[12px] text-torg-gray">filtrado</span>}
+        </td>
+        <td className="px-2 py-3 font-normal text-torg-gray">
+          <b className="text-torg-dark tabular-nums">{visiveis.length}</b> marca(s)
+          {filtrando && <span className="text-[12px]"> de {totalDaObra}</span>}
+        </td>
+        <td className="px-2 py-3 text-right tabular-nums">{pecas.toLocaleString("pt-BR")}</td>
+        <td className="px-2 py-3 text-center tabular-nums">{etiquetas.toLocaleString("pt-BR")}</td>
+        <td className="px-2 py-3 text-right tabular-nums">
+          {nkg(kg)} <span className="font-normal text-[11px] text-torg-gray">no total</span>
+        </td>
+        <td className="px-4 py-3"></td>
+      </tr>
+    </tfoot>
+  );
+}
+
+export default function TabelaMarcas({ visiveis, sel, alterna, busca, fp, emCaixa, alternarCaixa, totalDaObra }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-[13px]" style={{ minWidth: 640 }}>
@@ -117,6 +165,7 @@ export default function TabelaMarcas({ visiveis, sel, alterna, busca, fp, emCaix
             </td></tr>
           )}
         </tbody>
+        <Totais visiveis={visiveis} emCaixa={emCaixa} totalDaObra={totalDaObra} />
       </table>
     </div>
   );

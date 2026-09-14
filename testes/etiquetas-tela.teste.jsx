@@ -72,8 +72,11 @@ describe("filtros de coluna na lista de marcas", () => {
     fireEvent.click(await screen.findByText(/Não impressa/));
     await waitFor(() => expect(linhas()).toHaveLength(2));
     fireEvent.click(screen.getByText(/Marcar todas/));
-    // 2 marcas = 2 + 40 peças; a já impressa (1 peça) fica de fora
-    await waitFor(() => expect(screen.getByText("42")).toBeTruthy());
+    // 2 marcas = 2 + 40 peças; a já impressa (1 peça) fica de fora.
+    // ⚠ ESCOPADO AO CONTADOR DA BARRA desde que a lista ganhou rodapé de totais (14/09/2026): o
+    // mesmo 42 passou a aparecer também no fim da tabela, e `getByText("42")` solto casaria com os
+    // dois. O que este teste prova é a SELEÇÃO, não a soma da lista.
+    await waitFor(() => expect(screen.getByText(/etiqueta\(s\)/).textContent).toContain("42"));
   });
 
   // ⚠ ESTE TESTE ACHOU UM BUG DE VERDADE: "Limpar" era `disabled={!sel.size}`, então com um funil
@@ -104,5 +107,54 @@ describe("filtros de coluna na lista de marcas", () => {
     expect(celulaDa("T97A140", "Etiqueta").textContent).toMatch(/08\/09/);
     expect(celulaDa("T97A140", "Etiqueta").textContent).toContain("×2");
     expect(celulaDa("T97A180", "Etiqueta").textContent.trim()).toBe("—");
+  });
+});
+
+// ─── O FECHAMENTO DA LISTA (Matheus, 14/09/2026) ─────────────────────────────
+//
+// "preciso arrumar a tela de etiquetas para ter um total no fim da lista calculando o total de
+// itens e total de marcas".
+
+const rodape = () => within(document.querySelector("table tfoot"));
+
+describe("o total no fim da lista", () => {
+  it("soma marcas, peças, etiquetas e quilos do que está na tela", async () => {
+    await abrirOP();
+    const celulas = [...document.querySelector("table tfoot tr").cells].map((c) => c.textContent);
+    expect(celulas[2]).toContain("3");            // 3 marcas
+    expect(celulas[3]).toBe("43");                // 1 + 2 + 40 peças
+    expect(celulas[4]).toBe("43");                // uma etiqueta por peça
+    // 1×4,46 + 2×88 + 40×0,10 = 184,46
+    expect(celulas[5]).toContain("184,46");
+  });
+
+  // ⚠⚠ ETIQUETAS ≠ PEÇAS. A marca em caixa rende UMA etiqueta para as 40 peças; somar peças no
+  // lugar de etiquetas diria que o rolo precisa de 39 adesivos que ninguém vai colar.
+  it("a marca em caixa conta 1 etiqueta, mas continua contando as 40 peças", async () => {
+    await abrirOP();
+    fireEvent.click(screen.getByTitle(/Uma etiqueta por peça \(40 no total\)/));
+    const celulas = [...document.querySelector("table tfoot tr").cells].map((c) => c.textContent);
+    expect(celulas[3]).toBe("43");                // peças não mudam
+    expect(celulas[4]).toBe("4");                 // 1 + 2 + 1 etiqueta
+  });
+
+  // ⚠⚠ O TOTAL É DO QUE ESTÁ NA TELA, e quando o filtro esconde algo a linha DIZ isso. Um rodapé
+  // que soma a obra inteira enquanto a tela mostra 1 marca filtrada é pior que rodapé nenhum.
+  it("com filtro ativo, o total é do filtrado e avisa de quantas", async () => {
+    await abrirOP();
+    fireEvent.change(screen.getByPlaceholderText(/Filtrar por marca/), { target: { value: "T97-AC8" } });
+    await waitFor(() => expect(linhas()).toEqual(["T97-AC8"]));
+    expect(rodape().getByText(/filtrado/i)).toBeTruthy();
+    const celulas = [...document.querySelector("table tfoot tr").cells].map((c) => c.textContent);
+    expect(celulas[2]).toContain("de 3");
+    expect(celulas[3]).toBe("40");
+  });
+
+  // ⚠ Lista vazia não tem o que somar: um rodapé de zeros embaixo de "nenhuma marca" só confunde.
+  it("sem nenhuma marca visível, não há rodapé", async () => {
+    await abrirOP();
+    fireEvent.change(screen.getByPlaceholderText(/Filtrar por marca/), { target: { value: "zzzz" } });
+    await waitFor(() => expect(linhas()).toEqual([]));
+    expect(document.querySelector("table tfoot")).toBeNull();
   });
 });

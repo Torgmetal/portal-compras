@@ -278,7 +278,7 @@ export default function EtiquetasClient() {
               imprimir={imprimir} gerando={gerando}
             />
             <TabelaMarcas visiveis={visiveis} sel={sel} alterna={alterna} busca={busca} fp={fp}
-              emCaixa={emCaixa} alternarCaixa={alternarCaixa} />
+              emCaixa={emCaixa} alternarCaixa={alternarCaixa} totalDaObra={pecas.length} />
           </div>
         )
       )}

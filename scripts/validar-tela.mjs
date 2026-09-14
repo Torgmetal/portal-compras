@@ -34,11 +34,15 @@ if (fs.existsSync(LIBS)) {
 
 const [, , credenciais, caminho, saida = "tela.png", ...resto] = process.argv;
 if (!credenciais || !caminho) {
-  console.error("uso: node scripts/validar-tela.mjs <credenciais> <caminho> [saida.png] [--mobile] [--esperar=sel]");
+  console.error("uso: node scripts/validar-tela.mjs <credenciais> <caminho> [saida.png] [--mobile] [--esperar=sel] [--selecionar=texto]");
   process.exit(2);
 }
 const mobile = resto.includes("--mobile");
 const esperar = resto.find((a) => a.startsWith("--esperar="))?.slice(10);
+// ⚠ Muita tela do portal só tem o que conferir DEPOIS de escolher a obra (etiquetas, conferência,
+// listas). Sem isto, o screenshot é sempre o estado vazio — e o estado vazio nunca é o que se
+// pediu para validar.
+const selecionar = resto.find((a) => a.startsWith("--selecionar="))?.slice(13);
 const BASE = process.env.PORTAL_BASE || "http://localhost:3000";
 
 if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(BASE)) {
@@ -72,6 +76,13 @@ await pg.press('input[type="password"]', "Enter");
 await pg.waitForURL((u) => !u.pathname.includes("/entrar"), { timeout: 60000 });
 
 await pg.goto(`${BASE}${caminho}`, { waitUntil: "networkidle", timeout: 120000 });
+if (selecionar) {
+  const combo = pg.locator("select").first();
+  const opcao = (await combo.locator("option").allTextContents()).find((t) => t.includes(selecionar));
+  if (!opcao) problemas.push(`nenhuma opção contém "${selecionar}"`);
+  else { await combo.selectOption({ label: opcao }); console.log(`  escolhido: ${opcao.trim()}`); }
+  await pg.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
+}
 if (esperar) await pg.waitForSelector(esperar, { timeout: 60000 }).catch(() => problemas.push(`não apareceu: ${esperar}`));
 await pg.waitForTimeout(1200);
 await pg.screenshot({ path: saida, fullPage: true });
