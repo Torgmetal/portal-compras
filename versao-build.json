@@ -1,7 +1,12 @@
 {
-  "build": 3161,
-  "gerado": "2026-09-14T20:24:37.060Z",
+  "build": 3162,
+  "gerado": "2026-09-14T21:30:20.206Z",
   "commits": [
+    {
+      "hash": "5cfc3b55",
+      "data": "14/09/2026",
+      "titulo": "LE: a chave é o número da OP cadastrada e o rodapé TOTAL não vira peça"
+    },
     {
       "hash": "325fce4e",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "dafdba0c",
       "data": "13/09/2026",
       "titulo": "Simulador: peça fora do IFC entra com caixa estimada pelo peso; parafuso fica fora sem alarme"
-    },
-    {
-      "hash": "d4469726",
-      "data": "13/09/2026",
-      "titulo": "Romaneio prévio: card em três linhas (cabeçalho, dados, ações) e resumo da simulação"
     }
   ]
 }
