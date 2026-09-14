@@ -211,3 +211,43 @@ describe("POST — a pergunta é sobre o lote, não sobre a obra", () => {
     expect((await post({ opId: "op1", marcas: ["T97A140", "T97A141"] })).status).toBe(200);
   });
 });
+
+// ⚠⚠ O TETO POR IMPRESSÃO (14/09/2026). Marcar tudo na OP-067 são 60.281 etiquetas: ~12 minutos de
+// função e ~113 MB. A recusa tem de vir ANTES de gerar — e o carimbo de impressão, DEPOIS de saber
+// que o arquivo cabe, senão o portal registra como impressa uma etiqueta que ninguém recebeu.
+describe("POST — o teto de tamanho", () => {
+  it("seleção acima do limite é recusada com 413, sem desenhar nada", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue(
+      [{ id: "g", marca: "GIGANTE", descricao: "X", qte: 9999, pesoUnitKg: 1, naLE: true }]);
+    const r = await post({ opId: "op1", marcas: ["GIGANTE"] });
+    expect(r.status).toBe(413);
+    expect(mocks.pdf).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.createMany).not.toHaveBeenCalled();
+  });
+
+  it("a recusa diz quantas foram pedidas e qual o limite", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue(
+      [{ id: "g", marca: "GIGANTE", descricao: "X", qte: 9999, pesoUnitKg: 1, naLE: true }]);
+    const j = await (await post({ opId: "op1", marcas: ["GIGANTE"] })).json();
+    expect(j.etiquetas).toBe(9999);
+    expect(j.limite).toBe(2000);
+  });
+
+  // ⚠⚠ PDF PESADO DEMAIS NÃO PODE VIRAR HISTÓRICO. A plataforma recusaria a resposta; carimbando
+  // antes, a coluna "Etiqueta" passaria a dizer "já saiu" para um adesivo que ninguém viu.
+  it("PDF acima do limite de bytes é recusado e NÃO vira histórico", async () => {
+    mocks.pdf.mockResolvedValue(new Uint8Array(5_000_000));
+    const r = await post({ opId: "op1", marcas: ["T97A140"] });
+    expect(r.status).toBe(413);
+    expect((await r.json()).bytes).toBe(5_000_000);
+    expect(mockPrisma.auditLog.createMany).not.toHaveBeenCalled();
+  });
+
+  // ⚠ A caixa tira a seleção do limite: 9.999 peças numa caixa são UMA etiqueta.
+  it("marca em caixa passa, mesmo com milhares de peças", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue(
+      [{ id: "g", marca: "GIGANTE", descricao: "X", qte: 9999, pesoUnitKg: 1, naLE: true }]);
+    const r = await post({ opId: "op1", marcas: ["GIGANTE"], emCaixa: ["GIGANTE"] });
+    expect(r.status).toBe(200);
+  });
+});

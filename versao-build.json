@@ -1,7 +1,12 @@
 {
-  "build": 3154,
-  "gerado": "2026-09-14T19:08:19.527Z",
+  "build": 3155,
+  "gerado": "2026-09-14T19:22:18.345Z",
   "commits": [
+    {
+      "hash": "c3e41c591f",
+      "data": "14/09/2026",
+      "titulo": "Etiquetas: um QR por MARCA, nao por etiqueta — o 504 ao gerar a OP inteira"
+    },
     {
       "hash": "98d4e1e434",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "275e3aafdc",
       "data": "12/09/2026",
       "titulo": "Memória: fase no lugar de frente; separação por fase no modelo de carga"
-    },
-    {
-      "hash": "a2ce9999c0",
-      "data": "12/09/2026",
-      "titulo": "Memória: grades de piso em camadas, degraus junto, fusão de cargas leves"
     }
   ]
 }

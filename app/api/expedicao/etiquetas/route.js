@@ -16,9 +16,12 @@ import { MODELOS, gerarEtiquetasCarregamentoPDF } from "@/lib/etiqueta-carregame
 import { camposExtrasDaOP, juntarCamposExtras, juntarTagsCliente, tagsPorUnidade } from "@/lib/etiqueta-campos-extras";
 import { conferirCobertura, tagsDaOP } from "@/lib/etiqueta-tag-cliente";
 import { chaveMarca } from "@/lib/itens-expedicao";
+import { contarEtiquetas, recusaPorBytes, recusaPorTamanho } from "@/lib/etiquetas-carregamento-limites";
 import { itensExpediveisDaOP, opsComItensExpediveis } from "@/lib/itens-expedicao";
 import { lerCalibragem } from "@/lib/etiqueta-calibragem";
 import { log } from "@/lib/log";
+import { chaveHistorico, historicoDaMarca, impressoes, registrarImpressao, ultimaTagDaObra }
+  from "@/lib/etiqueta-historico";
 
 const registro = log("api/expedicao/etiquetas");
 const PERFIS = ["ADMIN", "EXPEDICAO", "PRODUCAO", "PCP", "PLANEJAMENTO"];
@@ -36,7 +39,6 @@ const erroDeAcesso = (e) =>
   NextResponse.json({ success: false, error: e.message },
     { status: e.message === "Unauthorized" ? 401 : 403 });
 
-const ACAO = "IMPRIMIR_ETIQUETA_CARREGAMENTO";
 
 /**
  * A CHAVE DO HISTÓRICO É A MARCA, NÃO O ID DA PEÇA.
@@ -50,69 +52,6 @@ const ACAO = "IMPRIMIR_ETIQUETA_CARREGAMENTO";
  * ⚠ Registros ANTIGOS foram gravados por id (`entity: "PecaConjunto"`). São lidos também, senão a
  * coluna diria "nunca impressa" para etiqueta que saiu — ver `historicoDaMarca`.
  */
-const ENTIDADE = "EtiquetaCarregamento";
-const chaveHistorico = (opNumero, marca) => `${opNumero}|${String(marca).trim().toUpperCase()}`;
-
-/**
- * Quando cada marca saiu impressa, e quantas vezes.
- *
- * ⚠ O HISTÓRICO MORA NO `AuditLog`, NÃO NUMA COLUNA NOVA. "Quem imprimiu e quando" é exatamente o
- * que a tabela de auditoria existe para responder — e o CLAUDE.md manda registrar toda mutação nela
- * de qualquer jeito, então a coluna seria a segunda cópia do mesmo fato. Uma coluna também daria só
- * a ÚLTIMA impressão; aqui ficam todas.
- */
-async function impressoes(chaves, idsLegados) {
-  const onde = [];
-  if (chaves.length) onde.push({ entity: ENTIDADE, entityId: { in: chaves } });
-  if (idsLegados.length) onde.push({ entity: "PecaConjunto", entityId: { in: idsLegados } });
-  if (!onde.length) return new Map();
-
-  const por = await prisma.auditLog.groupBy({
-    by: ["entityId"],
-    where: { action: ACAO, OR: onde },
-    _max: { createdAt: true },
-    _count: { _all: true },
-  });
-  return new Map(por.map((r) => [r.entityId, { em: r._max.createdAt, vezes: r._count._all }]));
-}
-
-/** O histórico de uma marca: a chave nova mais todos os ids antigos daquela marca. */
-function historicoDaMarca(hist, chave, ids) {
-  let em = null, vezes = 0;
-  for (const k of [chave, ...ids]) {
-    const h = hist.get(k);
-    if (!h) continue;
-    vezes += h.vezes;
-    if (!em || (h.em && h.em > em)) em = h.em;
-  }
-  return { em, vezes };
-}
-
-/**
- * A TAG usada na ÚLTIMA impressão desta obra, para a tela já vir preenchida.
- *
- * ⚠⚠ SAI DO `AuditLog`, SEM TABELA NOVA. O carimbo de cada impressão já guarda a TAG no `diff` —
- * perguntar a ele "qual foi a última" é de graça, e evita uma segunda cópia do mesmo fato.
- *
- * ⚠⚠ E EXISTE PARA EVITAR UM ERRO CARO, NÃO POR CONFORTO. A obra é impressa em lotes, ao longo de
- * dias. Se a TAG for digitada do zero a cada lote, mais cedo ou mais tarde um lote sai sem ela — ou
- * com ela errada — e vai para o caminhão misturado com os que saíram certos. Ninguém confere 442
- * adesivos um a um. Vir preenchida com o que foi usado da última vez transforma "lembrar" em
- * "conferir", que é o que dá para fazer com a peça na mão.
- *
- * ⚠ É SUGESTÃO, NÃO TRAVA: quem imprime pode apagar ou trocar. A TAG muda de embarque para
- * embarque, e travar no valor antigo seria pior que não sugerir.
- */
-async function ultimaTagDaObra(opNumero) {
-  const ultimo = await prisma.auditLog.findFirst({
-    where: { action: ACAO, entity: ENTIDADE, entityId: { startsWith: `${opNumero}|` } },
-    orderBy: { createdAt: "desc" },
-    select: { diff: true },
-  }).catch(() => null);
-  const tag = ultimo?.diff?.tagObra;
-  return typeof tag === "string" && tag.trim() ? tag.trim() : null;
-}
-
 async function carregar(opId) {
   // ⚠ QUEM DEFINE A LISTA É A LISTA DE EXPEDIÇÃO — a regra e o porquê moram em
   // `lib/itens-expedicao.js`, a mesma fonte usada pela Conferência de Peça.
@@ -273,27 +212,69 @@ async function selecionar(corpo) {
   return { op: dados.op, pecas: extras.pecas, modelo, tagObra };
 }
 
+/** O PDF em si — fora do POST só para ele caber no teto de statements. */
+async function desenhar({ op, pecas, modelo, tagObra }) {
+  return gerarEtiquetasCarregamentoPDF({
+    cliente: op.cliente,
+    obra: op.obra,
+    // ⚠⚠ O NÚMERO VAI CRU, e isso é decisão, não descuido.
+    //
+    // Cheguei a usar o `fmtOP` da casa aqui. Está errado para ESTA tela por dois motivos que só
+    // apareceram olhando o dado: (1) o `fmtOP` REMOVE um "T" inicial — decisão do Vitor em
+    // `58bc140e5c`, certa para a exibição no portal, mas aqui apagaria justamente o "T89" que a
+    // etiqueta em uso mostra; (2) ele completa com zeros ("89" -> "089"), e a etiqueta impressa
+    // hoje diz "T89", sem zero à esquerda.
+    //
+    // Hoje nenhuma das 35 OPs tem prefixo — são todas "121", "120". Então o "T89" da etiqueta
+    // antiga foi DIGITADO na planilha do BarTender, não veio do cadastro. Mandar cru faz a
+    // etiqueta mostrar exatamente o que está na OP, seja lá qual for a convenção que ela use.
+    opNumero: op.numero,
+    pecas,
+    modelo,
+    tagObra,
+    // ⚠ Lida a CADA impressão, não cacheada: quem está calibrando imprime, mede, ajusta e
+    // imprime de novo. Um cache de segundos faria a etiqueta seguinte sair com o valor velho e a
+    // pessoa concluir que o ajuste não funciona.
+    calibragem: await lerCalibragem(prisma),
+  });
+}
+
 /**
- * Uma linha de auditoria por MARCA — é a granularidade da pergunta que a tela faz ("esta marca já
- * saiu?"). Um registro só da OP inteira não responderia nada depois da primeira impressão parcial.
+ * Gera, confere o tamanho, carimba e devolve o PDF.
  *
- * ⚠ Não-fatal de propósito: uma falha ao registrar não pode segurar o PDF que já foi gerado. O
- * pior caso é a coluna dizer "—" para uma etiqueta impressa; imprimir de novo custa um adesivo.
+ * ⚠ Fora do POST só para ele caber no teto de statements — a ORDEM aqui dentro é que importa, e
+ * está comentada onde acontece.
  */
-async function registrarImpressao(user, { op, pecas, modelo, tagObra }) {
+async function gerarEResponder(user, { op, pecas, modelo, tagObra }) {
   try {
-    await prisma.auditLog.createMany({
-      data: pecas.map((p) => ({
-        userId: user?.id || null,
-        action: ACAO,
-        entity: ENTIDADE,
-        entityId: chaveHistorico(op.numero, p.marca),
-        diff: { op: op.numero, marca: p.marca, etiquetas: p.emCaixa ? 1 : Math.max(1, p.qte || 1),
-                emCaixa: !!p.emCaixa, modelo, tagObra, por: user?.name || null },
-      })),
+    const pdf = await desenhar({ op, pecas, modelo, tagObra });
+
+    // ⚠⚠ OS BYTES SÃO CONFERIDOS ANTES DA AUDITORIA (pedido do Codex). A plataforma recusa corpo
+    // de resposta acima de ~4,5 MB; carimbando primeiro, o portal registraria como impressa uma
+    // etiqueta que a pessoa NUNCA recebeu — e a coluna "Etiqueta" passaria a mentir.
+    const pesado = recusaPorBytes(pdf.byteLength ?? pdf.length);
+    if (pesado) {
+      registro.info(`OP ${op.numero}: PDF de ${pesado.bytes} bytes recusado (limite ${pesado.limite})`);
+      return NextResponse.json({ success: false, ...pesado }, { status: 413 });
+    }
+
+    // ⚠ SÓ DEPOIS DE O PDF EXISTIR. Carimbar antes marcaria como impressa uma marca cuja geração
+    // falhou — e a tela ficaria dizendo "já saiu" para uma etiqueta que ninguém viu.
+    await registrarImpressao(user, { op, pecas, modelo, tagObra });
+    // ⚠ A CONTA É A DO MÓDULO, NÃO UMA SOMA LOCAL: a que morava aqui ignorava `emCaixa` e contava
+    // 50 etiquetas numa marca que rende 1.
+    registro.info(`OP ${op.numero}: ${pecas.length} marca(s), ${contarEtiquetas(pecas)} etiqueta(s)`);
+
+    return new NextResponse(Buffer.from(pdf), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="etiquetas-OP-${op.numero}.pdf"`,
+        "Cache-Control": "no-store",
+      },
     });
   } catch (e) {
-    registro.erro("falha ao registrar a impressão:", e?.message);
+    registro.erro("falha ao gerar:", e?.message);
+    return NextResponse.json({ success: false, error: "Não consegui gerar as etiquetas: " + e.message }, { status: 500 });
   }
 }
 
@@ -306,45 +287,9 @@ export async function POST(req) {
   const { recusa, op, pecas, modelo, tagObra } = await selecionar(corpo);
   if (recusa) return recusa;
 
-  const dados = { op };
-  const total = pecas.reduce((s, p) => s + Math.max(1, p.qte || 1), 0);
-  try {
-    const pdf = await gerarEtiquetasCarregamentoPDF({
-      cliente: dados.op.cliente,
-      obra: dados.op.obra,
-      // ⚠⚠ O NÚMERO VAI CRU, e isso é decisão, não descuido.
-      //
-      // Cheguei a usar o `fmtOP` da casa aqui. Está errado para ESTA tela por dois motivos que só
-      // apareceram olhando o dado: (1) o `fmtOP` REMOVE um "T" inicial — decisão do Vitor em
-      // `58bc140e5c`, certa para a exibição no portal, mas aqui apagaria justamente o "T89" que a
-      // etiqueta em uso mostra; (2) ele completa com zeros ("89" -> "089"), e a etiqueta impressa
-      // hoje diz "T89", sem zero à esquerda.
-      //
-      // Hoje nenhuma das 35 OPs tem prefixo — são todas "121", "120". Então o "T89" da etiqueta
-      // antiga foi DIGITADO na planilha do BarTender, não veio do cadastro. Mandar cru faz a
-      // etiqueta mostrar exatamente o que está na OP, seja lá qual for a convenção que ela use.
-      opNumero: dados.op.numero,
-      pecas,
-      modelo,
-      tagObra,
-      // ⚠ Lida a CADA impressão, não cacheada: quem está calibrando imprime, mede, ajusta e
-      // imprime de novo. Um cache de segundos faria a etiqueta seguinte sair com o valor velho e a
-      // pessoa concluir que o ajuste não funciona.
-      calibragem: await lerCalibragem(prisma),
-    });
-    // ⚠ SÓ DEPOIS DE O PDF EXISTIR. Carimbar antes marcaria como impressa uma marca cuja geração
-    // falhou — e a tela ficaria dizendo "já saiu" para uma etiqueta que ninguém viu.
-    await registrarImpressao(user, { op: dados.op, pecas, modelo, tagObra });
-    registro.info(`OP ${dados.op.numero}: ${pecas.length} marca(s), ${total} etiqueta(s)`);
-    return new NextResponse(Buffer.from(pdf), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="etiquetas-OP-${dados.op.numero}.pdf"`,
-        "Cache-Control": "no-store",
-      },
-    });
-  } catch (e) {
-    registro.erro("falha ao gerar:", e?.message);
-    return NextResponse.json({ success: false, error: "Não consegui gerar as etiquetas: " + e.message }, { status: 500 });
-  }
+  // ⚠⚠ RECUSA ANTES DE GERAR. Marcar tudo na OP-067 são 60.281 etiquetas: ~12 minutos de função e
+  // ~113 MB. Sem esta barreira, a pessoa espera o tempo inteiro para receber um 504.
+  const grande = recusaPorTamanho(pecas);
+  if (grande) return NextResponse.json({ success: false, ...grande }, { status: 413 });
+  return gerarEResponder(user, { op, pecas, modelo, tagObra });
 }
