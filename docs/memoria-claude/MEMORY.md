@@ -168,3 +168,4 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Branch de outra sessão](torg_branch_de_outra_sessao.md) — conferir `git rev-parse --abbrev-ref HEAD` antes de commitar; se não for main, worktree de main; nunca `reset --hard` no diretório dos outros
 - [Simulador de carga no portal](torg_simulador_carga_portal.md) — "Simular carga" no romaneio prévio; motor lib/carga em Web Worker; IFC medido no navegador; CargaSimulada com itensHash
 - [Usuário sem e-mail (login por CPF)](torg_usuario_sem_email.md) — Admin › Usuários vincula ao funcionário do RH; e-mail interno cpf@funcionario.torg; RH › Habilitar acesso é só autoatendimento
+- [Permissões das pastas da OP (SharePoint)](torg_permissoes_pasta_op.md) — acesso é por usuário individual, não por grupo; "Acesso Limitado" engana a contagem; OP nova nasce liberada; script `scripts/permissoes-sharepoint.mjs`
