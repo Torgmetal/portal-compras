@@ -5,7 +5,8 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Tag } from "lucide-react";
+import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Tag, Box } from "lucide-react";
+import { enquadrarCameraCarga } from "@/lib/carga/enquadramento";
 import { montarCaminhao } from "@/lib/carga/caminhao-3d";
 import { MATERIAL_CINZA, montarCaibros, montarUnidade, rotuloVolume } from "@/lib/carga/cena-carga";
 
@@ -26,34 +27,31 @@ const VisualizadorCarga = forwardRef(function VisualizadorCarga({ carga, malhas,
   // ── cena: uma vez por carga ──
   useEffect(() => {
     const el = host.current; if (!el || !carga) return;
-    const W = el.clientWidth || 800, H = altura;
+    const W = el.clientWidth || 800, H = el.clientHeight || altura;
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); renderer.setSize(W, H);
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
     el.appendChild(renderer.domElement);
-    const scene = new THREE.Scene(); scene.background = new THREE.Color(0xeef2f6);
-    const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.55;
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0xf0f3f6); scene.fog = new THREE.Fog(0xf0f3f6, 32, 85);
+    const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.8;
     const camera = new THREE.PerspectiveCamera(42, W / H, 0.05, 600);
     const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
     scene.add(new THREE.HemisphereLight(0xffffff, 0x8d99a6, 0.6));
-    const sol = new THREE.DirectionalLight(0xffffff, 1.5); sol.position.set(-6, 14, 8); sol.castShadow = true; sol.shadow.mapSize.set(2048, 2048); Object.assign(sol.shadow.camera, { left: -14, right: 22, top: 12, bottom: -8, far: 60 }); sol.shadow.bias = -0.0005; sol.shadow.normalBias = 0.02; scene.add(sol);
-    const chao = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({ color: 0xdfe5eb })); chao.rotation.x = -Math.PI / 2; chao.receiveShadow = true; scene.add(chao);
-    const grade = new THREE.GridHelper(80, 80, 0xc5ced8, 0xd7dee6); scene.add(grade);
+    const sol = new THREE.DirectionalLight(0xffffff, 1.5); sol.position.set(-8, 16, 10); sol.castShadow = true; sol.shadow.mapSize.set(2048, 2048); Object.assign(sol.shadow.camera, { left: -14, right: 22, top: 12, bottom: -8, far: 60 }); sol.shadow.bias = -0.0002; sol.shadow.normalBias = 0.025; sol.shadow.radius = 3; scene.add(sol);
+    const chao = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({ color: 0xe8edf1, roughness: 0.95 })); chao.rotation.x = -Math.PI / 2; chao.receiveShadow = true; scene.add(chao);
+    const grade = new THREE.GridHelper(80, 40, 0xd6dfe6, 0xe0e7ed); grade.material.transparent = true; grade.material.opacity = 0.22; scene.add(grade);
     const V = carga.veiculo, veiculo3d = montarCaminhao(scene, V), C = mm(V.C), L = mm(V.L), A = mm(V.alturaUtil);
-    const limite = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(C, A, L)), new THREE.LineBasicMaterial({ color: 0xc0392b })); limite.position.set(C / 2, A / 2, L / 2); scene.add(limite);
+    const limite = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(C, A, L)), new THREE.LineBasicMaterial({ color: 0x5c839e, transparent: true, opacity: 0.35 })); limite.position.set(C / 2, A / 2, L / 2); scene.add(limite);
     chao.position.y = veiculo3d.solo - 0.01; grade.position.y = veiculo3d.solo - 0.005;
     const grupo = new THREE.Group(), grupoRot = new THREE.Group(); scene.add(grupo, grupoRot);
     const unidades = [], madeiras = [];
     const porId = new Map(carga.itens.map((u) => [u.id, u]));
     for (const u of carga.itens) { const g = montarUnidade(u, malhas); grupo.add(g); unidades.push(g); for (const m of montarCaibros(u, madeira, (u.sobre || []).map((id) => porId.get(id)).filter(Boolean))) { grupo.add(m); madeiras.push(m); } }
-    // enquadra SÓ a caçamba num ângulo que mostra comprimento, altura e lado
+    const caixaCena = new THREE.Box3().setFromObject(veiculo3d.grupo).union(new THREE.Box3().setFromObject(limite)).union(new THREE.Box3().setFromObject(grupo));
     const enquadrar = (nome = "iso") => {
-      const alvo = new THREE.Vector3(C / 2, A * 0.45, L / 2);
-      const dir = { iso: new THREE.Vector3(0.62, 0.42, 0.66), tras: new THREE.Vector3(1, 0.32, 0.55), topo: new THREE.Vector3(0, 1, 0.14), lado: new THREE.Vector3(0.001, 0.18, 1) }[nome].normalize();
-      const fov = camera.fov * Math.PI / 180, hfov = Math.atan(Math.tan(fov / 2) * camera.aspect); let dist;
-      if (nome === "topo") dist = Math.max((C / 2 + 0.6) / Math.tan(hfov), (L / 2 + 0.6) / Math.tan(fov / 2)) + A / 2;
-      else if (nome === "lado") { alvo.y = A / 2 + 0.2; dist = Math.max((C / 2 + 0.6) / Math.tan(hfov), (A / 2 + 0.9) / Math.tan(fov / 2)) + L / 2; }
-      else { const raio = Math.sqrt((C / 2) ** 2 + (L / 2) ** 2 + (A / 2) ** 2) * 0.74; dist = raio / Math.sin(Math.min(fov / 2, hfov * 0.95)); }
-      camera.position.copy(alvo).addScaledVector(dir, dist); controls.target.copy(alvo); controls.update(); };
+      const dir = { iso: new THREE.Vector3(-0.7, 0.48, 0.8), tras: new THREE.Vector3(1, 0.32, 0.55), topo: new THREE.Vector3(0, 1, 0.14), lado: new THREE.Vector3(0.001, 0.18, 1) }[nome];
+      controls.target.copy(enquadrarCameraCarga(camera, caixaCena, dir)); controls.update();
+      if (st.current) st.current.vista = nome;
+    };
     const rotular = (visiveis) => { grupoRot.clear(); for (const g of unidades) if (g.visible) grupoRot.add(rotuloVolume(g.userData.u, st.current?.tamRotulo || 0.05)); grupoRot.visible = visiveis; };
     const pintar = (g, cinza) => g.traverse((o) => { if (!o.material || o.isSprite || o.isLineSegments) return; if (!o.userData.matOrig) o.userData.matOrig = o.material; o.material = cinza ? MATERIAL_CINZA : o.userData.matOrig; });
     const mostrarPasso = (p, camada = null) => {
@@ -64,8 +62,9 @@ const VisualizadorCarga = forwardRef(function VisualizadorCarga({ carga, malhas,
     st.current = { renderer, scene, camera, controls, enquadrar, mostrarPasso, rotular, rotulos: true, vivo: true };
     enquadrar("iso"); mostrarPasso(carga.passos.length - 1);
     const loop = () => { if (!st.current?.vivo) return; controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); }; loop();
-    const onResize = () => { const w = el.clientWidth || W; camera.aspect = w / H; camera.updateProjectionMatrix(); renderer.setSize(w, H); }; window.addEventListener("resize", onResize);
-    return () => { st.current.vivo = false; window.removeEventListener("resize", onResize); controls.dispose(); pm.dispose(); renderer.dispose(); el.removeChild(renderer.domElement); st.current = null; };
+    const onResize = () => { const w = el.clientWidth || W, h = el.clientHeight || H; camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h); enquadrar(st.current?.vista || "iso"); };
+    const observador = new ResizeObserver(onResize); observador.observe(el);
+    return () => { st.current.vivo = false; observador.disconnect(); controls.dispose(); pm.dispose(); renderer.dispose(); el.removeChild(renderer.domElement); st.current = null; };
   }, [carga, malhas, madeira, altura]);
 
   useEffect(() => { setPasso(carga ? carga.passos.length - 1 : -1); }, [carga]);
@@ -77,7 +76,8 @@ const VisualizadorCarga = forwardRef(function VisualizadorCarga({ carga, malhas,
       const s = st.current; if (!s) return null;
       // tamanho fixo e pixelRatio 1: o PDF vai por upload e o corpo tem teto (~600 KB por imagem)
       const el = s.renderer.domElement, W0 = el.clientWidth, H0 = el.clientHeight, pr = s.renderer.getPixelRatio();
-      s.renderer.setPixelRatio(1); s.renderer.setSize(1200, 560, false); s.camera.aspect = 1200 / 560; s.camera.updateProjectionMatrix();
+      const capturaW = 1600, capturaH = vista === "iso" || vista === "tras" ? 960 : 480;
+      s.renderer.setPixelRatio(1); s.renderer.setSize(capturaW, capturaH, false); s.camera.aspect = capturaW / capturaH; s.camera.updateProjectionMatrix();
       s.rotulos = true; s.tamRotulo = 0.075;
       if (ci == null) s.mostrarPasso(carga.passos.length - 1); else { const byId = new Map(carga.itens.map((u) => [u.id, u])); let k = -1; carga.passos.forEach((id, i) => { if ((byId.get(id)?.camada || 0) === ci) k = i; }); s.mostrarPasso(k, ci); }
       s.enquadrar(vista); s.renderer.render(s.scene, s.camera);
@@ -105,22 +105,32 @@ const VisualizadorCarga = forwardRef(function VisualizadorCarga({ carga, malhas,
   }), [carga, passo, rotulos]);
 
   const n = carga?.passos?.length || 0, fim = passo >= n - 1, u = passo >= 0 && !fim ? carga.itens.find((x) => x.id === carga.passos[passo]) : null;
-  const btn = "px-2 py-1 rounded-md border border-gray-200 bg-white text-torg-dark hover:bg-gray-50 disabled:opacity-40 inline-flex items-center";
+  const btn = "min-w-11 min-h-11 px-3 rounded-lg border border-slate-200 bg-white text-torg-dark hover:bg-slate-50 disabled:opacity-35 inline-flex items-center justify-center focus-visible:ring-2 focus-visible:ring-torg-blue";
   return (
-    <div className="rounded-xl border border-gray-100 overflow-hidden bg-[#eef2f6]">
-      <div ref={host} style={{ height: altura }} className="w-full" />
-      <div className="px-3 py-2 bg-white border-t border-gray-100 flex flex-wrap items-center gap-2 text-[12px]">
-        <button className={btn} onClick={() => setPasso(-1)} title="Caçamba vazia"><ChevronsLeft size={14} /></button>
-        <button className={btn} onClick={() => setPasso((p) => Math.max(-1, p - 1))} title="Volume anterior"><ChevronLeft size={14} /></button>
-        <button className={btn} onClick={() => setPasso((p) => Math.min(n - 1, p + 1))} title="Próximo volume"><ChevronRight size={14} /></button>
-        <button className={btn} onClick={() => setPasso(n - 1)} title="Carga completa"><ChevronsRight size={14} /></button>
-        <span className="text-torg-gray">{fim ? <><b className="text-torg-dark">Carga completa</b> · {n} volumes</> : passo < 0 ? "Use ▶ para montar volume a volume" : <><b className="text-torg-dark">Volume {u?.volume}</b> · passo {passo + 1} de {n} · {u?.rotulo} · {Math.round(u?.kg || 0)} kg · {u?.C}×{u?.L}×{u?.A} mm · a {((u?.x || 0) / 1000).toFixed(1)} m da frente{u?.girada ? " · atravessado" : ""}</>}</span>
-        <span className="ml-auto flex items-center gap-1">
-          {["iso", "lado", "topo", "tras"].map((v) => <button key={v} className={btn} onClick={() => st.current?.enquadrar(v)}>{{ iso: "3D", lado: "Lateral", topo: "Cima", tras: "Trás" }[v]}</button>)}
-          <button className={`${btn} ${rotulos ? "border-torg-blue text-torg-blue" : ""}`} onClick={() => setRotulos((r) => !r)} title="Números dos volumes"><Tag size={14} /></button>
-        </span>
+    <section className="rounded-2xl border border-slate-200 shadow-sm overflow-hidden bg-[#eef2f6] min-w-0">
+      <div className="p-4 bg-white border-b border-slate-100 flex flex-wrap items-center gap-3">
+        <h3 className="flex-1 text-base font-bold text-torg-dark inline-flex items-center gap-2"><Box size={19} className="text-torg-blue" /> Disposição da carga</h3>
+        <div className="flex items-center gap-1 w-full sm:w-auto">
+          {["iso", "lado", "topo", "tras"].map((v) => <button key={v} className={`${btn} text-xs max-sm:flex-1`} onClick={() => st.current?.enquadrar(v)}>{{ iso: "3D", lado: "Lateral", topo: "Cima", tras: "Trás" }[v]}</button>)}
+          <button className={`${btn} ${rotulos ? "border-torg-blue text-torg-blue bg-torg-blue-50" : ""}`} onClick={() => setRotulos((r) => !r)} title="Números dos volumes" aria-label="Números dos volumes" aria-pressed={rotulos}><Tag size={17} /></button>
+        </div>
       </div>
-    </div>
+      <div ref={host} style={{ height: `clamp(280px, 48dvh, ${altura}px)` }} className="w-full overflow-hidden [&_canvas]:block" />
+      <p className="text-[11px] text-torg-gray px-4 pb-3">Arraste para girar · use dois dedos ou a rolagem para aproximar</p>
+      <div className="p-4 bg-white border-t border-slate-100 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1"><p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">Sequência de carregamento</p><p className="text-sm font-bold text-torg-dark mt-1" aria-live="polite">{fim ? `Carga completa · ${n} volumes` : passo < 0 ? "Veículo vazio" : `Volume ${u?.volume} · passo ${passo + 1} de ${n}`}</p></div>
+          <div className="flex items-center gap-2">
+            <button className={btn} onClick={() => setPasso(-1)} disabled={passo < 0} title="Caçamba vazia" aria-label="Caçamba vazia"><ChevronsLeft size={18} /></button>
+            <button className={btn} onClick={() => setPasso((p) => Math.max(-1, p - 1))} disabled={passo < 0} title="Volume anterior" aria-label="Volume anterior"><ChevronLeft size={18} /></button>
+            <button className={`${btn} flex-1 sm:flex-none gap-1.5`} onClick={() => setPasso((p) => Math.min(n - 1, p + 1))} disabled={fim} aria-label="Próximo volume"><span className="text-sm font-semibold">Próximo</span><ChevronRight size={18} /></button>
+            <button className={btn} onClick={() => setPasso(n - 1)} disabled={fim} title="Carga completa" aria-label="Carga completa"><ChevronsRight size={18} /></button>
+          </div>
+        </div>
+        <label className="block"><span className="sr-only">Etapa do carregamento</span><input type="range" min={-1} max={Math.max(-1, n - 1)} value={passo} onChange={(e) => setPasso(Number(e.target.value))} disabled={!n} className="w-full h-6 accent-torg-blue cursor-pointer" /></label>
+        {u && <p className="text-xs text-torg-gray leading-relaxed">{u.rotulo} · {Math.round(u.kg || 0).toLocaleString("pt-BR")} kg · {u.C} × {u.L} × {u.A} mm · a {((u.x || 0) / 1000).toFixed(1).replace(".", ",")} m da frente{u.girada ? " · atravessado" : ""}</p>}
+      </div>
+    </section>
   );
 });
 export default VisualizadorCarga;

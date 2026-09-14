@@ -5,7 +5,7 @@ import { useState } from "react";
 import { SlidersHorizontal, X, Save, Trash2, Loader2 } from "lucide-react";
 import { EMBALAGEM, POSICAO, ORIENTACAO, resumoDaRegra } from "@/lib/carga/ajustes";
 
-const sel = "w-full text-[12px] border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-torg-blue/30";
+const sel = "w-full min-h-11 text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-torg-blue/30";
 
 /** Editor de uma marca. `onSalvar(marca, regras|null)` devolve a promessa da gravação. */
 export function EditorAjuste({ marca, desc, regras, semGeometria, onSalvar, onFechar }) {
@@ -18,12 +18,12 @@ export function EditorAjuste({ marca, desc, regras, semGeometria, onSalvar, onFe
     catch (e) { setErro(e.message || "Não salvou"); } finally { setSalvando(false); }
   };
   return (
-    <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onFechar()}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+    <div className="fixed inset-0 z-[60] bg-black/40 flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onFechar()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md my-auto max-h-[calc(100dvh-1.5rem)] overflow-y-auto">
         <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
           <SlidersHorizontal size={16} className="text-torg-blue" />
           <div className="min-w-0"><h3 className="text-sm font-bold text-torg-dark">Ajustar {marca}</h3><p className="text-[11px] text-torg-gray truncate">{desc || ""}</p></div>
-          <button onClick={onFechar} className="ml-auto text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          <button onClick={onFechar} aria-label="Fechar ajuste" className="ml-auto min-w-11 min-h-11 flex items-center justify-center text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="px-5 py-4 space-y-3 text-[12px]">
           <label className="block"><span className="font-medium text-torg-dark">Embalagem</span><select value={r.embalagem} onChange={(e) => m("embalagem", e.target.value)} className={`${sel} mt-1`}>{EMBALAGEM.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
@@ -43,8 +43,8 @@ export function EditorAjuste({ marca, desc, regras, semGeometria, onSalvar, onFe
         <div className="px-5 py-3 border-t border-gray-100 flex items-center gap-2">
           {regras && <button onClick={() => salvar(true)} disabled={salvando} className="text-[12px] text-red-700 inline-flex items-center gap-1 hover:underline"><Trash2 size={13} /> Remover ajuste</button>}
           <span className="ml-auto flex gap-2">
-            <button onClick={onFechar} className="text-[12px] text-torg-gray border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50">Cancelar</button>
-            <button onClick={() => salvar(false)} disabled={salvando} className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-4 py-1.5 hover:bg-torg-dark inline-flex items-center gap-1.5 disabled:opacity-50">{salvando ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Salvar</button>
+            <button onClick={onFechar} className="min-h-11 text-sm text-torg-gray border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50">Cancelar</button>
+            <button onClick={() => salvar(false)} disabled={salvando} className="min-h-11 text-sm font-semibold text-white bg-torg-blue rounded-lg px-4 py-1.5 hover:bg-torg-dark inline-flex items-center gap-1.5 disabled:opacity-50">{salvando ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Salvar</button>
           </span>
         </div>
       </div>
@@ -56,20 +56,20 @@ export function EditorAjuste({ marca, desc, regras, semGeometria, onSalvar, onFe
 export function ListaAjustes({ ajustes, lista, onEditar, desatualizada }) {
   const [busca, setBusca] = useState("");
   const marcas = Object.keys(ajustes || {}).sort((a, b) => a.localeCompare(b, "pt", { numeric: true }));
-  const q = busca.trim().toUpperCase(), sugestoes = q ? (lista || []).filter((i) => i.marca.includes(q)).slice(0, 8) : [];
+  const q = busca.trim().toUpperCase(), sugestoes = q ? (lista || []).filter((i) => i.marca.toUpperCase().includes(q)).slice(0, 8) : [];
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-3 py-2">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-[12px] font-bold text-torg-dark inline-flex items-center gap-1.5"><SlidersHorizontal size={14} className="text-torg-blue" /> Ajustes por marca <span className="font-normal text-torg-gray">· {marcas.length} nesta obra</span></span>
         {desatualizada && <span className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">ajustes mudaram — simule de novo</span>}
-        <span className="ml-auto relative">
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Ajustar outra marca…" className="text-[12px] border border-gray-200 rounded-lg px-2 py-1 w-44" />
-          {sugestoes.length > 0 && <div className="absolute right-0 z-10 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg">{sugestoes.map((i) => <button key={i.marca} onClick={() => { onEditar(i.marca, i.desc); setBusca(""); }} className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-torg-blue-50"><b>{i.marca}</b> <span className="text-torg-gray">{i.desc}</span></button>)}</div>}
+        <span className="sm:ml-auto relative w-full sm:w-auto">
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Ajustar outra marca…" className="min-h-11 text-sm border border-gray-200 rounded-lg px-3 py-2 w-full sm:w-64" />
+          {sugestoes.length > 0 && <div className="absolute right-0 z-10 mt-1 w-full sm:w-72 bg-white border border-gray-200 rounded-lg shadow-lg">{sugestoes.map((i) => <button key={i.marca} onClick={() => { onEditar(i.marca, i.desc); setBusca(""); }} className="w-full text-left px-3 py-3 text-sm hover:bg-torg-blue-50"><b>{i.marca}</b> <span className="text-torg-gray">{i.desc}</span></button>)}</div>}
         </span>
       </div>
       {marcas.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2">
-          {marcas.map((m) => <button key={m} onClick={() => onEditar(m, (lista || []).find((i) => i.marca === m)?.desc)} className="text-[11px] border border-torg-blue-200 bg-torg-blue-50 text-torg-dark rounded-full px-2 py-0.5 hover:border-torg-blue"><b>{m}</b> · {resumoDaRegra(ajustes[m])}</button>)}
+          {marcas.map((m) => <button key={m} onClick={() => onEditar(m, (lista || []).find((i) => i.marca === m)?.desc)} className="min-h-11 text-xs border border-torg-blue-200 bg-torg-blue-50 text-torg-dark rounded-full px-2 py-0.5 hover:border-torg-blue"><b>{m}</b> · {resumoDaRegra(ajustes[m])}</button>)}
         </div>
       )}
     </div>

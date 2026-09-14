@@ -1,156 +1,156 @@
 {
-  "build": 3157,
-  "gerado": "2026-09-14T19:46:44.991Z",
+  "build": 3158,
+  "gerado": "2026-09-14T19:46:57.612Z",
   "commits": [
     {
-      "hash": "12aa3bc80e",
+      "hash": "c564f949",
+      "data": "14/09/2026",
+      "titulo": "Etiqueta: QR abaixo da linha do cabecalho, e a TAG no fim da descricao"
+    },
+    {
+      "hash": "12aa3bc8",
       "data": "14/09/2026",
       "titulo": "Portal do cliente: LPC da revisão entra na lista (naLPC) e o certificado diz em que perfil do projeto foi aplicado"
     },
     {
-      "hash": "ae2a738c32",
+      "hash": "ae2a738c",
       "data": "14/09/2026",
       "titulo": "Etiquetas: um teto por impressao, e o carimbo so depois de saber que o PDF cabe"
     },
     {
-      "hash": "c3e41c591f",
+      "hash": "c3e41c59",
       "data": "14/09/2026",
       "titulo": "Etiquetas: um QR por MARCA, nao por etiqueta — o 504 ao gerar a OP inteira"
     },
     {
-      "hash": "98d4e1e434",
+      "hash": "98d4e1e4",
       "data": "14/09/2026",
       "titulo": "Produção › Meu trabalho: botão Planilha p/ Syneco no cabeçalho (o card tinha ido para Gestão das OPs)"
     },
     {
-      "hash": "4e8d9d6501",
+      "hash": "4e8d9d65",
       "data": "14/09/2026",
       "titulo": "Etiquetas: a TAG do cliente sai na frente da descricao, importada da planilha"
     },
     {
-      "hash": "84ae66d1d0",
+      "hash": "84ae66d1",
       "data": "14/09/2026",
       "titulo": "Produção: planilha dos apontamentos do portal que faltam no Syneco"
     },
     {
-      "hash": "0dfcdcf2d3",
+      "hash": "0dfcdcf2",
       "data": "14/09/2026",
       "titulo": "Qualidade: campos que perdiam o foco a cada tecla (lote da tinta e os outros)"
     },
     {
-      "hash": "75542bccf0",
+      "hash": "75542bcc",
       "data": "14/09/2026",
       "titulo": "LPC: a chave da lista é a fase, nunca o número da OP — a OP-094 tinha 591 marcas duplicadas"
     },
     {
-      "hash": "4ba3dcbd39",
+      "hash": "4ba3dcbd",
       "data": "14/09/2026",
       "titulo": "Simulador: PDF v2 — modelos de embalagem desenhados e um cartão por volume com a foto 3D"
     },
     {
-      "hash": "e8d317df57",
+      "hash": "e8d317df",
       "data": "14/09/2026",
       "titulo": "Simulador: o botão do PDF não fazia nada — next/dynamic engolia o ref do 3D"
     },
     {
-      "hash": "54f7af92f5",
+      "hash": "54f7af92",
       "data": "14/09/2026",
       "titulo": "Expedicao: a marca que a revisao da L.E. excluiu nao imprime mais etiqueta"
     },
     {
-      "hash": "c56c1771bd",
+      "hash": "c56c1771",
       "data": "14/09/2026",
       "titulo": "Etiquetas: o fechamento da lista, com marcas, pecas, etiquetas e quilos"
     },
     {
-      "hash": "f702344eb4",
+      "hash": "f702344e",
       "data": "14/09/2026",
       "titulo": "Simulador: IFC de antes da revisão — a peça é achada pelo nome; corrimão é guarda-corpo"
     },
     {
-      "hash": "451728c828",
+      "hash": "451728c8",
       "data": "14/09/2026",
       "titulo": "Simulador: PDF do modelo montado no navegador — as fotos não sobem mais"
     },
     {
-      "hash": "11e46f3813",
+      "hash": "11e46f38",
       "data": "14/09/2026",
       "titulo": "PCP: posição de conjunto nunca vira conjunto; aposenta a baixa em massa da OP-113"
     },
     {
-      "hash": "000cc110ae",
+      "hash": "000cc110",
       "data": "14/09/2026",
       "titulo": "Melhora visão dos encarregados na produção por bancada e prioridade"
     },
     {
-      "hash": "a4ad306534",
+      "hash": "a4ad3065",
       "data": "14/09/2026",
       "titulo": "Montagem: liberação conta croqui cortado pela mesma regra da lista do PCP"
     },
     {
-      "hash": "ba6c76e275",
+      "hash": "ba6c76e2",
       "data": "14/09/2026",
       "titulo": "Simulador: ajustes por marca (embalagem, junto com, posição, orientação, medidas à mão)"
     },
     {
-      "hash": "fa5408313a",
+      "hash": "fa540831",
       "data": "14/09/2026",
       "titulo": "Desenhos em lote: diz qual marca falhou e por quê; avulsa sem croqui explica que vai ao Jato"
     },
     {
-      "hash": "28935e02cb",
+      "hash": "28935e02",
       "data": "14/09/2026",
       "titulo": "Admin › Usuários: conta sem e-mail vinculada ao funcionário do RH entra pelo CPF"
     },
     {
-      "hash": "545fe4fd0e",
+      "hash": "545fe4fd",
       "data": "13/09/2026",
       "titulo": "Os dois crons que nunca tinham rodado: produtos do Omie e orcamentos do SharePoint"
     },
     {
-      "hash": "d0923cb4a8",
+      "hash": "d0923cb4",
       "data": "13/09/2026",
       "titulo": "Cron financeiro: o orçamento sai de um prazo único, com reserva para o heartbeat"
     },
     {
-      "hash": "38b849a545",
+      "hash": "38b849a5",
       "data": "13/09/2026",
       "titulo": "Crons: quatro nunca rodaram, o financeiro se estrangulava e dois alarmes eram falsos"
     },
     {
-      "hash": "04e24ff808",
+      "hash": "04e24ff8",
       "data": "13/09/2026",
       "titulo": "Simulador: peça fora do IFC viaja só em caixa, com aviso no modal, no card e no PDF"
     },
     {
-      "hash": "dafdba0c12",
+      "hash": "dafdba0c",
       "data": "13/09/2026",
       "titulo": "Simulador: peça fora do IFC entra com caixa estimada pelo peso; parafuso fica fora sem alarme"
     },
     {
-      "hash": "d446972631",
+      "hash": "d4469726",
       "data": "13/09/2026",
       "titulo": "Romaneio prévio: card em três linhas (cabeçalho, dados, ações) e resumo da simulação"
     },
     {
-      "hash": "5911aa96d2",
+      "hash": "5911aa96",
       "data": "13/09/2026",
       "titulo": "Simulador: nada em cima de quadro vazado, caibros só sobre apoio, rótulos discretos"
     },
     {
-      "hash": "7c3fabd164",
+      "hash": "7c3fabd1",
       "data": "13/09/2026",
       "titulo": "Simular carga: percorre todos os IFCs da obra e deixa os AC fora"
     },
     {
-      "hash": "c52fb7bfdd",
+      "hash": "c52fb7bf",
       "data": "13/09/2026",
       "titulo": "Expedição: PDF do modelo de carga e veículos configuráveis do simulador"
-    },
-    {
-      "hash": "1e22c71457",
-      "data": "13/09/2026",
-      "titulo": "Expedição: Simular carga no romaneio prévio (motor lib/carga, IFC no navegador, 3D)"
     }
   ]
 }

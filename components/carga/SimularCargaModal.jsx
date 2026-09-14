@@ -6,11 +6,11 @@
 // Vitor (12/09/2026): a lista é o romaneio prévio; "se a lista não cabe num veículo, ele avisa na hora".
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Loader2, X, Play, RefreshCw, AlertCircle, CheckCircle2, FileText } from "lucide-react";
+import { Loader2, X, Play, RefreshCw, AlertCircle, CheckCircle2, FileText, Truck, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { geometriaDoIfc } from "@/lib/carga/geometria-ifc";
 import { prefixoDaOp } from "@/lib/carga/classificar";
 import { marcaEhAC } from "@/lib/marca-ac";
-import { ResumoSimulacao, VolumesDaCarga } from "./ResultadoSimulacao";
+import { ResumoSimulacao, VolumesDaCarga, AvisosSimulacao } from "./ResultadoSimulacao";
 import { EditorAjuste, ListaAjustes } from "./AjustesCarga";
 
 const VisualizadorCarga = dynamic(() => import("./VisualizadorCarga"), { ssr: false, loading: () => <div className="h-[480px] rounded-xl bg-[#eef2f6] flex items-center justify-center text-sm text-torg-gray">Carregando o 3D…</div> });
@@ -23,6 +23,13 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
   const [geo, setGeo] = useState(null), [perfil, setPerfil] = useState("recomendado");
   const [resultado, setResultado] = useState(null), [cargaSel, setCargaSel] = useState(0), [gravada, setGravada] = useState(null), [pdf, setPdf] = useState(null);
   const worker = useRef(null), viz = useRef(null);
+  const [tentativa, setTentativa] = useState(0);
+  const fecharRef = useRef(null);
+  useEffect(() => {
+    const anterior = document.activeElement, overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden"; fecharRef.current?.focus();
+    return () => { document.body.style.overflow = overflow; anterior?.focus?.(); };
+  }, []);
   // ajustes por marca da obra (AjusteCargaMarca): carregados junto com a lista; editar aqui e simular de novo
   const [ajustes, setAjustes] = useState({}), [editando, setEditando] = useState(null), [ajustesMudaram, setAjustesMudaram] = useState(false);
   useEffect(() => { fetch(`/api/comercial/op/${opId}/ajustes-carga`).then((r) => r.json()).then((j) => { if (j.success) setAjustes(j.ajustes || {}); }).catch(() => {}); }, [opId]);
@@ -36,7 +43,7 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
     fetch(`/api/comercial/op/${opId}/romaneios-previos/${previo.id}/simulacao`).then((r) => r.json())
       .then((j) => { if (!j.success) throw new Error(j.error || "Falha ao carregar"); setDados(j); setPerfil(j.perfilPadrao || "recomendado"); if (j.simulacao && !j.simulacao.desatualizada) { setResultado({ cargas: j.simulacao.cargas, resumo: j.simulacao.resumo, ...(j.simulacao.avisos || {}) }); setGravada(j.simulacao); } setFase("ifc"); })
       .catch((e) => { setErro(e.message); setFase("erro"); });
-  }, [opId, previo.id]);
+  }, [opId, previo.id, tentativa]);
 
   // 2) os IFCs da obra → geometria das marcas do romaneio. Uma obra pode ter um modelo por frente
   //    (a OP-107 tem seis): percorre TODOS, do mais novo ao mais antigo, até achar todas as marcas.
@@ -106,9 +113,16 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
     try {
       await new Promise((r) => setTimeout(r, 50));
       const camadas = [...new Set(c.itens.map((u) => u.camada || 0))].sort((a, b) => a - b);
-      const imagens = { full: { iso: v.capturar("iso"), lado: v.capturar("lado"), topo: v.capturar("topo") }, camadas: camadas.map((ci) => ({ ci, iso: v.capturar("iso", ci), topo: v.capturar("topo", ci) })),
-        // cada volume sozinho: é o desenho de referência para quem monta a embalagem
-        volumes: Object.fromEntries(c.itens.map((u) => [u.id, v.capturarVolume?.(u.id) || null])) };
+      const imagens = { full: {}, camadas: [], volumes: {} };
+      const totalFotos = 3 + camadas.length * 2 + c.itens.length; let foto = 0;
+      const progressoPdf = async () => { setPdf({ gerando: true, etapa: `Preparando imagem ${++foto} de ${totalFotos}` }); await new Promise((r) => setTimeout(r, 0)); };
+      for (const vista of ["iso", "lado", "topo"]) { await progressoPdf(); imagens.full[vista] = v.capturar(vista); }
+      for (const ci of camadas) {
+        await progressoPdf(); const iso = v.capturar("iso", ci);
+        await progressoPdf(); const topo = v.capturar("topo", ci); imagens.camadas.push({ ci, iso, topo });
+      }
+      for (const u of c.itens) { await progressoPdf(); imagens.volumes[u.id] = v.capturarVolume?.(u.id) || null; }
+      setPdf({ gerando: true, etapa: "Organizando as páginas do PDF…" });
       const [{ gerarModeloCargaPDF }, logo] = await Promise.all([
         import("@/lib/carga/modelo-carga-pdf"),
         fetch("/torg-logo-white.png").then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null),
@@ -126,37 +140,55 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
   const carga = resultado?.cargas?.[cargaSel] || null;
   const ocupado = fase === "carregando" || fase === "ifc" || fase === "simulando";
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center p-3 sm:p-6 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-[#F3F6F9] rounded-2xl shadow-2xl w-full max-w-6xl">
-        <div className="px-4 sm:px-5 py-3 bg-torg-dark text-white rounded-t-2xl flex flex-wrap items-center gap-x-3 gap-y-2">
-          <div className="basis-full sm:basis-auto sm:flex-1 min-w-0">
-            <h3 className="text-sm font-bold">Simular carga · Romaneio prévio {String(previo.numero).padStart(2, "0")} · OP {opNumero}</h3>
-            <p className="text-[11px] text-white/70">{dados ? `${dados.lista.length} marcas · ${dados.lista.reduce((t, i) => t + i.qtd, 0)} peças · ${Math.round(dados.previo.pesoKg || 0).toLocaleString("pt-BR")} kg` : "…"}{geo?.modelo ? ` · modelo: ${geo.modelo}` : ""}</p>
+    <div className="fixed inset-0 z-50 bg-torg-dark/60 sm:p-3 lg:p-5 flex items-center justify-center" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-labelledby="titulo-simular-carga" className="bg-[#F3F6F9] sm:rounded-2xl shadow-2xl w-full max-w-[1600px] h-[100dvh] sm:h-[calc(100dvh-1.5rem)] lg:h-[calc(100dvh-2.5rem)] flex flex-col overflow-hidden" onKeyDown={(e) => {
+        if (editando) return;
+        if (e.key === "Escape") { e.stopPropagation(); onClose(); }
+        if (e.key === "Tab") {
+          const elementos = [...e.currentTarget.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), a[href], summary')].filter((el) => el.getClientRects().length);
+          const primeiro = elementos[0], ultimo = elementos[elementos.length - 1];
+          if (e.shiftKey && document.activeElement === primeiro) { e.preventDefault(); ultimo?.focus(); }
+          else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primeiro?.focus(); }
+        }
+      }}>
+        <header className="px-4 sm:px-6 py-4 bg-white border-b border-slate-200 flex items-center gap-3 shrink-0">
+          <div className="hidden sm:flex h-11 w-11 rounded-xl bg-torg-blue-50 items-center justify-center text-torg-blue"><Truck size={23} /></div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-torg-gray">OP {opNumero} · Romaneio prévio {String(previo.numero).padStart(2, "0")}</p>
+            <h2 id="titulo-simular-carga" className="text-xl sm:text-2xl font-bold text-torg-dark">Simular carga</h2>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <select value={perfil} onChange={(e) => setPerfil(e.target.value)} disabled={ocupado} className="text-[12px] text-torg-dark rounded-lg px-2 py-1.5 border-0" title="Nível de embalagem (o padrão vem da LQC da obra)">
-              {(dados?.perfis || [{ chave: "recomendado", nome: "Padrão" }]).map((p) => <option key={p.chave} value={p.chave}>Embalagem {p.nome}</option>)}
-            </select>
-            <button onClick={simular} disabled={ocupado || !geo} className="text-[12px] font-semibold bg-torg-orange text-white rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-50 hover:bg-orange-600">
-              {fase === "simulando" ? <Loader2 size={14} className="animate-spin" /> : resultado ? <RefreshCw size={14} /> : <Play size={14} />} {resultado ? "Simular de novo" : "Simular"}
-            </button>
-            <button onClick={gerarPdf} disabled={ocupado || !resultado || !geo || pdf?.gerando} className="text-[12px] font-semibold bg-white/15 text-white rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-40 hover:bg-white/25" title="PDF do modelo de carga para a Expedição (separar, formar volumes, montar por camada)">
-              {pdf?.gerando ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} PDF do modelo
-            </button>
-            <button onClick={onClose} className="text-white/70 hover:text-white"><X size={20} /></button>
+          <div className="hidden md:flex items-center gap-5 text-sm text-torg-gray">
+            {dados && <><span><b className="text-torg-dark">{dados.lista.length}</b> marcas</span><span><b className="text-torg-dark">{dados.lista.reduce((t, i) => t + i.qtd, 0).toLocaleString("pt-BR")}</b> peças</span><span><b className="text-torg-dark">{Math.round(dados.previo.pesoKg || 0).toLocaleString("pt-BR")}</b> kg no romaneio</span></>}
           </div>
-        </div>
-
-        <div className="p-4 space-y-3">
+          <button ref={fecharRef} onClick={onClose} aria-label="Fechar simulação" className="h-11 w-11 shrink-0 rounded-xl text-torg-gray hover:bg-slate-100 flex items-center justify-center focus-visible:ring-2 focus-visible:ring-torg-blue"><X size={22} /></button>
+        </header>
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5">
+          <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-end gap-3">
+            <label className="block sm:w-64 text-sm font-semibold text-torg-dark">Padrão de embalagem
+              <select value={perfil} onChange={(e) => setPerfil(e.target.value)} disabled={ocupado || pdf?.gerando} className="mt-1.5 w-full h-11 text-sm font-normal text-torg-dark rounded-lg px-3 border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-torg-blue/30" title="O padrão vem da LQC da obra">
+                {(dados?.perfis || [{ chave: "recomendado", nome: "Padrão" }]).map((p) => <option key={p.chave} value={p.chave}>{p.nome}</option>)}
+              </select>
+            </label>
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <button onClick={simular} disabled={ocupado || !geo || pdf?.gerando} className="min-h-11 text-sm font-semibold bg-torg-blue text-white rounded-lg px-4 inline-flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-torg-dark">
+                {fase === "simulando" ? <Loader2 size={17} className="animate-spin" /> : resultado ? <RefreshCw size={17} /> : <Play size={17} />} {resultado ? "Simular de novo" : "Simular"}
+              </button>
+              <button onClick={gerarPdf} disabled={ocupado || !resultado || !geo || pdf?.gerando} className="min-h-11 text-sm font-semibold bg-white border border-slate-200 text-torg-dark rounded-lg px-4 inline-flex items-center justify-center gap-2 disabled:opacity-40 hover:bg-slate-50" title="Modelo de carga para a Expedição">
+                {pdf?.gerando ? <Loader2 size={17} className="animate-spin" /> : <FileText size={17} />} {pdf?.gerando ? "Gerando PDF…" : "PDF do modelo"}
+              </button>
+            </div>
+            <p className="sm:ml-auto text-xs text-torg-gray sm:text-right leading-relaxed">Confira o veículo, a disposição<br className="hidden sm:block" /> e a sequência de carregamento.</p>
+          </div>
+          {pdf?.gerando && <p role="status" className="rounded-xl border border-torg-blue-200 bg-torg-blue-50 p-4 text-sm text-torg-dark flex items-center gap-2"><Loader2 size={17} className="animate-spin text-torg-blue" />{pdf.etapa || "Preparando o PDF…"}</p>}
           {ocupado && (
             <div className="bg-white rounded-xl border border-gray-100 px-4 py-3">
-              <div className="text-[12px] text-torg-dark inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin text-torg-blue" /> {progresso.msg || "Carregando…"}</div>
+              <div className="text-sm text-torg-dark inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin text-torg-blue" /> {progresso.msg || "Carregando…"}</div>
               <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-torg-blue transition-all" style={{ width: `${Math.round(100 * (progresso.frac || 0))}%` }} /></div>
             </div>
           )}
-          {erro && <p className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 inline-flex items-center gap-2"><AlertCircle size={14} /> {erro}</p>}
+          {erro && <div role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl p-4 flex flex-wrap items-center gap-2"><AlertCircle size={18} className="shrink-0" /><span className="flex-1 min-w-0">{erro}</span>{fase === "erro" && <button onClick={() => { setErro(null); if (dados) setFase("ifc"); else { setFase("carregando"); setTentativa((t) => t + 1); } }} className="min-h-11 border border-red-200 rounded-lg px-3 font-semibold">Tentar novamente</button>}</div>}
           {geo && !resultado && fase === "pronto" && (
-            <div className="bg-white rounded-xl border border-gray-100 px-4 py-3 text-[12px] text-torg-dark">
+            <div className="bg-white rounded-xl border border-gray-100 p-5 text-sm leading-relaxed text-torg-dark">
               Marcas medidas no modelo: <b>{Object.keys(geo.geometria).length}</b> de {dados.lista.length}{geo.ac?.length ? <> · {geo.ac.length} AC (parafusos e acessórios comprados) ficam fora da carga</> : null}.
               {geo.porNome?.length > 0 && <p className="mt-1 text-amber-800"><b>Numeração do IFC diferente da lista ({geo.porNome.length}):</b> {geo.porNome.slice(0, 15).join(", ")}{geo.porNome.length > 15 ? ` e mais ${geo.porNome.length - 15}` : ""} — o modelo é de antes da revisão; a peça foi achada pela descrição, confira a medida.</p>}
               {geo.faltantes.length > 0 && <p className="mt-1 text-amber-800"><b>Fora do IFC ({geo.faltantes.length}):</b> {geo.faltantes.slice(0, 15).join(", ")}{geo.faltantes.length > 15 ? ` e mais ${geo.faltantes.length - 15}` : ""} — entram na carga com medida estimada pelo peso; conferir no pátio.</p>}
@@ -164,20 +196,30 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
               {dados.simulacao?.desatualizada && <p className="mt-1 text-amber-800">A última simulação ({fmtD(dados.simulacao.createdAt)}) é de antes de o romaneio mudar — simule de novo.</p>}
             </div>
           )}
-          {dados && fase !== "carregando" && <ListaAjustes ajustes={ajustes} lista={dados.lista} desatualizada={ajustesMudaram && !!resultado} onEditar={(marca, desc) => setEditando({ marca, desc })} />}
           {resultado && (
-            <>
-              <div className="flex items-center gap-2 text-[11px] text-torg-gray">
-                {gravada ? <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 size={13} /> Simulação gravada em {fmtD(gravada.createdAt)} · embalagem {gravada.perfilNome}</span> : <span>Resultado não gravado</span>}
-                {resultado.gcModo && <span>· guarda-corpo: {resultado.gcModo === "engradado" ? "em pé em engradado" : "deitado em pacote"}</span>}
-                {pdf?.url && <a href={pdf.url} download={pdf.nome} className="ml-auto text-torg-blue font-medium hover:underline inline-flex items-center gap-1"><FileText size={12} /> Baixar {pdf.nome}</a>}
+            <fieldset disabled={!!pdf?.gerando} className="min-w-0 space-y-5">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-torg-gray">
+                {gravada ? <span className="inline-flex items-center gap-1.5"><CheckCircle2 size={15} className="text-emerald-600" /> Gravada em {fmtD(gravada.createdAt)} · {gravada.perfilNome}</span> : <span>Resultado não gravado</span>}
+                {resultado.gcModo && <span>Guarda-corpo: {resultado.gcModo === "engradado" ? "em pé em engradado" : "deitado em pacote"}</span>}
+                {pdf?.url && <a href={pdf.url} download={pdf.nome} className="sm:ml-auto text-torg-blue font-semibold hover:underline inline-flex items-center gap-1.5 min-h-9"><FileText size={15} /> Baixar PDF gerado</a>}
               </div>
-              <ResumoSimulacao resultado={resultado} cargaSel={cargaSel} onCarga={setCargaSel} />
-              {carga && geo && <VisualizadorCarga apiRef={viz} carga={carga} malhas={geo.malhas} madeira={resultado.madeira || 100} altura={480} />}
-              {carga && !geo && <p className="text-[12px] text-torg-gray">Baixando o modelo para desenhar o 3D…</p>}
-              {carga && <VolumesDaCarga carga={carga} ajustes={ajustes} onAjustar={(marca, desc) => setEditando({ marca, desc })} />}
-            </>
+              {ajustesMudaram && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Os ajustes mudaram. Clique em <b>Simular de novo</b> para atualizar a disposição da carga.</p>}
+              <AvisosSimulacao resultado={resultado} />
+              <div className="grid lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)] gap-5 items-start">
+                <ResumoSimulacao resultado={resultado} cargaSel={cargaSel} onCarga={setCargaSel} />
+                <div className="min-w-0 space-y-3">
+                  {carga && geo && <VisualizadorCarga apiRef={viz} carga={carga} malhas={geo.malhas} madeira={resultado.madeira || 100} altura={480} />}
+                  {carga && !geo && <div className="min-h-64 rounded-2xl border border-slate-200 bg-white p-6 flex items-center justify-center text-sm text-torg-gray">{fase === "erro" ? "O modelo 3D não está disponível. Tente carregar novamente." : "Baixando o modelo para desenhar o 3D…"}</div>}
+                  {geo?.modelo && <details className="text-xs text-torg-gray px-1"><summary className="cursor-pointer py-2">Modelo de referência</summary><p className="break-words pb-2">{geo.modelo}</p></details>}
+                </div>
+              </div>
+              {carga && <VolumesDaCarga key={cargaSel} carga={carga} ajustes={ajustes} onAjustar={(marca, desc) => setEditando({ marca, desc })} />}
+            </fieldset>
           )}
+          {dados && fase !== "carregando" && <details className="group bg-white rounded-xl border border-slate-200">
+            <summary className="flex items-center gap-2 p-4 cursor-pointer list-none text-sm font-semibold text-torg-dark"><SlidersHorizontal size={18} className="text-torg-blue" /> Ajustes por marca <span className="font-normal text-xs text-torg-gray">({Object.keys(ajustes).length})</span><ChevronDown size={18} className="ml-auto group-open:rotate-180" /></summary>
+            <div className="px-4 pb-4"><p className="text-xs text-torg-gray mb-3">Defina exceções de embalagem, posição e medidas. Os ajustes ficam salvos para os próximos romaneios desta OP.</p><ListaAjustes ajustes={ajustes} lista={dados.lista} desatualizada={ajustesMudaram && !!resultado} onEditar={(marca, desc) => setEditando({ marca, desc })} /></div>
+          </details>}
         </div>
       </div>
       {editando && <EditorAjuste marca={editando.marca} desc={editando.desc} regras={ajustes[editando.marca] || null} semGeometria={!!geo && !geo.geometria[editando.marca]} onSalvar={salvarAjuste} onFechar={() => setEditando(null)} />}

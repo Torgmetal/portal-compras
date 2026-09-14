@@ -1,66 +1,106 @@
 "use client";
-// Resultado de uma simulação de carga: resumo, avisos e a lista de volumes da carga escolhida.
-import { AlertTriangle, Package, Truck, SlidersHorizontal } from "lucide-react";
+// Leitura da carga escolhida, pendências de conferência e volumes para separação.
+import { useState } from "react";
+import { AlertTriangle, Package, Truck, Search, X, Check, Layers, Clock3, Ruler, ChevronDown } from "lucide-react";
 
 const fmtKg = (v) => `${Math.round(v || 0).toLocaleString("pt-BR")} kg`;
-const TIPO_COR = { "caixa de madeira": "bg-amber-100 text-amber-900", "feixe cintado": "bg-blue-100 text-blue-900", "pacote de guarda-corpo cintado": "bg-emerald-100 text-emerald-900", "pacote de grade cintado": "bg-teal-100 text-teal-900", "pacote de degraus cintado": "bg-lime-100 text-lime-900", "peça solta calçada": "bg-gray-100 text-gray-800" };
+const metros = (v) => `${((v || 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} m`;
+const TIPO_COR = { "caixa de madeira": "bg-amber-50 text-amber-900", "feixe cintado": "bg-blue-50 text-blue-900", "pacote de guarda-corpo cintado": "bg-emerald-50 text-emerald-900", "pacote de grade cintado": "bg-teal-50 text-teal-900", "pacote de degraus cintado": "bg-lime-50 text-lime-900", "peça solta calçada": "bg-gray-100 text-gray-800" };
+
+function Ocupacao({ titulo, valor, detalhe }) {
+  return <div>
+    <div className="flex justify-between items-baseline gap-2 text-sm"><span className="text-torg-gray">{titulo}</span><strong className="text-torg-dark tabular-nums">{valor == null ? "—" : `${valor}%`}</strong></div>
+    <div className="h-2 rounded-full bg-slate-100 mt-2 overflow-hidden"><div className={`h-full rounded-full ${valor > 100 ? "bg-red-500" : "bg-torg-blue"}`} style={{ width: `${Math.min(100, Math.max(0, valor || 0))}%` }} /></div>
+    <p className="text-xs text-torg-gray mt-1.5">{detalhe}</p>
+  </div>;
+}
 
 export function ResumoSimulacao({ resultado, cargaSel, onCarga }) {
-  const r = resultado, cargas = r.cargas || [];
+  const cargas = resultado.cargas || [], c = cargas[cargaSel];
+  const [detalhes, setDetalhes] = useState(false);
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
-        {cargas.map((c, i) => (
-          <button key={i} onClick={() => onCarga(i)} className={`text-left rounded-lg border px-3 py-2 min-w-[210px] ${cargaSel === i ? "border-torg-blue bg-torg-blue-50" : "border-gray-200 bg-white hover:border-torg-blue"}`}>
-            <div className="text-[12px] font-bold text-torg-dark inline-flex items-center gap-1.5"><Truck size={14} className="text-torg-blue" /> {cargas.length > 1 ? `Carga ${i + 1} · ` : ""}{c.veiculo?.nome}</div>
-            <div className="text-[11px] text-torg-gray mt-0.5">{fmtKg(c.peso)} · {Math.round(100 * c.peso / (c.veiculo?.pesoMax || 1))} % do veículo · altura {(c.altura / 1000).toFixed(2).replace(".", ",")} m · chão {c.chao} %</div>
-            <div className="text-[11px] text-torg-gray">{c.volumes} volumes · {c.itens?.length ? c.itens.reduce((t, u) => t + (u.membros?.length || 1), 0) : 0} peças · ≈ {c.tempo?.minutos} min de carregamento</div>
-          </button>
-        ))}
+    <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-fit">
+      <div className="px-5 py-4 border-b border-slate-100">
+        <p className="text-xs font-semibold text-torg-gray uppercase tracking-wider">Veículos da simulação</p>
+        <h3 className="text-xl font-bold text-torg-dark mt-1">{cargas.length} {cargas.length === 1 ? "carga planejada" : "cargas planejadas"}</h3>
       </div>
-      {cargas.length > 1 && (
-        <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-start gap-2"><AlertTriangle size={14} className="mt-0.5 shrink-0" /><span><b>Não cabe num veículo só:</b> a lista pede {cargas.length} cargas. Tire peças do romaneio ou passe parte para o próximo, e simule de novo.</span></p>
-      )}
-      {r.estimadas?.length > 0 && (
-        <p className="text-[12px] text-amber-900 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 inline-flex items-start gap-2"><AlertTriangle size={14} className="mt-0.5 shrink-0" /><span><b>{r.estimadas.length} {r.estimadas.length === 1 ? "peça tem peso mas não está no IFC" : "peças têm peso mas não estão no IFC"} da obra.</b> Entraram em caixa de madeira com medida estimada pelo peso — confira no pátio antes de fechar a carga: {r.estimadas.map((e) => `${e.marca} (${e.desc || "?"}, ${Math.round(e.kg)} kg, est. ${Math.round(e.C / 10)}×${Math.round(e.L / 10)}×${Math.round(e.A / 10)} cm)`).join("; ")}.</span></p>
-      )}
-      {(r.resumo?.especiais > 0 || r.resumo?.semLugar?.length > 0 || r.semCaixa?.length > 0) && (
-        <div className="text-[12px] text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2 space-y-1">
-          {r.especiais?.map((e) => <div key={e.id}><b>Transporte especial:</b> {e.rotulo} — {e.aviso}</div>)}
-          {r.resumo?.semLugar?.map((s, i) => <div key={i}><b>Sem lugar:</b> {s}</div>)}
-          {r.semCaixa?.length > 0 && <div><b>Sem peso e sem geometria ({r.semCaixa.length} pç, ficaram fora):</b> {[...new Set(r.semCaixa.map((s) => s.marca))].join(", ")}</div>}
+      <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 max-h-64 overflow-y-auto">
+        {cargas.map((v, i) => <button key={i} onClick={() => onCarga(i)} aria-pressed={cargaSel === i} className={`w-full min-w-0 text-left rounded-xl border p-3 transition-colors focus-visible:ring-2 focus-visible:ring-torg-blue ${cargaSel === i ? "border-torg-blue bg-torg-blue-50" : "border-slate-200 hover:bg-slate-50"}`}>
+          <span className="flex items-center gap-2 text-sm font-semibold text-torg-dark"><Truck size={18} className="shrink-0 text-torg-blue" /><span className="flex-1">Carga {i + 1} <span className="font-normal text-torg-gray">/ {cargas.length}</span></span>{cargaSel === i && <Check size={17} className="text-torg-blue" />}</span>
+          <span className="block font-bold text-torg-dark mt-2">{v.veiculo?.nome || "Veículo"}</span>
+          <span className="block text-xs text-torg-gray mt-1">{fmtKg(v.peso)} · {v.volumes} volumes</span>
+        </button>)}
+      </div>
+      {c ? <div className="p-5 border-t border-slate-100 space-y-5">
+        <div className="grid grid-cols-2 gap-5 lg:grid-cols-1">
+          <Ocupacao titulo="Capacidade de peso" valor={c.veiculo?.pesoMax ? Math.round(100 * c.peso / c.veiculo.pesoMax) : null} detalhe={`${fmtKg(c.peso)} de ${fmtKg(c.veiculo?.pesoMax)}`} />
+          <Ocupacao titulo="Piso ocupado" valor={c.chao ?? null} detalhe="Área utilizada da carroceria" />
         </div>
-      )}
-    </div>
+        <button onClick={() => setDetalhes((v) => !v)} aria-expanded={detalhes} className="lg:hidden min-h-11 w-full text-sm text-torg-blue font-semibold flex items-center justify-between">Detalhes do veículo e da carga<ChevronDown size={17} className={detalhes ? "rotate-180" : ""} /></button>
+        <div className={`${detalhes ? "block" : "hidden lg:block"} space-y-5`}>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-5 text-sm">
+          {[[Ruler, "Altura da carga", metros(c.altura)], [Layers, "Camadas", c.camadas ?? new Set((c.itens || []).map((u) => u.camada || 0)).size], [Package, "Peças", (c.itens || []).reduce((t, u) => t + (u.membros?.length || 1), 0)], [Clock3, "Tempo estimado", c.tempo?.minutos == null ? "—" : `${c.tempo.minutos} min`]].map(([Icon, label, value]) => <div key={label}><dt className="text-xs text-torg-gray flex items-center gap-1.5"><Icon size={14} />{label}</dt><dd className="font-semibold text-torg-dark mt-1 text-base">{value}</dd></div>)}
+        </dl>
+        <div className="rounded-lg bg-slate-50 p-3 text-xs text-torg-gray leading-relaxed"><span className="font-semibold text-torg-dark block">Medidas úteis do veículo</span>{metros(c.veiculo?.C)} × {metros(c.veiculo?.L)} × {metros(c.veiculo?.alturaUtil)}<span className="block">comprimento × largura × altura</span></div>
+        </div>
+      </div> : <p className="p-5 text-sm text-torg-gray">Nenhuma carga foi montada. Confira as pendências da simulação.</p>}
+    </section>
   );
 }
 
+export function AvisosSimulacao({ resultado: r }) {
+  const cargas = r.cargas || [];
+  return <div className="space-y-3 text-sm">
+    {cargas.length > 1 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3 text-amber-900"><AlertTriangle size={19} className="shrink-0 mt-0.5" /><div><b>A lista precisa de {cargas.length} veículos.</b><p className="mt-1">Para usar um só, transfira parte das peças para outro romaneio e simule novamente.</p></div></div>}
+    {r.estimadas?.length > 0 && <details className="rounded-xl border border-amber-200 bg-amber-50 text-amber-900">
+      <summary className="p-4 cursor-pointer font-semibold">Conferir medidas no pátio · {r.estimadas.length} marcas com estimativa</summary>
+      <div className="px-4 pb-4"><p className="mb-3">Estas marcas não estão no IFC. A embalagem foi estimada pelo peso.</p><ul className="space-y-2 max-h-56 overflow-y-auto">{r.estimadas.map((e) => <li key={e.marca} className="border-t border-amber-200 pt-2"><b>{e.marca}</b> · {e.desc || "Sem descrição"}<span className="block text-xs mt-1">{fmtKg(e.kg)} · estimativa {Math.round(e.C / 10)} × {Math.round(e.L / 10)} × {Math.round(e.A / 10)} cm</span></li>)}</ul></div>
+    </details>}
+    {(r.especiais?.length > 0 || r.resumo?.semLugar?.length > 0 || r.semCaixa?.length > 0) && <div role="alert" className="text-red-800 bg-red-50 border border-red-200 rounded-xl p-4 space-y-2">
+      <p className="font-bold flex items-center gap-2"><AlertTriangle size={18} /> Pendências para fechar a carga</p>
+      {r.especiais?.map((e) => <p key={e.id}><b>Transporte especial:</b> {e.rotulo} — {e.aviso}</p>)}
+      {r.resumo?.semLugar?.map((s, i) => <p key={i}><b>Sem lugar:</b> {s}</p>)}
+      {r.semCaixa?.length > 0 && <p><b>Fora da carga, sem peso e sem geometria ({r.semCaixa.length} peças):</b> {[...new Set(r.semCaixa.map((s) => s.marca))].join(", ")}</p>}
+    </div>}
+  </div>;
+}
+
 export function VolumesDaCarga({ carga, onAjustar, ajustes }) {
-  const rom = carga?.romaneio || [];
+  const [busca, setBusca] = useState("");
+  const rom = carga?.romaneio || [], itens = new Map((carga?.itens || []).map((u) => [u.id, u]));
+  const q = busca.trim().toLocaleLowerCase("pt-BR");
+  const filtrados = rom.filter((v) => !q || [v.volume, v.tipo, v.rotulo, ...(v.marcas || []), ...(itens.get(v.id)?.membros || []).flatMap((m) => [m.marca, m.desc])].join(" ").toLocaleLowerCase("pt-BR").includes(q));
+  const marcas = (v) => {
+    const grupo = new Map();
+    for (const m of itens.get(v.id)?.membros || []) grupo.set(m.marca, { n: (grupo.get(m.marca)?.n || 0) + 1, desc: m.desc });
+    if (!grupo.size) for (const m of v.marcas || []) grupo.set(m, { n: 1 });
+    return <div className="flex flex-wrap gap-1.5">{[...grupo].map(([m, d]) => <span key={m} className="inline-flex items-center gap-1">{onAjustar ? <button onClick={() => onAjustar(m, d.desc)} className={`min-h-9 border rounded-md px-2 text-sm hover:border-torg-blue hover:bg-torg-blue-50 ${ajustes?.[m] ? "border-torg-blue-200 text-torg-blue font-semibold bg-torg-blue-50" : "border-slate-200 text-torg-dark"}`} title="Ajustar esta marca">{m}</button> : m}{d.n > 1 && <span className="text-xs text-torg-gray">×{d.n}</span>}</span>)}</div>;
+  };
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="px-3 py-2 border-b border-gray-100 text-[12px] font-bold text-torg-dark inline-flex items-center gap-1.5"><Package size={14} className="text-torg-blue" /> Volumes desta carga <span className="font-normal text-torg-gray">· {rom.length} volumes · madeira: {carga?.madeira?.pecas?.caibro || 0} caibros, {carga?.madeira?.pecas?.sarrafo || 0} sarrafos, {carga?.madeira?.pecas?.tabua || 0} tábuas (peças de 3 m)</span></div>
-      <div className="max-h-72 overflow-y-auto">
-        <table className="w-full text-[12px]">
-          <thead className="bg-gray-50/60 sticky top-0 text-torg-gray"><tr>
-            <th className="text-left px-3 py-1 font-medium w-12">Vol.</th><th className="text-left px-2 py-1 font-medium w-40">Tipo</th><th className="text-left px-2 py-1 font-medium">Conteúdo</th>
-            <th className="text-right px-2 py-1 font-medium w-12">Pç</th><th className="text-right px-2 py-1 font-medium w-20">kg</th><th className="text-right px-2 py-1 font-medium w-32">C×L×A (cm)</th><th className="text-right px-2 py-1 font-medium w-16">Camada</th>{onAjustar && <th className="px-2 py-1 w-24"></th>}
-          </tr></thead>
-          <tbody className="divide-y divide-gray-50">
-            {rom.map((v) => { const u = carga.itens.find((x) => x.id === v.id); return (
-              <tr key={v.volume}>
-                <td className="px-3 py-1 font-mono font-bold text-torg-dark">{v.volume}</td>
-                <td className="px-2 py-1"><span className={`px-1.5 py-0.5 rounded text-[11px] ${TIPO_COR[v.tipo] || "bg-gray-100 text-gray-800"}`}>{v.tipo}</span></td>
-                <td className="px-2 py-1 text-torg-dark">{(() => { const g = new Map(); for (const m of u?.membros || []) g.set(m.marca, { n: (g.get(m.marca)?.n || 0) + 1, desc: m.desc }); return [...g].map(([k, v], i) => <span key={k}>{i ? ", " : ""}{onAjustar ? <button onClick={() => onAjustar(k, v.desc)} className={`hover:underline ${ajustes?.[k] ? "text-torg-blue font-semibold" : ""}`} title={ajustes?.[k] ? "Marca com ajuste — clique para editar" : "Ajustar esta marca"}>{k}</button> : k}{v.n > 1 ? ` ×${v.n}` : ""}</span>); })()}</td>
-                <td className="px-2 py-1 text-right tabular-nums">{v.pecas}</td>
-                <td className="px-2 py-1 text-right tabular-nums">{v.kgBruto.toLocaleString("pt-BR")}</td>
-                <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">{v.dimsCm.join(" × ")}</td>
-                <td className="px-2 py-1 text-right tabular-nums">{(u?.camada || 0) + 1}</td>
-                {onAjustar && <td className="px-2 py-1 text-right">{u?.membros?.length === 1 ? <button onClick={() => onAjustar(u.membros[0].marca, u.membros[0].desc)} className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><SlidersHorizontal size={11} /> Ajustar</button> : <span className="text-[10px] text-torg-gray">clique na marca</span>}</td>}
-              </tr>); })}
+    <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex-1"><h3 className="text-base font-bold text-torg-dark flex items-center gap-2"><Package size={19} className="text-torg-blue" /> Volumes desta carga <span className="text-xs font-semibold rounded-full bg-slate-100 px-2 py-1">{rom.length}</span></h3><p className="text-xs text-torg-gray mt-1">Localize as peças para separar. Toque na marca para ajustar a embalagem.</p></div>
+        <div className="relative w-full sm:w-64"><Search size={17} className="absolute left-3 top-3.5 text-torg-gray" /><input type="search" aria-label="Buscar volume ou marca" placeholder="Buscar volume ou marca" value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full min-h-11 rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-torg-blue/30" />{busca && <button onClick={() => setBusca("")} aria-label="Limpar busca" className="absolute right-0 top-0 w-10 h-11 flex items-center justify-center text-torg-gray"><X size={16} /></button>}</div>
+      </div>
+      <div className="max-h-[520px] overflow-auto">
+        <table className="w-full text-sm max-sm:block">
+          <thead className="bg-gray-50/60 sticky top-0 text-torg-gray max-sm:hidden"><tr>{["Volume / embalagem", "Marcas e quantidades", "Peças", "Peso bruto", "C × L × A (cm)", "Camada"].map((h, i) => <th key={h} className={`px-4 py-3 font-medium whitespace-nowrap ${i < 2 ? "text-left" : "text-right"}`}>{h}</th>)}</tr></thead>
+          <tbody className="divide-y divide-gray-100 max-sm:block">
+            {filtrados.map((v) => <tr key={v.volume} className="hover:bg-slate-50/60 max-sm:block max-sm:p-4">
+              <td className="px-4 py-3 max-sm:p-0 max-sm:block"><b className="text-torg-dark">Volume {String(v.volume).padStart(2, "0")}</b><span className={`block w-fit mt-1.5 px-2 py-1 rounded-md text-xs ${TIPO_COR[v.tipo] || "bg-gray-100 text-gray-800"}`}>{v.tipo}</span></td>
+              <td className="px-4 py-3 max-sm:px-0 max-sm:block">{marcas(v)}</td>
+              <td className="px-4 py-3 text-right tabular-nums text-torg-dark max-sm:inline-block max-sm:pl-0 max-sm:py-1"><span className="sm:hidden text-torg-gray mr-1">Peças:</span>{v.pecas}</td>
+              <td className="px-4 py-3 text-right tabular-nums text-torg-dark whitespace-nowrap max-sm:inline-block max-sm:pl-0 max-sm:py-1">{fmtKg(v.kgBruto)}</td>
+              <td className="px-4 py-3 text-right tabular-nums text-torg-gray whitespace-nowrap max-sm:block max-sm:p-0 max-sm:text-left max-sm:mt-2">{v.dimsCm?.join(" × ")}<span className="sm:hidden"> cm</span></td>
+              <td className="px-4 py-3 text-right text-torg-dark max-sm:block max-sm:p-0 max-sm:text-left max-sm:mt-2"><span className="sm:hidden text-torg-gray">Camada </span>{(itens.get(v.id)?.camada || 0) + 1}</td>
+            </tr>)}
           </tbody>
         </table>
+        {!filtrados.length && <p className="p-8 text-center text-sm text-torg-gray">{q ? "Nenhum volume encontrado." : "Esta carga ainda não tem volumes."}</p>}
       </div>
-    </div>
+      <div className="px-4 sm:px-5 py-3 bg-slate-50 border-t border-slate-100 text-xs text-torg-gray flex flex-wrap gap-x-5 gap-y-2">
+        <b className="text-torg-dark">Madeira para esta carga</b><span>{carga?.madeira?.pecas?.caibro || 0} caibros</span><span>{carga?.madeira?.pecas?.sarrafo || 0} sarrafos</span><span>{carga?.madeira?.pecas?.tabua || 0} tábuas</span><span>Peças de 3 m</span>
+      </div>
+    </section>
   );
 }
