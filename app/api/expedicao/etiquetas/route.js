@@ -13,7 +13,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { MODELOS, gerarEtiquetasCarregamentoPDF } from "@/lib/etiqueta-carregamento-pdf";
-import { camposExtrasDaOP, juntarCamposExtras, juntarTagsCliente, tagsPorUnidade } from "@/lib/etiqueta-campos-extras";
+import { camposExtrasDaOP, juntarCamposExtras, juntarTagsCliente, tagsPorUnidade, caixasComDestinosDiferentes } from "@/lib/etiqueta-campos-extras";
 import { conferirCobertura, tagsDaOP } from "@/lib/etiqueta-tag-cliente";
 import { chaveMarca } from "@/lib/itens-expedicao";
 import { contarEtiquetas, recusaPorBytes, recusaPorTamanho } from "@/lib/etiquetas-carregamento-limites";
@@ -110,25 +110,40 @@ async function camposDoModelo(op, pecas, modelo, confirmado) {
   // sempre aparece é confirmação que ninguém lê. Filtrar pelo que foi escolhido é o que faz a
   // pergunta significar o que ela diz.
   const escolhidas = new Set(pecas.map((p) => chaveMarca(p.marca)));
-  const cobertura = conferirCobertura(mapa.filter((u) => escolhidas.has(chaveMarca(u.marca))), pecas);
-  if (!cobertura.completa && !confirmado) {
+  const doLote = mapa.filter((u) => escolhidas.has(chaveMarca(u.marca)));
+  const cobertura = conferirCobertura(doLote, pecas);
+  const porUnidade = tagsPorUnidade(mapa);
+  // A caixa com peças de dois destinos sai sem TAG — a cobertura não vê isso, porque para ela a
+  // marca está coberta. Ver `caixasComDestinosDiferentes`.
+  const caixas = caixasComDestinosDiferentes(pecas, porUnidade);
+  if ((!cobertura.completa || caixas.length) && !confirmado) {
     return {
       recusa: NextResponse.json(
-        { success: false, precisaConfirmar: true, error: frasedaCobertura(cobertura), cobertura },
+        { success: false, precisaConfirmar: true, error: frasedaCobertura(cobertura, caixas), cobertura, caixas },
         { status: 409 }),
     };
   }
-  return { pecas: juntarTagsCliente(pecas, tagsPorUnidade(mapa)) };
+  return { pecas: juntarTagsCliente(pecas, porUnidade) };
 }
 
 /** A frase da recusa por cobertura: diz QUANTAS etiquetas sairiam sem TAG, e de quais marcas. */
-function frasedaCobertura({ semTag, foraDaLista }) {
+function frasedaCobertura({ semTag, foraDaLista }, caixas = []) {
   const faltando = semTag.reduce((n, m) => n + (m.qte - m.comTag), 0);
   const quais = semTag.slice(0, 4).map((m) => `${m.marca} (${m.qte - m.comTag} de ${m.qte})`).join(", ");
   const resto = semTag.length > 4 ? ` e mais ${semTag.length - 4} marca(s)` : "";
   const fora = foraDaLista.length ? ` A planilha tem ${foraDaLista.length} marca(s) que não estão na Lista de Expedição.` : "";
-  if (!faltando) return `A planilha de TAGs não bate com esta obra.${fora}`;
-  return `${faltando} etiqueta(s) sairão SEM TAG: ${quais}${resto}.${fora} Confirme para imprimir assim.`;
+  // A caixa misturada é problema DIFERENTE de falta de TAG, e a saída também: ali se separa a
+  // caixa por destino; aqui se completa a planilha. Dizer "sem TAG" nos dois casos confundiria.
+  const caixa = caixas.length
+    ? ` ${caixas.length} caixa(s) levam peças de destinos diferentes e sairão SEM TAG: ` +
+      `${caixas.slice(0, 3).map((c) => `${c.marca} (${c.destinos.join(" e ")})`).join(", ")}.`
+    : "";
+  if (!faltando) {
+    return caixa
+      ? `${caixa.trim()} Separe por destino, ou confirme para imprimir assim.${fora}`
+      : `A planilha de TAGs não bate com esta obra.${fora}`;
+  }
+  return `${faltando} etiqueta(s) sairão SEM TAG: ${quais}${resto}.${fora}${caixa} Confirme para imprimir assim.`;
 }
 
 const erro400 = (msg) => NextResponse.json({ success: false, error: msg }, { status: 400 });

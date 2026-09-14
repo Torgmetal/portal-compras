@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import * as XLSX from "xlsx";
 import { parseEquivalenciaTag } from "@/lib/parse-equivalencia-tag";
 import { conferirCobertura } from "@/lib/etiqueta-tag-cliente";
-import { tagDaEtiqueta, descricaoComTag, tagsPorUnidade, juntarTagsCliente } from "@/lib/etiqueta-campos-extras";
+import { caixasComDestinosDiferentes, tagDaEtiqueta, descricaoComTag, tagsPorUnidade, juntarTagsCliente } from "@/lib/etiqueta-campos-extras";
 
 // ─── A "LISTA DE EQUIVALÊNCIA DE TAG" DO TMSA (14/09/2026) ───────────────────
 //
@@ -157,5 +157,80 @@ describe("a descrição com a TAG no fim", () => {
 
   it("obra sem mapa nenhum sai como sempre", () => {
     expect(descricaoComTag({ descricao: "Travamento - Mod.1" }, 1)).toBe("TRAVAMENTO - MOD.1");
+  });
+});
+
+// ─── Achados da revisão do Codex (14/09/2026) ────────────────────────────────
+
+describe("marca com caixa diferente entre abas", () => {
+  // ⚠⚠ A planilha real do TMSA vem em caixa alta, então isto nunca aconteceu — mas custa uma
+  // linha impedir, e o estrago seria silencioso: metade das peças com a TAG da outra aba.
+  it("é a MESMA marca — as unidades continuam de 1 a N, sem sobrescrever", () => {
+    const r = parseEquivalenciaTag(planilha([
+      ["TC 4706", aba("TC 4706", [["105A3", 2]])],
+      ["TC 4707", aba("TC 4707", [["105a3", 2]])],
+    ]));
+    expect(r.ok).toBe(true);
+    expect(r.unidades).toHaveLength(4);
+    expect(r.unidades.map((u) => u.unidade)).toEqual([1, 2, 3, 4]);
+    expect(r.unidades.map((u) => u.tag)).toEqual(["TC 4706", "TC 4706", "TC 4707", "TC 4707"]);
+    expect([...r.porMarca.keys()]).toEqual(["105A3"]);
+  });
+});
+
+describe("cobertura conta as unidades que a etiqueta procura", () => {
+  // ⚠⚠ Com {1,3} e 3 peças, pegar a MAIOR unidade diria "3 de 3" e a tela não perguntaria nada —
+  // enquanto a etiqueta 2/3 sai sem TAG. Acontece quando a planilha é reimportada em partes.
+  it("unidades {1,3} com 3 peças cobrem 2, não 3", () => {
+    const u = [{ marca: "105A3", unidade: 1, tag: "A" }, { marca: "105A3", unidade: 3, tag: "B" }];
+    const c = conferirCobertura(u, [{ marca: "105A3", qte: 3 }]);
+    expect(c).toMatchObject({ total: 3, cobertas: 2, completa: false });
+    expect(c.semTag).toEqual([{ marca: "105A3", qte: 3, comTag: 2 }]);
+  });
+
+  it("unidades {1,3} com 2 peças não viram cobertura integral", () => {
+    const u = [{ marca: "105A3", unidade: 1, tag: "A" }, { marca: "105A3", unidade: 3, tag: "A" }];
+    const c = conferirCobertura(u, [{ marca: "105A3", qte: 2 }]);
+    expect(c.cobertas).toBe(1);
+    expect(c.completa).toBe(false);
+    expect(c.sobrando).toEqual([{ marca: "105A3", qte: 2, comTag: 2 }]);
+  });
+
+  it("o caminho normal (1..n) continua cobrindo tudo", () => {
+    const u = [1, 2, 3].map((n) => ({ marca: "105A3", unidade: n, tag: "A" }));
+    expect(conferirCobertura(u, [{ marca: "105A3", qte: 3 }])).toMatchObject({ cobertas: 3, completa: true });
+  });
+});
+
+describe("caixa com peças de destinos diferentes", () => {
+  const mapa = (pares) => tagsPorUnidade(pares.map(([unidade, tag]) => ({ marca: "105A3", unidade, tag })));
+
+  it("acusa a caixa que mistura TC 4706 e TC 4707", () => {
+    const r = caixasComDestinosDiferentes(
+      [{ marca: "105A3", qte: 2, emCaixa: true }],
+      mapa([[1, "TC 4706"], [2, "TC 4707"]]),
+    );
+    expect(r).toEqual([{ marca: "105A3", destinos: ["TC 4706", "TC 4707"] }]);
+  });
+
+  it("não acusa caixa de destino único", () => {
+    expect(caixasComDestinosDiferentes(
+      [{ marca: "105A3", qte: 2, emCaixa: true }],
+      mapa([[1, "TC 4706"], [2, "TC 4706"]]),
+    )).toEqual([]);
+  });
+
+  it("não acusa quando NÃO é caixa — aí cada etiqueta leva o seu destino", () => {
+    expect(caixasComDestinosDiferentes(
+      [{ marca: "105A3", qte: 2 }],
+      mapa([[1, "TC 4706"], [2, "TC 4707"]]),
+    )).toEqual([]);
+  });
+
+  it("ignora unidade fora do intervalo: a caixa de 2 não olha a unidade 3", () => {
+    expect(caixasComDestinosDiferentes(
+      [{ marca: "105A3", qte: 2, emCaixa: true }],
+      mapa([[1, "TC 4706"], [2, "TC 4706"], [3, "TC 4707"]]),
+    )).toEqual([]);
   });
 });

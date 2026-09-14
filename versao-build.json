@@ -1,7 +1,12 @@
 {
-  "build": 3164,
-  "gerado": "2026-09-14T22:07:24.483Z",
+  "build": 3165,
+  "gerado": "2026-09-14T22:19:19.160Z",
   "commits": [
+    {
+      "hash": "97fdad65c6",
+      "data": "14/09/2026",
+      "titulo": "Permissao em massa nas pastas da OP: tirar uma pessoa de subpastas escolhidas"
+    },
     {
       "hash": "a102b24dc3",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "d0923cb4a8",
       "data": "13/09/2026",
       "titulo": "Cron financeiro: o orçamento sai de um prazo único, com reserva para o heartbeat"
-    },
-    {
-      "hash": "38b849a545",
-      "data": "13/09/2026",
-      "titulo": "Crons: quatro nunca rodaram, o financeiro se estrangulava e dois alarmes eram falsos"
     }
   ]
 }
