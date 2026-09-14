@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
-import { calcularProntidao, CONJUNTO_MONTAVEL } from "@/lib/prontidao-conjunto";
+import { calcularProntidao, CONJUNTO_MONTAVEL, CROQUI_PRONTIDAO_SELECT } from "@/lib/prontidao-conjunto";
 import { log } from "@/lib/log";
 
 const registro = log("api/producao/pecas/liberar-montagem");
@@ -79,7 +79,7 @@ export async function POST(req) {
         where: { id: { in: ids }, ...CONJUNTO_MONTAVEL },
         select: {
           id: true, marca: true,
-          conjuntoCroquis: { select: { croqui: { select: { marca: true, qte: true, qteProduzida: true } } } },
+          conjuntoCroquis: { select: { croqui: { select: CROQUI_PRONTIDAO_SELECT } } },
         },
       });
       const ok = new Set();

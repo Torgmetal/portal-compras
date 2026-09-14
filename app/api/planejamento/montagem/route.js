@@ -11,7 +11,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { proximoDiaUtil, isoDia } from "@/lib/programacao-dia";
-import { calcularProntidao, CONJUNTO_MONTAVEL } from "@/lib/prontidao-conjunto";
+import { calcularProntidao, CONJUNTO_MONTAVEL, CROQUI_PRONTIDAO_SELECT } from "@/lib/prontidao-conjunto";
 import { produzidoPorMarca } from "@/lib/conjuntos-setor";
 
 import {liberarMontagemSemData,conjuntosLiberadosMontagem} from '@/lib/planejamento-liberacao-montagem';
@@ -36,7 +36,7 @@ export async function GET(req) {
     select: {
       id: true, opNumero: true, marca: true, descricao: true, qte: true, pesoTotalKg: true, status: true,
       montagemDiaProgramado: true, montagemDiaOriginal: true, montagemAdiado: true, montagemProgramadaPor: true,
-      conjuntoCroquis: { select: { croqui: { select: { marca: true, qte: true, qteProduzida: true } } } },
+      conjuntoCroquis: { select: { croqui: { select: CROQUI_PRONTIDAO_SELECT } } },
     },
     take: 2000,
   });

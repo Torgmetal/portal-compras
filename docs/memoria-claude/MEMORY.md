@@ -132,6 +132,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Programação de corte dia a dia](torg_programacao_dia.md) — cada peça tem o SEU dia; adiar move o dia mas NUNCA o original (senão some o atraso); cota por busca binária
 - [Montagem → Solda](torg_montagem_solda.md) — ABA dentro de /planejamento/datas-setor (não tela solta); dia por conjunto; fila da solda SUGERE bancada; /pcp/solda ≠ /pcp/fila-solda
 - [Liberar montagem: conjunto PENDENTE](torg_liberar_montagem_pendente.md) — status do conjunto não diz nada sobre corte; filtrar por CORTE escondeu 197 lotes
+- [Croqui cortado = regra única](torg_croqui_cortado_regra_unica.md) — `croquiCortado` (Syneco OU corteConcluidoEm OU baixa) em TODA prontidão; select com `CROQUI_PRONTIDAO_SELECT`; OP-113 "2/2 pronto" × "1/2 cortados"
 - [Capacidade da montagem](torg_montagem_capacidade.md) — mede-se em PEÇAS por faixa de peso, NUNCA em kg (35→36 pç/dia com kg caindo 3×); repartir por dias-bancada; meta = p75
 - [Excluir OP — cascade](torg_excluir_op.md) — DELETE bloqueia com RM e não limpa PCP/produção/qualidade; ~15 FKs opId sem onDelete; precisa force-delete em transação
 - [Excluir peças selecionadas — permissão](torg_excluir_pecas_perm.md) — delete-por-ids (`/api/producao/pecas` {ids}) = UNIÃO dos perfis das telas que servem o ProgramacaoCorteClient (Corte/PCP/Fila/Listas Eng/Expedição); OP inteira só ADMIN; `User.modulos`=objetos no DB, strings na sessão

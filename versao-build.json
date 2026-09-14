@@ -1,7 +1,12 @@
 {
-  "build": 3139,
-  "gerado": "2026-09-14T11:35:51.364Z",
+  "build": 3140,
+  "gerado": "2026-09-14T11:45:51.339Z",
   "commits": [
+    {
+      "hash": "ba6c76e2",
+      "data": "14/09/2026",
+      "titulo": "Simulador: ajustes por marca (embalagem, junto com, posição, orientação, medidas à mão)"
+    },
     {
       "hash": "fa540831",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e64682bc",
       "data": "12/09/2026",
       "titulo": "fix(3d): melhorar painéis e seleção por toque no celular"
-    },
-    {
-      "hash": "6b713fa3",
-      "data": "12/09/2026",
-      "titulo": "fix(engenharia): fixar e revisar previsão da sequência com auditoria"
     }
   ]
 }

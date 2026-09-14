@@ -31,6 +31,9 @@ export default async function ProgramacaoMontagem() {
               material: true,
               qte: true,
               qteProduzida: true,
+              // ⚠ a prontidão (lib/prontidao-conjunto) lê baixa/corte concluído, não só o Syneco
+              corteConcluidoEm: true,
+              baixaSetores: true,
               pesoUnitKg: true,
               pesoTotalKg: true,
               comprimentoMm: true,
