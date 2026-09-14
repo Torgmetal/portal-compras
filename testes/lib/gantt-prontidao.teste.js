@@ -66,7 +66,9 @@ it.each(['MONTAGEM','SOLDA'])('recusa peça com saldo no terceiro em %s mesmo se
  expect(mockPrisma.pecaConjunto.updateMany).not.toHaveBeenCalled();
 });
 it('distingue ausência de croqui de corte parcial',()=>{
- expect(prontidaoDoGantt({...conjunto('C03',false),conjuntoCroquis:[]})).toMatchObject({pronto:false,total:0,motivo:'Sem croquis vinculados'});
+ // avulsa sem croquis: pronto=false SEMPRE (vai ao Jato), e o motivo diz isso — mesmo com status MONTAGEM (OP-113, 14/09/2026)
+ expect(prontidaoDoGantt({...conjunto('C03',false),conjuntoCroquis:[]})).toMatchObject({pronto:false,total:0,motivo:expect.stringMatching(/avulsa.*Jato/)});
+ expect(prontidaoDoGantt({...conjunto('C04',false),status:'MONTAGEM',conjuntoCroquis:[]})).toMatchObject({pronto:false,motivo:expect.stringMatching(/avulsa/)});
  expect(prontidaoDoGantt(conjunto('C02',false))).toMatchObject({pronto:false,total:1,cortados:0});
  expect(itemAptoMontagem({})).toBe(false);
 });

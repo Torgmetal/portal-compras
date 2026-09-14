@@ -342,7 +342,7 @@ export default function ProducaoClient({ portalProducao = false, entradaDecisao 
     if (!confirm(`Imprimir e liberar ${marcasSel.length} desenho(s) da ${fmtOP(detalhe.opNumero)}${emBlocos}?\n\nCada um sai carimbado com a rastreabilidade e a GRD fica registrada.${blocos.length > 1 ? " Sai um download por bloco." : ""} Pode levar alguns minutos.`)) return;
     setImprimindo(true); setAviso(null);
     try {
-      const j = { emitidas: 0, semDesenho: [], arquivos: [] };
+      const j = { emitidas: 0, semDesenho: [], arquivos: [], erros: [] };
       for (let b = 0; b < blocos.length; b++) {
         if (blocos.length > 1) setAviso({ ok: true, texto: `Bloco ${b + 1} de ${blocos.length} — gerando os desenhos…` });
         const r = await fetch("/api/producao/desenhos/lote", {
@@ -352,6 +352,7 @@ export default function ProducaoClient({ portalProducao = false, entradaDecisao 
         const parcial = await lerJson(r, `Emissão do lote de desenhos${blocos.length > 1 ? ` (bloco ${b + 1} de ${blocos.length})` : ""}`);
         j.emitidas += Number(parcial.emitidas) || 0;
         j.semDesenho.push(...(parcial.semDesenho || []));
+        j.erros.push(...(parcial.erros || []));
         j.arquivos.push(...(parcial.arquivos || []));
         if (Number(parcial.emitidas) > 0) {
           try { await baixarZipLote(parcial, `${detalhe.opNumero}${blocos.length > 1 ? `-bloco${b + 1}de${blocos.length}` : ""}`); }
@@ -367,11 +368,16 @@ export default function ProducaoClient({ portalProducao = false, entradaDecisao 
       const emitidas = Number(j.emitidas) || 0;
       const semDesenho = j.semDesenho?.length || 0;
       const faltantes = semDesenho ? ` Sem desenho na pasta da OP: ${j.semDesenho.slice(0, 8).join(", ")}${semDesenho > 8 ? ` e mais ${semDesenho - 8}` : ""}.` : "";
+      // ⚠ desenho que EXISTE mas falhou ao baixar ou carimbar não é "não encontrado": diz a marca e o motivo, senão
+      // o PCP procura na pasta um arquivo que está lá. Vitor (14/09/2026), OP-113.
+      const falhas = j.erros || [];
+      const comFalha = falhas.length ? ` Falhou em ${falhas.length}: ${falhas.slice(0, 6).map((f) => `${f.marca} (${f.erro || "erro"})`).join("; ")}${falhas.length > 6 ? ` e mais ${falhas.length - 6}` : ""}.` : "";
       if (!emitidas) {
         setAviso({
           ok: false,
-          texto: `Nenhum desenho foi encontrado para as ${marcasSel.length} marca(s) selecionada(s), então nada foi impresso nem liberado.${faltantes}`
-            + " Confira se os PDFs estão em 2. Engenharia › 2.5 Projetos › 2.5.2 Fabricação, com o nome começando pela marca.",
+          texto: (falhas.length ? "Os desenhos existem, mas nenhum pôde ser emitido." : `Nenhum desenho foi encontrado para as ${marcasSel.length} marca(s) selecionada(s), então nada foi impresso nem liberado.`)
+            + faltantes + comFalha
+            + (falhas.length ? " Tente de novo; se persistir, mande a mensagem acima para o suporte." : " Confira se os PDFs estão em 2. Engenharia › 2.5 Projetos › 2.5.2 Fabricação, com o nome começando pela marca."),
         });
         return;
       }
@@ -384,7 +390,7 @@ export default function ProducaoClient({ portalProducao = false, entradaDecisao 
         ok: !erroZip,
         texto: `${emitidas} desenho(s) liberado(s)`
           + (erroZip ? `, mas o download falhou (${erroZip}). A GRD está registrada; abra os arquivos pela pasta da OP no servidor.` : " e baixado(s) em pastas por impressora.")
-          + faltantes,
+          + faltantes + comFalha,
       });
       setSel(new Set());
       await carregarDetalhe(aberta, setorAba); // a GRD nova aparece na coluna

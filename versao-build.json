@@ -1,7 +1,12 @@
 {
-  "build": 3137,
-  "gerado": "2026-09-14T11:04:49.000Z",
+  "build": 3138,
+  "gerado": "2026-09-14T11:22:09.375Z",
   "commits": [
+    {
+      "hash": "28935e02",
+      "data": "14/09/2026",
+      "titulo": "Admin › Usuários: conta sem e-mail vinculada ao funcionário do RH entra pelo CPF"
+    },
     {
       "hash": "545fe4fd",
       "data": "13/09/2026",
@@ -146,11 +151,6 @@
       "hash": "8a1095a8",
       "data": "12/09/2026",
       "titulo": "Tekla 2025: pacote do teste TMSA/Vale (UDAs de montagem) e memória da OP-122"
-    },
-    {
-      "hash": "881df564",
-      "data": "12/09/2026",
-      "titulo": "Memória do Claude compartilhada no repositório, para Mac e Windows"
     }
   ]
 }
