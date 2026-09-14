@@ -170,7 +170,7 @@ export async function GET(req, { params }) {
         select: {
           id: true, nome: true, area: true, departamento: true, isSummary: true,
           dataInicioPrevista: true, dataFimPrevista: true, updatedAt: true,
-          percentualPrevisto: true, percentualRealizado: true,
+          percentualPrevisto: true, percentualRealizado: true, avancoManual: true,
         },
         orderBy: [{ dataInicioPrevista: "asc" }],
         take: 600,

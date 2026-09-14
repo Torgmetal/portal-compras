@@ -1,7 +1,12 @@
 {
-  "build": 3162,
-  "gerado": "2026-09-14T21:30:20.206Z",
+  "build": 3163,
+  "gerado": "2026-09-14T21:45:26.806Z",
   "commits": [
+    {
+      "hash": "72bb2b06",
+      "data": "14/09/2026",
+      "titulo": "Cronograma: material atendido pelo estoque conta como recebido na linha de matéria-prima"
+    },
     {
       "hash": "5cfc3b55",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "04e24ff8",
       "data": "13/09/2026",
       "titulo": "Simulador: peça fora do IFC viaja só em caixa, com aviso no modal, no card e no PDF"
-    },
-    {
-      "hash": "dafdba0c",
-      "data": "13/09/2026",
-      "titulo": "Simulador: peça fora do IFC entra com caixa estimada pelo peso; parafuso fica fora sem alarme"
     }
   ]
 }

@@ -4235,6 +4235,11 @@ model CronogramaTarefa {
   // de fato será finalizado". É estimativa de ESFORÇO RESTANTE a partir de hoje — não é a duração
   // planejada (`duracaoDias`), que é o que o cronograma previu lá atrás e não muda com a realidade.
   diasParaConcluir    Int?
+  /// ⚠ O NÚMERO DIGITADO À MÃO PREVALECE. Vitor (14/09/2026), sobre o Recebimento da OP-094 que o
+  /// Guilherme pôs em 100 % e o sync do CMR devolveu para 84 %: "não precisa atualizar, deixa como o
+  /// Guilherme fez". Com `avancoManual`, os sincronismos (Syneco na Fabricação, CMR em Suprimentos)
+  /// não tocam o percentual da tarefa. Coluna criada por scripts/ensure-cronograma-avanco-manual.mjs.
+  avancoManual        Boolean                 @default(false)
   // quando a estimativa foi dada — uma de 15 dias atrás não vale como previsão de hoje
   estimativaEm        DateTime?
   responsavelId       String?

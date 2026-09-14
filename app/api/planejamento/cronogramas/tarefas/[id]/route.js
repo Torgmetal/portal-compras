@@ -14,6 +14,7 @@ const patchSchema = z.object({
   nome: z.string().min(1).max(200).optional(),
   area: z.string().max(120).nullable().optional(),
   percentualRealizado: z.number().min(0).max(100).optional(),
+  avancoManual: z.boolean().optional(), // false = volta a aceitar o automático (Syneco/CMR)
   observacao: z.string().max(500).nullable().optional(),
   dataRealizacao: z.string().datetime().nullable().optional(),
   // Execução REAL — não altera previsto/base (o atraso é derivado na tela)
@@ -78,6 +79,9 @@ export async function PATCH(req, { params }) {
 
   const { data, diffAntes, diffDepois, antecessorasChanged } =
     await montarAtualizacaoDaTarefa(parsed.data, tarefa, id);
+  // ⚠ percentual digitado à mão prevalece sobre o sincronismo (ver CronogramaTarefa.avancoManual)
+  if (diffDepois.percentualRealizado !== undefined) data.avancoManual = true;
+  if (parsed.data.avancoManual === false) data.avancoManual = false;
   const ops = montarOperacoesDoPatch(prisma, {
     id, data, diffAntes, diffDepois, tarefa,
     userId: user.id,
