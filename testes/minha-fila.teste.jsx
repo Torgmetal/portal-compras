@@ -5,7 +5,11 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import MinhaFila from "@/components/producao/MinhaFila";
 vi.mock("@/lib/store", () => ({ useStore: () => ({ showToast: vi.fn() }) }));
 vi.mock("@/components/DesenhoPecaModal", () => ({
-  default: ({ marca }) => <div>Desenho aberto {marca}</div>,
+  default: ({ marca, setor }) => (
+    <div>
+      Desenho aberto {marca} · {setor || "sem setor"}
+    </div>
+  ),
 }));
 vi.mock("@/components/FichaPecaModal", () => ({ default: () => null }));
 const dados = {
@@ -129,7 +133,7 @@ it("abre o trabalho pelo setor e lembra a bancada no aparelho", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Ver peças e desenhos" }));
   expect(screen.getByText("10 un.")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Desenho", exact: true }));
-  expect(screen.getByText("Desenho aberto MARCA-A")).toBeTruthy();
+  expect(screen.getByText("Desenho aberto MARCA-A · SOLDA")).toBeTruthy();
   tela.unmount();
   render(<MinhaFila />);
   expect(await screen.findByText("Soldar · OP 112")).toBeTruthy();
@@ -137,4 +141,54 @@ it("abre o trabalho pelo setor e lembra a bancada no aparelho", async () => {
   expect(
     screen.getByRole("combobox", { name: "Minha bancada ou máquina" }).value,
   ).toBe("SOLDA 1");
+});
+
+it("mostra pendências junto do trabalho atual e separa peças sem programação", async () => {
+  const montagem = {
+    ...dados,
+    recursos: { MONTAGEM: ["MONTAGEM 1", "MONTAGEM 2"] },
+    lotes: [
+      {
+        ...dados.lotes[0],
+        setor: "MONTAGEM",
+        recurso: "MONTAGEM 1",
+        itens: [{ id: "a", m: "A", q: 12, f: 2, prontidao: { pronto: true } }],
+      },
+      {
+        ...dados.lotes[1],
+        setor: "MONTAGEM",
+        recurso: null,
+        fila: true,
+        itens: [
+          {
+            id: "b",
+            m: "B",
+            q: 4,
+            prontidao: { pronto: false, motivo: "Croquis pendentes" },
+          },
+          { id: "c", m: "C", q: 6, prontidao: { pronto: true } },
+        ],
+      },
+    ],
+  };
+  globalThis.fetch = vi.fn(async () => ({
+    ok: true,
+    json: async () => montagem,
+  }));
+  render(<MinhaFila />);
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Montagem", exact: true }),
+  );
+  expect(await screen.findByText("Croquis pendentes")).toBeTruthy();
+  const programacao = screen.getByRole("region", {
+    name: "Aguardando distribuição",
+  });
+  expect(programacao.textContent).toContain("6");
+  expect(programacao.textContent).not.toContain("Croquis pendentes");
+  const progresso = screen.getByRole("progressbar");
+  expect(progresso.getAttribute("aria-valuenow")).toBe("2");
+  expect(progresso.getAttribute("aria-valuemax")).toBe("12");
+  expect(
+    screen.getAllByRole("link", { name: /Modelo 3D/i })[0].getAttribute("href"),
+  ).toBe("/producao/modelo");
 });

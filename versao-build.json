@@ -1,7 +1,12 @@
 {
-  "build": 3140,
-  "gerado": "2026-09-14T11:45:51.339Z",
+  "build": 3141,
+  "gerado": "2026-09-14T11:55:27.092Z",
   "commits": [
+    {
+      "hash": "a4ad3065",
+      "data": "14/09/2026",
+      "titulo": "Montagem: liberação conta croqui cortado pela mesma regra da lista do PCP"
+    },
     {
       "hash": "ba6c76e2",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ad9e8d78",
       "data": "12/09/2026",
       "titulo": "feat: navegação móvel compartilhada com menu sobreposto"
-    },
-    {
-      "hash": "e64682bc",
-      "data": "12/09/2026",
-      "titulo": "fix(3d): melhorar painéis e seleção por toque no celular"
     }
   ]
 }

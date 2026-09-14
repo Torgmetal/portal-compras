@@ -8,20 +8,18 @@ import {
   Sparkles,
   Wind,
   Paintbrush,
-  ChevronRight,
-  FileText,
   Box,
   SlidersHorizontal,
   Flag,
+  CalendarDays,
+  AlertTriangle,
+  PackageOpen,
 } from "lucide-react";
 import { ETAPAS } from "@/lib/producao-operacional";
-import {
-  montarFilaOperador,
-  temPrioridade,
-  aplicarRemanejoNaFila,
-} from "@/lib/fila-operador";
+import { aplicarRemanejoNaFila } from "@/lib/fila-operador";
+import { montarVisaoEncarregado } from "@/lib/visao-encarregado";
 import { rotuloPosto } from "@/lib/postos-operador";
-import RemanejarBancada from "./RemanejarBancada";
+import TrabalhoEncarregado from "./TrabalhoEncarregado";
 import FichaPecaModal from "@/components/FichaPecaModal";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 import {
@@ -33,6 +31,7 @@ import {
   data,
   Atualizar,
 } from "./ConsultaOperacional";
+
 const SETORES = {
   CORTE: Scissors,
   MONTAGEM: Hammer,
@@ -41,24 +40,15 @@ const SETORES = {
   JATO: Wind,
   PINTURA: Paintbrush,
 };
-const VERBOS = {
-  CORTE: "Cortar",
-  MONTAGEM: "Montar",
-  SOLDA: "Soldar",
-  ACABAMENTO: "Dar acabamento",
-  JATO: "Jatear",
-  PINTURA: "Pintar",
-};
 const CHAVE = "torg.producao.meu-posto.v1";
 export default function MinhaFila() {
   const [posto, setPosto] = useState(null),
     [escolher, setEscolher] = useState(false),
-    [carregado, setCarregado] = useState(false),
-    [aba, setAba] = useState("hoje"),
-    [aberto, setAberto] = useState(null),
+    [carregado, setCarregado] = useState(false);
+  const [aberto, setAberto] = useState(null),
     [desenho, setDesenho] = useState(null),
-    [ficha, setFicha] = useState(null);
-  const [remanejar, setRemanejar] = useState(null);
+    [ficha, setFicha] = useState(null),
+    [remanejar, setRemanejar] = useState(null);
   useEffect(() => {
     try {
       const p = JSON.parse(localStorage.getItem(CHAVE) || "null");
@@ -87,7 +77,6 @@ export default function MinhaFila() {
     setPosto(p);
     setEscolher(false);
     setAberto(null);
-    setAba("hoje");
     setDesenho(null);
     setFicha(null);
     setRemanejar(null);
@@ -95,12 +84,6 @@ export default function MinhaFila() {
       localStorage.setItem(CHAVE, JSON.stringify(p));
     } catch {}
   }
-  const fila = montarFilaOperador(
-    estado.dados?.lotes,
-    posto?.setor,
-    posto?.recurso,
-    estado.dados?.hoje || "",
-  );
   const recursos = [
     ...new Set([
       ...(estado.dados?.recursos?.[posto?.setor] || []),
@@ -109,13 +92,40 @@ export default function MinhaFila() {
         .map((l) => l.recurso),
     ]),
   ].sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }));
-  const filaSetor = montarFilaOperador(
+  const hoje = estado.dados?.hoje || "";
+  const visao = montarVisaoEncarregado(
     estado.dados?.lotes,
     posto?.setor,
-    "",
-    estado.dados?.hoje || "",
+    posto?.recurso,
+    hoje,
+    recursos,
   );
-  const prioritarias = fila[aba].reduce((s, l) => s + l.saldoPrioritario, 0);
+  function salvarRemanejo(recurso, dia) {
+    estado.atualizar((d) => ({
+      ...d,
+      lotes: aplicarRemanejoNaFila(d.lotes, remanejar, recurso, dia),
+      geradoEm: new Date().toISOString(),
+    }));
+  }
+  function trabalho(l, tipo = "hoje", proximo = null) {
+    return (
+      <TrabalhoEncarregado
+        key={l.id}
+        lote={l}
+        tipo={tipo}
+        hoje={hoje}
+        aberto={aberto}
+        onAbrir={setAberto}
+        onDesenho={setDesenho}
+        onFicha={setFicha}
+        remanejar={remanejar}
+        onRemanejar={setRemanejar}
+        onSalvo={salvarRemanejo}
+        atualizando={estado.atualizando}
+        proximo={proximo}
+      />
+    );
+  }
   if (!carregado)
     return (
       <p role="status" className="p-5 text-torg-gray">
@@ -169,32 +179,35 @@ export default function MinhaFila() {
       </div>
     );
   return (
-    <div className="max-w-4xl mx-auto min-w-0 space-y-5">
-      <header className="flex justify-between items-start gap-3">
+    <div className="max-w-5xl mx-auto min-w-0 space-y-5">
+      <header className="flex flex-wrap justify-between items-start gap-3">
         <div>
           <p className="text-xs uppercase tracking-wider font-semibold text-torg-blue">
-            Meu trabalho
+            Meu trabalho · Produção
           </p>
-          <h1 className="text-2xl font-bold text-torg-dark mt-1">
-            {ETAPAS[posto.setor]}
+          <h1 className="text-2xl sm:text-3xl font-bold text-torg-dark mt-1">
+            Hoje na fábrica
           </h1>
+          <p className="text-sm text-torg-gray mt-1">
+            {ETAPAS[posto.setor]} · trabalho por{" "}
+            {posto.setor === "CORTE" ? "máquina" : "bancada"}
+          </p>
         </div>
-        <button
-          className={`${botao} flex items-center gap-2`}
-          disabled={!!remanejar}
-          onClick={() => setEscolher(true)}
+        <Link
+          href="/producao/modelo"
+          className={`${botao} inline-flex gap-2 items-center !text-torg-blue`}
         >
-          <SlidersHorizontal size={16} />
-          Trocar setor
-        </button>
+          <Box size={17} />
+          Modelo 3D
+        </Link>
       </header>
-      <div className="flex items-end gap-2">
-        <label className="text-xs text-torg-gray flex-1 min-w-0">
-          Minha bancada / máquina
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="text-xs text-torg-gray flex-1 min-w-0 basis-48">
+          {posto.setor === "CORTE" ? "Máquina" : "Montador / bancada"}
           <select
             aria-label="Minha bancada ou máquina"
             disabled={!!remanejar}
-            className={`${campo} block w-full mt-1`}
+            className={`${campo} !text-base block w-full mt-1`}
             value={posto.recurso}
             onChange={(e) => escolherPosto(posto.setor, e.target.value)}
           >
@@ -211,313 +224,196 @@ export default function MinhaFila() {
             ))}
           </select>
         </label>
+        <button
+          className={`${botao} flex items-center gap-2`}
+          disabled={!!remanejar}
+          onClick={() => setEscolher(true)}
+        >
+          <SlidersHorizontal size={16} />
+          Trocar setor
+        </button>
         <Atualizar
           onClick={estado.recarregar}
           disabled={estado.carregando || estado.atualizando || !!remanejar}
         />
       </div>
       <EstadoConsulta estado={estado}>
-        {posto.setor === "MONTAGEM" && (
-          <details className="bg-white border rounded-xl p-4">
-            <summary className="cursor-pointer font-semibold text-torg-blue min-h-7">
-              Ver todas as bancadas ({recursos.length})
-            </summary>
-            <p className="text-xs text-torg-gray mt-2">
-              Confira a fila de cada posto. Bancadas sem programação podem
-              receber novos lotes após definição com o PCP e confirmação do
-              montador no turno.
+        {visao.prioritarias > 0 && (
+          <p className="flex items-center gap-2 rounded-lg bg-orange-50 border border-orange-200 text-orange-900 p-3 text-sm font-semibold">
+            <Flag size={18} className="shrink-0" />
+            {fmt(visao.prioritarias)} peças prioritárias para fazer primeiro
+          </p>
+        )}
+        {visao.pendencias.length > 0 && (
+          <a
+            href="#pendencias-producao"
+            className="flex items-center gap-2 min-h-11 text-sm text-amber-900 underline underline-offset-4"
+          >
+            <AlertTriangle size={17} className="shrink-0" />
+            {fmt(visao.pendencias.reduce((s, l) => s + l.saldo, 0))} peças com
+            pendências · conferir abaixo
+          </a>
+        )}
+        <section aria-label="Trabalho para agora" className="space-y-3">
+          {!visao.postos.length ? (
+            <div className="bg-white rounded-xl border p-5 text-torg-gray">
+              <PackageOpen className="mb-2" />
+              <h2 className="font-semibold text-torg-dark">
+                Nenhum lote programado para agora
+              </h2>
+              <p className="text-sm mt-2">
+                Confira as pendências e os lotes aguardando distribuição abaixo.
+              </p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-4 items-start">
+              {visao.postos.map((p, index) => (
+                <div
+                  key={p.recurso}
+                  className={`min-w-0 space-y-3 ${index === 0 && p.agora[0].saldoPrioritario > 0 ? "md:col-span-2" : ""}`}
+                >
+                  {trabalho(p.agora[0], "hoje", p.agora[1] || p.proximo)}
+                  {p.agora.length > 1 && (
+                    <details className="bg-white border rounded-xl p-3">
+                      <summary className="min-h-11 cursor-pointer text-sm font-semibold text-torg-blue">
+                        Mais {p.agora.length - 1} lote(s) para agora ·{" "}
+                        {rotuloPosto(p.recurso)}
+                      </summary>
+                      <div className="space-y-3 mt-2">
+                        {p.agora.slice(1).map((l) => trabalho(l))}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+        <section
+          id="pendencias-producao"
+          aria-label="Pendências da produção"
+          className="space-y-3 scroll-mt-20"
+        >
+          <h2 className="font-bold text-lg text-torg-dark">
+            O que precisa de atenção
+          </h2>
+          {visao.pendencias.length ? (
+            <div className="grid md:grid-cols-2 gap-4 items-start">
+              {visao.pendencias.map((l) => trabalho(l, "pendencia"))}
+            </div>
+          ) : (
+            <p className="text-sm text-torg-gray">
+              Nenhuma pendência registrada nesta seleção.
             </p>
-            <div className="grid sm:grid-cols-2 gap-2 mt-3">
-              {recursos.map((r) => {
-                const tarefas = Object.values(filaSetor)
-                  .flat()
-                  .filter((l) => l.recurso === r);
-                const saldo = filaSetor.hoje
-                  .filter((l) => l.recurso === r)
-                  .reduce((s, l) => s + l.saldo, 0);
-                return (
-                  <button
-                    key={r}
-                    className={`text-left rounded-lg border p-3 min-h-16 ${posto.recurso === r ? "border-torg-blue bg-blue-50" : "border-gray-200"}`}
-                    onClick={() => escolherPosto(posto.setor, r)}
-                    disabled={!!remanejar}
-                  >
-                    <span className="block text-sm font-semibold text-torg-dark">
-                      {rotuloPosto(r)}
-                    </span>
-                    <span className="block text-xs text-torg-gray mt-1">
-                      {saldo
-                        ? `${fmt(saldo)} peças para fazer`
-                        : tarefas.length
-                          ? "Ver pendências / próximos dias"
-                          : "Sem programação"}
-                    </span>
-                  </button>
-                );
-              })}
+          )}
+        </section>
+        <section aria-label="Aguardando distribuição" className="space-y-3">
+          <div className="flex flex-wrap gap-3 items-center justify-between">
+            <h2 className="font-bold text-lg text-torg-dark">
+              Aguardando distribuição
+            </h2>
+            <Link
+              href="/pcp/producao"
+              className={`${botao} inline-flex items-center gap-2 !text-torg-blue`}
+            >
+              <CalendarDays size={16} />
+              Distribuir no Gantt
+            </Link>
+          </div>
+          <p className="text-sm text-torg-gray">
+            Lotes cuja pendência na fila é definir data ou posto. A distribuição
+            continua no Gantt compartilhado com o PCP.
+          </p>
+          {visao.aguardandoProgramacao.length ? (
+            <div className="grid md:grid-cols-2 gap-4 items-start">
+              {visao.aguardandoProgramacao.map((l) => trabalho(l, "programar"))}
+            </div>
+          ) : (
+            <p className="text-sm text-torg-gray">
+              Nenhum lote aguardando programação nesta seleção.
+            </p>
+          )}
+        </section>
+        <details className="bg-white border rounded-xl px-4">
+          <summary className="cursor-pointer font-semibold text-torg-blue min-h-12 py-3">
+            {posto.setor === "CORTE" ? "Máquinas" : "Bancadas"} sem trabalho
+            para agora ({visao.semTrabalho.length})
+          </summary>
+          <p className="text-xs text-torg-gray pb-3">
+            Confira pendências, programação futura e disponibilidade da equipe
+            antes de distribuir.
+          </p>
+          <div className="divide-y">
+            {visao.semTrabalho.map((p) => (
+              <button
+                key={p.recurso}
+                disabled={!!remanejar}
+                onClick={() => escolherPosto(posto.setor, p.recurso)}
+                className="block text-left w-full min-h-16 py-3 disabled:opacity-40"
+              >
+                <span className="block text-sm font-semibold text-torg-dark">
+                  {rotuloPosto(p.recurso)}
+                </span>
+                <span className="block text-xs text-torg-gray mt-1">
+                  {p.pendencias.length
+                    ? `${fmt(p.pendencias.reduce((s, l) => s + l.saldo, 0))} peças com pendências`
+                    : p.aguardandoProgramacao.length
+                      ? "Aguardando definição de data"
+                      : "Sem lote para agora"}
+                  {p.proximo
+                    ? ` · Próxima OP ${p.proximo.op} em ${data(p.proximo.dia)}`
+                    : " · sem programação futura"}
+                </span>
+              </button>
+            ))}
+          </div>
+          {!visao.semTrabalho.length && (
+            <p className="text-sm text-torg-gray pb-4">
+              Todos os postos desta seleção têm trabalho para agora.
+            </p>
+          )}
+        </details>
+        <details className="bg-white border rounded-xl px-4">
+          <summary className="cursor-pointer font-semibold text-torg-blue min-h-12 py-3">
+            Próximos 6 dias ({visao.proximos.length})
+          </summary>
+          <div className="space-y-3 pb-4">
+            {visao.proximos.map((l) => trabalho(l, "futuro"))}
+            {!visao.proximos.length && (
+              <p className="text-sm text-torg-gray">
+                Sem lotes programados neste período.
+              </p>
+            )}
+          </div>
+        </details>
+        {visao.maisAdiante.length > 0 && (
+          <details className="bg-white border rounded-xl px-4">
+            <summary className="cursor-pointer font-semibold text-torg-blue min-h-12 py-3">
+              Programação mais adiante ({visao.maisAdiante.length})
+            </summary>
+            <div className="space-y-3 pb-4">
+              {visao.maisAdiante.map((l) => trabalho(l, "futuro"))}
             </div>
           </details>
         )}
-        <nav
-          className="grid grid-cols-3 gap-1 bg-gray-100 p-1 rounded-xl"
-          aria-label="Fila de trabalho"
-        >
-          {[
-            ["hoje", "Para fazer"],
-            ["aguardando", "Aguardando"],
-            ["proximos", "Próximos dias"],
-          ].map(([k, l]) => (
-            <button
-              key={k}
-              className={`min-h-12 rounded-lg px-1 py-2 text-xs sm:text-sm font-semibold ${aba === k ? "bg-white text-torg-blue shadow-sm" : "text-torg-gray"}`}
-              aria-pressed={aba === k}
-              disabled={!!remanejar}
-              onClick={() => {
-                setAba(k);
-                setAberto(null);
-              }}
-            >
-              {l} <span className="ml-1">{fila[k].length}</span>
-            </button>
-          ))}
-        </nav>
-        {prioritarias > 0 && (
-          <p className="flex items-center gap-2 rounded-lg bg-orange-50 border border-orange-200 text-orange-900 p-3 text-sm font-semibold">
-            <Flag size={18} className="shrink-0" />
-            {fmt(prioritarias)} peças prioritárias
-            {aba === "aguardando"
-              ? " aguardando liberação"
-              : aba === "proximos"
-                ? " na programação futura"
-                : " para fazer primeiro"}
-          </p>
-        )}
-        {aba === "hoje" && (
-          <div>
-            <h2 className="font-bold text-lg text-torg-dark">
-              {posto.recurso ? "Na sua bancada" : "Programado para o setor"}
-            </h2>
-            <p className="text-sm text-torg-gray mt-1">
-              {posto.recurso
-                ? "Peças programadas para hoje e saldos anteriores."
-                : "Escolha a bancada acima para ver só o seu trabalho."}
-            </p>
-          </div>
-        )}
-        {aba === "aguardando" && (
-          <p className="text-sm text-amber-900">
-            Estes lotes dependem de definição do PCP, liberação da etapa ou
-            resolução da pendência indicada.
-          </p>
-        )}
-        {aba === "proximos" && (
-          <p className="text-sm text-torg-gray">
-            Programação futura. As datas indicam quando cada lote está previsto.
-          </p>
-        )}
-        {!fila[aba].length && (
-          <div className="rounded-xl bg-white border p-6">
-            <h2 className="font-semibold text-torg-dark">
-              {aba === "hoje"
-                ? "Nenhum lote programado para agora"
-                : aba === "aguardando"
-                  ? "Nenhuma pendência nesta seleção"
-                  : "Sem programação futura nesta seleção"}
-            </h2>
-            <p className="text-sm text-torg-gray mt-2">
-              {aba === "hoje"
-                ? "Confira “Aguardando” ou solicite ao PCP a programação da próxima atividade."
-                : "A fila será atualizada quando houver novos registros."}
-            </p>
-          </div>
-        )}
-        <div className="space-y-4">
-          {fila[aba].map((l) => (
-            <article
-              key={l.id}
-              className={`bg-white border rounded-xl overflow-hidden ${aba === "hoje" ? "border-l-4 border-l-torg-blue" : ""}`}
-            >
-              <div className="p-4 sm:p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs text-torg-gray">
-                      {rotuloPosto(l.recurso)}
-                      {aba === "proximos" ? ` · ${data(l.dia)}` : ""}
-                    </p>
-                    <h3 className="font-bold text-xl text-torg-dark mt-1">
-                      {VERBOS[posto.setor]} · OP {l.op}
-                    </h3>
-                    <p className="text-sm text-torg-gray truncate mt-1">
-                      {l.obra || "Obra sem descrição"}
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <strong className="block text-3xl text-torg-dark">
-                      {fmt(l.saldo)}
-                    </strong>
-                    <span className="text-xs text-torg-gray">
-                      peças restantes
-                    </span>
-                  </div>
-                </div>
-                {l.saldoPrioritario > 0 && (
-                  <p className="text-xs font-bold text-orange-800 mt-3 flex gap-2 items-center">
-                    <Flag size={15} />
-                    Prioridade · {fmt(l.saldoPrioritario)} peças
-                  </p>
-                )}
-                {aba === "aguardando" ? (
-                  <div className="text-sm bg-amber-50 text-amber-900 p-3 rounded-lg mt-3">
-                    {[...new Set(l.itens.map((i) => i.motivo))].map((m) => (
-                      <p key={m}>{m}</p>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-torg-dark mt-4 break-words">
-                    {l.itens
-                      .slice(0, 3)
-                      .map((i) => `${i.m} (${fmt(i.saldo)})`)
-                      .join(" · ")}
-                    {l.itens.length > 3
-                      ? ` · +${l.itens.length - 3} marcas`
-                      : ""}
-                  </p>
-                )}
-                <button
-                  className={`mt-4 min-h-12 w-full flex justify-between items-center px-4 rounded-lg font-semibold text-sm ${aba === "hoje" ? "bg-torg-blue text-white" : "border text-torg-dark"}`}
-                  aria-expanded={aberto === l.id}
-                  onClick={() => setAberto(aberto === l.id ? null : l.id)}
-                >
-                  {aberto === l.id
-                    ? "Recolher peças"
-                    : `Ver peças${aba === "hoje" ? " e desenhos" : ""}`}
-                  <ChevronRight
-                    size={18}
-                    className={aberto === l.id ? "rotate-90" : ""}
-                  />
-                </button>
-                {posto.setor === "MONTAGEM" &&
-                  aba !== "aguardando" &&
-                  l.recurso &&
-                  !l.terceiroRecebido &&
-                  !l.terceiroPrevisto &&
-                  (remanejar?.id === l.id ? (
-                    <RemanejarBancada
-                      trabalho={remanejar}
-                      hoje={estado.dados.hoje}
-                      onClose={() => setRemanejar(null)}
-                      onSalvo={(recurso, dia) => {
-                        estado.atualizar((d) => ({
-                          ...d,
-                          lotes: aplicarRemanejoNaFila(
-                            d.lotes,
-                            remanejar,
-                            recurso,
-                            dia,
-                          ),
-                          geradoEm: new Date().toISOString(),
-                        }));
-                      }}
-                    />
-                  ) : (
-                    <button
-                      className={`${botao} mt-2 w-full`}
-                      disabled={estado.atualizando || !!remanejar}
-                      onClick={() => setRemanejar(l)}
-                    >
-                      Trocar bancada / data
-                    </button>
-                  ))}
-              </div>
-              {aberto === l.id && (
-                <div className="border-t divide-y">
-                  {l.itens.map((i, k) => (
-                    <div
-                      key={`${i.id}-${i.inicioUnidade || 0}-${k}`}
-                      className="p-4 sm:px-5"
-                    >
-                      <div className="flex justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-bold text-torg-dark break-all">
-                            {i.m}
-                          </p>
-                          {temPrioridade(i) && (
-                            <p className="text-xs font-bold text-orange-800 mt-1">
-                              Prioridade {i.prioridade} nesta OP
-                            </p>
-                          )}
-                          {i.pf && (
-                            <p className="text-xs text-torg-gray mt-1">
-                              {i.pf}
-                            </p>
-                          )}
-                          <p className="text-xs text-torg-gray mt-1">
-                            {fmt(i.f)} de {fmt(i.q)} apontadas nesta seleção
-                          </p>
-                        </div>
-                        <strong className="shrink-0 text-lg">
-                          {fmt(i.saldo)} un.
-                        </strong>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 mt-3">
-                        <button
-                          disabled={!l.opId}
-                          className={`${botao} !text-torg-blue flex justify-center items-center gap-2`}
-                          onClick={() =>
-                            setDesenho({
-                              opId: l.opId,
-                              opNumero: l.op,
-                              marca: i.m,
-                            })
-                          }
-                        >
-                          <FileText size={16} />
-                          Desenho
-                        </button>
-                        <button
-                          disabled={!l.opId}
-                          className={botao}
-                          onClick={() => setFicha({ opId: l.opId, marca: i.m })}
-                        >
-                          Ficha e material
-                        </button>
-                      </div>
-                      {i.motivo && (
-                        <p className="text-xs text-amber-900 mt-2">
-                          {i.motivo}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </article>
-          ))}
-        </div>
-        <p className="text-xs text-torg-gray">
-          Atualizado às{" "}
-          {estado.dados?.geradoEm
-            ? new Date(estado.dados.geradoEm).toLocaleTimeString("pt-BR", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            : "—"}{" "}
-          · atualização automática a cada minuto
+        <p role="status" className="text-xs text-torg-gray">
+          {estado.atualizando
+            ? "Atualizando a fila…"
+            : `Atualizado às ${estado.dados?.geradoEm ? new Date(estado.dados.geradoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—"} · atualização automática a cada minuto`}
         </p>
       </EstadoConsulta>
       <footer className="border-t pt-4 flex flex-wrap justify-between gap-3 text-sm">
-        <Link
-          className="min-h-11 flex items-center text-torg-blue"
-          href="/producao/modelo"
-        >
-          <Box size={17} className="mr-2" />
-          Consultar 3D
-        </Link>
         <Link
           className="min-h-11 flex items-center text-torg-gray"
           href="/producao/gestao"
         >
           Gestão das OPs
+        </Link>
+        <Link
+          className="min-h-11 flex items-center text-torg-blue"
+          href="/producao/agenda"
+        >
+          Programação e recursos
         </Link>
       </footer>
       {desenho && (
