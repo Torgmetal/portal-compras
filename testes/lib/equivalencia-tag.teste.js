@@ -144,14 +144,15 @@ describe("qual TAG vai em cada etiqueta", () => {
   });
 });
 
-describe("a descrição com a TAG na frente", () => {
+describe("a descrição com a TAG no fim", () => {
   const peca = (tag) => juntarTagsCliente([{ marca: "M", qte: 1, descricao: "Travamento - Mod.1" }],
     tagsPorUnidade([{ marca: "M", unidade: 1, tag }]))[0];
 
-  // ⚠ SEPARADOR " | ", NÃO HÍFEN: o hífen funde dois códigos de origens diferentes num terceiro que
-  // não existe em lugar nenhum — mesma lição da TAG da obra e da marca/posição do QWS.
-  it("sai 'TC 4706 | DESCRIÇÃO', em caixa alta", () => {
-    expect(descricaoComTag(peca("TC 4706"), 1)).toBe("TC 4706 | TRAVAMENTO - MOD.1");
+  // ⚠⚠ DEPOIS DA DESCRIÇÃO E COM HÍFEN — Matheus (14/09/2026), vendo a etiqueta impressa: "a TAG
+  // ficou na frente da descrição, eu preciso que fique depois da descrição e separados por um -".
+  // A primeira versão saía na frente e com " | ".
+  it("sai 'DESCRIÇÃO - TC 4706', em caixa alta", () => {
+    expect(descricaoComTag(peca("TC 4706"), 1)).toBe("TRAVAMENTO - MOD.1 - TC 4706");
   });
 
   it("obra sem mapa nenhum sai como sempre", () => {
