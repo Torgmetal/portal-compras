@@ -1,7 +1,12 @@
 {
-  "build": 3132,
-  "gerado": "2026-09-14T00:08:41.476Z",
+  "build": 3133,
+  "gerado": "2026-09-14T00:11:54.852Z",
   "commits": [
+    {
+      "hash": "dafdba0c",
+      "data": "13/09/2026",
+      "titulo": "Simulador: peça fora do IFC entra com caixa estimada pelo peso; parafuso fica fora sem alarme"
+    },
     {
       "hash": "d4469726",
       "data": "13/09/2026",
@@ -146,11 +151,6 @@
       "hash": "f7110844",
       "data": "11/09/2026",
       "titulo": "Planos de ação: PDF horizontal 5W2H e exclusão com auditoria"
-    },
-    {
-      "hash": "fcad0bf6",
-      "data": "11/09/2026",
-      "titulo": "Cron do data book: de hora em hora, só em horário comercial"
     }
   ]
 }

@@ -169,5 +169,8 @@ describe("peça fora do IFC entra com caixa estimada pelo peso", () => {
     expect(r.semCaixa.every((s) => s.marca === "T107-AC1")).toBe(true);
     const pecasNaCarga = r.cargas.flatMap((c) => c.itens).reduce((t, u) => t + u.membros.length, 0);
     expect(pecasNaCarga).toBe(7);
+    // fora do IFC só viaja EMBALADA: tudo em caixa de madeira, nada solto nem em feixe
+    for (const u of r.cargas.flatMap((c) => c.itens)) expect(u.tipo).toBe("CAIXA");
+    expect(r.resumo.foraDoModelo).toBe(3);
   });
 });

@@ -22,7 +22,7 @@ export function ResumoSimulacao({ resultado, cargaSel, onCarga }) {
         <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-start gap-2"><AlertTriangle size={14} className="mt-0.5 shrink-0" /><span><b>Não cabe num veículo só:</b> a lista pede {cargas.length} cargas. Tire peças do romaneio ou passe parte para o próximo, e simule de novo.</span></p>
       )}
       {r.estimadas?.length > 0 && (
-        <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"><b>Medidas estimadas pelo peso</b> (não estão no IFC da obra; conferir no pátio): {r.estimadas.map((e) => `${e.marca} ${Math.round(e.C / 10)}×${Math.round(e.L / 10)}×${Math.round(e.A / 10)} cm`).join(", ")}</p>
+        <p className="text-[12px] text-amber-900 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 inline-flex items-start gap-2"><AlertTriangle size={14} className="mt-0.5 shrink-0" /><span><b>{r.estimadas.length} {r.estimadas.length === 1 ? "peça tem peso mas não está no IFC" : "peças têm peso mas não estão no IFC"} da obra.</b> Entraram em caixa de madeira com medida estimada pelo peso — confira no pátio antes de fechar a carga: {r.estimadas.map((e) => `${e.marca} (${e.desc || "?"}, ${Math.round(e.kg)} kg, est. ${Math.round(e.C / 10)}×${Math.round(e.L / 10)}×${Math.round(e.A / 10)} cm)`).join("; ")}.</span></p>
       )}
       {(r.resumo?.especiais > 0 || r.resumo?.semLugar?.length > 0 || r.semCaixa?.length > 0) && (
         <div className="text-[12px] text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2 space-y-1">

@@ -523,7 +523,7 @@ export default function ConsultaExpedicao({ opId, readOnly = false, focoPendente
                         {p.nfNumero && <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium" title={p.nfEmitidaEm ? `NF registrada em ${fmtD(p.nfEmitidaEm)}` : "NF vinculada pelo Fiscal"}>NF {p.nfNumero}{p.nfTipo ? ` · ${p.nfTipo}` : ""}</span>}
                         {p.simulacao && (
                           <span className={`inline-flex items-center gap-1 ${p.simulacao.desatualizada ? "text-amber-700" : "text-emerald-700"}`} title={`Simulado em ${new Date(p.simulacao.createdAt).toLocaleString("pt-BR")} · embalagem ${p.simulacao.perfilNome || ""}`}>
-                            <Truck size={11} /> {p.simulacao.resumo?.viagens === 1 ? (p.simulacao.veiculos?.[0] || "1 veículo") : `${p.simulacao.resumo?.viagens} cargas`} · {p.simulacao.resumo?.volumes} volumes{p.simulacao.desatualizada ? " · romaneio mudou, simule de novo" : ""}
+                            <Truck size={11} /> {p.simulacao.resumo?.viagens === 1 ? (p.simulacao.veiculos?.[0] || "1 veículo") : `${p.simulacao.resumo?.viagens} cargas`} · {p.simulacao.resumo?.volumes} volumes{p.simulacao.resumo?.foraDoModelo ? ` · ${p.simulacao.resumo.foraDoModelo} fora do IFC (conferir)` : ""}{p.simulacao.desatualizada ? " · romaneio mudou, simule de novo" : ""}
                           </span>
                         )}
                       </div>

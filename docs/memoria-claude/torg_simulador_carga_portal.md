@@ -43,3 +43,6 @@ monta a carga daquela lista.
   contagem); **peça com peso sem geometria** (escada móvel, contrapeso, batente da OP-107 — desenho do cliente, fora
   do modelo) entra com **caixa estimada pelo peso e pela família** (`caixaEstimada`), marcada `estimada`, e a tela
   pede conferência em âmbar. Nunca em vermelho: aviso vermelho na tela do carregamento vira peça deixada no pátio.
+  Vitor (13/09): "só deve fazer pacote para esses itens, exemplo de caixas" → peça estimada viaja SEMPRE em caixa de
+  madeira (nunca solta nem em feixe); e "essas peças que têm peso mas não têm IFC aí sim é importante avisar" → aviso
+  destacado no modal, no card do romaneio ("N fora do IFC (conferir)") e na página 1 do PDF.
