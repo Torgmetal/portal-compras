@@ -6043,6 +6043,18 @@ model MesSessao {
   marca        String?
   pecaId       String? // -> PecaConjunto.id, quando resolvido
   operacao     String? // etapa/setor da vez
+  /// ⚠⚠ A IDENTIDADE DO TRABALHO: "89|T89A16" (obra só em dígitos + marca), ou "—" quando o
+  /// operador abriu a máquina sem marca. É ela que a trava de unicidade usa — ver
+  /// `lib/mes/chave-trabalho.js` e o índice parcial em `scripts/ensure-mes-tables.mjs`.
+  chaveTrabalho String  @default("—")
+  /// ⚠⚠ SÃO LISTAS, NÃO UM CAMPO SÓ — e o motivo apareceu na primeira prova contra o banco
+  /// (13/09/2026): a MESMA marca pode estar em duas barras do mesmo plano abertas ao mesmo tempo, e
+  /// a sessão é uma só (a trava é por obra+marca). Guardando um `loteId` único, encerrar a barra 2
+  /// fecharia a marca que a barra 3 ainda está cortando. Aqui a sessão acumula os comandos que a
+  /// usam, e só fecha quando o último deles termina — foi o que o Codex chamou de "encerrar as
+  /// sessões daquela execução que não estejam sendo usadas por outra unidade ainda ativa".
+  lotes             String[]
+  nestingUnidades   String[]
   planejadoQtd Float     @default(0)
   status       String    @default("ABERTA") // ABERTA | ENCERRADA | CANCELADA
   abertaEm     DateTime  @default(now())
@@ -6056,12 +6068,19 @@ model MesSessao {
   eventos      MesEvento[]
   apontamentos MesApontamentoQtd[]
 
-  // ⚠⚠ UMA SESSÃO ABERTA POR RECURSO é garantida por ÍNDICE PARCIAL no Postgres
-  // (`ON "MesSessao"("recursoId") WHERE status = 'ABERTA'`), que o Prisma não
-  // sabe declarar — por isso mora em scripts/ensure-mes-tables.mjs
-  // (`travaDaSessaoDoRecurso`), igual ao da ConferenciaPeca. Sem ele, dois totens
-  // abrem duas sessões no mesmo recurso e ninguém percebe: os apontamentos se
-  // dividem entre as duas e o monitor mostra a máquina em dois estados.
+  @@index([lotes])
+
+  // ⚠⚠ UM TRABALHO ABERTO POR RECURSO — `(recursoId, chaveTrabalho) WHERE status = 'ABERTA'`,
+  // índice PARCIAL no Postgres, que o Prisma não sabe declarar; mora em
+  // scripts/ensure-mes-tables.mjs (`travaDoTrabalhoNoRecurso`), igual ao da
+  // ConferenciaPeca. Sem ele, dois totens abrem a MESMA marca duas vezes no mesmo
+  // posto e ninguém percebe: os apontamentos se dividem entre as duas sessões e o
+  // monitor mostra a máquina em dois estados.
+  //
+  // ⚠⚠ ERA `("recursoId")` SOZINHO — uma sessão por recurso — e mudou em 13/09/2026,
+  // quando o Matheus pediu "multi marcas ao mesmo tempo numa máquina" (o nesting abre
+  // todas as marcas da barra de uma vez). A chave ganhou a OBRA por achado do Codex:
+  // `(recurso, marca)` misturaria a T97A16 da 097 com a da 102.
   @@index([recursoId, status])
   @@index([opId])
   @@index([opNumero, marca])

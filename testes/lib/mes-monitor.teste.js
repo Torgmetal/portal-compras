@@ -89,8 +89,9 @@ describe("o alerta de sessão esquecida", () => {
 describe("cartaoDoRecurso", () => {
   it("leva o trabalho da sessão e as quantidades", () => {
     const c = cartaoDoRecurso(RECURSO, {
-      sessao: SESSAO, evento: evento(), somas: { boas: 4, rejeitadas: 1, retrabalho: 2 },
-      peca: { descricao: "COLUNA" },
+      sessoes: [{ ...SESSAO, pecaId: "p1" }], evento: evento(),
+      somas: new Map([["s1", { boas: 4, rejeitadas: 1, retrabalho: 2 }]]),
+      pecas: new Map([["p1", { descricao: "COLUNA" }]]),
     }, AGORA);
     expect(c).toMatchObject({
       codigo: "SOLDA 5", nome: "Wilson Barros", estado: "PRODUCAO", operador: "Jurandir",
@@ -103,13 +104,45 @@ describe("cartaoDoRecurso", () => {
   // Numa marca de 10 com 6 feitas ontem e 2 hoje, o monitor diria "faltam 8" e o totem "faltam 2".
   // Duas verdades sobre o mesmo número, e o chão acreditaria na que estivesse mais perto.
   it("NÃO manda saldo — ele divergiria do totem", () => {
-    const c = cartaoDoRecurso(RECURSO, { sessao: SESSAO, evento: evento(), somas: { boas: 2 } }, AGORA);
+    const c = cartaoDoRecurso(RECURSO, { sessoes: [SESSAO], evento: evento() }, AGORA);
     expect(c.saldo).toBeUndefined();
   });
 
   it("posto sem sessão não inventa obra nem operador", () => {
-    const c = cartaoDoRecurso(RECURSO, { evento: evento({ tipo: "ENCERRAMENTO", sessaoId: "s-velha" }) }, AGORA);
+    const c = cartaoDoRecurso(RECURSO, { sessoes: [], evento: evento({ tipo: "ENCERRAMENTO", sessaoId: "s-velha" }) }, AGORA);
     expect(c).toMatchObject({ estado: LIVRE, operador: null, obra: null, marca: null, planejado: 0, produzido: 0 });
+  });
+});
+
+// ─── VÁRIAS MARCAS ABERTAS NO MESMO POSTO (13/09/2026) ───────────────────────
+//
+// ⚠⚠ Matheus: "tem que ser possível multi marcas ao mesmo tempo numa máquina". O monitor via UMA
+// sessão por posto; com o lote do nesting, vê várias — e continua tendo de mostrar UM card.
+
+describe("o posto com várias marcas abertas", () => {
+  const outra = { ...SESSAO, id: "s2", marca: "T97A44", abertaEm: new Date("2026-09-13T12:10:00Z") };
+
+  it("mostra um card só, com o trabalho principal e quantas marcas mais", () => {
+    const c = cartaoDoRecurso(RECURSO, { sessoes: [SESSAO, outra], evento: evento() }, AGORA);
+    expect(c).toMatchObject({ marca: "T97A43", trabalhos: 2, outrasMarcas: ["T97A44"] });
+  });
+
+  // ⚠⚠ O EVENTO DO LOTE NÃO TEM SESSÃO (`sessaoId: null`) — é do RECURSO. Se o monitor só aceitasse
+  // evento de sessão, a máquina com o lote aberto apareceria SEM REGISTRO.
+  it("o evento do lote (do recurso) vale para todas as marcas", () => {
+    const r = estadoDoCartao([SESSAO, outra], evento({ sessaoId: null, tipo: "PRODUCAO" }), AGORA);
+    expect(r.estado).toBe("PRODUCAO");
+  });
+
+  it("evento de QUALQUER uma das abertas vale", () => {
+    expect(estadoDoCartao([SESSAO, outra], evento({ sessaoId: "s2" }), AGORA).estado).toBe("PRODUCAO");
+  });
+
+  // ⚠ O alerta de sessão esquecida olha a MAIS VELHA: é ela que denuncia o turno que foi embora.
+  it("o alerta olha a marca aberta há mais tempo", () => {
+    const velha = { ...SESSAO, id: "s0", abertaEm: new Date("2026-09-12T18:00:00Z") };
+    const r = estadoDoCartao([outra, velha], evento({ sessaoId: "s2" }), AGORA);
+    expect(r.alerta).toMatch(/19 h/);
   });
 });
 

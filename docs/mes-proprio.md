@@ -1268,3 +1268,91 @@ virar *"apontar por barra cortada"* — e aí espalha mudança pelo código inte
 E um achado que **não é deste trabalho, é de hoje**: ⚠⚠ `saldoDaMarca` soma as sessões de **vários
 recursos**, mas `comTravaDoRecurso` serializa **um**. Dois recursos podem consumir o mesmo saldo ao
 mesmo tempo. Fica anotado como defeito existente, a tratar junto.
+
+
+---
+
+# 17. Multi marcas na mesma máquina, e o nesting que abre a barra (13/09/2026)
+
+Implementado o que o §16.4 decidiu, com as correções do Codex. Regras em `lib/mes/lote.js`,
+`lib/mes/chave-trabalho.js`, `lib/mes/trava.js` e `lib/mes/saldo.js` (os dois últimos saíram de
+`sessao.js`, que passou de 350 linhas).
+
+## 17.1 A trava mudou de pergunta
+
+| Antes | Agora |
+|---|---|
+| uma SESSÃO aberta por recurso | um TRABALHO (obra+marca) aberto por recurso |
+| `ON "MesSessao"("recursoId") WHERE ABERTA` | `ON "MesSessao"("recursoId","chaveTrabalho") WHERE ABERTA` |
+
+⚠⚠ **A chave carrega a OBRA** (`"89|T89A16"`), não só a marca: `(recurso, marca)` misturaria a
+`T97A16` da obra 097 com a da 102 — duas peças diferentes que por acaso se chamam igual — e uma
+impediria a outra de abrir. ⚠ Trabalho sem marca vira `"—"`, para identidade nula não furar a trava.
+
+⚠⚠ **O índice antigo é derrubado por nome.** `CREATE UNIQUE INDEX IF NOT EXISTS` com o mesmo nome
+**não substitui nada** — só não faz nada, e a trava velha continuaria barrando a segunda marca.
+
+## 17.2 ⚠⚠ O ESTADO É DO RECURSO, E ISSO ERA O RISCO REAL
+
+Até aqui, abrir sessão gravava `PRODUCAO` e encerrar gravava `ENCERRAMENTO`, **presos à sessão**.
+Repetindo isso por marca, com várias abertas:
+
+- abrir uma marca **apagaria uma PARADA em curso** — e o Pareto e a Disponibilidade iriam junto;
+- fechar uma marca **liberaria a máquina inteira** enquanto as outras ainda produzem;
+- N marcas abertas no mesmo instante dariam N eventos de PRODUCAO, **inflando o tempo do posto N
+  vezes**.
+
+Agora a transição compartilhada é **um evento do recurso** (`sessaoId: null`), um por comando, e só
+acontece quando o posto **não** está num estado que alguém escolheu (PARADA, MANUTENÇÃO, SETUP,
+FORA DE TURNO). O `ENCERRAMENTO` só é gravado quando **não sobrou trabalho aberto**.
+
+Provado contra o banco do laboratório, pela rota, logado:
+
+```
+1) ABRIR TRABALHO NÃO APAGA UMA PARADA
+   lote A aberto (6 marcas) · estado: PARADA
+   abriu o lote B (8 marcas) → estado agora: PARADA
+   ✔ a parada resistiu · trabalhos abertos: 11
+
+2) ENCERRAR UM LOTE NÃO LIBERA A MÁQUINA COM O OUTRO ABERTO
+   encerrou o lote A (3) · sobraram 8 · estado: PARADA
+   encerrou o lote B (8) · sobraram 0 · estado: ENCERRAMENTO
+```
+
+## 17.3 ⚠⚠ A MESMA MARCA EM DUAS BARRAS — ACHADO NA PRIMEIRA PROVA CONTRA O BANCO
+
+Abrindo duas barras do mesmo plano na mesma máquina, **3 marcas se repetiam**. A sessão é uma só (a
+trava é por obra+marca), e encerrar a primeira barra fechava marca que a segunda ainda cortava —
+exatamente o que o Codex tinha previsto (*"encerrar as sessões daquela execução que não estejam
+sendo usadas por outra unidade ainda ativa"*).
+
+Por isso `MesSessao.lotes` e `.nestingUnidades` são **listas**, não campos únicos: a sessão acumula
+os comandos que a usam e **só encerra quando o último deles termina** (`encerradas: 3,
+seguemEmOutroLote: 3`). Um `loteId` único teria escondido isso.
+
+## 17.4 O teto do planejado atravessa os postos
+
+⚠⚠ Defeito que **já existia** e o Codex apontou de passagem: `saldoDaMarca` soma as boas de TODAS
+as sessões daquela obra+marca, **em qualquer posto** — mas a trava serializava só o recurso. Dois
+postos lançando a mesma marca ao mesmo tempo liam o mesmo saldo e passavam os dois. Agora o
+lançamento trava **as duas chaves** (recurso e trabalho), em ordem determinística — ordenar é o que
+evita abraço mortal entre dois lançamentos que precisam das mesmas duas travas.
+
+## 17.5 O totem e o monitor
+
+- `estadoDoRecurso` devolve `sessoes[]`; a rota do totem devolve **uma conta por marca aberta**
+  (cada uma com o seu apontado e o seu saldo), mais `planos` — as barras que aquele posto pode
+  abrir, dizendo qual já está em curso. ⚠ Só na **Preparação**: nesting é corte.
+- O monitor mostra **um card por posto**, com o trabalho principal e quantas marcas mais. Um card
+  por sessão faria a TV mostrar a mesma máquina cinco vezes, em cinco estados que são o mesmo.
+- ⚠ O alerta de sessão esquecida passou a olhar a **mais velha** das abertas.
+
+## 17.6 ⚠⚠ UMA FUNÇÃO SUMIU E 1.239 TESTES NÃO VIRAM
+
+Refatorando o encerramento, apaguei `estadoDoRecurso` junto com o bloco que reescrevi — e a suíte
+inteira continuou verde, porque **nenhum teste a chamava**. O defeito só apareceu quando o totem
+devolveu **500** no navegador. Agora ela tem teste, e a lição vale para o resto: função que a tela
+chama precisa de pelo menos um teste, nem que seja para provar que ela existe.
+
+⚠ E um segundo tropeço na mesma tarde: um `replace` de refatoração que **não casou virou no-op
+silencioso**, e eu segui adiante achando que tinha editado. Conferir o arquivo depois de mexer.

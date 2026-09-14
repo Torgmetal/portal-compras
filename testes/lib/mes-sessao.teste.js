@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { validarQuantidade, mudarEstado, apontarQuantidade, abrirSessao, saldoDaMarca, ESTADO, STATUS } from "@/lib/mes/sessao";
+import { validarQuantidade, mudarEstado, apontarQuantidade, abrirSessao, saldoDaMarca, estadoDoRecurso, ESTADO, STATUS } from "@/lib/mes/sessao";
 
 // MES — AS REGRAS DA SESSÃO DO TOTEM.
 //
@@ -286,5 +286,35 @@ describe("abrirSessao", () => {
     expect(r.jaExistia).toBe(false);
     expect(r.sessao.status).toBe(STATUS.ABERTA);
     expect(tx.mesEvento.create.mock.calls[0][0].data.tipo).toBe(ESTADO.PRODUCAO);
+  });
+});
+
+
+// ─── O ESTADO DO POSTO ───────────────────────────────────────────────────────
+//
+// ⚠⚠ ESTE TESTE EXISTE PORQUE A FUNÇÃO SUMIU SEM NINGUÉM NOTAR (13/09/2026). Refatorando o
+// encerramento, apaguei `estadoDoRecurso` junto — 1.239 testes continuaram passando, e o defeito só
+// apareceu quando o totem devolveu 500 no navegador. Toda função que a tela chama precisa de pelo
+// menos um teste, nem que seja para provar que ela existe.
+
+describe("estadoDoRecurso", () => {
+  const prismaFalso = (sessoes, evento) => ({
+    mesSessao: { findMany: vi.fn().mockResolvedValue(sessoes) },
+    mesEvento: { findFirst: vi.fn().mockResolvedValue(evento) },
+  });
+
+  it("devolve todas as marcas abertas no posto, e a primeira como principal", async () => {
+    const abertas = [{ id: "s1", marca: "A" }, { id: "s2", marca: "B" }];
+    const r = await estadoDoRecurso(prismaFalso(abertas, { tipo: "PRODUCAO", ocorridoEm: new Date("2026-09-13") }), "r1");
+    expect(r.sessoes).toHaveLength(2);
+    expect(r.sessao.id).toBe("s1");
+    expect(r.estado).toBe("PRODUCAO");
+  });
+
+  // ⚠ Sem evento não é "parado", é desconhecido (§7.3): conectividade é dimensão separada do
+  // estado produtivo, e pintar de vermelho o que ninguém sabe envenena o Pareto.
+  it("posto sem evento não vira parado", async () => {
+    const r = await estadoDoRecurso(prismaFalso([], null), "r1");
+    expect(r).toMatchObject({ estado: null, desde: null, sessao: null });
   });
 });

@@ -1,7 +1,12 @@
 {
-  "build": 3129,
-  "gerado": "2026-09-13T19:28:17.853Z",
+  "build": 3130,
+  "gerado": "2026-09-14T00:08:17.820Z",
   "commits": [
+    {
+      "hash": "32468fd126",
+      "data": "13/09/2026",
+      "titulo": "MES proprio: a conferencia com o Gantt virou direcional, e nao igualdade"
+    },
     {
       "hash": "9350504fbf",
       "data": "13/09/2026",
@@ -146,11 +151,6 @@
       "hash": "1495b70632",
       "data": "11/09/2026",
       "titulo": "CMR: editar a linha lançada, lançar sem esperar a planilha, e escolher o item repetido"
-    },
-    {
-      "hash": "d1823d0b5e",
-      "data": "11/09/2026",
-      "titulo": "Etiqueta: os corpos e os traços da do BarTender, que é a que se lê"
     }
   ]
 }

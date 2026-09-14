@@ -712,7 +712,7 @@ async function main() {
     await criarTabelasDoAgente(prisma, faltando);
   }
 
-  await travaDaSessaoDoRecurso(prisma);
+  await travaDoTrabalhoNoRecurso(prisma);
 
   // Após criar as tabelas, garante o event trigger de proteção
   await ensureEventTrigger(prisma);
@@ -816,13 +816,21 @@ async function criarTabelasDoAgente(prisma, faltando) {
  * roda por enquanto só no banco de laboratório), e este script é chamado no build — ele não pode
  * derrubar deploy nenhum por causa de uma tabela que ainda não nasceu.
  */
-async function travaDaSessaoDoRecurso(prisma) {
+async function travaDoTrabalhoNoRecurso(prisma) {
+  // ⚠⚠ O ÍNDICE ANTIGO TEM DE CAIR EXPLICITAMENTE (achado do Codex, 13/09/2026). Ele travava UMA
+  // sessão aberta por recurso; agora o que não pode repetir é o TRABALHO (obra+marca), porque o
+  // nesting abre várias marcas de uma vez na mesma máquina. `CREATE INDEX IF NOT EXISTS` com o
+  // mesmo nome NÃO substitui nada — só não faz nada, e a trava velha continuaria barrando a
+  // segunda marca. Nome novo + drop do antigo.
+  await prisma.$executeRawUnsafe(`DROP INDEX IF EXISTS "MesSessao_recursoId_aberta_key"`).then(
+    () => {}, (e) => console.warn("[ensure-mes-tables] drop do índice antigo:", e.message),
+  );
   await prisma.$executeRawUnsafe(`
-    CREATE UNIQUE INDEX IF NOT EXISTS "MesSessao_recursoId_aberta_key"
-    ON "MesSessao"("recursoId") WHERE "status" = 'ABERTA'
+    CREATE UNIQUE INDEX IF NOT EXISTS "MesSessao_recurso_trabalho_aberta_key"
+    ON "MesSessao"("recursoId", "chaveTrabalho") WHERE "status" = 'ABERTA'
   `).then(
-    () => console.log("[ensure-mes-tables] OK — uma sessão aberta por recurso (MesSessao)."),
-    (e) => console.warn("[ensure-mes-tables] índice de sessão única por recurso:", e.message),
+    () => console.log("[ensure-mes-tables] OK — um trabalho (obra+marca) aberto por recurso."),
+    (e) => console.warn("[ensure-mes-tables] índice de trabalho único por recurso:", e.message),
   );
 }
 
