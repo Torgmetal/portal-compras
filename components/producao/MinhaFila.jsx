@@ -14,6 +14,7 @@ import {
   CalendarDays,
   AlertTriangle,
   PackageOpen,
+  FileSpreadsheet,
 } from "lucide-react";
 import { ETAPAS } from "@/lib/producao-operacional";
 import { aplicarRemanejoNaFila } from "@/lib/fila-operador";
@@ -65,6 +66,16 @@ export default function MinhaFila() {
     true,
     true,
   );
+  const [baixandoSyneco, setBaixandoSyneco] = useState(false), [avisoSyneco, setAvisoSyneco] = useState("");
+  async function planilhaSyneco() {
+    setBaixandoSyneco(true); setAvisoSyneco("");
+    try {
+      const { baixarPlanilhaApontamentosSyneco } = await import("@/lib/apontamentos-syneco-cliente");
+      const t = await baixarPlanilhaApontamentosSyneco({ setor: posto.setor, nome: ETAPAS[posto.setor] || posto.setor });
+      setAvisoSyneco(t.linhas ? `${t.pecas} peça(s) em ${t.linhas} marca(s) para lançar no Syneco — planilha baixada.` : "Nada a lançar: o Syneco já tem tudo que o portal baixou neste setor.");
+    } catch (e) { setAvisoSyneco(e.message || "Não consegui montar a planilha."); }
+    finally { setBaixandoSyneco(false); }
+  }
   useEffect(() => {
     if (!posto || remanejar) return;
     const id = setInterval(() => {
@@ -193,14 +204,29 @@ export default function MinhaFila() {
             {posto.setor === "CORTE" ? "máquina" : "bancada"}
           </p>
         </div>
-        <Link
-          href="/producao/modelo"
-          className={`${botao} inline-flex gap-2 items-center !text-torg-blue`}
-        >
-          <Box size={17} />
-          Modelo 3D
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {/* ⚠ a planilha de CORREÇÃO do setor: o que foi baixado no portal e o Syneco ainda não tem. Vitor
+              (14/09/2026): "exportar a planilha de Apontamentos para ser corrigido no Syneco". */}
+          <button
+            type="button"
+            onClick={planilhaSyneco}
+            disabled={baixandoSyneco}
+            className={`${botao} inline-flex gap-2 items-center`}
+            title="Planilha do que este setor baixou no portal e ainda não está no Syneco, para lançar lá"
+          >
+            <FileSpreadsheet size={17} />
+            {baixandoSyneco ? "Montando…" : "Planilha p/ Syneco"}
+          </button>
+          <Link
+            href="/producao/modelo"
+            className={`${botao} inline-flex gap-2 items-center !text-torg-blue`}
+          >
+            <Box size={17} />
+            Modelo 3D
+          </Link>
+        </div>
       </header>
+      {avisoSyneco && <p className="text-sm text-torg-dark bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{avisoSyneco}</p>}
       <div className="flex flex-wrap items-end gap-2">
         <label className="text-xs text-torg-gray flex-1 min-w-0 basis-48">
           {posto.setor === "CORTE" ? "Máquina" : "Montador / bancada"}

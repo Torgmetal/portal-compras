@@ -5,10 +5,13 @@ metadata:
   type: project
 ---
 
-**Onde:** `Produção › Meu trabalho` tem um card com o total ("N peças em M marcas baixadas no portal ainda
-não estão no Syneco") e o botão *Planilha para o Syneco* (todas as OPs vivas, todos os setores). Em
-`Produção › Peças › OP › setor`, o botão *Apontamentos p/ Syneco* ao lado de *Exportar seleção* gera a
-mesma planilha só daquela OP e setor. Lib `lib/apontamentos-syneco.js`, rota
+**Onde:** `Produção › Meu trabalho` ("Hoje na fábrica", `components/producao/MinhaFila.jsx`) tem o botão
+*Planilha p/ Syneco* no cabeçalho, ao lado de *Modelo 3D* — gera a planilha do SETOR escolhido no posto.
+`Produção › Gestão das OPs` (`PainelProducaoClient`, aba Visão geral) tem o card com o total de todas as
+OPs vivas e o botão *Planilha para o Syneco*. Em `Produção › Peças › OP › setor`, o botão
+*Apontamentos p/ Syneco* ao lado de *Exportar seleção* gera só daquela OP e setor.
+⚠ `/producao` renderiza `MinhaFila`, NÃO `PainelProducaoClient` (que é o /producao/gestao) — errei
+isso na primeira entrega e o Vitor não achou o botão. Lib `lib/apontamentos-syneco.js`, rota
 `/api/producao/apontamentos-syneco?opId&setor`, planilha no padrão Torg (`criarExcelTabular`).
 
 **Why:** Vitor (14/09/2026): "precisamos ter uma forma de exportar a planilha de Apontamentos para ser
