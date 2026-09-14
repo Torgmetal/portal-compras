@@ -30,3 +30,13 @@ acusava: a importação "deu certo" duas vezes.
   (AuditLog `REGULARIZAR_LPC_CHAVE`). 14 conjuntos T89C que estavam sem croqui na LPC ganharam os seus.
   Só T89C100 não tem linha na LPC; o vínculo dele ficou na LE.
 - Relacionado: [[torg_pecaconjunto_opnumero]], [[torg_listas_le_lpc]], [[torg_producao_e_lpc]].
+
+## A LE também duplicava — pela grafia do número da OP (14/09/2026)
+
+`importar-le` gravava a chave como veio da planilha: a R00/R01 da OP-089 entrou como "089" e a R02 como
+"89" (561 linhas, a antiga com a linha "TOTAL.:" de 8.705 peças); a OP-084 tinha "084" × "84". Agora a
+chave da LE é o número da OP CADASTRADA quando a OP é casada, e o rodapé (TOTAL/SUBTOTAL/SOMA) fica de
+fora antes de virar peça (`ehLinhaDeTotal` continua na leitura, por segurança). Limpeza de 14/09:
+OP-089 ficou com a R02 (280 marcas) sob "089"; OP-084 perdeu as 9 cópias sob "84"; as linhas
+"TOTAL.:" das OPs 060/067/085 foram apagadas (AuditLog `LIMPAR_LE_DUPLICADA`). Varredura: nenhuma
+LE em dobro, nenhuma linha TOTAL, nenhuma LE órfã.

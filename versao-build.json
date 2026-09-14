@@ -1,7 +1,12 @@
 {
-  "build": 3160,
-  "gerado": "2026-09-14T20:04:24.951Z",
+  "build": 3161,
+  "gerado": "2026-09-14T20:24:37.060Z",
   "commits": [
+    {
+      "hash": "325fce4e",
+      "data": "14/09/2026",
+      "titulo": "Memória: OP-089 rechaveada (089 → T89C) e croquis ligados à LPC"
+    },
     {
       "hash": "0afc90d7",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "d4469726",
       "data": "13/09/2026",
       "titulo": "Romaneio prévio: card em três linhas (cabeçalho, dados, ações) e resumo da simulação"
-    },
-    {
-      "hash": "5911aa96",
-      "data": "13/09/2026",
-      "titulo": "Simulador: nada em cima de quadro vazado, caibros só sobre apoio, rótulos discretos"
     }
   ]
 }
