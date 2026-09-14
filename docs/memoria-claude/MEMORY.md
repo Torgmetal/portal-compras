@@ -152,6 +152,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Romaneio a partir da carga + FORM 22](torg_romaneio_carga.md) — romaneio da carga (PlanejamentoCarga); tirar peça exige motivo; gera FORM 22 (.xlsm base64, exceljs) em 4.2 Romaneios; A4 scale=20 era o bug
 - [Módulo Fiscal](torg_fiscal.md) — /fiscal; romaneio EMITIDO cai na fila aguardando NF; informa número+tipo → FINALIZADO; campos nf* no RomaneioPrevio
 - [Apontamento Syneco por setor](torg_syneco_apontamento_fonte.md) — somar `mesApontamento` por `dataInicio` (BRT), normalizar via lib/syneco-dia.js; NUNCA `mesOrdem` (cumulativo)
+- [Planilha "Apontamentos para o Syneco"](torg_apontamentos_syneco_planilha.md) — baixa do portal − Syneco, por marca/setor; card em Produção › Meu trabalho + botão por OP/setor; lib/apontamentos-syneco.js
 - [Syneco: vínculo obra→OP](torg_syneco_obra_vinculo.md) — `obra` sem prefixo T = órfão invisível (caso OP-92, 126 t); lib/syneco-obra.js
 - [Programação (o programador lançou?)](torg_programacao_syneco.md) — peça lançada = tem `MesOrdem`; ordens nascem pra rota inteira; Syneco separa Corte(10) de Preparação(20)
 - [Etapa da peça: conjunto herda do croqui](torg_etapa_conjunto_croqui.md) — corte é apontado no CROQUI; uma função só (`etapaDasMarcas`) para toda tela de "onde está"

@@ -1,10 +1,10 @@
 "use client";
-import { useState, useMemo, useTransition } from "react";
+import { useEffect, useState, useMemo, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   RefreshCw, AlertTriangle, Clock, ChevronDown, ChevronUp, ArrowRight,
-  Scissors, Wrench, Flame, Sparkles, Wind, Paintbrush, Truck, CalendarClock, Download, Flag, Layers, CalendarDays, PackageSearch, Box, FileText, CheckCircle2,
+  Scissors, Wrench, Flame, Sparkles, Wind, Paintbrush, Truck, CalendarClock, Download, Flag, Layers, CalendarDays, PackageSearch, Box, FileText, FileSpreadsheet, CheckCircle2,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import { SETORES_SOLICITACAO, SETOR_LABEL_SOLIC, STATUS_SOLIC } from "@/lib/solicitacao-producao-const";
@@ -29,6 +29,16 @@ const FLUXO = [
 
 export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setores, semanas, furos, paradas, solicitacoes = [], consultadoEm }) {
   const router = useRouter();
+  // ⚠ Apontamentos feitos no portal (baixa do encarregado) que o Syneco ainda não tem — a planilha de
+  // correção. Vitor (14/09/2026): "exportar a planilha de Apontamentos para ser corrigido no Syneco".
+  const [pendSyneco, setPendSyneco] = useState(null), [baixandoSyneco, setBaixandoSyneco] = useState(false);
+  useEffect(() => { fetch("/api/producao/apontamentos-syneco").then((r) => r.json()).then((j) => { if (j.success) setPendSyneco(j.total); }).catch(() => {}); }, []);
+  const planilhaSyneco = async () => {
+    setBaixandoSyneco(true);
+    try { const { baixarPlanilhaApontamentosSyneco } = await import("@/lib/apontamentos-syneco-cliente"); await baixarPlanilhaApontamentosSyneco({ nome: "todas-as-obras" }); }
+    catch { /* a planilha não saiu; o número na tela continua valendo */ }
+    finally { setBaixandoSyneco(false); }
+  };
   const [aba, setAba] = useState("Visão geral");
   const [verFuros, setVerFuros] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -117,6 +127,23 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
         </section>
       {aba === "Visão geral" && <>
       {/* Alertas */}
+      <div className={`rounded-xl border p-3 flex flex-wrap items-center gap-3 ${pendSyneco?.linhas ? "bg-amber-50 border-amber-200" : "bg-white border-gray-100"}`}>
+        <FileSpreadsheet size={16} className={pendSyneco?.linhas ? "text-amber-700" : "text-torg-gray"} />
+        <div className="flex-1 min-w-[220px]">
+          <p className={`text-sm font-semibold ${pendSyneco?.linhas ? "text-amber-800" : "text-torg-dark"}`}>
+            {pendSyneco == null ? "Conferindo os apontamentos do portal contra o Syneco…" : pendSyneco.linhas
+              ? `${pendSyneco.pecas} peça(s) em ${pendSyneco.linhas} marca(s) baixadas no portal ainda não estão no Syneco`
+              : "Tudo que foi baixado no portal já está no Syneco"}
+          </p>
+          <p className="text-xs text-torg-gray">{pendSyneco?.linhas ? `${pendSyneco.ops} obra(s) · ${pendSyneco.setores} setor(es) · ${pendSyneco.kg.toLocaleString("pt-BR")} kg. Lance no Syneco pela planilha; quando o sync trouxer, some daqui.` : "A baixa do portal só adianta; o Syneco continua sendo o registro oficial."}</p>
+        </div>
+        <button onClick={planilhaSyneco} disabled={baixandoSyneco || !pendSyneco?.linhas}
+          className="shrink-0 px-3 py-1.5 bg-white border border-amber-300 text-amber-800 text-xs rounded-lg hover:bg-amber-100 font-medium flex items-center gap-1.5 disabled:opacity-50"
+          title="Planilha com obra (código Syneco), setor, marca e quantidade a lançar">
+          <Download size={13} /> {baixandoSyneco ? "Montando…" : "Planilha para o Syneco"}
+        </button>
+      </div>
+
       {(furos.length > 0 || paradas > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {furos.length > 0 && (

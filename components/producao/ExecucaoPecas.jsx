@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Download, FileText, Search } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Search } from "lucide-react";
 import { useStore } from "@/lib/store";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import FichaPecaModal from "@/components/FichaPecaModal";
@@ -119,6 +119,16 @@ export default function ExecucaoPecas({
       setConfirmar(false);
       setBaixa(null);
     }
+  }
+  const [exportandoSyneco, setExportandoSyneco] = useState(false);
+  async function exportarSyneco() {
+    setExportandoSyneco(true);
+    try {
+      const { baixarPlanilhaApontamentosSyneco } = await import("@/lib/apontamentos-syneco-cliente");
+      const t = await baixarPlanilhaApontamentosSyneco({ opId: op.opId, setor, nome: `OP-${op.opNumero}-${setor}` });
+      showToast(t.linhas ? `${t.pecas} peça(s) em ${t.linhas} marca(s) para lançar no Syneco.` : "Nada a lançar: o Syneco já tem tudo que o portal baixou neste setor.", t.linhas ? "success" : "info");
+    } catch (e) { showToast(e.message, "error"); }
+    finally { setExportandoSyneco(false); }
   }
   async function exportar() {
     const XLSX = await import("xlsx");
@@ -252,6 +262,17 @@ export default function ExecucaoPecas({
           >
             <Download size={16} />
             Exportar seleção
+          </button>
+          {/* ⚠ a planilha de CORREÇÃO: o que este setor deu baixa no portal e o Syneco ainda não tem. Vitor
+              (14/09/2026): "exportar a planilha de Apontamentos para ser corrigido no Syneco". */}
+          <button
+            className={`${botao} flex items-center gap-2`}
+            onClick={exportarSyneco}
+            disabled={exportandoSyneco}
+            title="Planilha do que foi baixado no portal e ainda não está no Syneco, para lançar lá"
+          >
+            <FileSpreadsheet size={16} />
+            {exportandoSyneco ? "Montando…" : "Apontamentos p/ Syneco"}
           </button>
         </div>
         {materiais ? (

@@ -1,7 +1,12 @@
 {
-  "build": 3150,
-  "gerado": "2026-09-14T18:06:27.384Z",
+  "build": 3151,
+  "gerado": "2026-09-14T18:36:23.481Z",
   "commits": [
+    {
+      "hash": "0dfcdcf2",
+      "data": "14/09/2026",
+      "titulo": "Qualidade: campos que perdiam o foco a cada tecla (lote da tinta e os outros)"
+    },
     {
       "hash": "75542bcc",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7d9fc3b1",
       "data": "12/09/2026",
       "titulo": "feat(producao): remodela operação por OP, peças e recursos"
-    },
-    {
-      "hash": "9a960368",
-      "data": "12/09/2026",
-      "titulo": "Memória: commit em branch de outra sessão (worktree de main)"
     }
   ]
 }
