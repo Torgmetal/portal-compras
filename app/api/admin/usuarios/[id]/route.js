@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdminDoPortal } from "@/lib/session";
 import { MODULOS_VALIDOS } from "@/lib/modulos";
+import { validarVinculoFuncionario } from "@/lib/usuario-funcionario";
 
 // ⚠ CLIENTE é acesso de fora: sem módulo nenhum, serve para ASSINAR documento logado (o portal da
 // obra segue aberto por token). Ver TipoUsuario no schema.
@@ -12,7 +13,8 @@ const TIPOS_VALIDOS   = ["ADMIN", "USUARIO", "CLIENTE"];
 
 const schemaPut = z.object({
   name:             z.string().min(2).max(100).optional(),
-  email:            z.string().email("E-mail inválido").toLowerCase().optional(),
+  email:            z.string().email("E-mail inválido").toLowerCase().optional().or(z.literal("")),
+  funcionarioId:    z.string().min(1).nullable().optional(), // null = desvincular do RH
   tipo:             z.enum(TIPOS_VALIDOS).optional(),
   modulos:          z.array(z.enum(MODULOS_VALIDOS)).optional(),
   setor:            z.string().max(100).nullable().optional(),
@@ -27,6 +29,7 @@ const selectUsuario = {
   tipo:             true,
   modulos:          { select: { modulo: true } },
   setor:            true,
+  funcionario:      { select: { id: true, nome: true, cpf: true } }, // vínculo com o RH = entra pelo CPF
   assinaturaUrl:    true, // ⚠ NÃO vai para o cliente — vira `temAssinatura` na resposta
   ativo:            true,
   podeAlterarVerba: true,
@@ -106,6 +109,17 @@ export async function PUT(req, { params }) {
     return NextResponse.json({ success: false, error: "Usuário não encontrado." }, { status: 404 });
   }
 
+  // Funcionário do RH: valida o vínculo; e-mail vazio só é aceito com vínculo (vira o e-mail interno do CPF)
+  let vinculo = null;
+  if (body.funcionarioId) {
+    vinculo = await validarVinculoFuncionario(body.funcionarioId, alvoId);
+    if (!vinculo.ok) return NextResponse.json({ success: false, error: vinculo.erro }, { status: 400 });
+  }
+  if (body.email === "") {
+    const temVinculo = body.funcionarioId ? true : body.funcionarioId === null ? false : !!existente.funcionarioId;
+    if (!temVinculo) return NextResponse.json({ success: false, error: "Informe o e-mail ou vincule um funcionário do RH (aí ele entra pelo CPF)." }, { status: 400 });
+    body.email = vinculo?.emailInterno || (existente.email.endsWith("@funcionario.torg") ? existente.email : (await validarVinculoFuncionario(existente.funcionarioId, alvoId)).emailInterno);
+  }
   // Verifica duplicidade de e-mail (se estiver mudando)
   if (body.email && body.email !== existente.email) {
     const emailEmUso = await prisma.user.findUnique({ where: { email: body.email } });
@@ -126,6 +140,7 @@ export async function PUT(req, { params }) {
   const antes = {
     name:             existente.name,
     email:            existente.email,
+    funcionarioId:    existente.funcionarioId,
     tipo:             existente.tipo,
     modulos:          existente.modulos.map((m) => m.modulo),
     setor:            existente.setor,

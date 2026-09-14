@@ -1,4 +1,5 @@
 "use client";
+import SeletorFuncionario from "@/components/admin/SeletorFuncionario";
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -42,7 +43,7 @@ export default function PageEditarUsuario() {
 
   // Estado do formulário
   const [form, setForm] = useState({
-    name: "", email: "", tipo: "", modulos: [], setor: "", podeAlterarVerba: false, temAssinatura: false,
+    name: "", email: "", tipo: "", modulos: [], setor: "", podeAlterarVerba: false, temAssinatura: false, funcionarioId: null, funcionarioNome: "",
   });
   const [ativo, setAtivo] = useState(true);
 
@@ -71,7 +72,9 @@ export default function PageEditarUsuario() {
       setOriginal(u);
       setForm({
         name:             u.name,
-        email:            u.email,
+        email:            u.email.endsWith("@funcionario.torg") ? "" : u.email, // e-mail interno do CPF não é e-mail de verdade: mostra vazio
+        funcionarioId:    u.funcionario?.id || null,
+        funcionarioNome:  u.funcionario?.nome || "",
         tipo:             u.tipo,
         modulos:          (u.modulos ?? []).map((m) => m.modulo ?? m),
         setor:            u.setor ?? "",
@@ -99,9 +102,9 @@ export default function PageEditarUsuario() {
     const e = {};
     if (!form.name.trim() || form.name.trim().length < 2)
       e.name = "Nome deve ter pelo menos 2 caracteres.";
-    if (!form.email.trim())
-      e.email = "E-mail é obrigatório.";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+    if (!form.email.trim() && !form.funcionarioId)
+      e.email = "Informe o e-mail ou vincule um funcionário do RH (aí ele entra pelo CPF).";
+    else if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       e.email = "E-mail inválido.";
     if (!ehFuncionario) {
       if (!form.tipo)
@@ -123,6 +126,8 @@ export default function PageEditarUsuario() {
     setErros({});
     try {
       const body = { name: form.name.trim(), email: form.email.trim(), setor: form.setor.trim() || null };
+      // vínculo com o RH: envia o id (ou null para desvincular) só quando mudou
+      if ((original?.funcionario?.id || null) !== (form.funcionarioId || null)) body.funcionarioId = form.funcionarioId || null;
       // Anti-suicídio: não enviar tipo/modulos/podeAlterarVerba se for o próprio admin.
       // ⚠ conta do portal do funcionário também não: ela não tem tipo nem módulo do portal.
       if (!proprio && !ehFuncionario) {
@@ -302,15 +307,26 @@ export default function PageEditarUsuario() {
               {erros.name && <p className="mt-1 text-xs text-red-500">{erros.name}</p>}
             </div>
 
+            {/* Funcionário do RH — com o vínculo, a pessoa entra pelo CPF e o e-mail deixa de ser obrigatório */}
+            {!ehFuncionario && (
+              <div>
+                <label className="block text-sm font-medium text-torg-dark mb-1.5">Funcionário do RH <span className="text-gray-400 font-normal">(opcional)</span></label>
+                <SeletorFuncionario value={form.funcionarioId} nome={form.funcionarioNome} disabled={loadingSalvar}
+                  onChange={(f) => { setForm((prev) => ({ ...prev, funcionarioId: f?.id || null, funcionarioNome: f?.nome || "" })); if (erros.email) setErros((prev) => ({ ...prev, email: null })); }} />
+                <p className="mt-1 text-xs text-torg-gray">Vinculado ao cadastro do RH, entra no portal com o <b>CPF</b> — e o e-mail pode ficar em branco.</p>
+              </div>
+            )}
+
             {/* E-mail */}
             <div>
               <label className="block text-sm font-medium text-torg-dark mb-1.5">
-                E-mail <span className="text-red-500">*</span>
+                E-mail {form.funcionarioId ? <span className="text-gray-400 font-normal">(opcional)</span> : <span className="text-red-500">*</span>}
               </label>
               <input
                 type="email"
                 value={form.email}
                 onChange={(e) => setcampo("email", e.target.value)}
+                placeholder={form.funcionarioId ? "sem e-mail: entra pelo CPF" : ""}
                 disabled={loadingSalvar}
                 className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-torg-blue/30 disabled:bg-gray-50 disabled:text-gray-400 ${erros.email ? "border-red-400 bg-red-50" : "border-gray-200"}`}
               />

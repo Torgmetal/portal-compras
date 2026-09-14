@@ -19,6 +19,7 @@ export default function SenhaGeradaModal({
   senha,
   nomeUsuario,
   emailUsuario,
+  login, // { por: "cpf"|"email", login, semEmail } — quando há vínculo com o RH, a pessoa entra pelo CPF
 }) {
   const [visivel, setVisivel] = useState(false);
   const [copiado, setCopiado] = useState(false);
@@ -73,11 +74,18 @@ export default function SenhaGeradaModal({
         {/* Corpo */}
         <div className="px-6 py-5 space-y-4">
           <div>
-            <p className="text-sm text-gray-600">
-              O usuário <span className="font-semibold text-torg-dark">{nomeUsuario}</span>{" "}
-              foi criado com o e-mail{" "}
-              <span className="font-semibold text-torg-dark">{emailUsuario}</span>.
-            </p>
+            {login?.por === "cpf" ? (
+              <p className="text-sm text-gray-600">
+                O usuário <span className="font-semibold text-torg-dark">{nomeUsuario}</span> entra no portal com o{" "}
+                <span className="font-semibold text-torg-dark">CPF {login.login}</span>{login.semEmail ? " (conta sem e-mail)" : <> ou com o e-mail <span className="font-semibold text-torg-dark">{emailUsuario}</span></>}.
+              </p>
+            ) : (
+              <p className="text-sm text-gray-600">
+                O usuário <span className="font-semibold text-torg-dark">{nomeUsuario}</span>{" "}
+                foi criado com o e-mail{" "}
+                <span className="font-semibold text-torg-dark">{emailUsuario}</span>.
+              </p>
+            )}
           </div>
 
           <div className="rounded-lg border border-torg-blue/25 bg-torg-blue-50/40 px-4 py-3">

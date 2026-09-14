@@ -1,4 +1,5 @@
 "use client";
+import SeletorFuncionario from "@/components/admin/SeletorFuncionario";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -14,6 +15,8 @@ import { MODULOS_OPCOES } from "@/lib/modulos";
 const campoVazio = {
   name:             "",
   email:            "",
+  funcionarioId:    null, // vínculo com o RH: com ele, a pessoa entra pelo CPF e o e-mail é opcional
+  funcionarioNome:  "",
   tipo:             "",
   modulos:          [],
   setor:            "",
@@ -58,9 +61,9 @@ export default function FormNovoUsuario() {
     const novosErros = {};
     if (!form.name.trim() || form.name.trim().length < 2)
       novosErros.name = "Nome deve ter pelo menos 2 caracteres.";
-    if (!form.email.trim())
-      novosErros.email = "E-mail é obrigatório.";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+    if (!form.email.trim() && !form.funcionarioId)
+      novosErros.email = "Informe o e-mail ou vincule um funcionário do RH (aí ele entra pelo CPF).";
+    else if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       novosErros.email = "E-mail inválido.";
     if (!form.tipo)
       novosErros.tipo = "Selecione o tipo de usuário.";
@@ -88,6 +91,7 @@ export default function FormNovoUsuario() {
         body: JSON.stringify({
           name:             form.name.trim(),
           email:            form.email.trim(),
+          funcionarioId:    form.funcionarioId || null,
           tipo:             form.tipo,
           modulos:          form.tipo === "USUARIO" ? form.modulos : [],
           setor:            form.setor.trim() || null,
@@ -105,7 +109,7 @@ export default function FormNovoUsuario() {
         return;
       }
 
-      const { usuario, senhaTemporaria } = json.data;
+      const { usuario, senhaTemporaria, login } = json.data;
 
       if (assinatura && usuario?.id) {
         try {
@@ -123,6 +127,7 @@ export default function FormNovoUsuario() {
         senha:        senhaTemporaria,
         nomeUsuario:  usuario.name,
         emailUsuario: usuario.email,
+        login,
       });
     } catch {
       showToast("Erro de conexão. Tente novamente.", "error");
@@ -183,16 +188,24 @@ export default function FormNovoUsuario() {
               {erros.name && <p className="mt-1 text-xs text-red-500">{erros.name}</p>}
             </div>
 
+            {/* Funcionário do RH — com o vínculo, a pessoa entra pelo CPF e o e-mail deixa de ser obrigatório */}
+            <div>
+              <label className="block text-sm font-medium text-torg-dark mb-1.5">Funcionário do RH <span className="text-gray-400 font-normal">(opcional)</span></label>
+              <SeletorFuncionario value={form.funcionarioId} nome={form.funcionarioNome} disabled={loading}
+                onChange={(f) => { setForm((prev) => ({ ...prev, funcionarioId: f?.id || null, funcionarioNome: f?.nome || "" })); if (erros.email) setErros((prev) => ({ ...prev, email: null })); }} />
+              <p className="mt-1 text-xs text-torg-gray">Vinculado ao cadastro do RH, ele entra no portal com o <b>CPF</b> — e o e-mail pode ficar em branco.</p>
+            </div>
+
             {/* E-mail */}
             <div>
               <label className="block text-sm font-medium text-torg-dark mb-1.5">
-                E-mail <span className="text-red-500">*</span>
+                E-mail {form.funcionarioId ? <span className="text-gray-400 font-normal">(opcional)</span> : <span className="text-red-500">*</span>}
               </label>
               <input
                 type="email"
                 value={form.email}
                 onChange={(e) => setcampo("email", e.target.value)}
-                placeholder="usuario@torg.com.br"
+                placeholder={form.funcionarioId ? "sem e-mail: ele entra pelo CPF" : "usuario@torg.com.br"}
                 disabled={loading}
                 className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-torg-blue/30 disabled:bg-gray-50 disabled:text-gray-400 ${
                   erros.email ? "border-red-400 bg-red-50" : "border-gray-200"
@@ -351,6 +364,7 @@ export default function FormNovoUsuario() {
           senha={modal.senha}
           nomeUsuario={modal.nomeUsuario}
           emailUsuario={modal.emailUsuario}
+          login={modal.login}
         />
       )}
     </div>
