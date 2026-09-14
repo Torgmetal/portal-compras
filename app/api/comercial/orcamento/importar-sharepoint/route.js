@@ -12,6 +12,7 @@
 // guarda coisa que a planilha não tem — o vínculo com a OP, as observações — e uma célula em
 // branco quer dizer "não preenchi", nunca "apague".
 import { NextResponse } from "next/server";
+import { registrarExecucao } from "@/lib/cron-monitor";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { getAccessToken } from "@/lib/sharepoint";
@@ -118,8 +119,13 @@ export async function GET(req) {
                 entityId: String(ano), diff: { criados: r.criados, atualizados: r.atualizados, revisoes: r.revisoes, porCron: true } },
       }).catch(() => {});
     }
+    // ⚠⚠ HEARTBEAT — só na chamada do cron; a de gente é simulação e não é execução agendada.
+    // Esta rota estava agendada e fora do monitor, e por isso o redirect do middleware (307) passou
+    // meses sem ser notado.
+    if (doCron) await registrarExecucao("orcamento-sharepoint", { ok: true, mensagem: `${r.criados || 0} novo(s) · ${r.atualizados || 0} atualizado(s)` });
     return NextResponse.json({ simulacao: !doCron, ...r });
   } catch (e) {
+    if (doCron) await registrarExecucao("orcamento-sharepoint", { ok: false, mensagem: e.message });
     return NextResponse.json({ error: e.message }, { status: 502 });
   }
 }

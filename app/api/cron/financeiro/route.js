@@ -37,6 +37,16 @@ export async function GET(req) {
     out.receberErro = e?.message;
     registro.erro("[cron financeiro] receber:", e?.message);
   }
-  await registrarExecucao("financeiro", { ok: !out.pagarErro && !out.receberErro, mensagem: out.pagarErro || out.receberErro || null });
+  // ⚠ A MENSAGEM DIZ SE A PASSADA FOI PARCIAL. O sync de contas a pagar trabalha em janelas de
+  // poucos dias (`JANELA_MAX_DIAS`); recuperando um atraso grande, ele leva várias execuções para
+  // alcançar o presente. Sem isto no heartbeat, "ok" de hoje esconderia que ainda faltam dez dias.
+  const recuperando = out.pagar?.parcial || (out.pagar?.ate && Date.now() - new Date(out.pagar.ate).getTime() > 36e5);
+  const resumo = recuperando
+    ? `recuperando atraso — coberto até ${new Date(out.pagar.ate).toLocaleDateString("pt-BR")}${out.pagar.parcial ? " (passada parcial)" : ""}`
+    : null;
+  await registrarExecucao("financeiro", {
+    ok: !out.pagarErro && !out.receberErro,
+    mensagem: out.pagarErro || out.receberErro || resumo,
+  });
   return NextResponse.json(out);
 }

@@ -1,156 +1,156 @@
 {
-  "build": 3133,
-  "gerado": "2026-09-14T00:11:54.852Z",
+  "build": 3134,
+  "gerado": "2026-09-14T00:49:32.253Z",
   "commits": [
     {
-      "hash": "dafdba0c",
+      "hash": "04e24ff808",
+      "data": "13/09/2026",
+      "titulo": "Simulador: peça fora do IFC viaja só em caixa, com aviso no modal, no card e no PDF"
+    },
+    {
+      "hash": "dafdba0c12",
       "data": "13/09/2026",
       "titulo": "Simulador: peça fora do IFC entra com caixa estimada pelo peso; parafuso fica fora sem alarme"
     },
     {
-      "hash": "d4469726",
+      "hash": "d446972631",
       "data": "13/09/2026",
       "titulo": "Romaneio prévio: card em três linhas (cabeçalho, dados, ações) e resumo da simulação"
     },
     {
-      "hash": "5911aa96",
+      "hash": "5911aa96d2",
       "data": "13/09/2026",
       "titulo": "Simulador: nada em cima de quadro vazado, caibros só sobre apoio, rótulos discretos"
     },
     {
-      "hash": "7c3fabd1",
+      "hash": "7c3fabd164",
       "data": "13/09/2026",
       "titulo": "Simular carga: percorre todos os IFCs da obra e deixa os AC fora"
     },
     {
-      "hash": "c52fb7bf",
+      "hash": "c52fb7bfdd",
       "data": "13/09/2026",
       "titulo": "Expedição: PDF do modelo de carga e veículos configuráveis do simulador"
     },
     {
-      "hash": "1e22c714",
+      "hash": "1e22c71457",
       "data": "13/09/2026",
       "titulo": "Expedição: Simular carga no romaneio prévio (motor lib/carga, IFC no navegador, 3D)"
     },
     {
-      "hash": "616c32a8",
+      "hash": "616c32a83e",
       "data": "12/09/2026",
       "titulo": "feat(pcp): orienta liberação e cortes que destravam montagem"
     },
     {
-      "hash": "275e3aaf",
+      "hash": "275e3aafdc",
       "data": "12/09/2026",
       "titulo": "Memória: fase no lugar de frente; separação por fase no modelo de carga"
     },
     {
-      "hash": "a2ce9999",
+      "hash": "a2ce9999c0",
       "data": "12/09/2026",
       "titulo": "Memória: grades de piso em camadas, degraus junto, fusão de cargas leves"
     },
     {
-      "hash": "6c89310d",
+      "hash": "6c89310d54",
       "data": "12/09/2026",
       "titulo": "feat(producao): identifica montadores e remaneja saldo pelo Gantt"
     },
     {
-      "hash": "eca0f8c1",
+      "hash": "eca0f8c198",
       "data": "12/09/2026",
       "titulo": "feat(producao): abre fila de trabalho por setor e posto"
     },
     {
-      "hash": "7d9fc3b1",
+      "hash": "7d9fc3b167",
       "data": "12/09/2026",
       "titulo": "feat(producao): remodela operação por OP, peças e recursos"
     },
     {
-      "hash": "9a960368",
+      "hash": "9a9603685f",
       "data": "12/09/2026",
       "titulo": "Memória: commit em branch de outra sessão (worktree de main)"
     },
     {
-      "hash": "c0e1445b",
+      "hash": "c0e1445b0f",
       "data": "12/09/2026",
       "titulo": "Memória: rodas do simulador de carga"
     },
     {
-      "hash": "ad12bb7e",
+      "hash": "ad12bb7e5a",
       "data": "12/09/2026",
       "titulo": "Memória: modelo de carga com capturas 3D e caminhão v2"
     },
     {
-      "hash": "8c0c4fd7",
+      "hash": "8c0c4fd7bc",
       "data": "12/09/2026",
       "titulo": "feat: integra ordens programação e qualidade na central de produção"
     },
     {
-      "hash": "e0602c57",
+      "hash": "e0602c57bb",
       "data": "12/09/2026",
       "titulo": "feat: disponibiliza ficha da peça nas listas de produção e PCP"
     },
     {
-      "hash": "78fa9203",
+      "hash": "78fa92031c",
       "data": "12/09/2026",
       "titulo": "LQC: madeira de embalagem por nível na aba Frete, entra no R$/kg"
     },
     {
-      "hash": "3210e413",
+      "hash": "3210e413ee",
       "data": "12/09/2026",
       "titulo": "fix(3d): limpar seleção e contagens ao trocar de IFC"
     },
     {
-      "hash": "b78b2865",
+      "hash": "b78b2865c5",
       "data": "12/09/2026",
       "titulo": "fix(3d): aplicar filtro de etapa e conferir status por item do modelo"
     },
     {
-      "hash": "dc1b5577",
+      "hash": "dc1b55778b",
       "data": "12/09/2026",
       "titulo": "fix(producao): corrigir recuo e controles do modelo 3D no celular"
     },
     {
-      "hash": "ad9e8d78",
+      "hash": "ad9e8d7873",
       "data": "12/09/2026",
       "titulo": "feat: navegação móvel compartilhada com menu sobreposto"
     },
     {
-      "hash": "e64682bc",
+      "hash": "e64682bc8f",
       "data": "12/09/2026",
       "titulo": "fix(3d): melhorar painéis e seleção por toque no celular"
     },
     {
-      "hash": "6b713fa3",
+      "hash": "6b713fa33c",
       "data": "12/09/2026",
       "titulo": "fix(engenharia): fixar e revisar previsão da sequência com auditoria"
     },
     {
-      "hash": "8a1095a8",
+      "hash": "8a1095a886",
       "data": "12/09/2026",
       "titulo": "Tekla 2025: pacote do teste TMSA/Vale (UDAs de montagem) e memória da OP-122"
     },
     {
-      "hash": "881df564",
+      "hash": "881df56461",
       "data": "12/09/2026",
       "titulo": "Memória do Claude compartilhada no repositório, para Mac e Windows"
     },
     {
-      "hash": "66dc71ce",
+      "hash": "66dc71cee7",
       "data": "12/09/2026",
       "titulo": "Import de lista: marca que a LPC já tinha conta como gravada, não como faltante"
     },
     {
-      "hash": "5b25158b",
+      "hash": "5b25158b6d",
       "data": "12/09/2026",
       "titulo": "fix: separar referência FORM 20 da faixa no PDF de RNC"
     },
     {
-      "hash": "e3ceba47",
+      "hash": "e3ceba47a0",
       "data": "11/09/2026",
       "titulo": "Inspeções: lembrar escolhas por OP com padrões editáveis"
-    },
-    {
-      "hash": "f7110844",
-      "data": "11/09/2026",
-      "titulo": "Planos de ação: PDF horizontal 5W2H e exclusão com auditoria"
     }
   ]
 }

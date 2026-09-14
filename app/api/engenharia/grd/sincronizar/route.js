@@ -4,6 +4,7 @@
 // Vitor (31/08/2026): "quando for enviado alguma revisão ou algo do tipo vc deve alertar ao
 // Gabriel, assim como alertar a ele sempre que receber uma nova grd".
 import { NextResponse } from "next/server";
+import { registrarExecucao } from "@/lib/cron-monitor";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sincronizarGrds } from "@/lib/grd-engenharia-sync";
@@ -112,5 +113,11 @@ export async function GET(req) {
   if (!doCron) {
     return NextResponse.json({ error: "Use POST para sincronizar." }, { status: 405 });
   }
-  return POST(req);
+  // ⚠⚠ HEARTBEAT. A rota já era agendada e NÃO era cobrada pelo monitor. O comentário acima culpa
+  // o 405, mas a causa real era outra e mais antiga: o middleware mandava o cron para o `/entrar`
+  // (307) antes de o handler existir. Sem heartbeat, os dois defeitos foram invisíveis.
+  const t0 = Date.now();
+  const r = await POST(req);
+  await registrarExecucao("grd-sincronizar", { ok: r.status < 400, duracaoMs: Date.now() - t0 });
+  return r;
 }

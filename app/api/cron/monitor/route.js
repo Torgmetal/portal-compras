@@ -10,6 +10,8 @@ import { checarSaudeCrons, registrarExecucao } from "@/lib/cron-monitor";
 import { conferirOQueOClienteVe } from "@/lib/conferencia-cliente";
 import { aquecerBanco } from "@/lib/db-retry";
 import { ADMINS_DO_PORTAL } from "@/lib/admin-portal";
+// ⚠ `escaparHtml` em todo valor dinâmico — ver o porquê em `lib/email-layout.js`.
+import { escaparHtml as esc } from "@/lib/email-layout";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // a conferência do cliente simula a conciliação do CMR e lê o Syneco de cada portal publicado
@@ -44,7 +46,7 @@ export async function GET(req) {
 
     if (to.length) {
       const linhas = problemas
-        .map((p) => `<li style="margin-bottom:4px"><b>${p.label}</b> <span style="color:#888">(${p.job})</span> — ${p.motivo}. Última execução: ${fmt(p.ultimo)}.${p.mensagem ? `<br><span style="color:#888;font-size:12px">${p.mensagem}</span>` : ""}</li>`)
+        .map((p) => `<li style="margin-bottom:4px"><b>${esc(p.label)}</b> <span style="color:#888">(${esc(p.job)})</span> — ${esc(p.motivo)}. Última execução: ${fmt(p.ultimo)}.${p.mensagem ? `<br><span style="color:#888;font-size:12px">${esc(p.mensagem)}</span>` : ""}</li>`)
         .join("");
       const blocoCrons = problemas.length ? `
         <h2 style="color:#b91c1c;margin:0 0 8px">⚠ ${problemas.length} cron(s) com problema — Workspace Torg</h2>
@@ -54,7 +56,7 @@ export async function GET(req) {
       const blocoCliente = achados.length ? `
         <h2 style="color:#b45309;margin:${problemas.length ? "20px" : "0"} 0 8px">👁 ${achados.length} ponto(s) no que o cliente vê</h2>
         <p>Estes processos rodaram, mas o resultado não fecha — e está visível no portal do cliente:</p>
-        <ul style="padding-left:18px">${achados.map((a) => `<li style="margin-bottom:6px"><b>${a.titulo}</b><br><span style="font-size:13px">${a.detalhe}</span><br><span style="color:#888;font-size:12px">Onde resolver: ${a.onde}</span></li>`).join("")}</ul>` : "";
+        <ul style="padding-left:18px">${achados.map((a) => `<li style="margin-bottom:6px"><b>${esc(a.titulo)}</b><br><span style="font-size:13px">${esc(a.detalhe)}</span><br><span style="color:#888;font-size:12px">Onde resolver: ${esc(a.onde)}</span></li>`).join("")}</ul>` : "";
       const html = `<div style="font-family:Arial,sans-serif;color:#1f2937">
         ${blocoCrons}${blocoCliente}
         <p style="font-size:12px;color:#6b7280">Alerta automático do monitor do Workspace.</p>

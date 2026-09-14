@@ -16,6 +16,23 @@ import { NextResponse } from "next/server";
 // ("OPs · aberto a todos os setores"). O portão nunca foi atualizado junto, então o link aparecia
 // pra todos e derrubava quem clicasse. As ABAS é que limitam o que cada um vê lá dentro
 // (lib/op-abas.js).
+// ⚠⚠ CRONS AGENDADOS FORA DE `/api/cron/` — quatro rotas de MÓDULO que a Vercel também chama.
+// Descoberto em 13/09/2026: o `vercel.json` as agenda, o middleware as mandava para o `/entrar`
+// (307) e elas NUNCA rodaram. O `cmr-sincronizar` não tinha uma única linha em `CronHeartbeat`, e
+// as outras três nem eram cobradas pelo monitor — morreram caladas.
+//
+// ⚠⚠ SÓ O `GET`, E O CAMINHO EXATO (pedido do Codex, 13/09/2026). Estas rotas não são endpoints de
+// cron dedicados: o `POST` delas é o botão do módulo, e em duas (GRD e orçamento) o `POST` com o
+// segredo grava SEM sessão. Liberar por `startsWith`, ou liberar todos os métodos, ampliaria quem
+// pode escrever — o que aqui não é o pedido. O `GET` de cada uma valida o `CRON_SECRET` no próprio
+// handler, que é o mesmo contrato de `/api/cron/`.
+const CRONS_FORA_DO_PREFIXO = new Set([
+  "/api/qualidade/cmr/sincronizar",
+  "/api/compras/produtos-omie/sincronizar",
+  "/api/engenharia/grd/sincronizar",
+  "/api/comercial/orcamento/importar-sharepoint",
+]);
+
 const COMERCIAL_RESTRITO = ["nova", "orcamentos", "aprovacoes", "kickoffs", "apresentacoes", "indicadores"];
 
 /**
@@ -213,6 +230,7 @@ export default withAuth(
           // pro /entrar e NENHUM cron rodava (ex.: conciliação de recebimento).
           path.startsWith("/api/cron/") ||
           path.startsWith("/api/producao/sync-sharepoint") ||
+          (req.method === "GET" && CRONS_FORA_DO_PREFIXO.has(path)) ||
           // Resposta de cobranca de cronograma — publico via token
           path.startsWith("/planejamento/cronogramas/resposta/") ||
           path.startsWith("/api/planejamento/cronogramas/cobranca/") ||
