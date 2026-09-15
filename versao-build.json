@@ -1,7 +1,12 @@
 {
-  "build": 3179,
-  "gerado": "2026-09-15T18:29:47.900Z",
+  "build": 3180,
+  "gerado": "2026-09-15T18:43:10.872Z",
   "commits": [
+    {
+      "hash": "7f687dfc87",
+      "data": "15/09/2026",
+      "titulo": "RMs Materiais: funil por coluna no cabeçalho, como nas outras telas"
+    },
     {
       "hash": "68c01d92e3",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "0dfcdcf2d3",
       "data": "14/09/2026",
       "titulo": "Qualidade: campos que perdiam o foco a cada tecla (lote da tinta e os outros)"
-    },
-    {
-      "hash": "75542bccf0",
-      "data": "14/09/2026",
-      "titulo": "LPC: a chave da lista é a fase, nunca o número da OP — a OP-094 tinha 591 marcas duplicadas"
     }
   ]
 }

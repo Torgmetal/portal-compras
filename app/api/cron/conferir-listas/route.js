@@ -61,10 +61,19 @@ function corpoDoEmail(linhas) {
        aviso só confere — nada foi importado automaticamente.</p>`;
 }
 
+/**
+ * Avisa pelos dois canais e DIZ O QUE ENTREGOU.
+ *
+ * ⚠⚠ NENHUM CANAL ENTREGAR É FALHA DO CRON, NÃO DETALHE (achado do Codex, 15/09/2026).
+ * `criarNotificacao` engole a própria exceção e devolve `null` quando nada foi criado (nenhum
+ * destinatário resolvido, banco fora), e `sendEmail` devolve `{ok:false}` quando o Resend recusa.
+ * A rota ignorava os dois e respondia sucesso: o monitor ficava calado justamente no dia em que a
+ * Engenharia não foi avisada de nada — o MESMO defeito da obra que o Graph recusou.
+ */
 async function avisar(linhas) {
   const titulo = `${linhas.length} lista(s) de expedição a importar`;
   const mensagem = linhas.slice(0, 5).map((l) => `OP-${l.opNumero}: ${frase(l)}`).join(" · ");
-  await criarNotificacao({
+  const notificacao = await criarNotificacao({
     tipo: "LE_DESATUALIZADA",
     titulo,
     mensagem,
@@ -74,13 +83,51 @@ async function avisar(linhas) {
     // ⚠ Uma notificação por DIA e por conjunto de obras: sem a chave, o cron diário empilharia o
     // mesmo aviso no sino até alguém importar, e o sino vira ruído que ninguém abre.
     chaveEvento: `le-desatualizada:${new Date().toISOString().slice(0, 10)}`,
-  });
+  }).catch(() => null);
 
-  const to = await emailsDaEngenharia();
-  if (!to.length) { registro.aviso("nenhum e-mail de Engenharia — só o sino recebeu"); return { email: 0 }; }
-  const r = await sendEmail({ to, subject: `[Portal] ${titulo}`, html: corpoDoEmail(linhas) });
-  return { email: r?.ok ? to.length : 0 };
+  // ⚠ O e-mail é tentado MESMO se o sino falhou (e vice-versa): são canais independentes, e um
+  // problema de destinatário no sino não é razão para a Engenharia ficar sem o e-mail.
+  const to = await emailsDaEngenharia().catch(() => []);
+  let email = 0;
+  let erroEmail = null;
+  if (!to.length) {
+    erroEmail = "nenhum e-mail de Engenharia";
+    registro.aviso("nenhum e-mail de Engenharia");
+  } else {
+    const r = await sendEmail({ to, subject: `[Portal] ${titulo}`, html: corpoDoEmail(linhas) })
+      .catch((e) => ({ ok: false, error: e?.message }));
+    if (r?.ok) email = to.length;
+    else erroEmail = r?.error || "o Resend recusou o envio";
+  }
+  return { sino: !!notificacao, email, erroEmail };
 }
+
+/**
+ * O que impede este cron de ser dado por bem-sucedido hoje.
+ *
+ * ⚠ Uma lista só, para o heartbeat e a resposta contarem a MESMA história. Resposta dizendo "ok"
+ * com heartbeat dizendo "falhou" é o tipo de divergência que faz perder tempo procurando bug no
+ * monitor.
+ */
+function problemasDe(incompletas, envio, quantasPendentes) {
+  const fora = [];
+  if (incompletas.length) {
+    fora.push(`não consegui ler ${incompletas.length} obra(s): ${incompletas.slice(0, 3).map((i) => i.op).join(", ")}`);
+  }
+  if (quantasPendentes && envio && !envio.simulado && !envio.sino && !envio.email) {
+    fora.push(`${quantasPendentes} obra(s) pendente(s) e NENHUM canal entregou${envio.erroEmail ? ` (${envio.erroEmail})` : ""}`);
+  }
+  return fora;
+}
+
+/**
+ * Avisa quando há o que avisar. `?simular=1` confere e não avisa ninguém — ver o handler.
+ * Em arquivo de rota que já raspa o teto de complexidade, cada condição fora do GET conta.
+ */
+const avisarSePreciso = (aAvisar, simular) =>
+  (aAvisar.length && !simular
+    ? avisar(aAvisar)
+    : Promise.resolve({ sino: false, email: 0, erroEmail: null, simulado: simular }));
 
 /** Uma linha por obra vigente, com a situação da lista dela. */
 async function conferir() {
@@ -118,13 +165,11 @@ async function conferir() {
   return { linhas, incompletas };
 }
 
-/** O heartbeat. Consulta incompleta não entra como sucesso — ver a chamada. */
-const bater = (incompletas, t0) =>
+/** O heartbeat. Consulta incompleta ou aviso não entregue não entram como sucesso. */
+const bater = (problemas, t0) =>
   registrarExecucao("conferir-listas", {
-    ok: !incompletas.length,
-    mensagem: incompletas.length
-      ? `não consegui ler ${incompletas.length} obra(s): ${incompletas.slice(0, 3).map((i) => i.op).join(", ")}`
-      : undefined,
+    ok: !problemas.length,
+    mensagem: problemas.length ? problemas.join(" · ") : undefined,
     duracaoMs: Date.now() - t0,
   });
 
@@ -144,17 +189,22 @@ export async function GET(req) {
     const aAvisar = pendentes(linhas);
 
     // `?simular=1` confere e NÃO avisa ninguém — ver o comentário na entrada do handler.
-    const envio = aAvisar.length && !simular ? await avisar(aAvisar) : { email: 0, simulado: simular };
+    const envio = await avisarSePreciso(aAvisar, simular);
+    const problemas = problemasDe(incompletas, envio, aAvisar.length);
     registro.info(`conferidas ${linhas.length} obras, ${aAvisar.length} pendentes${simular ? " (simulação)" : ""}`);
+    if (problemas.length) registro.erro(problemas.join(" · "));
     // ⚠ Simulação não bate o heartbeat: marcaria o cron como "executado hoje" sem ninguém ter
     // sido avisado, e o monitor pararia de cobrar justamente no dia em que o cron falhou.
     // ⚠⚠ CONSULTA INCOMPLETA NÃO É SUCESSO. Se o Graph recusou alguma obra, aquela obra ficou
     // invisível — e registrar "ok" faria o monitor calar justamente no dia em que o cron ficou
     // cego (achado do Codex). O aviso do que FOI achado continua saindo; o heartbeat é que conta
     // a verdade.
-    if (!simular) await bater(incompletas, t0);
+    if (!simular) await bater(problemas, t0);
     return NextResponse.json({
-      ok: true,
+      // ⚠ `ok` é "o cron cumpriu o trabalho de hoje" — conferiu TODAS as obras e, havendo o que
+      // avisar, avisou. É o mesmo critério do heartbeat, de propósito.
+      ok: !problemas.length,
+      problemas,
       conferidas: linhas.length,
       incompletas,
       pendentes: aAvisar.map((l) => ({
