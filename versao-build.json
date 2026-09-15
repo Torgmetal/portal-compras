@@ -1,7 +1,12 @@
 {
-  "build": 3172,
-  "gerado": "2026-09-15T14:29:58.258Z",
+  "build": 3173,
+  "gerado": "2026-09-15T14:37:20.786Z",
   "commits": [
+    {
+      "hash": "39f8ce6350",
+      "data": "15/09/2026",
+      "titulo": "Cron da L.E.: os tres furos que a revisao do Codex achou no que ja estava no ar"
+    },
     {
       "hash": "748694a8b7",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "451728c828",
       "data": "14/09/2026",
       "titulo": "Simulador: PDF do modelo montado no navegador — as fotos não sobem mais"
-    },
-    {
-      "hash": "11e46f3813",
-      "data": "14/09/2026",
-      "titulo": "PCP: posição de conjunto nunca vira conjunto; aposenta a baixa em massa da OP-113"
     }
   ]
 }

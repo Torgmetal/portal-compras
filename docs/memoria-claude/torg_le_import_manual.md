@@ -27,11 +27,20 @@ avisado, e o monitor pararia de cobrar justamente no dia em que ele falhou.
 "arquivo trocado", e o temporário do Excel (`~$T105-LE-R02.xlsx`) sai da listagem — ele tem data de
 hoje e faria toda obra com a planilha aberta parecer arquivo trocado.
 
-⚠ **Primeira execução real (15/09/2026, simulada): 22 obras, 7 pendências** — 085, 094, 103, 107,
-115, 116, 118. Suspeitei que 085 e 103 fossem ruído (nomes parecidos: `T85-LE-R01.xls` contra
-`T85-LE-R01_GALV.xls` que o portal tem) e fui olhar a pasta: **cada uma tem UM arquivo só**. O
-`_GALV` não existe mais no servidor, e o da 103 foi renomeado e modificado. Eram divergências
-reais — a suspeita era minha, o dado desmentiu. **Olhar a pasta antes de relaxar a regra.**
+⚠⚠ **PRIMEIRA EXECUÇÃO REAL (15/09/2026): 7 pendências, e UMA ERA FALSO POSITIVO — a minha
+conclusão de que não era é que estava errada.** Suspeitei da OP-085 (`T85-LE-R01.xls` no servidor
+contra `T85-LE-R01_GALV.xls` no portal), abri a pasta do servidor, vi **um arquivo só** e conclui
+que era divergência real. Faltou olhar o OUTRO lado: no portal a 085 tem **duas frentes**
+(`T85-LE` → `T85-LE-R01.xls` e `T85-LE-R01 GALV` → `T85-LE-R01_GALV.xls`), e o arquivo do servidor
+já estava importado pela primeira. O comparador pegava a importação mais RECENTE da obra e
+comparava com ela. **Metade da evidência com confiança inteira** — olhar o servidor E o portal.
+Corrigido: o arquivo do servidor é procurado entre TODOS os registros da obra ("este arquivo já
+entrou?"), e o caso real da 085 virou teste. Depois da correção, 6 pendências — 094, 103, 107,
+115, 116 e 118 —, e as quatro últimas **nunca tiveram lista importada**.
+
+⚠ **Obra que o Graph recusou não é obra sem arquivo.** Um 403/429/500 virava `arquivos: []` →
+"sem-arquivo" → nenhum aviso, com heartbeat de SUCESSO: o cron ficava mudo exatamente quando
+quebrava. Hoje ela sai da comparação, volta em `incompletas` e o heartbeat registra `ok:false`.
 
 ⚠ `lesDeVariasOps` (`lib/le-servidor.js`) existe porque `lesDaOp` redescobre o drive e **relista as
 29 pastas de OP a cada chamada**: 22 obras viravam ~60 idas ao Graph, e o cron tem 60 s. Com a
