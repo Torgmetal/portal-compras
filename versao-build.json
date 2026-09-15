@@ -1,7 +1,12 @@
 {
-  "build": 3191,
-  "gerado": "2026-09-15T20:45:34.976Z",
+  "build": 3192,
+  "gerado": "2026-09-15T22:05:51.701Z",
   "commits": [
+    {
+      "hash": "abffd05b",
+      "data": "15/09/2026",
+      "titulo": "Relatório de pintura: hook depois do \"carregando o PLP\" derrubava a tela inteira"
+    },
     {
       "hash": "97f4f9be",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "72bb2b06",
       "data": "14/09/2026",
       "titulo": "Cronograma: material atendido pelo estoque conta como recebido na linha de matéria-prima"
-    },
-    {
-      "hash": "5cfc3b55",
-      "data": "14/09/2026",
-      "titulo": "LE: a chave é o número da OP cadastrada e o rodapé TOTAL não vira peça"
     }
   ]
 }

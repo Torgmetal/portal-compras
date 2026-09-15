@@ -81,6 +81,17 @@ export async function POST(req, { params }) {
   const corpo = await req.json().catch(() => ({}));
   const emailCliente = limparTextoCurto(corpo?.clienteEmail || "", 160).trim();
   const nomeCliente = limparTextoCurto(corpo?.clienteNome || "", 120).trim();
+  // ⚠⚠ E-MAIL DO CLIENTE NO NOSSO DOMÍNIO É ERRO DE DIGITAÇÃO, NÃO DESTINO. OP-089 (15/09/2026): o
+  // rascunho foi "enviado" para pinho.davi@torg.com.br — o Davi é da TMSA (pinho.davi@tmsa.ind.br,
+  // que está nos contatos da OP). O Resend aceita qualquer endereço, a caixa não existe, ninguém
+  // recebe e a tela diz "link enviado". Quem é da Torg entra pela lista de destinatários do portal.
+  if (/@torg\.com(\.br)?$/i.test(emailCliente)) {
+    const opCad = await prisma.oP.findFirst({ where: { numero: book.opNumero }, select: { clienteContatos: true } });
+    const contatos = (Array.isArray(opCad?.clienteContatos) ? opCad.clienteContatos : []).filter((c) => c?.email);
+    const parecido = contatos.filter((c) => emailCliente.split("@")[0].toLowerCase().split(/[._-]/).some((t) => t.length > 2 && String(c.email).toLowerCase().includes(t)));
+    const dica = (parecido.length ? parecido : contatos).slice(0, 4).map((c) => `${c.nome || ""} <${c.email}>`).join(", ");
+    return NextResponse.json({ success: false, error: `${emailCliente} é um endereço da Torg, não do cliente — a caixa não existe e o e-mail não chegaria a ninguém. ${dica ? `Contatos da OP: ${dica}.` : "Cadastre o contato do cliente na OP."}` }, { status: 400 });
+  }
 
   let portal = await prisma.portalCliente.findFirst({
     where: { opNumero: book.opNumero },
