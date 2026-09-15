@@ -116,6 +116,10 @@
     {
       "path": "/api/cron/casar-certificados",
       "schedule": "50 5,13 * * *"
+    },
+    {
+      "path": "/api/cron/conferir-listas",
+      "schedule": "0 10 * * 1-5"
     }
   ]
 }

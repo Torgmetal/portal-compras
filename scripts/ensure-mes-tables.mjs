@@ -23,6 +23,13 @@ async function main() {
   // (lib/recebimento-cmr.js). Idempotente. 19/08/2026.
   await prisma.$executeRawUnsafe(`ALTER TYPE "RecebimentoOrigem" ADD VALUE IF NOT EXISTS 'CMR'`).catch(() => {});
 
+  // Aviso do cron que confere a L.E. do servidor contra a importada (lib/le-pendencias.js).
+  // ⚠ O valor do enum precisa existir ANTES de o código novo subir — por isso aqui, que roda no
+  // build, e não por `prisma db push` (que derrubaria FKs e índices deste banco). 14/09/2026.
+  await prisma.$executeRawUnsafe(
+    `ALTER TYPE "NotificacaoTipo" ADD VALUE IF NOT EXISTS 'LE_DESATUALIZADA'`,
+  ).catch(() => {});
+
   // Vinculo da OP com o orcamento do Comercial (proposta + estudo). Idempotente. 19/08/2026.
   for (const c of [
     // Escopo de qualidade da obra (quais relatórios ela exige). 22/08/2026.

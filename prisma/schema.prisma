@@ -4800,6 +4800,10 @@ enum CotacaoStatus {
 }
 
 enum NotificacaoTipo {
+  // ⚠ Valor novo entra no banco por scripts/ensure-mes-tables.mjs (ALTER TYPE no build), nunca
+  // por `prisma db push` — o banco de produção tem drift de FKs e índices em relação a este
+  // arquivo, e o push os derrubaria.
+  LE_DESATUALIZADA
   MATERIAL_RECEBIDO
   RASTREABILIDADE_DEFINIDA
   RM_CRIADA
