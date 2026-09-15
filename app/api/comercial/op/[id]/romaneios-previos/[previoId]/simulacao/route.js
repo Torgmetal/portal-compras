@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { hashItens } from "@/lib/carga/hash-itens";
 import { PERFIS, perfilDaLqc } from "@/lib/carga/premissas";
+import { aplicarEdicaoMontagem, edicoesDaMontagem } from "@/lib/carga/montagem-manual";
 import { catalogoDeVeiculos } from "@/lib/carga/config-carga";
 
 export const runtime = "nodejs";
@@ -28,7 +29,8 @@ async function carregar(id, previoId) {
 }
 
 export async function GET(_req, { params }) {
-  try { await requireRole(ROLES); } catch (e) { return negar(e); }
+  let user;
+  try { user = await requireRole(ROLES); } catch (e) { return negar(e); }
   const { id, previoId } = await params;
   const { op, previo, erro } = await carregar(id, previoId); if (erro) return erro;
   const itens = Array.isArray(previo.itens) ? previo.itens : [];
@@ -40,7 +42,7 @@ export async function GET(_req, { params }) {
   const ultima = await prisma.cargaSimulada.findFirst({ where: { romaneioPrevioId: previo.id }, orderBy: { createdAt: "desc" } });
   const cfg = await prisma.configCarga.findUnique({ where: { id: "padrao" } }).catch(() => null), catalogo = catalogoDeVeiculos(cfg);
   const hash = hashItens(itens);
-  return NextResponse.json({ success: true, op, previo: { id: previo.id, numero: previo.numero, status: previo.status, pesoKg: previo.pesoKg, dataPrevista: previo.dataPrevista }, lista, hash,
+  return NextResponse.json({ success: true, podeEditar: user.tipo === "ADMIN" || (user.modulos || []).some(m=>m!=="PRODUCAO" && ROLES.includes(m)), op, previo: { id: previo.id, numero: previo.numero, status: previo.status, pesoKg: previo.pesoKg, dataPrevista: previo.dataPrevista }, lista, hash,
     perfilPadrao: perfilLqc.chave, perfis: Object.values(PERFIS).map((p) => ({ chave: p.chave, nome: p.nome, resumo: p.resumo })), opcoes: { veiculos: catalogo.veiculos, frete: catalogo.frete },
     simulacao: ultima ? { ...ultima, desatualizada: ultima.itensHash !== hash } : null });
 }
@@ -64,4 +66,46 @@ export async function POST(req, { params }) {
   const sim = await prisma.cargaSimulada.create({ data: { opId: op.id, romaneioPrevioId: previo.id, perfil: perfil.chave, perfilNome: perfil.nome, itensHash: body.itensHash, resumo: body.resumo, cargas: body.cargas, avisos: body.avisos || {}, criadoPorId: user.id } });
   await prisma.auditLog.create({ data: { userId: user.id, action: "SIMULAR_CARGA_ROMANEIO_PREVIO", entity: "CargaSimulada", entityId: sim.id, diff: { opNumero: op.numero, romaneioPrevio: previo.numero, perfil: perfil.chave, viagens: body.resumo?.viagens, volumes: body.resumo?.volumes, peso: body.resumo?.peso } } }).catch(() => {});
   return NextResponse.json({ success: true, simulacao: { ...sim, desatualizada: sim.itensHash !== hashItens(previo.itens) } });
+}
+
+
+const coordenada = z.number().finite().min(-50000).max(50000);
+const angulo = z.number().finite().min(-360).max(360);
+const schemaMontagem = z.object({
+  simulacaoId: z.string().min(1).max(100), itensHash: z.string().min(1).max(40),
+  cargas: z.array(z.object({
+    indice: z.number().int().min(0).max(19),
+    itens: z.array(z.object({id:z.string().min(1).max(150),x:coordenada,y:coordenada,z:coordenada,rotacao:z.object({x:angulo,y:angulo,z:angulo})}).strict()).max(3000),
+    passos: z.array(z.string().min(1).max(150)).max(3000),
+  }).strict()).min(1).max(20),
+}).strict();
+
+// Uma nova revisão; os volumes, pesos e veículos vêm da versão salva, nunca do formulário.
+export async function PATCH(req, {params}) {
+  let user;
+  try { user = await requireRole(ROLES.filter(r=>r!=="PRODUCAO")); } catch(e) {return negar(e);}
+  let body;
+  try {body=schemaMontagem.parse(await req.json());} catch(e) {return NextResponse.json({error:e.issues?.[0]?.message||"Montagem inválida"},{status:400});}
+  const {id,previoId}=await params;
+  const {op,previo,erro}=await carregar(id,previoId);if(erro)return erro;
+  try {
+    const sim=await prisma.$transaction(async(tx)=>{
+      const atual=await tx.cargaSimulada.findFirst({where:{opId:id,romaneioPrevioId:previoId},orderBy:{createdAt:"desc"}});
+      const listaAtual=await tx.romaneioPrevio.findFirst({where:{id:previoId,opId:id},select:{itens:true}});
+      if(!atual||atual.id!==body.simulacaoId||!listaAtual||hashItens(listaAtual.itens)!==body.itensHash||atual.itensHash!==body.itensHash){
+        const e=new Error("A simulação ou o romaneio mudou. Feche e reabra para carregar a versão atual antes de editar.");e.status=409;throw e;
+      }
+      let cargas;
+      try {cargas=aplicarEdicaoMontagem(atual.cargas,body.cargas);}catch(e){e.status=400;throw e;}
+      const resumo={...atual.resumo,alertas:cargas.reduce((n,c)=>n+c.verificacoes.length,0)};
+      const revisao=await tx.cargaSimulada.create({data:{opId:id,romaneioPrevioId:previoId,perfil:atual.perfil,perfilNome:atual.perfilNome,itensHash:atual.itensHash,resumo,cargas,
+        avisos:{...atual.avisos,montagemManual:{origemId:atual.id,ajustadaEm:new Date().toISOString(),usuarioId:user.id}},criadoPorId:user.id}});
+      await tx.auditLog.create({data:{userId:user.id,action:"AJUSTAR_MONTAGEM_CARGA",entity:"CargaSimulada",entityId:revisao.id,diff:{opNumero:op.numero,romaneioPrevio:previo.numero,antes:edicoesDaMontagem(atual.cargas),depois:body.cargas}}});
+      return revisao;
+    },{isolationLevel:"Serializable",timeout:15000});
+    return NextResponse.json({success:true,simulacao:{...sim,desatualizada:false}});
+  }catch(e){
+    const status=e.status||(e.code==="P2034"?409:500);
+    return NextResponse.json({error:status===500?"Não foi possível salvar a montagem. Tente novamente.":e.code==="P2034"?"Outra edição foi salva ao mesmo tempo. Reabra a simulação antes de continuar.":e.message},{status});
+  }
 }

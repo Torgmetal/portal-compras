@@ -12,6 +12,11 @@ import { prefixoDaOp } from "@/lib/carga/classificar";
 import { marcaEhAC } from "@/lib/marca-ac";
 import { ResumoSimulacao, VolumesDaCarga, AvisosSimulacao } from "./ResultadoSimulacao";
 import { EditorAjuste, ListaAjustes } from "./AjustesCarga";
+import EditorMontagemCarga from "./EditorMontagemCarga";
+import MontagemCargaWorkspace from "./MontagemCargaWorkspace";
+import ConfirmModal from "@/components/admin/ConfirmModal";
+import { useStore } from "@/lib/store";
+import { edicoesDaMontagem } from "@/lib/carga/montagem-manual";
 
 const VisualizadorCarga = dynamic(() => import("./VisualizadorCarga"), { ssr: false, loading: () => <div className="h-[480px] rounded-xl bg-[#eef2f6] flex items-center justify-center text-sm text-torg-gray">Carregando o 3D…</div> });
 
@@ -24,7 +29,25 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
   const [resultado, setResultado] = useState(null), [cargaSel, setCargaSel] = useState(0), [gravada, setGravada] = useState(null), [pdf, setPdf] = useState(null);
   const worker = useRef(null), viz = useRef(null);
   const [tentativa, setTentativa] = useState(0);
-  const fecharRef = useRef(null);
+  const fecharRef = useRef(null), baseEdicao = useRef(null);
+  const {showToast}=useStore();
+  const [montando,setMontando]=useState(false),[volumeSelecionado,setVolumeSelecionado]=useState(null),[historico,setHistorico]=useState([]),[salvandoMontagem,setSalvandoMontagem]=useState(false),[confirmacao,setConfirmacao]=useState(null);
+  const fecharSeguro=()=>{if(salvandoMontagem||pdf?.gerando||fase==="gravando")return;if(montando)setConfirmacao("fechar");else onClose();};
+  useEffect(()=>{if(!montando)return;const avisar=e=>{e.preventDefault();e.returnValue="";};window.addEventListener("beforeunload",avisar);return()=>window.removeEventListener("beforeunload",avisar);},[montando]);
+  const iniciarMontagem=()=>{baseEdicao.current=resultado;setHistorico([]);setVolumeSelecionado(resultado.cargas[cargaSel]?.itens[0]?.id||null);setMontando(true);setPdf(null);};
+  const cancelarMontagem=()=>{if(montando&&baseEdicao.current)setResultado(baseEdicao.current);setHistorico([]);setMontando(false);setVolumeSelecionado(null);};
+  const alterarMontagem=c=>{setHistorico(h=>[...h.slice(-19),resultado]);setResultado(r=>({...r,cargas:r.cargas.map((v,i)=>i===cargaSel?c:v)}));setPdf(null);};
+  const desfazerMontagem=()=>{if(!historico.length)return;setResultado(historico[historico.length-1]);setHistorico(h=>h.slice(0,-1));};
+  const salvarMontagem=async(c)=>{
+    if(!gravada?.id||salvandoMontagem)return;
+    const cargas=resultado.cargas.map((v,i)=>i===cargaSel?c:v);
+    setSalvandoMontagem(true);setErro(null);
+    try{
+      const resposta=await fetch(`/api/comercial/op/${opId}/romaneios-previos/${previo.id}/simulacao`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({simulacaoId:gravada.id,itensHash:dados.hash,cargas:edicoesDaMontagem(cargas)})});
+      const j=await resposta.json();if(!resposta.ok||!j.success)throw new Error(j.error||"Não foi possível salvar a montagem.");
+      setResultado(r=>({...r,cargas:j.simulacao.cargas,resumo:j.simulacao.resumo}));setGravada(j.simulacao);setHistorico([]);setMontando(false);setVolumeSelecionado(null);setPdf(null);showToast("Montagem salva. O PDF seguirá a sequência definida.","success");
+    }catch(e){setErro(e.message);}finally{setSalvandoMontagem(false);}
+  };
   useEffect(() => {
     const anterior = document.activeElement, overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden"; fecharRef.current?.focus();
@@ -41,7 +64,7 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
   // 1) a lista, o perfil da LQC e a última simulação
   useEffect(() => {
     fetch(`/api/comercial/op/${opId}/romaneios-previos/${previo.id}/simulacao`).then((r) => r.json())
-      .then((j) => { if (!j.success) throw new Error(j.error || "Falha ao carregar"); setDados(j); setPerfil(j.perfilPadrao || "recomendado"); if (j.simulacao && !j.simulacao.desatualizada) { setResultado({ cargas: j.simulacao.cargas, resumo: j.simulacao.resumo, ...(j.simulacao.avisos || {}) }); setGravada(j.simulacao); } setFase("ifc"); })
+      .then((j) => { if (!j.success) throw new Error(j.error || "Falha ao carregar"); setDados(j); setPerfil(j.simulacao?.perfil || j.perfilPadrao || "recomendado"); if (j.simulacao && !j.simulacao.desatualizada) { setResultado({ cargas: j.simulacao.cargas, resumo: j.simulacao.resumo, ...(j.simulacao.avisos || {}) }); setGravada(j.simulacao); } setFase("ifc"); })
       .catch((e) => { setErro(e.message); setFase("erro"); });
   }, [opId, previo.id, tentativa]);
 
@@ -78,25 +101,29 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
     return () => { cancelado = true; };
   }, [fase, dados, opId]);
 
-  useEffect(() => () => worker.current?.terminate(), []);
+  useEffect(() => () => { worker.current?.terminate(); worker.current=null; }, [opId, previo.id]);
 
   // 3) o motor, num worker; 4) grava
   const simular = () => {
-    if (!dados || !geo) return;
+    if (!dados || !geo || worker.current) return;
     setFase("simulando"); setErro(null); setGravada(null); setAjustesMudaram(false); setProgresso({ msg: "Montando os volumes e a carga…", frac: 0.5 });
     worker.current?.terminate();
     // ⚠ tem de ser exatamente `new Worker(new URL(…, import.meta.url))`: é essa forma que o webpack reconhece para empacotar o worker
     const w = new Worker(new URL("./simular.worker.js", import.meta.url)); worker.current = w;
     w.onmessage = async (ev) => {
-      if (!ev.data.ok) { setErro(ev.data.erro); setFase("pronto"); return; }
-      const r = ev.data.resultado; setResultado(r); setCargaSel(0); setFase("pronto");
+      if (worker.current !== w) return;
+      if (!ev.data.ok) { worker.current=null; w.terminate(); setErro(ev.data.erro); setFase("pronto"); return; }
+      const r = ev.data.resultado; setResultado(r); setCargaSel(0); setFase("gravando");
+      setProgresso({msg:"Salvando a simulação…",frac:0.95});
       try {
         const res = await fetch(`/api/comercial/op/${opId}/romaneios-previos/${previo.id}/simulacao`, { method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ perfil, itensHash: dados.hash, resumo: r.resumo, cargas: r.cargas, avisos: { especiais: r.especiais, ajustadas: r.ajustadas, semCaixa: r.semCaixa, estimadas: r.estimadas, perfil: r.perfil, gcModo: r.gcModo, porNome: geo.porNome || [], faltantes: geo.faltantes, ajustes } }) }).then((x) => x.json());
+        if (worker.current !== w) return;
         if (res.success) setGravada(res.simulacao); else setErro(res.error || "A simulação não foi gravada.");
-      } catch { setErro("A simulação não foi gravada."); }
+      } catch { if(worker.current===w)setErro("A simulação não foi gravada."); }
+      finally { if(worker.current===w){worker.current=null;w.terminate();setFase("pronto");} }
     };
-    w.onerror = (e) => { setErro(e.message || "Falha no simulador"); setFase("pronto"); };
+    w.onerror = (e) => { if(worker.current!==w)return;worker.current=null;w.terminate();setErro(e.message || "Falha no simulador"); setFase("pronto"); };
     w.postMessage({ lista: dados.lista.filter((i) => !marcaEhAC(i.marca)), geometria: geo.geometria, perfil, prefixo: prefixoDaOp(opNumero), opcoes: dados.opcoes || {}, ajustes });
   };
 
@@ -106,6 +133,7 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
   // `window.open` depois do `await` caía no bloqueador de pop-up. Agora nada sobe: o pdf-lib roda
   // aqui (import dinâmico, fora do bundle da tela) e o arquivo desce por um <a download>.
   const gerarPdf = async () => {
+    if(montando||salvandoMontagem){setErro("Salve a montagem antes de gerar o PDF.");return;}
     const v = viz.current, c = resultado?.cargas?.[cargaSel]; if (!c || !dados?.op) return;
     // ⚠ nunca falhar em silêncio: se o 3D não entregou a API (ver apiRef no VisualizadorCarga), a tela diz
     if (!v?.capturar) { setErro("O 3D ainda não está pronto para fotografar — espere o modelo aparecer e clique de novo."); return; }
@@ -113,11 +141,16 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
     try {
       await new Promise((r) => setTimeout(r, 50));
       const camadas = [...new Set(c.itens.map((u) => u.camada || 0))].sort((a, b) => a - b);
-      const imagens = { full: {}, camadas: [], volumes: {} };
-      const totalFotos = 3 + camadas.length * 2 + c.itens.length; let foto = 0;
+      const imagens = { full: {}, camadas: [], passos: [], volumes: {} };
+      const totalFotos = 3 + (c.montagemManual ? c.passos.length : camadas.length) * 2 + c.itens.length; let foto = 0;
       const progressoPdf = async () => { setPdf({ gerando: true, etapa: `Preparando imagem ${++foto} de ${totalFotos}` }); await new Promise((r) => setTimeout(r, 0)); };
       for (const vista of ["iso", "lado", "topo"]) { await progressoPdf(); imagens.full[vista] = v.capturar(vista); }
-      for (const ci of camadas) {
+      if(c.montagemManual){
+        for(let passo=0;passo<c.passos.length;passo++){
+          await progressoPdf();const iso=v.capturar("iso",null,passo);
+          await progressoPdf();const topo=v.capturar("topo",null,passo);imagens.passos.push({passo,iso,topo});
+        }
+      }else for (const ci of camadas) {
         await progressoPdf(); const iso = v.capturar("iso", ci);
         await progressoPdf(); const topo = v.capturar("topo", ci); imagens.camadas.push({ ci, iso, topo });
       }
@@ -138,12 +171,12 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
   useEffect(() => () => { if (pdf?.url) URL.revokeObjectURL(pdf.url); }, [pdf]);
 
   const carga = resultado?.cargas?.[cargaSel] || null;
-  const ocupado = fase === "carregando" || fase === "ifc" || fase === "simulando";
+  const ocupado = fase === "carregando" || fase === "ifc" || fase === "simulando" || fase === "gravando";
   return (
-    <div className="fixed inset-0 z-50 bg-torg-dark/60 sm:p-3 lg:p-5 flex items-center justify-center" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 z-50 bg-torg-dark/60 sm:p-3 lg:p-5 flex items-center justify-center" onClick={(e) => e.target === e.currentTarget && fecharSeguro()}>
       <div role="dialog" aria-modal="true" aria-labelledby="titulo-simular-carga" className="bg-[#F3F6F9] sm:rounded-2xl shadow-2xl w-full max-w-[1600px] h-[100dvh] sm:h-[calc(100dvh-1.5rem)] lg:h-[calc(100dvh-2.5rem)] flex flex-col overflow-hidden" onKeyDown={(e) => {
-        if (editando) return;
-        if (e.key === "Escape") { e.stopPropagation(); onClose(); }
+        if (editando || confirmacao) return;
+        if (e.key === "Escape") { e.stopPropagation(); fecharSeguro(); }
         if (e.key === "Tab") {
           const elementos = [...e.currentTarget.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), a[href], summary')].filter((el) => el.getClientRects().length);
           const primeiro = elementos[0], ultimo = elementos[elementos.length - 1];
@@ -151,31 +184,32 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
           else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primeiro?.focus(); }
         }
       }}>
-        <header className="px-4 sm:px-6 py-4 bg-white border-b border-slate-200 flex items-center gap-3 shrink-0">
+        <header className="px-4 sm:px-6 py-2 bg-white border-b border-slate-200 flex items-center gap-3 shrink-0">
           <div className="hidden sm:flex h-11 w-11 rounded-xl bg-torg-blue-50 items-center justify-center text-torg-blue"><Truck size={23} /></div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-torg-gray">OP {opNumero} · Romaneio prévio {String(previo.numero).padStart(2, "0")}</p>
-            <h2 id="titulo-simular-carga" className="text-xl sm:text-2xl font-bold text-torg-dark">Simular carga</h2>
+            <h2 id="titulo-simular-carga" className="text-xl sm:text-2xl font-bold text-torg-dark">{montando?"Acomodar carga":"Simular carga"}</h2>
           </div>
           <div className="hidden md:flex items-center gap-5 text-sm text-torg-gray">
             {dados && <><span><b className="text-torg-dark">{dados.lista.length}</b> marcas</span><span><b className="text-torg-dark">{dados.lista.reduce((t, i) => t + i.qtd, 0).toLocaleString("pt-BR")}</b> peças</span><span><b className="text-torg-dark">{Math.round(dados.previo.pesoKg || 0).toLocaleString("pt-BR")}</b> kg no romaneio</span></>}
           </div>
-          <button ref={fecharRef} onClick={onClose} aria-label="Fechar simulação" className="h-11 w-11 shrink-0 rounded-xl text-torg-gray hover:bg-slate-100 flex items-center justify-center focus-visible:ring-2 focus-visible:ring-torg-blue"><X size={22} /></button>
+          <button ref={fecharRef} onClick={fecharSeguro} disabled={fase==="gravando"||salvandoMontagem||pdf?.gerando} aria-label="Fechar simulação" className="h-11 w-11 shrink-0 rounded-xl text-torg-gray hover:bg-slate-100 flex items-center justify-center focus-visible:ring-2 focus-visible:ring-torg-blue"><X size={22} /></button>
         </header>
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5">
-          <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-end gap-3">
+        {montando&&carga&&geo?<MontagemCargaWorkspace Visualizador={VisualizadorCarga} carga={carga} malhas={geo.malhas} madeira={resultado.madeira||100} selecionado={volumeSelecionado} onSelecionar={setVolumeSelecionado} onAlterar={alterarMontagem} onSalvar={salvarMontagem} onDesfazer={desfazerMontagem} onCancelar={()=>setConfirmacao('cancelar')} podeDesfazer={historico.length>0} salvando={salvandoMontagem} erro={erro}/>:<div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5">
+          <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3">
             <label className="block sm:w-64 text-sm font-semibold text-torg-dark">Padrão de embalagem
-              <select value={perfil} onChange={(e) => setPerfil(e.target.value)} disabled={ocupado || pdf?.gerando} className="mt-1.5 w-full h-11 text-sm font-normal text-torg-dark rounded-lg px-3 border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-torg-blue/30" title="O padrão vem da LQC da obra">
+              <select value={perfil} onChange={(e) => setPerfil(e.target.value)} disabled={ocupado || pdf?.gerando || montando || salvandoMontagem} className="mt-1.5 w-full h-11 text-sm font-normal text-torg-dark rounded-lg px-3 border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-torg-blue/30" title="O padrão vem da LQC da obra">
                 {(dados?.perfis || [{ chave: "recomendado", nome: "Padrão" }]).map((p) => <option key={p.chave} value={p.chave}>{p.nome}</option>)}
               </select>
             </label>
-            <div className="grid grid-cols-2 gap-2 sm:flex">
-              <button onClick={simular} disabled={ocupado || !geo || pdf?.gerando} className="min-h-11 text-sm font-semibold bg-torg-blue text-white rounded-lg px-4 inline-flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-torg-dark">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              <button onClick={()=>{if(montando||resultado?.cargas?.some(c=>c.montagemManual))setConfirmacao("simular");else simular();}} disabled={ocupado || !geo || pdf?.gerando || salvandoMontagem} className="min-h-11 text-sm font-semibold bg-torg-blue text-white rounded-lg px-4 inline-flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-torg-dark">
                 {fase === "simulando" ? <Loader2 size={17} className="animate-spin" /> : resultado ? <RefreshCw size={17} /> : <Play size={17} />} {resultado ? "Simular de novo" : "Simular"}
               </button>
-              <button onClick={gerarPdf} disabled={ocupado || !resultado || !geo || pdf?.gerando} className="min-h-11 text-sm font-semibold bg-white border border-slate-200 text-torg-dark rounded-lg px-4 inline-flex items-center justify-center gap-2 disabled:opacity-40 hover:bg-slate-50" title="Modelo de carga para a Expedição">
+              <button onClick={gerarPdf} disabled={ocupado || !resultado || !geo || pdf?.gerando || montando || salvandoMontagem} className="min-h-11 text-sm font-semibold bg-white border border-slate-200 text-torg-dark rounded-lg px-4 inline-flex items-center justify-center gap-2 disabled:opacity-40 hover:bg-slate-50" title="Modelo de carga para a Expedição">
                 {pdf?.gerando ? <Loader2 size={17} className="animate-spin" /> : <FileText size={17} />} {pdf?.gerando ? "Gerando PDF…" : "PDF do modelo"}
               </button>
+              {dados?.podeEditar && <button onClick={iniciarMontagem} disabled={ocupado || !resultado || !gravada || !geo || pdf?.gerando || montando} className="col-span-2 min-h-11 text-sm font-semibold border border-torg-blue text-torg-blue rounded-lg px-4 disabled:opacity-40">Ajustar montagem</button>}
             </div>
             <p className="sm:ml-auto text-xs text-torg-gray sm:text-right leading-relaxed">Confira o veículo, a disposição<br className="hidden sm:block" /> e a sequência de carregamento.</p>
           </div>
@@ -197,31 +231,34 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
             </div>
           )}
           {resultado && (
-            <fieldset disabled={!!pdf?.gerando} className="min-w-0 space-y-5">
+            <fieldset disabled={!!pdf?.gerando || salvandoMontagem} className="min-w-0 space-y-5">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-torg-gray">
-                {gravada ? <span className="inline-flex items-center gap-1.5"><CheckCircle2 size={15} className="text-emerald-600" /> Gravada em {fmtD(gravada.createdAt)} · {gravada.perfilNome}</span> : <span>Resultado não gravado</span>}
+                {montando ? <span className="text-amber-800 font-semibold">Montagem em edição · salve para gerar o PDF</span> : gravada ? <span className="inline-flex items-center gap-1.5"><CheckCircle2 size={15} className="text-emerald-600" /> Gravada em {fmtD(gravada.createdAt)} · {gravada.perfilNome}</span> : <span>Resultado não gravado</span>}
                 {resultado.gcModo && <span>Guarda-corpo: {resultado.gcModo === "engradado" ? "em pé em engradado" : "deitado em pacote"}</span>}
                 {pdf?.url && <a href={pdf.url} download={pdf.nome} className="sm:ml-auto text-torg-blue font-semibold hover:underline inline-flex items-center gap-1.5 min-h-9"><FileText size={15} /> Baixar PDF gerado</a>}
               </div>
+              {carga && carga.versaoMontagem !== 5 && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Esta montagem foi calculada antes da revisão das embalagens e do encaixe dos volumes. Clique em <b>Simular de novo</b> para aplicar as correções.</p>}
               {ajustesMudaram && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Os ajustes mudaram. Clique em <b>Simular de novo</b> para atualizar a disposição da carga.</p>}
               <AvisosSimulacao resultado={resultado} />
               <div className="grid lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)] gap-5 items-start">
-                <ResumoSimulacao resultado={resultado} cargaSel={cargaSel} onCarga={setCargaSel} />
-                <div className="min-w-0 space-y-3">
-                  {carga && geo && <VisualizadorCarga apiRef={viz} carga={carga} malhas={geo.malhas} madeira={resultado.madeira || 100} altura={480} />}
+                {montando && carga ? <div className="order-2 lg:order-1"><EditorMontagemCarga carga={carga} selecionado={volumeSelecionado} onSelecionar={setVolumeSelecionado} onAlterar={alterarMontagem} onSalvar={salvarMontagem} onDesfazer={desfazerMontagem} onCancelar={()=>setConfirmacao("cancelar")} podeDesfazer={historico.length>0} salvando={salvandoMontagem}/></div> : <ResumoSimulacao resultado={resultado} cargaSel={cargaSel} onCarga={setCargaSel} />}
+                <div className={`min-w-0 space-y-3 ${montando ? "order-1 lg:order-2 lg:sticky lg:top-0 lg:z-10 bg-[#F3F6F9]" : ""}`}>
+                  {carga && geo && <VisualizadorCarga apiRef={viz} carga={carga} malhas={geo.malhas} madeira={resultado.madeira || 100} altura={montando ? 340 : 480} volumeSelecionado={montando?volumeSelecionado:null} onSelecionarVolume={montando?setVolumeSelecionado:null} onAlterarMontagem={montando&&!salvandoMontagem?alterarMontagem:null} onDesfazer={desfazerMontagem} podeDesfazer={historico.length>0} />}
                   {carga && !geo && <div className="min-h-64 rounded-2xl border border-slate-200 bg-white p-6 flex items-center justify-center text-sm text-torg-gray">{fase === "erro" ? "O modelo 3D não está disponível. Tente carregar novamente." : "Baixando o modelo para desenhar o 3D…"}</div>}
+                  {carga?.verificacoes?.length>0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><b>Conferências da montagem ({carga.verificacoes.length})</b><p className="text-xs mt-1">Verificação por espaço ocupado. Confira o apoio real das peças vazadas antes do carregamento.</p><ul className="mt-2 space-y-1 max-h-48 overflow-y-auto">{carga.verificacoes.map((a,i)=><li key={i}>{a.texto}</li>)}</ul></div>}
                   {geo?.modelo && <details className="text-xs text-torg-gray px-1"><summary className="cursor-pointer py-2">Modelo de referência</summary><p className="break-words pb-2">{geo.modelo}</p></details>}
                 </div>
               </div>
-              {carga && <VolumesDaCarga key={cargaSel} carga={carga} ajustes={ajustes} onAjustar={(marca, desc) => setEditando({ marca, desc })} />}
+              {carga && !montando && <VolumesDaCarga key={cargaSel} carga={carga} ajustes={ajustes} onAjustar={(marca, desc) => setEditando({ marca, desc })} />}
             </fieldset>
           )}
-          {dados && fase !== "carregando" && <details className="group bg-white rounded-xl border border-slate-200">
+          {dados && fase !== "carregando" && !montando && <details className="group bg-white rounded-xl border border-slate-200">
             <summary className="flex items-center gap-2 p-4 cursor-pointer list-none text-sm font-semibold text-torg-dark"><SlidersHorizontal size={18} className="text-torg-blue" /> Ajustes por marca <span className="font-normal text-xs text-torg-gray">({Object.keys(ajustes).length})</span><ChevronDown size={18} className="ml-auto group-open:rotate-180" /></summary>
             <div className="px-4 pb-4"><p className="text-xs text-torg-gray mb-3">Defina exceções de embalagem, posição e medidas. Os ajustes ficam salvos para os próximos romaneios desta OP.</p><ListaAjustes ajustes={ajustes} lista={dados.lista} desatualizada={ajustesMudaram && !!resultado} onEditar={(marca, desc) => setEditando({ marca, desc })} /></div>
           </details>}
-        </div>
+        </div>}
       </div>
+      <ConfirmModal open={!!confirmacao} onClose={()=>setConfirmacao(null)} variant="padrao" titulo={confirmacao==="simular"?"Gerar uma nova simulação?":"Descartar ajustes não salvos?"} mensagem={confirmacao==="simular"?"O simulador criará uma nova disposição automática. A montagem manual não será aplicada ao novo resultado.":"As alterações desta edição serão descartadas. A última montagem salva será preservada."} labelConfirmar={confirmacao==="simular"?"Simular de novo":"Descartar ajustes"} onConfirm={()=>{const acao=confirmacao;setConfirmacao(null);cancelarMontagem();if(acao==="fechar")onClose();else if(acao==="simular")simular();}}/>
       {editando && <EditorAjuste marca={editando.marca} desc={editando.desc} regras={ajustes[editando.marca] || null} semGeometria={!!geo && !geo.geometria[editando.marca]} onSalvar={salvarAjuste} onFechar={() => setEditando(null)} />}
     </div>
   );
