@@ -1,7 +1,12 @@
 {
-  "build": 3174,
-  "gerado": "2026-09-15T15:20:53.835Z",
+  "build": 3175,
+  "gerado": "2026-09-15T16:52:16.745Z",
   "commits": [
+    {
+      "hash": "a155344a",
+      "data": "15/09/2026",
+      "titulo": "Rastreabilidade: item comprado pronto (grade de piso) não conta como peça sem R"
+    },
     {
       "hash": "ccd178d5",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c56c1771",
       "data": "14/09/2026",
       "titulo": "Etiquetas: o fechamento da lista, com marcas, pecas, etiquetas e quilos"
-    },
-    {
-      "hash": "f702344e",
-      "data": "14/09/2026",
-      "titulo": "Simulador: IFC de antes da revisão — a peça é achada pelo nome; corrimão é guarda-corpo"
     }
   ]
 }
