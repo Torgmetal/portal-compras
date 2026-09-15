@@ -29,6 +29,19 @@ describe("ehUrlSharePoint", () => {
     ]) expect(ehUrlSharePoint(u)).toBe(false);
   });
 
+  // ⚠ Porta explícita passava pela checagem de hostname e apontaria para um serviço que não é o
+  // SharePoint (confirmado pelo Codex na 2ª rodada).
+  it("recusa porta explícita", () => {
+    for (const u of [
+      "https://torgmetal637.sharepoint.com:8443/x.pdf",
+      "https://torgmetal637.sharepoint.com:1234/sites/TorgMetal/x.pdf",
+    ]) expect(ehUrlSharePoint(u)).toBe(false);
+  });
+
+  it("aceita o dogfood (.sharepoint-df.com), que é o outro sufixo real", () => {
+    expect(ehUrlSharePoint("https://torgmetal637.sharepoint-df.com/x.pdf")).toBe(true);
+  });
+
   it("recusa http, credenciais embutidas e endereços internos", () => {
     for (const u of [
       "http://torgmetal637.sharepoint.com/x.pdf",

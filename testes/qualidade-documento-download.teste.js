@@ -21,7 +21,8 @@ vi.mock("@/lib/databook-arquivo", () => ({
     try {
       const x = new URL(String(u || ""));
       return x.protocol === "https:" && !x.username && !x.password
-        && x.hostname.toLowerCase().endsWith(".sharepoint.com");
+        && !x.port
+        && [".sharepoint.com", ".sharepoint-df.com"].some((sufixo) => x.hostname.toLowerCase().endsWith(sufixo));
     } catch { return false; }
   },
 }));

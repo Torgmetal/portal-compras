@@ -1,7 +1,12 @@
 {
-  "build": 3187,
-  "gerado": "2026-09-15T19:40:13.971Z",
+  "build": 3188,
+  "gerado": "2026-09-15T19:49:59.736Z",
   "commits": [
+    {
+      "hash": "7c1af37bee",
+      "data": "15/09/2026",
+      "titulo": "Anexo da Qualidade: a guarda de SSRF estava no lugar errado"
+    },
     {
       "hash": "aa84e48060",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "a0f140b30a",
       "data": "14/09/2026",
       "titulo": "Melhora navegação do simulador e referências de embalagem no PDF"
-    },
-    {
-      "hash": "c564f9495f",
-      "data": "14/09/2026",
-      "titulo": "Etiqueta: QR abaixo da linha do cabecalho, e a TAG no fim da descricao"
     }
   ]
 }

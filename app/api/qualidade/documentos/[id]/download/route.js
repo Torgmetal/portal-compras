@@ -52,7 +52,10 @@ export async function GET(req, { params }) {
     select: { arquivoUrl: true, arquivoNome: true, arquivoTipo: true, sharepointItemId: true,
               sharepointUrl: true, origem: true, opNumero: true },
   });
-  if (!doc?.arquivoUrl && !doc?.sharepointItemId) {
+  // ⚠ `sharepointUrl` conta como arquivo: é o campo do último recurso, e sem ele aqui um
+  // documento que só tem o caminho gravado levava 404 antes de a escada ser sequer chamada
+  // (apontado pelo Codex, 15/09/2026).
+  if (!doc?.arquivoUrl && !doc?.sharepointItemId && !doc?.sharepointUrl) {
     return NextResponse.json({ error: "Documento sem arquivo" }, { status: 404 });
   }
 
@@ -111,7 +114,7 @@ async function servirArquivo(doc, inline) {
   //
   // ⚠ A defesa de SSRF continua inteira: só entra aqui quem tem itemId ou URL do SharePoint da
   // empresa. URL de terceiro nunca é buscada — cai no 400 de sempre.
-  if (!doc.sharepointItemId && !ehUrlSharePoint(doc.arquivoUrl)) {
+  if (!doc.sharepointItemId && !ehUrlSharePoint(doc.arquivoUrl) && !ehUrlSharePoint(doc.sharepointUrl)) {
     return NextResponse.json({ error: "Arquivo inválido" }, { status: 400 });
   }
   try {
