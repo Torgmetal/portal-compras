@@ -64,6 +64,7 @@ export async function PUT(req, { params }) {
       mensagem: txt(b.mensagem, 4000), capaUrl: txt(b.capaUrl, 600), logoClienteUrl: txt(b.logoClienteUrl, 600),
       secoes: normalizarSecoes(b.secoes),
       ...(b.mostrarPeso === undefined ? {} : { mostrarPeso: b.mostrarPeso === true }),
+      ...(b.mostrarRastreio === undefined ? {} : { mostrarRastreio: b.mostrarRastreio === true }),
       fotos: Array.isArray(b.fotos)
         ? b.fotos.slice(0, 24).map((f) => ({ url: String(f?.url || "").slice(0, 600), legenda: txt(f?.legenda, 140), miniatura: /^https:\/\//.test(f?.miniatura || "") ? txt(f.miniatura, 600) : null }))
             .filter((f) => f.url)

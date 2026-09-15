@@ -1053,6 +1053,8 @@ function GrupoMarcas({ titulo, n, itens, cor, fundo }) {
  *
  * ⚠ a coluna de peso só existe quando a obra liberou (mostrarPeso): estrutura se cota por R$/kg,
  * e o peso item a item entrega a base do nosso preço.
+ * ⚠ a coluna de rastreabilidade idem (mostrarRastreio, só na LPC): o R e a corrida de cada croqui
+ * e peça avulsa — conjunto não leva R, é a soma das posições recuadas abaixo dele.
  */
 function BlocoLista({ icone, titulo, fonte, d, token }) {
   const r = d.revisao;
@@ -1076,8 +1078,8 @@ function BlocoLista({ icone, titulo, fonte, d, token }) {
         </p>
       )}
       <Tabela
-        quebra={[1]} larguraMin={d.comPeso ? 620 : 520}
-        cols={["Marca", "Descrição", "Material", "Qtd.", ...(d.comPeso ? ["Peso"] : [])]}
+        quebra={[1]} larguraMin={(d.comPeso ? 620 : 520) + (d.comRastreio ? 150 : 0)}
+        cols={["Marca", "Descrição", "Material", "Qtd.", ...(d.comPeso ? ["Peso"] : []), ...(d.comRastreio ? ["Rastreab. (R)"] : [])]}
         linhas={d.itens.slice(0, 200).map((p) => [
           // ⚠ a peça do conjunto entra RECUADA e em cinza: a LPC é "lista de peças POR CONJUNTO", e
           // é o recuo que mostra o que compõe o quê. Chapada, ela vira um índice de marcas.
@@ -1085,6 +1087,11 @@ function BlocoLista({ icone, titulo, fonte, d, token }) {
           <span key="d" className={p.nivel ? "text-gray-500" : ""}>{p.descricao}</span>,
           p.material || "—", p.qtd,
           ...(d.comPeso ? [fmtKg(p.pesoKg)] : []),
+          // ⚠ o R na frente, a corrida atrás — é o R que amarra a peça ao certificado. Sem R fica
+          // "—": peça ainda sem material definido, nunca frase ([[torg_nao_declarar_furo]]).
+          ...(d.comRastreio ? [p.rastreio?.r
+            ? <span key="r" className="whitespace-nowrap"><span className="font-mono font-semibold">R {p.rastreio.r}</span>{p.rastreio.corrida ? <span className="text-gray-500 text-[11px]"> · {p.rastreio.corrida}</span> : null}</span>
+            : p.rastreio === null ? "—" : ""] : []),
         ])}
         rodape={d.total > 200 ? `A tela mostra as primeiras 200 marcas — a planilha traz as ${d.total}.` : null}
       />

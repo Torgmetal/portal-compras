@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { secoesDoPortal, portalExpirado } from "@/lib/portal-cliente";
 import { LISTAS, pecasDaLista, sincronizarRevisao } from "@/lib/portal-listas";
+import { rastreioDaLpc, chaveRastreio } from "@/lib/rastreio-lpc";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais } from "@/lib/excel-relatorio";
 import { dispArquivo } from "@/lib/arquivo-http";
 
@@ -48,7 +49,10 @@ export async function GET(req, { params }) {
   const rev = await sincronizarRevisao(prisma, { opId: op.id, opNumero: portal.opNumero, chave, pecas }).catch(() => null);
   const revisao = rev?.rotulo || (rev ? `Revisao ${rev.seq}` : "00");
 
-  const headers = ["Marca", "Descricao", "Material", "Qtd.", ...(comPeso ? ["Peso (kg)"] : [])];
+  // ⚠ rastreabilidade opcional, só na LPC — a mesma regra e a mesma fonte da tela (lib/rastreio-lpc)
+  const rastreio = portal.mostrarRastreio === true && chave === "LPC"
+    ? await rastreioDaLpc(portal.opNumero, op.id, pecas).catch(() => null) : null;
+  const headers = ["Marca", "Descricao", "Material", "Qtd.", ...(comPeso ? ["Peso (kg)"] : []), ...(rastreio ? ["Rastreab. (R)", "Corrida"] : [])];
   // ⚠⚠ SÓ O NÍVEL 0 SOMA. Com as subpeças na lista, somar tudo conta o MESMO aço duas vezes — o
   // peso do conjunto já é a soma dos croquis dele (regra da casa: "somar PecaConjunto cru dobra").
   const totalKg = Math.round(pecas.filter((p) => !p.nivel).reduce((s, p) => s + (p.pesoTotalKg || 0), 0));
@@ -68,9 +72,12 @@ export async function GET(req, { params }) {
     codigoDoc: `${chave}-${op.numero}`,
     revisao,
   });
-  ws.columns = comPeso
-    ? [{ width: 16 }, { width: 40 }, { width: 16 }, { width: 9 }, { width: 13 }]
-    : [{ width: 16 }, { width: 44 }, { width: 18 }, { width: 10 }];
+  ws.columns = [
+    ...(comPeso
+      ? [{ width: 16 }, { width: 40 }, { width: 16 }, { width: 9 }, { width: 13 }]
+      : [{ width: 16 }, { width: 44 }, { width: 18 }, { width: 10 }]),
+    ...(rastreio ? [{ width: 14 }, { width: 14 }] : []),
+  ];
 
   let row = linhaInicio;
   adicionarHeaderTabela(ws, row, headers); row++;
@@ -84,11 +91,13 @@ export async function GET(req, { params }) {
       p.material || "—",
       p.qte || 0,
       ...(comPeso ? [Math.round(p.pesoTotalKg || 0)] : []),
+      // conjunto (sem perfil) fica em branco; peça com perfil e sem R leva "—"
+      ...(rastreio ? (() => { if (!p.perfil) return ["", ""]; const rr = rastreio.get(chaveRastreio(p.marca, p.perfil)); return [rr?.r ? `R ${rr.r}` : "—", rr?.corrida || (rr?.r ? "" : "—")]; })() : []),
     ], { alinhamento: { 3: "center", 4: "right" } });
     row++;
   }
   adicionarLinhaTotais(ws, row, [
-    "TOTAL", "", "", totalItens, ...(comPeso ? [totalKg] : []),
+    "TOTAL", "", "", totalItens, ...(comPeso ? [totalKg] : []), ...(rastreio ? ["", ""] : []),
   ]);
 
   const buf = await bufferWorkbookTorg(workbook);

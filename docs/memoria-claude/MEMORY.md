@@ -129,6 +129,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Recebimento pelo CMR](torg_recebimento_cmr.md) — item da RM baixa pelo CMR (FIFO, kg, ≥95%); Omie só no que não passa pelo CMR
 - [Rastreabilidade — o R por peça](torg_rastreio_corrida.md) — o R manda (puxa corrida/cert/NF); FIFO pela entrega mais antiga; só peça CORTADA ganha R; armadilha da chapa sem "ESPESSURA"
 - [Portal do cliente: naLPC/naLE + "aplicado em"](torg_portal_cliente_nalpc.md) — revisão da LPC gravava naLPC=false (OP-113 invisível ao cliente); certificado mostra o perfil do projeto; certificado sem PDF = pasta; LE só entra por Status da obra › Importar
+- [Portal do cliente — LPC com R por croqui (opcional)](torg_portal_lpc_rastreio.md) — `mostrarRastreio` por obra; lib/rastreio-lpc = 3 caminhos do carimbo; conjunto em branco, corrida N/A vazia; LE da 113 perdeu 120 estruturas em 03/09 → reimportar T113-LE-R00
 - [Os TRÊS caminhos do R no croqui](torg_r_tres_caminhos.md) — corte (fato) > amarração > material da obra (NA_OP); o 3º faltava e a OP-113 saiu sem R
 - [Marca NÃO é única na OP](torg_marca_nao_unica.md) — sub-obras repetem a marca com perfil diferente; indexar só por marca dá R errado no carimbo (`rastreioDaPeca`)
 - [Lista de separação de material](torg_separacao_material.md) — botão "Separação" no painel de Liberar; barras/peso + R por material, com troca do R (fardo mais acessível)

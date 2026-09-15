@@ -2683,6 +2683,12 @@ model PortalCliente {
   // próximo contrato. Nasce DESLIGADO: ligar é uma decisão consciente da obra, e o
   // contrário (descobrir depois que vazou) não tem volta.
   mostrarPeso      Boolean   @default(false)
+  // ⚠ RASTREABILIDADE É OPCIONAL. Vitor (15/09/2026): "a LPC precisa sair as peças que são
+  // posições dos conjuntos e já informar a rastreabilidade de cada croqui (…) queria deixar essa
+  // parte como opcional, pois nem sempre vamos disponibilizar essas informações". Ligado, cada
+  // croqui/avulsa da LPC sai com o R (e a corrida) pelos mesmos três caminhos do carimbo do desenho
+  // (lib/rastreio-lpc.js). Nasce DESLIGADO, como o peso.
+  mostrarRastreio  Boolean   @default(false)
   publicadoEm      DateTime?
   enviadoEm        DateTime?
   primeiroAcessoEm DateTime?

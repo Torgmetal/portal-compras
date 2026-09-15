@@ -204,6 +204,8 @@ async function main() {
       CONSTRAINT "PortalCliente_pkey" PRIMARY KEY ("id"))`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "PortalCliente" ADD COLUMN IF NOT EXISTS "logoClienteUrl" TEXT`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "PortalCliente" ADD COLUMN IF NOT EXISTS "mostrarPeso" BOOLEAN NOT NULL DEFAULT false`);
+  // rastreabilidade (R) por croqui na LPC do cliente — opcional por obra (15/09/2026)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "PortalCliente" ADD COLUMN IF NOT EXISTS "mostrarRastreio" BOOLEAN NOT NULL DEFAULT false`);
 
   // Revisoes das listas publicadas ao cliente (LPC / LE) — base do "o que mudou".
   await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "PortalListaRevisao" (
