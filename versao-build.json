@@ -1,7 +1,12 @@
 {
-  "build": 3184,
-  "gerado": "2026-09-15T18:58:16.600Z",
+  "build": 3185,
+  "gerado": "2026-09-15T19:17:51.714Z",
   "commits": [
+    {
+      "hash": "88b288180c",
+      "data": "15/09/2026",
+      "titulo": "Anexo de inspeção: o documento de uma obra não serve o relatório de outra"
+    },
     {
       "hash": "a89a9df26a",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ae2a738c32",
       "data": "14/09/2026",
       "titulo": "Etiquetas: um teto por impressao, e o carimbo so depois de saber que o PDF cabe"
-    },
-    {
-      "hash": "c3e41c591f",
-      "data": "14/09/2026",
-      "titulo": "Etiquetas: um QR por MARCA, nao por etiqueta — o 504 ao gerar a OP inteira"
     }
   ]
 }

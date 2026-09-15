@@ -6,7 +6,7 @@ import { log } from "@/lib/log";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { isBlobUrlSegura } from "@/lib/blob-url";
-import { fetchRhItemResponse } from "@/lib/sharepoint";
+import { baixarDocumento, ehUrlSharePoint } from "@/lib/databook-arquivo";
 import { dispArquivo } from "@/lib/arquivo-http";
 import { pdfDoRelatorio, fonteDeInspecao } from "@/lib/relatorio-pdf-fonte";
 
@@ -45,7 +45,11 @@ export async function GET(req, { params }) {
     where: { id: params.id },
     // ⚠ `origem` e `opNumero` não são enfeite no select: são as duas amarrações de
     // `fonteDeInspecao`, e sem elas o ramo do relatório se recusa a servir.
-    select: { arquivoUrl: true, arquivoNome: true, arquivoTipo: true, sharepointItemId: true, origem: true, opNumero: true },
+    // ⚠ `origem` e `opNumero` são as duas amarrações de `fonteDeInspecao`; `sharepointUrl` é o
+    // último recurso de `baixarDocumento` quando o itemId morre. Sem eles no select, o ramo do
+    // relatório se recusa a servir e o socorro pelo caminho nunca dispara.
+    select: { arquivoUrl: true, arquivoNome: true, arquivoTipo: true, sharepointItemId: true,
+              sharepointUrl: true, origem: true, opNumero: true },
   });
   if (!doc?.arquivoUrl && !doc?.sharepointItemId) {
     return NextResponse.json({ error: "Documento sem arquivo" }, { status: 404 });
@@ -87,24 +91,52 @@ export async function GET(req, { params }) {
   return servirArquivo(doc, inline);
 }
 
-/** Blob (fetch direto) ou item do SharePoint (por id). O que não for nenhum dos dois é 400. */
+/** Blob (stream direto) ou SharePoint (pela mesma escada do data book). O resto é 400. */
 async function servirArquivo(doc, inline) {
-  let res;
-  if (isBlobUrlSegura(doc.arquivoUrl)) {
-    res = await fetch(doc.arquivoUrl);
-  } else if (doc.sharepointItemId) {
-    res = await fetchRhItemResponse(doc.sharepointItemId); // genérico: baixa item por id no drive padrão
-  } else {
+  // O Blob continua em STREAM: é o caminho dos uploads do portal, e um data book de dezenas de
+  // megabytes não precisa passar inteiro pela memória da função para ser entregue.
+  if (isBlobUrlSegura(doc.arquivoUrl)) return await streamDoBlob(doc, inline);
+
+  // ⚠⚠ O SHAREPOINT VEM POR `baixarDocumento`, A MESMA FUNÇÃO QUE MONTA O LIVRO — e é isso que
+  // conserta o olho (Matheus, 15/09/2026: o R 261085 da OP-103 dava erro). A rota tentava UMA
+  // coisa só: o item por id no drive padrão. Quando esse id morre — e ele morre quando alguém
+  // move ou renomeia o arquivo no SharePoint — vinha 502 "Falha ao buscar arquivo" com o PDF
+  // intacto na pasta (conferido: `R 261085.pdf`, 309 KB, lá desde 24/08).
+  //
+  // `baixarDocumento` já sabia disso e tem a escada inteira: o drive provável pela origem, depois
+  // o outro, e por último o CAMINHO, que sobrevive à troca de id. Ela nasceu de um caso idêntico
+  // (o certificado do arame da OP-106, 28/08/2026) — o defeito não era novo, era o MESMO defeito
+  // num segundo lugar, porque existiam duas implementações do mesmo download e só uma aprendeu.
+  //
+  // ⚠ A defesa de SSRF continua inteira: só entra aqui quem tem itemId ou URL do SharePoint da
+  // empresa. URL de terceiro nunca é buscada — cai no 400 de sempre.
+  if (!doc.sharepointItemId && !ehUrlSharePoint(doc.arquivoUrl)) {
     return NextResponse.json({ error: "Arquivo inválido" }, { status: 400 });
   }
-  if (!res.ok || !res.body) return NextResponse.json({ error: "Falha ao buscar arquivo" }, { status: 502 });
+  try {
+    return new Response(await baixarDocumento(doc), { status: 200, headers: cabecalhos(doc, inline) });
+  } catch (e) {
+    registroLog.erro("falha ao baixar do SharePoint:", doc.sharepointItemId, e?.message);
+    return NextResponse.json({ error: "Falha ao buscar arquivo" }, { status: 502 });
+  }
+}
 
-  const nome = (doc.arquivoNome || "documento").replace(/["\r\n]/g, "");
-  const headers = new Headers();
-  headers.set("Content-Type", doc.arquivoTipo || res.headers.get("content-type") || "application/octet-stream");
-  headers.set("Content-Disposition", dispArquivo(nome, inline ? "inline" : "attachment"));
+async function streamDoBlob(doc, inline) {
+  const res = await fetch(doc.arquivoUrl).catch(() => null);
+  if (!res?.ok || !res.body) return NextResponse.json({ error: "Falha ao buscar arquivo" }, { status: 502 });
+  const headers = cabecalhos(doc, inline, res.headers.get("content-type"));
   const len = res.headers.get("content-length");
   if (len) headers.set("Content-Length", len);
-  headers.set("Cache-Control", "private, no-store");
   return new Response(res.body, { status: 200, headers });
+}
+
+/** ⚠ Sem o content-type da resposta (o SharePoint vem por buffer), o PDF cai no que o banco diz. */
+function cabecalhos(doc, inline, tipoDaResposta = null) {
+  const nome = (doc.arquivoNome || "documento").replace(/["\r\n]/g, "");
+  const ehPdf = /\.pdf($|\?)/i.test(doc.arquivoNome || doc.arquivoUrl || "");
+  const h = new Headers();
+  h.set("Content-Type", doc.arquivoTipo || tipoDaResposta || (ehPdf ? "application/pdf" : "application/octet-stream"));
+  h.set("Content-Disposition", dispArquivo(nome, inline ? "inline" : "attachment"));
+  h.set("Cache-Control", "private, no-store");
+  return h;
 }
