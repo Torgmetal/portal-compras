@@ -1,7 +1,12 @@
 {
-  "build": 3175,
-  "gerado": "2026-09-15T16:52:16.745Z",
+  "build": 3176,
+  "gerado": "2026-09-15T17:16:49.320Z",
   "commits": [
+    {
+      "hash": "cd3903b4",
+      "data": "15/09/2026",
+      "titulo": "Memória: OP-089 — as causas dos 307 'sem R' e as amarrações aplicadas"
+    },
     {
       "hash": "a155344a",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "54f7af92",
       "data": "14/09/2026",
       "titulo": "Expedicao: a marca que a revisao da L.E. excluiu nao imprime mais etiqueta"
-    },
-    {
-      "hash": "c56c1771",
-      "data": "14/09/2026",
-      "titulo": "Etiquetas: o fechamento da lista, com marcas, pecas, etiquetas e quilos"
     }
   ]
 }
