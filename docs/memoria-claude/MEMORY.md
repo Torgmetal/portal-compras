@@ -171,3 +171,4 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Simulador de carga no portal](torg_simulador_carga_portal.md) — "Simular carga" no romaneio prévio; motor lib/carga em Web Worker; IFC medido no navegador; CargaSimulada com itensHash
 - [Usuário sem e-mail (login por CPF)](torg_usuario_sem_email.md) — Admin › Usuários vincula ao funcionário do RH; e-mail interno cpf@funcionario.torg; RH › Habilitar acesso é só autoatendimento
 - [Permissões das pastas da OP (SharePoint)](torg_permissoes_pasta_op.md) — acesso é por usuário individual, não por grupo; "Acesso Limitado" engana a contagem; OP nova nasce liberada; script `scripts/permissoes-sharepoint.mjs`
+- [Import da L.E. é manual](torg_le_import_manual.md) — cron diário só AVISA (nunca importa); `?simular=1` não avisa nem bate heartbeat; olhar a pasta antes de achar que é ruído
