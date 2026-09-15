@@ -1,0 +1,16 @@
+import {beforeEach,it,expect,vi} from 'vitest';
+import {hashItens} from '@/lib/carga/hash-itens';
+const m=vi.hoisted(()=>({role:vi.fn(),op:vi.fn(),previo:vi.fn(),ultima:vi.fn(),criar:vi.fn(),audit:vi.fn(),transacao:vi.fn()}));
+vi.mock('@/lib/session',()=>({requireRole:m.role}));
+vi.mock('@/lib/prisma',()=>({prisma:{oP:{findUnique:m.op},romaneioPrevio:{findFirst:m.previo},$transaction:m.transacao}}));
+import {PATCH} from '@/app/api/comercial/op/[id]/romaneios-previos/[previoId]/simulacao/route';
+const itens=[{marca:'A',qte:1,pesoTotal:100}];
+const base={id:'s1',perfil:'recomendado',perfilNome:'Padrão',itensHash:hashItens(itens),resumo:{peso:100},avisos:{},cargas:[{veiculo:{C:8500,L:2450,alturaUtil:2600},peso:100,itens:[{id:'v1',volume:1,C:2000,L:300,A:500,x:0,y:0,z:0,kg:100,membros:[{marca:'A',kg:100}]}],passos:['v1'],romaneio:[]}]};
+const body=()=>({simulacaoId:'s1',itensHash:hashItens(itens),cargas:[{indice:0,itens:[{id:'v1',x:100,y:0,z:0,rotacao:{x:90,y:0,z:0}}],passos:['v1']}]});
+const patch=(b=body())=>PATCH(new Request('http://localhost/simulacao',{method:'PATCH',body:JSON.stringify(b)}),{params:Promise.resolve({id:'op',previoId:'previo'})});
+beforeEach(()=>{vi.resetAllMocks();m.role.mockResolvedValue({id:'u',role:'EXPEDICAO'});m.op.mockResolvedValue({id:'op',numero:'122'});m.previo.mockResolvedValue({id:'previo',itens,numero:1});m.ultima.mockResolvedValue(base);m.criar.mockImplementation(async({data})=>({...data,id:'s2'}));m.audit.mockResolvedValue({});m.transacao.mockImplementation(fn=>fn({cargaSimulada:{findFirst:m.ultima,create:m.criar},auditLog:{create:m.audit},romaneioPrevio:{findFirst:m.previo}}));});
+it('salva uma nova revisão sem substituir a original, com audit diff',async()=>{const r=await patch();expect(r.status).toBe(200);const j=await r.json();expect(j.simulacao.cargas[0].itens[0].fy).toBe(300);expect(m.criar).toHaveBeenCalledOnce();expect(m.audit.mock.calls[0][0].data.diff).toHaveProperty('antes');expect(m.audit.mock.calls[0][0].data.diff).toHaveProperty('depois');});
+it('nega falta de sessão e acesso da produção ao salvamento',async()=>{for(const [msg,status] of [['Unauthorized',401],['Forbidden',403]]){m.role.mockRejectedValueOnce(new Error(msg));expect((await patch()).status).toBe(status);}expect(m.criar).not.toHaveBeenCalled();expect(m.role.mock.calls[0][0]).not.toContain('PRODUCAO');});
+it('recusa edição quando outra revisão já foi salva',async()=>{m.ultima.mockResolvedValue({...base,id:'s3'});expect((await patch()).status).toBe(409);expect(m.criar).not.toHaveBeenCalled();});
+it('recusa quando a lista do romaneio mudou',async()=>{m.previo.mockResolvedValue({id:'previo',itens:[...itens,{marca:'B',qte:1}],numero:1});expect((await patch()).status).toBe(409);expect(m.criar).not.toHaveBeenCalled();});
+it('recusa coordenadas não finitas e volume estrangeiro',async()=>{let b=body();b.cargas[0].itens[0].x=null;expect((await patch(b)).status).toBe(400);b=body();b.cargas[0].itens[0].id='outro';expect((await patch(b)).status).toBe(400);expect(m.criar).not.toHaveBeenCalled();});

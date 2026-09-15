@@ -1,7 +1,12 @@
 {
-  "build": 3168,
-  "gerado": "2026-09-15T12:18:09.385Z",
+  "build": 3169,
+  "gerado": "2026-09-15T12:24:01.549Z",
   "commits": [
+    {
+      "hash": "c5f01fd5",
+      "data": "15/09/2026",
+      "titulo": "Portal do cliente: LPC com a rastreabilidade (R) de cada croqui, opcional por obra"
+    },
     {
       "hash": "e167d138",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ba6c76e2",
       "data": "14/09/2026",
       "titulo": "Simulador: ajustes por marca (embalagem, junto com, posição, orientação, medidas à mão)"
-    },
-    {
-      "hash": "fa540831",
-      "data": "14/09/2026",
-      "titulo": "Desenhos em lote: diz qual marca falhou e por quê; avulsa sem croqui explica que vai ao Jato"
     }
   ]
 }
