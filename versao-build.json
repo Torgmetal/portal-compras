@@ -1,7 +1,12 @@
 {
-  "build": 3169,
-  "gerado": "2026-09-15T12:24:01.549Z",
+  "build": 3170,
+  "gerado": "2026-09-15T12:26:55.521Z",
   "commits": [
+    {
+      "hash": "911fb91a",
+      "data": "15/09/2026",
+      "titulo": "Simulador de carga: edição manual e embalagens econômicas"
+    },
     {
       "hash": "c5f01fd5",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "a4ad3065",
       "data": "14/09/2026",
       "titulo": "Montagem: liberação conta croqui cortado pela mesma regra da lista do PCP"
-    },
-    {
-      "hash": "ba6c76e2",
-      "data": "14/09/2026",
-      "titulo": "Simulador: ajustes por marca (embalagem, junto com, posição, orientação, medidas à mão)"
     }
   ]
 }

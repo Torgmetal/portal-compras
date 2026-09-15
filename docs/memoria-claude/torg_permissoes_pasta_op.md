@@ -49,3 +49,13 @@ concedida à pessoa sobrevive à remoção no nível da pasta (Codex). Não varr
 importar, é a mesma consulta um nível abaixo.
 
 Relacionado: [[torg_sharepoint_servidor]], [[torg_op_pastas_servidor]].
+
+⚠ **CONCEDER acesso o app do portal CONSEGUE, pelo Graph** (15/09/2026): `POST
+/drives/{drive}/items/{item}/invite` com `{ recipients:[{email}], roles:["write"], requireSignIn:true,
+sendInvitation:false }` — é o "compartilhar com pessoas" do SharePoint, e funciona com
+Sites.ReadWrite.All (feito para `SERVIDOR/Almoxarifado` → expedicao@torg.com.br, a pedido do Vitor;
+a pasta já tinha permissão própria com 8 pessoas). `GET …/permissions` também lê a ACL sem
+navegador. O que continua exigindo a ponte pelo navegador é QUEBRAR herança/REMOVER em massa
+(breakroleinheritance na REST). Script de leitura/concessão: `$S/sp-almox-*.mjs` da sessão —
+vale virar comando `conceder` no `permissoes-sharepoint.mjs`.
+
