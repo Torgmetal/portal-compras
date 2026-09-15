@@ -149,7 +149,11 @@ export function ThFiltro({ col, label, larg = "", dica, className = "", filtros,
 
   return (
     <th className={`relative ${larg} ${className}`}>
-      <button ref={botaoRef} onClick={() => { setAberta(aberto ? null : col); setBusca(""); }}
+      {/* ⚠ `text-transform: inherit` NÃO É ENFEITE. O preflight do Tailwind zera o text-transform
+          de <button> (herança do Firefox/Edge), então o rótulo dentro do funil ignorava o
+          `uppercase` do <thead> e ficava em caixa mista ao lado dos cabeçalhos sem filtro —
+          duas caixas na mesma linha. `inherit` segue o que a tabela pedir, seja qual for. */}
+      <button ref={botaoRef} style={{ textTransform: "inherit" }} onClick={() => { setAberta(aberto ? null : col); setBusca(""); }}
         title={ativo ? `${sel.size} valor(es) escolhido(s) — clique para mudar` : dica || "Filtrar esta coluna"}
         className={`inline-flex items-center gap-1 max-w-full ${ativo ? "text-torg-orange" : "hover:text-torg-blue"}`}>
         <span className="truncate">{label}</span>

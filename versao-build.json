@@ -1,7 +1,12 @@
 {
-  "build": 3178,
-  "gerado": "2026-09-15T17:41:25.259Z",
+  "build": 3179,
+  "gerado": "2026-09-15T18:29:47.900Z",
   "commits": [
+    {
+      "hash": "68c01d92e3",
+      "data": "15/09/2026",
+      "titulo": "Data Book: o olho dava \"arquivo invalido\" e o X girava sem dizer por que"
+    },
     {
       "hash": "357b84c0a6",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "75542bccf0",
       "data": "14/09/2026",
       "titulo": "LPC: a chave da lista é a fase, nunca o número da OP — a OP-094 tinha 591 marcas duplicadas"
-    },
-    {
-      "hash": "4ba3dcbd39",
-      "data": "14/09/2026",
-      "titulo": "Simulador: PDF v2 — modelos de embalagem desenhados e um cartão por volume com a foto 3D"
     }
   ]
 }
