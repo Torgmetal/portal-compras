@@ -2,6 +2,7 @@
 import { FileText } from "lucide-react";
 import { numeroBR } from "@/lib/numero-br";
 import { fmtMoeda } from "../_lib/formatos";
+import CampoDecimal from "@/components/CampoDecimal";
 
 // Grade de precos por item da RM dentro do lancamento manual de proposta.
 export function TabelaLinhasProposta({
@@ -65,25 +66,25 @@ export function TabelaLinhasProposta({
                     )}
                   </td>
                   <td className="px-2 py-1.5 text-right">
-                    <input type="number" step="0.01" value={l.qtdCotada}
-                      onChange={(e) => setLinha(l.rmItemId, "qtdCotada", e.target.value)}
-                      className={`w-20 border rounded px-1.5 py-0.5 text-xs text-right tabular-nums ${inputCls}`} />
+                    <CampoDecimal value={l.qtdCotada}
+                      onChange={(txt) => setLinha(l.rmItemId, "qtdCotada", txt)}
+                      className={`w-24 border rounded px-1.5 py-0.5 text-xs text-right tabular-nums ${inputCls}`} />
                   </td>
                   <td className="px-2 py-1.5 text-right">
-                    <input type="number" step="0.01" value={l.precoUnit}
-                      onChange={(e) => setLinha(l.rmItemId, "precoUnit", e.target.value)}
+                    <CampoDecimal value={l.precoUnit}
+                      onChange={(txt) => setLinha(l.rmItemId, "precoUnit", txt)}
                       placeholder="0,00"
                       className={`w-24 border rounded px-1.5 py-0.5 text-xs text-right tabular-nums ${inputCls}`} />
                   </td>
                   <td className="px-2 py-1.5 text-right">
-                    <input type="number" step="0.01" value={l.icmsPct}
-                      onChange={(e) => setLinha(l.rmItemId, "icmsPct", e.target.value)}
+                    <CampoDecimal value={l.icmsPct}
+                      onChange={(txt) => setLinha(l.rmItemId, "icmsPct", txt)}
                       placeholder="0"
                       className="w-14 border border-gray-200 rounded px-1.5 py-0.5 text-xs text-right tabular-nums" />
                   </td>
                   <td className="px-2 py-1.5 text-right">
-                    <input type="number" step="0.01" value={l.ipiPct}
-                      onChange={(e) => setLinha(l.rmItemId, "ipiPct", e.target.value)}
+                    <CampoDecimal value={l.ipiPct}
+                      onChange={(txt) => setLinha(l.rmItemId, "ipiPct", txt)}
                       placeholder="0"
                       className="w-14 border border-gray-200 rounded px-1.5 py-0.5 text-xs text-right tabular-nums" />
                   </td>
@@ -126,12 +127,14 @@ export function TabelaLinhasProposta({
           <div className="text-right">
             <div className="inline-flex items-center bg-white border border-amber-300 rounded-lg overflow-hidden">
               <span className="px-2 text-xs text-torg-gray">R$</span>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
+              {/* ⚠⚠ ESTE É O CAMPO QUE MANDA NO PREÇO FINAL: quando preenchido, `gerar-pedidos`
+                  escala os unitários para bater com ele. Com `type="number"` a vírgula era
+                  descartada — "31.020,50" virava 3102050 — e o erro entrava no pedido do Omie
+                  multiplicado por cem, com cara de valor digitado. */}
+              <CampoDecimal
+                casas={2}
                 value={totalPropostaInput}
-                onChange={(e) => setTotalPropostaInput(e.target.value)}
+                onChange={setTotalPropostaInput}
                 placeholder="0,00"
                 className="w-32 px-2 py-1.5 text-right text-sm font-bold text-amber-700 tabular-nums focus:outline-none"
               />

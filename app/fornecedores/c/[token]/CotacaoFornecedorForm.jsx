@@ -7,6 +7,7 @@ import { fmtOP } from "@/lib/utils";
 import { Loader2, AlertCircle, Send, AlertTriangle, RotateCcw, CheckCircle2, Upload, FileText, Sparkles, PackageX, TrendingDown } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 import { numeroBR } from "@/lib/numero-br";
+import CampoDecimal from "@/components/CampoDecimal";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -1028,39 +1029,37 @@ dataHoraBR(new Date())
                           {l.qtdRm} {l.unidade}
                         </td>
                         <td className="px-2 py-2 text-right align-top">
-                          <input
-                            type="number" step="0.01" min="0"
+                          <CampoDecimal
                             value={l.semEstoque ? "" : l.qtdCotada}
-                            onChange={(e) => setLinha(l.id, "qtdCotada", e.target.value)}
+                            onChange={(txt) => setLinha(l.id, "qtdCotada", txt)}
                             disabled={l.semEstoque}
                             className={`w-20 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${l.semEstoque ? "bg-gray-100 border-gray-200 cursor-not-allowed" : inputCls}`}
                           />
                         </td>
                         <td className="px-2 py-2 text-right align-top">
-                          <input
-                            type="number" step="0.01" min="0"
+                          <CampoDecimal
                             value={l.semEstoque ? "" : l.precoUnit}
-                            onChange={(e) => setLinha(l.id, "precoUnit", e.target.value)}
+                            onChange={(txt) => setLinha(l.id, "precoUnit", txt)}
                             placeholder="0,00"
                             disabled={l.semEstoque}
                             className={`w-24 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${l.semEstoque ? "bg-gray-100 border-gray-200 cursor-not-allowed" : inputCls}`}
                           />
                         </td>
                         <td className="px-2 py-2 text-right align-top">
-                          <input
-                            type="number" step="0.01" min="0" max="100"
+                          <CampoDecimal
+                            casas={2}
                             value={l.semEstoque ? "" : l.icmsPct}
-                            onChange={(e) => setLinha(l.id, "icmsPct", e.target.value)}
+                            onChange={(txt) => setLinha(l.id, "icmsPct", txt)}
                             placeholder="0"
                             disabled={l.semEstoque}
                             className={`w-16 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${l.semEstoque ? "bg-gray-100 border-gray-200 cursor-not-allowed" : inputCls}`}
                           />
                         </td>
                         <td className="px-2 py-2 text-right align-top">
-                          <input
-                            type="number" step="0.01" min="0" max="100"
+                          <CampoDecimal
+                            casas={2}
                             value={l.semEstoque ? "" : l.ipiPct}
-                            onChange={(e) => setLinha(l.id, "ipiPct", e.target.value)}
+                            onChange={(txt) => setLinha(l.id, "ipiPct", txt)}
                             placeholder="0"
                             disabled={l.semEstoque}
                             className={`w-16 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${l.semEstoque ? "bg-gray-100 border-gray-200 cursor-not-allowed" : inputCls}`}

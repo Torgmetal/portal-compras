@@ -27,8 +27,10 @@ const itemSchema = z.object({
   cotacaoItemId: z.string().min(1),
   precoUnit: z.number().min(0),
   qtdCotada: z.number().min(0),
-  icmsPct: z.number().min(0).optional().nullable(),
-  ipiPct: z.number().min(0).optional().nullable(),
+  // ⚠ O teto de 100% era só o `max` do <input type="number"> — trava de navegador, que some junto
+  // com o campo numérico (e que nunca valeu para quem manda o POST direto). Agora está aqui.
+  icmsPct: z.number().min(0).max(100).optional().nullable(),
+  ipiPct: z.number().min(0).max(100).optional().nullable(),
   observacao: z.string().optional().nullable(),
   prazoEntrega: z.string().optional().nullable(), // "YYYY-MM-DD" ou null
   semEstoque: z.boolean().optional().default(false),

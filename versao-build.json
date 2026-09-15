@@ -1,7 +1,12 @@
 {
-  "build": 3188,
-  "gerado": "2026-09-15T19:49:59.736Z",
+  "build": 3189,
+  "gerado": "2026-09-15T20:09:01.912Z",
   "commits": [
+    {
+      "hash": "b613022a13",
+      "data": "15/09/2026",
+      "titulo": "SharePoint: o id do item vinha do banco e ia cru para a URL do Graph"
+    },
     {
       "hash": "7c1af37bee",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "0afc90d7da",
       "data": "14/09/2026",
       "titulo": "Memória: limpeza da LPC duplicada nas OPs 089 e 113; 067 é marca repetida entre sub-obras"
-    },
-    {
-      "hash": "a0f140b30a",
-      "data": "14/09/2026",
-      "titulo": "Melhora navegação do simulador e referências de embalagem no PDF"
     }
   ]
 }
