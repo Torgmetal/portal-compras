@@ -2,12 +2,15 @@
 // Proxy autenticado (só ADMIN/QUALIDADE): busca o arquivo do Blob server-side e
 // faz stream — o link do Blob nunca é exposto. inline=1 abre no navegador.
 import { NextResponse } from "next/server";
+import { log } from "@/lib/log";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { isBlobUrlSegura } from "@/lib/blob-url";
 import { fetchRhItemResponse } from "@/lib/sharepoint";
 import { dispArquivo } from "@/lib/arquivo-http";
-import { pdfDoRelatorio, refDeInspecao } from "@/lib/relatorio-pdf-fonte";
+import { pdfDoRelatorio, fonteDeInspecao } from "@/lib/relatorio-pdf-fonte";
+
+const registroLog = log("api/qualidade/documentos/download");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -23,7 +26,7 @@ export const maxDuration = 60;
  * fechou a inspeção rodando em dev.
  */
 async function servirInspecao(doc, insp, inline) {
-  const pdf = await pdfDoRelatorio(insp.relatorioId, { revisao: insp.revisao });
+  const pdf = await pdfDoRelatorio(insp.relatorioId, { revisao: insp.revisao, exigirOp: insp.exigirOp });
   const h = new Headers();
   h.set("Content-Type", "application/pdf");
   h.set("Content-Disposition", dispArquivo(doc.arquivoNome || pdf.nome, inline ? "inline" : "attachment"));
@@ -40,7 +43,9 @@ export async function GET(req, { params }) {
 
   const doc = await prisma.documentoQualidade.findUnique({
     where: { id: params.id },
-    select: { arquivoUrl: true, arquivoNome: true, arquivoTipo: true, sharepointItemId: true },
+    // ⚠ `origem` e `opNumero` não são enfeite no select: são as duas amarrações de
+    // `fonteDeInspecao`, e sem elas o ramo do relatório se recusa a servir.
+    select: { arquivoUrl: true, arquivoNome: true, arquivoTipo: true, sharepointItemId: true, origem: true, opNumero: true },
   });
   if (!doc?.arquivoUrl && !doc?.sharepointItemId) {
     return NextResponse.json({ error: "Documento sem arquivo" }, { status: 404 });
@@ -62,12 +67,20 @@ export async function GET(req, { params }) {
   const inline = new URL(req.url).searchParams.get("inline") === "1";
 
   // O relatório de inspeção não tem binário — ver `servirInspecao`.
-  const insp = refDeInspecao(doc.arquivoUrl);
+  const insp = fonteDeInspecao(doc);
   if (insp) {
     try {
       return await servirInspecao(doc, insp, inline);
     } catch (e) {
-      return NextResponse.json({ error: e.message }, { status: e.status || 502 });
+      // ⚠ Só a mensagem que EU escrevi chega ao cliente (404/409). Falha inesperada de Prisma ou
+      // do render vira texto genérico — `e.message` cru entregava nome de tabela e caminho de
+      // arquivo a quem abriu um PDF (parecer do Codex, 15/09/2026).
+      const meu = e.status === 404 || e.status === 409;
+      if (!meu) registroLog.erro("falha ao montar o PDF da inspeção:", e?.message);
+      return NextResponse.json(
+        { error: meu ? e.message : "Não consegui montar o PDF deste relatório." },
+        { status: e.status || 502 },
+      );
     }
   }
 

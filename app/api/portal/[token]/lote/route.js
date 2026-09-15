@@ -33,7 +33,7 @@ export async function POST(req, { params }) {
   const ativas = secoesDoPortal(portal);
   const docs = await prisma.documentoQualidade.findMany({
     where: { id: { in: ids }, opNumero: portal.opNumero, ativo: true },
-    select: { id: true, nome: true, categoria: true, importRef: true, arquivoUrl: true, sharepointItemId: true, sharepointUrl: true, origem: true },
+    select: { id: true, nome: true, categoria: true, importRef: true, arquivoUrl: true, sharepointItemId: true, sharepointUrl: true, origem: true, opNumero: true },
   });
   const liberados = docs.filter((d) =>
     d.categoria === "MATERIAL" ? ativas.includes("CERTIFICADOS") : ativas.includes("DOCUMENTOS"));
