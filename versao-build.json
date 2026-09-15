@@ -1,156 +1,156 @@
 {
-  "build": 3189,
-  "gerado": "2026-09-15T20:09:01.912Z",
+  "build": 3190,
+  "gerado": "2026-09-15T20:29:33.807Z",
   "commits": [
     {
-      "hash": "b613022a13",
+      "hash": "e6de513a",
+      "data": "15/09/2026",
+      "titulo": "Cotação: o campo numérico do navegador DESCARTA a vírgula"
+    },
+    {
+      "hash": "b613022a",
       "data": "15/09/2026",
       "titulo": "SharePoint: o id do item vinha do banco e ia cru para a URL do Graph"
     },
     {
-      "hash": "7c1af37bee",
+      "hash": "7c1af37b",
       "data": "15/09/2026",
       "titulo": "Anexo da Qualidade: a guarda de SSRF estava no lugar errado"
     },
     {
-      "hash": "aa84e48060",
+      "hash": "aa84e480",
       "data": "15/09/2026",
       "titulo": "Memória: o sharepointItemId morre, e a escada de download é uma só"
     },
     {
-      "hash": "1c2deae673",
+      "hash": "1c2deae6",
       "data": "15/09/2026",
       "titulo": "Qualidade: o olho desistia no primeiro erro; o livro já sabia tentar de novo"
     },
     {
-      "hash": "88b288180c",
+      "hash": "88b28818",
       "data": "15/09/2026",
       "titulo": "Anexo de inspeção: o documento de uma obra não serve o relatório de outra"
     },
     {
-      "hash": "a89a9df26a",
+      "hash": "a89a9df2",
       "data": "15/09/2026",
       "titulo": "Cron da L.E.: o aviso do sino repetia a lista de ontem (achado ALTA do Codex)"
     },
     {
-      "hash": "25135af1e9",
+      "hash": "25135af1",
       "data": "15/09/2026",
       "titulo": "Memória: contagem de peças do data book pela lista canônica; OP-103 e a LE duplicada da 089"
     },
     {
-      "hash": "143ae55096",
+      "hash": "143ae550",
       "data": "15/09/2026",
       "titulo": "Data book: peças e peso pela lista canônica (LE, senão LPC) — não LPC + LE somadas"
     },
     {
-      "hash": "6fe5ff1dbf",
+      "hash": "6fe5ff1d",
       "data": "15/09/2026",
       "titulo": "Cron da L.E.: aviso que não chegou a ninguém não é execução bem-sucedida"
     },
     {
-      "hash": "7f687dfc87",
+      "hash": "7f687dfc",
       "data": "15/09/2026",
       "titulo": "RMs Materiais: funil por coluna no cabeçalho, como nas outras telas"
     },
     {
-      "hash": "68c01d92e3",
+      "hash": "68c01d92",
       "data": "15/09/2026",
       "titulo": "Data Book: o olho dava \"arquivo invalido\" e o X girava sem dizer por que"
     },
     {
-      "hash": "357b84c0a6",
+      "hash": "357b84c0",
       "data": "15/09/2026",
       "titulo": "Data book: tirar um documento da seção deixa rastro no AuditLog"
     },
     {
-      "hash": "6f7ca54a88",
+      "hash": "6f7ca54a",
       "data": "15/09/2026",
       "titulo": "Relatório de inspeção: número apagado nunca volta — o AuditLog diz o maior já emitido"
     },
     {
-      "hash": "cd3903b40c",
+      "hash": "cd3903b4",
       "data": "15/09/2026",
       "titulo": "Memória: OP-089 — as causas dos 307 'sem R' e as amarrações aplicadas"
     },
     {
-      "hash": "a155344a32",
+      "hash": "a155344a",
       "data": "15/09/2026",
       "titulo": "Rastreabilidade: item comprado pronto (grade de piso) não conta como peça sem R"
     },
     {
-      "hash": "ccd178d560",
+      "hash": "ccd178d5",
       "data": "15/09/2026",
       "titulo": "Memoria: corrige o que eu registrei sobre a OP-085 no cron da L.E."
     },
     {
-      "hash": "39f8ce6350",
+      "hash": "39f8ce63",
       "data": "15/09/2026",
       "titulo": "Cron da L.E.: os tres furos que a revisao do Codex achou no que ja estava no ar"
     },
     {
-      "hash": "748694a8b7",
+      "hash": "748694a8",
       "data": "15/09/2026",
       "titulo": "Memoria: o import da L.E. e manual, e o cron que avisa"
     },
     {
-      "hash": "afe90467e7",
+      "hash": "afe90467",
       "data": "15/09/2026",
       "titulo": "Memória: conceder acesso a pasta do SharePoint funciona pelo Graph (invite), sem ponte de navegador"
     },
     {
-      "hash": "911fb91a32",
+      "hash": "911fb91a",
       "data": "15/09/2026",
       "titulo": "Simulador de carga: edição manual e embalagens econômicas"
     },
     {
-      "hash": "c5f01fd5b2",
+      "hash": "c5f01fd5",
       "data": "15/09/2026",
       "titulo": "Portal do cliente: LPC com a rastreabilidade (R) de cada croqui, opcional por obra"
     },
     {
-      "hash": "e167d1389f",
+      "hash": "e167d138",
       "data": "15/09/2026",
       "titulo": "Cron diario: avisa quando a L.E. do servidor e mais nova que a do portal"
     },
     {
-      "hash": "eba8df9477",
+      "hash": "eba8df94",
       "data": "14/09/2026",
       "titulo": "Inspeção: tela do inspetor lista produto final por fase, sem croqui nem acessório"
     },
     {
-      "hash": "fac5f1b05b",
+      "hash": "fac5f1b0",
       "data": "14/09/2026",
       "titulo": "Etiquetas: tres defeitos da TAG do cliente que a revisao do Codex achou"
     },
     {
-      "hash": "97fdad65c6",
+      "hash": "97fdad65",
       "data": "14/09/2026",
       "titulo": "Permissao em massa nas pastas da OP: tirar uma pessoa de subpastas escolhidas"
     },
     {
-      "hash": "a102b24dc3",
+      "hash": "a102b24d",
       "data": "14/09/2026",
       "titulo": "Cronograma: percentual digitado à mão prevalece sobre o sincronismo (avancoManual)"
     },
     {
-      "hash": "72bb2b0659",
+      "hash": "72bb2b06",
       "data": "14/09/2026",
       "titulo": "Cronograma: material atendido pelo estoque conta como recebido na linha de matéria-prima"
     },
     {
-      "hash": "5cfc3b5551",
+      "hash": "5cfc3b55",
       "data": "14/09/2026",
       "titulo": "LE: a chave é o número da OP cadastrada e o rodapé TOTAL não vira peça"
     },
     {
-      "hash": "325fce4eac",
+      "hash": "325fce4e",
       "data": "14/09/2026",
       "titulo": "Memória: OP-089 rechaveada (089 → T89C) e croquis ligados à LPC"
-    },
-    {
-      "hash": "0afc90d7da",
-      "data": "14/09/2026",
-      "titulo": "Memória: limpeza da LPC duplicada nas OPs 089 e 113; 067 é marca repetida entre sub-obras"
     }
   ]
 }
