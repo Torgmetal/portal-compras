@@ -62,6 +62,45 @@ function corpoDoEmail(linhas) {
 }
 
 /**
+ * O e-mail da Engenharia — e o MOTIVO quando não sai.
+ *
+ * ⚠ "Não consegui consultar" e "não há e-mail cadastrado" são problemas DIFERENTES e o
+ * diagnóstico precisa distinguir (achado do Codex, 15/09/2026). Um `.catch(() => [])` na consulta
+ * fazia o banco fora aparecer como cadastro vazio — quem lesse o alerta iria cadastrar e-mail
+ * para resolver um problema que não era esse.
+ */
+async function mandarEmail(linhas, titulo) {
+  let to;
+  try {
+    to = await emailsDaEngenharia();
+  } catch (e) {
+    return { email: 0, erroEmail: `não consegui consultar os e-mails da Engenharia (${e?.message})` };
+  }
+  if (!to.length) return { email: 0, erroEmail: "nenhum e-mail de Engenharia cadastrado" };
+
+  const r = await sendEmail({ to, subject: `[Portal] ${titulo}`, html: corpoDoEmail(linhas) })
+    .catch((e) => ({ ok: false, error: e?.message }));
+  return r?.ok
+    ? { email: to.length, erroEmail: null }
+    : { email: 0, erroEmail: r?.error || "o Resend recusou o envio" };
+}
+
+/**
+ * A chave do aviso no sino: o DIA e o CONJUNTO DE OBRAS.
+ *
+ * ⚠⚠ O CONJUNTO FAZ PARTE DA CHAVE, E ISSO É UM CONSERTO (achado do Codex, 15/09/2026). A chave
+ * era só a data e o upsert de `criarNotificacao` usa `update: {}`: uma segunda execução no mesmo
+ * dia, com pendências DIFERENTES, encontrava a notificação antiga, não mexia no conteúdo dela e
+ * devolvia sucesso — o sino seguia mostrando a lista de ontem à tarde e o cron dizia que avisou.
+ * O comentário original já dizia "por dia e por conjunto de obras"; o código é que não fazia.
+ *
+ * ⚠ Ordenado, para que a MESMA lista em outra ordem continue sendo o mesmo aviso — senão o
+ * `orderBy` do banco decidiria se o sino toca de novo.
+ */
+const chaveDoAviso = (linhas) =>
+  `le-desatualizada:${new Date().toISOString().slice(0, 10)}:${linhas.map((l) => l.opNumero).sort().join(",")}`;
+
+/**
  * Avisa pelos dois canais e DIZ O QUE ENTREGOU.
  *
  * ⚠⚠ NENHUM CANAL ENTREGAR É FALHA DO CRON, NÃO DETALHE (achado do Codex, 15/09/2026).
@@ -81,24 +120,14 @@ async function avisar(linhas) {
     dados: { obras: linhas.map((l) => ({ op: l.opNumero, situacao: l.situacao, arquivo: l.arquivo })) },
     modulos: ["ENGENHARIA"],
     // ⚠ Uma notificação por DIA e por conjunto de obras: sem a chave, o cron diário empilharia o
-    // mesmo aviso no sino até alguém importar, e o sino vira ruído que ninguém abre.
-    chaveEvento: `le-desatualizada:${new Date().toISOString().slice(0, 10)}`,
+    // mesmo aviso no sino até alguém importar, e o sino vira ruído que ninguém abre. Ver `chaveDoAviso`.
+    chaveEvento: chaveDoAviso(linhas),
   }).catch(() => null);
 
   // ⚠ O e-mail é tentado MESMO se o sino falhou (e vice-versa): são canais independentes, e um
   // problema de destinatário no sino não é razão para a Engenharia ficar sem o e-mail.
-  const to = await emailsDaEngenharia().catch(() => []);
-  let email = 0;
-  let erroEmail = null;
-  if (!to.length) {
-    erroEmail = "nenhum e-mail de Engenharia";
-    registro.aviso("nenhum e-mail de Engenharia");
-  } else {
-    const r = await sendEmail({ to, subject: `[Portal] ${titulo}`, html: corpoDoEmail(linhas) })
-      .catch((e) => ({ ok: false, error: e?.message }));
-    if (r?.ok) email = to.length;
-    else erroEmail = r?.error || "o Resend recusou o envio";
-  }
+  const { email, erroEmail } = await mandarEmail(linhas, titulo);
+  if (erroEmail) registro.aviso(`e-mail não saiu: ${erroEmail}`);
   return { sino: !!notificacao, email, erroEmail };
 }
 
@@ -115,7 +144,10 @@ function problemasDe(incompletas, envio, quantasPendentes) {
     fora.push(`não consegui ler ${incompletas.length} obra(s): ${incompletas.slice(0, 3).map((i) => i.op).join(", ")}`);
   }
   if (quantasPendentes && envio && !envio.simulado && !envio.sino && !envio.email) {
-    fora.push(`${quantasPendentes} obra(s) pendente(s) e NENHUM canal entregou${envio.erroEmail ? ` (${envio.erroEmail})` : ""}`);
+    // ⚠ "não confirmou", não "não entregou" (achado do Codex): o sino confirma persistência e o
+    // Resend confirma aceite — nenhum dos dois prova que alguém leu. Dizer mais do que se sabe numa
+    // mensagem de alarme faz procurar o problema no lugar errado.
+    fora.push(`${quantasPendentes} obra(s) pendente(s) e NENHUM canal confirmou o envio${envio.erroEmail ? ` (${envio.erroEmail})` : ""}`);
   }
   return fora;
 }
@@ -212,7 +244,12 @@ export async function GET(req) {
         arquivo: l.arquivo, noPortal: l.noPortal, frase: frase(l),
       })),
       ...envio,
-    });
+      // ⚠⚠ 500 QUANDO HOUVE PROBLEMA, com o corpo inteiro junto (parecer do Codex, 15/09/2026). Eu
+      // tinha ficado no 200 para não "esconder as pendências" — mas o corpo vai igual nos dois
+      // casos, e o 200 dava um sinal de sucesso para todo observador que não lê `ok`: o painel de
+      // crons da Vercel, um uptime check, o próprio log. A Vercel não faz retry de cron que falha,
+      // então o 500 não reenvia nada; só conta a verdade em mais um lugar.
+    }, { status: problemas.length ? 500 : 200 });
   } catch (e) {
     registro.erro("erro:", e?.message);
     if (!simular) {
