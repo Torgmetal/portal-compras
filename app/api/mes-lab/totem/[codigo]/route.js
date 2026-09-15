@@ -19,7 +19,6 @@ import { abrirSessao, apontarQuantidade, encerrarSessao, mudarEstado, estadoDoRe
 import { abrirLote, encerrarLote } from "@/lib/mes/lote";
 import { programadoPara, acharMarca } from "@/lib/mes/programado";
 import { entrarNoPosto, sairDoPosto, liberarPresenca, passarPosto } from "@/lib/mes/cracha";
-import { carimbarPassagem } from "@/lib/mes/passagem-auditoria";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -189,10 +188,11 @@ const ACOES = {
     const quemAssume = await prisma.mesOperador.findUnique({ where: { cracha: String(corpo.crachaAlvo || "").trim() } });
     if (!quemAssume || !quemAssume.ativo) return { erro: `Crachá ${corpo.crachaAlvo} não encontrado.` };
     // ⚠ Quem executa a ENTREGA é quem sai — e é o contexto dele que o porteiro confere.
-    const r = await passarPosto(prisma, {
+    // A trilha vai junto, dentro da mesma transação da passagem — ver `carimbarNaTx`.
+    return passarPosto(prisma, {
       deOperadorId: operador.id, paraOperadorId: quemAssume.id, recursoId: recurso.id, presenca,
+      auditoria: { usuario, recurso, modo: "ENTREGOU", de: operador, para: quemAssume },
     });
-    return carimbarPassagem(prisma, r, { usuario, recurso, modo: "ENTREGOU", de: operador, para: quemAssume });
   },
 
   /**
@@ -208,11 +208,11 @@ const ACOES = {
   async assumirPosto({ corpo, recurso, operador, presenca, usuario }) {
     // ⚠ Quem executa a RENDIÇÃO é quem assume; e `dePresencaId` amarra o toque ao vínculo que
     // estava na tela, não só à pessoa (achado do Codex).
-    const r = await passarPosto(prisma, {
+    return passarPosto(prisma, {
       deOperadorId: corpo.deOperadorId, paraOperadorId: operador.id, recursoId: recurso.id,
       dePresencaId: corpo.dePresencaId ?? null, presenca,
+      auditoria: { usuario, recurso, modo: "ASSUMIU", de: { id: corpo.deOperadorId }, para: operador },
     });
-    return carimbarPassagem(prisma, r, { usuario, recurso, modo: "ASSUMIU", de: { id: corpo.deOperadorId }, para: operador });
   },
 
   /**

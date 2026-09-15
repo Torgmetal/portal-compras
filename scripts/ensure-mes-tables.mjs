@@ -839,7 +839,11 @@ async function travaDoCrachaAtivo(prisma) {
       // esconderia o que importa — falta de permissão, ou linhas duplicadas que impedem o índice
       // único de nascer. Nos dois casos a trava do crachá simplesmente não existe, e o portal
       // seguiria dizendo "OK" enquanto o mesmo crachá abre em duas máquinas.
-      const tabelaAusente = e.code === "42P01" || /does not exist|não existe/i.test(e.message);
+      // ⚠ O texto só vale para ESTA tabela: um `/does not exist/` solto engoliria também
+      // "column ... does not exist" (42703) de schema desatualizado, e aí a trava não
+      // nasceria e o log diria "adiado" (Codex, 14/09/2026).
+      const tabelaAusente = e.code === "42P01"
+        || /relation[^\n]*MesPresenca[^\n]*(does not exist|não existe)/i.test(e.message);
       if (tabelaAusente) {
         console.log("[ensure-mes-tables] MesPresenca ainda não existe aqui — índice do crachá adiado.");
         return;

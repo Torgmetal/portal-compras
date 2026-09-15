@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { carimbarPassagem } from "@/lib/mes/passagem-auditoria";
+import { carimbarNaTx } from "@/lib/mes/passagem-auditoria";
 
 // ⚠⚠ O `motivoFim` DA PRESENÇA NÃO BASTA (achado do Codex, 14/09/2026): ele guarda o nome de quem
 // ASSUMIU, não quem mandou render, nem por qual caminho, nem qual vínculo morreu.
@@ -12,9 +12,9 @@ const OK = { saiu: "Jurandir", assumiu: "Rodrigo", vinculoEncerrado: "p-jur",
 
 describe("o carimbo da passagem", () => {
   it("grava autoria, modo, os dois operadores e os dois vínculos", async () => {
-    const prisma = fake();
-    await carimbarPassagem(prisma, OK, CTX);
-    const { data } = prisma.auditLog.create.mock.calls[0][0];
+    const tx = fake();
+    await carimbarNaTx(tx, OK, CTX);
+    const { data } = tx.auditLog.create.mock.calls[0][0];
     expect(data.userId).toBe("u1");
     expect(data.action).toBe("MES_PASSAR_POSTO");
     expect(data.entityId).toBe("p-jur");
@@ -27,16 +27,27 @@ describe("o carimbo da passagem", () => {
 
   // ⚠ Recusa não é passagem, e reenvio não é passagem nova — nenhum dos dois vira linha.
   it("não carimba recusa nem reenvio", async () => {
-    const prisma = fake();
-    await carimbarPassagem(prisma, { erro: "não deu" }, CTX);
-    await carimbarPassagem(prisma, { jaEstava: true }, CTX);
-    expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    const tx = fake();
+    await carimbarNaTx(tx, { erro: "não deu" }, CTX);
+    await carimbarNaTx(tx, { jaEstava: true }, CTX);
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
   });
 
-  // ⚠⚠ O trabalho já está trocado no chão de fábrica: falhar ao carimbar não pode derrubar a
-  // resposta e fazer o operador tentar de novo uma passagem que já aconteceu.
-  it("falha ao carimbar não derruba a passagem", async () => {
-    const prisma = { auditLog: { create: vi.fn().mockRejectedValue(new Error("banco fora")) } };
-    await expect(carimbarPassagem(prisma, OK, CTX)).resolves.toBe(OK);
+  // ⚠⚠ ESTE TESTE MUDOU DE LADO EM 14/09/2026, DE PROPÓSITO. Ele dizia "falha ao carimbar não
+  // derruba a passagem", porque o carimbo era gravado depois da transação com `.catch(() => {})`.
+  // O Codex mostrou o preço: a passagem podia acontecer SEM RASTRO, e o reenvio não recuperava o
+  // carimbo perdido. Passar o posto é assumir responsabilidade por ele; sem trilha, a pergunta que
+  // este módulo existe para responder fica sem resposta. Agora o carimbo é parte da transação:
+  // falhou, volta tudo atrás e o operador toca de novo — que é barato e deixa os dois de acordo.
+  it("falha ao carimbar DESFAZ a passagem (a transação inteira cai)", async () => {
+    const tx = { auditLog: { create: vi.fn().mockRejectedValue(new Error("banco fora")) } };
+    await expect(carimbarNaTx(tx, OK, CTX)).rejects.toThrow("banco fora");
+  });
+
+  // Sem contexto de auditoria (chamada interna, script de laboratório) não há o que carimbar.
+  it("sem contexto, devolve o resultado sem gravar", async () => {
+    const tx = fake();
+    await expect(carimbarNaTx(tx, OK, null)).resolves.toBe(OK);
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
   });
 });

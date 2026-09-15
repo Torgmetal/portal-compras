@@ -1,7 +1,12 @@
 {
-  "build": 3135,
-  "gerado": "2026-09-14T12:08:54.138Z",
+  "build": 3136,
+  "gerado": "2026-09-15T11:28:10.366Z",
   "commits": [
+    {
+      "hash": "6be39eb555",
+      "data": "14/09/2026",
+      "titulo": "MES proprio: a revisao da passagem achou o porteiro faltando"
+    },
     {
       "hash": "3484f30f86",
       "data": "14/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c299e59f37",
       "data": "11/09/2026",
       "titulo": "Cotação: \"não tenho\" ganha do preço, e o texto livre para de passar batido"
-    },
-    {
-      "hash": "9ecd5e0342",
-      "data": "11/09/2026",
-      "titulo": "Ajusta quantidades no celular e corrige ciclo das inspeções e assinaturas"
     }
   ]
 }

@@ -308,6 +308,35 @@ describe("passar o posto", () => {
     expect(r.erro).toContain("não está mais com o crachá neste posto");
   });
 
+  // ⚠⚠ O REENVIO DA ENTREGA (achado do Codex, 14/09/2026). Na entrega quem executa é quem SAI, e
+  // depois dela a presença dele está ENCERRADA. Com o porteiro rodando antes da checagem de
+  // reenvio, tocar de novo — porque a resposta se perdeu, porque o totem travou — respondia "você
+  // não está mais com o crachá neste posto" logo depois de um gesto que deu certo.
+  it("reenviar a entrega já feita devolve o estado, não erro", async () => {
+    const { prisma } = bancoFalso({
+      presencas: [presencaEm(LASER.id, "p-rod", "op-rodrigo")], // o Jurandir já saiu
+      sessoesAbertas: { [LASER.id]: 3 },
+    });
+    const r = await passarPosto(prisma, {
+      deOperadorId: "op-jurandir", paraOperadorId: "op-rodrigo", recursoId: LASER.id,
+      presenca: { operadorId: "op-jurandir", presencaId: "p-jur", exigirId: true }, // contexto de quem SAIU
+    });
+    expect(r.erro).toBeUndefined();
+    expect(r.jaEstava).toBe(true);
+    expect(r.presenca.id).toBe("p-rod");
+    expect(r.marcasQueSeguemAbertas).toBe(3);
+  });
+
+  // ⚠ E o porteiro continua valendo quando a passagem NÃO aconteceu: contexto inválido é recusado.
+  it("contexto de presença inválido continua sendo recusado quando há o que passar", async () => {
+    const { prisma } = doisNoLaser();
+    const r = await passarPosto(prisma, {
+      deOperadorId: "op-jurandir", paraOperadorId: "op-rodrigo", recursoId: LASER.id,
+      presenca: { operadorId: "op-jurandir", presencaId: "p-de-outra-aba", exigirId: true },
+    });
+    expect(r.erro).toBeTruthy();
+  });
+
   it("passar o posto para si mesmo é recusado", async () => {
     const { prisma } = doisNoLaser();
     const r = await passarPosto(prisma, { deOperadorId: "op-jurandir", paraOperadorId: "op-jurandir", recursoId: LASER.id });
