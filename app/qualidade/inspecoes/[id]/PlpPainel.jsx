@@ -144,14 +144,19 @@ export default function PlpPainel({ opNumero, podeEditar, onTintas, onPlp, res =
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
   }
 
-  if (!dados) return <p className="text-[11px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> carregando o PLP…</p>;
-
-  const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
-  const setD = (i, k, v) => setF((p) => ({ ...p, demaos: p.demaos.map((d, j) => (j === i ? { ...d, [k]: v } : d)) }));
+  // ⚠⚠ HOOK ANTES DE QUALQUER `return`. `useComponenteEstavel` é um hook: ficava DEPOIS do
+  // "carregando o PLP…" e, quando o PLP chegava, o React contava um hook a mais que na primeira
+  // renderização — "Rendered more hooks than during the previous render", e a tela do relatório
+  // de pintura inteira caía no "Algo deu errado" (Vitor, 15/09/2026).
   const Inp = useComponenteEstavel(({ v, on, ph = "", tipo = "text", w = "" }) => (
     <input type={tipo} value={v ?? ""} placeholder={ph} onChange={(e) => on(e.target.value)}
       className={`text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue ${w || "w-full"}`} />
   ));
+
+  if (!dados) return <p className="text-[11px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> carregando o PLP…</p>;
+
+  const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+  const setD = (i, k, v) => setF((p) => ({ ...p, demaos: p.demaos.map((d, j) => (j === i ? { ...d, [k]: v } : d)) }));
 
   if (!editando) {
     return (

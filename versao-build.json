@@ -1,7 +1,12 @@
 {
-  "build": 3190,
-  "gerado": "2026-09-15T20:29:33.807Z",
+  "build": 3191,
+  "gerado": "2026-09-15T20:45:34.976Z",
   "commits": [
+    {
+      "hash": "97f4f9be",
+      "data": "15/09/2026",
+      "titulo": "Data book: acento decomposto no nome do anexo não derruba mais a geração dos volumes"
+    },
     {
       "hash": "e6de513a",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5cfc3b55",
       "data": "14/09/2026",
       "titulo": "LE: a chave é o número da OP cadastrada e o rodapé TOTAL não vira peça"
-    },
-    {
-      "hash": "325fce4e",
-      "data": "14/09/2026",
-      "titulo": "Memória: OP-089 rechaveada (089 → T89C) e croquis ligados à LPC"
     }
   ]
 }
