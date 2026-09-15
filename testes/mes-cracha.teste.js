@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { entrarNoPosto, sairDoPosto, liberarPresenca, exigirPresenca, chaveDoCracha, passarPosto } from "@/lib/mes/cracha";
+import { idDaChave, idsDeTrava } from "@/lib/mes/trava";
 
 // ─── UM CRACHÁ, UM POSTO ─────────────────────────────────────────────────────
 //
@@ -215,14 +216,24 @@ describe("a transferência trava o posto de origem", () => {
   // crachá e o destino, alguém abre uma marca na origem entre a contagem e a liberação — e o
   // vínculo morre com trabalho vivo. As chaves passaram a ser pedidas todas juntas.
   it("pede a trava do posto de origem, além do crachá e do destino", async () => {
-    const chaves = [];
+    // ⚠⚠ ESTE TESTE COLETAVA AS CHAVES E NÃO OLHAVA NENHUMA — o nome prometia a trava da origem e
+    // o corpo só conferia que a presença tinha mudado de posto, que é outra coisa. Um teste que
+    // não pode falhar pelo motivo do próprio nome é pior que teste nenhum: ele dá a pergunta por
+    // respondida. Agora os ids pedidos são lidos de verdade.
+    const pedidos = [];
     const base = bancoFalso({ presencas: [presencaEm(LASER.id)], sessoesAbertas: { [LASER.id]: 0 } });
     const prisma = {
       ...base.prisma,
-      $transaction: (fn) => fn({ ...base.tx, $executeRaw: (...a) => chaves.push(String(a[0])) }),
+      // num tagged template, a[0] são os pedaços de SQL e a[1] em diante os valores
+      $transaction: (fn) => fn({ ...base.tx, $executeRaw: (...a) => pedidos.push(a[1]) }),
     };
     await entrarNoPosto(prisma, { operadorId: "op-jurandir", recursoId: SOLDA.id });
-    // `comTravaDe` ordena e deduplica — o que importa é que a ORIGEM esteja no conjunto.
+
+    expect(pedidos).toContain(idDaChave(LASER.id));                        // a ORIGEM
+    expect(pedidos).toContain(idDaChave(SOLDA.id));                        // o destino
+    expect(pedidos).toContain(idDaChave(chaveDoCracha("op-jurandir")));    // o crachá
+    // ⚠ e sempre em ordem crescente de id: é o que impede o abraço mortal entre dois postos.
+    expect(pedidos).toEqual([...pedidos].sort((x, y) => x - y));
     expect(base.estado.presencas[1]?.recursoId).toBe(SOLDA.id);
   });
 
@@ -427,5 +438,49 @@ describe("reenvio depois de resposta perdida", () => {
     const { prisma } = bancoFalso({ presencas: [], sessoesAbertas: { [LASER.id]: 5 } });
     const r = await passarPosto(prisma, { deOperadorId: "op-jurandir", paraOperadorId: "op-rodrigo", recursoId: LASER.id });
     expect(r.erro).toContain("não está mais com o crachá neste posto");
+  });
+});
+
+// ─── A ORDEM DAS TRAVAS (achado do Codex, 15/09/2026 — 2ª rodada) ────────────
+//
+// ⚠⚠ EU TINHA "DESCARTADO" ESTE PROBLEMA E ESCRITO A CONCLUSÃO ERRADA NO CÓDIGO. O argumento era
+// que chaves colidentes viram o mesmo lock e o advisory lock é reentrante. Reentrância impede a
+// transação de travar a SI MESMA; não impede duas transações de pedirem os mesmos dois locks em
+// ordem trocada. Com a ordenação pelas STRINGS, uma colisão fazia exatamente isso — e o Postgres
+// resolve matando uma das duas, ou seja, erro de deadlock para o operador no meio do turno.
+describe("idsDeTrava — a ordem é a dos LOCKS, não a das strings", () => {
+  // O contra-exemplo do parecer, com o hash injetado para forçar a colisão que ninguém reproduz
+  // de propósito: a e c caem no mesmo id, e b fica entre eles na ordem alfabética.
+  const colidente = (c) => ({ a: 1, b: 2, c: 1 }[c] ?? 99);
+
+  it("duas transações com chaves colidentes pedem na MESMA ordem", () => {
+    const t1 = idsDeTrava(["a", "b"], colidente); // ordenado por string daria 1, 2
+    const t2 = idsDeTrava(["b", "c"], colidente); // ordenado por string daria 2, 1 ← inversão
+    expect(t1).toEqual([1, 2]);
+    expect(t2).toEqual([1, 2]);
+  });
+
+  it("chaves que colidem viram UM lock só, pedido uma vez", () => {
+    expect(idsDeTrava(["a", "c"], colidente)).toEqual([1]);
+  });
+
+  it("chave repetida, vazia ou nula não entra", () => {
+    expect(idsDeTrava(["a", "a", null, "", undefined], colidente)).toEqual([1]);
+    expect(idsDeTrava([], colidente)).toEqual([]);
+    expect(idsDeTrava(null)).toEqual([]);
+  });
+
+  it("o id cabe em int32 com sinal, como o hashtext do Postgres", () => {
+    for (const c of ["cracha:op-1", "rec-laser", "T103|MARCA", "", "x".repeat(300)]) {
+      const id = idDaChave(c);
+      expect(Number.isInteger(id)).toBe(true);
+      expect(id).toBeGreaterThanOrEqual(-(2 ** 31));
+      expect(id).toBeLessThanOrEqual(2 ** 31 - 1);
+    }
+  });
+
+  it("a mesma chave dá sempre o mesmo id, chaves diferentes dão ids diferentes", () => {
+    expect(idDaChave("rec-laser")).toBe(idDaChave("rec-laser"));
+    expect(idDaChave("rec-laser")).not.toBe(idDaChave("rec-solda"));
   });
 });
