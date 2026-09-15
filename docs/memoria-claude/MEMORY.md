@@ -100,6 +100,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Portal da Qualidade](torg_qualidade.md) — setor (PQ-00/NBR 16775) na main; F1 Controle de Documentos, F2 CMR+casamento PDFs, F3/F5 Data Book (pdf-lib); falta F4 foto PWA
 - [Cotas A/B/C no dimensional](torg_cotas_abc.md) — cota simples com letra+espec+tolerância; a cota desenhada APONTA onde medir, não mede (some o problema de escala)
 - [Data Book — revisão e certificados](torg_databook_revisao.md) — emitido só muda por REVISÃO (zera assinaturas); validade congela na emissão; certificado puxa a ficha do CMR pelo R
+- [Anexo da Qualidade: itemId morre](torg_anexo_qualidade_itemid.md) — mover/renomear no SharePoint mata o `sharepointItemId`; a escada (drive provável → o outro → CAMINHO) vive em `lib/databook-arquivo.js` e TODO download passa por ela
 - [Planos de Ação 5W2H](torg_qualidade_plano_acao.md) — 3ª ABA de Auditorias Internas; 5W2H + status por ação (atrasado derivado do prazo); PDF paisagem; PlanoAcao (PA-001)
 - [RNC — Não Conformidades](torg_rnc.md) — /qualidade/rnc; NaoConformidade cobre FORM 20 + RTNC; 5 porquês; liga ao 5W2H; falta 2b (anexo+IA→plano→PDF) e 2c (indicadores)
 - [Auditorias Internas](torg_qualidade_auditorias_internas.md) — /qualidade/auditorias-internas (≠ Externas); cronograma + relatório enxuto → PDF → e-mail; AuditoriaInterna (RAI-001). Cronograma tem Exportar PDF + Enviar p/ assinatura + revisão (f7e9a96 antes) [[torg_assinatura_doc]]
