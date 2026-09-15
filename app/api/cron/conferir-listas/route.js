@@ -95,40 +95,68 @@ async function conferir() {
     select: { opNumero: true, arquivo: true, fileModificado: true, importadoEm: true },
     orderBy: { importadoEm: "desc" },
   });
-  // A mesma obra pode ter mais de uma frente (T89A, T89C); vale a importada mais recentemente.
+  // ⚠ TODOS os registros da obra, não só o último: a OP-085 tem duas frentes (T85-LE e
+  // T85-LE-R01 GALV) e comparar contra a importação mais recente acusava o arquivo da OUTRA
+  // frente como revisão nova. Ver `compararLista`.
   const porOp = new Map();
-  for (const r of registros) if (!porOp.has(r.opNumero)) porOp.set(r.opNumero, r);
+  for (const r of registros) porOp.set(r.opNumero, [...(porOp.get(r.opNumero) || []), r]);
 
-  return ops.map((op) => ({
-    opNumero: op.numero,
-    cliente: op.cliente,
-    ...compararLista(noServidor.get(op.numero)?.arquivos, porOp.get(op.numero) || null),
-  }));
+  // ⚠⚠ OBRA QUE O GRAPH RECUSOU NÃO É OBRA SEM ARQUIVO (achado do Codex). Um 403/429/500 virava
+  // `arquivos: []` → "sem-arquivo" → nenhum aviso, com heartbeat de sucesso: o cron ficava mudo
+  // exatamente quando quebrava. Agora ela sai da comparação e é reportada como incompleta.
+  const incompletas = [];
+  const linhas = [];
+  for (const op of ops) {
+    const doServidor = noServidor.get(op.numero);
+    if (doServidor?.erro) { incompletas.push({ op: op.numero, erro: doServidor.erro }); continue; }
+    linhas.push({
+      opNumero: op.numero,
+      cliente: op.cliente,
+      ...compararLista(doServidor?.arquivos, porOp.get(op.numero) || []),
+    });
+  }
+  return { linhas, incompletas };
 }
+
+/** O heartbeat. Consulta incompleta não entra como sucesso — ver a chamada. */
+const bater = (incompletas, t0) =>
+  registrarExecucao("conferir-listas", {
+    ok: !incompletas.length,
+    mensagem: incompletas.length
+      ? `não consegui ler ${incompletas.length} obra(s): ${incompletas.slice(0, 3).map((i) => i.op).join(", ")}`
+      : undefined,
+    duracaoMs: Date.now() - t0,
+  });
 
 export async function GET(req) {
   if (!temCronSecret(req) && process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // ⚠⚠ DECIDIDO ANTES DO `try`, E O `catch` TAMBÉM OBEDECE (achado do Codex, 15/09/2026). Estava
+  // dentro do try: uma simulação que falhasse gravava heartbeat de ERRO e o monitor alertaria por
+  // causa de um ensaio meu — alarme falso vindo justamente da ferramenta de alarme.
+  const simular = new URL(req.url).searchParams.get("simular") === "1";
   const t0 = Date.now();
   try {
     await aquecerBanco(prisma);
-    const linhas = await conferir();
+    const { linhas, incompletas } = await conferir();
     const aAvisar = pendentes(linhas);
 
-    // ⚠ `?simular=1` confere e NÃO avisa ninguém. Existe porque a única forma de provar este cron
-    // é rodá-lo contra o SharePoint de verdade — e sem isto, cada prova mandaria um e-mail para a
-    // Engenharia inteira e empilharia sino. Só o cron agendado (sem o parâmetro) avisa.
-    const simular = new URL(req.url).searchParams.get("simular") === "1";
+    // `?simular=1` confere e NÃO avisa ninguém — ver o comentário na entrada do handler.
     const envio = aAvisar.length && !simular ? await avisar(aAvisar) : { email: 0, simulado: simular };
     registro.info(`conferidas ${linhas.length} obras, ${aAvisar.length} pendentes${simular ? " (simulação)" : ""}`);
     // ⚠ Simulação não bate o heartbeat: marcaria o cron como "executado hoje" sem ninguém ter
     // sido avisado, e o monitor pararia de cobrar justamente no dia em que o cron falhou.
-    if (!simular) await registrarExecucao("conferir-listas", { ok: true, duracaoMs: Date.now() - t0 });
+    // ⚠⚠ CONSULTA INCOMPLETA NÃO É SUCESSO. Se o Graph recusou alguma obra, aquela obra ficou
+    // invisível — e registrar "ok" faria o monitor calar justamente no dia em que o cron ficou
+    // cego (achado do Codex). O aviso do que FOI achado continua saindo; o heartbeat é que conta
+    // a verdade.
+    if (!simular) await bater(incompletas, t0);
     return NextResponse.json({
       ok: true,
       conferidas: linhas.length,
+      incompletas,
       pendentes: aAvisar.map((l) => ({
         op: l.opNumero, cliente: l.cliente, situacao: l.situacao,
         arquivo: l.arquivo, noPortal: l.noPortal, frase: frase(l),
@@ -137,7 +165,9 @@ export async function GET(req) {
     });
   } catch (e) {
     registro.erro("erro:", e?.message);
-    await registrarExecucao("conferir-listas", { ok: false, mensagem: e?.message, duracaoMs: Date.now() - t0 });
+    if (!simular) {
+      await registrarExecucao("conferir-listas", { ok: false, mensagem: e?.message, duracaoMs: Date.now() - t0 });
+    }
     return NextResponse.json({ ok: false, error: e?.message }, { status: 500 });
   }
 }

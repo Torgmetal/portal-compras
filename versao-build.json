@@ -1,7 +1,12 @@
 {
-  "build": 3171,
-  "gerado": "2026-09-15T14:23:56.196Z",
+  "build": 3172,
+  "gerado": "2026-09-15T14:29:58.258Z",
   "commits": [
+    {
+      "hash": "748694a8b7",
+      "data": "15/09/2026",
+      "titulo": "Memoria: o import da L.E. e manual, e o cron que avisa"
+    },
     {
       "hash": "afe90467e7",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "11e46f3813",
       "data": "14/09/2026",
       "titulo": "PCP: posição de conjunto nunca vira conjunto; aposenta a baixa em massa da OP-113"
-    },
-    {
-      "hash": "000cc110ae",
-      "data": "14/09/2026",
-      "titulo": "Melhora visão dos encarregados na produção por bancada e prioridade"
     }
   ]
 }
