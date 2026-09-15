@@ -1,156 +1,156 @@
 {
-  "build": 3177,
-  "gerado": "2026-09-15T17:22:28.133Z",
+  "build": 3178,
+  "gerado": "2026-09-15T17:41:25.259Z",
   "commits": [
     {
-      "hash": "6f7ca54a",
+      "hash": "357b84c0a6",
+      "data": "15/09/2026",
+      "titulo": "Data book: tirar um documento da seção deixa rastro no AuditLog"
+    },
+    {
+      "hash": "6f7ca54a88",
       "data": "15/09/2026",
       "titulo": "Relatório de inspeção: número apagado nunca volta — o AuditLog diz o maior já emitido"
     },
     {
-      "hash": "cd3903b4",
+      "hash": "cd3903b40c",
       "data": "15/09/2026",
       "titulo": "Memória: OP-089 — as causas dos 307 'sem R' e as amarrações aplicadas"
     },
     {
-      "hash": "a155344a",
+      "hash": "a155344a32",
       "data": "15/09/2026",
       "titulo": "Rastreabilidade: item comprado pronto (grade de piso) não conta como peça sem R"
     },
     {
-      "hash": "ccd178d5",
+      "hash": "ccd178d560",
       "data": "15/09/2026",
       "titulo": "Memoria: corrige o que eu registrei sobre a OP-085 no cron da L.E."
     },
     {
-      "hash": "39f8ce63",
+      "hash": "39f8ce6350",
       "data": "15/09/2026",
       "titulo": "Cron da L.E.: os tres furos que a revisao do Codex achou no que ja estava no ar"
     },
     {
-      "hash": "748694a8",
+      "hash": "748694a8b7",
       "data": "15/09/2026",
       "titulo": "Memoria: o import da L.E. e manual, e o cron que avisa"
     },
     {
-      "hash": "afe90467",
+      "hash": "afe90467e7",
       "data": "15/09/2026",
       "titulo": "Memória: conceder acesso a pasta do SharePoint funciona pelo Graph (invite), sem ponte de navegador"
     },
     {
-      "hash": "911fb91a",
+      "hash": "911fb91a32",
       "data": "15/09/2026",
       "titulo": "Simulador de carga: edição manual e embalagens econômicas"
     },
     {
-      "hash": "c5f01fd5",
+      "hash": "c5f01fd5b2",
       "data": "15/09/2026",
       "titulo": "Portal do cliente: LPC com a rastreabilidade (R) de cada croqui, opcional por obra"
     },
     {
-      "hash": "e167d138",
+      "hash": "e167d1389f",
       "data": "15/09/2026",
       "titulo": "Cron diario: avisa quando a L.E. do servidor e mais nova que a do portal"
     },
     {
-      "hash": "eba8df94",
+      "hash": "eba8df9477",
       "data": "14/09/2026",
       "titulo": "Inspeção: tela do inspetor lista produto final por fase, sem croqui nem acessório"
     },
     {
-      "hash": "fac5f1b0",
+      "hash": "fac5f1b05b",
       "data": "14/09/2026",
       "titulo": "Etiquetas: tres defeitos da TAG do cliente que a revisao do Codex achou"
     },
     {
-      "hash": "97fdad65",
+      "hash": "97fdad65c6",
       "data": "14/09/2026",
       "titulo": "Permissao em massa nas pastas da OP: tirar uma pessoa de subpastas escolhidas"
     },
     {
-      "hash": "a102b24d",
+      "hash": "a102b24dc3",
       "data": "14/09/2026",
       "titulo": "Cronograma: percentual digitado à mão prevalece sobre o sincronismo (avancoManual)"
     },
     {
-      "hash": "72bb2b06",
+      "hash": "72bb2b0659",
       "data": "14/09/2026",
       "titulo": "Cronograma: material atendido pelo estoque conta como recebido na linha de matéria-prima"
     },
     {
-      "hash": "5cfc3b55",
+      "hash": "5cfc3b5551",
       "data": "14/09/2026",
       "titulo": "LE: a chave é o número da OP cadastrada e o rodapé TOTAL não vira peça"
     },
     {
-      "hash": "325fce4e",
+      "hash": "325fce4eac",
       "data": "14/09/2026",
       "titulo": "Memória: OP-089 rechaveada (089 → T89C) e croquis ligados à LPC"
     },
     {
-      "hash": "0afc90d7",
+      "hash": "0afc90d7da",
       "data": "14/09/2026",
       "titulo": "Memória: limpeza da LPC duplicada nas OPs 089 e 113; 067 é marca repetida entre sub-obras"
     },
     {
-      "hash": "a0f140b3",
+      "hash": "a0f140b30a",
       "data": "14/09/2026",
       "titulo": "Melhora navegação do simulador e referências de embalagem no PDF"
     },
     {
-      "hash": "c564f949",
+      "hash": "c564f9495f",
       "data": "14/09/2026",
       "titulo": "Etiqueta: QR abaixo da linha do cabecalho, e a TAG no fim da descricao"
     },
     {
-      "hash": "12aa3bc8",
+      "hash": "12aa3bc80e",
       "data": "14/09/2026",
       "titulo": "Portal do cliente: LPC da revisão entra na lista (naLPC) e o certificado diz em que perfil do projeto foi aplicado"
     },
     {
-      "hash": "ae2a738c",
+      "hash": "ae2a738c32",
       "data": "14/09/2026",
       "titulo": "Etiquetas: um teto por impressao, e o carimbo so depois de saber que o PDF cabe"
     },
     {
-      "hash": "c3e41c59",
+      "hash": "c3e41c591f",
       "data": "14/09/2026",
       "titulo": "Etiquetas: um QR por MARCA, nao por etiqueta — o 504 ao gerar a OP inteira"
     },
     {
-      "hash": "98d4e1e4",
+      "hash": "98d4e1e434",
       "data": "14/09/2026",
       "titulo": "Produção › Meu trabalho: botão Planilha p/ Syneco no cabeçalho (o card tinha ido para Gestão das OPs)"
     },
     {
-      "hash": "4e8d9d65",
+      "hash": "4e8d9d6501",
       "data": "14/09/2026",
       "titulo": "Etiquetas: a TAG do cliente sai na frente da descricao, importada da planilha"
     },
     {
-      "hash": "84ae66d1",
+      "hash": "84ae66d1d0",
       "data": "14/09/2026",
       "titulo": "Produção: planilha dos apontamentos do portal que faltam no Syneco"
     },
     {
-      "hash": "0dfcdcf2",
+      "hash": "0dfcdcf2d3",
       "data": "14/09/2026",
       "titulo": "Qualidade: campos que perdiam o foco a cada tecla (lote da tinta e os outros)"
     },
     {
-      "hash": "75542bcc",
+      "hash": "75542bccf0",
       "data": "14/09/2026",
       "titulo": "LPC: a chave da lista é a fase, nunca o número da OP — a OP-094 tinha 591 marcas duplicadas"
     },
     {
-      "hash": "4ba3dcbd",
+      "hash": "4ba3dcbd39",
       "data": "14/09/2026",
       "titulo": "Simulador: PDF v2 — modelos de embalagem desenhados e um cartão por volume com a foto 3D"
-    },
-    {
-      "hash": "e8d317df",
-      "data": "14/09/2026",
-      "titulo": "Simulador: o botão do PDF não fazia nada — next/dynamic engolia o ref do 3D"
     }
   ]
 }

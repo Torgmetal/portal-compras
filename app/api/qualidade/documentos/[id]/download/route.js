@@ -7,9 +7,29 @@ import { requireRole } from "@/lib/session";
 import { isBlobUrlSegura } from "@/lib/blob-url";
 import { fetchRhItemResponse } from "@/lib/sharepoint";
 import { dispArquivo } from "@/lib/arquivo-http";
+import { pdfDoRelatorio, refDeInspecao } from "@/lib/relatorio-pdf-fonte";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+/**
+ * O PDF do relatório de inspeção, montado em memória.
+ *
+ * ⚠⚠ ELE NÃO TEM ARQUIVO — É MONTADO NA HORA. O `arquivoUrl` do documento é a rota deste portal
+ * que renderiza o PDF, e ela exige sessão: buscá-la por `fetch` daqui daria 401, e antes disto a
+ * URL nem chegava a ser tentada (não é Blob, não tem itemId) — respondia 400 "Arquivo inválido",
+ * que foi o que o Matheus viu no botão do olho (15/09/2026). Montar em memória resolve os dois, e
+ * ainda ignora o host gravado: havia documento com `localhost:3000` no banco de PRODUÇÃO, de quem
+ * fechou a inspeção rodando em dev.
+ */
+async function servirInspecao(doc, insp, inline) {
+  const pdf = await pdfDoRelatorio(insp.relatorioId, { revisao: insp.revisao });
+  const h = new Headers();
+  h.set("Content-Type", "application/pdf");
+  h.set("Content-Disposition", dispArquivo(doc.arquivoNome || pdf.nome, inline ? "inline" : "attachment"));
+  h.set("Cache-Control", "private, no-store");
+  return new Response(pdf.bytes, { status: 200, headers: h });
+}
 
 export async function GET(req, { params }) {
   try {
@@ -39,6 +59,23 @@ export async function GET(req, { params }) {
   // ⚠ a defesa de SSRF continua inteira: URL que não é do Blob não é buscada por URL nenhuma — vai
   // pelo item do SharePoint, que é id opaco no drive da empresa. O que muda é que agora ela cai
   // para o SharePoint em vez de morrer em 400.
+  const inline = new URL(req.url).searchParams.get("inline") === "1";
+
+  // O relatório de inspeção não tem binário — ver `servirInspecao`.
+  const insp = refDeInspecao(doc.arquivoUrl);
+  if (insp) {
+    try {
+      return await servirInspecao(doc, insp, inline);
+    } catch (e) {
+      return NextResponse.json({ error: e.message }, { status: e.status || 502 });
+    }
+  }
+
+  return servirArquivo(doc, inline);
+}
+
+/** Blob (fetch direto) ou item do SharePoint (por id). O que não for nenhum dos dois é 400. */
+async function servirArquivo(doc, inline) {
   let res;
   if (isBlobUrlSegura(doc.arquivoUrl)) {
     res = await fetch(doc.arquivoUrl);
@@ -49,7 +86,6 @@ export async function GET(req, { params }) {
   }
   if (!res.ok || !res.body) return NextResponse.json({ error: "Falha ao buscar arquivo" }, { status: 502 });
 
-  const inline = new URL(req.url).searchParams.get("inline") === "1";
   const nome = (doc.arquivoNome || "documento").replace(/["\r\n]/g, "");
   const headers = new Headers();
   headers.set("Content-Type", doc.arquivoTipo || res.headers.get("content-type") || "application/octet-stream");

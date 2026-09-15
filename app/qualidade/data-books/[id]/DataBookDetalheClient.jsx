@@ -72,10 +72,17 @@ export default function DataBookDetalheClient({ id, userId }) {
     }
   }
 
+  // ⚠⚠ A RESPOSTA PRECISA SER LIDA — ELA JÁ EXPLICAVA, E A TELA JOGAVA FORA (15/09/2026).
+  // Matheus: "no X a gente clica, ele roda e não tira". O servidor estava certo: o data book da
+  // OP-106 tinha sido EMITIDO, e a rota devolvia 409 dizendo para abrir uma revisão — regra do
+  // Vitor, "data book emitido não se mexe, é um documento". Sem `res.ok`, o botão girava e o
+  // usuário ficava sem saber se era travamento, permissão ou defeito.
   async function desvincular(secao, documentoId) {
     setAcao(secao.id);
     try {
-      await fetch(`/api/qualidade/data-books/secao/${secao.id}/doc?documentoId=${encodeURIComponent(documentoId)}`, { method: "DELETE" });
+      const res = await fetch(`/api/qualidade/data-books/secao/${secao.id}/doc?documentoId=${encodeURIComponent(documentoId)}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) throw new Error(json.error || `Não consegui remover (HTTP ${res.status}).`);
       await carregar();
     } catch (e) {
       alert(e.message);
