@@ -1,7 +1,12 @@
 {
-  "build": 3181,
-  "gerado": "2026-09-15T18:42:35.464Z",
+  "build": 3182,
+  "gerado": "2026-09-15T18:44:02.111Z",
   "commits": [
+    {
+      "hash": "143ae550",
+      "data": "15/09/2026",
+      "titulo": "Data book: peças e peso pela lista canônica (LE, senão LPC) — não LPC + LE somadas"
+    },
     {
       "hash": "6fe5ff1d",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "4e8d9d65",
       "data": "14/09/2026",
       "titulo": "Etiquetas: a TAG do cliente sai na frente da descricao, importada da planilha"
-    },
-    {
-      "hash": "84ae66d1",
-      "data": "14/09/2026",
-      "titulo": "Produção: planilha dos apontamentos do portal que faltam no Syneco"
     }
   ]
 }
