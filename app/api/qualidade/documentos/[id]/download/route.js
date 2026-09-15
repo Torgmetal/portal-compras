@@ -30,6 +30,7 @@ async function servirInspecao(doc, insp, inline) {
   const h = new Headers();
   h.set("Content-Type", "application/pdf");
   h.set("Content-Disposition", dispArquivo(doc.arquivoNome || pdf.nome, inline ? "inline" : "attachment"));
+  h.set("X-Content-Type-Options", "nosniff");
   h.set("Cache-Control", "private, no-store");
   return new Response(pdf.bytes, { status: 200, headers: h });
 }
@@ -130,13 +131,30 @@ async function streamDoBlob(doc, inline) {
   return new Response(res.body, { status: 200, headers });
 }
 
+// ⚠⚠ O QUE PODE ABRIR DENTRO DO PORTAL. `arquivoTipo` é texto livre no banco, gravado por
+// importador, e prevalece sobre o tipo real. Um documento com `text/html` (ou `image/svg+xml`,
+// que executa script) servido com `?inline=1` rodaria NA ORIGEM DO PORTAL, onde quem abriu tem
+// sessão — e `nosniff` não protege contra um tipo declarado de propósito (achado ALTA do Codex,
+// 15/09/2026). Fora desta lista o arquivo BAIXA em vez de abrir: anexo não executa.
+//
+// ⚠ Medido no acervo (15/09/2026): `arquivoTipo` é null em 5.029, `application/pdf` em 1.462 e
+// `image/png` em 2. Nenhum documento legítimo perde a pré-visualização com este aperto.
+const TIPOS_QUE_ABREM = new Set([
+  "application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp", "text/plain",
+]);
+
 /** ⚠ Sem o content-type da resposta (o SharePoint vem por buffer), o PDF cai no que o banco diz. */
 function cabecalhos(doc, inline, tipoDaResposta = null) {
   const nome = (doc.arquivoNome || "documento").replace(/["\r\n]/g, "");
   const ehPdf = /\.pdf($|\?)/i.test(doc.arquivoNome || doc.arquivoUrl || "");
+  const tipo = doc.arquivoTipo || tipoDaResposta || (ehPdf ? "application/pdf" : "application/octet-stream");
+  const podeAbrir = TIPOS_QUE_ABREM.has(String(tipo).split(";")[0].trim().toLowerCase());
   const h = new Headers();
-  h.set("Content-Type", doc.arquivoTipo || tipoDaResposta || (ehPdf ? "application/pdf" : "application/octet-stream"));
-  h.set("Content-Disposition", dispArquivo(nome, inline ? "inline" : "attachment"));
+  h.set("Content-Type", tipo);
+  h.set("Content-Disposition", dispArquivo(nome, inline && podeAbrir ? "inline" : "attachment"));
+  // ⚠ Sem `nosniff` o navegador pode adivinhar HTML num arquivo declarado de outro jeito, e a
+  // lista acima perderia o sentido pela porta dos fundos.
+  h.set("X-Content-Type-Options", "nosniff");
   h.set("Cache-Control", "private, no-store");
   return h;
 }

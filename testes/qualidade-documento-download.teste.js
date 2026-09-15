@@ -13,7 +13,17 @@ vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma, prismaDirect: mockPrisma })
 vi.mock("@/lib/session", () => ({ requireRole: vi.fn() }));
 vi.mock("@/lib/databook-arquivo", () => ({
   baixarDocumento: vi.fn(),
-  ehUrlSharePoint: (u) => /sharepoint\.com/i.test(String(u || "")),
+  // ⚠⚠ ESPELHO FIEL DA IMPLEMENTAÇÃO, INCLUSIVE AS CREDENCIAIS NA URL. O primeiro espelho que
+  // escrevi esqueceu `username`/`password` e o teste de SSRF passou a mentir: dizia recusado o
+  // que a rota entregava. A função de verdade tem arquivo próprio
+  // (`testes/lib/databook-url-sharepoint.teste.js`) — guarda de segurança não se testa por espelho.
+  ehUrlSharePoint: (u) => {
+    try {
+      const x = new URL(String(u || ""));
+      return x.protocol === "https:" && !x.username && !x.password
+        && x.hostname.toLowerCase().endsWith(".sharepoint.com");
+    } catch { return false; }
+  },
 }));
 vi.mock("@/lib/relatorio-pdf-fonte", () => ({ pdfDoRelatorio: vi.fn(), fonteDeInspecao: vi.fn(() => null) }));
 
@@ -119,5 +129,63 @@ describe("download de documento da Qualidade", () => {
     const b = await chamar();
     expect(b.status).toBe(502);
     expect((await b.json()).error).not.toMatch(/relation/);
+  });
+});
+
+// ─── O QUE O PARECER DE SEGURANÇA DO CODEX (15/09/2026) APONTOU ──────────────
+
+describe("o inline não pode virar execução dentro do portal", () => {
+  // ⚠⚠ `arquivoTipo` é texto livre no banco, gravado por importador, e prevalece sobre o tipo
+  // real. Com `?inline=1`, um `text/html` rodaria NA ORIGEM DO PORTAL, onde quem abriu tem sessão.
+  it("tipo que executa BAIXA, mesmo com inline=1", async () => {
+    for (const arquivoTipo of ["text/html", "image/svg+xml", "application/xhtml+xml", "text/html; charset=utf-8"]) {
+      mockPrisma.documentoQualidade.findUnique.mockResolvedValue({ ...NO_SERVIDOR, arquivoTipo });
+      const res = await chamar("?inline=1");
+      expect(res.headers.get("Content-Disposition")).toMatch(/^attachment/);
+    }
+  });
+
+  it("PDF e imagem continuam abrindo", async () => {
+    for (const arquivoTipo of ["application/pdf", "image/png", "application/pdf; charset=binary"]) {
+      mockPrisma.documentoQualidade.findUnique.mockResolvedValue({ ...NO_SERVIDOR, arquivoTipo });
+      expect((await chamar("?inline=1")).headers.get("Content-Disposition")).toMatch(/^inline/);
+    }
+  });
+
+  it("nosniff vai em toda resposta — senão a lista de tipos cai pela porta dos fundos", async () => {
+    expect((await chamar("?inline=1")).headers.get("X-Content-Type-Options")).toBe("nosniff");
+    fonteDeInspecao.mockReturnValue({ relatorioId: "rel1", revisao: 0, exigirOp: "106" });
+    pdfDoRelatorio.mockResolvedValue({ bytes: Buffer.from("%PDF"), nome: "r.pdf" });
+    expect((await chamar("?inline=1")).headers.get("X-Content-Type-Options")).toBe("nosniff");
+  });
+});
+
+describe("SSRF — ter itemId não autoriza buscar outra URL", () => {
+  // ⚠⚠ O ACHADO ALTA, E EU TINHA AFIRMADO O CONTRÁRIO NO COMMIT. Meu teste de SSRF passava porque
+  // usava `sharepointItemId: null`. COM itemId, a rota liberava a entrada e `baixarDocumento`
+  // buscava a URL arbitrária ANTES de tentar o item. A guarda de verdade está lá dentro, junto do
+  // `fetch` — aqui provamos o que a ROTA entrega à função.
+  it("URL interna COM itemId chega à escada, e é ela quem tem de recusar o fetch", async () => {
+    const doc = { ...NO_SERVIDOR, arquivoUrl: "http://169.254.169.254/latest/meta-data/" };
+    mockPrisma.documentoQualidade.findUnique.mockResolvedValue(doc);
+    baixarDocumento.mockRejectedValue(new Error("documento sem arquivo (nem blob nem item do SharePoint)"));
+    const res = await chamar();
+    expect(res.status).toBe(502);
+    expect(baixarDocumento).toHaveBeenCalledWith(doc);
+  });
+
+  // ⚠ Host enganoso: a substring `sharepoint.com` aparece, o hostname não termina nela.
+  it("host que só IMITA o SharePoint, sem itemId, é recusado antes de qualquer busca", async () => {
+    for (const arquivoUrl of [
+      "https://sharepoint.com.exemplo-malicioso.br/x.pdf",
+      "https://evil-sharepoint.com/x.pdf",
+      "http://torgmetal637.sharepoint.com/x.pdf",
+      "https://malicioso.br/?q=torgmetal637.sharepoint.com",
+      "https://user:senha@torgmetal637.sharepoint.com/x.pdf",
+    ]) {
+      mockPrisma.documentoQualidade.findUnique.mockResolvedValue({ ...NO_SERVIDOR, arquivoUrl, sharepointItemId: null });
+      expect((await chamar()).status).toBe(400);
+      expect(baixarDocumento).not.toHaveBeenCalled();
+    }
   });
 });

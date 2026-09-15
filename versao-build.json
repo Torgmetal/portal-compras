@@ -1,7 +1,12 @@
 {
-  "build": 3186,
-  "gerado": "2026-09-15T19:24:02.130Z",
+  "build": 3187,
+  "gerado": "2026-09-15T19:40:13.971Z",
   "commits": [
+    {
+      "hash": "aa84e48060",
+      "data": "15/09/2026",
+      "titulo": "Memória: o sharepointItemId morre, e a escada de download é uma só"
+    },
     {
       "hash": "1c2deae673",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c564f9495f",
       "data": "14/09/2026",
       "titulo": "Etiqueta: QR abaixo da linha do cabecalho, e a TAG no fim da descricao"
-    },
-    {
-      "hash": "12aa3bc80e",
-      "data": "14/09/2026",
-      "titulo": "Portal do cliente: LPC da revisão entra na lista (naLPC) e o certificado diz em que perfil do projeto foi aplicado"
     }
   ]
 }
