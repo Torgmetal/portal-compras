@@ -1,7 +1,12 @@
 {
-  "build": 3192,
-  "gerado": "2026-09-15T22:05:51.701Z",
+  "build": 3193,
+  "gerado": "2026-09-15T23:32:09.441Z",
   "commits": [
+    {
+      "hash": "4c9ee0d2",
+      "data": "15/09/2026",
+      "titulo": "Data book: e-mail do cliente no domínio da Torg é recusado, com o contato certo da OP na mensagem"
+    },
     {
       "hash": "abffd05b",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "a102b24d",
       "data": "14/09/2026",
       "titulo": "Cronograma: percentual digitado à mão prevalece sobre o sincronismo (avancoManual)"
-    },
-    {
-      "hash": "72bb2b06",
-      "data": "14/09/2026",
-      "titulo": "Cronograma: material atendido pelo estoque conta como recebido na linha de matéria-prima"
     }
   ]
 }

@@ -49,3 +49,14 @@ Agora `/data-book/assinar/[token]` tem **"Encontrei algo errado — pedir revis�
 - Sobe a revisão, **zera todas as assinaturas**, volta o livro a `EM_MONTAGEM` e avisa por e-mail **todo o resto da cadeia** (`enviarEmailRevisaoPedida`) — quem já assinara precisa saber que a assinatura caiu. O solicitante não recebe.
 - ⚠️ Os **tokens NÃO mudam** no `abrirRevisao` (só status/datas), então o link de cada um continua valendo. Quem recria a cadeia com tokens novos é o `POST /api/qualidade/data-books/[id]/assinaturas`, que exige o livro **fechado** — ou seja, a Qualidade tem de **reemitir** antes de reiniciar o fluxo.
 - Dois pedidos quase juntos: o 2º é recusado com explicação, não sobe revisão duas vezes.
+
+## Conferência do rascunho pelo cliente é OPCIONAL (15/09/2026)
+
+Vitor: "vamos tirar essa necessidade de ter que mandar sempre o rascunho, deixe como opção de
+enviar ou não". A trava de 31/08 ("depois do ok dele aí sim subimos para assinatura") virou
+AVISO: se a conferência foi pedida e o cliente não respondeu (ou pediu ajuste), a tela pergunta e
+manda `ignorarConferencia: true`; a API registra `conferenciaPendente` no
+`INICIAR_ASSINATURAS_DATABOOK`. Sem confirmação explícita a API ainda devolve 409 — o pulo é
+decisão de quem monta, nunca silencioso. Caso OP-106: cliente pediu o relatório de pintura na R00,
+ajuste feito na R01 e a assinatura ficou presa esperando um segundo ok.
+

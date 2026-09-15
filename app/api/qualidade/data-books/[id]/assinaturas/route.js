@@ -31,6 +31,8 @@ const schema = z.object({
   rtEmail: z.string().email("E-mail do responsável técnico inválido").toLowerCase(),
   clienteNome: z.string().max(120).optional().nullable(),
   clienteEmail: z.string().email("E-mail do cliente inválido").toLowerCase(),
+  // a pessoa viu que a conferência do cliente está pendente e decidiu seguir (ver POST)
+  ignorarConferencia: z.boolean().optional(),
 });
 
 export async function POST(req, { params }) {
@@ -64,17 +66,21 @@ export async function POST(req, { params }) {
     );
   }
 
-  // ⚠ SE O CLIENTE FOI CHAMADO A CONFERIR, ESPERA-SE A RESPOSTA DELE. Vitor (31/08/2026): "depois
-  // do ok dele aí sim subimos para assinatura". A trava vale só quando a avaliação FOI PEDIDA —
-  // data book que nunca passou por essa etapa segue como antes, senão os livros em andamento
-  // travariam no meio do caminho por uma regra que não existia quando começaram.
-  if (book.avaliacaoEnviadaEm && !book.avaliacaoOkEm) {
+  // ⚠ A CONFERÊNCIA DO RASCUNHO É OPCIONAL — E QUEM DECIDE É QUEM MONTA. Vitor (31/08/2026) pediu
+  // "depois do ok dele aí sim subimos para assinatura", e isto virou trava. Em 15/09/2026, com a
+  // OP-106 parada (o cliente pediu o relatório de pintura, foi atendido, e a R01 não subia para
+  // assinatura sem um segundo ok dele): "vamos tirar essa necessidade de ter que mandar sempre o
+  // rascunho, deixe como opção". Se a conferência foi pedida e o cliente não respondeu (ou pediu
+  // ajuste), a tela AVISA e pede confirmação — `ignorarConferencia: true` diz que a pessoa viu e
+  // decidiu seguir, e isso fica no AuditLog. Sem a confirmação explícita continua parando.
+  const conferenciaPendente = !!(book.avaliacaoEnviadaEm && !book.avaliacaoOkEm);
+  if (conferenciaPendente && body.ignorarConferencia !== true) {
     return NextResponse.json(
       {
-        success: false,
+        success: false, conferenciaPendente: true, avaliacaoObs: book.avaliacaoObs || null,
         error: book.avaliacaoObs
-          ? `O cliente pediu ajuste na conferência: "${book.avaliacaoObs}". Resolva e mande para avaliação de novo antes de subir para assinatura.`
-          : "Este data book está com o cliente para conferência e ainda não teve o ok dele. Aguarde o retorno antes de iniciar as assinaturas.",
+          ? `O cliente pediu ajuste na conferência: "${book.avaliacaoObs}". Confirme para enviar para assinatura mesmo assim.`
+          : "O cliente está com o rascunho para conferir e ainda não deu o ok. Confirme para enviar para assinatura mesmo assim.",
       },
       { status: 409 },
     );
@@ -104,7 +110,7 @@ export async function POST(req, { params }) {
   await prisma.dataBookAssinatura.update({ where: { id: primeira.id }, data: { status: "ENVIADO", enviadoEm: new Date() } });
   await prisma.dataBookQualidade.update({ where: { id: params.id }, data: { status: book.status === "ACEITO" ? "ACEITO" : "EM_ASSINATURA" } });
 
-  await prisma.auditLog.create({ data: { userId: user.id, action: "INICIAR_ASSINATURAS_DATABOOK", entity: "DataBookQualidade", entityId: params.id, diff: { etapas: etapas.map((e) => ({ papel: e.papel, email: e.email })), enviado } } }).catch(() => {});
+  await prisma.auditLog.create({ data: { userId: user.id, action: "INICIAR_ASSINATURAS_DATABOOK", entity: "DataBookQualidade", entityId: params.id, diff: { etapas: etapas.map((e) => ({ papel: e.papel, email: e.email })), enviado, ...(conferenciaPendente ? { conferenciaPendente: true, avaliacaoObs: book.avaliacaoObs || null } : {}) } } }).catch(() => {});
 
   const assinaturas = await prisma.dataBookAssinatura.findMany({ where: { dataBookId: params.id }, orderBy: { ordem: "asc" } });
   return NextResponse.json({ success: true, enviado, assinaturas: assinaturas.map(pub) });
