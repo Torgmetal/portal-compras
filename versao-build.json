@@ -1,156 +1,156 @@
 {
-  "build": 3173,
-  "gerado": "2026-09-15T14:37:20.786Z",
+  "build": 3174,
+  "gerado": "2026-09-15T15:20:53.835Z",
   "commits": [
     {
-      "hash": "39f8ce6350",
+      "hash": "ccd178d5",
+      "data": "15/09/2026",
+      "titulo": "Memoria: corrige o que eu registrei sobre a OP-085 no cron da L.E."
+    },
+    {
+      "hash": "39f8ce63",
       "data": "15/09/2026",
       "titulo": "Cron da L.E.: os tres furos que a revisao do Codex achou no que ja estava no ar"
     },
     {
-      "hash": "748694a8b7",
+      "hash": "748694a8",
       "data": "15/09/2026",
       "titulo": "Memoria: o import da L.E. e manual, e o cron que avisa"
     },
     {
-      "hash": "afe90467e7",
+      "hash": "afe90467",
       "data": "15/09/2026",
       "titulo": "Memória: conceder acesso a pasta do SharePoint funciona pelo Graph (invite), sem ponte de navegador"
     },
     {
-      "hash": "911fb91a32",
+      "hash": "911fb91a",
       "data": "15/09/2026",
       "titulo": "Simulador de carga: edição manual e embalagens econômicas"
     },
     {
-      "hash": "c5f01fd5b2",
+      "hash": "c5f01fd5",
       "data": "15/09/2026",
       "titulo": "Portal do cliente: LPC com a rastreabilidade (R) de cada croqui, opcional por obra"
     },
     {
-      "hash": "e167d1389f",
+      "hash": "e167d138",
       "data": "15/09/2026",
       "titulo": "Cron diario: avisa quando a L.E. do servidor e mais nova que a do portal"
     },
     {
-      "hash": "eba8df9477",
+      "hash": "eba8df94",
       "data": "14/09/2026",
       "titulo": "Inspeção: tela do inspetor lista produto final por fase, sem croqui nem acessório"
     },
     {
-      "hash": "fac5f1b05b",
+      "hash": "fac5f1b0",
       "data": "14/09/2026",
       "titulo": "Etiquetas: tres defeitos da TAG do cliente que a revisao do Codex achou"
     },
     {
-      "hash": "97fdad65c6",
+      "hash": "97fdad65",
       "data": "14/09/2026",
       "titulo": "Permissao em massa nas pastas da OP: tirar uma pessoa de subpastas escolhidas"
     },
     {
-      "hash": "a102b24dc3",
+      "hash": "a102b24d",
       "data": "14/09/2026",
       "titulo": "Cronograma: percentual digitado à mão prevalece sobre o sincronismo (avancoManual)"
     },
     {
-      "hash": "72bb2b0659",
+      "hash": "72bb2b06",
       "data": "14/09/2026",
       "titulo": "Cronograma: material atendido pelo estoque conta como recebido na linha de matéria-prima"
     },
     {
-      "hash": "5cfc3b5551",
+      "hash": "5cfc3b55",
       "data": "14/09/2026",
       "titulo": "LE: a chave é o número da OP cadastrada e o rodapé TOTAL não vira peça"
     },
     {
-      "hash": "325fce4eac",
+      "hash": "325fce4e",
       "data": "14/09/2026",
       "titulo": "Memória: OP-089 rechaveada (089 → T89C) e croquis ligados à LPC"
     },
     {
-      "hash": "0afc90d7da",
+      "hash": "0afc90d7",
       "data": "14/09/2026",
       "titulo": "Memória: limpeza da LPC duplicada nas OPs 089 e 113; 067 é marca repetida entre sub-obras"
     },
     {
-      "hash": "a0f140b30a",
+      "hash": "a0f140b3",
       "data": "14/09/2026",
       "titulo": "Melhora navegação do simulador e referências de embalagem no PDF"
     },
     {
-      "hash": "c564f9495f",
+      "hash": "c564f949",
       "data": "14/09/2026",
       "titulo": "Etiqueta: QR abaixo da linha do cabecalho, e a TAG no fim da descricao"
     },
     {
-      "hash": "12aa3bc80e",
+      "hash": "12aa3bc8",
       "data": "14/09/2026",
       "titulo": "Portal do cliente: LPC da revisão entra na lista (naLPC) e o certificado diz em que perfil do projeto foi aplicado"
     },
     {
-      "hash": "ae2a738c32",
+      "hash": "ae2a738c",
       "data": "14/09/2026",
       "titulo": "Etiquetas: um teto por impressao, e o carimbo so depois de saber que o PDF cabe"
     },
     {
-      "hash": "c3e41c591f",
+      "hash": "c3e41c59",
       "data": "14/09/2026",
       "titulo": "Etiquetas: um QR por MARCA, nao por etiqueta — o 504 ao gerar a OP inteira"
     },
     {
-      "hash": "98d4e1e434",
+      "hash": "98d4e1e4",
       "data": "14/09/2026",
       "titulo": "Produção › Meu trabalho: botão Planilha p/ Syneco no cabeçalho (o card tinha ido para Gestão das OPs)"
     },
     {
-      "hash": "4e8d9d6501",
+      "hash": "4e8d9d65",
       "data": "14/09/2026",
       "titulo": "Etiquetas: a TAG do cliente sai na frente da descricao, importada da planilha"
     },
     {
-      "hash": "84ae66d1d0",
+      "hash": "84ae66d1",
       "data": "14/09/2026",
       "titulo": "Produção: planilha dos apontamentos do portal que faltam no Syneco"
     },
     {
-      "hash": "0dfcdcf2d3",
+      "hash": "0dfcdcf2",
       "data": "14/09/2026",
       "titulo": "Qualidade: campos que perdiam o foco a cada tecla (lote da tinta e os outros)"
     },
     {
-      "hash": "75542bccf0",
+      "hash": "75542bcc",
       "data": "14/09/2026",
       "titulo": "LPC: a chave da lista é a fase, nunca o número da OP — a OP-094 tinha 591 marcas duplicadas"
     },
     {
-      "hash": "4ba3dcbd39",
+      "hash": "4ba3dcbd",
       "data": "14/09/2026",
       "titulo": "Simulador: PDF v2 — modelos de embalagem desenhados e um cartão por volume com a foto 3D"
     },
     {
-      "hash": "e8d317df57",
+      "hash": "e8d317df",
       "data": "14/09/2026",
       "titulo": "Simulador: o botão do PDF não fazia nada — next/dynamic engolia o ref do 3D"
     },
     {
-      "hash": "54f7af92f5",
+      "hash": "54f7af92",
       "data": "14/09/2026",
       "titulo": "Expedicao: a marca que a revisao da L.E. excluiu nao imprime mais etiqueta"
     },
     {
-      "hash": "c56c1771bd",
+      "hash": "c56c1771",
       "data": "14/09/2026",
       "titulo": "Etiquetas: o fechamento da lista, com marcas, pecas, etiquetas e quilos"
     },
     {
-      "hash": "f702344eb4",
+      "hash": "f702344e",
       "data": "14/09/2026",
       "titulo": "Simulador: IFC de antes da revisão — a peça é achada pelo nome; corrimão é guarda-corpo"
-    },
-    {
-      "hash": "451728c828",
-      "data": "14/09/2026",
-      "titulo": "Simulador: PDF do modelo montado no navegador — as fotos não sobem mais"
     }
   ]
 }
