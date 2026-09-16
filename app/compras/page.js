@@ -1,122 +1,38 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import RMsTabelaSeletor from "./RMsTabelaSeletor";
+import { prisma } from "@/lib/prisma";
 import { log } from "@/lib/log";
+import { buscarRMsDoPainel, agregarCotacoes, normalizarOp, LIMITE_SEM_OBRA } from "@/lib/rms-painel";
 
 const registro = log("compras");
 
 // Sempre busca dados frescos do banco (sem cache de Server Component)
 
-
-
+/** Preserva a obra escolhida ao alternar Ativas/Histórico — trocar de aba não é trocar de obra. */
+const href = (arquivadas, op) => {
+  const q = new URLSearchParams();
+  if (arquivadas) q.set("arquivadas", "1");
+  if (op) q.set("op", op);
+  const s = q.toString();
+  return s ? `/compras?${s}` : "/compras";
+};
 
 export default async function PainelCompras({ searchParams }) {
   const user = await requireRole(["ADMIN", "COMPRAS"]);
   const verArquivadas = searchParams?.arquivadas === "1";
+  const opSelecionada = normalizarOp(searchParams?.op);
 
-  const where = {
-    tipoRM: "ENGENHARIA",
-    ...(verArquivadas
-      ? { status: { in: ["PEDIDO_GERADO", "CANCELADA"] } }
-      : { status: { in: ["ABERTA", "EM_COTACAO", "COTADA"] } }),
-  };
-
-  const [rms, categoriasCustom] = await Promise.all([
-    prisma.rM.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      include: {
-        op: { select: { numero: true, cliente: true } },
-        createdBy: { select: { name: true } },
-        itens: {
-          orderBy: { ordem: "asc" },
-          select: { id: true, descricao: true, status: true, qtd: true, unidade: true, peso: true },
-        },
-        _count: { select: { cotacoes: true, itens: true } },
-      },
-    }),
-    // Carrega categorias customizadas de fornecedor pra disponibilizar
-    // nos filtros do modal de envio de cotacao (alem das built-in)
+  const [{ rms, obras, total, truncada }, categoriasCustom] = await Promise.all([
+    buscarRMsDoPainel("ENGENHARIA", verArquivadas, opSelecionada),
+    // Categorias customizadas de fornecedor, para os filtros do modal de envio de cotação
     prisma.categoriaFornecedor.findMany({
       where: { ativa: true },
       orderBy: [{ ordem: "asc" }, { label: "asc" }],
     }),
   ]);
 
-  // Conta cotacoes por RM e agrega status (RECEBIDA/PENDENTE/atrasada).
-  // Usa CotacaoItem como ponte leve pra identificar cotacaoIds, evitando
-  // OR com subquery aninhada que causa OOM no Neon.
-  try {
-    const rmIdsListados = rms.map((r) => r.id);
-    if (rmIdsListados.length > 0) {
-      // 1) CotacaoItem -> mapa rmId -> Set<cotacaoId>
-      const cotItensRelacionados = await prisma.cotacaoItem.findMany({
-        where: { rmItem: { rmId: { in: rmIdsListados } } },
-        select: { cotacaoId: true, rmItem: { select: { rmId: true } } },
-      });
-      const cotacoesPorRm = new Map();
-      const todosCotsIds = new Set();
-      for (const ci of cotItensRelacionados) {
-        const rid = ci.rmItem?.rmId;
-        if (!rid) continue;
-        if (!cotacoesPorRm.has(rid)) cotacoesPorRm.set(rid, new Set());
-        cotacoesPorRm.get(rid).add(ci.cotacaoId);
-        todosCotsIds.add(ci.cotacaoId);
-      }
-      for (const rm of rms) {
-        if (rm._count) {
-          rm._count.cotacoes = cotacoesPorRm.get(rm.id)?.size ?? rm._count.cotacoes;
-        }
-      }
-
-      // 2) Busca status/prazo das cotacoes por ID direto (sem OR+subquery)
-      if (todosCotsIds.size > 0) {
-        const cotsRelacionadas = await prisma.cotacao.findMany({
-          where: { id: { in: [...todosCotsIds] } },
-          select: { id: true, status: true, prazoResposta: true },
-        });
-        const cotsMap = new Map();
-        for (const c of cotsRelacionadas) cotsMap.set(c.id, c);
-
-        const agora = Date.now();
-        const infoPorRm = new Map();
-        const upsert = (rmId) => {
-          if (!infoPorRm.has(rmId)) {
-            infoPorRm.set(rmId, { recebidas: new Set(), pendentes: new Set(), atrasadas: new Set() });
-          }
-          return infoPorRm.get(rmId);
-        };
-        for (const [rmId, cotIds] of cotacoesPorRm) {
-          if (!rmIdsListados.includes(rmId)) continue;
-          for (const cotId of cotIds) {
-            const cot = cotsMap.get(cotId);
-            if (!cot) continue;
-            const info = upsert(rmId);
-            if (cot.status === "RECEBIDA") info.recebidas.add(cot.id);
-            else if (cot.status === "PENDENTE") {
-              info.pendentes.add(cot.id);
-              if (cot.prazoResposta && new Date(cot.prazoResposta).getTime() < agora) {
-                info.atrasadas.add(cot.id);
-              }
-            }
-          }
-        }
-        for (const rm of rms) {
-          const info = infoPorRm.get(rm.id);
-          rm.recebidas = info ? info.recebidas.size : 0;
-          rm.pendentes = info ? info.pendentes.size : 0;
-          rm.atrasadas = info ? info.atrasadas.size : 0;
-        }
-      }
-    }
-  } catch (e) {
-    registro.erro("[/compras] Falha agregando cotacoes:", e?.message);
-    for (const rm of rms) {
-      rm.recebidas = 0; rm.pendentes = 0; rm.atrasadas = 0;
-    }
-  }
+  await agregarCotacoes(rms, registro, "/compras");
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -127,7 +43,7 @@ export default async function PainelCompras({ searchParams }) {
         </div>
         <div className="flex gap-2">
           <Link
-            href="/compras"
+            href={href(false, opSelecionada)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
               !verArquivadas ? "bg-torg-blue text-white" : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
             }`}
@@ -135,7 +51,7 @@ export default async function PainelCompras({ searchParams }) {
             Ativas
           </Link>
           <Link
-            href="/compras?arquivadas=1"
+            href={href(true, opSelecionada)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
               verArquivadas ? "bg-torg-blue text-white" : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
             }`}
@@ -153,12 +69,25 @@ export default async function PainelCompras({ searchParams }) {
           resposta é imediata: é aqui, e está zerado.
 
           ⚠ O estado vazio não some — mudou de lugar: a própria tabela diz "Nenhuma RM nesta lista"
-          na linha do corpo, e distingue isso de "o filtro escondeu tudo", que tem desfazer. */}
+          na linha do corpo, e distingue isso de "o filtro escondeu tudo", que tem desfazer.
+
+          ⚠⚠ `key` POR ESCOPO: trocar de obra ou de aba REMONTA o componente, zerando seleção em
+          massa, modal e funis. Sem isso dava para marcar RMs da OP-060, trocar para a OP-097 e
+          disparar uma cotação consolidada com as RMs da obra anterior — o contador lê
+          `selecionadas.size` e o envio lê a interseção com `rms`, então os dois nem concordariam
+          sobre o que estava indo. */}
       <RMsTabelaSeletor
+        key={`ENGENHARIA-${verArquivadas ? "hist" : "ativas"}-${opSelecionada || "todas"}`}
         rms={JSON.parse(JSON.stringify(rms))}
         isAdmin={user.role === "ADMIN"}
         categoriasCustom={JSON.parse(JSON.stringify(categoriasCustom))}
         verArquivadas={verArquivadas}
+        obras={obras}
+        opSelecionada={opSelecionada}
+        totalNoEscopo={total}
+        truncada={truncada}
+        limite={LIMITE_SEM_OBRA}
+        basePath="/compras"
       />
     </div>
   );

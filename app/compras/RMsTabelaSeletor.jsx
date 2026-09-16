@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, AlertCircle, Loader2, Mail, X, FileText, Send, Copy, Check, ExternalLink, CheckCircle2, Truck, Clock, LayoutGrid, List, Plus } from "lucide-react";
 import RMRowActions from "@/components/RMRowActions";
+import BarraFiltrosRM from "./BarraFiltrosRM";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import {
   CATEGORIAS_FORNECEDOR_BUILTIN,
@@ -55,9 +56,13 @@ const TH = "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whit
 //
 // ⚠ O valor é TEXTO e é o mesmo que a célula mostra. Filtrar por um rótulo que não aparece na
 // tabela ("EM_COTACAO" em vez de "Em cotação") faz o menu parecer de outra tela.
+// ⚠⚠ "OP / Cliente" NÃO TEM FUNIL, e a ausência é a correção. Um funil de coluna só enxerga o que
+// foi carregado — era um segundo caminho para filtrar por obra que continuava mentindo sobre as 100
+// linhas da janela, ao lado de um seletor de OP que agora filtra no banco. Dois filtros de obra na
+// mesma tela, um certo e um errado, é pior que um só: quem usasse o errado veria a lista curta sem
+// nada dizendo por quê. Obra se escolhe no seletor acima da tabela.
 const COLUNAS_FILTRO = [
   { key: "tipo",        label: "Tipo",         valor: (r) => TIPO_RM_LABELS[r.tipoRM] || r.tipoRM || "—" },
-  { key: "op",          label: "OP / Cliente", valor: (r) => (r.op ? `${fmtOP(r.op.numero)}${r.op.cliente ? ` — ${r.op.cliente}` : ""}` : "Sem OP") },
   { key: "descricao",   label: "Descrição",    valor: (r) => r.descricao || "—" },
   { key: "solicitante", label: "Solicitante",  valor: (r) => r.createdBy?.name || "—" },
   { key: "cot",         label: "Cot.",         valor: (r) => String(r._count?.cotacoes ?? 0) },
@@ -65,7 +70,11 @@ const COLUNAS_FILTRO = [
   { key: "status",      label: "Status",       valor: (r) => (STATUS_LABELS[r.status] || STATUS_LABELS.ABERTA).label },
 ];
 
-export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [], verArquivadas = false }) {
+export default function RMsTabelaSeletor({
+  rms, isAdmin, categoriasCustom = [], verArquivadas = false,
+  obras = [], opSelecionada = null, totalNoEscopo = null, truncada = false,
+  limite = 100, basePath = "/compras",
+}) {
   // Lista mesclada (built-in + custom do banco) — passada por toda a arvore
   const todasCategoriasFornecedor = useMemo(
     () => mergeCategorias(categoriasCustom),
@@ -79,21 +88,21 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [], 
   const [filtroCat, setFiltroCat] = useState(null);
   // Toggle entre tabela e kanban
   const [viewMode, setViewMode] = useState("tabela"); // "tabela" | "kanban"
-  const [filtroOp, setFiltroOp] = useState(""); // OP.numero ("" = todas)
+  // ⚠⚠ A OBRA É FILTRADA NO SERVIDOR, PELA URL — não mais aqui dentro. Matheus (16/09/2026):
+  // "existe 7 RMs mas na tela de RMs histórico e filtro por OP-097 só aparece 3". O filtro era um
+  // `rms.filter()` sobre uma lista que o servidor já tinha cortado nas 100 mais recentes: 111 das
+  // 211 RMs do histórico nunca chegavam aqui, e nenhum filtro de navegador alcança o que não veio.
+  // Com a obra na URL, a consulta busca a obra INTEIRA e este componente só exibe o que recebeu.
+  const rmsBase = rms;
 
-  // Base: aplica o filtro de OP (se houver) antes de tudo — cards, lista e seleção.
-  const rmsBase = useMemo(
-    () => (filtroOp ? rms.filter((r) => (r.op?.numero || "") === filtroOp) : rms),
-    [rms, filtroOp]
-  );
-
-  // OPs disponíveis para o filtro (uma por OP, com cliente) — maior número primeiro
-  const opsRM = useMemo(() => {
-    const m = new Map();
-    for (const r of rms) if (r.op?.numero && !m.has(r.op.numero)) m.set(r.op.numero, r.op.cliente || "");
-    const num = (s) => parseInt(String(s).match(/\d+/)?.[0] || "0", 10);
-    return [...m.entries()].sort((a, b) => num(b[0]) - num(a[0]));
-  }, [rms]);
+  /** Navega mudando só um parâmetro — a aba Ativas/Histórico sobrevive à troca de obra. */
+  const irPara = (op) => {
+    const q = new URLSearchParams();
+    if (verArquivadas) q.set("arquivadas", "1");
+    if (op) q.set("op", op);
+    const s = q.toString();
+    router.push(s ? `${basePath}?${s}` : basePath);
+  };
 
   // KPIs agregados por categoria de ação
   //
@@ -197,58 +206,14 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [], 
         />
       </div>
 
-      {/* Toggle de visualizacao + filtro ativo */}
-      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-        <div className="flex items-center gap-2 text-xs flex-wrap">
-          <select
-            value={filtroOp}
-            onChange={(e) => setFiltroOp(e.target.value)}
-            className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-torg-dark font-medium"
-            title="Filtrar RMs por OP"
-          >
-            <option value="">Todas as OPs</option>
-            {opsRM.map(([num, cliente]) => (
-              <option key={num} value={num}>{fmtOP(num)}{cliente ? ` — ${cliente}` : ""}</option>
-            ))}
-          </select>
-          {(filtroCat || filtroOp || filtrosColuna > 0) && (
-            <button
-              onClick={() => { setFiltroCat(null); setFiltroOp(""); limparColunas(); }}
-              className="text-torg-blue font-medium hover:underline inline-flex items-center gap-1"
-            >
-              <X size={12} /> Limpar filtros
-            </button>
-          )}
-          <span className="text-torg-gray">
-            Mostrando {filtradas.length} de {rmsBase.length} RM{rmsBase.length !== 1 ? "s" : ""}
-          </span>
-          {/* ⚠ O funil ativo vive DENTRO do cabeçalho, que no kanban nem existe. Sem dizer aqui
-              quais colunas estão filtrando, a lista curta vira mistério. */}
-          {filtrosColuna > 0 && (
-            <span className="text-torg-orange font-medium" title={rotulosAtivos.join(", ")}>
-              filtrando por {rotulosAtivos.join(", ")}
-            </span>
-          )}
-        </div>
-        <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
-          <button
-            onClick={() => setViewMode("tabela")}
-            className={`px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1 ${
-              viewMode === "tabela" ? "bg-torg-blue text-white" : "bg-white text-torg-gray hover:bg-gray-50"
-            }`}
-          >
-            <List size={14} /> Tabela
-          </button>
-          <button
-            onClick={() => setViewMode("kanban")}
-            className={`px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1 border-l border-gray-200 ${
-              viewMode === "kanban" ? "bg-torg-blue text-white" : "bg-white text-torg-gray hover:bg-gray-50"
-            }`}
-          >
-            <LayoutGrid size={14} /> Kanban
-          </button>
-        </div>
-      </div>
+      <BarraFiltrosRM
+        obras={obras} opSelecionada={opSelecionada} irPara={irPara}
+        exibidas={filtradas.length} naLista={rmsBase.length}
+        truncada={truncada} totalNoEscopo={totalNoEscopo} limite={limite}
+        filtroCat={filtroCat} setFiltroCat={setFiltroCat}
+        filtrosColuna={filtrosColuna} limparColunas={limparColunas} rotulosAtivos={rotulosAtivos}
+        viewMode={viewMode} setViewMode={setViewMode}
+      />
       {/* Action bar — aparece quando 1+ RM selecionada */}
       {selecionadas.size > 0 && (
         <div className="bg-torg-blue text-white rounded-xl shadow-md px-4 py-3 flex items-center justify-between flex-wrap gap-3 sticky top-2 z-10">
@@ -398,12 +363,19 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [], 
                     {rmsBase.length === 0 ? (
                       // ⚠ Diz QUAL lista está vazia: quem clicou em "Histórico" e lê "nenhuma RM
                       // ativa" acha que clicou errado.
-                      verArquivadas ? "Nenhuma RM arquivada ainda." : "Nenhuma RM ativa no momento."
+                      //
+                      // ⚠⚠ E, com obra escolhida, diz que é DAQUELA obra. A obra segue selecionada
+                      // ao alternar Ativas/Histórico (trocar de aba não é trocar de obra), então
+                      // ela pode ter RM numa aba e nenhuma na outra. Voltar sozinho para "todas"
+                      // responderia outra pergunta e escondria o fato.
+                      opSelecionada
+                        ? `A ${fmtOP(opSelecionada)} não tem RM ${verArquivadas ? "no histórico" : "ativa"}.`
+                        : (verArquivadas ? "Nenhuma RM arquivada ainda." : "Nenhuma RM ativa no momento.")
                     ) : (
                       <>
                         Nenhuma RM passa pelos filtros escolhidos.{" "}
                         <button
-                          onClick={() => { setFiltroCat(null); setFiltroOp(""); limparColunas(); }}
+                          onClick={() => { setFiltroCat(null); limparColunas(); if (opSelecionada) irPara(""); }}
                           className="text-torg-blue font-medium hover:underline"
                         >
                           Limpar filtros

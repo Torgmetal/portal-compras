@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/session";
 import { FileText, BarChart3, Truck, ClipboardList } from "lucide-react";
 import RMsTabelaSeletor from "../RMsTabelaSeletor";
 import { log } from "@/lib/log";
+import { buscarRMsDoPainel, agregarCotacoes, normalizarOp, LIMITE_SEM_OBRA } from "@/lib/rms-painel";
 
 const registro = log("compras/consumiveis");
 
@@ -13,110 +14,22 @@ export default async function PainelConsumiveis({ searchParams }) {
   const user = await requireRole(["ADMIN", "COMPRAS"]);
   const verArquivadas = searchParams?.arquivadas === "1";
 
-  const where = {
-    tipoRM: "INTERNA",
-    ...(verArquivadas
-      ? { status: { in: ["PEDIDO_GERADO", "CANCELADA"] } }
-      : { status: { in: ["ABERTA", "EM_COTACAO", "COTADA"] } }),
-  };
+  const opSelecionada = normalizarOp(searchParams?.op);
 
-  const [rms, totais, categoriasCustom] = await Promise.all([
-    prisma.rM.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      include: {
-        op: { select: { numero: true, cliente: true } },
-        createdBy: { select: { name: true } },
-        itens: {
-          orderBy: { ordem: "asc" },
-          select: { id: true, descricao: true, status: true, qtd: true, unidade: true, peso: true },
-        },
-        _count: { select: { cotacoes: true, itens: true } },
-      },
-    }),
-    prisma.rM.groupBy({
-      by: ["status"],
-      where: { tipoRM: "INTERNA" },
-      _count: { _all: true },
-    }),
+  const [{ rms, obras, total, truncada }, totais, categoriasCustom] = await Promise.all([
+    // ⚠ Mesma consulta das RMs de materiais (`lib/rms-painel.js`): o filtro de obra é do SERVIDOR e
+    // as opções saem de consulta própria. Hoje as 34 RMs internas são TODAS sem OP, então o seletor
+    // nem aparece — mas o teto de 100 é o mesmo, e o dia em que o histórico passar disso a tela vai
+    // dizer que está cortando, em vez de esconder RM como a de materiais escondia 111.
+    buscarRMsDoPainel("INTERNA", verArquivadas, opSelecionada),
+    prisma.rM.groupBy({ by: ["status"], where: { tipoRM: "INTERNA" }, _count: { _all: true } }),
     prisma.categoriaFornecedor.findMany({
       where: { ativa: true },
       orderBy: [{ ordem: "asc" }, { label: "asc" }],
     }),
   ]);
 
-  // Conta cotacoes por RM considerando consolidadas
-  // Conta cotacoes por RM e agrega status (RECEBIDA/PENDENTE/atrasada).
-  // Usa CotacaoItem como ponte leve pra identificar cotacaoIds, evitando
-  // OR com subquery aninhada que causa OOM no Neon.
-  try {
-    const rmIdsListados = rms.map((r) => r.id);
-    if (rmIdsListados.length > 0) {
-      const cotItensRelacionados = await prisma.cotacaoItem.findMany({
-        where: { rmItem: { rmId: { in: rmIdsListados } } },
-        select: { cotacaoId: true, rmItem: { select: { rmId: true } } },
-      });
-      const cotacoesPorRm = new Map();
-      const todosCotsIds = new Set();
-      for (const ci of cotItensRelacionados) {
-        const rid = ci.rmItem?.rmId;
-        if (!rid) continue;
-        if (!cotacoesPorRm.has(rid)) cotacoesPorRm.set(rid, new Set());
-        cotacoesPorRm.get(rid).add(ci.cotacaoId);
-        todosCotsIds.add(ci.cotacaoId);
-      }
-      for (const rm of rms) {
-        if (rm._count) {
-          rm._count.cotacoes = cotacoesPorRm.get(rm.id)?.size ?? rm._count.cotacoes;
-        }
-      }
-
-      if (todosCotsIds.size > 0) {
-        const cotsRelacionadas = await prisma.cotacao.findMany({
-          where: { id: { in: [...todosCotsIds] } },
-          select: { id: true, status: true, prazoResposta: true },
-        });
-        const cotsMap = new Map();
-        for (const c of cotsRelacionadas) cotsMap.set(c.id, c);
-
-        const agora = Date.now();
-        const infoPorRm = new Map();
-        const upsert = (rmId) => {
-          if (!infoPorRm.has(rmId)) {
-            infoPorRm.set(rmId, { recebidas: new Set(), pendentes: new Set(), atrasadas: new Set() });
-          }
-          return infoPorRm.get(rmId);
-        };
-        for (const [rmId, cotIds] of cotacoesPorRm) {
-          if (!rmIdsListados.includes(rmId)) continue;
-          for (const cotId of cotIds) {
-            const cot = cotsMap.get(cotId);
-            if (!cot) continue;
-            const info = upsert(rmId);
-            if (cot.status === "RECEBIDA") info.recebidas.add(cot.id);
-            else if (cot.status === "PENDENTE") {
-              info.pendentes.add(cot.id);
-              if (cot.prazoResposta && new Date(cot.prazoResposta).getTime() < agora) {
-                info.atrasadas.add(cot.id);
-              }
-            }
-          }
-        }
-        for (const rm of rms) {
-          const info = infoPorRm.get(rm.id);
-          rm.recebidas = info ? info.recebidas.size : 0;
-          rm.pendentes = info ? info.pendentes.size : 0;
-          rm.atrasadas = info ? info.atrasadas.size : 0;
-        }
-      }
-    }
-  } catch (e) {
-    registro.erro("[/compras/consumiveis] Falha agregando cotacoes:", e?.message);
-    for (const rm of rms) {
-      rm.recebidas = 0; rm.pendentes = 0; rm.atrasadas = 0;
-    }
-  }
+  await agregarCotacoes(rms, registro, "/compras/consumiveis");
 
   const statusCount = totais.reduce((acc, t) => {
     acc[t.status] = t._count._all;
@@ -188,9 +101,17 @@ export default async function PainelConsumiveis({ searchParams }) {
         </div>
       ) : (
         <RMsTabelaSeletor
+          key={`INTERNA-${verArquivadas ? "hist" : "ativas"}-${opSelecionada || "todas"}`}
           rms={JSON.parse(JSON.stringify(rms))}
           isAdmin={user.role === "ADMIN"}
           categoriasCustom={JSON.parse(JSON.stringify(categoriasCustom))}
+          verArquivadas={verArquivadas}
+          obras={obras}
+          opSelecionada={opSelecionada}
+          totalNoEscopo={total}
+          truncada={truncada}
+          limite={LIMITE_SEM_OBRA}
+          basePath="/compras/consumiveis"
         />
       )}
     </div>
