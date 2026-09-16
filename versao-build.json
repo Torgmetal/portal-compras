@@ -1,7 +1,12 @@
 {
-  "build": 3207,
-  "gerado": "2026-09-16T16:08:27.496Z",
+  "build": 3208,
+  "gerado": "2026-09-16T16:09:05.174Z",
   "commits": [
+    {
+      "hash": "76de20df",
+      "data": "16/09/2026",
+      "titulo": "Impressão de desenhos: o formato (A1–A4) é medido na página do PDF, não lido do nome da pasta"
+    },
     {
       "hash": "ba8db6fe",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "68c01d92",
       "data": "15/09/2026",
       "titulo": "Data Book: o olho dava \"arquivo invalido\" e o X girava sem dizer por que"
-    },
-    {
-      "hash": "357b84c0",
-      "data": "15/09/2026",
-      "titulo": "Data book: tirar um documento da seção deixa rastro no AuditLog"
     }
   ]
 }

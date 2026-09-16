@@ -1,6 +1,6 @@
 ---
 name: torg_grd_desenhos
-description: "Desenhos da Engenharia nas telas de produção/PCP: modal busca PDFs no SharePoint (formato A1–A4 pela pasta), Imprimir+GRD registra liberação (GrdLiberacao)"
+description: "Desenhos da Engenharia nas telas de produção/PCP: modal busca PDFs no SharePoint (formato A1–A4 MEDIDO na página do PDF; a pasta só desempata), Imprimir+GRD registra liberação (GrdLiberacao)"
 metadata: 
   node_type: memory
   type: project
@@ -11,7 +11,7 @@ metadata:
 **Desenhos/projetos da peça + controle de GRD (teste, Vitor 18/08, commit 15575c1).** Vitor: "na pasta da engenharia temos os projetos dessas peças… o próprio responsável do setor faz a impressão e já registra como nosso controle de liberação para os setores… seria até mesmo nosso controle de GRD" — na tela de produção E no PCP.
 
 **Estrutura no SharePoint (validada na OP-089):** `{pastaOP}/2. Engenharia/2.5 Projetos/2.5.2 Fabricação/`
-- **Conjunto:** `2.5.2.3 Conjunto/{frente A|B|C}/{A1|A2|A3|A4}/{marca}.pdf` → **formato de impressão = nome da pasta-mãe**.
+- **Conjunto:** `2.5.2.3 Conjunto/{frente A|B|C}/{A1|A2|A3|A4}/{marca}.pdf` → a pasta-mãe é só PISTA: **o formato é medido na página do PDF** (`lib/formato-folha`, ISO 216 ±6 %) ao emitir. ⚠ A OP-094 veio SEM as subpastas A1–A4 e 354 GRDs saíram "A4" com A1/A3 dentro (16/09/2026) — foi por isso que a pasta deixou de mandar.
 - **Croqui:** `2.5.2.2 Croqui/{frente}/{marca} - CROQUI.pdf` → **A4 (croqui)** (identifica por "CROQUI" no nome; croquis LE tipo T89AG1 ficam em subpastas tipo "GRADES E DEGRAUS" — a pasta-mãe NÃO é A1-4, o fallback pelo nome resolve).
 - Ignorar tudo com "obsolet" (nome ou pasta-mãe). Também existem `.dwg` — só os `.pdf` interessam pra impressão.
 
