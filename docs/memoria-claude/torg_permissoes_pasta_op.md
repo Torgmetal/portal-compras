@@ -1,6 +1,6 @@
 ---
 name: torg_permissoes_pasta_op
-description: "Acesso às subpastas da OP no SharePoint é por usuário individual, nunca por grupo; 'Acesso Limitado' engana a contagem; OP nova nasce liberada e o molde OP-000 não protege"
+description: "Acesso às subpastas da OP no SharePoint é por usuário individual, nunca por grupo; 'Acesso Limitado' engana a contagem; OP nova nasce liberada e o molde OP-000 não protege; conceder e remover em massa pelo mesmo script"
 metadata:
   type: project
 ---
@@ -59,3 +59,36 @@ navegador. O que continua exigindo a ponte pelo navegador é QUEBRAR herança/RE
 (breakroleinheritance na REST). Script de leitura/concessão: `$S/sp-almox-*.mjs` da sessão —
 vale virar comando `conceder` no `permissoes-sharepoint.mjs`.
 
+## 16/09/2026 — o comando `conceder`, e Colaboração ≠ Editar
+
+Matheus: *"igual foi feito com o usuário do Leandro para remover, mas agora adicionar o do Geraldo
+da Qualidade"* em todas as pastas Comercial das OPs. Feito: **25 pastas `1. Comercial` concedidas**
+com papel **Colaboração** a `qualidade@torg.com.br` (Geraldo Tank, id 25), conferido depois por
+releitura — 26 das 27 pastas (a 27ª é o molde `OP-000 - PADRÃO`, deixado de fora; a OP-105 já
+tinha). Diário do antes/depois gravado pelo `--diario`, que é o rollback.
+
+⚠⚠ **`conceder` NÃO É `remover` DE TRÁS PARA A FRENTE.** A remoção procura quem **já está** na ACL
+de cada pasta, então basta um trecho de nome. A concessão precisa resolver a pessoa **antes**,
+contra o diretório do site — ela justamente não está lá. Por isso o alvo vem de `--email`, que é
+único, e por `web/ensureuser`: quem nunca abriu o site ainda não existe na coleção de usuários
+dele, e um `siteusers/getbyemail` devolveria 404 para alguém que existe no tenant.
+
+⚠⚠ **"EDITAR" NÃO É "COLABORAÇÃO", E EU TINHA POSTO OS DOIS NA MESMA LISTA DE SINÔNIMOS.** No
+SharePoint, Colaboração/Contribute mexe em **itens**; Editar/Edit mexe também na **lista** (cria e
+apaga colunas, apaga a lista). O primeiro ensaio resolveu `Editar (1073741830)` para um pedido de
+igualar a Colaboração que o Geraldo já tinha — daria mais poder do que ele tem hoje, em 25 pastas,
+sem ninguém notar. Cada papel casa só os nomes dele, e `edicao` virou papel à parte. **Tradução
+aproximada de nome de papel não pode virar promoção de privilégio.**
+
+⚠ **Foi o ENSAIO que pegou isso**, na linha que imprime o papel resolvido antes de escrever. Sem
+imprimir o id e o nome que ele de fato resolveu, o lote teria aplicado o papel errado e o log diria
+"validado" nas 25 — porque a validação confere que a pessoa ENTROU, não com qual papel.
+
+⚠ **`--exceto="OP-000"`** tira o molde do escopo, com a mesma regra de fronteira do `casaOp`
+(`--exceto=OP-1` não engole OP-10 nem OP-100).
+
+⚠ **A conta `qualidade@torg.com.br` (Geraldo) NÃO tem o módulo COMERCIAL no portal** — tem
+REQUISICOES, QUALIDADE, PRODUCAO e PCP. Levantei isso antes de aplicar, porque a pasta Comercial
+guarda proposta, preço, BDI e margem: o acesso pelo SharePoint contorna a decisão tomada no portal.
+Matheus decidiu conceder assim mesmo, ciente. Se um dia a regra do portal mudar, esta concessão é
+o outro lugar a revisar.
