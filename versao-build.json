@@ -1,7 +1,12 @@
 {
-  "build": 3220,
-  "gerado": "2026-09-16T19:28:42.599Z",
+  "build": 3221,
+  "gerado": "2026-09-16T20:45:21.927Z",
   "commits": [
+    {
+      "hash": "1110650f",
+      "data": "16/09/2026",
+      "titulo": "Medição do aditivo: ao vincular o pedido Omie, escolhe-se de qual pedido é (contrato-base ou aditivo)"
+    },
     {
       "hash": "446830f2",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "abffd05b",
       "data": "15/09/2026",
       "titulo": "Relatório de pintura: hook depois do \"carregando o PLP\" derrubava a tela inteira"
-    },
-    {
-      "hash": "97f4f9be",
-      "data": "15/09/2026",
-      "titulo": "Data book: acento decomposto no nome do anexo não derruba mais a geração dos volumes"
     }
   ]
 }

@@ -38,11 +38,21 @@ export async function POST(req, { params }) {
   // faz sentido o portal perguntar de novo. Custo que o usuário já digitou aqui não é
   // sobrescrito: a importação traz o quantitativo, não apaga trabalho.
   const c = estudo.composicao || {};
-  const resumos = lido.resumos.map((r) => ({ ...r, precoKg: lido.precosPorArea[r.area] ?? null }));
+  const resumos = lido.resumos.map((r) => ({ ...r, precoKg: c.resumos?.find(a => a.area === r.area)?.precoKg ?? lido.precosPorArea[r.area] ?? lido.precoMateriaPrima ?? null }));
   // ⚠ o esquema de pintura também vem do estudo — produto, cor, sólidos e película são decisão de
   // PROJETO, não de custo. Só entra se o portal ainda não tiver um: importação não apaga trabalho.
   const tintas = (c.tintas?.length ? c.tintas : lido.tintas) || [];
-  const composicao = { ...c, resumos, tintas };
+  const importados = lido.custosImportados || {};
+  const classe = {...importados.precos?.classe};
+  for (const [k,v] of Object.entries(c.precos?.classe || {})) classe[k] = {...classe[k],...v};
+  const composicao = { ...importados, ...c, resumos, tintas,
+    precos:{...importados.precos,...c.precos,classe},
+    terceiros: c.terceiros?.length ? c.terceiros : (c.terceirizados && Object.keys(c.terceirizados).length ? [] : importados.terceiros || []),
+    faturamento:{...importados.faturamento,...c.faturamento},
+    bdi:c.bdi ?? lido.bdi, fixadoresRsKg:c.fixadoresRsKg ?? lido.fixadoresRsKg,
+    precoPlanilha:lido.precoPlanilha, blocosPlanilha:lido.blocosPlanilha,
+    avisosImportacao:lido.avisos || [],
+  };
   const resultado = calcularLqc({ ...composicao, preMontagem: estudo.preMontagem });
 
   const salvo = await prisma.estudoFabricacao.update({

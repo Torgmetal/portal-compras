@@ -115,7 +115,9 @@ async function processar(ano, aplicar, user, { forcar = [] } = {}) {
       const precoAco = (area) => lido.precosPorArea?.[area] ?? lido.precoMateriaPrima ?? null;
       const resumos = lido.resumos.map((r) => ({ ...r, precoKg: precoAco(r.area) }));
       const composicao = {
+        ...lido.custosImportados,
         resumos, tintas: lido.tintas || [], origemSharePoint: usada.nome,
+        avisosImportacao: lido.avisos || [],
         ...(lido.fixadoresRsKg ? { fixadoresRsKg: lido.fixadoresRsKg } : {}),
         // sem o BDI o cálculo fecha com preço = custo, e a tela mostra CUSTO chamando de preço
         ...(lido.bdi && Object.keys(lido.bdi).length ? { bdi: lido.bdi } : {}),

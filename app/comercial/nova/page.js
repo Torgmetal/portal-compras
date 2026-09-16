@@ -1,4 +1,6 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 import CampoData from "@/components/CampoData";
 import { useState, useMemo, useEffect } from "react";
 import OrcamentoComercial from "@/components/OrcamentoComercial";
@@ -27,6 +29,28 @@ export default function NovaOP() {
   const [itens, setItens] = useState([novoItem()]);
   // vínculo com o orçamento do Comercial (proposta + estudo)
   const [orc, setOrc] = useState({ pasta: null, ref: null, propostas: [], estudo: null, dados: null });
+  const [origemLqc, setOrigemLqc] = useState(null);
+  const [lendoLqc, setLendoLqc] = useState(false);
+  const [erroLqc, setErroLqc] = useState("");
+  const [tentativaLqc, setTentativaLqc] = useState(0);
+  const [valorContrato, setValorContrato] = useState("");
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("lqc");
+    if (!id) return;
+    let ativo = true;
+    setLendoLqc(true); setErroLqc("");
+    fetch(`/api/comercial/estudos/${encodeURIComponent(id)}/preparar-op`)
+      .then(async r => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "Não foi possível carregar a LQC."); return j; })
+      .then(j => {
+        if (!ativo) return;
+        if (j.opId) { router.replace(`/comercial/${j.opId}`); return; }
+        setOrigemLqc(j); setForm(f => ({...f,...j.form})); setItens(j.itens.length ? j.itens : [novoItem()]);
+        setValorContrato(j.valorContrato ?? "");
+        setOrc(o => ({...o,ref:j.orcamentoRef}));
+      }).catch(e => { if (ativo) setErroLqc(e.message); })
+      .finally(() => { if (ativo) setLendoLqc(false); });
+    return () => { ativo = false; };
+  }, [router,tentativaLqc]);
   // Nº da OP vem pronto (Vitor 19/08: "o número da OP deve ser preenchida automática").
   const [numAuto, setNumAuto] = useState(null);
   useEffect(() => {
@@ -122,6 +146,8 @@ export default function NovaOP() {
   const submit = async (e) => {
     e.preventDefault();
     setErro("");
+    if (lendoLqc || erroLqc) return;
+    if (origemLqc && !(numeroBR(valorContrato) > 0)) { setErro("Informe o valor contratado da OP."); return; }
     if (!form.numero.trim()) {
       setErro("Número da OP ainda carregando — aguarde um instante.");
       return;
@@ -143,6 +169,7 @@ export default function NovaOP() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form, itens: validos, referencias,
+          ...(origemLqc ? {estudoFabricacaoId:origemLqc.estudoId,estudoAtualizadoEm:origemLqc.atualizadoEm,valorContrato:numeroBR(valorContrato)} : {}),
           orcamentoPasta: orc.pasta, orcamentoRef: orc.ref,
           propostas: orc.propostas,
           estudoArquivo: orc.estudo, estudoDados: orc.dados,
@@ -157,6 +184,8 @@ export default function NovaOP() {
     }
   };
 
+  if (lendoLqc) return <div className="p-6 flex items-center gap-2"><Loader2 className="animate-spin" size={20} /> Carregando dados da LQC…</div>;
+  if (erroLqc) return <div className="p-6 space-y-3 text-red-700"><p>{erroLqc}</p><button onClick={() => setTentativaLqc(t => t + 1)} className="border rounded-lg px-4 py-2">Tentar novamente</button></div>;
   return (
     <form onSubmit={submit} className="max-w-6xl mx-auto space-y-6">
       <div>
@@ -177,7 +206,19 @@ export default function NovaOP() {
       )}
 
       {/* Orçamento do Comercial — primeira coisa da tela: quem cria a OP já traz de onde ela veio */}
-      <OrcamentoComercial valor={orc} onChange={setOrc} onPreencher={(p) => setForm((f) => ({ ...f, ...p }))} />
+      {origemLqc ? <section className="bg-white rounded-xl border border-blue-100 p-5 space-y-3">
+        <h3 className="font-semibold text-torg-dark">Gerar OP a partir da {origemLqc.codigo}</h3>
+        <p className="text-sm text-torg-gray">Confira o escopo, as verbas de compra e o valor contratado antes de criar. A OP ficará vinculada ao orçamento {origemLqc.orcamentoRef}.</p>
+        <div className="grid sm:grid-cols-3 gap-4 text-sm">
+          <p>Preço calculado na LQC<br /><strong>{fmtMoeda(origemLqc.precoCalculado)}</strong></p>
+          <p>Referência da planilha<br /><strong>{origemLqc.precoPlanilha ? fmtMoeda(origemLqc.precoPlanilha) : "Não informada"}</strong></p>
+          <label className="font-medium">Valor contratado (R$)
+            <CampoDecimal value={valorContrato} onChange={setValorContrato} casas={2} required className="mt-1 w-full border rounded-lg px-3 py-2" />
+          </label>
+        </div>
+        <p className="text-xs text-torg-gray">O valor contratado será a receita da OP. As verbas abaixo são os custos previstos de compra, sem a margem e a fabricação interna.</p>
+        {origemLqc.avisos.map((a,i) => <p key={i} className="text-sm text-amber-800">{a}</p>)}
+      </section> : <OrcamentoComercial valor={orc} onChange={setOrc} onPreencher={(p) => setForm((f) => ({ ...f, ...p }))} />}
 
       {/* Dados gerais */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
@@ -199,7 +240,7 @@ export default function NovaOP() {
             <datalist id="clientes-torg">
               {[...clientes.clientes.map((c) => c.nome), ...clientes.semCadastro].map((n) => <option key={n} value={n} />)}
             </datalist>
-            <p className="text-[11px] text-torg-gray mt-1">{temProposta ? "lido da proposta" : "vem da proposta quando você anexar uma"}{clienteCadastrado ? " · termos do cliente carregados" : ""}</p>
+            <p className="text-[11px] text-torg-gray mt-1">{temProposta ? "lido da proposta" : origemLqc ? "preenchido a partir da LQC" : "vem da proposta quando você anexar uma"}{clienteCadastrado ? " · termos do cliente carregados" : ""}</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-torg-dark mb-1">Obra</label>
@@ -338,7 +379,7 @@ export default function NovaOP() {
             )}
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-torg-gray">Total da verba contratada:</span>
+            <span className="text-sm text-torg-gray">Total das verbas de compra:</span>
             <span className="text-xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(totalVerba)}</span>
           </div>
         </div>
