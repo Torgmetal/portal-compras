@@ -1,4 +1,5 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X, Eraser, ZoomIn, ZoomOut, Ruler, ArrowLeftRight, Minus, Plus } from "lucide-react";
 import { layoutCotas, setaEm, PADDING } from "@/lib/cota-marcacao";
@@ -843,7 +844,7 @@ function BarraCota({ letra, valores, semDesenho, tol, onTol, sugestao, onConfirm
       </div>
 
       <div className="flex items-center gap-2 mt-1.5">
-        <input type="number" value={outro} onChange={(e) => setOutro(e.target.value)}
+        <CampoDecimal value={outro} onChange={(txt) => setOutro(txt)}
           placeholder="outro valor (mm)"
           onKeyDown={(e) => { if (e.key === "Enter" && outro !== "") onConfirmar(Number(outro)); }}
           className="w-40 border border-gray-200 rounded px-2 py-1 text-[12px] font-mono" />

@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 // Envio a TERCEIRO — aberto pelo painel de Liberar ao escolher "Terceiro". Escolhe o fornecedor
 // (categoria "Prestadores de Serviços Terceirizados" do Vendor List), o setor de RETORNO e a data
 // prevista; cria o RomaneioTerceiro (série RT-##, À PARTE do romaneio de obra) com as peças
@@ -93,7 +94,7 @@ export default function TerceiroModal({ obra, opId, setor, pecas, onClose, onDon
             </div>
             <div>
               <label className="text-[12px] font-semibold text-torg-gray">Retorno previsto</label>
-              <input type="date" value={dataRetorno} onChange={(e) => setDataRetorno(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[13px] mt-1" />
+              <CampoData value={dataRetorno} onChange={(iso) => setDataRetorno(iso)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[13px] mt-1" />
             </div>
           </div>
           <div>

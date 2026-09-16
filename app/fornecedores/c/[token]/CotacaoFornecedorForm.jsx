@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useMemo, useRef } from "react";
 import { dataBR, dataHoraBR } from "@/lib/data-br";
 import { useRouter } from "next/navigation";
@@ -1066,10 +1067,9 @@ dataHoraBR(new Date())
                           />
                         </td>
                         <td className="px-2 py-2 text-center align-top">
-                          <input
-                            type="date"
+                          <CampoData
                             value={l.semEstoque ? "" : l.prazoEntrega}
-                            onChange={(e) => setLinha(l.id, "prazoEntrega", e.target.value)}
+                            onChange={(iso) => setLinha(l.id, "prazoEntrega", iso)}
                             disabled={l.semEstoque}
                             className={`w-[130px] border rounded px-1.5 py-1 text-xs tabular-nums focus:ring-1 focus:ring-torg-blue ${l.semEstoque ? "bg-gray-100 border-gray-200 cursor-not-allowed" : inputCls}`}
                           />

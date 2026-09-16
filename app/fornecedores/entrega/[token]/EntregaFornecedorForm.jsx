@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect } from "react";
 import {
   Loader2, AlertCircle, CheckCircle2, CalendarDays,
@@ -237,10 +238,9 @@ export default function EntregaFornecedorForm({ token }) {
             <label className="block text-sm font-medium text-torg-dark mb-1">
               Data prevista de entrega *
             </label>
-            <input
-              type="date"
+            <CampoData
               value={novoPrazo}
-              onChange={(e) => setNovoPrazo(e.target.value)}
+              onChange={(iso) => setNovoPrazo(iso)}
               className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue"
             />
           </div>

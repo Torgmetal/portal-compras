@@ -20,6 +20,8 @@ import AnexarProjeto from "./AnexarProjeto";
 import EscolherProjeto from "./EscolherProjeto";
 import Fotos from "./Fotos";
 import { usaCotas } from "@/lib/qualidade-campo";
+import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 
 /**
  * O RELATÓRIO ABERTO — é aqui que o elaborador preenche e VÊ A PRÉVIA.
@@ -390,8 +392,8 @@ export default function RelatorioDetalheClient({ id }) {
                           <td className="py-1 text-right px-2"><CampoTolerancia value={l.tolerancia} disabled={travado} label={`Tolerância da dimensão ${l.letra || i+1} (mm)`} onChange={v=>setLinha(idxReal(i),"tolerancia",v)}/></td>
                           <td className="py-1 text-right">
                             {/* 🚫 nasce vazio: Vitor pediu que a dimensão encontrada seja do elaborador */}
-                            <input type="number" step="0.1" disabled={travado}
-                              value={l.encontradoMm ?? ""} onChange={(e) => setLinha(idxReal(i), "encontradoMm", e.target.value === "" ? null : Number(e.target.value))}
+                            <CampoDecimal disabled={travado}
+                              value={l.encontradoMm ?? ""} onChange={(txt) => setLinha(idxReal(i), "encontradoMm", txt === "" ? null : numeroBR(txt))}
                               className="w-20 text-right text-[12px] font-mono border border-gray-200 rounded px-1.5 py-0.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
                             {dif != null && dif !== 0 && (
                               <span className={`ml-1 text-[10px] font-semibold ${foraDaTolerancia(l) === true ? "text-red-600" : foraDaTolerancia(l) === false ? "text-amber-600" : "text-torg-gray"}`}>

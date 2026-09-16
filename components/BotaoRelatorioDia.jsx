@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState } from "react";
 import { FileSpreadsheet, Loader2 } from "lucide-react";
 import {
@@ -72,11 +73,10 @@ export default function BotaoRelatorioDia({ setor, codigoDoc = "REL-PRD-010" }) 
 
   return (
     <div className="flex items-center gap-1.5">
-      <input
-        type="date"
+      <CampoData
         value={data}
         max={hojeBRT()}
-        onChange={(e) => setData(e.target.value)}
+        onChange={(iso) => setData(iso)}
         title="Dia do relatório"
         className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-dark focus:ring-2 focus:ring-torg-blue/20 outline-none"
       />

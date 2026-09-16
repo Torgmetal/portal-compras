@@ -1,4 +1,5 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { numeroBR } from "@/lib/numero-br";
 import {
@@ -102,7 +103,7 @@ function NovoParafusoModal({ onClose, onSalvar }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-torg-dark mb-1">Quantidade</label>
-              <input type="number" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} placeholder="0" min="0" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none" />
+              <CampoDecimal value={quantidade} onChange={(txt) => setQuantidade(txt)} placeholder="0" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none" />
             </div>
             <div>
               <label className="block text-sm font-semibold text-torg-dark mb-1">Observacao</label>
@@ -505,7 +506,7 @@ export default function AbaParafusos({ estudo, estudoId, onEstudoUpdate }) {
                       <td className="py-1.5 px-2"><input type="text" value={editValores.descricao} onChange={(e) => setEditValores((v) => ({ ...v, descricao: e.target.value }))} className="w-full px-2 py-1 border border-gray-200 rounded text-xs outline-none" /></td>
                       <td className="py-1.5 px-2"><input type="text" value={editValores.diametro} onChange={(e) => setEditValores((v) => ({ ...v, diametro: e.target.value }))} className="w-16 px-2 py-1 border border-gray-200 rounded text-xs outline-none" /></td>
                       <td className="py-1.5 px-2"><input type="text" value={editValores.comprimento} onChange={(e) => setEditValores((v) => ({ ...v, comprimento: e.target.value }))} className="w-16 px-2 py-1 border border-gray-200 rounded text-xs outline-none" /></td>
-                      <td className="py-1.5 px-2"><input type="number" value={editValores.quantidade} onChange={(e) => setEditValores((v) => ({ ...v, quantidade: parseFloat(e.target.value) || 0 }))} className="w-20 px-2 py-1 border border-gray-200 rounded text-xs text-right outline-none" /></td>
+                      <td className="py-1.5 px-2"><CampoDecimal value={editValores.quantidade} onChange={(txt) => setEditValores((v) => ({ ...v, quantidade: numeroBR(txt) }))} className="w-20 px-2 py-1 border border-gray-200 rounded text-xs text-right outline-none" /></td>
                       <td className="py-1.5 px-2"><input type="text" value={editValores.observacao} onChange={(e) => setEditValores((v) => ({ ...v, observacao: e.target.value }))} className="w-full px-2 py-1 border border-gray-200 rounded text-xs outline-none" /></td>
                       <td className="py-1.5 px-2"><div className="flex items-center gap-1"><button onClick={saveEdit} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"><Check size={14} /></button><button onClick={() => setEditandoId(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><X size={14} /></button></div></td>
                     </>

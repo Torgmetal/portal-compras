@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Loader2, AlertCircle, Plus } from "lucide-react";
 import { numeroBR } from "@/lib/numero-br";
 import { Modal } from "./Modal";
+import CampoDecimal from "@/components/CampoDecimal";
 
 // Modal de edicao dos dados do item da RM. Permite ajustar descricao, qtd,
 // peso, unidade, codigo, material, comprimento, largura, tratamento. Bloqueado
@@ -202,9 +203,8 @@ export function ModalEditarRMItem({ item, rmId, onClose, onSaved }) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Quantidade *</label>
-            <input
-              type="number" step="0.01" min="0" value={form.qtd}
-              onChange={(e) => set("qtd", e.target.value)}
+            <CampoDecimal value={form.qtd}
+              onChange={(txt) => set("qtd", txt)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue"
             />
           </div>
@@ -268,17 +268,15 @@ export function ModalEditarRMItem({ item, rmId, onClose, onSaved }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Peso (kg)</label>
-            <input
-              type="number" step="0.01" min="0" value={form.peso}
-              onChange={(e) => set("peso", e.target.value)}
+            <CampoDecimal value={form.peso}
+              onChange={(txt) => set("peso", txt)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Peso linear (kg/m)</label>
-            <input
-              type="number" step="0.001" min="0" value={form.pesoLinear}
-              onChange={(e) => set("pesoLinear", e.target.value)}
+            <CampoDecimal value={form.pesoLinear}
+              onChange={(txt) => set("pesoLinear", txt)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue"
             />
           </div>

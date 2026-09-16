@@ -1,6 +1,8 @@
 "use client";
+import { numeroBR } from "@/lib/numero-br";
 import { useState, useRef, useEffect } from "react";
 import { Plus, Trash2, Loader2, X, Sparkles, Upload, Edit3, Check, Send, Search, ChevronDown, ChevronUp, Clock, CheckCircle2, XCircle, Package, FileSpreadsheet, CheckSquare, Square, Download } from "lucide-react";
+import CampoDecimal from "@/components/CampoDecimal";
 
 const CATEGORIAS = [
   { value: "TELHA", label: "Telha" },
@@ -268,25 +270,19 @@ function NovoAcessorioModal({ onClose, onSalvar }) {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-semibold text-torg-dark mb-1">Quantidade</label>
-              <input
-                type="number"
+              <CampoDecimal
                 value={quantidade}
-                onChange={(e) => setQuantidade(e.target.value)}
+                onChange={(txt) => setQuantidade(txt)}
                 placeholder="0"
-                min="0"
-                step="0.01"
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
               />
             </div>
             <div>
               <label className="block text-sm font-semibold text-torg-dark mb-1">Valor unitario (R$)</label>
-              <input
-                type="number"
+              <CampoDecimal
                 value={custoUnitario}
-                onChange={(e) => setCustoUnitario(e.target.value)}
+                onChange={(txt) => setCustoUnitario(txt)}
                 placeholder="0,00"
-                min="0"
-                step="0.01"
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
               />
             </div>
@@ -1167,21 +1163,17 @@ export default function AbaAcessorios({ estudo, estudoId }) {
                         />
                       </td>
                       <td className="py-1.5 px-2">
-                        <input
-                          type="number"
+                        <CampoDecimal
                           value={editValores.quantidade}
-                          onChange={(e) => setEditValores((v) => ({ ...v, quantidade: parseFloat(e.target.value) || 0 }))}
+                          onChange={(txt) => setEditValores((v) => ({ ...v, quantidade: numeroBR(txt) }))}
                           className="w-20 px-2 py-1 border border-gray-200 rounded text-xs text-right focus:ring-1 focus:ring-torg-blue/30 outline-none"
                         />
                       </td>
                       <td className="py-1.5 px-2">
-                        <input
-                          type="number"
+                        <CampoDecimal
                           value={editValores.custoUnitario}
-                          onChange={(e) => setEditValores((v) => ({ ...v, custoUnitario: parseFloat(e.target.value) || 0 }))}
+                          onChange={(txt) => setEditValores((v) => ({ ...v, custoUnitario: numeroBR(txt) }))}
                           placeholder="0,00"
-                          min="0"
-                          step="0.01"
                           className="w-24 px-2 py-1 border border-gray-200 rounded text-xs text-right focus:ring-1 focus:ring-torg-blue/30 outline-none"
                         />
                       </td>

@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useMemo, useEffect } from "react";
 import {
   ListOrdered, CalendarRange, Scissors, CheckCircle2, Loader2, AlertCircle,
@@ -492,7 +493,7 @@ export default function FilaCorteClient({ pecasIniciais }) {
               </p>
               <div>
                 <label className="block text-xs font-medium text-torg-gray mb-1">Novo dia</label>
-                <input type="date" value={adiarPara} onChange={(e) => setAdiarPara(e.target.value)}
+                <CampoData value={adiarPara} onChange={(iso) => setAdiarPara(iso)}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" />
                 <p className="text-[11px] text-torg-gray mt-1">Em branco = próximo dia útil de cada peça.</p>
               </div>
@@ -530,12 +531,12 @@ export default function FilaCorteClient({ pecasIniciais }) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-torg-gray mb-1">Data meta — início *</label>
-                  <input type="date" value={metaInicio} onChange={(e) => { setMetaInicio(e.target.value); if (metaFim < e.target.value) setMetaFim(e.target.value); }}
+                  <CampoData value={metaInicio} onChange={(iso) => { setMetaInicio(iso); if (metaFim < iso) setMetaFim(iso); }}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-torg-gray mb-1">Data meta — fim *</label>
-                  <input type="date" value={metaFim} min={metaInicio} onChange={(e) => setMetaFim(e.target.value)}
+                  <CampoData value={metaFim} min={metaInicio} onChange={(iso) => setMetaFim(iso)}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" />
                 </div>
               </div>

@@ -1,4 +1,6 @@
 "use client";
+import CampoData from "@/components/CampoData";
+import CampoDecimal from "@/components/CampoDecimal";
 // ─── A CARGA JÁ PROGRAMADA, POR DIA ───────────────────────────────────────────
 //
 // Vitor (03/09/2026): "não precisa ser apenas de uma OP, mostre tudo que foi para aquele dia" e
@@ -173,7 +175,7 @@ export default function CargaDosDias({ opId, recarga }) {
           ))}
           <label className="ml-2 text-[11px] text-torg-gray inline-flex items-center gap-1.5">
             meta
-            <input type="number" value={metaKg} onChange={(e) => setMetaKg(e.target.value)}
+            <CampoDecimal value={metaKg} onChange={(txt) => setMetaKg(txt)}
               className="w-[86px] border border-gray-200 rounded-md px-2 py-1 text-[11.5px] text-right tabular-nums outline-none focus:border-torg-blue" />
             kg/dia
           </label>
@@ -240,8 +242,8 @@ export default function CargaDosDias({ opId, recarga }) {
                               {lo.frente && <span className="text-torg-gray-light">{lo.frente}</span>}
                               <span className="tabular-nums text-torg-gray">{fmtKg(lo.kg)} · {fmtN(lo.pecas)} pç</span>
                               <span className="ml-auto text-[11px] text-torg-gray">mover para</span>
-                              <input type="date" defaultValue={x.dia} disabled={movendo === lo.id}
-                                onChange={(e) => moverLote(lo, e.target.value)}
+                              <CampoData defaultValue={x.dia} disabled={movendo === lo.id}
+                                onChange={(iso) => moverLote(lo, iso)}
                                 className="border border-gray-200 rounded-md px-2 py-1 text-[11.5px] outline-none focus:border-torg-blue disabled:opacity-50" />
                               {movendo === lo.id && <Loader2 size={12} className="animate-spin text-torg-blue" />}
                               {/* ⚠ separado do "mover": remarcar é trabalho real que muda de dia;

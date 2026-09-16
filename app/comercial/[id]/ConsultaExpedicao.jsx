@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { PackageSearch, Search, Loader2, FileSpreadsheet, CheckCircle2, Clock, AlertCircle, X, Truck, Trash2, Copy, CalendarDays, MapPin, Upload, Plus, ThumbsUp, RotateCcw, Star } from "lucide-react";
 import { exportarListaExpedicao } from "@/lib/export-lista-expedicao";
@@ -789,7 +790,7 @@ function NovoPrevioModal({ opId, numero, itens, peso, lotes, localObra, onClose,
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Data prevista</label>
-              <input type="date" value={f.dataPrevista} onChange={(e) => setF((v) => ({ ...v, dataPrevista: e.target.value }))} className={inp} />
+              <CampoData value={f.dataPrevista} onChange={(iso) => setF((v) => ({ ...v, dataPrevista: iso }))} className={inp} />
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Local de entrega</label>

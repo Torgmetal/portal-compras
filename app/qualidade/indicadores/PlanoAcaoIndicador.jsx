@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, X, Plus, Trash2, Check, ClipboardList, AlertCircle, FileDown } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
@@ -220,7 +221,7 @@ export default function PlanoAcaoIndicador({ ind, processo, ano, mes, valor, onF
                       <div className="grid sm:grid-cols-4 gap-3">
                         <Campo label="Onde" hint="Where"><input value={it.onde} onChange={(e) => setIt(i, "onde", e.target.value)} placeholder="Local / setor" className={inp} /></Campo>
                         <Campo label="Quem" hint="Who"><input value={it.quem} onChange={(e) => setIt(i, "quem", e.target.value)} placeholder="Responsável" className={inp} /></Campo>
-                        <Campo label="Quando" hint="When"><input type="date" value={it.quando || ""} onChange={(e) => setIt(i, "quando", e.target.value)} className={inp} /></Campo>
+                        <Campo label="Quando" hint="When"><CampoData value={it.quando || ""} onChange={(iso) => setIt(i, "quando", iso)} className={inp} /></Campo>
                         <Campo label="Quanto" hint="How much"><input value={it.quanto} onChange={(e) => setIt(i, "quanto", e.target.value)} placeholder="Custo (R$)" className={inp} /></Campo>
                       </div>
                       <div className="grid sm:grid-cols-[2fr_1fr] gap-3">

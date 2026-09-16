@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Modal } from "./Modal";
 import { fmtMoeda } from "../_lib/formatos";
+import CampoDecimal from "@/components/CampoDecimal";
 
 export function ModalCancelarItem({ item, rmId, onClose, onSaved }) {
   const [motivo, setMotivo] = useState("");
@@ -139,12 +140,9 @@ export function ModalAtenderEstoque({ item, rmId, onClose, onSaved }) {
         <div>
           <label className="block text-sm font-medium text-torg-dark mb-1">Quantidade atendida *</label>
           <div className="flex items-center gap-2">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
+            <CampoDecimal
               value={quantidade}
-              onChange={(e) => setQuantidade(e.target.value)}
+              onChange={(txt) => setQuantidade(txt)}
               className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
             />
             <span className="text-sm text-torg-gray font-medium">{item.peso > 0 ? "KG" : item.unidade}</span>
@@ -161,12 +159,9 @@ export function ModalAtenderEstoque({ item, rmId, onClose, onSaved }) {
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-torg-gray">R$</span>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
+              <CampoDecimal
                 value={precoUnit}
-                onChange={(e) => setPrecoUnit(e.target.value)}
+                onChange={(txt) => setPrecoUnit(txt)}
                 placeholder="0,00"
                 className="w-full border border-gray-300 rounded-lg pl-10 pr-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
               />

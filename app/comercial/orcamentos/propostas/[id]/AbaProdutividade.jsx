@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo, useRef } from "react";
 import { Save, Loader2, Info, ChevronDown, Upload, Sparkles, Trash2, FileText, X, AlertCircle } from "lucide-react";
+import CampoDecimal from "@/components/CampoDecimal";
 
 // ── Tipos de obra com Hh/ton padrão (fonte: TORG_Modelo_Completo.xlsx — aba Manual) ──
 const TIPOS_OBRA = [
@@ -440,12 +441,10 @@ export default function AbaProdutividade({ estudo, estudoId, onEstudoUpdate }) {
                             {m.kgmMedio ? fmtNum(m.kgmMedio, 1) : "—"}
                           </td>
                           <td className="py-2 px-4 text-right">
-                            <input
-                              type="number"
+                            <CampoDecimal
                               value={m.pesoKg || ""}
-                              onChange={(e) => handleMixPesoChange(idx, e.target.value)}
+                              onChange={(txt) => handleMixPesoChange(idx, txt)}
                               className="w-24 text-sm text-right bg-transparent border-0 outline-none text-torg-dark tabular-nums p-0"
-                              min="0"
                               placeholder="0"
                             />
                           </td>
@@ -538,13 +537,10 @@ export default function AbaProdutividade({ estudo, estudoId, onEstudoUpdate }) {
               <div>
                 <label className="block text-xs text-torg-gray mb-1">Hh/ton (editavel)</label>
                 <div className="flex items-center bg-white border border-gray-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-torg-blue/20 focus-within:border-torg-blue transition-all">
-                  <input
-                    type="number"
+                  <CampoDecimal
                     value={hhPorTon}
-                    onChange={(e) => setHhPorTon(e.target.value)}
+                    onChange={(txt) => setHhPorTon(txt)}
                     placeholder="0"
-                    min="0"
-                    step="0.1"
                     className="w-full px-4 py-3 text-sm text-right text-torg-dark outline-none bg-transparent"
                   />
                   <span className="px-3 py-3 bg-gray-50 text-xs text-torg-gray border-l border-gray-200 select-none whitespace-nowrap">Hh/ton</span>

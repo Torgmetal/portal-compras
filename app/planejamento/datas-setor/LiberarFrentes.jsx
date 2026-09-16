@@ -1,4 +1,5 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
 import { avisosPreparacao, materialResolvido } from "@/lib/avisos-preparacao";
 // LIBERAR PARA O PCP — planilha de peças, com filtro, prioridade e pré-seleção do dia.
 //
@@ -552,7 +553,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
 
         <span className="text-torg-gray-light">·</span>
         <span className="text-[12px] text-torg-gray">Referência de capacidade</span>
-        <input type="number" value={metaKg} onChange={(e) => setMetaKg(e.target.value)} min={500} step={500}
+        <CampoDecimal value={metaKg} onChange={(txt) => setMetaKg(txt)} min={500} step={500}
           className="w-24 text-[13px] border border-gray-200 rounded-lg px-2 py-1 text-right tabular-nums focus:border-torg-blue outline-none" />
         <span className="text-[12px] text-torg-gray">kg</span>
 

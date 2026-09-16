@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Factory, Download, Loader2, AlertCircle, RefreshCw, ChevronLeft, Inbox, Star, ArrowUp, ArrowDown, X, Plus } from "lucide-react";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, adicionarLegenda, downloadWorkbook, CORES } from "@/lib/excel-relatorio";
@@ -246,8 +247,8 @@ export default function RelatorioCorteClient() {
           <option value="">Todas as obras (resumo)</option>
           {listaExibida.map((o) => <option key={o.obra} value={o.obra}>{o.obra}</option>)}
         </select>
-        <label className="text-xs text-torg-gray flex items-center gap-1">De <input type="date" value={de} onChange={(e) => setDe(e.target.value)} className="px-2 py-1 border border-gray-300 rounded-lg text-sm" /></label>
-        <label className="text-xs text-torg-gray flex items-center gap-1">Até <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} className="px-2 py-1 border border-gray-300 rounded-lg text-sm" /></label>
+        <label className="text-xs text-torg-gray flex items-center gap-1">De <CampoData value={de} onChange={(iso) => setDe(iso)} className="px-2 py-1 border border-gray-300 rounded-lg text-sm" /></label>
+        <label className="text-xs text-torg-gray flex items-center gap-1">Até <CampoData value={ate} onChange={(iso) => setAte(iso)} className="px-2 py-1 border border-gray-300 rounded-lg text-sm" /></label>
         {(de || ate) && <button onClick={() => { setDe(""); setAte(""); }} className="text-xs text-torg-gray hover:text-torg-dark underline">limpar datas</button>}
         {obra && (
           <>
@@ -354,7 +355,7 @@ export default function RelatorioCorteClient() {
                           <button onClick={() => moverPrioridade(o.obra, "cima")} title="Subir prioridade" className="text-torg-gray hover:text-torg-blue"><ArrowUp size={12} /></button>
                           <button onClick={() => moverPrioridade(o.obra, "baixo")} title="Descer prioridade" className="text-torg-gray hover:text-torg-blue"><ArrowDown size={12} /></button>
                         </div>
-                        <input type="date" value={dataInputVal(o.dataEstimada)} onChange={(e) => setDataPrioridade(o.obra, e.target.value)}
+                        <CampoData value={dataInputVal(o.dataEstimada)} onChange={(iso) => setDataPrioridade(o.obra, iso)}
                           title="Data estimada de finalização" className="text-[11px] border border-gray-300 rounded px-1.5 py-1 focus:border-torg-blue outline-none" />
                         <button onClick={() => togglePrioridade(o.obra)} title="Remover prioridade" className="text-torg-gray hover:text-red-600"><X size={13} /></button>
                       </div>
@@ -436,7 +437,7 @@ function PrioridadeDetalheBar({ prioridade, setorNome, onToggle, onEscopo, onDat
       </span>
       <label className="text-[12px] text-torg-gray inline-flex items-center gap-1 ml-1">
         Finalizar até
-        <input type="date" value={dataInputVal(prioridade.dataEstimada)} onChange={(e) => onData(e.target.value)}
+        <CampoData value={dataInputVal(prioridade.dataEstimada)} onChange={(iso) => onData(iso)}
           className="text-[12px] border border-gray-300 rounded px-1.5 py-1 focus:border-torg-blue outline-none" />
       </label>
       {obraInteira ? (

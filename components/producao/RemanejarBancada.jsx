@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState } from "react";
 import { BANCADAS_CONSULTA_MONTAGEM, rotuloPosto } from "@/lib/postos-operador";
 import { useStore } from "@/lib/store";
@@ -67,11 +68,10 @@ export default function RemanejarBancada({ trabalho, hoje, onClose, onSalvo }) {
       </label>
       <label className="block text-sm text-torg-dark">
         Data programada
-        <input
+        <CampoData
           aria-label="Data programada"
-          type="date"
           value={dia}
-          onChange={(e) => setDia(e.target.value)}
+          onChange={(iso) => setDia(iso)}
           className={`${campo} block w-full mt-1`}
           disabled={salvando}
         />

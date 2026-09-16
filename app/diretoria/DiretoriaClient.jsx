@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import Link from "next/link";
 import { Lock, Loader2, AlertCircle, UserPlus, X, ShieldCheck, ArrowLeft, TrendingUp, TrendingDown, Wallet, Banknote, Truck, RefreshCw, AlertTriangle, Search, CalendarClock, Zap, Clock, Pencil, CheckCircle2, ExternalLink, ChevronDown, Download, Target } from "lucide-react";
@@ -736,9 +737,9 @@ function Conferencia() {
 
       <div className="flex flex-wrap items-center gap-2 text-[11px] text-torg-gray">
         <span>vencimento de</span>
-        <input type="date" value={vencDe} onChange={(e) => setVencDe(e.target.value)} className="border border-gray-200 rounded px-2 py-1 outline-none focus:border-torg-blue" />
+        <CampoData value={vencDe} onChange={(iso) => setVencDe(iso)} className="border border-gray-200 rounded px-2 py-1 outline-none focus:border-torg-blue" />
         <span>até</span>
-        <input type="date" value={vencAte} onChange={(e) => setVencAte(e.target.value)} className="border border-gray-200 rounded px-2 py-1 outline-none focus:border-torg-blue" />
+        <CampoData value={vencAte} onChange={(iso) => setVencAte(iso)} className="border border-gray-200 rounded px-2 py-1 outline-none focus:border-torg-blue" />
         {(vencDe || vencAte) && <button onClick={() => { setVencDe(""); setVencAte(""); }} className="text-torg-blue hover:underline">limpar datas</button>}
       </div>
 
@@ -1004,9 +1005,9 @@ function DrillLancamentos({ state, label, de, ate, onMes, onData, labelData = "E
       {/* Filtro fino por data (dia/intervalo) */}
       <div className="flex flex-wrap items-center gap-2 text-[11px] text-torg-gray">
         <span>de</span>
-        <input type="date" value={de} onChange={(e) => onData(e.target.value, ate)} className="border border-gray-200 rounded px-2 py-1 outline-none focus:border-torg-blue" />
+        <CampoData value={de} onChange={(iso) => onData(iso, ate)} className="border border-gray-200 rounded px-2 py-1 outline-none focus:border-torg-blue" />
         <span>até</span>
-        <input type="date" value={ate} onChange={(e) => onData(de, e.target.value)} className="border border-gray-200 rounded px-2 py-1 outline-none focus:border-torg-blue" />
+        <CampoData value={ate} onChange={(iso) => onData(de, iso)} className="border border-gray-200 rounded px-2 py-1 outline-none focus:border-torg-blue" />
         {filtrado && <button onClick={() => onData("", "")} className="text-torg-blue hover:underline">limpar</button>}
       </div>
 
@@ -1158,7 +1159,7 @@ function PrevisaoFaturamento() {
                 <td className="px-4 py-2.5 text-center whitespace-nowrap">
                   {editId === o.opId ? (
                     <div className="flex flex-col items-center gap-1">
-                      <input type="date" value={editData} onChange={(e) => setEditData(e.target.value)}
+                      <CampoData value={editData} onChange={(iso) => setEditData(iso)}
                         className="text-xs border border-gray-200 rounded px-2 py-1 outline-none focus:border-torg-blue" />
                       <input value={editObs} onChange={(e) => setEditObs(e.target.value)} placeholder="motivo (opcional)"
                         className="text-[11px] border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-torg-blue w-36" />

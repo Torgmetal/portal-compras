@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState } from "react";
 import Link from "next/link";
 import { ETAPAS } from "@/lib/producao-operacional";
@@ -137,12 +138,11 @@ export default function AgendaFabrica() {
             </option>
           ))}
         </select>
-        <input
-          type="date"
+        <CampoData
           aria-label="Dia da programação"
           className={campo}
           value={dia}
-          onChange={(e) => setDia(e.target.value)}
+          onChange={(iso) => setDia(iso)}
         />
         <label className="min-h-11 flex items-center gap-2 text-sm">
           <input

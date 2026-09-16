@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ClipboardList, Plus, Loader2, X, AlertCircle, CheckCircle2, CalendarDays, FileText, ListChecks, Archive, FileDown, Send, PenLine, Clock, Trash2, History } from "lucide-react";
@@ -301,7 +302,7 @@ function ModalNova({ onClose, onCriada }) {
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Data da auditoria *</label>
-              <input type="date" value={f.dataAuditoria} onChange={(e) => set("dataAuditoria", e.target.value)} className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" />
+              <CampoData value={f.dataAuditoria} onChange={(iso) => set("dataAuditoria", iso)} className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" />
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Responsável pelo acompanhamento *</label>

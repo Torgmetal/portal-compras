@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { upload as blobUpload } from "@vercel/blob/client";
 import { FileText, PenTool, Upload, Eye, Download, Trash2, ChevronUp, ChevronDown, ChevronRight, Loader2, X, ExternalLink, AlertCircle, Plus, FileSpreadsheet, MapPin, CalendarDays, Pencil } from "lucide-react";
@@ -292,7 +293,7 @@ function NovoLoteModal({ opId, onClose, onCriado, lote = null }) {
           </div>
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Data prevista <span className="text-torg-gray font-normal">— opcional</span></label>
-            <input type="date" value={f.dataPrevista} onChange={(e) => setF((v) => ({ ...v, dataPrevista: e.target.value }))} className={inp} />
+            <CampoData value={f.dataPrevista} onChange={(iso) => setF((v) => ({ ...v, dataPrevista: iso }))} className={inp} />
           </div>
           <p className="text-[11px] text-torg-gray">O peso do lote entra depois, com a lista final — na aba Expedição.</p>
           {erro && <p className="text-xs text-red-600 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}

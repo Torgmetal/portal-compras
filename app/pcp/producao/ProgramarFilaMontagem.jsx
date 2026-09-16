@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState } from 'react';
 import { CalendarClock, Loader2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
@@ -24,7 +25,7 @@ export default function ProgramarFilaMontagem({ ids, ocupado, onProgramado }) {
   return <section className="mx-3 mb-3 rounded-lg border border-torg-blue-100 bg-torg-blue-50/50 px-3 py-3 space-y-2" aria-label="Programar montagem sem bancada">
     <div className="flex items-end gap-3 flex-wrap">
       <label className="text-xs text-torg-dark flex flex-col gap-1">Data prevista
-        <input type="date" aria-label="Data prevista da montagem" value={dia} onChange={e=>setDia(e.target.value)} disabled={salvando || ocupado} className="rounded-lg border border-gray-200 px-2 py-1.5 bg-white" />
+        <CampoData aria-label="Data prevista da montagem" value={dia} onChange={(iso) =>setDia(iso)} disabled={salvando || ocupado} className="rounded-lg border border-gray-200 px-2 py-1.5 bg-white" />
       </label>
       <button type="button" onClick={programar} disabled={salvando || ocupado || !dia} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-torg-blue text-white text-xs font-semibold disabled:opacity-50">
         {salvando ? <Loader2 size={14} className="animate-spin" /> : <CalendarClock size={14} />}

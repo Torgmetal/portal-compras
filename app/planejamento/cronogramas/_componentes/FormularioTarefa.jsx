@@ -1,4 +1,7 @@
 "use client";
+import CampoData from "@/components/CampoData";
+import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 import { AlertTriangle, Calendar, CheckCircle2, Clock, Lock, Weight } from "lucide-react";
 import { AntecessorasPicker } from "./AntecessorasPicker";
 import { DEPT_LABEL } from "../_lib/rotulos";
@@ -81,10 +84,9 @@ export function FormularioTarefa({
         <div className="flex items-center gap-1.5">
           <Calendar size={11} className={cronogramaValidado && datasMudaram ? "text-amber-500" : "text-torg-blue"} />
           <span className="text-[10px] text-torg-gray whitespace-nowrap font-medium">Início previsto:</span>
-          <input
-            type="date"
+          <CampoData
             value={editInicio}
-            onChange={(e) => setEditInicio(e.target.value)}
+            onChange={(iso) => setEditInicio(iso)}
             className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white"
           />
           {editInicio && (
@@ -93,10 +95,9 @@ export function FormularioTarefa({
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-torg-gray whitespace-nowrap font-medium">Fim previsto:</span>
-          <input
-            type="date"
+          <CampoData
             value={editFim}
-            onChange={(e) => setEditFim(e.target.value)}
+            onChange={(iso) => setEditFim(iso)}
             className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white"
           />
           {editFim && (
@@ -140,10 +141,9 @@ export function FormularioTarefa({
         <div className="flex items-center gap-1.5">
           <Calendar size={11} className="text-emerald-600" />
           <span className="text-[10px] text-torg-gray whitespace-nowrap font-medium">Início real:</span>
-          <input
-            type="date"
+          <CampoData
             value={inicioReal}
-            onChange={(e) => setInicioReal(e.target.value)}
+            onChange={(iso) => setInicioReal(iso)}
             className="text-[10px] px-1.5 py-0.5 border border-emerald-200 rounded bg-white"
           />
           {inicioReal && (
@@ -152,10 +152,9 @@ export function FormularioTarefa({
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-torg-gray whitespace-nowrap font-medium">Término real:</span>
-          <input
-            type="date"
+          <CampoData
             value={fimReal}
-            onChange={(e) => { setFimReal(e.target.value); setDataExec(e.target.value); }}
+            onChange={(iso) => { setFimReal(iso); setDataExec(iso); }}
             className="text-[10px] px-1.5 py-0.5 border border-emerald-200 rounded bg-white"
           />
           {fimReal && (
@@ -173,12 +172,11 @@ export function FormularioTarefa({
         <div className="flex items-center gap-1.5">
           <Weight size={11} className="text-torg-gray" />
           <span className="text-[10px] text-torg-gray whitespace-nowrap">Peso plan.:</span>
-          <input
-            type="number"
+          <CampoDecimal
             min={0}
             step={100}
             value={pesoPlan || ""}
-            onChange={(e) => { const v = parseFloat(e.target.value) || 0; setPesoPlan(v); recalcPctPeso(v, pesoReal); }}
+            onChange={(txt) => { const v = numeroBR(txt); setPesoPlan(v); recalcPctPeso(v, pesoReal); }}
             className="w-20 text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white text-right"
             placeholder="0"
           />
@@ -186,12 +184,11 @@ export function FormularioTarefa({
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-torg-gray whitespace-nowrap">Realizado:</span>
-          <input
-            type="number"
+          <CampoDecimal
             min={0}
             step={100}
             value={pesoReal || ""}
-            onChange={(e) => { const v = parseFloat(e.target.value) || 0; setPesoReal(v); recalcPctPeso(pesoPlan, v); }}
+            onChange={(txt) => { const v = numeroBR(txt); setPesoReal(v); recalcPctPeso(pesoPlan, v); }}
             className="w-20 text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white text-right"
             placeholder="0"
           />
@@ -264,10 +261,9 @@ export function FormularioTarefa({
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] text-torg-gray whitespace-nowrap">Alterar data:</span>
-                <input
-                  type="date"
+                <CampoData
                   value={dataLib}
-                  onChange={(e) => setDataLib(e.target.value)}
+                  onChange={(iso) => setDataLib(iso)}
                   className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white"
                 />
               </div>

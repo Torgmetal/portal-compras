@@ -1,4 +1,6 @@
 "use client";
+import CampoData from "@/components/CampoData";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
@@ -329,7 +331,7 @@ function ModalRomaneio({ pedido, destino, onClose, onCreated }) {
             </label>
             <label className="block">
               <span className="text-[10px] font-medium text-torg-gray uppercase">Data</span>
-              <input type="date" value={data} onChange={(e) => setData(e.target.value)}
+              <CampoData value={data} onChange={(iso) => setData(iso)}
                 className="mt-1 w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:border-torg-blue focus:ring-1 focus:ring-torg-blue/30" />
             </label>
           </div>
@@ -382,7 +384,7 @@ function ModalRomaneio({ pedido, destino, onClose, onCreated }) {
                       <td className="px-2 py-1 font-mono font-semibold text-torg-dark whitespace-nowrap">{l.marca}</td>
                       <td className="px-2 py-1 text-torg-gray max-w-[240px] truncate" title={l.descricao || ""}>{l.descricao || "—"}</td>
                       <td className="px-2 py-1 text-right">
-                        <input type="number" min="0" value={l.qtd} onChange={(e) => setQtd(i, e.target.value)}
+                        <CampoDecimal value={l.qtd} onChange={(txt) => setQtd(i, txt)}
                           className="w-16 px-1.5 py-0.5 text-right text-[11px] tabular-nums border border-gray-200 rounded focus:border-torg-blue focus:ring-1 focus:ring-torg-blue/30" />
                       </td>
                       <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap text-torg-gray">

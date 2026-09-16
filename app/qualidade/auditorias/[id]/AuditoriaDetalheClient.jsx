@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { upload } from "@vercel/blob/client";
 import Link from "next/link";
@@ -473,7 +474,7 @@ function RelatorioAuditoria({ id, data, onChange }) {
 
       {/* Metadados */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-        <Campo label="Data da auditoria"><input type="date" value={meta.dataAuditoria} onChange={(e) => setM("dataAuditoria", e.target.value)} className="inp" /></Campo>
+        <Campo label="Data da auditoria"><CampoData value={meta.dataAuditoria} onChange={(iso) => setM("dataAuditoria", iso)} className="inp" /></Campo>
         <Campo label="Auditor (responsável)"><input value={meta.auditor} onChange={(e) => setM("auditor", e.target.value)} placeholder="Nome do auditor / certificadora" className="inp" /></Campo>
         <Campo label="Norma / referência"><input value={meta.norma} onChange={(e) => setM("norma", e.target.value)} placeholder="ISO 9001:2015 · NBR 16775…" className="inp" /></Campo>
         <Campo label="Objetivo / escopo"><input value={meta.escopo} onChange={(e) => setM("escopo", e.target.value)} placeholder="O que foi auditado" className="inp" /></Campo>

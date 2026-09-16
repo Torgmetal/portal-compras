@@ -1,4 +1,6 @@
 "use client";
+import CampoData from "@/components/CampoData";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import {
@@ -433,7 +435,7 @@ export default function KickoffClient({ opId }) {
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-gray mb-1">Data de entrega acordada com o cliente</label>
-              <input type="date" value={form.dataEntregaAcordada} onChange={(e) => set("dataEntregaAcordada", e.target.value)}
+              <CampoData value={form.dataEntregaAcordada} onChange={(iso) => set("dataEntregaAcordada", iso)}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" />
             </div>
           </div>
@@ -487,11 +489,11 @@ export default function KickoffClient({ opId }) {
                       className="w-full px-2 py-1 text-sm border border-gray-200 rounded print:border-0" />
                   </td>
                   <td className="py-1 pr-2">
-                    <input type="number" value={p.qtd ?? ""} onChange={(e) => setPeso(i, "qtd", e.target.value)}
+                    <CampoDecimal value={p.qtd ?? ""} onChange={(txt) => setPeso(i, "qtd", txt)}
                       className="w-full px-2 py-1 text-sm border border-gray-200 rounded text-right print:border-0" />
                   </td>
                   <td className="py-1 pr-2">
-                    <input type="number" value={p.pesoKg ?? ""} onChange={(e) => setPeso(i, "pesoKg", e.target.value)}
+                    <CampoDecimal value={p.pesoKg ?? ""} onChange={(txt) => setPeso(i, "pesoKg", txt)}
                       className="w-full px-2 py-1 text-sm border border-gray-200 rounded text-right print:border-0" />
                   </td>
                   <td className="py-1 print:hidden">
@@ -536,7 +538,7 @@ export default function KickoffClient({ opId }) {
                         className="w-full px-2 py-1 text-sm border border-gray-200 rounded font-medium print:border-0" />
                     </td>
                     <td className="py-1 pr-2">
-                      <input type="date" value={c.data || ""} onChange={(e) => setCron(i, "data", e.target.value)}
+                      <CampoData value={c.data || ""} onChange={(iso) => setCron(i, "data", iso)}
                         className="w-full px-2 py-1 text-sm border border-gray-200 rounded print:border-0" />
                     </td>
                     <td className="py-1 pr-2">
@@ -572,7 +574,7 @@ export default function KickoffClient({ opId }) {
                   <input type="text" value={p.descricao} onChange={(e) => setPrio(i, "descricao", e.target.value)}
                     placeholder="Fase, peça ou entrega prioritária…"
                     className="flex-1 px-2 py-1.5 text-sm border border-gray-200 rounded-lg print:border-0" />
-                  <input type="date" value={p.data || ""} onChange={(e) => setPrio(i, "data", e.target.value)}
+                  <CampoData value={p.data || ""} onChange={(iso) => setPrio(i, "data", iso)}
                     className="w-40 px-2 py-1.5 text-sm border border-gray-200 rounded-lg print:border-0" />
                   <button onClick={() => rmPrio(i)} className="text-gray-300 hover:text-red-500 print:hidden"><Trash2 size={14} /></button>
                 </div>
@@ -642,12 +644,12 @@ export default function KickoffClient({ opId }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
             <div>
               <label className="block text-xs font-medium text-torg-gray mb-1">Kick off com o comercial (data)</label>
-              <input type="date" value={form.kickoffComercialEm} onChange={(e) => set("kickoffComercialEm", e.target.value)}
+              <CampoData value={form.kickoffComercialEm} onChange={(iso) => set("kickoffComercialEm", iso)}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" />
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-gray mb-1">Kick off com os setores (data)</label>
-              <input type="date" value={form.kickoffSetoresEm} onChange={(e) => set("kickoffSetoresEm", e.target.value)}
+              <CampoData value={form.kickoffSetoresEm} onChange={(iso) => set("kickoffSetoresEm", iso)}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" />
             </div>
           </div>
@@ -735,8 +737,8 @@ export default function KickoffClient({ opId }) {
                 {(form.faturamentoEventos || []).map((ev, i) => (
                   <tr key={i}>
                     <td className="py-1 pr-2"><input type="text" value={ev.descricao || ""} onChange={(e) => setEvento(i, "descricao", e.target.value)} placeholder="Entrada, Medição 1…" className="w-full px-2 py-1 text-sm border border-gray-200 rounded font-medium print:border-0" /></td>
-                    <td className="py-1 pr-2"><input type="number" value={ev.percentual ?? ""} onChange={(e) => setEvento(i, "percentual", e.target.value)} className="w-full px-2 py-1 text-sm border border-gray-200 rounded text-right print:border-0" /></td>
-                    <td className="py-1 pr-2"><input type="number" value={ev.valor ?? ""} onChange={(e) => setEvento(i, "valor", e.target.value)} className="w-full px-2 py-1 text-sm border border-gray-200 rounded text-right print:border-0" /></td>
+                    <td className="py-1 pr-2"><CampoDecimal value={ev.percentual ?? ""} onChange={(txt) => setEvento(i, "percentual", txt)} className="w-full px-2 py-1 text-sm border border-gray-200 rounded text-right print:border-0" /></td>
+                    <td className="py-1 pr-2"><CampoDecimal value={ev.valor ?? ""} onChange={(txt) => setEvento(i, "valor", txt)} className="w-full px-2 py-1 text-sm border border-gray-200 rounded text-right print:border-0" /></td>
                     <td className="py-1 pr-2"><input type="text" value={ev.prazoPagamento || ""} onChange={(e) => setEvento(i, "prazoPagamento", e.target.value)} placeholder="28 dias após NF" className="w-full px-2 py-1 text-sm border border-gray-200 rounded print:border-0" /></td>
                     <td className="py-1 pr-2"><input type="text" value={ev.medicao || ""} onChange={(e) => setEvento(i, "medicao", e.target.value)} placeholder="233/1" className="w-full px-2 py-1 text-sm border border-gray-200 rounded text-center print:border-0" /></td>
                     <td className="py-1 pr-2"><input type="text" value={ev.obsNF || ""} onChange={(e) => setEvento(i, "obsNF", e.target.value)} className="w-full px-2 py-1 text-sm border border-gray-200 rounded print:border-0" /></td>

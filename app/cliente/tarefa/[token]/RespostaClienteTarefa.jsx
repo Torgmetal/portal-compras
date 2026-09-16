@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useEffect, useState } from "react";
 import { CheckCircle2, CalendarClock, Loader2, AlertCircle, Building2 } from "lucide-react";
 
@@ -92,7 +93,7 @@ export default function RespostaClienteTarefa({ token }) {
               {acao === "nova_data" && (
                 <div className="mt-3">
                   <label className="block text-[12px] text-torg-gray mb-1">Nova data prevista</label>
-                  <input type="date" value={novaData} onChange={(e) => setNovaData(e.target.value)} className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:border-torg-blue outline-none" />
+                  <CampoData value={novaData} onChange={(iso) => setNovaData(iso)} className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:border-torg-blue outline-none" />
                 </div>
               )}
 

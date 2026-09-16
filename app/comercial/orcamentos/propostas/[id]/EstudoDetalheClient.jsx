@@ -12,6 +12,7 @@ import {
   Send, Package, ChevronUp, XCircle,
 } from "lucide-react";
 import { log } from "@/lib/log";
+import CampoDecimal from "@/components/CampoDecimal";
 
 const registro = log("EstudoDetalheClient");
 
@@ -1056,13 +1057,10 @@ function NovoItemModal({ onClose, onSalvar }) {
 
             <div>
               <label className="block text-sm font-semibold text-torg-dark mb-1">Comprimento (m)</label>
-              <input
-                type="number"
+              <CampoDecimal
                 value={comprimento}
-                onChange={(e) => setComprimento(e.target.value)}
+                onChange={(txt) => setComprimento(txt)}
                 placeholder="0.00"
-                step="0.01"
-                min="0"
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
               />
             </div>
@@ -1071,24 +1069,19 @@ function NovoItemModal({ onClose, onSalvar }) {
               <label className="block text-sm font-semibold text-torg-dark mb-1">
                 Peso unitario (kg/m) <span className="text-red-400">*</span>
               </label>
-              <input
-                type="number"
+              <CampoDecimal
                 value={pesoUnitario}
-                onChange={(e) => setPesoUnitario(e.target.value)}
+                onChange={(txt) => setPesoUnitario(txt)}
                 placeholder="0.00"
-                step="0.01"
-                min="0"
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
               />
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-torg-dark mb-1">Quantidade</label>
-              <input
-                type="number"
+              <CampoDecimal
                 value={quantidade}
-                onChange={(e) => setQuantidade(e.target.value)}
-                min="1"
+                onChange={(txt) => setQuantidade(txt)}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
               />
             </div>
@@ -1716,20 +1709,16 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
             </p>
             {editandoPerda ? (
               <div className="flex items-center gap-1 mt-0.5">
-                <input
-                  type="number"
+                <CampoDecimal
                   autoFocus
                   value={editPerdaValor}
-                  onChange={(e) => setEditPerdaValor(e.target.value)}
+                  onChange={(txt) => setEditPerdaValor(txt)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") salvarPerda();
                     if (e.key === "Escape") setEditandoPerda(false);
                   }}
                   onBlur={salvarPerda}
                   className="w-16 px-2 py-1 border border-torg-blue rounded-lg text-lg font-bold text-right outline-none focus:ring-1 focus:ring-torg-blue/30"
-                  step="0.1"
-                  min="0"
-                  max="100"
                 />
                 <span className="text-lg font-bold text-amber-600">%</span>
               </div>
@@ -1956,32 +1945,24 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
                             {TIPO_MATERIAL_LABELS[detectTipoMaterial(editValores.descricao)] || "Outro"}
                           </td>
                           <td className="px-2 py-2 text-right">
-                            <input
-                              type="number"
+                            <CampoDecimal
                               value={editValores.comprimento}
-                              onChange={(e) => setEditValores((p) => ({ ...p, comprimento: e.target.value }))}
+                              onChange={(txt) => setEditValores((p) => ({ ...p, comprimento: txt }))}
                               className="w-16 px-1.5 py-1 border border-gray-200 rounded-lg text-sm text-right outline-none focus:border-torg-blue"
-                              step="0.01"
-                              min="0"
                             />
                           </td>
                           <td className="px-2 py-2 text-right">
-                            <input
-                              type="number"
+                            <CampoDecimal
                               value={editValores.pesoUnitario}
-                              onChange={(e) => setEditValores((p) => ({ ...p, pesoUnitario: e.target.value }))}
+                              onChange={(txt) => setEditValores((p) => ({ ...p, pesoUnitario: txt }))}
                               className="w-16 px-1.5 py-1 border border-gray-200 rounded-lg text-sm text-right outline-none focus:border-torg-blue"
-                              step="0.01"
-                              min="0"
                             />
                           </td>
                           <td className="px-2 py-2 text-right">
-                            <input
-                              type="number"
+                            <CampoDecimal
                               value={editValores.quantidade}
-                              onChange={(e) => setEditValores((p) => ({ ...p, quantidade: e.target.value }))}
+                              onChange={(txt) => setEditValores((p) => ({ ...p, quantidade: txt }))}
                               className="w-12 px-1.5 py-1 border border-gray-200 rounded-lg text-sm text-right outline-none focus:border-torg-blue"
-                              min="1"
                             />
                           </td>
                           <td className="px-2 py-2.5 text-right font-semibold text-torg-dark text-xs">
@@ -1993,13 +1974,10 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
                             })()}
                           </td>
                           <td className="px-2 py-2 text-right">
-                            <input
-                              type="number"
+                            <CampoDecimal
                               value={editValores.custoUnitario}
-                              onChange={(e) => setEditValores((p) => ({ ...p, custoUnitario: e.target.value }))}
+                              onChange={(txt) => setEditValores((p) => ({ ...p, custoUnitario: txt }))}
                               className="w-20 px-1.5 py-1 border border-gray-200 rounded-lg text-sm text-right outline-none focus:border-torg-blue"
-                              step="0.01"
-                              min="0"
                               placeholder="R$/kg"
                             />
                           </td>
@@ -2066,19 +2044,16 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
                               </span>
                             ) : editandoCustoId === item.id ? (
                               <div className="flex items-center justify-end gap-1">
-                                <input
-                                  type="number"
+                                <CampoDecimal
                                   autoFocus
                                   value={editCustoValor}
-                                  onChange={(e) => setEditCustoValor(e.target.value)}
+                                  onChange={(txt) => setEditCustoValor(txt)}
                                   onKeyDown={(e) => {
                                     if (e.key === "Enter") salvarCustoRapido(item.id);
                                     if (e.key === "Escape") { setEditandoCustoId(null); setEditCustoValor(""); }
                                   }}
                                   onBlur={() => salvarCustoRapido(item.id)}
                                   className="w-20 px-1.5 py-0.5 border border-torg-blue rounded-lg text-sm text-right outline-none focus:ring-1 focus:ring-torg-blue/30"
-                                  step="0.01"
-                                  min="0"
                                   placeholder="0.00"
                                 />
                               </div>

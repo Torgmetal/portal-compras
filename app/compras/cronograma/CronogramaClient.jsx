@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useMemo } from "react";
 import { fmtOP } from "@/lib/utils";
 import Link from "next/link";
@@ -1159,10 +1160,9 @@ function ModalAtualizarPrazo({ pedido, onClose, onSalvo }) {
                 <label className="block text-xs font-semibold text-torg-gray uppercase tracking-wide mb-1">
                   Novo prazo de entrega
                 </label>
-                <input
-                  type="date"
+                <CampoData
                   value={novoPrazo}
-                  onChange={(e) => setNovoPrazo(e.target.value)}
+                  onChange={(iso) => setNovoPrazo(iso)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue"
                 />
               </div>

@@ -6,6 +6,7 @@ import { ITENS_COMERCIAIS, FATURAMENTO, FATURAMENTO_ROTULO } from '@/lib/lqc';
 import { Sel } from './campos';
 import { QuantidadePorArea } from './QuantidadeComercialPorArea';
 import s from './ItensComerciais.module.css';
+import CampoDecimal from "@/components/CampoDecimal";
 const UNIDADES=['m²','m','un','kg','conjunto','caixa','rolo'];
 const moeda=v=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 export function ItensComerciais({c,res,setComp,estudoId}){
@@ -41,8 +42,8 @@ export function ItensComerciais({c,res,setComp,estudoId}){
      <p className={s.ajuda}>Informe quantidade e custo diretamente. O nome do modelo pode ser preenchido depois.</p>
      <div className={s.principais}>{linhasDe(familia).map((m,index)=><div key={m.id||index} className={s.modelo}>
       <div className={s.linhaPrincipal}>
-       <label>Quantidade<input aria-label={`Quantidade do item ${index+1} de ${familia}`} type="number" min="0" step="any" placeholder="0" disabled={Object.values(m.porArea||{}).some(v=>Number(String(v).replace(',','.'))>0)} value={Object.values(m.porArea||{}).some(v=>Number(String(v).replace(',','.'))>0)?quantidadeModelo(m,areasAtivas):(m.quantidade??'')} onChange={e=>atualizar(index,'quantidade',e.target.value)}/></label>
-       <label>Custo unit. (R$)<input aria-label={`Custo unitário do item ${index+1} de ${familia}`} type="number" min="0" step="0.01" placeholder="0,00" value={m.custoUnitario??''} onChange={e=>atualizar(index,'custoUnitario',e.target.value)}/></label>
+       <label>Quantidade<CampoDecimal aria-label={`Quantidade do item ${index+1} de ${familia}`} placeholder="0" disabled={Object.values(m.porArea||{}).some(v=>Number(String(v).replace(',','.'))>0)} value={Object.values(m.porArea||{}).some(v=>Number(String(v).replace(',','.'))>0)?quantidadeModelo(m,areasAtivas):(m.quantidade??'')} onChange={(txt) =>atualizar(index,'quantidade',txt)}/></label>
+       <label>Custo unit. (R$)<CampoDecimal aria-label={`Custo unitário do item ${index+1} de ${familia}`} placeholder="0,00" value={m.custoUnitario??''} onChange={(txt) => atualizar(index,'custoUnitario',txt)}/></label>
        <label>Unidade<select aria-label={`Unidade do item ${index+1} de ${familia}`} value={m.unidade||PADRAO[familia]} onChange={e=>atualizar(index,'unidade',e.target.value)}>{UNIDADES.map(u=><option key={u}>{u}</option>)}</select></label>
        <label>Item / modelo<input aria-label={`Modelo ${index+1} de ${familia}`} placeholder={`${familia} — informar modelo`} value={m.nome??''} onChange={e=>atualizar(index,'nome',e.target.value)}/></label>
        <div className={s.subtotal}><span>Subtotal</span><strong>{moeda(linhas.find(l=>l.id===(m.id||`${familia}:${index}`))?.subtotal||0)}</strong></div>
@@ -60,13 +61,13 @@ export function ItensComerciais({c,res,setComp,estudoId}){
       {config.itens.map(item=>{const v=dados[item.key]||{};const un=v.unidade||item.unidades[0];return <div key={item.key} className={s.linhaExtra}>
        <span className={s.nomeExtra}>{item.nome}</span>
        <label><span className={s.labelExtra}>Unidade</span>{item.unidades.length===1?<span className={s.unidadeFixa}>{un}</span>:<select aria-label={`Unidade de ${item.nome} em ${familia}`} value={un} onChange={e=>atualizarExtra(item.key,'unidade',e.target.value)}>{item.unidades.map(u=><option key={u}>{u}</option>)}</select>}</label>
-       <label><span className={s.labelExtra}>{item.key==='laRocha'?'Área (m²)':'Quantidade'}</span><input aria-label={`Quantidade de ${item.nome} em ${familia}`} type="number" min="0" step="any" placeholder="0" value={v.quantidade??''} onChange={e=>atualizarExtra(item.key,'quantidade',e.target.value)}/></label>
-       <label><span className={s.labelExtra}>Custo (R$/{un})</span><input aria-label={`Custo unitário de ${item.nome} em ${familia}`} type="number" min="0" step="0.01" placeholder="0,00" value={v.custoUnitario??''} onChange={e=>atualizarExtra(item.key,'custoUnitario',e.target.value)}/></label>
+       <label><span className={s.labelExtra}>{item.key==='laRocha'?'Área (m²)':'Quantidade'}</span><CampoDecimal aria-label={`Quantidade de ${item.nome} em ${familia}`} placeholder="0" value={v.quantidade??''} onChange={(txt) => atualizarExtra(item.key,'quantidade',txt)}/></label>
+       <label><span className={s.labelExtra}>Custo (R$/{un})</span><CampoDecimal aria-label={`Custo unitário de ${item.nome} em ${familia}`} placeholder="0,00" value={v.custoUnitario??''} onChange={(txt) => atualizarExtra(item.key,'custoUnitario',txt)}/></label>
        <div className={s.subtotal}><span>Subtotal</span><strong>{moeda(numero(v.quantidade)*numero(v.custoUnitario))}</strong></div>
       </div>;})}
       {(config.frete||config.montagem)&&<div className={s.servicos}>
-       {config.frete&&<label>Frete · valor total (R$)<input aria-label={`Frete de ${familia}`} type="number" min="0" step="0.01" placeholder="0,00" value={dados.frete??''} onChange={e=>setDados(atual=>({...atual,frete:e.target.value}))}/></label>}
-       {config.montagem&&<label>Montagem · valor total (R$)<input aria-label={`Montagem de ${familia}`} type="number" min="0" step="0.01" placeholder="0,00" value={dados.montagem??''} onChange={e=>setDados(atual=>({...atual,montagem:e.target.value}))}/></label>}
+       {config.frete&&<label>Frete · valor total (R$)<CampoDecimal aria-label={`Frete de ${familia}`} placeholder="0,00" value={dados.frete??''} onChange={(txt) =>setDados(atual=>({...atual,frete:txt}))}/></label>}
+       {config.montagem&&<label>Montagem · valor total (R$)<CampoDecimal aria-label={`Montagem de ${familia}`} placeholder="0,00" value={dados.montagem??''} onChange={(txt) =>setDados(atual=>({...atual,montagem:txt}))}/></label>}
       </div>}
      </div>
     </div>
@@ -78,8 +79,8 @@ export function ItensComerciais({c,res,setComp,estudoId}){
    const atualizarLegado=patch=>salvar({legados:compra.legados.map((v,i)=>i===index?{...v,...patch}:v)});
    const porArea=Object.values(m.porArea||{}).some(v=>Number(String(v).replace(',','.'))>0);
    return <div className={s.modelo} key={m.id}><strong>{m.nome}</strong><div className={s.servicos}>
-    <label>Quantidade ({m.unidade})<input aria-label={`Quantidade de ${m.nome}`} type="number" min="0" step="any" disabled={porArea} value={quantidadeModelo(m,areasAtivas)} onChange={e=>atualizarLegado({quantidade:e.target.value})}/></label>
-    <label>Custo unitário (R$)<input aria-label={`Custo unitário de ${m.nome}`} type="number" min="0" step="any" value={m.custoUnitario??''} onChange={e=>atualizarLegado({custoUnitario:e.target.value})}/></label>
+    <label>Quantidade ({m.unidade})<CampoDecimal aria-label={`Quantidade de ${m.nome}`} disabled={porArea} value={quantidadeModelo(m,areasAtivas)} onChange={(txt) =>atualizarLegado({quantidade:txt})}/></label>
+    <label>Custo unitário (R$)<CampoDecimal aria-label={`Custo unitário de ${m.nome}`} value={m.custoUnitario??''} onChange={(txt) =>atualizarLegado({custoUnitario:txt})}/></label>
    </div><QuantidadePorArea modelo={m} areasAtivas={areasAtivas} onChange={atualizarLegado}/>
    {m.codigoOmie&&<p>Código salvo: {m.codigoOmie}</p>}{m.especificacao&&<p>{m.especificacao}</p>}</div>;
   })}</section>}

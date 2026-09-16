@@ -1,4 +1,6 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Target, Save, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CheckCircle2, Factory, TrendingUp, DollarSign, Truck, ShoppingCart, Lock } from "lucide-react";
 
@@ -374,16 +376,13 @@ export default function MetasClient() {
                         const val = grid[setor.id]?.[mes]?.valorMensal || 0;
                         return (
                           <td key={mes} className="px-1 py-1.5 text-center">
-                            <input
-                              type="number"
+                            <CampoDecimal
                               value={val || ""}
-                              onChange={(e) => {
-                                const v = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                              onChange={(txt) => {
+                                const v = txt === "" ? 0 : numeroBR(txt);
                                 if (!isNaN(v)) atualizarCelula(setor.id, mes, v);
                               }}
                               placeholder="0"
-                              step="0.1"
-                              min="0"
                               className="w-full max-w-[72px] mx-auto text-center border border-gray-200 rounded-md px-1 py-1.5 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent hover:border-gray-300 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </td>
@@ -504,16 +503,13 @@ function SemanalDetail({ modulo, grid, mes, unidade, onUpdate, onAutoDistribuir,
                   </td>
                   {["semana1", "semana2", "semana3", "semana4", "semana5"].map((key) => (
                     <td key={key} className="px-1 py-1.5 text-center">
-                      <input
-                        type="number"
+                      <CampoDecimal
                         value={cell[key] ?? ""}
-                        onChange={(e) => {
-                          const v = e.target.value === "" ? null : parseFloat(e.target.value);
+                        onChange={(txt) => {
+                          const v = txt === "" ? null : numeroBR(txt);
                           onUpdate(setor.id, mes, key, isNaN(v) ? null : v);
                         }}
                         placeholder={mensal > 0 ? (mensal / 4).toFixed(1) : "—"}
-                        step="0.1"
-                        min="0"
                         className="w-full max-w-[72px] mx-auto text-center border border-gray-200 rounded-md px-1 py-1.5 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent hover:border-gray-300 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </td>

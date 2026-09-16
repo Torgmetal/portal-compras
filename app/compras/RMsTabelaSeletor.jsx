@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useMemo, useEffect } from "react";
 import { fmtOP } from "@/lib/utils";
 import Link from "next/link";
@@ -902,9 +903,8 @@ function ModalEnviarConsolidada({ rms, onClose, onSent, categoriasFornecedor = C
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-torg-dark mb-1">Prazo de resposta</label>
-              <input
-                type="date" value={prazo}
-                onChange={(e) => setPrazo(e.target.value)}
+              <CampoData value={prazo}
+                onChange={(iso) => setPrazo(iso)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
               />
             </div>

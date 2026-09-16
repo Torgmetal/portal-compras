@@ -1,4 +1,5 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Calculator, Loader2, AlertCircle, RefreshCw, Save, Plus, Trash2, Info, Upload } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -189,7 +190,7 @@ export default function CustoHoraClient() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
             <label className="text-xs text-torg-gray">Fator de encargos</label>
-            <input type="number" step="0.01" value={fator} onChange={(e) => { setFator(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
+            <CampoDecimal value={fator} onChange={(txt) => { setFator(txt); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
             <p className="text-[10px] text-torg-gray mt-1">Lucro Real ≈ 1,7–1,8</p>
           </div>
           <div>
@@ -206,7 +207,7 @@ export default function CustoHoraClient() {
           </div>
           <div>
             <label className="text-xs text-torg-gray">Impostos venda (%)</label>
-            <input type="number" step="0.1" value={impostosVenda} onChange={(e) => { setImpostosVenda(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
+            <CampoDecimal value={impostosVenda} onChange={(txt) => { setImpostosVenda(txt); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
             <p className="text-[10px] text-torg-gray mt-1">ISS + PIS/COFINS</p>
           </div>
         </div>
@@ -214,7 +215,7 @@ export default function CustoHoraClient() {
         <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-100">
           <div>
             <label className="text-xs text-torg-gray">Horas por dia</label>
-            <input type="number" step="0.1" value={horasDia} onChange={(e) => { setHorasDia(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
+            <CampoDecimal value={horasDia} onChange={(txt) => { setHorasDia(txt); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
           </div>
           <div>
             <label className="text-xs text-torg-gray">Dias úteis/mês</label>
@@ -222,7 +223,7 @@ export default function CustoHoraClient() {
           </div>
           <div>
             <label className="text-xs text-torg-gray">Absenteísmo (%)</label>
-            <input type="number" step="0.5" value={ocupacao} onChange={(e) => { setOcupacao(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
+            <CampoDecimal value={ocupacao} onChange={(txt) => { setOcupacao(txt); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
             <p className="text-[10px] text-torg-gray mt-1">faltas médias</p>
             {absurdo && (
               <p className="text-[10px] text-red-600 mt-1">

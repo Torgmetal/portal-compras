@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState } from "react";
 import GanttInline from "@/components/planejamento/GanttInline";
 import { Plus } from "lucide-react";
@@ -252,11 +253,11 @@ export function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) 
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1">
                 <span className="text-[10px] text-torg-gray">Início:</span>
-                <input type="date" value={newInicio} onChange={(e) => setNewInicio(e.target.value)} className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white" />
+                <CampoData value={newInicio} onChange={(iso) => setNewInicio(iso)} className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white" />
               </div>
               <div className="flex items-center gap-1">
                 <span className="text-[10px] text-torg-gray">Fim:</span>
-                <input type="date" value={newFim} onChange={(e) => setNewFim(e.target.value)} className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white" />
+                <CampoData value={newFim} onChange={(iso) => setNewFim(iso)} className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white" />
               </div>
               <div className="flex items-center gap-1 ml-auto">
                 <button onClick={() => setAddingGlobal(false)} className="px-2 py-1 text-[10px] text-torg-gray hover:text-torg-dark">

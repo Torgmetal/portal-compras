@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 // ─── REPARTIR OS CONJUNTOS ENTRE AS BANCADAS ──────────────────────────────────
 // Vitor (01/09/2026), o fluxo inteiro: "quero que a Larissa selecione todas as marcas que estão
 // disponível para montagem de acordo com a liberação dos croquis, com isso ele vai e libera para
@@ -247,7 +248,7 @@ export default function PainelBancadas({ conjuntos, onLiberar, ocupado }) {
         </span>
         <div className="ml-auto flex items-center gap-2 flex-wrap">
           <label className="text-[11px] text-torg-gray">começa em</label>
-          <input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)}
+          <CampoData value={inicio} onChange={(iso) => setInicio(iso)}
             className="px-2 py-1 text-[12px] border border-gray-200 rounded-lg" />
           <span className="text-[11px] text-torg-gray ml-1">bancadas:</span>
           {[1, 2, 3, 4, 5].map((k) => (

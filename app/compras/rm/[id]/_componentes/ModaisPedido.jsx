@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState } from "react";
 import { Loader2, AlertCircle, X, CheckCircle2, Check, Edit2, RotateCcw } from "lucide-react";
 import { numeroBR } from "@/lib/numero-br";
@@ -248,10 +249,9 @@ export function ModalReceberPedido({ pedido, onClose, onSaved }) {
             <label className="block text-sm font-medium text-torg-dark mb-1">
               Data de recebimento
             </label>
-            <input
-              type="date"
+            <CampoData
               value={dataRecebimento}
-              onChange={(e) => setDataRecebimento(e.target.value)}
+              onChange={(iso) => setDataRecebimento(iso)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
             />
           </div>

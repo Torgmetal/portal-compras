@@ -1,4 +1,6 @@
 "use client";
+import CampoData from "@/components/CampoData";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { upload } from "@vercel/blob/client";
@@ -128,8 +130,8 @@ export default function CalibracaoDetalheClient({ id }) {
           <Campo label="Faixa de uso"><input value={av.faixaUso || ""} onChange={(e) => setA("faixaUso", e.target.value)} className={inp} /></Campo>
           <Campo label="Laboratório"><input value={av.laboratorio || ""} onChange={(e) => setA("laboratorio", e.target.value)} className={inp} /></Campo>
           <Campo label="Nº do certificado"><input value={doc.numeroDocumento || ""} onChange={(e) => setD("numeroDocumento", e.target.value)} className={inp} /></Campo>
-          <Campo label="Data de calibração"><input type="date" value={toInput(doc.dataEmissao)} onChange={(e) => setD("dataEmissao", e.target.value)} className={inp} /></Campo>
-          <Campo label="Validade"><input type="date" value={toInput(doc.dataValidade)} onChange={(e) => setD("dataValidade", e.target.value)} className={inp} /></Campo>
+          <Campo label="Data de calibração"><CampoData value={toInput(doc.dataEmissao)} onChange={(iso) => setD("dataEmissao", iso)} className={inp} /></Campo>
+          <Campo label="Validade"><CampoData value={toInput(doc.dataValidade)} onChange={(iso) => setD("dataValidade", iso)} className={inp} /></Campo>
           <div className="sm:col-span-2"><Campo label="Norma / referência"><input value={doc.norma || ""} onChange={(e) => setD("norma", e.target.value)} className={inp} placeholder="ISO/IEC 17025 · NBR ISO 10012" /></Campo></div>
         </div>
       </Secao>
@@ -140,7 +142,7 @@ export default function CalibracaoDetalheClient({ id }) {
           <div className="flex items-end gap-3">
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Erro máx. admissível (%)</label>
-              <input type="number" step="0.1" min="0" value={av.erroMaxPercent ?? ""} onChange={(e) => setA("erroMaxPercent", e.target.value)} onBlur={() => salvar({}, "Limite aplicado.")} placeholder="10" className="w-36 text-sm border border-gray-300 rounded-lg px-3 py-2" />
+              <CampoDecimal value={av.erroMaxPercent ?? ""} onChange={(txt) => setA("erroMaxPercent", txt)} onBlur={() => salvar({}, "Limite aplicado.")} placeholder="10" className="w-36 text-sm border border-gray-300 rounded-lg px-3 py-2" />
             </div>
             <p className="text-[11px] text-torg-gray max-w-[240px] leading-tight">Padrão PO-20 = <strong>10%</strong> do valor nominal (erro + incerteza). Editável por equipamento; vazio usa o EMP do certificado.</p>
           </div>

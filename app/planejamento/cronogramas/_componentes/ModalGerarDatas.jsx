@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { AlertCircle, AlertTriangle, Calendar, CheckCircle2, Loader2, RotateCcw, X } from "lucide-react";
 import { DEPT_LABEL } from "../_lib/rotulos";
 
@@ -41,7 +42,7 @@ export function ModalGerarDatas({
               <label className="block text-[11px] text-torg-gray mb-1">
                 Início do projeto ({(detail.tipoDias || "DU") === "DU" ? "dias úteis" : "dias corridos"})
               </label>
-              <input type="date" value={gerarInicio} onChange={(e) => setGerarInicio(e.target.value)} className="text-xs px-2 py-1.5 border border-gray-200 rounded focus:ring-1 focus:ring-torg-blue" />
+              <CampoData value={gerarInicio} onChange={(iso) => setGerarInicio(iso)} className="text-xs px-2 py-1.5 border border-gray-200 rounded focus:ring-1 focus:ring-torg-blue" />
             </div>
             <button
               onClick={() => gerarDatas(false)}

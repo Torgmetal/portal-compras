@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 // ─── PCP › SOLDA — a fila do que saiu da montagem ─────────────────────────────
 // Vitor (01/09/2026): "depois que sair da montagem que foi dado o lançamento de concluído na
 // montagem deve ficar uma fila para podermos selecionar o que será feito na solda em cada bancada".
@@ -501,7 +502,7 @@ export default function SoldaClient({ conjuntosIniciais, montados = {}, soldados
               );
             })}
           </select>
-          <input type="date" value={novoDia} onChange={(e) => setNovoDia(e.target.value)}
+          <CampoData value={novoDia} onChange={(iso) => setNovoDia(iso)}
             title={todosNovos ? "Obrigatório: peça sem bancada precisa de um dia para entrar na carga do setor" : "Deixe vazio para manter o dia"}
             placeholder={todosNovos ? "escolha o dia" : "manter o dia"}
             className={`px-2 py-1.5 text-sm border rounded-lg bg-white ${todosNovos && !novoDia ? "border-amber-300" : "border-gray-200"}`} />

@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -183,7 +184,7 @@ export default function AuditoriaInternaDetalheClient({ id }) {
             <input list="setores-ai" value={ident.setor} onChange={(e) => setId("setor", e.target.value)} className="inp" />
             <datalist id="setores-ai">{SETORES_AUDITORIA.map((s) => <option key={s} value={s} />)}</datalist>
           </Campo>
-          <Campo label="Data da auditoria"><input type="date" value={ident.dataAuditoria} onChange={(e) => setId("dataAuditoria", e.target.value)} className="inp" /></Campo>
+          <Campo label="Data da auditoria"><CampoData value={ident.dataAuditoria} onChange={(iso) => setId("dataAuditoria", iso)} className="inp" /></Campo>
           <Campo label="Responsável pelo acompanhamento *"><input value={ident.responsavelAcompanhamento} onChange={(e) => setId("responsavelAcompanhamento", e.target.value)} className="inp" /></Campo>
           <Campo label="Auditor"><input value={ident.auditor} onChange={(e) => setId("auditor", e.target.value)} className="inp" /></Campo>
           <Campo label="Norma / referência"><input value={ident.norma} onChange={(e) => setId("norma", e.target.value)} placeholder="ISO 9001:2015, NBR 16775…" className="inp" /></Campo>
@@ -264,7 +265,7 @@ export default function AuditoriaInternaDetalheClient({ id }) {
                       <input value={ac.oque} onChange={(e) => setAc(i, "oque", e.target.value)} placeholder="Ação a executar" className="w-full text-[12px] border border-gray-200 rounded px-2 py-1.5 bg-white" />
                       <div className="flex gap-2 flex-wrap">
                         <input value={ac.responsavel || ""} onChange={(e) => setAc(i, "responsavel", e.target.value)} placeholder="Responsável" className="w-40 text-[12px] border border-gray-200 rounded px-2 py-1.5 bg-white" />
-                        <input type="date" value={ac.prazo || ""} onChange={(e) => setAc(i, "prazo", e.target.value)} className="w-36 text-[12px] border border-gray-200 rounded px-1.5 py-1.5 bg-white" title="Prazo" />
+                        <CampoData value={ac.prazo || ""} onChange={(iso) => setAc(i, "prazo", iso)} className="w-36 text-[12px] border border-gray-200 rounded px-1.5 py-1.5 bg-white" title="Prazo" />
                       </div>
                     </div>
                     <button onClick={() => setAcoes((p) => p.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-500 p-1 shrink-0"><Trash2 size={13} /></button>

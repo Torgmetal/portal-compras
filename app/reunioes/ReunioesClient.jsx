@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { NotebookPen, Plus, Loader2, AlertCircle, X, Trash2, CheckCircle2, RotateCcw } from "lucide-react";
@@ -144,7 +145,7 @@ function ModalNovaAta({ onClose, onCriada }) {
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Data</label>
-              <input type="date" value={dataReuniao} onChange={(e) => setDataReuniao(e.target.value)} className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" />
+              <CampoData value={dataReuniao} onChange={(iso) => setDataReuniao(iso)} className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" />
             </div>
           </div>
           <div>

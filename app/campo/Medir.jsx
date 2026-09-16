@@ -1,4 +1,6 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 import AvisoPadroesInspecao from "@/components/AvisoPadroesInspecao";
 import {foraDaTolerancia} from "@/lib/tolerancia-inspecao";
 import { useEffect, useState, useRef } from "react";
@@ -14,7 +16,6 @@ import { ParametrosLP, IndicacaoLP } from "./Lp";
 import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA } from "@/lib/evs-campos";
 import { criteriosDoDefeito, ONDE_VALE } from "@/lib/aws-d11";
 import { RESULTADO_LABEL } from "@/lib/revisao-inspecao";
-import { numeroBR } from "@/lib/numero-br";
 import { reduzImagem } from "@/lib/imagem-cliente";
 import { lerJson } from "@/lib/resposta-json";
 import { evidenciasDoTipo } from "@/lib/fotos-evidencia";
@@ -619,8 +620,8 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
                 <IndicacaoLP l={l} set={(campo, v) => set(i, campo, v)} />
               ) : ehDim ? (
                 <div className="mt-2">
-                  <input type="number" inputMode="decimal" value={l.encontradoMm ?? ""}
-                    onChange={(e) => set(i, "encontradoMm", e.target.value === "" ? null : Number(e.target.value))}
+                  <CampoDecimal inputMode="decimal" value={l.encontradoMm ?? ""}
+                    onChange={(txt) => set(i, "encontradoMm", txt === "" ? null : numeroBR(txt))}
                     placeholder="medida encontrada"
                     className={`w-full text-2xl font-mono text-center border-2 rounded-xl py-3 outline-none ${
                       fora ? "border-red-400 bg-red-50 text-red-700" : "border-gray-200 focus:border-torg-blue"}`} />

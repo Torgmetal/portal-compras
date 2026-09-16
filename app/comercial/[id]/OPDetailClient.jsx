@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -31,6 +32,7 @@ import { fmtOP } from "@/lib/utils";
 import OrcamentoComercial from "@/components/OrcamentoComercial";
 import { itensDaPlanilhaComercial } from "@/lib/op-categorias";
 import { numeroBR } from "@/lib/numero-br";
+import CampoDecimal from "@/components/CampoDecimal";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -1835,17 +1837,15 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Data de início</label>
-            <input
-              type="date" value={form.dataInicio}
-              onChange={(e) => set("dataInicio", e.target.value)}
+            <CampoData value={form.dataInicio}
+              onChange={(iso) => set("dataInicio", iso)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Data de fim prevista</label>
-            <input
-              type="date" value={form.dataFimPrevista}
-              onChange={(e) => set("dataFimPrevista", e.target.value)}
+            <CampoData value={form.dataFimPrevista}
+              onChange={(iso) => set("dataFimPrevista", iso)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
             />
           </div>
@@ -1856,10 +1856,9 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
             <label className="block text-xs font-medium text-torg-dark mb-1">
               Valor total do contrato (R$)
             </label>
-            <input
-              type="number" step="0.01" min="0"
+            <CampoDecimal
               value={form.valorTotalContrato}
-              onChange={(e) => set("valorTotalContrato", e.target.value)}
+              onChange={(txt) => set("valorTotalContrato", txt)}
               placeholder="Ex: 250000.00"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue tabular-nums"
             />
@@ -1871,10 +1870,9 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
             <label className="block text-xs font-medium text-torg-dark mb-1">
               R$/kg a faturar
             </label>
-            <input
-              type="number" step="0.01" min="0"
+            <CampoDecimal
               value={form.valorFaturarPorKg}
-              onChange={(e) => set("valorFaturarPorKg", e.target.value)}
+              onChange={(txt) => set("valorFaturarPorKg", txt)}
               placeholder="Ex: 8.50"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue tabular-nums"
             />
@@ -2473,20 +2471,18 @@ function ModalReceita({ opId, receita, onClose, onSaved, enderecosSugeridos = []
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Quantidade *</label>
-              <input
-                type="number" step="0.01" min="0"
+              <CampoDecimal
                 value={form.quantidade}
-                onChange={(e) => set("quantidade", e.target.value)}
+                onChange={(txt) => set("quantidade", txt)}
                 placeholder="0"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right tabular-nums focus:ring-2 focus:ring-torg-blue"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Valor unit. (R$/{un}) *</label>
-              <input
-                type="number" step="0.0001" min="0"
+              <CampoDecimal
                 value={form.valorUnitario}
-                onChange={(e) => set("valorUnitario", e.target.value)}
+                onChange={(txt) => set("valorUnitario", txt)}
                 placeholder="R$ 0,00"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right tabular-nums focus:ring-2 focus:ring-torg-blue"
               />
@@ -2499,10 +2495,9 @@ function ModalReceita({ opId, receita, onClose, onSaved, enderecosSugeridos = []
         ) : (
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Valor bruto (R$) *</label>
-            <input
-              type="number" step="0.01" min="0"
+            <CampoDecimal
               value={form.valor || ""}
-              onChange={(e) => set("valor", e.target.value)}
+              onChange={(txt) => set("valor", txt)}
               placeholder="R$ 0,00"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right tabular-nums focus:ring-2 focus:ring-torg-blue"
             />
@@ -2583,10 +2578,9 @@ function ModalReceita({ opId, receita, onClose, onSaved, enderecosSugeridos = []
             ].map((imp) => (
               <div key={imp.key}>
                 <label className="block text-[11px] font-medium text-torg-gray mb-1">{imp.label}</label>
-                <input
-                  type="number" step="0.01" min="0" max="100"
+                <CampoDecimal
                   value={form[imp.key]}
-                  onChange={(e) => set(imp.key, e.target.value)}
+                  onChange={(txt) => set(imp.key, txt)}
                   placeholder="0"
                   className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
                 />
@@ -2953,10 +2947,9 @@ function ModalPrazo({ opId, dataAtual, onClose, onSaved }) {
         </p>
         <div>
           <label className="block text-sm font-medium text-torg-dark mb-1">Nova data fim</label>
-          <input
-            type="date"
+          <CampoData
             value={novaData}
-            onChange={(e) => setNovaData(e.target.value)}
+            onChange={(iso) => setNovaData(iso)}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
           />
         </div>
@@ -3034,12 +3027,9 @@ function ModalSolicitarVerba({ tipo, itemId, atual, descricao, podeAlterarVerbaD
         </div>
         <div>
           <label className="block text-sm font-medium text-torg-dark mb-1">Valor proposto (R$)</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
+          <CampoDecimal
             value={valorProposto || ""}
-            onChange={(e) => setValorProposto(e.target.value)}
+            onChange={(txt) => setValorProposto(txt)}
             placeholder="R$ 0,00"
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue tabular-nums"
           />
@@ -3352,12 +3342,12 @@ function ModalAditivo({ opId, proximoNumero, onClose, onSaved }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-torg-dark mb-1">Data de início</label>
-            <input type="date" value={dataInicioAd} onChange={(e) => setDataInicioAd(e.target.value)}
+            <CampoData value={dataInicioAd} onChange={(iso) => setDataInicioAd(iso)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           </div>
           <div>
             <label className="block text-sm font-medium text-torg-dark mb-1">Fim previsto</label>
-            <input type="date" value={dataFimAd} onChange={(e) => setDataFimAd(e.target.value)}
+            <CampoData value={dataFimAd} onChange={(iso) => setDataFimAd(iso)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           </div>
         </div>

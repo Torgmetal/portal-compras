@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback } from "react";
 import PainelRastreabilidade from "./PainelRastreabilidade";
 import PerfisSemMaterial from "./PerfisSemMaterial";
@@ -831,8 +832,8 @@ function ModalDocumento({ doc, onClose, onSaved }) {
             <Campo label="Nº da corrida (heat)"><input value={form.numeroCorrida || ""} onChange={(e) => set("numeroCorrida", e.target.value)} className={inp} placeholder="só p/ certificado de material" /></Campo>
             <Campo label="Vínculo (livre)"><input value={form.vinculo || ""} onChange={(e) => set("vinculo", e.target.value)} className={inp} placeholder="OP-083 · Soldador João · Munck 01" /></Campo>
             <Campo label="OP (vínculo p/ data book)"><input value={form.opNumero || ""} onChange={(e) => set("opNumero", e.target.value)} className={inp} placeholder="ex.: 083" /></Campo>
-            <Campo label="Data de emissão"><input type="date" value={form.dataEmissao || ""} onChange={(e) => set("dataEmissao", e.target.value)} className={inp} /></Campo>
-            <Campo label="Data de validade"><input type="date" value={form.dataValidade || ""} onChange={(e) => set("dataValidade", e.target.value)} className={inp} /></Campo>
+            <Campo label="Data de emissão"><CampoData value={form.dataEmissao || ""} onChange={(iso) => set("dataEmissao", iso)} className={inp} /></Campo>
+            <Campo label="Data de validade"><CampoData value={form.dataValidade || ""} onChange={(iso) => set("dataValidade", iso)} className={inp} /></Campo>
             <Campo label="Responsável"><input value={form.responsavel || ""} onChange={(e) => set("responsavel", e.target.value)} className={inp} placeholder="quem registrou / emitiu" /></Campo>
             <Campo label="Observação" full><textarea value={form.observacao || ""} onChange={(e) => set("observacao", e.target.value)} rows={2} className={inp} /></Campo>
           </div>

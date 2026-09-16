@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useMemo, useEffect } from "react";
 import OrcamentoComercial from "@/components/OrcamentoComercial";
 import { useRouter } from "next/navigation";
@@ -217,17 +218,15 @@ export default function NovaOP() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-torg-dark mb-1">Data de início</label>
-            <input
-              type="date" value={form.dataInicio}
-              onChange={(e) => set("dataInicio", e.target.value)}
+            <CampoData value={form.dataInicio}
+              onChange={(iso) => set("dataInicio", iso)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-torg-dark mb-1">Data de fim prevista</label>
-            <input
-              type="date" value={form.dataFimPrevista}
-              onChange={(e) => set("dataFimPrevista", e.target.value)}
+            <CampoData value={form.dataFimPrevista}
+              onChange={(iso) => set("dataFimPrevista", iso)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
             />
           </div>

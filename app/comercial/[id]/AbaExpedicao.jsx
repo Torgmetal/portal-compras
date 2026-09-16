@@ -1,4 +1,6 @@
 "use client";
+import CampoData from "@/components/CampoData";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useEffect, useRef, Fragment } from "react";
 import * as XLSX from "xlsx";
 import { Truck, Plus, Pencil, Trash2, ChevronDown, ChevronRight, Loader2, X, Upload, Download, AlertCircle, CheckCircle2, FileSpreadsheet } from "lucide-react";
@@ -385,7 +387,7 @@ function LoteModal({ opId, lote, onClose, onSaved }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Data prevista</label>
-              <input type="date" value={f.dataPrevista} onChange={(e) => setF((v) => ({ ...v, dataPrevista: e.target.value }))} className={inp} />
+              <CampoData value={f.dataPrevista} onChange={(iso) => setF((v) => ({ ...v, dataPrevista: iso }))} className={inp} />
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Peso (kg) <span className="text-torg-gray font-normal">— opcional</span></label>
@@ -695,7 +697,7 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
                       <input type="checkbox" checked={sel.has(m.marca)} onChange={() => toggle(m.marca)} className="accent-torg-blue" />
                       <span className="font-mono text-torg-dark w-20 shrink-0 truncate">{m.marca}</span>
                       <span className="text-torg-gray truncate flex-1">{m.descricao || ""}</span>
-                      <input type="number" min="0" value={qtds[m.marca] ?? ""} onChange={(e) => setQtds((q) => ({ ...q, [m.marca]: e.target.value === "" ? "" : Number(e.target.value) }))} disabled={!sel.has(m.marca)} title="Quantidade" className="w-16 text-right text-[12px] border border-gray-300 rounded px-1.5 py-0.5 disabled:bg-gray-100 disabled:text-gray-400 outline-none focus:border-torg-blue" />
+                      <CampoDecimal value={qtds[m.marca] ?? ""} onChange={(txt) => setQtds((q) => ({ ...q, [m.marca]: txt === "" ? "" : numeroBR(txt) }))} disabled={!sel.has(m.marca)} title="Quantidade" className="w-16 text-right text-[12px] border border-gray-300 rounded px-1.5 py-0.5 disabled:bg-gray-100 disabled:text-gray-400 outline-none focus:border-torg-blue" />
                       <span className="text-torg-gray tabular-nums whitespace-nowrap w-16 text-right">{m.pesoTotalKg != null ? fmtKg(pesoAjustado(m)) : ""}</span>
                       <button onClick={() => removerMarca(m.marca)} className="text-gray-300 hover:text-red-600 shrink-0 ml-0.5" title="Tirar esta peça do romaneio"><X size={13} /></button>
                     </div>
@@ -742,7 +744,7 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
                 <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Placa (caminhão)</span><input value={f.placa} onChange={(e) => setF({ ...f, placa: e.target.value })} className={inp} placeholder="ABC1D23" /></label>
                 <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Placa carreta</span><input value={f.placaCarreta} onChange={(e) => setF({ ...f, placaCarreta: e.target.value })} className={inp} placeholder="se houver" /></label>
                 <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Contato / Fone</span><input value={f.contato} onChange={(e) => setF({ ...f, contato: e.target.value })} className={inp} placeholder="Telefone" /></label>
-                <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Data de saída</span><input type="date" value={f.data} onChange={(e) => setF({ ...f, data: e.target.value })} className={inp} /></label>
+                <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Data de saída</span><CampoData value={f.data} onChange={(iso) => setF({ ...f, data: iso })} className={inp} /></label>
               </div>
             </>
           ) : (

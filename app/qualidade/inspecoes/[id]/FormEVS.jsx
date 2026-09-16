@@ -4,6 +4,8 @@ import { useComponenteEstavel } from "@/lib/react-estavel";
 import { Plus, Trash2, AlertTriangle, Check } from "lucide-react";
 import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOES, METAIS_BASE, TIPOS_PECA, CRITERIO_PADRAO } from "@/lib/evs-campos";
 import { criteriosDoDefeito, ONDE_VALE } from "@/lib/aws-d11";
+import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 
 /**
  * O PREENCHIMENTO DO ENSAIO VISUAL DE SOLDA.
@@ -151,7 +153,7 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
                   </label>
                   <label className="block">
                     <span className="block text-[10px] text-torg-gray mb-0.5">Qtde</span>
-                    <input type="number" value={l.qtd ?? ""} disabled={travado} onChange={(e) => set(i, "qtd", e.target.value === "" ? null : Number(e.target.value))}
+                    <CampoDecimal value={l.qtd ?? ""} disabled={travado} onChange={(txt) => set(i, "qtd", txt === "" ? null : numeroBR(txt))}
                       className="w-full text-[12px] border border-gray-200 rounded px-1.5 py-1 disabled:bg-gray-50" />
                   </label>
                   <label className="block">

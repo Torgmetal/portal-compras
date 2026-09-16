@@ -1,4 +1,6 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 import { Trash2 } from "lucide-react";
 import {
   CATEGORIAS_MATERIAL, CATEGORIAS_SERVICOS_TERCEIRIZADOS, CATEGORIAS_ALUGUEL,
@@ -122,10 +124,9 @@ export default function ItemFormRow({ item, onChange, onRemove, canRemove, compa
               <label className="block text-xs font-medium text-torg-gray mb-1">
                 {tipo === "ESTRUTURA" ? "Peso estimado" : tipo === "AREA" ? "Área" : "Quantidade"}
               </label>
-              <input
-                type="number" step="0.01" min="0"
+              <CampoDecimal
                 value={item.qtdContratada || ""}
-                onChange={(e) => setKey("qtdContratada", parseFloat(e.target.value) || 0)}
+                onChange={(txt) => setKey("qtdContratada", numeroBR(txt))}
                 placeholder="0,00"
                 className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
               />
@@ -144,10 +145,9 @@ export default function ItemFormRow({ item, onChange, onRemove, canRemove, compa
                 <label className="block text-xs font-medium text-torg-gray mb-1">
                   CMC médio (R$/{item.unidade || (tipo === "AREA" ? "m²" : "kg")})
                 </label>
-                <input
-                  type="number" step="0.01" min="0"
+                <CampoDecimal
                   value={item.cmcMedio || ""}
-                  onChange={(e) => setKey("cmcMedio", parseFloat(e.target.value) || 0)}
+                  onChange={(txt) => setKey("cmcMedio", numeroBR(txt))}
                   placeholder="R$ 0,00"
                   className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
                 />
@@ -169,9 +169,8 @@ export default function ItemFormRow({ item, onChange, onRemove, canRemove, compa
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-gray mb-1">Valor / mês (R$)</label>
-              <input
-                type="number" step="0.01" min="0" value={item.valorPorMes || ""}
-                onChange={(e) => setKey("valorPorMes", parseFloat(e.target.value) || 0)}
+              <CampoDecimal value={item.valorPorMes || ""}
+                onChange={(txt) => setKey("valorPorMes", numeroBR(txt))}
                 placeholder="R$ 0,00"
                 className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
               />
@@ -196,9 +195,8 @@ export default function ItemFormRow({ item, onChange, onRemove, canRemove, compa
               <span className="text-torg-blue text-[10px]">(auto)</span>
             )}
           </label>
-          <input
-            type="number" step="0.01" min="0" value={item.valorVerba || ""}
-            onChange={(e) => setKey("valorVerba", parseFloat(e.target.value) || 0)}
+          <CampoDecimal value={item.valorVerba || ""}
+            onChange={(txt) => setKey("valorVerba", numeroBR(txt))}
             readOnly={verbaReadonly}
             placeholder="R$ 0,00"
             className={`w-full border rounded px-2 py-1.5 text-sm text-right font-medium tabular-nums focus:ring-1 focus:ring-torg-blue ${

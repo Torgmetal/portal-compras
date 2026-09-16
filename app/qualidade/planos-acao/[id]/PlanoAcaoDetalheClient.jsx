@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import ConfirmModal from "@/components/admin/ConfirmModal";
@@ -137,7 +138,7 @@ export default function PlanoAcaoDetalheClient({ id }) {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <Campo w="Where" label="Onde"><input value={it.onde} onChange={(e) => setIt(i, "onde", e.target.value)} placeholder="Local / setor" className="inp" /></Campo>
                   <Campo w="Who" label="Quem"><input value={it.quem} onChange={(e) => setIt(i, "quem", e.target.value)} placeholder="Responsável" className="inp" /></Campo>
-                  <Campo w="When" label="Quando"><input type="date" value={it.quando} onChange={(e) => setIt(i, "quando", e.target.value)} className="inp" /></Campo>
+                  <Campo w="When" label="Quando"><CampoData value={it.quando} onChange={(iso) => setIt(i, "quando", iso)} className="inp" /></Campo>
                   <Campo w="How much" label="Quanto"><input value={it.quanto} onChange={(e) => setIt(i, "quanto", e.target.value)} placeholder="Custo (R$)" className="inp" /></Campo>
                 </div>
                 <Campo w="How" label="Como"><textarea value={it.como} onChange={(e) => setIt(i, "como", e.target.value)} rows={1} placeholder="Método / como será feito" className="inp" /></Campo>

@@ -1,4 +1,5 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Plus, Trash2, Loader2, X, Edit3, Check, Paintbrush, ChevronDown, Calculator, DollarSign, ChevronRight, Ruler, Droplets, Package, Search, Beaker } from "lucide-react";
 import { calcularAreasTodosItens, TIPO_MATERIAL_LABEL } from "@/lib/perfil-perimetro";
@@ -275,7 +276,7 @@ function CamadaModal({ onClose, onSalvar, catalogo, loadingCatalogo, camada, are
             </div>
             <div>
               <label className="block text-sm font-semibold text-torg-dark mb-1">Espessura (µm) <span className="text-red-400">*</span></label>
-              <input type="number" value={espessuraMicra} onChange={(e) => setEspessuraMicra(e.target.value)} placeholder="75" min="1" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none" />
+              <CampoDecimal value={espessuraMicra} onChange={(txt) => setEspessuraMicra(txt)} placeholder="75" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none" />
             </div>
           </div>
 
@@ -291,7 +292,7 @@ function CamadaModal({ onClose, onSalvar, catalogo, loadingCatalogo, camada, are
             <div className="col-span-1">
               <label className="block text-sm font-semibold text-torg-dark mb-1">SV% <span className="text-red-400">*</span></label>
               <div className="relative">
-                <input type="number" value={svPct} onChange={(e) => setSvPct(e.target.value)} placeholder="75" min="1" max="100" className="w-full px-3 py-2.5 pr-7 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none" />
+                <CampoDecimal value={svPct} onChange={(txt) => setSvPct(txt)} placeholder="75" className="w-full px-3 py-2.5 pr-7 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none" />
                 <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-torg-gray">%</span>
               </div>
             </div>
