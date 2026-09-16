@@ -1,5 +1,5 @@
-import CampoData from "@/components/CampoData";
 'use client';
+import CampoData from "@/components/CampoData";
 import {Fragment,useState} from 'react';
 import {DESTINOS_TERCEIRO,saldosTerceiro,marcaTerceiro} from '@/lib/terceiros-retorno';
 import {itensRetornoSelecionados} from '@/lib/terceiros-distribuicao';
