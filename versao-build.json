@@ -1,7 +1,12 @@
 {
-  "build": 3215,
-  "gerado": "2026-09-16T18:43:38.919Z",
+  "build": 3216,
+  "gerado": "2026-09-16T19:08:24.118Z",
   "commits": [
+    {
+      "hash": "7f4d6f008b",
+      "data": "16/09/2026",
+      "titulo": "Permissão em massa nas pastas da OP: agora também CONCEDER — e Colaboração ≠ Editar"
+    },
     {
       "hash": "1a8e734267",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "aa84e48060",
       "data": "15/09/2026",
       "titulo": "Memória: o sharepointItemId morre, e a escada de download é uma só"
-    },
-    {
-      "hash": "1c2deae673",
-      "data": "15/09/2026",
-      "titulo": "Qualidade: o olho desistia no primeiro erro; o livro já sabia tentar de novo"
     }
   ]
 }

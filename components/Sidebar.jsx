@@ -3,8 +3,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Gauge, PlusCircle, FolderKanban, Building2, Boxes, Layers, Truck, RailSymbol, ShoppingCart, Forklift, Hammer, Star, PackageCheck
-} from "lucide-react";
+import { Gauge, PlusCircle, FolderKanban, Building2, Boxes, Layers, Truck, RailSymbol, ShoppingCart, Forklift, Hammer, Star, PackageCheck, CalendarClock } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -23,6 +22,11 @@ const menu = [
   { href: "/compras/montagem", label: "Medição de Montagem", icon: Hammer, matchPainel: "montagem" },
   { href: "/compras/nova-rm", label: "Nova RM", icon: PlusCircle },
   { href: "/compras/cronograma", label: "Entregas", icon: Truck },
+  // ⚠ "Prazos das RMs" e "Entregas" NÃO são a mesma tela, e ficam vizinhas de propósito: a Entregas
+  // lista PEDIDOS (kanban por situação, filtro por fornecedor) — é de quem cobra fornecedor; esta
+  // agrupa por RM e responde "o que a engenharia pediu já está chegando?". Matheus (16/09/2026):
+  // "preciso de uma aba fora para ver todas as RMs de uma vez, seus pedidos e prazos de cada".
+  { href: "/compras/prazos", label: "Prazos das RMs", icon: CalendarClock },
   { href: "/compras/estoque", label: "Estoque", icon: Boxes },
   { href: "/compras/materiais", label: "Materiais por OP", icon: Layers },
   { href: "/compras/vendorlist", label: "Vendor List", icon: Building2 },
