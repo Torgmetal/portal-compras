@@ -2275,9 +2275,19 @@ function ReceitasTabela({ receitas, onEditar, origemLqc = false }) {
     );
   }
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm min-w-[820px]">
-        <thead className="bg-gray-50">
+    <div className="overflow-x-auto" role="region" aria-label="Receitas do contrato" tabIndex={0}>
+      <table className="w-full table-fixed text-sm min-w-[1100px]">
+        <colgroup>
+          <col className="w-[110px]" />
+          <col />
+          <col className="w-[70px]" />
+          <col className="w-[100px]" />
+          <col className="w-[165px]" />
+          <col className="w-[140px]" />
+          <col className="w-[165px]" />
+          <col className="w-[90px]" />
+        </colgroup>
+        <thead className="bg-gray-50 [&_th]:whitespace-nowrap">
           <tr>
             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
@@ -2289,7 +2299,7 @@ function ReceitasTabela({ receitas, onEditar, origemLqc = false }) {
             <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
+        <tbody className="divide-y divide-gray-100 [&_td]:align-top [&_td]:py-3 [&_td]:leading-6">
           {receitas.map((r) => {
             const aliqTotal = (r.icmsPct || 0) + (r.ipiPct || 0) + (r.pisPct || 0)
               + (r.cofinsPct || 0) + (r.issPct || 0) + (r.irrfPct || 0) + (r.csllPct || 0);
@@ -2301,7 +2311,7 @@ function ReceitasTabela({ receitas, onEditar, origemLqc = false }) {
                 <td className="px-4 py-2 text-torg-dark text-xs">
                   <span className="font-medium">{labelCategoriaReceita(r.categoria)}</span>
                 </td>
-                <td className="px-4 py-2 text-torg-dark">
+                <td className="px-4 py-2 text-torg-dark break-words [text-wrap:pretty]">
                   {r.descricao}
                   {r.tipoPreco && r.tipoPreco !== "VALOR" && r.quantidade != null && (
                     <span className="block text-[10px] text-torg-gray tabular-nums">
@@ -2311,18 +2321,18 @@ function ReceitasTabela({ receitas, onEditar, origemLqc = false }) {
                 </td>
                 <td className="px-4 py-2 text-torg-gray text-xs font-mono">{r.cfop || "—"}</td>
                 <td className="px-4 py-2 text-torg-gray text-xs max-w-[180px] truncate" title={r.enderecoFaturamento || ""}>{r.enderecoFaturamento || "—"}</td>
-                <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">{fmtMoeda(r.valor)}</td>
-                <td className="px-4 py-2 text-right text-torg-orange-700 tabular-nums text-xs">
+                <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums whitespace-nowrap">{fmtMoeda(r.valor)}</td>
+                <td className="px-4 py-2 text-right text-torg-orange-700 tabular-nums text-xs whitespace-nowrap">
                   {fiscalPendente ? "A definir" : `− ${fmtMoeda(impostosVal)}`}
-                  <span className="text-[10px] text-torg-gray block">
+                  <span className="text-[10px] text-torg-gray block whitespace-nowrap">
                     {fiscalPendente ? "Conferir tributação" : aliqTotal > 0 ? `${aliqTotal.toFixed(2)}%` : "sem impostos"}
                   </span>
                 </td>
-                <td className="px-4 py-2 text-right text-torg-blue font-bold tabular-nums">{fiscalPendente ? "A definir" : fmtMoeda(liq)}</td>
+                <td className={`px-4 py-2 text-right tabular-nums whitespace-nowrap ${fiscalPendente ? "text-torg-gray font-medium" : "text-torg-blue font-bold"}`}>{fiscalPendente ? "A definir" : fmtMoeda(liq)}</td>
                 <td className="px-4 py-2 text-right">
                   <button
                     onClick={() => onEditar(r)}
-                    className="text-xs text-torg-gray hover:text-torg-dark font-medium inline-flex items-center gap-1"
+                    className="text-xs text-torg-gray hover:text-torg-dark font-medium inline-flex items-center gap-1 whitespace-nowrap"
                   >
                     <Pencil size={12} /> Editar
                   </button>
