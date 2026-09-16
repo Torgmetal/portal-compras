@@ -45,5 +45,7 @@ orçamentos — a LQC precisa do orçamento existir), heartbeat `lqc-sharepoint`
 lista de "atualizar" e seria apagado. Arquivo velho → "pulado: sem novidade"; arquivo refeito no
 Excel depois → atualiza.
 
-⚠ **LQC salva pela metade não entra**: a LQC-299-26 (TMSA Termasa) não tem a aba RESUMOS_EM e cai em
-`erros` a cada rodada até alguém salvar a planilha inteira. O erro aparece no retorno e no heartbeat.
+⚠ **LQC salva pela metade não entra**: a LQC-299-26 (TMSA Termasa) não tem a aba RESUMOS_EM (Vitor,
+16/09: "era apenas um teste"). Ela sai como **pulado** com o motivo, não como erro — erro de leitura
+acusava no heartbeat a cada hora. E `POST { forcar: [81] }` sobrescreve um estudo mesmo mais novo que a
+planilha, para quando o que está no portal era teste ("pode sobrescrever a 81").

@@ -1,156 +1,156 @@
 {
-  "build": 3213,
-  "gerado": "2026-09-16T18:19:25.443Z",
+  "build": 3214,
+  "gerado": "2026-09-16T18:34:41.798Z",
   "commits": [
     {
-      "hash": "710a69c1b3",
+      "hash": "2e90491f",
+      "data": "16/09/2026",
+      "titulo": "Pedido gerado: uma régua de acompanhamento na RM, do prazo à chegada"
+    },
+    {
+      "hash": "710a69c1",
       "data": "16/09/2026",
       "titulo": "LQC do SharePoint entra por cron, e a planilha só sobrescreve estudo que ela seja mais nova"
     },
     {
-      "hash": "8f1daa537a",
+      "hash": "8f1daa53",
       "data": "16/09/2026",
       "titulo": "Cotações: a forma de pagamento sai na tela, ao lado do prazo de entrega"
     },
     {
-      "hash": "4f8afe6fb9",
+      "hash": "4f8afe6f",
       "data": "16/09/2026",
       "titulo": "Cancelar RM deixa de ser privilégio de ADMIN e vira permissão por pessoa"
     },
     {
-      "hash": "a317c2556f",
+      "hash": "a317c255",
       "data": "16/09/2026",
       "titulo": "Data book: certificado movido de pasta no SharePoint é achado pelo nome, em vez de sumir do livro"
     },
     {
-      "hash": "ee300f4e08",
+      "hash": "ee300f4e",
       "data": "16/09/2026",
       "titulo": "Memória: formato do desenho é medido na página, a pasta A1–A4 só desempata (OP-094)"
     },
     {
-      "hash": "76de20df8c",
+      "hash": "76de20df",
       "data": "16/09/2026",
       "titulo": "Impressão de desenhos: o formato (A1–A4) é medido na página do PDF, não lido do nome da pasta"
     },
     {
-      "hash": "ba8db6fe53",
+      "hash": "ba8db6fe",
       "data": "16/09/2026",
       "titulo": "RNTRC no frete da remessa: o campo existe, e a tela parou de prometer o que o Omie não faz"
     },
     {
-      "hash": "ce38c4971e",
+      "hash": "ce38c497",
       "data": "16/09/2026",
       "titulo": "Observação do item: o rótulo avisa que o fornecedor lê — e agora dá para corrigir"
     },
     {
-      "hash": "1f1811ebf3",
+      "hash": "1f1811eb",
       "data": "16/09/2026",
       "titulo": "Cotação: o fornecedor passa a ver a observação do item"
     },
     {
-      "hash": "a929a6d958",
+      "hash": "a929a6d9",
       "data": "16/09/2026",
       "titulo": "Memória: contato de cliente digitado com @torg.com.br (OP-106, duas vezes)"
     },
     {
-      "hash": "3b2da1cf7b",
+      "hash": "3b2da1cf",
       "data": "16/09/2026",
       "titulo": "Relatórios de inspeção: o PDF entra na subpasta do tipo (3.1 Pintura, 3.2 DM…) quando ela existe"
     },
     {
-      "hash": "13515c5bb2",
+      "hash": "13515c5b",
       "data": "16/09/2026",
       "titulo": "Fotos dos relatórios: legenda ao capturar, editável na foto subida e com até 3 linhas no PDF"
     },
     {
-      "hash": "a8ecb8612a",
+      "hash": "a8ecb861",
       "data": "16/09/2026",
       "titulo": "RMs: as observações que alguém escreveu param de sumir da tela"
     },
     {
-      "hash": "4ec70d8f42",
+      "hash": "4ec70d8f",
       "data": "16/09/2026",
       "titulo": "Conserta a build: o import entrou antes do 'use client'"
     },
     {
-      "hash": "abd3898654",
+      "hash": "abd38986",
       "data": "16/09/2026",
       "titulo": "Espaço do cliente: relatório de inspeção para assinar aparece na obra dele"
     },
     {
-      "hash": "799c1e53a6",
+      "hash": "799c1e53",
       "data": "16/09/2026",
       "titulo": "Conferência de peça: a listagem conferida sai em PDF e em Excel"
     },
     {
-      "hash": "fc02dd40f4",
+      "hash": "fc02dd40",
       "data": "16/09/2026",
       "titulo": "Campo decimal e campo de data em português, no portal inteiro"
     },
     {
-      "hash": "d40c19e25d",
+      "hash": "d40c19e2",
       "data": "15/09/2026",
       "titulo": "Portal do cliente: \"onde a obra está\" é o reflexo do cronograma — acumulado por fase, mesmo %"
     },
     {
-      "hash": "9eebddf862",
+      "hash": "9eebddf8",
       "data": "15/09/2026",
       "titulo": "Portal do cliente: \"onde a obra está\" respeita a fase que o planejamento deu como 100% à mão"
     },
     {
-      "hash": "08be573d78",
+      "hash": "08be573d",
       "data": "15/09/2026",
       "titulo": "Data book: conferência do rascunho pelo cliente vira aviso — a assinatura não fica presa"
     },
     {
-      "hash": "4c9ee0d20b",
+      "hash": "4c9ee0d2",
       "data": "15/09/2026",
       "titulo": "Data book: e-mail do cliente no domínio da Torg é recusado, com o contato certo da OP na mensagem"
     },
     {
-      "hash": "abffd05bdc",
+      "hash": "abffd05b",
       "data": "15/09/2026",
       "titulo": "Relatório de pintura: hook depois do \"carregando o PLP\" derrubava a tela inteira"
     },
     {
-      "hash": "97f4f9be6b",
+      "hash": "97f4f9be",
       "data": "15/09/2026",
       "titulo": "Data book: acento decomposto no nome do anexo não derruba mais a geração dos volumes"
     },
     {
-      "hash": "e6de513a8d",
+      "hash": "e6de513a",
       "data": "15/09/2026",
       "titulo": "Cotação: o campo numérico do navegador DESCARTA a vírgula"
     },
     {
-      "hash": "b613022a13",
+      "hash": "b613022a",
       "data": "15/09/2026",
       "titulo": "SharePoint: o id do item vinha do banco e ia cru para a URL do Graph"
     },
     {
-      "hash": "7c1af37bee",
+      "hash": "7c1af37b",
       "data": "15/09/2026",
       "titulo": "Anexo da Qualidade: a guarda de SSRF estava no lugar errado"
     },
     {
-      "hash": "aa84e48060",
+      "hash": "aa84e480",
       "data": "15/09/2026",
       "titulo": "Memória: o sharepointItemId morre, e a escada de download é uma só"
     },
     {
-      "hash": "1c2deae673",
+      "hash": "1c2deae6",
       "data": "15/09/2026",
       "titulo": "Qualidade: o olho desistia no primeiro erro; o livro já sabia tentar de novo"
     },
     {
-      "hash": "88b288180c",
+      "hash": "88b28818",
       "data": "15/09/2026",
       "titulo": "Anexo de inspeção: o documento de uma obra não serve o relatório de outra"
-    },
-    {
-      "hash": "a89a9df26a",
-      "data": "15/09/2026",
-      "titulo": "Cron da L.E.: o aviso do sino repetia a lista de ontem (achado ALTA do Codex)"
     }
   ]
 }

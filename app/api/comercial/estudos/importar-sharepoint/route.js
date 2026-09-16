@@ -26,7 +26,11 @@ export const maxDuration = 800;
 
 const ROLES = ["ADMIN", "COMERCIAL"];
 
-async function processar(ano, aplicar, user) {
+async function processar(ano, aplicar, user, { forcar = [] } = {}) {
+  // ⚠ `forcar`: números cujo estudo do portal DEVE ser sobrescrito pela planilha mesmo sendo mais
+  // recente — Vitor (16/09/2026) sobre o 81: "pode sobrescrever a 81 pois a que fizemos no portal
+  // foi para apenas testar". É decisão de quem sabe o que tem dentro, por isso vem no pedido.
+  const forcados = new Set((Array.isArray(forcar) ? forcar : []).map(Number).filter(Boolean));
   const { lqcs, ignorados } = await listarLqcs(ano);
   const escolhidas = escolherPorOrcamento(lqcs);
 
@@ -61,7 +65,7 @@ async function processar(ano, aplicar, user) {
     // também não: a planilha só passa por cima se for mais nova que a última mexida
     // (`decidirImportacao`, com o porquê lá). (A primeira guarda testava uma flag `custosEditados`
     // que não existe; a segunda só olhava `origemSharePoint` e ia sobrescrever o 81 em 16/09/2026.)
-    const decisao = decidirImportacao(jaTem, escolhida);
+    const decisao = jaTem && forcados.has(numero) ? { acao: "atualizar", motivo: "forçado no pedido" } : decidirImportacao(jaTem, escolhida);
     if (decisao.acao === "pulado") {
       resumo.pulados++;
       detalhe.push({ numero, arquivo: escolhida.nome, acao: "pulado", motivo: decisao.motivo });
@@ -88,7 +92,17 @@ async function processar(ano, aplicar, user) {
           ultimoErro = r.erro;
         } catch (e) { ultimoErro = e.message; }
       }
-      if (!lido) { resumo.erros.push({ numero, arquivo: escolhida.nome, erro: ultimoErro || "não deu para ler" }); continue; }
+      if (!lido) {
+        // ⚠ PLANILHA SEM A ABA DE RESUMO NÃO É ERRO DE LEITURA — é uma LQC salva pela metade (ou um
+        // teste, como a 299-26 em 16/09/2026). Como "erro" ela acusava no heartbeat a cada hora;
+        // como "pulado" fica visível no detalhe, com o motivo, sem gritar.
+        if (/n[ãa]o tem a aba de resumo/i.test(ultimoErro || "")) {
+          resumo.pulados++;
+          detalhe[detalhe.length - 1] = { numero, arquivo: escolhida.nome, acao: "pulado", motivo: `planilha sem a aba de resumo — ${ultimoErro}` };
+          continue;
+        }
+        resumo.erros.push({ numero, arquivo: escolhida.nome, erro: ultimoErro || "não deu para ler" }); continue;
+      }
       if (usada.id !== escolhida.id) resumo.erros.push({ numero, arquivo: escolhida.nome, aviso: `ilegível — usei ${usada.nome}` });
 
       // ⚠⚠ O PREÇO DO AÇO PRECISA CHEGAR AQUI, SENÃO O ESTUDO NASCE SEM A MAIOR PARCELA DO CUSTO.
@@ -176,10 +190,11 @@ export async function POST(req) {
   const body = await req.json().catch(() => ({}));
   const ano = Number(body.ano) || new Date().getUTCFullYear();
   try {
-    const r = await processar(ano, true, user);
+    const forcar = Array.isArray(body.forcar) ? body.forcar.map(Number).filter(Boolean) : [];
+    const r = await processar(ano, true, user, { forcar });
     await prisma.auditLog.create({
       data: { userId: user.id, action: "IMPORTAR_LQC_SHAREPOINT", entity: "EstudoFabricacao",
-              entityId: String(ano), diff: { criados: r.criados, atualizados: r.atualizados, erros: r.erros.length } },
+              entityId: String(ano), diff: { criados: r.criados, atualizados: r.atualizados, pulados: r.pulados, erros: r.erros.length, ...(forcar.length ? { forcar } : {}) } },
     }).catch(() => {});
     return NextResponse.json(r);
   } catch (e) {
