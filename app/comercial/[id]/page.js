@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { margemOrcadaLqc } from "@/lib/lqc-op-margem";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -347,6 +348,7 @@ export async function carregarDetalheOP(id, user) {
     opData.materiaisEstoque = { itens: [], valorConsumido: 0, totalReservado: 0, totalConsumido: 0 };
   }
   opData.kpisFinanceiros = {
+    margemLqc: margemOrcadaLqc(op),
     verbaTotal, totalEmPedidos, saldo, consumoPct,
     receitaBruta, totalImpostos, receitaLiquida,
     margemPrevista, margemPct,

@@ -1,7 +1,12 @@
 {
-  "build": 3222,
-  "gerado": "2026-09-16T21:11:02.556Z",
+  "build": 3223,
+  "gerado": "2026-09-16T21:57:49.619Z",
   "commits": [
+    {
+      "hash": "b4c2bb54",
+      "data": "16/09/2026",
+      "titulo": "Confere custos e quantitativos da LQC com a planilha antes de gerar OP"
+    },
     {
       "hash": "42fecb34",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "08be573d",
       "data": "15/09/2026",
       "titulo": "Data book: conferência do rascunho pelo cliente vira aviso — a assinatura não fica presa"
-    },
-    {
-      "hash": "4c9ee0d2",
-      "data": "15/09/2026",
-      "titulo": "Data book: e-mail do cliente no domínio da Torg é recusado, com o contato certo da OP na mensagem"
     }
   ]
 }

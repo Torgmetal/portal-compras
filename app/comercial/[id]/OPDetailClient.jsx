@@ -1,4 +1,5 @@
 "use client";
+import MargemOrcadaLqc from "@/components/comercial/MargemOrcadaLqc";
 import CampoData from "@/components/CampoData";
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -498,7 +499,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
           {/* Duas colunas: Receita | Despesa */}
           <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
             {/* Coluna: Receita (entrada) */}
-            <div className="p-5">
+            {op.kpisFinanceiros.margemLqc ? <MargemOrcadaLqc dados={op.kpisFinanceiros.margemLqc} /> : <div className="p-5">
               <p className="text-[11px] uppercase tracking-wide text-torg-blue font-semibold mb-3">
                 Receita do contrato (entrada)
               </p>
@@ -544,7 +545,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
                   </div>
                 </div>
               )}
-            </div>
+            </div>}
 
             {/* Coluna: Despesa (saída) */}
             <div className="p-5">
@@ -594,7 +595,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
           </div>
 
           {/* Margem prevista */}
-          {op.kpisFinanceiros.receitaBruta > 0 && (
+          {!op.kpisFinanceiros.margemLqc && op.kpisFinanceiros.receitaBruta > 0 && (
             <div className="border-t border-gray-100 px-5 py-3 flex items-center justify-between bg-gray-50/50">
               <p className="text-xs text-torg-gray uppercase tracking-wide font-semibold">
                 Margem prevista (líquido − verba)
@@ -744,6 +745,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
           )}
         </div>
         <ReceitasTabela
+          origemLqc={!!op.kpisFinanceiros?.margemLqc}
           receitas={op.receitas || []}
           onEditar={(r) => setModalReceita(r)}
         />
@@ -2264,7 +2266,7 @@ function ModalClienteFiscal({ opId, op, onClose, onSaved }) {
 }
 
 // Tabela das receitas no detalhe da OP
-function ReceitasTabela({ receitas, onEditar }) {
+function ReceitasTabela({ receitas, onEditar, origemLqc = false }) {
   if (!receitas || receitas.length === 0) {
     return (
       <p className="px-6 py-4 text-sm text-torg-gray">
@@ -2291,6 +2293,7 @@ function ReceitasTabela({ receitas, onEditar }) {
           {receitas.map((r) => {
             const aliqTotal = (r.icmsPct || 0) + (r.ipiPct || 0) + (r.pisPct || 0)
               + (r.cofinsPct || 0) + (r.issPct || 0) + (r.irrfPct || 0) + (r.csllPct || 0);
+            const fiscalPendente = origemLqc && [r.icmsPct, r.ipiPct, r.pisPct, r.cofinsPct, r.issPct, r.irrfPct, r.csllPct].every((v) => v == null);
             const impostosVal = (r.valor || 0) * (aliqTotal / 100);
             const liq = (r.valor || 0) - impostosVal;
             return (
@@ -2310,12 +2313,12 @@ function ReceitasTabela({ receitas, onEditar }) {
                 <td className="px-4 py-2 text-torg-gray text-xs max-w-[180px] truncate" title={r.enderecoFaturamento || ""}>{r.enderecoFaturamento || "—"}</td>
                 <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">{fmtMoeda(r.valor)}</td>
                 <td className="px-4 py-2 text-right text-torg-orange-700 tabular-nums text-xs">
-                  − {fmtMoeda(impostosVal)}
+                  {fiscalPendente ? "A definir" : `− ${fmtMoeda(impostosVal)}`}
                   <span className="text-[10px] text-torg-gray block">
-                    {aliqTotal > 0 ? `${aliqTotal.toFixed(2)}%` : "sem impostos"}
+                    {fiscalPendente ? "Conferir tributação" : aliqTotal > 0 ? `${aliqTotal.toFixed(2)}%` : "sem impostos"}
                   </span>
                 </td>
-                <td className="px-4 py-2 text-right text-torg-blue font-bold tabular-nums">{fmtMoeda(liq)}</td>
+                <td className="px-4 py-2 text-right text-torg-blue font-bold tabular-nums">{fiscalPendente ? "A definir" : fmtMoeda(liq)}</td>
                 <td className="px-4 py-2 text-right">
                   <button
                     onClick={() => onEditar(r)}
