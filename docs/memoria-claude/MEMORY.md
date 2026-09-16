@@ -176,3 +176,4 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Import da L.E. é manual](torg_le_import_manual.md) — cron diário só AVISA (nunca importa); `?simular=1` não avisa nem bate heartbeat; olhar a pasta antes de achar que é ruído
 - [Conversão em massa de JSX](torg_conversao_em_massa.md) — o que só o `npm run build` pega: `'use client'` deslocado, import dentro de import multilinha, e o conversor mordendo o próprio componente
 - [E-mail de cliente com @torg.com.br](torg_email_cliente_dominio_torg.md) — OP-106 2× em set/2026: Resend aceita, ninguém recebe, portal do cliente não mostra (casa pelo e-mail da sessão); conferir domínio
+- [Certificado movido no SharePoint some do data book](torg_databook_certificado_movido.md) — OP-106: item 404 vira pendência silenciosa; 4º degrau busca pelo nome; ler `pendencias` antes de aceitar

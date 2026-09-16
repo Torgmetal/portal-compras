@@ -1,7 +1,12 @@
 {
-  "build": 3208,
-  "gerado": "2026-09-16T16:09:05.174Z",
+  "build": 3209,
+  "gerado": "2026-09-16T16:42:12.601Z",
   "commits": [
+    {
+      "hash": "ee300f4e",
+      "data": "16/09/2026",
+      "titulo": "Memória: formato do desenho é medido na página, a pasta A1–A4 só desempata (OP-094)"
+    },
     {
       "hash": "76de20df",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7f687dfc",
       "data": "15/09/2026",
       "titulo": "RMs Materiais: funil por coluna no cabeçalho, como nas outras telas"
-    },
-    {
-      "hash": "68c01d92",
-      "data": "15/09/2026",
-      "titulo": "Data Book: o olho dava \"arquivo invalido\" e o X girava sem dizer por que"
     }
   ]
 }

@@ -7,12 +7,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/sharepoint", () => ({
-  downloadRhItem: vi.fn(), downloadFileById: vi.fn(), downloadSharedFile: vi.fn(),
+  downloadRhItem: vi.fn(), downloadFileById: vi.fn(), downloadSharedFile: vi.fn(), procurarArquivoPorNome: vi.fn(),
 }));
+vi.mock("@/lib/prisma", () => ({ prisma: { documentoQualidade: { update: vi.fn(async () => ({})) } } }));
 vi.mock("@/lib/projetos-databook", () => ({ resolveServidorDriveId: vi.fn(async () => "drive-servidor") }));
 vi.mock("@/lib/relatorio-pdf-fonte", () => ({ pdfDoRelatorio: vi.fn(), fonteDeInspecao: vi.fn(() => null) }));
 
-import { downloadRhItem, downloadFileById, downloadSharedFile } from "@/lib/sharepoint";
+import { downloadRhItem, downloadFileById, downloadSharedFile, procurarArquivoPorNome } from "@/lib/sharepoint";
+import { prisma } from "@/lib/prisma";
 import { fonteDeInspecao, pdfDoRelatorio } from "@/lib/relatorio-pdf-fonte";
 import { baixarDocumento } from "@/lib/databook-arquivo";
 
@@ -26,6 +28,43 @@ beforeEach(() => {
   downloadRhItem.mockResolvedValue({ buffer: Buffer.from("PADRAO") });
   downloadFileById.mockResolvedValue({ buffer: Buffer.from("SERVIDOR") });
   downloadSharedFile.mockResolvedValue({ buffer: Buffer.from("CAMINHO") });
+  procurarArquivoPorNome.mockResolvedValue([]);
+});
+
+describe("baixarDocumento — 4º degrau: o arquivo mudou de pasta (OP-106, R 261162/261163)", () => {
+  const MOVIDO = "https://torgmetal637.sharepoint.com/sites/TorgMetal/SERVIDOR/Almoxarifado/01.%20Rastreabilidade/Certificados%20TMSA/R%20261163.pdf";
+  const tudoMorto = () => {
+    downloadFileById.mockRejectedValue(new Error("HTTP 404"));
+    downloadRhItem.mockRejectedValue(new Error("HTTP 404"));
+    downloadSharedFile.mockRejectedValue(new Error("SharePoint /shares HTTP 404"));
+  };
+
+  it("id e caminho mortos, UM arquivo com o nome na pasta-raiz: baixa e grava o endereço novo", async () => {
+    tudoMorto();
+    procurarArquivoPorNome.mockResolvedValue([{ id: "NOVO-ID", name: "R 261163.pdf", webUrl: "https://torgmetal637.sharepoint.com/sites/TorgMetal/SERVIDOR/Almoxarifado/01.%20Rastreabilidade/Certificados%202026/R%20261163.pdf", parentPath: null }]);
+    downloadFileById.mockImplementation(async (_d, id) => { if (id === "NOVO-ID") return { buffer: Buffer.from("ACHADO") }; throw new Error("HTTP 404"); });
+    const out = await baixarDocumento(doc({ id: "doc-1", arquivoUrl: MOVIDO }), "drive-servidor");
+    expect(out.toString()).toBe("ACHADO");
+    expect(procurarArquivoPorNome).toHaveBeenCalledWith("drive-servidor", "/Almoxarifado/01. Rastreabilidade", "R 261163.pdf");
+    expect(prisma.documentoQualidade.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "doc-1" }, data: expect.objectContaining({ sharepointItemId: "NOVO-ID" }) }));
+  });
+
+  it("dois arquivos com o mesmo nome: não adivinha — propaga o erro de sempre", async () => {
+    tudoMorto();
+    procurarArquivoPorNome.mockResolvedValue([{ id: "A", name: "R 261163.pdf" }, { id: "B", name: "R 261163.pdf" }]);
+    await expect(baixarDocumento(doc({ id: "doc-1", arquivoUrl: MOVIDO }), "drive-servidor")).rejects.toThrow("HTTP 404");
+    expect(prisma.documentoQualidade.update).not.toHaveBeenCalled();
+  });
+
+  it("nada com o nome: propaga o erro; e a busca só roda depois de id e caminho falharem", async () => {
+    tudoMorto();
+    await expect(baixarDocumento(doc({ id: "doc-1", arquivoUrl: MOVIDO }), "drive-servidor")).rejects.toThrow("HTTP 404");
+    expect(procurarArquivoPorNome).toHaveBeenCalledTimes(1);
+    downloadSharedFile.mockResolvedValue({ buffer: Buffer.from("CAMINHO") });
+    procurarArquivoPorNome.mockClear();
+    expect((await baixarDocumento(doc({ id: "doc-1", arquivoUrl: MOVIDO }), "drive-servidor")).toString()).toBe("CAMINHO");
+    expect(procurarArquivoPorNome).not.toHaveBeenCalled();
+  });
 });
 
 describe("baixarDocumento — a defesa contra SSRF fica junto do fetch", () => {
