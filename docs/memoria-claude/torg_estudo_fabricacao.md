@@ -29,3 +29,21 @@ Módulo de composição de custo de fabricação (`/comercial/orcamentos/estudos
 **Regras que já viraram código e não devem ser desfeitas:** desmarcar área é excluir do escopo; bases de imposto partem a venda (não somam em cima); ICMS credita 12% das compras da Torg (não do que o cliente compra direto); medição fatura kg produzido e trava no peso da obra; projeto e fabricação podem se sobrepor.
 
 Ver [[torg_custo_hora]] — o `ocupacaoPct` está em 80 numa fórmula que o lê como absenteísmo (38,5 h/pessoa/mês, 1,75 h/dia), inflando o custo-hora ~4,6×. **Vitor ainda não decidiu** o que aquele campo deveria significar.
+
+## LQC do SharePoint entra por cron (16/09/2026)
+
+Vitor: *"as LQCs vc está atualizando? pois está puxando a última dia 09/09"*. A importação em massa
+(`/api/comercial/estudos/importar-sharepoint`) só existia como chamada manual e ninguém chamava:
+última rodada 30/08; 17 LQCs novas (295–313, 231, 270) ficaram no SharePoint sem estudo enquanto os
+orçamentos (cron das :20) chegavam à 313-26. Agora roda às **:40, 6–20 h, dias úteis** (depois dos
+orçamentos — a LQC precisa do orçamento existir), heartbeat `lqc-sharepoint`, caminho liberado no
+`middleware.js` (`CRONS_FORA_DO_PREFIXO`) e cobrado no `cron-monitor`.
+
+⚠⚠ **A planilha só passa por cima se for MAIS NOVA que a última mexida no portal**
+(`decidirImportacao`, lib/lqc-sharepoint). A guarda antiga só poupava estudo nascido no portal; o
+81 (TMSA Vale TR36), importado e depois trabalhado pelo Vitor (19 salvamentos em 16/09), estava na
+lista de "atualizar" e seria apagado. Arquivo velho → "pulado: sem novidade"; arquivo refeito no
+Excel depois → atualiza.
+
+⚠ **LQC salva pela metade não entra**: a LQC-299-26 (TMSA Termasa) não tem a aba RESUMOS_EM e cai em
+`erros` a cada rodada até alguém salvar a planilha inteira. O erro aparece no retorno e no heartbeat.

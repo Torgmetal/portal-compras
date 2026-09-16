@@ -15,7 +15,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { listarLqcs, escolherPorOrcamento, baixarLqc } from "@/lib/lqc-sharepoint";
+import { listarLqcs, escolherPorOrcamento, baixarLqc, decidirImportacao } from "@/lib/lqc-sharepoint";
+import { registrarExecucao } from "@/lib/cron-monitor";
 import { importarLqc } from "@/lib/lqc-importar";
 import { calcularLqc } from "@/lib/lqc";
 
@@ -56,20 +57,20 @@ async function processar(ano, aplicar, user) {
       detalhe.push({ numero, arquivo: escolhida.nome, acao: "sem orçamento", motivo: `não existe ${numero}-${aa} na central` });
       continue;
     }
-    // ⚠ ESTUDO MONTADO À MÃO NÃO É SOBRESCRITO. Quem veio de importação carrega
-    // `composicao.origemSharePoint`; quem não carrega foi construído aqui dentro, por alguém, e a
-    // planilha não passa por cima disso. (Primeira versão desta guarda testava uma flag
-    // `custosEditados` que não existe no portal — protegia nada e parecia proteger.)
-    const feitoNoPortal = jaTem?.composicao && Object.keys(jaTem.composicao).length > 0 && !jaTem.composicao.origemSharePoint;
-    if (feitoNoPortal) {
+    // ⚠ ESTUDO MONTADO À MÃO NÃO É SOBRESCRITO, e estudo importado e depois TRABALHADO no portal
+    // também não: a planilha só passa por cima se for mais nova que a última mexida
+    // (`decidirImportacao`, com o porquê lá). (A primeira guarda testava uma flag `custosEditados`
+    // que não existe; a segunda só olhava `origemSharePoint` e ia sobrescrever o 81 em 16/09/2026.)
+    const decisao = decidirImportacao(jaTem, escolhida);
+    if (decisao.acao === "pulado") {
       resumo.pulados++;
-      detalhe.push({ numero, arquivo: escolhida.nome, acao: "pulado", motivo: "estudo montado no portal — a planilha não sobrescreve" });
+      detalhe.push({ numero, arquivo: escolhida.nome, acao: "pulado", motivo: decisao.motivo });
       continue;
     }
 
     detalhe.push({
       numero, arquivo: escolhida.nome, revisao: escolhida.revisao,
-      acao: jaTem ? "atualizar" : "criar",
+      acao: decisao.acao,
       orcamento: orc.numero, cliente: orc.cliente,
       outrasVersoes: outras.map((o) => o.nome),
     });
@@ -139,12 +140,33 @@ async function processar(ano, aplicar, user) {
   return { ...resumo, ignorados, detalhe };
 }
 
+// ⚠⚠ O CRON DA VERCEL DISPARA GET, NÃO POST (mesma lição da importação de orçamentos). Vitor
+// (16/09/2026): "as LQCs vc está atualizando? pois está puxando a última dia 09/09" — esta rota só
+// existia como chamada manual e ninguém chamava: a última importação foi 30/08 e 17 LQCs novas
+// ficaram no SharePoint sem estudo. Para GENTE o GET continua sendo SIMULAÇÃO; só o cron aplica.
 export async function GET(req) {
-  try { await requireRole(ROLES); }
-  catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  const auth = req.headers.get("authorization");
+  const doCron = !!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`;
+  if (!doCron) {
+    try { await requireRole(ROLES); }
+    catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  }
   const ano = Number(new URL(req.url).searchParams.get("ano")) || new Date().getUTCFullYear();
-  try { return NextResponse.json({ simulacao: true, ...(await processar(ano, false, null)) }); }
-  catch (e) { return NextResponse.json({ error: e.message }, { status: 502 }); }
+  try {
+    const r = await processar(ano, doCron, null);
+    if (doCron && (r.criados > 0 || r.atualizados > 0)) {
+      // registra só quando MUDOU — uma linha por hora dizendo "nada" enterraria as importações de verdade
+      await prisma.auditLog.create({
+        data: { userId: null, action: "IMPORTAR_LQC_SHAREPOINT", entity: "EstudoFabricacao",
+                entityId: String(ano), diff: { criados: r.criados, atualizados: r.atualizados, pulados: r.pulados, erros: r.erros.length, porCron: true } },
+      }).catch(() => {});
+    }
+    if (doCron) await registrarExecucao("lqc-sharepoint", { ok: true, mensagem: `${r.criados || 0} novo(s) · ${r.atualizados || 0} atualizado(s) · ${r.pulados || 0} pulado(s)${r.erros.length ? ` · ${r.erros.length} erro(s)` : ""}` });
+    return NextResponse.json({ simulacao: !doCron, ...r });
+  } catch (e) {
+    if (doCron) await registrarExecucao("lqc-sharepoint", { ok: false, mensagem: e.message });
+    return NextResponse.json({ error: e.message }, { status: 502 });
+  }
 }
 
 export async function POST(req) {

@@ -31,6 +31,7 @@ const CRONS_FORA_DO_PREFIXO = new Set([
   "/api/compras/produtos-omie/sincronizar",
   "/api/engenharia/grd/sincronizar",
   "/api/comercial/orcamento/importar-sharepoint",
+  "/api/comercial/estudos/importar-sharepoint",
 ]);
 
 const COMERCIAL_RESTRITO = ["nova", "orcamentos", "aprovacoes", "kickoffs", "apresentacoes", "indicadores"];

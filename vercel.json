@@ -114,6 +114,10 @@
       "schedule": "20 6-20 * * 1-5"
     },
     {
+      "path": "/api/comercial/estudos/importar-sharepoint",
+      "schedule": "40 6-20 * * 1-5"
+    },
+    {
       "path": "/api/cron/casar-certificados",
       "schedule": "50 5,13 * * *"
     },
