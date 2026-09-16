@@ -1,7 +1,12 @@
 {
-  "build": 3219,
-  "gerado": "2026-09-16T19:27:41.790Z",
+  "build": 3220,
+  "gerado": "2026-09-16T19:28:42.599Z",
   "commits": [
+    {
+      "hash": "446830f2",
+      "data": "16/09/2026",
+      "titulo": "Referências do cliente com as palavras dele, aditivo como pedido novo e comunicado aos setores"
+    },
     {
       "hash": "e2d02403",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "97f4f9be",
       "data": "15/09/2026",
       "titulo": "Data book: acento decomposto no nome do anexo não derruba mais a geração dos volumes"
-    },
-    {
-      "hash": "e6de513a",
-      "data": "15/09/2026",
-      "titulo": "Cotação: o campo numérico do navegador DESCARTA a vírgula"
     }
   ]
 }

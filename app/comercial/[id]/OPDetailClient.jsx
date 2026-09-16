@@ -1174,6 +1174,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
       {modalMedicao && (
         <ModalMedicao
           opId={op.id}
+          aditivos={op.aditivos || []}
           onClose={() => setModalMedicao(false)}
           onSaved={() => { setModalMedicao(false); router.refresh(); }}
         />
@@ -1519,8 +1520,10 @@ function statusMedicaoClasses(etapa) {
 }
 
 // Modal pra vincular medicao
-function ModalMedicao({ opId, onClose, onSaved }) {
+function ModalMedicao({ opId, aditivos = [], onClose, onSaved }) {
   const [tipo, setTipo] = useState("VENDA"); // VENDA | SERVICO
+  // a medição de um aditivo aponta para ele — "linha de medição nova" (Vitor, 16/09/2026)
+  const [aditivoId, setAditivoId] = useState("");
   const [numero, setNumero] = useState("");
   const [descricao, setDescricao] = useState("");
   const [modoManual, setModoManual] = useState(false);
@@ -1550,6 +1553,7 @@ function ModalMedicao({ opId, onClose, onSaved }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           numeroPedido: numero.trim(),
+          aditivoId: aditivoId || null,
           descricao: descricao.trim() || null,
           tipoDocumento: tipo,
           manual,
@@ -1635,6 +1639,16 @@ function ModalMedicao({ opId, onClose, onSaved }) {
             </button>
           </div>
         </div>
+
+        {aditivos.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">Esta medição é de qual pedido?</label>
+            <select value={aditivoId} onChange={(e) => setAditivoId(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+              <option value="">Contrato-base</option>
+              {aditivos.map((a) => <option key={a.id} value={a.id}>Aditivo {a.numero}{a.valor != null ? ` — ${fmtMoeda(a.valor)}` : ""}</option>)}
+            </select>
+          </div>
+        )}
 
         <p className="text-xs text-torg-gray">
           Digite o número da <strong>{tipoLabel}</strong> que você criou no Omie (ex: <code>1500</code> ou <code>233/1</code>).
