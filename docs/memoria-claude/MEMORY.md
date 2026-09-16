@@ -175,3 +175,4 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Permissões das pastas da OP (SharePoint)](torg_permissoes_pasta_op.md) — acesso é por usuário individual, não por grupo; "Acesso Limitado" engana a contagem; OP nova nasce liberada; script `scripts/permissoes-sharepoint.mjs`
 - [Import da L.E. é manual](torg_le_import_manual.md) — cron diário só AVISA (nunca importa); `?simular=1` não avisa nem bate heartbeat; olhar a pasta antes de achar que é ruído
 - [Conversão em massa de JSX](torg_conversao_em_massa.md) — o que só o `npm run build` pega: `'use client'` deslocado, import dentro de import multilinha, e o conversor mordendo o próprio componente
+- [E-mail de cliente com @torg.com.br](torg_email_cliente_dominio_torg.md) — OP-106 2× em set/2026: Resend aceita, ninguém recebe, portal do cliente não mostra (casa pelo e-mail da sessão); conferir domínio
