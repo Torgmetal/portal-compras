@@ -1,4 +1,5 @@
 "use client";
+import BlocoObservacao from "@/components/BlocoObservacao";
 import { XCircle, Edit2, Plus, Package } from "lucide-react";
 import { fmtMoeda, STATUS_ITEM_LABELS, STATUS_SEM_PROPOSTA } from "../_lib/formatos";
 
@@ -63,6 +64,11 @@ export function TabelaItensRM({
                   <td className="px-3 py-1.5 text-gray-400 align-top">{i + 1}</td>
                   <td className="px-3 py-1.5 align-top">
                     <p className="text-torg-dark font-medium">{it.descricao}</p>
+                    {/* ⚠⚠ A OBSERVAÇÃO DO ITEM NÃO APARECIA EM LUGAR NENHUM. Foi o caso que o
+                        Matheus mostrou (RI-0034, 16/09/2026): o item trazia "600,00 - Pedro
+                        Locatelli" escrito por quem abriu a RM, e a tela de compras — que é quem
+                        vai cotar — não tinha como saber. */}
+                    <BlocoObservacao texto={it.observacao} compacto />
                     {(it.comprimento || it.largura || it.tratamento) && (
                       <p className="text-[10px] text-torg-gray mt-0.5">
                         {it.comprimento && it.largura

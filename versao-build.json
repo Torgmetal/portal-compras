@@ -1,7 +1,12 @@
 {
-  "build": 3199,
-  "gerado": "2026-09-16T12:54:55.260Z",
+  "build": 3200,
+  "gerado": "2026-09-16T13:29:56.599Z",
   "commits": [
+    {
+      "hash": "4ec70d8f42",
+      "data": "16/09/2026",
+      "titulo": "Conserta a build: o import entrou antes do 'use client'"
+    },
     {
       "hash": "abd3898654",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "afe90467e7",
       "data": "15/09/2026",
       "titulo": "Memória: conceder acesso a pasta do SharePoint funciona pelo Graph (invite), sem ponte de navegador"
-    },
-    {
-      "hash": "911fb91a32",
-      "data": "15/09/2026",
-      "titulo": "Simulador de carga: edição manual e embalagens econômicas"
     }
   ]
 }

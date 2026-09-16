@@ -6,6 +6,7 @@ import { fmtOP } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 import RMHeaderActions from "@/components/RMHeaderActions";
+import BlocoObservacao from "@/components/BlocoObservacao";
 
 // Sempre busca dados frescos do banco
 
@@ -61,7 +62,8 @@ export default async function RMDetail({ params }) {
               <span className={`text-xs px-2 py-1 rounded-full font-medium ${status.className}`}>{status.label}</span>
             </div>
             <p className="text-torg-dark font-medium mt-1">{rm.descricao}</p>
-            {rm.observacao && <p className="text-sm text-torg-gray mt-1">{rm.observacao}</p>}
+            {/* ⚠ Mesma correção da tela de compras: era um <p> cinza sem rótulo e passava batido. */}
+            <BlocoObservacao texto={rm.observacao} rotulo="Observação da RM" autor={rm.createdBy?.name} />
           </div>
           {rm.op && (
             <div className="text-right text-sm">
@@ -143,7 +145,12 @@ export default async function RMDetail({ params }) {
               {rm.itens.map((it, i) => (
                 <tr key={it.id} className="hover:bg-gray-50">
                   <td className="px-3 py-1.5 text-gray-400">{i + 1}</td>
-                  <td className="px-3 py-1.5 text-torg-dark font-medium">{it.descricao}</td>
+                  <td className="px-3 py-1.5 text-torg-dark font-medium">
+                    {it.descricao}
+                    {/* ⚠ A observação do item não aparecia em NENHUMA das duas telas de RM — quem
+                        abre a RM escreve ali o que a descrição não cabe, e sumia. */}
+                    <BlocoObservacao texto={it.observacao} compacto />
+                  </td>
                   <td className="px-3 py-1.5 text-torg-gray text-xs font-mono">{it.codigo || "—"}</td>
                   <td className="px-3 py-1.5 text-torg-gray text-xs">{it.material || "—"}</td>
                   <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums">{it.qtd}</td>

@@ -109,6 +109,15 @@ export default async function RMComprasDetail({ params }) {
       ehPrimaria: c.rmId === rm.id,
       rmsVinculadas,
       itensCotaveis,
+      // ⚠⚠ AS OBSERVAÇÕES DOS ITENS VÊM À PARTE, E POR ISSO. `itens` é apagado logo abaixo para
+      // não inchar o payload, e `itensCotaveis` só traz item em status cotável — numa RM já
+      // fechada (tudo PEDIDO_GERADO) ele é VAZIO. Era o que escondia o que o fornecedor escreveu
+      // item a item: 1.266 observações no banco, e na RI-0007 as 7 da FERRO STORE não apareciam
+      // nem depois de a tela passar a mostrá-las (16/09/2026). Aqui vai só o que tem texto — são
+      // poucas linhas, e não dependem do status.
+      observacoesItens: (c.itens || [])
+        .filter((it) => String(it.observacao || "").trim())
+        .map((it) => ({ id: it.id, descricao: it.rmItem?.descricao || "Item", observacao: it.observacao })),
       // limpa itens pra nao bloar payload (itensCotaveis tem o que precisa)
       itens: undefined,
     };

@@ -1,4 +1,5 @@
 "use client";
+import BlocoObservacao from "@/components/BlocoObservacao";
 import { fmtOP } from "@/lib/utils";
 import { XCircle, Loader2, AlertCircle, CheckCircle2, Mail, Edit2, Trash2, Unlink, RotateCcw, Package } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
@@ -49,7 +50,8 @@ export function CabecalhoRM({
             </span>
           </div>
           <p className="text-torg-dark font-medium mt-1">{rm.descricao}</p>
-          {rm.observacao && <p className="text-sm text-torg-gray mt-1">{rm.observacao}</p>}
+          {/* ⚠ Era um <p> cinza de 12px sem rótulo, e passava batido — ver `BlocoObservacao`. */}
+          <BlocoObservacao texto={rm.observacao} rotulo="Observação da RM" autor={rm.createdBy?.name} />
         </div>
         {rm.op && (
           <div className="text-right text-sm">

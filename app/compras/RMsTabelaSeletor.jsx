@@ -96,13 +96,23 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
   }, [rms]);
 
   // KPIs agregados por categoria de ação
+  //
+  // ⚠⚠ O ATRASO É DAS QUE ESTÃO **EM COTAÇÃO**, E SÓ DELAS. O aviso mora embaixo do contador de
+  // "Em cotação", mas contava RM atrasada de QUALQUER categoria — Matheus (16/09/2026) mostrou o
+  // resultado: card marcando "0 · 1 atrasada(s)", com a única RM da tela já COTADA. Cotação que
+  // venceu numa RM já cotada não é pendência: a proposta chegou por outro fornecedor, e o que
+  // aquele não respondeu deixou de importar. Cobrar isso no card manda procurar trabalho que não
+  // existe, e alarme que não procede ensina a ignorar o card.
+  //
+  // ⚠ O número conta RMs; a linha da tabela conta COTAÇÕES ("2 atrasadas" naquela RM). Eram duas
+  // unidades com a mesma palavra na mesma tela — por isso o texto do card agora diz "RM".
   const stats = useMemo(() => {
     const acc = { ABERTA: 0, EM_COTACAO: 0, PRONTA: 0 };
     let atrasadas = 0;
     for (const r of rmsBase) {
       const cat = categoriaRM(r);
       if (acc[cat] != null) acc[cat]++;
-      if ((r.atrasadas || 0) > 0) atrasadas++;
+      if (cat === "EM_COTACAO" && (r.atrasadas || 0) > 0) atrasadas++;
     }
     return { ...acc, atrasadas };
   }, [rmsBase]);
@@ -169,7 +179,7 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
           label="Em cotação"
           subtitle="Aguardando proposta"
           value={stats.EM_COTACAO}
-          alerta={stats.atrasadas > 0 ? `${stats.atrasadas} atrasada(s)` : null}
+          alerta={stats.atrasadas > 0 ? `${stats.atrasadas} RM${stats.atrasadas > 1 ? "s" : ""} com prazo vencido` : null}
           color="orange"
           icon={Clock}
           active={filtroCat === "EM_COTACAO"}

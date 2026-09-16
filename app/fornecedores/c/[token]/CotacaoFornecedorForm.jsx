@@ -1,4 +1,5 @@
 "use client";
+import { parseObservacaoCotacao } from "@/lib/cotacao-observacao";
 import CampoData from "@/components/CampoData";
 import { useState, useMemo, useRef } from "react";
 import { dataBR, dataHoraBR } from "@/lib/data-br";
@@ -15,27 +16,13 @@ const fmtMoeda = (v) =>
 // ⚠ fuso fixo de Brasília (ver page.js): servidor em UTC e navegador em BRT não podem escrever dias diferentes
 const fmtData = (d) => (d ? dataBR(d) : "—");
 
-// Extrai prazo/pagamento da observacao salva (formato "Prazo de entrega: X | Pagamento: Y | <obs>")
-function parseObservacao(obs) {
-  if (!obs) return { prazoEntrega: "", condicaoPagamento: "", observacao: "" };
-  const partes = obs.split(" | ");
-  let prazoEntrega = "";
-  let condicaoPagamento = "";
-  const restos = [];
-  for (const p of partes) {
-    const m1 = p.match(/^Prazo de entrega:\s*(.+)$/);
-    const m2 = p.match(/^Pagamento:\s*(.+)$/);
-    if (m1) prazoEntrega = m1[1];
-    else if (m2) condicaoPagamento = m2[1];
-    else restos.push(p);
-  }
-  return { prazoEntrega, condicaoPagamento, observacao: restos.join(" | ") };
-}
+// ⚠ O parser mora em `lib/cotacao-observacao`: quem GRAVA (a rota) e quem LÊ (esta tela e a
+// de compras) têm de concordar no formato, e havia uma cópia só aqui.
 
 export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCotacao: anexosCotacaoInicial = [], vencida, faturamento = null, emRevisaoFinal = false, pedidoDesconto = false }) {
   const router = useRouter();
   const jaEnviou = cotacao.status === "RECEBIDA";
-  const obsParsed = parseObservacao(cotacao.observacao);
+  const obsParsed = parseObservacaoCotacao(cotacao.observacao);
   // State local pra refletir uploads em tempo real (sem precisar de reload da pagina)
   const [anexosCotacao, setAnexosCotacao] = useState(anexosCotacaoInicial);
 
