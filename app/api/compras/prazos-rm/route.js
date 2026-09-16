@@ -23,6 +23,10 @@ export async function GET() {
     where: { status: "CRIADO" },
     select: {
       id: true, numeroPedido: true, fornecedorNome: true, total: true, createdAt: true,
+      // ⚠ Faturamento Direto é do PEDIDO, não da RM — o material vai do fornecedor direto
+      // ao cliente e nunca entra no estoque da Torg. Muda quem cobra o quê, então precisa
+      // estar à vista nesta lista (Matheus, 16/09/2026).
+      faturamentoDireto: true,
       prazoEntregaPrevisto: true, prazoOriginal: true, statusEntrega: true,
       dataEntregaReal: true, recebidoEm: true, recebidoPor: { select: { name: true } },
       prazoHistorico: {

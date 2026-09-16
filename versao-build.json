@@ -1,7 +1,12 @@
 {
-  "build": 3234,
-  "gerado": "2026-09-16T23:43:54.785Z",
+  "build": 3235,
+  "gerado": "2026-09-16T23:57:52.234Z",
   "commits": [
+    {
+      "hash": "8fcf62cae1",
+      "data": "16/09/2026",
+      "titulo": "Previsão de entrega: a conta que ia para o Omie passa a ser guardada"
+    },
     {
       "hash": "caad5d3d09",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ce38c4971e",
       "data": "16/09/2026",
       "titulo": "Observação do item: o rótulo avisa que o fornecedor lê — e agora dá para corrigir"
-    },
-    {
-      "hash": "1f1811ebf3",
-      "data": "16/09/2026",
-      "titulo": "Cotação: o fornecedor passa a ver a observação do item"
     }
   ]
 }

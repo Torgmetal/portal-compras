@@ -44,6 +44,27 @@ const CHIP_NA_FAIXA = {
   amber: "bg-amber-600 text-white", sky: "bg-sky-600 text-white",
   gray: "bg-gray-600 text-white", emerald: "bg-emerald-600 text-white",
 };
+/**
+ * A marca de Faturamento Direto — mesmo desenho do painel financeiro da OP
+ * (`components/ControleFinanceiroOP.jsx`), para o mesmo conceito não ter duas caras no portal.
+ *
+ * ⚠ FD significa que o material vai do fornecedor DIRETO para o cliente e nunca entra no estoque
+ * da Torg. Quem acompanha prazo precisa saber disso: a cobrança da entrega é com o cliente, e não
+ * há recebimento no almoxarifado para conferir.
+ */
+function TagFD({ parcial = false }) {
+  return (
+    <span
+      className="text-[10px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap bg-amber-100 text-amber-800"
+      title={parcial
+        ? "Parte dos pedidos desta RM é Faturamento Direto — o material vai do fornecedor direto ao cliente"
+        : "Faturamento Direto — o material vai do fornecedor direto ao cliente, sem passar pela Torg"}
+    >
+      FD{parcial ? " parcial" : ""}
+    </span>
+  );
+}
+
 const ORDEM_CHIPS = ["ATRASADO", "VENCE_HOJE", "PROXIMO", "NO_PRAZO", "SEM_PRAZO", "CHEGOU"];
 
 /** O quanto falta, em palavras — a mesma frase que alguém usaria no telefone. */
@@ -68,9 +89,12 @@ function LinhaPedido({ p }) {
     <li className="py-2 flex items-start gap-3 flex-wrap">
       <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${CHIP[cfg.cor]}`}>{cfg.rotulo}</span>
       <div className="flex-1 min-w-[180px]">
-        <p className="text-sm text-torg-dark">
+        <p className="text-sm text-torg-dark flex items-center gap-1.5 flex-wrap">
           {p.fornecedorNome}
-          {p.numeroPedido && <span className="ml-1.5 text-xs text-torg-gray">#{p.numeroPedido}</span>}
+          {p.numeroPedido && <span className="text-xs text-torg-gray">#{p.numeroPedido}</span>}
+          {/* ⚠ A tag vive TAMBÉM na linha do pedido, não só no cabeçalho: numa RM com vários
+              pedidos é aqui que se vê qual deles é o direto. */}
+          {p.faturamentoDireto && <TagFD />}
         </p>
         <p className="text-xs text-torg-gray mt-0.5 flex items-center gap-1.5 flex-wrap">
           <CalendarClock size={11} /> Previsão: <b className="font-medium text-torg-dark">{fmt(p.previsao)}</b>
@@ -108,6 +132,7 @@ function CartaoRM({ l }) {
         ) : (
           <span className="font-semibold text-torg-dark">{l.numero}</span>
         )}
+        {l.fd !== "NENHUM" && <TagFD parcial={l.fd === "PARCIAL"} />}
         {l.op?.numero && <span className="text-xs text-torg-dark/70 font-medium">OP-{String(l.op.numero).padStart(3, "0")} · {l.op.cliente || l.op.obra || ""}</span>}
         <span className="ml-auto text-xs text-torg-dark/70">
           {l.pedidos.length} {l.pedidos.length === 1 ? "pedido" : "pedidos"} · <b className="text-torg-dark tabular-nums">{moeda(l.total)}</b>

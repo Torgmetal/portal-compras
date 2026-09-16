@@ -207,3 +207,43 @@ describe("filtrarLinhas — por onde a tela começa", () => {
     expect(filtrarLinhas(null, "TODAS")).toEqual([]);
   });
 });
+
+// ⚠⚠ A TAG FD. Matheus (16/09/2026): "marque na listagem Prazos de RM as RMs que são Faturamento
+// Direto, coloque uma TAG FD para saber quais são". Faturamento Direto é atributo do PEDIDO — o
+// material vai do fornecedor direto ao cliente e nunca entra no estoque da Torg — e a RM herda a
+// marca dos pedidos dela.
+describe("agruparPorRM — a marca de Faturamento Direto", () => {
+  const rm = { id: "rm1", numero: "T97-006-R00", tipoRM: "ENGENHARIA", op: null };
+  const ped = (id, fd) => ({
+    id, rm, faturamentoDireto: fd, total: 100,
+    createdAt: "2026-09-01T12:00:00.000Z",
+    prazoEntregaPrevisto: "2026-09-30T00:00:00.000Z",
+    prazoHistorico: [], acompanhamentos: [],
+  });
+
+  it("RM cujos pedidos são todos FD é marcada TODOS", () => {
+    const [l] = agruparPorRM([ped("a", true), ped("b", true)]);
+    expect(l.fd).toBe("TODOS");
+  });
+
+  it("RM sem nenhum pedido FD não ganha marca", () => {
+    expect(agruparPorRM([ped("a", false), ped("b", false)])[0].fd).toBe("NENHUM");
+  });
+
+  it("⚠⚠ RM MISTA é PARCIAL, não 'FD' — senão o cabeçalho diria que nada passa pela Torg", () => {
+    const [l] = agruparPorRM([ped("a", true), ped("b", false)]);
+    expect(l.fd).toBe("PARCIAL");
+  });
+
+  it("⚠ cada pedido carrega a própria marca, para a linha dizer QUAL deles é o direto", () => {
+    const [l] = agruparPorRM([ped("a", true), ped("b", false)]);
+    const porId = Object.fromEntries(l.pedidos.map((p) => [p.id, p.faturamentoDireto]));
+    expect(porId).toEqual({ a: true, b: false });
+  });
+
+  it("⚠ campo ausente vira false, nunca undefined — a tela testa por verdadeiro", () => {
+    const [l] = agruparPorRM([{ id: "x", rm, total: 0, createdAt: "2026-09-01", prazoHistorico: [], acompanhamentos: [] }]);
+    expect(l.pedidos[0].faturamentoDireto).toBe(false);
+    expect(l.fd).toBe("NENHUM");
+  });
+});
