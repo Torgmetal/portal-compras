@@ -22,6 +22,7 @@ const schemaPost = z.object({
   modulos:          z.array(z.enum(MODULOS_VALIDOS)).optional().default([]),
   setor:            z.string().max(100).optional().nullable(),
   podeAlterarVerba: z.boolean().default(false),
+  podeCancelarRM: z.boolean().default(false),
 });
 
 /** Selects reutilizáveis */
@@ -34,6 +35,7 @@ const selectUsuario = {
   setor:            true,
   ativo:            true,
   podeAlterarVerba: true,
+  podeCancelarRM: true,
   createdAt:        true,
   updatedAt:        true,
   funcionario:      { select: { id: true, nome: true, cpf: true } }, // vínculo com o RH = entra pelo CPF
@@ -124,6 +126,7 @@ export async function POST(req) {
       tipo:             body.tipo,
       setor:            body.setor ?? null,
       podeAlterarVerba: body.podeAlterarVerba,
+      podeCancelarRM: body.podeCancelarRM,
       ativo:            true,
       ...(body.tipo === "USUARIO" && body.modulos?.length > 0 && {
         modulos: { create: body.modulos.map((m) => ({ modulo: m })) },
@@ -146,6 +149,7 @@ export async function POST(req) {
         modulos:          novoUsuario.modulos.map((m) => m.modulo),
         setor:            novoUsuario.setor,
         podeAlterarVerba: novoUsuario.podeAlterarVerba,
+        podeCancelarRM: novoUsuario.podeCancelarRM,
       },
     },
   });

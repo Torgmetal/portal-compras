@@ -17,7 +17,7 @@ import { PedidosGerados } from "./_componentes/PedidosGerados";
 import { VerbaMaterialCard } from "./_componentes/VerbaMaterialCard";
 import { STATUS_RM_LABELS } from "./_lib/formatos";
 
-export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMapa = null, apiBaseMapa = null, categoriasCustom = [], pedidos = [], verbaMaterial = null, menorCotacaoRM = null }) {
+export default function RMComprasClient({ rm, outrasRMs = [], userRole, podeCancelarRM = false, dadosMapa = null, apiBaseMapa = null, categoriasCustom = [], pedidos = [], verbaMaterial = null, menorCotacaoRM = null }) {
   const router = useRouter();
   const isAdmin = userRole === "ADMIN";
   // Lista mesclada (built-in + custom do banco)
@@ -121,8 +121,11 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
     return counts;
   }, [rm.itens]);
 
+  // ⚠ Cancelar não é mais privilégio de ADMIN: é a permissão `podeCancelarRM`, dada por pessoa
+  // (Matheus, 16/09/2026 — a conta compras@ precisava cancelar RM criada errada). O botão de
+  // EXCLUIR, que é definitivo, continua atrás do `isAdmin`.
   const podeEncerrar =
-    isAdmin && rm.status !== "PEDIDO_GERADO" && rm.status !== "CANCELADA";
+    podeCancelarRM && rm.status !== "PEDIDO_GERADO" && rm.status !== "CANCELADA";
 
   // RM tem itens PEDIDO_GERADO mas a RM em si nao virou PEDIDO_GERADO ainda —
   // mostra botao pra fechar (cancela itens leftover).

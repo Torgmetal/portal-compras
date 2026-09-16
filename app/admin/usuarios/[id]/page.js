@@ -43,7 +43,7 @@ export default function PageEditarUsuario() {
 
   // Estado do formulário
   const [form, setForm] = useState({
-    name: "", email: "", tipo: "", modulos: [], setor: "", podeAlterarVerba: false, temAssinatura: false, funcionarioId: null, funcionarioNome: "",
+    name: "", email: "", tipo: "", modulos: [], setor: "", podeAlterarVerba: false, podeCancelarRM: false, temAssinatura: false, funcionarioId: null, funcionarioNome: "",
   });
   const [ativo, setAtivo] = useState(true);
 
@@ -80,6 +80,7 @@ export default function PageEditarUsuario() {
         setor:            u.setor ?? "",
         temAssinatura:    !!u.temAssinatura,
         podeAlterarVerba: u.podeAlterarVerba,
+        podeCancelarRM: u.podeCancelarRM ?? false,
       });
       setAtivo(u.ativo);
     } catch (e) {
@@ -134,6 +135,7 @@ export default function PageEditarUsuario() {
         body.tipo = form.tipo;
         body.modulos = form.tipo === "USUARIO" ? form.modulos : [];
         body.podeAlterarVerba = form.podeAlterarVerba;
+        body.podeCancelarRM = form.podeCancelarRM;
       }
 
       const res = await fetch(`/api/admin/usuarios/${id}`, {
@@ -472,6 +474,31 @@ export default function PageEditarUsuario() {
                   {proprio
                     ? "Você não pode alterar seu próprio podeAlterarVerba."
                     : "Permite que o usuário edite o valor de verba em ordens de produção."}
+                </span>
+              </label>
+            </div>
+
+            {/* podeCancelarRM */}
+            <div className={`flex items-start gap-3 py-1 ${proprio ? "opacity-50" : ""}`}>
+              <input
+                id="podeCancelarRM"
+                type="checkbox"
+                checked={form.podeCancelarRM}
+                onChange={(e) => setcampo("podeCancelarRM", e.target.checked)}
+                disabled={loadingSalvar || proprio}
+                className="mt-0.5 w-4 h-4 rounded border-gray-300 accent-torg-blue disabled:opacity-50"
+              />
+              <label
+                htmlFor="podeCancelarRM"
+                className={`text-sm text-torg-dark select-none ${proprio ? "cursor-not-allowed" : "cursor-pointer"}`}
+              >
+                Pode cancelar RMs
+                {/* ⚠ A descrição diz o que a permissão NÃO dá. Sem isso, "pode cancelar RMs" se
+                    lê como "pode desfazer RM", e quem liga o botão espera apagar também. */}
+                <span className="block text-xs text-torg-gray mt-0.5">
+                  {proprio
+                    ? "Você não pode alterar seu próprio podeCancelarRM."
+                    : "Permite cancelar uma RM (com motivo) sem ser administrador. Não permite excluir a RM, nem cancelar uma que já gerou pedido no Omie."}
                 </span>
               </label>
             </div>

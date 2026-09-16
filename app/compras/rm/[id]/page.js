@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { podeCancelarRM } from "@/lib/permissao-rm";
 import { ArrowLeft } from "lucide-react";
 import { calcularVerbaOP } from "@/lib/verba-op";
 import RMComprasClient from "./RMComprasClient";
@@ -295,6 +296,7 @@ export default async function RMComprasDetail({ params }) {
         rm={data}
         outrasRMs={outrasRMs}
         userRole={user.role}
+        podeCancelarRM={podeCancelarRM(user)}
         dadosMapa={dadosMapaSerial}
         apiBaseMapa={apiBaseMapa}
         categoriasCustom={JSON.parse(JSON.stringify(categoriasCustom))}

@@ -19,6 +19,7 @@ const schemaPut = z.object({
   modulos:          z.array(z.enum(MODULOS_VALIDOS)).optional(),
   setor:            z.string().max(100).nullable().optional(),
   podeAlterarVerba: z.boolean().optional(),
+  podeCancelarRM: z.boolean().optional(),
 });
 
 /** Selects reutilizáveis */
@@ -33,6 +34,7 @@ const selectUsuario = {
   assinaturaUrl:    true, // ⚠ NÃO vai para o cliente — vira `temAssinatura` na resposta
   ativo:            true,
   podeAlterarVerba: true,
+  podeCancelarRM: true,
   createdAt:        true,
   updatedAt:        true,
 };
@@ -100,6 +102,10 @@ export async function PUT(req, { params }) {
   if (ehProprioAdmin && body.podeAlterarVerba !== undefined) {
     return NextResponse.json({ success: false, error: "Você não pode alterar seu próprio podeAlterarVerba." }, { status: 400 });
   }
+  // ⚠ Mesma regra anti-suicídio do podeAlterarVerba: um admin não mexe na própria permissão.
+  if (ehProprioAdmin && body.podeCancelarRM !== undefined) {
+    return NextResponse.json({ success: false, error: "Você não pode alterar seu próprio podeCancelarRM." }, { status: 400 });
+  }
 
   const existente = await prisma.user.findUnique({
     where: { id: alvoId },
@@ -145,6 +151,7 @@ export async function PUT(req, { params }) {
     modulos:          existente.modulos.map((m) => m.modulo),
     setor:            existente.setor,
     podeAlterarVerba: existente.podeAlterarVerba,
+    podeCancelarRM: existente.podeCancelarRM,
   };
 
   // Campos escalares do User (sem modulos — tratados separado)

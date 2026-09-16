@@ -21,6 +21,7 @@ const campoVazio = {
   modulos:          [],
   setor:            "",
   podeAlterarVerba: false,
+  podeCancelarRM: false,
 };
 
 export default function FormNovoUsuario() {
@@ -96,6 +97,7 @@ export default function FormNovoUsuario() {
           modulos:          form.tipo === "USUARIO" ? form.modulos : [],
           setor:            form.setor.trim() || null,
           podeAlterarVerba: form.podeAlterarVerba,
+          podeCancelarRM: form.podeCancelarRM,
         }),
       });
       const json = await res.json();
@@ -321,6 +323,24 @@ export default function FormNovoUsuario() {
                 Pode alterar verba
                 <span className="block text-xs text-torg-gray mt-0.5">
                   Permite que o usuário edite o valor de verba em ordens de produção.
+                </span>
+              </label>
+            </div>
+
+            {/* podeCancelarRM */}
+            <div className="flex items-start gap-3 py-1">
+              <input
+                id="podeCancelarRM"
+                type="checkbox"
+                checked={form.podeCancelarRM}
+                onChange={(e) => setcampo("podeCancelarRM", e.target.checked)}
+                disabled={loading}
+                className="mt-0.5 w-4 h-4 rounded border-gray-300 accent-torg-blue disabled:opacity-50"
+              />
+              <label htmlFor="podeCancelarRM" className="text-sm text-torg-dark cursor-pointer select-none">
+                Pode cancelar RMs
+                <span className="block text-xs text-torg-gray mt-0.5">
+                  Permite cancelar uma RM (com motivo) sem ser administrador. Não permite excluir a RM, nem cancelar uma que já gerou pedido no Omie.
                 </span>
               </label>
             </div>

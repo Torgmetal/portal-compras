@@ -24,6 +24,11 @@ model User {
   createdAt                DateTime                  @default(now())
   updatedAt                DateTime                  @updatedAt
   podeAlterarVerba         Boolean                   @default(false)
+  // ⚠ Permissão fina, no mesmo padrão do `podeAlterarVerba`: cancelar uma RM era privilégio de
+  // tipo ADMIN, e dar ADMIN só para isso entregaria junto gestão de usuários, senhas e verba.
+  // Cancelar é o caminho BRANDO (status CANCELADA + motivo obrigatório + AuditLog); a EXCLUSÃO
+  // definitiva (DELETE, que cascateia cotações e pedidos) continua exclusiva do ADMIN.
+  podeCancelarRM           Boolean                   @default(false)
   tipo                     TipoUsuario
   // Troca de senha: força a definição de nova senha só no 1º acesso do
   // funcionário (senha provisória). Depois que ele troca, não volta a exigir
