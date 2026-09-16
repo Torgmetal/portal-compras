@@ -34,7 +34,7 @@ const CRONS_FORA_DO_PREFIXO = new Set([
   "/api/comercial/estudos/importar-sharepoint",
 ]);
 
-const COMERCIAL_RESTRITO = ["nova", "orcamentos", "aprovacoes", "kickoffs", "apresentacoes", "indicadores"];
+const COMERCIAL_RESTRITO = ["nova", "orcamentos", "aprovacoes", "kickoffs", "apresentacoes", "indicadores", "clientes"];
 
 /**
  * Falta módulo pra esta rota? Devolve o nome do que falta, ou null se pode passar.
@@ -238,6 +238,9 @@ export default withAuth(
           // Aceite do Kick Off pelos setores — publico via token unico
           path.startsWith("/kickoff/aceite/") ||
           path.startsWith("/api/kickoff/aceite/") ||
+          // Aceite do Comunicado de Aditivo pelos setores — publico via token unico (16/09/2026)
+          path.startsWith("/aditivo/aceite/") ||
+          path.startsWith("/api/aditivo/aceite/") ||
           // Ata de reunião da OP — cliente vê e aceita, publico via token
           path.startsWith("/ata-op/") ||
           path.startsWith("/api/ata-op/") ||

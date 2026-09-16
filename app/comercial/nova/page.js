@@ -9,6 +9,8 @@ import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import { itensDaPlanilhaComercial } from "@/lib/op-categorias";
 import { ESTOQUE_MATERIAL_OPCOES, TIPO_DATABOOK_OPCOES } from "@/lib/op-opcoes";
 import EscopoQualidade from "../EscopoQualidade";
+import ReferenciasClienteEditor, { REFERENCIAS_VAZIAS } from "@/components/comercial/ReferenciasClienteEditor";
+import { nomeClienteNormalizado } from "@/lib/referencias-cliente";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -35,6 +37,17 @@ export default function NovaOP() {
   }, []);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  // Referências do cliente (TPR/OC/TAG… com as palavras dele) — o dicionário vem do cadastro do
+  // cliente escolhido; sem cadastro, rótulos genéricos. Vitor (16/09/2026).
+  const [referencias, setReferencias] = useState(REFERENCIAS_VAZIAS);
+  const [clientes, setClientes] = useState({ clientes: [], semCadastro: [] });
+  useEffect(() => {
+    fetch("/api/comercial/clientes").then((r) => r.json()).then((j) => setClientes({ clientes: j.clientes || [], semCadastro: j.semCadastro || [] })).catch(() => {});
+  }, []);
+  const clienteCadastrado = useMemo(() => {
+    const n = nomeClienteNormalizado(form.cliente).toUpperCase();
+    return n ? clientes.clientes.find((c) => nomeClienteNormalizado(c.nome).toUpperCase() === n) || null : null;
+  }, [form.cliente, clientes]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -129,7 +142,7 @@ export default function NovaOP() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...form, itens: validos,
+          ...form, itens: validos, referencias,
           orcamentoPasta: orc.pasta, orcamentoRef: orc.ref,
           propostas: orc.propostas,
           estudoArquivo: orc.estudo, estudoDados: orc.dados,
@@ -179,11 +192,14 @@ export default function NovaOP() {
           </div>
           <div>
             <label className="block text-sm font-medium text-torg-dark mb-1">Cliente</label>
-            <input type="text" value={form.cliente} readOnly={temProposta}
+            <input type="text" value={form.cliente} readOnly={temProposta} list="clientes-torg"
               onChange={(e) => set("cliente", e.target.value)}
               placeholder={temProposta ? "" : "vincule a proposta acima"}
               className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm ${temProposta ? "bg-gray-50 text-torg-gray cursor-not-allowed" : ""}`} />
-            <p className="text-[11px] text-torg-gray mt-1">{temProposta ? "lido da proposta" : "vem da proposta quando você anexar uma"}</p>
+            <datalist id="clientes-torg">
+              {[...clientes.clientes.map((c) => c.nome), ...clientes.semCadastro].map((n) => <option key={n} value={n} />)}
+            </datalist>
+            <p className="text-[11px] text-torg-gray mt-1">{temProposta ? "lido da proposta" : "vem da proposta quando você anexar uma"}{clienteCadastrado ? " · termos do cliente carregados" : ""}</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-torg-dark mb-1">Obra</label>
@@ -195,15 +211,21 @@ export default function NovaOP() {
             />
           </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-torg-dark mb-1">Referência do cliente</label>
-          <input
-            type="text" value={form.refCliente}
-            onChange={(e) => set("refCliente", e.target.value)}
-            placeholder="Ex: código/nº da obra no cliente (contrato, WBS, TAG…)"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
-          />
-          <p className="text-[11px] text-torg-gray mt-1">Código próprio do cliente para esta obra — aparece nos relatórios e documentos enviados, pra ele identificar rápido do que se trata.</p>
+        <div className="rounded-xl border border-amber-100 bg-amber-50/30 p-4 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-torg-dark">Referências do cliente</p>
+            <p className="text-[11px] text-torg-gray">Os códigos que o cliente usa para esta obra, com as palavras dele{clienteCadastrado ? ` (dicionário de ${clienteCadastrado.nome})` : " (sem dicionário cadastrado — rótulos genéricos; ajuste em Comercial › Clientes)"}. Aparecem nos documentos enviados a ele.</p>
+          </div>
+          <ReferenciasClienteEditor termos={clienteCadastrado?.termos || null} valor={referencias} onChange={setReferencias} />
+          <div>
+            <label className="block text-[11px] font-medium text-torg-gray mb-1">Texto livre (só se não couber acima)</label>
+            <input
+              type="text" value={form.refCliente}
+              onChange={(e) => set("refCliente", e.target.value)}
+              placeholder="Ex: código/nº da obra no cliente"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
         </div>
         <div>
           <label className="block text-sm font-medium text-torg-dark mb-1">Descrição</label>

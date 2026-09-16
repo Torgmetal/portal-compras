@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { receitasDaPlanilhaComercial } from "@/lib/op-categorias";
+import { clientePorNome, salvarReferencias } from "@/lib/referencias-op";
+import { termosEfetivos } from "@/lib/referencias-cliente";
+import { log } from "@/lib/log";
+const registro = log("op");
 import { prisma } from "@/lib/prisma";
 import { normalizarEscopo } from "@/lib/qualidade-escopo";
 import { requireRole } from "@/lib/session";
@@ -44,6 +48,8 @@ const opSchema = z.object({
   estudoArquivo: z.any().optional().nullable(),
   estudoDados: z.any().optional().nullable(),
   itens: z.array(itemSchema).min(1),
+  // referências do cliente com as palavras dele: { projetos, pedidos:[{codigo, itens, tags…}], outros } (lib/referencias-cliente)
+  referencias: z.any().optional().nullable(),
 });
 
 export async function POST(req) {
@@ -117,6 +123,15 @@ export async function POST(req) {
   // CRONOGRAMA AUTOMÁTICO — nasce junto da OP, com a data que o Comercial informou (Vitor 19/08:
   // "abriu a OP, abre cronograma automático… o ideal seria o cálculo exatamente de acordo com as
   // datas que vêm indicadas pelo comercial"). Nunca derruba a criação da OP.
+  // ⚠ cadastro do cliente + referências (TPR/OC/TAG com as palavras dele) — nunca derruba a criação
+  try {
+    const cliente = await clientePorNome(op.cliente);
+    if (cliente) await prisma.oP.update({ where: { id: op.id }, data: { clienteId: cliente.id } });
+    if (body.referencias && typeof body.referencias === "object") {
+      await salvarReferencias({ opId: op.id, aditivoId: null, entrada: body.referencias, termos: termosEfetivos(cliente?.termos) });
+    }
+  } catch (e) { registro.erro("referências do cliente não gravadas", { opId: op.id, erro: e.message }); }
+
   try {
     await criarCronogramaPadrao({
       opId: op.id, opNumero: op.numero, titulo: op.obra || `OP-${op.numero}`,

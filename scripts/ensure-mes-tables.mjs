@@ -707,6 +707,120 @@ async function main() {
     )`).catch((e) => console.warn("[ensure-mes-tables] EtiquetaCalibragem:", e.message));
   console.log("[ensure-mes-tables] OK — EtiquetaCalibragem garantida.");
 
+  // ── Referências do cliente + aditivo como pedido novo + aceite do comunicado — 16/09/2026 ──
+  // Vitor: "precisamos ter campos para descrever as TAGs, OCs, TPR da TMSA (…) não amarrar esses
+  // termos (…) aditivo com linha de medição e de materiais como se fosse uma nova OP (…) e um aviso
+  // para os setores". Ver lib/referencias-cliente.js e docs/superpowers/specs/2026-09-16-*.md.
+  // ⚠ cada passo em try/catch próprio: uma coluna que já existe com outro tipo não pode derrubar
+  // as tabelas seguintes (nem o build).
+  const passo = async (sql, rotulo) => {
+    try { await prisma.$executeRawUnsafe(sql); } catch (e) { console.warn("[ensure-mes-tables] " + rotulo + ":", e.message); }
+  };
+  await passo(`
+    CREATE TABLE IF NOT EXISTS "Cliente" (
+      "id"          TEXT         NOT NULL,
+      "nome"        TEXT         NOT NULL,
+      "razaoSocial" TEXT,
+      "cnpj"        TEXT,
+      "termos"      JSONB,
+      "observacoes" TEXT,
+      "ativo"       BOOLEAN      NOT NULL DEFAULT true,
+      "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "Cliente_pkey" PRIMARY KEY ("id")
+    )`, "Cliente");
+  await passo(`CREATE UNIQUE INDEX IF NOT EXISTS "Cliente_nome_key" ON "Cliente"("nome")`, "Cliente_nome_key");
+  await passo(`ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "clienteId" TEXT`, "OP.clienteId");
+  await passo(`
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'OP_clienteId_fkey') THEN
+        ALTER TABLE "OP" ADD CONSTRAINT "OP_clienteId_fkey"
+          FOREIGN KEY ("clienteId") REFERENCES "Cliente"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$;`, "FK OP.clienteId");
+  await passo(`ALTER TABLE "Aditivo" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'RASCUNHO'`, "Aditivo.status");
+  await passo(`ALTER TABLE "Aditivo" ADD COLUMN IF NOT EXISTS "valor" DOUBLE PRECISION`, "Aditivo.valor");
+  await passo(`ALTER TABLE "Aditivo" ADD COLUMN IF NOT EXISTS "divulgadoEm" TIMESTAMP(3)`, "Aditivo.divulgadoEm");
+  await passo(`ALTER TABLE "Aditivo" ADD COLUMN IF NOT EXISTS "divulgadoPara" TEXT`, "Aditivo.divulgadoPara");
+  await passo(`ALTER TABLE "OPReceita" ADD COLUMN IF NOT EXISTS "aditivoId" TEXT`, "OPReceita.aditivoId");
+  await passo(`CREATE INDEX IF NOT EXISTS "OPReceita_aditivoId_idx" ON "OPReceita"("aditivoId")`, "OPReceita_aditivoId_idx");
+  await passo(`
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'OPReceita_aditivoId_fkey') THEN
+        ALTER TABLE "OPReceita" ADD CONSTRAINT "OPReceita_aditivoId_fkey"
+          FOREIGN KEY ("aditivoId") REFERENCES "Aditivo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$;`, "FK OPReceita.aditivoId");
+  await passo(`ALTER TABLE "OPMedicao" ADD COLUMN IF NOT EXISTS "aditivoId" TEXT`, "OPMedicao.aditivoId");
+  await passo(`CREATE INDEX IF NOT EXISTS "OPMedicao_aditivoId_idx" ON "OPMedicao"("aditivoId")`, "OPMedicao_aditivoId_idx");
+  await passo(`
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'OPMedicao_aditivoId_fkey') THEN
+        ALTER TABLE "OPMedicao" ADD CONSTRAINT "OPMedicao_aditivoId_fkey"
+          FOREIGN KEY ("aditivoId") REFERENCES "Aditivo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$;`, "FK OPMedicao.aditivoId");
+  await passo(`
+    CREATE TABLE IF NOT EXISTS "OPReferencia" (
+      "id"        TEXT         NOT NULL,
+      "opId"      TEXT         NOT NULL,
+      "aditivoId" TEXT,
+      "paiId"     TEXT,
+      "papel"     TEXT         NOT NULL,
+      "rotulo"    TEXT         NOT NULL,
+      "codigo"    TEXT         NOT NULL,
+      "descricao" TEXT,
+      "valor"     DOUBLE PRECISION,
+      "data"      TIMESTAMP(3),
+      "revisao"   TEXT,
+      "frente"    TEXT,
+      "ordem"     INTEGER      NOT NULL DEFAULT 0,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "OPReferencia_pkey" PRIMARY KEY ("id")
+    )`, "OPReferencia");
+  await passo(`CREATE INDEX IF NOT EXISTS "OPReferencia_opId_papel_idx" ON "OPReferencia"("opId","papel")`, "OPReferencia_opId_papel_idx");
+  await passo(`CREATE INDEX IF NOT EXISTS "OPReferencia_aditivoId_idx" ON "OPReferencia"("aditivoId")`, "OPReferencia_aditivoId_idx");
+  await passo(`CREATE INDEX IF NOT EXISTS "OPReferencia_paiId_idx" ON "OPReferencia"("paiId")`, "OPReferencia_paiId_idx");
+  await passo(`
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'OPReferencia_opId_fkey') THEN
+        ALTER TABLE "OPReferencia" ADD CONSTRAINT "OPReferencia_opId_fkey"
+          FOREIGN KEY ("opId") REFERENCES "OP"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'OPReferencia_aditivoId_fkey') THEN
+        ALTER TABLE "OPReferencia" ADD CONSTRAINT "OPReferencia_aditivoId_fkey"
+          FOREIGN KEY ("aditivoId") REFERENCES "Aditivo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'OPReferencia_paiId_fkey') THEN
+        ALTER TABLE "OPReferencia" ADD CONSTRAINT "OPReferencia_paiId_fkey"
+          FOREIGN KEY ("paiId") REFERENCES "OPReferencia"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$;`, "FKs OPReferencia");
+  await passo(`
+    CREATE TABLE IF NOT EXISTS "AditivoAceite" (
+      "id"        TEXT         NOT NULL,
+      "aditivoId" TEXT         NOT NULL,
+      "email"     TEXT         NOT NULL,
+      "token"     TEXT         NOT NULL,
+      "enviadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "aceitoEm"  TIMESTAMP(3),
+      "aceitoIp"  TEXT,
+      "cobradoEm" TIMESTAMP(3),
+      "cobrancas" INTEGER      NOT NULL DEFAULT 0,
+      CONSTRAINT "AditivoAceite_pkey" PRIMARY KEY ("id")
+    )`, "AditivoAceite");
+  await passo(`CREATE UNIQUE INDEX IF NOT EXISTS "AditivoAceite_token_key" ON "AditivoAceite"("token")`, "AditivoAceite_token_key");
+  await passo(`CREATE INDEX IF NOT EXISTS "AditivoAceite_aditivoId_idx" ON "AditivoAceite"("aditivoId")`, "AditivoAceite_aditivoId_idx");
+  await passo(`
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'AditivoAceite_aditivoId_fkey') THEN
+        ALTER TABLE "AditivoAceite" ADD CONSTRAINT "AditivoAceite_aditivoId_fkey"
+          FOREIGN KEY ("aditivoId") REFERENCES "Aditivo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$;`, "FK AditivoAceite");
+  console.log("[ensure-mes-tables] OK — Cliente, OPReferencia, AditivoAceite e colunas do aditivo garantidas.");
+
   const existentes = await prisma.$queryRawUnsafe(`
     SELECT tablename
     FROM pg_tables

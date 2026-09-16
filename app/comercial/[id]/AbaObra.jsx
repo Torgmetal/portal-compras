@@ -1,6 +1,10 @@
 "use client";
 import { Building2, Pencil, Hash, MapPin, CalendarRange, Users, AlertCircle } from "lucide-react";
 import { resumoEscopo } from "@/lib/qualidade-escopo";
+import { useState } from "react";
+import { agruparReferencias } from "@/lib/referencias-cliente";
+import ReferenciasClienteResumo from "@/components/comercial/ReferenciasClienteResumo";
+import ModalReferenciasCliente from "@/components/comercial/ModalReferenciasCliente";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const ESTOQUE = { PROPRIO_TORG: "Estoque próprio da Torg", CLIENTE_TERCEIRO: "Fornecido pelo cliente / terceiro" };
@@ -17,7 +21,10 @@ function Campo({ rotulo, valor, destaque, dica, pre }) {
   );
 }
 
-export default function AbaObra({ op, podeEditar, onEditar }) {
+export default function AbaObra({ op, podeEditar, onEditar, onAtualizar }) {
+  const [editandoRefs, setEditandoRefs] = useState(false);
+  const refsBase = agruparReferencias((op.referencias || []).filter((r) => !r.aditivoId));
+  const temRefs = refsBase.projetos.length + refsBase.pedidos.length + refsBase.outros.length > 0;
   const contatos = Array.isArray(op.clienteContatos) ? op.clienteContatos : [];
   const endereco = [op.clienteEndereco, op.clienteCidade, op.clienteUF, op.clienteCep].filter(Boolean).join(" · ");
 
@@ -44,12 +51,20 @@ export default function AbaObra({ op, podeEditar, onEditar }) {
           <Campo rotulo="Endereço de entrega" valor={op.kickoff?.entregaEndereco?.trim() || "Não informado"} pre />
         </div>
 
-        {/* Referência do cliente — o número que cada cliente usa */}
-        <div className={`mt-4 rounded-lg border p-4 ${op.refCliente ? "border-amber-200 bg-amber-50/60" : "border-dashed border-gray-300 bg-gray-50"}`}>
+        {/* Referências do cliente — os códigos que cada cliente usa, com as palavras dele (16/09/2026) */}
+        <div className={`mt-4 rounded-lg border p-4 ${temRefs || op.refCliente ? "border-amber-200 bg-amber-50/60" : "border-dashed border-gray-300 bg-gray-50"}`}>
           <div className="flex items-start gap-3">
-            <Hash size={18} className={op.refCliente ? "text-amber-700 mt-0.5" : "text-gray-400 mt-0.5"} />
+            <Hash size={18} className={temRefs || op.refCliente ? "text-amber-700 mt-0.5" : "text-gray-400 mt-0.5"} />
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Referência do cliente</p>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider">Referências do cliente</p>
+                {podeEditar && (
+                  <button onClick={() => setEditandoRefs(true)} className="text-[11px] text-torg-blue font-medium inline-flex items-center gap-1 hover:underline"><Pencil size={11} /> {temRefs ? "Editar" : "Informar"}</button>
+                )}
+              </div>
+              {temRefs && <div className="mb-2"><ReferenciasClienteResumo arvore={refsBase} /></div>}
+              {editandoRefs && <ModalReferenciasCliente opId={op.id} onClose={() => setEditandoRefs(false)} onSaved={() => { setEditandoRefs(false); if (onAtualizar) onAtualizar(); else window.location.reload(); }} />}
+              <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">{temRefs ? "Como sai nos documentos" : "Referência do cliente"}</p>
               {op.refCliente ? (
                 <p className="text-lg font-bold text-amber-800 break-words">{op.refCliente}</p>
               ) : (

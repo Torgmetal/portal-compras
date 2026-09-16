@@ -227,6 +227,10 @@ model OP {
   pastaEngenharia      PastaEngenharia?
   liberacoesProducao   LiberacaoProducao[]
   fotosObra            FotoObra[]
+  // ⚠ referências do cliente (TPR/OC/TAG… com as palavras dele) — ver lib/referencias-cliente.js
+  clienteId            String?
+  clienteRef           Cliente?             @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  referencias          OPReferencia[]
 
   @@index([numero])
   @@index([status])
@@ -427,9 +431,13 @@ model OPMedicao {
   valorContratado   Float?
   valorFaturadoAuto Float?
   op                OP        @relation(fields: [opId], references: [id], onDelete: Cascade)
+  // medição de um aditivo (o pedido Omie do aditivo, escolhido ao vincular)
+  aditivoId         String?
+  aditivo           Aditivo?  @relation(fields: [aditivoId], references: [id], onDelete: SetNull)
 
   @@unique([opId, numeroPedidoOmie])
   @@index([opId])
+  @@index([aditivoId])
 }
 
 model OPReceita {
@@ -458,9 +466,13 @@ model OPReceita {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   op                  OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
+  // receita que veio com um aditivo (antes ia só na observação "· aditivo N")
+  aditivoId           String?
+  aditivo             Aditivo? @relation(fields: [aditivoId], references: [id], onDelete: SetNull)
 
   @@index([opId])
   @@index([categoria])
+  @@index([aditivoId])
 }
 
 // Kick Off da OP — documento de alinhamento divulgado aos setores no início
@@ -687,7 +699,7 @@ model Revisao {
 }
 
 model Aditivo {
-  id              String        @id @default(cuid())
+  id              String          @id @default(cuid())
   opId            String
   numero          Int
   descricao       String
@@ -703,13 +715,91 @@ model Aditivo {
   estudoArquivo   Json?
   estudoDados     Json?
   createdById     String
-  createdAt       DateTime      @default(now())
-  createdBy       User          @relation(fields: [createdById], references: [id])
-  op              OP            @relation(fields: [opId], references: [id], onDelete: Cascade)
+  createdAt       DateTime        @default(now())
+  createdBy       User            @relation(fields: [createdById], references: [id])
+  op              OP              @relation(fields: [opId], references: [id], onDelete: Cascade)
   itens           AditivoItem[]
+  // ⚠⚠ ADITIVO É UM PEDIDO NOVO DO CLIENTE, "como se fosse uma nova OP" (Vitor, 16/09/2026): tem as
+  // referências dele (OC/TAG em OPReferencia), receitas e medições marcadas com o aditivo, um valor
+  // contratado próprio e um ciclo: RASCUNHO → DIVULGADO (comunicado aos setores, com aceite) →
+  // EM_EXECUCAO → ENCERRADO.
+  status          String          @default("RASCUNHO")
+  valor           Float?
+  divulgadoEm     DateTime?
+  divulgadoPara   String?
+  referencias     OPReferencia[]
+  aceites         AditivoAceite[]
+  receitas        OPReceita[]
+  medicoes        OPMedicao[]
 
   @@unique([opId, numero])
   @@index([opId])
+}
+
+// ─── CLIENTE: o dicionário de termos de cada um ───────────────────────────────
+// Vitor (16/09/2026): TMSA fala TPR/OC/ETC/TAG, Danpower ENC/PC, Marko AF, Valmet OC. O portal fixa
+// o PAPEL (projeto, pedido, item, tag) e guarda aqui a PALAVRA de cada cliente. Ver
+// lib/referencias-cliente.js. Cadastro mínimo: nasce da própria OP (OP.cliente) quando alguém
+// preenche os termos.
+model Cliente {
+  id          String   @id @default(cuid())
+  nome        String   @unique
+  razaoSocial String?
+  cnpj        String?
+  termos      Json? // { projeto:{rotulo,exemplo,ativo}, pedido:{…}, item:{…}, tag:{…} }
+  observacoes String?
+  ativo       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  ops         OP[]
+}
+
+// ─── REFERÊNCIAS DO CLIENTE NA OP ─────────────────────────────────────────────
+// Uma linha por código. `papel` é fixo (PROJETO | PEDIDO | ITEM | TAG | OUTRO); `rotulo` é a foto do
+// termo do cliente na época ("OC", "AF", "TPR"). ITEM e TAG pendem do PEDIDO por `paiId`; o pedido que
+// chegou num aditivo carrega `aditivoId`. `OP.refCliente` é recalculado a partir daqui (PROJETO +
+// PEDIDOs) para os documentos ao cliente continuarem iguais.
+model OPReferencia {
+  id        String         @id @default(cuid())
+  opId      String
+  aditivoId String?
+  paiId     String?
+  papel     String
+  rotulo    String
+  codigo    String
+  descricao String?
+  valor     Float?
+  data      DateTime?
+  revisao   String?
+  frente    String? // A/B/C — a frente da Torg a que a TAG corresponde
+  ordem     Int            @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  op        OP             @relation(fields: [opId], references: [id], onDelete: Cascade)
+  aditivo   Aditivo?       @relation(fields: [aditivoId], references: [id], onDelete: SetNull)
+  pai       OPReferencia?  @relation("ArvoreReferencia", fields: [paiId], references: [id], onDelete: Cascade)
+  filhos    OPReferencia[] @relation("ArvoreReferencia")
+
+  @@index([opId, papel])
+  @@index([aditivoId])
+  @@index([paiId])
+}
+
+// ─── ACEITE DO COMUNICADO DE ADITIVO ──────────────────────────────────────────
+// Mesmo desenho do KickoffAceite: um convite por pessoa, com o token dela; cobrança reusa o convite.
+model AditivoAceite {
+  id        String    @id @default(cuid())
+  aditivoId String
+  email     String
+  token     String    @unique
+  enviadoEm DateTime  @default(now())
+  aceitoEm  DateTime?
+  aceitoIp  String?
+  cobradoEm DateTime?
+  cobrancas Int       @default(0)
+  aditivo   Aditivo   @relation(fields: [aditivoId], references: [id], onDelete: Cascade)
+
+  @@index([aditivoId])
 }
 
 model AditivoItem {
@@ -809,25 +899,25 @@ model RM {
 }
 
 model PedidoOmie {
-  id                   String           @id @default(cuid())
+  id                   String                 @id @default(cuid())
   cotacaoId            String?
   fornecedorNome       String
   nCodFor              String?
   cnpj                 String?
   codigoPedido         String?
   numeroPedido         String?
-  total                Float            @default(0)
-  faturamentoDireto    Boolean          @default(false)
-  status               String           @default("CRIADO")
+  total                Float                  @default(0)
+  faturamentoDireto    Boolean                @default(false)
+  status               String                 @default("CRIADO")
   observacao           String?
   erroOmie             String?
   payload              Json?
   resposta             Json?
   createdById          String?
-  createdAt            DateTime         @default(now())
+  createdAt            DateTime               @default(now())
   anexoNome            String?
   anexoUrl             String?
-  criadoManualmente    Boolean          @default(false)
+  criadoManualmente    Boolean                @default(false)
   opId                 String?
   categoriaItem        String?
   // Categoria de compra + local de estoque escolhidos ao gerar o pedido no Omie —
@@ -840,7 +930,7 @@ model PedidoOmie {
   prazoEntregaPrevisto DateTime?
   statusEntrega        String?
   prazoOriginal        DateTime?
-  tokenEntrega         String?          @unique
+  tokenEntrega         String?                @unique
   itensOmie            Json?
   nfNumero             String?
   nfSerie              String?
@@ -848,10 +938,10 @@ model PedidoOmie {
   recebidoPorId        String?
   recebidoEm           DateTime?
   syncEntregaEm        DateTime? // última verificação de entrega no Omie (rotação do cron sync-entregas)
-  recebidoPor          User?            @relation("PedidoRecebidoPor", fields: [recebidoPorId], references: [id])
-  cotacao              Cotacao?         @relation(fields: [cotacaoId], references: [id])
-  op                   OP?              @relation(fields: [opId], references: [id])
-  rmAtendida           RM?              @relation("PedidoOmieRMAtendida", fields: [rmAtendidaId], references: [id])
+  recebidoPor          User?                  @relation("PedidoRecebidoPor", fields: [recebidoPorId], references: [id])
+  cotacao              Cotacao?               @relation(fields: [cotacaoId], references: [id])
+  op                   OP?                    @relation(fields: [opId], references: [id])
+  rmAtendida           RM?                    @relation("PedidoOmieRMAtendida", fields: [rmAtendidaId], references: [id])
   prazoHistorico       PrazoHistorico[]
   acompanhamentos      AcompanhamentoPedido[]
   rmItens              RMItem[]

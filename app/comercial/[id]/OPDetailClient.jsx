@@ -1,6 +1,6 @@
 "use client";
 import CampoData from "@/components/CampoData";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X, CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory, ShoppingCart, GanttChart, FileSpreadsheet, Building2, ShieldCheck, Globe } from "lucide-react";
@@ -17,6 +17,10 @@ import ConsultaExpedicao from "./ConsultaExpedicao";
 import DesenhosOPSection from "./DesenhosOPSection";
 import ListaExpedicaoSection from "./ListaExpedicaoSection";
 import AbaObra from "./AbaObra";
+import ReferenciasClienteEditor, { pedidoVazio } from "@/components/comercial/ReferenciasClienteEditor";
+import ReferenciasClienteResumo from "@/components/comercial/ReferenciasClienteResumo";
+import ModalDivulgarAditivo from "@/components/comercial/ModalDivulgarAditivo";
+import { agruparReferencias } from "@/lib/referencias-cliente";
 import AbaQualidade from "./AbaQualidade";
 import AbaPortalCliente from "./AbaPortalCliente";
 import AbaProducao from "./AbaProducao";
@@ -101,6 +105,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
   const [vista, setVista] = useState(inicial);
   const [exportandoLPC, setExportandoLPC] = useState(false);
   const [modalAditivo, setModalAditivo] = useState(false);
+  const [modalDivulgarAditivo, setModalDivulgarAditivo] = useState(null); // { id, numero }
   const [modalRevisao, setModalRevisao] = useState(false);
   const [modalPrazo, setModalPrazo] = useState(false);
   const [modalVerba, setModalVerba] = useState(null); // { tipo: "op"|"aditivo", itemId, atual }
@@ -781,8 +786,17 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
               <div className="px-6 py-4 border-b border-torg-orange-100 bg-torg-orange-50/50">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
-                    <h4 className="font-semibold text-torg-orange-700">Aditivo {ad.numero}</h4>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-semibold text-torg-orange-700">Aditivo {ad.numero}</h4>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${ad.status === "DIVULGADO" ? "bg-emerald-50 text-emerald-700 border-emerald-100" : ad.status === "EM_EXECUCAO" ? "bg-blue-50 text-blue-700 border-blue-100" : ad.status === "ENCERRADO" ? "bg-gray-100 text-gray-600 border-gray-200" : "bg-amber-50 text-amber-800 border-amber-100"}`}>
+                        {ad.status === "DIVULGADO" ? "Divulgado aos setores" : ad.status === "EM_EXECUCAO" ? "Em execução" : ad.status === "ENCERRADO" ? "Encerrado" : "Não comunicado"}
+                      </span>
+                      {ad.valor != null && <span className="text-xs text-torg-gray">{fmtMoeda(ad.valor)}</span>}
+                    </div>
                     <p className="text-sm text-torg-gray whitespace-pre-line leading-relaxed">{ad.descricao}</p>
+                    {(op.referencias || []).some((r) => r.aditivoId === ad.id) && (
+                      <div className="mt-2"><ReferenciasClienteResumo arvore={agruparReferencias((op.referencias || []).filter((r) => r.aditivoId === ad.id))} /></div>
+                    )}
                     {(ad.dataInicio || ad.dataFimPrevista || ad.orcamentoRef) && (
                       <p className="text-[11px] text-torg-gray mt-1">
                         {ad.dataInicio && `início ${fmtData(ad.dataInicio)}`}
@@ -796,6 +810,18 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
                     <p className="text-xs text-torg-gray">
                       {ad.createdBy?.name} • {fmtData(ad.createdAt)}
                     </p>
+                    {(ad.aceites || []).length > 0 && (
+                      <span className="text-[11px] text-torg-gray" title={(ad.aceites || []).map((a) => `${a.email}${a.aceitoEm ? " ✓" : " (pendente)"}`).join("\n")}>
+                        aceites {(ad.aceites || []).filter((a) => a.aceitoEm).length}/{(ad.aceites || []).length}
+                      </span>
+                    )}
+                    {podeGerenciarComercial && !encerradaOuCancelada && (
+                      <button onClick={() => setModalDivulgarAditivo({ id: ad.id, numero: ad.numero })}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg inline-flex items-center gap-1 ${ad.status === "RASCUNHO" ? "bg-torg-orange text-white" : "bg-white border border-torg-orange-200 text-torg-orange-700 hover:bg-torg-orange-50"}`}
+                        title="Manda o comunicado do aditivo (PDF + aceite) aos setores">
+                        <Rocket size={14} /> {ad.status === "RASCUNHO" ? "Divulgar aos setores" : "Reenviar comunicado"}
+                      </button>
+                    )}
                     {podeAlterarVerbaDireto && !encerradaOuCancelada && (
                       <button
                         onClick={() => setModalAddAditivo({ id: ad.id, numero: ad.numero })}
@@ -878,7 +904,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
         </div>
       )}
 
-      {vista === "obra" && <AbaObra op={op} podeEditar={podeGerenciarComercial && !encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} />}
+      {vista === "obra" && <AbaObra op={op} onAtualizar={() => router.refresh()} podeEditar={podeGerenciarComercial && !encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} />}
 
       {vista === "planejamento" && (
         <div className="space-y-6">
@@ -1079,6 +1105,9 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
       {/* Modais */}
       {modalAditivo && (
         <ModalAditivo opId={op.id} proximoNumero={op.aditivos.length + 1} onClose={() => setModalAditivo(false)} onSaved={() => router.refresh()} />
+      )}
+      {modalDivulgarAditivo && (
+        <ModalDivulgarAditivo aditivo={modalDivulgarAditivo} onClose={() => setModalDivulgarAditivo(null)} onEnviado={() => router.refresh()} />
       )}
       {modalRevisao && (
         <ModalRevisao opId={op.id} proximoNumero={op.revisoes.length + 1} onClose={() => setModalRevisao(false)} onSaved={() => router.refresh()} />
@@ -3281,6 +3310,13 @@ function ModalAditivo({ opId, proximoNumero, onClose, onSaved }) {
   const [dataFimAd, setDataFimAd] = useState("");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
+  // ⚠ o aditivo É um pedido novo do cliente (OC/AF/PC), nas palavras dele — Vitor (16/09/2026)
+  const [pedido, setPedido] = useState(pedidoVazio());
+  const [valorAd, setValorAd] = useState("");
+  const [termosAd, setTermosAd] = useState(null);
+  useEffect(() => {
+    fetch(`/api/comercial/op/${opId}/referencias`).then((r) => r.json()).then((j) => setTermosAd(j.termos || null)).catch(() => {});
+  }, [opId]);
 
   const updateItem = (i, novo) => setItens((p) => p.map((it, idx) => (idx === i ? novo : it)));
   const addItem = (cat = "MATERIA_PRIMA") => setItens((p) => [...p, novoItem(cat)]);
@@ -3311,6 +3347,8 @@ function ModalAditivo({ opId, proximoNumero, onClose, onSaved }) {
           dataFimPrevista: dataFimAd || null,
           orcamentoPasta: orcAd.pasta, orcamentoRef: orcAd.ref,
           propostas: orcAd.propostas, estudoArquivo: orcAd.estudo, estudoDados: orcAd.dados,
+          pedido: pedido.codigo?.trim() ? pedido : null,
+          valor: valorAd ? Number(String(valorAd).replace(/\./g, "").replace(",", ".")) || null : null,
         }),
       });
       const data = await res.json();
@@ -3338,6 +3376,16 @@ function ModalAditivo({ opId, proximoNumero, onClose, onSaved }) {
             if (prop?.descricao) setDescricao((d) => d || `Aditivo ${proximoNumero} — ${prop.obra || prop.numeroProposta || ""}\n\n${prop.descricao}`);
           }}
         />
+
+        <div className="rounded-xl border border-amber-100 bg-amber-50/30 p-4 space-y-3">
+          <p className="text-sm font-medium text-torg-dark">Pedido do cliente que veio com o aditivo</p>
+          <ReferenciasClienteEditor termos={termosAd} valor={{ pedidos: [pedido] }} onChange={(v) => setPedido(v.pedidos?.[0] || pedidoVazio())} modo="aditivo" />
+          <div className="max-w-xs">
+            <label className="block text-[11px] font-medium text-torg-gray mb-1">Valor do aditivo (R$) — vira a linha de receita se não houver estudo</label>
+            <input value={valorAd} onChange={(e) => setValorAd(e.target.value)} inputMode="decimal" placeholder="0,00"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+          </div>
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>

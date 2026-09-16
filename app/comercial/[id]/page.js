@@ -38,6 +38,7 @@ export async function carregarDetalheOP(id, user) {
         orderBy: { numero: "asc" },
         include: {
           createdBy: { select: { name: true } },
+          aceites: { select: { email: true, aceitoEm: true, enviadoEm: true } },
           itens: {
             orderBy: { ordem: "asc" },
             include: {
@@ -62,6 +63,7 @@ export async function carregarDetalheOP(id, user) {
         select: { id: true, numero: true, tipoRM: true, categoriasOP: true, status: true },
       },
       receitas: { orderBy: { ordem: "asc" } },
+      referencias: { orderBy: { ordem: "asc" } },
       medicoes: { orderBy: { createdAt: "asc" } },
     },
   });

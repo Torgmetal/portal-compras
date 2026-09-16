@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Loader2, AlertCircle, RefreshCw, Rocket, CheckCircle2, Clock, ChevronDown, ChevronRight, ExternalLink, Send, BellRing } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Rocket, CheckCircle2, Clock, ChevronDown, ChevronRight, ExternalLink, Send, BellRing, FilePlus2 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
@@ -223,6 +223,40 @@ export default function KickoffAceitesClient() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Aditivos divulgados — mesmo aceite, mesma cobrança (16/09/2026) */}
+      {!loading && !erro && (data?.aditivos || []).filter((a) => !soPend || a.totalPend > 0).length > 0 && (
+        <div className="space-y-2.5 pt-2">
+          <h2 className="text-lg font-bold text-torg-dark flex items-center gap-2"><FilePlus2 size={18} className="text-torg-orange" /> Aditivos — Aceites</h2>
+          {(data.aditivos || []).filter((a) => !soPend || a.totalPend > 0).map((a) => (
+            <div key={a.aditivoId} className="bg-white rounded-xl border border-torg-orange-100 shadow-sm p-4">
+              <div className="flex items-start justify-between flex-wrap gap-2">
+                <div>
+                  <p className="font-semibold text-torg-dark">Aditivo {a.aditivoNumero} · {fmtOP(a.numero)} — {a.cliente}{a.obra ? ` · ${a.obra}` : ""}</p>
+                  <p className="text-xs text-torg-gray">divulgado {a.divulgadoEm ? new Date(a.divulgadoEm).toLocaleDateString("pt-BR") : "—"} · {a.totalOk} confirmado(s) · <span className={a.totalPend ? "text-red-600 font-semibold" : ""}>{a.totalPend} pendente(s)</span>{a.maxDias != null ? ` · há ${a.maxDias} dia(s)` : ""}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link href={`/comercial/${a.opId}`} className="text-sm font-semibold text-torg-blue hover:underline inline-flex items-center gap-1"><ExternalLink size={14} /> Abrir OP</Link>
+                  {a.totalPend > 0 && (
+                    <button disabled={enviando === a.aditivoId} onClick={async () => {
+                      setEnviando(a.aditivoId);
+                      try {
+                        const r = await fetch(`/api/comercial/aditivo/${a.aditivoId}/cobrar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+                        const j = await r.json(); if (!r.ok) throw new Error(j.error || "Erro");
+                        setAviso({ ok: true, texto: `Cobrança do Aditivo ${a.aditivoNumero} enviada a ${j.enviados} pessoa(s).` }); carregar();
+                      } catch (e) { setAviso({ ok: false, texto: e.message }); } finally { setEnviando(null); }
+                    }} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-torg-orange text-white disabled:opacity-50">
+                      {enviando === a.aditivoId ? "Enviando…" : "Cobrar"}
+                    </button>
+                  )}
+                </div>
+              </div>
+              {a.pendentes.length > 0 && <p className="text-xs text-torg-gray mt-2"><b className="text-red-600">Faltam:</b> {a.pendentes.map((p) => `${p.email}${p.cobrancas ? ` (cobrado ${p.cobrancas}×)` : ""}`).join(", ")}</p>}
+              {a.confirmados.length > 0 && <p className="text-xs text-torg-gray mt-1"><b className="text-emerald-700">Confirmaram:</b> {a.confirmados.map((p) => p.email).join(", ")}</p>}
+            </div>
+          ))}
         </div>
       )}
     </div>
