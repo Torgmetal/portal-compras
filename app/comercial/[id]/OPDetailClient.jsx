@@ -2755,21 +2755,21 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
   return (
     <div>
       <p className="px-6 pt-4 text-xs font-semibold text-torg-gray uppercase tracking-wide">{titulo}</p>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" role="region" aria-label={`Itens — ${titulo}`} tabIndex={0}>
         {/* larguras fixas: sem elas a Descrição ficava espremida em 5 linhas e o resto sobrando */}
-        <table className="w-full text-sm min-w-[1040px] table-fixed">
-          <thead className="bg-gray-50">
+        <table className="w-full text-sm min-w-[1100px] table-fixed">
+          <thead className="bg-gray-50 [&_th]:whitespace-nowrap">
             <tr>
-              <th className="w-[120px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
+              <th className="w-[130px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-              <th className="w-[130px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Detalhes</th>
-              <th className="w-[90px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Local</th>
-              <th className="w-[190px] px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Verba</th>
-              <th className="w-[110px] px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Fat. direto</th>
-              <th className="w-[130px] px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
+              <th className="w-[135px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Detalhes</th>
+              <th className="w-[80px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Local</th>
+              <th className="w-[180px] px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Verba</th>
+              <th className="w-[145px] px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Faturamento</th>
+              <th className="w-[135px] px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 [&_td]:align-top [&_td]:py-3">
             {itens.map((it) => {
               const temPendente = (it.solicitacoesVerba || []).length > 0;
               const consumido = Number(it.consumido) || 0;
@@ -2782,18 +2782,21 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
               return (
                 <tr key={it.id}>
                   <td className="px-4 py-3 align-top text-torg-gray text-xs">{labelCategoria(it.categoria)}</td>
-                  {/* ⚠ NADA de line-clamp/truncate aqui: Vitor (19/08) — "consegue trazer todas as
-                      informações escritas, pois abreviar pode nos atrapalhar". A descrição do item
-                      e a origem dele na planilha precisam ser lidas por inteiro. */}
+                  {/* Descrição integral; observações extensas podem ser abertas sem perder conteúdo. */}
                   <td className="px-4 py-3 align-top text-torg-dark font-medium leading-snug break-words">
                     <span className="block">{it.descricao}</span>
-                    {it.observacao && <span className="block text-[11px] font-normal text-torg-gray mt-0.5">{it.observacao}</span>}
+                    {it.observacao && (it.observacao.length > 120 ? (
+                      <details className="mt-1 text-xs font-normal text-torg-gray">
+                        <summary className="cursor-pointer text-torg-blue hover:underline w-fit py-1">Ver observação</summary>
+                        <p className="mt-2 leading-relaxed whitespace-pre-wrap break-words">{it.observacao}</p>
+                      </details>
+                    ) : <span className="block text-[11px] font-normal text-torg-gray mt-1 leading-relaxed">{it.observacao}</span>)}
                   </td>
                   <td className="px-4 py-3 align-top text-torg-gray text-xs">{detalhesItem(it)}</td>
                   <td className="px-4 py-3 align-top text-torg-gray text-xs">{localLabel(it.localEstoque) || "—"}</td>
                   <td className="px-4 py-3 align-top text-right tabular-nums">
                     <div className="flex items-baseline justify-end gap-1.5">
-                      <span className="text-torg-dark font-semibold">{fmtMoeda(verba)}</span>
+                      <span className="text-torg-dark font-semibold whitespace-nowrap">{fmtMoeda(verba)}</span>
                       {consumido > 0 && (
                         <span className={`text-[10px] font-medium ${corSaldo}`}>
                           {pctUsado.toFixed(0)}%
@@ -2828,7 +2831,7 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
                     {onToggleFD ? (
                       <button
                         onClick={() => onToggleFD(it)}
-                        className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
+                        className={`text-xs font-semibold whitespace-nowrap px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
                           it.faturamentoDireto
                             ? "bg-torg-orange/10 text-torg-orange border-torg-orange/30 hover:bg-torg-orange/20"
                             : "bg-torg-blue/10 text-torg-blue border-torg-blue/20 hover:bg-torg-blue/20"
@@ -2838,7 +2841,7 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
                         {it.faturamentoDireto ? "Faturado Cliente" : "Faturado Torg"}
                       </button>
                     ) : (
-                      <span className={`text-xs font-medium px-2.5 py-0.5 rounded-lg border ${
+                      <span className={`text-xs font-medium whitespace-nowrap inline-block px-2.5 py-0.5 rounded-lg border ${
                         it.faturamentoDireto
                           ? "bg-torg-orange/10 text-torg-orange border-torg-orange/30"
                           : "bg-torg-blue/10 text-torg-blue border-torg-blue/20"
@@ -2848,11 +2851,11 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
                     )}
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <div className="inline-flex items-center gap-3 justify-end">
+                    <div className="flex flex-col items-end gap-2">
                       {podeAlterarVerbaDireto && onEditar && (
                         <button
                           onClick={() => onEditar(it)}
-                          className="text-xs text-torg-gray hover:text-torg-dark font-medium inline-flex items-center gap-1"
+                          className="text-xs text-torg-gray hover:text-torg-dark font-medium inline-flex items-center gap-1 whitespace-nowrap min-h-[28px]"
                           title="Editar item — alteração direta dos campos"
                         >
                           <Pencil size={12} /> Editar
@@ -2861,7 +2864,7 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
                       <button
                         onClick={() => onSolicitarVerba(it)}
                         disabled={temPendente}
-                        className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1 whitespace-nowrap min-h-[28px] disabled:opacity-40 disabled:cursor-not-allowed"
                         title={
                           temPendente
                             ? "Já tem solicitação pendente"

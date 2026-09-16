@@ -1,7 +1,12 @@
 {
-  "build": 3225,
-  "gerado": "2026-09-16T22:13:53.945Z",
+  "build": 3226,
+  "gerado": "2026-09-16T22:45:47.399Z",
   "commits": [
+    {
+      "hash": "5b50dd79",
+      "data": "16/09/2026",
+      "titulo": "Alinha colunas e evita quebra dos valores nas receitas da OP"
+    },
     {
       "hash": "f17bb838",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "fc02dd40",
       "data": "16/09/2026",
       "titulo": "Campo decimal e campo de data em português, no portal inteiro"
-    },
-    {
-      "hash": "d40c19e2",
-      "data": "15/09/2026",
-      "titulo": "Portal do cliente: \"onde a obra está\" é o reflexo do cronograma — acumulado por fase, mesmo %"
     }
   ]
 }
