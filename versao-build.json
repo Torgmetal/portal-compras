@@ -1,7 +1,12 @@
 {
-  "build": 3232,
-  "gerado": "2026-09-16T23:43:29.483Z",
+  "build": 3233,
+  "gerado": "2026-09-16T23:43:51.455Z",
   "commits": [
+    {
+      "hash": "04fc4c6bab",
+      "data": "16/09/2026",
+      "titulo": "Aluguel e Montagem ganham o mesmo filtro de obra, antes de o defeito aparecer"
+    },
     {
       "hash": "cd7b9399c4",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "a929a6d958",
       "data": "16/09/2026",
       "titulo": "Memória: contato de cliente digitado com @torg.com.br (OP-106, duas vezes)"
-    },
-    {
-      "hash": "3b2da1cf7b",
-      "data": "16/09/2026",
-      "titulo": "Relatórios de inspeção: o PDF entra na subpasta do tipo (3.1 Pintura, 3.2 DM…) quando ela existe"
     }
   ]
 }

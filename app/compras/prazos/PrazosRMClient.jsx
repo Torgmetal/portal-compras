@@ -11,7 +11,7 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { Loader2, AlertCircle, Package, CalendarClock, ChevronRight, Truck, PackageCheck, ExternalLink } from "lucide-react";
-import { SITUACAO, rotuloSituacao, filtrarLinhas } from "@/lib/painel-prazos-rm";
+import { SITUACAO, rotuloSituacao, filtrarLinhas, resumoPorSituacao } from "@/lib/painel-prazos-rm";
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const moeda = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -20,6 +20,29 @@ const CHIP = {
   red: "bg-red-100 text-red-700", orange: "bg-orange-100 text-orange-700",
   amber: "bg-amber-100 text-amber-700", sky: "bg-sky-100 text-sky-700",
   gray: "bg-gray-100 text-gray-600", emerald: "bg-emerald-100 text-emerald-700",
+};
+
+// ⚠⚠ O CABEÇALHO DE CADA RM É TINGIDO PELA SITUAÇÃO DELA. Matheus (16/09/2026): "deixe mais forte
+// a cor dos cabeçalhos de cada RM". O `bg-gray-50/60` de antes era quase branco: numa lista de
+// dezenas de cartões empilhados, a faixa não separava um do outro e a página virava uma parede.
+//
+// ⚠ A cor sai da MESMA situação do chip, não de uma paleta decorativa — a faixa repete o que o
+// chip diz, de longe. Quem rola a lista enxerga o bloco vermelho antes de ler qualquer palavra.
+//
+// ⚠ Fundo em 100 e borda em 200: forte o bastante para separar, fraco o bastante para o texto
+// escuro em cima continuar legível. Ir além (500/600) exigiria texto branco e faria a faixa
+// competir com o chip, que é quem deve nomear a situação.
+const FAIXA = {
+  red: "bg-red-100 border-red-200", orange: "bg-orange-100 border-orange-200",
+  amber: "bg-amber-100 border-amber-200", sky: "bg-sky-100 border-sky-200",
+  gray: "bg-gray-200/70 border-gray-300", emerald: "bg-emerald-100 border-emerald-200",
+};
+
+/** O chip dentro da faixa colorida precisa de mais peso que a faixa, senão some nela. */
+const CHIP_NA_FAIXA = {
+  red: "bg-red-600 text-white", orange: "bg-orange-600 text-white",
+  amber: "bg-amber-600 text-white", sky: "bg-sky-600 text-white",
+  gray: "bg-gray-600 text-white", emerald: "bg-emerald-600 text-white",
 };
 const ORDEM_CHIPS = ["ATRASADO", "VENCE_HOJE", "PROXIMO", "NO_PRAZO", "SEM_PRAZO", "CHEGOU"];
 
@@ -74,9 +97,9 @@ function LinhaPedido({ p }) {
 function CartaoRM({ l }) {
   const cfg = SITUACAO[l.situacao];
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="px-5 py-3 bg-gray-50/60 border-b border-gray-100 flex items-center gap-3 flex-wrap">
-        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${CHIP[cfg.cor]}`}>{cfg.rotulo}</span>
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className={`px-5 py-3 border-b flex items-center gap-3 flex-wrap ${FAIXA[cfg.cor]}`}>
+        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${CHIP_NA_FAIXA[cfg.cor]}`}>{cfg.rotulo}</span>
         {/* ⚠ O número da RM leva para a RM: esta tela responde "onde dói", e o conserto é lá. */}
         {l.rmId ? (
           <Link href={`/compras/rm/${l.rmId}`} className="font-semibold text-torg-dark hover:text-torg-blue inline-flex items-center gap-1">
@@ -85,8 +108,8 @@ function CartaoRM({ l }) {
         ) : (
           <span className="font-semibold text-torg-dark">{l.numero}</span>
         )}
-        {l.op?.numero && <span className="text-xs text-torg-gray">OP-{String(l.op.numero).padStart(3, "0")} · {l.op.cliente || l.op.obra || ""}</span>}
-        <span className="ml-auto text-xs text-torg-gray">
+        {l.op?.numero && <span className="text-xs text-torg-dark/70 font-medium">OP-{String(l.op.numero).padStart(3, "0")} · {l.op.cliente || l.op.obra || ""}</span>}
+        <span className="ml-auto text-xs text-torg-dark/70">
           {l.pedidos.length} {l.pedidos.length === 1 ? "pedido" : "pedidos"} · <b className="text-torg-dark tabular-nums">{moeda(l.total)}</b>
         </span>
       </div>
@@ -105,6 +128,7 @@ export default function PrazosRMClient() {
   // aberta em "todas", a tela saía com 31 mil pixels e escondia as 53 RMs que apertam atrás das
   // que já foram resolvidas.
   const [filtro, setFiltro] = useState("PENDENTES");
+  const [obra, setObra] = useState(""); // OP.numero ("" = todas)
 
   const buscar = async () => {
     setCarregando(true);
@@ -122,7 +146,38 @@ export default function PrazosRMClient() {
   };
   useEffect(() => { buscar(); }, []);
 
-  const visiveis = useMemo(() => filtrarLinhas(dados?.linhas, filtro), [dados, filtro]);
+  // ⚠⚠ A OBRA FILTRA ANTES DE TUDO — cartões, contadores e lista. Matheus (16/09/2026): "adicionar
+  // filtros por obra se eu quiser ver RMs somente de uma obra os prazos".
+  //
+  // ⚠ Aqui o filtro pode ser do NAVEGADOR sem mentir, porque a rota não corta nada: ela devolve
+  // todos os pedidos CRIADOS, sem `take`. Nas RMs de material o mesmo desenho escondeu 111 linhas
+  // justamente porque lá havia um `take: 100` antes do filtro. Se um dia esta rota ganhar teto, o
+  // filtro tem que subir para o servidor junto — senão o defeito volta igual.
+  const daObra = useMemo(
+    () => (obra ? (dados?.linhas || []).filter((l) => String(l.op?.numero || "") === obra) : (dados?.linhas || [])),
+    [dados, obra]
+  );
+
+  // ⚠⚠ OS CONTADORES SEGUEM A OBRA. Deixá-los no resumo do servidor faria o cabeçalho dizer
+  // "Atrasado 37" enquanto a lista da obra mostra 2 — número que não corresponde ao que está na
+  // tela é pior que número nenhum.
+  const resumo = useMemo(() => (obra ? resumoPorSituacao(daObra) : dados?.resumo), [obra, daObra, dados]);
+
+  // As obras que têm RM com pedido, com quantas cada uma tem. Saem de TODAS as linhas, nunca das
+  // já filtradas — senão escolher uma obra apagaria as outras da lista de opções.
+  const obras = useMemo(() => {
+    const m = new Map();
+    for (const l of dados?.linhas || []) {
+      const n = l.op?.numero ? String(l.op.numero) : null;
+      if (!n) continue;
+      if (!m.has(n)) m.set(n, { numero: n, cliente: l.op.cliente || l.op.obra || "", quantidade: 0 });
+      m.get(n).quantidade++;
+    }
+    const num = (x) => parseInt(String(x).match(/\d+/)?.[0] || "0", 10);
+    return [...m.values()].sort((a, b) => num(b.numero) - num(a.numero));
+  }, [dados]);
+
+  const visiveis = useMemo(() => filtrarLinhas(daObra, filtro), [daObra, filtro]);
 
   if (carregando) {
     return <p className="py-16 text-center text-sm text-torg-gray inline-flex items-center gap-2 justify-center w-full"><Loader2 size={16} className="animate-spin" /> Carregando os prazos…</p>;
@@ -137,7 +192,7 @@ export default function PrazosRMClient() {
     );
   }
 
-  const r = dados.resumo;
+  const r = resumo;
   return (
     <div className="space-y-5">
       <div>
@@ -150,6 +205,21 @@ export default function PrazosRMClient() {
       {/* ⚠ Os contadores FILTRAM, não são enfeite: quem chega para cobrar fornecedor clica em
           "Atrasado" e trabalha só naquilo. Clicar de novo volta para a lista inteira. */}
       <div className="flex items-center gap-2 flex-wrap">
+        {obras.length > 0 && (
+          <select
+            value={obra}
+            onChange={(e) => setObra(e.target.value)}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-gray-300 bg-white text-torg-dark"
+            title="Ver os prazos de uma obra só"
+          >
+            <option value="">Todas as obras</option>
+            {obras.map((o) => (
+              <option key={o.numero} value={o.numero}>
+                OP-{String(o.numero).padStart(3, "0")}{o.cliente ? ` — ${o.cliente}` : ""} ({o.quantidade})
+              </option>
+            ))}
+          </select>
+        )}
         <button type="button" onClick={() => setFiltro("PENDENTES")}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors bg-white text-torg-dark ${
             filtro === "PENDENTES" ? "border-torg-blue ring-1 ring-torg-blue" : "border-gray-200 hover:bg-gray-50"}`}>
@@ -178,12 +248,17 @@ export default function PrazosRMClient() {
         <div className="py-16 text-center bg-white rounded-xl border border-gray-100">
           <Package size={28} className="mx-auto text-gray-300" />
           <p className="mt-2 text-sm text-torg-gray">
-            {filtro === "PENDENTES" ? "Nenhuma RM esperando entrega — tudo que foi pedido já chegou."
-              : filtro === "TODAS" ? "Nenhuma RM com pedido gerado ainda."
-              : `Nenhuma RM em "${rotuloSituacao(filtro)}".`}
+            {(() => {
+              // ⚠ Com obra escolhida o vazio diz QUAL obra: "nenhuma RM atrasada" sem dizer onde
+              // faz parecer que o portal inteiro está em dia.
+              const onde = obra ? ` na OP-${String(obra).padStart(3, "0")}` : "";
+              if (filtro === "PENDENTES") return `Nenhuma RM${onde} esperando entrega — tudo que foi pedido já chegou.`;
+              if (filtro === "TODAS") return `Nenhuma RM${onde} com pedido gerado ainda.`;
+              return `Nenhuma RM${onde} em "${rotuloSituacao(filtro)}".`;
+            })()}
           </p>
-          {filtro !== "TODAS" && (
-            <button onClick={() => setFiltro("TODAS")} className="mt-3 text-sm text-torg-blue hover:underline inline-flex items-center gap-1">
+          {(filtro !== "TODAS" || obra) && (
+            <button onClick={() => { setFiltro("TODAS"); setObra(""); }} className="mt-3 text-sm text-torg-blue hover:underline inline-flex items-center gap-1">
               ver todas <ChevronRight size={13} />
             </button>
           )}

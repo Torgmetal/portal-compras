@@ -137,3 +137,60 @@ describe("as etapas", () => {
     expect(linhaDoTempo(null).eventos).toEqual([]);
   });
 });
+
+// ⚠⚠ O "SEM PRAZO" QUE NÃO ERA SEM PRAZO. Matheus (16/09/2026), olhando a tela de Prazos: "tem
+// algumas em cinza SEM PRAZO, mas tem prazo que o fornecedor colocou e foi para o pedido do Omie,
+// porque estão sem?" — estava certo. O prazo que o fornecedor informa item a item ficava em
+// `CotacaoItem.prazoEntrega`, e só a tela de Entregas o lia. A de Prazos dizia "sem prazo" sobre o
+// mesmo pedido. O caso real é o 2077 (Pizzinatto): 15/10/2026 nos 19 itens vencedores e
+// `prazoEntregaPrevisto` nulo.
+describe("previsaoAtual — o prazo dos itens da cotação é a última fonte", () => {
+  const comItens = (itens) => ({ cotacao: { itens } });
+
+  it("⚠⚠ pedido sem prazo próprio usa o que o fornecedor informou nos itens", () => {
+    const p = comItens([{ vencedor: true, prazoEntrega: "2026-10-15T00:00:00.000Z" }]);
+    expect(previsaoAtual(p)).toEqual(new Date("2026-10-15T00:00:00.000Z"));
+  });
+
+  it("⚠ entre vários itens vale o MAIS TARDIO — o pedido só fecha quando o último chega", () => {
+    const p = comItens([
+      { vencedor: true, prazoEntrega: "2026-10-01T00:00:00.000Z" },
+      { vencedor: true, prazoEntrega: "2026-10-20T00:00:00.000Z" },
+      { vencedor: true, prazoEntrega: "2026-10-10T00:00:00.000Z" },
+    ]);
+    expect(previsaoAtual(p)).toEqual(new Date("2026-10-20T00:00:00.000Z"));
+  });
+
+  it("⚠ item PERDEDOR não conta — ele não virou pedido", () => {
+    const p = comItens([
+      { vencedor: true, prazoEntrega: "2026-10-05T00:00:00.000Z" },
+      { vencedor: false, prazoEntrega: "2026-12-31T00:00:00.000Z" },
+    ]);
+    expect(previsaoAtual(p)).toEqual(new Date("2026-10-05T00:00:00.000Z"));
+  });
+
+  it("⚠⚠ o prazo do PEDIDO ganha do prazo dos itens — quem sabe mais manda", () => {
+    const p = { prazoEntregaPrevisto: "2026-09-01T00:00:00.000Z",
+                ...comItens([{ vencedor: true, prazoEntrega: "2026-10-15T00:00:00.000Z" }]) };
+    expect(previsaoAtual(p)).toBe("2026-09-01T00:00:00.000Z");
+  });
+
+  it("⚠⚠ e a remarcação ganha dos dois", () => {
+    const p = {
+      prazoHistorico: [{ prazoNovo: "2026-11-30T00:00:00.000Z", criadoEm: "2026-09-10" }],
+      prazoEntregaPrevisto: "2026-09-01T00:00:00.000Z",
+      ...comItens([{ vencedor: true, prazoEntrega: "2026-10-15T00:00:00.000Z" }]),
+    };
+    expect(previsaoAtual(p)).toBe("2026-11-30T00:00:00.000Z");
+  });
+
+  it("sem nenhuma das três fontes continua sendo sem prazo", () => {
+    expect(previsaoAtual({ cotacao: { itens: [] } })).toBe(null);
+    expect(previsaoAtual({})).toBe(null);
+    expect(previsaoAtual(null)).toBe(null);
+  });
+
+  it("⚠ item vencedor SEM data não inventa prazo", () => {
+    expect(previsaoAtual(comItens([{ vencedor: true, prazoEntrega: null }]))).toBe(null);
+  });
+});
