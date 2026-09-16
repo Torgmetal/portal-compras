@@ -26,6 +26,9 @@ const freteSchema = z.object({
   transpNome: z.string().max(120).nullable().optional(),
   placa: z.string().max(10).nullable().optional(),
   uf: z.string().max(2).nullable().optional(),
+  // ⚠ O RNTRC não vai para o bloco `frete` do Omie — ele não tem campo para isso. Sai impresso
+  // nas Informações Adicionais da NF-e (ver `dadosAdicionais` em omie-remessa-industrializacao).
+  rntrc: z.string().max(20).nullable().optional(),
   qtdVol: z.number().nonnegative().nullable().optional(),
   especie: z.string().max(60).nullable().optional(),
   pesoLiq: z.number().nonnegative().nullable().optional(),

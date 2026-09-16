@@ -276,6 +276,9 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
         valorFrete: num(frete.valorFrete),
         valorSeguro: num(frete.valorSeguro),
         valorOutras: num(frete.valorOutras),
+        // ⚠ Sem esta linha o RNTRC morria na tela: o payload é montado campo a campo, então um
+        // campo novo no formulário não chega ao servidor só por existir no estado.
+        rntrc: frete.rntrc || null,
       };
       const res = await fetch(`/api/fiscal/remessa-terceiro/${remessa.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await res.json();
@@ -339,8 +342,13 @@ function ModalPrepararRemessa({ remessa, onClose, onGerado }) {
                   <div><label className="block text-xs font-medium text-torg-dark mb-1">Seguro</label><input value={frete.valorSeguro ?? ""} onChange={(e) => setF("valorSeguro", e.target.value)} inputMode="decimal" placeholder="0,00" className={finp} /></div>
                   <div><label className="block text-xs font-medium text-torg-dark mb-1">Outras desp.</label><input value={frete.valorOutras ?? ""} onChange={(e) => setF("valorOutras", e.target.value)} inputMode="decimal" placeholder="0,00" className={finp} /></div>
                 </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-torg-dark mb-1">RNTRC / ANTT</label>
+                  <input value={frete.rntrc || ""} onChange={(e) => setF("rntrc", e.target.value.replace(/\D/g, "").slice(0, 12))} inputMode="numeric" placeholder="00000000" className={finp} />
+                  <p className="mt-1 text-[11px] text-torg-gray">Sai impresso nas <strong>Informações Adicionais</strong> da NF-e, como <code>RNTRC: 00000000</code>. O Omie não tem campo próprio para ele, nem na remessa nem no cadastro da transportadora.</p>
+                </div>
               </div>
-              {frete.nCodTransp && <p className="text-[11px] text-emerald-700 inline-flex items-center gap-1"><Check size={12} /> Transportadora vinculada (o RNTRC/ANTT vem do cadastro dela no Omie).</p>}
+              {frete.nCodTransp && <p className="text-[11px] text-emerald-700 inline-flex items-center gap-1"><Check size={12} /> Transportadora vinculada.</p>}
             </div>
           ) : !temMateriais ? (
             <div className="space-y-3">

@@ -1,7 +1,12 @@
 {
-  "build": 3205,
-  "gerado": "2026-09-16T14:04:01.749Z",
+  "build": 3206,
+  "gerado": "2026-09-16T14:45:35.337Z",
   "commits": [
+    {
+      "hash": "ce38c4971e",
+      "data": "16/09/2026",
+      "titulo": "Observação do item: o rótulo avisa que o fornecedor lê — e agora dá para corrigir"
+    },
     {
       "hash": "1f1811ebf3",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "6f7ca54a88",
       "data": "15/09/2026",
       "titulo": "Relatório de inspeção: número apagado nunca volta — o AuditLog diz o maior já emitido"
-    },
-    {
-      "hash": "cd3903b40c",
-      "data": "15/09/2026",
-      "titulo": "Memória: OP-089 — as causas dos 307 'sem R' e as amarrações aplicadas"
     }
   ]
 }

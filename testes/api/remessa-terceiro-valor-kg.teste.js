@@ -85,3 +85,25 @@ describe("gerar_pedido_omie — romaneio COM materiais", () => {
     expect(mocks.criarPedidoRemessa.mock.calls[0][2].valorKg).toBeUndefined();
   });
 });
+
+// ⚠⚠ O RNTRC atravessa a rota inteira — ele é a metade da ponte que o Codex cobrou (09/09/2026) e
+// que a tela prometia sem entregar. O schema do frete é `.strict()`: sem o campo declarado lá, o
+// Zod recusaria o PATCH e o Fiscal veria "erro" sem entender qual.
+describe("gerar_pedido_omie — RNTRC/ANTT do frete", () => {
+  it("o RNTRC digitado chega ao lib que monta a remessa", async () => {
+    const r = await PATCH(req({ acao: "gerar_pedido_omie", valorKg: 12.5, frete: { tpFrete: "0", rntrc: "12345678" } }), params);
+    expect(r.status).toBe(200);
+    expect(mocks.criarPedidoRemessa.mock.calls[0][2].frete.rntrc).toBe("12345678");
+  });
+
+  it("e fica gravado no romaneio, para a próxima remessa já vir preenchida", async () => {
+    await PATCH(req({ acao: "gerar_pedido_omie", valorKg: 12.5, frete: { tpFrete: "0", rntrc: "12345678" } }), params);
+    const gravado = mockPrisma.romaneioTerceiro.update.mock.calls.find(([a]) => a?.data?.remessaFrete);
+    expect(gravado[0].data.remessaFrete.rntrc).toBe("12345678");
+  });
+
+  it("frete sem RNTRC continua passando — o campo é opcional", async () => {
+    const r = await PATCH(req({ acao: "gerar_pedido_omie", valorKg: 12.5, frete: { tpFrete: "0" } }), params);
+    expect(r.status).toBe(200);
+  });
+});
