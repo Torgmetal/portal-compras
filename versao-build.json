@@ -1,7 +1,12 @@
 {
-  "build": 3201,
-  "gerado": "2026-09-16T13:34:53.278Z",
+  "build": 3202,
+  "gerado": "2026-09-16T13:41:45.509Z",
   "commits": [
+    {
+      "hash": "13515c5b",
+      "data": "16/09/2026",
+      "titulo": "Fotos dos relatórios: legenda ao capturar, editável na foto subida e com até 3 linhas no PDF"
+    },
     {
       "hash": "a8ecb861",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "39f8ce63",
       "data": "15/09/2026",
       "titulo": "Cron da L.E.: os tres furos que a revisao do Codex achou no que ja estava no ar"
-    },
-    {
-      "hash": "748694a8",
-      "data": "15/09/2026",
-      "titulo": "Memoria: o import da L.E. e manual, e o cron que avisa"
     }
   ]
 }
