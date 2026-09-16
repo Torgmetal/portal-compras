@@ -1,7 +1,12 @@
 {
-  "build": 3204,
-  "gerado": "2026-09-16T13:48:00.355Z",
+  "build": 3205,
+  "gerado": "2026-09-16T14:04:01.749Z",
   "commits": [
+    {
+      "hash": "1f1811ebf3",
+      "data": "16/09/2026",
+      "titulo": "Cotação: o fornecedor passa a ver a observação do item"
+    },
     {
       "hash": "a929a6d958",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "cd3903b40c",
       "data": "15/09/2026",
       "titulo": "Memória: OP-089 — as causas dos 307 'sem R' e as amarrações aplicadas"
-    },
-    {
-      "hash": "a155344a32",
-      "data": "15/09/2026",
-      "titulo": "Rastreabilidade: item comprado pronto (grade de piso) não conta como peça sem R"
     }
   ]
 }

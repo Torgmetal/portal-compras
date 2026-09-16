@@ -19,6 +19,11 @@ const schema = z.object({
   tratamento: z.string().nullable().optional(),
   peso: z.number().nullable().optional(),
   pesoLinear: z.number().nullable().optional(),
+  // ⚠⚠ EDITÁVEL PORQUE AGORA É PÚBLICA. Desde 16/09/2026 a observação do item aparece na cotação
+  // do FORNECEDOR, e até aqui ela só podia ser escrita na CRIAÇÃO do item — um texto errado (ou
+  // interno, como o "600,00 - Pedro Locatelli" que existe no banco) não tinha como ser corrigido
+  // pela tela. Campo que o cliente lê precisa de conserto pela tela, não por script.
+  observacao: z.string().nullable().optional(),
 });
 
 export async function PATCH(req, { params }) {

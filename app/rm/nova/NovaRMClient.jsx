@@ -513,12 +513,19 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">Observação</label>
+            {/* ⚠⚠ O RÓTULO AVISA QUEM LÊ. Este texto vai para a tela do fornecedor junto com a
+                cotação, e o campo era só "Observação · Opcional" — quem escrevia não tinha como
+                saber. Matheus (16/09/2026): "deixe na descrição do campo Observação para
+                fornecedor algo do tipo". No banco há observação de item com preço-alvo e nome de
+                colaborador, escritos quando ninguém sabia que o fornecedor veria. */}
+            <label className="block text-sm font-medium text-torg-dark mb-1">
+              Observação <span className="font-normal text-torg-orange">· o fornecedor vê</span>
+            </label>
             <input
               type="text"
               value={observacao}
               onChange={(e) => setObservacao(e.target.value)}
-              placeholder="Opcional"
+              placeholder="Ex.: prazo, condição de entrega — aparece na cotação do fornecedor"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
             />
           </div>
@@ -804,7 +811,11 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                   {!ehInterna && <th className="px-2 py-2 text-right font-medium text-gray-500 uppercase">Peso (kg)</th>}
                   {!ehInterna && <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase" title="OP destino (multi-OP)">OP dest.</th>}
                   {!ehInterna && <th className="px-2 py-2 text-center font-medium text-gray-500 uppercase" title="Vai pro estoque (categoria 3.1)?">Estq.</th>}
-                  {ehInterna && <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase min-w-[200px]">Observação</th>}
+                  {ehInterna && (
+                    <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase min-w-[200px]" title="Este texto vai junto na cotação — o fornecedor lê">
+                      Observação <span className="normal-case text-torg-orange">· o fornecedor vê</span>
+                    </th>
+                  )}
                   <th className="w-8"></th>
                 </tr>
               </thead>
@@ -922,7 +933,8 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                       <input
                         type="text" value={it.observacao || ""}
                         onChange={(e) => editarItem(i, "observacao", e.target.value)}
-                        placeholder="Observação (opcional)"
+                        placeholder="Ex.: modelo, marca, embalagem"
+                        title="Aparece na cotação do fornecedor — é onde se escreve a especificação que não cabe na descrição"
                         className="w-full min-w-[180px] border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
                       />
                     </td>
