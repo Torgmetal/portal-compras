@@ -21,6 +21,8 @@ import { analisarMaterial } from "@/lib/material-liberacao";
 import { carimbarDesenho } from "@/lib/carimbo-desenho";
 import { dataHoraBR } from "@/lib/data-br";
 import { consumivelDoConjunto } from "@/lib/consumivel-solda";
+import { PDFDocument } from "pdf-lib";
+import { formatoDoPdf } from "@/lib/formato-folha";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -206,7 +208,7 @@ export async function POST(req) {
   // 2) baixa o desenho original, carimba e arquiva. Se qualquer passo falhar, a liberação (GRD)
   //    ainda é registrada e a tela cai no PDF original — o controle não pode parar por causa do
   //    carimbo.
-  let carimbado = null, avisoCarimbo = null;
+  let carimbado = null, avisoCarimbo = null, formato = body.formato || null;
   if (body.itemId) {
     try {
       const token = await getAccessToken();
@@ -214,12 +216,15 @@ export async function POST(req) {
       const res = await fetch(`${GRAPH}/drives/${driveId}/items/${body.itemId}/content`, { headers: { Authorization: `Bearer ${token}` }, redirect: "follow" });
       if (!res.ok) throw new Error(`SharePoint HTTP ${res.status}`);
       const bytes = new Uint8Array(await res.arrayBuffer());
+      // ⚠ o formato é MEDIDO na página (lib/formato-folha); o da tela vem da pasta e erra quando a
+      // engenharia não cria as subpastas A1–A4 (OP-094, 16/09/2026)
+      formato = formatoDoPdf(await PDFDocument.load(bytes, { ignoreEncryption: true }).catch(() => null)) || formato;
       // consumível de solda vigente na data da emissão (muda quando entra lote novo no CMR)
       let consumivel = null;
       // pela data em que o conjunto foi SOLDADO — reemitir hoje não troca o arame de julho
       try { consumivel = await consumivelDoConjunto({ opId: op.id, marca, quando }); } catch {}
       const pdfOut = await carimbarDesenho(bytes, {
-        opNumero, marca, setor: body.setor || null, formato: body.formato || null,
+        opNumero, marca, setor: body.setor || null, formato,
         arquivo: body.arquivo, usuario: user.name || user.email || "—", quando, itens, consumivel,
       });
       // ⚠ SALVA NA MESMA PASTA DO DESENHO ORIGINAL (onde a Engenharia guarda os PDFs e às vezes
@@ -271,13 +276,14 @@ export async function POST(req) {
             historico: novaEntradaGrd({ anterior: jaTem.historico, quando: agora, usuario: user.name || user.email || null, itemId: carimbado?.id || null, itens }),
             impressoItemId: carimbado?.id || undefined,
             impressoUrl: carimbado?.webUrl || undefined,
+            formato: formato || undefined,
           },
         })
       : await prisma.grdLiberacao.create({
           data: {
             opId, opNumero, marca,
             arquivo: body.arquivo.trim(),
-            formato: body.formato || null,
+            formato: formato || null,
             setor: body.setor || null,
             itemId: body.itemId || null,
             // snapshot do casamento na emissão — é a prova do que foi pro chão de fábrica
