@@ -13,6 +13,7 @@ import { contatoParaEnvioAutomatico } from "@/lib/contatos-cliente";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import { opsComFaturamentoPara } from "@/lib/cliente-faturamento-servidor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -168,5 +169,7 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({ nome: user.name || null, email: user.email, obras });
+  // a aba "Pedidos e faturamento" só aparece para quem a Torg marcou com o papel (por obra)
+  const faturamento = (await opsComFaturamentoPara(email).catch(() => [])).length > 0;
+  return NextResponse.json({ nome: user.name || null, email: user.email, obras, faturamento });
 }

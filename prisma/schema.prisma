@@ -785,6 +785,22 @@ model OPReferencia {
   @@index([paiId])
 }
 
+// ─── NOTA FISCAL DO OMIE POR PEDIDO (parcela) ─────────────────────────────────
+// Vitor (16/09/2026), na aba de faturamento do cliente: "precisa informar o número da NF". O cache
+// diário do Omie traz as parcelas faturadas, mas não o número da nota; ele vem de ConsultarNF pelo
+// código do pedido (cada parcela é um pedido no Omie). Consultado uma vez e guardado aqui — a nota
+// não muda de número. `numero` null = consultado e ainda sem NF (reconsulta depois de 1 dia).
+model NotaFiscalOmie {
+  codigoPedido String    @id
+  numeroPedido String?
+  numero       String?
+  serie        String?
+  chave        String?
+  dataEmissao  DateTime?
+  consultadoEm DateTime  @default(now())
+  erro         String?
+}
+
 // ─── ACEITE DO COMUNICADO DE ADITIVO ──────────────────────────────────────────
 // Mesmo desenho do KickoffAceite: um convite por pessoa, com o token dela; cobrança reusa o convite.
 model AditivoAceite {
