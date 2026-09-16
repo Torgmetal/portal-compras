@@ -1,7 +1,12 @@
 {
-  "build": 3228,
-  "gerado": "2026-09-16T23:07:18.795Z",
+  "build": 3229,
+  "gerado": "2026-09-16T23:21:47.694Z",
   "commits": [
+    {
+      "hash": "79eea208",
+      "data": "16/09/2026",
+      "titulo": "Organiza contatos do cliente em tabela na aba Obra"
+    },
     {
       "hash": "adc0ce4e",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "4ec70d8f",
       "data": "16/09/2026",
       "titulo": "Conserta a build: o import entrou antes do 'use client'"
-    },
-    {
-      "hash": "abd38986",
-      "data": "16/09/2026",
-      "titulo": "Espaço do cliente: relatório de inspeção para assinar aparece na obra dele"
     }
   ]
 }

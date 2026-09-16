@@ -820,6 +820,20 @@ async function main() {
       END IF;
     END $$;`, "FK AditivoAceite");
   console.log("[ensure-mes-tables] OK — Cliente, OPReferencia, AditivoAceite e colunas do aditivo garantidas.");
+  // ── Nota fiscal do Omie por pedido/parcela — 16/09/2026 (aba de faturamento do cliente) ──
+  await passo(`
+    CREATE TABLE IF NOT EXISTS "NotaFiscalOmie" (
+      "codigoPedido" TEXT         NOT NULL,
+      "numeroPedido" TEXT,
+      "numero"       TEXT,
+      "serie"        TEXT,
+      "chave"        TEXT,
+      "dataEmissao"  TIMESTAMP(3),
+      "consultadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "erro"         TEXT,
+      CONSTRAINT "NotaFiscalOmie_pkey" PRIMARY KEY ("codigoPedido")
+    )`, "NotaFiscalOmie");
+  console.log("[ensure-mes-tables] OK — NotaFiscalOmie garantida.");
 
   const existentes = await prisma.$queryRawUnsafe(`
     SELECT tablename

@@ -5,6 +5,8 @@ import { useState } from "react";
 import { agruparReferencias } from "@/lib/referencias-cliente";
 import ReferenciasClienteResumo from "@/components/comercial/ReferenciasClienteResumo";
 import ModalReferenciasCliente from "@/components/comercial/ModalReferenciasCliente";
+import ModalContatosCliente from "@/components/comercial/ModalContatosCliente";
+import { contatoVeFaturamento } from "@/lib/cliente-faturamento";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const ESTOQUE = { PROPRIO_TORG: "Estoque próprio da Torg", CLIENTE_TERCEIRO: "Fornecido pelo cliente / terceiro" };
@@ -23,6 +25,7 @@ function Campo({ rotulo, valor, destaque, dica, pre }) {
 
 export default function AbaObra({ op, podeEditar, onEditar, onAtualizar }) {
   const [editandoRefs, setEditandoRefs] = useState(false);
+  const [editandoContatos, setEditandoContatos] = useState(false);
   const refsBase = agruparReferencias((op.referencias || []).filter((r) => !r.aditivoId));
   const temRefs = refsBase.projetos.length + refsBase.pedidos.length + refsBase.outros.length > 0;
   const contatos = Array.isArray(op.clienteContatos) ? op.clienteContatos : [];
@@ -31,12 +34,20 @@ export default function AbaObra({ op, podeEditar, onEditar, onAtualizar }) {
   return (
     <div className="space-y-4">
       <section className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden" aria-label="Contatos do cliente">
-        <h3 className="px-5 py-4 text-base font-semibold text-torg-dark flex items-center gap-2"><Users size={18} className="text-torg-blue" /> Contatos do cliente <span className="text-torg-gray font-normal">({contatos.length})</span></h3>
+        <div className="px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
+          <h3 className="text-base font-semibold text-torg-dark flex items-center gap-2"><Users size={18} className="text-torg-blue" /> Contatos do cliente <span className="text-torg-gray font-normal">({contatos.length})</span></h3>
+          {podeEditar && contatos.length > 0 && (
+            <button onClick={() => setEditandoContatos(true)} className="text-xs text-torg-blue border border-torg-blue-200 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1.5" title="Quem vê Pedidos e faturamento no login do cliente">
+              <Pencil size={12} /> Acessos no portal <span className="text-torg-gray font-normal">({contatos.filter(contatoVeFaturamento).length})</span>
+            </button>
+          )}
+        </div>
+        {editandoContatos && <ModalContatosCliente opId={op.id} contatos={contatos} onClose={() => setEditandoContatos(false)} onSaved={() => { setEditandoContatos(false); if (onAtualizar) onAtualizar(); else window.location.reload(); }} />}
         {contatos.length === 0 ? <p className="px-5 pb-4 text-sm text-torg-gray">Nenhum contato registrado.</p> : (
           <div className="overflow-x-auto" role="region" aria-label="Tabela de contatos do cliente" tabIndex={0}>
-            <table className="w-full min-w-[1100px] table-fixed text-sm text-left">
-              <colgroup><col style={{ width: 220 }} /><col /><col style={{ width: 280 }} /><col style={{ width: 210 }} /><col style={{ width: 160 }} /></colgroup>
-              <thead className="bg-gray-50/60 text-torg-gray"><tr>{["Nome", "Função", "E-mail", "Telefone fixo", "Celular"].map(t => <th key={t} className="px-4 py-2.5 font-medium whitespace-nowrap">{t}</th>)}</tr></thead>
+            <table className="w-full min-w-[1270px] table-fixed text-sm text-left">
+              <colgroup><col style={{ width: 220 }} /><col /><col style={{ width: 280 }} /><col style={{ width: 210 }} /><col style={{ width: 160 }} /><col style={{ width: 170 }} /></colgroup>
+              <thead className="bg-gray-50/60 text-torg-gray"><tr>{["Nome", "Função", "E-mail", "Telefone fixo", "Celular", "Acesso no portal"].map(t => <th key={t} className="px-4 py-2.5 font-medium whitespace-nowrap">{t}</th>)}</tr></thead>
               <tbody className="divide-y divide-gray-50">{contatos.map((c, i) => (
                 <tr key={c.email || i} className="hover:bg-gray-50/50">
                   <td className="px-4 py-2.5 align-top font-medium text-torg-dark whitespace-nowrap">{c.nome || "—"}</td>
@@ -44,6 +55,7 @@ export default function AbaObra({ op, podeEditar, onEditar, onAtualizar }) {
                   <td className="px-4 py-2.5 align-top text-torg-blue whitespace-nowrap">{c.email || "—"}</td>
                   <td className="px-4 py-2.5 align-top text-torg-gray whitespace-nowrap">{c.telefone || "—"}</td>
                   <td className="px-4 py-2.5 align-top text-torg-gray whitespace-nowrap">{c.celular || "—"}</td>
+                  <td className="px-4 py-2.5 align-top whitespace-nowrap">{contatoVeFaturamento(c) ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-50 text-orange-800 border border-orange-100 font-medium">Pedidos e faturamento</span> : <span className="text-[11px] text-gray-400">documentos</span>}</td>
                 </tr>
               ))}</tbody>
             </table>
