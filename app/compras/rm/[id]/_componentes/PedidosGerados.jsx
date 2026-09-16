@@ -1,9 +1,16 @@
 "use client";
 import { useState } from "react";
+// ⚠ `useRouter` em vez de reaproveitar a prop `onRevertido`: ela significa "um pedido voltou
+// para cotação" e dispara toast e recarga da lista. Um lançamento de acompanhamento só precisa
+// dos dados frescos, e emprestar o nome de outra ação faz o próximo leitor procurar a reversão
+// que não houve.
+import { useRouter } from "next/navigation";
 import { Loader2, FileText, CheckCircle2, Check, Edit2, Edit3, RotateCcw, Package } from "lucide-react";
+import { AcompanhamentoPedido } from "./AcompanhamentoPedido";
 import { ModalEditarPedido, ModalReceberPedido } from "./ModaisPedido";
 
 export function PedidosGerados({ pedidos, rmId: _rmId, onRevertido, isAdmin, userRole }) {
+  const router = useRouter();
   const [revertendo, setRevertendo] = useState(null);
   const [confirmando, setConfirmando] = useState(null);
   const [toast, setToast] = useState(null);
@@ -111,6 +118,11 @@ export function PedidosGerados({ pedidos, rmId: _rmId, onRevertido, isAdmin, use
                       )}
                     </div>
                   )}
+                  {/* ⚠⚠ ACRESCENTADO, NADA REMOVIDO (Matheus, 16/09/2026: "mas não altere nada do
+                      que existe hoje na tela"). A régua fica recolhida sob o que já estava aqui —
+                      fornecedor, número, status, NF, valor e botões seguem exatamente no mesmo
+                      lugar. */}
+                  <AcompanhamentoPedido pedido={p} aoMudar={() => router.refresh()} />
                 </div>
                 <span className="text-torg-orange-700 font-semibold tabular-nums text-sm">
                   {Number(p.total || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}

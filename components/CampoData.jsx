@@ -72,9 +72,14 @@ export default function CampoData({ value, onChange, className = "", disabled, .
               se renderizar dentro de si mesmo e a tela do fornecedor abriu com 2.546 campos
               aninhados antes de o React cortar (16/09/2026). Converter em massa exige olhar o
               próprio conversor. */}
+          {/* ⚠⚠ `e.target.value`, NÃO o primeiro argumento direto. O parâmetro do onChange é o
+              EVENTO do React, e este handler o tratava como se já fosse o ISO: `isoParaBR(evento)`
+              vira "[object Ob" e devolve "", então escolher no calendário APAGAVA o campo e ainda
+              mandava o objeto do evento ao pai. Achado ao usar o componente na régua de
+              acompanhamento (16/09/2026) — a digitação sempre funcionou, e é por isso que passou. */}
           <input ref={refNativo} type="date" tabIndex={-1} aria-hidden="true"
             value={brParaIso(texto) || ""}
-            onChange={(iso) => { setTexto(isoParaBR(iso)); onChange(iso); }}
+            onChange={(e) => { setTexto(isoParaBR(e.target.value)); onChange(e.target.value); }}
             className="absolute right-1.5 w-0 h-0 opacity-0 pointer-events-none" />
         </>
       )}

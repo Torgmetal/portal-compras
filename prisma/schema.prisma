@@ -76,6 +76,7 @@ model User {
   compromissosCriados      Compromisso[]             @relation("CompromissoCriadoPor")
   modulos                  UserModulo[]
   pmpMetas                 PmpMeta[]                 @relation("PmpMetaCriador")
+  acompanhamentosPedido    AcompanhamentoPedido[]
 }
 
 model PasswordResetToken {
@@ -852,6 +853,7 @@ model PedidoOmie {
   op                   OP?              @relation(fields: [opId], references: [id])
   rmAtendida           RM?              @relation("PedidoOmieRMAtendida", fields: [rmAtendidaId], references: [id])
   prazoHistorico       PrazoHistorico[]
+  acompanhamentos      AcompanhamentoPedido[]
   rmItens              RMItem[]
   recebimentos         Recebimento[]
 
@@ -859,6 +861,38 @@ model PedidoOmie {
   @@index([opId])
   @@index([status])
   @@index([dataEntregaReal, syncEntregaEm])
+}
+
+// ─── ACOMPANHAMENTO DO PEDIDO DEPOIS QUE ELE VAI PRO OMIE ────────────────────
+//
+// Matheus (16/09/2026): "preciso ter na tela de RMs que foram geradas pedidos um histórico de
+// datas da previsão de entrega para eu ir controlando depois que o pedido vai pro Omie se já foi
+// recebido o material ou encaminhado para obra ou liberado para coleta no prazo estimado".
+//
+// ⚠⚠ LINHA DO TEMPO, NÃO UM STATUS QUE ANDA. Um campo único ("estado atual") responde "onde está"
+// e perde "quando passou por onde" — que é exatamente o controle pedido: comparar o que aconteceu
+// com o prazo estimado. Também não aceitaria o caso comum de entrega em duas levas (parte coletada
+// hoje, o resto semana que vem), porque o segundo lançamento apagaria o primeiro.
+//
+// ⚠ A ETAPA É TEXTO, não enum do Postgres: etapa nova (ex.: "retido na portaria") entra sem
+// migração de tipo, e o conjunto válido mora em `lib/acompanhamento-pedido.js`, onde o teste
+// alcança. Enum aqui obrigaria um ALTER TYPE em produção para cada palavra nova.
+//
+// ⚠ `data` é QUANDO ACONTECEU (o comprador digita, e lança no dia seguinte se precisar);
+// `criadoEm` é quando foi registrado. Um campo só confundiria atraso de fato com atraso de
+// digitação — e o atraso de fato é o que se está medindo.
+model AcompanhamentoPedido {
+  id              String     @id @default(cuid())
+  pedidoId        String
+  etapa           String
+  data            DateTime
+  observacao      String?
+  registradoPorId String?
+  criadoEm        DateTime   @default(now())
+  pedido          PedidoOmie @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  registradoPor   User?      @relation(fields: [registradoPorId], references: [id])
+
+  @@index([pedidoId, data])
 }
 
 model PrazoHistorico {

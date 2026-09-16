@@ -248,6 +248,20 @@ export default async function RMComprasDetail({ params }) {
       nfSerie: true,
       recebidoEm: true,
       recebidoPor: { select: { name: true } },
+      // ⚠⚠ O ACOMPANHAMENTO PÓS-OMIE (Matheus, 16/09/2026): a previsão, cada remarcação dela e as
+      // etapas lançadas à mão. Tudo isto já existia no banco — `prazoEntregaPrevisto` em 274 dos
+      // 295 pedidos — e só aparecia na tela Compras › Entregas; aqui, onde se olha a RM, não havia
+      // como saber se o material chegou no prazo estimado.
+      prazoEntregaPrevisto: true,
+      prazoOriginal: true,
+      prazoHistorico: {
+        select: { id: true, prazoAnterior: true, prazoNovo: true, motivo: true, criadoEm: true, alteradoPor: { select: { name: true } } },
+        orderBy: { criadoEm: "asc" },
+      },
+      acompanhamentos: {
+        select: { id: true, etapa: true, data: true, observacao: true, registradoPor: { select: { name: true } } },
+        orderBy: { data: "asc" },
+      },
       rmItens: {
         where: { rmId: rm.id },
         select: { id: true, descricao: true },
