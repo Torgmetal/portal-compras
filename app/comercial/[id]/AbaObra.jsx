@@ -3,6 +3,7 @@ import { Building2, Pencil, Hash, MapPin, CalendarRange, Users, AlertCircle } fr
 import { resumoEscopo } from "@/lib/qualidade-escopo";
 import { useState } from "react";
 import { agruparReferencias } from "@/lib/referencias-cliente";
+import PropostaObraConsulta from "@/components/comercial/PropostaObraConsulta";
 import ReferenciasClienteResumo from "@/components/comercial/ReferenciasClienteResumo";
 import ModalReferenciasCliente from "@/components/comercial/ModalReferenciasCliente";
 
@@ -50,6 +51,8 @@ export default function AbaObra({ op, podeEditar, onEditar, onAtualizar }) {
           </div>
         )}
       </section>
+
+      <PropostaObraConsulta opId={op.id} />
 
       {/* Identificação da obra */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
