@@ -43,3 +43,17 @@ it('preserva categoria e faturamento direto dos itens comerciais',()=>{
  const p=prepararOpDaLqc({...estudo,composicao:{...estudo.composicao,itensComerciais:{TELHA_SIMPLES:{qtd:10,preco:100}},faturamento:{itensComerciais:'DIRETO'}}});
  expect(p.itens.find(i=>i.categoria==='TELHAS')).toMatchObject({valorVerba:1000,faturamentoDireto:true});
 });
+
+it('aceita orçamento ainda sem valor depois do preenchimento do contrato',async()=>{
+ const {prisma,tx}=banco();const semValor={...estudo,orcamento:{...estudo.orcamento,valor:0}};
+ tx.estudoFabricacao.findUnique.mockResolvedValue(semValor);
+ const previaConferida=prepararOpDaLqc(semValor),criar=vi.fn().mockResolvedValue({id:'op'});
+ await criarOpComOrigemLqc(prisma,{estudoId:'lqc',atualizadoEm:estudo.updatedAt.toISOString(),userId:'u',previaConferida},criar);
+ expect(criar).toHaveBeenCalled();
+});
+it('recusa orçamento alterado entre a conferência e a transação',async()=>{
+ const {prisma,tx}=banco(),criar=vi.fn();
+ tx.estudoFabricacao.findUnique.mockResolvedValue({...estudo,orcamento:{...estudo.orcamento,valor:999}});
+ await expect(criarOpComOrigemLqc(prisma,{estudoId:'lqc',atualizadoEm:estudo.updatedAt.toISOString(),userId:'u',previaConferida:prepararOpDaLqc(estudo)},criar)).rejects.toThrow(/orçamento mudou/);
+ expect(criar).not.toHaveBeenCalled();
+});

@@ -1,4 +1,5 @@
 "use client";
+import ConferenciaLqc from "@/components/comercial/ConferenciaLqc";
 import CampoDecimal from "@/components/CampoDecimal";
 import { numeroBR } from "@/lib/numero-br";
 import CampoData from "@/components/CampoData";
@@ -30,13 +31,13 @@ export default function NovaOP() {
   // vínculo com o orçamento do Comercial (proposta + estudo)
   const [orc, setOrc] = useState({ pasta: null, ref: null, propostas: [], estudo: null, dados: null });
   const [origemLqc, setOrigemLqc] = useState(null);
-  const [lendoLqc, setLendoLqc] = useState(false);
+  const [lendoLqc, setLendoLqc] = useState(true);
   const [erroLqc, setErroLqc] = useState("");
   const [tentativaLqc, setTentativaLqc] = useState(0);
   const [valorContrato, setValorContrato] = useState("");
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("lqc");
-    if (!id) return;
+    if (!id) { setLendoLqc(false); return; }
     let ativo = true;
     setLendoLqc(true); setErroLqc("");
     fetch(`/api/comercial/estudos/${encodeURIComponent(id)}/preparar-op`)
@@ -46,7 +47,7 @@ export default function NovaOP() {
         if (j.opId) { router.replace(`/comercial/${j.opId}`); return; }
         setOrigemLqc(j); setForm(f => ({...f,...j.form})); setItens(j.itens.length ? j.itens : [novoItem()]);
         setValorContrato(j.valorContrato ?? "");
-        setOrc(o => ({...o,ref:j.orcamentoRef}));
+        setOrc(o => ({...o,ref:j.orcamentoRef,pasta:j.orcamentoPasta,estudo:j.estudoArquivo,dados:j.estudoDados}));
       }).catch(e => { if (ativo) setErroLqc(e.message); })
       .finally(() => { if (ativo) setLendoLqc(false); });
     return () => { ativo = false; };
@@ -146,7 +147,7 @@ export default function NovaOP() {
   const submit = async (e) => {
     e.preventDefault();
     setErro("");
-    if (lendoLqc || erroLqc) return;
+    if (lendoLqc || erroLqc || (origemLqc && !origemLqc.conferencia?.ok)) return;
     if (origemLqc && !(numeroBR(valorContrato) > 0)) { setErro("Informe o valor contratado da OP."); return; }
     if (!form.numero.trim()) {
       setErro("Número da OP ainda carregando — aguarde um instante.");
@@ -169,7 +170,7 @@ export default function NovaOP() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form, itens: validos, referencias,
-          ...(origemLqc ? {estudoFabricacaoId:origemLqc.estudoId,estudoAtualizadoEm:origemLqc.atualizadoEm,valorContrato:numeroBR(valorContrato)} : {}),
+          ...(origemLqc ? {estudoFabricacaoId:origemLqc.estudoId,estudoAtualizadoEm:origemLqc.atualizadoEm,conferenciaCodigo:origemLqc.conferencia.codigo,valorContrato:numeroBR(valorContrato)} : {}),
           orcamentoPasta: orc.pasta, orcamentoRef: orc.ref,
           propostas: orc.propostas,
           estudoArquivo: orc.estudo, estudoDados: orc.dados,
@@ -213,10 +214,11 @@ export default function NovaOP() {
           <p>Preço calculado na LQC<br /><strong>{fmtMoeda(origemLqc.precoCalculado)}</strong></p>
           <p>Referência da planilha<br /><strong>{origemLqc.precoPlanilha ? fmtMoeda(origemLqc.precoPlanilha) : "Não informada"}</strong></p>
           <label className="font-medium">Valor contratado (R$)
-            <CampoDecimal value={valorContrato} onChange={setValorContrato} casas={2} required className="mt-1 w-full border rounded-lg px-3 py-2" />
+            {origemLqc.valorContrato > 0 ? <strong className="block mt-1 rounded-lg bg-blue-50 px-3 py-2">{fmtMoeda(valorContrato)}</strong> : <CampoDecimal value={valorContrato} onChange={setValorContrato} casas={2} required className="mt-1 w-full border rounded-lg px-3 py-2" />}
           </label>
         </div>
         <p className="text-xs text-torg-gray">O valor contratado será a receita da OP. As verbas abaixo são os custos previstos de compra, sem a margem e a fabricação interna.</p>
+        <ConferenciaLqc previa={origemLqc} form={form} />
         {origemLqc.avisos.map((a,i) => <p key={i} className="text-sm text-amber-800">{a}</p>)}
       </section> : <OrcamentoComercial valor={orc} onChange={setOrc} onPreencher={(p) => setForm((f) => ({ ...f, ...p }))} />}
 
@@ -330,8 +332,8 @@ export default function NovaOP() {
       {/* Itens */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-lg font-semibold text-torg-dark">Itens contratados ({itens.length})</h3>
-          <div className="flex gap-2">
+          <h3 className="text-lg font-semibold text-torg-dark">{origemLqc ? "Custos de compra definidos" : "Itens contratados"} ({itens.length})</h3>
+          {!origemLqc && <div className="flex gap-2">
             <button
               type="button" onClick={() => addItem("MATERIA_PRIMA")}
               className="text-sm text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium"
@@ -350,12 +352,20 @@ export default function NovaOP() {
             >
               <Plus size={14} /> Outro
             </button>
-          </div>
+          </div>}
         </div>
 
         <div className="divide-y divide-gray-100">
           {itens.map((it, i) => (
-            <ItemFormRow
+            origemLqc ? <div key={i} className="p-5 space-y-2">
+              <p className="font-semibold text-torg-dark">{it.descricao}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                <p className="text-torg-gray">{it.qtdContratada != null ? `${Number(it.qtdContratada).toLocaleString('pt-BR')} ${it.unidade}` : "Verba definida no estudo"}</p>
+                {it.cmcMedio != null && <p>{Number(it.cmcMedio).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:6})} R$/{it.unidade}</p>}
+                <strong>{fmtMoeda(it.valorVerba)}</strong>
+              </div>
+              <p className="text-xs text-torg-gray">{it.faturamentoDireto ? "Faturamento direto" : "Compra via Torg"} · {it.observacao}</p>
+            </div> : <ItemFormRow
               key={i}
               item={it}
               onChange={(novo) => updateItem(i, novo)}
@@ -390,7 +400,7 @@ export default function NovaOP() {
           Cancelar
         </Link>
         <button
-          type="submit" disabled={salvando}
+          type="submit" disabled={salvando || (origemLqc && !origemLqc.conferencia?.ok)}
           className="px-6 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2 disabled:opacity-50"
         >
           {salvando && <Loader2 size={16} className="animate-spin" />}

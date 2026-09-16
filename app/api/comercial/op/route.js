@@ -9,8 +9,12 @@ const registro = log("op");
 import { prisma } from "@/lib/prisma";
 import { normalizarEscopo } from "@/lib/qualidade-escopo";
 import { requireRole } from "@/lib/session";
+import { prepararOpConferida } from "@/lib/lqc-op-servidor";
+import { validarPreenchimentoLqc } from "@/lib/lqc-op-conferencia";
 import { criarOpComOrigemLqc } from "@/lib/lqc-op-criar";
 import { criarCronogramaPadrao } from "@/lib/cronograma-padrao";
+
+export const maxDuration = 60;
 
 const itemSchema = z.object({
   categoria: z.string().min(1),
@@ -52,6 +56,7 @@ const opSchema = z.object({
   // referências do cliente com as palavras dele: { projetos, pedidos:[{codigo, itens, tags…}], outros } (lib/referencias-cliente)
   referencias: z.any().optional().nullable(),
   estudoFabricacaoId: z.string().min(1).optional(),
+  conferenciaCodigo: z.string().optional(),
   estudoAtualizadoEm: z.string().datetime().optional(),
   valorContrato: z.number().positive().optional(),
 });
@@ -129,10 +134,16 @@ export async function POST(req) {
   let op;
   try {
     if (body.estudoFabricacaoId) {
-      op = await criarOpComOrigemLqc(prisma, {estudoId:body.estudoFabricacaoId, atualizadoEm:body.estudoAtualizadoEm, userId:user.id, dadosConfirmados:{valorContrato:body.valorContrato,cliente:body.cliente,obra:body.obra || null,itens:body.itens}},
+      const estudo = await prisma.estudoFabricacao.findUnique({where:{id:body.estudoFabricacaoId},include:{orcamento:true}});
+      if (!estudo) throw new Error("LQC não encontrada.");
+      const previaConferida = await prepararOpConferida(estudo);
+      validarPreenchimentoLqc(previaConferida, body);
+      op = await criarOpComOrigemLqc(prisma, {previaConferida,estudoId:body.estudoFabricacaoId, atualizadoEm:body.estudoAtualizadoEm, userId:user.id, dadosConfirmados:{valorContrato:body.valorContrato,cliente:body.cliente,obra:body.obra || null,itens:body.itens}},
         async (tx, previa) => tx.oP.create({data:{...dadosOp.data,
           orcamentoRef:previa.orcamentoRef,
           estudoDados:previa.estudoDados,
+          estudoArquivo:previa.estudoArquivo,
+          orcamentoPasta:previa.orcamentoPasta,
           receitas:{create:[{ordem:0,categoria:"FABRICACAO",tipoPreco:"VALOR",
             descricao:`Contrato — ${previa.form.obra || previa.form.cliente}`,
             valor:body.valorContrato,createdById:user.id,

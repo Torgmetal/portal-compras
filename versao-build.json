@@ -1,7 +1,12 @@
 {
-  "build": 3221,
-  "gerado": "2026-09-16T20:45:21.927Z",
+  "build": 3222,
+  "gerado": "2026-09-16T21:11:02.556Z",
   "commits": [
+    {
+      "hash": "42fecb34",
+      "data": "16/09/2026",
+      "titulo": "Corrige custos importados da LQC e permite gerar OP vinculada"
+    },
     {
       "hash": "1110650f",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "4c9ee0d2",
       "data": "15/09/2026",
       "titulo": "Data book: e-mail do cliente no domínio da Torg é recusado, com o contato certo da OP na mensagem"
-    },
-    {
-      "hash": "abffd05b",
-      "data": "15/09/2026",
-      "titulo": "Relatório de pintura: hook depois do \"carregando o PLP\" derrubava a tela inteira"
     }
   ]
 }
