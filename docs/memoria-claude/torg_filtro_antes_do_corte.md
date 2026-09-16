@@ -46,9 +46,25 @@ suspeita; obra ausente do seletor parece obra sem RM. Ninguém notou por semanas
 ## Onde mais isso mora
 
 `app/compras/consumiveis/page.js` usa o mesmo módulo (34 RMs internas, **todas sem OP** — o seletor
-nem aparece lá, mas o aviso de corte vale). `lib/rms-servico.js` (Aluguel e Montagem) tem a mesma
-estrutura `take: 100` com filtro no cliente e **ainda não foi corrigido** — não estourou porque os
-volumes são baixos, mas é o mesmo defeito esperando o histórico crescer.
+nem aparece lá, mas o aviso de corte vale).
+
+**Aluguel e Montagem** (`lib/rms-servico.js` + `components/compras/PainelServicosRM.jsx`) foram
+corrigidos no mesmo dia, **antes de sangrar** — tinham 1 RM de cada tipo, então o `take: 100` nunca
+tinha cortado nada. A política de escopo, teto e opções de obra vem importada de `lib/rms-painel.js`;
+o `include` é que continua próprio (diária, dias, valor total).
+
+⚠⚠ **Lá o corte tinha uma consequência que a tela de material não tem: um NÚMERO DE DINHEIRO
+PARCIAL.** O card "Valor em aberto" e o total do rodapé somam `valorRM` das linhas **carregadas** —
+não sai de um `aggregate` porque não é campo, é soma dos itens com fallback de diária × dias. Com a
+lista cortada o total ficaria menor, sem nada dizendo. Agora, quando há corte, o rótulo vira "Valor
+das N carregadas" e o rodapé, "Total das carregadas". **Total parcial sem aviso é pior que lista
+curta: ninguém desconfia de um total.** O card "RMs ativas" também passou a mostrar o `count` do
+escopo inteiro, não `rms.length`.
+
+⚠ **Esconder o seletor quando não há obras escondia junto a SAÍDA do filtro.** Na aba Histórico de
+uma obra sem RM, `obras` vem vazio — e a primeira versão devolvia `null`, sumindo com o `<select>` e
+com o botão "Limpar filtro" ao mesmo tempo. A pessoa ficava presa num filtro sem ter como tirá-lo
+pela tela. A barra só some quando não há **nada** a dizer: sem obras, sem corte e sem obra escolhida.
 
 ## A lição geral
 
