@@ -1308,7 +1308,8 @@ function Cronograma({ d, detalhado = true }) {
               mantém o cronograma honesto quando alguém esquece de atualizar a planilha. */}
           <p className="mt-3 text-[11.5px] text-gray-500 leading-relaxed">
             <span className="inline-block text-[10px] font-bold uppercase tracking-wide text-[#0E7A55] bg-[#E9F6F0] border border-[#BFE5D5] rounded-full px-2 py-0.5 mr-1.5">medido</span>
-            cada peça entra na etapa mais avançada em que a fábrica apontou produção. As barras da
+            cada peça entra na etapa mais avançada em que a fábrica apontou produção
+            {onde?.pisoDeclarado ? <> — etapas até <strong>{onde.pisoDeclarado}</strong> dadas como concluídas pelo planejamento</> : null}. As barras da
             linha do tempo, acima, vêm do cronograma do planejamento.
           </p>
         </div>

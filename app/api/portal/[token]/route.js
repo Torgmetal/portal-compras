@@ -20,6 +20,7 @@ import { etapaDasMarcas } from "@/lib/portal-obra-consulta";
 import { rastreioDaOp } from "@/lib/rastreio-peca";
 import { rastreioDaLpc, chaveRastreio } from "@/lib/rastreio-lpc";
 import { aplicarAvancoSyneco } from "@/lib/cronograma-syneco";
+import { ORDEM_ETAPAS, pisoDeclarado, aplicarPiso } from "@/lib/onde-obra-piso";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -281,7 +282,13 @@ export async function GET(req, { params }) {
               const g = dist.get(k) || { n: 0, kg: 0 };
               g.n++; g.kg += kg; dist.set(k, g);
             }
-            const ORDEM = ["Preparação", "Montagem", "Solda", "Acabamento", "Jato", "Pintura"];
+            const ORDEM = ORDEM_ETAPAS;
+            // ⚠⚠ O PLANEJAMENTO DECLAROU, O MEDIDO NÃO CONTRADIZ (Vitor, 15/09/2026, OP-102) —
+            // fase 100% manual no cronograma vira piso do bloco. Ver lib/onde-obra-piso.
+            const piso = pisoDeclarado(tarefasCru);
+            const ajust = aplicarPiso(dist, { n: semN, kg: semKg }, piso);
+            dist.clear(); for (const [k, v] of ajust.dist) dist.set(k, v);
+            semN = ajust.naoIniciada.n; semKg = ajust.naoIniciada.kg;
             dados.cronograma.onde = {
               pecas: base.length, kg: Math.round(kgTotal),
               etapas: ORDEM.filter((k) => dist.has(k)).map((k) => ({
@@ -289,6 +296,8 @@ export async function GET(req, { params }) {
                 pct: Math.round((dist.get(k).kg / kgTotal) * 100),
               })),
               naoIniciada: { pecas: semN, kg: Math.round(semKg), pct: Math.round((semKg / kgTotal) * 100) },
+              // a tela diz de onde veio o piso, para o "medido" continuar honesto
+              pisoDeclarado: piso,
             };
           }
 

@@ -1,7 +1,12 @@
 {
-  "build": 3193,
-  "gerado": "2026-09-15T23:32:09.441Z",
+  "build": 3194,
+  "gerado": "2026-09-16T00:45:03.608Z",
   "commits": [
+    {
+      "hash": "08be573d",
+      "data": "15/09/2026",
+      "titulo": "Data book: conferência do rascunho pelo cliente vira aviso — a assinatura não fica presa"
+    },
     {
       "hash": "4c9ee0d2",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "97fdad65",
       "data": "14/09/2026",
       "titulo": "Permissao em massa nas pastas da OP: tirar uma pessoa de subpastas escolhidas"
-    },
-    {
-      "hash": "a102b24d",
-      "data": "14/09/2026",
-      "titulo": "Cronograma: percentual digitado à mão prevalece sobre o sincronismo (avancoManual)"
     }
   ]
 }
