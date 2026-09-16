@@ -248,6 +248,10 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   const [fotos, setFotos] = useState([]);
   const [enviandoFoto, setEnviandoFoto] = useState(false);
   const [areaFoto, setAreaFoto] = useState("");
+  // ⚠ LEGENDA DA FOTO, OPCIONAL. Vitor (16/09/2026): "para a colocação das fotos dos relatórios,
+  // temos habilitado as legendas?" — a coluna existia e o PDF já imprimia, mas nenhuma tela
+  // deixava escrever. Vale para as fotos tiradas em seguida e sai embaixo da foto no PDF.
+  const [legendaFoto, setLegendaFoto] = useState("");
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -383,11 +387,13 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         // fotográfico. No celular fica antes do botão: quem está no galpão escolhe uma vez e
         // fotografa quantas precisar daquele teste.
         if (areaFoto) fd.append("evidencia", areaFoto);
+        if (legendaFoto.trim()) fd.append("observacao", legendaFoto.trim());
         const r = await fetch("/api/campo/foto", { method: "POST", body: fd });
         const j = await lerJson(r);
         if (!r.ok) throw new Error(j.error || "Erro ao enviar");
         setFotos((p) => [...p, j.foto || j]);
       }
+      setLegendaFoto(""); // a legenda é daquela foto: a próxima começa em branco
     } catch (err) { alert(err.message); } finally { setEnviandoFoto(false); }
   }
 
@@ -784,6 +790,9 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
             {areasFoto.map((a) => <option key={a.k} value={a.k}>{a.rot}</option>)}
           </select>
         )}
+        <input value={legendaFoto} onChange={(e) => setLegendaFoto(e.target.value)} maxLength={500}
+          placeholder="Legenda da foto (opcional) — sai embaixo dela no PDF"
+          className="w-full mb-2 border border-gray-200 rounded-xl px-3 py-2.5 text-[14px] bg-white outline-none focus:border-torg-blue" />
         <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={receberFotos} />
         <button onClick={() => fileRef.current?.click()} disabled={enviandoFoto}
           className="w-full bg-white border-2 border-torg-blue text-torg-blue active:bg-torg-blue/5 rounded-xl py-3.5 text-[15px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60">
@@ -792,8 +801,9 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         {fotos.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {fotos.map((ft) => (
-              <span key={ft.id} className="relative">
+              <span key={ft.id} className="relative w-20">
                 <img src={ft.url} alt="" className="w-20 h-20 object-cover rounded-lg border border-gray-200" />
+                {ft.observacao && <span className="block text-[10px] text-torg-gray leading-tight truncate" title={ft.observacao}>{ft.observacao}</span>}
                 <button onClick={() => apagarFoto(ft.id)}
                   className="absolute -top-1.5 -right-1.5 bg-white border border-gray-300 rounded-full p-0.5 text-torg-gray active:text-red-600">
                   <X size={12} />
