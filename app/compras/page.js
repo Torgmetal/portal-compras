@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { FileText } from "lucide-react";
 import RMsTabelaSeletor from "./RMsTabelaSeletor";
 import { log } from "@/lib/log";
 
@@ -146,20 +145,21 @@ export default async function PainelCompras({ searchParams }) {
         </div>
       </div>
 
-      {rms.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-          <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-torg-gray text-lg">
-            {verArquivadas ? "Nenhuma RM arquivada" : "Nenhuma RM ativa no momento"}
-          </p>
-        </div>
-      ) : (
-        <RMsTabelaSeletor
-          rms={JSON.parse(JSON.stringify(rms))}
-          isAdmin={user.role === "ADMIN"}
-          categoriasCustom={JSON.parse(JSON.stringify(categoriasCustom))}
-        />
-      )}
+      {/* ⚠⚠ A TELA VAZIA MANTÉM O CABEÇALHO (Matheus, 16/09/2026: "quando não tem RM eu preciso que
+          mesmo assim apareça esse cabeçalho 0 0 0, fica melhor o visual"). Antes, lista vazia
+          trocava o componente INTEIRO por um cartão de aviso — e junto iam embora os contadores,
+          o seletor de OP e o Tabela/Kanban. Some a régua da tela, e quem chega não sabe se está no
+          lugar certo, se o filtro escondeu tudo ou se o portal quebrou. Com os três zeros de pé, a
+          resposta é imediata: é aqui, e está zerado.
+
+          ⚠ O estado vazio não some — mudou de lugar: a própria tabela diz "Nenhuma RM nesta lista"
+          na linha do corpo, e distingue isso de "o filtro escondeu tudo", que tem desfazer. */}
+      <RMsTabelaSeletor
+        rms={JSON.parse(JSON.stringify(rms))}
+        isAdmin={user.role === "ADMIN"}
+        categoriasCustom={JSON.parse(JSON.stringify(categoriasCustom))}
+        verArquivadas={verArquivadas}
+      />
     </div>
   );
 }

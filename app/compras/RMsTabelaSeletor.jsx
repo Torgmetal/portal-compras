@@ -65,7 +65,7 @@ const COLUNAS_FILTRO = [
   { key: "status",      label: "Status",       valor: (r) => (STATUS_LABELS[r.status] || STATUS_LABELS.ABERTA).label },
 ];
 
-export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }) {
+export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [], verArquivadas = false }) {
   // Lista mesclada (built-in + custom do banco) — passada por toda a arvore
   const todasCategoriasFornecedor = useMemo(
     () => mergeCategorias(categoriasCustom),
@@ -396,7 +396,9 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
                 <tr>
                   <td colSpan={11} className="px-6 py-10 text-center text-sm text-torg-gray">
                     {rmsBase.length === 0 ? (
-                      "Nenhuma RM nesta lista."
+                      // ⚠ Diz QUAL lista está vazia: quem clicou em "Histórico" e lê "nenhuma RM
+                      // ativa" acha que clicou errado.
+                      verArquivadas ? "Nenhuma RM arquivada ainda." : "Nenhuma RM ativa no momento."
                     ) : (
                       <>
                         Nenhuma RM passa pelos filtros escolhidos.{" "}
