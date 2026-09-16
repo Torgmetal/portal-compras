@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { criarPedidoOmie, anexarAoPedidoOmie } from "@/lib/omie-pedido-compra";
 import { resolverCodProjetoPorOp } from "@/lib/omie-pedidos-abertos";
-import { previsaoEntregaDDMMYYYY } from "@/lib/prazo-entrega";
+import { previsaoEntregaDDMMYYYY, calcularDataEntrega, extrairPrazoEntrega } from "@/lib/prazo-entrega";
 import { TEXTO_CERTIFICADO_QUALIDADE } from "@/lib/certificado-qualidade";
 import { fdPorCategoriaDaOP, rmEhFD, itemEhFD } from "@/lib/faturamento-direto";
 import { reavaliarStatusRM } from "@/lib/rm-status";
@@ -252,6 +252,7 @@ export async function POST(req, { params }) {
     // de auth do middleware bloquear chamada interna).
     // Previsão de entrega = dia da geração (RM ganha) + prazo do fornecedor (dias úteis/corridos).
     const dDtPrevisao = previsaoEntregaDDMMYYYY(cotacao.observacao) || undefined;
+    const previsaoParaGravar = calcularDataEntrega(new Date(), extrairPrazoEntrega(cotacao.observacao));
 
     let pedidoCriado = null;
     let erroPedido = null;
@@ -317,6 +318,12 @@ export async function POST(req, { params }) {
             localEstoque: cCodLocalEstoque,
             payload: itensPayload,
             resposta: pedidoCriado || null,
+      // ⚠⚠ A MESMA DATA QUE FOI PARA O OMIE FICA GRAVADA AQUI. Ela já era calculada e enviada em
+      // `dDtPrevisao`, mas `prazoEntregaPrevisto` continuava nulo — o portal escolhia a data,
+      // contava para o Omie e esquecia, e depois as telas diziam "Sem prazo" sobre um pedido cuja
+      // previsão ele mesmo tinha definido (9 pedidos do acervo em 16/09/2026). Guardar aqui evita
+      // que todo leitor tenha que refazer a conta a partir do texto da cotação.
+            prazoEntregaPrevisto: previsaoParaGravar || null,
             createdById: user.id,
           },
         });

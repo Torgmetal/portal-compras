@@ -1,7 +1,12 @@
 {
-  "build": 3233,
-  "gerado": "2026-09-16T23:43:51.455Z",
+  "build": 3234,
+  "gerado": "2026-09-16T23:43:54.785Z",
   "commits": [
+    {
+      "hash": "caad5d3d09",
+      "data": "16/09/2026",
+      "titulo": "Prazos das RMs: cabeçalho colorido, filtro por obra, e o prazo dos itens deixa de sumir"
+    },
     {
       "hash": "04fc4c6bab",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "1f1811ebf3",
       "data": "16/09/2026",
       "titulo": "Cotação: o fornecedor passa a ver a observação do item"
-    },
-    {
-      "hash": "a929a6d958",
-      "data": "16/09/2026",
-      "titulo": "Memória: contato de cliente digitado com @torg.com.br (OP-106, duas vezes)"
     }
   ]
 }

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { criarPedidoOmie, anexarAoPedidoOmie } from "@/lib/omie-pedido-compra";
 import { resolverCodProjetoPorOp, resolverCodProjetoPorNome } from "@/lib/omie-pedidos-abertos";
-import { previsaoEntregaDDMMYYYY } from "@/lib/prazo-entrega";
+import { previsaoEntregaDDMMYYYY, calcularDataEntrega, extrairPrazoEntrega } from "@/lib/prazo-entrega";
 import { TEXTO_CERTIFICADO_QUALIDADE } from "@/lib/certificado-qualidade";
 import { reavaliarStatusRM } from "@/lib/rm-status";
 import { itensDoPedido, divergenciaProposta, totalDosItens } from "@/lib/pedido-itens";
@@ -177,11 +177,15 @@ export async function POST(req, { params }) {
       } catch {}
     }
 
+    // Previsão de entrega = dia da geração (RM ganha) + prazo do fornecedor (dias úteis/corridos).
+    // ⚠ Fora do `try`: a mesma data vai para o Omie AQUI e para o banco mais abaixo, e o `const`
+    // dentro do bloco não chegava lá.
+    const dDtPrevisao = previsaoEntregaDDMMYYYY(cotacao.observacao) || undefined;
+    const previsaoParaGravar = calcularDataEntrega(new Date(), extrairPrazoEntrega(cotacao.observacao));
+
     let pedidoCriado = null;
     let erroPedido = null;
     try {
-      // Previsão de entrega = dia da geração (RM ganha) + prazo do fornecedor (dias úteis/corridos).
-      const dDtPrevisao = previsaoEntregaDDMMYYYY(cotacao.observacao) || undefined;
       const data = await criarPedidoOmie({
         itens: itensPayload,
         observacao: observacaoBase,
@@ -241,6 +245,12 @@ export async function POST(req, { params }) {
             localEstoque: localSelecionado,
             payload: itensPayload,
             resposta: pedidoCriado || null,
+      // ⚠⚠ A MESMA DATA QUE FOI PARA O OMIE FICA GRAVADA AQUI. Ela já era calculada e enviada em
+      // `dDtPrevisao`, mas `prazoEntregaPrevisto` continuava nulo — o portal escolhia a data,
+      // contava para o Omie e esquecia, e depois as telas diziam "Sem prazo" sobre um pedido cuja
+      // previsão ele mesmo tinha definido (9 pedidos do acervo em 16/09/2026). Guardar aqui evita
+      // que todo leitor tenha que refazer a conta a partir do texto da cotação.
+            prazoEntregaPrevisto: previsaoParaGravar || null,
             createdById: user.id,
           },
         });

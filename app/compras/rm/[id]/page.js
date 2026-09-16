@@ -262,6 +262,14 @@ export default async function RMComprasDetail({ params }) {
         select: { id: true, etapa: true, data: true, observacao: true, registradoPor: { select: { name: true } } },
         orderBy: { data: "asc" },
       },
+      // ⚠ As duas últimas fontes de previsão, para a régua daqui não discordar da tela de Prazos:
+      // a data que o fornecedor pôs item a item, e o prazo em palavras da observação.
+      cotacao: {
+        select: {
+          observacao: true,
+          itens: { where: { vencedor: true }, select: { prazoEntrega: true, vencedor: true } },
+        },
+      },
       rmItens: {
         where: { rmId: rm.id },
         select: { id: true, descricao: true },

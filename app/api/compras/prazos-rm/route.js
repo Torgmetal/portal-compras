@@ -38,7 +38,15 @@ export async function GET() {
       // (`previsaoAtual`). Sem ele, pedido com data gravada nos itens e `prazoEntregaPrevisto`
       // nulo caía em "Sem prazo" aqui e aparecia COM data na tela de Entregas, que já tinha esse
       // fallback. Só os vencedores, que são os que viraram pedido.
-      cotacao: { select: { itens: { where: { vencedor: true }, select: { prazoEntrega: true, vencedor: true } } } },
+      // ⚠ `observacao` vem junto porque é dela que sai o prazo em PALAVRAS ("18 dias úteis"),
+      // a última fonte de previsão para os pedidos antigos que nasceram antes de o portal gravar
+      // `prazoEntregaPrevisto` na criação.
+      cotacao: {
+        select: {
+          observacao: true,
+          itens: { where: { vencedor: true }, select: { prazoEntrega: true, vencedor: true } },
+        },
+      },
       // ⚠ A RM vem pelos ITENS, não por `rmAtendidaId` (que é de outra coisa e está NULO nos 295
       // pedidos do acervo). É o mesmo caminho que a tela da RM usa para achar seus pedidos.
       rmItens: {

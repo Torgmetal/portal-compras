@@ -194,3 +194,65 @@ describe("previsaoAtual — o prazo dos itens da cotação é a última fonte", 
     expect(previsaoAtual(comItens([{ vencedor: true, prazoEntrega: null }]))).toBe(null);
   });
 });
+
+// ⚠⚠ A CONTA JÁ EXISTIA E SÓ NÃO ERA GUARDADA. Matheus (16/09/2026): "a data de entrega quando for
+// apenas texto converter para dias úteis pegando da data de criação do pedido, acredito que já é
+// feito essa lógica para enviar a data de entrega dentro do pedido do Omie". Exatamente:
+// `gerar-pedidos` calcula com `previsaoEntregaDDMMYYYY` e manda em `dDtPrevisao`, mas nunca gravava
+// em `prazoEntregaPrevisto`. Nove pedidos do acervo diziam "Sem prazo" sobre uma data que o próprio
+// portal tinha escolhido e informado ao Omie.
+describe("previsaoAtual — o prazo em palavras, contado da criação do pedido", () => {
+  // 01/09/2026 é uma terça-feira.
+  const criado = "2026-09-01T12:00:00.000Z";
+  const comTexto = (obs) => ({ createdAt: criado, cotacao: { observacao: obs, itens: [] } });
+  const iso = (d) => new Date(d).toISOString().slice(0, 10);
+
+  it("⚠⚠ '18 dias úteis' vira data, contada da criação do pedido", () => {
+    // 18 dias úteis a partir de terça 01/09 → 25/09 (pula 4 fins de semana).
+    expect(iso(previsaoAtual(comTexto("Prazo de entrega: 18 dias úteis | Pagamento: 30")))).toBe("2026-09-25");
+  });
+
+  it("⚠ dias CORRIDOS não pulam fim de semana", () => {
+    expect(iso(previsaoAtual(comTexto("Prazo de entrega: 10 dias")))).toBe("2026-09-11");
+  });
+
+  it("'2 semanas' conta 14 dias corridos", () => {
+    expect(iso(previsaoAtual(comTexto("Prazo de entrega: 2 semanas")))).toBe("2026-09-15");
+  });
+
+  it("⚠⚠ a base é a CRIAÇÃO, não hoje — senão a previsão andaria sozinha todo dia", () => {
+    const antigo = { createdAt: "2026-06-01T12:00:00.000Z", cotacao: { observacao: "Prazo de entrega: 5 dias", itens: [] } };
+    expect(iso(previsaoAtual(antigo))).toBe("2026-06-06");
+  });
+
+  it("⚠ data explícita na observação é usada como está", () => {
+    expect(iso(previsaoAtual(comTexto("Prazo de entrega: 15/10/2026")))).toBe("2026-10-15");
+  });
+
+  it("⚠⚠ é a ÚLTIMA fonte: data no item do fornecedor ganha do texto", () => {
+    const p = { createdAt: criado, cotacao: {
+      observacao: "Prazo de entrega: 90 dias",
+      itens: [{ vencedor: true, prazoEntrega: "2026-09-10T00:00:00.000Z" }],
+    } };
+    expect(previsaoAtual(p)).toEqual(new Date("2026-09-10T00:00:00.000Z"));
+  });
+
+  it("⚠ e o prazo do próprio pedido ganha de todas", () => {
+    const p = { createdAt: criado, prazoEntregaPrevisto: "2026-08-15T00:00:00.000Z",
+                cotacao: { observacao: "Prazo de entrega: 90 dias", itens: [] } };
+    expect(previsaoAtual(p)).toBe("2026-08-15T00:00:00.000Z");
+  });
+
+  it("observação sem prazo nenhum continua sem previsão", () => {
+    expect(previsaoAtual(comTexto("Pagamento: 30 dias | sem frete"))).toBe(null);
+    expect(previsaoAtual(comTexto(""))).toBe(null);
+  });
+
+  it("⚠ prazo em texto sem número não inventa data", () => {
+    expect(previsaoAtual(comTexto("Prazo de entrega: a combinar"))).toBe(null);
+  });
+
+  it("⚠ pedido sem data de criação não tem de onde contar", () => {
+    expect(previsaoAtual({ cotacao: { observacao: "Prazo de entrega: 5 dias", itens: [] } })).toBe(null);
+  });
+});
