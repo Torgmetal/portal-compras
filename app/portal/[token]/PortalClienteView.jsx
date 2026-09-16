@@ -1200,8 +1200,8 @@ function Cronograma({ d, detalhado = true }) {
       {/* os três números que respondem à pergunta antes de o cliente procurar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden mb-5">
         <Tile rot="Onde a obra está"
-          val={onde?.etapas?.length ? `${onde.etapas[onde.etapas.length - 1].pct}%` : "—"}
-          pe={onde?.etapas?.length ? `em ${onde.etapas[onde.etapas.length - 1].nome.toLowerCase()}` : "sem apontamento na fábrica"} />
+          val={onde?.atual ? `${onde.atual.pct}%` : "—"}
+          pe={onde?.atual ? `em ${onde.atual.nome.toLowerCase()}` : "sem apontamento na fábrica"} />
         <Tile rot="Próxima entrega prevista"
           val={proxima ? fmtD(proxima.fim).slice(0, 5) : "—"}
           pe={proxima ? (proxima.area || "expedição") : "sem expedição programada"} />
@@ -1308,9 +1308,9 @@ function Cronograma({ d, detalhado = true }) {
               mantém o cronograma honesto quando alguém esquece de atualizar a planilha. */}
           <p className="mt-3 text-[11.5px] text-gray-500 leading-relaxed">
             <span className="inline-block text-[10px] font-bold uppercase tracking-wide text-[#0E7A55] bg-[#E9F6F0] border border-[#BFE5D5] rounded-full px-2 py-0.5 mr-1.5">medido</span>
-            cada peça entra na etapa mais avançada em que a fábrica apontou produção
-            {onde?.pisoDeclarado ? <> — etapas até <strong>{onde.pisoDeclarado}</strong> dadas como concluídas pelo planejamento</> : null}. As barras da
-            linha do tempo, acima, vêm do cronograma do planejamento.
+            cada barra é quanto da estrutura já passou por aquela etapa — os percentuais são os mesmos da
+            linha do tempo acima (apontamento da fábrica, ou informados pelo planejamento); as peças vêm do apontamento
+            {onde?.pisoDeclarado ? <>, com as etapas até <strong>{onde.pisoDeclarado}</strong> dadas como concluídas pelo planejamento</> : null}.
           </p>
         </div>
       )}

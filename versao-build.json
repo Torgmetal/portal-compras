@@ -1,7 +1,12 @@
 {
-  "build": 3194,
-  "gerado": "2026-09-16T00:45:03.608Z",
+  "build": 3195,
+  "gerado": "2026-09-16T00:56:09.737Z",
   "commits": [
+    {
+      "hash": "9eebddf8",
+      "data": "15/09/2026",
+      "titulo": "Portal do cliente: \"onde a obra está\" respeita a fase que o planejamento deu como 100% à mão"
+    },
     {
       "hash": "08be573d",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "fac5f1b0",
       "data": "14/09/2026",
       "titulo": "Etiquetas: tres defeitos da TAG do cliente que a revisao do Codex achou"
-    },
-    {
-      "hash": "97fdad65",
-      "data": "14/09/2026",
-      "titulo": "Permissao em massa nas pastas da OP: tirar uma pessoa de subpastas escolhidas"
     }
   ]
 }

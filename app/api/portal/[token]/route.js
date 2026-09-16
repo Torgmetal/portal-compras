@@ -20,7 +20,7 @@ import { etapaDasMarcas } from "@/lib/portal-obra-consulta";
 import { rastreioDaOp } from "@/lib/rastreio-peca";
 import { rastreioDaLpc, chaveRastreio } from "@/lib/rastreio-lpc";
 import { aplicarAvancoSyneco } from "@/lib/cronograma-syneco";
-import { ORDEM_ETAPAS, pisoDeclarado, aplicarPiso } from "@/lib/onde-obra-piso";
+import { pisoDeclarado, aplicarPiso, acumuladoPorEtapa } from "@/lib/onde-obra-piso";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -282,25 +282,22 @@ export async function GET(req, { params }) {
               const g = dist.get(k) || { n: 0, kg: 0 };
               g.n++; g.kg += kg; dist.set(k, g);
             }
-            const ORDEM = ORDEM_ETAPAS;
-            // ⚠⚠ O PLANEJAMENTO DECLAROU, O MEDIDO NÃO CONTRADIZ (Vitor, 15/09/2026, OP-102) —
-            // fase 100% manual no cronograma vira piso do bloco. Ver lib/onde-obra-piso.
+            // ⚠⚠ O BLOCO É O REFLEXO DO CRONOGRAMA (Vitor, 15/09/2026, OP-102): acumulado por fase,
+            // com o percentual da linha do tempo onde ela existe; peças medidas pelo apontamento,
+            // com as fases dadas como 100% à mão valendo como piso. Ver lib/onde-obra-piso.
             const piso = pisoDeclarado(tarefasCru);
             const ajust = aplicarPiso(dist, { n: semN, kg: semKg }, piso);
-            dist.clear(); for (const [k, v] of ajust.dist) dist.set(k, v);
-            semN = ajust.naoIniciada.n; semKg = ajust.naoIniciada.kg;
+            const etapas = acumuladoPorEtapa(ajust.dist, kgTotal, dados.cronograma.tarefas || []);
+            const atual = [...etapas].reverse().find((e) => e.pct > 0) || null;
             dados.cronograma.onde = {
               pecas: base.length, kg: Math.round(kgTotal),
-              etapas: ORDEM.filter((k) => dist.has(k)).map((k) => ({
-                nome: k, pecas: dist.get(k).n, kg: Math.round(dist.get(k).kg),
-                pct: Math.round((dist.get(k).kg / kgTotal) * 100),
-              })),
-              naoIniciada: { pecas: semN, kg: Math.round(semKg), pct: Math.round((semKg / kgTotal) * 100) },
-              // a tela diz de onde veio o piso, para o "medido" continuar honesto
+              etapas,
+              // a etapa mais avançada em andamento — o que o cliente lê no cartão
+              atual: atual ? { nome: atual.nome, pct: atual.pct } : null,
+              naoIniciada: { pecas: ajust.naoIniciada.n, kg: Math.round(ajust.naoIniciada.kg), pct: kgTotal > 0 ? Math.round((ajust.naoIniciada.kg / kgTotal) * 100) : 0 },
               pisoDeclarado: piso,
             };
           }
-
           // ── EMBARQUES ─────────────────────────────────────────────────────────────────────────
           // ⚠ romaneio EMITIDO é o que saiu; o resto é PROGRAMADO. Chamar tudo de "embarcado" seria
           // prometer ao cliente uma carga que ainda está no pátio.
