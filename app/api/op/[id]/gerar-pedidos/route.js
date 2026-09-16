@@ -10,7 +10,7 @@ import { previsaoEntregaDDMMYYYY } from "@/lib/prazo-entrega";
 import { TEXTO_CERTIFICADO_QUALIDADE } from "@/lib/certificado-qualidade";
 import { fdPorCategoriaDaOP, rmEhFD, itemEhFD } from "@/lib/faturamento-direto";
 import { reavaliarStatusRM } from "@/lib/rm-status";
-import { itensDoPedido, divergenciaProposta } from "@/lib/pedido-itens";
+import { itensDoPedido, divergenciaProposta, totalDosItens } from "@/lib/pedido-itens";
 import { log } from "@/lib/log";
 import { bloqueioPorIndisponibilidade } from "@/lib/cotacao-indisponibilidade";
 
@@ -179,7 +179,11 @@ export async function POST(req, { params }) {
     // OP) precisam da MESMA conta, senão o mesmo fornecedor recebe dois números conforme a tela de
     // onde o comprador clicou.
     const { itens: itensPayload, alertas } = itensDoPedido(linhas);
-    const total = itensPayload.reduce((s, it) => s + it.qtd * it.precoUnit, 0);
+    // ⚠⚠ O TOTAL SOMA BASE + IPI. Desde 16/09/2026 o item leva o preço LÍQUIDO e o imposto
+    // separado (`lib/pedido-itens`); somar só `qtd × precoUnit` aqui faria o total registrado no
+    // portal PERDER o IPI e divergir do pedido no Omie — o defeito oposto ao que se estava
+    // consertando. `totalDosItens` é a mesma conta nas duas rotas de geração.
+    const total = totalDosItens(itensPayload);
 
     const totalProposta = Number(cotacao.totalProposta) || 0;
     const itensComPrecoCot = (cotacao.itens || []).filter((i) => Number(i.precoUnit) > 0);
@@ -213,7 +217,10 @@ export async function POST(req, { params }) {
         : `Pedido via Workspace Torg — RMs ${rmNumeros.join(", ")}`,
       todosEstoque && !isFD ? null : `Cliente: ${op.cliente}`,
       isFD ? "FATURAMENTO DIRETO — encerrar sem contas a pagar" : null,
-      temIPI ? "Preço unitário inclui IPI (para bater total com NF do fornecedor)" : null,
+      // ⚠ Esta linha anunciava o defeito: dizia "preço unitário inclui IPI" porque era verdade —
+      // o imposto ia embutido e o campo de IPI do Omie ficava zerado. Desde 16/09/2026 o preço é
+      // líquido e o IPI vai destacado por item; a observação passa a dizer onde conferir.
+      temIPI ? "IPI destacado por item (preço unitário liquido)" : null,
       divergencia.texto,
       cotacao.numeroProposta ? `Proposta forn.: ${cotacao.numeroProposta}` : null,
       cotacao.observacao || null,

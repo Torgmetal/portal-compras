@@ -53,7 +53,8 @@ PREÇO UNITÁRIO ≠ TOTAL DA LINHA — extraia SEMPRE o UNITÁRIO:
   Em planilhas de cotação tem geralmente colunas como:
     QTD | UNIT | PREÇO UNITÁRIO (R$) | DESCONTO | TOTAL (R$) | ICMS% | IPI%
     100 | KG   | 7,50                |          | 750,00     | 18    | 5
-  → precoUnit = 7.50, qtd = 100, totalBruto = 750.00
+  → precoUnit = 7.50, qtd = 100, totalBruto = 750.00, icmsPct = 18, ipiPct = 5
+  Note que aqui o IPI está EM % E NA LINHA — é o único caso em que ele vale.
   NUNCA confunda PREÇO UNITÁRIO com TOTAL — mesmo que sejam parecidos.
 
 VALIDE ARITMETICAMENTE quando possível:
@@ -64,7 +65,26 @@ VALIDE ARITMETICAMENTE quando possível:
 OUTROS:
 - "qtd" e "unidade" devem ser SEMPRE como o FORNECEDOR cotou (tipicamente KG pra aço/perfis).
   Se PDF diz "1.440 KG", devolva qtd=1440, unidade="KG", mesmo que RM diga "8 barras".
-- Captura ICMS%, IPI% por item (em colunas separadas, geralmente em %).
+
+IMPOSTOS — NUNCA ADIVINHE, NUNCA HERDE DO CABEÇALHO OU DO RODAPÉ:
+  • ICMS% e IPI% só valem se estiverem NA LINHA DO ITEM, numa coluna de PORCENTAGEM.
+  • Um total de imposto no rodapé ("Total IPI R$ 228,25"), uma alíquota no cabeçalho
+    ("IPI: 5,00% - Incluso") ou uma nota de rodapé NÃO se aplicam aos itens. Deixe null.
+  • Se a coluna de imposto da linha vier em REAIS (ex.: "Vr. IPI 87,25") e não em %, isso NÃO é
+    alíquota: devolva ipiPct = null e registre em "avisos" que o documento traz IPI em valor.
+    NÃO divida o valor pelo total para achar a porcentagem — R$ 5 sobre base 100 é 5%, sobre
+    total 105 é 4,76%, e você não sabe qual é a base.
+  • null ("não informado") é DIFERENTE de 0 ("informado como isento"). Use 0 apenas quando a
+    linha mostrar explicitamente zero.
+  • Se o rodapé disser que o imposto está "incluso" no preço, registre isso em "avisos" — não
+    mexa nos preços nem nas alíquotas por causa disso.
+
+ORDEM DE LEITURA — as linhas dos produtos primeiro:
+  1. Encontre a TABELA de itens e leia linha a linha (descrição, qtd, unidade, preço, impostos).
+  2. Só depois leia cabeçalho e rodapé, e apenas para prazo de pagamento, nome do fornecedor e
+     total da proposta.
+  3. Nada do passo 2 pode alterar o que foi lido no passo 1.
+
 - Captura prazo de pagamento ("28 DDL", "30/60/90", "à vista").
 - Ignora cabeçalho, rodapé, transporte, observações genéricas.
 
