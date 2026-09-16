@@ -32,7 +32,7 @@ export async function GET() {
       orderBy: { envio: { enviadoEm: "desc" } },
       select: {
         token: true, assinadoEm: true, convidadoEm: true, ordem: true, setor: true, ip: true,
-        envio: { select: { titulo: true, tipo: true, opNumero: true, revisao: true, enviadoEm: true, status: true } },
+        envio: { select: { titulo: true, tipo: true, opNumero: true, revisao: true, enviadoEm: true, status: true, snapshot: true } },
       },
       take: 200,
     }),
@@ -51,6 +51,11 @@ export async function GET() {
     prisma.planoResponsavel.findMany({ where: { clienteEmail: igual }, select: { opNumero: true } }).catch(() => []),
     prisma.portalCliente.findMany({ where: { clienteEmail: igual }, select: { opNumero: true } }).catch(() => []),
   ]);
+
+  // ⚠ envio antigo de relatório de inspeção nasceu sem `opNumero` na coluna (só no snapshot e no
+  // título "· OP-103") — sem isto o documento não se pendurava em obra nenhuma e sumia da lista.
+  const opDoEnvio = (e) => e?.opNumero || e?.snapshot?.opNumero || (String(e?.titulo || "").match(/OP-(\d+)/)?.[1] ?? null);
+  for (const a of assinaturas) a.envio.opNumero = opDoEnvio(a.envio);
 
   // ── as OPs em que este e-mail aparece ──
   const nums = new Set();
