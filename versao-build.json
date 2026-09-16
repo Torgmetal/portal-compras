@@ -1,7 +1,12 @@
 {
-  "build": 3196,
-  "gerado": "2026-09-16T12:28:24.341Z",
+  "build": 3197,
+  "gerado": "2026-09-16T12:42:29.005Z",
   "commits": [
+    {
+      "hash": "fc02dd40f4",
+      "data": "16/09/2026",
+      "titulo": "Campo decimal e campo de data em português, no portal inteiro"
+    },
     {
       "hash": "d40c19e25d",
       "data": "15/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e167d1389f",
       "data": "15/09/2026",
       "titulo": "Cron diario: avisa quando a L.E. do servidor e mais nova que a do portal"
-    },
-    {
-      "hash": "eba8df9477",
-      "data": "14/09/2026",
-      "titulo": "Inspeção: tela do inspetor lista produto final por fase, sem croqui nem acessório"
     }
   ]
 }
