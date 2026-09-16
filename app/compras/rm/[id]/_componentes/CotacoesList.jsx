@@ -1,6 +1,6 @@
 "use client";
 import BlocoObservacao from "@/components/BlocoObservacao";
-import { parseObservacaoCotacao } from "@/lib/cotacao-observacao";
+import { parseObservacaoCotacao, condicaoPagamentoDe } from "@/lib/cotacao-observacao";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { XCircle, Loader2, Check, Mail, Edit3, Plus, MessageSquareText } from "lucide-react";
@@ -141,19 +141,35 @@ export function CotacoesList({ rm, outrasRMs = [] }) {
                     DISPONIBILIDADE" — a informação que decide a compra, guardada no banco.
 
                     ⚠ `Cotacao.observacao` empilha prazo, pagamento e o texto livre num campo só;
-                    `parseObservacaoCotacao` separa. O prazo de entrega aparece junto porque não
-                    tem campo próprio na tela; o pagamento já sai no mapa comparativo. */}
+                    `parseObservacaoCotacao` separa. Prazo de entrega e condição de pagamento saem
+                    aqui porque não têm campo próprio NA TELA.
+
+                    ⚠⚠ O PAGAMENTO ESTAVA FALTANDO, E O COMENTÁRIO ANTERIOR DISFARÇAVA ISSO. Ele
+                    dizia "o pagamento já sai no mapa comparativo" — sai, no EXCEL do mapa, que
+                    alguém precisa baixar e abrir. Na tela não aparecia em canto nenhum. Matheus
+                    (16/09/2026): "quando o fornecedor preenche forma de pagamento devia aparecer
+                    também na tela pra gente avaliar igual o prazo de entrega". Comparar uma
+                    proposta em 28 dias com outra à vista sem ver isso é comparar só o preço. */}
                 {(() => {
                   const { prazoEntrega, observacao } = parseObservacaoCotacao(c.observacao);
+                  const pagamento = condicaoPagamentoDe(c);
                   // ⚠ `observacoesItens`, não `c.itens`: a página apaga os itens do payload e a
                   // lista que sobra só tem item em status cotável — numa RM já fechada, vazia.
                   const porItem = c.observacoesItens || [];
-                  if (!observacao && !prazoEntrega && !porItem.length) return null;
+                  if (!observacao && !prazoEntrega && !pagamento && !porItem.length) return null;
                   return (
                     <div className="mt-1.5 space-y-1">
-                      {prazoEntrega && (
-                        <p className="text-[11px] text-torg-gray">
-                          <b className="font-semibold text-torg-dark">Prazo de entrega:</b> {prazoEntrega}
+                      {/* ⚠ Os dois na MESMA linha quando cabem: são as duas condições comerciais
+                          da proposta e quem compara lê as duas juntas. Empilhados, viram duas
+                          linhas de 11px que o olho passa batido. */}
+                      {(prazoEntrega || pagamento) && (
+                        <p className="text-[11px] text-torg-gray flex flex-wrap gap-x-3 gap-y-0.5">
+                          {prazoEntrega && (
+                            <span><b className="font-semibold text-torg-dark">Prazo de entrega:</b> {prazoEntrega}</span>
+                          )}
+                          {pagamento && (
+                            <span><b className="font-semibold text-torg-dark">Pagamento:</b> {pagamento}</span>
+                          )}
                         </p>
                       )}
                       {/* ⚠ A resposta GERAL fica sempre à vista: é a que o fornecedor digitou

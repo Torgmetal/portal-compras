@@ -1,7 +1,12 @@
 {
-  "build": 3210,
-  "gerado": "2026-09-16T17:43:49.722Z",
+  "build": 3211,
+  "gerado": "2026-09-16T17:43:56.924Z",
   "commits": [
+    {
+      "hash": "4f8afe6fb9",
+      "data": "16/09/2026",
+      "titulo": "Cancelar RM deixa de ser privilégio de ADMIN e vira permissão por pessoa"
+    },
     {
       "hash": "a317c2556f",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "143ae55096",
       "data": "15/09/2026",
       "titulo": "Data book: peças e peso pela lista canônica (LE, senão LPC) — não LPC + LE somadas"
-    },
-    {
-      "hash": "6fe5ff1dbf",
-      "data": "15/09/2026",
-      "titulo": "Cron da L.E.: aviso que não chegou a ninguém não é execução bem-sucedida"
     }
   ]
 }

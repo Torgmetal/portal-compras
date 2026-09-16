@@ -55,6 +55,14 @@ export default async function RMComprasDetail({ params }) {
       // ⚠ A observação carrega o texto livre que o fornecedor digitou em prazo/pagamento — é onde a
       // SOUFER escreveu "SEM DISPONIBILIDADE" (T67-011-R00). Sem ela o mapa não tem como avisar.
       observacao: true,
+      // ⚠⚠ A CONDIÇÃO DE PAGAMENTO TEM CAMPO PRÓPRIO, e a tela não o lia (Matheus, 16/09/2026:
+      // "quando o fornecedor preenche forma de pagamento devia aparecer também na tela pra gente
+      // avaliar igual o prazo de entrega"). A rota de submissão grava a resposta em DOIS lugares —
+      // `prazoPagamento` e, de novo, dentro de `observacao` como "Pagamento: X" — e até aqui o
+      // único lugar que mostrava era o EXCEL do mapa comparativo, que alguém precisa baixar e
+      // abrir. Comparar duas propostas em 28 dias e à vista sem isso na tela é comparar preço
+      // fingindo que o prazo não existe.
+      prazoPagamento: true,
       // Itens completos com rmItem details — pra mostrar todos os itens
       // (incluindo de outras RMs) no modal de lancamento manual
       itens: {

@@ -52,3 +52,27 @@ describe("temObservacaoDoFornecedor", () => {
     expect(temObservacaoDoFornecedor({})).toBe(false);
   });
 });
+
+// ⚠⚠ Matheus (16/09/2026): "quando o fornecedor preenche forma de pagamento devia aparecer também
+// na tela pra gente avaliar igual o prazo de entrega". A condição existia no banco em 435 das 672
+// cotações e o único lugar que a mostrava era o EXCEL do mapa comparativo. Estes testes travam de
+// ONDE a tela lê — são duas fontes, e ler a errada faz sumir justamente a cotação lançada à mão.
+describe("condicaoPagamentoDe", () => {
+  it("prefere o campo próprio", async () => {
+    const { condicaoPagamentoDe } = await import("@/lib/cotacao-observacao");
+    expect(condicaoPagamentoDe({ prazoPagamento: "30/60/90", observacao: "Pagamento: à vista" })).toBe("30/60/90");
+  });
+
+  it("⚠ cai na observação quando o campo próprio está vazio — formato antigo", async () => {
+    const { condicaoPagamentoDe } = await import("@/lib/cotacao-observacao");
+    expect(condicaoPagamentoDe({ prazoPagamento: null, observacao: "Prazo de entrega: 7 dias | Pagamento: 28 DDL" })).toBe("28 DDL");
+    expect(condicaoPagamentoDe({ prazoPagamento: "   ", observacao: "Pagamento: à vista" })).toBe("à vista");
+  });
+
+  it("sem nenhuma das duas, devolve vazio — a tela não escreve 'Pagamento:' pelado", async () => {
+    const { condicaoPagamentoDe } = await import("@/lib/cotacao-observacao");
+    expect(condicaoPagamentoDe({ prazoPagamento: null, observacao: "SEM DISPONIBILIDADE" })).toBe("");
+    expect(condicaoPagamentoDe({})).toBe("");
+    expect(condicaoPagamentoDe(null)).toBe("");
+  });
+});
