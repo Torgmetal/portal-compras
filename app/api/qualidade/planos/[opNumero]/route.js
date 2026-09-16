@@ -36,7 +36,7 @@ export async function GET(_req, { params }) {
   // Redigitar o e-mail do inspetor a cada envio é como se erra o destinatário de um documento
   // controlado. (Ver OP.clienteContatos.)
   const contatos = Array.isArray(op?.clienteContatos)
-    ? op.clienteContatos.filter((c) => c?.email).map((c) => ({ nome: c.nome || null, email: c.email }))
+    ? op.clienteContatos.filter((c) => c?.email).map((c) => ({ nome: c.nome || null, email: c.email, apenasConsulta: c.apenasConsulta === true }))
     : [];
   // ⚠ os dados da OBRA vão junto. Vitor (27/08/2026): "trazer apenas as informações da Obra por
   // hora" — é o que o portal preenche sozinho no documento, e a tela do plano mostra quais são para

@@ -30,6 +30,27 @@ export default function AbaObra({ op, podeEditar, onEditar, onAtualizar }) {
 
   return (
     <div className="space-y-4">
+      <section className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden" aria-label="Contatos do cliente">
+        <h3 className="px-5 py-4 text-base font-semibold text-torg-dark flex items-center gap-2"><Users size={18} className="text-torg-blue" /> Contatos do cliente <span className="text-torg-gray font-normal">({contatos.length})</span></h3>
+        {contatos.length === 0 ? <p className="px-5 pb-4 text-sm text-torg-gray">Nenhum contato registrado.</p> : (
+          <div className="overflow-x-auto" role="region" aria-label="Tabela de contatos do cliente" tabIndex={0}>
+            <table className="w-full min-w-[1100px] table-fixed text-sm text-left">
+              <colgroup><col style={{ width: 220 }} /><col /><col style={{ width: 280 }} /><col style={{ width: 210 }} /><col style={{ width: 160 }} /></colgroup>
+              <thead className="bg-gray-50/60 text-torg-gray"><tr>{["Nome", "Função", "E-mail", "Telefone fixo", "Celular"].map(t => <th key={t} className="px-4 py-2.5 font-medium whitespace-nowrap">{t}</th>)}</tr></thead>
+              <tbody className="divide-y divide-gray-50">{contatos.map((c, i) => (
+                <tr key={c.email || i} className="hover:bg-gray-50/50">
+                  <td className="px-4 py-2.5 align-top font-medium text-torg-dark whitespace-nowrap">{c.nome || "—"}</td>
+                  <td className="px-4 py-2.5 align-top text-torg-gray break-words">{c.funcao || "—"}</td>
+                  <td className="px-4 py-2.5 align-top text-torg-blue whitespace-nowrap">{c.email || "—"}</td>
+                  <td className="px-4 py-2.5 align-top text-torg-gray whitespace-nowrap">{c.telefone || "—"}</td>
+                  <td className="px-4 py-2.5 align-top text-torg-gray whitespace-nowrap">{c.celular || "—"}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       {/* Identificação da obra */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
@@ -62,7 +83,7 @@ export default function AbaObra({ op, podeEditar, onEditar, onAtualizar }) {
                   <button onClick={() => setEditandoRefs(true)} className="text-[11px] text-torg-blue font-medium inline-flex items-center gap-1 hover:underline"><Pencil size={11} /> {temRefs ? "Editar" : "Informar"}</button>
                 )}
               </div>
-              {temRefs && <div className="mb-2"><ReferenciasClienteResumo arvore={refsBase} /></div>}
+              {temRefs && <div className="mb-2"><ReferenciasClienteResumo arvore={refsBase} mostrarValores={false} /></div>}
               {editandoRefs && <ModalReferenciasCliente opId={op.id} onClose={() => setEditandoRefs(false)} onSaved={() => { setEditandoRefs(false); if (onAtualizar) onAtualizar(); else window.location.reload(); }} />}
               <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">{temRefs ? "Como sai nos documentos" : "Referência do cliente"}</p>
               {op.refCliente ? (
@@ -110,23 +131,6 @@ export default function AbaObra({ op, podeEditar, onEditar, onAtualizar }) {
         </div>
       </div>
 
-      {/* Contatos usados nos envios */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h4 className="text-sm font-semibold text-torg-dark flex items-center gap-2 mb-1"><Users size={15} className="text-torg-blue" /> Contatos do cliente <span className="text-torg-gray font-normal">({contatos.length})</span></h4>
-        <p className="text-xs text-torg-gray mb-3">Quem recebe cronograma e ata desta OP. São registrados no primeiro envio e voltam prontos nos próximos — dá para corrigir na tela de envio do cronograma.</p>
-        {contatos.length === 0 ? (
-          <p className="text-sm text-torg-gray">Nenhum contato registrado ainda.</p>
-        ) : (
-          <div className="border border-gray-100 rounded-lg divide-y divide-gray-50">
-            {contatos.map((c, i) => (
-              <div key={i} className="px-3 py-2 flex items-center gap-2.5 text-[13px]">
-                <span className="font-medium text-torg-dark whitespace-nowrap">{c.nome || "—"}</span>
-                <span className="text-torg-gray flex-1 truncate">{c.email}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
     </div>
   );

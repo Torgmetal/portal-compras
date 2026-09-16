@@ -1,3 +1,4 @@
+import { contatoParaEnvioAutomatico } from "@/lib/contatos-cliente";
 // O PORTAL DO CLIENTE LOGADO — as obras dele, com os documentos de cada uma.
 //
 // ⚠⚠ TUDO PELO E-MAIL DA SESSÃO, nunca por parâmetro. Uma rota que aceitasse "?email=" deixaria
@@ -69,9 +70,12 @@ export async function GET() {
   // cliente, e muita gente chega ao portal por aí antes de assinar qualquer coisa.
   const porContato = await prisma.oP.findMany({
     where: { OR: [{ clienteEmail: igual }, { clienteContatos: { array_contains: [{ email: user.email }] } }] },
-    select: { numero: true },
+    select: { numero: true, clienteEmail: true, clienteContatos: true },
   }).catch(() => []);
-  for (const o of porContato) nums.add(soNum(o.numero));
+  for (const o of porContato) {
+    const email = user.email.trim().toLowerCase();
+    if (o.clienteEmail?.trim().toLowerCase() === email || (Array.isArray(o.clienteContatos) && o.clienteContatos.some(c => c.email?.trim().toLowerCase() === email && contatoParaEnvioAutomatico(c)))) nums.add(soNum(o.numero));
+  }
 
   const ops = nums.size
     ? await prisma.oP.findMany({

@@ -7,7 +7,7 @@ const chip = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-5
 const fmtR$ = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : null);
 
-export default function ReferenciasClienteResumo({ arvore, vazio = "Nenhuma referência do cliente registrada." }) {
+export default function ReferenciasClienteResumo({ arvore, mostrarValores = true, vazio = "Nenhuma referência do cliente registrada." }) {
   const a = arvore || { projetos: [], pedidos: [], outros: [] };
   const nada = !a.projetos?.length && !a.pedidos?.length && !a.outros?.length;
   if (nada) return <p className="text-sm text-torg-gray">{vazio}</p>;
@@ -23,7 +23,7 @@ export default function ReferenciasClienteResumo({ arvore, vazio = "Nenhuma refe
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="font-semibold text-torg-dark">{p.rotulo} {p.codigo}</span>
             {p.descricao && <span className="text-sm text-torg-gray">{p.descricao}</span>}
-            {p.valor != null && <span className="text-xs text-torg-gray">{fmtR$(p.valor)}</span>}
+            {mostrarValores && p.valor != null && <span className="text-xs text-torg-gray">{fmtR$(p.valor)}</span>}
             {p.data && <span className="text-xs text-torg-gray">{fmtData(p.data)}</span>}
             {p.revisao && <span className="text-xs text-torg-gray">rev. {p.revisao}</span>}
           </div>
