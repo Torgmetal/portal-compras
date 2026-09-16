@@ -39,6 +39,9 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
       return {
         id: it.id,
         descricao: it.rmItem.descricao,
+        // ⚠ `observacaoRM` e não `observacao`: esta é a da TORG (escrita na RM); `observacao`,
+        // logo abaixo, é a que o FORNECEDOR digita na proposta. Dois textos, dois donos.
+        observacaoRM: it.rmItem.observacao || "",
         material: it.rmItem.material,
         comprimento: it.rmItem.comprimento,
         largura: it.rmItem.largura,
@@ -947,6 +950,16 @@ dataHoraBR(new Date())
                         <td className="px-2 py-2 text-gray-400 align-top">{i + 1}</td>
                         <td className="px-2 py-2 align-top">
                           <p className={`font-medium text-xs ${l.semEstoque ? "line-through text-gray-400" : "text-torg-dark"}`}>{l.descricao}</p>
+                          {/* ⚠⚠ A ESPECIFICAÇÃO QUE NÃO COUBE NA DESCRIÇÃO. Matheus (16/09/2026),
+                              olhando a RI-0035 pelo link do fornecedor: "não apareceu a observação
+                              que escrevemos no item no momento da criação dele. Precisa aparecer
+                              pro fornecedor embaixo". Naquele item estava o modelo exato da
+                              máquina — sem isso, o fornecedor cota outra. */}
+                          {l.observacaoRM && (
+                            <p className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded px-1.5 py-1 mt-1 whitespace-pre-wrap break-words">
+                              {l.observacaoRM}
+                            </p>
+                          )}
                           {/* Detalhes técnicos — material, dimensões, peso, qtd em peças.
                               Importante pra chapas/perfis: fornecedor precisa entregar
                               QTD de peças com as dimensões especificadas */}

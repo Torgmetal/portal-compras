@@ -41,6 +41,17 @@ export default async function CotacaoPorToken({ params }) {
               descricao: true, qtd: true, unidade: true, material: true,
               comprimento: true, largura: true, tratamento: true,
               peso: true, codigo: true,
+              // ⚠⚠ A OBSERVAÇÃO DO ITEM VAI PARA O FORNECEDOR — decisão do Matheus (16/09/2026),
+              // reafirmada depois de eu levantar o risco: é o campo onde a engenharia escreve a
+              // ESPECIFICAÇÃO que não cabe na descrição ("Máquina de Solda TIG Inversora Saints
+              // Soldas ST 175 ELT 180A", "2 CAIXAS", "MARCA TIGRE"), e sem ela o fornecedor cota
+              // outra coisa.
+              //
+              // ⚠ QUEM ESCREVE AQUI ESTÁ FALANDO COM O FORNECEDOR. O campo já foi usado como
+              // recado interno — há "600,00 - Pedro Locatelli" (um preço-alvo e um nome) e
+              // "COLABORADOR - LUIZ OTAVIO" no banco. Daqui em diante isso é visível para quem
+              // recebe o link, e um valor de referência escrito aí entrega a negociação.
+              observacao: true,
               rmId: true,
               rm: { select: { numero: true } },
               opItem: { select: { faturamentoDireto: true } },

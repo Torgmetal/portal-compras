@@ -1,156 +1,156 @@
 {
-  "build": 3203,
-  "gerado": "2026-09-16T13:42:17.577Z",
+  "build": 3204,
+  "gerado": "2026-09-16T13:48:00.355Z",
   "commits": [
     {
-      "hash": "3b2da1cf",
+      "hash": "a929a6d958",
+      "data": "16/09/2026",
+      "titulo": "Memória: contato de cliente digitado com @torg.com.br (OP-106, duas vezes)"
+    },
+    {
+      "hash": "3b2da1cf7b",
       "data": "16/09/2026",
       "titulo": "Relatórios de inspeção: o PDF entra na subpasta do tipo (3.1 Pintura, 3.2 DM…) quando ela existe"
     },
     {
-      "hash": "13515c5b",
+      "hash": "13515c5bb2",
       "data": "16/09/2026",
       "titulo": "Fotos dos relatórios: legenda ao capturar, editável na foto subida e com até 3 linhas no PDF"
     },
     {
-      "hash": "a8ecb861",
+      "hash": "a8ecb8612a",
       "data": "16/09/2026",
       "titulo": "RMs: as observações que alguém escreveu param de sumir da tela"
     },
     {
-      "hash": "4ec70d8f",
+      "hash": "4ec70d8f42",
       "data": "16/09/2026",
       "titulo": "Conserta a build: o import entrou antes do 'use client'"
     },
     {
-      "hash": "abd38986",
+      "hash": "abd3898654",
       "data": "16/09/2026",
       "titulo": "Espaço do cliente: relatório de inspeção para assinar aparece na obra dele"
     },
     {
-      "hash": "799c1e53",
+      "hash": "799c1e53a6",
       "data": "16/09/2026",
       "titulo": "Conferência de peça: a listagem conferida sai em PDF e em Excel"
     },
     {
-      "hash": "fc02dd40",
+      "hash": "fc02dd40f4",
       "data": "16/09/2026",
       "titulo": "Campo decimal e campo de data em português, no portal inteiro"
     },
     {
-      "hash": "d40c19e2",
+      "hash": "d40c19e25d",
       "data": "15/09/2026",
       "titulo": "Portal do cliente: \"onde a obra está\" é o reflexo do cronograma — acumulado por fase, mesmo %"
     },
     {
-      "hash": "9eebddf8",
+      "hash": "9eebddf862",
       "data": "15/09/2026",
       "titulo": "Portal do cliente: \"onde a obra está\" respeita a fase que o planejamento deu como 100% à mão"
     },
     {
-      "hash": "08be573d",
+      "hash": "08be573d78",
       "data": "15/09/2026",
       "titulo": "Data book: conferência do rascunho pelo cliente vira aviso — a assinatura não fica presa"
     },
     {
-      "hash": "4c9ee0d2",
+      "hash": "4c9ee0d20b",
       "data": "15/09/2026",
       "titulo": "Data book: e-mail do cliente no domínio da Torg é recusado, com o contato certo da OP na mensagem"
     },
     {
-      "hash": "abffd05b",
+      "hash": "abffd05bdc",
       "data": "15/09/2026",
       "titulo": "Relatório de pintura: hook depois do \"carregando o PLP\" derrubava a tela inteira"
     },
     {
-      "hash": "97f4f9be",
+      "hash": "97f4f9be6b",
       "data": "15/09/2026",
       "titulo": "Data book: acento decomposto no nome do anexo não derruba mais a geração dos volumes"
     },
     {
-      "hash": "e6de513a",
+      "hash": "e6de513a8d",
       "data": "15/09/2026",
       "titulo": "Cotação: o campo numérico do navegador DESCARTA a vírgula"
     },
     {
-      "hash": "b613022a",
+      "hash": "b613022a13",
       "data": "15/09/2026",
       "titulo": "SharePoint: o id do item vinha do banco e ia cru para a URL do Graph"
     },
     {
-      "hash": "7c1af37b",
+      "hash": "7c1af37bee",
       "data": "15/09/2026",
       "titulo": "Anexo da Qualidade: a guarda de SSRF estava no lugar errado"
     },
     {
-      "hash": "aa84e480",
+      "hash": "aa84e48060",
       "data": "15/09/2026",
       "titulo": "Memória: o sharepointItemId morre, e a escada de download é uma só"
     },
     {
-      "hash": "1c2deae6",
+      "hash": "1c2deae673",
       "data": "15/09/2026",
       "titulo": "Qualidade: o olho desistia no primeiro erro; o livro já sabia tentar de novo"
     },
     {
-      "hash": "88b28818",
+      "hash": "88b288180c",
       "data": "15/09/2026",
       "titulo": "Anexo de inspeção: o documento de uma obra não serve o relatório de outra"
     },
     {
-      "hash": "a89a9df2",
+      "hash": "a89a9df26a",
       "data": "15/09/2026",
       "titulo": "Cron da L.E.: o aviso do sino repetia a lista de ontem (achado ALTA do Codex)"
     },
     {
-      "hash": "25135af1",
+      "hash": "25135af1e9",
       "data": "15/09/2026",
       "titulo": "Memória: contagem de peças do data book pela lista canônica; OP-103 e a LE duplicada da 089"
     },
     {
-      "hash": "143ae550",
+      "hash": "143ae55096",
       "data": "15/09/2026",
       "titulo": "Data book: peças e peso pela lista canônica (LE, senão LPC) — não LPC + LE somadas"
     },
     {
-      "hash": "6fe5ff1d",
+      "hash": "6fe5ff1dbf",
       "data": "15/09/2026",
       "titulo": "Cron da L.E.: aviso que não chegou a ninguém não é execução bem-sucedida"
     },
     {
-      "hash": "7f687dfc",
+      "hash": "7f687dfc87",
       "data": "15/09/2026",
       "titulo": "RMs Materiais: funil por coluna no cabeçalho, como nas outras telas"
     },
     {
-      "hash": "68c01d92",
+      "hash": "68c01d92e3",
       "data": "15/09/2026",
       "titulo": "Data Book: o olho dava \"arquivo invalido\" e o X girava sem dizer por que"
     },
     {
-      "hash": "357b84c0",
+      "hash": "357b84c0a6",
       "data": "15/09/2026",
       "titulo": "Data book: tirar um documento da seção deixa rastro no AuditLog"
     },
     {
-      "hash": "6f7ca54a",
+      "hash": "6f7ca54a88",
       "data": "15/09/2026",
       "titulo": "Relatório de inspeção: número apagado nunca volta — o AuditLog diz o maior já emitido"
     },
     {
-      "hash": "cd3903b4",
+      "hash": "cd3903b40c",
       "data": "15/09/2026",
       "titulo": "Memória: OP-089 — as causas dos 307 'sem R' e as amarrações aplicadas"
     },
     {
-      "hash": "a155344a",
+      "hash": "a155344a32",
       "data": "15/09/2026",
       "titulo": "Rastreabilidade: item comprado pronto (grade de piso) não conta como peça sem R"
-    },
-    {
-      "hash": "ccd178d5",
-      "data": "15/09/2026",
-      "titulo": "Memoria: corrige o que eu registrei sobre a OP-085 no cron da L.E."
     }
   ]
 }
