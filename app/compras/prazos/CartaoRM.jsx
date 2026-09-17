@@ -62,7 +62,21 @@ function TagFD({ parcial = false }) {
 const plural = (n) => (Math.abs(n) === 1 ? "dia" : "dias");
 
 /** O veredito de quem já chegou: dentro do prazo, atrasado ou adiantado. */
-function Chegou({ t }) {
+function Chegou({ t, porEncerramento, encerradoEm }) {
+  // ⚠⚠ DIZ DE ONDE VEM A CERTEZA. "Encerrado no Omie" deixou de ser uma situação à parte (Matheus:
+  // "se está encerrado chegou"), mas a PROCEDÊNCIA não pode sumir junto com o chip: quem confere
+  // precisa saber se o carimbo veio da nota fiscal ou do comprador fechando o pedido.
+  //
+  // ⚠ E aqui não se escreve atraso: o encerramento não traz a data em que o material chegou, só a
+  // data em que o portal viu o pedido fechado. Um "12 dias de atraso" calculado dela mediria o
+  // tempo que alguém levou para encerrar.
+  if (porEncerramento) {
+    return (
+      <span className="text-emerald-700" title="O pedido foi encerrado no Omie — o portal trata isso como material recebido">
+        chegou · encerrado no Omie{encerradoEm ? ` (visto em ${fmt(encerradoEm)})` : ""}
+      </span>
+    );
+  }
   const sufixo = t == null ? ""
     : t > 0 ? ` com ${t} ${plural(t)} de atraso`
       : t === 0 ? " no prazo"
@@ -115,18 +129,8 @@ function TagFrete({ frete }) {
 
 /** O quanto falta, em palavras — a mesma frase que alguém usaria no telefone. */
 function Quando({ p }) {
-  if (p.situacao === "CHEGOU") return <Chegou t={p.atrasoDias} />;
+  if (p.situacao === "CHEGOU") return <Chegou t={p.atrasoDias} porEncerramento={p.porEncerramento} encerradoEm={p.encerradoOmieEm} />;
   if (p.situacao === "PARCIAL") return <Parcial diasAte={p.diasAte} />;
-  // ⚠⚠ ENCERRADO PRECISA DA FRASE DELE. Sem isto cairia em "sem prazo informado" — e a queixa que
-  // originou tudo era justamente a tela mentir sobre pedido acabado. Aqui existe prazo; ele é que
-  // deixou de ser cobrado.
-  if (p.situacao === "ENCERRADO") {
-    return (
-      <span className="text-slate-600" title="O Omie encerrou este pedido — o portal parou de cobrar o prazo dele">
-        encerrado no Omie{p.encerradoOmieEm ? ` (visto em ${fmt(p.encerradoOmieEm)})` : ""}
-      </span>
-    );
-  }
   if (p.diasAte == null) return <span className="text-torg-gray">sem prazo informado</span>;
   if (p.diasAte < 0) return <span className="text-red-600 font-medium">{Math.abs(p.diasAte)} {plural(p.diasAte)} de atraso</span>;
   if (p.diasAte === 0) return <span className="text-orange-600 font-medium">vence hoje</span>;

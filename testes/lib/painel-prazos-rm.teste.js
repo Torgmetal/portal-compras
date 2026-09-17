@@ -248,19 +248,34 @@ describe("agruparPorRM — a marca de Faturamento Direto", () => {
   });
 });
 
-// ─── Pedido ENCERRADO no Omie (Matheus, 17/09/2026) ──────────────────────────
+// ─── Pedido ENCERRADO no Omie CONTA COMO CHEGOU (Matheus, 17/09/2026) ───────
+//
+// ⚠⚠ ISTO MUDOU NO MESMO DIA, E A MUDANÇA FOI DE REGRA DE NEGÓCIO. Nasceu como situação própria
+// ("Encerrado no Omie") porque encerrar é ato administrativo e não prova recebimento. Matheus
+// corrigiu: "agrupe encerrados junto com chegou, porque se está encerrado chegou" — na operação da
+// Torg o comprador só encerra depois que o material entrou. O chip separado dividia em dois uma
+// coisa que é uma só, e obrigava a somar dois números para saber o que falta.
 describe("pedido encerrado no Omie", () => {
   const ontem = new Date(Date.now() - 5 * 86400000);
   const encerrado = { id: "p1", createdAt: new Date("2026-01-01"), prazoEntregaPrevisto: ontem, encerradoOmieEm: new Date("2026-09-15") };
 
-  it("sai de ATRASADO e vira ENCERRADO", () => {
+  it("sai de ATRASADO e passa a contar como CHEGOU", () => {
     expect(situacaoDoPedido({ ...encerrado, encerradoOmieEm: null }).situacao).toBe("ATRASADO");
-    expect(situacaoDoPedido(encerrado).situacao).toBe("ENCERRADO");
+    expect(situacaoDoPedido(encerrado).situacao).toBe("CHEGOU");
   });
 
-  it("mas a CHEGADA continua ganhando — encerrar não apaga um recebimento", () => {
-    const p = { ...encerrado, statusEntrega: "ENTREGUE", dataEntregaReal: new Date("2026-09-10") };
-    expect(situacaoDoPedido(p).situacao).toBe("CHEGOU");
+  // ⚠ A PROCEDÊNCIA não some junto com o chip: a tela escreve "chegou · encerrado no Omie", porque
+  // quem confere precisa saber se o carimbo veio da nota fiscal ou do comprador fechando o pedido.
+  it("⚠ marca DE ONDE vem a certeza", () => {
+    expect(situacaoDoPedido(encerrado).porEncerramento).toBe(true);
+    const comNota = { ...encerrado, encerradoOmieEm: null, statusEntrega: "ENTREGUE", dataEntregaReal: new Date("2026-09-10") };
+    expect(situacaoDoPedido(comNota).porEncerramento).toBeUndefined();
+  });
+
+  // ⚠⚠ O encerramento não traz a data em que o material chegou, só a data em que o portal viu o
+  // pedido fechado. Um atraso calculado dela mediria o tempo que alguém levou para encerrar.
+  it("⚠⚠ NÃO inventa atraso a partir da data do encerramento", () => {
+    expect(situacaoDoPedido(encerrado).atrasoDias).toBeNull();
   });
 
   it("mantém a previsão à vista — o prazo existiu, só deixou de ser cobrado", () => {
@@ -269,16 +284,16 @@ describe("pedido encerrado no Omie", () => {
 
   it("não empresta a data da RM nem conta como pendente", () => {
     const [linha] = agruparPorRM([{ ...encerrado, rm: { id: "r1", numero: "RM-1" } }]);
-    expect(linha.situacao).toBe("ENCERRADO");
+    expect(linha.situacao).toBe("CHEGOU");
     expect(linha.proximaPrevisao).toBeNull();
     expect(resumoPorSituacao([linha]).pendentes).toBe(0);
   });
 
-  it("some do filtro padrão, e reaparece em TODAS e no filtro próprio", () => {
+  it("some do filtro padrão e aparece junto com os que chegaram", () => {
     const linhas = agruparPorRM([{ ...encerrado, rm: { id: "r1", numero: "RM-1" } }]);
     expect(filtrarLinhas(linhas, "PENDENTES")).toHaveLength(0);
     expect(filtrarLinhas(linhas, "TODAS")).toHaveLength(1);
-    expect(filtrarLinhas(linhas, "ENCERRADO")).toHaveLength(1);
+    expect(filtrarLinhas(linhas, "CHEGOU")).toHaveLength(1);
   });
 
   it("⚠ RM MISTA continua apertando: um pedido encerrado não silencia o irmão atrasado", () => {
@@ -293,7 +308,7 @@ describe("pedido encerrado no Omie", () => {
 
   it("⚠ encerrado SEM previsão não vira SEM_PRAZO — a RM sem prazo é que tem de aparecer", () => {
     const semPrazo = { id: "p3", createdAt: new Date("2026-01-01"), encerradoOmieEm: new Date("2026-09-15") };
-    expect(situacaoDoPedido(semPrazo).situacao).toBe("ENCERRADO");
+    expect(situacaoDoPedido(semPrazo).situacao).toBe("CHEGOU");
     const [linha] = agruparPorRM([
       { ...semPrazo, rm: { id: "r1", numero: "RM-1" } },
       { id: "p4", createdAt: new Date("2026-01-01"), rm: { id: "r1", numero: "RM-1" } },
@@ -332,7 +347,8 @@ describe("pedido recebido parcialmente", () => {
   it("⚠ ENCERROU → finaliza: encerrado no Omie tira o pedido de PARCIAL", () => {
     // O pedido 1903 (COMERCIAL ARARENSE) é exatamente este caso em 17/09/2026.
     const encerrado = { ...parcial, encerradoOmieEm: new Date("2026-09-16") };
-    expect(situacaoDoPedido(encerrado).situacao).toBe("ENCERRADO");
+    expect(situacaoDoPedido(encerrado).situacao).toBe("CHEGOU");
+    expect(situacaoDoPedido(encerrado).porEncerramento).toBe(true);
   });
 
   it("perde para o atrasado na ordem da RM — quem não recebeu nada aperta mais", () => {

@@ -624,8 +624,8 @@ chamadas separadas: o arquivo pode estar na pasta da obra sem que uma linha tenh
 `Compras › Prazos das RMs` agrupa os pedidos do Omie POR RM. A conta mora em
 `lib/painel-prazos-rm.js`; o desenho, em `app/compras/prazos/`.
 
-**Precedência da situação de um pedido** (e ela responde por três pedidos do Matheus em 17/09):
-`CHEGOU > ENCERRADO > PARCIAL > prazo (ATRASADO / VENCE_HOJE / PROXIMO / NO_PRAZO / SEM_PRAZO)`.
+**Precedência da situação de um pedido**:
+`CHEGOU (inclui encerrado no Omie) > PARCIAL > prazo (ATRASADO / VENCE_HOJE / PROXIMO / NO_PRAZO / SEM_PRAZO)`.
 
 ⚠⚠ **PEDIDO ENCERRADO NO OMIE NÃO É PEDIDO ATRASADO — e a ETAPA não serve para saber.** `cEtapa`
 vale "15" tanto em pendente quanto em encerrado, e `ConsultarPedCompra` não expõe bandeira nenhuma.
@@ -636,6 +636,15 @@ nada ali escreve `statusEntrega`/`dataEntregaReal` nem baixa item. Ver [[torg_om
 ⚠⚠ **AUSÊNCIA NÃO É REABERTURA.** Desmarcar só acontece com EVIDÊNCIA POSITIVA (o pedido aparecer
 na pesquisa de pendentes); coleta incompleta ou resposta sem forma de retrato **só marca, nunca
 desmarca**. Uma resposta `{}` do Omie chegou a valer "coletei tudo e não há nenhum encerrado".
+
+⚠⚠ **ENCERRADO NO OMIE CONTA COMO "CHEGOU" — não existe situação separada.** Matheus (17/09/2026):
+*"agrupe encerrados junto com chegou, porque se está encerrado chegou"*. Nasceu como chip próprio
+("Encerrado no Omie"), por eu achar que encerrar é ato administrativo e não prova recebimento; na
+operação da Torg o comprador só encerra depois que o material entrou, e o chip separado dividia em
+dois uma coisa que é uma só. ⚠ A PROCEDÊNCIA fica: a linha escreve "chegou · encerrado no Omie",
+porque quem confere precisa saber se o carimbo veio da nota fiscal ou do comprador. ⚠ E **não se
+inventa atraso** a partir da data do encerramento — ela diz quando o portal VIU o pedido fechado,
+não quando o material chegou.
 
 ⚠⚠ **PARCIAL VENCE O PRAZO, e isso foi medido.** Dos 275 pedidos CRIADO, 19 são `PARCIAL` e os 19
 têm previsão vencida — deixando o prazo ganhar, todos diriam só "Atrasado" e a parcialidade não
