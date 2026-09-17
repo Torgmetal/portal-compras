@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { syncEntregas } from "@/lib/omie-recebimento";
+import { comTravaDeCron } from "@/lib/cron-trava";
 
 export const maxDuration = 120; // re-checa só os pendentes (~39) → cabe folgado
 
@@ -14,7 +15,19 @@ export async function POST(_req) {
 
     // Manual: só pendentes, SEM a varredura de NFs (pularNF — o maior custo de tempo),
     // deadline 60s << maxDuration 120s → retorna JSON com folga, sem estourar no Vercel.
-    const resultado = await syncEntregas(prisma, { apenasPendentes: true, pularNF: true, deadlineMs: 60_000 });
+    //
+    // ⚠⚠ SOB A MESMA TRAVA DO CRON (chave `sync-entregas`), desde 17/09/2026: com três
+    // disparadores da mesma varredura — este botão, o cron e o botão dos Prazos das RMs —
+    // duas execuções sobrepostas gravariam retratos fora de ordem. Ver `lib/cron-trava.js`.
+    const resultado = await comTravaDeCron(prisma, "sync-entregas", () =>
+      syncEntregas(prisma, { apenasPendentes: true, pularNF: true, deadlineMs: 60_000 }));
+
+    // ⚠ Ocupado NÃO é erro, e a tela precisa distinguir: `resultado` seria `null` e o
+    // `resultado.total` do JSON quebraria aqui mesmo (achado do Codex, 17/09/2026).
+    if (!resultado) {
+      return NextResponse.json({ success: false, ocupado: true,
+        error: "Já havia uma sincronização em andamento — tente de novo em instantes." }, { status: 409 });
+    }
 
     await prisma.auditLog.create({
       data: {

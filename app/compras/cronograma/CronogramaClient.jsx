@@ -98,6 +98,9 @@ export default function CronogramaClient() {
       const res = await fetch("/api/compras/cronograma/sync", { method: "POST" });
       // Resposta pode não ser JSON (ex.: página de erro do Vercel em timeout) — trata sem quebrar.
       const data = await res.json().catch(() => ({ error: res.ok ? "Resposta inválida do servidor" : "A sincronização demorou demais — tente de novo (ela continua rodando em segundo plano no cron)." }));
+      // ⚠ Ocupado não é erro: outra sincronização (o cron, ou o botão dos Prazos das RMs) está
+      // rodando a MESMA varredura. Pintar isso de vermelho ensina a ignorar a tarja vermelha.
+      if (res.status === 409 && data.ocupado) { setSyncResult({ aviso: data.error }); return; }
       if (!res.ok) throw new Error(data.error || "Erro ao sincronizar");
       setSyncResult(data);
       fetchData();
@@ -407,6 +410,8 @@ export default function CronogramaClient() {
         <div className={`rounded-lg px-4 py-3 text-sm flex items-center justify-between ${
           syncResult.error
             ? "bg-red-50 border border-red-200 text-red-700"
+            : syncResult.aviso
+            ? "bg-amber-50 border border-amber-200 text-amber-800"
             : syncResult.sincronizados > 0
             ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
             : "bg-gray-50 border border-gray-200 text-torg-gray"
@@ -414,6 +419,8 @@ export default function CronogramaClient() {
           <div className="flex items-center gap-2">
             {syncResult.error ? (
               <><AlertCircle size={16} /> Erro: {syncResult.error}</>
+            ) : syncResult.aviso ? (
+              <><AlertCircle size={16} /> {syncResult.aviso}</>
             ) : syncResult.sincronizados > 0 ? (
               <><CheckCircle2 size={16} /> {syncResult.sincronizados} pedido{syncResult.sincronizados !== 1 ? "s" : ""} atualizado{syncResult.sincronizados !== 1 ? "s" : ""}</>
             ) : (

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { temCronSecret } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";
 import { syncEntregas } from "@/lib/omie-recebimento";
+import { comTravaDeCron } from "@/lib/cron-trava";
 import { registrarExecucao } from "@/lib/cron-monitor";
 import { aquecerBanco } from "@/lib/db-retry";
 import { log } from "@/lib/log";
@@ -25,7 +26,17 @@ export async function GET(req) {
     // Acorda a compute do Neon (scale-to-zero) antes do 1º query — evita o P1001
     // "Can't reach database server" no cold start (cron diário, compute ociosa).
     await aquecerBanco(prisma);
-    const resultado = await syncEntregas(prisma);
+    // ⚠⚠ A MESMA TRAVA DOS DISPAROS MANUAIS (chave `sync-entregas`). Desde 17/09/2026 a tela
+    // Prazos das RMs também dispara esta varredura por botão, e a tela Cronograma já disparava:
+    // sem uma vez compartilhada, duas execuções gravariam retratos fora de ordem, a mais lenta
+    // por cima da mais nova. Ver `lib/cron-trava.js`.
+    const resultado = await comTravaDeCron(prisma, "sync-entregas", () => syncEntregas(prisma));
+    // ⚠ Pulado não é sucesso mudo: o heartbeat tem de dizer que esta execução não fez trabalho.
+    if (!resultado) {
+      await registrarExecucao("sync-entregas", { ok: true, duracaoMs: Date.now() - t0,
+        mensagem: "pulou — outra sincronização de entregas já estava rodando" });
+      return NextResponse.json({ ok: true, pulou: true });
+    }
     const msg = `${resultado.sincronizados} entregas · ${resultado.processados}/${resultado.total} verificados${resultado.timeboxed ? " (parcial — resto na próxima)" : ""}`;
     await registrarExecucao("sync-entregas", { ok: true, duracaoMs: Date.now() - t0, mensagem: msg });
 

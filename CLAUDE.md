@@ -659,6 +659,40 @@ EMPRESA por lei — é exato, não heurístico. 57 → 42 opções. O rótulo do
 ⚠ **Filtrar por fornecedor REFAZ a linha da RM** (total, situação, próxima data) e **reordena** —
 tirando o pedido atrasado de um fornecedor, a RM pode virar "No prazo" e não pode seguir no topo.
 
+### O botão "Sincronizar" — sem esperar o cron
+`POST /api/compras/prazos-rm/sincronizar` (regra em `lib/sincronismo-prazos.js`). Matheus
+(17/09/2026): *"para quando eu receber alguns pedidos e quiser sincronizar eu conseguir sem
+precisar esperar o cron"* — os crons rodam 7h20 e 8/11/14/17h; quem dá entrada numa NF às 11h05
+esperaria três horas.
+
+⚠⚠ **SÃO DUAS VARREDURAS, PORQUE RECEBER MEXE EM DUAS COISAS NO OMIE**: dar entrada na nota
+(`sync-entregas` → `statusEntrega`) e encerrar o pedido (`omie-encerrados` → `encerradoOmieEm`).
+Uma etapa só corrigiria metade do que a pessoa acabou de fazer. **Cada uma relata a sua** — Omie
+fora do ar na primeira não impede a segunda: meia sincronização informada é melhor que nenhuma
+sincronização explicada. Estados: `concluida | parcial | ocupada | falhou`.
+
+⚠⚠ **OS TRÊS DISPARADORES DA VARREDURA DE ENTREGAS COMPARTILHAM A TRAVA** (`comTravaDeCron`, chave
+`sync-entregas`): este botão, o do Cronograma e o cron. Sem isso o botão seria exatamente o cenário
+que a trava existe para evitar — a pessoa clica quando desconfia do automático, ou seja, perto do
+horário dele. Ver [[torg_trava_entre_execucoes]].
+
+⚠⚠ **A TRAVA IMPEDE SIMULTANEIDADE, NÃO REPETIÇÃO** (achado do Codex): daí o **intervalo mínimo de
+2 min** (`reservarVez` sem soltar, chave `sync-manual`), contado do **FIM** da rodada — reservado no
+início, a rodada de 111 s deixava 10 s de espera. E se as duas etapas estiverem ocupadas, a vez é
+**devolvida**: nenhuma chamada ao Omie foi gasta.
+
+⚠⚠ **O "DEADLINE" ERA CONSELHO ATÉ 17/09/2026.** `omieCall` tem timeout de 45 s por tentativa e até
+5 tentativas: uma chamada iniciada com 1 s de orçamento ainda podia levar minutos, que é como a
+Vercel mata a rota e o navegador recebe HTML no lugar de JSON. Agora `omieCall` aceita **`ateMs`
+absoluto**, encolhe o `AbortSignal` para o tempo restante e recusa dormir para retentar além dele.
+`syncEntregas`, `coletarEncerrados` e o backfill repassam. ⚠ Nada muda para quem não passa `ateMs`.
+
+⚠ **Orçamento medido contra a produção**: rodada inteira ~110 s. Entregas 90 s (com 70 s fechava só
+46 de 54), encerrados até 150 s no total (274 pedidos em ~40 s), `maxDuration` 180 s.
+
+⚠ **O caminho manual não varre NFs** (`pularNF`) e só olha pedido sem entrega (`apenasPendentes`) —
+o `Recebimento` com a NF associada continua saindo do cron diário.
+
 ### CIF ou FOB — quem paga o frete, e quem vai buscar
 O fornecedor responde no portal de cotação (campo **obrigatório**, ao lado do prazo de entrega), e
 a resposta aparece nos Prazos das RMs. `lib/frete-cotacao.js`, coluna `Cotacao.tipoFrete`.

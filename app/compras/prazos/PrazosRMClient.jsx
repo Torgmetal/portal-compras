@@ -15,6 +15,7 @@ import { rotuloSituacao, filtrarLinhas, resumoPorSituacao, fornecedoresDasLinhas
 
 import CartaoRM from "./CartaoRM";
 import BarraFiltros from "./BarraFiltros";
+import BotaoSincronizar from "./BotaoSincronizar";
 
 
 export default function PrazosRMClient() {
@@ -28,8 +29,11 @@ export default function PrazosRMClient() {
   const [obra, setObra] = useState(""); // OP.numero ("" = todas)
   const [fornecedor, setFornecedor] = useState(""); // fornecedorNome ("" = todos)
 
-  const buscar = async () => {
-    setCarregando(true);
+  // ⚠⚠ `silencioso` existe para o botão Sincronizar. Recarregando com o spinner de página
+  // inteira, a tela se apagaria no fim de uma espera de um minuto — e a pessoa perderia de vista
+  // justamente a linha que foi conferir. Aqui os dados são trocados por baixo.
+  const buscar = async (silencioso = false) => {
+    if (!silencioso) setCarregando(true);
     setErro("");
     try {
       const r = await fetch("/api/compras/prazos-rm");
@@ -37,9 +41,11 @@ export default function PrazosRMClient() {
       if (!r.ok) throw new Error(j.error || "Não foi possível carregar.");
       setDados(j);
     } catch (e) {
-      setErro(e.message);
+      // ⚠ Recarregar em silêncio que falha não pode apagar a tela que está lá: o dado antigo
+      // ainda é o melhor que temos, e o botão já mostra o erro dele.
+      if (!silencioso) setErro(e.message);
     } finally {
-      setCarregando(false);
+      if (!silencioso) setCarregando(false);
     }
   };
   useEffect(() => { buscar(); }, []);
@@ -99,7 +105,7 @@ export default function PrazosRMClient() {
       <div className="py-16 text-center">
         <AlertCircle size={28} className="mx-auto text-red-400" />
         <p className="mt-2 text-sm text-red-700">{erro}</p>
-        <button onClick={buscar} className="mt-3 px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">Tentar novamente</button>
+        <button onClick={() => buscar()} className="mt-3 px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">Tentar novamente</button>
       </div>
     );
   }
@@ -107,11 +113,16 @@ export default function PrazosRMClient() {
   const r = resumo;
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-torg-dark flex items-center gap-2"><CalendarClock size={22} /> Prazos das RMs</h1>
-        <p className="text-sm text-torg-gray mt-0.5">
-          Todas as RMs com pedido no Omie, seus pedidos e o prazo de cada um. O que aperta vem primeiro.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-torg-dark flex items-center gap-2"><CalendarClock size={22} /> Prazos das RMs</h1>
+          <p className="text-sm text-torg-gray mt-0.5">
+            Todas as RMs com pedido no Omie, seus pedidos e o prazo de cada um. O que aperta vem primeiro.
+          </p>
+        </div>
+        {/* ⚠ No cabeçalho, e não na barra de filtros: filtro muda o que você VÊ, sincronizar muda
+            o que o portal SABE. Entre os chips, seria mais um recorte da lista. */}
+        <BotaoSincronizar onPronto={() => buscar(true)} />
       </div>
 
       <BarraFiltros r={r} obras={obras} obra={obra} setObra={setObra}
