@@ -122,6 +122,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Equivalência de material (perfil)](torg_equivalencia_material.md) — Tekla diz CH12, a lista diz CH12,5; `\S\X` do IFC = Ø; nunca casar perfil por string crua
 - [Dado histórico não fecha 100%](torg_dado_historico_incompleto.md) — obra antiga: medir, dizer o tamanho e PARAR; corrigir a regra que erra de novo, não o passado
 - [⚠ Produção é LPC — sempre escolher a lista](torg_producao_e_lpc.md) — `SO_FABRICACAO` em toda consulta de fabricação; registro da LE mente sobre prontidão
+- [LPC: chave numérica duplica marcas](torg_lpc_chave_duplicada.md) — arquivo com várias fases entra sob o número da obra e duplica; import avisa e o Planejamento exclui a linha errada
 - [Listas LE/LPC (Engenharia)](torg_listas_le_lpc.md) — import → PecaConjunto (LE_IMPORT/LPC_IMPORT); DUAS "LEs"; bug opId órfão ("78"≠"078"); itens AC pro fim (lib/marca-ac.js)
 - [Kick Off da OP](torg_kickoff.md) — /comercial/[id]/kickoff, 2 tipos GERAL (sem R$) e FISCAL (com R$); "Divulgar" e-mail+aceite por token; PDF pdf-lib padrão Torg
 - [Apresentação ao Cliente](torg_apresentacao_cliente.md) — /comercial/apresentacoes; página pública /apresentacao/[token] (capa+boas-vindas+docs); Resend; tabelas por SQL

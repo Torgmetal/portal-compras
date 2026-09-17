@@ -1,7 +1,12 @@
 {
-  "build": 3264,
-  "gerado": "2026-09-17T19:10:43.994Z",
+  "build": 3265,
+  "gerado": "2026-09-17T19:29:11.991Z",
   "commits": [
+    {
+      "hash": "972faa2e",
+      "data": "17/09/2026",
+      "titulo": "Dois crons parados em silêncio: o do PCP há 17 dias, o do CMR há 60 horas"
+    },
     {
       "hash": "6659f1e3",
       "data": "17/09/2026",
@@ -146,11 +151,6 @@
       "hash": "41d1affc",
       "data": "16/09/2026",
       "titulo": "Prazos das RMs: tag FD nas RMs e nos pedidos de Faturamento Direto"
-    },
-    {
-      "hash": "8fcf62ca",
-      "data": "16/09/2026",
-      "titulo": "Previsão de entrega: a conta que ia para o Omie passa a ser guardada"
     }
   ]
 }

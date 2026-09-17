@@ -69,10 +69,41 @@ export async function POST(req) {
   const op = cands.size ? await prisma.oP.findFirst({ where: { numero: { in: [...cands] } } }) : null;
   // chave só numérica com uma lista já gravada sob a fase (ex.: "094" × "T94A" existente): usa a existente
   let chaveAjustada = null;
+  let chaveConflito = null;
   if (op && ehSoNumero(opNumero)) {
     const existentes = (await prisma.pecaConjunto.groupBy({ by: ["opNumero"], where: { opId: op.id, fonte: "LPC_IMPORT" } })).map((e) => e.opNumero);
     const para = chaveAjustadaPeloBanco(opNumero, existentes);
     if (para) { chaveAjustada = { de: opNumero, para }; opNumero = para; parsed = { ...parsed, opNumero }; }
+    else {
+      /* ⚠⚠ DUAS CHAVES PARA A MESMA MARCA = LINHA DUPLICADA, E ISSO PASSAVA CALADO (OP-83, 17/09/2026).
+       * A engenharia subiu a lista corrigida cobrindo VÁRIAS fases, então nenhuma fase isolada servia
+       * de chave e sobrou o número da obra ("083"). Como a peça é única por (opNumero, marca), as
+       * marcas que já existiam sob "T83A".."T83D" NÃO foram atualizadas: nasceram linhas paralelas, e
+       * 83 conjuntos passaram a aparecer DUAS vezes na fila do Planejamento. Vitor: "o portal não
+       * reconheceu isso e as peças erradas permanecem na fila do planejamento ainda".
+       *
+       * Não dá para escolher a fase sozinho quando o arquivo mistura várias — mas dá para DIZER, com
+       * nome e número, em vez de duplicar em silêncio. A tela mostra o aviso e o Planejamento tira a
+       * linha que não vale (o cartão marca as repetidas). */
+      const porFase = existentes.filter((e) => e && e !== opNumero && !ehSoNumero(e));
+      if (porFase.length) {
+        const marcasDoArquivo = new Set([...parsed.conjuntos, ...parsed.croquis, ...parsed.avulsas].map((x) => String(x.marca || "").trim().toUpperCase()).filter(Boolean));
+        const jaExistem = marcasDoArquivo.size
+          ? await prisma.pecaConjunto.findMany({
+              where: { opId: op.id, opNumero: { in: porFase }, marca: { in: [...marcasDoArquivo] } },
+              select: { marca: true, opNumero: true }, take: 3000,
+            })
+          : [];
+        if (jaExistem.length) {
+          chaveConflito = {
+            chave: opNumero,
+            fases: [...new Set(jaExistem.map((x) => x.opNumero))].sort(),
+            marcas: jaExistem.length,
+            exemplos: jaExistem.slice(0, 5).map((x) => `${x.marca} (${x.opNumero})`),
+          };
+        }
+      }
+    }
   }
 
   // Diff da revisão (o que mudou vs a lista anterior): snapshot das marcas+peso
@@ -507,6 +538,8 @@ export async function POST(req) {
     ok: true,
     opNumero,
     chaveAjustada,
+    // ⚠ conflito de chave: a importação VAI duplicar essas marcas — quem importou precisa saber
+    chaveConflito,
     opEncontrada: !!op,
     obra: parsed.obra,
     cliente: parsed.cliente,

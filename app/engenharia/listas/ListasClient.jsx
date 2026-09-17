@@ -202,6 +202,34 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
             {res.marcas != null && <span>Marcas: {fmt(res.marcas)}</span>}
             {res.pesoTotal != null && <span>Peso: {fmt(Math.round(res.pesoTotal))} kg</span>}
           </div>
+          {/* ⚠⚠ DUAS CHAVES PARA A MESMA MARCA = LINHA DUPLICADA NA FILA DO PLANEJAMENTO.
+              OP-83 (17/09/2026): a lista corrigida cobria várias fases, nenhuma servia de chave, e
+              a importação entrou sob o número da obra ("083"). As marcas que já existiam sob
+              "T83A".."T83D" não foram atualizadas — nasceram linhas paralelas e 83 conjuntos
+              passaram a aparecer duas vezes. Vitor: "o portal não reconheceu isso e as peças
+              erradas permanecem na fila do planejamento ainda". A importação não tem como escolher
+              a fase sozinha quando o arquivo mistura várias; o que ela pode é DIZER. */}
+          {res.chaveConflito && (
+            <div className="mt-2.5 rounded-lg border border-red-300 bg-red-50 p-3 text-[12px] text-red-900">
+              <p className="font-semibold flex items-start gap-1.5">
+                <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+                Atenção: {fmt(res.chaveConflito.marcas)} marca(s) ficaram DUPLICADAS
+              </p>
+              <p className="mt-1">
+                Esta lista entrou sob a chave <b className="font-mono">{res.chaveConflito.chave}</b>, mas essas marcas
+                já existiam sob {res.chaveConflito.fases.map((f) => <b key={f} className="font-mono">{f}</b>).reduce((acc, el, i) => (i ? [...acc, ", ", el] : [el]), [])}.
+                Como a peça é única por chave + marca, as antigas não foram atualizadas: agora há duas linhas
+                para a mesma marca, e as duas aparecem na fila do Planejamento.
+              </p>
+              <p className="mt-1 font-mono text-[11px]">{res.chaveConflito.exemplos.join(" · ")}{res.chaveConflito.marcas > res.chaveConflito.exemplos.length ? " …" : ""}</p>
+              <p className="mt-1.5">
+                Para resolver: nomeie o arquivo com a fase (ex.: <b className="font-mono">T83A-LPC</b>) e importe uma
+                fase por vez, ou peça ao Planejamento para excluir a linha que não vale — em
+                <b> Planejamento › Datas por setor › Montagem</b> as repetidas vêm sinalizadas.
+              </p>
+            </div>
+          )}
+
           {/* ⚠⚠ "IMPORTADO" NÃO É "ENTROU". A LE R01 da OP-102 (13/08/2026) fechou com o aviso
               verde e o arquivo arquivado dizendo "18 incluídas" — e nenhuma das 18 chegou ao banco.
               O defeito era do importador e já foi corrigido, mas o que deixou isso passar quatro
