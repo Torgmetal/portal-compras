@@ -54,7 +54,9 @@ export default function CmrLancarClient() {
   const [salvando, setSalvando] = useState(false);
   const [pedido, setPedido] = useState(null); // itens puxados do pedido de compra
   const [buscandoPed, setBuscandoPed] = useState(false);
-  const [itemPedido, setItemPedido] = useState(null); // idx da linha do pedido escolhida
+  const [itemPedido, setItemPedido] = useState(null); // idx da linha do pedido escolhida (form de 1)
+  const [marcados, setMarcados] = useState(() => new Set()); // idx marcados p/ lançar de uma vez
+  const [origemMassa, setOrigemMassa] = useState(null);      // "pedido" | null (colado do Excel)
   const [filtros, setFiltros] = useState({}); // { colKey: Set(valores) }
   const [ordenar, setOrdenar] = useState(null); // { key, dir }
   const [filtroAberto, setFiltroAberto] = useState(null); // { key, rect }
@@ -116,7 +118,7 @@ export default function CmrLancarClient() {
   async function puxarPedido() {
     const num = (form.pedidoCompra || "").trim();
     if (!num) { showToast("Digite o nº do pedido de compra", "erro"); return; }
-    setBuscandoPed(true); setPedido(null); setItemPedido(null);
+    setBuscandoPed(true); setPedido(null); setItemPedido(null); setMarcados(new Set());
     try {
       const j = await fetch(`/api/compras/cmr/pedido?numero=${encodeURIComponent(num)}`).then((r) => r.json());
       if (!j.success) throw new Error(j.error || "Pedido não encontrado");
@@ -159,6 +161,7 @@ export default function CmrLancarClient() {
       // Mantém os campos repetitivos: quem lança uma nota inteira repete fornecedor, obra e NF.
       setForm({ ...VAZIO, rc: form.rc, obra: form.obra, fornecedor: form.fornecedor, dataRecebimento: form.dataRecebimento, nf: form.nf });
       setItemPedido(null);
+      await recarregarPedido();
     } catch (e) { showToast(e.message, "erro"); } finally { setSalvando(false); }
   }
 
@@ -177,6 +180,61 @@ export default function CmrLancarClient() {
    * ⚠ FALHAR AQUI NÃO PERDE NADA: a reconciliação (diária e no botão Sincronizar) reenvia à
    * planilha os R que o portal tem e ela não. Por isso o erro só avisa, não desfaz.
    */
+  /**
+   * Relê o pedido do servidor.
+   *
+   * ⚠⚠ O SALDO NÃO ABATIA SOZINHO. Matheus (17/09/2026): "quando ele seleciona 1 item e ajusta a
+   * quantidade recebida não está abatendo o saldo que sobra no pedido mostrado". O lançamento
+   * limpava o formulário e nunca tocava em `pedido` — a lista continuava com os números do
+   * primeiro fetch, então "faltam 120" seguia dizendo 120 depois de receber 120.
+   *
+   * ⚠ Relê do SERVIDOR em vez de descontar no navegador: o quanto já chegou é conta do servidor
+   * (Omie + os lançamentos do CMR), e subtrair aqui criaria um segundo lugar que calcula saldo —
+   * dois números que uma hora discordam.
+   */
+  async function recarregarPedido() {
+    const num = (pedido?.pedido || "").trim();
+    if (!num) return;
+    try {
+      const j = await fetch(`/api/compras/cmr/pedido?numero=${encodeURIComponent(num)}`).then((r) => r.json());
+      if (j.success) setPedido(j);
+    } catch { /* o saldo velho na tela é menos grave que um erro em cima de um lançamento que deu certo */ }
+  }
+
+  /**
+   * ⚠⚠ VÁRIOS ITENS DE UMA VEZ. Matheus (17/09/2026): "quando selecionar um pedido ser possível
+   * flegar vários itens do pedido, exemplo item 1, 4, 6, 8, e lançar todos de uma vez nas linhas
+   * abaixo, e depois o operador vem alterando o que for necessário nas linhas".
+   *
+   * ⚠ Cai no MESMO caminho do "Colar várias linhas": vira `massa`, aparece na tabela editável e
+   * grava pelo `salvarMassa`. Um segundo fluxo de lançamento em massa seria uma segunda chance de
+   * os dois divergirem — e a prévia editável é justamente onde o operador ajusta o que vem da nota.
+   *
+   * ⚠ A quantidade sugerida é o SALDO de cada linha, não o total do pedido — mesma regra do
+   * formulário de um item só.
+   */
+  function lancarMarcados() {
+    const itens = (pedido?.itens || []).filter((it) => marcados.has(it.idx));
+    if (!itens.length) return;
+    const linhas = itens.map((it) => {
+      const saldo = Math.max(0, (Number(it.qtd) || 0) - (Number(it.qtdRecebida) || 0)) || Number(it.qtd) || 0;
+      return {
+        ...VAZIO,
+        rc: form.rc || "R",
+        descricao: it.descricao,
+        pedidoCompra: pedido.pedido || form.pedidoCompra || "",
+        fornecedor: pedido.fornecedor || form.fornecedor || "",
+        obra: (pedido.obra || form.obra || "").replace(/^OP\s*/i, "OP "),
+        nf: form.nf || pedido.nf || "",
+        dataRecebimento: form.dataRecebimento || "",
+        qtd: saldo ? String(saldo) : "",
+      };
+    });
+    setMassa(linhas);
+    setOrigemMassa("pedido");
+    setModo("massa");
+  }
+
   async function lancar(lancamentos) {
     const r = await fetch("/api/compras/cmr", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -210,7 +268,7 @@ export default function CmrLancarClient() {
       COLS_MASSA.forEach((c, i) => { if (c !== "_indice") o[c] = (cels[i] || "").trim(); });
       return o;
     }).filter((o) => o.descricao);
-    setMassa(parsed);
+    setMassa(parsed); setOrigemMassa(null);
   }
   async function salvarMassa() {
     const validos = massa.filter((m) => m.descricao?.trim());
@@ -219,7 +277,8 @@ export default function CmrLancarClient() {
     try {
       const j = await lancar(validos);
       showToast(`${j.criados} lançamento(s) gravados (${j.indices?.[0]}…${j.indices?.[j.indices.length - 1]}) · enviando para a planilha…`, "success");
-      setMassa([]); setModo(null);
+      setMassa([]); setModo(null); setOrigemMassa(null); setMarcados(new Set());
+      await recarregarPedido();
     } catch (e) { showToast(e.message, "erro"); } finally { setSalvando(false); }
   }
 
@@ -296,7 +355,7 @@ export default function CmrLancarClient() {
           className={`text-sm font-medium rounded-lg px-4 py-2.5 inline-flex items-center gap-2 ${modo === "form" ? "bg-torg-blue text-white" : "bg-white border border-torg-blue-200 text-torg-blue hover:bg-torg-blue-50"}`}>
           <Plus size={16} /> Lançar item
         </button>
-        <button onClick={() => { setModo(modo === "massa" ? null : "massa"); setMassa([]); }}
+        <button onClick={() => { setModo(modo === "massa" ? null : "massa"); setMassa([]); setOrigemMassa(null); }}
           className={`text-sm font-medium rounded-lg px-4 py-2.5 inline-flex items-center gap-2 ${modo === "massa" ? "bg-torg-blue text-white" : "bg-white border border-torg-blue-200 text-torg-blue hover:bg-torg-blue-50"}`}>
           <ClipboardPaste size={16} /> Colar várias linhas (Excel)
         </button>
@@ -323,9 +382,17 @@ export default function CmrLancarClient() {
                     const escolhido = itemPedido === it.idx;
                     const falta = Math.max(0, (Number(it.qtd) || 0) - (Number(it.qtdRecebida) || 0));
                     return (
-                      <button key={it.idx} type="button" onClick={() => escolherItemPedido(it)}
-                        className={`w-full text-left px-3 py-2 text-xs hover:bg-white/70 flex items-start gap-2 ${escolhido ? "bg-white ring-1 ring-inset ring-torg-blue" : ""}`}>
-                        <span className={`w-4 h-4 mt-0.5 rounded border flex items-center justify-center shrink-0 ${escolhido ? "bg-torg-blue border-torg-blue" : "border-gray-300"}`}>{escolhido && <Check size={11} className="text-white" />}</span>
+                      <div key={it.idx}
+                        className={`w-full px-3 py-2 text-xs flex items-start gap-2 ${escolhido ? "bg-white ring-1 ring-inset ring-torg-blue" : "hover:bg-white/70"}`}>
+                        {/* ⚠⚠ A CAIXA MARCA PARA O LOTE; O RESTO DA LINHA ABRE O ITEM SOZINHO. São
+                            duas ações diferentes no mesmo lugar, e por isso a caixa é um alvo
+                            próprio: um clique só, servindo aos dois, obrigaria a escolher qual dos
+                            dois comportamentos perder. */}
+                        <input type="checkbox" checked={marcados.has(it.idx)} onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => setMarcados((m) => { const n = new Set(m); e.target.checked ? n.add(it.idx) : n.delete(it.idx); return n; })}
+                          title="Marcar para lançar junto com os outros"
+                          className="w-4 h-4 mt-0.5 rounded border-gray-300 text-torg-blue focus:ring-torg-blue shrink-0" />
+                        <button type="button" onClick={() => escolherItemPedido(it)} className="flex-1 min-w-0 text-left flex items-start gap-2">
                         {/* O número do item é o que separa duas linhas idênticas — sem ele, "qual
                             das três?" não tem resposta na tela. */}
                         <span className="font-mono text-[10px] text-torg-gray mt-0.5 shrink-0 w-5">{it.idx + 1}.</span>
@@ -340,10 +407,30 @@ export default function CmrLancarClient() {
                               : <b className="text-emerald-700">entregue</b>}
                           </span>
                         </span>
-                      </button>
+                        </button>
+                      </div>
                     );
                   })}
               </div>
+              {/* ⚠ Aparece só quando há marcados: barra vazia ocupando espaço numa tela de celular
+                  empurra o formulário para fora da dobra. */}
+              {marcados.size > 0 && (
+                <div className="px-3 py-2 border-t border-torg-blue-100 bg-white flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-[12px] text-torg-dark font-medium">
+                    {marcados.size} item(ns) marcado(s)
+                  </span>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setMarcados(new Set())}
+                      className="px-3 py-1.5 text-xs text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-50">
+                      Desmarcar
+                    </button>
+                    <button type="button" onClick={lancarMarcados}
+                      className="px-4 py-1.5 text-xs font-medium bg-torg-blue text-white rounded-lg hover:bg-torg-dark inline-flex items-center gap-1.5">
+                      <ClipboardPaste size={13} /> Lançar {marcados.size} de uma vez
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           <CmrCampos form={form} setF={setF} aoBuscarPedido={puxarPedido}
@@ -365,7 +452,7 @@ export default function CmrLancarClient() {
       {/* Colar em massa */}
       {modo === "massa" && (
         <CmrColarMassa massa={massa} setMassa={setMassa} colar={colar}
-          salvarMassa={salvarMassa} salvando={salvando} />
+          salvarMassa={salvarMassa} salvando={salvando} origem={origemMassa} />
       )}
       {/* Lista do ano */}
       <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
