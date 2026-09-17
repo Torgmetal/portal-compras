@@ -301,3 +301,52 @@ describe("pedido encerrado no Omie", () => {
     expect(linha.situacao).toBe("SEM_PRAZO");
   });
 });
+
+// ─── Pedido RECEBIDO PARCIALMENTE (Matheus, 17/09/2026) ──────────────────────
+describe("pedido recebido parcialmente", () => {
+  const vencido = new Date(Date.now() - 20 * 86400000);
+  const parcial = { id: "p1", createdAt: new Date("2026-01-01"), prazoEntregaPrevisto: vencido, statusEntrega: "PARCIAL" };
+
+  it("⚠⚠ vence o prazo: sem isso os 19 parciais de hoje continuariam só 'Atrasado'", () => {
+    expect(situacaoDoPedido({ ...parcial, statusEntrega: null }).situacao).toBe("ATRASADO");
+    expect(situacaoDoPedido(parcial).situacao).toBe("PARCIAL");
+  });
+
+  it("mas NÃO esconde o atraso do restante — `diasAte` continua negativo", () => {
+    expect(situacaoDoPedido(parcial).diasAte).toBeLessThan(0);
+  });
+
+  it("continua cobrando prazo: conta como pendente e empresta a data à RM", () => {
+    const [linha] = agruparPorRM([{ ...parcial, rm: { id: "r1", numero: "RM-1" } }]);
+    expect(linha.situacao).toBe("PARCIAL");
+    expect(linha.proximaPrevisao).toEqual(vencido);
+    expect(resumoPorSituacao([linha]).pendentes).toBe(1);
+    expect(filtrarLinhas([linha], "PENDENTES")).toHaveLength(1);
+  });
+
+  it("⚠ CONCLUIU → finaliza: recebimento completo tira o pedido de PARCIAL", () => {
+    const concluido = { ...parcial, statusEntrega: "ENTREGUE", dataEntregaReal: new Date("2026-09-12") };
+    expect(situacaoDoPedido(concluido).situacao).toBe("CHEGOU");
+  });
+
+  it("⚠ ENCERROU → finaliza: encerrado no Omie tira o pedido de PARCIAL", () => {
+    // O pedido 1903 (COMERCIAL ARARENSE) é exatamente este caso em 17/09/2026.
+    const encerrado = { ...parcial, encerradoOmieEm: new Date("2026-09-16") };
+    expect(situacaoDoPedido(encerrado).situacao).toBe("ENCERRADO");
+  });
+
+  it("perde para o atrasado na ordem da RM — quem não recebeu nada aperta mais", () => {
+    const [linha] = agruparPorRM([
+      { ...parcial, rm: { id: "r1", numero: "RM-1" } },
+      { id: "p2", createdAt: new Date("2026-01-01"), prazoEntregaPrevisto: vencido, rm: { id: "r1", numero: "RM-1" } },
+    ]);
+    expect(linha.situacao).toBe("ATRASADO");
+    expect(linha.pedidos.map((p) => p.situacao)).toEqual(["ATRASADO", "PARCIAL"]);
+  });
+
+  it("parcial sem previsão não quebra — diz que parte chegou, sem data", () => {
+    const r = situacaoDoPedido({ id: "p3", createdAt: new Date("2026-01-01"), statusEntrega: "PARCIAL" });
+    expect(r.situacao).toBe("PARCIAL");
+    expect(r.diasAte).toBeNull();
+  });
+});

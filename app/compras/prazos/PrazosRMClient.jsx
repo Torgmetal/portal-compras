@@ -20,7 +20,7 @@ const CHIP = {
   red: "bg-red-100 text-red-700", orange: "bg-orange-100 text-orange-700",
   amber: "bg-amber-100 text-amber-700", sky: "bg-sky-100 text-sky-700",
   gray: "bg-gray-100 text-gray-600", emerald: "bg-emerald-100 text-emerald-700",
-  slate: "bg-slate-200 text-slate-700",
+  slate: "bg-slate-200 text-slate-700", violet: "bg-violet-100 text-violet-700",
 };
 
 // ⚠⚠ A COR VIVE NUM FILETE, NÃO NA FAIXA INTEIRA. Duas correções na mesma tarde: o cabeçalho era
@@ -37,7 +37,7 @@ const CHIP = {
 const FILETE = {
   red: "border-l-red-500", orange: "border-l-orange-500", amber: "border-l-amber-500",
   sky: "border-l-sky-500", gray: "border-l-gray-300", emerald: "border-l-emerald-500",
-  slate: "border-l-slate-400",
+  slate: "border-l-slate-400", violet: "border-l-violet-500",
 };
 
 /**
@@ -61,7 +61,7 @@ function TagFD({ parcial = false }) {
   );
 }
 
-const ORDEM_CHIPS = ["ATRASADO", "VENCE_HOJE", "PROXIMO", "NO_PRAZO", "SEM_PRAZO", "ENCERRADO", "CHEGOU"];
+const ORDEM_CHIPS = ["ATRASADO", "PARCIAL", "VENCE_HOJE", "PROXIMO", "NO_PRAZO", "SEM_PRAZO", "ENCERRADO", "CHEGOU"];
 
 const plural = (n) => (Math.abs(n) === 1 ? "dia" : "dias");
 
@@ -74,9 +74,29 @@ function Chegou({ t }) {
   return <span className="text-emerald-700">chegou{sufixo}</span>;
 }
 
+/**
+ * O parcial diz DUAS coisas ao mesmo tempo: parte chegou, e o resto está a N dias de atraso.
+ *
+ * ⚠⚠ O ATRASO NÃO PODE SUMIR JUNTO COM O CHIP VERMELHO. Os 19 pedidos parciais de 17/09/2026
+ * tinham todos a previsão vencida; se o chip "Recebido parcial" fosse a única mudança, a tela
+ * trocaria um problema visível por um escondido. O chip diz o que é, a frase diz o quanto dói.
+ */
+function Parcial({ diasAte }) {
+  if (diasAte == null) return <span className="text-violet-700">parte do pedido já chegou</span>;
+  if (diasAte < 0) {
+    return (
+      <span className="text-violet-700">
+        parte já chegou · <b className="font-medium text-red-600">{Math.abs(diasAte)} {plural(diasAte)} de atraso no restante</b>
+      </span>
+    );
+  }
+  return <span className="text-violet-700">parte já chegou · restante em {diasAte} {plural(diasAte)}</span>;
+}
+
 /** O quanto falta, em palavras — a mesma frase que alguém usaria no telefone. */
 function Quando({ p }) {
   if (p.situacao === "CHEGOU") return <Chegou t={p.atrasoDias} />;
+  if (p.situacao === "PARCIAL") return <Parcial diasAte={p.diasAte} />;
   // ⚠⚠ ENCERRADO PRECISA DA FRASE DELE. Sem isto cairia em "sem prazo informado" — e a queixa que
   // originou tudo era justamente a tela mentir sobre pedido acabado. Aqui existe prazo; ele é que
   // deixou de ser cobrado.
