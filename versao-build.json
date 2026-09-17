@@ -1,7 +1,12 @@
 {
-  "build": 3246,
-  "gerado": "2026-09-17T16:37:16.511Z",
+  "build": 3247,
+  "gerado": "2026-09-17T16:42:16.006Z",
   "commits": [
+    {
+      "hash": "24ed63a2ff",
+      "data": "17/09/2026",
+      "titulo": "Filtro de fornecedor nos Prazos das RMs, refazendo a conta da RM"
+    },
     {
       "hash": "776074ade8",
       "data": "17/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ea76a9a7dc",
       "data": "16/09/2026",
       "titulo": "fix(qualidade): tornar quantitativo opcional na pre-montagem"
-    },
-    {
-      "hash": "7f99a77683",
-      "data": "16/09/2026",
-      "titulo": "Prazos das RMs: uma aba com todas as RMs, seus pedidos e o prazo de cada"
     }
   ]
 }
