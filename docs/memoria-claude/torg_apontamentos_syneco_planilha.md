@@ -50,3 +50,30 @@ linhas de ruído; depois de subtrair o que o Syneco já tem, a planilha sai com 
   senão `—`. ⚠ `MesOrdem.obra` é NOT NULL: um `{ not: null }` no `groupBy` invalida a consulta
   inteira e o `catch` devolvia lista vazia calada.
 - A planilha passou a ordenar por **setor** primeiro (ela é trabalhada setor a setor).
+
+## A 2ª aba: apontamento na frente manda dar baixa atrás (17/09/2026)
+
+Vitor: *"antes tínhamos uma planilha que pegava esses furos de apontamentos, exemplo: se a peça
+estava apontada na pintura já indicava que tinha que dar baixa nos setores anteriores que não foram
+dado baixa"*. A planilha passou a ter **duas abas**, que são duas ORIGENS diferentes:
+
+| Aba | De onde vem | Hoje |
+|---|---|---|
+| **Baixa do portal** | alguém baixou no portal, o Syneco não tem (`baixaSetores`) | 8 linhas |
+| **Setores anteriores** | o próprio Syneco: peça apontada à frente prova que passou atrás | 1.090 linhas · 4.366 peças · 146 t |
+
+`lib/baixa-etapa-anterior.js` (`lancamentosAtrasados` é puro), cadeia
+`Corte → Preparação → Montagem → Solda → Acabamento → Jato → Pintura`. Regra de
+[[torg_baixa_etapa_anterior]]. As travas, todas com teste:
+
+- ⚠⚠ **só é alvo o setor que TEM ordem no Syneco.** Etapa sem ordem não é "zero apontado", é peça
+  que não passa por ali — sem isso, toda chapa que pula a Preparação viraria linha falsa.
+- ⚠ **Acabamento nunca é cobrado** (opcional; mesma regra de `lib/conjuntos-setor.js`).
+- ⚠ **terceiro e encaminhamento cortam a cadeia**: quem volta do terceiro no Jato não deve nada à
+  Montagem. Terceiro **sem destino** ou com destino EXPEDIÇÃO fica FORA — melhor não listar do que
+  mandar lançar etapa que talvez não tenha acontecido.
+- ⚠ **teto no `planejadoUn`** da própria ordem; **inativo sem produção** (MesInativo) é feito fora.
+- ⚠ A **prova** é o setor MAIS ADIANTADO com apontamento (empate vai para o mais à frente): "chegou
+  na Pintura" convence mais que "chegou no Jato".
+- Distribuição hoje: Preparação 524, Jato 518, Corte 24, Solda 16, Montagem 8; OPs 083, 067 e 089
+  concentram 78%.
