@@ -20,7 +20,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Deploy Vercel — atraso do webhook](torg_vercel_deploy_atraso.md) — push às vezes leva 20+ min p/ buildar (esperar, sobe sozinho); NÃO forçar `vercel --prod`; CLI scope `torg`/`workspace-torg`
 - [Deploy Vercel/Neon — branch limit](torg_vercel_neon_deploy.md) — "Provisioning integrations failed" = Neon estourou branches; desligar per-preview branch ou apagar previews (nunca a primária)
 - [Deploy decisivo](torg_deploy_decisivo.md) — direção acordada = subir sem pedir permissão a cada passo
-- [Crons + middleware + monitor](torg_crons.md) — crons morriam por redirect .vercel.app→workspace (308) na edge; corrigido 02/07 (excluir /api/); Vercel MCP=403 use CLI; monitor heartbeat
+- [Crons + middleware + monitor](torg_crons.md) — crons morriam por redirect .vercel.app→workspace (308) na edge; corrigido 02/07 (excluir /api/); Vercel MCP=40; 17/09 cmr-reconciliar 55h parado NÃO era redirect nem timeout — Neon intermitente mata o cron E o registro da falha (heartbeat congela em ok=true); mitigado 2×/dia3 use CLI; monitor heartbeat
 - [MES/Syneco](torg_mes_syneco.md) — agente na fábrica (C:\MesSync, 2 datasets: apontamentos + ordens); incidente 01/06; rotacionar MES_SYNC_API_KEY
 - [iCloud apaga arquivos-fonte](torg_icloud_delecao.md) — repo no iCloud remove fontes e cria pastas " 2"; NUNCA `add -A`/`commit -a`; conferir `git status` antes
 

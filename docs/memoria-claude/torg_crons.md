@@ -37,3 +37,48 @@ build 6–8 min, 2.050 funções de 13 MB) e 21 crons ≈ 330 disparos/dia. Vito
 crons de hora em hora (estoque-produtos 58 s, estoque-movimentacoes, reconciliar-syneco, emails-engenharia, pasta-engenharia)
 para 10-21 UTC e menos vezes; `ignoreCommand` para não buildar commit só de docs/testes; spend cap. A CLI/API da Vercel não
 mostram uso por recurso (token do MCP = 403) e o Chrome do Vitor não está logado na Vercel — só ele vê vercel.com/torg/~/usage.
+
+---
+
+## 17/09/2026 — `cmr-reconciliar` parado 55h, e NÃO era redirect nem timeout
+
+Matheus recebeu o e-mail do monitor. Sintoma: heartbeat congelado em `ok=true` de **55,5 h** atrás,
+num cron **diário** (`40 5 * * *`).
+
+**Duas hipóteses testadas e descartadas:**
+
+1. ⚠ **Timeout da Vercel** (`maxDuration = 60`): a última execução registrada durou **29,6 s**.
+   Estava folgada. *(Era a minha primeira aposta, e estava errada.)*
+2. ⚠ **Redirect 308 no host do cron** — a causa raiz de junho, e o primeiro suspeito segundo esta
+   própria memória. Conferido: `vercel crons ls --format json` dá o host
+   `workspace-torg-357d38zkb-torg.vercel.app`, e `curl` nas rotas devolve **401**, não 308. O 401 é
+   a resposta da PRÓPRIA função (`temCronSecret`), então o host resolve e a função **executa**.
+
+**A explicação que sobra (bem apoiada, não provada):** o Neon fica **intermitentemente
+inalcançável**. Durante esta investigação o `npm run build` local quebrou com
+`Can't reach database server at ep-cold-hill-...-pooler`; refeito minutos depois, passou.
+
+⚠⚠ **E É POR ISSO QUE A FALHA É INVISÍVEL.** A sequência do cron:
+
+1. `aquecerBanco` retenta 5× com espera crescente — cobre ~**16 s**;
+2. se o banco não voltar, a rotina estoura;
+3. o `catch` chama `registrarExecucao(ok:false)` — **que também precisa do banco**. Ele retenta 4×
+   (~9 s) e, **por desenho, desiste em silêncio** (bookkeeping nunca derruba o cron).
+
+O job morre e **não sobra registro nenhum**. O heartbeat congela mostrando o último SUCESSO, com
+`ok=true`, de dias atrás. E 55 h não é acaso: são **duas manhãs seguidas** falhando no mesmo horário.
+
+**Mitigação aplicada:** `40 5,13 * * *` — duas vezes por dia, mesmo padrão do `casar-certificados`
+(`50 5,13`). Uma manhã ruim deixa de custar um dia inteiro de dessincronia.
+
+⚠ **Isso é mitigação, não conserto.** A causa raiz é infra e já está no CLAUDE.md: o mínimo de
+autoscaling da compute do Neon é baixo e ela dorme. Subir esse mínimo no painel do Neon é a correção
+de verdade — decisão do time.
+
+⚠ **Quem salvou foi o monitor**, que cobra por IDADE do último sucesso (limite 30 h) em vez de
+esperar um `ok=false` que nunca ia chegar. Alerta que depende do processo falho registrar a própria
+falha não alerta.
+
+⚠ **Cuidado ao diagnosticar:** `cmr-sincronizar` (meio-dia, importa da planilha) e `cmr-reconciliar`
+(5h40, vai nos dois sentidos) são crons DIFERENTES. Rodar "Sincronizar planilha" na tela mexe no
+primeiro e não diz nada sobre o segundo.

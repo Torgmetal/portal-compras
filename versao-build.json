@@ -1,7 +1,12 @@
 {
-  "build": 3239,
-  "gerado": "2026-09-17T13:10:06.447Z",
+  "build": 3240,
+  "gerado": "2026-09-17T13:25:24.399Z",
   "commits": [
+    {
+      "hash": "37abda0561",
+      "data": "17/09/2026",
+      "titulo": "Recebimento CMR: vários itens do pedido de uma vez, e o saldo passa a abater"
+    },
     {
       "hash": "b4eb0e7cf3",
       "data": "17/09/2026",
@@ -146,11 +151,6 @@
       "hash": "4f8afe6fb9",
       "data": "16/09/2026",
       "titulo": "Cancelar RM deixa de ser privilégio de ADMIN e vira permissão por pessoa"
-    },
-    {
-      "hash": "a317c2556f",
-      "data": "16/09/2026",
-      "titulo": "Data book: certificado movido de pasta no SharePoint é achado pelo nome, em vez de sumir do livro"
     }
   ]
 }

@@ -95,7 +95,7 @@
     },
     {
       "path": "/api/cron/cmr-reconciliar",
-      "schedule": "40 5 * * *"
+      "schedule": "40 5,13 * * *"
     },
     {
       "path": "/api/cron/pasta-engenharia",
