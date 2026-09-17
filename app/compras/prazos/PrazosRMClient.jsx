@@ -22,28 +22,22 @@ const CHIP = {
   gray: "bg-gray-100 text-gray-600", emerald: "bg-emerald-100 text-emerald-700",
 };
 
-// ⚠⚠ O CABEÇALHO DE CADA RM É TINGIDO PELA SITUAÇÃO DELA. Matheus (16/09/2026): "deixe mais forte
-// a cor dos cabeçalhos de cada RM". O `bg-gray-50/60` de antes era quase branco: numa lista de
-// dezenas de cartões empilhados, a faixa não separava um do outro e a página virava uma parede.
+// ⚠⚠ A COR VIVE NUM FILETE, NÃO NA FAIXA INTEIRA. Duas correções na mesma tarde: o cabeçalho era
+// `bg-gray-50/60`, quase branco, e nada separava um cartão do outro (Matheus: "deixe mais forte a
+// cor dos cabeçalhos"); tingir a faixa toda resolveu isso e criou o oposto — "está muito colorido,
+// deixe com layout melhor". São 238 cartões empilhados: faixa cheia vira parede.
 //
-// ⚠ A cor sai da MESMA situação do chip, não de uma paleta decorativa — a faixa repete o que o
-// chip diz, de longe. Quem rola a lista enxerga o bloco vermelho antes de ler qualquer palavra.
+// ⚠ O filete de 4px na borda esquerda dá o mesmo sinal a distância — a coluna de cores continua
+// legível ao rolar — gastando uma fração da área. É o padrão de "trilho de status": sinal forte
+// num lugar pequeno, superfície calma no resto.
 //
-// ⚠ Fundo em 100 e borda em 200: forte o bastante para separar, fraco o bastante para o texto
-// escuro em cima continuar legível. Ir além (500/600) exigiria texto branco e faria a faixa
-// competir com o chip, que é quem deve nomear a situação.
-const FAIXA = {
-  red: "bg-red-100 border-red-200", orange: "bg-orange-100 border-orange-200",
-  amber: "bg-amber-100 border-amber-200", sky: "bg-sky-100 border-sky-200",
-  gray: "bg-gray-200/70 border-gray-300", emerald: "bg-emerald-100 border-emerald-200",
+// ⚠ Com o filete carregando a cor, o CHIP volta ao tom suave. Dois elementos gritando pela mesma
+// informação é o que fazia a tela cansar; o filete diz "olhe aqui" e o chip diz "o que é".
+const FILETE = {
+  red: "border-l-red-500", orange: "border-l-orange-500", amber: "border-l-amber-500",
+  sky: "border-l-sky-500", gray: "border-l-gray-300", emerald: "border-l-emerald-500",
 };
 
-/** O chip dentro da faixa colorida precisa de mais peso que a faixa, senão some nela. */
-const CHIP_NA_FAIXA = {
-  red: "bg-red-600 text-white", orange: "bg-orange-600 text-white",
-  amber: "bg-amber-600 text-white", sky: "bg-sky-600 text-white",
-  gray: "bg-gray-600 text-white", emerald: "bg-emerald-600 text-white",
-};
 /**
  * A marca de Faturamento Direto — mesmo desenho do painel financeiro da OP
  * (`components/ControleFinanceiroOP.jsx`), para o mesmo conceito não ter duas caras no portal.
@@ -83,7 +77,7 @@ function Quando({ p }) {
   return <span className="text-torg-gray">em {p.diasAte} {p.diasAte === 1 ? "dia" : "dias"}</span>;
 }
 
-function LinhaPedido({ p }) {
+function LinhaPedido({ p, mostrarFD }) {
   const cfg = SITUACAO[p.situacao];
   return (
     <li className="py-2 flex items-start gap-3 flex-wrap">
@@ -92,9 +86,11 @@ function LinhaPedido({ p }) {
         <p className="text-sm text-torg-dark flex items-center gap-1.5 flex-wrap">
           {p.fornecedorNome}
           {p.numeroPedido && <span className="text-xs text-torg-gray">#{p.numeroPedido}</span>}
-          {/* ⚠ A tag vive TAMBÉM na linha do pedido, não só no cabeçalho: numa RM com vários
-              pedidos é aqui que se vê qual deles é o direto. */}
-          {p.faturamentoDireto && <TagFD />}
+          {/* ⚠⚠ A TAG SÓ DESCE PARA A LINHA QUANDO A RM É MISTA. Com a RM inteira em FD, o
+              cabeçalho já respondeu e repetir em cada pedido não acrescenta nada — só enche a tela,
+              que foi o que Matheus pediu para corrigir ("está muito colorido"). Numa RM mista é o
+              contrário: é aqui, e só aqui, que se vê QUAL pedido é o direto. */}
+          {mostrarFD && p.faturamentoDireto && <TagFD />}
         </p>
         <p className="text-xs text-torg-gray mt-0.5 flex items-center gap-1.5 flex-wrap">
           <CalendarClock size={11} /> Previsão: <b className="font-medium text-torg-dark">{fmt(p.previsao)}</b>
@@ -121,9 +117,9 @@ function LinhaPedido({ p }) {
 function CartaoRM({ l }) {
   const cfg = SITUACAO[l.situacao];
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className={`px-5 py-3 border-b flex items-center gap-3 flex-wrap ${FAIXA[cfg.cor]}`}>
-        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${CHIP_NA_FAIXA[cfg.cor]}`}>{cfg.rotulo}</span>
+    <div className={`bg-white rounded-xl border border-gray-200 border-l-4 shadow-sm overflow-hidden ${FILETE[cfg.cor]}`}>
+      <div className="px-5 py-3 bg-gray-50 border-b border-gray-200 flex items-center gap-3 flex-wrap">
+        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${CHIP[cfg.cor]}`}>{cfg.rotulo}</span>
         {/* ⚠ O número da RM leva para a RM: esta tela responde "onde dói", e o conserto é lá. */}
         {l.rmId ? (
           <Link href={`/compras/rm/${l.rmId}`} className="font-semibold text-torg-dark hover:text-torg-blue inline-flex items-center gap-1">
@@ -133,13 +129,13 @@ function CartaoRM({ l }) {
           <span className="font-semibold text-torg-dark">{l.numero}</span>
         )}
         {l.fd !== "NENHUM" && <TagFD parcial={l.fd === "PARCIAL"} />}
-        {l.op?.numero && <span className="text-xs text-torg-dark/70 font-medium">OP-{String(l.op.numero).padStart(3, "0")} · {l.op.cliente || l.op.obra || ""}</span>}
-        <span className="ml-auto text-xs text-torg-dark/70">
+        {l.op?.numero && <span className="text-xs text-torg-gray">OP-{String(l.op.numero).padStart(3, "0")} · {l.op.cliente || l.op.obra || ""}</span>}
+        <span className="ml-auto text-xs text-torg-gray">
           {l.pedidos.length} {l.pedidos.length === 1 ? "pedido" : "pedidos"} · <b className="text-torg-dark tabular-nums">{moeda(l.total)}</b>
         </span>
       </div>
       <ul className="px-5 divide-y divide-gray-50">
-        {l.pedidos.map((p) => <LinhaPedido key={p.id} p={p} />)}
+        {l.pedidos.map((p) => <LinhaPedido key={p.id} p={p} mostrarFD={l.fd === "PARCIAL"} />)}
       </ul>
     </div>
   );
