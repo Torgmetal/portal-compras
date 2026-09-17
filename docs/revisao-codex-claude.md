@@ -32,3 +32,15 @@
   `testes/aditivos-obra-tela.teste.jsx`.
 - **Para revisar (`security`/`database`):** a rota devolve 400 com a primeira issue do Zod (antes estourava 500);
   precedência digitado > planilha > valor único. O script `scripts/revisao-codex/consultar.py` continua ausente do clone.
+
+## 17/09/2026 — Dois crons parados: sync-sharepoint (17 dias) e cmr-reconciliar (60h) (Claude)
+
+- **Feito:** `escolherPlanilhaDaPasta` + fallback por prefixo em `downloadPlanilhaProducao` (o arquivo
+  do PCP ganhou o mês no fim do nome); `findEapSheetName` passa a RECUSAR aba EAP de outro mês (a
+  planilha de setembro só tem "EAP JUNHO" — o fallback mudo gravaria junho todo dia); resumo do cron
+  diz qual aba leu; `graphGet` com retry/backoff nas LEITURAS do Graph em `lib/cmr-sharepoint.js`
+  (escrita não é retentada, para não duplicar linha no Excel). Testes:
+  `testes/lib/planilha-producao-nome.teste.js`, `testes/lib/parse-pcp-eap-aba.teste.js`,
+  `testes/lib/cmr-graph-retry.teste.js`.
+- **Para revisar (`architecture`):** se a recusa da aba de outro mês deve virar alerta no monitor em
+  vez de só falha do cron. Pendência do PCP: criar a aba EAP do mês vigente.
