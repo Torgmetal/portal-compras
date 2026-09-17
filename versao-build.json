@@ -1,7 +1,12 @@
 {
-  "build": 3255,
-  "gerado": "2026-09-17T17:49:54.193Z",
+  "build": 3256,
+  "gerado": "2026-09-17T17:49:54.272Z",
   "commits": [
+    {
+      "hash": "e5cde484a3",
+      "data": "17/09/2026",
+      "titulo": "Frete: bloco alinhado com os outros campos, e o selecionado em azul cheio"
+    },
     {
       "hash": "01d4dae633",
       "data": "17/09/2026",
@@ -146,11 +151,6 @@
       "hash": "596212c40b",
       "data": "16/09/2026",
       "titulo": "Organiza colunas e observacoes dos itens de contrato"
-    },
-    {
-      "hash": "5b50dd7929",
-      "data": "16/09/2026",
-      "titulo": "Alinha colunas e evita quebra dos valores nas receitas da OP"
     }
   ]
 }

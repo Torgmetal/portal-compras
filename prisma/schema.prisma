@@ -5359,6 +5359,10 @@ model PcpCarteiraObraBaixa {
 // demais ou falhou. Guarda-corpo contra cron morrer silenciosamente.
 model CronHeartbeat {
   job       String    @id // ex.: "sync-entregas", "estoque-produtos"
+  // ⚠⚠ ARRENDAMENTO (lease) PARA UM CRON NÃO ATROPELAR A SI MESMO. Quem segura a vez grava aqui
+  // até quando pretende segurar; outra execução do MESMO job só entra se este instante já passou.
+  // Ver `lib/cron-trava.js` — e por que `pg_advisory_lock` NÃO serve aqui.
+  travadoAte DateTime?
   lastRunAt DateTime  @default(now())
   lastOkAt  DateTime?
   ok        Boolean   @default(true)

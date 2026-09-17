@@ -4,7 +4,7 @@
 // completa. Foi o achado do Codex (17/09/2026) — uma página que falhou no Omie viraria "o pedido
 // reabriu" e apagaria sozinha a marca de um pedido que ninguém tocou.
 import { describe, it, expect } from "vitest";
-import { decidirEncerramentos, janelaDaColeta, confirmarReaberturas } from "@/lib/omie-encerramento";
+import { decidirEncerramentos, janelaDaColeta, confirmarReaberturas, reconciliarEncerramentos } from "@/lib/omie-encerramento";
 
 
 const coleta = (codigos, completa = true) => ({ codigos: new Set(codigos), completa });
@@ -92,3 +92,4 @@ describe("confirmarReaberturas", () => {
     expect(r.indefinidos).toEqual(["a"]);
   });
 });
+

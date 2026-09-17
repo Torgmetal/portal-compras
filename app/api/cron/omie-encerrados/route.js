@@ -36,7 +36,11 @@ export async function GET(req) {
     const r = await reconciliarEncerramentos(prisma, { ateMs: t0 + (maxDuration - 25) * 1000 });
     // ⚠ Coleta incompleta é AVISO, não sucesso mudo: nessa rodada nada foi desmarcado de
     // propósito, e quem lê o heartbeat precisa saber que o retrato do Omie veio pela metade.
-    const msg = `${r.marcados} encerrado(s) novo(s) · ${r.desmarcados} reaberto(s) · ${r.total} pedidos`
+    // ⚠ Pular por trava não é erro, mas também não pode virar "rodou e não achou nada": o
+    // heartbeat tem de dizer que esta execução não fez trabalho nenhum.
+    const msg = r.pulou
+      ? "pulou — outra reconciliação já estava rodando"
+      : `${r.marcados} encerrado(s) novo(s) · ${r.desmarcados} reaberto(s) · ${r.total} pedidos`
       // ⚠ "Indefinido" é candidato a reabertura que o Omie não confirmou como pendente: a marca FICA
       // e o número aparece aqui. Sem isso o caso duvidoso viraria silêncio.
       + (r.indefinidos ? ` · ${r.indefinidos} sem confirmação (marca mantida)` : "")
