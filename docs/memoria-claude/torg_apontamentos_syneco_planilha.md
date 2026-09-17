@@ -77,3 +77,17 @@ dado baixa"*. A planilha passou a ter **duas abas**, que são duas ORIGENS difer
   na Pintura" convence mais que "chegou no Jato".
 - Distribuição hoje: Preparação 524, Jato 518, Corte 24, Solda 16, Montagem 8; OPs 083, 067 e 089
   concentram 78%.
+
+### Conferido com um caso forçado — T113A9 (17/09/2026)
+
+Vitor forçou o apontamento errado de propósito para testar: a TESOURA **T113A9** (obra T113) ficou
+com Montagem 1, **Solda 0**, Acabamento 0, **Jato 1** (operador TERCEIRO), Pintura 0. A aba
+*Setores anteriores* pega: `Solda · apontado 0 · a lançar 1 · prova "Jato tem 1 apontada(s)"`.
+
+- ⚠ **Acabamento zerado NÃO é cobrado, de propósito**, mesmo tendo ordem planejada: no Syneco as
+  ordens nascem para a rota inteira ([[torg_programacao_syneco]]), então "tem ordem" não prova que a
+  peça passa por ali — e a peça pode ir do Jato à Pintura sem acabamento. É a mesma exceção que já
+  valia na detecção de furo das telas de setor.
+- ⚠ **Marca duplicada estragava o peso.** A T113A9 existe sob `113` (antiga, 579,86 kg) e `T113A`
+  (vigente, 580,53 kg) — [[torg_lpc_chave_duplicada]]. A linha escolhida passou a ser a da **LPC
+  vigente** (`naLPC`), não a primeira que aparece.

@@ -101,6 +101,16 @@ describe("baixasDeEtapaAnterior — a lista pronta", () => {
     expect(mockPrisma.oP.findMany.mock.calls[0][0].where.status).toEqual({ notIn: ["ENCERRADA", "CANCELADA"] });
   });
 
+  it("marca duplicada: usa a linha da LPC vigente para peso e rota", async () => {
+    // a mesma marca existe sob a chave antiga e sob a vigente, com pesos diferentes (caso OP-113)
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue([
+      { opId: "op1", marca: "T89A1", descricao: "ANTIGA", qte: 4, pesoUnitKg: 1, naLPC: false, terceirizado: false, destinoTerceirizado: null, encaminhadoSetor: null },
+      { opId: "op1", marca: "T89A1", descricao: "CONJUNTO", qte: 4, pesoUnitKg: 10, naLPC: true, terceirizado: false, destinoTerceirizado: null, encaminhadoSetor: null },
+    ]);
+    const r = await baixasDeEtapaAnterior({});
+    expect(r.linhas[0]).toMatchObject({ descricao: "CONJUNTO", pesoALancarKg: 40 });
+  });
+
   it("sem OP viva não consulta o Syneco", async () => {
     mockPrisma.oP.findMany.mockResolvedValue([]);
     expect((await baixasDeEtapaAnterior({})).total.linhas).toBe(0);
