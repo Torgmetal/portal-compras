@@ -403,9 +403,18 @@ marcas da OP-67 **invisíveis em toda tela** por não terem nenhuma linha em `Pe
 Conferido linha a linha contra a planilha: OP-97, 60, 67, 85 e 121 batem **exatamente** (marcas e
 peças); a OP-89 soma as poucas marcas que só existem no cadastro (planilha 8705 + 204 = 8909).
 
-⚠ **`"TOTAL.:"` é uma marca no banco**, em 4 obras (060, 067, 085, 089) — o importador da L.E.
-engoliu o rodapé da planilha; a da OP-89 tinha `qte` 8705. `ehLinhaDeTotal` filtra na leitura.
-Consertar o importador e limpar as linhas continua pendente.
+⚠ **`"TOTAL.:"` era uma marca no banco**, em 4 obras (060, 067, 085, 089) — o importador da L.E.
+engoliu o rodapé da planilha; a da OP-89 tinha `qte` 8705. **RESOLVIDO (17/09/2026)**: medido, o
+banco está limpo — 0 linhas de rodapé em 22.517 de `PecaConjunto` e nas 60 listas de
+`ListaExpedicao`. A regra agora é UMA só, em **`lib/linha-de-total.js`** (`ehLinhaDeTotal`), usada
+pelo parser, pelo importador e pela leitura da expedição.
+
+⚠⚠ **ELA ESTAVA EM TRÊS LUGARES COM TRÊS ABRANGÊNCIAS DIFERENTES, e a mais estreita era a que
+importa.** O parser (`parse-le-form21.js`) pulava só o que começa com "total"; o importador e a
+leitura cobriam `TOTAL|SUBTOTAL|SOMA`. Só que **quem importa pelo SharePoint
+(`lib/lista-avancada-sharepoint.js`) grava `parsed.marcas` direto, sem passar pelo importador** — uma
+planilha com "SUBTOTAL" entrava por ali e inflava marcas, itens e peso contratado, exatamente como o
+"TOTAL.:" fazia antes. Defesa em profundidade só vale quando as camadas concordam.
 
 ⚠ **O histórico de impressão é gravado pela MARCA (`entity: "EtiquetaCarregamento"`,
 `entityId: "<opNumero>|<MARCA>"`), não pelo id de `PecaConjunto`.** O id não sobrevive à

@@ -1,7 +1,12 @@
 {
-  "build": 3250,
-  "gerado": "2026-09-17T17:00:16.920Z",
+  "build": 3251,
+  "gerado": "2026-09-17T17:07:33.168Z",
   "commits": [
+    {
+      "hash": "62ed6d043e",
+      "data": "17/09/2026",
+      "titulo": "Filtro de fornecedor agrupa pelo CNPJ: 57 opções viram 42"
+    },
     {
       "hash": "93251c6169",
       "data": "17/09/2026",
@@ -146,11 +151,6 @@
       "hash": "42fecb3410",
       "data": "16/09/2026",
       "titulo": "Corrige custos importados da LQC e permite gerar OP vinculada"
-    },
-    {
-      "hash": "1110650ff9",
-      "data": "16/09/2026",
-      "titulo": "Medição do aditivo: ao vincular o pedido Omie, escolhe-se de qual pedido é (contrato-base ou aditivo)"
     }
   ]
 }
