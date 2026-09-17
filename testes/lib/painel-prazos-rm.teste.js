@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { agruparPorRM, situacaoDoPedido, situacaoDaRM, resumoPorSituacao, rotuloSituacao, filtrarLinhas } from "@/lib/painel-prazos-rm";
+import { agruparPorRM, situacaoDoPedido, situacaoDaRM, resumoPorSituacao, rotuloSituacao, filtrarLinhas, fornecedoresDasLinhas, filtrarPorFornecedor } from "@/lib/painel-prazos-rm";
 
 // ⚠⚠ Matheus (16/09/2026): "preciso de uma aba fora para ver todas as RMs de uma vez, seus pedidos
 // e prazos de cada", aberta pelo que aperta. A ordem NÃO é detalhe de tela: é a resposta da tela.
@@ -348,5 +348,60 @@ describe("pedido recebido parcialmente", () => {
     const r = situacaoDoPedido({ id: "p3", createdAt: new Date("2026-01-01"), statusEntrega: "PARCIAL" });
     expect(r.situacao).toBe("PARCIAL");
     expect(r.diasAte).toBeNull();
+  });
+});
+
+// ─── Filtro por fornecedor (Matheus, 17/09/2026) ─────────────────────────────
+describe("filtro por fornecedor", () => {
+  const vencido = new Date(Date.now() - 10 * 86400000);
+  const futuro = new Date(Date.now() + 30 * 86400000);
+  const rm = { id: "r1", numero: "RM-1" };
+  const linhas = () => agruparPorRM([
+    { id: "p1", createdAt: new Date("2026-01-01"), fornecedorNome: "SOUFER", total: 1000, prazoEntregaPrevisto: vencido, rm },
+    { id: "p2", createdAt: new Date("2026-01-01"), fornecedorNome: "GERDAU", total: 500, prazoEntregaPrevisto: futuro, rm },
+    { id: "p3", createdAt: new Date("2026-01-01"), fornecedorNome: "GERDAU", total: 700, prazoEntregaPrevisto: futuro, rm: { id: "r2", numero: "RM-2" } },
+  ]);
+
+  it("lista os fornecedores com a contagem de pedidos, em ordem alfabética", () => {
+    expect(fornecedoresDasLinhas(linhas())).toEqual([
+      { nome: "GERDAU", quantidade: 2 },
+      { nome: "SOUFER", quantidade: 1 },
+    ]);
+  });
+
+  it("⚠⚠ REFAZ a conta da RM: total, situação e próxima data seguem o que sobrou", () => {
+    const [linha] = filtrarPorFornecedor(linhas(), "GERDAU").filter((l) => l.rmId === "r1");
+    expect(linha.pedidos).toHaveLength(1);
+    expect(linha.total).toBe(500);
+    // sem o pedido da SOUFER, a RM-1 deixa de estar atrasada
+    expect(linha.situacao).toBe("NO_PRAZO");
+    expect(linha.proximaPrevisao).toEqual(futuro);
+  });
+
+  it("some a RM que não tem pedido daquele fornecedor", () => {
+    expect(filtrarPorFornecedor(linhas(), "SOUFER").map((l) => l.rmId)).toEqual(["r1"]);
+  });
+
+  it("sem fornecedor escolhido, devolve tudo intacto", () => {
+    const todas = linhas();
+    expect(filtrarPorFornecedor(todas, "")).toBe(todas);
+  });
+
+  it("nome que não existe devolve lista vazia, não a lista inteira", () => {
+    expect(filtrarPorFornecedor(linhas(), "FORNECEDOR QUE NÃO EXISTE")).toEqual([]);
+  });
+
+  it("⚠ não funde nomes parecidos — R SIMIONI e R SIMIONI IND E COM LTDA são duas opções", () => {
+    const l = agruparPorRM([
+      { id: "a", createdAt: new Date("2026-01-01"), fornecedorNome: "R SIMIONI", rm },
+      { id: "b", createdAt: new Date("2026-01-01"), fornecedorNome: "R SIMIONI IND E COM LTDA", rm },
+    ]);
+    expect(fornecedoresDasLinhas(l).map((f) => f.nome)).toEqual(["R SIMIONI", "R SIMIONI IND E COM LTDA"]);
+    expect(filtrarPorFornecedor(l, "R SIMIONI")[0].pedidos).toHaveLength(1);
+  });
+
+  it("ignora pedido sem fornecedor em vez de criar uma opção em branco", () => {
+    const l = agruparPorRM([{ id: "a", createdAt: new Date("2026-01-01"), fornecedorNome: "", rm }]);
+    expect(fornecedoresDasLinhas(l)).toEqual([]);
   });
 });
