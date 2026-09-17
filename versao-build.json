@@ -1,7 +1,12 @@
 {
-  "build": 3249,
-  "gerado": "2026-09-17T17:00:13.742Z",
+  "build": 3250,
+  "gerado": "2026-09-17T17:00:16.920Z",
   "commits": [
+    {
+      "hash": "93251c6169",
+      "data": "17/09/2026",
+      "titulo": "Seis crons acordavam o Neon só na sorte — e agora o teste cobra isso"
+    },
     {
       "hash": "2a8d930526",
       "data": "17/09/2026",
@@ -146,11 +151,6 @@
       "hash": "1110650ff9",
       "data": "16/09/2026",
       "titulo": "Medição do aditivo: ao vincular o pedido Omie, escolhe-se de qual pedido é (contrato-base ou aditivo)"
-    },
-    {
-      "hash": "446830f26a",
-      "data": "16/09/2026",
-      "titulo": "Referências do cliente com as palavras dele, aditivo como pedido novo e comunicado aos setores"
     }
   ]
 }

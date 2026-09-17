@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { agruparPorRM, situacaoDoPedido, situacaoDaRM, resumoPorSituacao, rotuloSituacao, filtrarLinhas, fornecedoresDasLinhas, filtrarPorFornecedor } from "@/lib/painel-prazos-rm";
+import { agruparPorRM, situacaoDoPedido, situacaoDaRM, resumoPorSituacao, rotuloSituacao, filtrarLinhas, fornecedoresDasLinhas, filtrarPorFornecedor, chaveFornecedor } from "@/lib/painel-prazos-rm";
 
 // ⚠⚠ Matheus (16/09/2026): "preciso de uma aba fora para ver todas as RMs de uma vez, seus pedidos
 // e prazos de cada", aberta pelo que aperta. A ordem NÃO é detalhe de tela: é a resposta da tela.
@@ -351,26 +351,49 @@ describe("pedido recebido parcialmente", () => {
   });
 });
 
-// ─── Filtro por fornecedor (Matheus, 17/09/2026) ─────────────────────────────
+// ─── Filtro por fornecedor, agrupado por CNPJ (Matheus, 17/09/2026) ──────────
 describe("filtro por fornecedor", () => {
   const vencido = new Date(Date.now() - 10 * 86400000);
   const futuro = new Date(Date.now() + 30 * 86400000);
   const rm = { id: "r1", numero: "RM-1" };
+  const ped = (id, fornecedorNome, cnpj, extra = {}) => ({
+    id, createdAt: new Date("2026-01-01"), fornecedorNome, cnpj, rm, ...extra,
+  });
   const linhas = () => agruparPorRM([
-    { id: "p1", createdAt: new Date("2026-01-01"), fornecedorNome: "SOUFER", total: 1000, prazoEntregaPrevisto: vencido, rm },
-    { id: "p2", createdAt: new Date("2026-01-01"), fornecedorNome: "GERDAU", total: 500, prazoEntregaPrevisto: futuro, rm },
-    { id: "p3", createdAt: new Date("2026-01-01"), fornecedorNome: "GERDAU", total: 700, prazoEntregaPrevisto: futuro, rm: { id: "r2", numero: "RM-2" } },
+    ped("p1", "SOUFER", "45.987.062/0001-77", { total: 1000, prazoEntregaPrevisto: vencido }),
+    ped("p2", "GERDAU", "07.358.761/0001-69", { total: 500, prazoEntregaPrevisto: futuro }),
+    ped("p3", "GERDAU", "07358761024696", { total: 700, prazoEntregaPrevisto: futuro, rm: { id: "r2", numero: "RM-2" } }),
   ]);
 
-  it("lista os fornecedores com a contagem de pedidos, em ordem alfabética", () => {
+  it("agrupa pela RAIZ do CNPJ — matriz e filial viram UMA opção", () => {
     expect(fornecedoresDasLinhas(linhas())).toEqual([
-      { nome: "GERDAU", quantidade: 2 },
-      { nome: "SOUFER", quantidade: 1 },
+      { chave: "cnpj:07358761", nome: "GERDAU", quantidade: 2 },
+      { chave: "cnpj:45987062", nome: "SOUFER", quantidade: 1 },
     ]);
   });
 
+  it("⚠⚠ o rótulo é o nome MAIS USADO, não o mais completo", () => {
+    // Caso real: "INDUSCOLOR TINTAS" (28 pedidos) e "VENDAS" (1) no mesmo CNPJ — alguém digitou o
+    // nome do contato. Pelo nome mais longo ou pelo último, o grupo se chamaria "VENDAS".
+    const l = agruparPorRM([
+      ped("a", "INDUSCOLOR TINTAS", "09540021000174"),
+      ped("b", "INDUSCOLOR TINTAS", "09540021000174"),
+      ped("c", "VENDAS", "09540021000174"),
+    ]);
+    expect(fornecedoresDasLinhas(l)).toEqual([{ chave: "cnpj:09540021", nome: "INDUSCOLOR TINTAS", quantidade: 3 }]);
+  });
+
+  it("junta nomes escritos de jeitos diferentes com o mesmo CNPJ", () => {
+    const l = agruparPorRM([
+      ped("a", "AÇOS MAQ", "33414464000101"),
+      ped("b", "AÇOS MAQ CONCHAL LTDA", "33.414.464/0001-01"),
+    ]);
+    expect(fornecedoresDasLinhas(l)).toHaveLength(1);
+    expect(filtrarPorFornecedor(l, "cnpj:33414464")[0].pedidos).toHaveLength(2);
+  });
+
   it("⚠⚠ REFAZ a conta da RM: total, situação e próxima data seguem o que sobrou", () => {
-    const [linha] = filtrarPorFornecedor(linhas(), "GERDAU").filter((l) => l.rmId === "r1");
+    const [linha] = filtrarPorFornecedor(linhas(), "cnpj:07358761").filter((l) => l.rmId === "r1");
     expect(linha.pedidos).toHaveLength(1);
     expect(linha.total).toBe(500);
     // sem o pedido da SOUFER, a RM-1 deixa de estar atrasada
@@ -379,7 +402,7 @@ describe("filtro por fornecedor", () => {
   });
 
   it("some a RM que não tem pedido daquele fornecedor", () => {
-    expect(filtrarPorFornecedor(linhas(), "SOUFER").map((l) => l.rmId)).toEqual(["r1"]);
+    expect(filtrarPorFornecedor(linhas(), "cnpj:45987062").map((l) => l.rmId)).toEqual(["r1"]);
   });
 
   it("sem fornecedor escolhido, devolve tudo intacto", () => {
@@ -387,21 +410,20 @@ describe("filtro por fornecedor", () => {
     expect(filtrarPorFornecedor(todas, "")).toBe(todas);
   });
 
-  it("nome que não existe devolve lista vazia, não a lista inteira", () => {
-    expect(filtrarPorFornecedor(linhas(), "FORNECEDOR QUE NÃO EXISTE")).toEqual([]);
+  it("chave que não existe devolve lista vazia, não a lista inteira", () => {
+    expect(filtrarPorFornecedor(linhas(), "cnpj:00000000")).toEqual([]);
   });
 
-  it("⚠ não funde nomes parecidos — R SIMIONI e R SIMIONI IND E COM LTDA são duas opções", () => {
-    const l = agruparPorRM([
-      { id: "a", createdAt: new Date("2026-01-01"), fornecedorNome: "R SIMIONI", rm },
-      { id: "b", createdAt: new Date("2026-01-01"), fornecedorNome: "R SIMIONI IND E COM LTDA", rm },
-    ]);
-    expect(fornecedoresDasLinhas(l).map((f) => f.nome)).toEqual(["R SIMIONI", "R SIMIONI IND E COM LTDA"]);
-    expect(filtrarPorFornecedor(l, "R SIMIONI")[0].pedidos).toHaveLength(1);
+  it("⚠ CPF não tem raiz — pessoa física entra com os dígitos inteiros", () => {
+    expect(chaveFornecedor({ cnpj: "123.456.789-09", fornecedorNome: "CARLOS" })).toBe("doc:12345678909");
   });
 
-  it("ignora pedido sem fornecedor em vez de criar uma opção em branco", () => {
-    const l = agruparPorRM([{ id: "a", createdAt: new Date("2026-01-01"), fornecedorNome: "", rm }]);
-    expect(fornecedoresDasLinhas(l)).toEqual([]);
+  it("⚠ sem documento, cai no nome — pior chave, mas o pedido não some da lista", () => {
+    expect(chaveFornecedor({ cnpj: null, fornecedorNome: "FORNECEDOR SEM CNPJ" })).toBe("nome:FORNECEDOR SEM CNPJ");
+    expect(chaveFornecedor({ cnpj: "", fornecedorNome: "  " })).toBeNull();
+  });
+
+  it("dois fornecedores diferentes continuam separados", () => {
+    expect(filtrarPorFornecedor(linhas(), "cnpj:07358761").map((l) => l.rmId).sort()).toEqual(["r1", "r2"]);
   });
 });

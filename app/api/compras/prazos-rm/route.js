@@ -27,6 +27,9 @@ export async function GET() {
       // ao cliente e nunca entra no estoque da Torg. Muda quem cobra o quê, então precisa
       // estar à vista nesta lista (Matheus, 16/09/2026).
       faturamentoDireto: true,
+      // ⚠ O CNPJ é a IDENTIDADE do fornecedor no filtro — o nome duplicava a lista (ver
+      // `chaveFornecedor`). Vem só para agrupar; a tela nunca o exibe.
+      cnpj: true,
       // ⚠ A marca de que o Omie ENCERROU o pedido — sem ela a tela cobra prazo de pedido acabado,
       // e no FD isso é permanente (o material nunca entra NF na Torg). Ver `lib/omie-encerramento`.
       encerradoOmieEm: true,

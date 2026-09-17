@@ -141,7 +141,7 @@ export default function PrazosRMClient() {
           >
             <option value="">Todos os fornecedores</option>
             {fornecedores.map((f) => (
-              <option key={f.nome} value={f.nome}>{f.nome} ({f.quantidade})</option>
+              <option key={f.chave} value={f.chave}>{f.nome} ({f.quantidade})</option>
             ))}
           </select>
         )}
@@ -180,7 +180,9 @@ export default function PrazosRMClient() {
               // faz parecer que o portal inteiro está em dia.
               const onde = [
                 obra ? ` na OP-${String(obra).padStart(3, "0")}` : "",
-                fornecedor ? ` com pedido de ${fornecedor}` : "",
+                // ⚠ o NOME, não a chave: `fornecedor` guarda `cnpj:45987062`, que não diz nada
+                // a quem está lendo a tela vazia.
+                fornecedor ? ` com pedido de ${fornecedores.find((f) => f.chave === fornecedor)?.nome || "esse fornecedor"}` : "",
               ].join("");
               if (filtro === "PENDENTES") return `Nenhuma RM${onde} esperando entrega — o que foi pedido já chegou ou foi encerrado no Omie.`;
               if (filtro === "TODAS") return `Nenhuma RM${onde} com pedido gerado ainda.`;
