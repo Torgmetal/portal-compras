@@ -42,6 +42,9 @@ describe("montarRelatorio", () => {
   it("o resumo conta o que a expedição precisa saber", () => {
     expect(montarRelatorio(base).resumo).toEqual({
       marcas: 3, previsto: 12, conferido: 5, saldo: 7,
+      // ⚠ `pesoConferidoKg` entrou em 17/09/2026: a planilha vira romaneio no PCP, e romaneio sem
+      // peso não fecha carga. Aqui as marcas do fixture não têm peso, então soma zero.
+      pesoConferidoKg: 0,
       completas: 1, parciais: 1, naoConferidas: 1, percentual: 42, pendente: true,
     });
   });
@@ -80,5 +83,55 @@ describe("montarRelatorio", () => {
     expect(rotuloSituacao(SITUACAO.COMPLETA)).toBe("Conferida");
     expect(rotuloSituacao(SITUACAO.PARCIAL)).toBe("Parcial");
     expect(rotuloSituacao(SITUACAO.NAO_CONFERIDA)).toBe("Não conferida");
+  });
+});
+
+// ─── Peso e observações por marca (Matheus, 17/09/2026) ─────────────────────
+//
+// "precisa sair uma coluna somente com as marcas/tags, ou[tra] com descrição, quantidade, peso e
+// observações de cada se tiver" — a planilha vai por e-mail ao PCP, que monta romaneio com ela.
+describe("peso e observações na linha da marca", () => {
+  const rel = (marcas, lancamentos) => montarRelatorio({
+    sessao: { id: "s", status: "FINALIZADA" }, op: { numero: 97 }, marcas, lancamentos,
+  });
+
+  it("⚠⚠ o peso é o do CONFERIDO, não o do previsto — romaneio pesa o que sobe no caminhão", () => {
+    const [l] = rel([{ marca: "A", previsto: 10, conferido: 4, saldo: 6, pesoUnitKg: 2.5 }]).linhas;
+    expect(l.pesoUnitKg).toBe(2.5);
+    expect(l.pesoConferidoKg).toBe(10); // 4 × 2,5 — e não 25, que seria o previsto
+  });
+
+  it("marca sem peso cadastrado não quebra nem inventa número", () => {
+    const [l] = rel([{ marca: "A", previsto: 2, conferido: 2, saldo: 0 }]).linhas;
+    expect(l.pesoUnitKg).toBe(0);
+    expect(l.pesoConferidoKg).toBe(0);
+  });
+
+  it("o resumo soma o peso conferido de todas as marcas", () => {
+    const r = rel([
+      { marca: "A", previsto: 2, conferido: 2, saldo: 0, pesoUnitKg: 3 },
+      { marca: "B", previsto: 4, conferido: 1, saldo: 3, pesoUnitKg: 1.5 },
+    ]).resumo;
+    expect(r.pesoConferidoKg).toBe(7.5);
+  });
+
+  it("⚠ as observações do operador sobem para a linha da marca, todas elas", () => {
+    const [l] = rel(
+      [{ marca: "A", previsto: 3, conferido: 3, saldo: 0 }],
+      [{ marca: "A", observacao: "chegou amassada" }, { marca: "A", observacao: "faltou pintura" }]
+    ).linhas;
+    expect(l.observacoes).toBe("chegou amassada · faltou pintura");
+  });
+
+  it("casa a observação com a marca ignorando caixa e espaço", () => {
+    const [l] = rel([{ marca: "T97A10", previsto: 1, conferido: 1, saldo: 0 }],
+      [{ marca: " t97a10 ", observacao: "ok" }]).linhas;
+    expect(l.observacoes).toBe("ok");
+  });
+
+  it("observação vazia não vira ' · ' solto na planilha", () => {
+    const [l] = rel([{ marca: "A", previsto: 1, conferido: 1, saldo: 0 }],
+      [{ marca: "A", observacao: "   " }, { marca: "A", observacao: null }]).linhas;
+    expect(l.observacoes).toBe("");
   });
 });
