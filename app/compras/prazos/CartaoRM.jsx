@@ -8,6 +8,7 @@
 import Link from "next/link";
 import { CalendarClock, Truck, PackageCheck, ExternalLink } from "lucide-react";
 import { SITUACAO } from "@/lib/painel-prazos-rm";
+import { FRETES } from "@/lib/frete-cotacao";
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const moeda = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -88,6 +89,30 @@ function Parcial({ diasAte }) {
   return <span className="text-violet-700">parte já chegou · restante em {diasAte} {plural(diasAte)}</span>;
 }
 
+/**
+ * CIF ou FOB — e, principalmente, o que fazer a respeito.
+ *
+ * ⚠⚠ O RÓTULO LEVA A AÇÃO JUNTO, não só a sigla. Matheus (17/09/2026) quer a tela para "saber o
+ * que preciso programar coleta e o que vai ser entregue pelo fornecedor": "FOB" sozinho obriga
+ * quem lê a lembrar a convenção; "FOB · Coletar" responde na hora.
+ *
+ * ⚠ Contorno, não preenchimento. A tela já levou uma correção por excesso de cor ("está muito
+ * colorido") — o filete e o chip de situação são quem carrega cor aqui. O frete é informação de
+ * apoio e se veste como tal.
+ */
+function TagFrete({ frete }) {
+  const f = FRETES[frete];
+  if (!f) return null;
+  const cor = f.cor === "orange"
+    ? "border-orange-300 text-orange-700 bg-orange-50/60"
+    : "border-emerald-300 text-emerald-700 bg-emerald-50/60";
+  return (
+    <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium whitespace-nowrap ${cor}`} title={f.legenda}>
+      {f.valor} · {f.acao}
+    </span>
+  );
+}
+
 /** O quanto falta, em palavras — a mesma frase que alguém usaria no telefone. */
 function Quando({ p }) {
   if (p.situacao === "CHEGOU") return <Chegou t={p.atrasoDias} />;
@@ -108,7 +133,7 @@ function Quando({ p }) {
   return <span className="text-torg-gray">em {p.diasAte} {plural(p.diasAte)}</span>;
 }
 
-function LinhaPedido({ p, mostrarFD }) {
+function LinhaPedido({ p, mostrarFD, mostrarFrete }) {
   const cfg = SITUACAO[p.situacao];
   return (
     <li className="py-2 flex items-start gap-3 flex-wrap">
@@ -122,6 +147,10 @@ function LinhaPedido({ p, mostrarFD }) {
               que foi o que Matheus pediu para corrigir ("está muito colorido"). Numa RM mista é o
               contrário: é aqui, e só aqui, que se vê QUAL pedido é o direto. */}
           {mostrarFD && p.faturamentoDireto && <TagFD />}
+          {/* ⚠ Na linha o frete só aparece quando o cabeçalho NÃO respondeu — RM com os pedidos
+              todos CIF já disse isso uma vez, e repetir em cada linha é a poluição que a tela
+              acabou de corrigir. Numa RM mista é aqui, e só aqui, que se vê qual pedido coletar. */}
+          {mostrarFrete && <TagFrete frete={p.frete} />}
         </p>
         <p className="text-xs text-torg-gray mt-0.5 flex items-center gap-1.5 flex-wrap">
           <CalendarClock size={11} /> Previsão: <b className="font-medium text-torg-dark">{fmt(p.previsao)}</b>
@@ -160,13 +189,16 @@ export default function CartaoRM({ l }) {
           <span className="font-semibold text-torg-dark">{l.numero}</span>
         )}
         {l.fd !== "NENHUM" && <TagFD parcial={l.fd === "PARCIAL"} />}
+        {l.frete && <TagFrete frete={l.frete} />}
         {l.op?.numero && <span className="text-xs text-torg-gray">OP-{String(l.op.numero).padStart(3, "0")} · {l.op.cliente || l.op.obra || ""}</span>}
         <span className="ml-auto text-xs text-torg-gray">
           {l.pedidos.length} {l.pedidos.length === 1 ? "pedido" : "pedidos"} · <b className="text-torg-dark tabular-nums">{moeda(l.total)}</b>
         </span>
       </div>
       <ul className="px-5 divide-y divide-gray-50">
-        {l.pedidos.map((p) => <LinhaPedido key={p.id} p={p} mostrarFD={l.fd === "PARCIAL"} />)}
+        {l.pedidos.map((p) => (
+          <LinhaPedido key={p.id} p={p} mostrarFD={l.fd === "PARCIAL"} mostrarFrete={!l.frete} />
+        ))}
       </ul>
     </div>
   );

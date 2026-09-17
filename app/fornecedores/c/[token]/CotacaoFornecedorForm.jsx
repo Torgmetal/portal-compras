@@ -10,6 +10,7 @@ import { Loader2, AlertCircle, Send, AlertTriangle, RotateCcw, CheckCircle2, Upl
 import TorgLogo from "@/components/TorgLogo";
 import { numeroBR } from "@/lib/numero-br";
 import CampoDecimal from "@/components/CampoDecimal";
+import { FRETES } from "@/lib/frete-cotacao";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -70,6 +71,9 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
   );
   const [prazoEntrega, setPrazoEntrega] = useState(jaEnviou ? obsParsed.prazoEntrega : "");
   const [condicaoPagamento, setCondicaoPagamento] = useState(jaEnviou ? obsParsed.condicaoPagamento : "");
+  // ⚠ Sem padrão: CIF e FOB mudam quem paga o frete e quem vai buscar. Marcar um dos dois de
+  // antemão faria a metade dos fornecedores enviar a resposta errada sem perceber.
+  const [tipoFrete, setTipoFrete] = useState(cotacao.tipoFrete || "");
   const [observacaoGeral, setObservacaoGeral] = useState(jaEnviou ? obsParsed.observacao : "");
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -412,6 +416,11 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     if (!prazoEntrega.trim()) {
       return setErro("Informe o prazo de entrega.");
     }
+    // ⚠ Obrigatório, como prazo e pagamento. Deixar opcional devolveria a maioria das cotações em
+    // branco e o comprador continuaria sem saber o que precisa coletar — que é o motivo do campo.
+    if (!tipoFrete) {
+      return setErro("Informe se o frete é CIF (entrega do fornecedor) ou FOB (coleta pela Torg).");
+    }
     if (!condicaoPagamento.trim()) {
       return setErro("Informe a condicao de pagamento.");
     }
@@ -429,6 +438,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
           numeroProposta: numeroProposta.trim(),
           totalProposta: totalPropostaNum,
           prazoEntrega: prazoEntrega || null,
+          tipoFrete: tipoFrete || null,
           condicaoPagamento: condicaoPagamento || null,
           observacao: observacaoGeral || null,
         }),
@@ -1186,6 +1196,39 @@ dataHoraBR(new Date())
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
                   required
                 />
+              </div>
+              {/* ⚠⚠ O FRETE FICA COLADO NO PRAZO DE PROPÓSITO. Matheus (17/09/2026) pediu "perto do
+                  prazo de entrega": são a mesma pergunta para quem recebe — quando chega, e chega
+                  sozinho ou eu preciso buscar. Separado em outro bloco, viraria mais um campo que
+                  o fornecedor pula. */}
+              <div>
+                <span className="block text-sm font-medium text-torg-dark mb-1">Frete *</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.values(FRETES).map((f) => (
+                    <button
+                      key={f.valor}
+                      type="button"
+                      onClick={() => setTipoFrete(f.valor)}
+                      aria-pressed={tipoFrete === f.valor}
+                      className={`text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
+                        tipoFrete === f.valor
+                          ? "border-torg-blue bg-torg-blue-50 ring-1 ring-torg-blue"
+                          : "border-gray-300 hover:bg-gray-50"}`}
+                    >
+                      <span className="font-semibold text-torg-dark">{f.valor}</span>
+                    </button>
+                  ))}
+                </div>
+                {/* ⚠ A legenda aparece SEMPRE, das duas opções, e não só depois de escolher: quem
+                    não sabe a diferença precisa dela ANTES de clicar. É o motivo de o Matheus ter
+                    pedido "com legenda de cada uma". */}
+                <ul className="mt-2 space-y-0.5">
+                  {Object.values(FRETES).map((f) => (
+                    <li key={f.valor} className="text-[11px] text-torg-gray leading-snug">
+                      <b className="text-torg-dark">{f.valor}:</b> {f.legenda}
+                    </li>
+                  ))}
+                </ul>
               </div>
               <div>
                 <label className="block text-sm font-medium text-torg-dark mb-1">Condicao de pagamento *</label>

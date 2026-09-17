@@ -8,6 +8,7 @@ import { criarNotificacao } from "@/lib/notificacoes";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 import { escapeHtml, limparTextoCurto } from "@/lib/html";
 import { log } from "@/lib/log";
+import { FRETES_VALIDOS } from "@/lib/frete-cotacao";
 
 const registro = log("api/cotacao/submeter/[token]");
 
@@ -44,6 +45,16 @@ const schema = z.object({
   totalProposta: z.number().optional().nullable(),
   prazoEntrega: z.string().optional().nullable(),
   condicaoPagamento: z.string().optional().nullable(),
+  // ⚠⚠ OBRIGATÓRIO, E NO SERVIDOR (Matheus, 17/09/2026: "deixe esse campo obrigatório para o
+  // fornecedor ter que selecionar"). A trava do formulário evita o engano; a do servidor evita o
+  // resto — aba velha aberta antes desta versão, envio repetido, qualquer POST fora da tela. Sem
+  // ela, o campo seria "obrigatório" só para quem não tivesse motivo de burlá-lo.
+  //
+  // ⚠ Só CIF ou FOB. Texto livre viraria "cif", "C.I.F." e "por conta deles" no mesmo campo, e a
+  // tela de Prazos teria de adivinhar qual deles significa "preciso mandar buscar".
+  tipoFrete: z.enum(FRETES_VALIDOS, {
+    message: "Informe se o frete é CIF (entrega do fornecedor) ou FOB (coleta pela Torg).",
+  }),
   observacao: z.string().optional().nullable(),
 });
 
@@ -60,7 +71,11 @@ export async function POST(req, { params }) {
   try {
     body = schema.parse(await req.json());
   } catch (e) {
-    return NextResponse.json({ error: "Dados inválidos: " + e.message }, { status: 400 });
+    // ⚠ `e.issues[0].message` e não `e.message`: o segundo é o despejo JSON inteiro do Zod, e quem
+    // lê isto é o FORNECEDOR, numa tela pública. Com o frete virando obrigatório, essa mensagem
+    // passou a ser a explicação de um campo que ele talvez não conheça.
+    const msg = e?.issues?.[0]?.message || e?.message || "";
+    return NextResponse.json({ error: "Dados inválidos: " + msg }, { status: 400 });
   }
 
   const cotacao = await prisma.cotacao.findUnique({
@@ -163,6 +178,7 @@ export async function POST(req, { params }) {
         totalProposta: body.totalProposta ? round2(body.totalProposta) : null,
         numeroProposta: body.numeroProposta?.trim() || null,
         prazoPagamento: body.condicaoPagamento || null,
+        tipoFrete: body.tipoFrete || null,
         observacao: obsCombinada,
         cnpj: cnpjLimpo || cotacao.cnpj,
         nCodOmie: nCodOmieResolvido || cotacao.nCodOmie,

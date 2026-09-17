@@ -1081,6 +1081,11 @@ model Cotacao {
   cnpj                   String?
   faturamento            String        @default("Torg")
   prazoPagamento         String?
+  // ⚠⚠ COLUNA PRÓPRIA, NÃO MAIS UM PEDAÇO DE `observacao`. Aquele campo já empilha três coisas
+  // separadas por " | " (prazo, pagamento e o texto do fornecedor) e cada leitor precisa de um
+  // parser. O frete é uma escolha entre DUAS opções e vira filtro/etiqueta na tela de Prazos —
+  // texto livre dentro de outro texto seria um erro anunciado. Ver `lib/frete-cotacao.js`.
+  tipoFrete            String?
   observacao             String?
   total                  Float         @default(0)
   prazoResposta          DateTime?

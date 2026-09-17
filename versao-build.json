@@ -1,7 +1,12 @@
 {
-  "build": 3253,
-  "gerado": "2026-09-17T17:33:44.960Z",
+  "build": 3254,
+  "gerado": "2026-09-17T17:40:11.258Z",
   "commits": [
+    {
+      "hash": "e11b9b7657",
+      "data": "17/09/2026",
+      "titulo": "Ausência não é reabertura: desmarcar passa a exigir evidência positiva"
+    },
     {
       "hash": "97ce2411c6",
       "data": "17/09/2026",
@@ -146,11 +151,6 @@
       "hash": "f17bb838b5",
       "data": "16/09/2026",
       "titulo": "IPI destacado no pedido do Omie, observação do item junto, e a IA para de adivinhar imposto"
-    },
-    {
-      "hash": "5573b88f89",
-      "data": "16/09/2026",
-      "titulo": "Exibe margem orçada completa nas OPs originadas de LQC"
     }
   ]
 }

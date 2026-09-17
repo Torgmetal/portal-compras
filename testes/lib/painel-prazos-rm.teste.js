@@ -454,3 +454,32 @@ describe("ordem depois de filtrar por fornecedor", () => {
     expect(soGerdau.map((l) => l.numero)).toEqual(["RM-2", "RM-1"]);
   });
 });
+
+// ─── CIF/FOB na listagem (Matheus, 17/09/2026) ───────────────────────────────
+describe("frete da RM", () => {
+  const rm = { id: "r1", numero: "RM-1" };
+  const p = (id, tipoFrete) => ({
+    id, createdAt: new Date("2026-01-01"), fornecedorNome: "X", cnpj: "11111111000100",
+    cotacao: tipoFrete ? { tipoFrete } : null, rm,
+  });
+
+  it("todos os pedidos concordando, o cabeçalho da RM responde", () => {
+    expect(agruparPorRM([p("a", "FOB"), p("b", "FOB")])[0].frete).toBe("FOB");
+    expect(agruparPorRM([p("a", "CIF")])[0].frete).toBe("CIF");
+  });
+
+  // ⚠⚠ Carimbar "FOB" numa RM em que só um dos pedidos é FOB mandaria buscar o que já vem sozinho.
+  it("⚠⚠ RM MISTA não carimba nada no cabeçalho — cada linha responde por si", () => {
+    const [linha] = agruparPorRM([p("a", "FOB"), p("b", "CIF")]);
+    expect(linha.frete).toBeNull();
+    expect(linha.pedidos.map((x) => x.frete).sort()).toEqual(["CIF", "FOB"]);
+  });
+
+  it("⚠ um pedido sem resposta já tira o carimbo do cabeçalho", () => {
+    expect(agruparPorRM([p("a", "FOB"), p("b", null)])[0].frete).toBeNull();
+  });
+
+  it("pedido sem cotação fica sem frete, não com um chute", () => {
+    expect(agruparPorRM([p("a", null)])[0].pedidos[0].frete).toBeNull();
+  });
+});

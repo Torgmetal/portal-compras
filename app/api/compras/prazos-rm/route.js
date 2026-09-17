@@ -54,6 +54,9 @@ export async function GET() {
       cotacao: {
         select: {
           observacao: true,
+          // ⚠ CIF/FOB respondido pelo fornecedor no portal: é o que diz se a Torg precisa
+          // programar coleta ou se o material vem sozinho (ver `lib/frete-cotacao.js`).
+          tipoFrete: true,
           itens: { where: { vencedor: true }, select: { prazoEntrega: true, vencedor: true } },
         },
       },
