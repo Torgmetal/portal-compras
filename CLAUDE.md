@@ -619,6 +619,55 @@ marcaria o comportamento normal como defeito.
 (`/api/engenharia/listas/servidor`) e gravar as peças (`/api/producao/pecas/importar-le`) são duas
 chamadas separadas: o arquivo pode estar na pasta da obra sem que uma linha tenha chegado ao banco.
 
+## Prazos das RMs (Compras) — o que aperta, e o que exige coleta
+
+`Compras › Prazos das RMs` agrupa os pedidos do Omie POR RM. A conta mora em
+`lib/painel-prazos-rm.js`; o desenho, em `app/compras/prazos/`.
+
+**Precedência da situação de um pedido** (e ela responde por três pedidos do Matheus em 17/09):
+`CHEGOU > ENCERRADO > PARCIAL > prazo (ATRASADO / VENCE_HOJE / PROXIMO / NO_PRAZO / SEM_PRAZO)`.
+
+⚠⚠ **PEDIDO ENCERRADO NO OMIE NÃO É PEDIDO ATRASADO — e a ETAPA não serve para saber.** `cEtapa`
+vale "15" tanto em pendente quanto em encerrado, e `ConsultarPedCompra` não expõe bandeira nenhuma.
+Quem separa é o FILTRO da pesquisa: `PesquisarPedCompra{lExibirPedidosEncerrados:"T"}`. Cron próprio
+(`/api/cron/omie-encerrados`, 7h20) grava `PedidoOmie.encerradoOmieEm`. **Encerrar não é receber**:
+nada ali escreve `statusEntrega`/`dataEntregaReal` nem baixa item. Ver [[torg_omie_recebimento]].
+
+⚠⚠ **AUSÊNCIA NÃO É REABERTURA.** Desmarcar só acontece com EVIDÊNCIA POSITIVA (o pedido aparecer
+na pesquisa de pendentes); coleta incompleta ou resposta sem forma de retrato **só marca, nunca
+desmarca**. Uma resposta `{}` do Omie chegou a valer "coletei tudo e não há nenhum encerrado".
+
+⚠⚠ **PARCIAL VENCE O PRAZO, e isso foi medido.** Dos 275 pedidos CRIADO, 19 são `PARCIAL` e os 19
+têm previsão vencida — deixando o prazo ganhar, todos diriam só "Atrasado" e a parcialidade não
+apareceria. O atraso continua à vista na frase ("parte já chegou · N dias de atraso no restante").
+
+⚠⚠ **O FILTRO DE FORNECEDOR AGRUPA PELA RAIZ DO CNPJ (8 dígitos), não pelo nome nem pelo CNPJ
+inteiro.** Pelo nome, 57 opções com duplicatas ("AÇOS MAQ" × "AÇOS MAQ CONCHAL LTDA"); pelo CNPJ
+completo, a SOUFER apareceria 4× com rótulo idêntico (matriz + 3 filiais). A raiz identifica a
+EMPRESA por lei — é exato, não heurístico. 57 → 42 opções. O rótulo do grupo é o **nome mais usado**
+(senão "INDUSCOLOR TINTAS", com 28 pedidos, se chamaria "VENDAS", que alguém digitou uma vez).
+
+⚠ **Filtrar por fornecedor REFAZ a linha da RM** (total, situação, próxima data) e **reordena** —
+tirando o pedido atrasado de um fornecedor, a RM pode virar "No prazo" e não pode seguir no topo.
+
+### CIF ou FOB — quem paga o frete, e quem vai buscar
+O fornecedor responde no portal de cotação (campo **obrigatório**, ao lado do prazo de entrega), e
+a resposta aparece nos Prazos das RMs. `lib/frete-cotacao.js`, coluna `Cotacao.tipoFrete`.
+
+⚠⚠ **A PERGUNTA É OPERACIONAL, NÃO CONTÁBIL: "preciso mandar buscar?"** Por isso a etiqueta leva a
+AÇÃO junto da sigla — "FOB · Coletar", "CIF · Entrega do fornecedor". A sigla sozinha obriga quem lê
+a lembrar a convenção.
+
+⚠ **Obrigatório nos DOIS lados.** A tela bloqueia o engano; o servidor bloqueia o resto (aba velha,
+reenvio, POST fora do formulário). Sem a trava no servidor, o campo seria obrigatório só para quem
+não tivesse motivo de burlá-lo.
+
+⚠ **O frete da RM só existe quando TODOS os pedidos concordam.** Carimbar "FOB" numa RM em que só um
+dos três é FOB mandaria buscar o que já vem sozinho — mesma regra da tag FD.
+
+⚠ **Cotação antiga fica sem frete (`null`), não com um chute.** Chutar CIF faria a tela dizer que o
+material vem sozinho e ninguém programaria a coleta.
+
 ## O sino (notificações)
 
 `components/NotificationBell.jsx`, no rodapé de **toda** sidebar (`SidebarUserFooter.jsx`), ao
@@ -722,6 +771,36 @@ tela deixaria consertar só o que não precisava.
 do campo OBSERVAÇÃO, ao lado do botão de lançar (visto na validação em 390×844). Padding não
 resolve — ele flutua sobre a viewport. Está na mesma lista de exceções de `/colaborador` e
 `/meu-rh`, em `components/TorguinhoChat.jsx`.
+
+### Ao FINALIZAR, a planilha vai sozinha para o PCP
+
+Matheus (17/09/2026): *"quando o operador finalizar uma inspeção e clicar em Finalizar, o portal
+automaticamente envie um relatório em Excel para pcp@torg.com.br — dessa forma ela vai usar essa
+relação para realizar Romaneios"*. `lib/conferencia-email.js`, destino em `CONFERENCIA_PECA_EMAIL`
+(padrão `pcp@torg.com.br`).
+
+⚠⚠ **O ANEXO É O MESMO ARQUIVO DO BOTÃO "EXCEL" DA TELA**, do mesmo `montarRelatorio`. Um segundo
+relatório "para o e-mail" seria duas versões da mesma conferência divergindo na primeira vez que
+alguém mudasse uma coluna — e quem recebe por e-mail não teria como saber qual vale.
+
+⚠⚠ **ENVIAR NUNCA DERRUBA O FINALIZAR.** O operador está no pátio, no celular, com o caminhão
+esperando: Resend fora do ar não pode significar conferência que não encerra. O status é gravado
+ANTES; o envio é tentado depois e o resultado **volta para a tela** — falhar em silêncio faria o
+operador ir embora achando que o PCP recebeu.
+
+⚠ **Só no finalizar.** Cancelada é o desfazer de quem abriu por engano; planilha dela daria ar de
+documento ao que foi anulado de propósito (mesma regra da rota de relatório).
+
+⚠⚠ **A COLUNA A É SÓ A MARCA — o PCP COPIA ela inteira** para montar romaneio. Colunas:
+`Marca | Descrição | Previsto | Conferido | Saldo | Situação | Peso unit. | Peso conferido |
+Observações`. `testes/lib/conferencia-excel-colunas.teste.js` lê o XLSX gerado de volta e trava
+essa ORDEM: mudá-la quebra o trabalho de quem não tem como saber que mudou.
+
+⚠⚠ **O PESO DA LINHA É O DO CONFERIDO, NÃO O DO PREVISTO.** A planilha vira romaneio, e romaneio
+pesa o que sobe no caminhão; o previsto declararia carga que talvez não exista.
+
+⚠ **As observações sobem para a linha da marca.** Estavam só no histórico, que é cronológico — quem
+lê a linha da peça precisa ver ali o "chegou amassada", sem caçar no rodapé.
 
 ⚠ **A validação é no servidor.** A tela mostra o saldo e evita a maioria dos erros, mas lê um
 retrato de alguns segundos atrás. Toda gravação responde com o estado inteiro recalculado — o
