@@ -1,156 +1,156 @@
 {
-  "build": 3262,
-  "gerado": "2026-09-17T18:51:15.587Z",
+  "build": 3263,
+  "gerado": "2026-09-17T19:04:11.671Z",
   "commits": [
     {
-      "hash": "b04362604b",
+      "hash": "58e0effb",
+      "data": "17/09/2026",
+      "titulo": "Encerrado no Omie conta como chegou, e a barra de filtros separa escopo de situação"
+    },
+    {
+      "hash": "b0436260",
       "data": "17/09/2026",
       "titulo": "Prova de execução para o aquecimento dos crons, e a memória do que foi medido hoje"
     },
     {
-      "hash": "0ef927c75e",
+      "hash": "0ef927c7",
       "data": "17/09/2026",
       "titulo": "Planilha do Syneco ganha a 2ª aba: apontamento na frente manda dar baixa nos setores atrás"
     },
     {
-      "hash": "7521e51164",
+      "hash": "7521e511",
       "data": "17/09/2026",
       "titulo": "Conferência finalizada manda a planilha ao PCP, com peso e observações por marca"
     },
     {
-      "hash": "b19909227a",
+      "hash": "b1990922",
       "data": "17/09/2026",
       "titulo": "feat: PIT compacto com seletor e anexos do cliente restritos"
     },
     {
-      "hash": "4d1d73c60c",
+      "hash": "4d1d73c6",
       "data": "17/09/2026",
       "titulo": "As duas últimas cópias da regra do rodapé passam a usar a compartilhada"
     },
     {
-      "hash": "0a4ff68aac",
+      "hash": "0a4ff68a",
       "data": "17/09/2026",
       "titulo": "Um cron não atropela a si mesmo — e a primeira trava que escrevi não travava"
     },
     {
-      "hash": "e5cde484a3",
+      "hash": "e5cde484",
       "data": "17/09/2026",
       "titulo": "Frete: bloco alinhado com os outros campos, e o selecionado em azul cheio"
     },
     {
-      "hash": "01d4dae633",
+      "hash": "01d4dae6",
       "data": "17/09/2026",
       "titulo": "CIF ou FOB: o fornecedor responde, e os Prazos das RMs dizem o que precisa de coleta"
     },
     {
-      "hash": "e11b9b7657",
+      "hash": "e11b9b76",
       "data": "17/09/2026",
       "titulo": "Ausência não é reabertura: desmarcar passa a exigir evidência positiva"
     },
     {
-      "hash": "97ce2411c6",
+      "hash": "97ce2411",
       "data": "17/09/2026",
       "titulo": "Planilha do Syneco: só o que o setor baixou — romaneio, terceiro e fechamento administrativo saem"
     },
     {
-      "hash": "72167425ed",
+      "hash": "72167425",
       "data": "17/09/2026",
       "titulo": "O rodapé da planilha: uma regra só, porque a camada mais estreita era a que importa"
     },
     {
-      "hash": "62ed6d043e",
+      "hash": "62ed6d04",
       "data": "17/09/2026",
       "titulo": "Filtro de fornecedor agrupa pelo CNPJ: 57 opções viram 42"
     },
     {
-      "hash": "93251c6169",
+      "hash": "93251c61",
       "data": "17/09/2026",
       "titulo": "Seis crons acordavam o Neon só na sorte — e agora o teste cobra isso"
     },
     {
-      "hash": "2a8d930526",
+      "hash": "2a8d9305",
       "data": "17/09/2026",
       "titulo": "Aditivo: abertura em página própria, com a receita digitada à mão (descrição, peso, unitário)"
     },
     {
-      "hash": "5256542b45",
+      "hash": "5256542b",
       "data": "17/09/2026",
       "titulo": "Os 3 testes vermelhos eram contratos velhos, não regressões — suíte volta a 100%"
     },
     {
-      "hash": "24ed63a2ff",
+      "hash": "24ed63a2",
       "data": "17/09/2026",
       "titulo": "Filtro de fornecedor nos Prazos das RMs, refazendo a conta da RM"
     },
     {
-      "hash": "776074ade8",
+      "hash": "776074ad",
       "data": "17/09/2026",
       "titulo": "Memória: pedido encerrado, recebido parcial e a ausência de PDF na API do Omie"
     },
     {
-      "hash": "bab2573faf",
+      "hash": "bab2573f",
       "data": "17/09/2026",
       "titulo": "O link do pedido para de prometer um PDF que a API do Omie não sabe gerar"
     },
     {
-      "hash": "8e19223dbf",
+      "hash": "8e19223d",
       "data": "17/09/2026",
       "titulo": "Recebido parcial vira situação própria nos Prazos das RMs, e finaliza ao concluir ou encerrar"
     },
     {
-      "hash": "4ef5a395f4",
+      "hash": "4ef5a395",
       "data": "17/09/2026",
       "titulo": "feat: fases e referências da OP com prioridade e correção das demãos importadas"
     },
     {
-      "hash": "48d44761db",
+      "hash": "48d44761",
       "data": "17/09/2026",
       "titulo": "Pedido encerrado no Omie para de aparecer como atrasado — sobretudo no Faturamento Direto"
     },
     {
-      "hash": "c8bb767e9a",
+      "hash": "c8bb767e",
       "data": "17/09/2026",
       "titulo": "Reconciliação do CMR roda duas vezes por dia, para sobreviver a uma manhã ruim"
     },
     {
-      "hash": "37abda0561",
+      "hash": "37abda05",
       "data": "17/09/2026",
       "titulo": "Recebimento CMR: vários itens do pedido de uma vez, e o saldo passa a abater"
     },
     {
-      "hash": "b4eb0e7cf3",
+      "hash": "b4eb0e7c",
       "data": "17/09/2026",
       "titulo": "Aditivo com cara de aditivo: seção própria na aba Obra, marca no cabeçalho da OP e na lista"
     },
     {
-      "hash": "b7da7d4d07",
+      "hash": "b7da7d4d",
       "data": "17/09/2026",
       "titulo": "Painel de OPs abre para o Almoxarifado, e o token da cotação para de vazar"
     },
     {
-      "hash": "c4abcbc544",
+      "hash": "c4abcbc5",
       "data": "16/09/2026",
       "titulo": "Prazos das RMs: a cor volta para um filete, em vez de pintar a faixa inteira"
     },
     {
-      "hash": "41d1affcde",
+      "hash": "41d1affc",
       "data": "16/09/2026",
       "titulo": "Prazos das RMs: tag FD nas RMs e nos pedidos de Faturamento Direto"
     },
     {
-      "hash": "8fcf62cae1",
+      "hash": "8fcf62ca",
       "data": "16/09/2026",
       "titulo": "Previsão de entrega: a conta que ia para o Omie passa a ser guardada"
     },
     {
-      "hash": "caad5d3d09",
+      "hash": "caad5d3d",
       "data": "16/09/2026",
       "titulo": "Prazos das RMs: cabeçalho colorido, filtro por obra, e o prazo dos itens deixa de sumir"
-    },
-    {
-      "hash": "04fc4c6bab",
-      "data": "16/09/2026",
-      "titulo": "Aluguel e Montagem ganham o mesmo filtro de obra, antes de o defeito aparecer"
     }
   ]
 }

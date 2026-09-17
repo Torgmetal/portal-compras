@@ -44,3 +44,17 @@ export async function POST(req,{params}){
  return NextResponse.json({documento:{id:doc.id,nome:doc.nome,numeroDocumento:doc.numeroDocumento,arquivoNome:doc.arquivoNome,createdAt:doc.createdAt}});
  }catch{if(blob)await del(blob.url).catch(()=>{});return NextResponse.json({error:'Não foi possível salvar o PIT. Tente novamente.'},{status:500});}
 }
+
+export async function DELETE(req,{params}){
+ let user;try{user=await requireGestaoPit();}catch(e){return falha(e);}
+ const parsed=z.object({id:z.string().min(1).max(100)}).safeParse(await req.json().catch(()=>null));
+ if(!parsed.success)return NextResponse.json({error:'Documento inválido.'},{status:400});
+ try{
+ const doc=await prisma.documentoQualidade.findFirst({where:{id:parsed.data.id,opNumero:num(params),tipo:'PIT_CLIENTE',ativo:true}});
+ if(!doc)return NextResponse.json({error:'Documento não encontrado.'},{status:404});
+ await prisma.$transaction(async tx=>{
+ await tx.documentoQualidade.update({where:{id:doc.id},data:{ativo:false}});
+ await tx.auditLog.create({data:{userId:user.id,action:'EXCLUIR_PIT_CLIENTE',entity:'DocumentoQualidade',entityId:doc.id,diff:{opNumero:num(params),nome:doc.nome,antes:{ativo:true},depois:{ativo:false}}}});
+ });return NextResponse.json({ok:true});
+ }catch{return NextResponse.json({error:'Não foi possível excluir o anexo.'},{status:500});}
+}
