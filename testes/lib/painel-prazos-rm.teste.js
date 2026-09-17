@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { agruparPorRM, situacaoDoPedido, situacaoDaRM, resumoPorSituacao, rotuloSituacao } from "@/lib/painel-prazos-rm";
+import { agruparPorRM, situacaoDoPedido, situacaoDaRM, resumoPorSituacao, rotuloSituacao, filtrarLinhas } from "@/lib/painel-prazos-rm";
 
 // ⚠⚠ Matheus (16/09/2026): "preciso de uma aba fora para ver todas as RMs de uma vez, seus pedidos
 // e prazos de cada", aberta pelo que aperta. A ordem NÃO é detalhe de tela: é a resposta da tela.
@@ -245,5 +245,59 @@ describe("agruparPorRM — a marca de Faturamento Direto", () => {
     const [l] = agruparPorRM([{ id: "x", rm, total: 0, createdAt: "2026-09-01", prazoHistorico: [], acompanhamentos: [] }]);
     expect(l.pedidos[0].faturamentoDireto).toBe(false);
     expect(l.fd).toBe("NENHUM");
+  });
+});
+
+// ─── Pedido ENCERRADO no Omie (Matheus, 17/09/2026) ──────────────────────────
+describe("pedido encerrado no Omie", () => {
+  const ontem = new Date(Date.now() - 5 * 86400000);
+  const encerrado = { id: "p1", createdAt: new Date("2026-01-01"), prazoEntregaPrevisto: ontem, encerradoOmieEm: new Date("2026-09-15") };
+
+  it("sai de ATRASADO e vira ENCERRADO", () => {
+    expect(situacaoDoPedido({ ...encerrado, encerradoOmieEm: null }).situacao).toBe("ATRASADO");
+    expect(situacaoDoPedido(encerrado).situacao).toBe("ENCERRADO");
+  });
+
+  it("mas a CHEGADA continua ganhando — encerrar não apaga um recebimento", () => {
+    const p = { ...encerrado, statusEntrega: "ENTREGUE", dataEntregaReal: new Date("2026-09-10") };
+    expect(situacaoDoPedido(p).situacao).toBe("CHEGOU");
+  });
+
+  it("mantém a previsão à vista — o prazo existiu, só deixou de ser cobrado", () => {
+    expect(situacaoDoPedido(encerrado).previsao).toEqual(ontem);
+  });
+
+  it("não empresta a data da RM nem conta como pendente", () => {
+    const [linha] = agruparPorRM([{ ...encerrado, rm: { id: "r1", numero: "RM-1" } }]);
+    expect(linha.situacao).toBe("ENCERRADO");
+    expect(linha.proximaPrevisao).toBeNull();
+    expect(resumoPorSituacao([linha]).pendentes).toBe(0);
+  });
+
+  it("some do filtro padrão, e reaparece em TODAS e no filtro próprio", () => {
+    const linhas = agruparPorRM([{ ...encerrado, rm: { id: "r1", numero: "RM-1" } }]);
+    expect(filtrarLinhas(linhas, "PENDENTES")).toHaveLength(0);
+    expect(filtrarLinhas(linhas, "TODAS")).toHaveLength(1);
+    expect(filtrarLinhas(linhas, "ENCERRADO")).toHaveLength(1);
+  });
+
+  it("⚠ RM MISTA continua apertando: um pedido encerrado não silencia o irmão atrasado", () => {
+    const [linha] = agruparPorRM([
+      { ...encerrado, rm: { id: "r1", numero: "RM-1" } },
+      { id: "p2", createdAt: new Date("2026-01-01"), prazoEntregaPrevisto: ontem, rm: { id: "r1", numero: "RM-1" } },
+    ]);
+    expect(linha.situacao).toBe("ATRASADO");
+    expect(linha.proximaPrevisao).toEqual(ontem);
+    expect(resumoPorSituacao([linha]).pendentes).toBe(1);
+  });
+
+  it("⚠ encerrado SEM previsão não vira SEM_PRAZO — a RM sem prazo é que tem de aparecer", () => {
+    const semPrazo = { id: "p3", createdAt: new Date("2026-01-01"), encerradoOmieEm: new Date("2026-09-15") };
+    expect(situacaoDoPedido(semPrazo).situacao).toBe("ENCERRADO");
+    const [linha] = agruparPorRM([
+      { ...semPrazo, rm: { id: "r1", numero: "RM-1" } },
+      { id: "p4", createdAt: new Date("2026-01-01"), rm: { id: "r1", numero: "RM-1" } },
+    ]);
+    expect(linha.situacao).toBe("SEM_PRAZO");
   });
 });

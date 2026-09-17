@@ -954,6 +954,10 @@ model PedidoOmie {
   recebidoPorId        String?
   recebidoEm           DateTime?
   syncEntregaEm        DateTime? // última verificação de entrega no Omie (rotação do cron sync-entregas)
+  // ⚠⚠ ENCERRADO NO OMIE ≠ RECEBIDO. Guarda QUANDO O PORTAL DETECTOU o encerramento (o Omie não
+  // devolve a data do ato), e serve só para a tela parar de cobrar prazo de um pedido que o Omie
+  // já deu por acabado. NUNCA baixa item, NUNCA escreve `statusEntrega`/`dataEntregaReal`.
+  encerradoOmieEm      DateTime?
   recebidoPor          User?                  @relation("PedidoRecebidoPor", fields: [recebidoPorId], references: [id])
   cotacao              Cotacao?               @relation(fields: [cotacaoId], references: [id])
   op                   OP?                    @relation(fields: [opId], references: [id])

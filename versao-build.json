@@ -1,7 +1,12 @@
 {
-  "build": 3240,
-  "gerado": "2026-09-17T13:25:24.399Z",
+  "build": 3241,
+  "gerado": "2026-09-17T14:49:31.801Z",
   "commits": [
+    {
+      "hash": "c8bb767e9a",
+      "data": "17/09/2026",
+      "titulo": "Reconciliação do CMR roda duas vezes por dia, para sobreviver a uma manhã ruim"
+    },
     {
       "hash": "37abda0561",
       "data": "17/09/2026",
@@ -146,11 +151,6 @@
       "hash": "8f1daa537a",
       "data": "16/09/2026",
       "titulo": "Cotações: a forma de pagamento sai na tela, ao lado do prazo de entrega"
-    },
-    {
-      "hash": "4f8afe6fb9",
-      "data": "16/09/2026",
-      "titulo": "Cancelar RM deixa de ser privilégio de ADMIN e vira permissão por pessoa"
     }
   ]
 }

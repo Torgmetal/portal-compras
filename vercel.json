@@ -98,6 +98,10 @@
       "schedule": "40 5,13 * * *"
     },
     {
+      "path": "/api/cron/omie-encerrados",
+      "schedule": "20 7 * * *"
+    },
+    {
       "path": "/api/cron/pasta-engenharia",
       "schedule": "10 * * * *"
     },

@@ -20,6 +20,7 @@ const CHIP = {
   red: "bg-red-100 text-red-700", orange: "bg-orange-100 text-orange-700",
   amber: "bg-amber-100 text-amber-700", sky: "bg-sky-100 text-sky-700",
   gray: "bg-gray-100 text-gray-600", emerald: "bg-emerald-100 text-emerald-700",
+  slate: "bg-slate-200 text-slate-700",
 };
 
 // ⚠⚠ A COR VIVE NUM FILETE, NÃO NA FAIXA INTEIRA. Duas correções na mesma tarde: o cabeçalho era
@@ -36,6 +37,7 @@ const CHIP = {
 const FILETE = {
   red: "border-l-red-500", orange: "border-l-orange-500", amber: "border-l-amber-500",
   sky: "border-l-sky-500", gray: "border-l-gray-300", emerald: "border-l-emerald-500",
+  slate: "border-l-slate-400",
 };
 
 /**
@@ -59,22 +61,36 @@ function TagFD({ parcial = false }) {
   );
 }
 
-const ORDEM_CHIPS = ["ATRASADO", "VENCE_HOJE", "PROXIMO", "NO_PRAZO", "SEM_PRAZO", "CHEGOU"];
+const ORDEM_CHIPS = ["ATRASADO", "VENCE_HOJE", "PROXIMO", "NO_PRAZO", "SEM_PRAZO", "ENCERRADO", "CHEGOU"];
+
+const plural = (n) => (Math.abs(n) === 1 ? "dia" : "dias");
+
+/** O veredito de quem já chegou: dentro do prazo, atrasado ou adiantado. */
+function Chegou({ t }) {
+  const sufixo = t == null ? ""
+    : t > 0 ? ` com ${t} ${plural(t)} de atraso`
+      : t === 0 ? " no prazo"
+        : ` ${Math.abs(t)} ${plural(t)} adiantado`;
+  return <span className="text-emerald-700">chegou{sufixo}</span>;
+}
 
 /** O quanto falta, em palavras — a mesma frase que alguém usaria no telefone. */
 function Quando({ p }) {
-  if (p.situacao === "CHEGOU") {
-    const t = p.atrasoDias;
+  if (p.situacao === "CHEGOU") return <Chegou t={p.atrasoDias} />;
+  // ⚠⚠ ENCERRADO PRECISA DA FRASE DELE. Sem isto cairia em "sem prazo informado" — e a queixa que
+  // originou tudo era justamente a tela mentir sobre pedido acabado. Aqui existe prazo; ele é que
+  // deixou de ser cobrado.
+  if (p.situacao === "ENCERRADO") {
     return (
-      <span className="text-emerald-700">
-        chegou{t == null ? "" : t > 0 ? ` com ${t} ${t === 1 ? "dia" : "dias"} de atraso` : t === 0 ? " no prazo" : ` ${Math.abs(t)} ${Math.abs(t) === 1 ? "dia" : "dias"} adiantado`}
+      <span className="text-slate-600" title="O Omie encerrou este pedido — o portal parou de cobrar o prazo dele">
+        encerrado no Omie{p.encerradoOmieEm ? ` (visto em ${fmt(p.encerradoOmieEm)})` : ""}
       </span>
     );
   }
   if (p.diasAte == null) return <span className="text-torg-gray">sem prazo informado</span>;
-  if (p.diasAte < 0) return <span className="text-red-600 font-medium">{Math.abs(p.diasAte)} {Math.abs(p.diasAte) === 1 ? "dia" : "dias"} de atraso</span>;
+  if (p.diasAte < 0) return <span className="text-red-600 font-medium">{Math.abs(p.diasAte)} {plural(p.diasAte)} de atraso</span>;
   if (p.diasAte === 0) return <span className="text-orange-600 font-medium">vence hoje</span>;
-  return <span className="text-torg-gray">em {p.diasAte} {p.diasAte === 1 ? "dia" : "dias"}</span>;
+  return <span className="text-torg-gray">em {p.diasAte} {plural(p.diasAte)}</span>;
 }
 
 function LinhaPedido({ p, mostrarFD }) {
@@ -244,7 +260,7 @@ export default function PrazosRMClient() {
         <button type="button" onClick={() => setFiltro("PENDENTES")}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors bg-white text-torg-dark ${
             filtro === "PENDENTES" ? "border-torg-blue ring-1 ring-torg-blue" : "border-gray-200 hover:bg-gray-50"}`}>
-          A chegar <b className="ml-1 tabular-nums">{r.rms - r.CHEGOU}</b>
+          A chegar <b className="ml-1 tabular-nums">{r.rms - r.CHEGOU - r.ENCERRADO}</b>
         </button>
         {ORDEM_CHIPS.filter((k) => r[k] > 0).map((k) => (
           <button key={k} type="button" onClick={() => setFiltro(filtro === k ? "PENDENTES" : k)}
@@ -261,7 +277,9 @@ export default function PrazosRMClient() {
           Todas <b className="ml-1 tabular-nums">{r.rms}</b>
         </button>
         <span className="text-xs text-torg-gray ml-auto">
-          {r.rms} {r.rms === 1 ? "RM" : "RMs"} · {r.pedidos} pedidos · <b className="text-torg-dark">{r.pendentes}</b> ainda não chegaram
+          {/* ⚠ "cobram prazo", não "não chegaram": o encerrado também não chegou, mas saiu da conta
+              de propósito — a frase antiga passaria a discordar do número ao lado dela. */}
+          {r.rms} {r.rms === 1 ? "RM" : "RMs"} · {r.pedidos} pedidos · <b className="text-torg-dark">{r.pendentes}</b> ainda cobram prazo
         </span>
       </div>
 
@@ -273,7 +291,7 @@ export default function PrazosRMClient() {
               // ⚠ Com obra escolhida o vazio diz QUAL obra: "nenhuma RM atrasada" sem dizer onde
               // faz parecer que o portal inteiro está em dia.
               const onde = obra ? ` na OP-${String(obra).padStart(3, "0")}` : "";
-              if (filtro === "PENDENTES") return `Nenhuma RM${onde} esperando entrega — tudo que foi pedido já chegou.`;
+              if (filtro === "PENDENTES") return `Nenhuma RM${onde} esperando entrega — o que foi pedido já chegou ou foi encerrado no Omie.`;
               if (filtro === "TODAS") return `Nenhuma RM${onde} com pedido gerado ainda.`;
               return `Nenhuma RM${onde} em "${rotuloSituacao(filtro)}".`;
             })()}
