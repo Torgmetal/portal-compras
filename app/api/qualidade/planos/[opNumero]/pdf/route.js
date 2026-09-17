@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(req, { params }) {
-  try { await requireRole(["ADMIN", "QUALIDADE", "COMERCIAL", "PRODUCAO", "PCP"]); }
+  try { await requireRole(["ADMIN", "QUALIDADE", "COMERCIAL", "PRODUCAO", "PCP", "ENGENHARIA", "PLANEJAMENTO", "COMPRAS", "EXPEDICAO", "FINANCEIRO", "ALMOXARIFADO"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const opNumero = String((await params)?.opNumero || "").replace(/\D/g, "").padStart(3, "0");

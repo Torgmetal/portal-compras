@@ -1,5 +1,6 @@
 // PATCH  /api/qualidade/documentos/[id]  — edita (re-backup se trocar arquivo)
 // DELETE /api/qualidade/documentos/[id]  — soft delete (ativo=false)
+import {requireGestaoPit} from "@/lib/pit-acesso";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -50,6 +51,7 @@ export async function PATCH(req, { params }) {
   }
 
   const atual = await prisma.documentoQualidade.findUnique({ where: { id: params.id } });
+  if(atual?.tipo === "PIT_CLIENTE" || body.tipo === "PIT_CLIENTE"){try{await requireGestaoPit();}catch(e){return NextResponse.json({error:e.message},{status:e.message === "Unauthorized"?401:403});}}
   if (!atual || !atual.ativo) {
     return NextResponse.json({ success: false, error: "Documento não encontrado" }, { status: 404 });
   }
@@ -102,6 +104,7 @@ export async function DELETE(req, { params }) {
   }
 
   const atual = await prisma.documentoQualidade.findUnique({ where: { id: params.id } });
+  if(atual?.tipo === "PIT_CLIENTE"){try{await requireGestaoPit();}catch(e){return NextResponse.json({error:e.message},{status:e.message === "Unauthorized"?401:403});}}
   if (!atual) return NextResponse.json({ success: false, error: "Documento não encontrado" }, { status: 404 });
 
   const motivo = new URL(req.url).searchParams.get("motivo");

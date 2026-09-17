@@ -9,6 +9,8 @@
 // ⚠ O PADRÃO FICA NA OP, não num documento. É decisão DA OBRA: o PIT sai dele hoje, e o escopo de
 // inspeção e o Data Book podem sair amanhã. Guardar no documento faria a segunda tela ter de
 // adivinhar de novo.
+import {z} from "zod";
+import {podeGerenciarPit,requireGestaoPit,requireConsultaPit} from "@/lib/pit-acesso";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -17,11 +19,12 @@ import { PIT_PADROES, PIT_PADRAO } from "@/lib/pit-padroes";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ROLES = ["ADMIN", "QUALIDADE", "COMERCIAL", "PRODUCAO", "PCP"];
+const ROLES = ["ADMIN", "QUALIDADE", "COMERCIAL", "PRODUCAO", "PCP", "ENGENHARIA", "PLANEJAMENTO", "COMPRAS", "EXPEDICAO", "FINANCEIRO", "ALMOXARIFADO"];
 const numDaRota = async (params) => String((await params)?.opNumero || "").replace(/\D/g, "").padStart(3, "0");
 
 export async function GET(req, { params }) {
-  try { await requireRole(ROLES); }
+  let user;
+  try { user=await requireConsultaPit(); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const opNumero = await numDaRota(params);
@@ -32,6 +35,7 @@ export async function GET(req, { params }) {
   if (!op) return NextResponse.json({ error: "OP não encontrada." }, { status: 404 });
 
   return NextResponse.json({
+    podeGerenciar:await podeGerenciarPit(user),
     op,
     padrao: op.pitPadrao || null,
     revisao: op.pitRevisao || "0",
@@ -43,11 +47,13 @@ export async function GET(req, { params }) {
 
 export async function PUT(req, { params }) {
   let user;
-  try { user = await requireRole(["ADMIN", "QUALIDADE", "COMERCIAL"]); }
+  try { user = await requireGestaoPit(); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const opNumero = await numDaRota(params);
-  const { padrao, revisao } = await req.json().catch(() => ({}));
+  const parsed=z.object({padrao:z.string().nullable(),revisao:z.string().max(10).optional()}).safeParse(await req.json().catch(()=>null));
+  if(!parsed.success)return NextResponse.json({error:"Dados de PIT inválidos."},{status:400});
+  const {padrao,revisao}=parsed.data;
   if (padrao && !PIT_PADRAO[padrao]) return NextResponse.json({ error: "Padrão de PIT desconhecido." }, { status: 400 });
 
   const op = await prisma.oP.findFirst({ where: { numero: opNumero }, select: { id: true, pitPadrao: true } });
