@@ -38,6 +38,7 @@ import { fmtOP } from "@/lib/utils";
 import OrcamentoComercial from "@/components/OrcamentoComercial";
 import { itensDaPlanilhaComercial } from "@/lib/op-categorias";
 import { numeroBR } from "@/lib/numero-br";
+import { omiePedidoCompraUrl } from "@/lib/omie-urls";
 import CampoDecimal from "@/components/CampoDecimal";
 
 const fmtMoeda = (v) =>
@@ -1328,7 +1329,7 @@ function MedicoesCard({ medicoes, resumo, receitaBruta, valorTotalContrato = 0, 
                   <td className="px-4 py-2 whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
                       <a
-                        href={`/api/omie/pedido-compra-pdf/${m.codigoPedidoOmie || m.numeroPedidoOmie}`}
+                        href={omiePedidoCompraUrl(m.codigoPedidoOmie || m.numeroPedidoOmie)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="font-mono font-semibold text-torg-blue hover:underline"

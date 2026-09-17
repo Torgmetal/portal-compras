@@ -1,14 +1,16 @@
 "use client";
-import { Truck, ExternalLink, AlertCircle, FileText } from "lucide-react";
+import { Truck, ExternalLink, AlertCircle } from "lucide-react";
 import { omiePedidoCompraUrl } from "@/lib/omie-urls";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
-// Numero do pedido = link que abre o PDF do Omie em nova aba.
-// Por baixo, chama /api/omie/pedido-compra-pdf/[codigoPedido] que pede pra API
-// do Omie gerar o link temporario e redireciona pro PDF.
+// Número do pedido = link que abre o módulo de Compras do Omie em nova aba.
+//
+// ⚠ NÃO é PDF, e o rótulo parou de prometer isso (17/09/2026). A API do Omie não tem método de
+// impressão de pedido de compra — ver `lib/omie-urls.js`. Dizer "Abrir PDF" num link que sempre
+// caiu na listagem é pior que não ter o link: quem clica acha que o PDF sumiu.
 function PedidoNumeroCell({ pedido }) {
   const numero = pedido.numeroPedido || pedido.codigoPedido || "";
   const podeAbrir = pedido.status === "CRIADO" && pedido.codigoPedido;
@@ -17,17 +19,17 @@ function PedidoNumeroCell({ pedido }) {
     return <span className="font-mono text-torg-gray">{numero || "—"}</span>;
   }
 
-  const url = `/api/omie/pedido-compra-pdf/${pedido.codigoPedido}`;
+  const url = omiePedidoCompraUrl(pedido.codigoPedido);
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      title="Abrir PDF do pedido no Omie"
+      title="Abrir o módulo de Compras do Omie"
       className="inline-flex items-center gap-1 font-mono font-semibold text-torg-blue hover:text-torg-blue-700 hover:underline"
     >
       {numero}
-      <FileText size={12} />
+      <ExternalLink size={12} />
     </a>
   );
 }

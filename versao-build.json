@@ -1,7 +1,12 @@
 {
-  "build": 3243,
-  "gerado": "2026-09-17T16:28:35.952Z",
+  "build": 3244,
+  "gerado": "2026-09-17T16:28:41.694Z",
   "commits": [
+    {
+      "hash": "8e19223dbf",
+      "data": "17/09/2026",
+      "titulo": "Recebido parcial vira situação própria nos Prazos das RMs, e finaliza ao concluir ou encerrar"
+    },
     {
       "hash": "4ef5a395f4",
       "data": "17/09/2026",
@@ -146,11 +151,6 @@
       "hash": "1a8e734267",
       "data": "16/09/2026",
       "titulo": "Importação de LQC: `forcar` sobrescreve estudo escolhido, e planilha sem aba de resumo é pulada, não erro"
-    },
-    {
-      "hash": "2e90491f85",
-      "data": "16/09/2026",
-      "titulo": "Pedido gerado: uma régua de acompanhamento na RM, do prazo à chegada"
     }
   ]
 }
