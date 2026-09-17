@@ -1197,27 +1197,51 @@ dataHoraBR(new Date())
                   required
                 />
               </div>
-              {/* ⚠⚠ O FRETE FICA COLADO NO PRAZO DE PROPÓSITO. Matheus (17/09/2026) pediu "perto do
-                  prazo de entrega": são a mesma pergunta para quem recebe — quando chega, e chega
-                  sozinho ou eu preciso buscar. Separado em outro bloco, viraria mais um campo que
-                  o fornecedor pula. */}
               <div>
+                <label className="block text-sm font-medium text-torg-dark mb-1">Condicao de pagamento *</label>
+                <input
+                  type="text"
+                  value={condicaoPagamento}
+                  onChange={(e) => setCondicaoPagamento(e.target.value)}
+                  placeholder="Ex: 30 dias / 28 dias com 2% desc."
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+                  required
+                />
+              </div>
+              {/* ⚠⚠ O FRETE OCUPA A LINHA INTEIRA, LOGO ABAIXO DOS DOIS CAMPOS. Ele começou na
+                  segunda coluna, ao lado do prazo — mas a legenda das duas opções tem quatro linhas
+                  e esticava só aquela coluna, empurrando "Condição de pagamento" para baixo e
+                  abrindo um buraco embaixo do prazo (Matheus, 17/09/2026: "ficou um pouco quebrado
+                  o layout, ajuste para ficar alinhado as caixas").
+                  ⚠ Continua colado no prazo, que era o pedido original: é a linha seguinte, não
+                  outro bloco. Quem responde "quando chega" responde "e chega como" em seguida. */}
+              <div className="sm:col-span-2">
                 <span className="block text-sm font-medium text-torg-dark mb-1">Frete *</span>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.values(FRETES).map((f) => (
-                    <button
-                      key={f.valor}
-                      type="button"
-                      onClick={() => setTipoFrete(f.valor)}
-                      aria-pressed={tipoFrete === f.valor}
-                      className={`text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
-                        tipoFrete === f.valor
-                          ? "border-torg-blue bg-torg-blue-50 ring-1 ring-torg-blue"
-                          : "border-gray-300 hover:bg-gray-50"}`}
-                    >
-                      <span className="font-semibold text-torg-dark">{f.valor}</span>
-                    </button>
-                  ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {Object.values(FRETES).map((f) => {
+                    const escolhido = tipoFrete === f.valor;
+                    return (
+                      <button
+                        key={f.valor}
+                        type="button"
+                        onClick={() => setTipoFrete(f.valor)}
+                        aria-pressed={escolhido}
+                        className={`text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                          escolhido
+                            // ⚠⚠ AZUL CHEIO, NÃO UM FUNDO CLARINHO. O estado anterior era um
+                            // `bg-torg-blue-50` que, na tela do fornecedor, mal se distinguia do
+                            // branco — e este é um campo obrigatório de DUAS opções: não dá para
+                            // ficar em dúvida sobre qual está marcada.
+                            ? "bg-torg-blue border-torg-blue text-white shadow-sm"
+                            : "border-gray-300 text-torg-dark hover:bg-gray-50"}`}
+                      >
+                        <span className="block text-sm font-bold">{f.valor}</span>
+                        {/* ⚠ A ação dentro do botão: "CIF" e "FOB" sozinhos não dizem nada a quem
+                            não vive de logística, e a legenda embaixo é para ler, não para escolher. */}
+                        <span className={`block text-[11px] ${escolhido ? "text-white/90" : "text-torg-gray"}`}>{f.acao}</span>
+                      </button>
+                    );
+                  })}
                 </div>
                 {/* ⚠ A legenda aparece SEMPRE, das duas opções, e não só depois de escolher: quem
                     não sabe a diferença precisa dela ANTES de clicar. É o motivo de o Matheus ter
@@ -1229,17 +1253,6 @@ dataHoraBR(new Date())
                     </li>
                   ))}
                 </ul>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-torg-dark mb-1">Condicao de pagamento *</label>
-                <input
-                  type="text"
-                  value={condicaoPagamento}
-                  onChange={(e) => setCondicaoPagamento(e.target.value)}
-                  placeholder="Ex: 30 dias / 28 dias com 2% desc."
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
-                  required
-                />
               </div>
             </div>
             <div>

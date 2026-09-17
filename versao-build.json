@@ -1,7 +1,12 @@
 {
-  "build": 3254,
-  "gerado": "2026-09-17T17:40:11.258Z",
+  "build": 3255,
+  "gerado": "2026-09-17T17:49:54.193Z",
   "commits": [
+    {
+      "hash": "01d4dae633",
+      "data": "17/09/2026",
+      "titulo": "CIF ou FOB: o fornecedor responde, e os Prazos das RMs dizem o que precisa de coleta"
+    },
     {
       "hash": "e11b9b7657",
       "data": "17/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5b50dd7929",
       "data": "16/09/2026",
       "titulo": "Alinha colunas e evita quebra dos valores nas receitas da OP"
-    },
-    {
-      "hash": "f17bb838b5",
-      "data": "16/09/2026",
-      "titulo": "IPI destacado no pedido do Omie, observação do item junto, e a IA para de adivinhar imposto"
     }
   ]
 }
