@@ -114,7 +114,6 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [exportandoLPC, setExportandoLPC] = useState(false);
-  const [modalAditivo, setModalAditivo] = useState(false);
   const [modalDivulgarAditivo, setModalDivulgarAditivo] = useState(null); // { id, numero }
   const [modalRevisao, setModalRevisao] = useState(false);
   const [modalPrazo, setModalPrazo] = useState(false);
@@ -370,7 +369,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
           {/* Ações */}
           <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-gray-100">
             <button
-              onClick={() => setModalAditivo(true)}
+              onClick={() => router.push(`/comercial/${op.id}/aditivo/novo`)}
               disabled={encerradaOuCancelada}
               className="px-3.5 py-2 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -921,7 +920,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
         </div>
       )}
 
-      {vista === "obra" && <AbaObra op={op} onAtualizar={() => router.refresh()} podeEditar={podeGerenciarComercial && !encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} encerrada={encerradaOuCancelada} onNovoAditivo={() => setModalAditivo(true)} onDivulgarAditivo={(ad) => setModalDivulgarAditivo(ad)} />}
+      {vista === "obra" && <AbaObra op={op} onAtualizar={() => router.refresh()} podeEditar={podeGerenciarComercial && !encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} encerrada={encerradaOuCancelada} onNovoAditivo={() => router.push(`/comercial/${op.id}/aditivo/novo`)} onDivulgarAditivo={(ad) => setModalDivulgarAditivo(ad)} />}
 
       {vista === "planejamento" && (
         <div className="space-y-6">
@@ -1123,9 +1122,6 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
       })()}
 
       {/* Modais */}
-      {modalAditivo && (
-        <ModalAditivo opId={op.id} proximoNumero={op.aditivos.length + 1} onClose={() => setModalAditivo(false)} onSaved={() => router.refresh()} />
-      )}
       {modalDivulgarAditivo && (
         <ModalDivulgarAditivo aditivo={modalDivulgarAditivo} onClose={() => setModalDivulgarAditivo(null)} onEnviado={() => router.refresh()} />
       )}
@@ -3237,7 +3233,7 @@ function ModalEditarItem({ tipo, item, onClose, onSaved }) {
 }
 
 // Modal de adicionar itens NOVOS a uma OP existente (ADMIN-only).
-// Mesma UX do ModalAditivo mas vai pra OP base, sem criar aditivo.
+// Mesma UX dos itens de verba da abertura do aditivo, mas vai pra OP base, sem criar aditivo.
 function ModalAdicionarItens({ opId, aditivo = null, onClose, onSaved }) {
   const [itens, setItens] = useState([novoItem()]);
   const [erro, setErro] = useState("");
@@ -3350,165 +3346,3 @@ function ModalAdicionarItens({ opId, aditivo = null, onClose, onSaved }) {
   );
 }
 
-function ModalAditivo({ opId, proximoNumero, onClose, onSaved }) {
-  const [descricao, setDescricao] = useState("");
-  const [itens, setItens] = useState([novoItem()]);
-  const [orcAd, setOrcAd] = useState({ pasta: null, ref: null, propostas: [], estudo: null, dados: null });
-  const [dataInicioAd, setDataInicioAd] = useState("");
-  const [dataFimAd, setDataFimAd] = useState("");
-  const [erro, setErro] = useState("");
-  const [salvando, setSalvando] = useState(false);
-  // ⚠ o aditivo É um pedido novo do cliente (OC/AF/PC), nas palavras dele — Vitor (16/09/2026)
-  const [pedido, setPedido] = useState(pedidoVazio());
-  const [valorAd, setValorAd] = useState("");
-  const [termosAd, setTermosAd] = useState(null);
-  useEffect(() => {
-    fetch(`/api/comercial/op/${opId}/referencias`).then((r) => r.json()).then((j) => setTermosAd(j.termos || null)).catch(() => {});
-  }, [opId]);
-
-  const updateItem = (i, novo) => setItens((p) => p.map((it, idx) => (idx === i ? novo : it)));
-  const addItem = (cat = "MATERIA_PRIMA") => setItens((p) => [...p, novoItem(cat)]);
-  const removeItem = (i) => setItens((p) => p.filter((_, idx) => idx !== i));
-
-  const totalVerba = itens.reduce((s, it) => s + (Number(it.valorVerba) || 0), 0);
-
-  const submit = async () => {
-    if (!descricao.trim()) return setErro("Descreva o motivo do aditivo.");
-    const validos = itens.filter((it) => it.descricao.trim());
-    if (validos.length === 0) return setErro("Adicione pelo menos um item.");
-
-    setSalvando(true);
-    try {
-      const res = await fetch(`/api/comercial/op/${opId}/aditivo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          descricao: descricao.trim(),
-          itens: validos.map((it) => ({
-            ...it,
-            qtdContratada: Number(it.qtdContratada) || null,
-            meses: Number(it.meses) || null,
-            valorPorMes: Number(it.valorPorMes) || null,
-            valorVerba: Number(it.valorVerba),
-          })),
-          dataInicio: dataInicioAd || null,
-          dataFimPrevista: dataFimAd || null,
-          orcamentoPasta: orcAd.pasta, orcamentoRef: orcAd.ref,
-          propostas: orcAd.propostas, estudoArquivo: orcAd.estudo, estudoDados: orcAd.dados,
-          pedido: pedido.codigo?.trim() ? pedido : null,
-          valor: valorAd ? Number(String(valorAd).replace(/\./g, "").replace(",", ".")) || null : null,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
-      onSaved();
-      onClose();
-    } catch (e) {
-      setErro(e.message);
-      setSalvando(false);
-    }
-  };
-
-  return (
-    <Modal titulo={`Novo Aditivo ${proximoNumero}`} onClose={onClose}>
-      <div className="px-6 py-5 space-y-4">
-        {/* O aditivo nasce de OUTRA proposta e OUTRO estudo — e a informação precisa chegar a
-            todos os setores. Mesmo bloco da criação da OP. (Vitor 19/08.) */}
-        <OrcamentoComercial
-          valor={orcAd}
-          onChange={(v) => {
-            setOrcAd(v);
-            const daPlanilha = itensDaPlanilhaComercial(v.dados?.comercial, v.dados?.custos, v.dados);
-            if (daPlanilha.length) setItens((prev) => (prev.some((i) => String(i.descricao || "").trim()) ? prev : daPlanilha));
-            const prop = (v.propostas || []).find((p) => p.descricao);
-            if (prop?.descricao) setDescricao((d) => d || `Aditivo ${proximoNumero} — ${prop.obra || prop.numeroProposta || ""}\n\n${prop.descricao}`);
-          }}
-        />
-
-        <div className="rounded-xl border border-amber-100 bg-amber-50/30 p-4 space-y-3">
-          <p className="text-sm font-medium text-torg-dark">Pedido do cliente que veio com o aditivo</p>
-          <ReferenciasClienteEditor termos={termosAd} valor={{ pedidos: [pedido] }} onChange={(v) => setPedido(v.pedidos?.[0] || pedidoVazio())} modo="aditivo" />
-          <div className="max-w-xs">
-            <label className="block text-[11px] font-medium text-torg-gray mb-1">Valor do aditivo (R$) — vira a linha de receita se não houver estudo</label>
-            <input value={valorAd} onChange={(e) => setValorAd(e.target.value)} inputMode="decimal" placeholder="0,00"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">Data de início</label>
-            <CampoData value={dataInicioAd} onChange={(iso) => setDataInicioAd(iso)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">Fim previsto</label>
-            <CampoData value={dataFimAd} onChange={(iso) => setDataFimAd(iso)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-          </div>
-        </div>
-
-        {erro && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
-            <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
-          </div>
-        )}
-        <div>
-          <label className="block text-sm font-medium text-torg-dark mb-1">Descrição do aditivo</label>
-          <textarea
-            value={descricao}
-            onChange={(e) => setDescricao(e.target.value)}
-            rows={2}
-            placeholder="Ex: Aditivo 1 — inclusão de pipe rack adicional."
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
-          />
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-            <label className="block text-sm font-medium text-torg-dark">Itens do aditivo</label>
-            <div className="flex gap-2">
-              <button onClick={() => addItem("MATERIA_PRIMA")} className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1">
-                <Plus size={12} /> Material
-              </button>
-              <button onClick={() => addItem("ALUGUEL_PLATAFORMA")} className="text-xs text-torg-orange-700 hover:text-torg-dark font-medium inline-flex items-center gap-1">
-                <Plus size={12} /> Aluguel
-              </button>
-              <button onClick={() => addItem("OUTRO")} className="text-xs text-torg-gray hover:text-torg-dark font-medium inline-flex items-center gap-1">
-                <Plus size={12} /> Outro
-              </button>
-            </div>
-          </div>
-          <div className="border border-gray-100 rounded-lg divide-y divide-gray-100">
-            {itens.map((it, i) => (
-              <ItemFormRow
-                key={i}
-                item={it}
-                onChange={(novo) => updateItem(i, novo)}
-                onRemove={() => removeItem(i)}
-                canRemove={itens.length > 1}
-                compact
-              />
-            ))}
-          </div>
-          <div className="mt-2 text-right text-sm">
-            <span className="text-torg-gray">Total verba do aditivo: </span>
-            <span className="font-bold text-torg-orange-700 tabular-nums">{fmtMoeda(totalVerba)}</span>
-          </div>
-        </div>
-      </div>
-      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
-        <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">
-          Cancelar
-        </button>
-        <button
-          onClick={submit}
-          disabled={salvando}
-          className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
-        >
-          {salvando && <Loader2 size={14} className="animate-spin" />} Criar aditivo
-        </button>
-      </div>
-    </Modal>
-  );
-}

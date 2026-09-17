@@ -39,3 +39,24 @@ com vários ETC; TAGs digitadas × importadas da LX da TMSA (OP-122 Vale); quem 
 
 ⚠ `scripts/revisao-codex/consultar.py` **não existe** no clone (CLAUDE.md manda consultar o Codex antes
 de mexer em schema): a consulta `database` não rodou — pendência, não validação.
+
+## A abertura do aditivo é PÁGINA, e a receita se digita à mão (17/09/2026)
+
+Vitor, olhando o modal "Novo aditivo" no localhost: "e onde eu descrevo a receita por exemplo?"
+(não tinha onde — nascia sozinha da planilha do estudo ou de UMA linha com o "valor do aditivo"),
+"está muito ruim de ver essas info" e "para o caso de ter que digitar na mão precisamos de algumas
+coisas, informar o peso, unitário e a descrição".
+
+- `/comercial/[id]/aditivo/novo` (`NovoAditivoClient.jsx`), em 5 blocos na ordem em que o Comercial
+  pensa: **1 Pedido do cliente** (OC/ETC/TAG) → **2 Receita** (`ReceitasAditivoEditor`: descrição,
+  cobrado por kg/pç/m²/m/un/valor fechado, peso × unitário = total; avisa se não bate com o valor
+  da OC) → **3 Verba de compras** (os `ItemFormRow` de sempre) → **4 Prazo e comunicado** →
+  **5 Proposta e estudo** (recolhido; anexar preenche receita/verba/descrição só se ainda em branco).
+  Sem `<form>`: o navegador de pastas e as linhas têm botões próprios.
+- A conta mora em `lib/receita-aditivo.js` e a rota usa a MESMA (`receitasDoAditivo`): precedência
+  digitado > planilha do estudo > uma linha com o valor. O `valor` do aditivo = soma das linhas.
+- ⚠ Receita ≠ verba continua valendo: as linhas viram `OPReceita` marcadas com `aditivoId` (aba
+  Resumo › Receitas do contrato) e aparecem no cartão do aditivo na aba Obra só para quem vê
+  financeiro (a página apaga `op.receitas` dos outros).
+- O `ModalAditivo` do `OPDetailClient` foi removido; os botões "Novo aditivo" (cabeçalho e aba Obra)
+  fazem `router.push` para a página.

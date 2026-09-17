@@ -1,5 +1,5 @@
 "use client";
-import { FilePlus2, Rocket, Plus, Users, CalendarRange, Hash } from "lucide-react";
+import { FilePlus2, Rocket, Plus, Users, CalendarRange, Hash, Coins } from "lucide-react";
 import ReferenciasClienteResumo from "./ReferenciasClienteResumo";
 import { agruparReferencias } from "@/lib/referencias-cliente";
 
@@ -8,8 +8,10 @@ import { agruparReferencias } from "@/lib/referencias-cliente";
 // só precisa ficar de uma forma evidente que se trata de um aditivo". Antes o aditivo só existia
 // no fim da aba Resumo, atrás da tabela de itens — e a verba (itens, solicitações) continua lá,
 // que é assunto do Comercial/Compras. Aqui é o que TODO setor precisa: o que entrou, com que
-// pedido, TAGs, prazo, quem já confirmou.
+// pedido, TAGs, prazo, quem já confirmou — e a receita do aditivo (Vitor, 17/09: "onde eu descrevo
+// a receita?"), que só chega aqui para quem vê financeiro (a página apaga `op.receitas` dos outros).
 const fmtMoeda = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const fmtNum = (v) => Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : null);
 const STATUS = {
   RASCUNHO: { rotulo: "Não comunicado aos setores", cls: "bg-amber-100 text-amber-900 border-amber-200" },
@@ -39,6 +41,8 @@ export default function AditivosObra({ op, podeGerenciar = false, encerrada = fa
             const ok = aceites.filter((a) => a.aceitoEm).length;
             const arvore = agruparReferencias(refs.filter((r) => r.aditivoId === ad.id));
             const temRefs = arvore.pedidos.length + arvore.projetos.length + arvore.outros.length > 0;
+            const receitas = (op?.receitas || []).filter((r) => r.aditivoId === ad.id);
+            const totalReceita = receitas.reduce((s, r) => s + (Number(r.valor) || 0), 0);
             return (
               <article key={ad.id} id={`aditivo-${ad.numero}`} className="px-5 py-4 space-y-3 scroll-mt-24">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -67,6 +71,21 @@ export default function AditivosObra({ op, podeGerenciar = false, encerrada = fa
                     )}
                   </div>
                 </div>
+
+                {receitas.length > 0 && (
+                  <div className="rounded-lg border border-gray-100 p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-torg-gray mb-1 flex items-center gap-1"><Coins size={11} /> Receita do aditivo</p>
+                    <ul className="text-sm text-torg-dark divide-y divide-gray-50">
+                      {receitas.map((r) => (
+                        <li key={r.id} className="flex justify-between gap-3 py-1">
+                          <span>{r.descricao}{r.tipoPreco === "POR_UNIDADE" && r.quantidade ? <span className="text-torg-gray"> — {fmtNum(r.quantidade)} {r.unidade || ""} × {fmtMoeda(r.valorUnitario)}</span> : null}</span>
+                          <span className="font-mono tabular-nums whitespace-nowrap">{fmtMoeda(r.valor)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {receitas.length > 1 && <p className="text-right text-sm font-semibold text-torg-dark mt-1 tabular-nums">Total {fmtMoeda(totalReceita)}</p>}
+                  </div>
+                )}
 
                 <div className="rounded-lg bg-orange-50/60 border border-orange-100 p-3">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-[#c2610f] mb-1">O que muda com este aditivo</p>

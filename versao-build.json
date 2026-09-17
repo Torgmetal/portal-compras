@@ -1,156 +1,156 @@
 {
-  "build": 3247,
-  "gerado": "2026-09-17T16:42:16.006Z",
+  "build": 3248,
+  "gerado": "2026-09-17T16:45:30.580Z",
   "commits": [
     {
-      "hash": "24ed63a2ff",
+      "hash": "5256542b",
+      "data": "17/09/2026",
+      "titulo": "Os 3 testes vermelhos eram contratos velhos, não regressões — suíte volta a 100%"
+    },
+    {
+      "hash": "24ed63a2",
       "data": "17/09/2026",
       "titulo": "Filtro de fornecedor nos Prazos das RMs, refazendo a conta da RM"
     },
     {
-      "hash": "776074ade8",
+      "hash": "776074ad",
       "data": "17/09/2026",
       "titulo": "Memória: pedido encerrado, recebido parcial e a ausência de PDF na API do Omie"
     },
     {
-      "hash": "bab2573faf",
+      "hash": "bab2573f",
       "data": "17/09/2026",
       "titulo": "O link do pedido para de prometer um PDF que a API do Omie não sabe gerar"
     },
     {
-      "hash": "8e19223dbf",
+      "hash": "8e19223d",
       "data": "17/09/2026",
       "titulo": "Recebido parcial vira situação própria nos Prazos das RMs, e finaliza ao concluir ou encerrar"
     },
     {
-      "hash": "4ef5a395f4",
+      "hash": "4ef5a395",
       "data": "17/09/2026",
       "titulo": "feat: fases e referências da OP com prioridade e correção das demãos importadas"
     },
     {
-      "hash": "48d44761db",
+      "hash": "48d44761",
       "data": "17/09/2026",
       "titulo": "Pedido encerrado no Omie para de aparecer como atrasado — sobretudo no Faturamento Direto"
     },
     {
-      "hash": "c8bb767e9a",
+      "hash": "c8bb767e",
       "data": "17/09/2026",
       "titulo": "Reconciliação do CMR roda duas vezes por dia, para sobreviver a uma manhã ruim"
     },
     {
-      "hash": "37abda0561",
+      "hash": "37abda05",
       "data": "17/09/2026",
       "titulo": "Recebimento CMR: vários itens do pedido de uma vez, e o saldo passa a abater"
     },
     {
-      "hash": "b4eb0e7cf3",
+      "hash": "b4eb0e7c",
       "data": "17/09/2026",
       "titulo": "Aditivo com cara de aditivo: seção própria na aba Obra, marca no cabeçalho da OP e na lista"
     },
     {
-      "hash": "b7da7d4d07",
+      "hash": "b7da7d4d",
       "data": "17/09/2026",
       "titulo": "Painel de OPs abre para o Almoxarifado, e o token da cotação para de vazar"
     },
     {
-      "hash": "c4abcbc544",
+      "hash": "c4abcbc5",
       "data": "16/09/2026",
       "titulo": "Prazos das RMs: a cor volta para um filete, em vez de pintar a faixa inteira"
     },
     {
-      "hash": "41d1affcde",
+      "hash": "41d1affc",
       "data": "16/09/2026",
       "titulo": "Prazos das RMs: tag FD nas RMs e nos pedidos de Faturamento Direto"
     },
     {
-      "hash": "8fcf62cae1",
+      "hash": "8fcf62ca",
       "data": "16/09/2026",
       "titulo": "Previsão de entrega: a conta que ia para o Omie passa a ser guardada"
     },
     {
-      "hash": "caad5d3d09",
+      "hash": "caad5d3d",
       "data": "16/09/2026",
       "titulo": "Prazos das RMs: cabeçalho colorido, filtro por obra, e o prazo dos itens deixa de sumir"
     },
     {
-      "hash": "04fc4c6bab",
+      "hash": "04fc4c6b",
       "data": "16/09/2026",
       "titulo": "Aluguel e Montagem ganham o mesmo filtro de obra, antes de o defeito aparecer"
     },
     {
-      "hash": "cd7b9399c4",
+      "hash": "cd7b9399",
       "data": "16/09/2026",
       "titulo": "Merge branch 'main' of github.com:Torgmetal/portal-compras into codex/corrigir-planilha-syneco"
     },
     {
-      "hash": "e4a46f815e",
+      "hash": "e4a46f81",
       "data": "16/09/2026",
       "titulo": "feat: consulta técnica de propostas na aba Obra"
     },
     {
-      "hash": "87df9b88f0",
+      "hash": "87df9b88",
       "data": "16/09/2026",
       "titulo": "Portal do cliente: aba \"Pedidos e faturamento\" (OC × pedido Omie × notas), só por login e papel por contato"
     },
     {
-      "hash": "79eea208e9",
+      "hash": "79eea208",
       "data": "16/09/2026",
       "titulo": "Organiza contatos do cliente em tabela na aba Obra"
     },
     {
-      "hash": "adc0ce4e44",
+      "hash": "adc0ce4e",
       "data": "16/09/2026",
       "titulo": "Filtro de obra nas RMs passa a ser do servidor, e o corte da lista aparece"
     },
     {
-      "hash": "596212c40b",
+      "hash": "596212c4",
       "data": "16/09/2026",
       "titulo": "Organiza colunas e observacoes dos itens de contrato"
     },
     {
-      "hash": "5b50dd7929",
+      "hash": "5b50dd79",
       "data": "16/09/2026",
       "titulo": "Alinha colunas e evita quebra dos valores nas receitas da OP"
     },
     {
-      "hash": "f17bb838b5",
+      "hash": "f17bb838",
       "data": "16/09/2026",
       "titulo": "IPI destacado no pedido do Omie, observação do item junto, e a IA para de adivinhar imposto"
     },
     {
-      "hash": "5573b88f89",
+      "hash": "5573b88f",
       "data": "16/09/2026",
       "titulo": "Exibe margem orçada completa nas OPs originadas de LQC"
     },
     {
-      "hash": "b4c2bb5421",
+      "hash": "b4c2bb54",
       "data": "16/09/2026",
       "titulo": "Confere custos e quantitativos da LQC com a planilha antes de gerar OP"
     },
     {
-      "hash": "42fecb3410",
+      "hash": "42fecb34",
       "data": "16/09/2026",
       "titulo": "Corrige custos importados da LQC e permite gerar OP vinculada"
     },
     {
-      "hash": "1110650ff9",
+      "hash": "1110650f",
       "data": "16/09/2026",
       "titulo": "Medição do aditivo: ao vincular o pedido Omie, escolhe-se de qual pedido é (contrato-base ou aditivo)"
     },
     {
-      "hash": "446830f26a",
+      "hash": "446830f2",
       "data": "16/09/2026",
       "titulo": "Referências do cliente com as palavras dele, aditivo como pedido novo e comunicado aos setores"
     },
     {
-      "hash": "e2d02403e2",
+      "hash": "e2d02403",
       "data": "16/09/2026",
       "titulo": "RMs Materiais: a lista vazia mantém o cabeçalho, com os zeros de pé"
-    },
-    {
-      "hash": "ea76a9a7dc",
-      "data": "16/09/2026",
-      "titulo": "fix(qualidade): tornar quantitativo opcional na pre-montagem"
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { receitasDaPlanilhaComercial, categoriaDaReceita } from "@/lib/op-categorias";
+import { receitasDoAditivo } from "@/lib/receita-aditivo";
 import { salvarReferencias, termosDaOP } from "@/lib/referencias-op";
 import { rotuloDoPapel } from "@/lib/referencias-cliente";
 import { prisma } from "@/lib/prisma";
@@ -21,6 +21,19 @@ const itemSchema = z.object({
   valorVerba: z.number().min(0),
   faturamentoDireto: z.boolean().default(false),
   observacao: z.string().optional().nullable(),
+});
+
+// A receita digitada à mão na abertura do aditivo (lib/receita-aditivo → linhasParaEnvio).
+// Vitor (17/09/2026): "para o caso de ter que digitar na mão precisamos de algumas coisas,
+// informar o peso, unitário e a descrição".
+const receitaSchema = z.object({
+  categoria: z.string().min(1).max(40),
+  descricao: z.string().trim().min(1).max(200),
+  tipoPreco: z.enum(["VALOR", "POR_UNIDADE"]),
+  unidade: z.string().trim().max(20).optional().nullable(),
+  quantidade: z.number().min(0).optional().nullable(),
+  valorUnitario: z.number().min(0).optional().nullable(),
+  valor: z.number().min(0),
 });
 
 const schema = z.object({
@@ -47,6 +60,7 @@ const schema = z.object({
     itens: z.union([z.array(z.any()), z.string()]).optional().nullable(),
     tags: z.union([z.array(z.any()), z.string()]).optional().nullable(),
   }).optional().nullable(),
+  receitas: z.array(receitaSchema).max(50).optional().nullable(),
   valor: z.number().min(0).optional().nullable(),
 });
 
@@ -58,16 +72,35 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = schema.parse(await req.json());
+  let body;
+  try {
+    body = schema.parse(await req.json());
+  } catch (e) {
+    return NextResponse.json({ error: e?.issues?.[0]?.message || "Dados inválidos" }, { status: 400 });
+  }
 
   const ultimo = await prisma.aditivo.findFirst({
     where: { opId: params.id },
     orderBy: { numero: "desc" },
   });
   const numero = (ultimo?.numero || 0) + 1;
-  const receitasNovas = receitasDaPlanilhaComercial(body.estudoDados?.comercial, body.estudoDados?.bdi);
-  const valorReceitas = receitasNovas.reduce((s, r) => s + (Number(r.valor) || 0), 0);
-  const valor = body.valor != null ? Number(body.valor) : (valorReceitas || null);
+
+  // as referências do pedido do cliente (OC/AF/PC + itens + TAGs), com o rótulo do cliente fotografado
+  let pedidoTexto = null;
+  let termos = null;
+  if (body.pedido?.codigo) {
+    const op = await prisma.oP.findUnique({ where: { id: params.id }, select: { id: true, cliente: true, clienteId: true } });
+    ({ termos } = await termosDaOP(op));
+    pedidoTexto = `${rotuloDoPapel("PEDIDO", termos)} ${String(body.pedido.codigo).trim()}`;
+  }
+
+  // O aditivo também traz RECEITA nova (o que passa a ser faturado a mais) — as linhas entram na
+  // OP, atrás das que já existem, marcadas com o aditivo. Os itens do aditivo continuam sendo a
+  // VERBA DE COMPRA; são coisas diferentes e não podem se confundir (Vitor 19/08). A precedência
+  // (digitado > planilha do estudo > valor único) mora em lib/receita-aditivo.
+  const { linhas: linhasReceita, valor } = receitasDoAditivo({
+    receitas: body.receitas || [], estudoDados: body.estudoDados, valor: body.valor, descricao: body.descricao, numero, pedidoTexto,
+  });
 
   const ad = await prisma.aditivo.create({
     data: {
@@ -106,22 +139,9 @@ export async function POST(req, { params }) {
     },
   });
 
-  // as referências do pedido do cliente (OC/AF/PC + itens + TAGs), com o rótulo do cliente fotografado
-  let pedidoTexto = null;
   if (body.pedido?.codigo) {
-    const op = await prisma.oP.findUnique({ where: { id: params.id }, select: { id: true, cliente: true, clienteId: true } });
-    const { termos } = await termosDaOP(op);
     await salvarReferencias({ opId: params.id, aditivoId: ad.id, entrada: { pedidos: [body.pedido] }, termos });
-    pedidoTexto = `${rotuloDoPapel("PEDIDO", termos)} ${String(body.pedido.codigo).trim()}`;
   }
-  // O aditivo também traz RECEITA nova (o que passa a ser faturado a mais) — as linhas de venda
-  // do estudo do aditivo entram na OP, atrás das que já existem, marcadas com o aditivo. Os itens do
-  // aditivo continuam sendo a VERBA DE COMPRA; são coisas diferentes e não podem se confundir
-  // (Vitor 19/08). Sem estudo mas com valor, nasce UMA linha de receita com o valor do aditivo —
-  // "linha de medição nova, como se fosse uma nova OP" (Vitor, 16/09/2026).
-  const linhasReceita = receitasNovas.length
-    ? receitasNovas.map((r) => ({ ...r, observacao: `${r.observacao} · aditivo ${numero}` }))
-    : (valor > 0 ? [{ categoria: categoriaDaReceita(body.descricao), descricao: `Aditivo ${numero}${pedidoTexto ? ` — ${pedidoTexto}` : ""}`.slice(0, 200), tipoPreco: "VALOR", unidade: null, quantidade: null, valorUnitario: null, valor, observacao: `aditivo ${numero}` }] : []);
   if (linhasReceita.length) {
     const ultimaOrdem = await prisma.oPReceita.aggregate({ where: { opId: params.id }, _max: { ordem: true } });
     const base = (ultimaOrdem._max.ordem ?? -1) + 1;
@@ -131,7 +151,7 @@ export async function POST(req, { params }) {
   }
 
   await prisma.auditLog.create({
-    data: { userId: user.id, action: "create_aditivo", entity: "Aditivo", entityId: ad.id, diff: { numero, itens: body.itens.length, receitas: linhasReceita.length, valor, pedido: body.pedido?.codigo || null } },
+    data: { userId: user.id, action: "create_aditivo", entity: "Aditivo", entityId: ad.id, diff: { numero, itens: body.itens.length, receitas: linhasReceita.length, receitasDigitadas: (body.receitas || []).length, valor, pedido: body.pedido?.codigo || null } },
   });
 
   return NextResponse.json({ id: ad.id, numero });
