@@ -25,3 +25,28 @@ Syneco" no Gantt do PCP, mas por marcas selecionadas — o encarregado não vive
 - Medido em 14/09: 3.496 marcas / 14.855 peças em 4 obras (067: 8.694 croquis de corte baixados em
   agosto como "fora do escopo — já fabricada"). Quando o Syneco recebe o lançamento, a linha some no sync.
 - Relacionado: [[torg_syneco_apontamento_fonte]], [[torg_pecaconjunto_opnumero]], [[torg_baixa_etapa_anterior]].
+
+## ⚠⚠ SÓ BAIXA DE SETOR — romaneio, terceiro e fechamento administrativo ficam de fora (17/09/2026)
+
+Vitor: *"vc esta trazendo algumas informações sem sentido, informações de romaneio, enfim está bem
+ruim"* → *"somente dos setores para podermos baixar as peças"*.
+
+A planilha lia TODA linha de `baixaSetores`. Medido no banco no mesmo dia: das **3.527** baixas,
+**3.504 não eram produção de ninguém no chão de fábrica** — 1.723 `porNome: "Romaneio importado"`
+(a peça já embarcou, a baixa nasceu da importação do FORM-22), 1.280 com
+`motivo: "preparação encerrada — nada mais a cortar nesta obra"` (fechamento em massa do corte),
+456 `"Guarda-corpo — fabricação no terceiro"` (fabricada FORA: não existe operação para lançar) e
+45 `"Fora do escopo — já fabricada (Vitor)"`. Sobravam 23 baixas reais, escondidas atrás de 3.503
+linhas de ruído; depois de subtrair o que o Syneco já tem, a planilha sai com **8 linhas**.
+
+- `ehBaixaDeSetor(bx)` (`lib/apontamentos-syneco.js`) é o portão: recusa pelo `motivo` de fechamento
+  e pelo `porNome` de importação/terceiro. ⚠ A regra mora no VALOR GRAVADO, não numa rota — nenhum
+  código vivo escreve esses nomes (são scripts/importações históricas), e uma importação nova de
+  romaneio volta a cair no filtro sozinha. Baixa em lote feita por uma PESSOA (`lote: true` com
+  motivo de produção) continua valendo.
+- `obraDoSyneco(opNumero, obrasDaOP)`: a coluna **Obra (Syneco)** mostrava `083` em 724 linhas — o
+  número do PORTAL, que não existe do lado de lá ([[torg_pecaconjunto_opnumero]]). Agora só sai
+  código `T\d+[A-Z]*`; na falta dele, a obra que o Syneco tem para aquela OP (quando é uma só), e
+  senão `—`. ⚠ `MesOrdem.obra` é NOT NULL: um `{ not: null }` no `groupBy` invalida a consulta
+  inteira e o `catch` devolvia lista vazia calada.
+- A planilha passou a ordenar por **setor** primeiro (ela é trabalhada setor a setor).
