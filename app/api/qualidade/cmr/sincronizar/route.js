@@ -97,8 +97,6 @@ export async function GET(req) {
   // e o primeiro query de um cron estoura com P1001 "Can't reach database server" — foi assim que o
   // `cmr-reconciliar` passou 55h parado sem ninguém saber. Faltava nas SEIS rotas que são cron E
   // botão manual ao mesmo tempo: nasceram como rota de tela, e o aquecimento só virou regra depois.
-  await aquecerBanco(prisma);
-  await aquecerBanco(prismaDirect).catch(() => {});
   const t0 = Date.now();
   // ⚠⚠ A CONCILIAÇÃO NÃO PODE SER REFÉM DO DOWNLOAD. Medido em 02/09/2026: o último recebimento de
   // origem CMR é de **19/08** — o dia em que a rotina nasceu. De lá pra cá o Almoxarifado lançou e
@@ -113,8 +111,14 @@ export async function GET(req) {
   // Agora são passos independentes: o download pode falhar que a conciliação roda assim mesmo,
   // sobre o CMR que já está gravado.
   let r = null, erroSync = null;
-  try { r = await sincronizar(null); }
-  catch (e) { erroSync = e?.message || "falhou"; }
+  try {
+    // ⚠⚠ DENTRO do bloco que registra a execução: `aquecerBanco` LANÇA ao esgotar as tentativas, e
+    // fora dele a falha escapava sem heartbeat — o cenário que o aquecimento existe para sobreviver
+    // seria justamente o que apagaria o cron do monitor.
+    await aquecerBanco(prisma);
+    await aquecerBanco(prismaDirect).catch(() => {});
+    r = await sincronizar(null);
+  } catch (e) { erroSync = e?.message || "falhou"; }
 
   try {
     // Material que o Almoxarifado lançou deixa de aparecer como "aguardando entrega".

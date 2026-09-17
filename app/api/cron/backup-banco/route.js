@@ -28,10 +28,12 @@ export async function GET(req) {
   // e o primeiro query de um cron estoura com P1001 "Can't reach database server" — foi assim que o
   // `cmr-reconciliar` passou 55h parado sem ninguém saber. Faltava nas SEIS rotas que são cron E
   // botão manual ao mesmo tempo: nasceram como rota de tela, e o aquecimento só virou regra depois.
-  await aquecerBanco(prisma);
-
   const t0 = Date.now();
   try {
+  // ⚠⚠ DENTRO DO `try`, e a medição começa ANTES: `aquecerBanco` LANÇA ao esgotar as tentativas.
+  // Fora do try, a falha escapava sem passar pelo `registrarExecucao` — o cenário que o aquecimento
+  // existe para sobreviver (Neon dormindo) seria justamente o que apagaria o cron do heartbeat.
+    await aquecerBanco(prisma);
     const manifesto = await rodarBackup();
     const mb = Math.round(manifesto.totalBytes / 1024 / 1024);
     await registrarExecucao("backup-banco", {

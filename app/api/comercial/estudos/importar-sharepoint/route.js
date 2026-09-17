@@ -174,9 +174,12 @@ export async function GET(req) {
   // ⚠ SEM `if (doCron)` de propósito: esta função já está acima do teto de complexidade, e um ramo
   // a mais para poupar ~1ms de um SELECT 1 em banco acordado paga mal. Na chamada manual, se o
   // banco estiver frio, aquecer é melhor que devolver P1001 na cara de quem clicou.
-  await aquecerBanco(prisma);
   const ano = Number(new URL(req.url).searchParams.get("ano")) || new Date().getUTCFullYear();
   try {
+  // ⚠⚠ DENTRO DO `try`, e a medição começa ANTES: `aquecerBanco` LANÇA ao esgotar as tentativas.
+  // Fora do try, a falha escapava sem passar pelo `registrarExecucao` — o cenário que o aquecimento
+  // existe para sobreviver (Neon dormindo) seria justamente o que apagaria o cron do heartbeat.
+    await aquecerBanco(prisma);
     const r = await processar(ano, doCron, null);
     if (doCron && (r.criados > 0 || r.atualizados > 0)) {
       // registra só quando MUDOU — uma linha por hora dizendo "nada" enterraria as importações de verdade

@@ -427,3 +427,30 @@ describe("filtro por fornecedor", () => {
     expect(filtrarPorFornecedor(linhas(), "cnpj:07358761").map((l) => l.rmId).sort()).toEqual(["r1", "r2"]);
   });
 });
+
+// ⚠⚠ FILTRAR RECALCULA A URGÊNCIA — E A ORDEM TEM DE ACOMPANHAR (achado do Codex, 17/09/2026).
+// Tirando o pedido atrasado de um fornecedor, a RM pode virar "No prazo"; sem reordenar, ela
+// continuava no topo, acima de RMs realmente atrasadas. A lista dizia uma coisa nos chips e outra
+// na ordem — o pior tipo de erro, porque parece certo.
+describe("ordem depois de filtrar por fornecedor", () => {
+  it("a RM que deixou de apertar desce", () => {
+    const vencido = new Date(Date.now() - 10 * 86400000);
+    const futuro = new Date(Date.now() + 30 * 86400000);
+    const p = (id, rmId, numero, fornecedorNome, cnpj, prazo) => ({
+      id, createdAt: new Date("2026-01-01"), fornecedorNome, cnpj,
+      prazoEntregaPrevisto: prazo, rm: { id: rmId, numero },
+    });
+    const linhas = agruparPorRM([
+      // RM-1 fica no topo por causa do pedido atrasado da SOUFER
+      p("a", "r1", "RM-1", "SOUFER", "45987062000177", vencido),
+      p("b", "r1", "RM-1", "GERDAU", "07358761000169", futuro),
+      // RM-2 só tem GERDAU, e atrasado
+      p("c", "r2", "RM-2", "GERDAU", "07358761000169", vencido),
+    ]);
+    expect(linhas.map((l) => l.numero)).toEqual(["RM-1", "RM-2"]);
+
+    const soGerdau = filtrarPorFornecedor(linhas, "cnpj:07358761");
+    expect(soGerdau.map((l) => l.situacao)).toEqual(["ATRASADO", "NO_PRAZO"]);
+    expect(soGerdau.map((l) => l.numero)).toEqual(["RM-2", "RM-1"]);
+  });
+});

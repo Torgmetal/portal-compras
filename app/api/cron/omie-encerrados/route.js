@@ -27,11 +27,19 @@ export async function GET(req) {
   }
   const t0 = Date.now();
   try {
+    // ⚠⚠ O AQUECIMENTO FICA DENTRO DO `try`, e a medição começa ANTES dele (achado do Codex,
+    // 17/09/2026). `aquecerBanco` LANÇA quando esgota as tentativas; fora do try, a falha escapava
+    // sem passar pelo `registrarExecucao` — ou seja, justamente o cenário que este cron existe para
+    // sobreviver (Neon dormindo) seria o que apagaria o cron do heartbeat.
     await aquecerBanco(prisma);
-    const r = await reconciliarEncerramentos(prisma);
+    // ⚠ Reserva ~25s do orçamento para gravar e bater o ponto depois da coleta.
+    const r = await reconciliarEncerramentos(prisma, { ateMs: t0 + (maxDuration - 25) * 1000 });
     // ⚠ Coleta incompleta é AVISO, não sucesso mudo: nessa rodada nada foi desmarcado de
     // propósito, e quem lê o heartbeat precisa saber que o retrato do Omie veio pela metade.
     const msg = `${r.marcados} encerrado(s) novo(s) · ${r.desmarcados} reaberto(s) · ${r.total} pedidos`
+      // ⚠ "Indefinido" é candidato a reabertura que o Omie não confirmou como pendente: a marca FICA
+      // e o número aparece aqui. Sem isso o caso duvidoso viraria silêncio.
+      + (r.indefinidos ? ` · ${r.indefinidos} sem confirmação (marca mantida)` : "")
       + (r.completa ? "" : ` ⚠ coleta incompleta (${r.motivo}) — nada desmarcado`);
     await registrarExecucao("omie-encerrados", { ok: true, duracaoMs: Date.now() - t0, mensagem: msg });
 
@@ -39,7 +47,7 @@ export async function GET(req) {
       await prisma.auditLog.create({
         data: {
           userId: null, action: "SYNC_ENCERRADOS_OMIE", entity: "PedidoOmie", entityId: "batch",
-          diff: { marcados: r.marcados, desmarcados: r.desmarcados, total: r.total, completa: r.completa },
+          diff: { marcados: r.marcados, desmarcados: r.desmarcados, indefinidos: r.indefinidos, total: r.total, completa: r.completa },
         },
       }).catch(() => {}); // bookkeeping nunca derruba o cron
     }
