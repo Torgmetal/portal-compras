@@ -1,7 +1,12 @@
 {
-  "build": 3244,
-  "gerado": "2026-09-17T16:28:41.694Z",
+  "build": 3245,
+  "gerado": "2026-09-17T16:29:04.771Z",
   "commits": [
+    {
+      "hash": "bab2573faf",
+      "data": "17/09/2026",
+      "titulo": "O link do pedido para de prometer um PDF que a API do Omie não sabe gerar"
+    },
     {
       "hash": "8e19223dbf",
       "data": "17/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7f4d6f008b",
       "data": "16/09/2026",
       "titulo": "Permissão em massa nas pastas da OP: agora também CONCEDER — e Colaboração ≠ Editar"
-    },
-    {
-      "hash": "1a8e734267",
-      "data": "16/09/2026",
-      "titulo": "Importação de LQC: `forcar` sobrescreve estudo escolhido, e planilha sem aba de resumo é pulada, não erro"
     }
   ]
 }
