@@ -35,3 +35,24 @@ atualizadas: nasceram linhas paralelas.
 
 ⚠ **O jeito certo de importar continua sendo UMA FASE POR ARQUIVO**, com a fase no nome
 (`T83A-LPC_R01.xlsx`). Ver [[torg_listas_le_lpc]] e [[torg_pecaconjunto_opnumero]].
+
+### Onde o Planejamento exclui (17/09/2026)
+
+Vitor: *"tire essas peças da página do planejamento pois não estamos conseguindo excluir"* — eram 9
+croquis **órfãos** da OP-83 (`T83F-82/84/85/86/87/90/91/92/93`), criados no import de 16/09: sem
+conjunto, sem desenho, sem NC1, sem ordem no Syneco, zero produzido, nenhum lote liberado apontando
+para eles. A tela onde ele os via é **Liberar frentes**, e ela não tinha exclusão.
+
+Agora as DUAS telas do Planejamento excluem, com confirmação e com o aviso de lote liberado:
+
+| Tela | O que lista | Onde fica o botão |
+|---|---|---|
+| `Datas por setor › Montagem` | CONJUNTOS | barra de ações, "excluir N da obra" |
+| `Datas por setor › Liberar frentes` | CROQUIS e avulsas | barra da seleção, "excluir" |
+
+⚠ Só a Montagem marca a **"repetida"**: lá a duplicidade é por marca na obra. Em Liberar frentes a
+lista já é por frente, e a coluna FRENTE distingue.
+
+⚠⚠ **Apagar direto no banco por script é bloqueado pelo classificador de auto-mode** (17/09/2026) —
+e está certo: exclusão em produção é do usuário, pela tela, com auditoria. O caminho é sempre dar o
+botão, não rodar o `deleteMany`.

@@ -1,7 +1,12 @@
 {
-  "build": 3267,
-  "gerado": "2026-09-17T19:54:10.755Z",
+  "build": 3268,
+  "gerado": "2026-09-17T20:13:32.151Z",
   "commits": [
+    {
+      "hash": "2dbd9434",
+      "data": "17/09/2026",
+      "titulo": "Planilha do Syneco: marca duplicada dava o peso da linha antiga"
+    },
     {
       "hash": "edfd4a1c",
       "data": "17/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b4eb0e7c",
       "data": "17/09/2026",
       "titulo": "Aditivo com cara de aditivo: seção própria na aba Obra, marca no cabeçalho da OP e na lista"
-    },
-    {
-      "hash": "b7da7d4d",
-      "data": "17/09/2026",
-      "titulo": "Painel de OPs abre para o Almoxarifado, e o token da cotação para de vazar"
     }
   ]
 }

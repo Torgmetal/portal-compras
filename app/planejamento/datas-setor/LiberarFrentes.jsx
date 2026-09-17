@@ -16,7 +16,7 @@ import { avisosPreparacao, materialResolvido } from "@/lib/avisos-preparacao";
 // custa prazo). O marco é congelado na liberação — recalcular o cronograma depois não pode apagar
 // um desvio já medido.
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, AlertCircle, Send, Check, X, CalendarClock, Wand2, Star, RefreshCw, Minus, FileWarning, Timer, FileDown, CalendarRange, FolderTree, PackageSearch } from "lucide-react";
+import { Loader2, AlertCircle, Send, Check, X, CalendarClock, Wand2, Star, RefreshCw, Minus, FileWarning, Timer, FileDown, CalendarRange, FolderTree, PackageSearch, Trash2 } from "lucide-react";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import SeletorRMaterial from "./SeletorRMaterial";
 import { estimarPrazo, classeDaPeca, kgPorMetro } from "@/lib/prazo-preparacao";
@@ -109,6 +109,11 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   const [motivo, setMotivo] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [marcando, setMarcando] = useState(false);
+  // ⚠ Vitor (17/09/2026): "tire essas peças da página do planejamento pois não estamos conseguindo
+  // excluir". Eram 9 croquis órfãos da OP-83 que entraram no import de 16/09 sem conjunto, sem
+  // desenho e sem NC1 — e esta tela, que é onde o Planejamento os vê, não tinha como tirá-los.
+  const [confirmarExcluir, setConfirmarExcluir] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
   const [conferindo, setConferindo] = useState(false);
   const [baixando, setBaixando] = useState(false);
   // ⚠⚠ DECLARAR O FARDO DO ESTOQUE. Vitor (02/09/2026), na linha da T113A-P64 com "✕ não comprado":
@@ -223,6 +228,25 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
       if (!r.ok) throw new Error(j.error || "Erro ao marcar");
       await carregar();
     } catch (e) { setErro(e.message); } finally { setMarcando(false); }
+  }
+
+  /** Tira as peças selecionadas da obra. Só o registro do portal sai; o Syneco não é tocado. */
+  async function excluirSelecionadas() {
+    if (!sel.size) return;
+    setExcluindo(true); setErro("");
+    try {
+      const r = await fetch("/api/producao/pecas", {
+        method: "DELETE", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...sel] }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Não consegui excluir.");
+      // ⚠ apagar peça corta a programação já liberada, e isso era silencioso: o aviso vem da rota
+      if (j.lotesAfetados > 0) setErro(`${j.removidas} peça(s) removida(s). Atenção: ${j.lotesAfetados} lote(s) já liberado(s) apontavam para alguma delas — confira a liberação do PCP.`);
+      setConfirmarExcluir(false);
+      setSel(new Set());
+      await carregar();
+    } catch (e) { setErro(e.message); } finally { setExcluindo(false); }
   }
 
   // ⚠ EXPORTA O QUE ESTÁ NA TELA, não a lista bruta: sai com os filtros aplicados e na ordem que a
@@ -613,8 +637,39 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
               tirar
             </button>
             {marcando && <Loader2 size={12} className="animate-spin text-torg-blue" />}
+            <button onClick={() => setConfirmarExcluir((v) => !v)} disabled={excluindo}
+              title="Tira estas peças da obra no portal — para marca que não deveria estar na lista"
+              className="text-[11px] px-2 py-0.5 rounded-lg border bg-white text-red-700 border-red-200 hover:bg-red-50 disabled:opacity-40 inline-flex items-center gap-1">
+              <Trash2 size={11} /> excluir
+            </button>
             <button onClick={() => { setSel(new Set()); setSugestao(null); }} className="text-[11px] text-torg-gray hover:underline ml-auto">limpar seleção</button>
           </div>
+
+          {confirmarExcluir && (
+            <div className="rounded-lg border border-red-300 bg-red-50 p-2.5 text-[12px] text-red-900 space-y-2">
+              <p className="font-semibold inline-flex items-center gap-1.5">
+                <AlertCircle size={13} /> Excluir {fmtN(sel.size)} peça(s) desta obra?
+              </p>
+              <p className="text-[11px]">
+                Sai o registro da peça no portal, com a programação e a prontidão dela. O Syneco não é tocado, e a
+                peça volta se a lista for importada de novo — use quando a linha não deveria existir, como croqui
+                órfão ou lista antiga que ficou para trás.
+              </p>
+              <ul className="max-h-24 overflow-y-auto space-y-0.5 font-mono text-[11px]">
+                {selecionadas.slice(0, 12).map((x) => (
+                  <li key={x.id}>{x.marca} <span className="text-red-500">· {x.frente || x.opNumero || ""}</span></li>
+                ))}
+                {selecionadas.length > 12 && <li className="font-sans">e mais {selecionadas.length - 12}…</li>}
+              </ul>
+              <div className="flex gap-2">
+                <button onClick={excluirSelecionadas} disabled={excluindo}
+                  className="px-2.5 py-1 rounded-md bg-red-600 text-white font-semibold inline-flex items-center gap-1.5 disabled:opacity-50">
+                  {excluindo && <Loader2 size={11} className="animate-spin" />} excluir
+                </button>
+                <button onClick={() => setConfirmarExcluir(false)} className="px-2.5 py-1 rounded-md border border-red-200 bg-white font-semibold">cancelar</button>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-gray-100 pt-2">
             <span className="text-[10px] uppercase text-torg-gray-light">Descem</span>
