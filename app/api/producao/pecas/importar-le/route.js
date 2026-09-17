@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/session";
 import { parseFormularioLE } from "@/lib/parse-le-form21";
 import * as XLSX from "xlsx";
 import { log } from "@/lib/log";
+import { ehLinhaDeTotal } from "@/lib/linha-de-total";
 
 const registro = log("api/producao/pecas/importar-le");
 
@@ -71,9 +72,11 @@ export async function POST(req) {
   // OP-089 (14/09/2026): a R00/R01 entrou como "089" e a R02 como "89" — duas LEs, 561 linhas, uma
   // delas com a linha "TOTAL.:" do rodapé; OP-084 igual ("084" × "84"). Casada a OP, a chave é a dela.
   if (op?.numero && /^\d+$/.test(opNumero) && String(op.numero) !== opNumero) opNumero = String(op.numero);
-  // ⚠ o rodapé da FORM21 ("TOTAL.:", 8.705 peças na OP-089) não é marca: fica de fora antes de virar peça
-  const ehRodape = (m) => /^\s*(TOTAL|SUBTOTAL|SOMA)\b/i.test(String(m ?? ""));
-  parsed.pecas = (parsed.pecas || []).filter((p) => !ehRodape(p.marca));
+  // ⚠ o rodapé da FORM21 ("TOTAL.:", 8.705 peças na OP-089) não é marca: fica de fora antes de virar peça.
+  // ⚠ A regra é a compartilhada (`lib/linha-de-total.js`) — a cópia local aqui não normalizava
+  // acento, então "TOTÁL" passava por ela e era barrado só pelo parser. Duas regras para a mesma
+  // pergunta é como o buraco do SUBTOTAL nasceu (achado do Codex, 17/09/2026).
+  parsed.pecas = (parsed.pecas || []).filter((p) => !ehLinhaDeTotal(p.marca));
 
   // Diff da revisão (o que mudou vs a LE anterior): snapshot marcas+peso ANTES do
   // upsert (e antes do sobrescrever). incluídas = novas; removidas = sumiram;

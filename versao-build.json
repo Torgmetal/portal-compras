@@ -1,7 +1,12 @@
 {
-  "build": 3256,
-  "gerado": "2026-09-17T17:49:54.272Z",
+  "build": 3257,
+  "gerado": "2026-09-17T17:49:54.342Z",
   "commits": [
+    {
+      "hash": "0a4ff68aac",
+      "data": "17/09/2026",
+      "titulo": "Um cron não atropela a si mesmo — e a primeira trava que escrevi não travava"
+    },
     {
       "hash": "e5cde484a3",
       "data": "17/09/2026",
@@ -146,11 +151,6 @@
       "hash": "adc0ce4e44",
       "data": "16/09/2026",
       "titulo": "Filtro de obra nas RMs passa a ser do servidor, e o corte da lista aparece"
-    },
-    {
-      "hash": "596212c40b",
-      "data": "16/09/2026",
-      "titulo": "Organiza colunas e observacoes dos itens de contrato"
     }
   ]
 }
