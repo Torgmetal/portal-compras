@@ -1,0 +1,17 @@
+import {it,expect,vi,beforeEach} from 'vitest';
+import {mockPrisma} from '@/testes/apoio/prisma';
+vi.mock('@/lib/prisma',()=>({prisma:mockPrisma}));
+vi.mock('@/lib/session',()=>({requireRole:vi.fn()}));
+import {requireRole} from '@/lib/session';
+import {GET,PUT} from '@/app/api/comercial/op/[id]/fases/route';
+const op={id:'op1',updatedAt:new Date('2026-09-17T12:00:00Z'),fasesReferencias:null};
+const tabela={empresas:['TMSA','Vale'],fases:[{fase:'B',descricao:'Treliça',referencias:['12','34']}]};
+const req=()=>({json:async()=>({tabela,versao:op.updatedAt.toISOString()})});
+const ctx={params:{id:'op1'}};
+beforeEach(()=>{vi.clearAllMocks();requireRole.mockResolvedValue({id:'u1',tipo:'USUARIO',modulos:['ENGENHARIA']});mockPrisma.oP.findUnique.mockResolvedValue(op);mockPrisma.oP.updateMany.mockResolvedValue({count:1});});
+it('libera edição para Engenharia por módulo',async()=>{expect((await (await GET({},ctx)).json()).podeEditar).toBe(true);});
+it('consulta da Produção não habilita edição',async()=>{requireRole.mockResolvedValue({tipo:'USUARIO',modulos:['PRODUCAO']});expect((await (await GET({},ctx)).json()).podeEditar).toBe(false);});
+it.each([['Unauthorized',401],['Forbidden',403]])('respeita a recusa de acesso %s',async(msg,status)=>{requireRole.mockRejectedValue(Error(msg));expect((await PUT(req(),ctx)).status).toBe(status);expect(mockPrisma.oP.updateMany).not.toHaveBeenCalled();});
+it('grava ordem e referências com auditoria',async()=>{expect((await PUT(req(),ctx)).status).toBe(200);expect(mockPrisma.oP.updateMany).toHaveBeenCalledWith({where:{id:'op1',updatedAt:op.updatedAt},data:{fasesReferencias:tabela}});expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({diff:{antes:null,depois:tabela}})}));});
+it('recusa edição concorrente sem auditar uma alteração inexistente',async()=>{mockPrisma.oP.updateMany.mockResolvedValue({count:0});expect((await PUT(req(),ctx)).status).toBe(409);expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();});
+it('recusa fases repetidas antes de gravar',async()=>{const r=req();r.json=async()=>({tabela:{...tabela,fases:[...tabela.fases,...tabela.fases]},versao:op.updatedAt.toISOString()});expect((await PUT(r,ctx)).status).toBe(400);expect(mockPrisma.oP.updateMany).not.toHaveBeenCalled();});

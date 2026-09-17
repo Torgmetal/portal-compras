@@ -11,6 +11,7 @@ import SaudeFinanceiraOP from "./SaudeFinanceiraOP";
 import MateriaisOPSection from "@/components/MateriaisOPSection";
 import { pesoRealPecas } from "@/lib/peso-op";
 import RelatoriosOPSection from "@/components/RelatoriosOPSection";
+import FasesReferencias from "@/components/comercial/FasesReferencias";
 import AbaPlanejamento from "./AbaPlanejamento";
 import AnaliseCriticaSection from "./AnaliseCriticaSection";
 import AbaExpedicao from "./AbaExpedicao";
@@ -929,12 +930,14 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
           <ListaExpedicaoSection opId={op.id}>
             <ConsultaExpedicao opId={op.id} focoPendentes semCard />
           </ListaExpedicaoSection>
+          <FasesReferencias opId={op.id} consulta />
           <AbaPlanejamento opId={op.id} />
         </div>
       )}
 
       {vista === "engenharia" && (
         <div className="space-y-4">
+          <FasesReferencias opId={op.id} />
           <DesenhosOPSection opId={op.id} opNumero={op.numero} obra={op.obra} cliente={op.cliente} refCliente={op.refCliente} />
           {/* Análise Crítica de Projeto (PO-13) — Vitor (10/09/2026): na pasta da OP, aba Engenharia, "para não ficar alguma coisa a mais" */}
           <AnaliseCriticaSection opId={op.id} isDiretoria={isDiretoria} />
@@ -1024,6 +1027,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
 
       {vista === "producao" && (
         <div className="space-y-6">
+          <FasesReferencias opId={op.id} consulta />
           <AbaProducao opId={op.id} opNumero={op.numero} obra={op.obra} cliente={op.cliente} refCliente={op.refCliente} />
         </div>
       )}

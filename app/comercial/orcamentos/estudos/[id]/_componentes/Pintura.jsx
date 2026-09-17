@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Plus, Droplets, Layers, FileText, ChevronRight, Trash2, Paintbrush } from 'lucide-react';
 import { CAMADAS_TINTA, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURA_ROTULO } from '@/lib/lqc';
 import s from './Pintura.module.css';
-import { calcularCamadasPintura, estruturasDoQuantitativo, chaveAreaPintura, pinturaComDestino, atualizarDemao, custoHistoricoDaDemao, usarConsumoDaDemao } from '@/lib/lqc';
+import { calcularCamadasPinturaConsulta, estruturasDoQuantitativo, chaveAreaPintura, pinturaComDestino, atualizarDemao, custoHistoricoDaDemao, usarConsumoDaDemao } from '@/lib/lqc';
 import { DocumentosPintura } from './DocumentosPintura';
 import { CotacaoTinta } from './CotacaoTinta';
 import CampoDecimal from "@/components/CampoDecimal";
@@ -13,7 +13,7 @@ export function Pintura({ c, res, setComp, estudoId }) {
  const tintas = Array.isArray(c.tintas) ? c.tintas : [];
  const setC = (fn) => setComp(fn({ ...c, tintas }));
  const [ativo,setAtivo]=useState(0),[vista,setVista]=useState('Sistema de pintura');
- const camadas = calcularCamadasPintura(c);
+ const camadas = calcularCamadasPinturaConsulta(c);
  const linhasAtivas = (c.resumos || []).filter(l => l.ativo !== false);
  const indice = Math.min(ativo, Math.max(0, tintas.length - 1));
  const estruturas=estruturasDoQuantitativo(c);
@@ -41,6 +41,7 @@ export function Pintura({ c, res, setComp, estudoId }) {
      <div className={s.perda}>Perda individual desta demão: <b>{t.perda??45}%</b><span>A mudança não altera a perda das demais demãos.</span></div>
      <details className={s.opcionais}><summary>Ajustes da demão e diluente</summary><p>Área em branco segue o quantitativo. O consumo acompanha o destino e a cor selecionados.</p><div className={s.tecnica}>{campo('Área manual da demão','areaM2','m²',{placeholder:'Automática'})}{campo('Preço do diluente','precoDiluente','R$/L')}{campo('Proporção de diluente','diluentePct','%',{placeholder:'25'})}</div></details>
      {!(Number(t.solidos)>0&&Number(t.peliculaSeca)>0&&Number(t.precoLitro)>0)&&<p className={s.aviso}>Informe sólidos, película e preço para calcular o custo desta demão.</p>}
+     {calc.referenciaImportada&&<p className={s.aviso}>Consumo de referência da planilha importada, proporcional às áreas ativas. As cores ainda precisam ser distribuídas no Quantitativo antes de calcular por consumo. O total do orçamento permanece pelo custo fechado do grupo.</p>}
      {!(calc.areaM2>0)&&<p className={s.aviso}>Nenhuma área atende à estrutura selecionada{t.camada==='ACABAMENTO'?' e à cor desta demão':''}. Confira o Quantitativo e o destino da demão.</p>}
      {custoHistorico>0&&<div className={s.aviso}><p>Este grupo usa o custo histórico fechado de {dinheiro(custoHistorico)}/kg. Alterar o preço por litro atualiza a estimativa da demão; o total do grupo continua pelo valor histórico.</p><button type="button" className={s.trocarCalculo} onClick={()=>setComp({tintas:usarConsumoDaDemao(tintas,indice)})}>Calcular produtos pelo consumo</button><small>A troca vale para todas as demãos deste grupo e preserva seus produtos, perdas e destinos.</small></div>}
     </div>

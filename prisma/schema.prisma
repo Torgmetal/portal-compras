@@ -126,6 +126,7 @@ model UserModulo {
 }
 
 model OP {
+  fasesReferencias      Json? // {empresas:[], fases:[{fase,descricao,referencias:[]}]} — ordem = prioridade
   id                   String               @id @default(cuid())
   numero               String               @unique
   /**
