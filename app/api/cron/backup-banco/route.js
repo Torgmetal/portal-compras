@@ -11,6 +11,8 @@ import { NextResponse } from "next/server";
 import { temCronSecret } from "@/lib/cron-auth";
 import { registrarExecucao } from "@/lib/cron-monitor";
 import { rodarBackup, PASTA_BACKUP } from "@/lib/backup-banco";
+import { prisma } from "@/lib/prisma";
+import { aquecerBanco } from "@/lib/db-retry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +24,11 @@ export async function GET(req) {
   if (!temCronSecret(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // ⚠⚠ ACORDA A COMPUTE DO NEON ANTES DO PRIMEIRO QUERY. Ela suspende quando ociosa (scale-to-zero)
+  // e o primeiro query de um cron estoura com P1001 "Can't reach database server" — foi assim que o
+  // `cmr-reconciliar` passou 55h parado sem ninguém saber. Faltava nas SEIS rotas que são cron E
+  // botão manual ao mesmo tempo: nasceram como rota de tela, e o aquecimento só virou regra depois.
+  await aquecerBanco(prisma);
 
   const t0 = Date.now();
   try {

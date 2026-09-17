@@ -7,6 +7,7 @@ import { registrarExecucao } from "@/lib/cron-monitor";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sincronizarProdutosOmie } from "@/lib/omie-produtos";
+import { aquecerBanco } from "@/lib/db-retry";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -33,6 +34,11 @@ export async function GET(req) {
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "não autorizado" }, { status: 401 });
   }
+  // ⚠⚠ ACORDA A COMPUTE DO NEON ANTES DO PRIMEIRO QUERY. Ela suspende quando ociosa (scale-to-zero)
+  // e o primeiro query de um cron estoura com P1001 "Can't reach database server" — foi assim que o
+  // `cmr-reconciliar` passou 55h parado sem ninguém saber. Faltava nas SEIS rotas que são cron E
+  // botão manual ao mesmo tempo: nasceram como rota de tela, e o aquecimento só virou regra depois.
+  await aquecerBanco(prisma);
   const t0 = Date.now();
   try {
     const r = await sincronizarProdutosOmie();

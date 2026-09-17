@@ -19,6 +19,7 @@ import { listarLqcs, escolherPorOrcamento, baixarLqc, decidirImportacao } from "
 import { registrarExecucao } from "@/lib/cron-monitor";
 import { importarLqc } from "@/lib/lqc-importar";
 import { calcularLqc } from "@/lib/lqc";
+import { aquecerBanco } from "@/lib/db-retry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -167,6 +168,13 @@ export async function GET(req) {
     try { await requireRole(ROLES); }
     catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
   }
+  // ⚠⚠ ACORDA A COMPUTE DO NEON ANTES DO PRIMEIRO QUERY. Ela suspende quando ociosa
+  // (scale-to-zero) e o primeiro query de um cron estoura com P1001 "Can't reach database server".
+  //
+  // ⚠ SEM `if (doCron)` de propósito: esta função já está acima do teto de complexidade, e um ramo
+  // a mais para poupar ~1ms de um SELECT 1 em banco acordado paga mal. Na chamada manual, se o
+  // banco estiver frio, aquecer é melhor que devolver P1001 na cara de quem clicou.
+  await aquecerBanco(prisma);
   const ano = Number(new URL(req.url).searchParams.get("ano")) || new Date().getUTCFullYear();
   try {
     const r = await processar(ano, doCron, null);

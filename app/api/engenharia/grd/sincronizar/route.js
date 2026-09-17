@@ -13,6 +13,7 @@ import { cabecalhoEmail } from "@/lib/email-layout";
 import { fmtOP } from "@/lib/utils";
 import { escapeHtml } from "@/lib/html";
 import { DESTINO_ENGENHARIA } from "@/lib/grd-roteiro";
+import { aquecerBanco } from "@/lib/db-retry";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -113,6 +114,11 @@ export async function GET(req) {
   if (!doCron) {
     return NextResponse.json({ error: "Use POST para sincronizar." }, { status: 405 });
   }
+  // ⚠⚠ ACORDA A COMPUTE DO NEON ANTES DO PRIMEIRO QUERY. Ela suspende quando ociosa (scale-to-zero)
+  // e o primeiro query de um cron estoura com P1001 "Can't reach database server" — foi assim que o
+  // `cmr-reconciliar` passou 55h parado sem ninguém saber. Faltava nas SEIS rotas que são cron E
+  // botão manual ao mesmo tempo: nasceram como rota de tela, e o aquecimento só virou regra depois.
+  await aquecerBanco(prisma);
   // ⚠⚠ HEARTBEAT. A rota já era agendada e NÃO era cobrada pelo monitor. O comentário acima culpa
   // o 405, mas a causa real era outra e mais antiga: o middleware mandava o cron para o `/entrar`
   // (307) antes de o handler existir. Sem heartbeat, os dois defeitos foram invisíveis.

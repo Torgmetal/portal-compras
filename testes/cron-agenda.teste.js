@@ -89,3 +89,35 @@ describe("escaparHtml — o alerta não deixa texto de fora virar marcação", (
     expect(escaparHtml(undefined)).toBe("");
   });
 });
+
+// ─── TODO CRON TEM DE ACORDAR O BANCO ANTES DO PRIMEIRO QUERY (17/09/2026) ────
+//
+// ⚠⚠ A COMPUTE DO NEON SUSPENDE QUANDO OCIOSA, e o primeiro query de um cron estoura com P1001
+// "Can't reach database server". Foi assim que o `cmr-reconciliar` passou 55h parado: o erro
+// derrubava o cron E o registro da falha, então o heartbeat congelava dizendo `ok: true`.
+//
+// ⚠ Seis crons estavam sem o aquecimento, e eles têm uma coisa em comum: são as rotas que NÃO
+// moram em `/api/cron/` — nasceram como rota de tela, com botão manual, e viraram cron depois.
+// A regra ("todo cron chama `aquecerBanco`") estava só na documentação, e documentação não falha
+// o build. Este teste falha.
+describe("todo cron agendado acorda o banco e bate o ponto", () => {
+  const rota = (path) => {
+    try { return readFileSync(`app${path}/route.js`, "utf8"); } catch { return null; }
+  };
+  const agendados = [...AGENDA.keys()];
+
+  it("a agenda tem crons e todos têm arquivo de rota", () => {
+    expect(agendados.length).toBeGreaterThan(0);
+    expect(agendados.filter((p) => rota(p) === null)).toEqual([]);
+  });
+
+  it("nenhum cron chega ao primeiro query sem `aquecerBanco`", () => {
+    expect(agendados.filter((p) => !rota(p).includes("aquecerBanco"))).toEqual([]);
+  });
+
+  // ⚠ Sem heartbeat o cron morre calado — é o outro lado do mesmo buraco: o `cmr-sincronizar`
+  // parou em 19/08 e só apareceu quando o cliente viu "Comprado" numa linha que já tinha chegado.
+  it("nenhum cron deixa de registrar a própria execução", () => {
+    expect(agendados.filter((p) => !rota(p).includes("registrarExecucao"))).toEqual([]);
+  });
+});
