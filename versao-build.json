@@ -1,7 +1,12 @@
 {
-  "build": 3236,
-  "gerado": "2026-09-17T00:05:54.576Z",
+  "build": 3237,
+  "gerado": "2026-09-17T12:22:37.719Z",
   "commits": [
+    {
+      "hash": "c4abcbc544",
+      "data": "16/09/2026",
+      "titulo": "Prazos das RMs: a cor volta para um filete, em vez de pintar a faixa inteira"
+    },
     {
       "hash": "41d1affcde",
       "data": "16/09/2026",
@@ -146,11 +151,6 @@
       "hash": "76de20df8c",
       "data": "16/09/2026",
       "titulo": "Impressão de desenhos: o formato (A1–A4) é medido na página do PDF, não lido do nome da pasta"
-    },
-    {
-      "hash": "ba8db6fe53",
-      "data": "16/09/2026",
-      "titulo": "RNTRC no frete da remessa: o campo existe, e a tela parou de prometer o que o Omie não faz"
     }
   ]
 }

@@ -21,7 +21,8 @@ function calcStatus(op) {
 
 
 export default async function PainelOPs() {
-  await requireRole(["ADMIN", "COMPRAS"]);
+  // ⚠ O Almoxarifado também lista as obras — a tela filtra o que ele vê dentro de cada uma.
+  await requireRole(["ADMIN", "COMPRAS", "ALMOXARIFADO"]);
 
   const opsRaw = await prisma.oP.findMany({
     include: {

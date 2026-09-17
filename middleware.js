@@ -61,6 +61,18 @@ function moduloNegado(path, token) {
   // Recebimento (CMR): quem LANÇA os recebimentos é o Almoxarifado. Ele acessa essa tela do
   // Compras sem ter o módulo COMPRAS inteiro (a Sidebar de Compras filtra o resto pra ele).
   if (path.startsWith("/compras/recebimento-cmr")) return nega("COMPRAS", "ALMOXARIFADO");
+  // Painel de OPs: o Almoxarifado acompanha o que foi comprado para cada obra — o que já virou
+  // pedido, o que está a caminho e quanto. Matheus (17/09/2026): "libere o painel de OPs para o
+  // almoxarifado@torg.com.br, ele precisa ver somente a tela de compras de cada OP."
+  //
+  // ⚠⚠ ISTO É SÓ O PORTÃO DA ROTA. A tela mostra MUITO mais do que "compras da OP" — verba da obra,
+  // saldo, mapa de cotação com o preço de cada concorrente e os botões de finalizar/excluir. Quem
+  // decide o que cada público vê é a própria página (`ehCompras`), e é lá que os dados deixam de
+  // ser calculados e serializados. Passar por aqui não é permissão para ver tudo.
+  //
+  // ⚠ Qualquer página nova sob `/compras/painel-ops/` herda este portão pelo `startsWith` e
+  // precisa declarar o próprio `requireRole` — não confie neste `if` para protegê-la.
+  if (path.startsWith("/compras/painel-ops")) return nega("COMPRAS", "ALMOXARIFADO");
   if (path.startsWith("/compras")) return nega("COMPRAS");
   // Módulo Indicadores (visão gerencial consolidada) é só do ADMIN. Cada setor continua
   // vendo os SEUS indicadores pela aba "Indicadores" dentro do próprio módulo.

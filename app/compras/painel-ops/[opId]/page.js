@@ -25,7 +25,21 @@ const STATUS_RM_BADGE = {
 };
 
 export default async function PainelOPDetalhe({ params }) {
-  const user = await requireRole(["ADMIN", "COMPRAS"]);
+  // ⚠⚠ DOIS PÚBLICOS NESTA TELA. Matheus (17/09/2026): "libere o painel de OPs para o
+  // almoxarifado@torg.com.br, ele precisa ver somente a tela de compras de cada OP." Quem entra
+  // pelo ALMOXARIFADO acompanha a obra pelo lado de quem RECEBE material: quais RMs existem, o que
+  // já virou pedido, por quanto e quando chega.
+  //
+  // ⚠⚠ O QUE ELE NÃO VÊ, E POR QUÊ: a verba da obra e o saldo (número de gestão, não de
+  // recebimento); o MAPA DE COTAÇÃO, que expõe o preço de CADA concorrente item a item; o resumo FD
+  // (documento do cliente), os FDs avulsos e o controle financeiro; e os botões de finalizar e
+  // excluir a OP. Ele vê o valor dos pedidos JÁ FECHADOS — foi a linha que o Matheus escolheu.
+  //
+  // ⚠ Esconder não é o mesmo que não mandar: cada bloco abaixo é montado só quando `ehCompras`, e
+  // o `data` do mapa nem é construído para quem não pode vê-lo. Componente escondido com o dado
+  // dentro do payload é teatro — o HTML continua tendo o número.
+  const user = await requireRole(["ADMIN", "COMPRAS", "ALMOXARIFADO"]);
+  const ehCompras = user.tipo === "ADMIN" || (user.modulos ?? []).includes("COMPRAS");
 
   const op = await prisma.oP.findUnique({
     where: { id: params.opId },
@@ -282,15 +296,40 @@ export default async function PainelOPDetalhe({ params }) {
     }
   }
 
-  // Plain object pra Client Component
-  const data = JSON.parse(JSON.stringify({
-    id: op.id,
-    numero: op.numero,
-    cliente: op.cliente,
-    obra: op.obra,
-    descricao: op.descricao,
-    verbaTotal,
-    rms: op.rms,
+  // ⚠⚠ O TOKEN DA COTAÇÃO NUNCA VAI PARA O NAVEGADOR. As duas buscas de cotação acima usam
+  // `include` sem `select`, então trazem TODOS os escalares de `Cotacao` — inclusive `token`, que é
+  // `@unique` e é a chave do portal PÚBLICO do fornecedor (`/fornecedores/c/[token]`), aberto SEM
+  // login, onde ele lê a RM, vê os dados do cliente e ENVIA a proposta.
+  //
+  // Medido em 17/09/2026 abrindo a OP-097 logado: o token da cotação da VITOR estava no HTML da
+  // página. Na prática, quem abria a tela de uma OP recebia o link privado de cotação de todos os
+  // fornecedores dela. Isso já valia para ADMIN e COMPRAS — o defeito é anterior a esta tela ganhar
+  // um público novo, e é por isso que ele é corrigido aqui e não só escondido do público novo.
+  //
+  // ⚠ Tirado na SERIALIZAÇÃO, não na consulta, de propósito: o `include` alimenta cálculos do
+  // servidor mais acima, e recortá-lo lá arriscaria quebrá-los em silêncio. Aqui a regra é simples
+  // e vale para as duas origens (as cotações da RM e as externas anexadas na `rms[0]`).
+  const semToken = (rms) => rms.map((rm) => ({
+    ...rm,
+    cotacoes: (rm.cotacoes || []).map(({ token, ...resto }) => resto),
+  }));
+
+  // O identificador da obra, que os dois públicos veem.
+  const cabecalho = { id: op.id, numero: op.numero, cliente: op.cliente, obra: op.obra, descricao: op.descricao };
+
+  // ⚠⚠ O PAYLOAD DO MAPA SÓ EXISTE PARA O COMPRAS. Ele carrega `verbaTotal` e as cotações inteiras
+  // (preço de cada fornecedor por item). Montá-lo e só não renderizar o componente mandaria tudo
+  // isso no HTML para quem não pode ver.
+  const data = ehCompras
+    ? JSON.parse(JSON.stringify({ ...cabecalho, verbaTotal, rms: semToken(op.rms) }))
+    : null;
+
+  // ⚠ A lista de RMs aparece para os dois, mas para o Almoxarifado ela sai PROJETADA: só o que a
+  // linha mostra. Sem itens detalhados, sem cotações, sem preço.
+  const rmsDaLista = ehCompras ? data.rms : op.rms.map((rm) => ({
+    id: rm.id, numero: rm.numero, descricao: rm.descricao, status: rm.status,
+    itens: rm.itens.map(() => ({})),     // só a contagem é usada na linha
+    cotacoes: rm.cotacoes.map(() => ({})),
   }));
 
   return (
@@ -301,12 +340,15 @@ export default async function PainelOPDetalhe({ params }) {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div>
-          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight font-mono">{fmtOP(data.numero)}</h2>
-          <p className="text-torg-dark font-medium mt-1">{data.cliente}</p>
-          {data.obra && <p className="text-sm text-torg-gray">{data.obra}</p>}
-          {data.descricao && <p className="text-sm text-torg-gray mt-2">{data.descricao}</p>}
+          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight font-mono">{fmtOP(cabecalho.numero)}</h2>
+          <p className="text-torg-dark font-medium mt-1">{cabecalho.cliente}</p>
+          {cabecalho.obra && <p className="text-sm text-torg-gray">{cabecalho.obra}</p>}
+          {cabecalho.descricao && <p className="text-sm text-torg-gray mt-2">{cabecalho.descricao}</p>}
         </div>
 
+        {/* ⚠ Verba, saldo e as ações de finalizar/excluir a OP são de gestão da obra, não de
+            recebimento — só o Compras. */}
+        {ehCompras && (<>
         <div className="mt-5 pt-5 border-t border-gray-100">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
@@ -362,13 +404,14 @@ export default async function PainelOPDetalhe({ params }) {
           qtdRMs={op.rms.length}
           isAdmin={user.role === "ADMIN"}
         />
+        </>)}
       </div>
 
       {/* RMs vinculadas */}
-      {data.rms.length > 0 && (
+      {rmsDaLista.length > 0 && (
         <div id="rms-vinculadas" className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden scroll-mt-4">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
-            <h3 className="text-lg font-semibold text-torg-dark">RMs vinculadas ({data.rms.length})</h3>
+            <h3 className="text-lg font-semibold text-torg-dark">RMs vinculadas ({rmsDaLista.length})</h3>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3 text-xs">
                 <span className="text-torg-gray">
@@ -380,11 +423,12 @@ export default async function PainelOPDetalhe({ params }) {
                   </span>
                 )}
               </div>
-              <BotaoResumoFD opId={op.id} numero={op.numero} />
+              {/* ⚠ O Resumo FD é documento para o CLIENTE — não é leitura de almoxarifado. */}
+              {ehCompras && <BotaoResumoFD opId={op.id} numero={op.numero} />}
             </div>
           </div>
           <ul className="divide-y divide-gray-100">
-            {data.rms.map((rm) => {
+            {rmsDaLista.map((rm) => {
               const pedidosDaRm = pedidosFlat.filter((p) => p.rmNumero === rm.numero && p.status === "CRIADO");
               const totalPedidosRm = pedidosDaRm.reduce((s, p) => s + (p.total || 0), 0);
               // Contagem considera cotacoes consolidadas que tocam essa RM
@@ -393,9 +437,15 @@ export default async function PainelOPDetalhe({ params }) {
               <li key={rm.id} className="px-6 py-3 flex items-center justify-between hover:bg-gray-50">
                 <div className="flex items-center gap-3">
                   <FileText size={16} className="text-torg-gray" />
-                  <Link href={`/compras/rm/${rm.id}`} className="font-mono font-semibold text-torg-blue hover:underline">
-                    {rm.numero}
-                  </Link>
+                  {/* ⚠ O detalhe da RM continua sendo só do Compras. Para o Almoxarifado o número
+                      aparece como TEXTO: link que leva a um 403 é pior que nenhum link. */}
+                  {ehCompras ? (
+                    <Link href={`/compras/rm/${rm.id}`} className="font-mono font-semibold text-torg-blue hover:underline">
+                      {rm.numero}
+                    </Link>
+                  ) : (
+                    <span className="font-mono font-semibold text-torg-dark">{rm.numero}</span>
+                  )}
                   <span className="text-sm text-torg-dark">{rm.descricao}</span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-torg-gray">
@@ -425,10 +475,11 @@ export default async function PainelOPDetalhe({ params }) {
       {/* Materiais da OP — todos os itens com status */}
       <MateriaisOPSection opId={op.id} />
 
-      {/* Mapa de Cotação */}
-      <MapaCotacaoClient op={data} />
+      {/* Mapa de Cotação — preço de cada concorrente, item a item. Só o Compras. */}
+      {ehCompras && <MapaCotacaoClient op={data} />}
 
-      {/* FDs avulsos / Regularizacao — acima do PedidosOmieSection */}
+      {/* ⚠ FDs avulsos trazem valores, observações e anexos do faturamento direto — só o Compras. */}
+      {ehCompras && (
       <FDAvulsosSection
         opId={op.id}
         pedidos={pedidosFdAvulsos}
@@ -441,12 +492,13 @@ export default async function PainelOPDetalhe({ params }) {
           .filter((rm) => !["PEDIDO_GERADO", "CANCELADA"].includes(rm.status))
           .map((rm) => ({ id: rm.id, numero: rm.numero, status: rm.status }))}
       />
+      )}
 
       {/* Pedidos no Omie vinculados a essa OP */}
       <PedidosOmieSection pedidos={pedidosFlat} />
 
-      {/* Controle Financeiro — pedidos + estoque (informativo) */}
-      <ControleFinanceiroOP opId={op.id} />
+      {/* Controle Financeiro — pedidos + estoque, com valores de gestão. Só o Compras. */}
+      {ehCompras && <ControleFinanceiroOP opId={op.id} />}
     </div>
   );
 }

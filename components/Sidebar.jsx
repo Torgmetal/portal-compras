@@ -11,7 +11,9 @@ import SidebarUserFooter from "@/components/SidebarUserFooter";
 // painéis — o link de origem passa ?painel=aluguel|montagem para o menu
 // manter o item certo ativo (sem o parâmetro, vale RMs Materiais).
 const menu = [
-  { href: "/compras/painel-ops", label: "Painel de OPs", icon: FolderKanban },
+  // ⚠ O Almoxarifado também vê — acompanha o que foi comprado para cada obra. A tela filtra o
+  // que ele enxerga lá dentro (sem verba, sem mapa de cotação, sem finalizar/excluir).
+  { href: "/compras/painel-ops", label: "Painel de OPs", icon: FolderKanban, modulos: ["COMPRAS", "ALMOXARIFADO"] },
   // ⚠ ENTRA NO MENU JUNTO COM A TELA. A auditoria de 23/08 encontrou 11 páginas órfãs — tela sem
   // link é tela que ninguém usa, e a lista dos itens que não casaram com o CMR existia calculada
   // e jogada fora justamente por não ter para onde aparecer.
