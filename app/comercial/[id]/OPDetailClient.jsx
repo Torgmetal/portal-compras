@@ -104,6 +104,13 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
   const inicial = vistasVisiveis.find((v) => v.key === (podeVerFinanceiro ? "resumo" : "obra"))?.key
     || vistasVisiveis[0]?.key || "obra";
   const [vista, setVista] = useState(inicial);
+  // ?vista=obra#aditivo-1 — o sino e o e-mail do aditivo caem direto na aba certa, no cartão certo
+  useEffect(() => {
+    const pedida = new URLSearchParams(window.location.search).get("vista");
+    if (pedida && vistasVisiveis.some((v) => v.key === pedida)) setVista(pedida);
+    if (window.location.hash) setTimeout(() => document.querySelector(window.location.hash)?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [exportandoLPC, setExportandoLPC] = useState(false);
   const [modalAditivo, setModalAditivo] = useState(false);
   const [modalDivulgarAditivo, setModalDivulgarAditivo] = useState(null); // { id, numero }
@@ -291,6 +298,11 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
                       <span className="text-gray-300">·</span>
                       <span className="text-torg-gray">{op.obra}</span>
                     </>
+                  )}
+                  {(op.aditivos || []).length > 0 && (
+                    <button onClick={() => setVista("obra")} className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-900 font-bold border border-orange-300 whitespace-nowrap hover:bg-orange-200" title="Esta obra tem aditivo — ver na aba Obra">
+                      {op.aditivos.length === 1 ? "1 ADITIVO" : `${op.aditivos.length} ADITIVOS`}{op.aditivos.some((a) => a.status === "RASCUNHO") ? " · não comunicado" : ""}
+                    </button>
                   )}
                   {op.refCliente && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium border border-amber-100 whitespace-nowrap" title="Referência do cliente para esta obra">Ref. cliente: {op.refCliente}</span>
@@ -782,7 +794,8 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
       {/* Aditivos */}
       {op.aditivos.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-torg-dark">Aditivos ({op.aditivos.length})</h3>
+          <h3 className="text-lg font-semibold text-torg-dark">Itens de verba dos aditivos ({op.aditivos.length})</h3>
+          <p className="text-xs text-torg-gray -mt-2">Aqui só a verba de compra de cada aditivo. O aditivo em si — pedido do cliente, TAGs, prazo, o que muda, comunicado aos setores — está na aba <button onClick={() => setVista("obra")} className="text-torg-blue font-semibold hover:underline">Obra</button>.</p>
           {op.aditivos.map((ad) => (
             <div key={ad.id} className="bg-white rounded-xl shadow-sm border border-torg-orange-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-torg-orange-100 bg-torg-orange-50/50">
@@ -906,7 +919,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
         </div>
       )}
 
-      {vista === "obra" && <AbaObra op={op} onAtualizar={() => router.refresh()} podeEditar={podeGerenciarComercial && !encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} />}
+      {vista === "obra" && <AbaObra op={op} onAtualizar={() => router.refresh()} podeEditar={podeGerenciarComercial && !encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} encerrada={encerradaOuCancelada} onNovoAditivo={() => setModalAditivo(true)} onDivulgarAditivo={(ad) => setModalDivulgarAditivo(ad)} />}
 
       {vista === "planejamento" && (
         <div className="space-y-6">

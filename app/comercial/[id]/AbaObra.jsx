@@ -7,6 +7,7 @@ import PropostaObraConsulta from "@/components/comercial/PropostaObraConsulta";
 import ReferenciasClienteResumo from "@/components/comercial/ReferenciasClienteResumo";
 import ModalReferenciasCliente from "@/components/comercial/ModalReferenciasCliente";
 import ModalContatosCliente from "@/components/comercial/ModalContatosCliente";
+import AditivosObra from "@/components/comercial/AditivosObra";
 import { contatoVeFaturamento } from "@/lib/cliente-faturamento";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
@@ -24,7 +25,7 @@ function Campo({ rotulo, valor, destaque, dica, pre }) {
   );
 }
 
-export default function AbaObra({ op, podeEditar, onEditar, onAtualizar }) {
+export default function AbaObra({ op, podeEditar, onEditar, onAtualizar, onNovoAditivo, onDivulgarAditivo, encerrada = false }) {
   const [editandoRefs, setEditandoRefs] = useState(false);
   const [editandoContatos, setEditandoContatos] = useState(false);
   const refsBase = agruparReferencias((op.referencias || []).filter((r) => !r.aditivoId));
@@ -34,6 +35,10 @@ export default function AbaObra({ op, podeEditar, onEditar, onAtualizar }) {
 
   return (
     <div className="space-y-4">
+      {/* Aditivos primeiro, com cara de aditivo — Vitor (17/09/2026): "de uma forma evidente" */}
+      {(op.aditivos?.length > 0 || podeEditar) && (
+        <AditivosObra op={op} podeGerenciar={podeEditar} encerrada={encerrada} onNovo={onNovoAditivo} onDivulgar={onDivulgarAditivo} />
+      )}
       <section className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden" aria-label="Contatos do cliente">
         <div className="px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
           <h3 className="text-base font-semibold text-torg-dark flex items-center gap-2"><Users size={18} className="text-torg-blue" /> Contatos do cliente <span className="text-torg-gray font-normal">({contatos.length})</span></h3>

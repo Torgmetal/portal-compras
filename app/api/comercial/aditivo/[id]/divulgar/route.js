@@ -59,7 +59,7 @@ export async function POST(req, { params }) {
   await criarNotificacao({
     tipo: "ADITIVO_DIVULGADO", titulo: `Aditivo ${ad.numero} · OP-${ad.op.numero} · ${ad.op.cliente}`,
     mensagem: dados.pedido ? `${dados.pedido.rotulo} ${dados.pedido.codigo}${dados.pedido.descricao ? ` — ${dados.pedido.descricao}` : ""}` : (ad.descricao || "").slice(0, 160),
-    link: `/comercial/${ad.op.id}`, origemUserId: user.id, modulos: MODULOS_AVISO, chaveEvento: `aditivo-divulgado:${ad.id}`,
+    link: `/comercial/${ad.op.id}?vista=obra#aditivo-${ad.numero}`, origemUserId: user.id, modulos: MODULOS_AVISO, chaveEvento: `aditivo-divulgado:${ad.id}`,
   });
   await prisma.auditLog.create({
     data: { userId: user.id, action: "DIVULGAR_ADITIVO", entity: "Aditivo", entityId: ad.id,
