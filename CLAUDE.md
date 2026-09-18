@@ -630,6 +630,17 @@ aplica matriz nenhuma: ela lê a vista já recortada, e aplicar de novo giraria 
 o lado vertical do retângulo cru vira horizontal na folha orientada, e filtrar pelos lados crus
 perdia a moldura inteira — justamente o que `regioes` usa para achar carimbo e lista.
 
+⚠⚠ **`closePath` NÃO ERA TRATADO, E ISSO VALIA EM FOLHA `0°` TAMBÉM** (achado 18/09/2026, ao
+escrever o teste do retângulo). O pdf-lib e vários CADs escrevem um retângulo como
+`moveTo lineTo lineTo lineTo closePath`, **sem** usar o operador `rectangle`. Sem tratar `closePath`:
+1. o lado de FECHAMENTO sumia — medido, 3 retângulos davam **9 segmentos em vez de 12**;
+2. o `else ai += 2` consumia dois argumentos que `closePath` não tem, **dessincronizando as
+   coordenadas de tudo que viesse depois no mesmo traçado** (`m l l h m l l h` → lixo do segundo
+   subcaminho em diante), e o filtro "está dentro da folha?" descartava esse lixo em silêncio.
+
+É outro caminho para "o desenho vem incompleto", independente de rotação. Corrigido nos quatro
+percorredores de path (`pontosDaPagina`, `segsDoConteudo`, `verticais`, `horizontais`).
+
 ⚠⚠ **RELATÓRIO DE FOLHA GIRADA QUE JÁ TINHA COTA MARCADA PRECISA SER REMARCADO.** A cota foi
 marcada sobre uma vista que estava errada; não há como reinterpretá-la, e o portal não tem como
 adivinhar sozinho. Folha `0°` não é afetada (a matriz é a identidade).

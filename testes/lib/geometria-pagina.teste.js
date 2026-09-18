@@ -5,7 +5,7 @@
 // todo traço que passasse da dimensão trocada.
 import { describe, it, expect } from "vitest";
 import {
-  aplicar, inverter, ehIdentidade, caixaParaCru, espacoDaPagina, IDENTIDADE,
+  aplicar, inverter, ehIdentidade, caixaParaCru, caixaDoTexto, espacoDaPagina, IDENTIDADE,
 } from "@/lib/geometria-pagina";
 
 /**
@@ -103,5 +103,62 @@ describe("⚠⚠ a caixa do recorte converte pelos QUATRO cantos", () => {
     const caixa = { left: 10, bottom: 20, right: 300, top: 400 };
     const crua = caixaParaCru(caixa, IDENTIDADE);
     expect(crua).toEqual(caixa);
+  });
+});
+
+describe("⚠⚠ a matriz confere com o PRÓPRIO PDF.js, não só comigo mesmo", () => {
+  // ⚠⚠ ACHADO DO CODEX (18/09/2026): os testes de ida-e-volta usam a inversa da implementação que
+  // está sendo testada — se `M` e `M⁻¹` estiverem ambas erradas do mesmo jeito, o erro se cancela
+  // e o teste passa. Aqui o oráculo é EXTERNO: `convertToViewportPoint` é do próprio PDF.js, a
+  // mesma conta que ele usa para renderizar. Se a minha matriz discordar dela, a minha está errada.
+  it.each([0, 90, 180, 270])("/Rotate %i: M concorda com convertToViewportPoint", async (rot) => {
+    const { PDFDocument, degrees } = await import("pdf-lib");
+    const doc = await PDFDocument.create();
+    const pg = doc.addPage([842, 1191]);
+    if (rot) pg.setRotation(degrees(rot));
+    const { getDocumentProxy } = await import("unpdf");
+    const lido = await getDocumentProxy(new Uint8Array(await doc.save()));
+    const pagina = await lido.getPage(1);
+    const vp = pagina.getViewport({ scale: 1 });
+    const { M } = espacoDaPagina(pagina);
+
+    for (const [x, y] of [[0, 0], [842, 0], [842, 1191], [0, 1191], [123, 456]]) {
+      const [vx, vy] = vp.convertToViewportPoint(x, y); // PDF.js: Y para BAIXO
+      const [mx, my] = aplicar(M, x, y);                // nosso espaço: Y para CIMA
+      expect(mx).toBeCloseTo(vx, 6);
+      expect(my).toBeCloseTo(vp.height - vy, 6);
+    }
+  });
+});
+
+describe("a caixa do texto sai dos quatro cantos", () => {
+  // ⚠⚠ Texto não avança sempre para a direita. `(x,y) → (x+larg, y+alt)` só vale sem rotação; numa
+  // cota vertical ou numa folha girada a caixa crescia para fora do texto, e cota rente à borda
+  // continuava sendo cortada (achado do Codex).
+  it("texto horizontal: a caixa é o retângulo óbvio", () => {
+    const c = caixaDoTexto([1, 0, 0, 1, 100, 200], 50, 10);
+    expect(c).toEqual({ left: 100, right: 150, bottom: 200, top: 210 });
+  });
+
+  it("⚠⚠ texto girado 90°: a caixa cresce para CIMA, não para a direita", () => {
+    // matriz de um texto deitado: avança em +Y, sobe em -X
+    const c = caixaDoTexto([0, 1, -1, 0, 100, 200], 50, 10);
+    expect(c.bottom).toBeCloseTo(200, 6);
+    expect(c.top).toBeCloseTo(250, 6);      // o avanço de 50 foi para cima
+    expect(c.right).toBeCloseTo(100, 6);
+    expect(c.left).toBeCloseTo(90, 6);      // a altura de 10 foi para a esquerda
+  });
+
+  it("texto de cabeça para baixo (180°) cresce para a esquerda e para baixo", () => {
+    const c = caixaDoTexto([-1, 0, 0, -1, 100, 200], 50, 10);
+    expect(c.right).toBeCloseTo(100, 6);
+    expect(c.left).toBeCloseTo(50, 6);
+    expect(c.top).toBeCloseTo(200, 6);
+    expect(c.bottom).toBeCloseTo(190, 6);
+  });
+
+  it("largura ou altura zerada não gera NaN", () => {
+    const c = caixaDoTexto([0, 0, 0, 0, 10, 20], 0, 0);
+    expect(Object.values(c).every(Number.isFinite)).toBe(true);
   });
 });

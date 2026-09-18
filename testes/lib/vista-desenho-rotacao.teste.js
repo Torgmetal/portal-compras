@@ -246,3 +246,91 @@ describe("⚠⚠ sem rotação, nada muda", () => {
     expect(Math.round(r.altura)).toBe(700);
   });
 });
+
+describe("⚠⚠ moldura desenhada como RETÂNGULO, não como quatro linhas", () => {
+  // ⚠⚠ ACHADO DO CODEX (18/09/2026): a correção fez `verticais`/`horizontais` emitirem os QUATRO
+  // lados de um `rectangle` — e nenhum teste cobria isso, porque as folhas sintéticas desenhavam a
+  // moldura com linhas soltas. Um desenho de verdade costuma usar o operador `rectangle`, e é dele
+  // que sai a moldura que `regioes` usa para separar carimbo e lista da peça.
+  async function lados(rotate) {
+    const { PDFDocument, degrees, rgb: cor } = await import("pdf-lib");
+    const { verticais, horizontais } = await import("@/lib/campos-desenho");
+    const { getDocumentProxy, getResolvedPDFJS } = await import("unpdf");
+
+    const cruas = rotate % 180 ? [VA, VL] : [VL, VA];
+    const doc = await PDFDocument.create();
+    const pg = doc.addPage(cruas);
+    if (rotate) pg.setRotation(degrees(rotate));
+    // UM retângulo, do jeito que o CAD escreve: operador `re`, não quatro `l`
+    pg.drawRectangle({ x: 40, y: 40, width: cruas[0] - 80, height: cruas[1] - 80,
+      borderWidth: 2, borderColor: cor(0, 0, 0) });
+
+    const lido = await getDocumentProxy(new Uint8Array(await doc.save()));
+    const pagina = await lido.getPage(1);
+    const { OPS } = await getResolvedPDFJS();
+    const ol = await pagina.getOperatorList();
+    const { M } = espacoDaPagina(pagina);
+    return { v: verticais(ol, OPS, M), h: horizontais(ol, OPS, M) };
+  }
+
+  it.each(ANGULOS)("/Rotate %i: os dois lados verticais e os dois horizontais são achados", async (rot) => {
+    const { v, h } = await lados(rot);
+    // ⚠ Antes da correção, sob 90/270 um dos dois vinha ZERADO: o lado vertical cru vira
+    // horizontal na folha orientada, e o detector filtrava pelos lados crus.
+    expect(v.length).toBeGreaterThanOrEqual(2);
+    expect(h.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it.each(ANGULOS)("/Rotate %i: a moldura achada tem o tamanho da folha orientada", async (rot) => {
+    const { v, h } = await lados(rot);
+    const larguraMoldura = Math.max(...v.map((l) => l.x)) - Math.min(...v.map((l) => l.x));
+    const alturaMoldura = Math.max(...h.map((l) => l.y)) - Math.min(...h.map((l) => l.y));
+    expect(Math.round(larguraMoldura)).toBe(VL - 80);
+    expect(Math.round(alturaMoldura)).toBe(VA - 80);
+  });
+});
+
+describe("⚠⚠ caminho fechado (`closePath`) não perde o lado de fechamento", () => {
+  // ⚠⚠ ACHADO AO ESCREVER O TESTE DO RETÂNGULO (18/09/2026), e independente de rotação: o pdf-lib
+  // — e vários CADs — escrevem um retângulo como `moveTo lineTo lineTo lineTo closePath`, sem usar
+  // o operador `rectangle`. `closePath` não era tratado, então:
+  //   1. o lado de FECHAMENTO sumia — medido, 3 retângulos davam 9 segmentos em vez de 12;
+  //   2. o `else ai += 2` consumia dois argumentos que `closePath` não tem, dessincronizando as
+  //      coordenadas de tudo que viesse depois no MESMO traçado.
+  // Isto valia em folha `/Rotate 0` também. É outro caminho para "o desenho vem incompleto".
+  async function folhaComRetangulos(rotate = 0) {
+    const { PDFDocument, degrees, rgb: cor } = await import("pdf-lib");
+    const cruas = rotate % 180 ? [VA, VL] : [VL, VA];
+    const doc = await PDFDocument.create();
+    const pg = doc.addPage(cruas);
+    if (rotate) pg.setRotation(degrees(rotate));
+    pg.drawRectangle({ x: 40, y: 40, width: cruas[0] - 80, height: cruas[1] - 80, borderWidth: 2, borderColor: cor(0,0,0) });
+    pg.drawRectangle({ x: 100, y: 100, width: 240, height: 120, borderWidth: 1, borderColor: cor(0,0,0) });
+    pg.drawRectangle({ x: 400, y: 300, width: 200, height: 150, borderWidth: 1, borderColor: cor(0,0,0) });
+    return Buffer.from(await doc.save());
+  }
+
+  it("três retângulos dão os 12 lados — não 9", async () => {
+    const v = await vetoresDaPagina(await folhaComRetangulos(0));
+    expect(v.segs.length).toBe(12);
+  });
+
+  it.each(ANGULOS)("/Rotate %i: continua 12, gire como girar", async (rot) => {
+    const v = await vetoresDaPagina(await folhaComRetangulos(rot));
+    expect(v.segs.length).toBe(12);
+  });
+
+  // ⚠ O pior dos dois defeitos: coordenada dessincronizada não some, vai parar longe — e o filtro
+  // "está dentro da folha?" a descarta em silêncio, levando junto traço legítimo.
+  it("nenhum traço cai fora da folha depois de um caminho fechado", async () => {
+    const v = await vetoresDaPagina(await folhaComRetangulos(0));
+    for (const [x1, y1, x2, y2] of v.segs) {
+      for (const [x, y] of [[x1, y1], [x2, y2]]) {
+        expect(x).toBeGreaterThanOrEqual(-2);
+        expect(x).toBeLessThanOrEqual(v.largura + 2);
+        expect(y).toBeGreaterThanOrEqual(-2);
+        expect(y).toBeLessThanOrEqual(v.altura + 2);
+      }
+    }
+  });
+});
