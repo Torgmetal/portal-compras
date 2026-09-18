@@ -9,6 +9,7 @@ import Link from "next/link";
 import { CalendarClock, Truck, PackageCheck, ExternalLink, MessageSquare, FileText } from "lucide-react";
 import { SITUACAO } from "@/lib/painel-prazos-rm";
 import { FRETES } from "@/lib/frete-cotacao";
+import PropostaDePrazo from "./PropostaDePrazo";
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const moeda = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -176,7 +177,7 @@ function Quando({ p }) {
   return <span className="text-torg-gray">em {p.diasAte} {plural(p.diasAte)}</span>;
 }
 
-function LinhaPedido({ p, mostrarFD, mostrarFrete }) {
+function LinhaPedido({ p, mostrarFD, mostrarFrete, onDecidido }) {
   const cfg = SITUACAO[p.situacao];
   return (
     <li className="py-2 flex items-start gap-3 flex-wrap">
@@ -200,6 +201,9 @@ function LinhaPedido({ p, mostrarFD, mostrarFrete }) {
           <span>·</span> <Quando p={p} />
         </p>
         <DoFornecedor p={p} />
+        {/* ⚠ A proposta fica logo abaixo da previsão, e não no topo do cartão: a decisão é de UM
+            pedido, e quem olha precisa ver ao lado dela a data que vale hoje. */}
+        <PropostaDePrazo pedido={p} onDecidido={onDecidido} />
         {/* ⚠ As etapas já lançadas aparecem aqui como rastro curto: quem varre a lista quer saber
             se alguém já mexeu no pedido, sem ter que abrir a RM para descobrir. */}
         {p.etapas.length > 0 && (
@@ -218,7 +222,7 @@ function LinhaPedido({ p, mostrarFD, mostrarFrete }) {
   );
 }
 
-export default function CartaoRM({ l }) {
+export default function CartaoRM({ l, onDecidido }) {
   const cfg = SITUACAO[l.situacao];
   return (
     <div className={`bg-white rounded-xl border border-gray-200 border-l-4 shadow-sm overflow-hidden ${FILETE[cfg.cor]}`}>
@@ -241,7 +245,7 @@ export default function CartaoRM({ l }) {
       </div>
       <ul className="px-5 divide-y divide-gray-50">
         {l.pedidos.map((p) => (
-          <LinhaPedido key={p.id} p={p} mostrarFD={l.fd === "PARCIAL"} mostrarFrete={!l.frete} />
+          <LinhaPedido key={p.id} p={p} mostrarFD={l.fd === "PARCIAL"} mostrarFrete={!l.frete} onDecidido={onDecidido} />
         ))}
       </ul>
     </div>

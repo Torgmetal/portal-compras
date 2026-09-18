@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { avisarResposta } from "@/lib/resposta-fornecedor";
+import { novaPropostaId, propostaPendente, ehRepeticao } from "@/lib/prazo-proposto";
 
 // ⚠ Página de token: nada daqui pode ficar em cache intermediário, e o token não pode vazar no
 // `Referer` de um clique para fora (achado do Codex, 18/09/2026).
@@ -12,6 +13,15 @@ const responder = (corpo, status = 200) => NextResponse.json(corpo, { status, he
 
 /** O prefixo que separa o que o fornecedor escreveu do comentário interno de Compras. */
 const MARCA_FORNECEDOR = "[Fornecedor]";
+
+/**
+ * A proposta pendente como o FORNECEDOR a vê — sem o `id`, que é assunto interno da tela de
+ * Compras (é ele que trava o aprovar contra uma proposta trocada no meio).
+ */
+function propostaParaOFornecedor(pedido) {
+  const p = propostaPendente(pedido);
+  return p ? { prazo: p.prazo, em: p.em, motivo: p.motivo } : null;
+}
 
 // ── GET: retorna dados do pedido para a pagina publica ──
 export async function GET(_req, { params }) {
@@ -35,6 +45,10 @@ export async function GET(_req, { params }) {
       prazoEntregaPrevisto: true,
       prazoOriginal: true,
       dataEntregaReal: true,
+      prazoProposto: true,
+      prazoPropostoEm: true,
+      prazoPropostoMotivo: true,
+      prazoPropostoId: true,
       cotacao: {
         select: {
           fornecedorNome: true,
@@ -124,6 +138,11 @@ export async function GET(_req, { params }) {
     prazoEntregaPrevisto: pedido.prazoEntregaPrevisto,
     prazoOriginal: pedido.prazoOriginal,
     jaEntregue: !!pedido.dataEntregaReal,
+    // ⚠⚠ A TELA DO FORNECEDOR PRECISA DIZER "EM ANÁLISE". Ele informou uma data, a página não
+    // mostrava nada diferente e o prazo continuava o antigo — pareceria que a resposta se perdeu,
+    // e ele responderia de novo. Agora a proposta pendente aparece, com a data e o dia em que ele
+    // mandou, marcada como aguardando a Torg.
+    propostaEmAnalise: propostaParaOFornecedor(pedido),
     itensPendentes,
     totalItens: itens.length,
     // ⚠⚠ SÓ O QUE O PRÓPRIO FORNECEDOR ESCREVEU (achado do Codex, 18/09/2026). O mesmo
@@ -194,6 +213,7 @@ const pedidoDoToken = (token) => prisma.pedidoOmie.findUnique({
     id: true, numeroPedido: true, fornecedorNome: true,
     prazoEntregaPrevisto: true, prazoOriginal: true, dataEntregaReal: true,
     encerradoOmieEm: true, fornecedorEntregaEm: true, fornecedorNfNumero: true,
+    prazoProposto: true, prazoPropostoEm: true, prazoPropostoMotivo: true, prazoPropostoId: true,
     rmItens: { select: { rm: { select: { numero: true } } }, take: 1 },
   },
 });
@@ -227,52 +247,54 @@ async function declararEntrega(pedido, body) {
   return { repetido: false, resposta: { entregue: true, nfNumero: body.nfNumero, motivo: body.motivo } };
 }
 
-/** O fornecedor informa uma nova previsão. */
-async function informarPrevisao(pedido, body) {
+/**
+ * O fornecedor PROPÕE uma nova previsão.
+ *
+ * ⚠⚠ NÃO ESCREVE `prazoEntregaPrevisto`, NÃO CRIA `PrazoHistorico` E NÃO TOCA EM `prazoOriginal`.
+ * Tudo isso é efeito de prazo VALENDO, e quem decide é Compras em
+ * `POST /api/compras/prazos-rm/prazo-proposto`. Aqui só fica registrado o que ele pediu.
+ */
+async function proporPrevisao(pedido, body) {
   const novoPrazo = new Date(body.novoPrazo);
   if (isNaN(novoPrazo.getTime())) throw new Error("Data invalida");
 
-  const prazoAnterior = pedido.prazoEntregaPrevisto;
-  // ⚠ Mesma data de novo não é notícia — e a rota é pública.
-  if (prazoAnterior && +new Date(prazoAnterior) === +novoPrazo) {
-    return { repetido: true, resposta: { prazoNovo: novoPrazo, prazoAnterior } };
+  const motivo = body.motivo?.trim() || null;
+  // ⚠ Mesma proposta de novo não é notícia — e a rota é pública.
+  if (ehRepeticao(pedido, novoPrazo, motivo)) {
+    return { repetido: true, resposta: { proposto: true, prazoNovo: novoPrazo, prazoAnterior: pedido.prazoEntregaPrevisto } };
   }
 
+  const propostaId = novaPropostaId();
   await prisma.$transaction(async (tx) => {
-    const updateData = { prazoEntregaPrevisto: novoPrazo };
-    // ⚠ O prazo combinado no começo é gravado UMA vez: ele é a referência da cobrança, e seria
-    // perdido se cada empurrão sobrescrevesse o anterior.
-    if (!pedido.prazoOriginal && prazoAnterior) updateData.prazoOriginal = prazoAnterior;
-
+    // ⚠ A condição de estado vai no próprio UPDATE: entre ler e gravar, alguém pode ter confirmado
+    // o recebimento por dentro, e a escrita pública não pode passar por cima disso.
     const r = await tx.pedidoOmie.updateMany({
-      where: { id: pedido.id, dataEntregaReal: null }, data: updateData,
+      where: { id: pedido.id, dataEntregaReal: null },
+      data: {
+        prazoProposto: novoPrazo,
+        prazoPropostoEm: new Date(),
+        prazoPropostoMotivo: motivo,
+        prazoPropostoId: propostaId,
+      },
     });
     if (r.count === 0) throw new Error("Este pedido ja foi entregue.");
 
-    await tx.prazoHistorico.create({
-      data: {
-        pedidoId: pedido.id, prazoAnterior, prazoNovo: novoPrazo,
-        motivo: body.motivo?.trim()
-          ? `${MARCA_FORNECEDOR} ${body.motivo.trim()}`
-          : `${MARCA_FORNECEDOR} Previsao informada via portal`,
-        alteradoPorId: null, // ação do fornecedor, sem login
-      },
-    });
-
     await tx.auditLog.create({
       data: {
-        userId: null, action: "FORNECEDOR_ATUALIZOU_PRAZO", entity: "PedidoOmie", entityId: pedido.id,
+        userId: null, action: "FORNECEDOR_PROPOS_PRAZO", entity: "PedidoOmie", entityId: pedido.id,
         diff: {
-          prazoAnterior: prazoAnterior?.toISOString() || null,
-          prazoNovo: novoPrazo.toISOString(),
-          motivo: body.motivo?.trim() || null,
-          viaPortalFornecedor: true,
+          prazoAtual: pedido.prazoEntregaPrevisto?.toISOString() || null,
+          prazoProposto: novoPrazo.toISOString(),
+          propostaId, motivo, viaPortalFornecedor: true,
         },
       },
     });
   });
 
-  return { repetido: false, resposta: { prazoNovo: novoPrazo, prazoAnterior, motivo: body.motivo } };
+  return {
+    repetido: false,
+    resposta: { proposto: true, prazoNovo: novoPrazo, prazoAnterior: pedido.prazoEntregaPrevisto, motivo: body.motivo },
+  };
 }
 
 export async function PATCH(req, { params }) {
@@ -291,7 +313,7 @@ export async function PATCH(req, { params }) {
 
   let r;
   try {
-    r = body.entregue ? await declararEntrega(pedido, body) : await informarPrevisao(pedido, body);
+    r = body.entregue ? await declararEntrega(pedido, body) : await proporPrevisao(pedido, body);
   } catch (e) {
     return responder({ error: e.message || "Nao foi possivel registrar sua resposta." }, 400);
   }

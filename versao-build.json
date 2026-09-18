@@ -1,7 +1,12 @@
 {
-  "build": 3275,
-  "gerado": "2026-09-18T12:38:55.381Z",
+  "build": 3276,
+  "gerado": "2026-09-18T14:50:06.463Z",
   "commits": [
+    {
+      "hash": "475c3ca77d",
+      "data": "18/09/2026",
+      "titulo": "Quando o fornecedor responde, Compras fica sabendo — e a tela diz de quem é a data"
+    },
     {
       "hash": "6f4c8840bc",
       "data": "18/09/2026",
@@ -146,11 +151,6 @@
       "hash": "24ed63a2ff",
       "data": "17/09/2026",
       "titulo": "Filtro de fornecedor nos Prazos das RMs, refazendo a conta da RM"
-    },
-    {
-      "hash": "776074ade8",
-      "data": "17/09/2026",
-      "titulo": "Memória: pedido encerrado, recebido parcial e a ausência de PDF na API do Omie"
     }
   ]
 }

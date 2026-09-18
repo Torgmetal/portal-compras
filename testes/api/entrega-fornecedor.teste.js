@@ -20,6 +20,7 @@ const PEDIDO = {
   prazoEntregaPrevisto: new Date("2026-09-08T12:00:00-03:00"), prazoOriginal: null,
   dataEntregaReal: null, encerradoOmieEm: null,
   fornecedorEntregaEm: null, fornecedorNfNumero: null,
+  prazoProposto: null, prazoPropostoEm: null, prazoPropostoMotivo: null, prazoPropostoId: null,
   rmItens: [{ rm: { numero: "T118-001-R00" } }],
 };
 
@@ -119,10 +120,27 @@ describe("⚠⚠ repetição idêntica é sucesso SEM evento", () => {
     expect(mockPrisma.pedidoOmie.updateMany).not.toHaveBeenCalled();
   });
 
-  it("⚠⚠ a mesma data de novo não avisa ninguém", async () => {
-    const res = await PATCH(req({ novoPrazo: "2026-09-08T15:00:00.000Z" }), { params });
+  // ⚠ A repetição é medida contra a PROPOSTA pendente, não contra `prazoEntregaPrevisto`: a data
+  // do fornecedor não vira prazo até Compras aprovar, então "já mandei isso" é sobre a proposta.
+  it("⚠⚠ a mesma proposta de novo não avisa ninguém", async () => {
+    mockPrisma.pedidoOmie.findUnique.mockResolvedValue({
+      ...PEDIDO,
+      prazoProposto: new Date("2026-10-01T00:00:00.000Z"),
+      prazoPropostoMotivo: null, prazoPropostoId: "prop-1", prazoPropostoEm: new Date(),
+    });
+    const res = await PATCH(req({ novoPrazo: "2026-10-01T00:00:00.000Z" }), { params });
     expect(res.status).toBe(200);
     expect(mocks.avisar).not.toHaveBeenCalled();
+  });
+
+  it("mesma data com outro motivo é proposta NOVA e avisa", async () => {
+    mockPrisma.pedidoOmie.findUnique.mockResolvedValue({
+      ...PEDIDO,
+      prazoProposto: new Date("2026-10-01T00:00:00.000Z"),
+      prazoPropostoMotivo: "greve", prazoPropostoId: "prop-1", prazoPropostoEm: new Date(),
+    });
+    await PATCH(req({ novoPrazo: "2026-10-01T00:00:00.000Z", motivo: "falta de chapa" }), { params });
+    expect(mocks.avisar).toHaveBeenCalled();
   });
 
   it("NF diferente é resposta nova e avisa", async () => {
@@ -160,25 +178,36 @@ describe("estado do pedido", () => {
   });
 });
 
-describe("a nova previsão", () => {
-  it("guarda o prazo combinado ANTES, uma vez só", async () => {
-    await PATCH(req({ novoPrazo: "2026-10-01" }), { params });
-    expect(mockPrisma.pedidoOmie.updateMany.mock.calls[0][0].data.prazoOriginal)
-      .toEqual(PEDIDO.prazoEntregaPrevisto);
-
-    vi.clearAllMocks();
-    mockPrisma.pedidoOmie.findUnique.mockResolvedValue({ ...PEDIDO, prazoOriginal: new Date("2026-08-01") });
-    mockPrisma.pedidoOmie.updateMany.mockResolvedValue({ count: 1 });
-    await PATCH(req({ novoPrazo: "2026-11-01" }), { params });
-    expect(mockPrisma.pedidoOmie.updateMany.mock.calls[0][0].data).not.toHaveProperty("prazoOriginal");
+describe("⚠⚠ a nova previsão é PROPOSTA, não prazo", () => {
+  // ⚠⚠ O CORAÇÃO DO FLUXO. Matheus (18/09/2026): "sim, o Compras precisa aprovar a alteração
+  // depois". Até aqui, quem abrisse o token digitava uma data e o pedido saía do vermelho sozinho.
+  it("⚠⚠ NÃO escreve prazoEntregaPrevisto, prazoOriginal nem PrazoHistorico", async () => {
+    await PATCH(req({ novoPrazo: "2026-10-01", motivo: "atraso na laminação" }), { params });
+    const data = mockPrisma.pedidoOmie.updateMany.mock.calls[0][0].data;
+    expect(data).not.toHaveProperty("prazoEntregaPrevisto");
+    expect(data).not.toHaveProperty("prazoOriginal");
+    expect(mockPrisma.prazoHistorico.create).not.toHaveBeenCalled();
   });
 
-  // ⚠ O prefixo é o que separa o recado do fornecedor do comentário interno de Compras — e é por
-  // ele que a rota pública decide o que devolver.
-  it("⚠ carimba o histórico com [Fornecedor]", async () => {
+  it("grava a proposta em colunas próprias, com motivo e um id", async () => {
     await PATCH(req({ novoPrazo: "2026-10-01", motivo: "atraso na laminação" }), { params });
-    expect(mockPrisma.prazoHistorico.create.mock.calls[0][0].data.motivo)
-      .toBe("[Fornecedor] atraso na laminação");
+    const data = mockPrisma.pedidoOmie.updateMany.mock.calls[0][0].data;
+    expect(+data.prazoProposto).toBe(+new Date("2026-10-01"));
+    expect(data.prazoPropostoMotivo).toBe("atraso na laminação");
+    expect(data.prazoPropostoId).toBeTruthy();
+    expect(data.prazoPropostoEm).toBeInstanceOf(Date);
+  });
+
+  // ⚠ A escrita pública nunca pode passar por cima de um recebimento confirmado por dentro.
+  it("a condição de estado vai no próprio UPDATE", async () => {
+    await PATCH(req({ novoPrazo: "2026-10-01" }), { params });
+    expect(mockPrisma.pedidoOmie.updateMany.mock.calls[0][0].where)
+      .toEqual({ id: "p1", dataEntregaReal: null });
+  });
+
+  it("registra na auditoria como proposta, com ação própria", async () => {
+    await PATCH(req({ novoPrazo: "2026-10-01" }), { params });
+    expect(mockPrisma.auditLog.create.mock.calls[0][0].data.action).toBe("FORNECEDOR_PROPOS_PRAZO");
   });
 
   it("data impossível é recusada", async () => {

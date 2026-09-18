@@ -120,7 +120,7 @@ export default function PrazosRMClient() {
         </div>
       ) : (
         <div className="space-y-3">
-          {f.visiveis.map((l) => <CartaoRM key={l.rmId || l.numero} l={l} />)}
+          {f.visiveis.map((l) => <CartaoRM key={l.rmId || l.numero} l={l} onDecidido={() => buscar(true)} />)}
         </div>
       )}
     </div>

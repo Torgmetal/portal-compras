@@ -965,6 +965,16 @@ model PedidoOmie {
   // continua cobrável até a confirmação. Colunas criadas por `scripts/ensure-entrega-declarada.mjs`.
   fornecedorEntregaEm  DateTime?
   fornecedorNfNumero   String?
+  // ⚠⚠ PROPOSTA DE PRAZO, NÃO PRAZO. O fornecedor sugere a data pelo link público; ela SÓ vira
+  // `prazoEntregaPrevisto` quando Compras aprova em `/api/compras/prazos-rm/prazo-proposto`.
+  // Matheus (18/09/2026): "sim, o Compras precisa aprovar a alteração depois".
+  // ⚠ `prazoPropostoId` é a versão da proposta: a tela devolve o id que leu, e divergência é 409.
+  // Comparar só a data deixava passar mesma-data-outro-motivo e o vaivém A→B→A (achado do Codex).
+  // Colunas criadas por `scripts/ensure-prazo-proposto.mjs`.
+  prazoProposto        DateTime?
+  prazoPropostoEm      DateTime?
+  prazoPropostoMotivo  String?
+  prazoPropostoId      String?
   recebidoPor          User?                  @relation("PedidoRecebidoPor", fields: [recebidoPorId], references: [id])
   cotacao              Cotacao?               @relation(fields: [cotacaoId], references: [id])
   op                   OP?                    @relation(fields: [opId], references: [id])

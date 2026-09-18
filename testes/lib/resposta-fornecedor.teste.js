@@ -52,7 +52,10 @@ describe("o texto do aviso", () => {
       prazoAnterior: new Date("2026-09-08T12:00:00-03:00"),
     });
     expect(t.linha).toMatch(/01\/10\/2026/);
-    expect(t.linha).toMatch(/antes era 08\/09\/2026/);
+    expect(t.linha).toMatch(/a data combinada é 08\/09\/2026/);
+    // ⚠ "propôs", não "informou": a data não vale até Compras aprovar.
+    expect(t.titulo).toMatch(/propôs/);
+    expect(t.acao).toMatch(/aprovar/);
   });
 
   it("pedido sem número nem RM não vira 'undefined' no assunto", () => {

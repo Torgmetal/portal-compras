@@ -36,6 +36,7 @@ export async function GET() {
       // ⚠ A entrega que o FORNECEDOR declarou no portal público — declaração a conferir, nunca
       // recebimento. Ver `scripts/ensure-entrega-declarada.mjs`.
       fornecedorEntregaEm: true, fornecedorNfNumero: true,
+      prazoProposto: true, prazoPropostoEm: true, prazoPropostoMotivo: true, prazoPropostoId: true,
       prazoEntregaPrevisto: true, prazoOriginal: true, statusEntrega: true,
       dataEntregaReal: true, recebidoEm: true, recebidoPor: { select: { name: true } },
       prazoHistorico: {

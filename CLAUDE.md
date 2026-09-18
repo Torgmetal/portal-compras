@@ -837,6 +837,57 @@ e-mail e não pode ficar em cache intermediário nem vazar no `Referer` de um cl
 ⚠ **O aviso nunca derruba a resposta.** Ela já está gravada; dizer ao fornecedor que deu errado o
 faria tentar de novo, e cada tentativa é outro aviso.
 
+### A data do fornecedor é PROPOSTA — quem efetiva é Compras
+`POST /api/compras/prazos-rm/prazo-proposto` (regra em `lib/prazo-proposto.js`, tela em
+`app/compras/prazos/PropostaDePrazo.jsx`). Matheus (18/09/2026): *"sim, o Compras precisa aprovar
+a alteração depois"*.
+
+⚠⚠ **ATÉ AQUI O LINK PÚBLICO REMARCAVA O PRAZO SOZINHO.** Quem abrisse o token digitava uma data e
+o `prazoEntregaPrevisto` mudava na hora: o pedido saía do vermelho, saía da lista de cobrança e a
+RM inteira podia virar "No prazo" — por ação de um terceiro sem login. A rota pública agora grava
+só `prazoProposto*`; **nada nela escreve `prazoEntregaPrevisto` nem cria `PrazoHistorico`**. Mesma
+lição de `fornecedorEntregaEm`: resposta de terceiro é INSUMO, não fato.
+
+⚠⚠ **PROPOSTA PENDENTE NÃO SUSPENDE A COBRANÇA** (achado do Codex). Suspendesse, responder
+qualquer data — inclusive uma impossível — seria o jeito mais barato de sumir da cobrança, e o
+silêncio de Compras viraria aprovação tácita. `propostaPendente` fica FORA de `situacaoDoPedido`.
+
+⚠⚠ **`prazoPropostoId` É A VERSÃO DA PROPOSTA, e existe porque comparar a data não basta** (achado
+do Codex): mesma data com outro motivo, e o vaivém A→B→A, passariam por "é a mesma proposta que eu
+estava vendo". A tela devolve o id que leu; divergiu, é **409**. E a troca é condicionada no
+próprio UPDATE (`where: { id, prazoPropostoId }`), não só na leitura.
+
+⚠⚠ **`prazoOriginal` VEM DA PREVISÃO EFETIVA (`previsaoAtual`), NÃO DA COLUNA CRUA** (achado do
+Codex). Há pedido cuja previsão vem dos itens da cotação ou do prazo escrito em palavras, com
+`prazoEntregaPrevisto` nulo — gravando a coluna, o original nasceria nulo e a cobrança perderia a
+referência do que foi combinado.
+
+⚠⚠ **SÃO DOIS EFETIVADORES, E O OUTRO É `app/api/compras/entregas/prazo/route.js`** (achado do
+Codex). Ele lia antes da transação; agora lê dentro dela, e **remarcar por dentro MATA a proposta
+pendente** — deixada viva, o botão "aprovar" continuaria na tela e um clique depois desfaria a
+decisão interna com a data (mais antiga) do fornecedor, sem ninguém perceber. O descarte fica no
+`AuditLog`.
+
+⚠⚠ **RECUSAR AVISA O FORNECEDOR POR E-MAIL** (achado do Codex). Recusa silenciosa é pior que não
+ter o fluxo: ele viu "recebido" na tela e segue achando que a data está combinada — a Torg programa
+o pátio para uma data e ele carrega para outra. ⚠ O aviso nunca derruba a recusa (já gravada), mas
+a tela diz em **vermelho** quando o e-mail falhou ou o fornecedor não tem endereço: quem recusou
+precisa saber que ninguém foi avisado.
+
+⚠ **O histórico guarda o prefixo `[Fornecedor]` e o que ELE escreveu** — nunca o comentário de quem
+aprovou. É por esse prefixo que o GET público decide o que devolver, e um texto interno colado ali
+vazaria pelo link. Quem aprovou fica em `alteradoPorId`.
+
+⚠ **A página do fornecedor diz "em análise"** e "enviada", nunca "registrada com sucesso" — senão
+ele programa o carregamento para uma data que a Torg ainda não aceitou. E sem o bloco de análise
+ele voltava ao link, via o prazo antigo intacto e reenviava (cada reenvio é outro aviso).
+
+⚠⚠ **PRAZO SE FORMATA EM UTC, NÃO EM SÃO PAULO** (18/09/2026). A data vem de um
+`<input type="date">`: "2026-11-20" é meia-noite UTC, e meia-noite UTC em São Paulo ainda é o
+**dia 19**. O e-mail de aviso e a página do fornecedor mostravam um dia ANTES do que ele digitou,
+enquanto a tela de Compras (que já formatava em UTC) mostrava o certo. ⚠ Isso vale para PRAZO; o
+carimbo de *quando* algo aconteceu continua em `America/Sao_Paulo`.
+
 ### De quem é a data que está valendo
 ⚠⚠ **O CARTÃO MOSTRAVA SÓ A DATA NOVA**, indistinguível da original. Quem olha a tela precisa
 diferenciar *"esta data veio do fornecedor ontem, depois de cobrarmos"* de *"esta data sempre foi
