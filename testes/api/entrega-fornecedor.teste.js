@@ -5,9 +5,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockPrisma } from "@/testes/apoio/prisma";
 
-const mocks = vi.hoisted(() => ({ avisar: vi.fn() }));
+const mocks = vi.hoisted(() => ({ avisar: vi.fn(), cota: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma, prismaDirect: mockPrisma }));
-vi.mock("@/lib/resposta-fornecedor", () => ({ avisarResposta: mocks.avisar }));
+vi.mock("@/lib/resposta-fornecedor", () => ({
+  avisarResposta: mocks.avisar, podeEscrever: mocks.cota,
+}));
 
 import { PATCH } from "@/app/api/fornecedores/entrega/[token]/route";
 
@@ -32,6 +34,7 @@ beforeEach(() => {
   mockPrisma.prazoHistorico.create.mockResolvedValue({});
   mockPrisma.auditLog.create.mockResolvedValue({});
   mocks.avisar.mockResolvedValue({ avisado: true });
+  mocks.cota.mockResolvedValue({ ok: true });
 });
 
 describe("o corpo tem de escolher UMA resposta", () => {
@@ -232,5 +235,29 @@ describe("⚠ a resposta não deixa rastro do token", () => {
     const res = await PATCH(req({ novoPrazo: "2026-10-01" }), { params });
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+  });
+});
+
+describe("⚠⚠ o teto de escrita do token", () => {
+  // ⚠⚠ ACHADO DO CODEX (18/09/2026): a rota é pública e a escrita não tinha teto — só o e-mail
+  // tinha. Alternar data e motivo abria transação e gravava auditoria à vontade.
+  it("estourando a cota, devolve 429 e NÃO grava nada", async () => {
+    mocks.cota.mockResolvedValue({ ok: false, motivo: "Muitas respostas em pouco tempo." });
+    const res = await PATCH(req({ novoPrazo: "2026-10-01" }), { params });
+    expect(res.status).toBe(429);
+    expect(mockPrisma.pedidoOmie.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  // ⚠ A cota é conferida ANTES da gravação — não adianta limitar depois de já ter escrito.
+  it("a cota é consultada antes de qualquer escrita", async () => {
+    await PATCH(req({ novoPrazo: "2026-10-01" }), { params });
+    expect(mocks.cota).toHaveBeenCalledWith(expect.anything(), "p1");
+  });
+
+  it("declarar entrega passa pelo mesmo teto", async () => {
+    mocks.cota.mockResolvedValue({ ok: false, motivo: "Muitas respostas hoje." });
+    const res = await PATCH(req({ entregue: true, nfNumero: "123" }), { params });
+    expect(res.status).toBe(429);
   });
 });

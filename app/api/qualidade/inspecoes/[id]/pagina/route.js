@@ -9,9 +9,17 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { baixarDesenho, garantirDesenhos } from "@/lib/relatorio-dimensional";
 import { vetoresDaPagina } from "@/lib/vista-desenho";
+import { espacoDaPagina, recorteAproveitavel } from "@/lib/geometria-pagina";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+/** O espaço da folha, só para decidir se o recorte gravado ainda vale. */
+async function espacoDoPdf(bytes) {
+  const { getDocumentProxy } = await import("unpdf");
+  const doc = await getDocumentProxy(new Uint8Array(bytes));
+  return espacoDaPagina(await doc.getPage(1));
+}
 
 export async function GET(req, { params }) {
   try { await requireRole(["ADMIN", "QUALIDADE", "QUALIDADE_CAMPO"]); }
@@ -35,5 +43,14 @@ export async function GET(req, { params }) {
   const v = await vetoresDaPagina(bytes).catch(() => null);
   if (!v) return NextResponse.json({ error: "Não consegui ler a geometria desta folha." }, { status: 422 });
 
-  return NextResponse.json({ marca: d.marca, recorte: d.recorte || null, ...v });
+  // ⚠⚠ NÃO PRÉ-CARREGA RECORTE QUE NÃO VALE MAIS. Gravado antes de 18/09/2026 numa folha girada,
+  // ele foi escolhido sob outro contrato de coordenadas: mostrá-lo aqui faria a pessoa achar que
+  // o enquadramento dela está preservado, quando ele aponta para outro pedaço da folha.
+  const aproveita = recorteAproveitavel(d.recorte, await espacoDoPdf(bytes));
+  return NextResponse.json({
+    marca: d.marca,
+    recorte: aproveita.ok ? d.recorte || null : null,
+    recorteAntigoIgnorado: !!d.recorte && !aproveita.ok,
+    ...v,
+  });
 }

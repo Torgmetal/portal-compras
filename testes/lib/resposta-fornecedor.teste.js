@@ -10,7 +10,7 @@ vi.mock("@/lib/email", () => ({ sendEmail: mocks.email }));
 
 import {
   avisarResposta, podeAvisar, textoDoAviso, destinosDoAviso,
-  INTERVALO_AVISO_MS, TETO_AVISOS_DIA,
+  INTERVALO_AVISO_MS, TETO_AVISOS_DIA, podeEscrever, ESCRITAS_MAX_HORA, ESCRITAS_MAX_DIA,
 } from "@/lib/resposta-fornecedor";
 
 const PEDIDO = { id: "p1", numeroPedido: "1977", fornecedorNome: "SOUFER", rmNumero: "T118-001-R00" };
@@ -139,5 +139,46 @@ describe("avisarResposta", () => {
     expect(r.avisado).toBe(false);
     expect(mocks.email).not.toHaveBeenCalled();
     expect(mocks.sino).not.toHaveBeenCalled();
+  });
+});
+
+describe("⚠⚠ o teto de ESCRITA do token (não o de aviso)", () => {
+  // ⚠⚠ ACHADO DO CODEX (18/09/2026): as travas de aviso limitam o E-MAIL, não o banco. Quem tem um
+  // token podia alternar data e motivo à vontade — cada chamada abria transação, gravava auditoria
+  // e gerava proposta nova, fazendo a tela de Compras colher 409 atrás de 409.
+  const comEscritas = (n, minutosAtras = 1) => ({
+    auditLog: {
+      findMany: vi.fn().mockResolvedValue(
+        Array.from({ length: n }, () => ({ createdAt: new Date(Date.now() - minutosAtras * 60_000) })),
+      ),
+    },
+  });
+
+  it("fornecedor normal passa sem nem perceber", async () => {
+    expect((await podeEscrever(comEscritas(3), "p1")).ok).toBe(true);
+  });
+
+  it("estourando o teto da hora, recusa", async () => {
+    const r = await podeEscrever(comEscritas(ESCRITAS_MAX_HORA), "p1");
+    expect(r.ok).toBe(false);
+    expect(r.motivo).toMatch(/pouco tempo/i);
+  });
+
+  // ⚠ O teto da hora conta só o que é recente; escrita de ontem não pode travar hoje.
+  it("escritas antigas não contam para o teto da hora", async () => {
+    expect((await podeEscrever(comEscritas(ESCRITAS_MAX_HORA, 120), "p1")).ok).toBe(true);
+  });
+
+  it("o teto do dia é a defesa que sobra", async () => {
+    const r = await podeEscrever(comEscritas(ESCRITAS_MAX_DIA, 120), "p1");
+    expect(r.ok).toBe(false);
+    expect(r.motivo).toMatch(/hoje/i);
+  });
+
+  // ⚠⚠ AO CONTRÁRIO DE `podeAvisar`, ESTE FALHA ABERTO. Não conseguir ler o limite aqui
+  // significaria o fornecedor não conseguir responder — e a resposta dele é o propósito do link.
+  it("⚠⚠ falhar a leitura NÃO impede o fornecedor de responder", async () => {
+    const prisma = { auditLog: { findMany: vi.fn().mockRejectedValue(new Error("banco fora")) } };
+    expect((await podeEscrever(prisma, "p1")).ok).toBe(true);
   });
 });

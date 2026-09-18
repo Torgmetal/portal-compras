@@ -640,6 +640,20 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
 
   const conteudo = (
     <div className={amplo ? "fixed inset-0 z-50 bg-white p-4 overflow-auto" : ""}>
+      {/* ⚠⚠ O RECORTE SUMIU E A PESSOA PRECISA SABER POR QUÊ. Recorte gravado antes de 18/09/2026
+          numa folha girada foi escolhido sob outro contrato de coordenadas — reaplicá-lo poria o
+          enquadramento noutro pedaço da folha, e as cotas marcadas em cima dele iriam junto. Some
+          calado, ela reclamaria que o portal "perdeu" o recorte (achado do Codex). */}
+      {dados.recorteAntigoIgnorado && (
+        <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2 flex items-start gap-1.5">
+          <AlertCircle size={13} className="mt-0.5 shrink-0" />
+          <span>
+            O recorte salvo para este desenho é anterior à correção de orientação da folha e não
+            vale mais — a vista voltou ao recorte automático. Refaça em <b>ajustar recorte</b>, e
+            confira as cotas marcadas antes desta data.
+          </span>
+        </p>
+      )}
       <div className="flex items-start justify-between gap-3 mb-1.5">
         <p className="text-[11px] text-torg-gray">
           {borracha

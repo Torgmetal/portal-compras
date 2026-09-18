@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { ESPACO_ATUAL } from "@/lib/geometria-pagina";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -37,7 +38,9 @@ export async function POST(req, { params }) {
   const novo = desenhos.map((d, idx) => {
     if (idx !== i) return d;
     if (!valido) { const { recorte: _recorte, ...resto } = d; return resto; }
-    return { ...d, recorte: { left: r.left, right: r.right, bottom: r.bottom, top: r.top } };
+    // ⚠⚠ CARIMBA A VERSÃO DO ESPAÇO DE COORDENADAS. Recorte sem carimbo é de antes de 18/09/2026
+    // e não pode ser reaplicado às cegas numa folha girada — ver `recorteAproveitavel`.
+    return { ...d, recorte: { left: r.left, right: r.right, bottom: r.bottom, top: r.top, espaco: ESPACO_ATUAL } };
   });
 
   await prisma.relatorioInspecao.update({ where: { id }, data: { desenhos: novo } });

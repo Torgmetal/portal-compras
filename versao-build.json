@@ -1,7 +1,12 @@
 {
-  "build": 3283,
-  "gerado": "2026-09-18T20:49:44.149Z",
+  "build": 3284,
+  "gerado": "2026-09-18T21:00:49.517Z",
   "commits": [
+    {
+      "hash": "c92e64cd32",
+      "data": "18/09/2026",
+      "titulo": "Registra as duas revisões pedidas à mão e o que ficou pendente"
+    },
     {
       "hash": "b448052a64",
       "data": "18/09/2026",
@@ -146,11 +151,6 @@
       "hash": "01d4dae633",
       "data": "17/09/2026",
       "titulo": "CIF ou FOB: o fornecedor responde, e os Prazos das RMs dizem o que precisa de coleta"
-    },
-    {
-      "hash": "e11b9b7657",
-      "data": "17/09/2026",
-      "titulo": "Ausência não é reabertura: desmarcar passa a exigir evidência positiva"
     }
   ]
 }

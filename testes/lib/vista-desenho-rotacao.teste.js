@@ -13,7 +13,10 @@
 import { describe, it, expect } from "vitest";
 import { PDFDocument, rgb, degrees } from "pdf-lib";
 import { vetoresDaPagina, vetoresDaVista, recortarVista } from "@/lib/vista-desenho";
-import { espacoDaPagina, aplicar } from "@/lib/geometria-pagina";
+import { espacoDaPagina, aplicar, ESPACO_ATUAL } from "@/lib/geometria-pagina";
+
+/** Um recorte escolhido AGORA — a tela carimba a versão do espaço ao salvar. */
+const recorteNovo = (c) => ({ ...c, espaco: ESPACO_ATUAL });
 
 const W = 842, H = 1191; // folha CRUA em retrato; com /Rotate 90 ou 270 vira paisagem
 
@@ -152,7 +155,7 @@ describe("⚠⚠ o recorte manual devolve o que foi enquadrado", () => {
   it.each(ANGULOS)("/Rotate %i: pedir a folha inteira devolve a folha inteira", async (rot) => {
     const d = dims(rot);
     const r = await recortarVista(await folha(rot), {
-      caixaManual: { left: 0, bottom: 0, right: d.largura, top: d.altura },
+      caixaManual: recorteNovo({ left: 0, bottom: 0, right: d.largura, top: d.altura }),
     });
     expect(r).not.toBeNull();
     expect(Math.round(r.largura)).toBe(d.largura);
@@ -163,7 +166,7 @@ describe("⚠⚠ o recorte manual devolve o que foi enquadrado", () => {
   // troca de largura por altura. Um retângulo deitado, sim.
   it.each(ANGULOS)("/Rotate %i: caixa assimétrica sai com as medidas pedidas", async (rot) => {
     const d = dims(rot);
-    const caixa = { left: 40, bottom: 60, right: 40 + d.largura * 0.6, top: 60 + d.altura * 0.3 };
+    const caixa = recorteNovo({ left: 40, bottom: 60, right: 40 + d.largura * 0.6, top: 60 + d.altura * 0.3 });
     const r = await recortarVista(await folha(rot), { caixaManual: caixa });
     expect(Math.round(r.largura)).toBe(Math.round(caixa.right - caixa.left));
     expect(Math.round(r.altura)).toBe(Math.round(caixa.top - caixa.bottom));
@@ -173,11 +176,11 @@ describe("⚠⚠ o recorte manual devolve o que foi enquadrado", () => {
   // recortado saísse girado dentro de uma página com as medidas certas, a cota cairia fora da peça.
   it.each(ANGULOS)("/Rotate %i: o conteúdo recortado vem junto, não fica para trás", async (rot) => {
     const d = dims(rot);
-    const caixa = { left: 0, bottom: 0, right: d.largura, top: d.altura };
+    const caixa = recorteNovo({ left: 0, bottom: 0, right: d.largura, top: d.altura });
     const v = await vetoresDaVista(await folha(rot), { caixaManual: caixa });
     expect(v).not.toBeNull();
     const base = await vetoresDaVista(await folha(0), {
-      caixaManual: { left: 0, bottom: 0, right: W, top: H },
+      caixaManual: recorteNovo({ left: 0, bottom: 0, right: W, top: H }),
     });
     // mesma folha, mesmo conteúdo: a contagem de traço não pode cair porque alguém girou o papel
     expect(v.segs.length).toBeGreaterThanOrEqual(Math.round(base.segs.length * 0.9));
@@ -240,7 +243,7 @@ describe("⚠⚠ sem rotação, nada muda", () => {
   });
 
   it("recorte manual sem rotação devolve exatamente a caixa pedida", async () => {
-    const caixa = { left: 100, bottom: 200, right: 700, top: 900 };
+    const caixa = recorteNovo({ left: 100, bottom: 200, right: 700, top: 900 });
     const r = await recortarVista(await folha(0), { caixaManual: caixa });
     expect(Math.round(r.largura)).toBe(600);
     expect(Math.round(r.altura)).toBe(700);
@@ -332,5 +335,94 @@ describe("⚠⚠ caminho fechado (`closePath`) não perde o lado de fechamento",
         expect(y).toBeLessThanOrEqual(v.altura + 2);
       }
     }
+  });
+});
+
+describe("⚠⚠ desenho dentro de Form XObject com `/Matrix` própria", () => {
+  // ⚠⚠ ACHADO DO CODEX, confirmado por medição (18/09/2026). O pdf.js emite a COLOCAÇÃO do form
+  // como `transform` — que todos os percorredores já tratavam — e a `/Matrix` INTERNA do form à
+  // parte. Só `segsDoConteudo` tratava essa segunda. Resultado: o vetor mostrado na tela via a
+  // peça no lugar certo, enquanto o recorte automático e a detecção de moldura/carimbo a
+  // procuravam em coordenadas cruas. As duas metades do módulo discordavam sobre onde está a peça.
+  //
+  // ⚠ O PDF é montado à mão porque o pdf-lib não expõe como dar `/Matrix` não-identidade a um
+  // form: `embedPdf` sempre gera identidade, e era justamente o caso identidade que já passava.
+  async function folhaComForm() {
+    const { PDFDocument, PDFName, PDFRawStream } = await import("pdf-lib");
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([600, 400]);
+    const ctx = doc.context;
+    // dentro do form: uma vertical em x=10 (y 10..110) e uma horizontal em y=10 (x 10..110)
+    const conteudo = "2 w 0 0 0 RG 10 10 m 10 110 l S 10 10 m 110 10 l S\n";
+    const dict = ctx.obj({
+      Type: "XObject", Subtype: "Form", FormType: 1, BBox: [0, 0, 300, 300],
+      Matrix: [2, 0, 0, 2, 50, 30], Resources: ctx.obj({}), Length: conteudo.length,
+    });
+    page.node.setXObject(PDFName.of("Fx1"),
+      ctx.register(PDFRawStream.of(dict, Buffer.from(conteudo, "latin1"))));
+    page.node.set(PDFName.of("Contents"),
+      ctx.register(PDFRawStream.of(ctx.obj({ Length: 8 }), Buffer.from("/Fx1 Do\n", "latin1"))));
+    return Buffer.from(await doc.save());
+  }
+
+  const OPERADORES = async (bytes) => {
+    const { getDocumentProxy, getResolvedPDFJS } = await import("unpdf");
+    const { OPS } = await getResolvedPDFJS();
+    const pg = await (await getDocumentProxy(new Uint8Array(bytes))).getPage(1);
+    return { ol: await pg.getOperatorList(), OPS };
+  };
+
+  // Com `/Matrix [2 0 0 2 50 30]`: x=10 → 2·10+50 = 70; y=10 → 2·10+30 = 50.
+  it("⚠⚠ os detectores de linha aplicam a matriz do form", async () => {
+    const { verticais, horizontais } = await import("@/lib/campos-desenho");
+    const { ol, OPS } = await OPERADORES(await folhaComForm());
+    expect(verticais(ol, OPS)).toEqual([{ x: 70, y1: 50, y2: 250 }]);
+    expect(horizontais(ol, OPS)).toEqual([{ y: 50, x1: 70, x2: 270 }]);
+  });
+
+  // ⚠ A prova de que as duas metades voltaram a concordar: o extrator de vetor já acertava, e
+  // agora os detectores chegam no mesmo lugar.
+  it("o vetor extraído concorda com os detectores", async () => {
+    const bytes = await folhaComForm();
+    const v = await vetoresDaPagina(bytes);
+    const xs = v.segs.flatMap((s) => [s[0], s[2]]);
+    const ys = v.segs.flatMap((s) => [s[1], s[3]]);
+    expect(Math.min(...xs)).toBe(70);
+    expect(Math.max(...xs)).toBe(270);
+    expect(Math.min(...ys)).toBe(50);
+    expect(Math.max(...ys)).toBe(250);
+  });
+});
+
+describe("⚠⚠ recorte gravado antes da correção", () => {
+  // ⚠⚠ ACHADO DO CODEX: "não reinterpretar silenciosamente". A caixa antiga foi escolhida sobre
+  // uma folha cuja geometria estava truncada; reaplicá-la calada poria o enquadramento noutro
+  // pedaço, levando junto as cotas marcadas em cima dele.
+  const semCarimbo = { left: 100, bottom: 100, right: 700, top: 600 };
+
+  it("⚠⚠ em folha GIRADA é ignorado, e o aviso chega à tela", async () => {
+    const r = await recortarVista(await folhaVisual(90, desenhoRealista), { caixaManual: semCarimbo });
+    expect(r.recorteAntigoIgnorado).toBe(true);
+    // caiu no automático: não tem as medidas da caixa pedida
+    expect(Math.round(r.largura)).not.toBe(600);
+  });
+
+  // ⚠ Onde a matriz é identidade os dois contratos COINCIDEM. Descartar aqui seria jogar fora o
+  // enquadramento de quem já fez o trabalho — e é a esmagadora maioria das folhas.
+  it("⚠ em folha SEM giro continua valendo, sem aviso", async () => {
+    const r = await recortarVista(await folhaVisual(0, desenhoRealista), { caixaManual: semCarimbo });
+    expect(r.recorteAntigoIgnorado).toBe(false);
+    expect(Math.round(r.largura)).toBe(600);
+    expect(Math.round(r.altura)).toBe(500);
+  });
+
+  it("recorte carimbado vale em folha girada", async () => {
+    const d = dims(90);
+    const r = await recortarVista(await folhaVisual(90, desenhoRealista), {
+      caixaManual: recorteNovo({ left: 100, bottom: 100, right: 700, top: 600 }),
+    });
+    expect(r.recorteAntigoIgnorado).toBe(false);
+    expect(Math.round(r.largura)).toBe(600);
+    expect(d.largura).toBe(VL);
   });
 });

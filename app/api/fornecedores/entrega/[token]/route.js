@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { avisarResposta } from "@/lib/resposta-fornecedor";
+import { avisarResposta, podeEscrever } from "@/lib/resposta-fornecedor";
 import { novaPropostaId, propostaPendente, ehRepeticao } from "@/lib/prazo-proposto";
 
 // ⚠ Página de token: nada daqui pode ficar em cache intermediário, e o token não pode vazar no
@@ -310,6 +310,13 @@ export async function PATCH(req, { params }) {
   const pedido = await pedidoDoToken(token);
   if (!pedido) return responder({ error: "Token invalido" }, 404);
   if (pedido.dataEntregaReal) return responder({ error: "Este pedido ja foi entregue." }, 400);
+
+  // ⚠⚠ TETO DE ESCRITA POR TOKEN, antes de qualquer gravação (achado do Codex, 18/09/2026). As
+  // travas de aviso limitavam o E-MAIL, não o banco: alternar data e motivo abria transação e
+  // gravava auditoria sem limite nenhum. 429 é a resposta certa — o pedido é válido, só veio
+  // vezes demais.
+  const cota = await podeEscrever(prisma, pedido.id);
+  if (!cota.ok) return responder({ error: cota.motivo }, 429);
 
   let r;
   try {

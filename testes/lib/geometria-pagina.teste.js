@@ -5,7 +5,8 @@
 // todo traço que passasse da dimensão trocada.
 import { describe, it, expect } from "vitest";
 import {
-  aplicar, inverter, ehIdentidade, caixaParaCru, caixaDoTexto, espacoDaPagina, IDENTIDADE,
+  aplicar, inverter, ehIdentidade, caixaParaCru, caixaDoTexto, espacoDaPagina,
+  recorteAproveitavel, ESPACO_ATUAL, IDENTIDADE,
 } from "@/lib/geometria-pagina";
 
 /**
@@ -160,5 +161,37 @@ describe("a caixa do texto sai dos quatro cantos", () => {
   it("largura ou altura zerada não gera NaN", () => {
     const c = caixaDoTexto([0, 0, 0, 0, 10, 20], 0, 0);
     expect(Object.values(c).every(Number.isFinite)).toBe(true);
+  });
+});
+
+describe("⚠⚠ recorte gravado sob o contrato antigo não é reaplicado às cegas", () => {
+  // ⚠⚠ ACHADO DO CODEX (18/09/2026): "não reinterpretar silenciosamente". Até a correção, a caixa
+  // escolhida à mão era entregue CRUA ao `embedPage`, sobre uma folha cuja geometria podia estar
+  // truncada. Reaplicá-la agora poria o recorte noutro lugar — e as cotas marcadas em cima dele
+  // iriam junto.
+  const caixa = { left: 10, bottom: 20, right: 300, top: 400 };
+  const semGiro = { girada: false };
+  const comGiro = { girada: true };
+
+  it("recorte novo (carimbado) vale em qualquer folha", () => {
+    const novo = { ...caixa, espaco: ESPACO_ATUAL };
+    expect(recorteAproveitavel(novo, comGiro).ok).toBe(true);
+    expect(recorteAproveitavel(novo, semGiro).ok).toBe(true);
+  });
+
+  // ⚠ Onde a matriz é identidade os dois contratos COINCIDEM — e é a esmagadora maioria das
+  // folhas. Descartar esses recortes seria quebrar o trabalho de quem já enquadrou.
+  it("⚠ recorte antigo continua valendo em folha sem giro", () => {
+    expect(recorteAproveitavel(caixa, semGiro).ok).toBe(true);
+  });
+
+  it("⚠⚠ recorte antigo em folha girada é RECUSADO, com motivo", () => {
+    const r = recorteAproveitavel(caixa, comGiro);
+    expect(r.ok).toBe(false);
+    expect(r.motivo).toMatch(/antig/i);
+  });
+
+  it("sem recorte nenhum, não há o que aproveitar", () => {
+    expect(recorteAproveitavel(null, semGiro).ok).toBe(false);
   });
 });

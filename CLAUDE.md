@@ -641,9 +641,27 @@ escrever o teste do retângulo). O pdf-lib e vários CADs escrevem um retângulo
 É outro caminho para "o desenho vem incompleto", independente de rotação. Corrigido nos quatro
 percorredores de path (`pontosDaPagina`, `segsDoConteudo`, `verticais`, `horizontais`).
 
+⚠⚠ **A `/Matrix` PRÓPRIA DO FORM XOBJECT NÃO VEM COMO `transform`.** O pdf.js emite a COLOCAÇÃO do
+form como `transform` (que todo percorredor já tratava) e a matriz INTERNA à parte. Só
+`segsDoConteudo` tratava a segunda: o vetor na tela via a peça no lugar certo enquanto o recorte
+automático e a detecção de moldura/carimbo a procuravam em coordenadas cruas — as duas metades do
+módulo discordando sobre onde está a peça. Medido com `/Matrix [2 0 0 2 50 30]`: vertical em x=10
+no lugar de x=70 (achado do Codex, 18/09/2026).
+
+⚠⚠ **RECORTE GRAVADO ANTES DE 18/09/2026 NÃO É REAPLICADO ÀS CEGAS.** Ele foi escolhido sob outro
+contrato de coordenadas, sobre uma folha que podia estar truncada. O recorte salvo leva
+`espaco: ESPACO_ATUAL`; sem carimbo, ele só vale onde a matriz da página é a IDENTIDADE (os dois
+contratos coincidem). Em folha girada é **ignorado**, a vista volta ao automático e a tela diz por
+quê — sumir calado faria parecer que o portal perdeu o recorte (achado do Codex).
+
+⚠ **A decisão é POR DESENHO, na hora de ler — não por migração.** Não há como saber quais folhas
+são giradas sem abrir cada PDF, e as credenciais do SharePoint não saem da Vercel.
+
 ⚠⚠ **RELATÓRIO DE FOLHA GIRADA QUE JÁ TINHA COTA MARCADA PRECISA SER REMARCADO.** A cota foi
-marcada sobre uma vista que estava errada; não há como reinterpretá-la, e o portal não tem como
-adivinhar sozinho. Folha `0°` não é afetada (a matriz é a identidade).
+marcada sobre uma vista que estava errada; não há como reinterpretá-la. ⚠ E o corte NÃO é
+"`/Rotate 0` está a salvo": é **matriz identidade** — `/Rotate 0` com **CropBox deslocada** também
+é afetado, e **180° preserva as dimensões** (podia ter recorte e cota válidos antes). Foi por isso
+que a tela passou a avisar em vez de eu confiar numa linha de documentação.
 
 ⚠ **Não confundir com o mascaramento branco**, que é outro mecanismo: as tabelas que caem dentro do
 recorte são cobertas de branco, e isso **nunca** roda no recorte manual (Vitor, 03/09/2026 — ele
@@ -837,6 +855,14 @@ como pendente e o fornecedor responde "já mandamos" — com razão.
 a porta com quem a Torg vai precisar na semana que vem.
 ⚠ **Cópia para `matheus@` e `compras@`** (env `COBRANCA_ATRASO_CC`), **respostas para `compras@`**
 (caixa da área, não some quando alguém sai de férias). A tela mostra os dois ANTES do clique.
+
+⚠⚠ **A ESCRITA PÚBLICA TEM TETO, e ele é diferente do teto de aviso** (achado do Codex,
+18/09/2026). As travas de aviso limitavam o **e-mail**, não o banco: alternar data e motivo abria
+transação, gravava auditoria e gerava proposta nova sem limite — e ainda fazia a tela de Compras
+colher 409 atrás de 409. `podeEscrever` corta em **10 por hora e 30 por dia** por pedido, com
+**429**. ⚠ Tetos folgados de propósito: é anti-abuso, não controle de fluxo. ⚠⚠ E este **falha
+ABERTO**, ao contrário de `podeAvisar` — não conseguir ler o limite ali atrasa um aviso; aqui
+impediria o fornecedor de responder, que é o propósito inteiro do link.
 
 ### O fornecedor responde — e agora alguém fica sabendo
 `/fornecedores/entrega/<token>` é **público, sem login** — o link vai no e-mail de cobrança, um por
