@@ -1,7 +1,12 @@
 {
-  "build": 3277,
-  "gerado": "2026-09-18T17:00:04.345Z",
+  "build": 3278,
+  "gerado": "2026-09-18T18:12:30.363Z",
   "commits": [
+    {
+      "hash": "20b77e3d9c",
+      "data": "18/09/2026",
+      "titulo": "Remove o \"Enviar teste para mim\" da cobrança, como combinado"
+    },
     {
       "hash": "572d4d97e9",
       "data": "18/09/2026",
@@ -146,11 +151,6 @@
       "hash": "2a8d930526",
       "data": "17/09/2026",
       "titulo": "Aditivo: abertura em página própria, com a receita digitada à mão (descrição, peso, unitário)"
-    },
-    {
-      "hash": "5256542b45",
-      "data": "17/09/2026",
-      "titulo": "Os 3 testes vermelhos eram contratos velhos, não regressões — suíte volta a 100%"
     }
   ]
 }
