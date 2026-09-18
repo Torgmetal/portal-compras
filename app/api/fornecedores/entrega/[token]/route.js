@@ -3,13 +3,30 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { avisarResposta } from "@/lib/resposta-fornecedor";
+
+// ⚠ Página de token: nada daqui pode ficar em cache intermediário, e o token não pode vazar no
+// `Referer` de um clique para fora (achado do Codex, 18/09/2026).
+const SEM_RASTRO = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" };
+const responder = (corpo, status = 200) => NextResponse.json(corpo, { status, headers: SEM_RASTRO });
+
+/** O prefixo que separa o que o fornecedor escreveu do comentário interno de Compras. */
+const MARCA_FORNECEDOR = "[Fornecedor]";
 
 // ── GET: retorna dados do pedido para a pagina publica ──
 export async function GET(_req, { params }) {
   const { token } = params;
 
+  // ⚠ Duas consultas de propósito: o `where` dos recebimentos precisa do id do pedido, e ele só
+  // se conhece depois de resolver o token.
+  const achado = await prisma.pedidoOmie.findUnique({
+    where: { tokenEntrega: token }, select: { id: true },
+  });
+  if (!achado) return responder({ error: "Token invalido" }, 404);
+  const pedidoDoToken = achado;
+
   const pedido = await prisma.pedidoOmie.findUnique({
-    where: { tokenEntrega: token },
+    where: { id: pedidoDoToken.id },
     select: {
       id: true,
       numeroPedido: true,
@@ -33,7 +50,12 @@ export async function GET(_req, { params }) {
                   qtd: true,
                   unidade: true,
                   peso: true,
+                  // ⚠⚠ SÓ OS RECEBIMENTOS DESTE PEDIDO (achado do Codex, 18/09/2026). Um RMItem
+                  // pode ser atendido por mais de um pedido; somando todos, o saldo mostrado ao
+                  // fornecedor incluiria quantidade que outro entregou. Medido: 0 casos hoje —
+                  // é defeito estrutural, não incidente.
                   recebimentos: {
+                    where: { pedidoOmieId: pedidoDoToken.id },
                     select: { qtdRecebida: true },
                   },
                 },
@@ -50,6 +72,7 @@ export async function GET(_req, { params }) {
           unidade: true,
           peso: true,
           recebimentos: {
+            where: { pedidoOmieId: pedidoDoToken.id },
             select: { qtdRecebida: true },
           },
         },
@@ -66,10 +89,6 @@ export async function GET(_req, { params }) {
       },
     },
   });
-
-  if (!pedido) {
-    return NextResponse.json({ error: "Token invalido" }, { status: 404 });
-  }
 
   // Montar itens com saldo pendente
   const itensCotacao = pedido.cotacao?.itens?.map((ci) => {
@@ -107,86 +126,142 @@ export async function GET(_req, { params }) {
     jaEntregue: !!pedido.dataEntregaReal,
     itensPendentes,
     totalItens: itens.length,
-    prazoHistorico: pedido.prazoHistorico,
-  });
+    // ⚠⚠ SÓ O QUE O PRÓPRIO FORNECEDOR ESCREVEU (achado do Codex, 18/09/2026). O mesmo
+    // `PrazoHistorico` guarda o comentário INTERNO de quem altera prazo por dentro
+    // (`/api/compras/entregas/prazo`), sem prefixo nenhum — e esta rota é pública. Medido em
+    // 18/09/2026: 15 das 17 linhas são internas, e uma delas já tinha texto ("Ajuste manual de
+    // prazo por ter importado errado do pedido"). Inofensivo hoje; estrutural sempre, e o link
+    // agora vai para oito fornecedores de uma vez.
+    //
+    // ⚠ A data e o prazo de CADA alteração continuam à vista — o fornecedor precisa conferir o
+    // que combinou. O que sai é o TEXTO interno.
+    prazoHistorico: (pedido.prazoHistorico || []).map((h) => ({
+      prazoAnterior: h.prazoAnterior,
+      prazoNovo: h.prazoNovo,
+      criadoEm: h.criadoEm,
+      motivo: String(h.motivo || "").startsWith(MARCA_FORNECEDOR) ? h.motivo : null,
+    })),
+  }, { headers: SEM_RASTRO });
 }
 
-// ── PATCH: fornecedor informa nova data ──
+// ── PATCH: o fornecedor responde ────────────────────────────────────────────
+//
+// Duas respostas possíveis, e o corpo tem de escolher UMA (união estrita do Zod): informar nova
+// PREVISÃO, ou declarar que já ENTREGOU, com o número da NF.
+//
+// ⚠⚠ DECLARAR ENTREGA NÃO É ENTREGAR. Nada aqui escreve `dataEntregaReal`, `statusEntrega` nem
+// `nfNumero` — esses vêm da NF de entrada REAL, pelo cron `sync-entregas`. Um terceiro sem login
+// mudando a crença do portal sobre o que chegou faria o pedido sumir do vermelho e da lista de
+// cobrança sem ninguém da Torg ter conferido nada. A declaração fica em colunas próprias
+// (`fornecedorEntregaEm`, `fornecedorNfNumero`), alguém confere, e o pedido CONTINUA cobrável até
+// lá (achado do Codex, 18/09/2026).
+
+// ⚠ NF é texto: zero à esquerda importa, e "consertar" a entrada apagaria dígito de quem digitou
+// certo. Só apara espaço, limita tamanho e recusa quebra de linha e caractere de controle.
+const semControle = (v) => [...v].every((c) => c.codePointAt(0) >= 0x20 && c.codePointAt(0) !== 0x7f);
+const nf = z.string().trim().min(1, "Informe o número da NF").max(40, "Número de NF longo demais")
+  .refine(semControle, "Número de NF inválido");
+
+// ⚠⚠ UMA RESPOSTA DE CADA VEZ, e a checagem é no `superRefine` — NÃO num `z.union` com
+// `z.undefined()` nos campos da outra metade. No **Zod 4** `z.undefined()` é NÃO-OPCIONAL: chave
+// ausente falha com "expected nonoptional, received undefined", e as DUAS metades da união
+// recusavam o corpo correto. Custou uma bateria inteira de teste vermelho (18/09/2026).
 const patchSchema = z.object({
-  novoPrazo: z.string().min(1, "Data obrigatoria"),
+  novoPrazo: z.string().min(1, "Data obrigatoria").optional(),
+  entregue: z.literal(true).optional(),
+  nfNumero: nf.optional(),
   motivo: z.string().max(500).optional(),
+}).superRefine((v, ctx) => {
+  const quer = [v.novoPrazo !== undefined, v.entregue === true].filter(Boolean).length;
+  if (quer !== 1) {
+    ctx.addIssue({ code: "custom",
+      message: "Informe uma nova previsão OU marque o pedido como entregue" });
+    return;
+  }
+  // ⚠ A nota é o que torna a declaração conferível: "entreguei" sem número não dá para checar.
+  if (v.entregue && !v.nfNumero) {
+    ctx.addIssue({ code: "custom", path: ["nfNumero"], message: "Informe o número da NF" });
+  }
+  if (v.novoPrazo !== undefined && v.nfNumero !== undefined) {
+    ctx.addIssue({ code: "custom", message: "Nota fiscal só vai com a declaração de entrega" });
+  }
 });
 
-export async function PATCH(req, { params }) {
-  const { token } = params;
+/** O pedido que o token abre, com o que o PATCH precisa decidir. */
+const pedidoDoToken = (token) => prisma.pedidoOmie.findUnique({
+  where: { tokenEntrega: token },
+  select: {
+    id: true, numeroPedido: true, fornecedorNome: true,
+    prazoEntregaPrevisto: true, prazoOriginal: true, dataEntregaReal: true,
+    encerradoOmieEm: true, fornecedorEntregaEm: true, fornecedorNfNumero: true,
+    rmItens: { select: { rm: { select: { numero: true } } }, take: 1 },
+  },
+});
 
-  let body;
-  try {
-    body = patchSchema.parse(await req.json());
-  } catch (e) {
-    return NextResponse.json(
-      { error: "Dados invalidos: " + (e.issues?.[0]?.message || e.message) },
-      { status: 400 }
-    );
+/** O fornecedor declara que já entregou. Declaração, não fato. */
+async function declararEntrega(pedido, body) {
+  const agora = new Date();
+  // ⚠⚠ REPETIÇÃO IDÊNTICA É SUCESSO SEM EVENTO (achado do Codex). Sem isto, recarregar a página e
+  // reenviar viraria outro aviso — e a rota é pública.
+  if (pedido.fornecedorEntregaEm && pedido.fornecedorNfNumero === body.nfNumero) {
+    return { repetido: true, resposta: { entregue: true, nfNumero: body.nfNumero } };
   }
 
-  const novoPrazo = new Date(body.novoPrazo);
-  if (isNaN(novoPrazo.getTime())) {
-    return NextResponse.json({ error: "Data invalida" }, { status: 400 });
-  }
+  await prisma.$transaction(async (tx) => {
+    // ⚠ A condição de estado vai no próprio UPDATE: entre ler e gravar, alguém pode ter confirmado
+    // o recebimento por dentro, e a escrita pública não pode passar por cima disso.
+    const r = await tx.pedidoOmie.updateMany({
+      where: { id: pedido.id, dataEntregaReal: null },
+      data: { fornecedorEntregaEm: agora, fornecedorNfNumero: body.nfNumero },
+    });
+    if (r.count === 0) throw new Error("Este pedido ja foi entregue.");
 
-  const pedido = await prisma.pedidoOmie.findUnique({
-    where: { tokenEntrega: token },
-    select: {
-      id: true,
-      prazoEntregaPrevisto: true,
-      prazoOriginal: true,
-      dataEntregaReal: true,
-    },
+    await tx.auditLog.create({
+      data: {
+        userId: null, action: "FORNECEDOR_DECLAROU_ENTREGA", entity: "PedidoOmie", entityId: pedido.id,
+        diff: { nfNumero: body.nfNumero, motivo: body.motivo?.trim() || null, viaPortalFornecedor: true },
+      },
+    });
   });
 
-  if (!pedido) {
-    return NextResponse.json({ error: "Token invalido" }, { status: 404 });
-  }
+  return { repetido: false, resposta: { entregue: true, nfNumero: body.nfNumero, motivo: body.motivo } };
+}
 
-  if (pedido.dataEntregaReal) {
-    return NextResponse.json(
-      { error: "Este pedido ja foi entregue." },
-      { status: 400 }
-    );
-  }
+/** O fornecedor informa uma nova previsão. */
+async function informarPrevisao(pedido, body) {
+  const novoPrazo = new Date(body.novoPrazo);
+  if (isNaN(novoPrazo.getTime())) throw new Error("Data invalida");
 
   const prazoAnterior = pedido.prazoEntregaPrevisto;
+  // ⚠ Mesma data de novo não é notícia — e a rota é pública.
+  if (prazoAnterior && +new Date(prazoAnterior) === +novoPrazo) {
+    return { repetido: true, resposta: { prazoNovo: novoPrazo, prazoAnterior } };
+  }
 
   await prisma.$transaction(async (tx) => {
     const updateData = { prazoEntregaPrevisto: novoPrazo };
-    if (!pedido.prazoOriginal && prazoAnterior) {
-      updateData.prazoOriginal = prazoAnterior;
-    }
+    // ⚠ O prazo combinado no começo é gravado UMA vez: ele é a referência da cobrança, e seria
+    // perdido se cada empurrão sobrescrevesse o anterior.
+    if (!pedido.prazoOriginal && prazoAnterior) updateData.prazoOriginal = prazoAnterior;
 
-    await tx.pedidoOmie.update({
-      where: { id: pedido.id },
-      data: updateData,
+    const r = await tx.pedidoOmie.updateMany({
+      where: { id: pedido.id, dataEntregaReal: null }, data: updateData,
     });
+    if (r.count === 0) throw new Error("Este pedido ja foi entregue.");
 
     await tx.prazoHistorico.create({
       data: {
-        pedidoId: pedido.id,
-        prazoAnterior,
-        prazoNovo: novoPrazo,
+        pedidoId: pedido.id, prazoAnterior, prazoNovo: novoPrazo,
         motivo: body.motivo?.trim()
-          ? `[Fornecedor] ${body.motivo.trim()}`
-          : "[Fornecedor] Previsao informada via portal",
-        // alteradoPorId nao preenchido — acao do fornecedor (sem login)
-        alteradoPorId: null,
+          ? `${MARCA_FORNECEDOR} ${body.motivo.trim()}`
+          : `${MARCA_FORNECEDOR} Previsao informada via portal`,
+        alteradoPorId: null, // ação do fornecedor, sem login
       },
     });
 
     await tx.auditLog.create({
       data: {
-        action: "FORNECEDOR_ATUALIZOU_PRAZO",
-        entity: "PedidoOmie",
-        entityId: pedido.id,
+        userId: null, action: "FORNECEDOR_ATUALIZOU_PRAZO", entity: "PedidoOmie", entityId: pedido.id,
         diff: {
           prazoAnterior: prazoAnterior?.toISOString() || null,
           prazoNovo: novoPrazo.toISOString(),
@@ -197,9 +272,38 @@ export async function PATCH(req, { params }) {
     });
   });
 
-  return NextResponse.json({
-    success: true,
-    prazoAnterior,
-    prazoNovo: novoPrazo,
-  });
+  return { repetido: false, resposta: { prazoNovo: novoPrazo, prazoAnterior, motivo: body.motivo } };
+}
+
+export async function PATCH(req, { params }) {
+  const { token } = params;
+
+  let body;
+  try {
+    body = patchSchema.parse(await req.json());
+  } catch (e) {
+    return responder({ error: "Dados invalidos: " + (e.issues?.[0]?.message || e.message) }, 400);
+  }
+
+  const pedido = await pedidoDoToken(token);
+  if (!pedido) return responder({ error: "Token invalido" }, 404);
+  if (pedido.dataEntregaReal) return responder({ error: "Este pedido ja foi entregue." }, 400);
+
+  let r;
+  try {
+    r = body.entregue ? await declararEntrega(pedido, body) : await informarPrevisao(pedido, body);
+  } catch (e) {
+    return responder({ error: e.message || "Nao foi possivel registrar sua resposta." }, 400);
+  }
+
+  // ⚠⚠ O AVISO NUNCA DERRUBA A RESPOSTA. Ela já está gravada; dizer ao fornecedor que deu errado
+  // o faria tentar de novo, e cada tentativa é outro aviso.
+  const aviso = r.repetido
+    ? { avisado: false, motivo: "resposta repetida" }
+    : await avisarResposta(prisma, {
+        id: pedido.id, numeroPedido: pedido.numeroPedido,
+        fornecedorNome: pedido.fornecedorNome, rmNumero: pedido.rmItens?.[0]?.rm?.numero || null,
+      }, r.resposta).catch(() => ({ avisado: false, motivo: "falha ao avisar" }));
+
+  return responder({ success: true, ...r.resposta, avisoInterno: aviso.avisado });
 }

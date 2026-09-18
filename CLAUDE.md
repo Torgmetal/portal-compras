@@ -791,6 +791,62 @@ fosse. Teto de `MAX_TESTE` (3) por clique.
 `app/api/compras/prazos-rm/cobrar/route.js`, o botão em `ModalCobrarAtrasados.jsx` e o bloco de
 testes correspondente. Nada mais depende disto.
 
+### O fornecedor responde — e agora alguém fica sabendo
+`/fornecedores/entrega/<token>` é **público, sem login** — o link vai no e-mail de cobrança, um por
+linha da tabela. `PATCH` aceita UMA de duas respostas: nova **previsão** ou **"já foi entregue"**
+com o número da NF (`lib/resposta-fornecedor.js`, `scripts/ensure-entrega-declarada.mjs`).
+
+⚠⚠ **O LINK EXISTIA DESDE MAIO, FOI USADO 6 VEZES E NADA REAGIA.** Medido em 18/09/2026: última
+resposta em 10/06, e duas delas nem eram prazo — eram recado ("Material foi entregue na NF
+000362322"). Para um recurso cujo propósito é *obter uma resposta*, o elo que faltava era avisar
+alguém. Agora toca o **sino do módulo COMPRAS** e sai **e-mail** (`RESPOSTA_FORNECEDOR_CC`).
+
+⚠⚠ **DECLARAR ENTREGA NÃO É ENTREGAR.** Nada ali escreve `dataEntregaReal`, `statusEntrega` nem
+`nfNumero` — esses vêm da NF de entrada REAL, pelo cron `sync-entregas`. A declaração mora em
+colunas próprias (`fornecedorEntregaEm`, `fornecedorNfNumero`), a tela escreve *"fornecedor informou
+entrega na NF X · aguardando conferência"* em âmbar, e **o pedido continua cobrável e na mesma
+situação** até alguém conferir. Um terceiro sem login mudando a crença do portal sobre o que chegou
+faria o pedido sumir do vermelho e da lista de cobrança sem ninguém da Torg ter olhado nada.
+
+⚠⚠ **A ROTA É PÚBLICA: AVISAR A CADA CHAMADA É UMA TORNEIRA DE E-MAIL** apontada para `compras@`
+(achado do Codex). Três travas: **repetição idêntica é sucesso SEM evento** (mesma NF, mesma data →
+não avisa, não grava), **intervalo de 15 min** entre avisos do mesmo pedido, e **teto de 5 por 24h**.
+⚠ Falhar a leitura do limite NÃO libera o aviso — o pior caso de não avisar é um atraso; o de
+avisar sem limite é inundar quem precisa ler.
+
+⚠⚠ **O HISTÓRICO INTERNO VAZAVA PELO LINK.** `PrazoHistorico` guarda tanto o recado do fornecedor
+(prefixo `[Fornecedor]`) quanto o comentário interno de quem altera prazo por dentro
+(`/api/compras/entregas/prazo`), **sem prefixo**. O GET público devolvia todos. Medido: 15 das 17
+linhas são internas, e uma já tinha texto. Agora só o texto `[Fornecedor]` sai; as datas de todas as
+alterações continuam à vista, porque o fornecedor precisa conferir o que combinou.
+
+⚠ **Os recebimentos são escopados ao pedido** (`where: { pedidoOmieId }`). Um RMItem pode ser
+atendido por mais de um pedido, e somar todos mostraria ao fornecedor quantidade que outro entregou.
+Medido: 0 casos hoje — é defeito estrutural, não incidente.
+
+⚠ **A condição de estado vai no próprio UPDATE** (`where: { id, dataEntregaReal: null }`), não só na
+leitura: entre ler e gravar, alguém pode ter confirmado o recebimento por dentro.
+
+⚠ **A NF é texto**: zero à esquerda importa, e "consertar" a entrada apagaria dígito de quem digitou
+certo. Só `trim`, teto de 40 e recusa de caractere de controle. ⚠ Número de NF **não prova nada** —
+é pista para quem vai conferir.
+
+⚠ **`Cache-Control: no-store` e `Referrer-Policy: no-referrer`** nas respostas: o token viaja por
+e-mail e não pode ficar em cache intermediário nem vazar no `Referer` de um clique para fora.
+
+⚠ **O aviso nunca derruba a resposta.** Ela já está gravada; dizer ao fornecedor que deu errado o
+faria tentar de novo, e cada tentativa é outro aviso.
+
+### De quem é a data que está valendo
+⚠⚠ **O CARTÃO MOSTRAVA SÓ A DATA NOVA**, indistinguível da original. Quem olha a tela precisa
+diferenciar *"esta data veio do fornecedor ontem, depois de cobrarmos"* de *"esta data sempre foi
+essa"* — senão o fornecedor empurra o prazo, o pedido sai do vermelho e ninguém percebe que nada de
+fato melhorou. `origemDaPrevisao` (`lib/painel-prazos-rm.js`) lê o último `PrazoHistorico`; a linha
+escreve *"previsão informada pelo fornecedor em dd/mm — “motivo”"*.
+
+⚠ **Vale só a ÚLTIMA alteração**: uma edição interna depois dele devolve a autoria a quem editou.
+Manter o crédito do fornecedor ali seria mentir sobre de quem é a data que vale.
+
 ### CIF ou FOB — quem paga o frete, e quem vai buscar
 O fornecedor responde no portal de cotação (campo **obrigatório**, ao lado do prazo de entrega), e
 a resposta aparece nos Prazos das RMs. `lib/frete-cotacao.js`, coluna `Cotacao.tipoFrete`.
@@ -1011,6 +1067,10 @@ Consolidados nas Fases 1 e 2 (gestão de usuários). Aplicar em todos os módulo
   }
   ```
 - **Zod 4**: usar `e.issues[0]?.message` (não `e.errors` — foi removido). Não usar `errorMap` (silenciosamente ignorado na v4).
+  - ⚠⚠ **`z.undefined()` é NÃO-OPCIONAL na v4**: chave ausente falha com *"expected nonoptional,
+    received undefined"*. Uma `z.union` que use `z.undefined()` para marcar "este campo é da outra
+    metade" recusa os DOIS lados, e o corpo correto toma 400. Para "um OU outro", use campos
+    `.optional()` + `superRefine` (18/09/2026, custou uma bateria inteira de teste vermelho).
 - **Validação Zod** em todo endpoint que recebe body.
 - **AuditLog em toda mutação** — incluir diff `{ antes, depois }` quando aplicável. Nunca usar `console.log` para rastrear mutações (some no Vercel; AuditLog persiste).
 - **Nunca retornar `password`** no response — nem o hash.

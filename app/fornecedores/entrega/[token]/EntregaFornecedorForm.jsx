@@ -1,10 +1,9 @@
 "use client";
-import CampoData from "@/components/CampoData";
 import { useState, useEffect } from "react";
 import {
-  Loader2, AlertCircle, CheckCircle2, CalendarDays,
-  Package, Truck, Clock, History,
+  Loader2, AlertCircle, CheckCircle2, CalendarDays, Package, Truck, Clock, History,
 } from "lucide-react";
+import Formulario from "./Formulario";
 
 const fmtData = (d) =>
   d ? new Date(d).toLocaleDateString("pt-BR") : "—";
@@ -20,7 +19,13 @@ export default function EntregaFornecedorForm({ token }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
 
+  // ⚠⚠ DUAS RESPOSTAS POSSÍVEIS, UMA DE CADA VEZ. Matheus (18/09/2026): "é interessante ter a
+  // opção de Pedido Entregue e campo para informar número da NF". Deixar os dois formulários
+  // abertos ao mesmo tempo convidaria a preencher os dois e o servidor recusaria — a escolha vem
+  // antes, e cada aba mostra só o que ela pede.
+  const [aba, setAba] = useState("previsao"); // "previsao" | "entregue"
   const [novoPrazo, setNovoPrazo] = useState("");
+  const [nfNumero, setNfNumero] = useState("");
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [sucesso, setSucesso] = useState(false);
@@ -41,15 +46,22 @@ export default function EntregaFornecedorForm({ token }) {
     })();
   }, [token]);
 
+  const entregueAba = aba === "entregue";
+
   const enviar = async () => {
-    if (!novoPrazo) { setErroEnvio("Selecione a data de previsao"); return; }
+    if (entregueAba && !nfNumero.trim()) { setErroEnvio("Informe o numero da nota fiscal"); return; }
+    if (!entregueAba && !novoPrazo) { setErroEnvio("Selecione a data de previsao"); return; }
     setEnviando(true);
     setErroEnvio("");
     try {
+      // ⚠ Manda um OU outro, nunca os dois: o servidor recusa corpo ambíguo de propósito.
+      const corpo = entregueAba
+        ? { entregue: true, nfNumero: nfNumero.trim(), motivo: motivo.trim() || undefined }
+        : { novoPrazo, motivo: motivo.trim() || undefined };
       const res = await fetch(`/api/fornecedores/entrega/${token}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ novoPrazo, motivo: motivo.trim() || undefined }),
+        body: JSON.stringify(corpo),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao enviar");
@@ -104,9 +116,16 @@ export default function EntregaFornecedorForm({ token }) {
     return (
       <div className="text-center py-12">
         <CheckCircle2 size={48} className="text-emerald-500 mx-auto mb-3" />
-        <h2 className="text-xl font-bold text-torg-dark">Previsao registrada!</h2>
+        <h2 className="text-xl font-bold text-torg-dark">
+          {entregueAba ? "Entrega informada!" : "Previsao registrada!"}
+        </h2>
+        {/* ⚠⚠ "INFORMADA", NÃO "CONFIRMADA". O fornecedor precisa saber que a Torg ainda vai
+            conferir o recebimento — prometer baixa aqui faria ele parar de acompanhar um pedido
+            que talvez não tenha chegado. */}
         <p className="text-sm text-torg-gray mt-2">
-          A nova data de entrega foi registrada com sucesso. A equipe de Compras da Torg Metal ja foi notificada.
+          {entregueAba
+            ? "Obrigado. A equipe de Compras da Torg Metal foi avisada e vai conferir o recebimento."
+            : "A nova data de entrega foi registrada com sucesso. A equipe de Compras da Torg Metal ja foi notificada."}
         </p>
         <p className="text-sm text-torg-gray mt-1">
           Obrigado, <strong>{d.fornecedor}</strong>.
@@ -118,6 +137,9 @@ export default function EntregaFornecedorForm({ token }) {
   const diasAtraso = d.prazoEntregaPrevisto
     ? Math.max(0, Math.ceil((Date.now() - new Date(d.prazoEntregaPrevisto).getTime()) / (1000 * 60 * 60 * 24)))
     : 0;
+
+  const form = { aba, setAba, entregueAba, novoPrazo, setNovoPrazo, nfNumero, setNfNumero,
+    motivo, setMotivo, erroEnvio, setErroEnvio, enviando, enviar };
 
   return (
     <div className="space-y-6 max-w-xl mx-auto">
@@ -226,57 +248,7 @@ export default function EntregaFornecedorForm({ token }) {
         </div>
       )}
 
-      {/* Formulario */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-3 border-b border-gray-100 bg-amber-50/50">
-          <h3 className="text-sm font-semibold text-amber-800">
-            Informar nova previsao de entrega
-          </h3>
-        </div>
-        <div className="px-6 py-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">
-              Data prevista de entrega *
-            </label>
-            <CampoData
-              value={novoPrazo}
-              onChange={(iso) => setNovoPrazo(iso)}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">
-              Observacao <span className="font-normal text-torg-gray">(opcional)</span>
-            </label>
-            <textarea
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              placeholder="Ex: Material em transito, previsao de chegada na proxima semana"
-              rows={3}
-              maxLength={500}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue"
-            />
-          </div>
-
-          {erroEnvio && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-center gap-2">
-              <AlertCircle size={14} /> {erroEnvio}
-            </div>
-          )}
-
-          <button
-            onClick={enviar}
-            disabled={enviando || !novoPrazo}
-            className="w-full py-3 bg-torg-blue text-white text-sm font-semibold rounded-lg hover:bg-torg-blue/90 disabled:opacity-50 inline-flex items-center justify-center gap-2"
-          >
-            {enviando ? (
-              <><Loader2 size={16} className="animate-spin" /> Enviando...</>
-            ) : (
-              <><CalendarDays size={16} /> Confirmar previsao de entrega</>
-            )}
-          </button>
-        </div>
-      </div>
+      <Formulario estado={form} />
 
       {/* Nota */}
       <p className="text-[11px] text-center text-gray-400 pb-4">

@@ -33,6 +33,9 @@ export async function GET() {
       // ⚠ A marca de que o Omie ENCERROU o pedido — sem ela a tela cobra prazo de pedido acabado,
       // e no FD isso é permanente (o material nunca entra NF na Torg). Ver `lib/omie-encerramento`.
       encerradoOmieEm: true,
+      // ⚠ A entrega que o FORNECEDOR declarou no portal público — declaração a conferir, nunca
+      // recebimento. Ver `scripts/ensure-entrega-declarada.mjs`.
+      fornecedorEntregaEm: true, fornecedorNfNumero: true,
       prazoEntregaPrevisto: true, prazoOriginal: true, statusEntrega: true,
       dataEntregaReal: true, recebidoEm: true, recebidoPor: { select: { name: true } },
       prazoHistorico: {

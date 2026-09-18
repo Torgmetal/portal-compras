@@ -959,6 +959,12 @@ model PedidoOmie {
   // devolve a data do ato), e serve só para a tela parar de cobrar prazo de um pedido que o Omie
   // já deu por acabado. NUNCA baixa item, NUNCA escreve `statusEntrega`/`dataEntregaReal`.
   encerradoOmieEm      DateTime?
+  // ⚠⚠ DECLARAÇÃO DO FORNECEDOR, NÃO FATO. Ele marca "pedido entregue" no portal público e informa
+  // o número da NF; isso NÃO escreve `dataEntregaReal`, `statusEntrega` nem `nfNumero` (esses vêm
+  // da NF de entrada real, pelo cron `sync-entregas`). Serve para alguém CONFERIR — e o pedido
+  // continua cobrável até a confirmação. Colunas criadas por `scripts/ensure-entrega-declarada.mjs`.
+  fornecedorEntregaEm  DateTime?
+  fornecedorNfNumero   String?
   recebidoPor          User?                  @relation("PedidoRecebidoPor", fields: [recebidoPorId], references: [id])
   cotacao              Cotacao?               @relation(fields: [cotacaoId], references: [id])
   op                   OP?                    @relation(fields: [opId], references: [id])

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { agruparPorRM, situacaoDoPedido, situacaoDaRM, resumoPorSituacao, rotuloSituacao, filtrarLinhas, fornecedoresDasLinhas, filtrarPorFornecedor, chaveFornecedor } from "@/lib/painel-prazos-rm";
+import { agruparPorRM, situacaoDoPedido, situacaoDaRM, resumoPorSituacao, rotuloSituacao, filtrarLinhas, fornecedoresDasLinhas, filtrarPorFornecedor, chaveFornecedor, origemDaPrevisao } from "@/lib/painel-prazos-rm";
 
 // ⚠⚠ Matheus (16/09/2026): "preciso de uma aba fora para ver todas as RMs de uma vez, seus pedidos
 // e prazos de cada", aberta pelo que aperta. A ordem NÃO é detalhe de tela: é a resposta da tela.
@@ -497,5 +497,78 @@ describe("frete da RM", () => {
 
   it("pedido sem cotação fica sem frete, não com um chute", () => {
     expect(agruparPorRM([p("a", null)])[0].pedidos[0].frete).toBeNull();
+  });
+});
+
+// ─── DE QUEM É A DATA QUE ESTÁ VALENDO ───────────────────────────────────────
+//
+// ⚠⚠ O cartão mostrava só a data nova, indistinguível da original — um fornecedor empurra o prazo,
+// o pedido sai do vermelho e ninguém percebe que nada de fato melhorou (18/09/2026).
+describe("origemDaPrevisao", () => {
+  const hist = (motivo, criadoEm) => ({ prazoNovo: new Date("2026-10-01"), motivo, criadoEm: new Date(criadoEm) });
+
+  it("⚠⚠ reconhece a previsão que veio do fornecedor, e devolve o recado sem o prefixo", () => {
+    const r = origemDaPrevisao({ prazoHistorico: [hist("[Fornecedor] atraso na laminação", "2026-09-17")] });
+    expect(r).toEqual({ em: new Date("2026-09-17"), motivo: "atraso na laminação" });
+  });
+
+  it("alteração interna não vira crédito do fornecedor", () => {
+    expect(origemDaPrevisao({ prazoHistorico: [hist("Ajuste manual de prazo", "2026-09-17")] })).toBeNull();
+  });
+
+  // ⚠ Manter o crédito do fornecedor depois de uma edição interna seria mentir sobre de quem é a
+  // data que vale.
+  it("⚠ vale só a ÚLTIMA alteração: edição interna depois dele devolve a autoria", () => {
+    const r = origemDaPrevisao({ prazoHistorico: [
+      hist("[Fornecedor] vou atrasar", "2026-09-15"),
+      hist("Ajuste manual de prazo", "2026-09-17"),
+    ] });
+    expect(r).toBeNull();
+  });
+
+  it("a ordem do array não importa — ordena pela data", () => {
+    const r = origemDaPrevisao({ prazoHistorico: [
+      hist("Ajuste manual", "2026-09-15"),
+      hist("[Fornecedor] vou atrasar", "2026-09-17"),
+    ] });
+    expect(r?.motivo).toBe("vou atrasar");
+  });
+
+  it("sem histórico, sem procedência", () => {
+    expect(origemDaPrevisao({})).toBeNull();
+    expect(origemDaPrevisao({ prazoHistorico: [] })).toBeNull();
+  });
+
+  it("recado vazio não vira aspas em branco na tela", () => {
+    expect(origemDaPrevisao({ prazoHistorico: [hist("[Fornecedor]", "2026-09-17")] })?.motivo).toBeNull();
+  });
+});
+
+// ⚠⚠ DECLARAÇÃO NÃO MUDA SITUAÇÃO. Ela existe para alguém CONFERIR — e o pedido continua cobrável
+// até lá (achado do Codex, 18/09/2026).
+describe("⚠⚠ a entrega declarada pelo fornecedor", () => {
+  const ped = (extra) => ({
+    id: "p1", numeroPedido: "1", fornecedorNome: "SOUFER", total: 0,
+    prazoEntregaPrevisto: new Date("2026-09-01T12:00:00-03:00"),
+    acompanhamentos: [], prazoHistorico: [], rm: { id: "r1", numero: "RM1" }, ...extra,
+  });
+  const agora = new Date("2026-09-18T12:00:00-03:00").getTime();
+
+  it("⚠⚠ NÃO tira o pedido de Atrasado", () => {
+    const [l] = agruparPorRM([ped({
+      fornecedorEntregaEm: new Date("2026-09-17"), fornecedorNfNumero: "000362322" })], agora);
+    expect(l.pedidos[0].situacao).toBe("ATRASADO");
+  });
+
+  it("aparece na linha, para alguém conferir", () => {
+    const [l] = agruparPorRM([ped({
+      fornecedorEntregaEm: new Date("2026-09-17"), fornecedorNfNumero: "000362322" })], agora);
+    expect(l.pedidos[0].entregaDeclarada).toEqual({
+      em: new Date("2026-09-17"), nfNumero: "000362322" });
+  });
+
+  it("sem declaração, o campo é nulo — não um objeto vazio", () => {
+    const [l] = agruparPorRM([ped({})], agora);
+    expect(l.pedidos[0].entregaDeclarada).toBeNull();
   });
 });

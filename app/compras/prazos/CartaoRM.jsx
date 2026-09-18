@@ -6,7 +6,7 @@
 // `PrazosRMClient` a passar do teto de 350 linhas. O corte é por responsabilidade, não por
 // contagem: aqui mora o DESENHO de uma RM e de um pedido; lá, a busca, os filtros e o estado.
 import Link from "next/link";
-import { CalendarClock, Truck, PackageCheck, ExternalLink } from "lucide-react";
+import { CalendarClock, Truck, PackageCheck, ExternalLink, MessageSquare, FileText } from "lucide-react";
 import { SITUACAO } from "@/lib/painel-prazos-rm";
 import { FRETES } from "@/lib/frete-cotacao";
 
@@ -127,6 +127,45 @@ function TagFrete({ frete }) {
   );
 }
 
+/**
+ * De onde veio a data que está valendo, e o que o fornecedor declarou.
+ *
+ * ⚠⚠ O CARTÃO MOSTRAVA SÓ A DATA NOVA, indistinguível da original. Quem olha a tela precisa
+ * diferenciar "esta data veio do fornecedor ontem, depois de cobrarmos" de "esta data sempre foi
+ * essa" — senão o fornecedor empurra o prazo, o pedido sai do vermelho e ninguém percebe que nada
+ * de fato melhorou (Matheus, 18/09/2026: "pode fechar as duas").
+ *
+ * ⚠⚠ "INFORMOU ENTREGA" NÃO É "CHEGOU". É declaração de terceiro sem login: o pedido continua
+ * cobrável e na mesma situação até alguém conferir a nota. Por isso âmbar, e não verde.
+ */
+function DoFornecedor({ p }) {
+  const prev = p.previsaoDoFornecedor;
+  const ent = p.entregaDeclarada;
+  if (!prev && !ent) return null;
+  return (
+    <>
+      {prev && (
+        <p className="text-[11px] text-amber-700 mt-0.5 flex items-start gap-1">
+          <MessageSquare size={10} className="mt-0.5 shrink-0" />
+          <span>
+            previsão informada pelo fornecedor em {fmt(prev.em)}
+            {prev.motivo ? <> — <i>“{prev.motivo}”</i></> : null}
+          </span>
+        </p>
+      )}
+      {ent && (
+        <p className="text-[11px] text-amber-800 mt-0.5 flex items-start gap-1 font-medium">
+          <FileText size={10} className="mt-0.5 shrink-0" />
+          <span>
+            fornecedor informou entrega{ent.nfNumero ? ` na NF ${ent.nfNumero}` : ""} em {fmt(ent.em)} ·
+            aguardando conferência
+          </span>
+        </p>
+      )}
+    </>
+  );
+}
+
 /** O quanto falta, em palavras — a mesma frase que alguém usaria no telefone. */
 function Quando({ p }) {
   if (p.situacao === "CHEGOU") return <Chegou t={p.atrasoDias} porEncerramento={p.porEncerramento} encerradoEm={p.encerradoOmieEm} />;
@@ -160,6 +199,7 @@ function LinhaPedido({ p, mostrarFD, mostrarFrete }) {
           <CalendarClock size={11} /> Previsão: <b className="font-medium text-torg-dark">{fmt(p.previsao)}</b>
           <span>·</span> <Quando p={p} />
         </p>
+        <DoFornecedor p={p} />
         {/* ⚠ As etapas já lançadas aparecem aqui como rastro curto: quem varre a lista quer saber
             se alguém já mexeu no pedido, sem ter que abrir a RM para descobrir. */}
         {p.etapas.length > 0 && (
