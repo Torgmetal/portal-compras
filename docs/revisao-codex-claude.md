@@ -44,3 +44,44 @@
   `testes/lib/cmr-graph-retry.teste.js`.
 - **Para revisar (`architecture`):** se a recusa da aba de outro mês deve virar alerta no monitor em
   vez de só falha do cron. Pendência do PCP: criar a aba EAP do mês vigente.
+
+## 18/09/2026 — Prazo proposto, remoção da prévia e a página girada (Claude)
+
+- **Feito (3 commits, no ar em `25d2ffbb93`, build 3278):**
+  1. `572d4d97e9` — a data que o fornecedor manda pelo link público virou **proposta**; quem
+     efetiva é `POST /api/compras/prazos-rm/prazo-proposto`. Colunas por
+     `scripts/ensure-prazo-proposto.mjs`; regra em `lib/prazo-proposto.js`; tela em
+     `app/compras/prazos/PropostaDePrazo.jsx`.
+  2. `20b77e3d9c` — removido o "Enviar teste para mim" da cobrança, como combinado.
+  3. `25d2ffbb93` — desenho da inspeção vinha cortado: `/Rotate` não era tratado. Espaço único em
+     `lib/geometria-pagina.js`; `lib/vista-desenho.js` e `lib/campos-desenho.js` passam a ler nele.
+
+- **Pareceres do Codex atendidos (`architecture`):**
+  - prazo proposto: identificador de versão da proposta (409 na divergência), `prazoOriginal` da
+    previsão EFETIVA e não da coluna crua, e o segundo efetivador
+    (`/api/compras/entregas/prazo`) lendo dentro da transação e matando a proposta pendente.
+  - página girada: a matriz **não** é `vp.transform` (Y para baixo × Y para cima — viraria de
+    cabeça para baixo o que funciona), caixa convertida pelos **quatro** cantos, e retângulo
+    emitindo os **quatro** lados em `verticais`/`horizontais`.
+
+- **Testes:** 2350 passando. Novos: `testes/lib/geometria-pagina.teste.js`,
+  `testes/lib/vista-desenho-rotacao.teste.js` (43 casos; **13 falham no código anterior**),
+  `testes/api/prazo-proposto.teste.js`, `testes/proposta-de-prazo.teste.jsx`,
+  `testes/entrega-fornecedor-tela.teste.jsx`.
+
+- **Garantia de não-regressão medida (A/B antes × depois, folha `/Rotate 0`):** `820 x 210`,
+  mesmos 83 segmentos, **hash de geometria idêntico**; os arquivos diferiam em 1 byte, que é
+  carimbo de data comprimido. Travado como teste de caracterização.
+
+- **Não validado / dúvidas para nova revisão:**
+  - **A correção da rotação não foi confirmada contra o desenho real.** `AZURE_*` e `SHAREPOINT_*`
+    são Secret na Vercel (`vercel env pull` devolve `[SENSITIVE]`), então `/vetor` e `/pagina` dão
+    **502** no dev local e os testes usam folha sintética. Matheus informou depois que **o Vitor
+    já ajustou o desenho da OP-105** — ou seja, o caso real segue sem confirmar qual mecanismo
+    estava agindo.
+  - **Risco herdado (Codex, alta):** relatório de folha girada que já tinha cota marcada precisa
+    ser remarcado — a cota foi posta sobre uma vista errada e não há como reinterpretá-la. Não sei
+    se existe algum além do T105.
+  - `lib/vista-desenho.js` está com 679 linhas (teto 350). O Codex sugeriu separar extração
+    vetorial de heurística de recorte; não fiz junto para não embaralhar o diff da correção.
+    (Contexto: são 188 arquivos acima do teto no repositório.)
