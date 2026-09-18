@@ -1,156 +1,156 @@
 {
-  "build": 3273,
-  "gerado": "2026-09-18T12:07:54.615Z",
+  "build": 3274,
+  "gerado": "2026-09-18T12:18:03.405Z",
   "commits": [
     {
-      "hash": "2843fc7e38",
+      "hash": "eb12db03",
+      "data": "18/09/2026",
+      "titulo": "Prévia da cobrança para quem está logado, para ver antes de o fornecedor ver"
+    },
+    {
+      "hash": "2843fc7e",
       "data": "18/09/2026",
       "titulo": "Cobrar os atrasados: um e-mail por fornecedor, com os pedidos e as RMs dele"
     },
     {
-      "hash": "2bb831e083",
+      "hash": "2bb831e0",
       "data": "18/09/2026",
       "titulo": "Planilha do Syneco abre no resumo e traz uma aba por setor"
     },
     {
-      "hash": "e6b564994b",
+      "hash": "e6b56499",
       "data": "18/09/2026",
       "titulo": "Peça sem desenho volta a poder ser marcada: o portão do PCP travava a seleção inteira"
     },
     {
-      "hash": "380c222b6e",
+      "hash": "380c222b",
       "data": "17/09/2026",
       "titulo": "Corrige área de acabamento por cor no estudo de pintura"
     },
     {
-      "hash": "a837cc0252",
+      "hash": "a837cc02",
       "data": "17/09/2026",
       "titulo": "Liberar frentes também exclui: é lá que o Planejamento vê os croquis órfãos"
     },
     {
-      "hash": "2dbd943445",
+      "hash": "2dbd9434",
       "data": "17/09/2026",
       "titulo": "Planilha do Syneco: marca duplicada dava o peso da linha antiga"
     },
     {
-      "hash": "edfd4a1ca9",
+      "hash": "edfd4a1c",
       "data": "17/09/2026",
       "titulo": "Botão Sincronizar nos Prazos das RMs, e o prazo do Omie deixa de ser conselho"
     },
     {
-      "hash": "6a4ffe4afa",
+      "hash": "6a4ffe4a",
       "data": "17/09/2026",
       "titulo": "Planejamento pode excluir a marca errada, e a LPC para de duplicar em silêncio"
     },
     {
-      "hash": "972faa2e0d",
+      "hash": "972faa2e",
       "data": "17/09/2026",
       "titulo": "Dois crons parados em silêncio: o do PCP há 17 dias, o do CMR há 60 horas"
     },
     {
-      "hash": "6659f1e3b3",
+      "hash": "6659f1e3",
       "data": "17/09/2026",
       "titulo": "Permite excluir PIT Torg e anexos do cliente com confirmação"
     },
     {
-      "hash": "58e0effb47",
+      "hash": "58e0effb",
       "data": "17/09/2026",
       "titulo": "Encerrado no Omie conta como chegou, e a barra de filtros separa escopo de situação"
     },
     {
-      "hash": "b04362604b",
+      "hash": "b0436260",
       "data": "17/09/2026",
       "titulo": "Prova de execução para o aquecimento dos crons, e a memória do que foi medido hoje"
     },
     {
-      "hash": "0ef927c75e",
+      "hash": "0ef927c7",
       "data": "17/09/2026",
       "titulo": "Planilha do Syneco ganha a 2ª aba: apontamento na frente manda dar baixa nos setores atrás"
     },
     {
-      "hash": "7521e51164",
+      "hash": "7521e511",
       "data": "17/09/2026",
       "titulo": "Conferência finalizada manda a planilha ao PCP, com peso e observações por marca"
     },
     {
-      "hash": "b19909227a",
+      "hash": "b1990922",
       "data": "17/09/2026",
       "titulo": "feat: PIT compacto com seletor e anexos do cliente restritos"
     },
     {
-      "hash": "4d1d73c60c",
+      "hash": "4d1d73c6",
       "data": "17/09/2026",
       "titulo": "As duas últimas cópias da regra do rodapé passam a usar a compartilhada"
     },
     {
-      "hash": "0a4ff68aac",
+      "hash": "0a4ff68a",
       "data": "17/09/2026",
       "titulo": "Um cron não atropela a si mesmo — e a primeira trava que escrevi não travava"
     },
     {
-      "hash": "e5cde484a3",
+      "hash": "e5cde484",
       "data": "17/09/2026",
       "titulo": "Frete: bloco alinhado com os outros campos, e o selecionado em azul cheio"
     },
     {
-      "hash": "01d4dae633",
+      "hash": "01d4dae6",
       "data": "17/09/2026",
       "titulo": "CIF ou FOB: o fornecedor responde, e os Prazos das RMs dizem o que precisa de coleta"
     },
     {
-      "hash": "e11b9b7657",
+      "hash": "e11b9b76",
       "data": "17/09/2026",
       "titulo": "Ausência não é reabertura: desmarcar passa a exigir evidência positiva"
     },
     {
-      "hash": "97ce2411c6",
+      "hash": "97ce2411",
       "data": "17/09/2026",
       "titulo": "Planilha do Syneco: só o que o setor baixou — romaneio, terceiro e fechamento administrativo saem"
     },
     {
-      "hash": "72167425ed",
+      "hash": "72167425",
       "data": "17/09/2026",
       "titulo": "O rodapé da planilha: uma regra só, porque a camada mais estreita era a que importa"
     },
     {
-      "hash": "62ed6d043e",
+      "hash": "62ed6d04",
       "data": "17/09/2026",
       "titulo": "Filtro de fornecedor agrupa pelo CNPJ: 57 opções viram 42"
     },
     {
-      "hash": "93251c6169",
+      "hash": "93251c61",
       "data": "17/09/2026",
       "titulo": "Seis crons acordavam o Neon só na sorte — e agora o teste cobra isso"
     },
     {
-      "hash": "2a8d930526",
+      "hash": "2a8d9305",
       "data": "17/09/2026",
       "titulo": "Aditivo: abertura em página própria, com a receita digitada à mão (descrição, peso, unitário)"
     },
     {
-      "hash": "5256542b45",
+      "hash": "5256542b",
       "data": "17/09/2026",
       "titulo": "Os 3 testes vermelhos eram contratos velhos, não regressões — suíte volta a 100%"
     },
     {
-      "hash": "24ed63a2ff",
+      "hash": "24ed63a2",
       "data": "17/09/2026",
       "titulo": "Filtro de fornecedor nos Prazos das RMs, refazendo a conta da RM"
     },
     {
-      "hash": "776074ade8",
+      "hash": "776074ad",
       "data": "17/09/2026",
       "titulo": "Memória: pedido encerrado, recebido parcial e a ausência de PDF na API do Omie"
     },
     {
-      "hash": "bab2573faf",
+      "hash": "bab2573f",
       "data": "17/09/2026",
       "titulo": "O link do pedido para de prometer um PDF que a API do Omie não sabe gerar"
-    },
-    {
-      "hash": "8e19223dbf",
-      "data": "17/09/2026",
-      "titulo": "Recebido parcial vira situação própria nos Prazos das RMs, e finaliza ao concluir ou encerrar"
     }
   ]
 }

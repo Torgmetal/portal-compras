@@ -28,7 +28,7 @@ export async function GET(req) {
       apontamentosParaSyneco({ opId, setor }),
       baixasDeEtapaAnterior({ opId, setorSyneco }),
     ]);
-    return NextResponse.json({ success: true, ...portal, etapaAnterior: atras });
+    return NextResponse.json({ success: true, ...portal, setorSyneco, etapaAnterior: atras });
   }
   catch (e) { return NextResponse.json({ error: e.message || "Falha ao montar a lista" }, { status: 400 }); }
 }

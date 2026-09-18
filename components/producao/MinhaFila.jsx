@@ -72,7 +72,13 @@ export default function MinhaFila() {
     try {
       const { baixarPlanilhaApontamentosSyneco } = await import("@/lib/apontamentos-syneco-cliente");
       const t = await baixarPlanilhaApontamentosSyneco({ setor: posto.setor, nome: ETAPAS[posto.setor] || posto.setor });
-      setAvisoSyneco(t.linhas ? `${t.pecas} peça(s) em ${t.linhas} marca(s) para lançar no Syneco — planilha baixada.` : "Nada a lançar: o Syneco já tem tudo que o portal baixou neste setor.");
+      // ⚠ o total que importa aqui é o das DUAS origens: a baixa do portal e o furo que o
+      // apontamento à frente denuncia. Só a primeira fazia a tela dizer "nada a lançar" com a
+      // planilha cheia — e, no posto de Pintura ou Acabamento, vazia sem dizer por quê.
+      const aLancar = (t.linhas || 0) + (t.etapaAnterior?.linhas || 0);
+      setAvisoSyneco(aLancar
+        ? `${aLancar} lançamento(s) para o Syneco — planilha baixada.`
+        : (t.motivo || "Nada a lançar neste setor."));
     } catch (e) { setAvisoSyneco(e.message || "Não consegui montar a planilha."); }
     finally { setBaixandoSyneco(false); }
   }

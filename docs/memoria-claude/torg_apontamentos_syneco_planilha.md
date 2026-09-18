@@ -115,3 +115,24 @@ não serve para produtividade por período). Confirmar se o Syneco aceita data r
 
 **Medido em 18/09/2026:** 1.084 lançamentos · 4.360 peças · 147.710 kg · 901 marcas, em 10 obras, TODAS
 com apontamento nos últimos 9 dias — não é histórico morto. As OPs 083, 067 e 089 concentram 78%.
+
+### ⚠⚠ Pintura e Acabamento NUNCA têm linha — e a planilha vazia parecia quebrada (18/09/2026)
+
+Geraldo gerou a planilha no posto dele e "não tem nada". Não estava quebrada:
+
+- **Pintura é a ÚLTIMA etapa da rota.** Não existe apontamento adiante para provar que a peça passou
+  por ela, então ela jamais é cobrada. Pela construção de `lancamentosAtrasados`, o último setor da
+  `CADEIA` nunca vira alvo.
+- **Acabamento é opcional** (a peça pode ir do Jato à Pintura sem passar) e por isso nunca é alvo.
+
+Ou seja, **dois dos sete postos sempre recebem planilha vazia**, e a aba em branco não distinguia
+"não há o que lançar" de "o portal falhou". `motivoDoVazio(setorSyneco)` agora escreve a razão, com
+o nome do setor, **na aba e no aviso da tela** (`MinhaFila`). ⚠ A explicação vai também numa LINHA da
+aba, não só no subtítulo — subtítulo sozinho some no cabeçalho e a aba continua parecendo em branco.
+
+⚠ O aviso da tela somava só a baixa do portal: dizia "nada a lançar" com a planilha cheia de furos do
+Syneco. Agora soma as DUAS origens.
+
+Medido no mesmo dia, direto na rota: sem filtro 1.077 · Corte 24 · Preparação 526 · Solda 9 · Jato
+518 · **Montagem 0 · Acabamento 0 · Pintura 0**. (A Montagem tinha 7 pela manhã e foi lançada no
+Syneco no meio do dia — a lista encolhe sozinha conforme lançam, que é o comportamento esperado.)

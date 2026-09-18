@@ -2,7 +2,7 @@
 // Vitor (18/09/2026): "gere na planilha as peças que estão faltando apontamentos das ops que
 // estamos fazendo".
 import { describe, expect, it } from "vitest";
-import { planilhaApontamentos, ORDEM_SETORES } from "@/lib/apontamentos-syneco-planilha";
+import { planilhaApontamentos, motivoDoVazio, ORDEM_SETORES } from "@/lib/apontamentos-syneco-planilha";
 
 const atras = (setorSyneco, opNumero, marca, aLancar = 1, pesoALancarKg = 10) => ({
   setorSyneco, opNumero, obra: `OBRA ${opNumero}`, obraSyneco: `T${opNumero}`, marca,
@@ -51,6 +51,18 @@ describe("planilhaApontamentos", () => {
     const p = planilhaApontamentos({});
     expect(nomes(p)).toEqual(["Nada a lançar"]);
     expect(p.abas[0].subtitulo).toMatch(/em dia/);
+    // a explicação também vai numa LINHA, senão some no cabeçalho e a aba parece em branco
+    expect(p.abas[0].linhas).toHaveLength(1);
+  });
+
+  it("Pintura e Acabamento explicam por que nunca têm linha", () => {
+    // ⚠ caso do Geraldo (18/09/2026): gerou no posto dele e "não tem nada"
+    expect(motivoDoVazio("Pintura")).toMatch(/última etapa da rota/);
+    expect(motivoDoVazio("Pintura")).toMatch(/não é falha da planilha/);
+    expect(motivoDoVazio("Acabamento")).toMatch(/opcional/);
+    expect(motivoDoVazio("Solda")).toMatch(/Nada a lançar na Solda/);
+    expect(motivoDoVazio("")).toMatch(/em dia/);
+    expect(planilhaApontamentos({ setorSyneco: "Pintura" }).abas[0].linhas[0][0]).toMatch(/última etapa/);
   });
 
   it("nome de aba sai sem acento e dentro do teto do Excel", () => {
