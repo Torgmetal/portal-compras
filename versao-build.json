@@ -1,7 +1,12 @@
 {
-  "build": 3282,
-  "gerado": "2026-09-18T20:49:18.546Z",
+  "build": 3283,
+  "gerado": "2026-09-18T20:49:44.149Z",
   "commits": [
+    {
+      "hash": "b448052a64",
+      "data": "18/09/2026",
+      "titulo": "Revisão do Codex: caminho fechado perdia um lado, e a caixa do texto crescia para o lado errado"
+    },
     {
       "hash": "6ca087680a",
       "data": "18/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e11b9b7657",
       "data": "17/09/2026",
       "titulo": "Ausência não é reabertura: desmarcar passa a exigir evidência positiva"
-    },
-    {
-      "hash": "97ce2411c6",
-      "data": "17/09/2026",
-      "titulo": "Planilha do Syneco: só o que o setor baixou — romaneio, terceiro e fechamento administrativo saem"
     }
   ]
 }

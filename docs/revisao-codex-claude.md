@@ -85,3 +85,52 @@
   - `lib/vista-desenho.js` está com 679 linhas (teto 350). O Codex sugeriu separar extração
     vetorial de heurística de recorte; não fiz junto para não embaralhar o diff da correção.
     (Contexto: são 188 arquivos acima do teto no repositório.)
+
+### 18/09/2026 (tarde) — revisão pedida à mão, porque o hook não rodou (Claude)
+
+⚠ **O hook Stop recusou a revisão em TODOS os turnos desta sessão** com "Há tarefas em segundo
+plano" (`ponte.py:216`, lê `evento["background_tasks"]`). Conferido: nenhum processo rodando,
+nenhuma porta em uso, e o `execucao.lock` é de 09/09 e está vazio. O sinalizador ficou preso.
+**Vale olhar isso** — o efeito é a revisão automática não acontecer e ninguém perceber.
+
+Submeti à mão o que já estava no ar: perfil `security` (rota pública do fornecedor) e `testing`
+(correção da rotação).
+
+- **`security` — nenhum CRITICAL, nenhum HIGH.** Confirmado que não há caminho para efetivar
+  prazo, recebimento ou cobrança apenas com o token público. Pendências anotadas:
+  - *(MEDIUM, preexistente)* o limite de avisos é contornável por concorrência: a checagem vem
+    antes do envio e o carimbo depois. Sugestão: reservar a permissão atomicamente.
+  - *(MEDIUM)* **escritas públicas sem limite de taxa** — alternar data/motivo gera transação,
+    linha de auditoria e novo `prazoPropostoId` a cada chamada, mesmo com os avisos esgotados, e
+    ainda provoca 409 sucessivos para Compras. **Decisão do time:** limitar por token/IP?
+  - *(LOW, preexistente)* o prefixo `[Fornecedor]` não prova origem — comentário interno que comece
+    com ele também sairia no GET público.
+  - **Feito:** `prazoPropostoId` virou `randomUUID` (sugestão do parecer).
+
+- **`testing` — a álgebra de `D` e a conversão de caixa foram confirmadas** para 0/90/180/270 e
+  CropBox deslocada. Furos apontados e **corrigidos agora**:
+  - caixa do texto usava `x + largura, y + altura` (só vale sem rotação) → agora pelos 4 cantos;
+  - o oráculo dos testes era a inversa da própria implementação → agora é externo
+    (`convertToViewportPoint` do PDF.js);
+  - retângulo como operador de caminho não tinha teste → coberto.
+  - **Achado novo, fora do parecer:** `closePath` não era tratado em nenhum dos quatro
+    percorredores. Perdia o lado de fechamento (3 retângulos → 9 segmentos em vez de 12) e o
+    `else ai += 2` dessincronizava o resto do traçado. **Vale em folha `0°` também.**
+
+- **Pendências que NÃO tratei, para nova revisão:**
+  - `mapeiaTextos` reduz orientação a um booleano `v`: não distingue 90° de 270°, nem 0° de 180°.
+    Mexe em `RecorteDesenho.jsx` e `MarcadorCotas.jsx` — é mudança de contrato de tela.
+  - `pontosDaPagina`, `verticais` e `horizontais` não processam `paintFormXObject*`, enquanto
+    `segsDoConteudo` processa. Divergência preexistente.
+  - **Geometria persistida:** o Codex discorda de eu ter resolvido "remarcar" só no CLAUDE.md, e
+    tem razão em um ponto que eu errei — eu disse que folha `0°` não muda, mas **CropBox deslocada
+    afeta `/Rotate 0`**, e **180° preserva as dimensões** (podia ter recorte/cota válidos antes).
+    Além de recortes e cotas, há ocultações de texto/linha reusadas em
+    `lib/relatorio-dimensional-pdf.js`. Precisa de decisão: versionar o espaço de coordenadas ou
+    identificar e invalidar os registros afetados.
+  - `lib/vista-desenho.js` segue com ~690 linhas (teto 350), sem separar extração de heurística.
+  - **O caso real continua não validado** — o Vitor ajustou o desenho da OP-105 por fora.
+
+⚠ O Codex não conseguiu EXECUTAR testes nas duas consultas (Vitest falhou ao criar diretório
+temporário, `ENOENT`). Os pareceres são estáticos; quem rodou a suíte fui eu (2386 passando).
+
