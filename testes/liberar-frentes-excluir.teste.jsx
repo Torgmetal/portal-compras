@@ -58,6 +58,34 @@ it("com peça selecionada aparece excluir, que pede confirmação e manda os ids
   });
 });
 
+it("peça SEM desenho e SEM NC1 pode ser marcada — é ela que precisa ser excluída", async () => {
+  // ⚠ o caso do Geraldo e do Gabriel (18/09/2026): os croquis órfãos da OP-83 não têm desenho nem
+  // NC1, e o checkbox vinha desabilitado, então não dava para selecioná-los para excluir.
+  render(<LiberarFrentes opId="op83" opNumero="083" />);
+  await waitFor(() => expect(screen.getByText("T83F-82")).toBeTruthy());
+  const caixas = screen.getAllByRole("checkbox");
+  const daLinha = caixas[caixas.length - 1];
+  expect(daLinha.disabled).toBe(false);
+  fireEvent.click(daLinha);
+  await waitFor(() => expect(screen.getByText("excluir")).toBeTruthy());
+});
+
+it("liberar ao PCP continua recusando peça sem desenho", async () => {
+  render(<LiberarFrentes opId="op83" opNumero="083" />);
+  await waitFor(() => expect(screen.getByText("T83F-82")).toBeTruthy());
+  const caixas = screen.getAllByRole("checkbox");
+  fireEvent.click(caixas[caixas.length - 1]);
+  await waitFor(() => expect(screen.getByText("excluir")).toBeTruthy());
+
+  const liberar = screen.getAllByRole("button").find((b) => /liberar/i.test(b.textContent));
+  expect(liberar).toBeTruthy();
+  fireEvent.click(liberar);
+
+  await waitFor(() => expect(screen.getByText(/não descem para o PCP/)).toBeTruthy());
+  // e nada foi mandado para a rota de liberação
+  expect(chamadas.some((c) => c.url.endsWith("/api/planejamento/liberacao") && c.metodo === "POST")).toBe(false);
+});
+
 it("cancelar fecha a confirmação sem excluir nada", async () => {
   await selecionarTudo();
   fireEvent.click(screen.getByText("excluir"));

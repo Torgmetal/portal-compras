@@ -56,3 +56,20 @@ lista já é por frente, e a coluna FRENTE distingue.
 ⚠⚠ **Apagar direto no banco por script é bloqueado pelo classificador de auto-mode** (17/09/2026) —
 e está certo: exclusão em produção é do usuário, pela tela, com auditoria. O caminho é sempre dar o
 botão, não rodar o `deleteMany`.
+
+### ⚠⚠ O portão do desenho travava a SELEÇÃO, não só a liberação (18/09/2026)
+
+Geraldo e Gabriel: *"na tela do Gabriel do Planejamento não estamos conseguindo selecionar as marcas
+pois estão sem NC1 e desenho"*. O checkbox da linha em **Liberar frentes** vinha
+`disabled={!liberavel(p)}`, e `liberavel` exige `temDesenho === true` e `temMaquina !== false`. Os
+croquis órfãos da OP-83 não têm nenhum dos dois — então não podiam ser marcados para **nada**: nem
+prioridade, nem exclusão. O botão de excluir que eu tinha acabado de pôr era inalcançável para
+exatamente as peças que precisavam dele.
+
+- O checkbox voltou a ser livre. A linha continua vermelha e o `title` explica que não desce ao PCP.
+- **O portão mudou de lugar, não sumiu**: `liberar()` recusa a seleção que contenha peça travada,
+  nomeando as primeiras e pedindo para desmarcar. ⚠ Recusa em vez de liberar só as boas — mandar
+  menos do que o número do botão diz é o erro que o comentário do `pecaIds` já registrava.
+- ⚠ "Marcar todas as visíveis" continua pegando só as **liberáveis**, para não atrapalhar o fluxo
+  diário de liberação. Para limpar lixo, marca-se linha a linha.
+- Regra geral que ficou: **trava de AÇÃO não pode virar trava de SELEÇÃO**. Ver [[torg_portao_desenho]].

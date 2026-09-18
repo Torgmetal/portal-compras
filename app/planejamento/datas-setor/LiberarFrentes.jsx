@@ -336,6 +336,15 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
 
   async function liberar() {
     if (!selecionadas.length) return false;
+    // ⚠⚠ O PORTÃO DO DESENHO MUDOU DE LUGAR, NÃO SUMIU. Antes ele morava no `disabled` do checkbox;
+    // agora mora aqui, porque marcar a peça passou a servir também para prioridade e exclusão.
+    // Recusa em vez de liberar só as boas: mandar menos do que o número do botão diz é exatamente o
+    // erro que o comentário do `pecaIds` abaixo já registrava.
+    const travadas = selecionadas.filter((x) => !liberavel(x));
+    if (travadas.length) {
+      setErro(`${fmtN(travadas.length)} peça(s) da seleção não descem para o PCP (sem desenho em 2.5.2, sem arquivo de máquina, sem material resolvido ou já programadas): ${travadas.slice(0, 6).map((x) => x.marca).join(", ")}${travadas.length > 6 ? "…" : ""}. Desmarque essas para liberar o resto.`);
+      return false;
+    }
     // a frente da liberação: se a seleção é de uma frente só, usa ela; senão, marca como mista
     const frentes = [...new Set(selecionadas.map((p) => p.frente))];
     const frente = frentes.length === 1 ? frentes[0] : `${frentes.length} frentes`;
@@ -789,13 +798,19 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                 const on = sel.has(p.id);
                 // ⚠ trava a linha, não some com ela: a marca sem desenho é justamente a que o
                 // Planejamento precisa enxergar para cobrar a Engenharia.
+                // ⚠⚠ TRAVA É "NÃO DESCE PARA O PCP", NÃO "NÃO PODE SER MARCADA". O checkbox vinha
+                // `disabled`, e com isso a peça sem desenho/NC1 não podia ser marcada para NADA —
+                // nem prioridade, nem exclusão. Geraldo e Gabriel (18/09/2026): "não estamos
+                // conseguindo selecionar as marcas pois estão sem NC1 e desenho", justamente para
+                // tirar os croquis órfãos da OP-83. Quem guarda o portão agora é `liberar()`, que
+                // recusa a seleção com peça travada; marcar segue livre.
                 const trava = !liberavel(p);
                 return (
                   <tr key={p.id} className={`${on ? "bg-torg-blue-50/50" : trava ? "bg-red-50/40" : "hover:bg-gray-50/60"} ${p.cortada ? "opacity-60" : ""}`}>
                     <td className="px-3 py-1.5">
-                      <input type="checkbox" className="accent-torg-orange disabled:cursor-not-allowed" checked={on} disabled={trava}
-                        aria-label={trava ? `${p.marca} sem desenho na pasta — não pode ser liberada` : `Selecionar ${p.marca}`}
-                        title={trava ? "Sem desenho em 2.5.2 Fabricação — não desce para o PCP" : ""}
+                      <input type="checkbox" className="accent-torg-orange" checked={on}
+                        aria-label={`Selecionar ${p.marca}${trava ? " (sem desenho — não desce para o PCP)" : ""}`}
+                        title={trava ? "Sem desenho em 2.5.2 Fabricação — não desce para o PCP, mas pode ser marcada para prioridade ou exclusão" : ""}
                         onChange={() => setSel((s) => { const n = new Set(s); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n; })} />
                     </td>
                     <td className="px-3 py-1.5 font-mono text-[12px] font-semibold text-torg-dark whitespace-nowrap">

@@ -1,7 +1,12 @@
 {
-  "build": 3269,
-  "gerado": "2026-09-17T20:57:29.081Z",
+  "build": 3270,
+  "gerado": "2026-09-18T10:53:20.245Z",
   "commits": [
+    {
+      "hash": "380c222b",
+      "data": "17/09/2026",
+      "titulo": "Corrige área de acabamento por cor no estudo de pintura"
+    },
     {
       "hash": "a837cc02",
       "data": "17/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c8bb767e",
       "data": "17/09/2026",
       "titulo": "Reconciliação do CMR roda duas vezes por dia, para sobreviver a uma manhã ruim"
-    },
-    {
-      "hash": "37abda05",
-      "data": "17/09/2026",
-      "titulo": "Recebimento CMR: vários itens do pedido de uma vez, e o saldo passa a abater"
     }
   ]
 }
