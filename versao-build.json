@@ -1,7 +1,12 @@
 {
-  "build": 3272,
-  "gerado": "2026-09-18T11:24:55.628Z",
+  "build": 3273,
+  "gerado": "2026-09-18T12:07:54.615Z",
   "commits": [
+    {
+      "hash": "2843fc7e38",
+      "data": "18/09/2026",
+      "titulo": "Cobrar os atrasados: um e-mail por fornecedor, com os pedidos e as RMs dele"
+    },
     {
       "hash": "2bb831e083",
       "data": "18/09/2026",
@@ -146,11 +151,6 @@
       "hash": "8e19223dbf",
       "data": "17/09/2026",
       "titulo": "Recebido parcial vira situação própria nos Prazos das RMs, e finaliza ao concluir ou encerrar"
-    },
-    {
-      "hash": "4ef5a395f4",
-      "data": "17/09/2026",
-      "titulo": "feat: fases e referências da OP com prioridade e correção das demãos importadas"
     }
   ]
 }

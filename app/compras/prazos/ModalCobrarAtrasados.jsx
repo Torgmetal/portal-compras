@@ -10,7 +10,7 @@
 // "marcar todos" por padrão transforma um clique distraído em oito cobranças. Quem quiser todos
 // tem o atalho; quem não quiser não precisa desmarcar nada.
 import { useEffect, useState, useMemo } from "react";
-import { X, Mail, Loader2, AlertCircle, Send } from "lucide-react";
+import { X, Mail, Loader2, AlertCircle, Send, Eye } from "lucide-react";
 import LinhaFornecedorCobranca from "./LinhaFornecedorCobranca";
 
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
@@ -96,17 +96,38 @@ function Rodape({ estado }) {
               </label>
             )}
 
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <span className="text-xs text-torg-gray">
                 {marcadas.size === 0 ? "Nenhum fornecedor marcado"
                   : `${plural(marcadas.size, "e-mail", "e-mails")} · ${plural(totalPedidos, "pedido", "pedidos")}`}
               </span>
-              <button type="button" onClick={enviar} disabled={travado}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-torg-blue text-white hover:bg-torg-blue/90 disabled:opacity-50 disabled:cursor-not-allowed">
-                {enviando ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-                {enviando ? "Enviando…" : "Enviar cobranças"}
-              </button>
+              <div className="flex items-center gap-2">
+                {/* ⚠⚠ TEMPORÁRIO (Matheus, 18/09/2026: "depois removemos"). Manda o MESMO e-mail
+                    para quem está logado, sem cópia e sem registrar cobrança — ver como ficou não
+                    pode bloquear a cobrança de verdade por dois dias. Para remover: apague este
+                    botão e o `teste` da rota e da lib. */}
+                {dados.testePara && (
+                  <button type="button" onClick={() => enviar(true)} disabled={enviando || marcadas.size === 0}
+                    title={`Manda o mesmo e-mail para ${dados.testePara}, sem cópia e sem cobrar ninguém`}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 bg-white text-torg-dark hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <Eye size={15} /> Enviar teste para mim
+                  </button>
+                )}
+                <button type="button" onClick={() => enviar(false)} disabled={travado}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-torg-blue text-white hover:bg-torg-blue/90 disabled:opacity-50 disabled:cursor-not-allowed">
+                  {enviando ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                  {enviando ? "Enviando…" : "Enviar cobranças"}
+                </button>
+              </div>
             </div>
+            {/* ⚠ Diz para onde a prévia vai e quantas cabem: sem isso, marcar os oito e clicar em
+                teste encheria a própria caixa de quem clicou. */}
+            {dados.testePara && (
+              <p className="text-xs text-torg-gray">
+                O teste vai só para <b className="text-torg-dark">{dados.testePara}</b>
+                {marcadas.size > dados.maxTeste ? ` — no máximo ${dados.maxTeste} de cada vez` : ""}, sem cópia e sem cobrar o fornecedor.
+              </p>
+            )}
           </div>
   );
 }
@@ -156,17 +177,23 @@ export default function ModalCobrarAtrasados({ onFechar, onEnviado }) {
   const totalPedidos = [...marcadas].reduce((s, c) => s + (porChave.get(c)?.pedidos.length || 0), 0);
   const travado = enviando || marcadas.size === 0 || (recentesMarcados.length > 0 && !confirmar);
 
-  const enviar = async () => {
+  // ⚠ `teste` é TEMPORÁRIO (Matheus, 18/09/2026: "acrescente um enviar teste pra mim só para eu
+  // testar, depois removemos"). Ele reusa este mesmo caminho de propósito: uma prévia que passa
+  // por outro código não prova nada sobre o e-mail que vai sair.
+  const enviar = async (teste = false) => {
     setEnviando(true);
     setErro("");
     try {
       const r = await fetch("/api/compras/prazos-rm/cobrar", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chaves: [...marcadas], confirmar }),
+        body: JSON.stringify({ chaves: [...marcadas], confirmar, ...(teste ? { teste: true } : {}) }),
       });
       const j = await r.json().catch(() => null);
       if (!r.ok || !j?.success) throw new Error(j?.error || "Não foi possível enviar.");
       setResultados(j.resultados);
+      // ⚠ A prévia não mexe na seleção: quem mandou o teste vai querer mandar a cobrança de
+      // verdade para os mesmos, logo em seguida.
+      if (teste) return;
       // ⚠⚠ SÓ O QUE FALHOU DE VERDADE CONTINUA MARCADO. `aceito` sai porque já foi, e
       // `indeterminado` sai porque PODE ter ido: deixá-lo marcado convidaria o segundo clique a
       // mandar de novo a mesma cobrança (achado do Codex, 18/09/2026). Para reenviar um

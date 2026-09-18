@@ -770,6 +770,27 @@ a porta com quem a Torg vai precisar na semana que vem.
 ⚠ **Cópia para `matheus@` e `compras@`** (env `COBRANCA_ATRASO_CC`), **respostas para `compras@`**
 (caixa da área, não some quando alguém sai de férias). A tela mostra os dois ANTES do clique.
 
+### ⚠ "Enviar teste para mim" — TEMPORÁRIO (18/09/2026)
+Matheus: *"acrescente um enviar teste pra mim só para eu testar, depois removemos"*. Manda o
+**mesmo** e-mail que o fornecedor receberia para quem está logado.
+
+⚠⚠ **O DESTINATÁRIO VEM DA SESSÃO, NUNCA DO CORPO DA REQUISIÇÃO.** Um "mande para este endereço"
+seria um jeito de usar o portal para disparar e-mail com a marca da Torg para qualquer um.
+
+⚠⚠ **NÃO ENCOSTA NAS TRAVAS DO CAMINHO REAL**: sem reserva, sem intervalo de 2 dias, e com ação
+própria no AuditLog (`COBRAR_ATRASO_TESTE`). Gravando `COBRAR_ATRASO_FORNECEDOR`, ver como ficou
+bloquearia a cobrança de verdade por dois dias.
+
+⚠ **Vai sem cópia interna** (cópia para o diretor numa prévia seria cobrança que ninguém mandou) e
+com o assunto prefixado por `[PRÉVIA]` — o CORPO sai idêntico, porque é ele que está sendo
+avaliado; o prefixo evita a prévia ser confundida com cobrança de verdade, ou encaminhada como se
+fosse. Teto de `MAX_TESTE` (3) por clique.
+
+**Para remover**: o bloco marcado em `lib/cobranca-atraso-envio.js` (entre os comentários
+`PRÉVIA PARA QUEM ESTÁ OLHANDO` e `FIM DO TRECHO TEMPORÁRIO`), o `teste` do schema e do POST em
+`app/api/compras/prazos-rm/cobrar/route.js`, o botão em `ModalCobrarAtrasados.jsx` e o bloco de
+testes correspondente. Nada mais depende disto.
+
 ### CIF ou FOB — quem paga o frete, e quem vai buscar
 O fornecedor responde no portal de cotação (campo **obrigatório**, ao lado do prazo de entrega), e
 a resposta aparece nos Prazos das RMs. `lib/frete-cotacao.js`, coluna `Cotacao.tipoFrete`.

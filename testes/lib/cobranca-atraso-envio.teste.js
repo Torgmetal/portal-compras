@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mocks = vi.hoisted(() => ({ reservar: vi.fn(), soltar: vi.fn() }));
 vi.mock("@/lib/cron-trava", () => ({ reservarVez: mocks.reservar, soltarVez: mocks.soltar }));
 
-import { enviarCobrancas, ESTADOS, copiasInternas, respostaPara, garantirToken } from "@/lib/cobranca-atraso-envio";
+import { enviarCobrancas, ESTADOS, copiasInternas, respostaPara, garantirToken, enviarTeste, MAX_TESTE } from "@/lib/cobranca-atraso-envio";
 
 const grupo = (o = {}) => ({
   chave: o.chave || "cnpj:111",
@@ -261,5 +261,83 @@ describe("⚠⚠ o token do pedido é criado com condição", () => {
       .mockResolvedValueOnce({ tokenEntrega: "do-outro" });
     prisma.pedidoOmie.updateMany.mockResolvedValue({ count: 0 });
     expect(await garantirToken(prisma, "p1", () => "novo")).toBe("do-outro");
+  });
+});
+
+// ─── PRÉVIA (TEMPORÁRIO) ─────────────────────────────────────────────────────
+//
+// ⚠⚠ Matheus (18/09/2026): "acrescente um enviar teste pra mim só para eu testar, depois
+// removemos". Estes testes saem junto com o recurso — e existem porque a prévia é a única parte do
+// sistema que manda a cobrança para um endereço que não é o do fornecedor.
+describe("⚠⚠ a prévia nunca chega ao fornecedor", () => {
+  const ctxTeste = (extra = {}) => ({
+    para: "matheus@torg.com.br", baseUrl: "https://portal", userId: "u1",
+    gerarToken: () => "novo", enviar: vi.fn(async () => ({ ok: true, id: "re_1" })), ...extra,
+  });
+
+  it("⚠⚠ manda para quem está logado, NUNCA para o e-mail do fornecedor", async () => {
+    const ctx = ctxTeste();
+    const g = grupo({ chave: "a", email: "fornecedor@externo.com" });
+    const r = await enviarTeste(prismaFake(), { ...ctx, grupos: [g], chaves: ["a"] });
+    const msg = ctx.enviar.mock.calls[0][0];
+    expect(msg.to).toBe("matheus@torg.com.br");
+    expect(JSON.stringify(msg)).not.toContain("fornecedor@externo.com");
+    expect(r[0]).toMatchObject({ estado: ESTADOS.ACEITO, teste: true, destino: "matheus@torg.com.br" });
+  });
+
+  // ⚠ Cópia para o diretor numa prévia seria cobrança que ninguém mandou.
+  it("⚠ vai SEM cópia interna", async () => {
+    const ctx = ctxTeste();
+    await enviarTeste(prismaFake(), { ...ctx, grupos: [grupo({ chave: "a" })], chaves: ["a"] });
+    expect(ctx.enviar.mock.calls[0][0].cc).toBeUndefined();
+  });
+
+  // ⚠⚠ Se a prévia gravasse `COBRAR_ATRASO_FORNECEDOR`, ver como ficou bloquearia a cobrança de
+  // verdade por dois dias.
+  it("⚠⚠ NÃO grava a ação que alimenta o intervalo de 2 dias", async () => {
+    const prisma = prismaFake();
+    await enviarTeste(prisma, { ...ctxTeste(), grupos: [grupo({ chave: "a" })], chaves: ["a"] });
+    const acao = prisma.auditLog.create.mock.calls[0][0].data.action;
+    expect(acao).toBe("COBRAR_ATRASO_TESTE");
+    expect(acao).not.toBe("COBRAR_ATRASO_FORNECEDOR");
+  });
+
+  // ⚠ A prévia não pode consumir a vez de uma cobrança de verdade que esteja rodando.
+  it("⚠ não toma nem confere reserva nenhuma", async () => {
+    await enviarTeste(prismaFake(), { ...ctxTeste(), grupos: [grupo({ chave: "a" })], chaves: ["a"] });
+    expect(mocks.reservar).not.toHaveBeenCalled();
+    expect(mocks.soltar).not.toHaveBeenCalled();
+  });
+
+  it("o corpo é idêntico ao do fornecedor; só o assunto ganha o prefixo", async () => {
+    const ctx = ctxTeste();
+    await enviarTeste(prismaFake(), { ...ctx, grupos: [grupo({ chave: "a" })], chaves: ["a"] });
+    const msg = ctx.enviar.mock.calls[0][0];
+    expect(msg.subject).toMatch(/^\[PRÉVIA\] Torg Metal/);
+    expect(msg.html).toContain("pronto para carregamento");
+    expect(msg.text).toContain("pronto para carregamento");
+  });
+
+  // ⚠ Marcar os oito e clicar em teste encheria a própria caixa de quem clicou.
+  it("⚠ manda no máximo MAX_TESTE de cada vez", async () => {
+    const ctx = ctxTeste();
+    const chaves = ["a", "b", "c", "d", "e"];
+    const g = chaves.map((c) => grupo({ chave: c, nome: c }));
+    const r = await enviarTeste(prismaFake(), { ...ctx, grupos: g, chaves });
+    expect(ctx.enviar).toHaveBeenCalledTimes(MAX_TESTE);
+    expect(r).toHaveLength(MAX_TESTE);
+  });
+
+  it("grupo bloqueado também não vira prévia — o e-mail seria o errado", async () => {
+    const ctx = ctxTeste();
+    const g = grupo({ chave: "a", bloqueio: "varios-destinos", email: null });
+    const r = await enviarTeste(prismaFake(), { ...ctx, grupos: [g], chaves: ["a"] });
+    expect(r[0].estado).toBe(ESTADOS.BLOQUEADO);
+    expect(ctx.enviar).not.toHaveBeenCalled();
+  });
+
+  it("sem destinatário na sessão, recusa em vez de adivinhar", async () => {
+    await expect(enviarTeste(prismaFake(), { ...ctxTeste({ para: null }), grupos: [], chaves: [] }))
+      .rejects.toThrow(/destinat/i);
   });
 });
