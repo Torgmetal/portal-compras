@@ -1,7 +1,12 @@
 {
-  "build": 3284,
-  "gerado": "2026-09-18T21:00:49.517Z",
+  "build": 3285,
+  "gerado": "2026-09-18T21:01:13.512Z",
   "commits": [
+    {
+      "hash": "8a14ae626e",
+      "data": "18/09/2026",
+      "titulo": "Fecha os três pendentes da revisão: Form XObject, teto de escrita e recorte legado"
+    },
     {
       "hash": "c92e64cd32",
       "data": "18/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e5cde484a3",
       "data": "17/09/2026",
       "titulo": "Frete: bloco alinhado com os outros campos, e o selecionado em azul cheio"
-    },
-    {
-      "hash": "01d4dae633",
-      "data": "17/09/2026",
-      "titulo": "CIF ou FOB: o fornecedor responde, e os Prazos das RMs dizem o que precisa de coleta"
     }
   ]
 }

@@ -134,3 +134,37 @@ Submeti à mão o que já estava no ar: perfil `security` (rota pública do forn
 ⚠ O Codex não conseguiu EXECUTAR testes nas duas consultas (Vitest falhou ao criar diretório
 temporário, `ENOENT`). Os pareceres são estáticos; quem rodou a suíte fui eu (2386 passando).
 
+### 18/09/2026 (noite) — os três pendentes da revisão, fechados (Claude) — `8a14ae626e`
+
+- **Form XObject com `/Matrix` própria** — *era o item "HIGH, condicional ao PDF" do parecer.*
+  Investigado até o fim: o pdf.js emite a COLOCAÇÃO do form como `transform` (que todos os
+  percorredores já tratavam) e a matriz INTERNA à parte. Logo, o problema só aparece com `/Matrix`
+  não-identidade — **reproduzido**: `[2 0 0 2 50 30]` dava vertical em x=10 no lugar de x=70.
+  Corrigido em `pontosDaPagina`, `verticais` e `horizontais`. Teste monta o PDF à mão (o pdf-lib
+  só gera form identidade, que já passava).
+
+- **Teto de escrita na rota pública** — *MEDIUM do parecer de `security`.* `podeEscrever`: 10/hora
+  e 30/dia por pedido, **429**. Falha ABERTO de propósito (justificativa no código e no CLAUDE.md).
+  ⚠ Fiz por token/pedido, **não por IP** — em Vercel o IP vem de `x-forwarded-for` e é falsificável;
+  quem abusa já tem o token, que é o eixo que importa. Se o time quiser IP também, é acrescentar.
+
+- **Geometria persistida** — *o ponto em que você discordou de mim, com razão.* Recorte salvo passa
+  a levar `espaco: ESPACO_ATUAL`. Sem carimbo, só vale onde a matriz da página é IDENTIDADE; em
+  folha girada é ignorado, cai no automático e a **tela avisa** (`MarcadorCotas`), além de `/pagina`
+  não pré-carregar a caixa morta. Decisão **por desenho, na hora de ler**, não por migração — não
+  há como saber quais folhas são giradas sem abrir cada PDF, e as credenciais não saem da Vercel.
+  ⚠ Corrigi a afirmação errada que eu tinha feito: o corte não é "`/Rotate 0` está a salvo", é
+  **matriz identidade** (CropBox deslocada afeta 0°; 180° preserva dimensões).
+
+- **Ainda em aberto, para nova revisão:**
+  - `mapeiaTextos` reduz orientação ao booleano `v` (não distingue 90 de 270, nem 0 de 180). Mexe
+    em `RecorteDesenho.jsx` e `MarcadorCotas.jsx` — mudança de contrato de tela, não fiz.
+  - **Cotas** continuam sem carimbo de espaço; a defesa hoje é o aviso na tela quando o recorte é
+    descartado. Carimbá-las exige mexer na persistência do relatório.
+  - `lib/vista-desenho.js` ~700 linhas (teto 350), sem separar extração de heurística.
+  - O caso real (OP-105) segue sem confirmar qual mecanismo agia — o Vitor ajustou por fora.
+    ⚠ Note que de lá para cá apareceram **três** causas independentes de "desenho incompleto":
+    rotação, `closePath` e `/Matrix` de form. As duas últimas valem em folha `0°`.
+
+- **Estado:** 2403 testes passando; `/qualidade/inspecoes` e `/compras/prazos` validadas logado.
+
