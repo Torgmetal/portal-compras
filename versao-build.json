@@ -1,7 +1,12 @@
 {
-  "build": 3276,
-  "gerado": "2026-09-18T14:50:06.463Z",
+  "build": 3277,
+  "gerado": "2026-09-18T17:00:04.345Z",
   "commits": [
+    {
+      "hash": "572d4d97e9",
+      "data": "18/09/2026",
+      "titulo": "A data que o fornecedor manda agora é proposta — quem decide é Compras"
+    },
     {
       "hash": "475c3ca77d",
       "data": "18/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5256542b45",
       "data": "17/09/2026",
       "titulo": "Os 3 testes vermelhos eram contratos velhos, não regressões — suíte volta a 100%"
-    },
-    {
-      "hash": "24ed63a2ff",
-      "data": "17/09/2026",
-      "titulo": "Filtro de fornecedor nos Prazos das RMs, refazendo a conta da RM"
     }
   ]
 }

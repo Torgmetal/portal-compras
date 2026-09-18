@@ -3,14 +3,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockPrisma } from "@/testes/apoio/prisma";
 
-const mocks = vi.hoisted(() => ({ role: vi.fn(), agrupar: vi.fn(), enviar: vi.fn(), ultimas: vi.fn(), teste: vi.fn() }));
+const mocks = vi.hoisted(() => ({ role: vi.fn(), agrupar: vi.fn(), enviar: vi.fn(), ultimas: vi.fn() }));
 vi.mock("@/lib/session", () => ({ requireRole: mocks.role }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma, prismaDirect: mockPrisma }));
 vi.mock("@/lib/email", () => ({ sendEmail: vi.fn(async () => ({ ok: true })) }));
 vi.mock("@/lib/cobranca-atraso", async (real) => ({ ...(await real()), agruparParaCobranca: mocks.agrupar }));
 vi.mock("@/lib/cobranca-atraso-envio", async (real) => ({
   ...(await real()), enviarCobrancas: mocks.enviar, ultimasCobrancas: mocks.ultimas,
-  enviarTeste: mocks.teste, // ⚠ TEMPORÁRIO — sai com o recurso de prévia
 }));
 
 import { GET, POST } from "@/app/api/compras/prazos-rm/cobrar/route";
@@ -30,7 +29,6 @@ beforeEach(() => {
   mocks.agrupar.mockReturnValue([GRUPO]);
   mocks.ultimas.mockResolvedValue(new Map());
   mocks.enviar.mockResolvedValue([{ chave: "cnpj:111", nome: "ALFA", estado: "aceito" }]);
-  mocks.teste.mockResolvedValue([{ chave: "cnpj:111", nome: "ALFA", estado: "aceito", teste: true }]);
   mockPrisma.pedidoOmie.findMany.mockResolvedValue([]);
 });
 
@@ -100,42 +98,6 @@ describe("POST — o que o corpo tem permissão de escolher", () => {
   it("recusa uma lista absurda de chaves", async () => {
     const muitas = Array.from({ length: 51 }, (_, i) => `c${i}`);
     expect((await POST(req({ chaves: muitas }))).status).toBe(400);
-  });
-});
-
-// ─── PRÉVIA (TEMPORÁRIO, 18/09/2026) ────────────────────────────────────────
-describe("⚠⚠ POST com `teste` — a prévia", () => {
-  it("⚠⚠ o destinatário vem da SESSÃO, nunca do corpo", async () => {
-    await POST(req({ chaves: ["cnpj:111"], teste: true, para: "invasor@fora.com" }));
-    expect(mocks.teste).toHaveBeenCalled();
-    expect(mocks.enviar).not.toHaveBeenCalled();
-    const arg = mocks.teste.mock.calls[0][1];
-    expect(arg.para).toBe("matheus@torg.com.br"); // o e-mail da sessão
-    expect(JSON.stringify(arg)).not.toContain("invasor@fora.com");
-  });
-
-  it("sem `teste`, o caminho real é o que roda", async () => {
-    await POST(req({ chaves: ["cnpj:111"] }));
-    expect(mocks.enviar).toHaveBeenCalled();
-    expect(mocks.teste).not.toHaveBeenCalled();
-  });
-
-  it("⚠ `teste` precisa ser booleano de verdade", async () => {
-    expect((await POST(req({ chaves: ["a"], teste: "sim" }))).status).toBe(400);
-  });
-
-  it("usuário sem e-mail na sessão recebe recusa clara, não um 500", async () => {
-    mocks.role.mockResolvedValue({ id: "u1" });
-    const res = await POST(req({ chaves: ["cnpj:111"], teste: true }));
-    expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/e-mail cadastrado/i);
-    expect(mocks.teste).not.toHaveBeenCalled();
-  });
-
-  it("o GET diz para onde a prévia iria e quantas cabem", async () => {
-    const j = await (await GET()).json();
-    expect(j.testePara).toBe("matheus@torg.com.br");
-    expect(j.maxTeste).toBeGreaterThan(0);
   });
 });
 
