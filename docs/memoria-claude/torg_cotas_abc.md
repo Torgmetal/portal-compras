@@ -31,3 +31,23 @@ Ver [[torg_relatorios]] e [[torg_qualidade]].
 
 - 🚨 **`listarPasta` (lib/databook-pastas.js) devolvia `path` só na PASTA, nunca no ARQUIVO.** O "escolher na pasta da obra" mandava `arq.path` = `undefined` e a rota respondia *"Escolha um PDF."* com a lista de PDFs na tela. Corrigido na origem (o arquivo agora leva `path`). Se for consumir `arquivos` de `listarPasta`, o caminho existe — não remontar `${pasta}/${nome}` à mão.
 - 🚨 **`garantirDesenhos` não era chamado por ninguém que a tela alcançasse.** O relatório nasce SEM desenho de propósito (a varredura na pasta da OP é cara e segurava o clique de criar) e deve ser resolvido na 1ª abertura. Mas só `/vetor` e `/pdf` o chamavam, e `/vetor` só é buscado pelo `MarcadorCotas`, que a tela só monta quando JÁ existe desenho — ovo e galinha. Agora quem resolve é o **GET do relatório** (`/api/qualidade/inspecoes/[id]`). Custa ~1,5 s na 1ª abertura, 0 nas seguintes; escolha manual nunca é sobrescrita (a função devolve o que já está gravado sem varrer).
+
+## A descrição da cota é digitável (18/09/2026)
+
+Vitor: *"estamos tentando colocar as descrições das cotas no relatório de pré montagem da OP-105, e
+não estamos conseguindo"*. Não dava mesmo — não era permissão nem bug de salvamento, era **campo
+inexistente**:
+
+1. a descrição nascia como `Cota ${letra}` em `confirmar()`;
+2. era exibida como **texto fixo** (`<span>`), não como input;
+3. e era **reescrita** a cada `remover()`, que renumerava tudo com o rótulo automático.
+
+Agora é um `<input>` na lista de cotas, e `renumerarCotas` (`lib/cota-marcacao.js`, puro e testado)
+só reescreve o rótulo quando ele **é** o automático — `ehDescricaoPadraoCota` trata vazio e
+`Cota C27` como automáticos, e qualquer texto de gente como digitado.
+
+⚠ **No DESENHO continua só a letra.** Vitor (21/08/2026): "nas marcações laterais você precisa trazer
+apenas isso: cota A, Cota B e Cota C". Quem diz ONDE medir é a marca no desenho; a descrição é o que
+sai na coluna "Descrição" da tabela (`lib/relatorio-inspecao-pdf.js`, que já imprimia `l.descricao`).
+
+⚠ Vale para os dois tipos com cota: DIMENSIONAL e PRE_MONTAGEM (`TIPOS_COM_COTAS`).

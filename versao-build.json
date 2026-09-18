@@ -1,7 +1,12 @@
 {
-  "build": 3279,
-  "gerado": "2026-09-18T18:24:32.211Z",
+  "build": 3280,
+  "gerado": "2026-09-18T19:58:38.460Z",
   "commits": [
+    {
+      "hash": "7174e7f0",
+      "data": "18/09/2026",
+      "titulo": "Confere apoios pelo IFC e evita giro automático de carga larga"
+    },
     {
       "hash": "25d2ffbb",
       "data": "18/09/2026",
@@ -146,11 +151,6 @@
       "hash": "62ed6d04",
       "data": "17/09/2026",
       "titulo": "Filtro de fornecedor agrupa pelo CNPJ: 57 opções viram 42"
-    },
-    {
-      "hash": "93251c61",
-      "data": "17/09/2026",
-      "titulo": "Seis crons acordavam o Neon só na sorte — e agora o teste cobra isso"
     }
   ]
 }
