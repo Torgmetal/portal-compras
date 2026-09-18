@@ -91,3 +91,27 @@ com Montagem 1, **Solda 0**, Acabamento 0, **Jato 1** (operador TERCEIRO), Pintu
 - ⚠ **Marca duplicada estragava o peso.** A T113A9 existe sob `113` (antiga, 579,86 kg) e `T113A`
   (vigente, 580,53 kg) — [[torg_lpc_chave_duplicada]]. A linha escolhida passou a ser a da **LPC
   vigente** (`naLPC`), não a primeira que aparece.
+
+## A planilha abre no RESUMO e traz uma aba por SETOR (18/09/2026)
+
+Vitor: *"o que eu preciso é que vc gere na planilha as peças que estão faltando apontamentos das ops
+que estamos fazendo"*. Uma aba corrida com 1.084 linhas não se lança — quem lança trabalha setor a
+setor. `lib/apontamentos-syneco-planilha.js` (puro, testado) monta:
+
+1. **Resumo** — OP × setor, com lançamentos, peças e kg. É por onde se escolhe o que atacar.
+2. **Uma aba por setor** com linha (Corte, Preparação, Montagem, Solda, Acabamento, Jato, Pintura),
+   na ordem física da fábrica. ⚠ Setor sem linha NÃO vira aba vazia.
+3. **Baixa do portal**, só quando existe.
+
+⚠ **O Syneco NÃO importa planilha** — confirmado pelo Vitor em 18/09/2026, e eu tinha perguntado
+depois de já ter isso registrado. O único caminho para dentro do SKA é a API na LAN, que o agente usa
+**só para ler** ([[torg_mes_syneco]]). Então a planilha é lista de DIGITAÇÃO, e a ordem das colunas
+segue a ordem em que se digita lá.
+
+⚠⚠ **Lançar em massa credita a produção ao DIA DO LANÇAMENTO.** Em 18/09/2026 os 1.084 lançamentos
+estavam concentrados em Preparação (526) e Jato (518); jogar tudo de uma vez infla o mês desses dois
+setores e estraga o indicador de produtividade ([[torg_syneco_apontamento_fonte]] avisa que a dedução
+não serve para produtividade por período). Confirmar se o Syneco aceita data retroativa antes.
+
+**Medido em 18/09/2026:** 1.084 lançamentos · 4.360 peças · 147.710 kg · 901 marcas, em 10 obras, TODAS
+com apontamento nos últimos 9 dias — não é histórico morto. As OPs 083, 067 e 089 concentram 78%.

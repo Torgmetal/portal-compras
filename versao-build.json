@@ -1,7 +1,12 @@
 {
-  "build": 3270,
-  "gerado": "2026-09-18T10:53:20.245Z",
+  "build": 3271,
+  "gerado": "2026-09-18T11:17:20.319Z",
   "commits": [
+    {
+      "hash": "e6b56499",
+      "data": "18/09/2026",
+      "titulo": "Peça sem desenho volta a poder ser marcada: o portão do PCP travava a seleção inteira"
+    },
     {
       "hash": "380c222b",
       "data": "17/09/2026",
@@ -146,11 +151,6 @@
       "hash": "48d44761",
       "data": "17/09/2026",
       "titulo": "Pedido encerrado no Omie para de aparecer como atrasado — sobretudo no Faturamento Direto"
-    },
-    {
-      "hash": "c8bb767e",
-      "data": "17/09/2026",
-      "titulo": "Reconciliação do CMR roda duas vezes por dia, para sobreviver a uma manhã ruim"
     }
   ]
 }
