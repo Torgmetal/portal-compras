@@ -693,6 +693,83 @@ absoluto**, encolhe o `AbortSignal` para o tempo restante e recusa dormir para r
 ⚠ **O caminho manual não varre NFs** (`pularNF`) e só olha pedido sem entrega (`apenasPendentes`) —
 o `Recebimento` com a NF associada continua saindo do cron diário.
 
+### Cobrar os atrasados — um e-mail por fornecedor
+`POST /api/compras/prazos-rm/cobrar` (regra em `lib/cobranca-atraso*.js`; a tela em
+`ModalCobrarAtrasados.jsx`). Matheus (17/09/2026): *"um botão para disparar e-mails para os
+pedidos/RMs que já estão com 1 dia em atraso, mas eu devo conseguir escolher qual fornecedor (…)
+preciso desse e-mail separado, um para cada fornecedor com sua respectiva RM/Pedido e suas datas"*.
+
+⚠⚠ **UM E-MAIL POR FORNECEDOR, COM A LISTA DENTRO — nunca um por pedido.** Medido em 18/09/2026:
+8 fornecedores atrasados, 25 pedidos, e a SOUFER sozinha tem **12**. Um e-mail por pedido encheria
+a caixa dela com doze mensagens quase idênticas, e a primeira coisa que alguém faz com doze e-mails
+iguais é parar de ler os doze.
+
+⚠⚠ **O AGRUPAMENTO POR RAIZ DE CNPJ SERVE PARA FILTRAR UMA TELA; PARA MANDAR E-MAIL, PRECISA DE
+GUARDA** (achados do Codex). Agrupar é afirmar "é a mesma empresa" — e o e-mail de um fornecedor
+não pode conter pedido de outro. O grupo é **bloqueado**, nunca "resolvido no chute", quando:
+- os pedidos apontam para **e-mails diferentes** (`varios-destinos`);
+- **algum** pedido está **sem e-mail** (`email-parcial`) — ignorá-lo fazia o pedido órfão, com o
+  token público dele, sair no e-mail do contato do vizinho;
+- o documento **não é um CNPJ plausível** (`sem-cnpj`) — `chaveFornecedor` também produz
+  `doc:<dígitos>` para documento curto ou fictício, e dois cadastros com "0" no campo entrariam
+  juntos.
+
+⚠ Hoje nenhum dos 8 é bloqueado: a SOUFER abrange matriz e filial (dois CNPJs) com **um contato
+só**, e é por isso que o corte é por DESTINO divergente, não por CNPJ divergente.
+
+⚠⚠ **O PARCIAL VENCIDO É COBRADO, ao contrário do chip "Atrasado" da tela.** Lá ele tem chip
+próprio e sai de "Atrasado"; aqui o que falta dele é exatamente o que precisa ser cobrado — o
+pedido 1594 da SOUFER está parcial e 42 dias vencido. Por isso o número do modal é MAIOR que o do
+chip, e a tela escreve *"inclui os recebidos parcialmente"*.
+
+⚠ **`dataEntregaReal` sozinha não é chegada** — ela é anotação humana e existe em 222 dos pedidos
+vivos. Quem carimba é o `statusEntrega` junto dela; os únicos vencidos com essa data e sem status
+terminal são 2, ambos PARCIAL.
+
+### E-mail não tem desfazer — o que isso obriga
+⚠⚠ **A TENTATIVA É GRAVADA ANTES DO ENVIO, e falhar aí IMPEDE o envio.** Gravando só depois, um
+erro na auditoria apagaria a prova de que o e-mail saiu — e o intervalo de 2 dias, que lê dali,
+mandaria tudo de novo. Transação de banco não desfaz e-mail; a ordem é a única proteção.
+
+⚠⚠ **EXCEÇÃO NO ENVIO É `indeterminado`, NUNCA "falhou".** Timeout depois de o provedor aceitar é
+indistinguível de recusa — e reenviar "por garantia" é como a mesma cobrança chega duas vezes.
+`sendEmail` marca `indeterminado: true` só no caminho de exceção; a tela **desmarca** o
+indeterminado, exigindo nova seleção consciente para reenviar.
+
+⚠ **Intervalo mínimo de 2 dias por fornecedor**, lido do AuditLog **dentro** da reserva
+(`reservarVez("cobranca:<chave>")`) — lido antes da fila, duas requisições veriam as duas "nunca
+cobrado". **Falhar a leitura não vale "nunca foi cobrado"**: sem leitura, não envia.
+
+⚠ **Um fornecedor não derruba a rodada**: cada um volta com o seu estado
+(`aceito | falhou | indeterminado | bloqueado | recente | ocupado | desconhecido`) num **200**. Um
+500 faria a tela oferecer "tentar de novo" para a lista inteira, inclusive para quem já recebeu.
+
+⚠ **O corpo da requisição escolhe QUAIS chaves, e mais nada** — nunca destinatário, pedido, data
+ou token. Chave fora da lista de atrasados é recusa, não busca nova.
+
+⚠ **Sem `sendEmailBatch`**: ele descarta `cc` e `replyTo`, então a cobrança sairia sem as cópias
+internas, em silêncio. Laço sequencial com pausa de 600 ms (Resend aceita ~2 req/s).
+
+⚠ **O token nunca entra na auditoria** — é credencial de acesso público, e log não é lugar de
+guardar credencial. E ele é criado com `where: { tokenEntrega: null }`: ler nulo e gravar sem
+condição deixava duas execuções sobrescreverem o token uma da outra, e o link que já saiu num
+e-mail anterior passava a dar 404 na cara do fornecedor.
+
+### O texto da cobrança (aprovado por Matheus, 17/09/2026)
+⚠⚠ **PERGUNTA DUAS DATAS**: a nova data de entrega E quando o material estará **pronto para
+carregamento**. "Entrego dia 25" e "está pronto dia 22" levam a programações diferentes no pátio.
+Como ninguém tem CIF/FOB respondido ainda (0 de 25), "pronto para carregamento" funciona nos dois
+casos; quando o campo encher, dá para afiar a pergunta por fornecedor.
+
+⚠⚠ **A COLUNA "SITUAÇÃO" EXISTE POR CAUSA DOS PARCIAIS.** Sem ela o e-mail lista o pedido inteiro
+como pendente e o fornecedor responde "já mandamos" — com razão.
+
+⚠ **Pede a nota fiscal de volta**: é a saída mais barata para a lista encolher sozinha.
+⚠ **Não acusa.** "Já passaram da data combinada" é fato; "precisamos de uma posição urgente" fecha
+a porta com quem a Torg vai precisar na semana que vem.
+⚠ **Cópia para `matheus@` e `compras@`** (env `COBRANCA_ATRASO_CC`), **respostas para `compras@`**
+(caixa da área, não some quando alguém sai de férias). A tela mostra os dois ANTES do clique.
+
 ### CIF ou FOB — quem paga o frete, e quem vai buscar
 O fornecedor responde no portal de cotação (campo **obrigatório**, ao lado do prazo de entrega), e
 a resposta aparece nos Prazos das RMs. `lib/frete-cotacao.js`, coluna `Cotacao.tipoFrete`.
