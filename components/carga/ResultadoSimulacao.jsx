@@ -57,7 +57,7 @@ export function AvisosSimulacao({ resultado: r }) {
       <div className="px-4 pb-4"><p className="mb-3">Estas marcas não estão no IFC. A embalagem foi estimada pelo peso.</p><ul className="space-y-2 max-h-56 overflow-y-auto">{r.estimadas.map((e) => <li key={e.marca} className="border-t border-amber-200 pt-2"><b>{e.marca}</b> · {e.desc || "Sem descrição"}<span className="block text-xs mt-1">{fmtKg(e.kg)} · estimativa {Math.round(e.C / 10)} × {Math.round(e.L / 10)} × {Math.round(e.A / 10)} cm</span></li>)}</ul></div>
     </details>}
     {(r.especiais?.length > 0 || r.resumo?.semLugar?.length > 0 || r.semCaixa?.length > 0) && <div role="alert" className="text-red-800 bg-red-50 border border-red-200 rounded-xl p-4 space-y-2">
-      <p className="font-bold flex items-center gap-2"><AlertTriangle size={18} /> Pendências para fechar a carga</p>
+      <p className="font-bold flex items-center gap-2"><AlertTriangle size={18} /> Pendências para fechar a carga</p>{r.especiais?.length>0&&<p>Estes volumes não estão nos veículos simulados. Planejamento e transportadora devem definir veículo, apoios, amarração e necessidade de AET antes do embarque.</p>}
       {r.especiais?.map((e) => <p key={e.id}><b>Transporte especial:</b> {e.rotulo} — {e.aviso}</p>)}
       {r.resumo?.semLugar?.map((s, i) => <p key={i}><b>Sem lugar:</b> {s}</p>)}
       {r.semCaixa?.length > 0 && <p><b>Fora da carga, sem peso e sem geometria ({r.semCaixa.length} peças):</b> {[...new Set(r.semCaixa.map((s) => s.marca))].join(", ")}</p>}
