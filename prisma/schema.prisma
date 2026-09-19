@@ -2046,6 +2046,7 @@ model AvaliacaoCalibracao {
 // Uma por OP, com as 20 seções (template em lib/databook-secoes). Seções de
 // fonte "modulo1" puxam documentos do Controle de Documentos pelo vínculo de OP.
 model DataBookQualidade {
+  templateVisual String @default("TORG_2026") // Persistido: LEGADO ou TORG_2026; revisão nunca troca.
   id          String  @id @default(cuid())
   opNumero    String  @unique
   opId        String?

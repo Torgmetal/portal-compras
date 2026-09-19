@@ -1,7 +1,12 @@
 {
-  "build": 3287,
-  "gerado": "2026-09-19T14:57:36.743Z",
+  "build": 3288,
+  "gerado": "2026-09-19T18:47:39.405Z",
   "commits": [
+    {
+      "hash": "f4c5df4f",
+      "data": "19/09/2026",
+      "titulo": "Amplia campos de RNC e avisa sobre edições não salvas"
+    },
     {
       "hash": "b191d482",
       "data": "19/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b1990922",
       "data": "17/09/2026",
       "titulo": "feat: PIT compacto com seletor e anexos do cliente restritos"
-    },
-    {
-      "hash": "4d1d73c6",
-      "data": "17/09/2026",
-      "titulo": "As duas últimas cópias da regra do rodapé passam a usar a compartilhada"
     }
   ]
 }

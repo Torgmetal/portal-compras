@@ -85,7 +85,7 @@ async function montarDetalhe(id) {
   const anexadas = secoes.filter((s) => s.estado === "ANEXADO").length;
 
   return {
-    id: book.id, opNumero: book.opNumero, cliente: book.cliente, obra: book.obra,
+    id: book.id, templateVisual: book.templateVisual, opNumero: book.opNumero, cliente: book.cliente, obra: book.obra,
     pesoTotalKg: book.pesoTotalKg, pecas: book.pecas, observacao: book.observacao, tipo: book.tipo,
     status: book.status, emitidoEm: book.emitidoEm, createdAt: book.createdAt,
     // a revisão diz QUAL documento é este — o cabeçalho e o PDF mostram R00, R01…

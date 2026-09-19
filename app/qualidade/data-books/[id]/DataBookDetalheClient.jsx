@@ -345,6 +345,7 @@ export default function DataBookDetalheClient({ id, userId }) {
             <p className="text-xs text-torg-gray mt-0.5">
               {data.obra ? `${data.obra} · ` : ""}<span className="inline-flex items-center gap-1"><Weight size={11} /> {fmtKg(data.pesoTotalKg)}</span>{data.pecas ? ` · ${data.pecas} peças` : ""}
             </p>
+            <p className="text-xs text-torg-gray mt-1">Modelo: {data.templateVisual === "TORG_2026" ? "Torg · padrão atual" : "Original da obra"}</p>
             {data.tipo && (
               <span className="inline-block mt-1.5 text-[10px] px-2 py-0.5 rounded-full bg-torg-blue-50 text-torg-blue font-medium">
                 {TIPO_DATABOOK_LABEL[data.tipo] || data.tipo}
