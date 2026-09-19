@@ -1,4 +1,5 @@
 "use client";
+import ProtecaoEdicao from "@/components/qualidade/ProtecaoEdicao";
 import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -15,6 +16,7 @@ const dISO = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 
 export default function RncDetalheClient({ id }) {
   const router = useRouter();
+  const [versaoSalva, setVersaoSalva] = useState(0);
   const [d, setD] = useState(null);
   const [plano, setPlano] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -40,6 +42,7 @@ export default function RncDetalheClient({ id }) {
         cincoPorques: Array.from({ length: 5 }, (_, i) => ({ porque: `${i + 1}º porquê`, resposta: (Array.isArray(r.cincoPorques) ? r.cincoPorques[i]?.resposta : "") || "" })),
       });
       setPlano(j.plano || null);
+      setVersaoSalva(v=>v+1);
     }).catch(() => setErro("Erro ao carregar")).finally(() => setLoading(false));
   }, [id]);
   useEffect(() => { carregar(); }, [carregar]);
@@ -72,7 +75,7 @@ export default function RncDetalheClient({ id }) {
       const r = await fetch(`/api/qualidade/rnc/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao salvar");
-      flash("RNC salva."); carregar();
+      flash("RNC salva."); carregar(); return true;
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
   }
 
@@ -182,6 +185,7 @@ export default function RncDetalheClient({ id }) {
 
   return (
     <div className="space-y-5 max-w-4xl pb-24">
+      <ProtecaoEdicao conteudo={d} versaoSalva={versaoSalva} salvar={salvar} salvando={salvando} pendencias={[!d.descricao?.trim() && !apts.some(a=>a.descricao?.trim()) && "Descreva a não conformidade.", !d.elaborador?.trim() && "Informe o elaborador / responsável."].filter(Boolean)}/>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Link href="/qualidade/rnc" className="text-sm text-torg-gray hover:text-torg-blue inline-flex items-center gap-1"><ArrowLeft size={15} /> RNCs</Link>
         <div className="flex items-center gap-2">
@@ -274,7 +278,7 @@ export default function RncDetalheClient({ id }) {
 
       {/* Descrição */}
       <Secao titulo="Não conformidade">
-        <Campo label="Descrição da não conformidade"><textarea value={d.descricao || ""} onChange={(e) => set("descricao", e.target.value)} rows={3} className="inp" /></Campo>
+        <Campo label="Descrição da não conformidade"><textarea value={d.descricao || ""} onChange={(e) => set("descricao", e.target.value)} rows={6} className="inp min-h-[160px] resize-y leading-relaxed" /></Campo>
         <Campo label="Elaborador / responsável"><input value={d.elaborador || ""} onChange={(e) => set("elaborador", e.target.value)} className="inp" /></Campo>
       </Secao>
 
@@ -347,7 +351,7 @@ export default function RncDetalheClient({ id }) {
           <Campo label="Reinspecionado por"><input value={d.reinspecaoPor || ""} onChange={(e) => set("reinspecaoPor", e.target.value)} placeholder="Nome de quem conferiu" className="inp" /></Campo>
           <Campo label="Data da reinspeção"><CampoData value={d.reinspecaoEm || ""} onChange={(iso) => set("reinspecaoEm", iso)} className="inp" /></Campo>
         </div>
-        <Campo label="Resultado da reinspeção"><textarea value={d.resultadoReinspecao || ""} onChange={(e) => set("resultadoReinspecao", e.target.value)} rows={2} className="inp" placeholder="O que foi conferido e qual o resultado." /></Campo>
+        <Campo label="Resultado da reinspeção"><textarea value={d.resultadoReinspecao || ""} onChange={(e) => set("resultadoReinspecao", e.target.value)} rows={6} className="inp min-h-[160px] resize-y leading-relaxed" placeholder="O que foi conferido e qual o resultado." /></Campo>
         <div>
           <div className="flex items-center justify-between gap-2 mb-1.5">
             <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Registro fotográfico da reinspeção</p>
@@ -370,7 +374,7 @@ export default function RncDetalheClient({ id }) {
         <>
           {/* Causa raiz */}
           <Secao titulo="Análise de causa raiz">
-            <Campo label="Causas da não conformidade"><textarea value={d.causas || ""} onChange={(e) => set("causas", e.target.value)} rows={2} className="inp" /></Campo>
+            <Campo label="Causas da não conformidade"><textarea value={d.causas || ""} onChange={(e) => set("causas", e.target.value)} rows={6} className="inp min-h-[160px] resize-y leading-relaxed" /></Campo>
             <div className="space-y-2 mt-1">
               <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Ferramenta dos 5 porquês <span className="normal-case font-normal text-[10px] text-torg-gray">— preencha os 5</span></p>
               {d.cincoPorques.map((pq, i) => (
@@ -403,8 +407,8 @@ export default function RncDetalheClient({ id }) {
               <Campo label="Realizado em"><CampoData value={d.realizadoEm || ""} onChange={(iso) => set("realizadoEm", iso)} className="inp" /></Campo>
               <Campo label="Acompanhado por"><input value={d.acompanhadoPor || ""} onChange={(e) => set("acompanhadoPor", e.target.value)} className="inp" /></Campo>
             </div>
-            <Campo label="Acompanhamento da implementação"><textarea value={d.acompanhamento || ""} onChange={(e) => set("acompanhamento", e.target.value)} rows={2} className="inp" /></Campo>
-            <Campo label="Avaliação da eficácia"><textarea value={d.avaliacaoEficacia || ""} onChange={(e) => set("avaliacaoEficacia", e.target.value)} rows={2} className="inp" /></Campo>
+            <Campo label="Acompanhamento da implementação"><textarea value={d.acompanhamento || ""} onChange={(e) => set("acompanhamento", e.target.value)} rows={6} className="inp min-h-[160px] resize-y leading-relaxed" /></Campo>
+            <Campo label="Avaliação da eficácia"><textarea value={d.avaliacaoEficacia || ""} onChange={(e) => set("avaliacaoEficacia", e.target.value)} rows={6} className="inp min-h-[160px] resize-y leading-relaxed" /></Campo>
           </Secao>
         </>
       )}

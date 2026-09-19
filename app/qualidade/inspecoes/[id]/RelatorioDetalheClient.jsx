@@ -1,4 +1,5 @@
 "use client";
+import ProtecaoEdicao from "@/components/qualidade/ProtecaoEdicao";
 import AvisoPadroesInspecao from "@/components/AvisoPadroesInspecao";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -6,7 +7,7 @@ import { useStore } from "@/lib/store";
 import { pecasDoRelatorio, pecasInformadasSchema, usaQuantidadeInspecao } from "@/lib/inspecao-pecas";
 import PecasInformadasEditor from "./PecasInformadasEditor";
 import { Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, Lock, FolderOpen, Crop, RotateCcw } from "lucide-react";
-import { TIPO_LABEL } from "@/lib/qualidade-campo";
+import { TIPO_LABEL, pendenciasParaAssinatura } from "@/lib/qualidade-campo";
 import CampoTolerancia from "./CampoTolerancia";
 import {foraDaTolerancia} from "@/lib/tolerancia-inspecao";
 import MarcadorCotas from "./MarcadorCotas";
@@ -37,6 +38,7 @@ const RESULTADOS = ["APROVADO", "REPROVADO", "RETRABALHAR"];
 
 export default function RelatorioDetalheClient({ id }) {
   const { showToast } = useStore();
+  const [versaoSalva, setVersaoSalva] = useState(0);
   const [pecasEditadas, setPecasEditadas] = useState(null);
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
@@ -58,6 +60,7 @@ export default function RelatorioDetalheClient({ id }) {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
       setDados(j);
+      setVersaoSalva(v=>v+1);
     } catch (e) { setErro(e.message); }
   }, [id]);
   useEffect(() => { carregar(); }, [carregar]);
@@ -115,7 +118,9 @@ export default function RelatorioDetalheClient({ id }) {
       if (!r.ok) throw new Error(j.error || "Erro");
       setDados(d => ({ ...d, relatorio: j.relatorio }));
       setPecasEditadas(null);
+      setVersaoSalva(v=>v+1);
       showToast("Relatório salvo. Peças e quantidades atualizadas.", "success");
+      return true;
     } catch (e) { showToast(e.message, "error"); } finally { setSalvando(false); }
   }
 
@@ -135,6 +140,7 @@ export default function RelatorioDetalheClient({ id }) {
 
   return (
     <div className="p-4 sm:p-6 max-w-[1500px] mx-auto">
+      <ProtecaoEdicao conteudo={{rel,pecasEditadas}} versaoSalva={versaoSalva} salvar={salvar} salvando={salvando} pendencias={travado?[]:pendenciasParaAssinatura(rel)}/>
       {!travado && <div className="mb-3"><AvisoPadroesInspecao tipo={rel.tipo} resultados={res} /></div>}
       <Link href="/qualidade/inspecoes" className="text-[12px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 mb-3"><ArrowLeft size={13} /> Inspeções</Link>
 

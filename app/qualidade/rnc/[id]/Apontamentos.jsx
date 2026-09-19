@@ -70,7 +70,7 @@ function ItemApontamento({ a, i, cliente, set, del, podeApagar }) {
   const proc = a.procedente !== false;
   return (
     <div className="rounded-lg border border-gray-200 p-3 space-y-2.5">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-[11px] font-bold text-torg-gray bg-gray-100 rounded px-1.5 py-0.5 tabular-nums">{i + 1}</span>
         {cliente && (
           <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
@@ -94,8 +94,8 @@ function ItemApontamento({ a, i, cliente, set, del, podeApagar }) {
         )}
       </div>
 
-      <textarea value={a.descricao || ""} onChange={(e) => set(i, "descricao", e.target.value)} rows={2}
-        placeholder="O que foi apontado" className="inp" />
+      <textarea value={a.descricao || ""} onChange={(e) => set(i, "descricao", e.target.value)} rows={6}
+        placeholder="O que foi apontado" className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-[13px] min-h-[160px] resize-y leading-relaxed" />
 
       <div className="border-t border-gray-100 pt-2.5">
         <p className="text-[13px] font-semibold text-torg-dark">Disposição</p>
@@ -109,7 +109,7 @@ function ItemApontamento({ a, i, cliente, set, del, podeApagar }) {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
             <label className="block">
               <span className="block text-[11px] text-torg-gray mb-1">Decisão</span>
-              <select value={a.decisao || ""} onChange={(e) => set(i, "decisao", e.target.value)} className="inp">
+              <select value={a.decisao || ""} onChange={(e) => set(i, "decisao", e.target.value)} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-[13px]">
                 <option value="">—</option>
                 {Object.entries(DISPOSICAO_NC).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
@@ -118,19 +118,19 @@ function ItemApontamento({ a, i, cliente, set, del, podeApagar }) {
               <span className="block text-[11px] text-torg-gray mb-1">Peso (kg)</span>
               <CampoDecimal value={a.pesoKg ?? ""} placeholder="0"
                 onChange={(txt) => set(i, "pesoKg", txt === "" ? null : numeroBR(txt))}
-                disabled={a.decisao !== "RETRABALHAR"} className="inp disabled:bg-gray-50 disabled:text-gray-400" />
+                disabled={a.decisao !== "RETRABALHAR"} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-[13px] disabled:bg-gray-50 disabled:text-gray-400" />
             </label>
             <label className="block">
               <span className="block text-[11px] text-torg-gray mb-1">Setor gerador</span>
-              <select value={a.setor || ""} onChange={(e) => set(i, "setor", e.target.value)} className="inp">
+              <select value={a.setor || ""} onChange={(e) => set(i, "setor", e.target.value)} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-[13px]">
                 <option value="">—</option>
                 {SETORES_RETRABALHO.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
               </select>
             </label>
           </div>
         )}
-        <textarea value={a.disposicao || ""} onChange={(e) => set(i, "disposicao", e.target.value)} rows={3}
-          className="inp" placeholder={proc
+        <textarea value={a.disposicao || ""} onChange={(e) => set(i, "disposicao", e.target.value)} rows={6}
+          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-[13px] min-h-[160px] resize-y leading-relaxed" placeholder={proc
             ? "Ex.: furação refeita em campo pela equipe Torg, com gabarito conferido contra a estrutura da plataforma."
             : "Ex.: montagem executada conforme desenho aprovado; a interferência decorre da cota de piso definida em projeto do cliente."} />
       </div>

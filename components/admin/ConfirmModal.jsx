@@ -24,6 +24,8 @@ export default function ConfirmModal({
   labelConfirmar = "Confirmar",
   loading = false,
   variant = "padrao",
+  labelCancelar = "Cancelar",
+  acaoSecundaria,
 }) {
   useEffect(() => {
     if (!open) return;
@@ -72,14 +74,15 @@ export default function ConfirmModal({
         </div>
 
         {/* Rodapé */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-wrap justify-end gap-3">
           <button
             onClick={onClose}
             disabled={loading}
             className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50"
           >
-            Cancelar
+            {labelCancelar}
           </button>
+          {acaoSecundaria && <button onClick={acaoSecundaria.onClick} disabled={loading} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg disabled:opacity-50">{acaoSecundaria.label}</button>}
           <button
             onClick={onConfirm}
             disabled={loading}

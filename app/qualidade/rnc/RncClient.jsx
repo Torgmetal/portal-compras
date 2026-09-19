@@ -297,7 +297,7 @@ function ModalNova({ onClose, onCriada }) {
               <Campo label="Programa"><input value={f.programa} onChange={(e) => set("programa", e.target.value)} placeholder="ASME" className="inp" /></Campo>
             </>}
           </div>
-          <Campo label={cliente ? "Descrição da não conformidade" : "Descrição da não conformidade *"}><textarea value={f.descricao} onChange={(e) => set("descricao", e.target.value)} rows={3} className="inp" placeholder={cliente ? "Pode deixar em branco — anexe o PDF na tela da RNC e a IA preenche." : "O que foi constatado"} /></Campo>
+          <Campo label={cliente ? "Descrição da não conformidade" : "Descrição da não conformidade *"}><textarea value={f.descricao} onChange={(e) => set("descricao", e.target.value)} rows={6} className="inp min-h-[160px] resize-y leading-relaxed" placeholder={cliente ? "Pode deixar em branco — anexe o PDF na tela da RNC e a IA preenche." : "O que foi constatado"} /></Campo>
           {erro && <p className="text-[12px] text-red-600 flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
         </div>
         <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 rounded-b-xl">
