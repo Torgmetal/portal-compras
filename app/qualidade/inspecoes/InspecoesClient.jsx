@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { Loader2, FileText, Check, Send, AlertCircle, ChevronRight, ExternalLink, Plus, X, ShieldCheck, Trash2, Link2 } from "lucide-react";
+import { Loader2, FileText, Check, Send, AlertCircle, ChevronRight, ExternalLink, Plus, X, ShieldCheck, Trash2, Link2, Search, MoreHorizontal } from "lucide-react";
 import { TIPO_LABEL, TIPOS_RELATORIO, usaCotas, pendenciasParaAssinatura } from "@/lib/qualidade-campo";
 import { rotuloFase } from "@/lib/fase-peca";
 import FiltroFase from "@/components/qualidade/FiltroFase";
@@ -29,6 +29,8 @@ export default function InspecoesClient({ podeFechar = true }) {
   const [erro, setErro] = useState("");
   const [montando, setMontando] = useState(null); // { opNumero, tipo, opId }
   const [novoTipo, setNovoTipo] = useState(null); // qual tipo está sendo criado
+  const [busca, setBusca] = useState("");
+  const [tipoFiltro, setTipoFiltro] = useState("");
   const [opFiltro, setOpFiltro] = useState("");   // "" = todas as obras
   const [recolhidos, setRecolhidos] = useState(() => new Set());
   // ⚠ RELATÓRIO APROVADO SAI DA FILA. Vitor (22/08/2026): "relatórios aprovados precisam sair da
@@ -41,6 +43,7 @@ export default function InspecoesClient({ podeFechar = true }) {
   const [aba, setAba] = useState("PENDENTES");
 
   const carregar = useCallback(async () => {
+    setErro("");
     try {
       const r = await fetch("/api/qualidade/inspecoes");
       const j = await r.json();
@@ -50,7 +53,7 @@ export default function InspecoesClient({ podeFechar = true }) {
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
 
-  if (erro) return <div className="p-6"><p className="text-sm text-red-600 inline-flex items-center gap-2"><AlertCircle size={15} /> {erro}</p></div>;
+  if (erro) return <div className="p-6"><p className="text-sm text-red-600 inline-flex items-center gap-2"><AlertCircle size={15} /> {erro}</p><button onClick={carregar} className="block mt-3 rounded-lg border px-4 py-2 text-torg-blue">Tentar novamente</button></div>;
   if (!dados) return <div className="p-6"><p className="text-sm text-torg-gray inline-flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> carregando…</p></div>;
 
   // agrupa o que está solto por OP + tipo — é assim que vira um relatório
@@ -77,7 +80,9 @@ export default function InspecoesClient({ podeFechar = true }) {
   const opsComRelatorio = [...new Set(dados.relatorios.map((r) => r.opNumero))]
     .sort((a, b) => String(b).localeCompare(String(a), "pt-BR", { numeric: true }));
   const visiveis = dados.relatorios
-    .filter((r) => !opFiltro || r.opNumero === opFiltro)
+    .filter((r) => !opFiltro || String(r.opNumero) === opFiltro)
+    .filter((r) => !tipoFiltro || r.tipo === tipoFiltro)
+    .filter((r) => !busca.trim() || [r.codigo, r.opNumero, r.inspetor, r.criadoPorNome, ...(r.marcas || [])].join(" ").toLocaleLowerCase("pt-BR").includes(busca.trim().toLocaleLowerCase("pt-BR")))
     .filter((r) => (aba === "APROVADOS" ? ehConcluido(r) : !ehConcluido(r)));
 
 
@@ -88,14 +93,14 @@ export default function InspecoesClient({ podeFechar = true }) {
         <div>
           <h1 className="text-xl font-extrabold text-torg-dark tracking-tight">Inspeções</h1>
           <p className="text-[13px] text-torg-gray mt-0.5">
-            O que a fábrica registrou pelo celular, virando relatório numerado e assinado.
+            Preencha as inspeções, acompanhe as assinaturas e consulte os relatórios aprovados.
           </p>
         </div>
         {/* ⚠ TODO TIPO PODE NASCER AQUI. Antes só o dimensional tinha entrada; os demais dependiam de
             alguém mandar foto do celular primeiro, e quem trabalha no computador ficava sem começo. */}
-        <div className="relative">
-          <select value="" onChange={(e) => e.target.value && setNovoTipo(e.target.value)}
-            className="appearance-none text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg pl-8 pr-7 py-1.5 cursor-pointer outline-none">
+        <div className="relative w-full sm:w-auto">
+          <select aria-label="Criar novo relatório" value="" onChange={(e) => e.target.value && setNovoTipo(e.target.value)}
+            className="w-full sm:max-w-sm min-h-[44px] appearance-none text-sm font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg pl-8 pr-7 py-1.5 cursor-pointer outline-none">
             <option value="">Novo relatório</option>
             {TIPOS_RELATORIO.map((t) => <option key={t.id} value={t.id} className="text-torg-dark bg-white">{t.sigla} · {t.label}</option>)}
           </select>
@@ -114,12 +119,12 @@ export default function InspecoesClient({ podeFechar = true }) {
       <h2 className="text-sm font-bold text-torg-dark mt-7 mb-2 inline-flex items-center gap-1.5">
         <FileText size={15} className="text-torg-blue" /> Relatórios
       </h2>
-      {!dados.relatorios.length && <p className="text-[13px] text-torg-gray">Nenhum relatório montado ainda.</p>}
+      {!dados.relatorios.length && <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-torg-gray"><FileText size={28} className="mx-auto mb-3"/><p>Nenhum relatório criado ainda.</p><p className="text-sm mt-1">Selecione o tipo em Novo relatório para começar.</p></div>}
 
       {dados.relatorios.length > 0 && (
         <>
           <div className="flex gap-1 border-b border-gray-200 mb-3">
-            {[["PENDENTES", "Aguardando aprovação", pendentes], ["APROVADOS", "Aprovados", concluidos]].map(([k, rot, n]) => (
+            {[["PENDENTES", "Em andamento", pendentes], ["APROVADOS", "Aprovados", concluidos]].map(([k, rot, n]) => (
               <button key={k} onClick={() => setAba(k)}
                 className={`px-3 py-2 text-[13px] font-semibold border-b-2 -mb-px ${
                   aba === k ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
@@ -127,52 +132,43 @@ export default function InspecoesClient({ podeFechar = true }) {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2 flex-wrap mb-3">
-            <select value={opFiltro} onChange={(e) => setOpFiltro(e.target.value)}
-              className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:border-torg-blue outline-none">
-              <option value="">Todas as obras</option>
-              {opsComRelatorio.map((n) => <option key={n} value={n}>OP-{n}</option>)}
-            </select>
-            <span className="text-[11px] text-torg-gray ml-auto">
-              {aba === "APROVADOS"
-                ? "guardados também em 8. Qualidade / 3. Relatórios de Inspeção, na pasta da obra"
-                : `${visiveis.length} para preencher`}
-            </span>
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px_240px]">
+              <label className="block text-xs font-semibold text-torg-gray">Buscar relatório
+                <div className="relative mt-1"><Search size={16} className="absolute left-3 top-3 text-torg-gray"/><input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Código, marca ou inspetor" className="w-full min-h-[44px] rounded-lg border border-gray-200 pl-9 pr-3 text-sm font-normal"/></div>
+              </label>
+              <label className="block text-xs font-semibold text-torg-gray">Obra
+                <select value={opFiltro} onChange={e=>setOpFiltro(e.target.value)} className="mt-1 w-full min-h-[44px] border border-gray-200 rounded-lg px-3 bg-white text-sm font-normal"><option value="">Todas as obras</option>{opsComRelatorio.map(n=><option key={n} value={n}>OP-{n}</option>)}</select>
+              </label>
+              <label className="block text-xs font-semibold text-torg-gray">Tipo de inspeção
+                <select value={tipoFiltro} onChange={e=>setTipoFiltro(e.target.value)} className="mt-1 w-full min-h-[44px] border border-gray-200 rounded-lg px-3 bg-white text-sm font-normal"><option value="">Todos os tipos</option>{TIPOS_RELATORIO.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}</select>
+              </label>
+            </div>
+            <div className="flex flex-wrap justify-between gap-2 mt-3 text-xs text-torg-gray"><span>{visiveis.length} relatório(s) nesta lista</span>{(busca||opFiltro||tipoFiltro)&&<button onClick={()=>{setBusca("");setOpFiltro("");setTipoFiltro("");}} className="text-torg-blue font-semibold">Limpar filtros</button>}</div>
           </div>
+          <p className="text-xs text-torg-gray mb-4">{aba==="APROVADOS"?"Inspeções com resultado aprovado. Confira a situação das assinaturas em cada relatório.":"Abra o relatório para preencher ou revisar. O envio para assinatura é uma etapa separada."}</p>
         </>
       )}
 
       {dados.relatorios.length > 0 && !visiveis.length && (
         <p className="text-[13px] text-torg-gray">
-          {aba === "APROVADOS" ? "Nenhum relatório aprovado ainda." : "Nada aguardando aprovação."}
+          {aba === "APROVADOS" ? "Nenhum relatório aprovado ainda." : "Nenhum relatório em andamento com estes filtros."}
           {opFiltro ? " nesta obra." : ""}
         </p>
       )}
       {agruparRelatorios(visiveis).map((t) => (
-        <div key={t.tipo} className="mb-5">
+        <div key={t.tipo} className="mb-4 bg-white border border-gray-100 rounded-xl shadow-sm">
           <button onClick={() => setRecolhidos((p) => {
               const n = new Set(p);
               if (n.has(t.tipo)) n.delete(t.tipo); else n.add(t.tipo);
               return n;
             })}
-            className="w-full flex items-center gap-2 bg-torg-blue/5 border-l-[3px] border-torg-blue rounded-r-lg px-2.5 py-1.5 mb-2 hover:bg-torg-blue/10">
+            aria-expanded={!recolhidos.has(t.tipo)} className="w-full flex items-center gap-2 bg-gray-50/60 rounded-t-xl px-4 py-3 text-left hover:bg-gray-50">
             <ChevronRight size={13} className={`text-torg-blue transition-transform ${recolhidos.has(t.tipo) ? "" : "rotate-90"}`} />
             <h3 className="text-[13px] font-bold text-torg-dark">{TIPO_LABEL[t.tipo] || t.tipo}</h3>
-            <span className="text-[11px] text-torg-gray">{t.total} relatório{t.total > 1 ? "s" : ""}</span>
+            <span className="ml-auto shrink-0 text-[11px] text-torg-gray">{t.total} relatório{t.total > 1 ? "s" : ""}</span>
           </button>
-          {!recolhidos.has(t.tipo) && t.ops.map((o) => (
-            <div key={o.opNumero} className="mb-2.5">
-              <p className="mb-1 pl-0.5">
-                <span className="text-[11px] font-bold text-torg-dark bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5">
-                  OP-{o.opNumero}
-                </span>
-                <span className="text-[11px] text-torg-gray ml-1.5">{o.relatorios.length} relatório{o.relatorios.length > 1 ? "s" : ""}</span>
-              </p>
-              <div className="space-y-2">
-                {o.relatorios.map((r) => <Relatorio key={r.id} r={r} onMudou={carregar} podeFechar={podeFechar} />)}
-              </div>
-            </div>
-          ))}
+          {!recolhidos.has(t.tipo) && <div className="divide-y divide-gray-100">{t.ops.flatMap(o=>o.relatorios).map(r=><Relatorio key={r.id} r={r} onMudou={carregar} podeFechar={podeFechar}/>)}</div>}
         </div>
       ))}
 
@@ -225,6 +221,8 @@ function Relatorio({ r, onMudou, podeFechar = true }) {
   const [abrindo, setAbrindo] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   const assinadas = r.assinaturas.filter((a) => a.assinadoEm).length;
+  const resultado = { APROVADO: "Inspeção aprovada", REPROVADO: "Reprovado · revisar", REC: "Exame complementar" }[r.resultadoInspecao];
+  const situacao = r.envioAssinaturaId ? (r.assinaturas.length > 0 && assinadas === r.assinaturas.length ? "Assinaturas concluídas" : "Aguardando assinaturas") : r.emitidoEm ? "Emitido · não enviado" : "Rascunho";
 
   async function excluir() {
     // ⚠ o aviso diz o que ACONTECE, não só "tem certeza?": o relatório sai do data book e as fotos
@@ -245,51 +243,31 @@ function Relatorio({ r, onMudou, podeFechar = true }) {
   }
 
   return (
-    <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="min-w-0">
-          <Link href={`/qualidade/inspecoes/${r.id}`} className="font-semibold text-torg-blue hover:text-torg-dark text-sm">
-            <span className="font-mono">{r.codigo}</span>
-            {r.marcas?.length ? <span className="font-normal text-torg-dark"> · {r.marcas.slice(0, 4).join(", ")}{r.marcas.length > 4 ? ` +${r.marcas.length - 4}` : ""}</span> : null}
-          </Link>
-          <p className="text-[11px] text-torg-gray">
-            {r.fotos > 0 ? `${r.fotos} foto${r.fotos > 1 ? "s" : ""} · ` : ""}
-            {/* ⚠ o tipo identifica melhor que "sem título". Vitor (22/08/2026): "essa parte de
-                título não há necessidade de ter em nenhum dos relatórios... seria um campo a
-                mais para termos que pensar em preencher". Relatório antigo com título mantém
-                o dele. */}
-            {r.titulo || TIPO_LABEL[r.tipo] || r.tipo} · {r.inspetor || r.criadoPorNome || "—"}
-            {r.emitidoEm ? ` · emitido ${fmtDT(r.emitidoEm)}` : " · rascunho"}
-          </p>
+    <div className="px-4 py-3">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
+            <span className="text-xs font-bold text-torg-gray">OP-{r.opNumero}</span>
+            <Link href={`/qualidade/inspecoes/${r.id}`} className="font-semibold font-mono text-sm text-torg-blue hover:underline">{r.codigo}</Link>
+            <span className="text-[11px] rounded px-2 py-0.5 bg-slate-100 text-torg-gray">{situacao}</span>
+            {resultado&&<span className={`text-[11px] ${r.resultadoInspecao==="APROVADO"?"text-emerald-700":"text-orange-700"}`}>{resultado}</span>}
+          </div>
+          <p className="text-xs text-torg-gray mt-1.5">{r.inspetor || r.criadoPorNome || "Inspetor não informado"}{r.fotos>0?` · ${r.fotos} fotos`:""}{r.emitidoEm?` · ${fmtDT(r.emitidoEm)}`:""}{r.envioAssinaturaId?` · ${assinadas}/${r.assinaturas.length} assinaturas`:""}</p>
+          {!!r.marcas?.length&&<details className="mt-1 text-xs text-torg-gray"><summary className="cursor-pointer py-1 w-fit">{r.marcas.length} marca{r.marcas.length>1?"s":""} · ver peças</summary><p className="mt-1 break-words text-torg-dark leading-relaxed">{r.marcas.join(", ")}</p></details>}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {r.envioAssinaturaId && (
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-              assinadas === r.assinaturas.length ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-            }`}>
-              {assinadas}/{r.assinaturas.length} assinaram
-            </span>
-          )}
-          <a href={`/api/qualidade/inspecoes/${r.id}/pdf`} target="_blank" rel="noopener noreferrer"
-            className="text-[12px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium">
-            <ExternalLink size={13} /> PDF
-          </a>
-          {podeFechar && (
-            <>
-              <button onClick={() => setAbrindo((v) => !v)}
-                className="text-[12px] text-torg-blue border border-torg-blue-200 hover:bg-torg-blue-50 rounded-lg px-2.5 py-1 inline-flex items-center gap-1.5 font-medium">
-                <Send size={13} /> {r.envioAssinaturaId ? "Assinaturas" : "Enviar p/ assinatura"}
-              </button>
-              <button onClick={excluir} disabled={excluindo} title="Apagar relatório"
-                className="text-torg-gray hover:text-red-600 disabled:opacity-40 p-1">
-                {excluindo ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-              </button>
-            </>
-          )}
+        <div className="flex shrink-0 items-center gap-1">
+          <Link aria-label={`Abrir ${r.codigo}`} href={`/qualidade/inspecoes/${r.id}`} className="inline-flex items-center justify-center min-h-[44px] px-3 text-sm font-semibold text-torg-blue rounded-lg hover:bg-blue-50">Abrir <ChevronRight size={15}/></Link>
+          <details className="relative" onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget))e.currentTarget.open=false;}} onKeyDown={e=>{if(e.key==="Escape"){e.currentTarget.open=false;e.currentTarget.querySelector('summary')?.focus();}}}>
+            <summary aria-label={`Ações de ${r.codigo}`} className="list-none [&::-webkit-details-marker]:hidden cursor-pointer min-h-[44px] w-9 flex items-center justify-center rounded-lg text-torg-gray hover:bg-gray-100"><MoreHorizontal size={20}/></summary>
+            <div className="absolute right-0 top-full z-20 w-56 max-w-[75vw] bg-white rounded-xl border border-gray-200 shadow-lg p-1">
+              <a href={`/api/qualidade/inspecoes/${r.id}/pdf`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 min-h-[44px] px-3 text-sm text-torg-dark rounded-lg hover:bg-gray-50"><ExternalLink size={15}/>Visualizar PDF</a>
+              {podeFechar&&<><button onClick={e=>{e.currentTarget.closest('details').open=false;setAbrindo(v=>!v);}} className="w-full flex items-center gap-2 min-h-[44px] px-3 text-sm text-torg-dark rounded-lg hover:bg-gray-50"><Send size={15}/>{r.envioAssinaturaId?"Gerenciar assinaturas":"Enviar para assinatura"}</button><button onClick={excluir} disabled={excluindo} aria-label={`Excluir ${r.codigo}`} className="w-full flex items-center gap-2 min-h-[44px] px-3 text-sm text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-40">{excluindo?<Loader2 size={15} className="animate-spin"/>:<Trash2 size={15}/>}Excluir relatório</button></>}
+            </div>
+          </details>
         </div>
       </div>
 
-      {r.assinaturas.length > 0 && (
+      {r.assinaturas.length > 0 && abrindo && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {r.assinaturas.map((a) => (
             <span key={a.email} className={`text-[10px] px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${
