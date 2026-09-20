@@ -1,7 +1,12 @@
 {
-  "build": 3291,
-  "gerado": "2026-09-20T20:24:06.914Z",
+  "build": 3292,
+  "gerado": "2026-09-20T20:30:28.319Z",
   "commits": [
+    {
+      "hash": "55976535",
+      "data": "20/09/2026",
+      "titulo": "Manutenção: OP-105 grava as listas em lote; a tela explica o corte por tempo"
+    },
     {
       "hash": "89f4ca6d",
       "data": "20/09/2026",
@@ -146,11 +151,6 @@
       "hash": "58e0effb",
       "data": "17/09/2026",
       "titulo": "Encerrado no Omie conta como chegou, e a barra de filtros separa escopo de situação"
-    },
-    {
-      "hash": "b0436260",
-      "data": "17/09/2026",
-      "titulo": "Prova de execução para o aquecimento dos crons, e a memória do que foi medido hoje"
     }
   ]
 }
