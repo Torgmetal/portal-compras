@@ -1,7 +1,12 @@
 {
-  "build": 3288,
-  "gerado": "2026-09-19T18:47:39.405Z",
+  "build": 3289,
+  "gerado": "2026-09-20T19:11:27.059Z",
   "commits": [
+    {
+      "hash": "a6dea056",
+      "data": "19/09/2026",
+      "titulo": "feat: adotar template Torg para data books sem emissão anterior"
+    },
     {
       "hash": "f4c5df4f",
       "data": "19/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7521e511",
       "data": "17/09/2026",
       "titulo": "Conferência finalizada manda a planilha ao PCP, com peso e observações por marca"
-    },
-    {
-      "hash": "b1990922",
-      "data": "17/09/2026",
-      "titulo": "feat: PIT compacto com seletor e anexos do cliente restritos"
     }
   ]
 }
