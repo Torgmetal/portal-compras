@@ -1,0 +1,1132 @@
+{
+ "_leia": "Lista de peças por fase da OP-105 (Vitor, 20/09/2026): quais marcas, e quantas, entram em cada fase de entrega. A e B vêm da lista de equivalência de TAGs do cliente (TMSA); C é a LPC T105C inteira. Os croquis não estão aqui: entram pelo vínculo croqui→conjunto da LPC. Aplicada pela tarefa de manutenção 'op105-fases-por-tag'.",
+ "op": "105",
+ "origem": {
+  "equivalencia": "T105-LISTA DE EQUIVALÊNCIA TAG TORG_TMSA.xlsx (Diego, 11/09/2026, Rev. 01)",
+  "lpcB": "T105B- LPC_R00.xlsx",
+  "lpcC": "T105C- LPC_R01.xlsx"
+ },
+ "loteA": {
+  "nomeAtual": "Treliças TC 4706 - 4707 (A)",
+  "novoNome4706": "Treliças TC 4706 (A)",
+  "nome4707": "Treliças TC 4707 (A)"
+ },
+ "rechavear": {
+  "de": "105",
+  "para": "T105C",
+  "marcas": [
+   "72103380-1",
+   "72103380-2",
+   "72138737-1",
+   "72138737-2",
+   "T105C-P1",
+   "T105C-P3",
+   "T105C-P4",
+   "T105C-P5",
+   "T105C-P2",
+   "T105C-P6",
+   "70408127",
+   "72211498",
+   "T105C-P7",
+   "T105C-P8"
+  ]
+ },
+ "lotes": [
+  {
+   "nome": "Treliças TC 4706 (A)",
+   "marcas": [
+    {
+     "marca": "105A1",
+     "qtd": 1,
+     "descricao": "MODULO 1 - DIREITA",
+     "pesoUnitKg": 247.84,
+     "pesoTotalKg": 247.839
+    },
+    {
+     "marca": "105A2",
+     "qtd": 1,
+     "descricao": "MODULO 1 - ESQUERDA",
+     "pesoUnitKg": 248,
+     "pesoTotalKg": 248
+    },
+    {
+     "marca": "105A3",
+     "qtd": 2,
+     "descricao": "TRAVAMENTO - MOD.1",
+     "pesoUnitKg": 10.98,
+     "pesoTotalKg": 21.957
+    },
+    {
+     "marca": "105A4",
+     "qtd": 5,
+     "descricao": "TRAVAMENTO - MOD.1",
+     "pesoUnitKg": 5.46,
+     "pesoTotalKg": 27.297
+    },
+    {
+     "marca": "105A5",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.1",
+     "pesoUnitKg": 7.56,
+     "pesoTotalKg": 7.556
+    },
+    {
+     "marca": "105A6",
+     "qtd": 4,
+     "descricao": "TRAVAMENTO - MOD.1",
+     "pesoUnitKg": 7.79,
+     "pesoTotalKg": 31.146
+    },
+    {
+     "marca": "105A7",
+     "qtd": 4,
+     "descricao": "TRAVAMENTO - MOD.1",
+     "pesoUnitKg": 4.97,
+     "pesoTotalKg": 19.868
+    },
+    {
+     "marca": "105A8",
+     "qtd": 3,
+     "descricao": "TRAVAMENTO - MOD.1",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 23.302
+    },
+    {
+     "marca": "105A9",
+     "qtd": 2,
+     "descricao": "TRAVAMENTO - MOD.1",
+     "pesoUnitKg": 3.65,
+     "pesoTotalKg": 7.309
+    },
+    {
+     "marca": "105A10",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.1",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 7.767
+    },
+    {
+     "marca": "105A11",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.1",
+     "pesoUnitKg": 6.79,
+     "pesoTotalKg": 6.794
+    },
+    {
+     "marca": "105A12",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.1",
+     "pesoUnitKg": 10.99,
+     "pesoTotalKg": 10.988
+    },
+    {
+     "marca": "105A13",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.1",
+     "pesoUnitKg": 1.34,
+     "pesoTotalKg": 1.343
+    },
+    {
+     "marca": "105A14",
+     "qtd": 17,
+     "descricao": "MODULO 2 - DIREITA",
+     "pesoUnitKg": 249.9,
+     "pesoTotalKg": 4248.324
+    },
+    {
+     "marca": "105A15",
+     "qtd": 17,
+     "descricao": "MODULO 2 - ESQUERDA",
+     "pesoUnitKg": 250.52,
+     "pesoTotalKg": 4258.836
+    },
+    {
+     "marca": "105A16",
+     "qtd": 34,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 10.99,
+     "pesoTotalKg": 373.594
+    },
+    {
+     "marca": "105A17",
+     "qtd": 34,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 10.98,
+     "pesoTotalKg": 373.272
+    },
+    {
+     "marca": "105A18",
+     "qtd": 34,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 6.79,
+     "pesoTotalKg": 231.013
+    },
+    {
+     "marca": "105A19",
+     "qtd": 85,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 5.46,
+     "pesoTotalKg": 464.054
+    },
+    {
+     "marca": "105A20",
+     "qtd": 17,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 132.044
+    },
+    {
+     "marca": "105A21",
+     "qtd": 68,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 7.79,
+     "pesoTotalKg": 529.478
+    },
+    {
+     "marca": "105A22",
+     "qtd": 68,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 4.97,
+     "pesoTotalKg": 337.762
+    },
+    {
+     "marca": "105A23",
+     "qtd": 51,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 396.132
+    },
+    {
+     "marca": "105A24",
+     "qtd": 34,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 3.65,
+     "pesoTotalKg": 124.257
+    },
+    {
+     "marca": "105A25",
+     "qtd": 17,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 132.044
+    },
+    {
+     "marca": "105A26",
+     "qtd": 17,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 1.34,
+     "pesoTotalKg": 22.837
+    },
+    {
+     "marca": "105A27",
+     "qtd": 1,
+     "descricao": "MODULO 3 - DIREITA",
+     "pesoUnitKg": 290.31,
+     "pesoTotalKg": 290.308
+    },
+    {
+     "marca": "105A28",
+     "qtd": 1,
+     "descricao": "MODULO 3 - ESQUERDA",
+     "pesoUnitKg": 290.32,
+     "pesoTotalKg": 290.323
+    },
+    {
+     "marca": "105A29",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.3",
+     "pesoUnitKg": 12.14,
+     "pesoTotalKg": 12.143
+    },
+    {
+     "marca": "105A30",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.3",
+     "pesoUnitKg": 10.99,
+     "pesoTotalKg": 10.988
+    },
+    {
+     "marca": "105A31",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.3",
+     "pesoUnitKg": 10.98,
+     "pesoTotalKg": 10.979
+    },
+    {
+     "marca": "105A32",
+     "qtd": 2,
+     "descricao": "TRAVAMENTO - MOD.3",
+     "pesoUnitKg": 6.79,
+     "pesoTotalKg": 13.589
+    },
+    {
+     "marca": "105A33",
+     "qtd": 5,
+     "descricao": "TRAVAMENTO - MOD.3",
+     "pesoUnitKg": 5.46,
+     "pesoTotalKg": 27.297
+    },
+    {
+     "marca": "105A34",
+     "qtd": 4,
+     "descricao": "TRAVAMENTO - MOD.3",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 31.069
+    },
+    {
+     "marca": "105A35",
+     "qtd": 4,
+     "descricao": "TRAVAMENTO - MOD.3",
+     "pesoUnitKg": 4.97,
+     "pesoTotalKg": 19.868
+    },
+    {
+     "marca": "105A36",
+     "qtd": 4,
+     "descricao": "TRAVAMENTO - MOD.3",
+     "pesoUnitKg": 7.79,
+     "pesoTotalKg": 31.146
+    },
+    {
+     "marca": "105A37",
+     "qtd": 2,
+     "descricao": "TRAVAMENTO - MOD.3",
+     "pesoUnitKg": 3.65,
+     "pesoTotalKg": 7.309
+    },
+    {
+     "marca": "105A38",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.3",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 7.767
+    },
+    {
+     "marca": "105A39",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.3",
+     "pesoUnitKg": 10.99,
+     "pesoTotalKg": 10.988
+    },
+    {
+     "marca": "105A40",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.3",
+     "pesoUnitKg": 1.34,
+     "pesoTotalKg": 1.343
+    },
+    {
+     "marca": "105A41",
+     "qtd": 1,
+     "descricao": "MODULO 4 - DIREITA",
+     "pesoUnitKg": 292.97,
+     "pesoTotalKg": 292.966
+    },
+    {
+     "marca": "105A42",
+     "qtd": 1,
+     "descricao": "MODULO 4 - ESQUERDA",
+     "pesoUnitKg": 292.98,
+     "pesoTotalKg": 292.982
+    },
+    {
+     "marca": "105A43",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.4",
+     "pesoUnitKg": 12.14,
+     "pesoTotalKg": 12.143
+    },
+    {
+     "marca": "105A44",
+     "qtd": 2,
+     "descricao": "TRAVAMENTO - MOD.4",
+     "pesoUnitKg": 6.49,
+     "pesoTotalKg": 12.987
+    },
+    {
+     "marca": "105A45",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.4",
+     "pesoUnitKg": 10.99,
+     "pesoTotalKg": 10.988
+    },
+    {
+     "marca": "105A46",
+     "qtd": 2,
+     "descricao": "TRAVAMENTO - MOD.4",
+     "pesoUnitKg": 6.79,
+     "pesoTotalKg": 13.589
+    },
+    {
+     "marca": "105A47",
+     "qtd": 5,
+     "descricao": "TRAVAMENTO - MOD.4",
+     "pesoUnitKg": 5.46,
+     "pesoTotalKg": 27.297
+    },
+    {
+     "marca": "105A48",
+     "qtd": 4,
+     "descricao": "TRAVAMENTO - MOD.4",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 31.069
+    },
+    {
+     "marca": "105A49",
+     "qtd": 4,
+     "descricao": "TRAVAMENTO - MOD.4",
+     "pesoUnitKg": 4.97,
+     "pesoTotalKg": 19.868
+    },
+    {
+     "marca": "105A50",
+     "qtd": 4,
+     "descricao": "TRAVAMENTO - MOD.4",
+     "pesoUnitKg": 7.79,
+     "pesoTotalKg": 31.146
+    },
+    {
+     "marca": "105A51",
+     "qtd": 2,
+     "descricao": "TRAVAMENTO - MOD.4",
+     "pesoUnitKg": 3.65,
+     "pesoTotalKg": 7.309
+    },
+    {
+     "marca": "105A52",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.4",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 7.767
+    },
+    {
+     "marca": "105A53",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.4",
+     "pesoUnitKg": 10.99,
+     "pesoTotalKg": 10.988
+    },
+    {
+     "marca": "105A54",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.4",
+     "pesoUnitKg": 11.24,
+     "pesoTotalKg": 11.241
+    },
+    {
+     "marca": "105A55",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.4",
+     "pesoUnitKg": 1.34,
+     "pesoTotalKg": 1.343
+    },
+    {
+     "marca": "105A56",
+     "qtd": 1,
+     "descricao": "MODULO 5 - DIREITA",
+     "pesoUnitKg": 220.68,
+     "pesoTotalKg": 220.677
+    },
+    {
+     "marca": "105A57",
+     "qtd": 1,
+     "descricao": "MODULO 5 - ESQUERDA",
+     "pesoUnitKg": 221,
+     "pesoTotalKg": 221
+    },
+    {
+     "marca": "105A58",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 10.99,
+     "pesoTotalKg": 10.988
+    },
+    {
+     "marca": "105A59",
+     "qtd": 2,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 10.98,
+     "pesoTotalKg": 21.957
+    },
+    {
+     "marca": "105A60",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 6.78,
+     "pesoTotalKg": 6.784
+    },
+    {
+     "marca": "105A61",
+     "qtd": 5,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 5.46,
+     "pesoTotalKg": 27.297
+    },
+    {
+     "marca": "105A62",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 7.84,
+     "pesoTotalKg": 7.836
+    },
+    {
+     "marca": "105A63",
+     "qtd": 4,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 7.79,
+     "pesoTotalKg": 31.146
+    },
+    {
+     "marca": "105A64",
+     "qtd": 4,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 4.97,
+     "pesoTotalKg": 19.868
+    },
+    {
+     "marca": "105A65",
+     "qtd": 3,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 23.302
+    },
+    {
+     "marca": "105A66",
+     "qtd": 2,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 3.65,
+     "pesoTotalKg": 7.309
+    },
+    {
+     "marca": "105A67",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 7.767
+    },
+    {
+     "marca": "105A68",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 6.9,
+     "pesoTotalKg": 6.904
+    },
+    {
+     "marca": "105A69",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 10.99,
+     "pesoTotalKg": 10.988
+    },
+    {
+     "marca": "105A70",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 1.34,
+     "pesoTotalKg": 1.343
+    },
+    {
+     "marca": "105A71",
+     "qtd": 1,
+     "descricao": "MODULO 6 - DIREITA",
+     "pesoUnitKg": 237.17,
+     "pesoTotalKg": 237.169
+    },
+    {
+     "marca": "105A72",
+     "qtd": 1,
+     "descricao": "MODULO 6 - ESQUERDA",
+     "pesoUnitKg": 236.46,
+     "pesoTotalKg": 236.463
+    },
+    {
+     "marca": "105A73",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 10.99,
+     "pesoTotalKg": 10.988
+    },
+    {
+     "marca": "105A74",
+     "qtd": 2,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 10.98,
+     "pesoTotalKg": 21.957
+    },
+    {
+     "marca": "105A75",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 6.79,
+     "pesoTotalKg": 6.794
+    },
+    {
+     "marca": "105A76",
+     "qtd": 5,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 5.46,
+     "pesoTotalKg": 27.297
+    },
+    {
+     "marca": "105A77",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 7.767
+    },
+    {
+     "marca": "105A78",
+     "qtd": 4,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 7.79,
+     "pesoTotalKg": 31.146
+    },
+    {
+     "marca": "105A79",
+     "qtd": 4,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 4.97,
+     "pesoTotalKg": 19.868
+    },
+    {
+     "marca": "105A80",
+     "qtd": 3,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 23.302
+    },
+    {
+     "marca": "105A81",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 4.09,
+     "pesoTotalKg": 4.095
+    },
+    {
+     "marca": "105A82",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 8.56,
+     "pesoTotalKg": 8.556
+    },
+    {
+     "marca": "105A83",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 7.36,
+     "pesoTotalKg": 7.36
+    },
+    {
+     "marca": "105A84",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 4.08,
+     "pesoTotalKg": 4.075
+    },
+    {
+     "marca": "105A85",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 10.98,
+     "pesoTotalKg": 10.979
+    },
+    {
+     "marca": "105A86",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 1.55,
+     "pesoTotalKg": 1.553
+    },
+    {
+     "marca": "105A87",
+     "qtd": 2,
+     "descricao": "BASE TRELIÇA - MOD. 1",
+     "pesoUnitKg": 6.03,
+     "pesoTotalKg": 12.06
+    },
+    {
+     "marca": "105A88",
+     "qtd": 42,
+     "descricao": "BASE TRELIÇA",
+     "pesoUnitKg": 5.98,
+     "pesoTotalKg": 251.089
+    },
+    {
+     "marca": "105A89",
+     "qtd": 2,
+     "descricao": "BASE - SUPORTE MOD. 6",
+     "pesoUnitKg": 2.03,
+     "pesoTotalKg": 4.066
+    },
+    {
+     "marca": "105A90",
+     "qtd": 1,
+     "descricao": "SUPORTE MOD. 6",
+     "pesoUnitKg": 11.32,
+     "pesoTotalKg": 11.318
+    },
+    {
+     "marca": "105A91",
+     "qtd": 1,
+     "descricao": "SUPORTE MOD. 6",
+     "pesoUnitKg": 11.32,
+     "pesoTotalKg": 11.318
+    }
+   ]
+  },
+  {
+   "nome": "Treliças TC 4707 (A)",
+   "marcas": [
+    {
+     "marca": "105A1",
+     "qtd": 1,
+     "descricao": "MODULO 1 - DIREITA",
+     "pesoUnitKg": 247.84,
+     "pesoTotalKg": 247.839
+    },
+    {
+     "marca": "105A2",
+     "qtd": 1,
+     "descricao": "MODULO 1 - ESQUERDA",
+     "pesoUnitKg": 248,
+     "pesoTotalKg": 248
+    },
+    {
+     "marca": "105A3",
+     "qtd": 2,
+     "descricao": "TRAVAMENTO - MOD.1",
+     "pesoUnitKg": 10.98,
+     "pesoTotalKg": 21.957
+    },
+    {
+     "marca": "105A5",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.1",
+     "pesoUnitKg": 7.56,
+     "pesoTotalKg": 7.556
+    },
+    {
+     "marca": "105A14",
+     "qtd": 17,
+     "descricao": "MODULO 2 - DIREITA",
+     "pesoUnitKg": 249.9,
+     "pesoTotalKg": 4248.324
+    },
+    {
+     "marca": "105A15",
+     "qtd": 17,
+     "descricao": "MODULO 2 - ESQUERDA",
+     "pesoUnitKg": 250.52,
+     "pesoTotalKg": 4258.836
+    },
+    {
+     "marca": "105A16",
+     "qtd": 38,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 10.99,
+     "pesoTotalKg": 417.546
+    },
+    {
+     "marca": "105A17",
+     "qtd": 34,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 10.98,
+     "pesoTotalKg": 373.272
+    },
+    {
+     "marca": "105A18",
+     "qtd": 39,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 6.79,
+     "pesoTotalKg": 264.985
+    },
+    {
+     "marca": "105A19",
+     "qtd": 110,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 5.46,
+     "pesoTotalKg": 600.54
+    },
+    {
+     "marca": "105A20",
+     "qtd": 17,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 132.044
+    },
+    {
+     "marca": "105A21",
+     "qtd": 88,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 7.79,
+     "pesoTotalKg": 685.206
+    },
+    {
+     "marca": "105A22",
+     "qtd": 84,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 4.97,
+     "pesoTotalKg": 417.236
+    },
+    {
+     "marca": "105A23",
+     "qtd": 62,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 481.572
+    },
+    {
+     "marca": "105A24",
+     "qtd": 42,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 3.65,
+     "pesoTotalKg": 153.495
+    },
+    {
+     "marca": "105A25",
+     "qtd": 21,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 163.113
+    },
+    {
+     "marca": "105A26",
+     "qtd": 21,
+     "descricao": "TRAVAMENTO - MOD.2",
+     "pesoUnitKg": 1.34,
+     "pesoTotalKg": 28.211
+    },
+    {
+     "marca": "105A27",
+     "qtd": 1,
+     "descricao": "MODULO 3 - DIREITA",
+     "pesoUnitKg": 290.31,
+     "pesoTotalKg": 290.308
+    },
+    {
+     "marca": "105A28",
+     "qtd": 1,
+     "descricao": "MODULO 3 - ESQUERDA",
+     "pesoUnitKg": 290.32,
+     "pesoTotalKg": 290.323
+    },
+    {
+     "marca": "105A29",
+     "qtd": 2,
+     "descricao": "TRAVAMENTO - MOD.4",
+     "pesoUnitKg": 12.14,
+     "pesoTotalKg": 24.286
+    },
+    {
+     "marca": "105A31",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.3",
+     "pesoUnitKg": 10.98,
+     "pesoTotalKg": 10.979
+    },
+    {
+     "marca": "105A39",
+     "qtd": 4,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 10.99,
+     "pesoTotalKg": 43.952
+    },
+    {
+     "marca": "105A41",
+     "qtd": 1,
+     "descricao": "MODULO 4 - DIREITA",
+     "pesoUnitKg": 292.97,
+     "pesoTotalKg": 292.966
+    },
+    {
+     "marca": "105A42",
+     "qtd": 1,
+     "descricao": "MODULO 4 - ESQUERDA",
+     "pesoUnitKg": 292.98,
+     "pesoTotalKg": 292.982
+    },
+    {
+     "marca": "105A44",
+     "qtd": 2,
+     "descricao": "TRAVAMENTO - MOD.4",
+     "pesoUnitKg": 6.49,
+     "pesoTotalKg": 12.987
+    },
+    {
+     "marca": "105A54",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.4",
+     "pesoUnitKg": 11.24,
+     "pesoTotalKg": 11.241
+    },
+    {
+     "marca": "105A56",
+     "qtd": 1,
+     "descricao": "MODULO 5 - DIREITA",
+     "pesoUnitKg": 220.68,
+     "pesoTotalKg": 220.677
+    },
+    {
+     "marca": "105A57",
+     "qtd": 1,
+     "descricao": "MODULO 5 - ESQUERDA",
+     "pesoUnitKg": 221,
+     "pesoTotalKg": 221
+    },
+    {
+     "marca": "105A59",
+     "qtd": 2,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 10.98,
+     "pesoTotalKg": 21.957
+    },
+    {
+     "marca": "105A60",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 6.78,
+     "pesoTotalKg": 6.784
+    },
+    {
+     "marca": "105A62",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 7.84,
+     "pesoTotalKg": 7.836
+    },
+    {
+     "marca": "105A65",
+     "qtd": 3,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 23.302
+    },
+    {
+     "marca": "105A68",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.5",
+     "pesoUnitKg": 6.9,
+     "pesoTotalKg": 6.904
+    },
+    {
+     "marca": "105A71",
+     "qtd": 1,
+     "descricao": "MODULO 6 - DIREITA",
+     "pesoUnitKg": 237.17,
+     "pesoTotalKg": 237.169
+    },
+    {
+     "marca": "105A72",
+     "qtd": 1,
+     "descricao": "MODULO 6 - ESQUERDA",
+     "pesoUnitKg": 236.46,
+     "pesoTotalKg": 236.463
+    },
+    {
+     "marca": "105A74",
+     "qtd": 2,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 10.98,
+     "pesoTotalKg": 21.957
+    },
+    {
+     "marca": "105A75",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 6.79,
+     "pesoTotalKg": 6.794
+    },
+    {
+     "marca": "105A77",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 7.767
+    },
+    {
+     "marca": "105A79",
+     "qtd": 4,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 4.97,
+     "pesoTotalKg": 19.868
+    },
+    {
+     "marca": "105A80",
+     "qtd": 3,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 7.77,
+     "pesoTotalKg": 23.302
+    },
+    {
+     "marca": "105A81",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 4.09,
+     "pesoTotalKg": 4.095
+    },
+    {
+     "marca": "105A82",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 8.56,
+     "pesoTotalKg": 8.556
+    },
+    {
+     "marca": "105A83",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 7.36,
+     "pesoTotalKg": 7.36
+    },
+    {
+     "marca": "105A84",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 4.08,
+     "pesoTotalKg": 4.075
+    },
+    {
+     "marca": "105A85",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 10.98,
+     "pesoTotalKg": 10.979
+    },
+    {
+     "marca": "105A86",
+     "qtd": 1,
+     "descricao": "TRAVAMENTO - MOD.6",
+     "pesoUnitKg": 1.55,
+     "pesoTotalKg": 1.553
+    },
+    {
+     "marca": "105A87",
+     "qtd": 2,
+     "descricao": "BASE TRELIÇA - MOD. 1",
+     "pesoUnitKg": 6.03,
+     "pesoTotalKg": 12.06
+    },
+    {
+     "marca": "105A88",
+     "qtd": 42,
+     "descricao": "BASE TRELIÇA",
+     "pesoUnitKg": 5.98,
+     "pesoTotalKg": 251.089
+    },
+    {
+     "marca": "105A89",
+     "qtd": 2,
+     "descricao": "BASE - SUPORTE MOD. 6",
+     "pesoUnitKg": 2.03,
+     "pesoTotalKg": 4.066
+    },
+    {
+     "marca": "105A90",
+     "qtd": 1,
+     "descricao": "SUPORTE MOD. 6",
+     "pesoUnitKg": 11.32,
+     "pesoTotalKg": 11.318
+    },
+    {
+     "marca": "105A91",
+     "qtd": 1,
+     "descricao": "SUPORTE MOD. 6",
+     "pesoUnitKg": 11.32,
+     "pesoTotalKg": 11.318
+    }
+   ]
+  },
+  {
+   "nome": "Quadros Vasadores TC- 4708 (B)",
+   "marcas": [
+    {
+     "marca": "72118932-1",
+     "qtd": 76,
+     "descricao": "QUADRO DO VAZADOR",
+     "pesoUnitKg": 30.57,
+     "pesoTotalKg": 2323.609
+    }
+   ]
+  },
+  {
+   "nome": "Longarinas TC - 4708 (B)",
+   "marcas": [
+    {
+     "marca": "72120236-1",
+     "qtd": 107,
+     "descricao": "APOIO LONGARINA TC-54",
+     "pesoUnitKg": 21.33,
+     "pesoTotalKg": 2282.166
+    },
+    {
+     "marca": "704081271",
+     "qtd": 106,
+     "descricao": "LONGARINA TC42/48/54/60",
+     "pesoUnitKg": 58.87,
+     "pesoTotalKg": 6240.745
+    },
+    {
+     "marca": "721634511",
+     "qtd": 1,
+     "descricao": "LONGARINA RETORNO DIR",
+     "pesoUnitKg": 62.8,
+     "pesoTotalKg": 62.8
+    },
+    {
+     "marca": "721635091",
+     "qtd": 1,
+     "descricao": "LONGARINA RETORNO ESQ",
+     "pesoUnitKg": 62.8,
+     "pesoTotalKg": 62.8
+    }
+   ]
+  },
+  {
+   "nome": "Apoio e Longarina TC - 4701 (C)",
+   "marcas": [
+    {
+     "marca": "72103380-1",
+     "qtd": 30,
+     "descricao": "APOIO AJUSTAVEL CJSD",
+     "pesoUnitKg": 21.505,
+     "pesoTotalKg": 645.14
+    },
+    {
+     "marca": "72103380-2",
+     "qtd": 60,
+     "descricao": "APOIO BASE INFERIOR",
+     "pesoUnitKg": 4.055,
+     "pesoTotalKg": 243.3
+    },
+    {
+     "marca": "72138737-1",
+     "qtd": 2,
+     "descricao": "APOIO AJUSTAVEL CJSD",
+     "pesoUnitKg": 17.77,
+     "pesoTotalKg": 35.54
+    },
+    {
+     "marca": "72138737-2",
+     "qtd": 4,
+     "descricao": "APOIO BASE INFERIOR",
+     "pesoUnitKg": 2.265,
+     "pesoTotalKg": 9.06
+    },
+    {
+     "marca": "70408127",
+     "qtd": 32,
+     "descricao": "L4''X1/4''",
+     "pesoUnitKg": 58.951,
+     "pesoTotalKg": 1886.43
+    },
+    {
+     "marca": "72211498",
+     "qtd": 2,
+     "descricao": "L4''X1/4''",
+     "pesoUnitKg": 12.775,
+     "pesoTotalKg": 25.55
+    }
+   ]
+  }
+ ]
+}

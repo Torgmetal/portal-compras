@@ -74,6 +74,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Enviar cronograma ao cliente](torg_cronograma_envio_cliente.md) — botão manda PDF anexo; contatos do CLIENTE ficam na OP (`OP.clienteContatos`) e voltam prontos
 - [Cronograma — lead/lag, área, período](torg_cronograma_periodo.md) — antecipar é NORMAL (`defasagemDias` negativo, FS não rígido); agrupar por área; período grava e corta na borda do Gantt
 - [Cronograma × Syneco](torg_cronograma_syneco.md) — avanço das linhas auto do Syneco por frente/fase; falta expedição+histórico+snapshot
+- [Cronograma por LISTA de peças da fase](torg_cronograma_por_lista_de_fase.md) — lote com `PecaLote` mede pela lista, não pela letra; marca repartida preenche na ordem de entrega; `qtdNoConjunto` é TOTAL; OP-105 = tarefa `op105-fases-por-tag` + importar T105B pela tela
 - [Cronograma — avanço manual prevalece](torg_cronograma_avanco_manual.md) — `avancoManual` na tarefa; Syneco/CMR não sobrescrevem; estoque conta como recebido; % geral ponderado por duração
 - [Cronograma](torg_cronograma.md) — antecessoras cross-setor cascateiam; 2 motores: recalcular (só desloca) vs gerarDatasCronograma ("Gerar Datas")
 - [Meta da preparação = 6.000 kg/dia](torg_meta_preparacao.md) — base dos "dias de carga" (/pcp/carga-corte), não a média do Syneco

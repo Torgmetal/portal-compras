@@ -168,3 +168,20 @@ temporário, `ENOENT`). Os pareceres são estáticos; quem rodou a suíte fui eu
 
 - **Estado:** 2403 testes passando; `/qualidade/inspecoes` e `/compras/prazos` validadas logado.
 
+
+## 20/09/2026 — Cronograma medido pela lista de peças da fase (OP-105 por TAG) (Claude)
+
+- **Feito:** `lib/cronograma-lotes.js` (regra pura: escopo e produção por lote × setor a partir de
+  `PecaLote`, croqui pelo vínculo na proporção do conjunto, marca repartida preenche as fases na ordem de
+  entrega, teto na LPC); `lib/cronograma-syneco.js` passa a devolver `sync.porLote` e a casar a área pelo
+  nome do lote antes da letra (chave de ambiguidade `L:<lote>|SETOR`); tarefa de manutenção
+  `op105-fases-por-tag` (`lib/op105-fases-por-tag.js` + `.json`): rechaveia a LPC da fase C ("105" → "T105C"),
+  divide a fase A em TC 4706 / TC 4707 (lote, áreas e tarefas do cronograma) e grava as listas. Testes:
+  `testes/lib/cronograma-lotes.teste.js` (5). Simulação com dados reais da 105 no histórico da sessão.
+- **Para revisar (`database`/`architecture`):** (1) `qtdNoConjunto` tratado como TOTAL no conjunto
+  (medido: 133/135 croquis da T105A) — se algum importador gravar por unidade, a proporção erra;
+  (2) a tarefa faz UPDATEs fora de transação, em passos idempotentes — se cair no meio, rodar de novo
+  completa; (3) `sincronizarCronogramaSyneco` só carrega `ConjuntoCroqui` quando a OP tem lote com lista.
+  O script `scripts/revisao-codex/consultar.py` continua ausente do clone.
+- **Depende do usuário:** clicar a tarefa em Admin › Manutenção e importar `T105B- LPC_R00.xlsx` em
+  Engenharia › Listas.

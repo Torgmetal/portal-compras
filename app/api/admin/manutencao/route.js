@@ -13,6 +13,7 @@ import { requireAdminDoPortal } from "@/lib/session";
 import { conferirBanco } from "@/lib/banco-esperado";
 import { conferirEtapaPortalXSyneco } from "@/lib/conferencias";
 import { perfisSemMaterialDaOp } from "@/lib/rastreio-sem-material";
+import { checarOp105, aplicarOp105 } from "@/lib/op105-fases-por-tag";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -142,6 +143,17 @@ const TAREFAS = [
       }
       return `${n} perfil(s) amarrado(s) em ${grupos.length} material(is). Agora abra o data book da 085 e clique em "Trazer certificados de material (aço) desta OP" na §04 — é o clique que traz os certificados desses R para dentro do livro.`;
     },
+  },
+  {
+    // Vitor (20/09/2026): o cliente da OP-105 pediu o cronograma de fabricação separado por fase —
+    // duas entregas B e as duas treliças A por TAG — com o avanço "exatamente como está o
+    // apontamento". A regra e o porquê moram em lib/op105-fases-por-tag.js.
+    id: "op105-fases-por-tag",
+    titulo: "OP-105 — fases de entrega por TAG, com lista de peças (cronograma mede por fase)",
+    porque:
+      "A fase C entrou sob a chave \"105\" (antes da regra da fase no nome) e não aparece como fase; as duas entregas B têm a mesma letra e as duas treliças A são as mesmas marcas repartidas por TAG. O motor de avanço passa a medir pela lista de peças de cada fase — esta tarefa troca a chave da C, divide a fase A em TC 4706 / TC 4707 e grava as listas. Depois, importe a T105B- LPC_R00.xlsx em Engenharia › Listas.",
+    checar: () => checarOp105(prisma),
+    aplicar: (user) => aplicarOp105(prisma, user),
   },
 ];
 
