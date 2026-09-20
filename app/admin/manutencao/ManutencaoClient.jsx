@@ -41,7 +41,11 @@ export default function ManutencaoClient() {
     setRodando(true); setErro(""); setFeitos(null);
     try {
       const r = await fetch("/api/admin/manutencao", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      const j = await r.json();
+      // ⚠ quando a Vercel corta a função pelo tempo, a resposta não é JSON — e o `r.json()` cru
+      // devolvia "The string did not match the expected pattern" no Safari (Vitor, 20/09/2026).
+      // As tarefas são idempotentes: clicar de novo continua de onde parou, e é isso que a tela diz.
+      const j = await r.json().catch(() => null);
+      if (!j) throw new Error(`O servidor não respondeu a tempo (HTTP ${r.status}). As tarefas são retomáveis — clique em Aplicar de novo para continuar de onde parou.`);
       if (!r.ok) throw new Error(j.error || "Falha ao aplicar.");
       setFeitos(j.feitos || []);
       await carregar();

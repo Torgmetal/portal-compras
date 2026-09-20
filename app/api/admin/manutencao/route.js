@@ -16,7 +16,7 @@ import { perfisSemMaterialDaOp } from "@/lib/rastreio-sem-material";
 import { checarOp105, aplicarOp105 } from "@/lib/op105-fases-por-tag";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120; // a manutenção da OP-105 estourou 60 s gravando lista a lista (20/09/2026)
 
 /**
  * As tarefas, na ordem em que devem rodar.

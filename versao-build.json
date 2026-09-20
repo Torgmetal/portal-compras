@@ -1,7 +1,12 @@
 {
-  "build": 3290,
-  "gerado": "2026-09-20T20:11:19.310Z",
+  "build": 3291,
+  "gerado": "2026-09-20T20:24:06.914Z",
   "commits": [
+    {
+      "hash": "89f4ca6d",
+      "data": "20/09/2026",
+      "titulo": "Cronograma: avanço de fabricação medido pela lista de peças da fase (OP-105 por TAG)"
+    },
     {
       "hash": "22e5ebf0",
       "data": "20/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b0436260",
       "data": "17/09/2026",
       "titulo": "Prova de execução para o aquecimento dos crons, e a memória do que foi medido hoje"
-    },
-    {
-      "hash": "0ef927c7",
-      "data": "17/09/2026",
-      "titulo": "Planilha do Syneco ganha a 2ª aba: apontamento na frente manda dar baixa nos setores atrás"
     }
   ]
 }
