@@ -255,3 +255,5 @@ temporário, `ENOENT`). Os pareceres são estáticos; quem rodou a suíte fui eu
   `op-contatos-editar` (4), `admin-usuario-obras` (7), `contatos-cliente-obra` (3). 2492 passando; build ok.
 - **Para revisar (security):** o `PUT` de obras é `requireAdminDoPortal` (allowlist Vitor/Matheus) e
   grava em `OP.clienteContatos` — conferir se Comercial/Planejamento também deveriam poder liberar.
+- **(19h30)** Excel: `refinarPlanilhaExcel` só congela o painel se o cabeçalho da tabela está até a
+  linha 10 (`LINHA_MAXIMA_CONGELAR`), com opt-out `_torgSemCongelar`. Teste `excel-congelar-painel` (3).

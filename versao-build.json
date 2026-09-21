@@ -1,7 +1,12 @@
 {
-  "build": 3309,
-  "gerado": "2026-09-21T21:05:55.408Z",
+  "build": 3310,
+  "gerado": "2026-09-21T22:41:09.396Z",
   "commits": [
+    {
+      "hash": "eb18132f",
+      "data": "21/09/2026",
+      "titulo": "Atualiza relatórios LP e EVS ao modelo revisado"
+    },
     {
       "hash": "96041359",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "54b49cb9",
       "data": "18/09/2026",
       "titulo": "Descrição da cota passa a ser digitável, e sobrevive à renumeração"
-    },
-    {
-      "hash": "7174e7f0",
-      "data": "18/09/2026",
-      "titulo": "Confere apoios pelo IFC e evita giro automático de carga larga"
     }
   ]
 }

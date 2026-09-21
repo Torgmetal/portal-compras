@@ -32,3 +32,13 @@ adicionarLinhaTotais(ws, linha, [...]);
 Escrever `linha = adicionarLinhaTabela(...)` faz a primeira linha chamar `getCell(undefined, 1)` e estourar. Aconteceu na planilha do `/pcp/producao` em 24/08/2026.
 
 ⚠️ **Sempre `try/catch` no `exportar()`**, com mensagem na tela. Sem ele o erro some: o clique não faz nada e não diz nada, e o usuário acha que o navegador travou — foi assim que o bug chegou ao Vitor em vez de aparecer no portal.
+
+### Painel congelado: só com o cabeçalho perto do topo (21/09/2026)
+
+Vitor, sobre as planilhas do adiamento da OP-122: *"essas planilhas com esses painéis congelados não
+estão legais, fica difícil de visualizar"*. O acabamento comum (`refinarPlanilhaExcel`) congelava o
+painel no cabeçalho de TODA folha com uma tabela só — numa folha-relatório com a tabela na linha 17,
+sobram 8 linhas rolando num notebook. Regra agora: congela só se o cabeçalho está até a linha
+**10** (`LINHA_MAXIMA_CONGELAR`); `ws._torgSemCongelar = true` recusa de vez. Tabela de dados no topo
+(a maioria dos exports) continua com o título acompanhando a rolagem.
+
