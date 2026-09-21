@@ -201,9 +201,16 @@ export async function POST(req) {
   const obsTexto = body.observacaoExtra?.trim() || null;
   const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+  // ⚠⚠ UM DE CADA VEZ, COM PAUSA — nunca `Promise.all`. Medido em 21/09/2026: T122-001 com 10
+  // fornecedores → 10 e-mails; T122-002 com 12 → só 10 (NOROACO e FERALVAREZ ficaram sem). Doze
+  // chamadas no mesmo segundo estouram o limite de ~2 req/s do Resend. A cobrança de atraso já
+  // manda em fila com 600 ms pelo mesmo motivo (lib/cobranca-atraso-envio.js). 12 e-mails ≈ 7 s,
+  // que cabem no maxDuration de 60.
+  const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
   const emailResults = [];
-  await Promise.all(cotacoesCriadas.map(async (cot) => {
-    if (!cot.fornecedorEmail) return;
+  for (const [idx, cot] of cotacoesCriadas.entries()) {
+    if (!cot.fornecedorEmail) continue;
+    if (idx > 0) await pausa(600);
     const link = `${baseUrl}/fornecedores/c/${cot.token}`;
     const subject = `Solicitacao de Cotacao — ${rotuloRMs} (Torg Metal)`;
 
@@ -268,21 +275,23 @@ export async function POST(req) {
       });
       emailResults.push({ fornecedor: cot.fornecedorNome, email: cot.fornecedorEmail, ok: result.ok, error: result.error || null });
 
-      if (result.ok) {
-        await prisma.auditLog.create({
-          data: {
-            userId: user.id,
-            action: "email_cotacao_automatico",
-            entity: "Cotacao",
-            entityId: cot.id,
-            diff: { email: cot.fornecedorEmail, cc: user.email, resendId: result.id },
-          },
-        });
-      }
+      // ⚠ A falha também deixa rastro: antes só o sucesso era auditado, e quem investigava tinha
+      // que DEDUZIR pelo que faltava. Auditoria é best-effort — nunca derruba o envio dos demais.
+      await prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          action: result.ok ? "email_cotacao_automatico" : "email_cotacao_falha",
+          entity: "Cotacao",
+          entityId: cot.id,
+          diff: result.ok
+            ? { email: cot.fornecedorEmail, cc: user.email, resendId: result.id }
+            : { email: cot.fornecedorEmail, cc: user.email, erro: String(result.error || "").slice(0, 300), indeterminado: !!result.indeterminado },
+        },
+      }).catch((e) => registro.aviso("[enviar] auditoria do e-mail falhou:", e?.message));
     } catch (e) {
       emailResults.push({ fornecedor: cot.fornecedorNome, email: cot.fornecedorEmail, ok: false, error: e.message });
     }
-  }));
+  }
 
   return NextResponse.json({
     ok: true,

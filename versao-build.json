@@ -1,7 +1,12 @@
 {
-  "build": 3295,
-  "gerado": "2026-09-21T13:09:54.936Z",
+  "build": 3296,
+  "gerado": "2026-09-21T13:37:10.512Z",
   "commits": [
+    {
+      "hash": "703e2aa5",
+      "data": "21/09/2026",
+      "titulo": "Cotação: a gravação vai em lote — 85 idas e voltas a São Paulo não cabiam nos 5 s da transação"
+    },
     {
       "hash": "3273d9f1",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "edfd4a1c",
       "data": "17/09/2026",
       "titulo": "Botão Sincronizar nos Prazos das RMs, e o prazo do Omie deixa de ser conselho"
-    },
-    {
-      "hash": "6a4ffe4a",
-      "data": "17/09/2026",
-      "titulo": "Planejamento pode excluir a marca errada, e a LPC para de duplicar em silêncio"
     }
   ]
 }

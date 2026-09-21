@@ -133,3 +133,43 @@ describe("quando o banco falha", () => {
     expect(mockPrisma.cotacao.createManyAndReturn).not.toHaveBeenCalled();
   });
 });
+
+describe("os e-mails saem um de cada vez", () => {
+  // Medido em 21/09/2026: T122-001 com 10 fornecedores → 10 e-mails; T122-002 com 12 → só 10
+  // (NOROACO e FERALVAREZ ficaram sem). O envio era `Promise.all`: doze chamadas no mesmo
+  // segundo contra o limite de ~2 req/s do Resend. A cobrança de atraso já mandava em fila com
+  // pausa de 600 ms pelo mesmo motivo.
+  it("nunca há duas chamadas ao Resend em voo ao mesmo tempo", async () => {
+    let emVoo = 0, maxEmVoo = 0;
+    mocks.sendEmail.mockImplementation(async () => {
+      emVoo++; maxEmVoo = Math.max(maxEmVoo, emVoo);
+      await new Promise((r) => setTimeout(r, 5));
+      emVoo--;
+      return { ok: true, id: "re" };
+    });
+    const cinco = Array.from({ length: 5 }, (_, i) => ({ nome: `F${i}`, email: `f${i}@x.com` }));
+    mockPrisma.cotacao.createManyAndReturn.mockImplementation(async ({ data }) => data.map((d, i) => ({ id: `c${i}`, token: d.token, fornecedorNome: d.fornecedorNome, fornecedorEmail: d.fornecedorEmail })));
+    const r = await enviar(req({ ...corpo, fornecedores: cinco }));
+    expect(r.status).toBe(200);
+    expect(mocks.sendEmail).toHaveBeenCalledTimes(5);
+    expect(maxEmVoo).toBe(1);
+    const { emails } = await r.json();
+    expect(emails.filter((e) => e.ok)).toHaveLength(5);
+  }, 15_000);
+
+  // Antes só o sucesso deixava rastro (`email_cotacao_automatico`); a falha só aparecia na tela,
+  // e quem investigava depois tinha que DEDUZIR pelo que faltava.
+  it("falha do Resend fica no AuditLog, com o motivo", async () => {
+    mocks.sendEmail
+      .mockResolvedValueOnce({ ok: true, id: "re_ok" })
+      .mockResolvedValueOnce({ ok: false, error: "Too many requests. You can only make 2 requests per second." });
+    const r = await enviar(req(corpo));
+    const { emails } = await r.json();
+    expect(emails.map((e) => e.ok)).toEqual([true, false]);
+    const acoes = mockPrisma.auditLog.create.mock.calls.map((c) => c[0].data.action);
+    expect(acoes).toContain("email_cotacao_automatico");
+    expect(acoes).toContain("email_cotacao_falha");
+    const falha = mockPrisma.auditLog.create.mock.calls.find((c) => c[0].data.action === "email_cotacao_falha")[0].data;
+    expect(falha.diff).toMatchObject({ email: "equipe.paralegal@arcelormittal.com.br", erro: expect.stringContaining("2 requests per second") });
+  });
+});

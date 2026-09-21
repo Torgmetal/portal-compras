@@ -78,3 +78,12 @@ anterior foi desfeita por completo (nada commitado, nenhum e-mail). Erro que nã
 
 ⚠ Visto de passagem no mesmo log: `/api/qualidade/plp/[opNumero]` seleciona `indiceR`, campo que
 NÃO existe em `DocumentoQualidade` — a rota devolve 500 desde 22/08. Pendência separada.
+
+### Terceira: doze e-mails no mesmo segundo (21/09/2026, 10:18)
+
+Com as duas correções no ar, Matheus enviou T122-001 (10 fornecedores → **10 e-mails**) e
+T122-002 (12 fornecedores → **só 10**; NOROACO e FERALVAREZ ficaram sem, e a tela avisou "alguns
+e-mails falharam"). O envio era `Promise.all` — doze chamadas no mesmo segundo contra o limite de
+~2 req/s do Resend. ⚠⚠ **Um de cada vez, com pausa de 600 ms**, como a cobrança de atraso já fazia.
+⚠ A falha passou a ser auditada (`email_cotacao_falha`, com o motivo) — antes só o sucesso deixava
+rastro, e a investigação era por dedução do que faltava.

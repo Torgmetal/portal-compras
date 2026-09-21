@@ -222,3 +222,5 @@ temporário, `ENOENT`). Os pareceres são estáticos; quem rodou a suíte fui eu
   único com N linhas; o aviso do `CLAUDE.md` sobre bulk write é para milhares de linhas, aqui são dezenas.
 - **Achado paralelo, não tratado:** `/api/qualidade/plp/[opNumero]` seleciona `indiceR` (inexistente em
   `DocumentoQualidade`) → 500 desde 22/08.
+- **(10h30)** Envio confirmado: T122-001 10/10 e-mails; T122-002 10/12 (Resend, ~2 req/s, `Promise.all`).
+  Feito: fila com pausa de 600 ms + `email_cotacao_falha` no AuditLog. Testes +2 (2448).
