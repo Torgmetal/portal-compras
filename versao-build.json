@@ -1,7 +1,12 @@
 {
-  "build": 3306,
-  "gerado": "2026-09-21T19:11:18.085Z",
+  "build": 3307,
+  "gerado": "2026-09-21T19:11:22.627Z",
   "commits": [
+    {
+      "hash": "1617eebdd2",
+      "data": "21/09/2026",
+      "titulo": "Cotação: o que o PDF leu e não casou deixa de ser jogado fora"
+    },
     {
       "hash": "a4012125d7",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "20b77e3d9c",
       "data": "18/09/2026",
       "titulo": "Remove o \"Enviar teste para mim\" da cobrança, como combinado"
-    },
-    {
-      "hash": "572d4d97e9",
-      "data": "18/09/2026",
-      "titulo": "A data que o fornecedor manda agora é proposta — quem decide é Compras"
     }
   ]
 }

@@ -16,8 +16,11 @@ const REL = montarRelatorio({
             finalizadaEm: new Date("2026-09-17T15:00:00Z"), iniciadaPorNome: "Zé", finalizadaPorNome: "Zé" },
   op: { numero: 97, cliente: "MEGASTEAM", obra: "Galpão 3" },
   marcas: [
-    { marca: "T97A140", descricao: "TRAVAMENTO", previsto: 2, conferido: 2, saldo: 0, pesoUnitKg: 12.5 },
-    { marca: "T97A10", descricao: "CONTRAVENTAMENTO", previsto: 10, conferido: 4, saldo: 6, pesoUnitKg: 3.2 },
+    // ⚠ A T97A140 foi conferida numa remessa ANTERIOR: tem data da obra, mas nada desta.
+    { marca: "T97A140", descricao: "TRAVAMENTO", previsto: 2, conferido: 2, saldo: 0, pesoUnitKg: 12.5,
+      conferidaEm: new Date("2026-09-03T12:00:00Z") },
+    { marca: "T97A10", descricao: "CONTRAVENTAMENTO", previsto: 10, conferido: 4, saldo: 6, pesoUnitKg: 3.2,
+      conferidaEm: new Date("2026-09-17T13:00:00Z") },
   ],
   lancamentos: [{ id: "l1", marca: "T97A10", qte: 4, observacao: "faltou pintura", criadoEm: new Date("2026-09-17T13:00:00Z"), criadoPorNome: "Zé" }],
 });
@@ -39,8 +42,8 @@ describe("planilha da conferência", () => {
     expect(cabecalho).toEqual([
       "Marca", "Descrição", "Previsto", "Conferido", "Saldo",
       "Situação", "Peso unit. (kg)", "Peso conferido (kg)", "Observações",
-      // ⚠ As duas entraram em 21/09/2026, NO FIM: as nove de cima são contrato antigo com o PCP.
-      "Conferido nesta remessa", "Data desta remessa",
+      // ⚠ As três entraram em 21/09/2026, NO FIM: as nove de cima são contrato antigo com o PCP.
+      "Conferido nesta remessa", "Data desta remessa", "Conferida em",
     ]);
   });
 
@@ -89,6 +92,19 @@ describe("planilha da conferência", () => {
     // a texto, silenciosamente) apareça aqui.
     expect(linha[10]).toBeInstanceOf(Date);
     expect(linha[10].toISOString().slice(0, 10)).toBe("2026-09-17");
+  });
+
+  // ⚠⚠ O PEDIDO DE 21/09/2026: "para saber em qual data tal peça foi conferida sem precisar ir
+  // nos outros arquivos". A T97A140 não foi tocada NESTA conferência — as duas colunas de remessa
+  // ficam em branco — mas a planilha ainda diz QUANDO ela foi conferida.
+  it("marca de remessa anterior mostra a data da obra, mesmo sem nada desta", async () => {
+    const ws = await planilha();
+    let linha = null;
+    ws.eachRow((row) => { if (valores(row)[0] === "T97A140") linha = valores(row); });
+    expect(linha[9] == null || linha[9] === "").toBe(true);   // nada desta remessa
+    expect(linha[10] == null || linha[10] === "").toBe(true);
+    expect(linha[11]).toBeInstanceOf(Date);                   // mas tem data da obra
+    expect(linha[11].toISOString().slice(0, 10)).toBe("2026-09-03");
   });
 
   // ⚠ Branco, e não "0" nem "—": zero pareceria contagem feita e dava zero. O branco diz
