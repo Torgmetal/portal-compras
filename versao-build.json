@@ -1,156 +1,156 @@
 {
-  "build": 3285,
-  "gerado": "2026-09-21T16:56:34.555Z",
+  "build": 3323,
+  "gerado": "2026-09-21T16:57:09.058Z",
   "commits": [
     {
-      "hash": "eb683eafc9",
-      "data": "15/09/2026",
-      "titulo": "MES: eu tinha descartado a colisao de hash com um argumento errado"
+      "hash": "eef7306500",
+      "data": "21/09/2026",
+      "titulo": "Traz a main para a branch do MES próprio"
     },
     {
-      "hash": "c020f58141",
-      "data": "15/09/2026",
-      "titulo": "MES: a revisao do cracha achou a trilha que sumia e o reenvio que virava erro"
+      "hash": "b38de698ed",
+      "data": "18/09/2026",
+      "titulo": "Registra o fechamento dos três pendentes da revisão"
     },
     {
-      "hash": "6be39eb555",
-      "data": "14/09/2026",
-      "titulo": "MES proprio: a revisao da passagem achou o porteiro faltando"
+      "hash": "8a14ae626e",
+      "data": "18/09/2026",
+      "titulo": "Fecha os três pendentes da revisão: Form XObject, teto de escrita e recorte legado"
     },
     {
-      "hash": "3484f30f86",
-      "data": "14/09/2026",
-      "titulo": "MES proprio: a passagem do posto — o turno vira sem a barra parar"
+      "hash": "c92e64cd32",
+      "data": "18/09/2026",
+      "titulo": "Registra as duas revisões pedidas à mão e o que ficou pendente"
     },
     {
-      "hash": "c8e9035f3d",
-      "data": "14/09/2026",
-      "titulo": "MES proprio: os tres furos que a revisao do cracha achou"
+      "hash": "b448052a64",
+      "data": "18/09/2026",
+      "titulo": "Revisão do Codex: caminho fechado perdia um lado, e a caixa do texto crescia para o lado errado"
     },
     {
-      "hash": "dee6658dd1",
-      "data": "13/09/2026",
-      "titulo": "MES proprio: um cracha, um posto — e o botao Voltar na tela do cracha"
+      "hash": "6ca087680a",
+      "data": "18/09/2026",
+      "titulo": "Registra no log de revisão o que foi feito hoje e o que ficou sem confirmar"
     },
     {
-      "hash": "07dc491651",
-      "data": "13/09/2026",
-      "titulo": "MES proprio: o operador escolhe a barra e as marcas abrem juntas"
+      "hash": "54b49cb9d3",
+      "data": "18/09/2026",
+      "titulo": "Descrição da cota passa a ser digitável, e sobrevive à renumeração"
     },
     {
-      "hash": "9ed15a5271",
-      "data": "13/09/2026",
-      "titulo": "MES proprio: varias marcas na mesma maquina, e o nesting que abre a barra inteira"
+      "hash": "7174e7f0b6",
+      "data": "18/09/2026",
+      "titulo": "Confere apoios pelo IFC e evita giro automático de carga larga"
     },
     {
-      "hash": "32468fd126",
-      "data": "13/09/2026",
-      "titulo": "MES proprio: a conferencia com o Gantt virou direcional, e nao igualdade"
+      "hash": "25d2ffbb93",
+      "data": "18/09/2026",
+      "titulo": "Desenho da inspeção vinha cortado: a página girada não era tratada"
     },
     {
-      "hash": "9350504fbf",
-      "data": "13/09/2026",
-      "titulo": "MES proprio: bater o nesting do dia com o que o PCP liberou no Gantt"
+      "hash": "20b77e3d9c",
+      "data": "18/09/2026",
+      "titulo": "Remove o \"Enviar teste para mim\" da cobrança, como combinado"
     },
     {
-      "hash": "58405e4bca",
-      "data": "13/09/2026",
-      "titulo": "MES proprio: o plano de corte entra no portal, e a lista do operador era o PDF"
+      "hash": "572d4d97e9",
+      "data": "18/09/2026",
+      "titulo": "A data que o fornecedor manda agora é proposta — quem decide é Compras"
     },
     {
-      "hash": "1f88f803da",
-      "data": "13/09/2026",
-      "titulo": "MES proprio: a engine de nesting le os tres formatos, e o monitor no padrao TORG"
+      "hash": "475c3ca77d",
+      "data": "18/09/2026",
+      "titulo": "Quando o fornecedor responde, Compras fica sabendo — e a tela diz de quem é a data"
     },
     {
-      "hash": "8c883d04a6",
-      "data": "13/09/2026",
-      "titulo": "MES proprio: o monitor de maquinas, e o que o Codex achou nele antes de ir ao ar"
+      "hash": "6f4c8840bc",
+      "data": "18/09/2026",
+      "titulo": "Planilha vazia agora diz por que está vazia: Pintura e Acabamento nunca entram"
     },
     {
-      "hash": "084e22be0f",
-      "data": "13/09/2026",
-      "titulo": "MES proprio: o cadastro da fabrica, e o totem que nunca achava o Acabamento"
+      "hash": "eb12db037a",
+      "data": "18/09/2026",
+      "titulo": "Prévia da cobrança para quem está logado, para ver antes de o fornecedor ver"
     },
     {
-      "hash": "1b8888394f",
-      "data": "11/09/2026",
-      "titulo": "MES proprio: as bancadas do setor, legiveis a dois metros"
+      "hash": "2843fc7e38",
+      "data": "18/09/2026",
+      "titulo": "Cobrar os atrasados: um e-mail por fornecedor, com os pedidos e as RMs dele"
     },
     {
-      "hash": "0c650a033b",
-      "data": "11/09/2026",
-      "titulo": "MES proprio: um totem por setor, e a tela do cracha que se devolve sozinha"
+      "hash": "2bb831e083",
+      "data": "18/09/2026",
+      "titulo": "Planilha do Syneco abre no resumo e traz uma aba por setor"
     },
     {
-      "hash": "c3120b68b5",
-      "data": "11/09/2026",
-      "titulo": "MES proprio: marca fechada encerra a sessao e volta marcada na lista"
+      "hash": "e6b564994b",
+      "data": "18/09/2026",
+      "titulo": "Peça sem desenho volta a poder ser marcada: o portão do PCP travava a seleção inteira"
     },
     {
-      "hash": "08c1b0b3af",
-      "data": "11/09/2026",
-      "titulo": "MES proprio: o estado do posto visivel de longe, e o teto do planejado"
+      "hash": "380c222b6e",
+      "data": "17/09/2026",
+      "titulo": "Corrige área de acabamento por cor no estudo de pintura"
     },
     {
-      "hash": "8bfe758a2c",
-      "data": "11/09/2026",
-      "titulo": "Merge branch 'main' into matheus/mes-proprio"
+      "hash": "a837cc0252",
+      "data": "17/09/2026",
+      "titulo": "Liberar frentes também exclui: é lá que o Planejamento vê os croquis órfãos"
     },
     {
-      "hash": "2a290582cb",
-      "data": "11/09/2026",
-      "titulo": "Cotação: salvar proposta grande morria em 10s e voltava sem corpo"
+      "hash": "2dbd943445",
+      "data": "17/09/2026",
+      "titulo": "Planilha do Syneco: marca duplicada dava o peso da linha antiga"
     },
     {
-      "hash": "17388a2fac",
-      "data": "11/09/2026",
-      "titulo": "Cotação por IA: a resposta não vinha com ruído, vinha cortada"
+      "hash": "edfd4a1ca9",
+      "data": "17/09/2026",
+      "titulo": "Botão Sincronizar nos Prazos das RMs, e o prazo do Omie deixa de ser conselho"
     },
     {
-      "hash": "6b2bafb0b0",
-      "data": "11/09/2026",
-      "titulo": "MES proprio: os tres formatos de nesting decifrados, e 28 de 28 marcas casaram"
+      "hash": "6a4ffe4afa",
+      "data": "17/09/2026",
+      "titulo": "Planejamento pode excluir a marca errada, e a LPC para de duplicar em silêncio"
     },
     {
-      "hash": "23b6948a43",
-      "data": "11/09/2026",
-      "titulo": "Teste do plano de ação dos indicadores lê o campo pelo rótulo novo"
+      "hash": "972faa2e0d",
+      "data": "17/09/2026",
+      "titulo": "Dois crons parados em silêncio: o do PCP há 17 dias, o do CMR há 60 horas"
     },
     {
-      "hash": "7f9f55d96b",
-      "data": "11/09/2026",
-      "titulo": "Plano de ação 5W2H: ficha por ação no PDF e formulário legível nos indicadores"
+      "hash": "6659f1e3b3",
+      "data": "17/09/2026",
+      "titulo": "Permite excluir PIT Torg e anexos do cliente com confirmação"
     },
     {
-      "hash": "23005fa2e0",
-      "data": "11/09/2026",
-      "titulo": "fix(planejamento): contar corretamente materiais pendentes nos avisos"
+      "hash": "58e0effb47",
+      "data": "17/09/2026",
+      "titulo": "Encerrado no Omie conta como chegou, e a barra de filtros separa escopo de situação"
     },
     {
-      "hash": "3b95884d8e",
-      "data": "11/09/2026",
-      "titulo": "feat(planejamento): consultar recebimentos e encaminhar rastreabilidade ao PCP"
+      "hash": "b04362604b",
+      "data": "17/09/2026",
+      "titulo": "Prova de execução para o aquecimento dos crons, e a memória do que foi medido hoje"
     },
     {
-      "hash": "2844dea93b",
-      "data": "11/09/2026",
-      "titulo": "Fiscal: a Remessa Terceiro mostra de quando ela é"
+      "hash": "0ef927c75e",
+      "data": "17/09/2026",
+      "titulo": "Planilha do Syneco ganha a 2ª aba: apontamento na frente manda dar baixa nos setores atrás"
     },
     {
-      "hash": "5954391a0c",
-      "data": "11/09/2026",
-      "titulo": "PCP: peça liberada pela GRD e sem ordem no Syneco vira pendência de lançamento"
+      "hash": "7521e51164",
+      "data": "17/09/2026",
+      "titulo": "Conferência finalizada manda a planilha ao PCP, com peso e observações por marca"
     },
     {
-      "hash": "ebcd3f7611",
-      "data": "11/09/2026",
-      "titulo": "MES proprio: o desenho da engine de nesting da Preparacao (bloqueado no formato)"
+      "hash": "b19909227a",
+      "data": "17/09/2026",
+      "titulo": "feat: PIT compacto com seletor e anexos do cliente restritos"
     },
     {
-      "hash": "988d0466cd",
-      "data": "11/09/2026",
-      "titulo": "Análise crítica: ata FORM 10 em PDF e ações levadas ao 5W2H da Qualidade"
+      "hash": "4d1d73c60c",
+      "data": "17/09/2026",
+      "titulo": "As duas últimas cópias da regra do rodapé passam a usar a compartilhada"
     }
   ]
 }
