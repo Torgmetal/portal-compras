@@ -1,10 +1,11 @@
 # Ambiente de DEMONSTRAÇÃO — copie para `.env.demo` na raiz do projeto (que é ignorado pelo git) e complete com os
 # segredos do seu `.env.local` (SharePoint, Blob e Anthropic; NÃO Omie nem Resend).
+# O usuário do Postgres do Homebrew é o seu usuário do Mac (`whoami`), sem senha.
 # Sobe com `npm run demo` (porta 3002) — as variáveis daqui vencem as do `.env.local`.
 MODO_DEMO=1
-DATABASE_URL=postgresql://localhost:5432/torg_demo
-DATABASE_URL_UNPOOLED=postgresql://localhost:5432/torg_demo
-DIRECT_URL=postgresql://localhost:5432/torg_demo
+DATABASE_URL=postgresql://SEU_USUARIO_DO_MAC@localhost:5432/torg_demo
+DATABASE_URL_UNPOOLED=postgresql://SEU_USUARIO_DO_MAC@localhost:5432/torg_demo
+DIRECT_URL=postgresql://SEU_USUARIO_DO_MAC@localhost:5432/torg_demo
 NEXTAUTH_URL=http://localhost:3002
 NEXTAUTH_SECRET=troque-por-um-segredo-so-da-demo
 # segunda trava, além do MODO_DEMO: sem chave, nada sai

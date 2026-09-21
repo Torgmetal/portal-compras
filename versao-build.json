@@ -1,7 +1,12 @@
 {
-  "build": 3311,
-  "gerado": "2026-09-21T23:11:10.548Z",
+  "build": 3312,
+  "gerado": "2026-09-21T23:12:57.436Z",
   "commits": [
+    {
+      "hash": "4996b945",
+      "data": "21/09/2026",
+      "titulo": "Ambiente de demonstração: banco local e modo demo que corta e-mail, Omie e SharePoint"
+    },
     {
       "hash": "6d3ec758",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b448052a",
       "data": "18/09/2026",
       "titulo": "Revisão do Codex: caminho fechado perdia um lado, e a caixa do texto crescia para o lado errado"
-    },
-    {
-      "hash": "6ca08768",
-      "data": "18/09/2026",
-      "titulo": "Registra no log de revisão o que foi feito hoje e o que ficou sem confirmar"
     }
   ]
 }
