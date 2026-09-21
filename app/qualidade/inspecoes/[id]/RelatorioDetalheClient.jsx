@@ -221,7 +221,8 @@ export default function RelatorioDetalheClient({ id }) {
             {!travado && (
               <button onClick={() => setEscolhendo((v) => !v)}
                 className="text-[11px] font-semibold text-white bg-torg-blue rounded-lg px-2 py-0.5 hover:opacity-90 inline-flex items-center gap-1">
-                <FolderOpen size={11} /> escolher na pasta da obra
+                {/* na pré-montagem escolher SOMA ao relatório (vários projetos); nos outros, troca */}
+                <FolderOpen size={11} /> {rel.tipo === "PRE_MONTAGEM" && desenhos.length > 0 ? "adicionar projeto da pasta da obra" : "escolher na pasta da obra"}
               </button>
             )}
             <AnexarProjeto relatorioId={id} anexado={!!desenhos[0]?.anexado} travado={travado}

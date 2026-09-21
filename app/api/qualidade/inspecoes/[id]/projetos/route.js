@@ -23,7 +23,7 @@ export const maxDuration = 60;
 
 async function contexto(id) {
   const rel = await prisma.relatorioInspecao.findUnique({
-    where: { id }, select: { id: true, opNumero: true, envioAssinaturaId: true },
+    where: { id }, select: { id: true, opNumero: true, tipo: true, desenhos: true, envioAssinaturaId: true },
   });
   if (!rel) return { erro: "Relatório não encontrado.", status: 404 };
   const { driveId, fontes, erros } = await resolverPastasDaSecao("02", rel.opNumero);
@@ -81,19 +81,18 @@ export async function POST(req, { params }) {
   if (!dentro) return NextResponse.json({ error: "Arquivo fora dos projetos desta OP." }, { status: 403 });
 
   const nome = caminho.split("/").pop();
-  await prisma.relatorioInspecao.update({
-    where: { id },
-    data: {
-      // ⚠ `caminho` (servidor), não `url`: o relatório aponta para o arquivo ORIGINAL da
-      // Engenharia. Se o projeto for revisado, é a revisão que o portal lê — cópia no blob
-      // congelaria uma versão sem ninguém saber.
-      desenhos: [{
-        marca: nome.replace(/\.pdf$/i, "").slice(0, 60),
-        nome,
-        caminho,
-        escolhido: true,
-      }],
-    },
-  });
-  return NextResponse.json({ ok: true, nome });
+  // ⚠ `caminho` (servidor), não `url`: o relatório aponta para o arquivo ORIGINAL da
+  // Engenharia. Se o projeto for revisado, é a revisão que o portal lê — cópia no blob
+  // congelaria uma versão sem ninguém saber.
+  const novo = { marca: nome.replace(/\.pdf$/i, "").slice(0, 60), nome, caminho, escolhido: true };
+  // ⚠⚠ NA PRÉ-MONTAGEM, ESCOLHER SOMA; NOS OUTROS, TROCA. O dimensional é de UM conjunto — escolher
+  // outro é corrigir o desenho. A pré-montagem cobre o arranjo: conjuntos e diagrama de montagem
+  // convivem no mesmo relatório (Vitor, 22/08/2026), e trocar apagaria o que já estava cotado.
+  // Mesmo arquivo de novo não duplica; teto de 12, como na abertura.
+  const atuais = Array.isArray(ctx.rel.desenhos) ? ctx.rel.desenhos : [];
+  const desenhos = ctx.rel.tipo === "PRE_MONTAGEM"
+    ? (atuais.some((d) => d.caminho === caminho) ? atuais : [...atuais, novo].slice(0, 12))
+    : [novo];
+  await prisma.relatorioInspecao.update({ where: { id }, data: { desenhos } });
+  return NextResponse.json({ ok: true, nome, total: desenhos.length });
 }

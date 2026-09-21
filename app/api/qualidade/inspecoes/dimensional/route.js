@@ -47,15 +47,32 @@ export async function POST(req) {
   const { tipoValido, usaCotas } = await import("@/lib/qualidade-campo");
   const tipo = tipoValido(body?.tipo) ? body.tipo : "DIMENSIONAL";
   const ehDimensional = usaCotas(tipo);
+  // ⚠⚠ NA PRÉ-MONTAGEM NÃO SE ESCOLHE PEÇA, SE ESCOLHE PROJETO — e pode ser MAIS DE UM. Vitor
+  // (22/08/2026): "vamos ter que puxar alguns projetos diferentes, podendo ser conjuntos ou diagrama
+  // de montagem". A tela deixa marcar vários e o relatório guarda até 12 desenhos, mas a regra "um
+  // conjunto por relatório" do dimensional, logo abaixo, barrava o segundo projeto com uma mensagem
+  // sobre um escopo que a pré-montagem nem mostra (Geraldo, OP-105, 21/09/2026). Os 5 RPM que
+  // existiam tinham exatamente 1 projeto cada: nunca tinha sido possível mais de um.
+  const ehPreMontagem = tipo === "PRE_MONTAGEM";
+  const projetos = ehPreMontagem && Array.isArray(body?.projetos)
+    ? body.projetos.slice(0, 12).map((pr) => ({
+        marca: String(pr?.nome || "").slice(0, 60),
+        nome: String(pr?.nome || "").slice(0, 120),
+        caminho: String(pr?.caminho || ""),
+        escolhido: true,
+      })).filter((d) => d.marca && d.caminho)
+    : [];
   const marcas = [...new Set((Array.isArray(body?.marcas) ? body.marcas : []).map((m) => String(m || "").trim().toUpperCase()).filter(Boolean))];
 
   if (!opNumero) return NextResponse.json({ error: "Informe a OP." }, { status: 400 });
   // ⚠ só o dimensional exige peça: o relatório é de UM conjunto e é dele que sai o desenho das
   // cotas. Um EVS pode cobrir várias peças, e quais foram fica na tabela do próprio relatório.
-  if (ehDimensional && !marcas.length) return NextResponse.json({ error: "Escolha ao menos uma peça." }, { status: 400 });
+  if (ehPreMontagem && !projetos.length) return NextResponse.json({ error: "Escolha ao menos um projeto (conjunto ou diagrama de montagem) — a pré-montagem nasce do projeto." }, { status: 400 });
+  if (ehDimensional && !ehPreMontagem && !marcas.length) return NextResponse.json({ error: "Escolha ao menos uma peça." }, { status: 400 });
   // ⚠ conjunto é UM por relatório — é o que o modelo do Vitor prevê ("IDENTIFICAÇÃO DA PEÇA",
-  // "Nº DESENHO", "FOLHA 1 DE 1"). Agrupar é privilégio da peça avulsa.
-  if (ehDimensional && escopo === "CONJUNTO" && marcas.length > 1) {
+  // "Nº DESENHO", "FOLHA 1 DE 1"). Agrupar é privilégio da peça avulsa. A pré-montagem fica de
+  // fora: lá cada linha é um PROJETO, e o relatório cobre o arranjo inteiro (ver acima).
+  if (ehDimensional && !ehPreMontagem && escopo === "CONJUNTO" && marcas.length > 1) {
     return NextResponse.json({ error: "Relatório de conjunto é um por conjunto. Para agrupar, use o escopo de peças avulsas." }, { status: 400 });
   }
 
@@ -187,14 +204,7 @@ export async function POST(req) {
         // ⚠ A PRÉ-MONTAGEM NASCE COM O DESENHO. Os demais resolvem na primeira abertura da
         // marcação, varrendo a pasta da OP pela MARCA da peça — e isso nunca acharia um diagrama
         // de montagem, que não é peça da LPC. Aqui o caminho vem escolhido da tela.
-        desenhos: Array.isArray(body?.projetos) && body.projetos.length
-          ? body.projetos.slice(0, 12).map((pr) => ({
-              marca: String(pr?.nome || "").slice(0, 60),
-              nome: String(pr?.nome || "").slice(0, 120),
-              caminho: String(pr?.caminho || ""),
-              escolhido: true,
-            })).filter((d) => d.marca && d.caminho)
-          : [],
+        desenhos: projetos,
         resultados: { dimensional: null, alinhamento: null, acabamento: null, resultado: null, tolerancia, tiposPeca, qtdPeca, comprPeca,
           procedimento: proc?.nome || null, procedimentoId: proc?.id || null,
           // o critério do ensaio visual de solda é fixado pelo PO-06, item 9.4

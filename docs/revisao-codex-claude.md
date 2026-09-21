@@ -224,3 +224,15 @@ temporário, `ENOENT`). Os pareceres são estáticos; quem rodou a suíte fui eu
   `DocumentoQualidade`) → 500 desde 22/08.
 - **(10h30)** Envio confirmado: T122-001 10/10 e-mails; T122-002 10/12 (Resend, ~2 req/s, `Promise.all`).
   Feito: fila com pausa de 600 ms + `email_cotacao_falha` no AuditLog. Testes +2 (2448).
+
+## 21/09/2026 (13h30) — Pré-montagem: o servidor recusava o segundo projeto (Claude)
+
+- **Relato:** "não estamos conseguindo mais salvar os projetos da OP-105 de pré-montagem no relatório".
+- **Evidência:** dry-run da criação com os dados reais da OP-105 — 1 projeto passa, 2 projetos → 400
+  "Relatório de conjunto é um por conjunto…" (regra do dimensional alcançando PRE_MONTAGEM via
+  `usaCotas`); os 5 RPM existentes têm 1 projeto cada.
+- **Feito:** criação exige ≥1 projeto e sai da regra; `POST /[id]/projetos` soma na pré-montagem
+  (teto 12, sem repetir) e troca nos outros; rótulo do botão. Testes:
+  `testes/api/inspecoes-pre-montagem-projetos` (5). 2460 passando; checar limpo; build ok.
+- **Para revisar (testing):** o PDF do RPM com vários desenhos (`gerarDimensionalPDF`) — o detalhe já
+  tinha seletor por desenho, mas não validei a impressão com 3 projetos.
