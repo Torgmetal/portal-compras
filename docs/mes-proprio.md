@@ -31,8 +31,67 @@ reais, em 6 setores. Números conferidos **contando no destino**, não somando a
 3. ~~Fluxo do **totem** contra o banco local~~ — **feito** (§13).
 4. ~~**Telas de cadastro** de setores, máquinas e bancadas (§11.3)~~ — **feito** (§14).
 5. ~~**Monitor** de máquinas — contrato: dataset 131 (§6.4)~~ — **feito** (§15).
-6. **Engine de nesting** — os três formatos lidos, conferidos contra os arquivos reais (§12.8).
-   Falta a **tela**: importar o plano e o operador escolher no totem. **← É AQUI QUE SE RETOMA.**
+6. ~~**Engine de nesting** — os três formatos e a tela~~ — **feito** (§12.8).
+
+## ► A SUBIDA PARA PRODUÇÃO (21/09/2026)
+
+Matheus autorizou subir o MES para testar em produção, com três decisões:
+
+- **Rota fica em `/mes-lab`**, ADMIN-only, fora de todo menu.
+- **Separado no Vercel/Neon**: "dois sistemas que se integram nativamente".
+- **Nada do Syneco é usado** — só comparação de informação. (Já era verdade: o MES não
+  lê `MesApontamento`/`MesOrdem`/`MesInativo`. Conferido por grep em 21/09.)
+- Regime de uso: **aberto o dia todo em ~30 terminais**, mais conexões com máquinas.
+
+### O que o Codex decidiu (2 consultas `architecture`, 20-21/09)
+
+- **Cliente Prisma próprio** para o MES (`prisma/mes/schema.prisma`, `lib/mes/prisma.js`,
+  URL com `schema=mes`) — e NÃO multiSchema no schema do portal. ⚠ Medido: com
+  `multiSchema` ligado, **todo** model e enum exigem `@@schema` — 218 models + 21 enums.
+- **14ª tabela `mes.MesAuditoria`**: com dois clients, o `tx.auditLog.create` de
+  `passagem-auditoria.js` deixa de ser atômico com a passagem de posto.
+- **`ensure-mes-proprio-tables.mjs`** novo, SQL qualificado (`mes."MesSessao"`),
+  idempotente, e que **sai diferente de zero** quando falha. ⚠ Preview build não provisiona
+  o banco operacional.
+- ⚠⚠ **O modo sombra hoje NÃO isola**: `ambiente` nasce `"PROD"` em 8 models de fato, e os
+  índices parciais filtram só por `status`. DEMO e PROD disputam a mesma trava.
+
+### Desempenho — medido em 21/09, contra produção
+
+| | |
+|---|---|
+| `PecaConjunto` | **22.508** linhas |
+| Programadas | corte 1.708 · montagem 385 · solda 168 · acabamento 90 · jato 22 · pintura 3 |
+| Consulta do totem (acabamento) | 90 linhas em **45 ms** |
+| Índice em `*DiaProgramado` | **nenhum** (só `opId`, `status`, `marca`, `tipoPeca`) |
+
+⚠⚠ **O GET do totem custa `4 + 2N` consultas** — `saldoDaMarca` agrega sobre TODAS as
+sessões daquela marca+obra na história inteira, e desde 13/09 o posto tem várias marcas
+abertas. A conta do regime pedido: 30 terminais a cada 10 s × 24 consultas = **72/s**.
+Por isso a ordem inverte: **mata o N+1 e entra índice ANTES de ligar polling**.
+
+⚠ O totem hoje **não faz polling nenhum** — só busca em ação do operador.
+⚠ `connection_limit=1` foi **revogado** pelo Codex: com PgBouncer na frente serializaria as
+consultas paralelas do próprio totem. Começa em 2, compara com 4, decide por medição.
+⚠ Não pôr piso de data, `take` nem filtro de OP viva como "otimização": esconderiam atraso
+que a tela mostra hoje.
+
+⚠⚠ **DEPENDE DE INTERNET, e a doc §9 já concluiu que isso não serve para a fábrica.** Os
+totens falam DIRETO com a Vercel. Aceitável enquanto é o Matheus simulando o operador e o
+Syneco é o sistema de verdade; **antes dos 30 terminais, o gateway local é condição**.
+O barato a fazer agora: todo `fetch` num cliente com endereço configurável, e cada comando
+com id estável reutilizado nas retentativas — aí o gateway entra por troca de endereço.
+
+⚠ Maior risco: **a volta da internet** — dezenas de terminais reenviando minutos de evento
+juntos. Fila durável, lote limitado, recuo com jitter.
+
+**Passos:** 1 merge · 2 separar clients/adaptador/auditoria/ambiente + desempenho ·
+3 validar · 4 laboratório novo (`public` + `mes`) · 5 rodar o ensure DUAS vezes ·
+6 validar no dev apontado ao laboratório · 7 push, cadastro pela tela.
+
+**← RETOMA-SE NO PASSO 2.** O passo 1 está feito na branch `matheus/mes-subir`:
+main trazida (184 commits, 2 conflitos), `prisma validate` limpo, **2.647 testes passando**,
+eslint 0 erros.
 
 > ⚠ A lista do totem está **longa demais** (a captura da tela inteira do Laser Chapa deu 41.607 px).
 > As marcas concluídas deveriam ir para o fim ou para uma seção recolhida, e a busca ganhar foco
