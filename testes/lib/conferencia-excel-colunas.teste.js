@@ -19,7 +19,7 @@ const REL = montarRelatorio({
     { marca: "T97A140", descricao: "TRAVAMENTO", previsto: 2, conferido: 2, saldo: 0, pesoUnitKg: 12.5 },
     { marca: "T97A10", descricao: "CONTRAVENTAMENTO", previsto: 10, conferido: 4, saldo: 6, pesoUnitKg: 3.2 },
   ],
-  lancamentos: [{ id: "l1", marca: "T97A10", qte: 4, observacao: "faltou pintura", criadoEm: new Date(), criadoPorNome: "Zé" }],
+  lancamentos: [{ id: "l1", marca: "T97A10", qte: 4, observacao: "faltou pintura", criadoEm: new Date("2026-09-17T13:00:00Z"), criadoPorNome: "Zé" }],
 });
 
 async function planilha() {
@@ -39,6 +39,8 @@ describe("planilha da conferência", () => {
     expect(cabecalho).toEqual([
       "Marca", "Descrição", "Previsto", "Conferido", "Saldo",
       "Situação", "Peso unit. (kg)", "Peso conferido (kg)", "Observações",
+      // ⚠ As duas entraram em 21/09/2026, NO FIM: as nove de cima são contrato antigo com o PCP.
+      "Conferido nesta remessa", "Data desta remessa",
     ]);
   });
 
@@ -68,5 +70,34 @@ describe("planilha da conferência", () => {
     let linha = null;
     ws.eachRow((row) => { if (valores(row)[0] === "T97A140") linha = valores(row); });
     expect(linha[8] == null || linha[8] === "").toBe(true);
+  });
+
+  // ⚠⚠ O MOTIVO DAS DUAS COLUNAS. `Conferido` é o acumulado da OBRA (todas as conferências não
+  // canceladas); `lancamentos` é só desta. Sem separar, quem recebe a segunda remessa lê o total
+  // como novidade. Matheus (21/09/2026): "para não se confundirem com o que já foi mandado no dia
+  // anterior".
+  it("separa o que é DESTA remessa do acumulado da obra", async () => {
+    const ws = await planilha();
+    let linha = null;
+    ws.eachRow((row) => { if (valores(row)[0] === "T97A10") linha = valores(row); });
+    expect(linha[3]).toBe(4);              // Conferido — acumulado da obra
+    expect(linha[9]).toBe(4);              // desta remessa
+    // ⚠⚠ DATA DE VERDADE, NÃO TEXTO — e isso não foi escolha minha: `lib/excel-refinamento.js`
+    // converte "dd/mm/aaaa" em data do Excel quando o CABEÇALHO casa com /data|.../, e
+    // "Data desta remessa" casa. É o comportamento certo para quem vai ordenar e filtrar a
+    // coluna; o teste trava isso para que renomear a coluna para algo sem "data" (e devolvê-la
+    // a texto, silenciosamente) apareça aqui.
+    expect(linha[10]).toBeInstanceOf(Date);
+    expect(linha[10].toISOString().slice(0, 10)).toBe("2026-09-17");
+  });
+
+  // ⚠ Branco, e não "0" nem "—": zero pareceria contagem feita e dava zero. O branco diz
+  // "isto não é desta remessa", que é a pergunta que o PCP faz ao abrir a segunda planilha.
+  it("marca não lançada nesta conferência sai em BRANCO nas duas colunas novas", async () => {
+    const ws = await planilha();
+    let linha = null;
+    ws.eachRow((row) => { if (valores(row)[0] === "T97A140") linha = valores(row); });
+    expect(linha[9] == null || linha[9] === "").toBe(true);
+    expect(linha[10] == null || linha[10] === "").toBe(true);
   });
 });
