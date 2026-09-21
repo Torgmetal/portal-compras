@@ -57,9 +57,14 @@ export default function FormLP({ rel, linhas, res, travado, setLinhas, setResult
           <Campo rot="Data de inspeção" k="dataInspecao" tipo="date" />
           <Campo rot="Componente inspecionado" k="componente" />
           <Campo rot="Revisão do desenho" k="revisaoDesenho" />
+          <Campo rot="Desenho do cliente" k="desenhoCliente" />
+          <Campo rot="Revisão do cliente" k="revisaoCliente" />
           <Campo rot="Metal base / espessura" k="metalBase" />
           <Campo rot="Metal de adição" k="metalAdicao" />
           <Campo rot="Processo de soldagem" k="processoSolda" />
+          <Campo rot="EPS" k="eps" />
+          <Campo rot="RQS" k="rqs" />
+          <Campo rot="Tipo de junta" k="tipoJunta" />
           <Campo rot="Condições superficiais" k="condicoes" opcoes={CONDICOES_SUPERFICIE} />
         </div>
       </div>

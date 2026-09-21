@@ -230,6 +230,7 @@ export async function PATCH(req, { params }) {
       "documentoInspecao", "dataInspecao", "revisaoDesenho", "tipoPenetrante", "penetranteMarca",
       "penetranteLote", "tempoPenetracao", "metodo", "removedor", "removedorLote", "tempoSecagem",
       "temperatura", "revelador", "reveladorLote", "tempoRevelador", "uv",
+      "desenhoCliente", "revisaoCliente", "eps", "rqs", "tipoJunta",
       // vínculo com o procedimento do Controle de Documentos
       "procedimentoId",
       // ⚠ tipo de estrutura da AWS D1.1 — é ele que decide QUAL limite vale para cada

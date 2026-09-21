@@ -238,7 +238,10 @@ export async function PATCH(req, { params }) {
                      // líquido penetrante — o que o inspetor mede/registra no galpão
                      "tipoPenetrante", "penetranteMarca", "penetranteLote", "tempoPenetracao",
                      "metodo", "removedor", "removedorLote", "tempoSecagem", "temperatura",
-                     "revelador", "reveladorLote", "tempoRevelador", "uv", "dataInspecao"]) {
+                     "revelador", "reveladorLote", "tempoRevelador", "uv", "dataInspecao",
+                     // modelos LP/EVS revisados em 21/09/2026
+                     "desenhoCliente", "revisaoCliente", "revisaoDesenho", "metalAdicao",
+                     "processoSolda", "eps", "rqs", "tipoJunta"]) {
       if (c[k] !== undefined) dados.resultados[k] = c[k] == null || c[k] === "" ? null : String(c[k]).slice(0, 120);
     }
 

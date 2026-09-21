@@ -83,7 +83,16 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
         <div className="grid sm:grid-cols-3 gap-2.5">
           <Campo rot="Tipo de estrutura" k="tipoPeca" opcoes={TIPOS_PECA} />
           <Campo rot="Componente / parte" k="componente" />
+          <Campo rot="Desenho Torg" k="desenho" />
+          <Campo rot="Revisão do desenho Torg" k="revisaoDesenho" />
+          <Campo rot="Desenho do cliente" k="desenhoCliente" />
+          <Campo rot="Revisão do desenho do cliente" k="revisaoCliente" />
           <Campo rot="Metal base" k="metalBase" opcoes={METAIS_BASE} />
+          <Campo rot="Metal de adição" k="metalAdicao" />
+          <Campo rot="Processo de soldagem" k="processoSolda" />
+          <Campo rot="EPS" k="eps" />
+          <Campo rot="RQS" k="rqs" />
+          <Campo rot="Tipo de junta" k="tipoJunta" />
           <label className="block">
             <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">
               Iluminação (lux) <span className="font-normal">· mínimo {LUX_MINIMO}</span>
