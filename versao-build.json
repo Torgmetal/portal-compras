@@ -1,7 +1,12 @@
 {
-  "build": 3292,
-  "gerado": "2026-09-20T20:30:28.319Z",
+  "build": 3293,
+  "gerado": "2026-09-21T11:55:49.991Z",
   "commits": [
+    {
+      "hash": "0446a634",
+      "data": "20/09/2026",
+      "titulo": "OP-105: a tarefa devolve as linhas de fabricação das fases ao avanço automático"
+    },
     {
       "hash": "55976535",
       "data": "20/09/2026",
@@ -146,11 +151,6 @@
       "hash": "6659f1e3",
       "data": "17/09/2026",
       "titulo": "Permite excluir PIT Torg e anexos do cliente com confirmação"
-    },
-    {
-      "hash": "58e0effb",
-      "data": "17/09/2026",
-      "titulo": "Encerrado no Omie conta como chegou, e a barra de filtros separa escopo de situação"
     }
   ]
 }

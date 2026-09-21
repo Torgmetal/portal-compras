@@ -40,3 +40,18 @@ fora antes de virar peça (`ehLinhaDeTotal` continua na leitura, por segurança)
 OP-089 ficou com a R02 (280 marcas) sob "089"; OP-084 perdeu as 9 cópias sob "84"; as linhas
 "TOTAL.:" das OPs 060/067/085 foram apagadas (AuditLog `LIMPAR_LE_DUPLICADA`). Varredura: nenhuma
 LE em dobro, nenhuma linha TOTAL, nenhuma LE órfã.
+
+## ⚠⚠ A limpeza da 094 apagou a LE junto — a LE REAPROVEITA a linha sob a chave numérica (21/09/2026)
+
+Vitor: *"a LE da OP-94 no portal do cliente está trazendo apenas GC e parafusos"*. Reconstruído pela
+auditoria de 14/09: às 17:11 o Diego importou a `T94-LE_R01.xlsx` (331 marcas; 241 criadas, 90
+atualizadas). Como a LE entra sob "094" e sob "094" já estavam as 591 linhas da LPC duplicada, o
+importador **reaproveitou essas linhas** para as 211 marcas da estrutura (T94A1 COLUNA…), só marcando
+`naLE`. Às 17:32 a limpeza `LIMPAR_LPC_DUPLICADA` apagou as 591 linhas sob "094" olhando chave e
+fonte — e levou as 211 que tinham acabado de virar a LE. Sobraram 120 marcas (acessórios, GC, grades,
+escadas): as que a LE criou do zero por não existirem na LPC.
+
+**Regra:** antes de apagar linha sob a chave numérica, conferir **`naLE`** — a linha pode ser a LE da
+obra, não só a LPC repetida. Se `naLE`, o certo é tirar `naLPC`/deixar a linha, nunca apagar.
+**Conserto:** reimportar a `T94-LE_R01.xlsx` em Engenharia › Listas (o importador de hoje filtra por
+fonte e cria as 211 como LE sem encostar na T94A).
