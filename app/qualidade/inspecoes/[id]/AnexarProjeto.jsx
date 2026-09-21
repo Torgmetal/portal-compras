@@ -17,7 +17,14 @@ import { Upload, Loader2, X, AlertTriangle } from "lucide-react";
 // ⚠ SOBE DIRETO PARA O BLOB, com token. Desenho A1 passa de 4,5 MB com facilidade — o
 // tamanho em que a rota serverless trava. Pela rota, o inspetor veria "não anexa" sem
 // entender que o problema era o tamanho.
-export default function AnexarProjeto({ relatorioId, anexado, onMudou, travado }) {
+// ⚠⚠ O VÍNCULO É GRAVADO PELO PRÓPRIO NAVEGADOR (PUT), logo depois do upload. A versão anterior
+// confiava só no webhook `onUploadCompleted` do Vercel Blob — que chega sem sessão e tomava 401 da
+// rota — e por isso nenhum anexo chegou ao banco em um mês (OP-105, 21/09/2026: o PDF subiu duas
+// vezes e o relatório continuou sem ele). O webhook segue como reserva; repetir não duplica.
+//
+// `marca` = qual anexo este botão remove (na pré-montagem há vários desenhos); `somaVarios` muda o
+// rótulo: lá anexar acrescenta, nos outros tipos troca.
+export default function AnexarProjeto({ relatorioId, anexado, marca, somaVarios = false, onMudou, travado }) {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const ref = useRef(null);
@@ -29,11 +36,16 @@ export default function AnexarProjeto({ relatorioId, anexado, onMudou, travado }
     if (!/\.pdf$/i.test(arq.name)) { setErro("O projeto precisa ser um PDF."); return; }
     setEnviando(true); setErro("");
     try {
-      await upload(arq.name, arq, {
+      const blob = await upload(arq.name, arq, {
         access: "public",
         handleUploadUrl: `/api/qualidade/inspecoes/${relatorioId}/desenho-anexo`,
         contentType: "application/pdf",
       });
+      const r = await fetch(`/api/qualidade/inspecoes/${relatorioId}/desenho-anexo`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: blob.url, nome: arq.name }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "O arquivo subiu, mas não consegui vinculá-lo ao relatório.");
       onMudou?.();
     } catch (e2) {
       setErro(e2.message || "Falha ao anexar o projeto.");
@@ -41,10 +53,11 @@ export default function AnexarProjeto({ relatorioId, anexado, onMudou, travado }
   }
 
   async function remover() {
-    if (!confirm("Remover o projeto anexado? O portal volta a procurar o desenho na pasta da OP.")) return;
+    if (!confirm(somaVarios ? "Remover este projeto anexado do relatório?" : "Remover o projeto anexado? O portal volta a procurar o desenho na pasta da OP.")) return;
     setEnviando(true); setErro("");
     try {
-      const r = await fetch(`/api/qualidade/inspecoes/${relatorioId}/desenho-anexo`, { method: "DELETE" });
+      const alvo = somaVarios && marca ? `?marca=${encodeURIComponent(marca)}` : "";
+      const r = await fetch(`/api/qualidade/inspecoes/${relatorioId}/desenho-anexo${alvo}`, { method: "DELETE" });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Falha ao remover.");
       onMudou?.();
     } catch (e2) { setErro(e2.message); } finally { setEnviando(false); }
@@ -59,10 +72,10 @@ export default function AnexarProjeto({ relatorioId, anexado, onMudou, travado }
         title="Sobe um PDF de projeto (conjunto ou diagrama de montagem) para marcar as cotas em cima dele"
         className="text-[11px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-2 py-0.5 hover:bg-torg-blue-50 disabled:opacity-50 inline-flex items-center gap-1">
         {enviando ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
-        {anexado ? "trocar projeto" : "anexar projeto"}
+        {somaVarios ? "anexar projeto" : anexado ? "trocar projeto" : "anexar projeto"}
       </button>
       {anexado && !enviando && (
-        <button onClick={remover} title="Volta a usar o desenho da pasta da OP"
+        <button onClick={remover} title={somaVarios ? "Remove este anexo do relatório" : "Volta a usar o desenho da pasta da OP"}
           className="text-torg-gray hover:text-red-600"><X size={12} /></button>
       )}
       {erro && (

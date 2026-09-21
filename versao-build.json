@@ -1,7 +1,12 @@
 {
-  "build": 3299,
-  "gerado": "2026-09-21T16:37:10.169Z",
+  "build": 3300,
+  "gerado": "2026-09-21T16:55:38.308Z",
   "commits": [
+    {
+      "hash": "b2e6cf92",
+      "data": "21/09/2026",
+      "titulo": "Pré-montagem: o relatório aceita vários projetos — o servidor barrava o segundo"
+    },
     {
       "hash": "c4b5c6a1",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e6b56499",
       "data": "18/09/2026",
       "titulo": "Peça sem desenho volta a poder ser marcada: o portão do PCP travava a seleção inteira"
-    },
-    {
-      "hash": "380c222b",
-      "data": "17/09/2026",
-      "titulo": "Corrige área de acabamento por cor no estudo de pintura"
     }
   ]
 }

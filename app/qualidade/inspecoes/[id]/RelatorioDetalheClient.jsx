@@ -225,8 +225,11 @@ export default function RelatorioDetalheClient({ id }) {
                 <FolderOpen size={11} /> {rel.tipo === "PRE_MONTAGEM" && desenhos.length > 0 ? "adicionar projeto da pasta da obra" : "escolher na pasta da obra"}
               </button>
             )}
-            <AnexarProjeto relatorioId={id} anexado={!!desenhos[0]?.anexado} travado={travado}
-              onMudou={carregar} />
+            {/* na pré-montagem o anexo se SOMA aos desenhos e o × tira só o desenho em vista */}
+            <AnexarProjeto relatorioId={id} travado={travado} onMudou={carregar}
+              somaVarios={rel.tipo === "PRE_MONTAGEM"}
+              marca={marcaAtual}
+              anexado={!!(desenhos.find((d) => d.marca === marcaAtual) || desenhos[0])?.anexado} />
             {/* ⚠⚠ RECORTE MANUAL. Vitor (03/09/2026): "quero poder colocar o projeto dentro do
                 relatório e poder mover ele dentro para mostrar apenas o que eu selecionar" — o
                 automático (recortarVista) erra em folha com várias vistas parecidas, como um

@@ -28,3 +28,25 @@ possível mais de um** desde 22/08 (`ehDimensional = usaCotas(tipo)` passou a in
 DIMENSIONAL e PRE_MONTAGEM para não espalhar `tipo === …` por dez arquivos — e a regra de "um
 conjunto" foi junto sem ninguém decidir. Ver [[torg_desenho_rotacao_pdf]] (a mesma tela, o desenho
 cortado) e [[torg_qualidade]].
+
+### O anexo nunca chegou ao banco (21/09/2026, mesma tarde)
+
+Vitor: *"nesse caso de pré-montagem não será um conjunto e sim um projeto de montagem mesmo,
+estamos com um anexado lá porém dá erro"*. Medido: **0 relatórios com desenho anexado em toda a
+base**, e o PDF da OP-105 no blob **duas vezes** (18/09 16:34 e 21/09 16:26 UTC) sem ninguém
+apontando para ele.
+
+⚠⚠ **`handleUpload` ATENDE DOIS EVENTOS NO MESMO POST, e o segundo chega SEM SESSÃO.** O pedido de
+token vem do navegador logado; o `blob.upload-completed` é o Vercel Blob chamando a rota de fora,
+sem cookie. A rota `desenho-anexo` fazia `requireRole` antes de olhar o evento → o webhook tomava
+401 → e o vínculo, que só era gravado no `onUploadCompleted`, nunca aconteceu. As outras rotas
+`upload-token` do portal já colocavam a sessão DENTRO de `onBeforeGenerateToken` e não dependiam
+do webhook — esta era a exceção.
+
+**O que mudou** (`lib/inspecao-anexo.js`): o vínculo é gravado por dois caminhos idempotentes — o
+navegador chama **`PUT`** com a URL assim que o `upload()` resolve (valida host `*.public.blob.vercel-storage.com`,
+`.pdf` e `head()` no blob) e o webhook fica como reserva, com erro logado em vez de `.catch(() => {})`.
+Na pré-montagem o anexo **soma** aos desenhos e o × remove só o desenho em vista (`?marca=`).
+
+⚠ Regra que ficou: **rota que recebe webhook não pode exigir sessão antes de saber qual evento é** —
+e "gravar só no callback" é gravar em lugar nenhum quando o callback falha calado.

@@ -236,3 +236,10 @@ temporário, `ENOENT`). Os pareceres são estáticos; quem rodou a suíte fui eu
   `testes/api/inspecoes-pre-montagem-projetos` (5). 2460 passando; checar limpo; build ok.
 - **Para revisar (testing):** o PDF do RPM com vários desenhos (`gerarDimensionalPDF`) — o detalhe já
   tinha seletor por desenho, mas não validei a impressão com 3 projetos.
+- **(14h)** Anexar projeto nunca vinculou: `requireRole` antes do `handleUpload` dava 401 ao webhook
+  `blob.upload-completed` (sem cookie), único lugar que gravava. Feito: sessão dentro de
+  `onBeforeGenerateToken`, `PUT` de vínculo pelo navegador (host do blob + `head()`), webhook como
+  reserva com log, `lib/inspecao-anexo.js`; pré-montagem soma, outros trocam; `DELETE ?marca=`.
+  Testes: `inspecoes-desenho-anexo` (7) + `anexar-projeto` (3). 2470 passando; build ok.
+  **Para revisar (security):** o `PUT` aceita URL do navegador — restrito ao host do blob e a PDF
+  existente; conferir se convém amarrar também ao `tokenPayload` (relatorioId) do upload.
