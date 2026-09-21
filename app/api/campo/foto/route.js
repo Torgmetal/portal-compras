@@ -106,7 +106,9 @@ export async function GET(req) {
     where: relatorioId ? { relatorioId } : { opNumero, ...(tipo ? { tipo } : {}) },
     select: { id: true, url: true, marca: true, origemMarca: true, observacao: true, equipamentos: true, capturadaEm: true, autorNome: true, tipo: true, evidencia: true },
     orderBy: { capturadaEm: relatorioId ? "asc" : "desc" },
-    take: 60,
+    // Relatório precisa devolver TODAS as evidências: o PDF já pagina de 6 em 6.
+    // Mantém o teto apenas na consulta geral da OP, que pode reunir vários relatórios.
+    ...(relatorioId ? {} : { take: 60 }),
   });
   return NextResponse.json({ fotos });
 }

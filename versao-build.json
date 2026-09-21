@@ -1,7 +1,12 @@
 {
-  "build": 3296,
-  "gerado": "2026-09-21T13:37:10.512Z",
+  "build": 3297,
+  "gerado": "2026-09-21T16:15:41.520Z",
   "commits": [
+    {
+      "hash": "abe1be02",
+      "data": "21/09/2026",
+      "titulo": "Cotação: os e-mails saem em fila, com pausa — doze de uma vez estouravam o Resend"
+    },
     {
       "hash": "703e2aa5",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "2dbd9434",
       "data": "17/09/2026",
       "titulo": "Planilha do Syneco: marca duplicada dava o peso da linha antiga"
-    },
-    {
-      "hash": "edfd4a1c",
-      "data": "17/09/2026",
-      "titulo": "Botão Sincronizar nos Prazos das RMs, e o prazo do Omie deixa de ser conselho"
     }
   ]
 }
